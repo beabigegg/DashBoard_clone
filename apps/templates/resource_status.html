@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全廠機況 Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #00d4ff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .last-update {
+            color: #888;
+            font-size: 13px;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.1);
+            padding: 8px 15px;
+            border-radius: 20px;
+        }
+
+        .filter-group label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .filter-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .filter-group select {
+            background: #1a1a2e;
+            color: #eee;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            min-width: 120px;
+        }
+
+        .filter-group select:focus {
+            border-color: #00d4ff;
+            outline: none;
+        }
+
+        .filter-group select[multiple] {
+            min-width: 150px;
+            height: 80px;
+            padding: 5px;
+        }
+
+        .filter-group select[multiple] option {
+            padding: 3px 8px;
+            margin: 1px 0;
+            border-radius: 3px;
+        }
+
+        .filter-group select[multiple] option:checked {
+            background: linear-gradient(0deg, #00d4ff 0%, #00d4ff 100%);
+            color: #000;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            color: #888;
+            margin-right: 5px;
+        }
+
+        .filter-hint {
+            font-size: 10px;
+            color: #666;
+            display: block;
+            margin-top: 2px;
+        }
+
+        .btn-query {
+            background: #00d4ff;
+            color: #1a1a2e;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-query:hover {
+            background: #00a8cc;
+            transform: scale(1.05);
+        }
+
+        .btn-query:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* KPI Cards */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .kpi-card {
+            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #333;
+            transition: transform 0.3s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .kpi-label {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .kpi-value {
+            font-size: 36px;
+            font-weight: bold;
+        }
+
+        .kpi-value.green { color: #00ff88; }
+        .kpi-value.blue { color: #00d4ff; }
+        .kpi-value.red { color: #ff4757; }
+        .kpi-value.yellow { color: #ffc107; }
+
+        .kpi-sub {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* Workcenter Cards Grid */
+        .workcenter-section {
+            margin-bottom: 15px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            color: #00d4ff;
+            margin-bottom: 10px;
+            padding-left: 10px;
+            border-left: 3px solid #00d4ff;
+        }
+
+        .workcenter-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+        }
+
+        .wc-card {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .wc-card:hover {
+            border-color: #00d4ff;
+            transform: translateY(-2px);
+        }
+
+        .wc-card.selected {
+            border-color: #00ff88;
+            background: #1a3a5c;
+        }
+
+        .wc-card.has-issue {
+            border-left: 4px solid #ff4757;
+        }
+
+        .wc-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .wc-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .wc-ou {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .wc-ou.high { color: #00ff88; }
+        .wc-ou.medium { color: #ffc107; }
+        .wc-ou.low { color: #ff4757; }
+
+        .wc-counts {
+            text-align: right;
+            font-size: 11px;
+            color: #888;
+        }
+
+        .wc-counts .down {
+            color: #ff4757;
+            font-weight: bold;
+        }
+
+        .wc-mini-chart {
+            height: 30px;
+            margin-top: 8px;
+        }
+
+        /* Detail Table */
+        .detail-section {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .detail-title {
+            font-size: 16px;
+            color: #00d4ff;
+        }
+
+        .detail-count {
+            color: #888;
+            font-size: 13px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            background: #0f3460;
+            z-index: 1;
+        }
+
+        th {
+            padding: 10px 8px;
+            text-align: left;
+            color: #00d4ff;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #2a2a4a;
+        }
+
+        tbody tr:hover {
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .status-prd { background: #00ff88; color: #000; }
+        .status-sby { background: #17a2b8; color: #fff; }
+        .status-udt { background: #ff4757; color: #fff; }
+        .status-sdt { background: #ffc107; color: #000; }
+        .status-egt { background: #6c757d; color: #fff; }
+        .status-nst { background: #9b59b6; color: #fff; }
+        .status-other { background: #444; color: #fff; }
+
+        .flag-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 10px;
+            margin-right: 3px;
+        }
+
+        .flag-prod { background: #28a745; color: white; }
+        .flag-key { background: #dc3545; color: white; }
+        .flag-monitor { background: #17a2b8; color: white; }
+
+        .down-time {
+            color: #ff4757;
+            font-weight: bold;
+        }
+
+        .job-info {
+            font-size: 11px;
+            color: #888;
+        }
+
+        /* Loading */
+        .loading-spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #333;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(26, 26, 46, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            border-radius: 10px;
+        }
+
+        .loading-text {
+            color: #00d4ff;
+            font-size: 14px;
+        }
+
+        .placeholder {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        /* Responsive */
+        @media (max-width: 1400px) {
+            .kpi-row {
+                grid-template-columns: repeat(5, 1fr);
+            }
+            .workcenter-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .kpi-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .workcenter-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .kpi-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .workcenter-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <h1>全廠機況 Dashboard</h1>
+            <div class="header-right">
+                <div class="filters">
+                    <div class="filter-group">
+                        <label><input type="checkbox" id="filterProduction"> 生產設備</label>
+                        <label><input type="checkbox" id="filterKey"> 關鍵設備</label>
+                        <label><input type="checkbox" id="filterMonitor"> 監控設備</label>
+                    </div>
+                    <div class="filter-group" style="flex-direction: column; align-items: flex-start;">
+                        <span class="filter-label">廠區: <span class="filter-hint">(Ctrl+點選多選)</span></span>
+                        <select id="filterLocation" multiple>
+                        </select>
+                    </div>
+                    <div class="filter-group" style="flex-direction: column; align-items: flex-start;">
+                        <span class="filter-label">資產狀態: <span class="filter-hint">(Ctrl+點選多選)</span></span>
+                        <select id="filterAssetsStatus" multiple>
+                        </select>
+                    </div>
+                    <button id="btnQuery" class="btn-query" onclick="loadDashboard()">查詢</button>
+                </div>
+                <span id="lastUpdate" class="last-update"></span>
+            </div>
+        </div>
+
+        <!-- KPI Row: OU / RUN / DOWN / IDLE / ENG -->
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="kpi-label">OU%</div>
+                <div class="kpi-value green" id="kpiOu">-</div>
+                <div class="kpi-sub" id="kpiOuFormula">PRD / (PRD+SBY+EGT+SDT+UDT)</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">RUN (PRD)</div>
+                <div class="kpi-value green" id="kpiRun">-</div>
+                <div class="kpi-sub" id="kpiRunCount">RUN: -</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">DOWN (UDT+SDT)</div>
+                <div class="kpi-value red" id="kpiDown">-</div>
+                <div class="kpi-sub" id="kpiDownDetail">UDT: - / SDT: -</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">IDLE (SBY+NST)</div>
+                <div class="kpi-value yellow" id="kpiIdle">-</div>
+                <div class="kpi-sub" id="kpiIdleDetail">SBY: - / NST: -</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">ENG (EGT)</div>
+                <div class="kpi-value blue" id="kpiEng">-</div>
+                <div class="kpi-sub" id="kpiEngCount">EGT: -</div>
+            </div>
+        </div>
+
+        <!-- Workcenter Cards -->
+        <div class="workcenter-section">
+            <div class="section-title">各工站狀態 (點選卡片查看明細)</div>
+            <div class="workcenter-grid" id="workcenterGrid">
+                <div class="placeholder">請點擊「查詢」載入資料</div>
+            </div>
+        </div>
+
+        <!-- Detail Table -->
+        <div class="detail-section" style="position: relative;">
+            <div class="detail-header">
+                <div class="detail-title" id="detailTitle">機台明細</div>
+                <div class="detail-count" id="detailCount"></div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>機台</th>
+                            <th>工作中心</th>
+                            <th>狀態</th>
+                            <th>原因</th>
+                            <th>Down Time</th>
+                            <th>批號 (PJ_LOTID)</th>
+                            <th>症狀 (JOB)</th>
+                            <th>原因碼 (JOB)</th>
+                            <th>標記</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailTableBody">
+                        <tr><td colspan="9" class="placeholder">請點擊「查詢」載入資料</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedWorkcenter = null;
+        let selectedOriginalWcs = null;  // 儲存合併群組的原始工站列表
+        let workcenterData = {};  // 快取工站資料
+        let isLoading = false;
+        let miniCharts = {};  // 快取 ECharts 實例
+
+        // 狀態顏色定義 (統一)
+        const STATUS_COLORS = {
+            PRD: '#00ff88',   // 綠色 - 生產中
+            SBY: '#17a2b8',   // 青色 - 待機
+            UDT: '#ff4757',   // 紅色 - 非計畫停機
+            SDT: '#ffc107',   // 黃色 - 計畫停機
+            EGT: '#6c757d',   // 灰色 - 工程時間
+            NST: '#9b59b6'    // 紫色 - NST
+        };
+
+        function getFilters() {
+            const filters = {};
+            if (document.getElementById('filterProduction').checked) filters.isProduction = true;
+            if (document.getElementById('filterKey').checked) filters.isKey = true;
+            if (document.getElementById('filterMonitor').checked) filters.isMonitor = true;
+
+            // 多選廠區
+            const locationSelect = document.getElementById('filterLocation');
+            const selectedLocations = Array.from(locationSelect.selectedOptions).map(opt => opt.value);
+            if (selectedLocations.length > 0) {
+                filters.locations = selectedLocations;
+            }
+
+            // 多選資產狀態
+            const assetsStatusSelect = document.getElementById('filterAssetsStatus');
+            const selectedStatuses = Array.from(assetsStatusSelect.selectedOptions).map(opt => opt.value);
+            if (selectedStatuses.length > 0) {
+                filters.assetsStatuses = selectedStatuses;
+            }
+
+            return Object.keys(filters).length > 0 ? filters : null;
+        }
+
+        async function loadFilterOptions() {
+            console.log('loadFilterOptions() 開始執行');
+            console.log('當前 URL:', window.location.href);
+            try {
+                const apiUrl = '/api/resource/filter_options';
+                console.log('準備呼叫:', apiUrl);
+                const response = await fetch(apiUrl);
+                console.log('API 回應狀態:', response.status, response.statusText);
+
+                if (!response.ok) {
+                    console.error('API 回應錯誤:', response.status, response.statusText);
+                    return;
+                }
+
+                const result = await response.json();
+                console.log('Filter options API response:', result);
+
+                if (result.success) {
+                    const data = result.data;
+                    console.log('locations:', data.locations);
+                    console.log('assets_statuses:', data.assets_statuses);
+
+                    // 載入 LOCATIONNAME 選項 (多選)
+                    const locationSelect = document.getElementById('filterLocation');
+                    locationSelect.innerHTML = '';  // 清空
+                    if (data.locations && data.locations.length > 0) {
+                        data.locations.forEach(loc => {
+                            const option = document.createElement('option');
+                            option.value = loc;
+                            option.textContent = loc;
+                            locationSelect.appendChild(option);
+                        });
+                    } else {
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = '(無資料)';
+                        option.disabled = true;
+                        locationSelect.appendChild(option);
+                    }
+
+                    // 載入 PJ_ASSETSSTATUS 選項 (多選)
+                    const assetsStatusSelect = document.getElementById('filterAssetsStatus');
+                    assetsStatusSelect.innerHTML = '';  // 清空
+                    if (data.assets_statuses && data.assets_statuses.length > 0) {
+                        data.assets_statuses.forEach(status => {
+                            const option = document.createElement('option');
+                            option.value = status;
+                            option.textContent = status;
+                            assetsStatusSelect.appendChild(option);
+                        });
+                    } else {
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = '(無資料)';
+                        option.disabled = true;
+                        assetsStatusSelect.appendChild(option);
+                    }
+                } else {
+                    console.error('API 回傳失敗:', result.error);
+                }
+            } catch (error) {
+                console.error('篩選選項載入失敗:', error);
+                console.error('錯誤詳情:', error.message, error.stack);
+            }
+        }
+
+        function formatNumber(num) {
+            if (num === null || num === undefined) return '-';
+            return num.toLocaleString('zh-TW');
+        }
+
+        function getStatusClass(status) {
+            if (!status) return 'status-other';
+            const s = status.toUpperCase();
+            if (s === 'PRD') return 'status-prd';
+            if (s === 'SBY') return 'status-sby';
+            if (s === 'UDT') return 'status-udt';
+            if (s === 'SDT') return 'status-sdt';
+            if (s === 'EGT') return 'status-egt';
+            if (s === 'NST') return 'status-nst';
+            return 'status-other';
+        }
+
+        function getOuClass(ouPct) {
+            if (ouPct >= 80) return 'high';
+            if (ouPct >= 50) return 'medium';
+            return 'low';
+        }
+
+        function formatDownTime(minutes) {
+            if (!minutes || minutes <= 0) return '-';
+            if (minutes < 60) return `${Math.round(minutes)}m`;
+            const hours = Math.floor(minutes / 60);
+            const mins = Math.round(minutes % 60);
+            return `${hours}h ${mins}m`;
+        }
+
+        async function loadKPI() {
+            try {
+                const response = await fetch('/api/dashboard/kpi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filters: getFilters() })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    const d = result.data;
+                    // 計算各項百分比
+                    const total = d.total || 1;
+                    const runPct = ((d.run / total) * 100).toFixed(1);
+                    const downPct = ((d.down / total) * 100).toFixed(1);
+                    const idlePct = ((d.idle / total) * 100).toFixed(1);
+                    const engPct = ((d.eng / total) * 100).toFixed(1);
+
+                    // OU%
+                    document.getElementById('kpiOu').textContent = d.ou_pct + '%';
+                    document.getElementById('kpiOuFormula').textContent = `PRD / (PRD+SBY+EGT+SDT+UDT)`;
+                    // RUN (PRD) - 顯示百分比
+                    document.getElementById('kpiRun').textContent = runPct + '%';
+                    document.getElementById('kpiRunCount').textContent = `RUN: ${formatNumber(d.run)}`;
+                    // DOWN (UDT+SDT) - 顯示百分比
+                    document.getElementById('kpiDown').textContent = downPct + '%';
+                    document.getElementById('kpiDownDetail').textContent = `UDT: ${formatNumber(d.udt)} / SDT: ${formatNumber(d.sdt)}`;
+                    // IDLE (SBY+NST) - 顯示百分比
+                    document.getElementById('kpiIdle').textContent = idlePct + '%';
+                    document.getElementById('kpiIdleDetail').textContent = `SBY: ${formatNumber(d.sby)} / NST: ${formatNumber(d.nst)}`;
+                    // ENG (EGT) - 顯示百分比
+                    document.getElementById('kpiEng').textContent = engPct + '%';
+                    document.getElementById('kpiEngCount').textContent = `EGT: ${formatNumber(d.eng)}`;
+                }
+            } catch (error) {
+                console.error('KPI 載入失敗:', error);
+            }
+        }
+
+        async function loadWorkcenterCards() {
+            const grid = document.getElementById('workcenterGrid');
+            grid.innerHTML = '<div class="placeholder"><span class="loading-spinner"></span>載入中...</div>';
+
+            try {
+                const response = await fetch('/api/dashboard/workcenter_cards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filters: getFilters() })
+                });
+                const result = await response.json();
+
+                if (result.success && result.data.length > 0) {
+                    // 快取工站資料
+                    workcenterData = {};
+                    result.data.forEach(wc => {
+                        workcenterData[wc.workcenter] = wc;
+                    });
+
+                    let html = '';
+                    result.data.forEach(wc => {
+                        const ouClass = getOuClass(wc.ou_pct);
+                        const hasIssue = wc.udt > 0 || wc.sdt > 0;
+                        const selectedClass = selectedWorkcenter === wc.workcenter ? 'selected' : '';
+                        // 如果有多個原始工站，顯示提示
+                        const tooltip = wc.original_wcs && wc.original_wcs.length > 1
+                            ? `${wc.workcenter} (含: ${wc.original_wcs.join(', ')})`
+                            : wc.workcenter;
+
+                        html += `
+                            <div class="wc-card ${hasIssue ? 'has-issue' : ''} ${selectedClass}"
+                                 onclick="selectWorkcenter('${wc.workcenter}')">
+                                <div class="wc-name" title="${tooltip}">${wc.workcenter}</div>
+                                <div class="wc-stats">
+                                    <div class="wc-ou ${ouClass}">${wc.ou_pct}%</div>
+                                    <div class="wc-counts">
+                                        <div>Total: ${wc.total}</div>
+                                        <div>RUN: ${wc.prd}</div>
+                                        ${wc.down > 0 ? `<div class="down">Down: ${wc.down}</div>` : ''}
+                                    </div>
+                                </div>
+                                <div class="wc-mini-chart" id="miniChart_${encodeURIComponent(wc.workcenter)}"></div>
+                            </div>
+                        `;
+                    });
+                    grid.innerHTML = html;
+
+                    // Render mini charts
+                    result.data.forEach(wc => {
+                        renderMiniChart(wc);
+                    });
+                } else {
+                    grid.innerHTML = '<div class="placeholder">查無資料</div>';
+                }
+            } catch (error) {
+                console.error('工站卡片載入失敗:', error);
+                grid.innerHTML = '<div class="placeholder">載入失敗</div>';
+            }
+        }
+
+        function renderMiniChart(wc, retryCount = 0) {
+            // 使用 encodeURIComponent 確保中文名稱生成唯一 ID
+            const chartId = `miniChart_${encodeURIComponent(wc.workcenter)}`;
+            const chartDom = document.getElementById(chartId);
+            if (!chartDom) {
+                console.warn(`圖表容器不存在: ${chartId}`);
+                return;
+            }
+
+            // 銷毀舊的實例（如果存在）
+            if (miniCharts[chartId]) {
+                miniCharts[chartId].dispose();
+            }
+
+            // 確保容器有尺寸，如果沒有則延遲重試
+            if (chartDom.offsetWidth === 0 || chartDom.offsetHeight === 0) {
+                if (retryCount < 3) {
+                    setTimeout(() => renderMiniChart(wc, retryCount + 1), 100);
+                }
+                return;
+            }
+
+            const chart = echarts.init(chartDom);
+            miniCharts[chartId] = chart;
+
+            const total = wc.total || 1;
+
+            // 計算各狀態百分比
+            const calcPct = (val) => ((val / total) * 100).toFixed(1);
+
+            const option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(params) {
+                        const statusMap = {
+                            'PRD': '生產中',
+                            'SBY': '待機',
+                            'UDT': '非計畫停機',
+                            'SDT': '計畫停機',
+                            'EGT': '工程時間',
+                            'NST': '未排單'
+                        };
+                        const statusName = statusMap[params.seriesName] || params.seriesName;
+                        const count = params.value;
+                        const pct = calcPct(count);
+                        return `<div style="font-weight:bold;margin-bottom:5px;">${statusName}</div>
+                                <div>機台數: ${count}</div>
+                                <div>佔比: ${pct}%</div>`;
+                    },
+                    backgroundColor: 'rgba(22, 33, 62, 0.95)',
+                    borderColor: '#00d4ff',
+                    borderWidth: 1,
+                    textStyle: { color: '#eee', fontSize: 12 },
+                    padding: [8, 12]
+                },
+                grid: { left: 0, right: 0, top: 0, bottom: 0 },
+                xAxis: { type: 'value', show: false, max: total },
+                yAxis: { type: 'category', show: false, data: [''] },
+                series: [
+                    {
+                        name: 'PRD',
+                        type: 'bar',
+                        stack: 'total',
+                        data: [wc.prd],
+                        itemStyle: { color: STATUS_COLORS.PRD },
+                        barWidth: '100%',
+                        emphasis: { itemStyle: { color: STATUS_COLORS.PRD } }
+                    },
+                    {
+                        name: 'SBY',
+                        type: 'bar',
+                        stack: 'total',
+                        data: [wc.sby],
+                        itemStyle: { color: STATUS_COLORS.SBY },
+                        barWidth: '100%',
+                        emphasis: { itemStyle: { color: STATUS_COLORS.SBY } }
+                    },
+                    {
+                        name: 'UDT',
+                        type: 'bar',
+                        stack: 'total',
+                        data: [wc.udt],
+                        itemStyle: { color: STATUS_COLORS.UDT },
+                        barWidth: '100%',
+                        emphasis: { itemStyle: { color: STATUS_COLORS.UDT } }
+                    },
+                    {
+                        name: 'SDT',
+                        type: 'bar',
+                        stack: 'total',
+                        data: [wc.sdt],
+                        itemStyle: { color: STATUS_COLORS.SDT },
+                        barWidth: '100%',
+                        emphasis: { itemStyle: { color: STATUS_COLORS.SDT } }
+                    },
+                    {
+                        name: 'EGT',
+                        type: 'bar',
+                        stack: 'total',
+                        data: [wc.egt],
+                        itemStyle: { color: STATUS_COLORS.EGT },
+                        barWidth: '100%',
+                        emphasis: { itemStyle: { color: STATUS_COLORS.EGT } }
+                    },
+                    {
+                        name: 'NST',
+                        type: 'bar',
+                        stack: 'total',
+                        data: [wc.nst],
+                        itemStyle: { color: STATUS_COLORS.NST },
+                        barWidth: '100%',
+                        emphasis: { itemStyle: { color: STATUS_COLORS.NST } }
+                    }
+                ]
+            };
+            chart.setOption(option);
+        }
+
+        // 全局 resize 監聽器 - 調整所有圖表大小
+        window.addEventListener('resize', () => {
+            Object.values(miniCharts).forEach(chart => {
+                if (chart && !chart.isDisposed()) {
+                    chart.resize();
+                }
+            });
+        });
+
+        function selectWorkcenter(workcenter) {
+            if (selectedWorkcenter === workcenter) {
+                selectedWorkcenter = null;
+                selectedOriginalWcs = null;
+            } else {
+                selectedWorkcenter = workcenter;
+                // 取得合併群組的原始工站列表
+                if (workcenterData[workcenter] && workcenterData[workcenter].original_wcs) {
+                    selectedOriginalWcs = workcenterData[workcenter].original_wcs;
+                } else {
+                    selectedOriginalWcs = [workcenter];
+                }
+            }
+
+            // Update card selection
+            document.querySelectorAll('.wc-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            if (selectedWorkcenter) {
+                const cards = document.querySelectorAll('.wc-card');
+                cards.forEach(card => {
+                    if (card.querySelector('.wc-name').textContent === selectedWorkcenter) {
+                        card.classList.add('selected');
+                    }
+                });
+            }
+
+            loadDetail();
+        }
+
+        async function loadDetail() {
+            const tbody = document.getElementById('detailTableBody');
+            const title = document.getElementById('detailTitle');
+            const count = document.getElementById('detailCount');
+
+            tbody.innerHTML = '<tr><td colspan="9" class="placeholder"><span class="loading-spinner"></span>載入中...</td></tr>';
+
+            const filters = getFilters() || {};
+            if (selectedWorkcenter) {
+                filters.workcenter = selectedWorkcenter;
+                // 傳遞原始工站列表，讓後端可以用 IN 查詢
+                if (selectedOriginalWcs && selectedOriginalWcs.length > 0) {
+                    filters.original_wcs = selectedOriginalWcs;
+                }
+                title.textContent = `機台明細 - ${selectedWorkcenter}`;
+            } else {
+                title.textContent = '機台明細 (全部)';
+            }
+
+            try {
+                const response = await fetch('/api/dashboard/detail', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filters: Object.keys(filters).length > 0 ? filters : null, limit: 200 })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    count.textContent = `(${result.count} 筆)`;
+
+                    if (result.data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="9" class="placeholder">查無資料</td></tr>';
+                        return;
+                    }
+
+                    let html = '';
+                    result.data.forEach(row => {
+                        const statusClass = getStatusClass(row.NEWSTATUSNAME);
+                        const downTime = formatDownTime(row.DOWN_MINUTES);
+
+                        let flags = '';
+                        if (row.PJ_ISPRODUCTION === 1) flags += '<span class="flag-badge flag-prod">生產</span>';
+                        if (row.PJ_ISKEY === 1) flags += '<span class="flag-badge flag-key">關鍵</span>';
+                        if (row.PJ_ISMONITOR === 1) flags += '<span class="flag-badge flag-monitor">監控</span>';
+
+                        // PJ_LOTID 來自 DW_MES_RESOURCE
+                        // SYMPTOMCODENAME, CAUSECODENAME 來自 DW_MES_JOB (透過 JOBID 關聯)
+                        // DOWN_MINUTES 計算自 LASTSTATUSCHANGEDATE 到現在
+                        html += `
+                            <tr>
+                                <td><strong>${row.RESOURCENAME || '-'}</strong></td>
+                                <td>${row.WORKCENTERNAME || '-'}</td>
+                                <td><span class="status-badge ${statusClass}">${row.NEWSTATUSNAME || '-'}</span></td>
+                                <td>${row.NEWREASONNAME || '-'}</td>
+                                <td class="${row.DOWN_MINUTES > 0 ? 'down-time' : ''}">${downTime}</td>
+                                <td class="job-info">${row.PJ_LOTID || '-'}</td>
+                                <td class="job-info">${row.SYMPTOMCODENAME || '-'}</td>
+                                <td class="job-info">${row.CAUSECODENAME || '-'}</td>
+                                <td>${flags || '-'}</td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = html;
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="9" class="placeholder">${result.error}</td></tr>`;
+                }
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="9" class="placeholder">載入失敗: ${error.message}</td></tr>`;
+            }
+        }
+
+        async function loadDashboard() {
+            if (isLoading) return;
+            isLoading = true;
+
+            const btn = document.getElementById('btnQuery');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span>查詢中...';
+
+            document.getElementById('lastUpdate').textContent = `Last Update: ${new Date().toLocaleTimeString('zh-TW')}`;
+
+            try {
+                await Promise.all([
+                    loadKPI(),
+                    loadWorkcenterCards(),
+                    loadDetail()
+                ]);
+            } finally {
+                isLoading = false;
+                btn.disabled = false;
+                btn.textContent = '查詢';
+            }
+        }
+
+        // Page init - 使用標記確保只執行一次
+        let filterOptionsLoaded = false;
+
+        function initFilterOptions() {
+            if (filterOptionsLoaded) {
+                console.log('篩選選項已經載入過，跳過');
+                return;
+            }
+            filterOptionsLoaded = true;
+            console.log('initFilterOptions() - 開始載入篩選選項');
+            loadFilterOptions();
+        }
+
+        // 使用 DOMContentLoaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('DOMContentLoaded 事件觸發');
+                initFilterOptions();
+            });
+        } else {
+            // DOM 已經準備好，直接執行
+            console.log('DOM 已準備好，直接初始化');
+            initFilterOptions();
+        }
+    </script>
+</body>
+</html>
