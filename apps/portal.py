@@ -1455,11 +1455,25 @@ def query_resource_detail_with_job(filters=None, limit=200, offset=0):
     - 工單 (PJ_LOTID): 來自 DW_MES_RESOURCE.PJ_LOTID
     - 症狀 (SYMPTOMCODENAME): 來自 DW_MES_JOB.SYMPTOMCODENAME (透過 JOBID 關聯)
     - 原因碼 (CAUSECODENAME): 來自 DW_MES_JOB.CAUSECODENAME (透過 JOBID 關聯)
-    - DownTime: 計算自 LASTSTATUSCHANGEDATE 到現在的時間差 (分鐘)
+    - DownTime: 計算自最新的 LASTSTATUSCHANGEDATE - 每台機台自己的 LASTSTATUSCHANGEDATE (分鐘)
+
+    Returns:
+    - DataFrame with detail records
+    - Also includes MAX_STATUS_TIME for Last Update display
     """
     try:
         days_back = get_days_back(filters)
-        base_sql = get_resource_latest_status_subquery(days_back)
+
+        # 建立篩選條件
+        location_filter = ""
+        if EXCLUDED_LOCATIONS:
+            excluded_locations = "', '".join(EXCLUDED_LOCATIONS)
+            location_filter = f"AND (r.LOCATIONNAME IS NULL OR r.LOCATIONNAME NOT IN ('{excluded_locations}'))"
+
+        asset_status_filter = ""
+        if EXCLUDED_ASSET_STATUSES:
+            excluded_assets = "', '".join(EXCLUDED_ASSET_STATUSES)
+            asset_status_filter = f"AND (r.PJ_ASSETSSTATUS IS NULL OR r.PJ_ASSETSSTATUS NOT IN ('{excluded_assets}'))"
 
         where_conditions = []
         if filters:
@@ -1499,14 +1513,70 @@ def query_resource_detail_with_job(filters=None, limit=200, offset=0):
                 status_list = "', '".join(filters['assetsStatuses'])
                 where_conditions.append(f"rs.PJ_ASSETSSTATUS IN ('{status_list}')")
 
+        # 預設只顯示 DOWN 狀態 (UDT, SDT)
+        where_conditions.append("rs.NEWSTATUSNAME IN ('UDT', 'SDT')")
+
         where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
 
         # Left join with JOB table for SDT/UDT details
         # PJ_LOTID 來自 RESOURCE 表
         # SYMPTOMCODENAME, CAUSECODENAME 來自 JOB 表
+        # DOWN_MINUTES: 使用全體最大 LASTSTATUSCHANGEDATE - 每台機台自己的時間
+        # 注意: 將所有 CTE 放在同一層級，避免巢狀 WITH 子句 (Oracle 不支援)
         start_row = offset + 1
         end_row = offset + limit
         sql = f"""
+            WITH latest_txn AS (
+                SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
+                FROM DW_MES_RESOURCESTATUS
+            ),
+            base_data AS (
+                SELECT *
+                FROM (
+                    SELECT
+                        r.RESOURCEID,
+                        r.RESOURCENAME,
+                        r.OBJECTCATEGORY,
+                        r.OBJECTTYPE,
+                        r.RESOURCEFAMILYNAME,
+                        r.WORKCENTERNAME,
+                        r.LOCATIONNAME,
+                        r.VENDORNAME,
+                        r.VENDORMODEL,
+                        r.PJ_DEPARTMENT,
+                        r.PJ_ASSETSSTATUS,
+                        r.PJ_ISPRODUCTION,
+                        r.PJ_ISKEY,
+                        r.PJ_ISMONITOR,
+                        r.PJ_LOTID,
+                        r.DESCRIPTION,
+                        s.NEWSTATUSNAME,
+                        s.NEWREASONNAME,
+                        s.LASTSTATUSCHANGEDATE,
+                        s.OLDSTATUSNAME,
+                        s.OLDREASONNAME,
+                        s.AVAILABILITY,
+                        s.JOBID,
+                        s.TXNDATE,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY r.RESOURCEID
+                            ORDER BY s.LASTSTATUSCHANGEDATE DESC NULLS LAST,
+                                     COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) DESC
+                        ) AS rn
+                    FROM DW_MES_RESOURCE r
+                    JOIN DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
+                    CROSS JOIN latest_txn lt
+                    WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
+                        OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
+                      AND COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) >= lt.MAX_TXNDATE - {days_back}
+                      {location_filter}
+                      {asset_status_filter}
+                )
+                WHERE rn = 1
+            ),
+            max_time AS (
+                SELECT MAX(LASTSTATUSCHANGEDATE) AS MAX_STATUS_TIME FROM base_data
+            )
             SELECT * FROM (
                 SELECT
                     rs.RESOURCENAME,
@@ -1530,7 +1600,8 @@ def query_resource_detail_with_job(filters=None, limit=200, offset=0):
                     j.REPAIRCODENAME,
                     j.CREATEDATE as JOB_CREATEDATE,
                     j.FIRSTCLOCKONDATE,
-                    ROUND((SYSDATE - rs.LASTSTATUSCHANGEDATE) * 24 * 60, 0) as DOWN_MINUTES,
+                    mt.MAX_STATUS_TIME,
+                    ROUND((mt.MAX_STATUS_TIME - rs.LASTSTATUSCHANGEDATE) * 24 * 60, 0) as DOWN_MINUTES,
                     ROW_NUMBER() OVER (
                         ORDER BY
                             CASE rs.NEWSTATUSNAME
@@ -1540,25 +1611,33 @@ def query_resource_detail_with_job(filters=None, limit=200, offset=0):
                             END,
                             rs.LASTSTATUSCHANGEDATE DESC NULLS LAST
                     ) AS rn
-                FROM ({base_sql}) rs
+                FROM base_data rs
+                CROSS JOIN max_time mt
                 LEFT JOIN DW_MES_JOB j ON rs.JOBID = j.JOBID
                 WHERE {where_clause}
             ) WHERE rn BETWEEN {start_row} AND {end_row}
         """
         df = read_sql_df(sql)
 
+        # Get max_status_time for Last Update display
+        max_status_time = None
+        if 'MAX_STATUS_TIME' in df.columns and len(df) > 0:
+            max_status_time = df['MAX_STATUS_TIME'].iloc[0]
+            if pd.notna(max_status_time):
+                max_status_time = max_status_time.strftime('%Y-%m-%d %H:%M:%S')
+
         # Convert datetime columns
-        datetime_cols = ['LASTSTATUSCHANGEDATE', 'JOB_CREATEDATE', 'FIRSTCLOCKONDATE']
+        datetime_cols = ['LASTSTATUSCHANGEDATE', 'JOB_CREATEDATE', 'FIRSTCLOCKONDATE', 'MAX_STATUS_TIME']
         for col in datetime_cols:
             if col in df.columns:
                 df[col] = df[col].apply(
                     lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(x) else None
                 )
 
-        return df
+        return df, max_status_time
     except Exception as exc:
         print(f"明細查詢失敗: {exc}")
-        return None
+        return None, None
 
 
 @app.route('/api/dashboard/kpi', methods=['POST'])
@@ -1605,10 +1684,16 @@ def api_dashboard_detail():
     limit = data.get('limit', 200)
     offset = data.get('offset', 0)
 
-    df = query_resource_detail_with_job(filters, limit, offset)
+    df, max_status_time = query_resource_detail_with_job(filters, limit, offset)
     if df is not None:
         records = df.to_dict(orient='records')
-        return jsonify({'success': True, 'data': records, 'count': len(records), 'offset': offset})
+        return jsonify({
+            'success': True,
+            'data': records,
+            'count': len(records),
+            'offset': offset,
+            'max_status_time': max_status_time
+        })
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
 
 

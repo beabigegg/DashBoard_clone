@@ -489,7 +489,7 @@
         <!-- Detail Table -->
         <div class="detail-section" style="position: relative;">
             <div class="detail-header">
-                <div class="detail-title" id="detailTitle">機台明細</div>
+                <div class="detail-title" id="detailTitle">DOWN 機台明細 (UDT/SDT)</div>
                 <div class="detail-count" id="detailCount"></div>
             </div>
             <div class="table-container">
@@ -845,9 +845,9 @@
                 if (selectedOriginalWcs && selectedOriginalWcs.length > 0) {
                     filters.original_wcs = selectedOriginalWcs;
                 }
-                title.textContent = `機台明細 - ${selectedWorkcenter}`;
+                title.textContent = `DOWN 機台明細 - ${selectedWorkcenter}`;
             } else {
-                title.textContent = '機台明細 (全部)';
+                title.textContent = 'DOWN 機台明細 (全部)';
             }
 
             try {
@@ -860,6 +860,11 @@
 
                 if (result.success) {
                     count.textContent = `(${result.count} 筆)`;
+
+                    // 更新 Last Update 使用 API 返回的最新狀態時間
+                    if (result.max_status_time) {
+                        document.getElementById('lastUpdate').textContent = `Last Update: ${result.max_status_time}`;
+                    }
 
                     if (result.data.length === 0) {
                         tbody.innerHTML = '<tr><td colspan="10" class="placeholder">查無資料</td></tr>';
@@ -878,7 +883,7 @@
 
                         // PJ_LOTID 來自 DW_MES_RESOURCE
                         // SYMPTOMCODENAME, CAUSECODENAME 來自 DW_MES_JOB (透過 JOBID 關聯)
-                        // DOWN_MINUTES 計算自 LASTSTATUSCHANGEDATE 到現在
+                        // DOWN_MINUTES 使用最新 LASTSTATUSCHANGEDATE - 每台機台自己的時間
                         html += `
                             <tr>
                                 <td><strong>${row.RESOURCENAME || '-'}</strong></td>
@@ -911,7 +916,7 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="loading-spinner"></span>查詢中...';
 
-            document.getElementById('lastUpdate').textContent = `Last Update: ${new Date().toLocaleTimeString('zh-TW')}`;
+            // Last Update 會由 loadDetail() 中的 API 回應更新
 
             try {
                 await Promise.all([
