@@ -3,10 +3,13 @@ Unified MES portal with tabs for WIP report and table viewer.
 """
 
 from datetime import datetime
+import json
+import time
 
 import oracledb
 import pandas as pd
 from flask import Flask, jsonify, render_template, request
+from sqlalchemy import create_engine, text
 
 # Database connection config
 DB_CONFIG = {
@@ -138,6 +141,27 @@ TABLES_CONFIG = {
 }
 
 app = Flask(__name__, template_folder="templates")
+ENGINE = create_engine(
+    "oracle+oracledb://MBU1_R:Pj2481mbu1@10.1.1.58:1521/?service_name=DWDB",
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
+)
+CACHE_TTL_SECONDS = 60
+CACHE = {}
+EXCLUDED_LOCATIONS = [
+    'ATEC',
+    'F區',
+    'F區焊接站',
+    '報廢',
+    '實驗室',
+    '山東',
+    '成型站_F區',
+    '焊接F區',
+    '無錫',
+    '熒茂',
+]
+EXCLUDED_ASSET_STATUSES = ['Disapproved']
 
 
 def get_db_connection():
@@ -147,6 +171,40 @@ def get_db_connection():
     except Exception as exc:
         print(f"數據庫連接失敗: {exc}")
         return None
+
+
+def read_sql_df(sql, params=None):
+    """Run SQL with SQLAlchemy engine to avoid pandas DBAPI warnings."""
+    with ENGINE.connect() as conn:
+        df = pd.read_sql(text(sql), conn, params=params)
+        df.columns = [str(c).upper() for c in df.columns]
+        return df
+
+
+def cache_get(key):
+    entry = CACHE.get(key)
+    if not entry:
+        return None
+    expires_at, value = entry
+    if time.time() > expires_at:
+        CACHE.pop(key, None)
+        return None
+    return value
+
+
+def cache_set(key, value, ttl=CACHE_TTL_SECONDS):
+    CACHE[key] = (time.time() + ttl, value)
+
+
+def make_cache_key(prefix, days_back=None, filters=None):
+    filters_key = json.dumps(filters, sort_keys=True, ensure_ascii=False) if filters else ""
+    return f"{prefix}:{days_back}:{filters_key}"
+
+
+def get_days_back(filters=None, default=365):
+    if filters:
+        return int(filters.get('days_back', default))
+    return default
 
 
 def get_table_columns(table_name):
@@ -298,7 +356,7 @@ def query_wip_by_spec_workcenter():
             GROUP BY SPECNAME, WORKCENTERNAME
             ORDER BY TOTAL_QTY DESC
         """
-        df = pd.read_sql(sql, connection)
+        df = read_sql_df(sql)
         connection.close()
         return df
     except Exception as exc:
@@ -327,7 +385,7 @@ def query_wip_by_product_line():
             GROUP BY PRODUCTLINENAME_LEF, SPECNAME, WORKCENTERNAME
             ORDER BY TOTAL_QTY DESC
         """
-        df = pd.read_sql(sql, connection)
+        df = read_sql_df(sql)
         connection.close()
         return df
     except Exception as exc:
@@ -489,7 +547,7 @@ def query_wip_by_status():
             GROUP BY STATUS
             ORDER BY LOT_COUNT DESC
         """
-        df = pd.read_sql(sql, connection)
+        df = read_sql_df(sql)
         connection.close()
         return df
     except Exception as exc:
@@ -518,7 +576,7 @@ def query_wip_by_mfgorder(limit=100):
                 ORDER BY TOTAL_QTY DESC
             ) WHERE ROWNUM <= :limit
         """
-        df = pd.read_sql(sql, connection, params={'limit': limit})
+        df = read_sql_df(sql, params={'limit': limit})
         connection.close()
         return df
     except Exception as exc:
@@ -564,10 +622,24 @@ def get_resource_latest_status_subquery(days_back=30):
     Includes JOBID for SDT/UDT drill-down.
     Includes PJ_LOTID from RESOURCE table.
     """
+    location_filter = ""
+    if EXCLUDED_LOCATIONS:
+        excluded_locations = "', '".join(EXCLUDED_LOCATIONS)
+        location_filter = f"AND (r.LOCATIONNAME IS NULL OR r.LOCATIONNAME NOT IN ('{excluded_locations}'))"
+
+    asset_status_filter = ""
+    if EXCLUDED_ASSET_STATUSES:
+        excluded_assets = "', '".join(EXCLUDED_ASSET_STATUSES)
+        asset_status_filter = f"AND (r.PJ_ASSETSSTATUS IS NULL OR r.PJ_ASSETSSTATUS NOT IN ('{excluded_assets}'))"
+
     return f"""
-        SELECT *
-        FROM (
-            SELECT
+          WITH latest_txn AS (
+              SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
+              FROM DW_MES_RESOURCESTATUS
+          )
+          SELECT *
+          FROM (
+              SELECT
                 r.RESOURCEID,
                 r.RESOURCENAME,
                 r.OBJECTCATEGORY,
@@ -584,28 +656,33 @@ def get_resource_latest_status_subquery(days_back=30):
                 r.PJ_ISMONITOR,
                 r.PJ_LOTID,
                 r.DESCRIPTION,
-                s.NEWSTATUSNAME,
-                s.NEWREASONNAME,
-                s.LASTSTATUSCHANGEDATE,
-                s.OLDSTATUSNAME,
+                  s.NEWSTATUSNAME,
+                  s.NEWREASONNAME,
+                  s.LASTSTATUSCHANGEDATE,
+                  s.OLDSTATUSNAME,
                 s.OLDREASONNAME,
-                s.AVAILABILITY,
-                s.JOBID,
-                ROW_NUMBER() OVER (
-                    PARTITION BY r.RESOURCEID
-                    ORDER BY s.LASTSTATUSCHANGEDATE DESC NULLS LAST, s.TXNDATE DESC
-                ) AS rn
-            FROM DW_MES_RESOURCE r
-            JOIN DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
-            WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
-                OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
-              AND s.LASTSTATUSCHANGEDATE >= SYSDATE - {days_back}
-        )
-        WHERE rn = 1
-    """
+                  s.AVAILABILITY,
+                  s.JOBID,
+                  s.TXNDATE,
+                  ROW_NUMBER() OVER (
+                      PARTITION BY r.RESOURCEID
+                      ORDER BY s.LASTSTATUSCHANGEDATE DESC NULLS LAST,
+                               COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) DESC
+                  ) AS rn
+              FROM DW_MES_RESOURCE r
+              JOIN DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
+              CROSS JOIN latest_txn lt
+              WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
+                  OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
+                AND COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) >= lt.MAX_TXNDATE - {days_back}
+                {location_filter}
+                {asset_status_filter}
+          )
+          WHERE rn = 1
+      """
 
 
-def query_resource_status_summary():
+def query_resource_status_summary(days_back=30):
     """Query resource status summary."""
     connection = get_db_connection()
     if not connection:
@@ -618,7 +695,7 @@ def query_resource_status_summary():
                 COUNT(DISTINCT WORKCENTERNAME) as WORKCENTER_COUNT,
                 COUNT(DISTINCT RESOURCEFAMILYNAME) as FAMILY_COUNT,
                 COUNT(DISTINCT PJ_DEPARTMENT) as DEPT_COUNT
-            FROM ({get_resource_latest_status_subquery()}) rs
+            FROM ({get_resource_latest_status_subquery(days_back)}) rs
         """
         cursor = connection.cursor()
         cursor.execute(sql)
@@ -641,67 +718,49 @@ def query_resource_status_summary():
         return None
 
 
-def query_resource_by_status():
+def query_resource_by_status(days_back=30):
     """Query resource count by status."""
-    connection = get_db_connection()
-    if not connection:
-        return None
-
     try:
         sql = f"""
             SELECT
                 NEWSTATUSNAME,
                 COUNT(*) as COUNT
-            FROM ({get_resource_latest_status_subquery()}) rs
+            FROM ({get_resource_latest_status_subquery(days_back)}) rs
             WHERE NEWSTATUSNAME IS NOT NULL
             GROUP BY NEWSTATUSNAME
             ORDER BY COUNT DESC
         """
-        df = pd.read_sql(sql, connection)
-        connection.close()
+        df = read_sql_df(sql)
         return df
     except Exception as exc:
-        if connection:
-            connection.close()
         print(f"查詢失敗: {exc}")
         return None
 
 
-def query_resource_by_workcenter():
+def query_resource_by_workcenter(days_back=30):
     """Query resource count by workcenter and status."""
-    connection = get_db_connection()
-    if not connection:
-        return None
-
     try:
         sql = f"""
             SELECT
                 WORKCENTERNAME,
                 NEWSTATUSNAME,
                 COUNT(*) as COUNT
-            FROM ({get_resource_latest_status_subquery()}) rs
+            FROM ({get_resource_latest_status_subquery(days_back)}) rs
             WHERE WORKCENTERNAME IS NOT NULL
             GROUP BY WORKCENTERNAME, NEWSTATUSNAME
             ORDER BY WORKCENTERNAME, COUNT DESC
         """
-        df = pd.read_sql(sql, connection)
-        connection.close()
+        df = read_sql_df(sql)
         return df
     except Exception as exc:
-        if connection:
-            connection.close()
         print(f"查詢失敗: {exc}")
         return None
 
 
-def query_resource_detail(filters=None, limit=500):
+def query_resource_detail(filters=None, limit=500, offset=0, days_back=30):
     """Query resource detail with optional filters."""
-    connection = get_db_connection()
-    if not connection:
-        return None
-
     try:
-        base_sql = get_resource_latest_status_subquery()
+        base_sql = get_resource_latest_status_subquery(days_back)
 
         where_conditions = []
         if filters:
@@ -740,6 +799,8 @@ def query_resource_detail(filters=None, limit=500):
         else:
             where_clause = ""
 
+        start_row = offset + 1
+        end_row = offset + limit
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -756,14 +817,15 @@ def query_resource_detail(filters=None, limit=500):
                     AVAILABILITY,
                     PJ_ISPRODUCTION,
                     PJ_ISKEY,
-                    PJ_ISMONITOR
+                    PJ_ISMONITOR,
+                    ROW_NUMBER() OVER (
+                        ORDER BY LASTSTATUSCHANGEDATE DESC NULLS LAST
+                    ) AS rn
                 FROM ({base_sql}) rs
                 WHERE 1=1 {where_clause}
-                ORDER BY LASTSTATUSCHANGEDATE DESC NULLS LAST
-            ) WHERE ROWNUM <= {limit}
+            ) WHERE rn BETWEEN {start_row} AND {end_row}
         """
-        df = pd.read_sql(sql, connection)
-        connection.close()
+        df = read_sql_df(sql)
 
         # Convert datetime to string
         if 'LASTSTATUSCHANGEDATE' in df.columns:
@@ -773,13 +835,11 @@ def query_resource_detail(filters=None, limit=500):
 
         return df
     except Exception as exc:
-        if connection:
-            connection.close()
         print(f"查詢失敗: {exc}")
         return None
 
 
-def query_resource_workcenter_status_matrix():
+def query_resource_workcenter_status_matrix(days_back=30):
     """Query resource count matrix by workcenter and status category.
 
     Actual status values in database (verified):
@@ -791,10 +851,6 @@ def query_resource_workcenter_status_matrix():
     - NST: (待確認，暫歸類為 OTHER)
     - SCRAP: 報廢
     """
-    connection = get_db_connection()
-    if not connection:
-        return None
-
     try:
         # Use exact status values based on database verification
         sql = f"""
@@ -812,7 +868,7 @@ def query_resource_workcenter_status_matrix():
                 END as STATUS_CATEGORY,
                 NEWSTATUSNAME,
                 COUNT(*) as COUNT
-            FROM ({get_resource_latest_status_subquery()}) rs
+            FROM ({get_resource_latest_status_subquery(days_back)}) rs
             WHERE WORKCENTERNAME IS NOT NULL
             GROUP BY WORKCENTERNAME,
                 CASE NEWSTATUSNAME
@@ -828,49 +884,46 @@ def query_resource_workcenter_status_matrix():
                 NEWSTATUSNAME
             ORDER BY WORKCENTERNAME, STATUS_CATEGORY
         """
-        df = pd.read_sql(sql, connection)
-        connection.close()
+        df = read_sql_df(sql)
         return df
     except Exception as exc:
-        if connection:
-            connection.close()
         print(f"查詢失敗: {exc}")
         return None
 
 
-def query_resource_filter_options():
+def query_resource_filter_options(days_back=30):
     """Get available filter options.
 
     優化：合併成一個查詢，只掃描一次子查詢，大幅提升效能。
     """
-    connection = get_db_connection()
-    if not connection:
-        return None
-
     try:
-        # 一次查詢取得所有需要的 distinct 值
-        sql = f"""
+        sql_latest = f"""
             SELECT
                 WORKCENTERNAME,
                 NEWSTATUSNAME,
                 RESOURCEFAMILYNAME,
-                PJ_DEPARTMENT,
+                PJ_DEPARTMENT
+            FROM ({get_resource_latest_status_subquery(days_back)}) rs
+        """
+        latest_df = read_sql_df(sql_latest)
+
+        sql_resource = """
+            SELECT
                 LOCATIONNAME,
                 PJ_ASSETSSTATUS
-            FROM ({get_resource_latest_status_subquery()}) rs
+            FROM DW_MES_RESOURCE r
+            WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
+               OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
         """
-        print("開始執行 filter_options 查詢...")
-        df = pd.read_sql(sql, connection)
-        print(f"查詢完成，共 {len(df)} 筆資料")
-        connection.close()
+        resource_df = read_sql_df(sql_resource)
 
         # 從結果中提取各欄位的不重複值
-        workcenters = sorted(df['WORKCENTERNAME'].dropna().unique().tolist())
-        statuses = sorted(df['NEWSTATUSNAME'].dropna().unique().tolist())
-        families = sorted(df['RESOURCEFAMILYNAME'].dropna().unique().tolist())
-        departments = sorted(df['PJ_DEPARTMENT'].dropna().unique().tolist())
-        locations = sorted(df['LOCATIONNAME'].dropna().unique().tolist())
-        assets_statuses = sorted(df['PJ_ASSETSSTATUS'].dropna().unique().tolist())
+        workcenters = sorted(latest_df['WORKCENTERNAME'].dropna().unique().tolist())
+        statuses = sorted(latest_df['NEWSTATUSNAME'].dropna().unique().tolist())
+        families = sorted(latest_df['RESOURCEFAMILYNAME'].dropna().unique().tolist())
+        departments = sorted(latest_df['PJ_DEPARTMENT'].dropna().unique().tolist())
+        locations = sorted(resource_df['LOCATIONNAME'].dropna().unique().tolist())
+        assets_statuses = sorted(resource_df['PJ_ASSETSSTATUS'].dropna().unique().tolist())
 
         print(f"篩選選項: locations={len(locations)}, assets_statuses={len(assets_statuses)}")
 
@@ -883,8 +936,6 @@ def query_resource_filter_options():
             'assets_statuses': assets_statuses
         }
     except Exception as exc:
-        if connection:
-            connection.close()
         print(f"查詢失敗: {exc}")
         import traceback
         traceback.print_exc()
@@ -900,7 +951,13 @@ def resource_page():
 @app.route('/api/resource/summary')
 def api_resource_summary():
     """API: Resource status summary."""
-    summary = query_resource_status_summary()
+    days_back = request.args.get('days_back', 30, type=int)
+    cache_key = make_cache_key("resource_summary", days_back)
+    summary = cache_get(cache_key)
+    if summary is None:
+        summary = query_resource_status_summary(days_back)
+        if summary:
+            cache_set(cache_key, summary)
     if summary:
         return jsonify({'success': True, 'data': summary})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
@@ -909,9 +966,17 @@ def api_resource_summary():
 @app.route('/api/resource/by_status')
 def api_resource_by_status():
     """API: Resource count by status."""
-    df = query_resource_by_status()
-    if df is not None:
-        data = df.to_dict(orient='records')
+    days_back = request.args.get('days_back', 30, type=int)
+    cache_key = make_cache_key("resource_by_status", days_back)
+    data = cache_get(cache_key)
+    if data is None:
+        df = query_resource_by_status(days_back)
+        if df is not None:
+            data = df.to_dict(orient='records')
+            cache_set(cache_key, data)
+        else:
+            data = None
+    if data is not None:
         return jsonify({'success': True, 'data': data})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
 
@@ -919,9 +984,17 @@ def api_resource_by_status():
 @app.route('/api/resource/by_workcenter')
 def api_resource_by_workcenter():
     """API: Resource count by workcenter."""
-    df = query_resource_by_workcenter()
-    if df is not None:
-        data = df.to_dict(orient='records')
+    days_back = request.args.get('days_back', 30, type=int)
+    cache_key = make_cache_key("resource_by_workcenter", days_back)
+    data = cache_get(cache_key)
+    if data is None:
+        df = query_resource_by_workcenter(days_back)
+        if df is not None:
+            data = df.to_dict(orient='records')
+            cache_set(cache_key, data)
+        else:
+            data = None
+    if data is not None:
         return jsonify({'success': True, 'data': data})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
 
@@ -929,9 +1002,17 @@ def api_resource_by_workcenter():
 @app.route('/api/resource/workcenter_status_matrix')
 def api_resource_workcenter_status_matrix():
     """API: Resource count matrix by workcenter and status category."""
-    df = query_resource_workcenter_status_matrix()
-    if df is not None:
-        data = df.to_dict(orient='records')
+    days_back = request.args.get('days_back', 30, type=int)
+    cache_key = make_cache_key("resource_workcenter_matrix", days_back)
+    data = cache_get(cache_key)
+    if data is None:
+        df = query_resource_workcenter_status_matrix(days_back)
+        if df is not None:
+            data = df.to_dict(orient='records')
+            cache_set(cache_key, data)
+        else:
+            data = None
+    if data is not None:
         return jsonify({'success': True, 'data': data})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
 
@@ -942,24 +1023,28 @@ def api_resource_detail():
     data = request.get_json() or {}
     filters = data.get('filters')
     limit = data.get('limit', 500)
+    offset = data.get('offset', 0)
+    days_back = get_days_back(filters)
 
-    df = query_resource_detail(filters, limit)
+    df = query_resource_detail(filters, limit, offset, days_back)
     if df is not None:
         records = df.to_dict(orient='records')
-        return jsonify({'success': True, 'data': records, 'count': len(records)})
+        return jsonify({'success': True, 'data': records, 'count': len(records), 'offset': offset})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
 
 
 @app.route('/api/resource/filter_options')
 def api_resource_filter_options():
     """API: Get filter options."""
-    print("=== /api/resource/filter_options 被呼叫 ===")
-    options = query_resource_filter_options()
+    days_back = request.args.get('days_back', 30, type=int)
+    cache_key = make_cache_key("resource_filter_options", days_back)
+    options = cache_get(cache_key)
+    if options is None:
+        options = query_resource_filter_options(days_back)
+        if options:
+            cache_set(cache_key, options)
     if options:
-        print(f"locations 數量: {len(options.get('locations', []))}")
-        print(f"assets_statuses 數量: {len(options.get('assets_statuses', []))}")
         return jsonify({'success': True, 'data': options})
-    print("查詢失敗，options 為 None")
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
 
 
@@ -1013,7 +1098,8 @@ def query_dashboard_kpi(filters=None):
         return None
 
     try:
-        base_sql = get_resource_latest_status_subquery()
+        days_back = get_days_back(filters)
+        base_sql = get_resource_latest_status_subquery(days_back)
 
         # Build filter conditions
         where_conditions = []
@@ -1203,12 +1289,9 @@ def query_workcenter_cards(filters=None):
     10: 元件切割 (PKG_SAE)
     11: 測試 (TMTT)
     """
-    connection = get_db_connection()
-    if not connection:
-        return None
-
     try:
-        base_sql = get_resource_latest_status_subquery()
+        days_back = get_days_back(filters)
+        base_sql = get_resource_latest_status_subquery(days_back)
 
         # Build filter conditions
         where_conditions = []
@@ -1244,8 +1327,7 @@ def query_workcenter_cards(filters=None):
             WHERE WORKCENTERNAME IS NOT NULL AND {where_clause}
             GROUP BY WORKCENTERNAME
         """
-        df = pd.read_sql(sql, connection)
-        connection.close()
+        df = read_sql_df(sql)
 
         # Group workcenters
         grouped_data = {}
@@ -1362,13 +1444,11 @@ def query_workcenter_cards(filters=None):
 
         return result
     except Exception as exc:
-        if connection:
-            connection.close()
         print(f"工站卡片查詢失敗: {exc}")
         return None
 
 
-def query_resource_detail_with_job(filters=None, limit=200):
+def query_resource_detail_with_job(filters=None, limit=200, offset=0):
     """Query resource detail with JOB info for SDT/UDT drill-down.
 
     欄位來源說明:
@@ -1377,12 +1457,9 @@ def query_resource_detail_with_job(filters=None, limit=200):
     - 原因碼 (CAUSECODENAME): 來自 DW_MES_JOB.CAUSECODENAME (透過 JOBID 關聯)
     - DownTime: 計算自 LASTSTATUSCHANGEDATE 到現在的時間差 (分鐘)
     """
-    connection = get_db_connection()
-    if not connection:
-        return None
-
     try:
-        base_sql = get_resource_latest_status_subquery()
+        days_back = get_days_back(filters)
+        base_sql = get_resource_latest_status_subquery(days_back)
 
         where_conditions = []
         if filters:
@@ -1427,6 +1504,8 @@ def query_resource_detail_with_job(filters=None, limit=200):
         # Left join with JOB table for SDT/UDT details
         # PJ_LOTID 來自 RESOURCE 表
         # SYMPTOMCODENAME, CAUSECODENAME 來自 JOB 表
+        start_row = offset + 1
+        end_row = offset + limit
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -1451,21 +1530,22 @@ def query_resource_detail_with_job(filters=None, limit=200):
                     j.REPAIRCODENAME,
                     j.CREATEDATE as JOB_CREATEDATE,
                     j.FIRSTCLOCKONDATE,
-                    ROUND((SYSDATE - rs.LASTSTATUSCHANGEDATE) * 24 * 60, 0) as DOWN_MINUTES
+                    ROUND((SYSDATE - rs.LASTSTATUSCHANGEDATE) * 24 * 60, 0) as DOWN_MINUTES,
+                    ROW_NUMBER() OVER (
+                        ORDER BY
+                            CASE rs.NEWSTATUSNAME
+                                WHEN 'UDT' THEN 1
+                                WHEN 'SDT' THEN 2
+                                ELSE 3
+                            END,
+                            rs.LASTSTATUSCHANGEDATE DESC NULLS LAST
+                    ) AS rn
                 FROM ({base_sql}) rs
                 LEFT JOIN DW_MES_JOB j ON rs.JOBID = j.JOBID
                 WHERE {where_clause}
-                ORDER BY
-                    CASE rs.NEWSTATUSNAME
-                        WHEN 'UDT' THEN 1
-                        WHEN 'SDT' THEN 2
-                        ELSE 3
-                    END,
-                    rs.LASTSTATUSCHANGEDATE DESC NULLS LAST
-            ) WHERE ROWNUM <= {limit}
+            ) WHERE rn BETWEEN {start_row} AND {end_row}
         """
-        df = pd.read_sql(sql, connection)
-        connection.close()
+        df = read_sql_df(sql)
 
         # Convert datetime columns
         datetime_cols = ['LASTSTATUSCHANGEDATE', 'JOB_CREATEDATE', 'FIRSTCLOCKONDATE']
@@ -1477,8 +1557,6 @@ def query_resource_detail_with_job(filters=None, limit=200):
 
         return df
     except Exception as exc:
-        if connection:
-            connection.close()
         print(f"明細查詢失敗: {exc}")
         return None
 
@@ -1489,7 +1567,13 @@ def api_dashboard_kpi():
     data = request.get_json() or {}
     filters = data.get('filters')
 
-    kpi = query_dashboard_kpi(filters)
+    days_back = get_days_back(filters)
+    cache_key = make_cache_key("dashboard_kpi", days_back, filters)
+    kpi = cache_get(cache_key)
+    if kpi is None:
+        kpi = query_dashboard_kpi(filters)
+        if kpi:
+            cache_set(cache_key, kpi)
     if kpi:
         return jsonify({'success': True, 'data': kpi})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
@@ -1501,7 +1585,13 @@ def api_dashboard_workcenter_cards():
     data = request.get_json() or {}
     filters = data.get('filters')
 
-    cards = query_workcenter_cards(filters)
+    days_back = get_days_back(filters)
+    cache_key = make_cache_key("dashboard_workcenter_cards", days_back, filters)
+    cards = cache_get(cache_key)
+    if cards is None:
+        cards = query_workcenter_cards(filters)
+        if cards is not None:
+            cache_set(cache_key, cards)
     if cards is not None:
         return jsonify({'success': True, 'data': cards})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
@@ -1513,11 +1603,12 @@ def api_dashboard_detail():
     data = request.get_json() or {}
     filters = data.get('filters')
     limit = data.get('limit', 200)
+    offset = data.get('offset', 0)
 
-    df = query_resource_detail_with_job(filters, limit)
+    df = query_resource_detail_with_job(filters, limit, offset)
     if df is not None:
         records = df.to_dict(orient='records')
-        return jsonify({'success': True, 'data': records, 'count': len(records)})
+        return jsonify({'success': True, 'data': records, 'count': len(records), 'offset': offset})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
 
 

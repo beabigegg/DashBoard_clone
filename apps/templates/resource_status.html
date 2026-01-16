@@ -5,7 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>全廠機況 Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    
     <style>
+        :root {
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text: #222;
+            --muted: #666;
+            --border: #e2e6ef;
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --shadow: 0 2px 10px rgba(0,0,0,0.08);
+            --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --neutral: #64748b;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,15 +32,15 @@
 
         body {
             font-family: 'Microsoft JhengHei', Arial, sans-serif;
-            background: #1a1a2e;
-            color: #eee;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
         }
 
         .dashboard {
             max-width: 1800px;
             margin: 0 auto;
-            padding: 15px;
+            padding: 20px;
         }
 
         /* Header */
@@ -30,182 +48,137 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 15px 20px;
-            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 18px 22px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-strong);
         }
 
         .header h1 {
             font-size: 24px;
-            color: #00d4ff;
+            color: #fff;
         }
 
         .header-right {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 16px;
+            flex-wrap: wrap;
         }
 
         .last-update {
-            color: #888;
+            color: rgba(255, 255, 255, 0.8);
             font-size: 13px;
         }
 
         /* Filters */
         .filters {
             display: flex;
-            gap: 15px;
+            gap: 12px;
             align-items: center;
             flex-wrap: wrap;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 14px;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
         }
 
         .filter-group {
             display: flex;
             align-items: center;
-            gap: 8px;
-            background: rgba(255,255,255,0.1);
-            padding: 8px 15px;
-            border-radius: 20px;
+            gap: 10px;
         }
 
         .filter-group label {
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             cursor: pointer;
             font-size: 13px;
+            color: var(--text);
         }
 
         .filter-group input[type="checkbox"] {
             width: 16px;
             height: 16px;
             cursor: pointer;
-        }
-
-        .filter-group select {
-            background: #1a1a2e;
-            color: #eee;
-            border: 1px solid #444;
-            border-radius: 5px;
-            padding: 5px 10px;
-            font-size: 12px;
-            cursor: pointer;
-            min-width: 120px;
-        }
-
-        .filter-group select:focus {
-            border-color: #00d4ff;
-            outline: none;
-        }
-
-        .filter-group select[multiple] {
-            min-width: 150px;
-            height: 80px;
-            padding: 5px;
-        }
-
-        .filter-group select[multiple] option {
-            padding: 3px 8px;
-            margin: 1px 0;
-            border-radius: 3px;
-        }
-
-        .filter-group select[multiple] option:checked {
-            background: linear-gradient(0deg, #00d4ff 0%, #00d4ff 100%);
-            color: #000;
-        }
-
-        .filter-label {
-            font-size: 12px;
-            color: #888;
-            margin-right: 5px;
-        }
-
-        .filter-hint {
-            font-size: 10px;
-            color: #666;
-            display: block;
-            margin-top: 2px;
+            accent-color: var(--primary);
         }
 
         .btn-query {
-            background: #00d4ff;
-            color: #1a1a2e;
+            background: var(--primary);
+            color: white;
             border: none;
-            padding: 10px 25px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
+            padding: 9px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: background 0.2s ease;
         }
 
         .btn-query:hover {
-            background: #00a8cc;
-            transform: scale(1.05);
+            background: var(--primary-dark);
         }
 
         .btn-query:disabled {
-            background: #555;
+            background: #a6b0f5;
             cursor: not-allowed;
-            transform: none;
         }
 
         /* KPI Cards */
         .kpi-row {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 15px;
-            margin-bottom: 15px;
+            gap: 14px;
+            margin-bottom: 16px;
         }
 
         .kpi-card {
-            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+            background: var(--card-bg);
             border-radius: 10px;
-            padding: 20px;
+            padding: 18px;
             text-align: center;
-            border: 1px solid #333;
-            transition: transform 0.3s;
-        }
-
-        .kpi-card:hover {
-            transform: translateY(-3px);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
         }
 
         .kpi-label {
             font-size: 13px;
-            color: #888;
-            margin-bottom: 8px;
+            color: var(--muted);
+            margin-bottom: 6px;
         }
 
         .kpi-value {
-            font-size: 36px;
+            font-size: 30px;
             font-weight: bold;
         }
 
-        .kpi-value.green { color: #00ff88; }
-        .kpi-value.blue { color: #00d4ff; }
-        .kpi-value.red { color: #ff4757; }
-        .kpi-value.yellow { color: #ffc107; }
+        .kpi-value.green { color: var(--success); }
+        .kpi-value.blue { color: var(--primary); }
+        .kpi-value.red { color: var(--danger); }
+        .kpi-value.yellow { color: var(--warning); }
 
         .kpi-sub {
             font-size: 12px;
-            color: #666;
-            margin-top: 5px;
+            color: var(--muted);
+            margin-top: 4px;
         }
 
         /* Workcenter Cards Grid */
         .workcenter-section {
-            margin-bottom: 15px;
+            margin-bottom: 16px;
         }
 
         .section-title {
             font-size: 16px;
-            color: #00d4ff;
+            color: var(--primary);
             margin-bottom: 10px;
             padding-left: 10px;
-            border-left: 3px solid #00d4ff;
+            border-left: 3px solid var(--primary);
         }
 
         .workcenter-grid {
@@ -215,33 +188,34 @@
         }
 
         .wc-card {
-            background: #16213e;
+            background: var(--card-bg);
             border-radius: 8px;
-            padding: 15px;
+            padding: 14px;
             cursor: pointer;
-            transition: all 0.3s;
-            border: 2px solid transparent;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
         }
 
         .wc-card:hover {
-            border-color: #00d4ff;
+            border-color: var(--primary);
             transform: translateY(-2px);
         }
 
         .wc-card.selected {
-            border-color: #00ff88;
-            background: #1a3a5c;
+            border-color: var(--success);
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
         }
 
         .wc-card.has-issue {
-            border-left: 4px solid #ff4757;
+            border-left: 4px solid var(--danger);
         }
 
         .wc-name {
             font-size: 14px;
-            font-weight: bold;
-            color: #fff;
-            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -254,51 +228,53 @@
         }
 
         .wc-ou {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: bold;
         }
 
-        .wc-ou.high { color: #00ff88; }
-        .wc-ou.medium { color: #ffc107; }
-        .wc-ou.low { color: #ff4757; }
+        .wc-ou.high { color: var(--success); }
+        .wc-ou.medium { color: var(--warning); }
+        .wc-ou.low { color: var(--danger); }
 
         .wc-counts {
             text-align: right;
             font-size: 11px;
-            color: #888;
+            color: var(--muted);
         }
 
         .wc-counts .down {
-            color: #ff4757;
+            color: var(--danger);
             font-weight: bold;
         }
 
         .wc-mini-chart {
-            height: 30px;
+            height: 34px;
             margin-top: 8px;
         }
 
         /* Detail Table */
         .detail-section {
-            background: #16213e;
+            background: var(--card-bg);
             border-radius: 10px;
-            padding: 15px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
         }
 
         .detail-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         .detail-title {
             font-size: 16px;
-            color: #00d4ff;
+            color: var(--primary);
         }
 
         .detail-count {
-            color: #888;
+            color: var(--muted);
             font-size: 13px;
         }
 
@@ -317,25 +293,27 @@
         thead {
             position: sticky;
             top: 0;
-            background: #0f3460;
+            background: #eef2ff;
             z-index: 1;
         }
 
         th {
             padding: 10px 8px;
             text-align: left;
-            color: #00d4ff;
+            color: #3f4aa7;
             font-weight: 600;
             white-space: nowrap;
+            border-bottom: 1px solid var(--border);
         }
 
         td {
             padding: 8px;
-            border-bottom: 1px solid #2a2a4a;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
         }
 
         tbody tr:hover {
-            background: rgba(0, 212, 255, 0.1);
+            background: #f1f5ff;
         }
 
         .status-badge {
@@ -343,16 +321,16 @@
             padding: 3px 10px;
             border-radius: 12px;
             font-size: 11px;
-            font-weight: bold;
+            font-weight: 700;
         }
 
-        .status-prd { background: #00ff88; color: #000; }
-        .status-sby { background: #17a2b8; color: #fff; }
-        .status-udt { background: #ff4757; color: #fff; }
-        .status-sdt { background: #ffc107; color: #000; }
-        .status-egt { background: #6c757d; color: #fff; }
-        .status-nst { background: #9b59b6; color: #fff; }
-        .status-other { background: #444; color: #fff; }
+        .status-prd { background: #bbf7d0; color: #166534; }
+        .status-sby { background: #bfdbfe; color: #1e40af; }
+        .status-udt { background: #fecaca; color: #991b1b; }
+        .status-sdt { background: #fef3c7; color: #92400e; }
+        .status-egt { background: #e2e8f0; color: #475569; }
+        .status-nst { background: #e9d5ff; color: #6b21a8; }
+        .status-other { background: #e5e7eb; color: #374151; }
 
         .flag-badge {
             display: inline-block;
@@ -362,18 +340,18 @@
             margin-right: 3px;
         }
 
-        .flag-prod { background: #28a745; color: white; }
-        .flag-key { background: #dc3545; color: white; }
-        .flag-monitor { background: #17a2b8; color: white; }
+        .flag-prod { background: #dcfce7; color: #166534; }
+        .flag-key { background: #fee2e2; color: #991b1b; }
+        .flag-monitor { background: #dbeafe; color: #1e40af; }
 
         .down-time {
-            color: #ff4757;
+            color: var(--danger);
             font-weight: bold;
         }
 
         .job-info {
             font-size: 11px;
-            color: #888;
+            color: var(--muted);
         }
 
         /* Loading */
@@ -381,8 +359,8 @@
             display: inline-block;
             width: 18px;
             height: 18px;
-            border: 2px solid #333;
-            border-top-color: #00d4ff;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             margin-right: 8px;
@@ -399,7 +377,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(26, 26, 46, 0.9);
+            background: rgba(255, 255, 255, 0.85);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -408,14 +386,14 @@
         }
 
         .loading-text {
-            color: #00d4ff;
+            color: var(--primary);
             font-size: 14px;
         }
 
         .placeholder {
             text-align: center;
             padding: 40px;
-            color: #666;
+            color: var(--muted);
         }
 
         /* Responsive */
@@ -444,8 +422,12 @@
             .workcenter-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
+            .header {
+                align-items: flex-start;
+            }
         }
     </style>
+
 </head>
 <body>
     <div class="dashboard">
@@ -459,16 +441,8 @@
                         <label><input type="checkbox" id="filterKey"> 關鍵設備</label>
                         <label><input type="checkbox" id="filterMonitor"> 監控設備</label>
                     </div>
-                    <div class="filter-group" style="flex-direction: column; align-items: flex-start;">
-                        <span class="filter-label">廠區: <span class="filter-hint">(Ctrl+點選多選)</span></span>
-                        <select id="filterLocation" multiple>
-                        </select>
-                    </div>
-                    <div class="filter-group" style="flex-direction: column; align-items: flex-start;">
-                        <span class="filter-label">資產狀態: <span class="filter-hint">(Ctrl+點選多選)</span></span>
-                        <select id="filterAssetsStatus" multiple>
-                        </select>
-                    </div>
+                    
+                    
                     <button id="btnQuery" class="btn-query" onclick="loadDashboard()">查詢</button>
                 </div>
                 <span id="lastUpdate" class="last-update"></span>
@@ -526,6 +500,7 @@
                             <th>工作中心</th>
                             <th>狀態</th>
                             <th>原因</th>
+                            <th>最後狀態時間</th>
                             <th>Down Time</th>
                             <th>批號 (PJ_LOTID)</th>
                             <th>症狀 (JOB)</th>
@@ -534,7 +509,7 @@
                         </tr>
                     </thead>
                     <tbody id="detailTableBody">
-                        <tr><td colspan="9" class="placeholder">請點擊「查詢」載入資料</td></tr>
+                        <tr><td colspan="10" class="placeholder">請點擊「查詢」載入資料</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -563,88 +538,10 @@
             if (document.getElementById('filterProduction').checked) filters.isProduction = true;
             if (document.getElementById('filterKey').checked) filters.isKey = true;
             if (document.getElementById('filterMonitor').checked) filters.isMonitor = true;
+            filters.days_back = 365;
 
             // 多選廠區
-            const locationSelect = document.getElementById('filterLocation');
-            const selectedLocations = Array.from(locationSelect.selectedOptions).map(opt => opt.value);
-            if (selectedLocations.length > 0) {
-                filters.locations = selectedLocations;
-            }
-
-            // 多選資產狀態
-            const assetsStatusSelect = document.getElementById('filterAssetsStatus');
-            const selectedStatuses = Array.from(assetsStatusSelect.selectedOptions).map(opt => opt.value);
-            if (selectedStatuses.length > 0) {
-                filters.assetsStatuses = selectedStatuses;
-            }
-
             return Object.keys(filters).length > 0 ? filters : null;
-        }
-
-        async function loadFilterOptions() {
-            console.log('loadFilterOptions() 開始執行');
-            console.log('當前 URL:', window.location.href);
-            try {
-                const apiUrl = '/api/resource/filter_options';
-                console.log('準備呼叫:', apiUrl);
-                const response = await fetch(apiUrl);
-                console.log('API 回應狀態:', response.status, response.statusText);
-
-                if (!response.ok) {
-                    console.error('API 回應錯誤:', response.status, response.statusText);
-                    return;
-                }
-
-                const result = await response.json();
-                console.log('Filter options API response:', result);
-
-                if (result.success) {
-                    const data = result.data;
-                    console.log('locations:', data.locations);
-                    console.log('assets_statuses:', data.assets_statuses);
-
-                    // 載入 LOCATIONNAME 選項 (多選)
-                    const locationSelect = document.getElementById('filterLocation');
-                    locationSelect.innerHTML = '';  // 清空
-                    if (data.locations && data.locations.length > 0) {
-                        data.locations.forEach(loc => {
-                            const option = document.createElement('option');
-                            option.value = loc;
-                            option.textContent = loc;
-                            locationSelect.appendChild(option);
-                        });
-                    } else {
-                        const option = document.createElement('option');
-                        option.value = '';
-                        option.textContent = '(無資料)';
-                        option.disabled = true;
-                        locationSelect.appendChild(option);
-                    }
-
-                    // 載入 PJ_ASSETSSTATUS 選項 (多選)
-                    const assetsStatusSelect = document.getElementById('filterAssetsStatus');
-                    assetsStatusSelect.innerHTML = '';  // 清空
-                    if (data.assets_statuses && data.assets_statuses.length > 0) {
-                        data.assets_statuses.forEach(status => {
-                            const option = document.createElement('option');
-                            option.value = status;
-                            option.textContent = status;
-                            assetsStatusSelect.appendChild(option);
-                        });
-                    } else {
-                        const option = document.createElement('option');
-                        option.value = '';
-                        option.textContent = '(無資料)';
-                        option.disabled = true;
-                        assetsStatusSelect.appendChild(option);
-                    }
-                } else {
-                    console.error('API 回傳失敗:', result.error);
-                }
-            } catch (error) {
-                console.error('篩選選項載入失敗:', error);
-                console.error('錯誤詳情:', error.message, error.stack);
-            }
         }
 
         function formatNumber(num) {
@@ -939,7 +836,7 @@
             const title = document.getElementById('detailTitle');
             const count = document.getElementById('detailCount');
 
-            tbody.innerHTML = '<tr><td colspan="9" class="placeholder"><span class="loading-spinner"></span>載入中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="placeholder"><span class="loading-spinner"></span>載入中...</td></tr>';
 
             const filters = getFilters() || {};
             if (selectedWorkcenter) {
@@ -957,7 +854,7 @@
                 const response = await fetch('/api/dashboard/detail', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filters: Object.keys(filters).length > 0 ? filters : null, limit: 200 })
+                    body: JSON.stringify({ filters: Object.keys(filters).length > 0 ? filters : null, limit: 200, offset: 0 })
                 });
                 const result = await response.json();
 
@@ -965,7 +862,7 @@
                     count.textContent = `(${result.count} 筆)`;
 
                     if (result.data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="9" class="placeholder">查無資料</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="10" class="placeholder">查無資料</td></tr>';
                         return;
                     }
 
@@ -988,6 +885,7 @@
                                 <td>${row.WORKCENTERNAME || '-'}</td>
                                 <td><span class="status-badge ${statusClass}">${row.NEWSTATUSNAME || '-'}</span></td>
                                 <td>${row.NEWREASONNAME || '-'}</td>
+                                <td>${row.LASTSTATUSCHANGEDATE || '-'}</td>
                                 <td class="${row.DOWN_MINUTES > 0 ? 'down-time' : ''}">${downTime}</td>
                                 <td class="job-info">${row.PJ_LOTID || '-'}</td>
                                 <td class="job-info">${row.SYMPTOMCODENAME || '-'}</td>
@@ -998,10 +896,10 @@
                     });
                     tbody.innerHTML = html;
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="9" class="placeholder">${result.error}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="10" class="placeholder">${result.error}</td></tr>`;
                 }
             } catch (error) {
-                tbody.innerHTML = `<tr><td colspan="9" class="placeholder">載入失敗: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" class="placeholder">載入失敗: ${error.message}</td></tr>`;
             }
         }
 
@@ -1029,29 +927,6 @@
         }
 
         // Page init - 使用標記確保只執行一次
-        let filterOptionsLoaded = false;
-
-        function initFilterOptions() {
-            if (filterOptionsLoaded) {
-                console.log('篩選選項已經載入過，跳過');
-                return;
-            }
-            filterOptionsLoaded = true;
-            console.log('initFilterOptions() - 開始載入篩選選項');
-            loadFilterOptions();
-        }
-
-        // 使用 DOMContentLoaded
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                console.log('DOMContentLoaded 事件觸發');
-                initFilterOptions();
-            });
-        } else {
-            // DOM 已經準備好，直接執行
-            console.log('DOM 已準備好，直接初始化');
-            initFilterOptions();
-        }
-    </script>
+        </script>
 </body>
 </html>
