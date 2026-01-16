@@ -252,108 +252,6 @@
             margin-top: 8px;
         }
 
-        /* Detail Table */
-        .detail-section {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 16px;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-        }
-
-        .detail-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .detail-title {
-            font-size: 16px;
-            color: var(--primary);
-        }
-
-        .detail-count {
-            color: var(--muted);
-            font-size: 13px;
-        }
-
-        .table-container {
-            overflow-x: auto;
-            max-height: 350px;
-            overflow-y: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-
-        thead {
-            position: sticky;
-            top: 0;
-            background: #eef2ff;
-            z-index: 1;
-        }
-
-        th {
-            padding: 10px 8px;
-            text-align: left;
-            color: #3f4aa7;
-            font-weight: 600;
-            white-space: nowrap;
-            border-bottom: 1px solid var(--border);
-        }
-
-        td {
-            padding: 8px;
-            border-bottom: 1px solid var(--border);
-            color: var(--text);
-        }
-
-        tbody tr:hover {
-            background: #f1f5ff;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-
-        .status-prd { background: #bbf7d0; color: #166534; }
-        .status-sby { background: #bfdbfe; color: #1e40af; }
-        .status-udt { background: #fecaca; color: #991b1b; }
-        .status-sdt { background: #fef3c7; color: #92400e; }
-        .status-egt { background: #e2e8f0; color: #475569; }
-        .status-nst { background: #e9d5ff; color: #6b21a8; }
-        .status-other { background: #e5e7eb; color: #374151; }
-
-        .flag-badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 8px;
-            font-size: 10px;
-            margin-right: 3px;
-        }
-
-        .flag-prod { background: #dcfce7; color: #166534; }
-        .flag-key { background: #fee2e2; color: #991b1b; }
-        .flag-monitor { background: #dbeafe; color: #1e40af; }
-
-        .down-time {
-            color: var(--danger);
-            font-weight: bold;
-        }
-
-        .job-info {
-            font-size: 11px;
-            color: var(--muted);
-        }
-
         /* Loading */
         .loading-spinner {
             display: inline-block;
@@ -486,34 +384,6 @@
             </div>
         </div>
 
-        <!-- Detail Table -->
-        <div class="detail-section" style="position: relative;">
-            <div class="detail-header">
-                <div class="detail-title" id="detailTitle">DOWN 機台明細 (UDT/SDT)</div>
-                <div class="detail-count" id="detailCount"></div>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>機台</th>
-                            <th>工作中心</th>
-                            <th>狀態</th>
-                            <th>原因</th>
-                            <th>最後狀態時間</th>
-                            <th>Down Time</th>
-                            <th>批號 (PJ_LOTID)</th>
-                            <th>症狀 (JOB)</th>
-                            <th>原因碼 (JOB)</th>
-                            <th>標記</th>
-                        </tr>
-                    </thead>
-                    <tbody id="detailTableBody">
-                        <tr><td colspan="10" class="placeholder">請點擊「查詢」載入資料</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -549,30 +419,10 @@
             return num.toLocaleString('zh-TW');
         }
 
-        function getStatusClass(status) {
-            if (!status) return 'status-other';
-            const s = status.toUpperCase();
-            if (s === 'PRD') return 'status-prd';
-            if (s === 'SBY') return 'status-sby';
-            if (s === 'UDT') return 'status-udt';
-            if (s === 'SDT') return 'status-sdt';
-            if (s === 'EGT') return 'status-egt';
-            if (s === 'NST') return 'status-nst';
-            return 'status-other';
-        }
-
         function getOuClass(ouPct) {
             if (ouPct >= 80) return 'high';
             if (ouPct >= 50) return 'medium';
             return 'low';
-        }
-
-        function formatDownTime(minutes) {
-            if (!minutes || minutes <= 0) return '-';
-            if (minutes < 60) return `${Math.round(minutes)}m`;
-            const hours = Math.floor(minutes / 60);
-            const mins = Math.round(minutes % 60);
-            return `${hours}h ${mins}m`;
         }
 
         async function loadKPI() {
@@ -828,84 +678,6 @@
                 });
             }
 
-            loadDetail();
-        }
-
-        async function loadDetail() {
-            const tbody = document.getElementById('detailTableBody');
-            const title = document.getElementById('detailTitle');
-            const count = document.getElementById('detailCount');
-
-            tbody.innerHTML = '<tr><td colspan="10" class="placeholder"><span class="loading-spinner"></span>載入中...</td></tr>';
-
-            const filters = getFilters() || {};
-            if (selectedWorkcenter) {
-                filters.workcenter = selectedWorkcenter;
-                // 傳遞原始工站列表，讓後端可以用 IN 查詢
-                if (selectedOriginalWcs && selectedOriginalWcs.length > 0) {
-                    filters.original_wcs = selectedOriginalWcs;
-                }
-                title.textContent = `DOWN 機台明細 - ${selectedWorkcenter}`;
-            } else {
-                title.textContent = 'DOWN 機台明細 (全部)';
-            }
-
-            try {
-                const response = await fetch('/api/dashboard/detail', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filters: Object.keys(filters).length > 0 ? filters : null, limit: 200, offset: 0 })
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    count.textContent = `(${result.count} 筆)`;
-
-                    // 更新 Last Update 使用 API 返回的最新狀態時間
-                    if (result.max_status_time) {
-                        document.getElementById('lastUpdate').textContent = `Last Update: ${result.max_status_time}`;
-                    }
-
-                    if (result.data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="10" class="placeholder">查無資料</td></tr>';
-                        return;
-                    }
-
-                    let html = '';
-                    result.data.forEach(row => {
-                        const statusClass = getStatusClass(row.NEWSTATUSNAME);
-                        const downTime = formatDownTime(row.DOWN_MINUTES);
-
-                        let flags = '';
-                        if (row.PJ_ISPRODUCTION === 1) flags += '<span class="flag-badge flag-prod">生產</span>';
-                        if (row.PJ_ISKEY === 1) flags += '<span class="flag-badge flag-key">關鍵</span>';
-                        if (row.PJ_ISMONITOR === 1) flags += '<span class="flag-badge flag-monitor">監控</span>';
-
-                        // PJ_LOTID 來自 DW_MES_RESOURCE
-                        // SYMPTOMCODENAME, CAUSECODENAME 來自 DW_MES_JOB (透過 JOBID 關聯)
-                        // DOWN_MINUTES 使用最新 LASTSTATUSCHANGEDATE - 每台機台自己的時間
-                        html += `
-                            <tr>
-                                <td><strong>${row.RESOURCENAME || '-'}</strong></td>
-                                <td>${row.WORKCENTERNAME || '-'}</td>
-                                <td><span class="status-badge ${statusClass}">${row.NEWSTATUSNAME || '-'}</span></td>
-                                <td>${row.NEWREASONNAME || '-'}</td>
-                                <td>${row.LASTSTATUSCHANGEDATE || '-'}</td>
-                                <td class="${row.DOWN_MINUTES > 0 ? 'down-time' : ''}">${downTime}</td>
-                                <td class="job-info">${row.PJ_LOTID || '-'}</td>
-                                <td class="job-info">${row.SYMPTOMCODENAME || '-'}</td>
-                                <td class="job-info">${row.CAUSECODENAME || '-'}</td>
-                                <td>${flags || '-'}</td>
-                            </tr>
-                        `;
-                    });
-                    tbody.innerHTML = html;
-                } else {
-                    tbody.innerHTML = `<tr><td colspan="10" class="placeholder">${result.error}</td></tr>`;
-                }
-            } catch (error) {
-                tbody.innerHTML = `<tr><td colspan="10" class="placeholder">載入失敗: ${error.message}</td></tr>`;
-            }
         }
 
         async function loadDashboard() {
@@ -916,14 +688,13 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="loading-spinner"></span>查詢中...';
 
-            // Last Update 會由 loadDetail() 中的 API 回應更新
-
             try {
                 await Promise.all([
                     loadKPI(),
-                    loadWorkcenterCards(),
-                    loadDetail()
+                    loadWorkcenterCards()
                 ]);
+                // 更新 Last Update
+                document.getElementById('lastUpdate').textContent = `Last Update: ${new Date().toLocaleString('zh-TW')}`;
             } finally {
                 isLoading = false;
                 btn.disabled = false;

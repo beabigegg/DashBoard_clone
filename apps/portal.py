@@ -1519,8 +1519,9 @@ def query_resource_detail_with_job(filters=None, limit=200, offset=0):
         where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
 
         # Left join with JOB table for SDT/UDT details
+        # JOB 匹配邏輯: RESOURCEID + CREATEDATE = LASTSTATUSCHANGEDATE (等值匹配)
         # PJ_LOTID 來自 RESOURCE 表
-        # SYMPTOMCODENAME, CAUSECODENAME 來自 JOB 表
+        # SYMPTOMCODENAME, CAUSECODENAME, JOBID 等來自 JOB 表
         # DOWN_MINUTES: 使用全體最大 LASTSTATUSCHANGEDATE - 每台機台自己的時間
         # 注意: 將所有 CTE 放在同一層級，避免巢狀 WITH 子句 (Oracle 不支援)
         start_row = offset + 1
@@ -1591,7 +1592,7 @@ def query_resource_detail_with_job(filters=None, limit=200, offset=0):
                     rs.PJ_ISPRODUCTION,
                     rs.PJ_ISKEY,
                     rs.PJ_ISMONITOR,
-                    rs.JOBID,
+                    j.JOBID,
                     rs.PJ_LOTID,
                     j.JOBORDERNAME,
                     j.JOBSTATUS,
@@ -1613,7 +1614,8 @@ def query_resource_detail_with_job(filters=None, limit=200, offset=0):
                     ) AS rn
                 FROM base_data rs
                 CROSS JOIN max_time mt
-                LEFT JOIN DW_MES_JOB j ON rs.JOBID = j.JOBID
+                LEFT JOIN DW_MES_JOB j ON j.RESOURCEID = rs.RESOURCEID
+                                       AND j.CREATEDATE = rs.LASTSTATUSCHANGEDATE
                 WHERE {where_clause}
             ) WHERE rn BETWEEN {start_row} AND {end_row}
         """
