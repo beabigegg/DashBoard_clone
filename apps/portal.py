@@ -62,7 +62,7 @@ TABLES_CONFIG = {
             'name': 'DW_MES_RESOURCESTATUS_SHIFT',
             'display_name': 'RESOURCESTATUS_SHIFT (資源班次狀態)',
             'row_count': 74155046,
-            'time_field': 'SHIFTDATE',
+            'time_field': 'DATADATE',
             'description': '設備狀態班次彙總表 - 班次級狀態/工時'
         },
         {
@@ -1696,6 +1696,223 @@ def api_dashboard_detail():
             'offset': offset,
             'max_status_time': max_status_time
         })
+    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+def query_ou_trend(days=7, filters=None):
+    """Query OU% trend by date using RESOURCESTATUS_SHIFT table.
+
+    Uses HOURS field to calculate actual time-based OU%.
+    OU% = PRD_HOURS / (PRD + SBY + EGT + SDT + UDT) * 100
+
+    Args:
+        days: Number of days to query (default 7)
+        filters: Optional filters (isProduction, isKey, isMonitor)
+
+    Returns:
+        List of {date, ou_pct, prd_hours, total_hours} records
+    """
+    try:
+        # Build location and asset status filters
+        location_filter = ""
+        if EXCLUDED_LOCATIONS:
+            excluded_locations = "', '".join(EXCLUDED_LOCATIONS)
+            location_filter = f"AND (ss.LOCATIONNAME IS NULL OR ss.LOCATIONNAME NOT IN ('{excluded_locations}'))"
+
+        asset_status_filter = ""
+        if EXCLUDED_ASSET_STATUSES:
+            excluded_assets = "', '".join(EXCLUDED_ASSET_STATUSES)
+            asset_status_filter = f"AND (ss.PJ_ASSETSSTATUS IS NULL OR ss.PJ_ASSETSSTATUS NOT IN ('{excluded_assets}'))"
+
+        # Build filter conditions for equipment flags
+        flag_conditions = []
+        if filters:
+            if filters.get('isProduction'):
+                flag_conditions.append("r.PJ_ISPRODUCTION = 1")
+            if filters.get('isKey'):
+                flag_conditions.append("r.PJ_ISKEY = 1")
+            if filters.get('isMonitor'):
+                flag_conditions.append("r.PJ_ISMONITOR = 1")
+
+        flag_filter = ""
+        if flag_conditions:
+            flag_filter = "AND " + " AND ".join(flag_conditions)
+
+        sql = f"""
+            SELECT
+                TRUNC(ss.TXNDATE) as DATA_DATE,
+                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
+                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SBY' THEN ss.HOURS ELSE 0 END) as SBY_HOURS,
+                SUM(CASE WHEN ss.OLDSTATUSNAME = 'UDT' THEN ss.HOURS ELSE 0 END) as UDT_HOURS,
+                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
+                SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS,
+                SUM(ss.HOURS) as TOTAL_HOURS
+            FROM DW_MES_RESOURCESTATUS_SHIFT ss
+            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            WHERE ss.TXNDATE >= TRUNC(SYSDATE) - {days}
+              AND ss.TXNDATE < TRUNC(SYSDATE)
+              AND ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
+                   OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
+              {location_filter}
+              {asset_status_filter}
+              {flag_filter}
+            GROUP BY TRUNC(ss.TXNDATE)
+            ORDER BY DATA_DATE
+        """
+        df = read_sql_df(sql)
+
+        result = []
+        for _, row in df.iterrows():
+            prd = float(row['PRD_HOURS'] or 0)
+            sby = float(row['SBY_HOURS'] or 0)
+            udt = float(row['UDT_HOURS'] or 0)
+            sdt = float(row['SDT_HOURS'] or 0)
+            egt = float(row['EGT_HOURS'] or 0)
+
+            # OU% denominator: PRD + SBY + EGT + SDT + UDT (excludes NST)
+            denominator = prd + sby + egt + sdt + udt
+            ou_pct = round((prd / denominator * 100), 2) if denominator > 0 else 0
+
+            result.append({
+                'date': row['DATA_DATE'].strftime('%Y-%m-%d') if pd.notna(row['DATA_DATE']) else None,
+                'ou_pct': ou_pct,
+                'prd_hours': round(prd, 1),
+                'sby_hours': round(sby, 1),
+                'udt_hours': round(udt, 1),
+                'sdt_hours': round(sdt, 1),
+                'egt_hours': round(egt, 1),
+                'total_hours': round(float(row['TOTAL_HOURS'] or 0), 1)
+            })
+
+        return result
+    except Exception as exc:
+        print(f"OU趨勢查詢失敗: {exc}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def query_utilization_heatmap(days=7, filters=None):
+    """Query equipment utilization heatmap data by workcenter and date.
+
+    Uses HOURS field to calculate PRD% per workcenter per day.
+
+    Args:
+        days: Number of days to query (default 7)
+        filters: Optional filters (isProduction, isKey, isMonitor)
+
+    Returns:
+        List of {workcenter, date, prd_pct, prd_hours, total_hours} records
+    """
+    try:
+        # Build location and asset status filters
+        location_filter = ""
+        if EXCLUDED_LOCATIONS:
+            excluded_locations = "', '".join(EXCLUDED_LOCATIONS)
+            location_filter = f"AND (ss.LOCATIONNAME IS NULL OR ss.LOCATIONNAME NOT IN ('{excluded_locations}'))"
+
+        asset_status_filter = ""
+        if EXCLUDED_ASSET_STATUSES:
+            excluded_assets = "', '".join(EXCLUDED_ASSET_STATUSES)
+            asset_status_filter = f"AND (ss.PJ_ASSETSSTATUS IS NULL OR ss.PJ_ASSETSSTATUS NOT IN ('{excluded_assets}'))"
+
+        # Build filter conditions for equipment flags
+        flag_conditions = []
+        if filters:
+            if filters.get('isProduction'):
+                flag_conditions.append("r.PJ_ISPRODUCTION = 1")
+            if filters.get('isKey'):
+                flag_conditions.append("r.PJ_ISKEY = 1")
+            if filters.get('isMonitor'):
+                flag_conditions.append("r.PJ_ISMONITOR = 1")
+
+        flag_filter = ""
+        if flag_conditions:
+            flag_filter = "AND " + " AND ".join(flag_conditions)
+
+        sql = f"""
+            SELECT
+                ss.WORKCENTERNAME,
+                TRUNC(ss.TXNDATE) as DATA_DATE,
+                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
+                SUM(CASE WHEN ss.OLDSTATUSNAME IN ('PRD', 'SBY', 'UDT', 'SDT', 'EGT') THEN ss.HOURS ELSE 0 END) as AVAIL_HOURS
+            FROM DW_MES_RESOURCESTATUS_SHIFT ss
+            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            WHERE ss.TXNDATE >= TRUNC(SYSDATE) - {days}
+              AND ss.TXNDATE < TRUNC(SYSDATE)
+              AND ss.WORKCENTERNAME IS NOT NULL
+              AND ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
+                   OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
+              {location_filter}
+              {asset_status_filter}
+              {flag_filter}
+            GROUP BY ss.WORKCENTERNAME, TRUNC(ss.TXNDATE)
+            ORDER BY ss.WORKCENTERNAME, DATA_DATE
+        """
+        df = read_sql_df(sql)
+
+        # Group by workcenter for heatmap format
+        result = []
+        for _, row in df.iterrows():
+            prd = float(row['PRD_HOURS'] or 0)
+            avail = float(row['AVAIL_HOURS'] or 0)
+            prd_pct = round((prd / avail * 100), 2) if avail > 0 else 0
+
+            wc_name = row['WORKCENTERNAME']
+            # Apply workcenter grouping
+            group_name, _ = get_workcenter_group(wc_name)
+
+            result.append({
+                'workcenter': wc_name,
+                'group': group_name,
+                'date': row['DATA_DATE'].strftime('%Y-%m-%d') if pd.notna(row['DATA_DATE']) else None,
+                'prd_pct': prd_pct,
+                'prd_hours': round(prd, 1),
+                'avail_hours': round(avail, 1)
+            })
+
+        return result
+    except Exception as exc:
+        print(f"利用率熱力圖查詢失敗: {exc}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+@app.route('/api/dashboard/ou_trend', methods=['POST'])
+def api_dashboard_ou_trend():
+    """API: OU% trend data for line chart."""
+    data = request.get_json() or {}
+    filters = data.get('filters')
+    days = data.get('days', 7)
+
+    days_back = get_days_back(filters)
+    cache_key = make_cache_key("dashboard_ou_trend", days, filters)
+    trend = cache_get(cache_key)
+    if trend is None:
+        trend = query_ou_trend(days, filters)
+        if trend is not None:
+            cache_set(cache_key, trend, ttl=300)  # 5 min cache
+    if trend is not None:
+        return jsonify({'success': True, 'data': trend})
+    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+@app.route('/api/dashboard/utilization_heatmap', methods=['POST'])
+def api_dashboard_utilization_heatmap():
+    """API: Utilization heatmap data."""
+    data = request.get_json() or {}
+    filters = data.get('filters')
+    days = data.get('days', 7)
+
+    cache_key = make_cache_key("dashboard_heatmap", days, filters)
+    heatmap = cache_get(cache_key)
+    if heatmap is None:
+        heatmap = query_utilization_heatmap(days, filters)
+        if heatmap is not None:
+            cache_set(cache_key, heatmap, ttl=300)  # 5 min cache
+    if heatmap is not None:
+        return jsonify({'success': True, 'data': heatmap})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
 
 

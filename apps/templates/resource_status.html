@@ -252,6 +252,51 @@
             margin-top: 8px;
         }
 
+        /* Charts Section */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chart-title select {
+            font-size: 12px;
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .chart-container {
+            height: 280px;
+        }
+
+        @media (max-width: 1200px) {
+            .charts-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* Loading */
         .loading-spinner {
             display: inline-block;
@@ -376,9 +421,35 @@
             </div>
         </div>
 
+        <!-- Charts Row: Trend + Heatmap -->
+        <div class="charts-row">
+            <div class="chart-card">
+                <div class="chart-title">
+                    <span>稼動率趨勢 (OU%)</span>
+                    <select id="trendDays" onchange="loadOuTrend()">
+                        <option value="7" selected>過去 7 天</option>
+                        <option value="14">過去 14 天</option>
+                        <option value="30">過去 30 天</option>
+                    </select>
+                </div>
+                <div class="chart-container" id="ouTrendChart"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">
+                    <span>工站利用率熱力圖</span>
+                    <select id="heatmapDays" onchange="loadHeatmap()">
+                        <option value="7" selected>過去 7 天</option>
+                        <option value="14">過去 14 天</option>
+                        <option value="30">過去 30 天</option>
+                    </select>
+                </div>
+                <div class="chart-container" id="heatmapChart"></div>
+            </div>
+        </div>
+
         <!-- Workcenter Cards -->
         <div class="workcenter-section">
-            <div class="section-title">各工站狀態 (點選卡片查看明細)</div>
+            <div class="section-title">各工站即時狀態</div>
             <div class="workcenter-grid" id="workcenterGrid">
                 <div class="placeholder">請點擊「查詢」載入資料</div>
             </div>
@@ -392,6 +463,8 @@
         let workcenterData = {};  // 快取工站資料
         let isLoading = false;
         let miniCharts = {};  // 快取 ECharts 實例
+        let ouTrendChart = null;  // OU趨勢圖實例
+        let heatmapChart = null;  // 熱力圖實例
 
         // 狀態顏色定義 (統一)
         const STATUS_COLORS = {
@@ -680,6 +753,257 @@
 
         }
 
+        // ========== OU% 趨勢圖 ==========
+        async function loadOuTrend() {
+            const days = parseInt(document.getElementById('trendDays').value);
+            const chartDom = document.getElementById('ouTrendChart');
+
+            try {
+                const response = await fetch('/api/dashboard/ou_trend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filters: getFilters(), days: days })
+                });
+                const result = await response.json();
+
+                if (result.success && result.data.length > 0) {
+                    renderOuTrendChart(result.data);
+                } else {
+                    chartDom.innerHTML = '<div class="placeholder">查無資料</div>';
+                }
+            } catch (error) {
+                console.error('OU趨勢載入失敗:', error);
+                chartDom.innerHTML = '<div class="placeholder">載入失敗</div>';
+            }
+        }
+
+        function renderOuTrendChart(data) {
+            const chartDom = document.getElementById('ouTrendChart');
+            if (ouTrendChart) {
+                ouTrendChart.dispose();
+            }
+            ouTrendChart = echarts.init(chartDom);
+
+            const dates = data.map(d => d.date.substring(5)); // MM-DD
+            const ouValues = data.map(d => d.ou_pct);
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        const idx = params[0].dataIndex;
+                        const d = data[idx];
+                        return `<b>${d.date}</b><br/>
+                                OU%: <b>${d.ou_pct}%</b><br/>
+                                PRD: ${d.prd_hours}h<br/>
+                                SBY: ${d.sby_hours}h<br/>
+                                UDT: ${d.udt_hours}h<br/>
+                                SDT: ${d.sdt_hours}h<br/>
+                                EGT: ${d.egt_hours}h`;
+                    }
+                },
+                grid: {
+                    left: 50,
+                    right: 20,
+                    top: 30,
+                    bottom: 30
+                },
+                xAxis: {
+                    type: 'category',
+                    data: dates,
+                    axisLabel: { fontSize: 11, color: '#666' }
+                },
+                yAxis: {
+                    type: 'value',
+                    min: 0,
+                    max: 100,
+                    axisLabel: { formatter: '{value}%', fontSize: 11, color: '#666' }
+                },
+                series: [{
+                    name: 'OU%',
+                    type: 'line',
+                    data: ouValues,
+                    smooth: true,
+                    symbol: 'circle',
+                    symbolSize: 8,
+                    lineStyle: { width: 3, color: '#667eea' },
+                    itemStyle: { color: '#667eea' },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(102, 126, 234, 0.3)' },
+                            { offset: 1, color: 'rgba(102, 126, 234, 0.05)' }
+                        ])
+                    },
+                    markLine: {
+                        silent: true,
+                        data: [
+                            { yAxis: 80, lineStyle: { color: '#22c55e', type: 'dashed' }, label: { formatter: '80%', position: 'end' } },
+                            { yAxis: 50, lineStyle: { color: '#f59e0b', type: 'dashed' }, label: { formatter: '50%', position: 'end' } }
+                        ]
+                    }
+                }]
+            };
+            ouTrendChart.setOption(option);
+        }
+
+        // ========== 工站利用率熱力圖 ==========
+        async function loadHeatmap() {
+            const days = parseInt(document.getElementById('heatmapDays').value);
+            const chartDom = document.getElementById('heatmapChart');
+
+            try {
+                const response = await fetch('/api/dashboard/utilization_heatmap', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filters: getFilters(), days: days })
+                });
+                const result = await response.json();
+
+                if (result.success && result.data.length > 0) {
+                    renderHeatmapChart(result.data, days);
+                } else {
+                    chartDom.innerHTML = '<div class="placeholder">查無資料</div>';
+                }
+            } catch (error) {
+                console.error('熱力圖載入失敗:', error);
+                chartDom.innerHTML = '<div class="placeholder">載入失敗</div>';
+            }
+        }
+
+        function renderHeatmapChart(data, days) {
+            const chartDom = document.getElementById('heatmapChart');
+            if (heatmapChart) {
+                heatmapChart.dispose();
+            }
+            heatmapChart = echarts.init(chartDom);
+
+            // 工站排序順序定義 (與後端 WORKCENTER_GROUPS 對應)
+            const GROUP_ORDER = {
+                '切割': 0,
+                '焊接_DB': 1,
+                '焊接_WB': 2,
+                '焊接_DW': 3,
+                '成型': 4,
+                '去膠': 5,
+                '水吹砂': 6,
+                '電鍍': 7,
+                '移印': 8,
+                '切彎腳': 9,
+                '元件切割': 10,
+                '測試': 11
+            };
+
+            // 取得工站排序值
+            function getGroupOrder(groupName) {
+                if (GROUP_ORDER.hasOwnProperty(groupName)) {
+                    return GROUP_ORDER[groupName];
+                }
+                return 999; // 未定義的放最後
+            }
+
+            // 整理資料：按群組聚合
+            const groupedData = {};
+            const allDates = new Set();
+
+            data.forEach(d => {
+                const group = d.group || d.workcenter;
+                if (!groupedData[group]) {
+                    groupedData[group] = {};
+                }
+                if (!groupedData[group][d.date]) {
+                    groupedData[group][d.date] = { prd: 0, avail: 0 };
+                }
+                groupedData[group][d.date].prd += d.prd_hours;
+                groupedData[group][d.date].avail += d.avail_hours;
+                allDates.add(d.date);
+            });
+
+            // 排序：日期升序，工站按指定順序 (order 小的在上方，ECharts Y軸需反轉)
+            const dates = Array.from(allDates).sort();
+            const groups = Object.keys(groupedData).sort((a, b) => {
+                const orderA = getGroupOrder(a);
+                const orderB = getGroupOrder(b);
+                if (orderA !== orderB) return orderB - orderA;  // 反轉：讓 order 小的在上方
+                return a.localeCompare(b);  // 同 order 按字母排序
+            });
+
+            // 轉換為熱力圖資料格式 [x, y, value]
+            const heatmapData = [];
+            groups.forEach((group, yIdx) => {
+                dates.forEach((date, xIdx) => {
+                    const cell = groupedData[group][date];
+                    if (cell && cell.avail > 0) {
+                        const pct = Math.round(cell.prd / cell.avail * 10000) / 100;
+                        heatmapData.push([xIdx, yIdx, pct]);
+                    } else {
+                        heatmapData.push([xIdx, yIdx, '-']);
+                    }
+                });
+            });
+
+            const option = {
+                tooltip: {
+                    position: 'top',
+                    formatter: function(params) {
+                        const xIdx = params.data[0];
+                        const yIdx = params.data[1];
+                        const val = params.data[2];
+                        const date = dates[xIdx];
+                        const group = groups[yIdx];
+                        const cell = groupedData[group][date];
+                        if (val === '-') return `${group}<br/>${date}<br/>無資料`;
+                        return `<b>${group}</b><br/>${date}<br/>OU%: <b>${val}%</b><br/>PRD: ${cell?.prd?.toFixed(1) || 0}h`;
+                    }
+                },
+                grid: {
+                    left: 100,
+                    right: 40,
+                    top: 10,
+                    bottom: 30
+                },
+                xAxis: {
+                    type: 'category',
+                    data: dates.map(d => d.substring(5)),
+                    splitArea: { show: true },
+                    axisLabel: { fontSize: 10, color: '#666' }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: groups,
+                    splitArea: { show: true },
+                    axisLabel: { fontSize: 10, color: '#666', width: 80, overflow: 'truncate' }
+                },
+                visualMap: {
+                    min: 0,
+                    max: 100,
+                    calculable: true,
+                    orient: 'vertical',
+                    right: 0,
+                    top: 'center',
+                    itemHeight: 120,
+                    inRange: {
+                        color: ['#fee2e2', '#fef3c7', '#bbf7d0', '#22c55e']
+                    },
+                    formatter: '{value}%'
+                },
+                series: [{
+                    type: 'heatmap',
+                    data: heatmapData,
+                    label: {
+                        show: days <= 7,
+                        fontSize: 9,
+                        formatter: function(params) {
+                            return params.data[2] === '-' ? '' : params.data[2];
+                        }
+                    },
+                    emphasis: {
+                        itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' }
+                    }
+                }]
+            };
+            heatmapChart.setOption(option);
+        }
+
         async function loadDashboard() {
             if (isLoading) return;
             isLoading = true;
@@ -691,7 +1015,9 @@
             try {
                 await Promise.all([
                     loadKPI(),
-                    loadWorkcenterCards()
+                    loadWorkcenterCards(),
+                    loadOuTrend(),
+                    loadHeatmap()
                 ]);
                 // 更新 Last Update
                 document.getElementById('lastUpdate').textContent = `Last Update: ${new Date().toLocaleString('zh-TW')}`;
@@ -701,6 +1027,15 @@
                 btn.textContent = '查詢';
             }
         }
+
+        // 視窗調整時重繪圖表
+        window.addEventListener('resize', () => {
+            if (ouTrendChart && !ouTrendChart.isDisposed()) ouTrendChart.resize();
+            if (heatmapChart && !heatmapChart.isDisposed()) heatmapChart.resize();
+            Object.values(miniCharts).forEach(chart => {
+                if (chart && !chart.isDisposed()) chart.resize();
+            });
+        });
 
         // Page init - 使用標記確保只執行一次
         </script>

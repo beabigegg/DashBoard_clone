@@ -60,7 +60,7 @@ TABLES_CONFIG = {
             'name': 'DW_MES_RESOURCESTATUS_SHIFT',
             'display_name': 'RESOURCESTATUS_SHIFT (資源班次狀態)',
             'row_count': 74155046,
-            'time_field': 'SHIFTDATE',
+            'time_field': 'DATADATE',
             'description': '設備狀態班次彙總表 - 班次級狀態/工時'
         },
         {
