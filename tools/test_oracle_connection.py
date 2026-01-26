@@ -5,17 +5,33 @@ Oracle Database Connection Test Script
 
 import sys
 import io
+import os
 import oracledb
 from datetime import datetime
+from pathlib import Path
 
 # 设置 UTF-8 编码输出
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-# 数据库连接信息
+# Load .env file
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).resolve().parent.parent / '.env'
+    load_dotenv(env_path)
+except ImportError:
+    pass
+
+# 数据库连接信息 (从环境变量读取)
+DB_HOST = os.getenv('DB_HOST', '10.1.1.58')
+DB_PORT = os.getenv('DB_PORT', '1521')
+DB_SERVICE = os.getenv('DB_SERVICE', 'DWDB')
+DB_USER = os.getenv('DB_USER', '')
+DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+
 DB_CONFIG = {
-    'user': 'MBU1_R',
-    'password': 'Pj2481mbu1',
-    'dsn': '(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=10.1.1.58)(PORT=1521)))(CONNECT_DATA=(SERVICE_NAME=DWDB)))'
+    'user': DB_USER,
+    'password': DB_PASSWORD,
+    'dsn': f'(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST={DB_HOST})(PORT={DB_PORT})))(CONNECT_DATA=(SERVICE_NAME={DB_SERVICE})))'
 }
 
 # MES 表列表
@@ -45,9 +61,9 @@ def test_connection():
     print("Oracle Database Connection Test")
     print("=" * 60)
     print(f"Test Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Host: 10.1.1.58:1521")
-    print(f"Service Name: DWDB")
-    print(f"User: {DB_CONFIG['user']}")
+    print(f"Host: {DB_HOST}:{DB_PORT}")
+    print(f"Service Name: {DB_SERVICE}")
+    print(f"User: {DB_USER}")
     print("=" * 60)
 
     try:

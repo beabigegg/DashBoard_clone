@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mes-dashboard"
+version = "0.1.0"
+description = "MES Dashboard Portal"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "MES Dashboard Team" }
+]
+keywords = ["flask", "mes", "dashboard"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "oracledb>=2.0.0",
+    "flask>=3.0.0",
+    "pandas>=2.0.0",
+    "sqlalchemy>=2.0.0",
+    "openpyxl>=3.0.0",
+    "python-dotenv>=1.0.0",
+    "gunicorn>=21.2.0",
+    "waitress>=2.1.2; platform_system == 'Windows'",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mes_dashboard = ["templates/**/*"]

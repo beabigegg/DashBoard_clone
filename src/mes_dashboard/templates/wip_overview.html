@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>各站 WIP 即時概況</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text: #222;
+            --muted: #666;
+            --border: #e2e6ef;
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --shadow: 0 2px 10px rgba(0,0,0,0.08);
+            --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            max-width: 1900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 18px 22px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-strong);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .last-update {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 13px;
+        }
+
+        .btn {
+            padding: 9px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-light {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .btn-light:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 16px 20px;
+            text-align: center;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .summary-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .summary-value {
+            font-size: 26px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        /* Chart Grid */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .chart-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #fafbfc;
+        }
+
+        .chart-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .chart-container {
+            padding: 16px;
+            height: 350px;
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 1400px) {
+            .summary-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 1000px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .summary-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <h1>各站 WIP 即時概況</h1>
+            <div class="header-right">
+                <span id="lastUpdate" class="last-update"></span>
+                <button class="btn btn-light" onclick="loadAllData()">重新整理</button>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-row">
+            <div class="summary-card">
+                <div class="summary-label">總 LOT 數</div>
+                <div class="summary-value" id="totalLots">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">總數量 (QTY)</div>
+                <div class="summary-value" id="totalQty">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">總片數 (QTY2)</div>
+                <div class="summary-value" id="totalQty2">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">SPEC 數</div>
+                <div class="summary-value" id="specCount">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">工站數</div>
+                <div class="summary-value" id="wcCount">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">產品線數</div>
+                <div class="summary-value" id="plCount">-</div>
+            </div>
+        </div>
+
+        <!-- Chart Grid -->
+        <div class="chart-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">各站 WIP 分布</div>
+                </div>
+                <div class="chart-container" id="chartWorkcenter"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">狀態分布</div>
+                </div>
+                <div class="chart-container" id="chartStatus"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">產品線分布</div>
+                </div>
+                <div class="chart-container" id="chartProductLine"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">Top 20 工單</div>
+                </div>
+                <div class="chart-container" id="chartMfgOrder"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <span class="loading-spinner"></span>
+        <span>載入中...</span>
+    </div>
+
+    <script>
+        // Chart instances
+        let chartWorkcenter = null;
+        let chartStatus = null;
+        let chartProductLine = null;
+        let chartMfgOrder = null;
+
+        // Format number with commas
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '-') return '-';
+            return num.toLocaleString('zh-TW');
+        }
+
+        // Status name mapping
+        const STATUS_MAP = {
+            1: 'Queue',
+            2: 'Run',
+            4: 'Hold'
+        };
+
+        // Initialize charts
+        function initCharts() {
+            chartWorkcenter = echarts.init(document.getElementById('chartWorkcenter'));
+            chartStatus = echarts.init(document.getElementById('chartStatus'));
+            chartProductLine = echarts.init(document.getElementById('chartProductLine'));
+            chartMfgOrder = echarts.init(document.getElementById('chartMfgOrder'));
+
+            // Handle resize
+            window.addEventListener('resize', () => {
+                chartWorkcenter.resize();
+                chartStatus.resize();
+                chartProductLine.resize();
+                chartMfgOrder.resize();
+            });
+        }
+
+        // Load summary data
+        async function loadSummary() {
+            try {
+                const response = await fetch('/api/wip/summary');
+                const result = await response.json();
+
+                if (result.success) {
+                    const data = result.data;
+                    document.getElementById('totalLots').textContent = formatNumber(data.total_lot_count);
+                    document.getElementById('totalQty').textContent = formatNumber(data.total_qty);
+                    document.getElementById('totalQty2').textContent = formatNumber(data.total_qty2);
+                    document.getElementById('specCount').textContent = formatNumber(data.spec_count);
+                    document.getElementById('wcCount').textContent = formatNumber(data.workcenter_count);
+                    document.getElementById('plCount').textContent = formatNumber(data.product_line_count);
+                }
+            } catch (error) {
+                console.error('Summary load failed:', error);
+            }
+        }
+
+        // Load workcenter chart
+        async function loadWorkcenterChart() {
+            try {
+                const response = await fetch('/api/wip/by_spec_workcenter');
+                const result = await response.json();
+
+                if (result.success && result.data.length > 0) {
+                    // Aggregate by workcenter
+                    const wcMap = {};
+                    result.data.forEach(row => {
+                        const wc = row.WORKCENTERNAME || '(Unknown)';
+                        if (!wcMap[wc]) wcMap[wc] = 0;
+                        wcMap[wc] += row.TOTAL_QTY || 0;
+                    });
+
+                    // Sort by value desc and take top 15
+                    const sorted = Object.entries(wcMap)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 15);
+
+                    const categories = sorted.map(x => x[0]);
+                    const values = sorted.map(x => x[1]);
+
+                    chartWorkcenter.setOption({
+                        tooltip: {
+                            trigger: 'axis',
+                            axisPointer: { type: 'shadow' }
+                        },
+                        grid: {
+                            left: '3%',
+                            right: '4%',
+                            bottom: '3%',
+                            top: '3%',
+                            containLabel: true
+                        },
+                        xAxis: {
+                            type: 'value'
+                        },
+                        yAxis: {
+                            type: 'category',
+                            data: categories.reverse(),
+                            axisLabel: {
+                                fontSize: 11,
+                                width: 100,
+                                overflow: 'truncate'
+                            }
+                        },
+                        series: [{
+                            type: 'bar',
+                            data: values.reverse(),
+                            itemStyle: {
+                                color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                    { offset: 0, color: '#667eea' },
+                                    { offset: 1, color: '#764ba2' }
+                                ])
+                            },
+                            label: {
+                                show: true,
+                                position: 'right',
+                                fontSize: 11,
+                                formatter: params => formatNumber(params.value)
+                            }
+                        }]
+                    });
+                } else {
+                    chartWorkcenter.setOption({
+                        title: { text: '無資料', left: 'center', top: 'center', textStyle: { color: '#999' } }
+                    });
+                }
+            } catch (error) {
+                console.error('Workcenter chart load failed:', error);
+            }
+        }
+
+        // Load status chart
+        async function loadStatusChart() {
+            try {
+                const response = await fetch('/api/wip/by_status');
+                const result = await response.json();
+
+                if (result.success && result.data.length > 0) {
+                    const pieData = result.data.map(row => ({
+                        name: STATUS_MAP[row.STATUS] || `Status ${row.STATUS}`,
+                        value: row.TOTAL_QTY || 0
+                    }));
+
+                    chartStatus.setOption({
+                        tooltip: {
+                            trigger: 'item',
+                            formatter: '{b}: {c} ({d}%)'
+                        },
+                        legend: {
+                            orient: 'vertical',
+                            right: '5%',
+                            top: 'center'
+                        },
+                        series: [{
+                            type: 'pie',
+                            radius: ['40%', '70%'],
+                            center: ['40%', '50%'],
+                            avoidLabelOverlap: true,
+                            itemStyle: {
+                                borderRadius: 6,
+                                borderColor: '#fff',
+                                borderWidth: 2
+                            },
+                            label: {
+                                show: true,
+                                formatter: '{b}\n{d}%'
+                            },
+                            data: pieData,
+                            color: ['#667eea', '#22c55e', '#ef4444', '#f59e0b', '#8b5cf6']
+                        }]
+                    });
+                } else {
+                    chartStatus.setOption({
+                        title: { text: '無資料', left: 'center', top: 'center', textStyle: { color: '#999' } }
+                    });
+                }
+            } catch (error) {
+                console.error('Status chart load failed:', error);
+            }
+        }
+
+        // Load product line chart
+        async function loadProductLineChart() {
+            try {
+                const response = await fetch('/api/wip/by_product_line');
+                const result = await response.json();
+
+                if (result.success && result.summary && result.summary.length > 0) {
+                    const pieData = result.summary
+                        .sort((a, b) => b.TOTAL_QTY - a.TOTAL_QTY)
+                        .slice(0, 10)
+                        .map(row => ({
+                            name: row.PRODUCTLINENAME_LEF || '(Unknown)',
+                            value: row.TOTAL_QTY || 0
+                        }));
+
+                    chartProductLine.setOption({
+                        tooltip: {
+                            trigger: 'item',
+                            formatter: '{b}: {c} ({d}%)'
+                        },
+                        legend: {
+                            orient: 'vertical',
+                            right: '5%',
+                            top: 'center',
+                            formatter: name => name.length > 12 ? name.slice(0, 12) + '...' : name
+                        },
+                        series: [{
+                            type: 'pie',
+                            radius: ['40%', '70%'],
+                            center: ['40%', '50%'],
+                            avoidLabelOverlap: true,
+                            itemStyle: {
+                                borderRadius: 6,
+                                borderColor: '#fff',
+                                borderWidth: 2
+                            },
+                            label: {
+                                show: false
+                            },
+                            data: pieData,
+                            color: ['#667eea', '#764ba2', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#6366f1']
+                        }]
+                    });
+                } else {
+                    chartProductLine.setOption({
+                        title: { text: '無資料', left: 'center', top: 'center', textStyle: { color: '#999' } }
+                    });
+                }
+            } catch (error) {
+                console.error('Product line chart load failed:', error);
+            }
+        }
+
+        // Load mfg order chart
+        async function loadMfgOrderChart() {
+            try {
+                const response = await fetch('/api/wip/by_mfgorder?limit=20');
+                const result = await response.json();
+
+                if (result.success && result.data.length > 0) {
+                    const categories = result.data.map(row => row.MFGORDERNAME || '(Unknown)');
+                    const values = result.data.map(row => row.TOTAL_QTY || 0);
+
+                    chartMfgOrder.setOption({
+                        tooltip: {
+                            trigger: 'axis',
+                            axisPointer: { type: 'shadow' }
+                        },
+                        grid: {
+                            left: '3%',
+                            right: '4%',
+                            bottom: '3%',
+                            top: '3%',
+                            containLabel: true
+                        },
+                        xAxis: {
+                            type: 'value'
+                        },
+                        yAxis: {
+                            type: 'category',
+                            data: categories.reverse(),
+                            axisLabel: {
+                                fontSize: 10,
+                                width: 100,
+                                overflow: 'truncate'
+                            }
+                        },
+                        series: [{
+                            type: 'bar',
+                            data: values.reverse(),
+                            itemStyle: {
+                                color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                    { offset: 0, color: '#22c55e' },
+                                    { offset: 1, color: '#16a34a' }
+                                ])
+                            },
+                            label: {
+                                show: true,
+                                position: 'right',
+                                fontSize: 10,
+                                formatter: params => formatNumber(params.value)
+                            }
+                        }]
+                    });
+                } else {
+                    chartMfgOrder.setOption({
+                        title: { text: '無資料', left: 'center', top: 'center', textStyle: { color: '#999' } }
+                    });
+                }
+            } catch (error) {
+                console.error('Mfg order chart load failed:', error);
+            }
+        }
+
+        // Load all data
+        async function loadAllData() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+
+            try {
+                await Promise.all([
+                    loadSummary(),
+                    loadWorkcenterChart(),
+                    loadStatusChart(),
+                    loadProductLineChart(),
+                    loadMfgOrderChart()
+                ]);
+
+                document.getElementById('lastUpdate').textContent =
+                    `Last Update: ${new Date().toLocaleString('zh-TW')}`;
+            } finally {
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }
+        }
+
+        // Initialize on load
+        window.onload = function() {
+            initCharts();
+            loadAllData();
+        };
+    </script>
+</body>
+</html>

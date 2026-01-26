@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel 批次查詢工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .step-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .step-section.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .step-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .upload-area {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        input[type="file"]:hover {
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        select {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 200px;
+            background: white;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .info-box {
+            background: #e3e8ff;
+            color: #667eea;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .info-box.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .checkbox-item:hover {
+            background: #e3e8ff;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .select-all-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .select-all-bar button {
+            padding: 5px 10px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .select-all-bar button:hover {
+            background: #f0f0f0;
+        }
+
+        .result-section {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .result-section.active {
+            display: block;
+        }
+
+        .result-header {
+            background: #667eea;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 6px 6px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .result-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            max-height: 500px;
+            border: 1px solid #e0e0e0;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            background: #f8f9fa;
+            z-index: 10;
+        }
+
+        th {
+            padding: 12px 10px;
+            text-align: left;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+            color: #495057;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .preview-table {
+            margin-top: 15px;
+            font-size: 12px;
+        }
+
+        .preview-table th {
+            background: #e9ecef;
+            padding: 8px;
+        }
+
+        .preview-table td {
+            padding: 8px;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .col {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Excel 批次查詢工具</h1>
+            <p>上傳 Excel 檔案，批次查詢資料庫並匯出結果</p>
+        </div>
+
+        <div class="content">
+            <!-- Step 1: Upload Excel -->
+            <div class="step-section" id="step1">
+                <div class="step-title">
+                    <span class="step-number">1</span>
+                    上傳 Excel 檔案
+                </div>
+                <div class="upload-area">
+                    <input type="file" id="excelFile" accept=".xlsx,.xls">
+                    <button class="btn btn-primary" onclick="uploadExcel()">上傳</button>
+                </div>
+                <div id="uploadInfo"></div>
+                <div id="previewTable"></div>
+            </div>
+
+            <!-- Step 2: Select Excel Column -->
+            <div class="step-section disabled" id="step2">
+                <div class="step-title">
+                    <span class="step-number">2</span>
+                    選擇 Excel 欄位（作為查詢值）
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <label>選擇欄位：</label>
+                        <select id="excelColumn" onchange="loadColumnValues()">
+                            <option value="">-- 請選擇 --</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="columnInfo"></div>
+            </div>
+
+            <!-- Step 3: Select Target Table -->
+            <div class="step-section disabled" id="step3">
+                <div class="step-title">
+                    <span class="step-number">3</span>
+                    選擇目標資料表
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <label>資料表：</label>
+                        <select id="targetTable" onchange="loadTableColumns()">
+                            <option value="">-- 請選擇 --</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="tableInfo"></div>
+            </div>
+
+            <!-- Step 4: Select Columns -->
+            <div class="step-section disabled" id="step4">
+                <div class="step-title">
+                    <span class="step-number">4</span>
+                    選擇查詢欄位與回傳欄位
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <label>查詢欄位（WHERE IN）：</label>
+                        <select id="searchColumn">
+                            <option value="">-- 請選擇 --</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <label>回傳欄位（可多選）：</label>
+                    <div class="select-all-bar">
+                        <button onclick="selectAllColumns()">全選</button>
+                        <button onclick="deselectAllColumns()">取消全選</button>
+                    </div>
+                    <div class="checkbox-group" id="returnColumns"></div>
+                </div>
+            </div>
+
+            <!-- Step 5: Execute -->
+            <div class="step-section disabled" id="step5">
+                <div class="step-title">
+                    <span class="step-number">5</span>
+                    執行查詢
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <button class="btn btn-primary" onclick="executeQuery()">查詢預覽</button>
+                    <button class="btn btn-success" onclick="exportCSV()">匯出 CSV</button>
+                </div>
+                <div id="executeInfo"></div>
+            </div>
+
+            <!-- Result Section -->
+            <div class="result-section" id="resultSection">
+                <div class="result-header">
+                    <h3>查詢結果</h3>
+                    <div class="result-stats" id="resultStats"></div>
+                </div>
+                <div class="table-container">
+                    <div id="resultTable"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let excelColumns = [];
+        let searchValues = [];
+        let tableColumns = [];
+        let queryResult = null;
+
+        // Step 1: Upload Excel
+        async function uploadExcel() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('請選擇檔案');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            document.getElementById('uploadInfo').innerHTML = '<div class="loading"><div class="loading-spinner"></div><br>上傳中...</div>';
+
+            try {
+                const response = await fetch('/api/excel-query/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('uploadInfo').innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+
+                excelColumns = data.columns;
+                document.getElementById('uploadInfo').innerHTML = `
+                    <div class="info-box">
+                        檔案上傳成功！共 ${data.total_rows} 行，${data.columns.length} 欄
+                    </div>
+                `;
+
+                // Show preview table
+                renderPreviewTable(data.columns, data.preview);
+
+                // Populate Excel column dropdown
+                const select = document.getElementById('excelColumn');
+                select.innerHTML = '<option value="">-- 請選擇 --</option>';
+                excelColumns.forEach(col => {
+                    select.innerHTML += `<option value="${col}">${col}</option>`;
+                });
+
+                // Enable step 2
+                document.getElementById('step2').classList.remove('disabled');
+
+                // Load available tables
+                loadTables();
+
+            } catch (error) {
+                document.getElementById('uploadInfo').innerHTML = `<div class="error">上傳失敗: ${error.message}</div>`;
+            }
+        }
+
+        function renderPreviewTable(columns, data) {
+            if (!data || data.length === 0) return;
+
+            let html = '<table class="preview-table"><thead><tr>';
+            columns.forEach(col => {
+                html += `<th>${col}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                html += '<tr>';
+                columns.forEach(col => {
+                    const val = row[col] !== null && row[col] !== undefined ? row[col] : '';
+                    html += `<td title="${val}">${val}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+
+            document.getElementById('previewTable').innerHTML = html;
+        }
+
+        // Step 2: Load column values
+        async function loadColumnValues() {
+            const column = document.getElementById('excelColumn').value;
+            if (!column) {
+                searchValues = [];
+                document.getElementById('columnInfo').innerHTML = '';
+                return;
+            }
+
+            document.getElementById('columnInfo').innerHTML = '<div class="loading"><div class="loading-spinner"></div><br>讀取中...</div>';
+
+            try {
+                const response = await fetch('/api/excel-query/column-values', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ column_name: column })
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('columnInfo').innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+
+                searchValues = data.values;
+                const warningClass = data.count > 1000 ? ' warning' : '';
+                document.getElementById('columnInfo').innerHTML = `
+                    <div class="info-box${warningClass}">
+                        共 ${data.count} 個不重複值
+                        ${data.count > 1000 ? '（將分批查詢，每批 1000 筆）' : ''}
+                    </div>
+                `;
+
+                // Enable step 3
+                document.getElementById('step3').classList.remove('disabled');
+
+            } catch (error) {
+                document.getElementById('columnInfo').innerHTML = `<div class="error">讀取失敗: ${error.message}</div>`;
+            }
+        }
+
+        // Load available tables
+        async function loadTables() {
+            try {
+                const response = await fetch('/api/excel-query/tables');
+                const data = await response.json();
+
+                const select = document.getElementById('targetTable');
+                select.innerHTML = '<option value="">-- 請選擇 --</option>';
+
+                data.tables.forEach(table => {
+                    select.innerHTML += `<option value="${table.name}">${table.display_name} (${table.name})</option>`;
+                });
+            } catch (error) {
+                console.error('Failed to load tables:', error);
+            }
+        }
+
+        // Step 3: Load table columns
+        async function loadTableColumns() {
+            const tableName = document.getElementById('targetTable').value;
+            if (!tableName) {
+                tableColumns = [];
+                document.getElementById('tableInfo').innerHTML = '';
+                return;
+            }
+
+            document.getElementById('tableInfo').innerHTML = '<div class="loading"><div class="loading-spinner"></div><br>讀取欄位...</div>';
+
+            try {
+                const response = await fetch('/api/excel-query/table-columns', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table_name: tableName })
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('tableInfo').innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+
+                tableColumns = data.columns;
+                document.getElementById('tableInfo').innerHTML = `
+                    <div class="info-box">共 ${data.columns.length} 個欄位</div>
+                `;
+
+                // Populate search column dropdown
+                const searchSelect = document.getElementById('searchColumn');
+                searchSelect.innerHTML = '<option value="">-- 請選擇 --</option>';
+                tableColumns.forEach(col => {
+                    searchSelect.innerHTML += `<option value="${col}">${col}</option>`;
+                });
+
+                // Populate return columns checkboxes
+                const container = document.getElementById('returnColumns');
+                container.innerHTML = '';
+                tableColumns.forEach(col => {
+                    container.innerHTML += `
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="${col}" checked>
+                            ${col}
+                        </label>
+                    `;
+                });
+
+                // Enable step 4 and 5
+                document.getElementById('step4').classList.remove('disabled');
+                document.getElementById('step5').classList.remove('disabled');
+
+            } catch (error) {
+                document.getElementById('tableInfo').innerHTML = `<div class="error">讀取失敗: ${error.message}</div>`;
+            }
+        }
+
+        function selectAllColumns() {
+            document.querySelectorAll('#returnColumns input[type="checkbox"]').forEach(cb => cb.checked = true);
+        }
+
+        function deselectAllColumns() {
+            document.querySelectorAll('#returnColumns input[type="checkbox"]').forEach(cb => cb.checked = false);
+        }
+
+        function getSelectedReturnColumns() {
+            const checkboxes = document.querySelectorAll('#returnColumns input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function getQueryParams() {
+            return {
+                table_name: document.getElementById('targetTable').value,
+                search_column: document.getElementById('searchColumn').value,
+                return_columns: getSelectedReturnColumns(),
+                search_values: searchValues
+            };
+        }
+
+        function validateQuery() {
+            const params = getQueryParams();
+
+            if (!params.table_name) {
+                alert('請選擇資料表');
+                return false;
+            }
+            if (!params.search_column) {
+                alert('請選擇查詢欄位');
+                return false;
+            }
+            if (params.return_columns.length === 0) {
+                alert('請至少選擇一個回傳欄位');
+                return false;
+            }
+            if (params.search_values.length === 0) {
+                alert('無查詢值，請先選擇 Excel 欄位');
+                return false;
+            }
+            return true;
+        }
+
+        // Step 5: Execute query
+        async function executeQuery() {
+            if (!validateQuery()) return;
+
+            const params = getQueryParams();
+            const batchCount = Math.ceil(params.search_values.length / 1000);
+
+            document.getElementById('executeInfo').innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div><br>
+                    查詢中... (${params.search_values.length} 筆，${batchCount} 批次)
+                </div>
+            `;
+            document.getElementById('resultSection').classList.remove('active');
+
+            try {
+                const response = await fetch('/api/excel-query/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('executeInfo').innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+
+                queryResult = data;
+                document.getElementById('executeInfo').innerHTML = `
+                    <div class="info-box">
+                        查詢完成！搜尋 ${data.search_count} 筆，找到 ${data.row_count} 筆結果
+                    </div>
+                `;
+
+                renderResult(data);
+
+            } catch (error) {
+                document.getElementById('executeInfo').innerHTML = `<div class="error">查詢失敗: ${error.message}</div>`;
+            }
+        }
+
+        function renderResult(data) {
+            const section = document.getElementById('resultSection');
+            const statsDiv = document.getElementById('resultStats');
+            const tableDiv = document.getElementById('resultTable');
+
+            statsDiv.innerHTML = `
+                <span>搜尋值: ${data.search_count}</span>
+                <span>結果: ${data.row_count} 筆</span>
+                ${data.batch_count > 1 ? `<span>批次: ${data.batch_count}</span>` : ''}
+            `;
+
+            if (data.data.length === 0) {
+                tableDiv.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">查無資料</div>';
+            } else {
+                let html = '<table><thead><tr>';
+                data.columns.forEach(col => {
+                    html += `<th>${col}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+
+                // Show first 1000 rows in preview
+                const previewData = data.data.slice(0, 1000);
+                previewData.forEach(row => {
+                    html += '<tr>';
+                    data.columns.forEach(col => {
+                        const val = row[col] !== null && row[col] !== undefined ? row[col] : '<i style="color:#999">NULL</i>';
+                        html += `<td>${val}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                html += '</tbody></table>';
+
+                if (data.data.length > 1000) {
+                    html += `<div style="padding: 15px; text-align: center; color: #666; background: #f8f9fa;">
+                        顯示前 1000 筆，完整資料請匯出 CSV
+                    </div>`;
+                }
+
+                tableDiv.innerHTML = html;
+            }
+
+            section.classList.add('active');
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Export CSV
+        async function exportCSV() {
+            if (!validateQuery()) return;
+
+            const params = getQueryParams();
+            const batchCount = Math.ceil(params.search_values.length / 1000);
+
+            document.getElementById('executeInfo').innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div><br>
+                    匯出中... (${params.search_values.length} 筆，${batchCount} 批次)
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/excel-query/export-csv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    document.getElementById('executeInfo').innerHTML = `<div class="error">${data.error || '匯出失敗'}</div>`;
+                    return;
+                }
+
+                // Download file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'query_result.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                document.getElementById('executeInfo').innerHTML = `
+                    <div class="info-box">CSV 匯出完成！</div>
+                `;
+
+            } catch (error) {
+                document.getElementById('executeInfo').innerHTML = `<div class="error">匯出失敗: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

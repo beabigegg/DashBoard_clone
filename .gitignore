@@ -4,28 +4,49 @@ __pycache__/
 *$py.class
 *.so
 .Python
+
+# Virtual environments
 venv/
 ENV/
 env/
 .venv/
+
+# Package build artifacts
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*.sublime-*
 
 # OS
 .DS_Store
 Thumbs.db
-nul
 
 # Logs
 *.log
+logs/
 
-# Local config
+# Local config (credentials)
 .env
-*.local
 
-# Claude
+# AI/LLM tools
 .claude/
+.codex/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Note: openspec/ is tracked (not ignored)

@@ -21,14 +21,22 @@ if exist "%ROOT%\venv\Scripts\python.exe" (
     exit /b 1
 )
 
+set "PYTHONPATH=%ROOT%\src"
+set "WAITRESS=%ROOT%\venv\Scripts\waitress-serve.exe"
+
 echo Starting server...
-echo URL: http://localhost:5000
+echo URL: http://localhost:8080
 echo Press Ctrl+C to stop
 echo.
 echo ========================================
 echo.
 
-"%PYTHON%" "%ROOT%\apps\portal.py"
+if exist "%WAITRESS%" (
+    "%WAITRESS%" --listen=0.0.0.0:8080 mes_dashboard:create_app
+) else (
+    echo [WARN] waitress-serve not found, falling back to development server
+    "%PYTHON%" -m mes_dashboard
+)
 
 echo.
 echo ========================================

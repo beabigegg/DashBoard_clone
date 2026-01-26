@@ -2,3 +2,7 @@ oracledb>=2.0.0
 flask>=3.0.0
 pandas>=2.0.0
 sqlalchemy>=2.0.0
+openpyxl>=3.0.0
+python-dotenv>=1.0.0
+gunicorn>=21.2.0
+waitress>=2.1.2; platform_system=="Windows"

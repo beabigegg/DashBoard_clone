@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIP 即時分布表</title>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text: #222;
+            --muted: #666;
+            --border: #e2e6ef;
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --shadow: 0 2px 10px rgba(0,0,0,0.08);
+            --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            max-width: 1900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 18px 22px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-strong);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .last-update {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 13px;
+        }
+
+        /* Filters */
+        .filters {
+            background: var(--card-bg);
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            min-width: 150px;
+        }
+
+        .filter-group select:focus,
+        .filter-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .btn {
+            padding: 9px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-primary:disabled {
+            background: #a6b0f5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 16px 20px;
+            text-align: center;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .summary-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .summary-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        /* Table Section */
+        .table-section {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #fafbfc;
+        }
+
+        .table-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .table-info {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            background: #f8f9fa;
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* 固定欄位 */
+        th.fixed-col,
+        td.fixed-col {
+            position: sticky;
+            background: #fff;
+            z-index: 5;
+        }
+
+        th.fixed-col {
+            background: #f8f9fa;
+            z-index: 11;
+        }
+
+        th.fixed-col:nth-child(1), td.fixed-col:nth-child(1) { left: 0; min-width: 100px; }
+        th.fixed-col:nth-child(2), td.fixed-col:nth-child(2) { left: 100px; min-width: 130px; }
+        th.fixed-col:nth-child(3), td.fixed-col:nth-child(3) { left: 230px; min-width: 90px; }
+        th.fixed-col:nth-child(4), td.fixed-col:nth-child(4) { left: 320px; min-width: 100px; }
+        th.fixed-col:nth-child(5), td.fixed-col:nth-child(5) { left: 420px; min-width: 70px; }
+        th.fixed-col:nth-child(6), td.fixed-col:nth-child(6) { left: 490px; min-width: 50px; }
+        th.fixed-col:nth-child(7), td.fixed-col:nth-child(7) { left: 540px; min-width: 120px; }
+        th.fixed-col:nth-child(8), td.fixed-col:nth-child(8) { left: 660px; min-width: 90px; border-right: 2px solid var(--primary); }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+        }
+
+        tbody tr:hover td {
+            background: #f8f9fc;
+        }
+
+        tbody tr:hover td.fixed-col {
+            background: #f0f2ff;
+        }
+
+        /* Workcenter 分組標題 */
+        th.wc-group {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        th.spec-col {
+            background: #e8ebff;
+            text-align: center;
+            font-size: 11px;
+            max-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Pivot 資料格 */
+        td.pivot-cell {
+            text-align: center;
+            font-weight: 600;
+        }
+
+        td.pivot-cell.has-data {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        td.pivot-cell.no-data {
+            color: #ccc;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination button {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .placeholder {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .summary-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-group select,
+            .filter-group input {
+                width: 100%;
+            }
+            .summary-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <h1>WIP 即時分布表</h1>
+            <div class="header-right">
+                <span id="lastUpdate" class="last-update"></span>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>Package (產品線)</label>
+                <select id="filterPackage">
+                    <option value="">全部</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Type (類型)</label>
+                <select id="filterType">
+                    <option value="">全部</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Area (廠區)</label>
+                <select id="filterArea">
+                    <option value="">全部</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Lot Status (狀態)</label>
+                <select id="filterLotStatus">
+                    <option value="">全部</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>搜尋 (GA/Lot ID)</label>
+                <input type="text" id="filterSearch" placeholder="輸入關鍵字...">
+            </div>
+            <button id="btnQuery" class="btn btn-primary" onclick="loadData()">查詢</button>
+            <button class="btn btn-secondary" onclick="clearFilters()">清除篩選</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-row">
+            <div class="summary-card">
+                <div class="summary-label">總 LOT 數</div>
+                <div class="summary-value" id="totalLots">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">總數量 (QTY)</div>
+                <div class="summary-value" id="totalQty">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">HOLD LOT 數</div>
+                <div class="summary-value" id="holdLots" style="color: var(--danger);">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">HOLD 數量</div>
+                <div class="summary-value" id="holdQty" style="color: var(--danger);">-</div>
+            </div>
+        </div>
+
+        <!-- Table Section -->
+        <div class="table-section" style="position: relative;">
+            <div class="table-header">
+                <div class="table-title">WIP 分布明細</div>
+                <div class="table-info" id="tableInfo">請點擊「查詢」載入資料</div>
+            </div>
+            <div class="table-container" id="tableContainer">
+                <div class="placeholder">請點擊「查詢」載入資料</div>
+            </div>
+            <div class="pagination" id="pagination" style="display: none;">
+                <button id="btnPrev" onclick="prevPage()">上一頁</button>
+                <span class="page-info" id="pageInfo">第 1 頁</span>
+                <button id="btnNext" onclick="nextPage()">下一頁</button>
+            </div>
+            <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+                <span class="loading-spinner"></span>
+                <span>載入中...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 狀態管理
+        const state = {
+            filters: { packages: [], types: [], areas: [], search: '' },
+            pivotColumns: [],
+            groupedPivotColumns: {},  // 按 Workcenter 分組
+            data: [],
+            page: 1,
+            pageSize: 100,
+            totalCount: 0,
+            isLoading: false
+        };
+
+        // 工站排序順序由後端 WORKCENTER_GROUPS 處理，前端使用 API 回傳的 order 值
+
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '-') return '-';
+            return num.toLocaleString('zh-TW');
+        }
+
+        // Lot 狀態說明
+        // Active = HOLDREASONNAME IS NULL (正常在製)
+        // Hold = HOLDREASONNAME IS NOT NULL (暫停/鎖定)
+
+        // 取得篩選條件
+        function getFilters() {
+            const filters = {};
+            const pkg = document.getElementById('filterPackage').value;
+            const type = document.getElementById('filterType').value;
+            const area = document.getElementById('filterArea').value;
+            const lotStatus = document.getElementById('filterLotStatus').value;
+            const search = document.getElementById('filterSearch').value.trim();
+
+            if (pkg) filters.packages = [pkg];
+            if (type) filters.types = [type];
+            if (area) filters.areas = [area];
+            if (lotStatus) filters.lot_statuses = [lotStatus];
+            if (search) filters.search = search;
+
+            return Object.keys(filters).length > 0 ? filters : null;
+        }
+
+        // 載入篩選選項
+        async function loadFilterOptions() {
+            try {
+                const response = await fetch('/api/wip/distribution/filter_options');
+                const result = await response.json();
+
+                if (result.success) {
+                    populateSelect('filterPackage', result.data.packages);
+                    populateSelect('filterType', result.data.types);
+                    populateSelect('filterArea', result.data.areas);
+                    populateSelect('filterLotStatus', result.data.lot_statuses);
+                }
+            } catch (error) {
+                console.error('篩選選項載入失敗:', error);
+            }
+        }
+
+        function populateSelect(elementId, options) {
+            const select = document.getElementById(elementId);
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">全部</option>';
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                select.appendChild(option);
+            });
+            select.value = currentValue;
+        }
+
+        // 載入 Pivot 欄位
+        async function loadPivotColumns() {
+            try {
+                const response = await fetch('/api/wip/distribution/pivot_columns', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filters: getFilters() })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    state.pivotColumns = result.data;
+                    // groupPivotColumns 會在 loadData 取得數據後呼叫
+                }
+            } catch (error) {
+                console.error('Pivot 欄位載入失敗:', error);
+            }
+        }
+
+        // 按 Workcenter Group 分組 Pivot 欄位 (使用後端回傳的 workcenter_group 和 order)
+        // 只顯示有資料的站點組合
+        function groupPivotColumns() {
+            // 先收集當前數據中實際存在的 pivot_key
+            const existingKeys = new Set();
+            state.data.forEach(row => {
+                if (row.pivot_key) {
+                    existingKeys.add(row.pivot_key);
+                }
+            });
+
+            // 過濾只保留有資料的 pivot columns
+            const filteredColumns = state.pivotColumns.filter(col => existingKeys.has(col.key));
+
+            const groups = {};
+            filteredColumns.forEach(col => {
+                // 使用後端計算的合併群組名稱
+                const groupName = col.workcenter_group || col.workcenter || '(未知)';
+                const order = col.order !== undefined ? col.order : 999;
+
+                if (!groups[groupName]) {
+                    groups[groupName] = { workcenter: groupName, specs: [], order: order };
+                }
+                groups[groupName].specs.push(col);
+            });
+
+            // 按工站順序排序 (order 小的在左邊)
+            state.groupedPivotColumns = Object.values(groups).sort((a, b) => {
+                if (a.order !== b.order) return a.order - b.order;
+                return a.workcenter.localeCompare(b.workcenter);
+            });
+        }
+
+        // 載入主數據
+        async function loadData() {
+            if (state.isLoading) return;
+            state.isLoading = true;
+            state.page = 1;
+
+            showLoading();
+
+            try {
+                // 同時載入 Pivot 欄位和主數據
+                await loadPivotColumns();
+
+                const response = await fetch('/api/wip/distribution', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filters: getFilters(),
+                        limit: state.pageSize,
+                        offset: 0
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    state.data = result.data.rows;
+                    state.totalCount = result.data.total_count;
+
+                    // 根據當前數據過濾並分組 Pivot 欄位（只顯示有資料的站點）
+                    groupPivotColumns();
+                    renderTable();
+                    updateSummary();
+                    updatePagination();
+
+                    document.getElementById('lastUpdate').textContent =
+                        `Last Update: ${new Date().toLocaleString('zh-TW')}`;
+                } else {
+                    showError(result.error || '查詢失敗');
+                }
+            } catch (error) {
+                console.error('數據載入失敗:', error);
+                showError('數據載入失敗');
+            } finally {
+                state.isLoading = false;
+                hideLoading();
+            }
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const container = document.getElementById('tableContainer');
+
+            if (state.data.length === 0) {
+                container.innerHTML = '<div class="placeholder">查無資料</div>';
+                return;
+            }
+
+            let html = '<table><thead>';
+
+            // 第一行：Workcenter 分組標題
+            html += '<tr>';
+            // 固定欄位佔位 (colspan=8)
+            html += '<th class="fixed-col" rowspan="2">GA</th>';
+            html += '<th class="fixed-col" rowspan="2">Lot ID</th>';
+            html += '<th class="fixed-col" rowspan="2">Package</th>';
+            html += '<th class="fixed-col" rowspan="2">Wafer Lot</th>';
+            html += '<th class="fixed-col" rowspan="2">Type</th>';
+            html += '<th class="fixed-col" rowspan="2">Area</th>';
+            html += '<th class="fixed-col" rowspan="2">Lot Status</th>';
+            html += '<th class="fixed-col" rowspan="2">Equipment</th>';
+
+            // Workcenter 分組標題
+            state.groupedPivotColumns.forEach(group => {
+                html += `<th class="wc-group" colspan="${group.specs.length}">${group.workcenter}</th>`;
+            });
+            html += '</tr>';
+
+            // 第二行：Spec 子標題
+            html += '<tr>';
+            state.groupedPivotColumns.forEach(group => {
+                group.specs.forEach(spec => {
+                    const displaySpec = spec.spec || '-';
+                    html += `<th class="spec-col" title="${group.workcenter} | ${displaySpec}">${displaySpec}</th>`;
+                });
+            });
+            html += '</tr></thead><tbody>';
+
+            // 建立 pivot key 到索引的映射
+            const pivotKeySet = new Set();
+            state.pivotColumns.forEach(col => pivotKeySet.add(col.key));
+
+            // 數據行
+            state.data.forEach(row => {
+                html += '<tr>';
+                // 固定欄位
+                html += `<td class="fixed-col">${row.MFGORDERNAME || '-'}</td>`;
+                html += `<td class="fixed-col">${row.CONTAINERNAME || '-'}</td>`;
+                html += `<td class="fixed-col">${row.PRODUCTLINENAME_LEF || '-'}</td>`;
+                html += `<td class="fixed-col">${row.WAFERLOT || '-'}</td>`;
+                html += `<td class="fixed-col">${row.PJ_TYPE || '-'}</td>`;
+                html += `<td class="fixed-col">${row.PJ_PRODUCEREGION || '-'}</td>`;
+                // Lot Status: Active (綠色) / Hold (紅色，顯示 Hold 原因)
+                const lotStatusClass = row.LOT_STATUS === 'Hold' ? 'style="color: var(--danger); font-weight: bold;"' : 'style="color: var(--success);"';
+                const lotStatusText = row.LOT_STATUS === 'Hold' ? `Hold (${row.HOLDREASONNAME || ''})` : 'Active';
+                html += `<td class="fixed-col" ${lotStatusClass}>${lotStatusText}</td>`;
+                html += `<td class="fixed-col">${row.EQUIPMENTS || '-'}</td>`;
+
+                // Pivot 欄位
+                state.groupedPivotColumns.forEach(group => {
+                    group.specs.forEach(spec => {
+                        const isMatch = row.pivot_key === spec.key;
+                        if (isMatch) {
+                            html += `<td class="pivot-cell has-data">&#10003;</td>`;
+                        } else {
+                            html += `<td class="pivot-cell no-data">-</td>`;
+                        }
+                    });
+                });
+
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            document.getElementById('tableInfo').textContent =
+                `共 ${formatNumber(state.totalCount)} 筆，顯示第 ${(state.page - 1) * state.pageSize + 1} - ${Math.min(state.page * state.pageSize, state.totalCount)} 筆`;
+        }
+
+        // 更新統計摘要
+        function updateSummary() {
+            document.getElementById('totalLots').textContent = formatNumber(state.totalCount);
+
+            // 計算總 QTY
+            const totalQty = state.data.reduce((sum, row) => sum + (row.QTY || 0), 0);
+            document.getElementById('totalQty').textContent = formatNumber(totalQty);
+
+            // 計算 HOLD LOT 數和 HOLD 數量
+            const holdRows = state.data.filter(row => row.LOT_STATUS === 'Hold');
+            const holdLots = holdRows.length;
+            const holdQty = holdRows.reduce((sum, row) => sum + (row.QTY || 0), 0);
+
+            document.getElementById('holdLots').textContent = formatNumber(holdLots);
+            document.getElementById('holdQty').textContent = formatNumber(holdQty);
+        }
+
+        // 更新分頁
+        function updatePagination() {
+            const pagination = document.getElementById('pagination');
+            const totalPages = Math.ceil(state.totalCount / state.pageSize);
+
+            if (totalPages <= 1) {
+                pagination.style.display = 'none';
+                return;
+            }
+
+            pagination.style.display = 'flex';
+            document.getElementById('pageInfo').textContent = `第 ${state.page} 頁 / 共 ${totalPages} 頁`;
+            document.getElementById('btnPrev').disabled = state.page <= 1;
+            document.getElementById('btnNext').disabled = state.page >= totalPages;
+        }
+
+        async function prevPage() {
+            if (state.page <= 1) return;
+            state.page--;
+            await loadPageData();
+        }
+
+        async function nextPage() {
+            const totalPages = Math.ceil(state.totalCount / state.pageSize);
+            if (state.page >= totalPages) return;
+            state.page++;
+            await loadPageData();
+        }
+
+        async function loadPageData() {
+            showLoading();
+            try {
+                const response = await fetch('/api/wip/distribution', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filters: getFilters(),
+                        limit: state.pageSize,
+                        offset: (state.page - 1) * state.pageSize
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    state.data = result.data.rows;
+                    // 根據當前頁面數據重新過濾 Pivot 欄位
+                    groupPivotColumns();
+                    renderTable();
+                    updatePagination();
+                }
+            } catch (error) {
+                console.error('分頁載入失敗:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function clearFilters() {
+            document.getElementById('filterPackage').value = '';
+            document.getElementById('filterType').value = '';
+            document.getElementById('filterArea').value = '';
+            document.getElementById('filterLotStatus').value = '';
+            document.getElementById('filterSearch').value = '';
+        }
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            document.getElementById('btnQuery').disabled = true;
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+            document.getElementById('btnQuery').disabled = false;
+        }
+
+        function showError(message) {
+            document.getElementById('tableContainer').innerHTML =
+                `<div class="placeholder" style="color: var(--danger);">${message}</div>`;
+        }
+
+        // Enter 鍵觸發查詢
+        document.getElementById('filterSearch').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                loadData();
+            }
+        });
+
+        // 頁面初始化
+        window.onload = function() {
+            loadFilterOptions();
+        };
+    </script>
+</body>
+</html>

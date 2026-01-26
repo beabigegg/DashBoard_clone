@@ -1,0 +1,15 @@
+name: mes-dashboard
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    - oracledb>=2.0.0
+    - flask>=3.0.0
+    - pandas>=2.0.0
+    - sqlalchemy>=2.0.0
+    - openpyxl>=3.0.0
+    - python-dotenv>=1.0.0
+    - gunicorn>=21.2.0
