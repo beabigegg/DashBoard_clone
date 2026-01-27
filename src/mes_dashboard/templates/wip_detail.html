@@ -328,13 +328,35 @@
             animation: valueUpdate 0.5s ease;
         }
 
-        /* Status Card Colors */
+        /* Status Card Colors - Clickable */
+        .summary-card.status-run,
+        .summary-card.status-queue,
+        .summary-card.status-hold {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .summary-card.status-run:hover,
+        .summary-card.status-queue:hover,
+        .summary-card.status-hold:hover {
+            transform: translateY(-2px);
+        }
+
         .summary-card.status-run {
             background: #F0FDF4;
             border-color: #22C55E;
         }
         .summary-card.status-run .summary-value {
             color: #166534;
+        }
+        .summary-card.status-run:hover {
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.25);
+        }
+        .summary-card.status-run.active {
+            background: #DCFCE7;
+            border-width: 3px;
+            transform: scale(1.03);
+            box-shadow: 0 6px 25px rgba(34, 197, 94, 0.5);
         }
 
         .summary-card.status-queue {
@@ -344,6 +366,15 @@
         .summary-card.status-queue .summary-value {
             color: #92400E;
         }
+        .summary-card.status-queue:hover {
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.25);
+        }
+        .summary-card.status-queue.active {
+            background: #FEF3C7;
+            border-width: 3px;
+            transform: scale(1.03);
+            box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5);
+        }
 
         .summary-card.status-hold {
             background: #FEF2F2;
@@ -351,6 +382,22 @@
         }
         .summary-card.status-hold .summary-value {
             color: #991B1B;
+        }
+        .summary-card.status-hold:hover {
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.25);
+        }
+        .summary-card.status-hold.active {
+            background: #FEE2E2;
+            border-width: 3px;
+            transform: scale(1.03);
+            box-shadow: 0 6px 25px rgba(239, 68, 68, 0.5);
+        }
+
+        /* Dim non-active cards when filtering */
+        .summary-row.filtering .summary-card.status-run:not(.active),
+        .summary-row.filtering .summary-card.status-queue:not(.active),
+        .summary-row.filtering .summary-card.status-hold:not(.active) {
+            opacity: 0.5;
         }
 
         @keyframes valueUpdate {
@@ -610,33 +657,25 @@
                     <option value="">All</option>
                 </select>
             </div>
-            <div class="filter-group">
-                <label>Status</label>
-                <select id="filterStatus" onchange="applyFilters()">
-                    <option value="">All</option>
-                    <option value="ACTIVE">Active</option>
-                    <option value="HOLD">Hold</option>
-                </select>
-            </div>
             <button class="btn-primary" onclick="applyFilters()">Apply</button>
             <button class="btn-secondary" onclick="clearFilters()">Clear</button>
         </div>
 
         <!-- Summary Cards -->
-        <div class="summary-row">
+        <div class="summary-row" id="summaryRow">
             <div class="summary-card">
                 <div class="summary-label">Total Lots</div>
                 <div class="summary-value" id="totalLots">-</div>
             </div>
-            <div class="summary-card status-run">
+            <div class="summary-card status-run" onclick="toggleStatusFilter('run')" title="Click to filter RUN only">
                 <div class="summary-label">RUN</div>
                 <div class="summary-value" id="runLots">-</div>
             </div>
-            <div class="summary-card status-queue">
+            <div class="summary-card status-queue" onclick="toggleStatusFilter('queue')" title="Click to filter QUEUE only">
                 <div class="summary-label">QUEUE</div>
                 <div class="summary-value" id="queueLots">-</div>
             </div>
-            <div class="summary-card status-hold">
+            <div class="summary-card status-hold" onclick="toggleStatusFilter('hold')" title="Click to filter HOLD only">
                 <div class="summary-label">HOLD</div>
                 <div class="summary-value" id="holdLots">-</div>
             </div>
@@ -677,7 +716,6 @@
             pageSize: 100,
             filters: {
                 package: '',
-                status: '',
                 workorder: '',
                 lotid: ''
             },
@@ -686,6 +724,12 @@
             REFRESH_INTERVAL: 10 * 60 * 1000,  // 10 minutes
             searchDebounceTimers: {}
         };
+
+        // WIP Status filter (separate from other filters)
+        let activeStatusFilter = null;  // null | 'run' | 'queue' | 'hold'
+
+        // AbortController for cancelling in-flight table requests
+        let tableAbortController = null;
 
         // ============================================================
         // Utility Functions
@@ -717,9 +761,14 @@
         // ============================================================
         const API_TIMEOUT = 60000;  // 60 seconds timeout
 
-        async function fetchWithTimeout(url, timeout = API_TIMEOUT) {
+        async function fetchWithTimeout(url, timeout = API_TIMEOUT, externalSignal = null) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            // If external signal is provided, abort when it fires
+            if (externalSignal) {
+                externalSignal.addEventListener('abort', () => controller.abort());
+            }
 
             try {
                 const response = await fetch(url, { signal: controller.signal });
@@ -728,6 +777,10 @@
             } catch (error) {
                 clearTimeout(timeoutId);
                 if (error.name === 'AbortError') {
+                    // Check if it was external cancellation or timeout
+                    if (externalSignal && externalSignal.aborted) {
+                        throw error;  // Re-throw AbortError for external cancellation
+                    }
                     throw new Error('Request timeout');
                 }
                 throw error;
@@ -743,7 +796,7 @@
             throw new Error(result.error || 'Failed to fetch packages');
         }
 
-        async function fetchDetail() {
+        async function fetchDetail(signal = null) {
             const params = new URLSearchParams({
                 page: state.page,
                 page_size: state.pageSize
@@ -752,8 +805,9 @@
             if (state.filters.package) {
                 params.append('package', state.filters.package);
             }
-            if (state.filters.status) {
-                params.append('status', state.filters.status);
+            if (activeStatusFilter) {
+                // Convert to API status format (RUN/QUEUE/HOLD)
+                params.append('status', activeStatusFilter.toUpperCase());
             }
             if (state.filters.workorder) {
                 params.append('workorder', state.filters.workorder);
@@ -762,7 +816,7 @@
                 params.append('lotid', state.filters.lotid);
             }
 
-            const response = await fetchWithTimeout(`/api/wip/detail/${encodeURIComponent(state.workcenter)}?${params}`);
+            const response = await fetchWithTimeout(`/api/wip/detail/${encodeURIComponent(state.workcenter)}?${params}`, API_TIMEOUT, signal);
             const result = await response.json();
             if (result.success) {
                 return result.data;
@@ -1034,13 +1088,109 @@
         }
 
         // ============================================================
+        // Status Filter Toggle (Clickable Cards)
+        // ============================================================
+        function toggleStatusFilter(status) {
+            if (activeStatusFilter === status) {
+                // Clicking the same card again removes the filter
+                activeStatusFilter = null;
+            } else {
+                // Apply new filter
+                activeStatusFilter = status;
+            }
+
+            // Update card styles
+            updateCardStyles();
+
+            // Update table title
+            updateTableTitle();
+
+            // Reset to page 1 and reload table only (no isLoading guard)
+            state.page = 1;
+            loadTableOnly();
+        }
+
+        async function loadTableOnly() {
+            // Cancel any in-flight request to prevent pile-up
+            if (tableAbortController) {
+                tableAbortController.abort();
+            }
+            tableAbortController = new AbortController();
+
+            // Show loading in table container
+            const container = document.getElementById('tableContainer');
+            container.innerHTML = '<div class="placeholder">Loading...</div>';
+
+            // Show refresh indicator
+            document.getElementById('refreshIndicator').classList.add('active');
+
+            try {
+                state.data = await fetchDetail(tableAbortController.signal);
+                renderSummary(state.data.summary);
+                renderTable(state.data);
+
+                // Show success indicator
+                document.getElementById('refreshSuccess').classList.add('active');
+                setTimeout(() => {
+                    document.getElementById('refreshSuccess').classList.remove('active');
+                }, 1500);
+            } catch (error) {
+                // Ignore abort errors (expected when user clicks quickly)
+                if (error.name === 'AbortError') {
+                    console.log('[WIP Detail] Table request cancelled (new filter selected)');
+                    return;
+                }
+                console.error('Table load failed:', error);
+                container.innerHTML = '<div class="placeholder">Error loading data</div>';
+                document.getElementById('refreshError').classList.add('active');
+            } finally {
+                document.getElementById('refreshIndicator').classList.remove('active');
+            }
+        }
+
+        function updateCardStyles() {
+            const row = document.getElementById('summaryRow');
+            const statusCards = document.querySelectorAll('.summary-card.status-run, .summary-card.status-queue, .summary-card.status-hold');
+
+            // Remove active from all status cards
+            statusCards.forEach(card => {
+                card.classList.remove('active');
+            });
+
+            if (activeStatusFilter) {
+                // Add filtering class to row (dims non-active cards)
+                row.classList.add('filtering');
+
+                // Add active to the selected card
+                const activeCard = document.querySelector(`.summary-card.status-${activeStatusFilter}`);
+                if (activeCard) {
+                    activeCard.classList.add('active');
+                }
+            } else {
+                // Remove filtering class
+                row.classList.remove('filtering');
+            }
+        }
+
+        function updateTableTitle() {
+            const titleEl = document.querySelector('.table-title');
+            const baseTitle = 'Lot Details';
+
+            if (activeStatusFilter) {
+                const statusLabel = activeStatusFilter.toUpperCase();
+                titleEl.textContent = `${baseTitle} - ${statusLabel} Only`;
+            } else {
+                titleEl.textContent = baseTitle;
+            }
+        }
+
+        // ============================================================
         // Filter & Pagination
         // ============================================================
         function applyFilters() {
             state.filters.workorder = document.getElementById('filterWorkorder').value.trim();
             state.filters.lotid = document.getElementById('filterLotid').value.trim();
             state.filters.package = document.getElementById('filterPackage').value;
-            state.filters.status = document.getElementById('filterStatus').value;
             state.page = 1;
             loadAllData(false);
         }
@@ -1049,8 +1199,13 @@
             document.getElementById('filterWorkorder').value = '';
             document.getElementById('filterLotid').value = '';
             document.getElementById('filterPackage').value = '';
-            document.getElementById('filterStatus').value = '';
-            state.filters = { package: '', status: '', workorder: '', lotid: '' };
+            state.filters = { package: '', workorder: '', lotid: '' };
+
+            // Also clear status filter
+            activeStatusFilter = null;
+            updateCardStyles();
+            updateTableTitle();
+
             state.page = 1;
             loadAllData(false);
         }

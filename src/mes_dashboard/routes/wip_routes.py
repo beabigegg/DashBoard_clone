@@ -65,6 +65,7 @@ def api_overview_matrix():
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
         include_dummy: Include DUMMY lots (default: false)
+        status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
 
     Returns:
         JSON with workcenters, packages, matrix, workcenter_totals,
@@ -73,11 +74,20 @@ def api_overview_matrix():
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
     include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    status = request.args.get('status', '').strip().upper() or None
+
+    # Validate status parameter
+    if status and status not in ('RUN', 'QUEUE', 'HOLD'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid status. Use RUN, QUEUE, or HOLD'
+        }), 400
 
     result = get_wip_matrix(
         include_dummy=include_dummy,
         workorder=workorder,
-        lotid=lotid
+        lotid=lotid,
+        status=status
     )
     if result is not None:
         return jsonify({'success': True, 'data': result})
@@ -123,7 +133,7 @@ def api_detail(workcenter: str):
 
     Query Parameters:
         package: Optional PRODUCTLINENAME filter
-        status: Optional STATUS filter ('ACTIVE', 'HOLD')
+        status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
         include_dummy: Include DUMMY lots (default: false)
@@ -134,7 +144,7 @@ def api_detail(workcenter: str):
         JSON with workcenter, summary, specs, lots, pagination, sys_date
     """
     package = request.args.get('package', '').strip() or None
-    status = request.args.get('status', '').strip() or None
+    status = request.args.get('status', '').strip().upper() or None
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
     include_dummy = _parse_bool(request.args.get('include_dummy', ''))
@@ -143,6 +153,13 @@ def api_detail(workcenter: str):
 
     if page < 1:
         page = 1
+
+    # Validate status parameter
+    if status and status not in ('RUN', 'QUEUE', 'HOLD'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid status. Use RUN, QUEUE, or HOLD'
+        }), 400
 
     result = get_wip_detail(
         workcenter=workcenter,

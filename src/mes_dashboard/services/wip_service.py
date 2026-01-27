@@ -143,7 +143,8 @@ def get_wip_summary(
 def get_wip_matrix(
     include_dummy: bool = False,
     workorder: Optional[str] = None,
-    lotid: Optional[str] = None
+    lotid: Optional[str] = None,
+    status: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Get workcenter x product line matrix for overview dashboard.
 
@@ -151,6 +152,7 @@ def get_wip_matrix(
         include_dummy: If True, include DUMMY lots (default: False)
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
+        status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
 
     Returns:
         Dict with matrix data:
@@ -165,6 +167,16 @@ def get_wip_matrix(
         conditions = _build_base_conditions(include_dummy, workorder, lotid)
         conditions.append("WORKCENTER_GROUP IS NOT NULL")
         conditions.append("PRODUCTLINENAME IS NOT NULL")
+
+        # WIP status filter
+        if status:
+            status_upper = status.upper()
+            if status_upper == 'RUN':
+                conditions.append("EQUIPMENTCOUNT > 0")
+            elif status_upper == 'HOLD':
+                conditions.append("EQUIPMENTCOUNT = 0 AND CURRENTHOLDCOUNT > 0")
+            elif status_upper == 'QUEUE':
+                conditions.append("EQUIPMENTCOUNT = 0 AND CURRENTHOLDCOUNT = 0")
         where_clause = f"WHERE {' AND '.join(conditions)}"
 
         sql = f"""
@@ -303,7 +315,7 @@ def get_wip_detail(
     Args:
         workcenter: WORKCENTER_GROUP name
         package: Optional PRODUCTLINENAME filter
-        status: Optional STATUS filter ('ACTIVE', 'HOLD')
+        status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
         include_dummy: If True, include DUMMY lots (default: False)
@@ -313,7 +325,7 @@ def get_wip_detail(
     Returns:
         Dict with:
         - workcenter: The workcenter group name
-        - summary: {total_lots, on_equipment_lots, waiting_lots, hold_lots}
+        - summary: {totalLots, runLots, queueLots, holdLots}
         - specs: List of spec names (sorted by SPECSEQUENCE)
         - lots: List of lot details
         - pagination: {page, page_size, total_count, total_pages}
@@ -327,8 +339,15 @@ def get_wip_detail(
         if package:
             conditions.append(f"PRODUCTLINENAME = '{_escape_sql(package)}'")
 
+        # WIP status filter (RUN/QUEUE/HOLD based on EQUIPMENTCOUNT and CURRENTHOLDCOUNT)
         if status:
-            conditions.append(f"STATUS = '{_escape_sql(status)}'")
+            status_upper = status.upper()
+            if status_upper == 'RUN':
+                conditions.append("COALESCE(EQUIPMENTCOUNT, 0) > 0")
+            elif status_upper == 'HOLD':
+                conditions.append("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) > 0")
+            elif status_upper == 'QUEUE':
+                conditions.append("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) = 0")
 
         where_clause = f"WHERE {' AND '.join(conditions)}"
 

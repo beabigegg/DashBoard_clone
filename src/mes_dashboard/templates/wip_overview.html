@@ -388,6 +388,42 @@
             font-weight: 800;
         }
 
+        /* Clickable status cards */
+        .wip-status-card {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .wip-status-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .wip-status-card.active {
+            border-width: 4px;
+            transform: scale(1.03);
+        }
+
+        .wip-status-card.run.active {
+            background: #DCFCE7;
+            box-shadow: 0 6px 25px rgba(34, 197, 94, 0.5);
+        }
+
+        .wip-status-card.queue.active {
+            background: #FEF3C7;
+            box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5);
+        }
+
+        .wip-status-card.hold.active {
+            background: #FEE2E2;
+            box-shadow: 0 6px 25px rgba(239, 68, 68, 0.5);
+        }
+
+        /* Dim non-active cards when filtering */
+        .wip-status-row.filtering .wip-status-card:not(.active) {
+            opacity: 0.5;
+        }
+
         /* Content Grid */
         .content-grid {
             display: grid;
@@ -647,21 +683,21 @@
 
         <!-- WIP Status Cards -->
         <div class="wip-status-row">
-            <div class="wip-status-card run">
+            <div class="wip-status-card run" onclick="toggleStatusFilter('run')">
                 <div class="status-header"><span class="dot"></span>RUN</div>
                 <div class="status-values">
                     <span id="runLots">-</span>
                     <span id="runQty">-</span>
                 </div>
             </div>
-            <div class="wip-status-card queue">
+            <div class="wip-status-card queue" onclick="toggleStatusFilter('queue')">
                 <div class="status-header"><span class="dot"></span>QUEUE</div>
                 <div class="status-values">
                     <span id="queueLots">-</span>
                     <span id="queueQty">-</span>
                 </div>
             </div>
-            <div class="wip-status-card hold">
+            <div class="wip-status-card hold" onclick="toggleStatusFilter('hold')">
                 <div class="status-header"><span class="dot"></span>HOLD</div>
                 <div class="status-values">
                     <span id="holdLots">-</span>
@@ -725,6 +761,12 @@
                 lotid: null
             }
         };
+
+        // Status filter state (null = no filter, 'run'/'queue'/'hold' = filtered)
+        let activeStatusFilter = null;
+
+        // AbortController for cancelling in-flight matrix requests
+        let matrixAbortController = null;
 
         // ============================================================
         // Utility Functions
@@ -906,9 +948,14 @@
         // ============================================================
         const API_TIMEOUT = 60000;  // 60 seconds timeout
 
-        async function fetchWithTimeout(url, timeout = API_TIMEOUT) {
+        async function fetchWithTimeout(url, timeout = API_TIMEOUT, externalSignal = null) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            // If external signal is provided, abort when it fires
+            if (externalSignal) {
+                externalSignal.addEventListener('abort', () => controller.abort());
+            }
 
             try {
                 const response = await fetch(url, { signal: controller.signal });
@@ -917,6 +964,10 @@
             } catch (error) {
                 clearTimeout(timeoutId);
                 if (error.name === 'AbortError') {
+                    // Check if it was external cancellation or timeout
+                    if (externalSignal && externalSignal.aborted) {
+                        throw error;  // Re-throw AbortError for external cancellation
+                    }
                     throw new Error('Request timeout');
                 }
                 throw error;
@@ -934,10 +985,21 @@
             throw new Error(result.error || 'Failed to fetch summary');
         }
 
-        async function fetchMatrix() {
-            const queryParams = buildQueryParams();
+        async function fetchMatrix(signal = null) {
+            const params = new URLSearchParams();
+            if (state.filters.workorder) {
+                params.append('workorder', state.filters.workorder);
+            }
+            if (state.filters.lotid) {
+                params.append('lotid', state.filters.lotid);
+            }
+            // Add status filter if active
+            if (activeStatusFilter) {
+                params.append('status', activeStatusFilter.toUpperCase());
+            }
+            const queryParams = params.toString();
             const url = `/api/wip/overview/matrix${queryParams ? '?' + queryParams : ''}`;
-            const response = await fetchWithTimeout(url);
+            const response = await fetchWithTimeout(url, API_TIMEOUT, signal);
             const result = await response.json();
             if (result.success) {
                 return result.data;
@@ -1000,6 +1062,78 @@
 
             if (data.dataUpdateDate) {
                 document.getElementById('lastUpdate').textContent = `Last Update: ${data.dataUpdateDate}`;
+            }
+        }
+
+        // ============================================================
+        // Status Filter Functions
+        // ============================================================
+        function toggleStatusFilter(status) {
+            if (activeStatusFilter === status) {
+                // Deactivate filter
+                activeStatusFilter = null;
+            } else {
+                // Activate new filter
+                activeStatusFilter = status;
+            }
+
+            updateCardStyles();
+            updateMatrixTitle();
+            loadMatrixOnly();
+        }
+
+        function updateCardStyles() {
+            const row = document.querySelector('.wip-status-row');
+            document.querySelectorAll('.wip-status-card').forEach(card => {
+                card.classList.remove('active');
+            });
+
+            if (activeStatusFilter) {
+                row.classList.add('filtering');
+                const activeCard = document.querySelector(`.wip-status-card.${activeStatusFilter}`);
+                if (activeCard) {
+                    activeCard.classList.add('active');
+                }
+            } else {
+                row.classList.remove('filtering');
+            }
+        }
+
+        function updateMatrixTitle() {
+            const titleEl = document.querySelector('.card-title');
+            if (!titleEl) return;
+
+            const baseTitle = 'Workcenter x Package Matrix (QTY)';
+            if (activeStatusFilter) {
+                const statusLabel = activeStatusFilter.toUpperCase();
+                titleEl.textContent = `${baseTitle} - ${statusLabel} Only`;
+            } else {
+                titleEl.textContent = baseTitle;
+            }
+        }
+
+        async function loadMatrixOnly() {
+            // Cancel any in-flight matrix request to prevent pile-up
+            if (matrixAbortController) {
+                matrixAbortController.abort();
+            }
+            matrixAbortController = new AbortController();
+
+            const container = document.getElementById('matrixContainer');
+            container.innerHTML = '<div class="placeholder">Loading...</div>';
+
+            try {
+                const matrix = await fetchMatrix(matrixAbortController.signal);
+                state.matrix = matrix;
+                renderMatrix(matrix);
+            } catch (error) {
+                // Ignore abort errors (expected when user clicks quickly)
+                if (error.name === 'AbortError') {
+                    console.log('[WIP Overview] Matrix request cancelled (new filter selected)');
+                    return;
+                }
+                console.error('[WIP Overview] Matrix load failed:', error);
+                container.innerHTML = '<div class="placeholder">Error loading data</div>';
             }
         }
 
