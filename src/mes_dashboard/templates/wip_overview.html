@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>各站 WIP 即時概況</title>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <title>WIP Overview Dashboard</title>
     <style>
         :root {
             --bg: #f5f7fa;
@@ -69,6 +68,55 @@
         .last-update {
             color: rgba(255, 255, 255, 0.8);
             font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-indicator {
+            display: none;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .refresh-indicator.active {
+            display: inline-block;
+        }
+
+        .refresh-success {
+            color: #22c55e;
+            display: none;
+        }
+
+        .refresh-success.active {
+            display: inline-block;
+            animation: fadeOut 1s ease-out forwards;
+        }
+
+        .refresh-error {
+            width: 8px;
+            height: 8px;
+            background: var(--danger);
+            border-radius: 50%;
+            display: none;
+        }
+
+        .refresh-error.active {
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
         }
 
         .btn {
@@ -90,10 +138,148 @@
             background: rgba(255,255,255,0.3);
         }
 
+        /* Filters */
+        .filters {
+            background: var(--card-bg);
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            position: relative;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            min-width: 200px;
+        }
+
+        .filter-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .filter-group .search-loading {
+            position: absolute;
+            right: 10px;
+            top: 32px;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        .filter-group .search-loading.active {
+            display: block;
+        }
+
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: var(--shadow);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+
+        .autocomplete-dropdown.active {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .autocomplete-item:hover {
+            background: #f3f4f6;
+        }
+
+        .autocomplete-item.no-results {
+            color: var(--muted);
+            cursor: default;
+        }
+
+        .btn-primary {
+            padding: 9px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            padding: 9px 20px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .filter-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: #e8ecff;
+            color: var(--primary);
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+
+        .filter-tag .remove {
+            cursor: pointer;
+            font-weight: bold;
+        }
+
         /* Summary Cards */
         .summary-row {
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 14px;
             margin-bottom: 16px;
         }
@@ -114,41 +300,156 @@
         }
 
         .summary-value {
-            font-size: 26px;
+            font-size: 28px;
             font-weight: bold;
             color: var(--primary);
+            transition: all 0.3s ease;
         }
 
-        /* Chart Grid */
-        .chart-grid {
+        .summary-value.highlight {
+            color: var(--danger);
+        }
+
+        .summary-value.updated {
+            animation: valueUpdate 0.5s ease;
+        }
+
+        @keyframes valueUpdate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); background: rgba(102, 126, 234, 0.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Content Grid */
+        .content-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: 3fr 1fr;
             gap: 16px;
-            margin-bottom: 16px;
         }
 
-        .chart-card {
+        /* Card Styles */
+        .card {
             background: var(--card-bg);
             border-radius: 10px;
             box-shadow: var(--shadow);
             overflow: hidden;
         }
 
-        .chart-header {
+        .card-header {
             padding: 14px 20px;
             border-bottom: 1px solid var(--border);
             background: #fafbfc;
         }
 
-        .chart-title {
+        .card-title {
             font-size: 15px;
             font-weight: 600;
             color: var(--text);
         }
 
-        .chart-container {
+        .card-body {
             padding: 16px;
-            height: 350px;
+            overflow-x: auto;
+        }
+
+        /* Matrix Table */
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .matrix-table th,
+        .matrix-table td {
+            padding: 8px 10px;
+            text-align: right;
+            border: 1px solid #e5e7eb;
+            white-space: nowrap;
+        }
+
+        .matrix-table th {
+            background: #f3f4f6;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .matrix-table th:first-child {
+            text-align: left;
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #e5e7eb;
+        }
+
+        .matrix-table td:first-child {
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            left: 0;
+            background: #f9fafb;
+            z-index: 1;
+        }
+
+        .matrix-table tbody tr:hover td {
+            background: #f0f4ff;
+        }
+
+        .matrix-table tbody tr:hover td:first-child {
+            background: #e8ecff;
+        }
+
+        .matrix-table .total-row td {
+            background: #e5e7eb;
+            font-weight: bold;
+        }
+
+        .matrix-table .total-col {
+            background: #e5e7eb;
+            font-weight: bold;
+        }
+
+        .matrix-table .clickable {
+            cursor: pointer;
+            color: var(--primary);
+        }
+
+        .matrix-table .clickable:hover {
+            text-decoration: underline;
+        }
+
+        /* Hold Table */
+        .hold-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .hold-table th,
+        .hold-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .hold-table th {
+            background: #f3f4f6;
+            font-weight: 600;
+        }
+
+        .hold-table td:nth-child(2),
+        .hold-table td:nth-child(3) {
+            text-align: right;
+        }
+
+        .hold-table th:nth-child(2),
+        .hold-table th:nth-child(3) {
+            text-align: right;
+        }
+
+        .hold-table tbody tr:hover {
+            background: #f9fafb;
         }
 
         /* Loading */
@@ -176,34 +477,32 @@
             margin-right: 10px;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
         .placeholder {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
+            text-align: center;
+            padding: 40px 20px;
             color: var(--muted);
         }
 
         /* Responsive */
-        @media (max-width: 1400px) {
-            .summary-row {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
-
-        @media (max-width: 1000px) {
-            .chart-grid {
+        @media (max-width: 1200px) {
+            .content-grid {
                 grid-template-columns: 1fr;
+            }
+            .summary-row {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
         @media (max-width: 768px) {
             .summary-row {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: 1fr;
+            }
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-group input {
+                width: 100%;
             }
         }
     </style>
@@ -212,66 +511,83 @@
     <div class="dashboard">
         <!-- Header -->
         <div class="header">
-            <h1>各站 WIP 即時概況</h1>
+            <h1>WIP Overview Dashboard</h1>
             <div class="header-right">
-                <span id="lastUpdate" class="last-update"></span>
-                <button class="btn btn-light" onclick="loadAllData()">重新整理</button>
+                <span class="last-update">
+                    <span class="refresh-indicator" id="refreshIndicator"></span>
+                    <span class="refresh-success" id="refreshSuccess">&#10003;</span>
+                    <span class="refresh-error" id="refreshError"></span>
+                    <span id="lastUpdate"></span>
+                </span>
+                <button class="btn btn-light" onclick="manualRefresh()">
+                    <span id="refreshBtnText">重新整理</span>
+                </button>
             </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>Work Order</label>
+                <input type="text" id="filterWorkorder" placeholder="輸入 Work Order..." autocomplete="off">
+                <span class="search-loading" id="workorderLoading"></span>
+                <div class="autocomplete-dropdown" id="workorderDropdown"></div>
+            </div>
+            <div class="filter-group">
+                <label>Lot ID</label>
+                <input type="text" id="filterLotid" placeholder="輸入 Lot ID..." autocomplete="off">
+                <span class="search-loading" id="lotidLoading"></span>
+                <div class="autocomplete-dropdown" id="lotidDropdown"></div>
+            </div>
+            <button class="btn-primary" onclick="applyFilters()">套用篩選</button>
+            <button class="btn-secondary" onclick="clearFilters()">清除篩選</button>
+            <span id="activeFilters"></span>
         </div>
 
         <!-- Summary Cards -->
         <div class="summary-row">
             <div class="summary-card">
-                <div class="summary-label">總 LOT 數</div>
+                <div class="summary-label">Total Lots</div>
                 <div class="summary-value" id="totalLots">-</div>
             </div>
             <div class="summary-card">
-                <div class="summary-label">總數量 (QTY)</div>
+                <div class="summary-label">Total QTY</div>
                 <div class="summary-value" id="totalQty">-</div>
             </div>
             <div class="summary-card">
-                <div class="summary-label">總片數 (QTY2)</div>
-                <div class="summary-value" id="totalQty2">-</div>
+                <div class="summary-label">Hold Lots</div>
+                <div class="summary-value highlight" id="holdLots">-</div>
             </div>
             <div class="summary-card">
-                <div class="summary-label">SPEC 數</div>
-                <div class="summary-value" id="specCount">-</div>
-            </div>
-            <div class="summary-card">
-                <div class="summary-label">工站數</div>
-                <div class="summary-value" id="wcCount">-</div>
-            </div>
-            <div class="summary-card">
-                <div class="summary-label">產品線數</div>
-                <div class="summary-value" id="plCount">-</div>
+                <div class="summary-label">Hold QTY</div>
+                <div class="summary-value highlight" id="holdQty">-</div>
             </div>
         </div>
 
-        <!-- Chart Grid -->
-        <div class="chart-grid">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div class="chart-title">各站 WIP 分布</div>
+        <!-- Content Grid -->
+        <div class="content-grid">
+            <!-- Matrix Table -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Workcenter x Package Matrix (QTY)</div>
                 </div>
-                <div class="chart-container" id="chartWorkcenter"></div>
+                <div class="card-body" style="max-height: 500px; overflow: auto;">
+                    <div id="matrixContainer">
+                        <div class="placeholder">Loading...</div>
+                    </div>
+                </div>
             </div>
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div class="chart-title">狀態分布</div>
+
+            <!-- Hold Summary -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Hold Summary</div>
                 </div>
-                <div class="chart-container" id="chartStatus"></div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div class="chart-title">產品線分布</div>
+                <div class="card-body" style="max-height: 500px; overflow: auto;">
+                    <div id="holdContainer">
+                        <div class="placeholder">Loading...</div>
+                    </div>
                 </div>
-                <div class="chart-container" id="chartProductLine"></div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div class="chart-title">Top 20 工單</div>
-                </div>
-                <div class="chart-container" id="chartMfgOrder"></div>
             </div>
         </div>
     </div>
@@ -279,327 +595,451 @@
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <span class="loading-spinner"></span>
-        <span>載入中...</span>
+        <span>Loading...</span>
     </div>
 
     <script>
-        // Chart instances
-        let chartWorkcenter = null;
-        let chartStatus = null;
-        let chartProductLine = null;
-        let chartMfgOrder = null;
+        // ============================================================
+        // State Management
+        // ============================================================
+        const state = {
+            summary: null,
+            matrix: null,
+            hold: null,
+            isLoading: false,
+            lastError: false,
+            refreshTimer: null,
+            REFRESH_INTERVAL: 10 * 60 * 1000,  // 10 minutes
+            filters: {
+                workorder: '',
+                lotid: ''
+            },
+            searchTimers: {
+                workorder: null,
+                lotid: null
+            }
+        };
 
-        // Format number with commas
+        // ============================================================
+        // Utility Functions
+        // ============================================================
         function formatNumber(num) {
             if (num === null || num === undefined || num === '-') return '-';
             return num.toLocaleString('zh-TW');
         }
 
-        // Status name mapping
-        const STATUS_MAP = {
-            1: 'Queue',
-            2: 'Run',
-            4: 'Hold'
-        };
+        function updateElementWithTransition(elementId, newValue) {
+            const el = document.getElementById(elementId);
+            const oldValue = el.textContent;
+            const formattedNew = formatNumber(newValue);
 
-        // Initialize charts
-        function initCharts() {
-            chartWorkcenter = echarts.init(document.getElementById('chartWorkcenter'));
-            chartStatus = echarts.init(document.getElementById('chartStatus'));
-            chartProductLine = echarts.init(document.getElementById('chartProductLine'));
-            chartMfgOrder = echarts.init(document.getElementById('chartMfgOrder'));
+            if (oldValue !== formattedNew) {
+                el.textContent = formattedNew;
+                el.classList.add('updated');
+                setTimeout(() => el.classList.remove('updated'), 500);
+            }
+        }
 
-            // Handle resize
-            window.addEventListener('resize', () => {
-                chartWorkcenter.resize();
-                chartStatus.resize();
-                chartProductLine.resize();
-                chartMfgOrder.resize();
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        function buildQueryParams() {
+            const params = new URLSearchParams();
+            if (state.filters.workorder) {
+                params.append('workorder', state.filters.workorder);
+            }
+            if (state.filters.lotid) {
+                params.append('lotid', state.filters.lotid);
+            }
+            return params.toString();
+        }
+
+        // ============================================================
+        // Autocomplete Functions
+        // ============================================================
+        async function searchAutocomplete(type, query) {
+            if (query.length < 2) {
+                return [];
+            }
+
+            const loadingEl = document.getElementById(`${type}Loading`);
+            loadingEl.classList.add('active');
+
+            try {
+                const response = await fetch(`/api/wip/meta/search?type=${type}&q=${encodeURIComponent(query)}&limit=20`);
+                const result = await response.json();
+                if (result.success) {
+                    return result.data.items || [];
+                }
+            } catch (error) {
+                console.error(`Search ${type} failed:`, error);
+            } finally {
+                loadingEl.classList.remove('active');
+            }
+            return [];
+        }
+
+        function showDropdown(type, items) {
+            const dropdown = document.getElementById(`${type}Dropdown`);
+
+            if (items.length === 0) {
+                dropdown.innerHTML = '<div class="autocomplete-item no-results">無符合結果</div>';
+            } else {
+                dropdown.innerHTML = items.map(item =>
+                    `<div class="autocomplete-item" onclick="selectAutocomplete('${type}', '${item}')">${item}</div>`
+                ).join('');
+            }
+            dropdown.classList.add('active');
+        }
+
+        function hideDropdown(type) {
+            const dropdown = document.getElementById(`${type}Dropdown`);
+            dropdown.classList.remove('active');
+        }
+
+        function selectAutocomplete(type, value) {
+            const input = document.getElementById(`filter${type.charAt(0).toUpperCase() + type.slice(1)}`);
+            input.value = value;
+            hideDropdown(type);
+        }
+
+        // Setup autocomplete for inputs
+        function setupAutocomplete(type) {
+            const input = document.getElementById(`filter${type.charAt(0).toUpperCase() + type.slice(1)}`);
+
+            const debouncedSearch = debounce(async (query) => {
+                if (query.length >= 2) {
+                    const items = await searchAutocomplete(type, query);
+                    showDropdown(type, items);
+                } else {
+                    hideDropdown(type);
+                }
+            }, 300);
+
+            input.addEventListener('input', (e) => {
+                debouncedSearch(e.target.value);
+            });
+
+            input.addEventListener('focus', async () => {
+                const query = input.value;
+                if (query.length >= 2) {
+                    const items = await searchAutocomplete(type, query);
+                    showDropdown(type, items);
+                }
+            });
+
+            input.addEventListener('blur', () => {
+                // Delay hide to allow click on dropdown
+                setTimeout(() => hideDropdown(type), 200);
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    hideDropdown(type);
+                    applyFilters();
+                }
             });
         }
 
-        // Load summary data
-        async function loadSummary() {
-            try {
-                const response = await fetch('/api/wip/summary');
-                const result = await response.json();
+        // ============================================================
+        // Filter Functions
+        // ============================================================
+        function applyFilters() {
+            state.filters.workorder = document.getElementById('filterWorkorder').value.trim();
+            state.filters.lotid = document.getElementById('filterLotid').value.trim();
 
-                if (result.success) {
-                    const data = result.data;
-                    document.getElementById('totalLots').textContent = formatNumber(data.total_lot_count);
-                    document.getElementById('totalQty').textContent = formatNumber(data.total_qty);
-                    document.getElementById('totalQty2').textContent = formatNumber(data.total_qty2);
-                    document.getElementById('specCount').textContent = formatNumber(data.spec_count);
-                    document.getElementById('wcCount').textContent = formatNumber(data.workcenter_count);
-                    document.getElementById('plCount').textContent = formatNumber(data.product_line_count);
-                }
+            updateActiveFiltersDisplay();
+            loadAllData(false);
+        }
+
+        function clearFilters() {
+            document.getElementById('filterWorkorder').value = '';
+            document.getElementById('filterLotid').value = '';
+            state.filters.workorder = '';
+            state.filters.lotid = '';
+
+            updateActiveFiltersDisplay();
+            loadAllData(false);
+        }
+
+        function removeFilter(type) {
+            document.getElementById(`filter${type.charAt(0).toUpperCase() + type.slice(1)}`).value = '';
+            state.filters[type] = '';
+            updateActiveFiltersDisplay();
+            loadAllData(false);
+        }
+
+        function updateActiveFiltersDisplay() {
+            const container = document.getElementById('activeFilters');
+            let html = '';
+
+            if (state.filters.workorder) {
+                html += `<span class="filter-tag">WO: ${state.filters.workorder} <span class="remove" onclick="removeFilter('workorder')">×</span></span>`;
+            }
+            if (state.filters.lotid) {
+                html += `<span class="filter-tag">Lot: ${state.filters.lotid} <span class="remove" onclick="removeFilter('lotid')">×</span></span>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        // ============================================================
+        // API Functions
+        // ============================================================
+        const API_TIMEOUT = 30000;  // 30 seconds timeout
+
+        async function fetchWithTimeout(url, timeout = API_TIMEOUT) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                return response;
             } catch (error) {
-                console.error('Summary load failed:', error);
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timeout');
+                }
+                throw error;
             }
         }
 
-        // Load workcenter chart
-        async function loadWorkcenterChart() {
-            try {
-                const response = await fetch('/api/wip/by_spec_workcenter');
-                const result = await response.json();
+        async function fetchSummary() {
+            const queryParams = buildQueryParams();
+            const url = `/api/wip/overview/summary${queryParams ? '?' + queryParams : ''}`;
+            const response = await fetchWithTimeout(url);
+            const result = await response.json();
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch summary');
+        }
 
-                if (result.success && result.data.length > 0) {
-                    // Aggregate by workcenter
-                    const wcMap = {};
-                    result.data.forEach(row => {
-                        const wc = row.WORKCENTERNAME || '(Unknown)';
-                        if (!wcMap[wc]) wcMap[wc] = 0;
-                        wcMap[wc] += row.TOTAL_QTY || 0;
-                    });
+        async function fetchMatrix() {
+            const queryParams = buildQueryParams();
+            const url = `/api/wip/overview/matrix${queryParams ? '?' + queryParams : ''}`;
+            const response = await fetchWithTimeout(url);
+            const result = await response.json();
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch matrix');
+        }
 
-                    // Sort by value desc and take top 15
-                    const sorted = Object.entries(wcMap)
-                        .sort((a, b) => b[1] - a[1])
-                        .slice(0, 15);
+        async function fetchHold() {
+            const queryParams = buildQueryParams();
+            const url = `/api/wip/overview/hold${queryParams ? '?' + queryParams : ''}`;
+            const response = await fetchWithTimeout(url);
+            const result = await response.json();
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch hold');
+        }
 
-                    const categories = sorted.map(x => x[0]);
-                    const values = sorted.map(x => x[1]);
+        // ============================================================
+        // Render Functions
+        // ============================================================
+        function renderSummary(data) {
+            if (!data) return;
 
-                    chartWorkcenter.setOption({
-                        tooltip: {
-                            trigger: 'axis',
-                            axisPointer: { type: 'shadow' }
-                        },
-                        grid: {
-                            left: '3%',
-                            right: '4%',
-                            bottom: '3%',
-                            top: '3%',
-                            containLabel: true
-                        },
-                        xAxis: {
-                            type: 'value'
-                        },
-                        yAxis: {
-                            type: 'category',
-                            data: categories.reverse(),
-                            axisLabel: {
-                                fontSize: 11,
-                                width: 100,
-                                overflow: 'truncate'
-                            }
-                        },
-                        series: [{
-                            type: 'bar',
-                            data: values.reverse(),
-                            itemStyle: {
-                                color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                                    { offset: 0, color: '#667eea' },
-                                    { offset: 1, color: '#764ba2' }
-                                ])
-                            },
-                            label: {
-                                show: true,
-                                position: 'right',
-                                fontSize: 11,
-                                formatter: params => formatNumber(params.value)
-                            }
-                        }]
-                    });
-                } else {
-                    chartWorkcenter.setOption({
-                        title: { text: '無資料', left: 'center', top: 'center', textStyle: { color: '#999' } }
-                    });
-                }
-            } catch (error) {
-                console.error('Workcenter chart load failed:', error);
+            updateElementWithTransition('totalLots', data.total_lots);
+            updateElementWithTransition('totalQty', data.total_qty);
+            updateElementWithTransition('holdLots', data.hold_lots);
+            updateElementWithTransition('holdQty', data.hold_qty);
+
+            if (data.sys_date) {
+                document.getElementById('lastUpdate').textContent = `Last Update: ${data.sys_date}`;
             }
         }
 
-        // Load status chart
-        async function loadStatusChart() {
-            try {
-                const response = await fetch('/api/wip/by_status');
-                const result = await response.json();
+        function renderMatrix(data) {
+            const container = document.getElementById('matrixContainer');
 
-                if (result.success && result.data.length > 0) {
-                    const pieData = result.data.map(row => ({
-                        name: STATUS_MAP[row.STATUS] || `Status ${row.STATUS}`,
-                        value: row.TOTAL_QTY || 0
-                    }));
-
-                    chartStatus.setOption({
-                        tooltip: {
-                            trigger: 'item',
-                            formatter: '{b}: {c} ({d}%)'
-                        },
-                        legend: {
-                            orient: 'vertical',
-                            right: '5%',
-                            top: 'center'
-                        },
-                        series: [{
-                            type: 'pie',
-                            radius: ['40%', '70%'],
-                            center: ['40%', '50%'],
-                            avoidLabelOverlap: true,
-                            itemStyle: {
-                                borderRadius: 6,
-                                borderColor: '#fff',
-                                borderWidth: 2
-                            },
-                            label: {
-                                show: true,
-                                formatter: '{b}\n{d}%'
-                            },
-                            data: pieData,
-                            color: ['#667eea', '#22c55e', '#ef4444', '#f59e0b', '#8b5cf6']
-                        }]
-                    });
-                } else {
-                    chartStatus.setOption({
-                        title: { text: '無資料', left: 'center', top: 'center', textStyle: { color: '#999' } }
-                    });
-                }
-            } catch (error) {
-                console.error('Status chart load failed:', error);
+            if (!data || !data.workcenters || data.workcenters.length === 0) {
+                container.innerHTML = '<div class="placeholder">No data available</div>';
+                return;
             }
+
+            // Limit packages to top 15 for display
+            const displayPackages = data.packages.slice(0, 15);
+
+            let html = '<table class="matrix-table"><thead><tr>';
+            html += '<th>Workcenter</th>';
+            displayPackages.forEach(pkg => {
+                html += `<th>${pkg}</th>`;
+            });
+            html += '<th class="total-col">Total</th>';
+            html += '</tr></thead><tbody>';
+
+            // Data rows
+            data.workcenters.forEach(wc => {
+                html += '<tr>';
+                html += `<td class="clickable" onclick="navigateToDetail('${encodeURIComponent(wc)}')">${wc}</td>`;
+
+                displayPackages.forEach(pkg => {
+                    const qty = data.matrix[wc]?.[pkg] || 0;
+                    html += `<td>${qty ? formatNumber(qty) : '-'}</td>`;
+                });
+
+                html += `<td class="total-col">${formatNumber(data.workcenter_totals[wc] || 0)}</td>`;
+                html += '</tr>';
+            });
+
+            // Total row
+            html += '<tr class="total-row">';
+            html += '<td>Total</td>';
+            displayPackages.forEach(pkg => {
+                html += `<td>${formatNumber(data.package_totals[pkg] || 0)}</td>`;
+            });
+            html += `<td class="total-col">${formatNumber(data.grand_total || 0)}</td>`;
+            html += '</tr>';
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
         }
 
-        // Load product line chart
-        async function loadProductLineChart() {
-            try {
-                const response = await fetch('/api/wip/by_product_line');
-                const result = await response.json();
+        function renderHold(data) {
+            const container = document.getElementById('holdContainer');
 
-                if (result.success && result.summary && result.summary.length > 0) {
-                    const pieData = result.summary
-                        .sort((a, b) => b.TOTAL_QTY - a.TOTAL_QTY)
-                        .slice(0, 10)
-                        .map(row => ({
-                            name: row.PRODUCTLINENAME_LEF || '(Unknown)',
-                            value: row.TOTAL_QTY || 0
-                        }));
-
-                    chartProductLine.setOption({
-                        tooltip: {
-                            trigger: 'item',
-                            formatter: '{b}: {c} ({d}%)'
-                        },
-                        legend: {
-                            orient: 'vertical',
-                            right: '5%',
-                            top: 'center',
-                            formatter: name => name.length > 12 ? name.slice(0, 12) + '...' : name
-                        },
-                        series: [{
-                            type: 'pie',
-                            radius: ['40%', '70%'],
-                            center: ['40%', '50%'],
-                            avoidLabelOverlap: true,
-                            itemStyle: {
-                                borderRadius: 6,
-                                borderColor: '#fff',
-                                borderWidth: 2
-                            },
-                            label: {
-                                show: false
-                            },
-                            data: pieData,
-                            color: ['#667eea', '#764ba2', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#6366f1']
-                        }]
-                    });
-                } else {
-                    chartProductLine.setOption({
-                        title: { text: '無資料', left: 'center', top: 'center', textStyle: { color: '#999' } }
-                    });
-                }
-            } catch (error) {
-                console.error('Product line chart load failed:', error);
+            if (!data || !data.items || data.items.length === 0) {
+                container.innerHTML = '<div class="placeholder">No hold lots</div>';
+                return;
             }
+
+            let html = '<table class="hold-table"><thead><tr>';
+            html += '<th>Hold Reason</th>';
+            html += '<th>Lots</th>';
+            html += '<th>QTY</th>';
+            html += '</tr></thead><tbody>';
+
+            data.items.forEach(item => {
+                html += '<tr>';
+                html += `<td>${item.reason || '-'}</td>`;
+                html += `<td>${formatNumber(item.lots)}</td>`;
+                html += `<td>${formatNumber(item.qty)}</td>`;
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
         }
 
-        // Load mfg order chart
-        async function loadMfgOrderChart() {
-            try {
-                const response = await fetch('/api/wip/by_mfgorder?limit=20');
-                const result = await response.json();
-
-                if (result.success && result.data.length > 0) {
-                    const categories = result.data.map(row => row.MFGORDERNAME || '(Unknown)');
-                    const values = result.data.map(row => row.TOTAL_QTY || 0);
-
-                    chartMfgOrder.setOption({
-                        tooltip: {
-                            trigger: 'axis',
-                            axisPointer: { type: 'shadow' }
-                        },
-                        grid: {
-                            left: '3%',
-                            right: '4%',
-                            bottom: '3%',
-                            top: '3%',
-                            containLabel: true
-                        },
-                        xAxis: {
-                            type: 'value'
-                        },
-                        yAxis: {
-                            type: 'category',
-                            data: categories.reverse(),
-                            axisLabel: {
-                                fontSize: 10,
-                                width: 100,
-                                overflow: 'truncate'
-                            }
-                        },
-                        series: [{
-                            type: 'bar',
-                            data: values.reverse(),
-                            itemStyle: {
-                                color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                                    { offset: 0, color: '#22c55e' },
-                                    { offset: 1, color: '#16a34a' }
-                                ])
-                            },
-                            label: {
-                                show: true,
-                                position: 'right',
-                                fontSize: 10,
-                                formatter: params => formatNumber(params.value)
-                            }
-                        }]
-                    });
-                } else {
-                    chartMfgOrder.setOption({
-                        title: { text: '無資料', left: 'center', top: 'center', textStyle: { color: '#999' } }
-                    });
-                }
-            } catch (error) {
-                console.error('Mfg order chart load failed:', error);
-            }
+        // ============================================================
+        // Navigation
+        // ============================================================
+        function navigateToDetail(workcenter) {
+            const params = new URLSearchParams();
+            params.append('workcenter', workcenter);
+            if (state.filters.workorder) params.append('workorder', state.filters.workorder);
+            if (state.filters.lotid) params.append('lotid', state.filters.lotid);
+            window.location.href = `/wip-detail?${params.toString()}`;
         }
 
-        // Load all data
-        async function loadAllData() {
-            document.getElementById('loadingOverlay').style.display = 'flex';
+        // ============================================================
+        // Data Loading
+        // ============================================================
+        async function loadAllData(showOverlay = true) {
+            if (state.isLoading) {
+                console.log('[WIP Overview] Load skipped (already loading)');
+                return;
+            }
+            state.isLoading = true;
+            console.log('[WIP Overview] Loading data...', showOverlay ? '(with overlay)' : '(background)');
+
+            if (showOverlay) {
+                document.getElementById('loadingOverlay').style.display = 'flex';
+            }
+
+            // Show refresh indicator
+            document.getElementById('refreshIndicator').classList.add('active');
+            document.getElementById('refreshError').classList.remove('active');
+            document.getElementById('refreshSuccess').classList.remove('active');
 
             try {
-                await Promise.all([
-                    loadSummary(),
-                    loadWorkcenterChart(),
-                    loadStatusChart(),
-                    loadProductLineChart(),
-                    loadMfgOrderChart()
+                const startTime = performance.now();
+                const [summary, matrix, hold] = await Promise.all([
+                    fetchSummary(),
+                    fetchMatrix(),
+                    fetchHold()
                 ]);
+                const elapsed = Math.round(performance.now() - startTime);
 
-                document.getElementById('lastUpdate').textContent =
-                    `Last Update: ${new Date().toLocaleString('zh-TW')}`;
+                state.summary = summary;
+                state.matrix = matrix;
+                state.hold = hold;
+                state.lastError = false;
+
+                renderSummary(summary);
+                renderMatrix(matrix);
+                renderHold(hold);
+
+                console.log(`[WIP Overview] Data loaded successfully in ${elapsed}ms`);
+
+                // Show success indicator
+                document.getElementById('refreshSuccess').classList.add('active');
+                setTimeout(() => {
+                    document.getElementById('refreshSuccess').classList.remove('active');
+                }, 1500);
+
+            } catch (error) {
+                console.error('[WIP Overview] Data load failed:', error);
+                state.lastError = true;
+                document.getElementById('refreshError').classList.add('active');
             } finally {
+                state.isLoading = false;
                 document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('refreshIndicator').classList.remove('active');
             }
         }
 
-        // Initialize on load
+        // ============================================================
+        // Auto-refresh
+        // ============================================================
+        function startAutoRefresh() {
+            if (state.refreshTimer) {
+                clearInterval(state.refreshTimer);
+            }
+            console.log('[WIP Overview] Auto-refresh started, interval:', state.REFRESH_INTERVAL / 1000, 'seconds');
+            state.refreshTimer = setInterval(() => {
+                if (!document.hidden) {
+                    console.log('[WIP Overview] Auto-refresh triggered at', new Date().toLocaleTimeString());
+                    loadAllData(false);  // Don't show overlay for auto-refresh
+                } else {
+                    console.log('[WIP Overview] Auto-refresh skipped (tab hidden)');
+                }
+            }, state.REFRESH_INTERVAL);
+        }
+
+        function manualRefresh() {
+            // Reset timer on manual refresh
+            startAutoRefresh();
+            loadAllData(false);
+        }
+
+        // Handle page visibility
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                // Page became visible - refresh immediately
+                loadAllData(false);
+                startAutoRefresh();
+            }
+        });
+
+        // ============================================================
+        // Initialize
+        // ============================================================
         window.onload = function() {
-            initCharts();
-            loadAllData();
+            setupAutocomplete('workorder');
+            setupAutocomplete('lotid');
+            loadAllData(true);
+            startAutoRefresh();
         };
     </script>
 </body>

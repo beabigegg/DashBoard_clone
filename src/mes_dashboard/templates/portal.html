@@ -92,20 +92,20 @@
     <div class="shell">
         <div class="header">
             <h1>MES 報表入口</h1>
-            <p>統一入口：WIP 報表、機台狀態報表與數據表查詢工具</p>
+            <p>統一入口：WIP 即時看板、機台狀態報表與數據表查詢工具</p>
         </div>
 
         <div class="tabs">
-            <button class="tab active" data-target="wipFrame">WIP 在制品報表</button>
-            <button class="tab" data-target="wipOverviewFrame">WIP 即時概況</button>
+            <button class="tab active" data-target="wipOverviewFrame">WIP 即時概況</button>
+            <button class="tab" data-target="wipDetailFrame">WIP 工站明細</button>
             <button class="tab" data-target="resourceFrame">機台狀態報表</button>
             <button class="tab" data-target="tableFrame">數據表查詢工具</button>
             <button class="tab" data-target="excelQueryFrame">Excel 批次查詢</button>
         </div>
 
         <div class="panel">
-            <iframe id="wipFrame" class="active" src="/wip" title="WIP 在制品報表"></iframe>
-            <iframe id="wipOverviewFrame" src="/wip-overview" title="WIP 即時概況"></iframe>
+            <iframe id="wipOverviewFrame" class="active" src="/wip-overview" title="WIP 即時概況"></iframe>
+            <iframe id="wipDetailFrame" src="/wip-detail" title="WIP 工站明細"></iframe>
             <iframe id="resourceFrame" src="/resource" title="機台狀態報表"></iframe>
             <iframe id="tableFrame" src="/tables" title="數據表查詢工具"></iframe>
             <iframe id="excelQueryFrame" src="/excel-query" title="Excel 批次查詢"></iframe>

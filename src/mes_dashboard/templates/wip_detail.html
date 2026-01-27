@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIP Detail Dashboard</title>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text: #222;
+            --muted: #666;
+            --border: #e2e6ef;
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --shadow: 0 2px 10px rgba(0,0,0,0.08);
+            --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            max-width: 1900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 18px 22px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-strong);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .last-update {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-indicator {
+            display: none;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .refresh-indicator.active {
+            display: inline-block;
+        }
+
+        .refresh-success {
+            color: #22c55e;
+            display: none;
+        }
+
+        .refresh-success.active {
+            display: inline-block;
+            animation: fadeOut 1s ease-out forwards;
+        }
+
+        .refresh-error {
+            width: 8px;
+            height: 8px;
+            background: var(--danger);
+            border-radius: 50%;
+            display: none;
+        }
+
+        .refresh-error.active {
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .btn {
+            padding: 9px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-light {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .btn-light:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .btn-back {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-back:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        /* Filters */
+        .filters {
+            background: var(--card-bg);
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        .filter-group select,
+        .filter-group input[type="text"] {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            min-width: 150px;
+        }
+
+        .filter-group select:focus,
+        .filter-group input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        /* Autocomplete container */
+        .autocomplete-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .autocomplete-container input {
+            width: 180px;
+        }
+
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            box-shadow: var(--shadow);
+            z-index: 100;
+            display: none;
+        }
+
+        .autocomplete-dropdown.show {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .autocomplete-item:hover {
+            background: #f0f2ff;
+        }
+
+        .autocomplete-loading {
+            padding: 8px 12px;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .autocomplete-empty {
+            padding: 8px 12px;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .btn-primary {
+            padding: 9px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            padding: 9px 20px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 16px 20px;
+            text-align: center;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .summary-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .summary-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary);
+            transition: all 0.3s ease;
+        }
+
+        .summary-value.highlight {
+            color: var(--danger);
+        }
+
+        .summary-value.success {
+            color: var(--success);
+        }
+
+        .summary-value.warning {
+            color: var(--warning);
+        }
+
+        .summary-value.updated {
+            animation: valueUpdate 0.5s ease;
+        }
+
+        @keyframes valueUpdate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); background: rgba(102, 126, 234, 0.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Table Section */
+        .table-section {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #fafbfc;
+        }
+
+        .table-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .table-info {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            background: #f8f9fa;
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* Fixed columns */
+        th.fixed-col,
+        td.fixed-col {
+            position: sticky;
+            background: #fff;
+            z-index: 5;
+        }
+
+        th.fixed-col {
+            background: #f8f9fa;
+            z-index: 11;
+        }
+
+        th.fixed-col:nth-child(1), td.fixed-col:nth-child(1) { left: 0; min-width: 150px; }
+        th.fixed-col:nth-child(2), td.fixed-col:nth-child(2) { left: 150px; min-width: 100px; }
+        th.fixed-col:nth-child(3), td.fixed-col:nth-child(3) { left: 250px; min-width: 120px; }
+        th.fixed-col:nth-child(4), td.fixed-col:nth-child(4) { left: 370px; min-width: 100px; border-right: 2px solid var(--primary); }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+        }
+
+        tbody tr:hover td {
+            background: #f8f9fc;
+        }
+
+        tbody tr:hover td.fixed-col {
+            background: #f0f2ff;
+        }
+
+        /* Spec columns */
+        th.spec-col {
+            background: #e8ebff;
+            text-align: center;
+            font-size: 12px;
+            min-width: 80px;
+        }
+
+        td.spec-cell {
+            text-align: center;
+            font-weight: 600;
+        }
+
+        td.spec-cell.has-data {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        /* Status styles */
+        .status-active {
+            color: var(--success);
+        }
+
+        .status-hold {
+            color: var(--danger);
+            font-weight: bold;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination button {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+
+        .placeholder {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .summary-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-group select {
+                width: 100%;
+            }
+            .summary-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <a href="/wip-overview" class="btn btn-back">&larr; Overview</a>
+                <h1 id="pageTitle">WIP Detail</h1>
+            </div>
+            <div class="header-right">
+                <span class="last-update">
+                    <span class="refresh-indicator" id="refreshIndicator"></span>
+                    <span class="refresh-success" id="refreshSuccess">&#10003;</span>
+                    <span class="refresh-error" id="refreshError"></span>
+                    <span id="lastUpdate"></span>
+                </span>
+                <button class="btn btn-light" onclick="manualRefresh()">Refresh</button>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>WORKORDER</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="filterWorkorder" placeholder="Search..." autocomplete="off">
+                    <div class="autocomplete-dropdown" id="workorderDropdown"></div>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>LOT ID</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="filterLotid" placeholder="Search..." autocomplete="off">
+                    <div class="autocomplete-dropdown" id="lotidDropdown"></div>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Package</label>
+                <select id="filterPackage" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Status</label>
+                <select id="filterStatus" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="HOLD">Hold</option>
+                </select>
+            </div>
+            <button class="btn-primary" onclick="applyFilters()">Apply</button>
+            <button class="btn-secondary" onclick="clearFilters()">Clear</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-row">
+            <div class="summary-card">
+                <div class="summary-label">Total Lots</div>
+                <div class="summary-value" id="totalLots">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">On Equipment</div>
+                <div class="summary-value success" id="onEquipmentLots">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Waiting</div>
+                <div class="summary-value warning" id="waitingLots">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Hold</div>
+                <div class="summary-value highlight" id="holdLots">-</div>
+            </div>
+        </div>
+
+        <!-- Table Section -->
+        <div class="table-section" style="position: relative;">
+            <div class="table-header">
+                <div class="table-title">Lot Details</div>
+                <div class="table-info" id="tableInfo">Loading...</div>
+            </div>
+            <div class="table-container" id="tableContainer">
+                <div class="placeholder">Loading...</div>
+            </div>
+            <div class="pagination" id="pagination" style="display: none;">
+                <button id="btnPrev" onclick="prevPage()">Prev</button>
+                <span class="page-info" id="pageInfo">Page 1</span>
+                <button id="btnNext" onclick="nextPage()">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <span class="loading-spinner"></span>
+        <span>Loading...</span>
+    </div>
+
+    <script>
+        // ============================================================
+        // State Management
+        // ============================================================
+        const state = {
+            workcenter: '',
+            data: null,
+            packages: [],
+            page: 1,
+            pageSize: 100,
+            filters: {
+                package: '',
+                status: '',
+                workorder: '',
+                lotid: ''
+            },
+            isLoading: false,
+            refreshTimer: null,
+            REFRESH_INTERVAL: 10 * 60 * 1000,  // 10 minutes
+            searchDebounceTimers: {}
+        };
+
+        // ============================================================
+        // Utility Functions
+        // ============================================================
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '-') return '-';
+            return num.toLocaleString('zh-TW');
+        }
+
+        function updateElementWithTransition(elementId, newValue) {
+            const el = document.getElementById(elementId);
+            const oldValue = el.textContent;
+            const formattedNew = formatNumber(newValue);
+
+            if (oldValue !== formattedNew) {
+                el.textContent = formattedNew;
+                el.classList.add('updated');
+                setTimeout(() => el.classList.remove('updated'), 500);
+            }
+        }
+
+        function getUrlParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name) || '';
+        }
+
+        // ============================================================
+        // API Functions
+        // ============================================================
+        const API_TIMEOUT = 30000;  // 30 seconds timeout
+
+        async function fetchWithTimeout(url, timeout = API_TIMEOUT) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                return response;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timeout');
+                }
+                throw error;
+            }
+        }
+
+        async function fetchPackages() {
+            const response = await fetchWithTimeout('/api/wip/meta/packages');
+            const result = await response.json();
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch packages');
+        }
+
+        async function fetchDetail() {
+            const params = new URLSearchParams({
+                page: state.page,
+                page_size: state.pageSize
+            });
+
+            if (state.filters.package) {
+                params.append('package', state.filters.package);
+            }
+            if (state.filters.status) {
+                params.append('status', state.filters.status);
+            }
+            if (state.filters.workorder) {
+                params.append('workorder', state.filters.workorder);
+            }
+            if (state.filters.lotid) {
+                params.append('lotid', state.filters.lotid);
+            }
+
+            const response = await fetchWithTimeout(`/api/wip/detail/${encodeURIComponent(state.workcenter)}?${params}`);
+            const result = await response.json();
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch detail');
+        }
+
+        async function fetchWorkcenters() {
+            const response = await fetchWithTimeout('/api/wip/meta/workcenters');
+            const result = await response.json();
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch workcenters');
+        }
+
+        async function searchApi(type, query) {
+            if (!query || query.length < 2) {
+                return [];
+            }
+            const params = new URLSearchParams({
+                type: type,
+                q: query,
+                limit: 20
+            });
+            const response = await fetch(`/api/wip/meta/search?${params}`);
+            const result = await response.json();
+            if (result.success) {
+                return result.data.items || [];
+            }
+            return [];
+        }
+
+        // ============================================================
+        // Render Functions
+        // ============================================================
+        function renderSummary(summary) {
+            if (!summary) return;
+
+            updateElementWithTransition('totalLots', summary.total_lots);
+            updateElementWithTransition('onEquipmentLots', summary.on_equipment_lots);
+            updateElementWithTransition('waitingLots', summary.waiting_lots);
+            updateElementWithTransition('holdLots', summary.hold_lots);
+        }
+
+        function renderTable(data) {
+            const container = document.getElementById('tableContainer');
+
+            if (!data || !data.lots || data.lots.length === 0) {
+                container.innerHTML = '<div class="placeholder">No data available</div>';
+                document.getElementById('tableInfo').textContent = 'No data';
+                document.getElementById('pagination').style.display = 'none';
+                return;
+            }
+
+            const specs = data.specs || [];
+
+            let html = '<table><thead><tr>';
+            // Fixed columns
+            html += '<th class="fixed-col">Lot ID</th>';
+            html += '<th class="fixed-col">Equipment</th>';
+            html += '<th class="fixed-col">Status</th>';
+            html += '<th class="fixed-col">Package</th>';
+
+            // Spec columns
+            specs.forEach(spec => {
+                html += `<th class="spec-col">${spec}</th>`;
+            });
+
+            html += '</tr></thead><tbody>';
+
+            data.lots.forEach(lot => {
+                html += '<tr>';
+
+                // Fixed columns
+                html += `<td class="fixed-col">${lot.lot_id || '-'}</td>`;
+                html += `<td class="fixed-col">${lot.equipment || '<span style="color: var(--warning);">Waiting</span>'}</td>`;
+
+                // Status with hold reason
+                if (lot.status === 'HOLD') {
+                    const holdText = lot.hold_reason ? `Hold (${lot.hold_reason})` : 'Hold';
+                    html += `<td class="fixed-col status-hold">${holdText}</td>`;
+                } else {
+                    html += `<td class="fixed-col status-active">${lot.status || 'Active'}</td>`;
+                }
+
+                html += `<td class="fixed-col">${lot.package || '-'}</td>`;
+
+                // Spec columns - show QTY in matching spec column
+                specs.forEach(spec => {
+                    if (lot.spec === spec) {
+                        html += `<td class="spec-cell has-data">${formatNumber(lot.qty)}</td>`;
+                    } else {
+                        html += '<td class="spec-cell"></td>';
+                    }
+                });
+
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            // Update info
+            const pagination = data.pagination;
+            const start = (pagination.page - 1) * pagination.page_size + 1;
+            const end = Math.min(pagination.page * pagination.page_size, pagination.total_count);
+            document.getElementById('tableInfo').textContent =
+                `Showing ${start} - ${end} of ${formatNumber(pagination.total_count)}`;
+
+            // Update pagination
+            if (pagination.total_pages > 1) {
+                document.getElementById('pagination').style.display = 'flex';
+                document.getElementById('pageInfo').textContent =
+                    `Page ${pagination.page} / ${pagination.total_pages}`;
+                document.getElementById('btnPrev').disabled = pagination.page <= 1;
+                document.getElementById('btnNext').disabled = pagination.page >= pagination.total_pages;
+            } else {
+                document.getElementById('pagination').style.display = 'none';
+            }
+
+            // Update last update time
+            if (data.sys_date) {
+                document.getElementById('lastUpdate').textContent = `Last Update: ${data.sys_date}`;
+            }
+        }
+
+        function populatePackageFilter(packages) {
+            const select = document.getElementById('filterPackage');
+            const currentValue = select.value;
+
+            select.innerHTML = '<option value="">All</option>';
+            packages.forEach(pkg => {
+                const option = document.createElement('option');
+                option.value = pkg.name;
+                option.textContent = `${pkg.name} (${pkg.lot_count})`;
+                select.appendChild(option);
+            });
+
+            select.value = currentValue;
+        }
+
+        // ============================================================
+        // Data Loading
+        // ============================================================
+        async function loadAllData(showOverlay = true) {
+            if (state.isLoading) return;
+            state.isLoading = true;
+
+            if (showOverlay) {
+                document.getElementById('loadingOverlay').style.display = 'flex';
+            }
+
+            // Show refresh indicator
+            document.getElementById('refreshIndicator').classList.add('active');
+            document.getElementById('refreshError').classList.remove('active');
+            document.getElementById('refreshSuccess').classList.remove('active');
+
+            try {
+                // Load packages for filter (only on first load)
+                if (state.packages.length === 0) {
+                    state.packages = await fetchPackages();
+                    populatePackageFilter(state.packages);
+                }
+
+                // Load detail data
+                state.data = await fetchDetail();
+
+                renderSummary(state.data.summary);
+                renderTable(state.data);
+
+                // Show success indicator
+                document.getElementById('refreshSuccess').classList.add('active');
+                setTimeout(() => {
+                    document.getElementById('refreshSuccess').classList.remove('active');
+                }, 1500);
+
+            } catch (error) {
+                console.error('Data load failed:', error);
+                document.getElementById('refreshError').classList.add('active');
+            } finally {
+                state.isLoading = false;
+                document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('refreshIndicator').classList.remove('active');
+            }
+        }
+
+        // ============================================================
+        // Autocomplete Functions
+        // ============================================================
+        function debounce(func, wait, key) {
+            return function(...args) {
+                if (state.searchDebounceTimers[key]) {
+                    clearTimeout(state.searchDebounceTimers[key]);
+                }
+                state.searchDebounceTimers[key] = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        function showDropdown(dropdownId, items, onSelect) {
+            const dropdown = document.getElementById(dropdownId);
+            if (!items || items.length === 0) {
+                dropdown.innerHTML = '<div class="autocomplete-empty">No results</div>';
+                dropdown.classList.add('show');
+                return;
+            }
+            dropdown.innerHTML = items.map(item =>
+                `<div class="autocomplete-item" data-value="${item}">${item}</div>`
+            ).join('');
+            dropdown.classList.add('show');
+
+            dropdown.querySelectorAll('.autocomplete-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    onSelect(el.dataset.value);
+                    dropdown.classList.remove('show');
+                });
+            });
+        }
+
+        function hideDropdown(dropdownId) {
+            document.getElementById(dropdownId).classList.remove('show');
+        }
+
+        function showLoading(dropdownId) {
+            const dropdown = document.getElementById(dropdownId);
+            dropdown.innerHTML = '<div class="autocomplete-loading">Searching...</div>';
+            dropdown.classList.add('show');
+        }
+
+        function setupAutocomplete(inputId, dropdownId, searchType) {
+            const input = document.getElementById(inputId);
+
+            const doSearch = debounce(async (query) => {
+                if (query.length < 2) {
+                    hideDropdown(dropdownId);
+                    return;
+                }
+                showLoading(dropdownId);
+                try {
+                    const items = await searchApi(searchType, query);
+                    showDropdown(dropdownId, items, (value) => {
+                        input.value = value;
+                    });
+                } catch (e) {
+                    hideDropdown(dropdownId);
+                }
+            }, 300, inputId);
+
+            input.addEventListener('input', (e) => {
+                doSearch(e.target.value);
+            });
+
+            input.addEventListener('focus', (e) => {
+                if (e.target.value.length >= 2) {
+                    doSearch(e.target.value);
+                }
+            });
+
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${dropdownId}`)) {
+                    hideDropdown(dropdownId);
+                }
+            });
+        }
+
+        // ============================================================
+        // Filter & Pagination
+        // ============================================================
+        function applyFilters() {
+            state.filters.workorder = document.getElementById('filterWorkorder').value.trim();
+            state.filters.lotid = document.getElementById('filterLotid').value.trim();
+            state.filters.package = document.getElementById('filterPackage').value;
+            state.filters.status = document.getElementById('filterStatus').value;
+            state.page = 1;
+            loadAllData(false);
+        }
+
+        function clearFilters() {
+            document.getElementById('filterWorkorder').value = '';
+            document.getElementById('filterLotid').value = '';
+            document.getElementById('filterPackage').value = '';
+            document.getElementById('filterStatus').value = '';
+            state.filters = { package: '', status: '', workorder: '', lotid: '' };
+            state.page = 1;
+            loadAllData(false);
+        }
+
+        function prevPage() {
+            if (state.page > 1) {
+                state.page--;
+                loadAllData(false);
+            }
+        }
+
+        function nextPage() {
+            if (state.data && state.page < state.data.pagination.total_pages) {
+                state.page++;
+                loadAllData(false);
+            }
+        }
+
+        // ============================================================
+        // Auto-refresh
+        // ============================================================
+        function startAutoRefresh() {
+            if (state.refreshTimer) {
+                clearInterval(state.refreshTimer);
+            }
+            state.refreshTimer = setInterval(() => {
+                if (!document.hidden) {
+                    loadAllData(false);
+                }
+            }, state.REFRESH_INTERVAL);
+        }
+
+        function manualRefresh() {
+            startAutoRefresh();
+            loadAllData(false);
+        }
+
+        // Handle page visibility
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                loadAllData(false);
+                startAutoRefresh();
+            }
+        });
+
+        // ============================================================
+        // Initialize
+        // ============================================================
+        async function init() {
+            // Setup autocomplete for WORKORDER and LOT ID
+            setupAutocomplete('filterWorkorder', 'workorderDropdown', 'workorder');
+            setupAutocomplete('filterLotid', 'lotidDropdown', 'lotid');
+
+            // Allow Enter key to trigger filter
+            document.getElementById('filterWorkorder').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
+            document.getElementById('filterLotid').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
+
+            // Get workcenter from URL or use first available
+            state.workcenter = getUrlParam('workcenter');
+
+            if (!state.workcenter) {
+                // Fetch workcenters and use first one
+                try {
+                    const workcenters = await fetchWorkcenters();
+                    if (workcenters && workcenters.length > 0) {
+                        state.workcenter = workcenters[0].name;
+                        // Update URL without reload
+                        window.history.replaceState({}, '', `/wip-detail?workcenter=${encodeURIComponent(state.workcenter)}`);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch workcenters:', error);
+                }
+            }
+
+            if (state.workcenter) {
+                document.getElementById('pageTitle').textContent = `WIP Detail - ${state.workcenter}`;
+                loadAllData(true);
+                startAutoRefresh();
+            } else {
+                document.getElementById('tableContainer').innerHTML =
+                    '<div class="placeholder">No workcenter available</div>';
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

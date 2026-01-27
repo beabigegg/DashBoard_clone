@@ -2,116 +2,239 @@
 """WIP API routes for MES Dashboard.
 
 Contains Flask Blueprint for WIP-related API endpoints.
+Uses DWH.DW_PJ_LOT_V view for real-time WIP data.
 """
 
 from flask import Blueprint, jsonify, request
 
 from mes_dashboard.services.wip_service import (
-    query_wip_summary,
-    query_wip_by_spec_workcenter,
-    query_wip_by_product_line,
-    query_wip_by_status,
-    query_wip_by_mfgorder,
-    query_wip_distribution_filter_options,
-    query_wip_distribution_pivot_columns,
-    query_wip_distribution,
+    get_wip_summary,
+    get_wip_matrix,
+    get_wip_hold_summary,
+    get_wip_detail,
+    get_workcenters,
+    get_packages,
+    search_workorders,
+    search_lot_ids,
 )
 
 # Create Blueprint
 wip_bp = Blueprint('wip', __name__, url_prefix='/api/wip')
 
 
-@wip_bp.route('/summary')
-def api_wip_summary():
-    """API: Current WIP summary."""
-    summary = query_wip_summary()
-    if summary:
-        return jsonify({'success': True, 'data': summary})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+def _parse_bool(value: str) -> bool:
+    """Parse boolean from query string."""
+    return value.lower() in ('true', '1', 'yes') if value else False
 
 
-@wip_bp.route('/by_spec_workcenter')
-def api_wip_by_spec_workcenter():
-    """API: Current WIP by spec/workcenter."""
-    df = query_wip_by_spec_workcenter()
-    if df is not None:
-        data = df.to_dict(orient='records')
-        return jsonify({'success': True, 'data': data, 'count': len(data)})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+# ============================================================
+# Overview APIs
+# ============================================================
 
+@wip_bp.route('/overview/summary')
+def api_overview_summary():
+    """API: Get WIP KPI summary for overview dashboard.
 
-@wip_bp.route('/by_product_line')
-def api_wip_by_product_line():
-    """API: Current WIP by product line."""
-    df = query_wip_by_product_line()
-    if df is not None:
-        data = df.to_dict(orient='records')
-        if not df.empty:
-            product_line_summary = df.groupby('PRODUCTLINENAME_LEF').agg({
-                'LOT_COUNT': 'sum',
-                'TOTAL_QTY': 'sum',
-                'TOTAL_QTY2': 'sum'
-            }).reset_index()
-            summary = product_line_summary.to_dict(orient='records')
-        else:
-            summary = []
-        return jsonify({'success': True, 'data': data, 'summary': summary, 'count': len(data)})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+    Query Parameters:
+        workorder: Optional WORKORDER filter (fuzzy match)
+        lotid: Optional LOTID filter (fuzzy match)
+        include_dummy: Include DUMMY lots (default: false)
 
+    Returns:
+        JSON with total_lots, total_qty, hold_lots, hold_qty, sys_date
+    """
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
 
-@wip_bp.route('/by_status')
-def api_wip_by_status():
-    """API: Current WIP by status."""
-    df = query_wip_by_status()
-    if df is not None:
-        data = df.to_dict(orient='records')
-        return jsonify({'success': True, 'data': data})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
-
-
-@wip_bp.route('/by_mfgorder')
-def api_wip_by_mfgorder():
-    """API: Current WIP by mfg order (Top N)."""
-    limit = request.args.get('limit', 100, type=int)
-    df = query_wip_by_mfgorder(limit)
-    if df is not None:
-        data = df.to_dict(orient='records')
-        return jsonify({'success': True, 'data': data})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
-
-
-@wip_bp.route('/distribution/filter_options')
-def api_wip_distribution_filter_options():
-    """API: Get WIP distribution filter options."""
-    days_back = request.args.get('days_back', 90, type=int)
-    options = query_wip_distribution_filter_options(days_back)
-    if options:
-        return jsonify({'success': True, 'data': options})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
-
-
-@wip_bp.route('/distribution/pivot_columns', methods=['POST'])
-def api_wip_distribution_pivot_columns():
-    """API: Get WIP distribution pivot columns."""
-    data = request.get_json() or {}
-    filters = data.get('filters')
-    days_back = data.get('days_back', 90)
-    columns = query_wip_distribution_pivot_columns(filters, days_back)
-    if columns is not None:
-        return jsonify({'success': True, 'data': columns})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
-
-
-@wip_bp.route('/distribution', methods=['POST'])
-def api_wip_distribution():
-    """API: Query WIP distribution main data."""
-    data = request.get_json() or {}
-    filters = data.get('filters')
-    limit = min(data.get('limit', 500), 1000)  # Max 1000 records
-    offset = data.get('offset', 0)
-    days_back = data.get('days_back', 90)
-
-    result = query_wip_distribution(filters, limit, offset, days_back)
+    result = get_wip_summary(
+        include_dummy=include_dummy,
+        workorder=workorder,
+        lotid=lotid
+    )
     if result is not None:
         return jsonify({'success': True, 'data': result})
+    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+@wip_bp.route('/overview/matrix')
+def api_overview_matrix():
+    """API: Get workcenter x product line matrix for overview dashboard.
+
+    Query Parameters:
+        workorder: Optional WORKORDER filter (fuzzy match)
+        lotid: Optional LOTID filter (fuzzy match)
+        include_dummy: Include DUMMY lots (default: false)
+
+    Returns:
+        JSON with workcenters, packages, matrix, workcenter_totals,
+        package_totals, grand_total
+    """
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+
+    result = get_wip_matrix(
+        include_dummy=include_dummy,
+        workorder=workorder,
+        lotid=lotid
+    )
+    if result is not None:
+        return jsonify({'success': True, 'data': result})
+    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+@wip_bp.route('/overview/hold')
+def api_overview_hold():
+    """API: Get hold summary grouped by hold reason.
+
+    Query Parameters:
+        workorder: Optional WORKORDER filter (fuzzy match)
+        lotid: Optional LOTID filter (fuzzy match)
+        include_dummy: Include DUMMY lots (default: false)
+
+    Returns:
+        JSON with items list containing reason, lots, qty
+    """
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+
+    result = get_wip_hold_summary(
+        include_dummy=include_dummy,
+        workorder=workorder,
+        lotid=lotid
+    )
+    if result is not None:
+        return jsonify({'success': True, 'data': result})
+    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+# ============================================================
+# Detail APIs
+# ============================================================
+
+@wip_bp.route('/detail/<workcenter>')
+def api_detail(workcenter: str):
+    """API: Get WIP detail for a specific workcenter group.
+
+    Args:
+        workcenter: WORKCENTER_GROUP name (URL path parameter)
+
+    Query Parameters:
+        package: Optional PRODUCTLINENAME filter
+        status: Optional STATUS filter ('ACTIVE', 'HOLD')
+        workorder: Optional WORKORDER filter (fuzzy match)
+        lotid: Optional LOTID filter (fuzzy match)
+        include_dummy: Include DUMMY lots (default: false)
+        page: Page number (default 1)
+        page_size: Records per page (default 100, max 500)
+
+    Returns:
+        JSON with workcenter, summary, specs, lots, pagination, sys_date
+    """
+    package = request.args.get('package', '').strip() or None
+    status = request.args.get('status', '').strip() or None
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    page = request.args.get('page', 1, type=int)
+    page_size = min(request.args.get('page_size', 100, type=int), 500)
+
+    if page < 1:
+        page = 1
+
+    result = get_wip_detail(
+        workcenter=workcenter,
+        package=package,
+        status=status,
+        workorder=workorder,
+        lotid=lotid,
+        include_dummy=include_dummy,
+        page=page,
+        page_size=page_size
+    )
+
+    if result is not None:
+        return jsonify({'success': True, 'data': result})
+    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+# ============================================================
+# Meta APIs
+# ============================================================
+
+@wip_bp.route('/meta/workcenters')
+def api_meta_workcenters():
+    """API: Get list of workcenter groups with lot counts.
+
+    Query Parameters:
+        include_dummy: Include DUMMY lots (default: false)
+
+    Returns:
+        JSON with list of {name, lot_count} sorted by sequence
+    """
+    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+
+    result = get_workcenters(include_dummy=include_dummy)
+    if result is not None:
+        return jsonify({'success': True, 'data': result})
+    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+@wip_bp.route('/meta/packages')
+def api_meta_packages():
+    """API: Get list of packages (product lines) with lot counts.
+
+    Query Parameters:
+        include_dummy: Include DUMMY lots (default: false)
+
+    Returns:
+        JSON with list of {name, lot_count} sorted by count desc
+    """
+    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+
+    result = get_packages(include_dummy=include_dummy)
+    if result is not None:
+        return jsonify({'success': True, 'data': result})
+    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+@wip_bp.route('/meta/search')
+def api_meta_search():
+    """API: Search for WORKORDER or LOTID values.
+
+    Query Parameters:
+        type: Search type ('workorder' or 'lotid')
+        q: Search query (minimum 2 characters)
+        limit: Maximum results (default: 20, max: 50)
+        include_dummy: Include DUMMY lots (default: false)
+
+    Returns:
+        JSON with items list containing matching values
+    """
+    search_type = request.args.get('type', '').strip().lower()
+    q = request.args.get('q', '').strip()
+    limit = min(request.args.get('limit', 20, type=int), 50)
+    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+
+    # Validate search type
+    if search_type not in ('workorder', 'lotid'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid type. Use "workorder" or "lotid"'
+        }), 400
+
+    # Validate query length
+    if len(q) < 2:
+        return jsonify({'success': True, 'data': {'items': []}})
+
+    # Perform search
+    if search_type == 'workorder':
+        result = search_workorders(q=q, limit=limit, include_dummy=include_dummy)
+    else:
+        result = search_lot_ids(q=q, limit=limit, include_dummy=include_dummy)
+
+    if result is not None:
+        return jsonify({'success': True, 'data': {'items': result}})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500

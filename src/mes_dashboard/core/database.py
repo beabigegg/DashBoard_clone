@@ -3,44 +3,44 @@
 
 from __future__ import annotations
 
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 
 import oracledb
 import pandas as pd
 from flask import g, current_app
 from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
 
 from mes_dashboard.config.database import DB_CONFIG, CONNECTION_STRING
 from mes_dashboard.config.settings import DevelopmentConfig
 
 # ============================================================
-# SQLAlchemy Engine (Singleton with connection pooling)
+# SQLAlchemy Engine (NullPool - no connection pooling)
 # ============================================================
+# Using NullPool for dashboard applications that need long-term stability.
+# Each query creates a new connection and closes it immediately after use.
+# This avoids issues with idle connections being dropped by firewalls/NAT.
 
 _ENGINE = None
 
 
-def _get_pool_settings() -> Tuple[int, int]:
-    """Return pool size and max overflow from app config or defaults."""
-    try:
-        pool_size = current_app.config.get("DB_POOL_SIZE", DevelopmentConfig.DB_POOL_SIZE)
-        max_overflow = current_app.config.get("DB_MAX_OVERFLOW", DevelopmentConfig.DB_MAX_OVERFLOW)
-    except RuntimeError:
-        pool_size = DevelopmentConfig.DB_POOL_SIZE
-        max_overflow = DevelopmentConfig.DB_MAX_OVERFLOW
-    return pool_size, max_overflow
-
-
 def get_engine():
-    """Get SQLAlchemy engine with connection pooling (singleton pattern)."""
+    """Get SQLAlchemy engine without connection pooling.
+
+    Uses NullPool to create fresh connections for each request.
+    This is more reliable for long-running dashboard applications
+    where idle connections may be dropped by network infrastructure.
+    """
     global _ENGINE
     if _ENGINE is None:
-        pool_size, max_overflow = _get_pool_settings()
         _ENGINE = create_engine(
             CONNECTION_STRING,
-            pool_size=pool_size,
-            max_overflow=max_overflow,
-            pool_pre_ping=True,
+            poolclass=NullPool,  # No connection pooling - fresh connection each time
+            connect_args={
+                "tcp_connect_timeout": 15,   # TCP connect timeout 15s
+                "retry_count": 2,            # Retry twice on connection failure
+                "retry_delay": 1,            # 1s delay between retries
+            }
         )
     return _ENGINE
 
@@ -70,6 +70,22 @@ def init_db(app) -> None:
 
 
 # ============================================================
+# Keep-Alive (No-op with NullPool)
+# ============================================================
+# Keep-alive is not needed with NullPool since each query creates
+# a fresh connection. These functions are kept for API compatibility.
+
+def start_keepalive():
+    """No-op: Keep-alive not needed with NullPool."""
+    print("[DB] Using NullPool - no keep-alive needed")
+
+
+def stop_keepalive():
+    """No-op: Keep-alive not needed with NullPool."""
+    pass
+
+
+# ============================================================
 # Direct Connection Helpers
 # ============================================================
 
@@ -80,7 +96,12 @@ def get_db_connection():
     Used for operations that need direct cursor access.
     """
     try:
-        return oracledb.connect(**DB_CONFIG)
+        return oracledb.connect(
+            **DB_CONFIG,
+            tcp_connect_timeout=10,  # TCP connect timeout 10s
+            retry_count=1,           # Retry once on connection failure
+            retry_delay=1,           # 1s delay between retries
+        )
     except Exception as exc:
         print(f"Database connection failed: {exc}")
         return None

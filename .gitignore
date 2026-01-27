@@ -50,3 +50,4 @@ htmlcov/
 .ipynb_checkpoints/
 
 # Note: openspec/ is tracked (not ignored)
+tmp/

@@ -8,7 +8,7 @@ from flask import Flask, jsonify, render_template, request
 from mes_dashboard.config.tables import TABLES_CONFIG
 from mes_dashboard.config.settings import get_config
 from mes_dashboard.core.cache import NoOpCache
-from mes_dashboard.core.database import get_table_data, get_table_columns, get_engine, init_db
+from mes_dashboard.core.database import get_table_data, get_table_columns, get_engine, init_db, start_keepalive
 from mes_dashboard.routes import register_routes
 
 
@@ -26,6 +26,7 @@ def create_app(config_name: str | None = None) -> Flask:
     init_db(app)
     with app.app_context():
         get_engine()
+        start_keepalive()  # Keep database connections alive
 
     # Register API routes
     register_routes(app)
@@ -44,20 +45,20 @@ def create_app(config_name: str | None = None) -> Flask:
         """Table viewer page."""
         return render_template('index.html', tables_config=TABLES_CONFIG)
 
-    @app.route('/wip')
-    def wip_page():
-        """WIP report page."""
-        return render_template('wip_report.html')
+    @app.route('/wip-overview')
+    def wip_overview_page():
+        """WIP Overview Dashboard - for executives."""
+        return render_template('wip_overview.html')
+
+    @app.route('/wip-detail')
+    def wip_detail_page():
+        """WIP Detail Dashboard - for production lines."""
+        return render_template('wip_detail.html')
 
     @app.route('/resource')
     def resource_page():
         """Resource status report page."""
         return render_template('resource_status.html')
-
-    @app.route('/wip-overview')
-    def wip_overview_page():
-        """WIP overview dashboard page."""
-        return render_template('wip_overview.html')
 
     @app.route('/excel-query')
     def excel_query_page():

@@ -31,8 +31,9 @@ class DevelopmentConfig(Config):
     DEBUG = True
     ENV = "development"
 
-    DB_POOL_SIZE = _int_env("DB_POOL_SIZE", 5)
-    DB_MAX_OVERFLOW = _int_env("DB_MAX_OVERFLOW", 10)
+    # Smaller pool to ensure keep-alive covers all connections
+    DB_POOL_SIZE = _int_env("DB_POOL_SIZE", 2)
+    DB_MAX_OVERFLOW = _int_env("DB_MAX_OVERFLOW", 3)
 
 
 class ProductionConfig(Config):
@@ -45,9 +46,22 @@ class ProductionConfig(Config):
     DB_MAX_OVERFLOW = _int_env("DB_MAX_OVERFLOW", 20)
 
 
+class TestingConfig(Config):
+    """Testing configuration."""
+
+    DEBUG = True
+    TESTING = True
+    ENV = "testing"
+
+    DB_POOL_SIZE = 1
+    DB_MAX_OVERFLOW = 0
+
+
 def get_config(env: str | None = None) -> Type[Config]:
     """Select config class based on environment name."""
     value = (env or os.getenv("FLASK_ENV", "development")).lower()
     if value in {"prod", "production"}:
         return ProductionConfig
+    if value in {"test", "testing"}:
+        return TestingConfig
     return DevelopmentConfig

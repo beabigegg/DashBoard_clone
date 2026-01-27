@@ -1,22 +1,30 @@
 ﻿# MES 核心表詳細分析報告
 
-**生成時間**: 2026-01-14
-**分析範圍**: 16 張 MES 核心表
-**資料來源**: MES_Database_Reference.md
+**生成時間**: 2026-01-14（最後更新: 2026-01-27）
+**分析範圍**: 17 張 MES 核心表（含 1 張 DWH 即時視圖）
+**資料來源**: MES_Database_Reference.md, DWH.DW_PJ_LOT_V 實際數據分析
 
 ---
 
 ## 目錄
 
 1. [表性質分類總覽](#表性質分類總覽)
-2. [現況快照表分析](#現況快照表分析)
-3. [歷史累積表分析](#歷史累積表分析)
-4. [表間關聯關係圖](#表間關聯關係圖)
-5. [關鍵業務場景查詢策略](#關鍵業務場景查詢策略)
+2. [即時數據表分析](#即時數據表分析)
+3. [現況快照表分析](#現況快照表分析)
+4. [歷史累積表分析](#歷史累積表分析)
+5. [表間關聯關係圖](#表間關聯關係圖)
+6. [關鍵業務場景查詢策略](#關鍵業務場景查詢策略)
 
 ---
 
 ## 表性質分類總覽
+
+### 即時數據表（Real-time Views）
+透過 DB Link 從 DWH 取得的即時 WIP 視圖，每 5 分鐘自動更新
+
+| 表名 | 數據量 | 主要用途 | 更新方式 |
+|------|--------|---------|---------|
+| **DWH.DW_PJ_LOT_V** | ~9,000-12,000 | 即時 WIP 分布（70欄位） | 每 5 分鐘從 DWH 同步 |
 
 ### 現況快照表（Snapshot Tables）
 存儲當前狀態的數據，數據會被更新或覆蓋
@@ -50,6 +58,253 @@
 |------|--------|---------|
 | **DW_MES_PARTREQUESTORDER** | 61,396 | 物料請求訂單 |
 | **DW_MES_PJ_COMBINEDASSYLOTS** | 1,955,691 | 組合裝配批次 |
+
+---
+
+## 即時數據表分析
+
+### DWH.DW_PJ_LOT_V（即時 WIP 批次視圖）⭐⭐⭐
+
+**表性質**: 即時數據視圖（Real-time View）
+
+**業務定義**: DWH 提供的即時 WIP 視圖，透過 DB Link 從 `PJ_LOT_MV@DWDB_MESDB` 取得，每 5 分鐘自動更新。包含完整的批次狀態、工站位置、設備資訊、Hold 原因等 70 個欄位，是 WIP Dashboard 的主要數據源。
+
+**數據來源**: `PJ_LOT_MV@DWDB_MESDB`（DB Link 連線）
+
+**數據量**: 約 9,000 - 12,000 筆（動態變化）
+
+#### 欄位分類總覽（70 欄位）
+
+| 分類 | 欄位數 | 說明 |
+|------|--------|------|
+| 批次識別 | 5 | LOTID, CONTAINERID, WORKORDER, FIRSTNAME, NO |
+| 數量相關 | 6 | QTY, QTY2, STARTQTY, STARTQTY2, MOVEINQTY, MOVEINQTY2 |
+| 狀態相關 | 4 | STATUS, CURRENTHOLDCOUNT, STARTREASON, OWNER |
+| 時間相關 | 7 | STARTDATE, UTS, MOVEINTIMESTAMP, SYS_DATE, AGEBYDAYS, REMAINTIME, OCCURRENCEDATE |
+| 工站/流程 | 12 | WORKCENTER*, SPEC*, STEP, WORKFLOWNAME, LOCATIONNAME |
+| 產品/封裝 | 8 | PRODUCT, PRODUCTLINENAME, PACKAGE_LEF, MATERIALTYPE, PJ_TYPE, PJ_FUNCTION, BOP |
+| Hold 相關 | 8 | HOLDREASONNAME, HOLDEMP, HOLDLOCATION, RELEASETIME, RELEASEEMP, RELEASEREASON, COMMENT_HOLD |
+| 設備相關 | 4 | EQUIPMENTNAME, EQUIPMENTS, EQUIPMENTCOUNT, DEPTNAME |
+| 物料資訊 | 6 | LEADFRAMENAME, LEADFRAMEOPTION, WAFERNAME, WAFERLOT, COMNAME, DATECODE |
+| 備註/其他 | 10 | CONTAINERCOMMENTS, COMMENT_*, PRIORITYCODENAME, JOB*, PB_FUNCTION, TMTT_R, WAFER_FACTOR |
+
+#### 關鍵時間欄位
+
+| 欄位名 | 類型 | 用途 | 說明 |
+|--------|------|------|------|
+| `SYS_DATE` | TIMESTAMP | 數據更新時間 | 視圖同步時間戳，用於確認數據新鮮度 |
+| `STARTDATE` | TIMESTAMP | 批次開始時間 | 批次投產的時間點 |
+| `MOVEINTIMESTAMP` | TIMESTAMP | 移入當前工站時間 | 進入當前工序的時間 |
+| `UTS` | VARCHAR2 | 預計完成日期 | 格式為 'YYYY/MM/DD' |
+| `AGEBYDAYS` | NUMBER | 批次天數 | 從 STARTDATE 到現在的天數（含小數） |
+| `REMAINTIME` | NUMBER | 剩餘時間 | 預計完成前的剩餘天數（含小數） |
+
+#### 關鍵業務欄位詳解
+
+##### 批次識別欄位
+
+| 欄位名 | 類型 | 說明 | 範例值 |
+|--------|------|------|--------|
+| `LOTID` | VARCHAR2(40) | 批次號（業務識別碼） | `GA26011704-A00-003` |
+| `CONTAINERID` | VARCHAR2(40) | 容器 ID（系統識別碼） | `48810480002ab0b4` |
+| `WORKORDER` | VARCHAR2(40) | 工單號 | `GA26011704` |
+| `FIRSTNAME` | VARCHAR2(100) | 首片批號 | `PSMS-4473#RFTLD3` |
+| `NO` | NUMBER | 序號（查詢結果排序用） | 1, 2, 3... |
+
+##### 狀態欄位
+
+| 欄位名 | 類型 | 說明 | 實際值分布 |
+|--------|------|------|-----------|
+| `STATUS` | VARCHAR2(20) | 批次狀態 | `ACTIVE`（約 98.7%）、`HOLD`（約 1.3%） |
+| `OWNER` | VARCHAR2(40) | 所有者/用途 | `量產`、`重工RW`、`代工`、`點測`、`樣品`、`餘晶`、`工程`、`久存`、`PROD`、`降規` |
+| `MATERIALTYPE` | VARCHAR2(40) | 物料類型 | `成品`（約 99%）、`Wafer`（約 1%） |
+| `STARTREASON` | VARCHAR2(40) | 開始原因 | `NORMAL`、`RW` 等 |
+
+##### 數量欄位
+
+| 欄位名 | 類型 | 說明 | 數值範圍 |
+|--------|------|------|---------|
+| `QTY` | NUMBER | 當前數量（主單位） | 1 - 3,000,000+ |
+| `QTY2` | NUMBER | 當前數量（輔單位） | 通常為 0 |
+| `STARTQTY` | NUMBER | 起始數量 | 通常 ≥ QTY |
+| `MOVEINQTY` | NUMBER | 移入數量 | 進站時的數量 |
+
+##### 工站/流程欄位
+
+| 欄位名 | 類型 | 說明 | 範例值 |
+|--------|------|------|--------|
+| `WORKCENTERNAME` | VARCHAR2(40) | 工作中心名稱 | `成型`、`TMTT`、`電鍍`、`焊接` |
+| `WORKCENTER_GROUP` | VARCHAR2(40) | 工作中心群組 | 與 WORKCENTERNAME 相同或分組 |
+| `WORKCENTER_SHORT` | VARCHAR2(20) | 工站簡稱 | `Mold`、`TMTT`、`DB`、`WB` |
+| `WORKCENTERSEQUENCE` | VARCHAR2(10) | 工站順序 | `130`、`300` 等（數值越大越後段） |
+| `SPECNAME` | VARCHAR2(100) | 工序規格名稱 | `成型烘烤`、`PRE TMTT` |
+| `STEP` | VARCHAR2(100) | 當前步驟 | 通常與 SPECNAME 相同 |
+| `WORKFLOWNAME` | VARCHAR2(100) | 工藝流程名稱 | `PCC_SOT-223`、`UAC_SOD-523` |
+
+##### 產品/封裝欄位
+
+| 欄位名 | 類型 | 說明 | 範例值 |
+|--------|------|------|--------|
+| `PRODUCT` | VARCHAR2(100) | 產品名稱（完整） | `PJW5P06A_R2_00701` |
+| `PRODUCTLINENAME` | VARCHAR2(40) | 產品線/封裝類型 | `SOT-223`、`SOD-523` |
+| `PACKAGE_LEF` | VARCHAR2(40) | 封裝型號 | `SOT-223`、`SOD-523` |
+| `PJ_TYPE` | VARCHAR2(40) | 產品型號 | `PJW5P06A`、`RB521S30-NC` |
+| `PJ_FUNCTION` | VARCHAR2(40) | 產品功能分類 | `MOSFET`、`SKY` |
+| `BOP` | VARCHAR2(40) | BOP 代碼 | `PCC15`、`UAC10` |
+
+##### Hold 相關欄位
+
+| 欄位名 | 類型 | 說明 | 範例值 |
+|--------|------|------|--------|
+| `HOLDREASONNAME` | VARCHAR2(100) | Hold 原因 | `S2品質異常單(PE)`、`特殊需求管控` |
+| `CURRENTHOLDCOUNT` | NUMBER | 當前 Hold 次數 | 0 = 非 Hold，≥1 = Hold 中 |
+| `HOLDEMP` | VARCHAR2(40) | Hold 操作人員 | 員工姓名 |
+| `HOLDLOCATION` | VARCHAR2(40) | Hold 位置 | 通常為 NULL |
+| `RELEASETIME` | TIMESTAMP | 預計解除時間 | NULL 表示未設定 |
+| `RELEASEEMP` | VARCHAR2(40) | 解除人員 | NULL 表示尚未解除 |
+| `RELEASEREASON` | VARCHAR2(200) | 解除原因 | NULL 表示尚未解除 |
+| `COMMENT_HOLD` | VARCHAR2(4000) | Hold 備註 | 詳細說明 Hold 原因 |
+
+##### 設備欄位（重要說明）
+
+| 欄位名 | 類型 | 說明 | 使用工站 |
+|--------|------|------|---------|
+| `EQUIPMENTNAME` | VARCHAR2(40) | 設備名稱（單一設備） | TMTT（82%）、切彎腳（69%）、PKG_SAW |
+| `EQUIPMENTS` | VARCHAR2(4000) | 設備清單（逗號分隔） | 成型、焊接、電鍍、打印等其他工站 |
+| `EQUIPMENTCOUNT` | NUMBER | 設備數量 | 0 表示尚無設備綁定 |
+
+**⚠️ 重要**: `EQUIPMENTNAME` 與 `EQUIPMENTS` 為**互斥使用**：
+- **TMTT、切彎腳、PKG_SAW** 工站使用 `EQUIPMENTNAME`（單一設備）
+- **其他工站**（成型、焊接、電鍍、打印等）使用 `EQUIPMENTS`（設備清單）
+- 僅約 100 筆同時有兩欄位數據（均為 TMTT 工站）
+- **建議查詢**: 使用 `COALESCE(EQUIPMENTNAME, EQUIPMENTS)` 取得統一設備資訊
+
+##### 優先度欄位
+
+| 欄位名 | 值 | 說明 |
+|--------|-----|------|
+| `PRIORITYCODENAME` | `1.超特急` | 最高優先度 |
+| | `2.特急` | 高優先度 |
+| | `3.急件` | 中高優先度（約 3%） |
+| | `4.一般` | 一般優先度（約 96%） |
+
+##### Hold 原因分布（參考數據）
+
+| HOLDREASONNAME | 說明 | 典型佔比 |
+|----------------|------|---------|
+| `特殊需求管控` | 特殊製程或客戶要求 | 最常見 |
+| `S2品質異常單(PE)` | PE 開立的品質異常 | 常見 |
+| `現場品質異常單(PQC)` | PQC 開立的品質異常 | 常見 |
+| `自行暫停` | 自主暫停 | 偶爾 |
+| `治具不足HOLD` | 治具問題 | 偶爾 |
+| 其他 | 換線暫停、生管暫停等 | 少見 |
+
+#### 查詢策略
+
+**1. WIP 即時分布統計（按工站）**
+```sql
+SELECT
+    WORKCENTER_GROUP,
+    WORKCENTER_SHORT,
+    COUNT(*) as LOT_COUNT,
+    SUM(QTY) as TOTAL_QTY,
+    SUM(CASE WHEN STATUS = 'HOLD' THEN 1 ELSE 0 END) as HOLD_LOTS,
+    SUM(CASE WHEN STATUS = 'HOLD' THEN QTY ELSE 0 END) as HOLD_QTY
+FROM DWH.DW_PJ_LOT_V
+WHERE OWNER NOT IN ('DUMMY')  -- 排除 DUMMY 批次
+GROUP BY WORKCENTER_GROUP, WORKCENTER_SHORT, WORKCENTERSEQUENCE_GROUP
+ORDER BY TO_NUMBER(WORKCENTERSEQUENCE_GROUP);
+```
+
+**2. WIP 交叉分析（工站 x 封裝）**
+```sql
+SELECT
+    WORKCENTER_GROUP,
+    PRODUCTLINENAME,
+    COUNT(*) as LOT_COUNT,
+    SUM(QTY) as TOTAL_QTY
+FROM DWH.DW_PJ_LOT_V
+WHERE OWNER NOT IN ('DUMMY')
+GROUP BY WORKCENTER_GROUP, PRODUCTLINENAME
+ORDER BY WORKCENTER_GROUP, LOT_COUNT DESC;
+```
+
+**3. Hold 批次清單**
+```sql
+SELECT
+    LOTID,
+    PRODUCT,
+    WORKCENTERNAME,
+    SPECNAME,
+    QTY,
+    HOLDREASONNAME,
+    HOLDEMP,
+    COMMENT_HOLD,
+    AGEBYDAYS
+FROM DWH.DW_PJ_LOT_V
+WHERE STATUS = 'HOLD'
+ORDER BY AGEBYDAYS DESC;
+```
+
+**4. 設備使用查詢（統一處理 EQUIPMENTNAME/EQUIPMENTS）**
+```sql
+SELECT
+    LOTID,
+    WORKCENTERNAME,
+    COALESCE(EQUIPMENTNAME, EQUIPMENTS) as EQUIPMENT_INFO,
+    EQUIPMENTCOUNT,
+    QTY
+FROM DWH.DW_PJ_LOT_V
+WHERE COALESCE(EQUIPMENTNAME, EQUIPMENTS) IS NOT NULL
+ORDER BY WORKCENTERNAME;
+```
+
+**5. 批次詳細查詢**
+```sql
+SELECT
+    LOTID,
+    CONTAINERID,
+    WORKORDER,
+    PRODUCT,
+    PJ_TYPE,
+    PJ_FUNCTION,
+    PRODUCTLINENAME,
+    WORKCENTERNAME,
+    SPECNAME,
+    STATUS,
+    QTY,
+    STARTQTY,
+    AGEBYDAYS,
+    REMAINTIME,
+    UTS,
+    PRIORITYCODENAME,
+    OWNER,
+    COALESCE(EQUIPMENTNAME, EQUIPMENTS) as EQUIPMENT,
+    SYS_DATE
+FROM DWH.DW_PJ_LOT_V
+WHERE LOTID LIKE 'GA26011%'  -- 工單篩選
+ORDER BY WORKCENTERSEQUENCE;
+```
+
+#### 與其他表的關聯
+
+| 關聯表 | 關聯欄位 | 用途 |
+|--------|---------|------|
+| DW_MES_CONTAINER | CONTAINERID | 取得更詳細的容器資訊 |
+| DW_MES_LOTWIPHISTORY | CONTAINERID | 查詢批次流轉歷史 |
+| DW_MES_HOLDRELEASEHISTORY | CONTAINERID | 查詢 Hold/Release 歷史 |
+
+#### 重要注意事項
+
+⚠️ **資料更新頻率**: 每 5 分鐘從 DWH 同步，查詢時注意 `SYS_DATE` 確認數據新鮮度
+
+⚠️ **DUMMY 批次過濾**: 生產報表應排除 `OWNER IN ('DUMMY')` 的測試批次
+
+⚠️ **設備欄位選擇**: 使用 `COALESCE(EQUIPMENTNAME, EQUIPMENTS)` 處理不同工站的設備資訊
+
+⚠️ **時間欄位**: `UTS` 為 VARCHAR2 格式 'YYYY/MM/DD'，需轉換後才能計算
+
+⚠️ **無資料庫備註**: 此視圖無 Oracle 欄位備註（ALL_COL_COMMENTS 為空），欄位說明請參考本文件
 
 ---
 
@@ -1836,8 +2091,9 @@ WHERE RN > 0;
 
 ---
 
-**文檔版本**: v1.0
-**最後更新**: 2026-01-14
+**文檔版本**: v1.1
+**最後更新**: 2026-01-27
+**更新內容**: 新增 DWH.DW_PJ_LOT_V 即時 WIP 視圖詳細分析（70 欄位）
 **建議更新週期**: 每季度或表結構變更時
 
 
