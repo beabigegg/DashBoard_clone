@@ -5,14 +5,15 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
 from typing import Optional, Dict, Any
 
 import oracledb
 import pandas as pd
 from flask import g, current_app
-from sqlalchemy import create_engine, text
-from sqlalchemy.pool import NullPool
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.pool import QueuePool
 
 from mes_dashboard.config.database import DB_CONFIG, CONNECTION_STRING
 from mes_dashboard.config.settings import DevelopmentConfig
@@ -21,35 +22,71 @@ from mes_dashboard.config.settings import DevelopmentConfig
 logger = logging.getLogger('mes_dashboard.database')
 
 # ============================================================
-# SQLAlchemy Engine (NullPool - no connection pooling)
+# SQLAlchemy Engine (QueuePool - connection pooling)
 # ============================================================
-# Using NullPool for dashboard applications that need long-term stability.
-# Each query creates a new connection and closes it immediately after use.
-# This avoids issues with idle connections being dropped by firewalls/NAT.
+# Using QueuePool for better performance and connection reuse.
+# pool_pre_ping ensures connections are valid before use.
+# pool_recycle prevents stale connections from firewalls/NAT.
 
 _ENGINE = None
 
 
 def get_engine():
-    """Get SQLAlchemy engine without connection pooling.
+    """Get SQLAlchemy engine with connection pooling.
 
-    Uses NullPool to create fresh connections for each request.
-    This is more reliable for long-running dashboard applications
-    where idle connections may be dropped by network infrastructure.
+    Uses QueuePool for connection reuse and better performance.
+    - pool_size: Base number of persistent connections
+    - max_overflow: Additional connections during peak load
+    - pool_timeout: Max wait time for available connection
+    - pool_recycle: Recycle connections after 30 minutes
+    - pool_pre_ping: Validate connection before checkout
     """
     global _ENGINE
     if _ENGINE is None:
         _ENGINE = create_engine(
             CONNECTION_STRING,
-            poolclass=NullPool,  # No connection pooling - fresh connection each time
+            poolclass=QueuePool,
+            pool_size=5,              # Base connections
+            max_overflow=10,          # Peak extra connections (total max: 15)
+            pool_timeout=30,          # Wait up to 30s for connection
+            pool_recycle=1800,        # Recycle connections every 30 minutes
+            pool_pre_ping=True,       # Validate connection before use
             connect_args={
-                "tcp_connect_timeout": 15,   # TCP connect timeout 15s
-                "retry_count": 2,            # Retry twice on connection failure
+                "tcp_connect_timeout": 10,   # TCP connect timeout 10s (reduced)
+                "retry_count": 1,            # Retry once on connection failure
                 "retry_delay": 1,            # 1s delay between retries
             }
         )
-        logger.info("Database engine created with NullPool")
+        # Register pool event listeners for monitoring
+        _register_pool_events(_ENGINE)
+        logger.info(
+            "Database engine created with QueuePool "
+            f"(pool_size=5, max_overflow=10, pool_recycle=1800)"
+        )
     return _ENGINE
+
+
+def _register_pool_events(engine):
+    """Register event listeners for connection pool monitoring."""
+
+    @event.listens_for(engine, "checkout")
+    def on_checkout(dbapi_conn, connection_record, connection_proxy):
+        logger.debug("Connection checked out from pool")
+
+    @event.listens_for(engine, "checkin")
+    def on_checkin(dbapi_conn, connection_record):
+        logger.debug("Connection returned to pool")
+
+    @event.listens_for(engine, "invalidate")
+    def on_invalidate(dbapi_conn, connection_record, exception):
+        if exception:
+            logger.warning(f"Connection invalidated due to: {exception}")
+        else:
+            logger.debug("Connection invalidated (soft)")
+
+    @event.listens_for(engine, "connect")
+    def on_connect(dbapi_conn, connection_record):
+        logger.info("New database connection established")
 
 
 # ============================================================
@@ -77,19 +114,62 @@ def init_db(app) -> None:
 
 
 # ============================================================
-# Keep-Alive (No-op with NullPool)
+# Keep-Alive for Connection Pool
 # ============================================================
-# Keep-alive is not needed with NullPool since each query creates
-# a fresh connection. These functions are kept for API compatibility.
+# Periodic keep-alive prevents idle connections from being dropped
+# by firewalls/NAT. Runs every 5 minutes in a background thread.
+
+_KEEPALIVE_THREAD = None
+_KEEPALIVE_STOP = threading.Event()
+KEEPALIVE_INTERVAL = 300  # 5 minutes
+
+
+def _keepalive_worker():
+    """Background worker that pings the database periodically."""
+    while not _KEEPALIVE_STOP.wait(KEEPALIVE_INTERVAL):
+        try:
+            engine = get_engine()
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1 FROM DUAL"))
+            logger.debug("Keep-alive ping successful")
+        except Exception as exc:
+            logger.warning(f"Keep-alive ping failed: {exc}")
+
 
 def start_keepalive():
-    """No-op: Keep-alive not needed with NullPool."""
-    logger.debug("Using NullPool - no keep-alive needed")
+    """Start background keep-alive thread for connection pool."""
+    global _KEEPALIVE_THREAD
+    if _KEEPALIVE_THREAD is None or not _KEEPALIVE_THREAD.is_alive():
+        _KEEPALIVE_STOP.clear()
+        _KEEPALIVE_THREAD = threading.Thread(
+            target=_keepalive_worker,
+            daemon=True,
+            name="db-keepalive"
+        )
+        _KEEPALIVE_THREAD.start()
+        logger.info(f"Keep-alive thread started (interval: {KEEPALIVE_INTERVAL}s)")
 
 
 def stop_keepalive():
-    """No-op: Keep-alive not needed with NullPool."""
-    pass
+    """Stop the keep-alive background thread."""
+    global _KEEPALIVE_THREAD
+    if _KEEPALIVE_THREAD and _KEEPALIVE_THREAD.is_alive():
+        _KEEPALIVE_STOP.set()
+        _KEEPALIVE_THREAD.join(timeout=5)
+        logger.info("Keep-alive thread stopped")
+
+
+def dispose_engine():
+    """Dispose the database engine and all pooled connections.
+
+    Call this during application shutdown to cleanly release resources.
+    """
+    global _ENGINE
+    stop_keepalive()
+    if _ENGINE is not None:
+        _ENGINE.dispose()
+        logger.info("Database engine disposed, all connections closed")
+        _ENGINE = None
 
 
 # ============================================================
