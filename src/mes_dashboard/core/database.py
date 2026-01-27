@@ -181,6 +181,7 @@ def get_db_connection():
     """Create a direct oracledb connection.
 
     Used for operations that need direct cursor access.
+    Includes call_timeout to prevent long-running queries from blocking workers.
     """
     try:
         conn = oracledb.connect(
@@ -189,7 +190,10 @@ def get_db_connection():
             retry_count=1,           # Retry once on connection failure
             retry_delay=1,           # 1s delay between retries
         )
-        logger.debug("Direct oracledb connection established")
+        # Set call timeout to 55 seconds (must be less than Gunicorn's 60s worker timeout)
+        # This prevents queries from blocking workers indefinitely
+        conn.call_timeout = 55000  # milliseconds
+        logger.debug("Direct oracledb connection established (call_timeout=55s)")
         return conn
     except Exception as exc:
         ora_code = _extract_ora_code(exc)

@@ -951,7 +951,11 @@
 
         async function fetchWithTimeout(url, timeout = API_TIMEOUT, externalSignal = null) {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            let timedOut = false;
+            const timeoutId = setTimeout(() => {
+                timedOut = true;
+                controller.abort();
+            }, timeout);
 
             // If external signal is provided, abort when it fires
             if (externalSignal) {
@@ -969,9 +973,12 @@
                     if (externalSignal && externalSignal.aborted) {
                         throw error;  // Re-throw AbortError for external cancellation
                     }
-                    throw new Error('Request timeout');
+                    if (timedOut) {
+                        throw new Error(`Request timeout after ${timeout/1000}s: ${url}`);
+                    }
+                    throw error;  // Other abort (shouldn't happen, but be safe)
                 }
-                throw error;
+                throw new Error(`Network error for ${url}: ${error.message}`);
             }
         }
 
