@@ -97,18 +97,17 @@
 
         <div class="tabs">
             <button class="tab active" data-target="wipOverviewFrame">WIP 即時概況</button>
-            <button class="tab" data-target="wipDetailFrame">WIP 工站明細</button>
             <button class="tab" data-target="resourceFrame">機台狀態報表</button>
             <button class="tab" data-target="tableFrame">數據表查詢工具</button>
             <button class="tab" data-target="excelQueryFrame">Excel 批次查詢</button>
         </div>
 
         <div class="panel">
+            <!-- Lazy load: only first iframe has src, others load on tab click -->
             <iframe id="wipOverviewFrame" class="active" src="/wip-overview" title="WIP 即時概況"></iframe>
-            <iframe id="wipDetailFrame" src="/wip-detail" title="WIP 工站明細"></iframe>
-            <iframe id="resourceFrame" src="/resource" title="機台狀態報表"></iframe>
-            <iframe id="tableFrame" src="/tables" title="數據表查詢工具"></iframe>
-            <iframe id="excelQueryFrame" src="/excel-query" title="Excel 批次查詢"></iframe>
+            <iframe id="resourceFrame" data-src="/resource" title="機台狀態報表"></iframe>
+            <iframe id="tableFrame" data-src="/tables" title="數據表查詢工具"></iframe>
+            <iframe id="excelQueryFrame" data-src="/excel-query" title="Excel 批次查詢"></iframe>
         </div>
     </div>
 
@@ -130,7 +129,14 @@
             tabs.forEach(tab => tab.classList.remove('active'));
             frames.forEach(frame => frame.classList.remove('active'));
             document.querySelector(`[data-target="${targetId}"]`).classList.add('active');
-            document.getElementById(targetId).classList.add('active');
+
+            const targetFrame = document.getElementById(targetId);
+            targetFrame.classList.add('active');
+
+            // Lazy load: load iframe src on first activation
+            if (targetFrame.dataset.src && !targetFrame.src) {
+                targetFrame.src = targetFrame.dataset.src;
+            }
         }
 
         tabs.forEach(tab => {

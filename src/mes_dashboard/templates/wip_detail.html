@@ -728,8 +728,9 @@
         // WIP Status filter (separate from other filters)
         let activeStatusFilter = null;  // null | 'run' | 'queue' | 'hold'
 
-        // AbortController for cancelling in-flight table requests
-        let tableAbortController = null;
+        // AbortController for cancelling in-flight requests
+        let tableAbortController = null;      // For loadTableOnly()
+        let loadAllAbortController = null;    // For loadAllData()
 
         // ============================================================
         // Utility Functions
@@ -963,7 +964,14 @@
         // Data Loading
         // ============================================================
         async function loadAllData(showOverlay = true) {
-            if (state.isLoading) return;
+            // Cancel any in-flight request to prevent connection pile-up
+            if (loadAllAbortController) {
+                loadAllAbortController.abort();
+                console.log('[WIP Detail] Previous request cancelled');
+            }
+            loadAllAbortController = new AbortController();
+            const signal = loadAllAbortController.signal;
+
             state.isLoading = true;
 
             if (showOverlay) {
@@ -987,7 +995,7 @@
                 }
 
                 // Load detail data (main data - this is critical)
-                state.data = await fetchDetail();
+                state.data = await fetchDetail(signal);
 
                 renderSummary(state.data.summary);
                 renderTable(state.data);
@@ -999,6 +1007,11 @@
                 }, 1500);
 
             } catch (error) {
+                // Ignore abort errors (expected when user triggers new request)
+                if (error.name === 'AbortError') {
+                    console.log('[WIP Detail] Request cancelled (new request started)');
+                    return;
+                }
                 console.error('Data load failed:', error);
                 document.getElementById('refreshError').classList.add('active');
             } finally {

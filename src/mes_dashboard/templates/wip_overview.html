@@ -765,8 +765,9 @@
         // Status filter state (null = no filter, 'run'/'queue'/'hold' = filtered)
         let activeStatusFilter = null;
 
-        // AbortController for cancelling in-flight matrix requests
-        let matrixAbortController = null;
+        // AbortController for cancelling in-flight requests
+        let matrixAbortController = null;      // For loadMatrixOnly()
+        let loadAllAbortController = null;     // For loadAllData()
 
         // ============================================================
         // Utility Functions
@@ -974,10 +975,10 @@
             }
         }
 
-        async function fetchSummary() {
+        async function fetchSummary(signal = null) {
             const queryParams = buildQueryParams();
             const url = `/api/wip/overview/summary${queryParams ? '?' + queryParams : ''}`;
-            const response = await fetchWithTimeout(url);
+            const response = await fetchWithTimeout(url, API_TIMEOUT, signal);
             const result = await response.json();
             if (result.success) {
                 return result.data;
@@ -1007,10 +1008,10 @@
             throw new Error(result.error || 'Failed to fetch matrix');
         }
 
-        async function fetchHold() {
+        async function fetchHold(signal = null) {
             const queryParams = buildQueryParams();
             const url = `/api/wip/overview/hold${queryParams ? '?' + queryParams : ''}`;
-            const response = await fetchWithTimeout(url);
+            const response = await fetchWithTimeout(url, API_TIMEOUT, signal);
             const result = await response.json();
             if (result.success) {
                 return result.data;
@@ -1224,10 +1225,14 @@
         // Data Loading
         // ============================================================
         async function loadAllData(showOverlay = true) {
-            if (state.isLoading) {
-                console.log('[WIP Overview] Load skipped (already loading)');
-                return;
+            // Cancel any in-flight request to prevent connection pile-up
+            if (loadAllAbortController) {
+                loadAllAbortController.abort();
+                console.log('[WIP Overview] Previous request cancelled');
             }
+            loadAllAbortController = new AbortController();
+            const signal = loadAllAbortController.signal;
+
             state.isLoading = true;
             console.log('[WIP Overview] Loading data...', showOverlay ? '(with overlay)' : '(background)');
 
@@ -1243,9 +1248,9 @@
             try {
                 const startTime = performance.now();
                 const [summary, matrix, hold] = await Promise.all([
-                    fetchSummary(),
-                    fetchMatrix(),
-                    fetchHold()
+                    fetchSummary(signal),
+                    fetchMatrix(signal),
+                    fetchHold(signal)
                 ]);
                 const elapsed = Math.round(performance.now() - startTime);
 
@@ -1267,6 +1272,11 @@
                 }, 1500);
 
             } catch (error) {
+                // Ignore abort errors (expected when user triggers new request)
+                if (error.name === 'AbortError') {
+                    console.log('[WIP Overview] Request cancelled (new request started)');
+                    return;
+                }
                 console.error('[WIP Overview] Data load failed:', error);
                 state.lastError = true;
                 document.getElementById('refreshError').classList.add('active');
