@@ -7,6 +7,7 @@ Loads credentials from environment variables (.env file).
 
 import os
 from pathlib import Path
+from urllib.parse import quote_plus
 
 # Load .env file if python-dotenv is available
 try:
@@ -25,7 +26,7 @@ DB_SERVICE = os.getenv('DB_SERVICE', 'DWDB')
 DB_USER = os.getenv('DB_USER', '')
 DB_PASSWORD = os.getenv('DB_PASSWORD', '')
 
-# Oracle Database connection config
+# Oracle Database connection config (for direct oracledb connections)
 DB_CONFIG = {
     'user': DB_USER,
     'password': DB_PASSWORD,
@@ -33,6 +34,8 @@ DB_CONFIG = {
 }
 
 # SQLAlchemy connection string
+# Note: Password is URL-encoded to handle special characters (@:/?# etc.)
 CONNECTION_STRING = (
-    f"oracle+oracledb://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/?service_name={DB_SERVICE}"
+    f"oracle+oracledb://{DB_USER}:{quote_plus(DB_PASSWORD)}"
+    f"@{DB_HOST}:{DB_PORT}/?service_name={DB_SERVICE}"
 )

@@ -159,7 +159,32 @@ run_all_checks() {
 # ============================================================
 ensure_dirs() {
     mkdir -p "${LOG_DIR}"
+    mkdir -p "${LOG_DIR}/archive"
     mkdir -p "${ROOT}/tmp"
+}
+
+rotate_logs() {
+    # Archive existing logs with timestamp before starting new session
+    local ts=$(date '+%Y%m%d_%H%M%S')
+
+    if [ -f "$ACCESS_LOG" ] && [ -s "$ACCESS_LOG" ]; then
+        mv "$ACCESS_LOG" "${LOG_DIR}/archive/access_${ts}.log"
+        log_info "Archived access.log -> archive/access_${ts}.log"
+    fi
+
+    if [ -f "$ERROR_LOG" ] && [ -s "$ERROR_LOG" ]; then
+        mv "$ERROR_LOG" "${LOG_DIR}/archive/error_${ts}.log"
+        log_info "Archived error.log -> archive/error_${ts}.log"
+    fi
+
+    # Clean up old archives (keep last 10)
+    cd "${LOG_DIR}/archive" 2>/dev/null && \
+        ls -t access_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
+        ls -t error_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f
+    cd "$ROOT"
+
+    # Create fresh log files
+    touch "$ACCESS_LOG" "$ERROR_LOG"
 }
 
 get_pid() {
@@ -205,6 +230,7 @@ do_start() {
     log_info "Starting ${APP_NAME} server..."
 
     ensure_dirs
+    rotate_logs  # Archive old logs before starting new session
     conda activate "$CONDA_ENV"
     export PYTHONPATH="${ROOT}/src:${PYTHONPATH:-}"
     cd "$ROOT"

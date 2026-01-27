@@ -979,7 +979,7 @@
             );
             updateElementWithTransition(
                 'runQty',
-                runQty === null || runQty === undefined ? '-' : `${formatNumber(runQty)} pcs`
+                runQty === null || runQty === undefined ? '-' : formatNumber(runQty)
             );
             updateElementWithTransition(
                 'queueLots',
@@ -987,7 +987,7 @@
             );
             updateElementWithTransition(
                 'queueQty',
-                queueQty === null || queueQty === undefined ? '-' : `${formatNumber(queueQty)} pcs`
+                queueQty === null || queueQty === undefined ? '-' : formatNumber(queueQty)
             );
             updateElementWithTransition(
                 'holdLots',
@@ -995,7 +995,7 @@
             );
             updateElementWithTransition(
                 'holdQty',
-                holdQty === null || holdQty === undefined ? '-' : `${formatNumber(holdQty)} pcs`
+                holdQty === null || holdQty === undefined ? '-' : formatNumber(holdQty)
             );
 
             if (data.dataUpdateDate) {

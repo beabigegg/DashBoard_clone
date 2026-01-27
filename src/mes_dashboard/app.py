@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import logging
+import sys
+
 from flask import Flask, jsonify, render_template, request
 
 from mes_dashboard.config.tables import TABLES_CONFIG
@@ -12,12 +15,43 @@ from mes_dashboard.core.database import get_table_data, get_table_columns, get_e
 from mes_dashboard.routes import register_routes
 
 
+def _configure_logging(app: Flask) -> None:
+    """Configure application logging.
+
+    Sets up logging to stderr (captured by Gunicorn's --capture-output).
+    Log levels:
+    - DEBUG: Query completion times, connection events
+    - WARNING: Slow queries (>1s)
+    - ERROR: Connection failures, query errors with ORA codes
+    """
+    # Configure the mes_dashboard logger
+    logger = logging.getLogger('mes_dashboard')
+    logger.setLevel(logging.DEBUG if app.debug else logging.INFO)
+
+    # Only add handler if not already configured (avoid duplicates)
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    # Prevent propagation to root logger (avoid duplicate logs)
+    logger.propagate = False
+
+
 def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the Flask app instance."""
     app = Flask(__name__, template_folder="templates")
 
     config_class = get_config(config_name)
     app.config.from_object(config_class)
+
+    # Configure logging first
+    _configure_logging(app)
 
     # Default cache backend (no-op)
     app.extensions["cache"] = NoOpCache()

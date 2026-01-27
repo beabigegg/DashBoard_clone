@@ -380,7 +380,7 @@ def get_wip_detail(
             SELECT * FROM (
                 SELECT
                     LOTID,
-                    EQUIPMENTNAME,
+                    EQUIPMENTS,
                     STATUS,
                     HOLDREASONNAME,
                     QTY,
@@ -404,7 +404,7 @@ def get_wip_detail(
             for _, row in lots_df.iterrows():
                 lots.append({
                     'lotId': _safe_value(row['LOTID']),
-                    'equipment': _safe_value(row['EQUIPMENTNAME']),
+                    'equipment': _safe_value(row['EQUIPMENTS']),
                     'wipStatus': _safe_value(row['WIP_STATUS']),
                     'holdReason': _safe_value(row['HOLDREASONNAME']),
                     'qty': int(row['QTY'] or 0),

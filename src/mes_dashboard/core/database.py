@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import logging
+import re
+import time
 from typing import Optional, Dict, Any
 
 import oracledb
@@ -13,6 +16,9 @@ from sqlalchemy.pool import NullPool
 
 from mes_dashboard.config.database import DB_CONFIG, CONNECTION_STRING
 from mes_dashboard.config.settings import DevelopmentConfig
+
+# Configure module logger
+logger = logging.getLogger('mes_dashboard.database')
 
 # ============================================================
 # SQLAlchemy Engine (NullPool - no connection pooling)
@@ -42,6 +48,7 @@ def get_engine():
                 "retry_delay": 1,            # 1s delay between retries
             }
         )
+        logger.info("Database engine created with NullPool")
     return _ENGINE
 
 
@@ -77,7 +84,7 @@ def init_db(app) -> None:
 
 def start_keepalive():
     """No-op: Keep-alive not needed with NullPool."""
-    print("[DB] Using NullPool - no keep-alive needed")
+    logger.debug("Using NullPool - no keep-alive needed")
 
 
 def stop_keepalive():
@@ -96,24 +103,58 @@ def get_db_connection():
     Used for operations that need direct cursor access.
     """
     try:
-        return oracledb.connect(
+        conn = oracledb.connect(
             **DB_CONFIG,
             tcp_connect_timeout=10,  # TCP connect timeout 10s
             retry_count=1,           # Retry once on connection failure
             retry_delay=1,           # 1s delay between retries
         )
+        logger.debug("Direct oracledb connection established")
+        return conn
     except Exception as exc:
-        print(f"Database connection failed: {exc}")
+        ora_code = _extract_ora_code(exc)
+        logger.error(f"Database connection failed - ORA-{ora_code}: {exc}")
         return None
 
 
+def _extract_ora_code(exc: Exception) -> str:
+    """Extract ORA error code from exception message."""
+    match = re.search(r'ORA-(\d+)', str(exc))
+    return match.group(1) if match else 'UNKNOWN'
+
+
 def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
-    """Execute SQL query and return results as a DataFrame."""
+    """Execute SQL query and return results as a DataFrame.
+
+    Includes query timing and error logging with ORA codes.
+    """
+    start_time = time.time()
     engine = get_engine()
-    with engine.connect() as conn:
-        df = pd.read_sql(text(sql), conn, params=params)
-        df.columns = [str(c).upper() for c in df.columns]
-        return df
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(sql), conn, params=params)
+            df.columns = [str(c).upper() for c in df.columns]
+
+            elapsed = time.time() - start_time
+            # Log slow queries (>1 second) as warnings
+            if elapsed > 1.0:
+                # Truncate SQL for logging (first 100 chars)
+                sql_preview = sql.strip().replace('\n', ' ')[:100]
+                logger.warning(f"Slow query ({elapsed:.2f}s): {sql_preview}...")
+            else:
+                logger.debug(f"Query completed in {elapsed:.3f}s, rows={len(df)}")
+
+            return df
+
+    except Exception as exc:
+        elapsed = time.time() - start_time
+        ora_code = _extract_ora_code(exc)
+        sql_preview = sql.strip().replace('\n', ' ')[:100]
+        logger.error(
+            f"Query failed after {elapsed:.2f}s - ORA-{ora_code}: {exc} | SQL: {sql_preview}..."
+        )
+        raise
 
 
 # ============================================================
@@ -223,6 +264,8 @@ def get_table_data(
             'row_count': len(data)
         }
     except Exception as exc:
+        ora_code = _extract_ora_code(exc)
+        logger.error(f"get_table_data failed - ORA-{ora_code}: {exc}")
         if connection:
             connection.close()
         return {'error': f'查詢失敗: {str(exc)}'}
