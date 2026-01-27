@@ -82,12 +82,11 @@ def get_wip_summary(
         lotid: Optional LOTID filter (fuzzy match)
 
     Returns:
-        Dict with summary stats:
-        - total_lots: Total number of lots
-        - total_qty: Total quantity
-        - hold_lots: Number of hold lots
-        - hold_qty: Hold quantity
-        - sys_date: Data timestamp
+        Dict with summary stats (camelCase):
+        - totalLots: Total number of lots
+        - totalQtyPcs: Total quantity
+        - byWipStatus: Grouped counts for RUN/QUEUE/HOLD
+        - dataUpdateDate: Data timestamp
     """
     try:
         conditions = _build_base_conditions(include_dummy, workorder, lotid)
@@ -96,10 +95,18 @@ def get_wip_summary(
         sql = f"""
             SELECT
                 COUNT(*) as TOTAL_LOTS,
-                SUM(QTY) as TOTAL_QTY,
-                SUM(CASE WHEN STATUS = 'HOLD' THEN 1 ELSE 0 END) as HOLD_LOTS,
-                SUM(CASE WHEN STATUS = 'HOLD' THEN QTY ELSE 0 END) as HOLD_QTY,
-                MAX(SYS_DATE) as SYS_DATE
+                SUM(QTY) as TOTAL_QTY_PCS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) > 0 THEN 1 ELSE 0 END) as RUN_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) > 0 THEN QTY ELSE 0 END) as RUN_QTY_PCS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN 1 ELSE 0 END) as HOLD_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN QTY ELSE 0 END) as HOLD_QTY_PCS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) = 0 THEN 1 ELSE 0 END) as QUEUE_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) = 0 THEN QTY ELSE 0 END) as QUEUE_QTY_PCS,
+                MAX(SYS_DATE) as DATA_UPDATE_DATE
             FROM {WIP_VIEW}
             {where_clause}
         """
@@ -110,11 +117,23 @@ def get_wip_summary(
 
         row = df.iloc[0]
         return {
-            'total_lots': int(row['TOTAL_LOTS'] or 0),
-            'total_qty': int(row['TOTAL_QTY'] or 0),
-            'hold_lots': int(row['HOLD_LOTS'] or 0),
-            'hold_qty': int(row['HOLD_QTY'] or 0),
-            'sys_date': str(row['SYS_DATE']) if row['SYS_DATE'] else None
+            'totalLots': int(row['TOTAL_LOTS'] or 0),
+            'totalQtyPcs': int(row['TOTAL_QTY_PCS'] or 0),
+            'byWipStatus': {
+                'run': {
+                    'lots': int(row['RUN_LOTS'] or 0),
+                    'qtyPcs': int(row['RUN_QTY_PCS'] or 0)
+                },
+                'queue': {
+                    'lots': int(row['QUEUE_LOTS'] or 0),
+                    'qtyPcs': int(row['QUEUE_QTY_PCS'] or 0)
+                },
+                'hold': {
+                    'lots': int(row['HOLD_LOTS'] or 0),
+                    'qtyPcs': int(row['HOLD_QTY_PCS'] or 0)
+                }
+            },
+            'dataUpdateDate': str(row['DATA_UPDATE_DATE']) if row['DATA_UPDATE_DATE'] else None
         }
     except Exception as exc:
         print(f"WIP summary query failed: {exc}")
@@ -313,13 +332,15 @@ def get_wip_detail(
 
         where_clause = f"WHERE {' AND '.join(conditions)}"
 
-        # Get summary
+        # Get summary with RUN/QUEUE/HOLD classification (IT standard)
         summary_sql = f"""
             SELECT
                 COUNT(*) as TOTAL_LOTS,
-                SUM(CASE WHEN EQUIPMENTNAME IS NOT NULL THEN 1 ELSE 0 END) as ON_EQUIPMENT_LOTS,
-                SUM(CASE WHEN EQUIPMENTNAME IS NULL THEN 1 ELSE 0 END) as WAITING_LOTS,
-                SUM(CASE WHEN STATUS = 'HOLD' THEN 1 ELSE 0 END) as HOLD_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) > 0 THEN 1 ELSE 0 END) as RUN_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) = 0 THEN 1 ELSE 0 END) as QUEUE_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN 1 ELSE 0 END) as HOLD_LOTS,
                 MAX(SYS_DATE) as SYS_DATE
             FROM {WIP_VIEW}
             {where_clause}
@@ -335,10 +356,10 @@ def get_wip_detail(
         sys_date = str(summary_row['SYS_DATE']) if summary_row['SYS_DATE'] else None
 
         summary = {
-            'total_lots': total_count,
-            'on_equipment_lots': int(summary_row['ON_EQUIPMENT_LOTS'] or 0),
-            'waiting_lots': int(summary_row['WAITING_LOTS'] or 0),
-            'hold_lots': int(summary_row['HOLD_LOTS'] or 0)
+            'totalLots': total_count,
+            'runLots': int(summary_row['RUN_LOTS'] or 0),
+            'queueLots': int(summary_row['QUEUE_LOTS'] or 0),
+            'holdLots': int(summary_row['HOLD_LOTS'] or 0)
         }
 
         # Get unique specs for this workcenter (sorted by SPECSEQUENCE)
@@ -353,7 +374,7 @@ def get_wip_detail(
         specs_df = read_sql_df(specs_sql)
         specs = specs_df['SPECNAME'].tolist() if specs_df is not None and not specs_df.empty else []
 
-        # Get paginated lot details
+        # Get paginated lot details with WIP Status (IT standard)
         offset = (page - 1) * page_size
         lots_sql = f"""
             SELECT * FROM (
@@ -365,6 +386,9 @@ def get_wip_detail(
                     QTY,
                     PRODUCTLINENAME,
                     SPECNAME,
+                    CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) > 0 THEN 'RUN'
+                         WHEN COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN 'HOLD'
+                         ELSE 'QUEUE' END AS WIP_STATUS,
                     ROW_NUMBER() OVER (ORDER BY LOTID) as RN
                 FROM {WIP_VIEW}
                 {where_clause}
@@ -379,10 +403,10 @@ def get_wip_detail(
         if lots_df is not None and not lots_df.empty:
             for _, row in lots_df.iterrows():
                 lots.append({
-                    'lot_id': _safe_value(row['LOTID']),
+                    'lotId': _safe_value(row['LOTID']),
                     'equipment': _safe_value(row['EQUIPMENTNAME']),
-                    'status': _safe_value(row['STATUS']),
-                    'hold_reason': _safe_value(row['HOLDREASONNAME']),
+                    'wipStatus': _safe_value(row['WIP_STATUS']),
+                    'holdReason': _safe_value(row['HOLDREASONNAME']),
                     'qty': int(row['QTY'] or 0),
                     'package': _safe_value(row['PRODUCTLINENAME']),
                     'spec': _safe_value(row['SPECNAME'])

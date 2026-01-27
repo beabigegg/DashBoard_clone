@@ -41,7 +41,7 @@ def api_overview_summary():
         include_dummy: Include DUMMY lots (default: false)
 
     Returns:
-        JSON with total_lots, total_qty, hold_lots, hold_qty, sys_date
+        JSON with totalLots, totalQtyPcs, byWipStatus, dataUpdateDate
     """
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None

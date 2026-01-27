@@ -106,21 +106,25 @@ class TestGetWipSummary(unittest.TestCase):
         """Should return dict with summary fields when query succeeds."""
         mock_df = pd.DataFrame({
             'TOTAL_LOTS': [9073],
-            'TOTAL_QTY': [858878718],
+            'TOTAL_QTY_PCS': [858878718],
+            'RUN_LOTS': [8000],
+            'RUN_QTY_PCS': [800000000],
+            'QUEUE_LOTS': [953],
+            'QUEUE_QTY_PCS': [504645323],
             'HOLD_LOTS': [120],
-            'HOLD_QTY': [8213395],
-            'SYS_DATE': ['2026-01-26 19:18:29']
+            'HOLD_QTY_PCS': [8213395],
+            'DATA_UPDATE_DATE': ['2026-01-26 19:18:29']
         })
         mock_read_sql.return_value = mock_df
 
         result = get_wip_summary()
 
         self.assertIsNotNone(result)
-        self.assertEqual(result['total_lots'], 9073)
-        self.assertEqual(result['total_qty'], 858878718)
-        self.assertEqual(result['hold_lots'], 120)
-        self.assertEqual(result['hold_qty'], 8213395)
-        self.assertIn('sys_date', result)
+        self.assertEqual(result['totalLots'], 9073)
+        self.assertEqual(result['totalQtyPcs'], 858878718)
+        self.assertEqual(result['byWipStatus']['hold']['lots'], 120)
+        self.assertEqual(result['byWipStatus']['hold']['qtyPcs'], 8213395)
+        self.assertIn('dataUpdateDate', result)
 
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_none_on_empty_result(self, mock_read_sql):
@@ -145,20 +149,25 @@ class TestGetWipSummary(unittest.TestCase):
         """Should handle NULL values gracefully."""
         mock_df = pd.DataFrame({
             'TOTAL_LOTS': [None],
-            'TOTAL_QTY': [None],
+            'TOTAL_QTY_PCS': [None],
+            'RUN_LOTS': [None],
+            'RUN_QTY_PCS': [None],
+            'QUEUE_LOTS': [None],
+            'QUEUE_QTY_PCS': [None],
             'HOLD_LOTS': [None],
-            'HOLD_QTY': [None],
-            'SYS_DATE': [None]
+            'HOLD_QTY_PCS': [None],
+            'DATA_UPDATE_DATE': [None]
         })
         mock_read_sql.return_value = mock_df
 
         result = get_wip_summary()
 
         self.assertIsNotNone(result)
-        self.assertEqual(result['total_lots'], 0)
-        self.assertEqual(result['total_qty'], 0)
-        self.assertEqual(result['hold_lots'], 0)
-        self.assertEqual(result['hold_qty'], 0)
+        self.assertEqual(result['totalLots'], 0)
+        self.assertEqual(result['totalQtyPcs'], 0)
+        self.assertEqual(result['byWipStatus']['run']['lots'], 0)
+        self.assertEqual(result['byWipStatus']['queue']['lots'], 0)
+        self.assertEqual(result['byWipStatus']['hold']['lots'], 0)
 
 
 class TestGetWipMatrix(unittest.TestCase):
@@ -601,9 +610,15 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
     def test_get_wip_summary_excludes_dummy_by_default(self, mock_read_sql):
         """get_wip_summary should exclude DUMMY by default."""
         mock_df = pd.DataFrame({
-            'TOTAL_LOTS': [100], 'TOTAL_QTY': [1000],
-            'HOLD_LOTS': [10], 'HOLD_QTY': [100],
-            'SYS_DATE': ['2026-01-26']
+            'TOTAL_LOTS': [100],
+            'TOTAL_QTY_PCS': [1000],
+            'RUN_LOTS': [80],
+            'RUN_QTY_PCS': [800],
+            'QUEUE_LOTS': [10],
+            'QUEUE_QTY_PCS': [100],
+            'HOLD_LOTS': [10],
+            'HOLD_QTY_PCS': [100],
+            'DATA_UPDATE_DATE': ['2026-01-26']
         })
         mock_read_sql.return_value = mock_df
 
@@ -616,9 +631,15 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
     def test_get_wip_summary_includes_dummy_when_specified(self, mock_read_sql):
         """get_wip_summary should include DUMMY when specified."""
         mock_df = pd.DataFrame({
-            'TOTAL_LOTS': [100], 'TOTAL_QTY': [1000],
-            'HOLD_LOTS': [10], 'HOLD_QTY': [100],
-            'SYS_DATE': ['2026-01-26']
+            'TOTAL_LOTS': [100],
+            'TOTAL_QTY_PCS': [1000],
+            'RUN_LOTS': [80],
+            'RUN_QTY_PCS': [800],
+            'QUEUE_LOTS': [10],
+            'QUEUE_QTY_PCS': [100],
+            'HOLD_LOTS': [10],
+            'HOLD_QTY_PCS': [100],
+            'DATA_UPDATE_DATE': ['2026-01-26']
         })
         mock_read_sql.return_value = mock_df
 
@@ -692,9 +713,15 @@ class TestMultipleFilterConditions(unittest.TestCase):
     def test_get_wip_summary_with_all_filters(self, mock_read_sql):
         """get_wip_summary should combine all filter conditions."""
         mock_df = pd.DataFrame({
-            'TOTAL_LOTS': [50], 'TOTAL_QTY': [500],
-            'HOLD_LOTS': [5], 'HOLD_QTY': [50],
-            'SYS_DATE': ['2026-01-26']
+            'TOTAL_LOTS': [50],
+            'TOTAL_QTY_PCS': [500],
+            'RUN_LOTS': [40],
+            'RUN_QTY_PCS': [400],
+            'QUEUE_LOTS': [5],
+            'QUEUE_QTY_PCS': [50],
+            'HOLD_LOTS': [5],
+            'HOLD_QTY_PCS': [50],
+            'DATA_UPDATE_DATE': ['2026-01-26']
         })
         mock_read_sql.return_value = mock_df
 
@@ -770,8 +797,8 @@ class TestWipServiceIntegration:
         """Integration test for get_wip_summary."""
         result = get_wip_summary()
         assert result is not None
-        assert result['total_lots'] > 0
-        assert 'sys_date' in result
+        assert result['totalLots'] > 0
+        assert 'dataUpdateDate' in result
 
     @pytest.mark.integration
     def test_get_wip_matrix_integration(self):
@@ -851,7 +878,7 @@ class TestWipServiceIntegration:
 
         # If there are DUMMY lots, with_dummy should have more
         # (or equal if no DUMMY lots exist)
-        assert result_with_dummy['total_lots'] >= result_without_dummy['total_lots']
+        assert result_with_dummy['totalLots'] >= result_without_dummy['totalLots']
 
     @pytest.mark.integration
     def test_workorder_filter_integration(self):
@@ -867,7 +894,7 @@ class TestWipServiceIntegration:
             filtered_result = get_wip_summary(workorder=workorders[0])
             assert filtered_result is not None
             # Filtered count should be less than or equal to total
-            assert filtered_result['total_lots'] <= all_result['total_lots']
+            assert filtered_result['totalLots'] <= all_result['totalLots']
 
 
 if __name__ == "__main__":

@@ -279,7 +279,7 @@
         /* Summary Cards */
         .summary-row {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 14px;
             margin-bottom: 16px;
         }
@@ -320,6 +320,74 @@
             100% { transform: scale(1); }
         }
 
+        /* WIP Status Cards */
+        .wip-status-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .wip-status-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 12px 16px;
+            border: 2px solid;
+            box-shadow: var(--shadow);
+        }
+
+        .wip-status-card.run {
+            background: #F0FDF4;
+            border-color: #22C55E;
+        }
+
+        .wip-status-card.queue {
+            background: #FFFBEB;
+            border-color: #F59E0B;
+        }
+
+        .wip-status-card.hold {
+            background: #FEF2F2;
+            border-color: #EF4444;
+        }
+
+        .wip-status-card .status-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .wip-status-card.run .status-header { color: #166534; }
+        .wip-status-card.queue .status-header { color: #92400E; }
+        .wip-status-card.hold .status-header { color: #991B1B; }
+
+        .wip-status-card .status-header .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .wip-status-card .status-values {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        .wip-status-card .status-values span {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .wip-status-card .status-values span:first-child {
+            font-weight: 800;
+        }
+
         /* Content Grid */
         .content-grid {
             display: grid;
@@ -352,6 +420,12 @@
             overflow-x: auto;
         }
 
+        .card-body.matrix-container {
+            padding-left: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
         /* Matrix Table */
         .matrix-table {
             width: 100%;
@@ -373,14 +447,18 @@
             position: sticky;
             top: 0;
             z-index: 1;
+            border-bottom: 2px solid #cbd5e1;
         }
 
         .matrix-table th:first-child {
             text-align: left;
             position: sticky;
             left: 0;
-            z-index: 2;
+            top: 0;
+            z-index: 3;
             background: #e5e7eb;
+            border-right: 2px solid #cbd5e1;
+            border-bottom: 2px solid #cbd5e1;
         }
 
         .matrix-table td:first-child {
@@ -390,6 +468,7 @@
             left: 0;
             background: #f9fafb;
             z-index: 1;
+            border-right: 2px solid #cbd5e1;
         }
 
         .matrix-table tbody tr:hover td {
@@ -403,6 +482,10 @@
         .matrix-table .total-row td {
             background: #e5e7eb;
             font-weight: bold;
+        }
+
+        .matrix-table .total-row td:first-child {
+            border-right: 2px solid #cbd5e1;
         }
 
         .matrix-table .total-col {
@@ -491,10 +574,16 @@
             .summary-row {
                 grid-template-columns: repeat(2, 1fr);
             }
+            .wip-status-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @media (max-width: 768px) {
             .summary-row {
+                grid-template-columns: 1fr;
+            }
+            .wip-status-row {
                 grid-template-columns: 1fr;
             }
             .filters {
@@ -554,13 +643,30 @@
                 <div class="summary-label">Total QTY</div>
                 <div class="summary-value" id="totalQty">-</div>
             </div>
-            <div class="summary-card">
-                <div class="summary-label">Hold Lots</div>
-                <div class="summary-value highlight" id="holdLots">-</div>
+        </div>
+
+        <!-- WIP Status Cards -->
+        <div class="wip-status-row">
+            <div class="wip-status-card run">
+                <div class="status-header"><span class="dot"></span>RUN</div>
+                <div class="status-values">
+                    <span id="runLots">-</span>
+                    <span id="runQty">-</span>
+                </div>
             </div>
-            <div class="summary-card">
-                <div class="summary-label">Hold QTY</div>
-                <div class="summary-value highlight" id="holdQty">-</div>
+            <div class="wip-status-card queue">
+                <div class="status-header"><span class="dot"></span>QUEUE</div>
+                <div class="status-values">
+                    <span id="queueLots">-</span>
+                    <span id="queueQty">-</span>
+                </div>
+            </div>
+            <div class="wip-status-card hold">
+                <div class="status-header"><span class="dot"></span>HOLD</div>
+                <div class="status-values">
+                    <span id="holdLots">-</span>
+                    <span id="holdQty">-</span>
+                </div>
             </div>
         </div>
 
@@ -571,7 +677,7 @@
                 <div class="card-header">
                     <div class="card-title">Workcenter x Package Matrix (QTY)</div>
                 </div>
-                <div class="card-body" style="max-height: 500px; overflow: auto;">
+                <div class="card-body matrix-container" style="max-height: 500px; overflow: auto;">
                     <div id="matrixContainer">
                         <div class="placeholder">Loading...</div>
                     </div>
@@ -631,7 +737,14 @@
         function updateElementWithTransition(elementId, newValue) {
             const el = document.getElementById(elementId);
             const oldValue = el.textContent;
-            const formattedNew = formatNumber(newValue);
+            let formattedNew;
+            if (typeof newValue === 'number') {
+                formattedNew = formatNumber(newValue);
+            } else if (newValue === null || newValue === undefined) {
+                formattedNew = '-';
+            } else {
+                formattedNew = newValue;
+            }
 
             if (oldValue !== formattedNew) {
                 el.textContent = formattedNew;
@@ -791,7 +904,7 @@
         // ============================================================
         // API Functions
         // ============================================================
-        const API_TIMEOUT = 30000;  // 30 seconds timeout
+        const API_TIMEOUT = 60000;  // 60 seconds timeout
 
         async function fetchWithTimeout(url, timeout = API_TIMEOUT) {
             const controller = new AbortController();
@@ -849,13 +962,44 @@
         function renderSummary(data) {
             if (!data) return;
 
-            updateElementWithTransition('totalLots', data.total_lots);
-            updateElementWithTransition('totalQty', data.total_qty);
-            updateElementWithTransition('holdLots', data.hold_lots);
-            updateElementWithTransition('holdQty', data.hold_qty);
+            updateElementWithTransition('totalLots', data.totalLots);
+            updateElementWithTransition('totalQty', data.totalQtyPcs);
 
-            if (data.sys_date) {
-                document.getElementById('lastUpdate').textContent = `Last Update: ${data.sys_date}`;
+            const ws = data.byWipStatus || {};
+            const runLots = ws.run?.lots;
+            const runQty = ws.run?.qtyPcs;
+            const queueLots = ws.queue?.lots;
+            const queueQty = ws.queue?.qtyPcs;
+            const holdLots = ws.hold?.lots;
+            const holdQty = ws.hold?.qtyPcs;
+
+            updateElementWithTransition(
+                'runLots',
+                runLots === null || runLots === undefined ? '-' : `${formatNumber(runLots)} lots`
+            );
+            updateElementWithTransition(
+                'runQty',
+                runQty === null || runQty === undefined ? '-' : `${formatNumber(runQty)} pcs`
+            );
+            updateElementWithTransition(
+                'queueLots',
+                queueLots === null || queueLots === undefined ? '-' : `${formatNumber(queueLots)} lots`
+            );
+            updateElementWithTransition(
+                'queueQty',
+                queueQty === null || queueQty === undefined ? '-' : `${formatNumber(queueQty)} pcs`
+            );
+            updateElementWithTransition(
+                'holdLots',
+                holdLots === null || holdLots === undefined ? '-' : `${formatNumber(holdLots)} lots`
+            );
+            updateElementWithTransition(
+                'holdQty',
+                holdQty === null || holdQty === undefined ? '-' : `${formatNumber(holdQty)} pcs`
+            );
+
+            if (data.dataUpdateDate) {
+                document.getElementById('lastUpdate').textContent = `Last Update: ${data.dataUpdateDate}`;
             }
         }
 
@@ -881,7 +1025,7 @@
             // Data rows
             data.workcenters.forEach(wc => {
                 html += '<tr>';
-                html += `<td class="clickable" onclick="navigateToDetail('${encodeURIComponent(wc)}')">${wc}</td>`;
+                html += `<td class="clickable" onclick="navigateToDetail('${wc.replace(/'/g, "\\'")}')">${wc}</td>`;
 
                 displayPackages.forEach(pkg => {
                     const qty = data.matrix[wc]?.[pkg] || 0;

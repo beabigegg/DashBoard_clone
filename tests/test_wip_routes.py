@@ -30,11 +30,14 @@ class TestOverviewSummaryRoute(TestWipRoutesBase):
     def test_returns_success_with_data(self, mock_get_summary):
         """Should return success=True with summary data."""
         mock_get_summary.return_value = {
-            'total_lots': 9073,
-            'total_qty': 858878718,
-            'hold_lots': 120,
-            'hold_qty': 8213395,
-            'sys_date': '2026-01-26 19:18:29'
+            'totalLots': 9073,
+            'totalQtyPcs': 858878718,
+            'byWipStatus': {
+                'run': {'lots': 8000, 'qtyPcs': 800000000},
+                'queue': {'lots': 953, 'qtyPcs': 504645323},
+                'hold': {'lots': 120, 'qtyPcs': 8213395}
+            },
+            'dataUpdateDate': '2026-01-26 19:18:29'
         }
 
         response = self.client.get('/api/wip/overview/summary')
@@ -42,8 +45,8 @@ class TestOverviewSummaryRoute(TestWipRoutesBase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(data['success'])
-        self.assertEqual(data['data']['total_lots'], 9073)
-        self.assertEqual(data['data']['hold_lots'], 120)
+        self.assertEqual(data['data']['totalLots'], 9073)
+        self.assertEqual(data['data']['byWipStatus']['hold']['lots'], 120)
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_summary')
     def test_returns_error_on_failure(self, mock_get_summary):

@@ -328,6 +328,31 @@
             animation: valueUpdate 0.5s ease;
         }
 
+        /* Status Card Colors */
+        .summary-card.status-run {
+            background: #F0FDF4;
+            border-color: #22C55E;
+        }
+        .summary-card.status-run .summary-value {
+            color: #166534;
+        }
+
+        .summary-card.status-queue {
+            background: #FFFBEB;
+            border-color: #F59E0B;
+        }
+        .summary-card.status-queue .summary-value {
+            color: #92400E;
+        }
+
+        .summary-card.status-hold {
+            background: #FEF2F2;
+            border-color: #EF4444;
+        }
+        .summary-card.status-hold .summary-value {
+            color: #991B1B;
+        }
+
         @keyframes valueUpdate {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); background: rgba(102, 126, 234, 0.1); }
@@ -439,14 +464,23 @@
             color: #155724;
         }
 
-        /* Status styles */
-        .status-active {
-            color: var(--success);
+        /* WIP Status styles in table */
+        .wip-status-run {
+            color: #166534;
+            background: #F0FDF4;
+            font-weight: 600;
         }
 
-        .status-hold {
-            color: var(--danger);
-            font-weight: bold;
+        .wip-status-queue {
+            color: #92400E;
+            background: #FFFBEB;
+            font-weight: 600;
+        }
+
+        .wip-status-hold {
+            color: #991B1B;
+            background: #FEF2F2;
+            font-weight: 600;
         }
 
         /* Pagination */
@@ -594,17 +628,17 @@
                 <div class="summary-label">Total Lots</div>
                 <div class="summary-value" id="totalLots">-</div>
             </div>
-            <div class="summary-card">
-                <div class="summary-label">On Equipment</div>
-                <div class="summary-value success" id="onEquipmentLots">-</div>
+            <div class="summary-card status-run">
+                <div class="summary-label">RUN</div>
+                <div class="summary-value" id="runLots">-</div>
             </div>
-            <div class="summary-card">
-                <div class="summary-label">Waiting</div>
-                <div class="summary-value warning" id="waitingLots">-</div>
+            <div class="summary-card status-queue">
+                <div class="summary-label">QUEUE</div>
+                <div class="summary-value" id="queueLots">-</div>
             </div>
-            <div class="summary-card">
-                <div class="summary-label">Hold</div>
-                <div class="summary-value highlight" id="holdLots">-</div>
+            <div class="summary-card status-hold">
+                <div class="summary-label">HOLD</div>
+                <div class="summary-value" id="holdLots">-</div>
             </div>
         </div>
 
@@ -681,7 +715,7 @@
         // ============================================================
         // API Functions
         // ============================================================
-        const API_TIMEOUT = 30000;  // 30 seconds timeout
+        const API_TIMEOUT = 60000;  // 60 seconds timeout
 
         async function fetchWithTimeout(url, timeout = API_TIMEOUT) {
             const controller = new AbortController();
@@ -768,10 +802,10 @@
         function renderSummary(summary) {
             if (!summary) return;
 
-            updateElementWithTransition('totalLots', summary.total_lots);
-            updateElementWithTransition('onEquipmentLots', summary.on_equipment_lots);
-            updateElementWithTransition('waitingLots', summary.waiting_lots);
-            updateElementWithTransition('holdLots', summary.hold_lots);
+            updateElementWithTransition('totalLots', summary.totalLots);
+            updateElementWithTransition('runLots', summary.runLots);
+            updateElementWithTransition('queueLots', summary.queueLots);
+            updateElementWithTransition('holdLots', summary.holdLots);
         }
 
         function renderTable(data) {
@@ -790,7 +824,7 @@
             // Fixed columns
             html += '<th class="fixed-col">Lot ID</th>';
             html += '<th class="fixed-col">Equipment</th>';
-            html += '<th class="fixed-col">Status</th>';
+            html += '<th class="fixed-col">WIP Status</th>';
             html += '<th class="fixed-col">Package</th>';
 
             // Spec columns
@@ -804,16 +838,16 @@
                 html += '<tr>';
 
                 // Fixed columns
-                html += `<td class="fixed-col">${lot.lot_id || '-'}</td>`;
-                html += `<td class="fixed-col">${lot.equipment || '<span style="color: var(--warning);">Waiting</span>'}</td>`;
+                html += `<td class="fixed-col">${lot.lotId || '-'}</td>`;
+                html += `<td class="fixed-col">${lot.equipment || '<span style="color: var(--muted);">-</span>'}</td>`;
 
-                // Status with hold reason
-                if (lot.status === 'HOLD') {
-                    const holdText = lot.hold_reason ? `Hold (${lot.hold_reason})` : 'Hold';
-                    html += `<td class="fixed-col status-hold">${holdText}</td>`;
-                } else {
-                    html += `<td class="fixed-col status-active">${lot.status || 'Active'}</td>`;
+                // WIP Status with color and hold reason
+                const statusClass = `wip-status-${(lot.wipStatus || 'queue').toLowerCase()}`;
+                let statusText = lot.wipStatus || 'QUEUE';
+                if (lot.wipStatus === 'HOLD' && lot.holdReason) {
+                    statusText = `HOLD (${lot.holdReason})`;
                 }
+                html += `<td class="fixed-col ${statusClass}">${statusText}</td>`;
 
                 html += `<td class="fixed-col">${lot.package || '-'}</td>`;
 
@@ -888,13 +922,17 @@
             document.getElementById('refreshSuccess').classList.remove('active');
 
             try {
-                // Load packages for filter (only on first load)
+                // Load packages for filter (non-blocking - don't fail if this times out)
                 if (state.packages.length === 0) {
-                    state.packages = await fetchPackages();
-                    populatePackageFilter(state.packages);
+                    try {
+                        state.packages = await fetchPackages();
+                        populatePackageFilter(state.packages);
+                    } catch (pkgError) {
+                        console.warn('Failed to load packages filter:', pkgError);
+                    }
                 }
 
-                // Load detail data
+                // Load detail data (main data - this is critical)
                 state.data = await fetchDetail();
 
                 renderSummary(state.data.summary);
@@ -1050,14 +1088,6 @@
             loadAllData(false);
         }
 
-        // Handle page visibility
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                loadAllData(false);
-                startAutoRefresh();
-            }
-        });
-
         // ============================================================
         // Initialize
         // ============================================================
@@ -1095,6 +1125,14 @@
                 document.getElementById('pageTitle').textContent = `WIP Detail - ${state.workcenter}`;
                 loadAllData(true);
                 startAutoRefresh();
+
+                // Handle page visibility (must be after workcenter is set)
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden && state.workcenter) {
+                        loadAllData(false);
+                        startAutoRefresh();
+                    }
+                });
             } else {
                 document.getElementById('tableContainer').innerHTML =
                     '<div class="placeholder">No workcenter available</div>';
