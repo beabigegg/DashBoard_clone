@@ -43,6 +43,9 @@ def _build_base_conditions(
     """
     conditions = []
 
+    # Exclude raw materials (NULL WORKORDER)
+    conditions.append("WORKORDER IS NOT NULL")
+
     # DUMMY exclusion (default behavior)
     if not include_dummy:
         conditions.append("LOTID NOT LIKE '%DUMMY%'")
