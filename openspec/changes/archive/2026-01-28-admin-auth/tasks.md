@@ -72,10 +72,26 @@
 - [x] 管理員登入後顯示名稱和「頁面管理」連結
 - [x] Dev 頁面 tabs 對非管理員隱藏（使用 `can_view_page` 條件渲染）
 
-## 測試任務（延後）
+## 測試任務
 
-### Task 12-14: 單元測試與整合測試
-- [ ] 待後續補充
+### Task 12: 單元測試
+- [x] auth_service 測試（LDAP 認證、管理員檢查）
+- [x] page_registry 測試（頁面狀態讀寫、並發存取）
+- [x] permissions 測試（權限檢查、裝飾器）
+
+### Task 13: 整合測試
+- [x] 登入/登出路由測試
+- [x] 權限中介層測試（released/dev 頁面存取）
+- [x] Admin API 測試（頁面管理）
+- [x] Context Processor 測試
+
+### Task 14: E2E 測試
+- [x] 完整登入登出流程
+- [x] 頁面存取控制流程
+- [x] 頁面管理流程
+- [x] Portal 動態 tabs 顯示
+- [x] Session 持久性
+- [x] 安全性場景測試
 
 ## 部署任務
 
