@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MES 數據表查詢工具</title>
+{% extends "_base.html" %}
+
+{% block title %}MES 數據表查詢工具{% endblock %}
+
+{% block head_extra %}
     <style>
         * {
             margin: 0;
@@ -333,8 +332,9 @@
             color: #dc3545;
         }
     </style>
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
     <div class="container">
         <div class="header">
             <h1>MES 數據表查詢工具</h1>
@@ -354,9 +354,9 @@
                             <span class="badge large">大表</span>
                             {% endif %}
                         </div>
-                        <div class="table-info">📦 數據量: {{ "{:,}".format(table.row_count) }} 行</div>
+                        <div class="table-info">數據量: {{ "{:,}".format(table.row_count) }} 行</div>
                         {% if table.time_field %}
-                        <div class="table-info">🕐 時間欄位: {{ table.time_field }}</div>
+                        <div class="table-info">時間欄位: {{ table.time_field }}</div>
                         {% endif %}
                         <div class="table-desc">{{ table.description }}</div>
                     </div>
@@ -377,7 +377,9 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script>
         let currentTable = null;
         let currentDisplayName = null;
@@ -385,8 +387,8 @@
         let currentColumns = [];
         let currentFilters = {};
 
-        function loadTableData(tableName, displayName, timeField) {
-            // 標記當前選中的表
+        async function loadTableData(tableName, displayName, timeField) {
+            // Mark current selected table
             document.querySelectorAll('.table-card').forEach(card => {
                 card.classList.remove('active');
             });
@@ -402,23 +404,16 @@
             const content = document.getElementById('tableContent');
             const statsContainer = document.getElementById('statsContainer');
 
-            // 顯示查看器
             viewer.classList.add('active');
             title.textContent = `正在載入: ${displayName}`;
             content.innerHTML = '<div class="loading">正在載入欄位資訊...</div>';
             statsContainer.innerHTML = '';
 
-            // 滾動到查看器
             viewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-            // 先取得欄位資訊
-            fetch('/api/get_table_columns', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ table_name: tableName })
-            })
-            .then(response => response.json())
-            .then(data => {
+            try {
+                const data = await MesApi.post('/api/get_table_columns', { table_name: tableName });
+
                 if (data.error) {
                     content.innerHTML = `<div class="error">${data.error}</div>`;
                     return;
@@ -427,19 +422,16 @@
                 currentColumns = data.columns;
                 title.textContent = `${displayName} (${currentColumns.length} 欄位)`;
 
-                // 顯示篩選控制區
                 renderFilterControls();
-            })
-            .catch(error => {
+            } catch (error) {
                 content.innerHTML = `<div class="error">請求失敗: ${error.message}</div>`;
-            });
+            }
         }
 
         function renderFilterControls() {
             const statsContainer = document.getElementById('statsContainer');
             const content = document.getElementById('tableContent');
 
-            // 統計區 + 查詢按鈕
             statsContainer.innerHTML = `
                 <div class="stats">
                     <div class="stat-item">
@@ -457,17 +449,13 @@
                 <div id="activeFilters" class="active-filters"></div>
             `;
 
-            // 生成表格結構 (含篩選輸入行)
             let html = '<table><thead>';
-
-            // 欄位名稱行
             html += '<tr>';
             currentColumns.forEach(col => {
                 html += `<th>${col}</th>`;
             });
             html += '</tr>';
 
-            // 篩選輸入行
             html += '<tr class="filter-row">';
             currentColumns.forEach(col => {
                 html += `<th><input type="text" id="filter_${col}" placeholder="篩選..." onkeypress="handleFilterKeypress(event)" onchange="updateFilter('${col}', this.value)"></th>`;
@@ -529,11 +517,10 @@
             }
         }
 
-        function executeQuery() {
+        async function executeQuery() {
             const title = document.getElementById('viewerTitle');
             const tbody = document.getElementById('dataBody');
 
-            // 收集所有篩選條件
             currentFilters = {};
             currentColumns.forEach(col => {
                 const input = document.getElementById(`filter_${col}`);
@@ -546,30 +533,23 @@
             title.textContent = `正在查詢: ${currentDisplayName}`;
             tbody.innerHTML = `<tr><td colspan="${currentColumns.length}" class="loading">正在查詢資料...</td></tr>`;
 
-            // 發送查詢請求
-            fetch('/api/query_table', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            try {
+                const data = await MesApi.post('/api/query_table', {
                     table_name: currentTable,
                     limit: 1000,
                     time_field: currentTimeField,
                     filters: Object.keys(currentFilters).length > 0 ? currentFilters : null
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
+                });
+
                 if (data.error) {
                     tbody.innerHTML = `<tr><td colspan="${currentColumns.length}" class="error">${data.error}</td></tr>`;
                     return;
                 }
 
-                // 更新標題
                 const filterCount = Object.keys(currentFilters).length;
                 const filterText = filterCount > 0 ? ` [${filterCount} 個篩選]` : '';
                 title.textContent = `${currentDisplayName} (${data.row_count} 筆)${filterText}`;
 
-                // 生成資料行
                 if (data.data.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="${currentColumns.length}" style="text-align: center; padding: 40px; color: #999;">查無資料</td></tr>`;
                     return;
@@ -586,10 +566,9 @@
                     html += '</tr>';
                 });
                 tbody.innerHTML = html;
-            })
-            .catch(error => {
+            } catch (error) {
                 tbody.innerHTML = `<tr><td colspan="${currentColumns.length}" class="error">請求失敗: ${error.message}</td></tr>`;
-            });
+            }
         }
 
         function closeViewer() {
@@ -602,5 +581,4 @@
             currentFilters = {};
         }
     </script>
-</body>
-</html>
+{% endblock %}

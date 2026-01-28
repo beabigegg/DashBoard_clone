@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WIP Overview Dashboard</title>
+{% extends "_base.html" %}
+
+{% block title %}WIP Overview Dashboard{% endblock %}
+
+{% block head_extra %}
     <style>
         :root {
             --bg: #f5f7fa;
@@ -631,8 +630,9 @@
             }
         }
     </style>
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
     <div class="dashboard">
         <!-- Header -->
         <div class="header">
@@ -739,7 +739,9 @@
         <span class="loading-spinner"></span>
         <span>Loading...</span>
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script>
         // ============================================================
         // State Management
@@ -805,14 +807,62 @@
         }
 
         function buildQueryParams() {
-            const params = new URLSearchParams();
+            const params = {};
             if (state.filters.workorder) {
-                params.append('workorder', state.filters.workorder);
+                params.workorder = state.filters.workorder;
             }
             if (state.filters.lotid) {
-                params.append('lotid', state.filters.lotid);
+                params.lotid = state.filters.lotid;
             }
-            return params.toString();
+            return params;
+        }
+
+        // ============================================================
+        // API Functions (using MesApi)
+        // ============================================================
+        const API_TIMEOUT = 60000;  // 60 seconds timeout
+
+        async function fetchSummary(signal = null) {
+            const params = buildQueryParams();
+            const result = await MesApi.get('/api/wip/overview/summary', {
+                params,
+                timeout: API_TIMEOUT,
+                signal
+            });
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch summary');
+        }
+
+        async function fetchMatrix(signal = null) {
+            const params = buildQueryParams();
+            // Add status filter if active
+            if (activeStatusFilter) {
+                params.status = activeStatusFilter.toUpperCase();
+            }
+            const result = await MesApi.get('/api/wip/overview/matrix', {
+                params,
+                timeout: API_TIMEOUT,
+                signal
+            });
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch matrix');
+        }
+
+        async function fetchHold(signal = null) {
+            const params = buildQueryParams();
+            const result = await MesApi.get('/api/wip/overview/hold', {
+                params,
+                timeout: API_TIMEOUT,
+                signal
+            });
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch hold');
         }
 
         // ============================================================
@@ -827,8 +877,11 @@
             loadingEl.classList.add('active');
 
             try {
-                const response = await fetch(`/api/wip/meta/search?type=${type}&q=${encodeURIComponent(query)}&limit=20`);
-                const result = await response.json();
+                const result = await MesApi.get('/api/wip/meta/search', {
+                    params: { type, q: query, limit: 20 },
+                    silent: true,
+                    retries: 0  // No retry for autocomplete
+                });
                 if (result.success) {
                     return result.data.items || [];
                 }
@@ -942,88 +995,6 @@
             }
 
             container.innerHTML = html;
-        }
-
-        // ============================================================
-        // API Functions
-        // ============================================================
-        const API_TIMEOUT = 60000;  // 60 seconds timeout
-
-        async function fetchWithTimeout(url, timeout = API_TIMEOUT, externalSignal = null) {
-            const controller = new AbortController();
-            let timedOut = false;
-            const timeoutId = setTimeout(() => {
-                timedOut = true;
-                controller.abort();
-            }, timeout);
-
-            // If external signal is provided, abort when it fires
-            if (externalSignal) {
-                externalSignal.addEventListener('abort', () => controller.abort());
-            }
-
-            try {
-                const response = await fetch(url, { signal: controller.signal });
-                clearTimeout(timeoutId);
-                return response;
-            } catch (error) {
-                clearTimeout(timeoutId);
-                if (error.name === 'AbortError') {
-                    // Check if it was external cancellation or timeout
-                    if (externalSignal && externalSignal.aborted) {
-                        throw error;  // Re-throw AbortError for external cancellation
-                    }
-                    if (timedOut) {
-                        throw new Error(`Request timeout after ${timeout/1000}s: ${url}`);
-                    }
-                    throw error;  // Other abort (shouldn't happen, but be safe)
-                }
-                throw new Error(`Network error for ${url}: ${error.message}`);
-            }
-        }
-
-        async function fetchSummary(signal = null) {
-            const queryParams = buildQueryParams();
-            const url = `/api/wip/overview/summary${queryParams ? '?' + queryParams : ''}`;
-            const response = await fetchWithTimeout(url, API_TIMEOUT, signal);
-            const result = await response.json();
-            if (result.success) {
-                return result.data;
-            }
-            throw new Error(result.error || 'Failed to fetch summary');
-        }
-
-        async function fetchMatrix(signal = null) {
-            const params = new URLSearchParams();
-            if (state.filters.workorder) {
-                params.append('workorder', state.filters.workorder);
-            }
-            if (state.filters.lotid) {
-                params.append('lotid', state.filters.lotid);
-            }
-            // Add status filter if active
-            if (activeStatusFilter) {
-                params.append('status', activeStatusFilter.toUpperCase());
-            }
-            const queryParams = params.toString();
-            const url = `/api/wip/overview/matrix${queryParams ? '?' + queryParams : ''}`;
-            const response = await fetchWithTimeout(url, API_TIMEOUT, signal);
-            const result = await response.json();
-            if (result.success) {
-                return result.data;
-            }
-            throw new Error(result.error || 'Failed to fetch matrix');
-        }
-
-        async function fetchHold(signal = null) {
-            const queryParams = buildQueryParams();
-            const url = `/api/wip/overview/hold${queryParams ? '?' + queryParams : ''}`;
-            const response = await fetchWithTimeout(url, API_TIMEOUT, signal);
-            const result = await response.json();
-            if (result.success) {
-                return result.data;
-            }
-            throw new Error(result.error || 'Failed to fetch hold');
         }
 
         // ============================================================
@@ -1337,5 +1308,4 @@
             startAutoRefresh();
         };
     </script>
-</body>
-</html>
+{% endblock %}

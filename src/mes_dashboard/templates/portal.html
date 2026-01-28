@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MES 報表入口</title>
+{% extends "_base.html" %}
+
+{% block title %}MES 報表入口{% endblock %}
+
+{% block head_extra %}
     <style>
         * {
             margin: 0;
@@ -87,8 +86,9 @@
             display: block;
         }
     </style>
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
     <div class="shell">
         <div class="header">
             <h1>MES 報表入口</h1>
@@ -110,7 +110,9 @@
             <iframe id="excelQueryFrame" data-src="/excel-query" title="Excel 批次查詢"></iframe>
         </div>
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script>
         const tabs = document.querySelectorAll('.tab');
         const frames = document.querySelectorAll('iframe');
@@ -146,5 +148,4 @@
         window.addEventListener('resize', setFrameHeight);
         setFrameHeight();
     </script>
-</body>
-</html>
+{% endblock %}

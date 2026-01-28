@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel 批次查詢工具</title>
+{% extends "_base.html" %}
+
+{% block title %}Excel 批次查詢工具{% endblock %}
+
+{% block head_extra %}
     <style>
         * {
             margin: 0;
@@ -341,8 +340,9 @@
             color: #333;
         }
     </style>
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
     <div class="container">
         <div class="header">
             <h1>Excel 批次查詢工具</h1>
@@ -447,7 +447,9 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script>
         // State
         let excelColumns = [];
@@ -471,6 +473,7 @@
             document.getElementById('uploadInfo').innerHTML = '<div class="loading"><div class="loading-spinner"></div><br>上傳中...</div>';
 
             try {
+                // Note: File upload uses native fetch since MesApi doesn't support FormData
                 const response = await fetch('/api/excel-query/upload', {
                     method: 'POST',
                     body: formData
@@ -489,20 +492,15 @@
                     </div>
                 `;
 
-                // Show preview table
                 renderPreviewTable(data.columns, data.preview);
 
-                // Populate Excel column dropdown
                 const select = document.getElementById('excelColumn');
                 select.innerHTML = '<option value="">-- 請選擇 --</option>';
                 excelColumns.forEach(col => {
                     select.innerHTML += `<option value="${col}">${col}</option>`;
                 });
 
-                // Enable step 2
                 document.getElementById('step2').classList.remove('disabled');
-
-                // Load available tables
                 loadTables();
 
             } catch (error) {
@@ -544,12 +542,7 @@
             document.getElementById('columnInfo').innerHTML = '<div class="loading"><div class="loading-spinner"></div><br>讀取中...</div>';
 
             try {
-                const response = await fetch('/api/excel-query/column-values', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ column_name: column })
-                });
-                const data = await response.json();
+                const data = await MesApi.post('/api/excel-query/column-values', { column_name: column });
 
                 if (data.error) {
                     document.getElementById('columnInfo').innerHTML = `<div class="error">${data.error}</div>`;
@@ -565,7 +558,6 @@
                     </div>
                 `;
 
-                // Enable step 3
                 document.getElementById('step3').classList.remove('disabled');
 
             } catch (error) {
@@ -576,8 +568,7 @@
         // Load available tables
         async function loadTables() {
             try {
-                const response = await fetch('/api/excel-query/tables');
-                const data = await response.json();
+                const data = await MesApi.get('/api/excel-query/tables', { silent: true });
 
                 const select = document.getElementById('targetTable');
                 select.innerHTML = '<option value="">-- 請選擇 --</option>';
@@ -602,12 +593,7 @@
             document.getElementById('tableInfo').innerHTML = '<div class="loading"><div class="loading-spinner"></div><br>讀取欄位...</div>';
 
             try {
-                const response = await fetch('/api/excel-query/table-columns', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ table_name: tableName })
-                });
-                const data = await response.json();
+                const data = await MesApi.post('/api/excel-query/table-columns', { table_name: tableName });
 
                 if (data.error) {
                     document.getElementById('tableInfo').innerHTML = `<div class="error">${data.error}</div>`;
@@ -619,14 +605,12 @@
                     <div class="info-box">共 ${data.columns.length} 個欄位</div>
                 `;
 
-                // Populate search column dropdown
                 const searchSelect = document.getElementById('searchColumn');
                 searchSelect.innerHTML = '<option value="">-- 請選擇 --</option>';
                 tableColumns.forEach(col => {
                     searchSelect.innerHTML += `<option value="${col}">${col}</option>`;
                 });
 
-                // Populate return columns checkboxes
                 const container = document.getElementById('returnColumns');
                 container.innerHTML = '';
                 tableColumns.forEach(col => {
@@ -638,7 +622,6 @@
                     `;
                 });
 
-                // Enable step 4 and 5
                 document.getElementById('step4').classList.remove('disabled');
                 document.getElementById('step5').classList.remove('disabled');
 
@@ -707,12 +690,7 @@
             document.getElementById('resultSection').classList.remove('active');
 
             try {
-                const response = await fetch('/api/excel-query/execute', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(params)
-                });
-                const data = await response.json();
+                const data = await MesApi.post('/api/excel-query/execute', params);
 
                 if (data.error) {
                     document.getElementById('executeInfo').innerHTML = `<div class="error">${data.error}</div>`;
@@ -753,7 +731,6 @@
                 });
                 html += '</tr></thead><tbody>';
 
-                // Show first 1000 rows in preview
                 const previewData = data.data.slice(0, 1000);
                 previewData.forEach(row => {
                     html += '<tr>';
@@ -793,6 +770,7 @@
             `;
 
             try {
+                // Note: CSV export uses native fetch for blob response
                 const response = await fetch('/api/excel-query/export-csv', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -805,7 +783,6 @@
                     return;
                 }
 
-                // Download file
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -825,5 +802,4 @@
             }
         }
     </script>
-</body>
-</html>
+{% endblock %}

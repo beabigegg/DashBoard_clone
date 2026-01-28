@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WIP Detail Dashboard</title>
+{% extends "_base.html" %}
+
+{% block title %}WIP Detail Dashboard{% endblock %}
+
+{% block head_extra %}
     <style>
         :root {
             --bg: #f5f7fa;
@@ -615,8 +614,9 @@
             }
         }
     </style>
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
     <div class="dashboard">
         <!-- Header -->
         <div class="header">
@@ -703,7 +703,9 @@
         <span class="loading-spinner"></span>
         <span>Loading...</span>
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script>
         // ============================================================
         // State Management
@@ -758,46 +760,12 @@
         }
 
         // ============================================================
-        // API Functions
+        // API Functions (using MesApi)
         // ============================================================
         const API_TIMEOUT = 60000;  // 60 seconds timeout
 
-        async function fetchWithTimeout(url, timeout = API_TIMEOUT, externalSignal = null) {
-            const controller = new AbortController();
-            let timedOut = false;
-            const timeoutId = setTimeout(() => {
-                timedOut = true;
-                controller.abort();
-            }, timeout);
-
-            // If external signal is provided, abort when it fires
-            if (externalSignal) {
-                externalSignal.addEventListener('abort', () => controller.abort());
-            }
-
-            try {
-                const response = await fetch(url, { signal: controller.signal });
-                clearTimeout(timeoutId);
-                return response;
-            } catch (error) {
-                clearTimeout(timeoutId);
-                if (error.name === 'AbortError') {
-                    // Check if it was external cancellation or timeout
-                    if (externalSignal && externalSignal.aborted) {
-                        throw error;  // Re-throw AbortError for external cancellation
-                    }
-                    if (timedOut) {
-                        throw new Error(`Request timeout after ${timeout/1000}s: ${url}`);
-                    }
-                    throw error;  // Other abort (shouldn't happen, but be safe)
-                }
-                throw new Error(`Network error for ${url}: ${error.message}`);
-            }
-        }
-
         async function fetchPackages() {
-            const response = await fetchWithTimeout('/api/wip/meta/packages');
-            const result = await response.json();
+            const result = await MesApi.get('/api/wip/meta/packages', { silent: true, timeout: API_TIMEOUT });
             if (result.success) {
                 return result.data;
             }
@@ -805,27 +773,30 @@
         }
 
         async function fetchDetail(signal = null) {
-            const params = new URLSearchParams({
+            const params = {
                 page: state.page,
                 page_size: state.pageSize
-            });
+            };
 
             if (state.filters.package) {
-                params.append('package', state.filters.package);
+                params.package = state.filters.package;
             }
             if (activeStatusFilter) {
                 // Convert to API status format (RUN/QUEUE/HOLD)
-                params.append('status', activeStatusFilter.toUpperCase());
+                params.status = activeStatusFilter.toUpperCase();
             }
             if (state.filters.workorder) {
-                params.append('workorder', state.filters.workorder);
+                params.workorder = state.filters.workorder;
             }
             if (state.filters.lotid) {
-                params.append('lotid', state.filters.lotid);
+                params.lotid = state.filters.lotid;
             }
 
-            const response = await fetchWithTimeout(`/api/wip/detail/${encodeURIComponent(state.workcenter)}?${params}`, API_TIMEOUT, signal);
-            const result = await response.json();
+            const result = await MesApi.get(`/api/wip/detail/${encodeURIComponent(state.workcenter)}`, {
+                params,
+                timeout: API_TIMEOUT,
+                signal
+            });
             if (result.success) {
                 return result.data;
             }
@@ -833,8 +804,7 @@
         }
 
         async function fetchWorkcenters() {
-            const response = await fetchWithTimeout('/api/wip/meta/workcenters');
-            const result = await response.json();
+            const result = await MesApi.get('/api/wip/meta/workcenters', { silent: true, timeout: API_TIMEOUT });
             if (result.success) {
                 return result.data;
             }
@@ -845,15 +815,17 @@
             if (!query || query.length < 2) {
                 return [];
             }
-            const params = new URLSearchParams({
-                type: type,
-                q: query,
-                limit: 20
-            });
-            const response = await fetch(`/api/wip/meta/search?${params}`);
-            const result = await response.json();
-            if (result.success) {
-                return result.data.items || [];
+            try {
+                const result = await MesApi.get('/api/wip/meta/search', {
+                    params: { type, q: query, limit: 20 },
+                    silent: true,
+                    retries: 0  // No retry for autocomplete
+                });
+                if (result.success) {
+                    return result.data.items || [];
+                }
+            } catch (e) {
+                // Ignore errors for autocomplete
             }
             return [];
         }
@@ -1317,5 +1289,4 @@
 
         window.onload = init;
     </script>
-</body>
-</html>
+{% endblock %}

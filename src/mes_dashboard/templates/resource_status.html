@@ -1,11 +1,10 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全廠機況 Dashboard</title>
+{% extends "_base.html" %}
+
+{% block title %}全廠機況 Dashboard{% endblock %}
+
+{% block head_extra %}
     <script src="/static/js/echarts.min.js"></script>
-    
+
     <style>
         :root {
             --bg: #f5f7fa;
@@ -370,9 +369,9 @@
             }
         }
     </style>
+{% endblock %}
 
-</head>
-<body>
+{% block content %}
     <div class="dashboard">
         <!-- Header -->
         <div class="header">
@@ -384,8 +383,8 @@
                         <label><input type="checkbox" id="filterKey"> 關鍵設備</label>
                         <label><input type="checkbox" id="filterMonitor"> 監控設備</label>
                     </div>
-                    
-                    
+
+
                     <button id="btnQuery" class="btn-query" onclick="loadDashboard()">查詢</button>
                 </div>
                 <span id="lastUpdate" class="last-update"></span>
@@ -456,24 +455,25 @@
         </div>
 
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script>
         let selectedWorkcenter = null;
-        let selectedOriginalWcs = null;  // 儲存合併群組的原始工站列表
-        let workcenterData = {};  // 快取工站資料
+        let selectedOriginalWcs = null;
+        let workcenterData = {};
         let isLoading = false;
-        let miniCharts = {};  // 快取 ECharts 實例
-        let ouTrendChart = null;  // OU趨勢圖實例
-        let heatmapChart = null;  // 熱力圖實例
+        let miniCharts = {};
+        let ouTrendChart = null;
+        let heatmapChart = null;
 
-        // 狀態顏色定義 (統一)
         const STATUS_COLORS = {
-            PRD: '#00ff88',   // 綠色 - 生產中
-            SBY: '#17a2b8',   // 青色 - 待機
-            UDT: '#ff4757',   // 紅色 - 非計畫停機
-            SDT: '#ffc107',   // 黃色 - 計畫停機
-            EGT: '#6c757d',   // 灰色 - 工程時間
-            NST: '#9b59b6'    // 紫色 - NST
+            PRD: '#00ff88',
+            SBY: '#17a2b8',
+            UDT: '#ff4757',
+            SDT: '#ffc107',
+            EGT: '#6c757d',
+            NST: '#9b59b6'
         };
 
         function getFilters() {
@@ -482,8 +482,6 @@
             if (document.getElementById('filterKey').checked) filters.isKey = true;
             if (document.getElementById('filterMonitor').checked) filters.isMonitor = true;
             filters.days_back = 365;
-
-            // 多選廠區
             return Object.keys(filters).length > 0 ? filters : null;
         }
 
@@ -500,35 +498,24 @@
 
         async function loadKPI() {
             try {
-                const response = await fetch('/api/dashboard/kpi', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filters: getFilters() })
-                });
-                const result = await response.json();
+                const result = await MesApi.post('/api/dashboard/kpi', { filters: getFilters() });
 
                 if (result.success) {
                     const d = result.data;
-                    // 計算各項百分比
                     const total = d.total || 1;
                     const runPct = ((d.run / total) * 100).toFixed(1);
                     const downPct = ((d.down / total) * 100).toFixed(1);
                     const idlePct = ((d.idle / total) * 100).toFixed(1);
                     const engPct = ((d.eng / total) * 100).toFixed(1);
 
-                    // OU%
                     document.getElementById('kpiOu').textContent = d.ou_pct + '%';
                     document.getElementById('kpiOuFormula').textContent = `PRD / (PRD+SBY+EGT+SDT+UDT)`;
-                    // RUN (PRD) - 顯示百分比
                     document.getElementById('kpiRun').textContent = runPct + '%';
                     document.getElementById('kpiRunCount').textContent = `RUN: ${formatNumber(d.run)}`;
-                    // DOWN (UDT+SDT) - 顯示百分比
                     document.getElementById('kpiDown').textContent = downPct + '%';
                     document.getElementById('kpiDownDetail').textContent = `UDT: ${formatNumber(d.udt)} / SDT: ${formatNumber(d.sdt)}`;
-                    // IDLE (SBY+NST) - 顯示百分比
                     document.getElementById('kpiIdle').textContent = idlePct + '%';
                     document.getElementById('kpiIdleDetail').textContent = `SBY: ${formatNumber(d.sby)} / NST: ${formatNumber(d.nst)}`;
-                    // ENG (EGT) - 顯示百分比
                     document.getElementById('kpiEng').textContent = engPct + '%';
                     document.getElementById('kpiEngCount').textContent = `EGT: ${formatNumber(d.eng)}`;
                 }
@@ -542,15 +529,9 @@
             grid.innerHTML = '<div class="placeholder"><span class="loading-spinner"></span>載入中...</div>';
 
             try {
-                const response = await fetch('/api/dashboard/workcenter_cards', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filters: getFilters() })
-                });
-                const result = await response.json();
+                const result = await MesApi.post('/api/dashboard/workcenter_cards', { filters: getFilters() });
 
                 if (result.success && result.data.length > 0) {
-                    // 快取工站資料
                     workcenterData = {};
                     result.data.forEach(wc => {
                         workcenterData[wc.workcenter] = wc;
@@ -561,7 +542,6 @@
                         const ouClass = getOuClass(wc.ou_pct);
                         const hasIssue = wc.udt > 0 || wc.sdt > 0;
                         const selectedClass = selectedWorkcenter === wc.workcenter ? 'selected' : '';
-                        // 如果有多個原始工站，顯示提示
                         const tooltip = wc.original_wcs && wc.original_wcs.length > 1
                             ? `${wc.workcenter} (含: ${wc.original_wcs.join(', ')})`
                             : wc.workcenter;
@@ -584,7 +564,6 @@
                     });
                     grid.innerHTML = html;
 
-                    // Render mini charts
                     result.data.forEach(wc => {
                         renderMiniChart(wc);
                     });
@@ -598,7 +577,6 @@
         }
 
         function renderMiniChart(wc, retryCount = 0) {
-            // 使用 encodeURIComponent 確保中文名稱生成唯一 ID
             const chartId = `miniChart_${encodeURIComponent(wc.workcenter)}`;
             const chartDom = document.getElementById(chartId);
             if (!chartDom) {
@@ -606,12 +584,10 @@
                 return;
             }
 
-            // 銷毀舊的實例（如果存在）
             if (miniCharts[chartId]) {
                 miniCharts[chartId].dispose();
             }
 
-            // 確保容器有尺寸，如果沒有則延遲重試
             if (chartDom.offsetWidth === 0 || chartDom.offsetHeight === 0) {
                 if (retryCount < 3) {
                     setTimeout(() => renderMiniChart(wc, retryCount + 1), 100);
@@ -623,8 +599,6 @@
             miniCharts[chartId] = chart;
 
             const total = wc.total || 1;
-
-            // 計算各狀態百分比
             const calcPct = (val) => ((val / total) * 100).toFixed(1);
 
             const option = {
@@ -656,66 +630,17 @@
                 xAxis: { type: 'value', show: false, max: total },
                 yAxis: { type: 'category', show: false, data: [''] },
                 series: [
-                    {
-                        name: 'PRD',
-                        type: 'bar',
-                        stack: 'total',
-                        data: [wc.prd],
-                        itemStyle: { color: STATUS_COLORS.PRD },
-                        barWidth: '100%',
-                        emphasis: { itemStyle: { color: STATUS_COLORS.PRD } }
-                    },
-                    {
-                        name: 'SBY',
-                        type: 'bar',
-                        stack: 'total',
-                        data: [wc.sby],
-                        itemStyle: { color: STATUS_COLORS.SBY },
-                        barWidth: '100%',
-                        emphasis: { itemStyle: { color: STATUS_COLORS.SBY } }
-                    },
-                    {
-                        name: 'UDT',
-                        type: 'bar',
-                        stack: 'total',
-                        data: [wc.udt],
-                        itemStyle: { color: STATUS_COLORS.UDT },
-                        barWidth: '100%',
-                        emphasis: { itemStyle: { color: STATUS_COLORS.UDT } }
-                    },
-                    {
-                        name: 'SDT',
-                        type: 'bar',
-                        stack: 'total',
-                        data: [wc.sdt],
-                        itemStyle: { color: STATUS_COLORS.SDT },
-                        barWidth: '100%',
-                        emphasis: { itemStyle: { color: STATUS_COLORS.SDT } }
-                    },
-                    {
-                        name: 'EGT',
-                        type: 'bar',
-                        stack: 'total',
-                        data: [wc.egt],
-                        itemStyle: { color: STATUS_COLORS.EGT },
-                        barWidth: '100%',
-                        emphasis: { itemStyle: { color: STATUS_COLORS.EGT } }
-                    },
-                    {
-                        name: 'NST',
-                        type: 'bar',
-                        stack: 'total',
-                        data: [wc.nst],
-                        itemStyle: { color: STATUS_COLORS.NST },
-                        barWidth: '100%',
-                        emphasis: { itemStyle: { color: STATUS_COLORS.NST } }
-                    }
+                    { name: 'PRD', type: 'bar', stack: 'total', data: [wc.prd], itemStyle: { color: STATUS_COLORS.PRD }, barWidth: '100%' },
+                    { name: 'SBY', type: 'bar', stack: 'total', data: [wc.sby], itemStyle: { color: STATUS_COLORS.SBY }, barWidth: '100%' },
+                    { name: 'UDT', type: 'bar', stack: 'total', data: [wc.udt], itemStyle: { color: STATUS_COLORS.UDT }, barWidth: '100%' },
+                    { name: 'SDT', type: 'bar', stack: 'total', data: [wc.sdt], itemStyle: { color: STATUS_COLORS.SDT }, barWidth: '100%' },
+                    { name: 'EGT', type: 'bar', stack: 'total', data: [wc.egt], itemStyle: { color: STATUS_COLORS.EGT }, barWidth: '100%' },
+                    { name: 'NST', type: 'bar', stack: 'total', data: [wc.nst], itemStyle: { color: STATUS_COLORS.NST }, barWidth: '100%' }
                 ]
             };
             chart.setOption(option);
         }
 
-        // 全局 resize 監聽器 - 調整所有圖表大小
         window.addEventListener('resize', () => {
             Object.values(miniCharts).forEach(chart => {
                 if (chart && !chart.isDisposed()) {
@@ -730,7 +655,6 @@
                 selectedOriginalWcs = null;
             } else {
                 selectedWorkcenter = workcenter;
-                // 取得合併群組的原始工站列表
                 if (workcenterData[workcenter] && workcenterData[workcenter].original_wcs) {
                     selectedOriginalWcs = workcenterData[workcenter].original_wcs;
                 } else {
@@ -738,7 +662,6 @@
                 }
             }
 
-            // Update card selection
             document.querySelectorAll('.wc-card').forEach(card => {
                 card.classList.remove('selected');
             });
@@ -750,21 +673,14 @@
                     }
                 });
             }
-
         }
 
-        // ========== OU% 趨勢圖 ==========
         async function loadOuTrend() {
             const days = parseInt(document.getElementById('trendDays').value);
             const chartDom = document.getElementById('ouTrendChart');
 
             try {
-                const response = await fetch('/api/dashboard/ou_trend', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filters: getFilters(), days: days })
-                });
-                const result = await response.json();
+                const result = await MesApi.post('/api/dashboard/ou_trend', { filters: getFilters(), days: days });
 
                 if (result.success && result.data.length > 0) {
                     renderOuTrendChart(result.data);
@@ -784,7 +700,7 @@
             }
             ouTrendChart = echarts.init(chartDom);
 
-            const dates = data.map(d => d.date.substring(5)); // MM-DD
+            const dates = data.map(d => d.date.substring(5));
             const ouValues = data.map(d => d.ou_pct);
 
             const option = {
@@ -802,12 +718,7 @@
                                 EGT: ${d.egt_hours}h`;
                     }
                 },
-                grid: {
-                    left: 50,
-                    right: 20,
-                    top: 30,
-                    bottom: 30
-                },
+                grid: { left: 50, right: 20, top: 30, bottom: 30 },
                 xAxis: {
                     type: 'category',
                     data: dates,
@@ -846,18 +757,12 @@
             ouTrendChart.setOption(option);
         }
 
-        // ========== 工站利用率熱力圖 ==========
         async function loadHeatmap() {
             const days = parseInt(document.getElementById('heatmapDays').value);
             const chartDom = document.getElementById('heatmapChart');
 
             try {
-                const response = await fetch('/api/dashboard/utilization_heatmap', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filters: getFilters(), days: days })
-                });
-                const result = await response.json();
+                const result = await MesApi.post('/api/dashboard/utilization_heatmap', { filters: getFilters(), days: days });
 
                 if (result.success && result.data.length > 0) {
                     renderHeatmapChart(result.data, days);
@@ -877,57 +782,36 @@
             }
             heatmapChart = echarts.init(chartDom);
 
-            // 工站排序順序定義 (與後端 WORKCENTER_GROUPS 對應)
             const GROUP_ORDER = {
-                '切割': 0,
-                '焊接_DB': 1,
-                '焊接_WB': 2,
-                '焊接_DW': 3,
-                '成型': 4,
-                '去膠': 5,
-                '水吹砂': 6,
-                '電鍍': 7,
-                '移印': 8,
-                '切彎腳': 9,
-                '元件切割': 10,
-                '測試': 11
+                '切割': 0, '焊接_DB': 1, '焊接_WB': 2, '焊接_DW': 3, '成型': 4,
+                '去膠': 5, '水吹砂': 6, '電鍍': 7, '移印': 8, '切彎腳': 9,
+                '元件切割': 10, '測試': 11
             };
 
-            // 取得工站排序值
             function getGroupOrder(groupName) {
-                if (GROUP_ORDER.hasOwnProperty(groupName)) {
-                    return GROUP_ORDER[groupName];
-                }
-                return 999; // 未定義的放最後
+                return GROUP_ORDER.hasOwnProperty(groupName) ? GROUP_ORDER[groupName] : 999;
             }
 
-            // 整理資料：按群組聚合
             const groupedData = {};
             const allDates = new Set();
 
             data.forEach(d => {
                 const group = d.group || d.workcenter;
-                if (!groupedData[group]) {
-                    groupedData[group] = {};
-                }
-                if (!groupedData[group][d.date]) {
-                    groupedData[group][d.date] = { prd: 0, avail: 0 };
-                }
+                if (!groupedData[group]) groupedData[group] = {};
+                if (!groupedData[group][d.date]) groupedData[group][d.date] = { prd: 0, avail: 0 };
                 groupedData[group][d.date].prd += d.prd_hours;
                 groupedData[group][d.date].avail += d.avail_hours;
                 allDates.add(d.date);
             });
 
-            // 排序：日期升序，工站按指定順序 (order 小的在上方，ECharts Y軸需反轉)
             const dates = Array.from(allDates).sort();
             const groups = Object.keys(groupedData).sort((a, b) => {
                 const orderA = getGroupOrder(a);
                 const orderB = getGroupOrder(b);
-                if (orderA !== orderB) return orderB - orderA;  // 反轉：讓 order 小的在上方
-                return a.localeCompare(b);  // 同 order 按字母排序
+                if (orderA !== orderB) return orderB - orderA;
+                return a.localeCompare(b);
             });
 
-            // 轉換為熱力圖資料格式 [x, y, value]
             const heatmapData = [];
             groups.forEach((group, yIdx) => {
                 dates.forEach((date, xIdx) => {
@@ -955,12 +839,7 @@
                         return `<b>${group}</b><br/>${date}<br/>OU%: <b>${val}%</b><br/>PRD: ${cell?.prd?.toFixed(1) || 0}h`;
                     }
                 },
-                grid: {
-                    left: 100,
-                    right: 40,
-                    top: 10,
-                    bottom: 30
-                },
+                grid: { left: 100, right: 40, top: 10, bottom: 30 },
                 xAxis: {
                     type: 'category',
                     data: dates.map(d => d.substring(5)),
@@ -974,16 +853,9 @@
                     axisLabel: { fontSize: 10, color: '#666', width: 80, overflow: 'truncate' }
                 },
                 visualMap: {
-                    min: 0,
-                    max: 100,
-                    calculable: true,
-                    orient: 'vertical',
-                    right: 0,
-                    top: 'center',
-                    itemHeight: 120,
-                    inRange: {
-                        color: ['#fee2e2', '#fef3c7', '#bbf7d0', '#22c55e']
-                    },
+                    min: 0, max: 100, calculable: true, orient: 'vertical',
+                    right: 0, top: 'center', itemHeight: 120,
+                    inRange: { color: ['#fee2e2', '#fef3c7', '#bbf7d0', '#22c55e'] },
                     formatter: '{value}%'
                 },
                 series: [{
@@ -992,13 +864,9 @@
                     label: {
                         show: days <= 7,
                         fontSize: 9,
-                        formatter: function(params) {
-                            return params.data[2] === '-' ? '' : params.data[2];
-                        }
+                        formatter: params => params.data[2] === '-' ? '' : params.data[2]
                     },
-                    emphasis: {
-                        itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' }
-                    }
+                    emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
                 }]
             };
             heatmapChart.setOption(option);
@@ -1019,7 +887,6 @@
                     loadOuTrend(),
                     loadHeatmap()
                 ]);
-                // 更新 Last Update
                 document.getElementById('lastUpdate').textContent = `Last Update: ${new Date().toLocaleString('zh-TW')}`;
             } finally {
                 isLoading = false;
@@ -1028,7 +895,6 @@
             }
         }
 
-        // 視窗調整時重繪圖表
         window.addEventListener('resize', () => {
             if (ouTrendChart && !ouTrendChart.isDisposed()) ouTrendChart.resize();
             if (heatmapChart && !heatmapChart.isDisposed()) heatmapChart.resize();
@@ -1036,8 +902,5 @@
                 if (chart && !chart.isDisposed()) chart.resize();
             });
         });
-
-        // Page init - 使用標記確保只執行一次
-        </script>
-</body>
-</html>
+    </script>
+{% endblock %}

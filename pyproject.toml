@@ -30,6 +30,13 @@ dependencies = [
     "waitress>=2.1.2; platform_system == 'Windows'",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-playwright>=0.4.0",
+    "playwright>=1.40.0",
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 include-package-data = true
