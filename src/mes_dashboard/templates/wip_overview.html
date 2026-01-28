@@ -322,7 +322,7 @@
         /* WIP Status Cards */
         .wip-status-row {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 14px;
             margin-bottom: 16px;
         }
@@ -345,9 +345,14 @@
             border-color: #F59E0B;
         }
 
-        .wip-status-card.hold {
+        .wip-status-card.quality-hold {
             background: #FEF2F2;
             border-color: #EF4444;
+        }
+
+        .wip-status-card.non-quality-hold {
+            background: #FFF7ED;
+            border-color: #F97316;
         }
 
         .wip-status-card .status-header {
@@ -361,7 +366,8 @@
 
         .wip-status-card.run .status-header { color: #166534; }
         .wip-status-card.queue .status-header { color: #92400E; }
-        .wip-status-card.hold .status-header { color: #991B1B; }
+        .wip-status-card.quality-hold .status-header { color: #991B1B; }
+        .wip-status-card.non-quality-hold .status-header { color: #9A3412; }
 
         .wip-status-card .status-header .dot {
             width: 8px;
@@ -413,9 +419,14 @@
             box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5);
         }
 
-        .wip-status-card.hold.active {
+        .wip-status-card.quality-hold.active {
             background: #FEE2E2;
             box-shadow: 0 6px 25px rgba(239, 68, 68, 0.5);
+        }
+
+        .wip-status-card.non-quality-hold.active {
+            background: #FFEDD5;
+            box-shadow: 0 6px 25px rgba(249, 115, 22, 0.5);
         }
 
         /* Dim non-active cards when filtering */
@@ -570,6 +581,26 @@
             background: #f9fafb;
         }
 
+        /* Hold Type Badge */
+        .hold-type-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        .hold-type-badge.quality {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .hold-type-badge.non-quality {
+            background: #FFEDD5;
+            color: #9A3412;
+        }
+
         /* Loading */
         .loading-overlay {
             position: fixed;
@@ -602,14 +633,17 @@
         }
 
         /* Responsive */
+        @media (max-width: 1400px) {
+            .wip-status-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
         @media (max-width: 1200px) {
             .content-grid {
                 grid-template-columns: 1fr;
             }
             .summary-row {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .wip-status-row {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
@@ -697,11 +731,18 @@
                     <span id="queueQty">-</span>
                 </div>
             </div>
-            <div class="wip-status-card hold" onclick="toggleStatusFilter('hold')">
-                <div class="status-header"><span class="dot"></span>HOLD</div>
+            <div class="wip-status-card quality-hold" onclick="toggleStatusFilter('quality-hold')">
+                <div class="status-header"><span class="dot"></span>品質異常</div>
                 <div class="status-values">
-                    <span id="holdLots">-</span>
-                    <span id="holdQty">-</span>
+                    <span id="qualityHoldLots">-</span>
+                    <span id="qualityHoldQty">-</span>
+                </div>
+            </div>
+            <div class="wip-status-card non-quality-hold" onclick="toggleStatusFilter('non-quality-hold')">
+                <div class="status-header"><span class="dot"></span>非品質異常</div>
+                <div class="status-values">
+                    <span id="nonQualityHoldLots">-</span>
+                    <span id="nonQualityHoldQty">-</span>
                 </div>
             </div>
         </div>
@@ -839,7 +880,15 @@
             const params = buildQueryParams();
             // Add status filter if active
             if (activeStatusFilter) {
-                params.status = activeStatusFilter.toUpperCase();
+                if (activeStatusFilter === 'quality-hold') {
+                    params.status = 'HOLD';
+                    params.hold_type = 'quality';
+                } else if (activeStatusFilter === 'non-quality-hold') {
+                    params.status = 'HOLD';
+                    params.hold_type = 'non-quality';
+                } else {
+                    params.status = activeStatusFilter.toUpperCase();
+                }
             }
             const result = await MesApi.get('/api/wip/overview/matrix', {
                 params,
@@ -1011,8 +1060,10 @@
             const runQty = ws.run?.qtyPcs;
             const queueLots = ws.queue?.lots;
             const queueQty = ws.queue?.qtyPcs;
-            const holdLots = ws.hold?.lots;
-            const holdQty = ws.hold?.qtyPcs;
+            const qualityHoldLots = ws.qualityHold?.lots;
+            const qualityHoldQty = ws.qualityHold?.qtyPcs;
+            const nonQualityHoldLots = ws.nonQualityHold?.lots;
+            const nonQualityHoldQty = ws.nonQualityHold?.qtyPcs;
 
             updateElementWithTransition(
                 'runLots',
@@ -1031,12 +1082,20 @@
                 queueQty === null || queueQty === undefined ? '-' : formatNumber(queueQty)
             );
             updateElementWithTransition(
-                'holdLots',
-                holdLots === null || holdLots === undefined ? '-' : `${formatNumber(holdLots)} lots`
+                'qualityHoldLots',
+                qualityHoldLots === null || qualityHoldLots === undefined ? '-' : `${formatNumber(qualityHoldLots)} lots`
             );
             updateElementWithTransition(
-                'holdQty',
-                holdQty === null || holdQty === undefined ? '-' : formatNumber(holdQty)
+                'qualityHoldQty',
+                qualityHoldQty === null || qualityHoldQty === undefined ? '-' : formatNumber(qualityHoldQty)
+            );
+            updateElementWithTransition(
+                'nonQualityHoldLots',
+                nonQualityHoldLots === null || nonQualityHoldLots === undefined ? '-' : `${formatNumber(nonQualityHoldLots)} lots`
+            );
+            updateElementWithTransition(
+                'nonQualityHoldQty',
+                nonQualityHoldQty === null || nonQualityHoldQty === undefined ? '-' : formatNumber(nonQualityHoldQty)
             );
 
             if (data.dataUpdateDate) {
@@ -1084,7 +1143,14 @@
 
             const baseTitle = 'Workcenter x Package Matrix (QTY)';
             if (activeStatusFilter) {
-                const statusLabel = activeStatusFilter.toUpperCase();
+                let statusLabel;
+                if (activeStatusFilter === 'quality-hold') {
+                    statusLabel = '品質異常 Hold';
+                } else if (activeStatusFilter === 'non-quality-hold') {
+                    statusLabel = '非品質異常 Hold';
+                } else {
+                    statusLabel = activeStatusFilter.toUpperCase();
+                }
                 titleEl.textContent = `${baseTitle} - ${statusLabel} Only`;
             } else {
                 titleEl.textContent = baseTitle;
@@ -1177,8 +1243,10 @@
             html += '</tr></thead><tbody>';
 
             data.items.forEach(item => {
+                const badgeClass = item.holdType === 'quality' ? 'quality' : 'non-quality';
+                const badgeText = item.holdType === 'quality' ? '品質' : '非品質';
                 html += '<tr>';
-                html += `<td>${item.reason || '-'}</td>`;
+                html += `<td><span class="hold-type-badge ${badgeClass}">${badgeText}</span>${item.reason || '-'}</td>`;
                 html += `<td>${formatNumber(item.lots)}</td>`;
                 html += `<td>${formatNumber(item.qty)}</td>`;
                 html += '</tr>';

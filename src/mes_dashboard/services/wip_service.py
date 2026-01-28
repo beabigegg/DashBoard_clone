@@ -59,6 +59,49 @@ def _build_base_conditions(
 
 
 # ============================================================
+# Hold Type Classification
+# ============================================================
+# Non-quality hold reasons (all other reasons are quality holds)
+NON_QUALITY_HOLD_REASONS = {
+    'IQC檢驗(久存品驗證)(QC)',
+    '大中/安波幅50pcs樣品留樣(PD)',
+    '工程驗證(PE)',
+    '工程驗證(RD)',
+    '指定機台生產',
+    '特殊需求(X-Ray全檢)',
+    '特殊需求管控',
+    '第一次量產QC品質確認(QC)',
+    '需綁尾數(PD)',
+    '樣品需求留存打樣(樣品)',
+    '盤點(收線)需求',
+}
+
+
+def is_quality_hold(reason: str) -> bool:
+    """Check if a hold reason is quality-related.
+
+    Args:
+        reason: The HOLDREASONNAME value
+
+    Returns:
+        True if this is a quality hold, False if non-quality hold
+    """
+    if reason is None:
+        return True  # Default to quality if reason is unknown
+    return reason not in NON_QUALITY_HOLD_REASONS
+
+
+def _build_hold_type_sql_list() -> str:
+    """Build SQL IN clause list for non-quality hold reasons.
+
+    Returns:
+        Comma-separated string of escaped reason names for SQL IN clause
+    """
+    escaped = [f"'{_escape_sql(r)}'" for r in NON_QUALITY_HOLD_REASONS]
+    return ', '.join(escaped)
+
+
+# ============================================================
 # Data Source Configuration
 # ============================================================
 # The view DWH.DW_PJ_LOT_V must be accessed with schema prefix
@@ -91,6 +134,7 @@ def get_wip_summary(
     try:
         conditions = _build_base_conditions(include_dummy, workorder, lotid)
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        non_quality_list = _build_hold_type_sql_list()
 
         sql = f"""
             SELECT
@@ -102,6 +146,22 @@ def get_wip_summary(
                           AND COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN 1 ELSE 0 END) as HOLD_LOTS,
                 SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
                           AND COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN QTY ELSE 0 END) as HOLD_QTY_PCS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
+                          AND (HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ({non_quality_list}))
+                          THEN 1 ELSE 0 END) as QUALITY_HOLD_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
+                          AND (HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ({non_quality_list}))
+                          THEN QTY ELSE 0 END) as QUALITY_HOLD_QTY_PCS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
+                          AND HOLDREASONNAME IN ({non_quality_list})
+                          THEN 1 ELSE 0 END) as NON_QUALITY_HOLD_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
+                          AND HOLDREASONNAME IN ({non_quality_list})
+                          THEN QTY ELSE 0 END) as NON_QUALITY_HOLD_QTY_PCS,
                 SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
                           AND COALESCE(CURRENTHOLDCOUNT, 0) = 0 THEN 1 ELSE 0 END) as QUEUE_LOTS,
                 SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
@@ -131,6 +191,14 @@ def get_wip_summary(
                 'hold': {
                     'lots': int(row['HOLD_LOTS'] or 0),
                     'qtyPcs': int(row['HOLD_QTY_PCS'] or 0)
+                },
+                'qualityHold': {
+                    'lots': int(row['QUALITY_HOLD_LOTS'] or 0),
+                    'qtyPcs': int(row['QUALITY_HOLD_QTY_PCS'] or 0)
+                },
+                'nonQualityHold': {
+                    'lots': int(row['NON_QUALITY_HOLD_LOTS'] or 0),
+                    'qtyPcs': int(row['NON_QUALITY_HOLD_QTY_PCS'] or 0)
                 }
             },
             'dataUpdateDate': str(row['DATA_UPDATE_DATE']) if row['DATA_UPDATE_DATE'] else None
@@ -144,7 +212,8 @@ def get_wip_matrix(
     include_dummy: bool = False,
     workorder: Optional[str] = None,
     lotid: Optional[str] = None,
-    status: Optional[str] = None
+    status: Optional[str] = None,
+    hold_type: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Get workcenter x product line matrix for overview dashboard.
 
@@ -153,6 +222,8 @@ def get_wip_matrix(
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
+        hold_type: Optional hold type filter ('quality', 'non-quality')
+                   Only effective when status='HOLD'
 
     Returns:
         Dict with matrix data:
@@ -175,6 +246,15 @@ def get_wip_matrix(
                 conditions.append("EQUIPMENTCOUNT > 0")
             elif status_upper == 'HOLD':
                 conditions.append("EQUIPMENTCOUNT = 0 AND CURRENTHOLDCOUNT > 0")
+                # Hold type sub-filter
+                if hold_type:
+                    non_quality_list = _build_hold_type_sql_list()
+                    if hold_type == 'quality':
+                        conditions.append(
+                            f"(HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ({non_quality_list}))"
+                        )
+                    elif hold_type == 'non-quality':
+                        conditions.append(f"HOLDREASONNAME IN ({non_quality_list})")
             elif status_upper == 'QUEUE':
                 conditions.append("EQUIPMENTCOUNT = 0 AND CURRENTHOLDCOUNT = 0")
         where_clause = f"WHERE {' AND '.join(conditions)}"
@@ -284,10 +364,12 @@ def get_wip_hold_summary(
 
         items = []
         for _, row in df.iterrows():
+            reason = row['REASON']
             items.append({
-                'reason': row['REASON'],
+                'reason': reason,
                 'lots': int(row['LOTS'] or 0),
-                'qty': int(row['QTY'] or 0)
+                'qty': int(row['QTY'] or 0),
+                'holdType': 'quality' if is_quality_hold(reason) else 'non-quality'
             })
 
         return {'items': items}
@@ -304,6 +386,7 @@ def get_wip_detail(
     workcenter: str,
     package: Optional[str] = None,
     status: Optional[str] = None,
+    hold_type: Optional[str] = None,
     workorder: Optional[str] = None,
     lotid: Optional[str] = None,
     include_dummy: bool = False,
@@ -316,6 +399,8 @@ def get_wip_detail(
         workcenter: WORKCENTER_GROUP name
         package: Optional PRODUCTLINENAME filter
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
+        hold_type: Optional hold type filter ('quality', 'non-quality')
+                   Only effective when status='HOLD'
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
         include_dummy: If True, include DUMMY lots (default: False)
@@ -325,7 +410,7 @@ def get_wip_detail(
     Returns:
         Dict with:
         - workcenter: The workcenter group name
-        - summary: {totalLots, runLots, queueLots, holdLots}
+        - summary: {totalLots, runLots, queueLots, holdLots, qualityHoldLots, nonQualityHoldLots}
         - specs: List of spec names (sorted by SPECSEQUENCE)
         - lots: List of lot details
         - pagination: {page, page_size, total_count, total_pages}
@@ -346,12 +431,29 @@ def get_wip_detail(
                 conditions.append("COALESCE(EQUIPMENTCOUNT, 0) > 0")
             elif status_upper == 'HOLD':
                 conditions.append("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) > 0")
+                # Hold type sub-filter
+                if hold_type:
+                    non_quality_list = _build_hold_type_sql_list()
+                    if hold_type == 'quality':
+                        conditions.append(
+                            f"(HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ({non_quality_list}))"
+                        )
+                    elif hold_type == 'non-quality':
+                        conditions.append(f"HOLDREASONNAME IN ({non_quality_list})")
             elif status_upper == 'QUEUE':
                 conditions.append("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) = 0")
 
         where_clause = f"WHERE {' AND '.join(conditions)}"
 
         # Get summary with RUN/QUEUE/HOLD classification (IT standard)
+        # Note: summary always uses base_conditions (without hold_type filter) to show full breakdown
+        summary_conditions = _build_base_conditions(include_dummy, workorder, lotid)
+        summary_conditions.append(f"WORKCENTER_GROUP = '{_escape_sql(workcenter)}'")
+        if package:
+            summary_conditions.append(f"PRODUCTLINENAME = '{_escape_sql(package)}'")
+        summary_where = f"WHERE {' AND '.join(summary_conditions)}"
+        non_quality_list = _build_hold_type_sql_list()
+
         summary_sql = f"""
             SELECT
                 COUNT(*) as TOTAL_LOTS,
@@ -360,9 +462,17 @@ def get_wip_detail(
                           AND COALESCE(CURRENTHOLDCOUNT, 0) = 0 THEN 1 ELSE 0 END) as QUEUE_LOTS,
                 SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
                           AND COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN 1 ELSE 0 END) as HOLD_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
+                          AND (HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ({non_quality_list}))
+                          THEN 1 ELSE 0 END) as QUALITY_HOLD_LOTS,
+                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
+                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
+                          AND HOLDREASONNAME IN ({non_quality_list})
+                          THEN 1 ELSE 0 END) as NON_QUALITY_HOLD_LOTS,
                 MAX(SYS_DATE) as SYS_DATE
             FROM {WIP_VIEW}
-            {where_clause}
+            {summary_where}
         """
 
         summary_df = read_sql_df(summary_sql)
@@ -378,7 +488,9 @@ def get_wip_detail(
             'totalLots': total_count,
             'runLots': int(summary_row['RUN_LOTS'] or 0),
             'queueLots': int(summary_row['QUEUE_LOTS'] or 0),
-            'holdLots': int(summary_row['HOLD_LOTS'] or 0)
+            'holdLots': int(summary_row['HOLD_LOTS'] or 0),
+            'qualityHoldLots': int(summary_row['QUALITY_HOLD_LOTS'] or 0),
+            'nonQualityHoldLots': int(summary_row['NON_QUALITY_HOLD_LOTS'] or 0)
         }
 
         # Get unique specs for this workcenter (sorted by SPECSEQUENCE)

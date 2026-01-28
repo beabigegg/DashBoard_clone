@@ -284,7 +284,7 @@
         /* Summary Cards */
         .summary-row {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 14px;
             margin-bottom: 16px;
         }
@@ -330,14 +330,16 @@
         /* Status Card Colors - Clickable */
         .summary-card.status-run,
         .summary-card.status-queue,
-        .summary-card.status-hold {
+        .summary-card.status-quality-hold,
+        .summary-card.status-non-quality-hold {
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .summary-card.status-run:hover,
         .summary-card.status-queue:hover,
-        .summary-card.status-hold:hover {
+        .summary-card.status-quality-hold:hover,
+        .summary-card.status-non-quality-hold:hover {
             transform: translateY(-2px);
         }
 
@@ -375,27 +377,45 @@
             box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5);
         }
 
-        .summary-card.status-hold {
+        .summary-card.status-quality-hold {
             background: #FEF2F2;
             border-color: #EF4444;
         }
-        .summary-card.status-hold .summary-value {
+        .summary-card.status-quality-hold .summary-value {
             color: #991B1B;
         }
-        .summary-card.status-hold:hover {
+        .summary-card.status-quality-hold:hover {
             box-shadow: 0 4px 15px rgba(239, 68, 68, 0.25);
         }
-        .summary-card.status-hold.active {
+        .summary-card.status-quality-hold.active {
             background: #FEE2E2;
             border-width: 3px;
             transform: scale(1.03);
             box-shadow: 0 6px 25px rgba(239, 68, 68, 0.5);
         }
 
+        .summary-card.status-non-quality-hold {
+            background: #FFF7ED;
+            border-color: #F97316;
+        }
+        .summary-card.status-non-quality-hold .summary-value {
+            color: #9A3412;
+        }
+        .summary-card.status-non-quality-hold:hover {
+            box-shadow: 0 4px 15px rgba(249, 115, 22, 0.25);
+        }
+        .summary-card.status-non-quality-hold.active {
+            background: #FFEDD5;
+            border-width: 3px;
+            transform: scale(1.03);
+            box-shadow: 0 6px 25px rgba(249, 115, 22, 0.5);
+        }
+
         /* Dim non-active cards when filtering */
         .summary-row.filtering .summary-card.status-run:not(.active),
         .summary-row.filtering .summary-card.status-queue:not(.active),
-        .summary-row.filtering .summary-card.status-hold:not(.active) {
+        .summary-row.filtering .summary-card.status-quality-hold:not(.active),
+        .summary-row.filtering .summary-card.status-non-quality-hold:not(.active) {
             opacity: 0.5;
         }
 
@@ -595,7 +615,13 @@
         }
 
         /* Responsive */
-        @media (max-width: 1200px) {
+        @media (max-width: 1400px) {
+            .summary-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 1000px) {
             .summary-row {
                 grid-template-columns: repeat(2, 1fr);
             }
@@ -675,9 +701,13 @@
                 <div class="summary-label">QUEUE</div>
                 <div class="summary-value" id="queueLots">-</div>
             </div>
-            <div class="summary-card status-hold" onclick="toggleStatusFilter('hold')" title="Click to filter HOLD only">
-                <div class="summary-label">HOLD</div>
-                <div class="summary-value" id="holdLots">-</div>
+            <div class="summary-card status-quality-hold" onclick="toggleStatusFilter('quality-hold')" title="Click to filter Quality Hold only">
+                <div class="summary-label">品質異常</div>
+                <div class="summary-value" id="qualityHoldLots">-</div>
+            </div>
+            <div class="summary-card status-non-quality-hold" onclick="toggleStatusFilter('non-quality-hold')" title="Click to filter Non-Quality Hold only">
+                <div class="summary-label">非品質異常</div>
+                <div class="summary-value" id="nonQualityHoldLots">-</div>
             </div>
         </div>
 
@@ -728,7 +758,7 @@
         };
 
         // WIP Status filter (separate from other filters)
-        let activeStatusFilter = null;  // null | 'run' | 'queue' | 'hold'
+        let activeStatusFilter = null;  // null | 'run' | 'queue' | 'quality-hold' | 'non-quality-hold'
 
         // AbortController for cancelling in-flight requests
         let tableAbortController = null;      // For loadTableOnly()
@@ -782,8 +812,17 @@
                 params.package = state.filters.package;
             }
             if (activeStatusFilter) {
-                // Convert to API status format (RUN/QUEUE/HOLD)
-                params.status = activeStatusFilter.toUpperCase();
+                // Handle hold type filters
+                if (activeStatusFilter === 'quality-hold') {
+                    params.status = 'HOLD';
+                    params.hold_type = 'quality';
+                } else if (activeStatusFilter === 'non-quality-hold') {
+                    params.status = 'HOLD';
+                    params.hold_type = 'non-quality';
+                } else {
+                    // Convert to API status format (RUN/QUEUE)
+                    params.status = activeStatusFilter.toUpperCase();
+                }
             }
             if (state.filters.workorder) {
                 params.workorder = state.filters.workorder;
@@ -839,7 +878,8 @@
             updateElementWithTransition('totalLots', summary.totalLots);
             updateElementWithTransition('runLots', summary.runLots);
             updateElementWithTransition('queueLots', summary.queueLots);
-            updateElementWithTransition('holdLots', summary.holdLots);
+            updateElementWithTransition('qualityHoldLots', summary.qualityHoldLots);
+            updateElementWithTransition('nonQualityHoldLots', summary.nonQualityHoldLots);
         }
 
         function renderTable(data) {
@@ -1142,7 +1182,7 @@
 
         function updateCardStyles() {
             const row = document.getElementById('summaryRow');
-            const statusCards = document.querySelectorAll('.summary-card.status-run, .summary-card.status-queue, .summary-card.status-hold');
+            const statusCards = document.querySelectorAll('.summary-card.status-run, .summary-card.status-queue, .summary-card.status-quality-hold, .summary-card.status-non-quality-hold');
 
             // Remove active from all status cards
             statusCards.forEach(card => {
@@ -1169,7 +1209,14 @@
             const baseTitle = 'Lot Details';
 
             if (activeStatusFilter) {
-                const statusLabel = activeStatusFilter.toUpperCase();
+                let statusLabel;
+                if (activeStatusFilter === 'quality-hold') {
+                    statusLabel = '品質異常 Hold';
+                } else if (activeStatusFilter === 'non-quality-hold') {
+                    statusLabel = '非品質異常 Hold';
+                } else {
+                    statusLabel = activeStatusFilter.toUpperCase();
+                }
                 titleEl.textContent = `${baseTitle} - ${statusLabel} Only`;
             } else {
                 titleEl.textContent = baseTitle;

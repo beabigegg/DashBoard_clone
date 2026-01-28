@@ -66,6 +66,8 @@ def api_overview_matrix():
         lotid: Optional LOTID filter (fuzzy match)
         include_dummy: Include DUMMY lots (default: false)
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
+        hold_type: Optional hold type filter ('quality', 'non-quality')
+                   Only effective when status='HOLD'
 
     Returns:
         JSON with workcenters, packages, matrix, workcenter_totals,
@@ -75,6 +77,7 @@ def api_overview_matrix():
     lotid = request.args.get('lotid', '').strip() or None
     include_dummy = _parse_bool(request.args.get('include_dummy', ''))
     status = request.args.get('status', '').strip().upper() or None
+    hold_type = request.args.get('hold_type', '').strip().lower() or None
 
     # Validate status parameter
     if status and status not in ('RUN', 'QUEUE', 'HOLD'):
@@ -83,11 +86,19 @@ def api_overview_matrix():
             'error': 'Invalid status. Use RUN, QUEUE, or HOLD'
         }), 400
 
+    # Validate hold_type parameter
+    if hold_type and hold_type not in ('quality', 'non-quality'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid hold_type. Use quality or non-quality'
+        }), 400
+
     result = get_wip_matrix(
         include_dummy=include_dummy,
         workorder=workorder,
         lotid=lotid,
-        status=status
+        status=status,
+        hold_type=hold_type
     )
     if result is not None:
         return jsonify({'success': True, 'data': result})
@@ -134,6 +145,8 @@ def api_detail(workcenter: str):
     Query Parameters:
         package: Optional PRODUCTLINENAME filter
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
+        hold_type: Optional hold type filter ('quality', 'non-quality')
+                   Only effective when status='HOLD'
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
         include_dummy: Include DUMMY lots (default: false)
@@ -145,6 +158,7 @@ def api_detail(workcenter: str):
     """
     package = request.args.get('package', '').strip() or None
     status = request.args.get('status', '').strip().upper() or None
+    hold_type = request.args.get('hold_type', '').strip().lower() or None
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
     include_dummy = _parse_bool(request.args.get('include_dummy', ''))
@@ -161,10 +175,18 @@ def api_detail(workcenter: str):
             'error': 'Invalid status. Use RUN, QUEUE, or HOLD'
         }), 400
 
+    # Validate hold_type parameter
+    if hold_type and hold_type not in ('quality', 'non-quality'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid hold_type. Use quality or non-quality'
+        }), 400
+
     result = get_wip_detail(
         workcenter=workcenter,
         package=package,
         status=status,
+        hold_type=hold_type,
         workorder=workorder,
         lotid=lotid,
         include_dummy=include_dummy,
