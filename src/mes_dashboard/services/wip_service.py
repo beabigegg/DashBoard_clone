@@ -484,16 +484,44 @@ def get_wip_detail(
             return None
 
         summary_row = summary_df.iloc[0]
-        total_count = int(summary_row['TOTAL_LOTS'] or 0)
         sys_date = str(summary_row['SYS_DATE']) if summary_row['SYS_DATE'] else None
 
+        # Calculate counts from summary
+        total_lots = int(summary_row['TOTAL_LOTS'] or 0)
+        run_lots = int(summary_row['RUN_LOTS'] or 0)
+        queue_lots = int(summary_row['QUEUE_LOTS'] or 0)
+        hold_lots = int(summary_row['HOLD_LOTS'] or 0)
+        quality_hold_lots = int(summary_row['QUALITY_HOLD_LOTS'] or 0)
+        non_quality_hold_lots = int(summary_row['NON_QUALITY_HOLD_LOTS'] or 0)
+
+        # Determine filtered count based on status filter
+        # When a status filter is applied, use the corresponding count for pagination
+        if status:
+            status_upper = status.upper()
+            if status_upper == 'RUN':
+                filtered_count = run_lots
+            elif status_upper == 'QUEUE':
+                filtered_count = queue_lots
+            elif status_upper == 'HOLD':
+                # Further filter by hold_type if specified
+                if hold_type == 'quality':
+                    filtered_count = quality_hold_lots
+                elif hold_type == 'non-quality':
+                    filtered_count = non_quality_hold_lots
+                else:
+                    filtered_count = hold_lots
+            else:
+                filtered_count = total_lots
+        else:
+            filtered_count = total_lots
+
         summary = {
-            'totalLots': total_count,
-            'runLots': int(summary_row['RUN_LOTS'] or 0),
-            'queueLots': int(summary_row['QUEUE_LOTS'] or 0),
-            'holdLots': int(summary_row['HOLD_LOTS'] or 0),
-            'qualityHoldLots': int(summary_row['QUALITY_HOLD_LOTS'] or 0),
-            'nonQualityHoldLots': int(summary_row['NON_QUALITY_HOLD_LOTS'] or 0)
+            'totalLots': total_lots,
+            'runLots': run_lots,
+            'queueLots': queue_lots,
+            'holdLots': hold_lots,
+            'qualityHoldLots': quality_hold_lots,
+            'nonQualityHoldLots': non_quality_hold_lots
         }
 
         # Get unique specs for this workcenter (sorted by SPECSEQUENCE)
@@ -546,7 +574,7 @@ def get_wip_detail(
                     'spec': _safe_value(row['SPECNAME'])
                 })
 
-        total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+        total_pages = (filtered_count + page_size - 1) // page_size if filtered_count > 0 else 1
 
         return {
             'workcenter': workcenter,
@@ -556,7 +584,7 @@ def get_wip_detail(
             'pagination': {
                 'page': page,
                 'page_size': page_size,
-                'total_count': total_count,
+                'total_count': filtered_count,
                 'total_pages': total_pages
             },
             'sys_date': sys_date
@@ -745,4 +773,325 @@ def search_lot_ids(
         return df['LOTID'].tolist()
     except Exception as exc:
         print(f"Search lot IDs failed: {exc}")
+        return None
+
+
+# ============================================================
+# Hold Detail API Functions
+# ============================================================
+
+def get_hold_detail_summary(
+    reason: str,
+    include_dummy: bool = False
+) -> Optional[Dict[str, Any]]:
+    """Get summary statistics for a specific hold reason.
+
+    Args:
+        reason: The HOLDREASONNAME to filter by
+        include_dummy: If True, include DUMMY lots (default: False)
+
+    Returns:
+        Dict with totalLots, totalQty, avgAge, maxAge, workcenterCount
+    """
+    try:
+        conditions = _build_base_conditions(include_dummy)
+        conditions.append("STATUS = 'HOLD'")
+        conditions.append("CURRENTHOLDCOUNT > 0")
+        conditions.append(f"HOLDREASONNAME = '{_escape_sql(reason)}'")
+        where_clause = f"WHERE {' AND '.join(conditions)}"
+
+        sql = f"""
+            SELECT
+                COUNT(*) AS TOTAL_LOTS,
+                SUM(QTY) AS TOTAL_QTY,
+                ROUND(AVG(AGEBYDAYS), 1) AS AVG_AGE,
+                MAX(AGEBYDAYS) AS MAX_AGE,
+                COUNT(DISTINCT WORKCENTER_GROUP) AS WORKCENTER_COUNT
+            FROM {WIP_VIEW}
+            {where_clause}
+        """
+        df = read_sql_df(sql)
+
+        if df is None or df.empty:
+            return None
+
+        row = df.iloc[0]
+        return {
+            'totalLots': int(row['TOTAL_LOTS'] or 0),
+            'totalQty': int(row['TOTAL_QTY'] or 0),
+            'avgAge': float(row['AVG_AGE']) if row['AVG_AGE'] else 0,
+            'maxAge': float(row['MAX_AGE']) if row['MAX_AGE'] else 0,
+            'workcenterCount': int(row['WORKCENTER_COUNT'] or 0)
+        }
+    except Exception as exc:
+        print(f"Hold detail summary query failed: {exc}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def get_hold_detail_distribution(
+    reason: str,
+    include_dummy: bool = False
+) -> Optional[Dict[str, Any]]:
+    """Get distribution statistics for a specific hold reason.
+
+    Args:
+        reason: The HOLDREASONNAME to filter by
+        include_dummy: If True, include DUMMY lots (default: False)
+
+    Returns:
+        Dict with byWorkcenter, byPackage, byAge distributions
+    """
+    try:
+        conditions = _build_base_conditions(include_dummy)
+        conditions.append("STATUS = 'HOLD'")
+        conditions.append("CURRENTHOLDCOUNT > 0")
+        conditions.append(f"HOLDREASONNAME = '{_escape_sql(reason)}'")
+        where_clause = f"WHERE {' AND '.join(conditions)}"
+
+        # Get total for percentage calculation
+        total_sql = f"""
+            SELECT COUNT(*) AS TOTAL_LOTS, SUM(QTY) AS TOTAL_QTY
+            FROM {WIP_VIEW}
+            {where_clause}
+        """
+        total_df = read_sql_df(total_sql)
+        total_lots = int(total_df.iloc[0]['TOTAL_LOTS'] or 0) if total_df is not None else 0
+
+        if total_lots == 0:
+            return {
+                'byWorkcenter': [],
+                'byPackage': [],
+                'byAge': []
+            }
+
+        # By Workcenter
+        wc_sql = f"""
+            SELECT
+                WORKCENTER_GROUP AS NAME,
+                COUNT(*) AS LOTS,
+                SUM(QTY) AS QTY
+            FROM {WIP_VIEW}
+            {where_clause}
+              AND WORKCENTER_GROUP IS NOT NULL
+            GROUP BY WORKCENTER_GROUP
+            ORDER BY COUNT(*) DESC
+        """
+        wc_df = read_sql_df(wc_sql)
+        by_workcenter = []
+        if wc_df is not None and not wc_df.empty:
+            for _, row in wc_df.iterrows():
+                lots = int(row['LOTS'] or 0)
+                by_workcenter.append({
+                    'name': row['NAME'],
+                    'lots': lots,
+                    'qty': int(row['QTY'] or 0),
+                    'percentage': round(lots / total_lots * 100, 1) if total_lots > 0 else 0
+                })
+
+        # By Package
+        pkg_sql = f"""
+            SELECT
+                PRODUCTLINENAME AS NAME,
+                COUNT(*) AS LOTS,
+                SUM(QTY) AS QTY
+            FROM {WIP_VIEW}
+            {where_clause}
+              AND PRODUCTLINENAME IS NOT NULL
+            GROUP BY PRODUCTLINENAME
+            ORDER BY COUNT(*) DESC
+        """
+        pkg_df = read_sql_df(pkg_sql)
+        by_package = []
+        if pkg_df is not None and not pkg_df.empty:
+            for _, row in pkg_df.iterrows():
+                lots = int(row['LOTS'] or 0)
+                by_package.append({
+                    'name': row['NAME'],
+                    'lots': lots,
+                    'qty': int(row['QTY'] or 0),
+                    'percentage': round(lots / total_lots * 100, 1) if total_lots > 0 else 0
+                })
+
+        # By Age (station dwell time)
+        age_sql = f"""
+            SELECT
+                CASE
+                    WHEN AGEBYDAYS < 1 THEN '0-1'
+                    WHEN AGEBYDAYS < 3 THEN '1-3'
+                    WHEN AGEBYDAYS < 7 THEN '3-7'
+                    ELSE '7+'
+                END AS AGE_RANGE,
+                COUNT(*) AS LOTS,
+                SUM(QTY) AS QTY
+            FROM {WIP_VIEW}
+            {where_clause}
+            GROUP BY CASE
+                WHEN AGEBYDAYS < 1 THEN '0-1'
+                WHEN AGEBYDAYS < 3 THEN '1-3'
+                WHEN AGEBYDAYS < 7 THEN '3-7'
+                ELSE '7+'
+            END
+        """
+        age_df = read_sql_df(age_sql)
+
+        # Define age ranges in order
+        age_labels = {
+            '0-1': '0-1天',
+            '1-3': '1-3天',
+            '3-7': '3-7天',
+            '7+': '7+天'
+        }
+        age_order = ['0-1', '1-3', '3-7', '7+']
+
+        # Build age distribution with all ranges (even if 0)
+        age_data = {r: {'lots': 0, 'qty': 0} for r in age_order}
+        if age_df is not None and not age_df.empty:
+            for _, row in age_df.iterrows():
+                range_key = row['AGE_RANGE']
+                if range_key in age_data:
+                    age_data[range_key] = {
+                        'lots': int(row['LOTS'] or 0),
+                        'qty': int(row['QTY'] or 0)
+                    }
+
+        by_age = []
+        for r in age_order:
+            lots = age_data[r]['lots']
+            by_age.append({
+                'range': r,
+                'label': age_labels[r],
+                'lots': lots,
+                'qty': age_data[r]['qty'],
+                'percentage': round(lots / total_lots * 100, 1) if total_lots > 0 else 0
+            })
+
+        return {
+            'byWorkcenter': by_workcenter,
+            'byPackage': by_package,
+            'byAge': by_age
+        }
+    except Exception as exc:
+        print(f"Hold detail distribution query failed: {exc}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def get_hold_detail_lots(
+    reason: str,
+    workcenter: Optional[str] = None,
+    package: Optional[str] = None,
+    age_range: Optional[str] = None,
+    include_dummy: bool = False,
+    page: int = 1,
+    page_size: int = 50
+) -> Optional[Dict[str, Any]]:
+    """Get paginated lot details for a specific hold reason.
+
+    Args:
+        reason: The HOLDREASONNAME to filter by
+        workcenter: Optional WORKCENTER_GROUP filter
+        package: Optional PRODUCTLINENAME filter
+        age_range: Optional age range filter ('0-1', '1-3', '3-7', '7+')
+        include_dummy: If True, include DUMMY lots (default: False)
+        page: Page number (1-based)
+        page_size: Number of records per page
+
+    Returns:
+        Dict with lots list, pagination info, and active filters
+    """
+    try:
+        conditions = _build_base_conditions(include_dummy)
+        conditions.append("STATUS = 'HOLD'")
+        conditions.append("CURRENTHOLDCOUNT > 0")
+        conditions.append(f"HOLDREASONNAME = '{_escape_sql(reason)}'")
+
+        # Optional filters
+        if workcenter:
+            conditions.append(f"WORKCENTER_GROUP = '{_escape_sql(workcenter)}'")
+        if package:
+            conditions.append(f"PRODUCTLINENAME = '{_escape_sql(package)}'")
+        if age_range:
+            if age_range == '0-1':
+                conditions.append("AGEBYDAYS >= 0 AND AGEBYDAYS < 1")
+            elif age_range == '1-3':
+                conditions.append("AGEBYDAYS >= 1 AND AGEBYDAYS < 3")
+            elif age_range == '3-7':
+                conditions.append("AGEBYDAYS >= 3 AND AGEBYDAYS < 7")
+            elif age_range == '7+':
+                conditions.append("AGEBYDAYS >= 7")
+
+        where_clause = f"WHERE {' AND '.join(conditions)}"
+
+        # Get total count
+        count_sql = f"""
+            SELECT COUNT(*) AS TOTAL
+            FROM {WIP_VIEW}
+            {where_clause}
+        """
+        count_df = read_sql_df(count_sql)
+        total = int(count_df.iloc[0]['TOTAL'] or 0) if count_df is not None else 0
+
+        # Get paginated lots
+        offset = (page - 1) * page_size
+        lots_sql = f"""
+            SELECT * FROM (
+                SELECT
+                    LOTID,
+                    WORKORDER,
+                    QTY,
+                    PRODUCTLINENAME AS PACKAGE,
+                    WORKCENTER_GROUP AS WORKCENTER,
+                    SPECNAME AS SPEC,
+                    ROUND(AGEBYDAYS, 1) AS AGE,
+                    HOLDEMP AS HOLD_BY,
+                    DEPTNAME AS DEPT,
+                    COMMENT_HOLD AS HOLD_COMMENT,
+                    ROW_NUMBER() OVER (ORDER BY AGEBYDAYS DESC, LOTID) AS RN
+                FROM {WIP_VIEW}
+                {where_clause}
+            )
+            WHERE RN > {offset} AND RN <= {offset + page_size}
+            ORDER BY RN
+        """
+        lots_df = read_sql_df(lots_sql)
+
+        lots = []
+        if lots_df is not None and not lots_df.empty:
+            for _, row in lots_df.iterrows():
+                lots.append({
+                    'lotId': _safe_value(row['LOTID']),
+                    'workorder': _safe_value(row['WORKORDER']),
+                    'qty': int(row['QTY'] or 0),
+                    'package': _safe_value(row['PACKAGE']),
+                    'workcenter': _safe_value(row['WORKCENTER']),
+                    'spec': _safe_value(row['SPEC']),
+                    'age': float(row['AGE']) if row['AGE'] else 0,
+                    'holdBy': _safe_value(row['HOLD_BY']),
+                    'dept': _safe_value(row['DEPT']),
+                    'holdComment': _safe_value(row['HOLD_COMMENT'])
+                })
+
+        total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+
+        return {
+            'lots': lots,
+            'pagination': {
+                'page': page,
+                'perPage': page_size,
+                'total': total,
+                'totalPages': total_pages
+            },
+            'filters': {
+                'workcenter': workcenter,
+                'package': package,
+                'ageRange': age_range
+            }
+        }
+    except Exception as exc:
+        print(f"Hold detail lots query failed: {exc}")
+        import traceback
+        traceback.print_exc()
         return None

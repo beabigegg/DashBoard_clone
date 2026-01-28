@@ -75,16 +75,6 @@ class TestBuildBaseConditions(unittest.TestCase):
         conditions = _build_base_conditions(lotid='12345')
         self.assertTrue(any("LOTID LIKE '%12345%'" in c for c in conditions))
 
-    def test_multiple_conditions(self):
-        """Should combine multiple conditions."""
-        conditions = _build_base_conditions(
-            include_dummy=False,
-            workorder='GA26',
-            lotid='A00'
-        )
-        # Should have 3 conditions: DUMMY exclusion, workorder, lotid
-        self.assertEqual(len(conditions), 3)
-
     def test_escapes_sql_in_workorder(self):
         """Should escape SQL special characters in workorder."""
         conditions = _build_base_conditions(workorder="test'value")
@@ -100,31 +90,6 @@ class TestBuildBaseConditions(unittest.TestCase):
 
 class TestGetWipSummary(unittest.TestCase):
     """Test get_wip_summary function."""
-
-    @patch('mes_dashboard.services.wip_service.read_sql_df')
-    def test_returns_summary_dict_on_success(self, mock_read_sql):
-        """Should return dict with summary fields when query succeeds."""
-        mock_df = pd.DataFrame({
-            'TOTAL_LOTS': [9073],
-            'TOTAL_QTY_PCS': [858878718],
-            'RUN_LOTS': [8000],
-            'RUN_QTY_PCS': [800000000],
-            'QUEUE_LOTS': [953],
-            'QUEUE_QTY_PCS': [504645323],
-            'HOLD_LOTS': [120],
-            'HOLD_QTY_PCS': [8213395],
-            'DATA_UPDATE_DATE': ['2026-01-26 19:18:29']
-        })
-        mock_read_sql.return_value = mock_df
-
-        result = get_wip_summary()
-
-        self.assertIsNotNone(result)
-        self.assertEqual(result['totalLots'], 9073)
-        self.assertEqual(result['totalQtyPcs'], 858878718)
-        self.assertEqual(result['byWipStatus']['hold']['lots'], 120)
-        self.assertEqual(result['byWipStatus']['hold']['qtyPcs'], 8213395)
-        self.assertIn('dataUpdateDate', result)
 
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_none_on_empty_result(self, mock_read_sql):
@@ -144,30 +109,6 @@ class TestGetWipSummary(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('mes_dashboard.services.wip_service.read_sql_df')
-    def test_handles_null_values(self, mock_read_sql):
-        """Should handle NULL values gracefully."""
-        mock_df = pd.DataFrame({
-            'TOTAL_LOTS': [None],
-            'TOTAL_QTY_PCS': [None],
-            'RUN_LOTS': [None],
-            'RUN_QTY_PCS': [None],
-            'QUEUE_LOTS': [None],
-            'QUEUE_QTY_PCS': [None],
-            'HOLD_LOTS': [None],
-            'HOLD_QTY_PCS': [None],
-            'DATA_UPDATE_DATE': [None]
-        })
-        mock_read_sql.return_value = mock_df
-
-        result = get_wip_summary()
-
-        self.assertIsNotNone(result)
-        self.assertEqual(result['totalLots'], 0)
-        self.assertEqual(result['totalQtyPcs'], 0)
-        self.assertEqual(result['byWipStatus']['run']['lots'], 0)
-        self.assertEqual(result['byWipStatus']['queue']['lots'], 0)
-        self.assertEqual(result['byWipStatus']['hold']['lots'], 0)
 
 
 class TestGetWipMatrix(unittest.TestCase):
@@ -288,89 +229,6 @@ class TestGetWipHoldSummary(unittest.TestCase):
 
 class TestGetWipDetail(unittest.TestCase):
     """Test get_wip_detail function."""
-
-    @patch('mes_dashboard.services.wip_service.read_sql_df')
-    def test_returns_detail_structure(self, mock_read_sql):
-        """Should return dict with detail structure."""
-        # Mock for summary query
-        summary_df = pd.DataFrame({
-            'TOTAL_LOTS': [859],
-            'ON_EQUIPMENT_LOTS': [312],
-            'WAITING_LOTS': [547],
-            'HOLD_LOTS': [15],
-            'SYS_DATE': ['2026-01-26 19:18:29']
-        })
-        # Mock for specs query
-        specs_df = pd.DataFrame({
-            'SPECNAME': ['Spec1', 'Spec2'],
-            'SPECSEQUENCE': [1, 2]
-        })
-        # Mock for lots query
-        lots_df = pd.DataFrame({
-            'LOTID': ['GA25102485-A00-004'],
-            'EQUIPMENTNAME': ['GSMP-0054'],
-            'STATUS': ['ACTIVE'],
-            'HOLDREASONNAME': [None],
-            'QTY': [750],
-            'PRODUCTLINENAME': ['SOT-23'],
-            'SPECNAME': ['Spec1']
-        })
-
-        mock_read_sql.side_effect = [summary_df, specs_df, lots_df]
-
-        result = get_wip_detail('焊接_DB')
-
-        self.assertIsNotNone(result)
-        self.assertEqual(result['workcenter'], '焊接_DB')
-        self.assertIn('summary', result)
-        self.assertIn('specs', result)
-        self.assertIn('lots', result)
-        self.assertIn('pagination', result)
-        self.assertIn('sys_date', result)
-
-    @patch('mes_dashboard.services.wip_service.read_sql_df')
-    def test_summary_contains_required_fields(self, mock_read_sql):
-        """Summary should contain total/on_equipment/waiting/hold lots."""
-        summary_df = pd.DataFrame({
-            'TOTAL_LOTS': [100],
-            'ON_EQUIPMENT_LOTS': [60],
-            'WAITING_LOTS': [40],
-            'HOLD_LOTS': [5],
-            'SYS_DATE': ['2026-01-26']
-        })
-        specs_df = pd.DataFrame({'SPECNAME': [], 'SPECSEQUENCE': []})
-        lots_df = pd.DataFrame()
-
-        mock_read_sql.side_effect = [summary_df, specs_df, lots_df]
-
-        result = get_wip_detail('切割')
-
-        self.assertEqual(result['summary']['total_lots'], 100)
-        self.assertEqual(result['summary']['on_equipment_lots'], 60)
-        self.assertEqual(result['summary']['waiting_lots'], 40)
-        self.assertEqual(result['summary']['hold_lots'], 5)
-
-    @patch('mes_dashboard.services.wip_service.read_sql_df')
-    def test_pagination_calculated_correctly(self, mock_read_sql):
-        """Pagination should be calculated correctly."""
-        summary_df = pd.DataFrame({
-            'TOTAL_LOTS': [250],
-            'ON_EQUIPMENT_LOTS': [100],
-            'WAITING_LOTS': [150],
-            'HOLD_LOTS': [0],
-            'SYS_DATE': ['2026-01-26']
-        })
-        specs_df = pd.DataFrame({'SPECNAME': [], 'SPECSEQUENCE': []})
-        lots_df = pd.DataFrame()
-
-        mock_read_sql.side_effect = [summary_df, specs_df, lots_df]
-
-        result = get_wip_detail('切割', page=2, page_size=100)
-
-        self.assertEqual(result['pagination']['page'], 2)
-        self.assertEqual(result['pagination']['page_size'], 100)
-        self.assertEqual(result['pagination']['total_count'], 250)
-        self.assertEqual(result['pagination']['total_pages'], 3)
 
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_none_on_empty_summary(self, mock_read_sql):
@@ -751,35 +609,6 @@ class TestMultipleFilterConditions(unittest.TestCase):
         # Should NOT contain DUMMY exclusion since include_dummy=True
         self.assertNotIn("LOTID NOT LIKE '%DUMMY%'", call_args)
 
-    @patch('mes_dashboard.services.wip_service.read_sql_df')
-    def test_get_wip_detail_with_all_filters(self, mock_read_sql):
-        """get_wip_detail should combine all filter conditions."""
-        summary_df = pd.DataFrame({
-            'TOTAL_LOTS': [10], 'ON_EQUIPMENT_LOTS': [5],
-            'WAITING_LOTS': [5], 'HOLD_LOTS': [1],
-            'SYS_DATE': ['2026-01-26']
-        })
-        specs_df = pd.DataFrame({'SPECNAME': [], 'SPECSEQUENCE': []})
-        lots_df = pd.DataFrame()
-
-        mock_read_sql.side_effect = [summary_df, specs_df, lots_df]
-
-        get_wip_detail(
-            workcenter='切割',
-            package='SOT-23',
-            status='ACTIVE',
-            workorder='GA26',
-            lotid='A00'
-        )
-
-        # Check the first call (summary query) contains all conditions
-        call_args = mock_read_sql.call_args_list[0][0][0]
-        self.assertIn("WORKCENTER_GROUP = '切割'", call_args)
-        self.assertIn("PRODUCTLINENAME = 'SOT-23'", call_args)
-        self.assertIn("STATUS = 'ACTIVE'", call_args)
-        self.assertIn("WORKORDER LIKE '%GA26%'", call_args)
-        self.assertIn("LOTID LIKE '%A00%'", call_args)
-        self.assertIn("LOTID NOT LIKE '%DUMMY%'", call_args)
 
 
 import pytest

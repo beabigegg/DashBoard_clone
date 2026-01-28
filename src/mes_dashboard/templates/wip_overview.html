@@ -596,6 +596,17 @@
             color: #991B1B;
         }
 
+        .hold-reason-link {
+            color: var(--primary);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .hold-reason-link:hover {
+            text-decoration: underline;
+            color: var(--primary-dark);
+        }
+
         .hold-type-badge.non-quality {
             background: #FFEDD5;
             color: #9A3412;
@@ -1245,8 +1256,12 @@
             data.items.forEach(item => {
                 const badgeClass = item.holdType === 'quality' ? 'quality' : 'non-quality';
                 const badgeText = item.holdType === 'quality' ? '品質' : '非品質';
+                const reasonText = item.reason || '-';
+                const reasonLink = item.reason
+                    ? `<a href="/hold-detail?reason=${encodeURIComponent(item.reason)}" class="hold-reason-link">${reasonText}</a>`
+                    : reasonText;
                 html += '<tr>';
-                html += `<td><span class="hold-type-badge ${badgeClass}">${badgeText}</span>${item.reason || '-'}</td>`;
+                html += `<td><span class="hold-type-badge ${badgeClass}">${badgeText}</span>${reasonLink}</td>`;
                 html += `<td>${formatNumber(item.lots)}</td>`;
                 html += `<td>${formatNumber(item.qty)}</td>`;
                 html += '</tr>';

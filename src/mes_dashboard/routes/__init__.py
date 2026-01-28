@@ -8,6 +8,7 @@ from .wip_routes import wip_bp
 from .resource_routes import resource_bp
 from .dashboard_routes import dashboard_bp
 from .excel_query_routes import excel_query_bp
+from .hold_routes import hold_bp
 
 
 def register_routes(app) -> None:
@@ -16,11 +17,13 @@ def register_routes(app) -> None:
     app.register_blueprint(resource_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(excel_query_bp)
+    app.register_blueprint(hold_bp)
 
 __all__ = [
     'wip_bp',
     'resource_bp',
     'dashboard_bp',
     'excel_query_bp',
+    'hold_bp',
     'register_routes',
 ]

@@ -181,13 +181,14 @@ class TestDetailRoute(TestWipRoutesBase):
         }
 
         response = self.client.get(
-            '/api/wip/detail/焊接_DB?package=SOT-23&status=ACTIVE&page=2&page_size=50'
+            '/api/wip/detail/焊接_DB?package=SOT-23&status=RUN&page=2&page_size=50'
         )
 
         mock_get_detail.assert_called_once_with(
             workcenter='焊接_DB',
             package='SOT-23',
-            status='ACTIVE',
+            status='RUN',
+            hold_type=None,
             workorder=None,
             lotid=None,
             include_dummy=False,
