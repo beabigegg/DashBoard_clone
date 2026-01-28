@@ -49,6 +49,16 @@ timestamp() {
     date '+%Y-%m-%d %H:%M:%S'
 }
 
+# Load .env file if exists
+load_env() {
+    if [ -f "${ROOT}/.env" ]; then
+        log_info "Loading environment from .env"
+        set -a  # Mark all variables for export
+        source "${ROOT}/.env"
+        set +a
+    fi
+}
+
 # ============================================================
 # Environment Check Functions
 # ============================================================
@@ -232,6 +242,9 @@ do_start() {
     ensure_dirs
     rotate_logs  # Archive old logs before starting new session
     conda activate "$CONDA_ENV"
+    load_env  # Load environment variables from .env file
+    # Re-evaluate port after loading .env (GUNICORN_BIND may have changed)
+    PORT=$(echo "${GUNICORN_BIND:-0.0.0.0:8080}" | cut -d: -f2)
     export PYTHONPATH="${ROOT}/src:${PYTHONPATH:-}"
     cd "$ROOT"
 

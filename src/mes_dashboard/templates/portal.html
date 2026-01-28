@@ -29,15 +29,48 @@
             border-radius: 10px;
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
             margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .header h1 {
+        .header-left h1 {
             font-size: 26px;
             margin-bottom: 6px;
         }
 
-        .header p {
+        .header-left p {
             font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .admin-status {
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .admin-status a {
+            color: white;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.15);
+            transition: background 0.2s ease;
+        }
+
+        .admin-status a:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .admin-name {
             opacity: 0.9;
         }
 
@@ -91,23 +124,52 @@
 {% block content %}
     <div class="shell">
         <div class="header">
-            <h1>MES 報表入口</h1>
-            <p>統一入口：WIP 即時看板、機台狀態報表與數據表查詢工具</p>
+            <div class="header-left">
+                <h1>MES 報表入口</h1>
+                <p>統一入口：WIP 即時看板、機台狀態報表與數據表查詢工具</p>
+            </div>
+            <div class="header-right">
+                <div class="admin-status">
+                    {% if is_admin %}
+                        <span class="admin-name">{{ admin_user.displayName }}</span>
+                        <a href="{{ url_for('admin.pages') }}">頁面管理</a>
+                        <a href="{{ url_for('auth.logout') }}">登出</a>
+                    {% else %}
+                        <a href="{{ url_for('auth.login') }}">管理員登入</a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
         <div class="tabs">
-            <button class="tab active" data-target="wipOverviewFrame">WIP 即時概況</button>
+            {% if can_view_page('/wip-overview') %}
+            <button class="tab" data-target="wipOverviewFrame">WIP 即時概況</button>
+            {% endif %}
+            {% if can_view_page('/resource') %}
             <button class="tab" data-target="resourceFrame">機台狀態報表</button>
+            {% endif %}
+            {% if can_view_page('/tables') %}
             <button class="tab" data-target="tableFrame">數據表查詢工具</button>
+            {% endif %}
+            {% if can_view_page('/excel-query') %}
             <button class="tab" data-target="excelQueryFrame">Excel 批次查詢</button>
+            {% endif %}
         </div>
 
         <div class="panel">
-            <!-- Lazy load: only first iframe has src, others load on tab click -->
-            <iframe id="wipOverviewFrame" class="active" src="/wip-overview" title="WIP 即時概況"></iframe>
+            <!-- Lazy load: iframes load on tab activation -->
+            {% if can_view_page('/wip-overview') %}
+            <iframe id="wipOverviewFrame" data-src="/wip-overview" title="WIP 即時概況"></iframe>
+            {% endif %}
+            {% if can_view_page('/resource') %}
             <iframe id="resourceFrame" data-src="/resource" title="機台狀態報表"></iframe>
+            {% endif %}
+            {% if can_view_page('/tables') %}
             <iframe id="tableFrame" data-src="/tables" title="數據表查詢工具"></iframe>
+            {% endif %}
+            {% if can_view_page('/excel-query') %}
             <iframe id="excelQueryFrame" data-src="/excel-query" title="Excel 批次查詢"></iframe>
+            {% endif %}
         </div>
     </div>
 {% endblock %}
@@ -130,20 +192,33 @@
         function activateTab(targetId) {
             tabs.forEach(tab => tab.classList.remove('active'));
             frames.forEach(frame => frame.classList.remove('active'));
-            document.querySelector(`[data-target="${targetId}"]`).classList.add('active');
 
+            const tabBtn = document.querySelector(`[data-target="${targetId}"]`);
             const targetFrame = document.getElementById(targetId);
-            targetFrame.classList.add('active');
 
-            // Lazy load: load iframe src on first activation
-            if (targetFrame.dataset.src && !targetFrame.src) {
-                targetFrame.src = targetFrame.dataset.src;
+            if (tabBtn) tabBtn.classList.add('active');
+            if (targetFrame) {
+                targetFrame.classList.add('active');
+                // Lazy load: load iframe src on first activation
+                if (targetFrame.dataset.src && !targetFrame.src) {
+                    targetFrame.src = targetFrame.dataset.src;
+                }
             }
         }
 
         tabs.forEach(tab => {
             tab.addEventListener('click', () => activateTab(tab.dataset.target));
         });
+
+        // Auto-activate first available tab
+        if (tabs.length > 0) {
+            const firstTab = tabs[0];
+            // Clear any pre-set active states
+            tabs.forEach(tab => tab.classList.remove('active'));
+            frames.forEach(frame => frame.classList.remove('active'));
+            // Activate first tab
+            activateTab(firstTab.dataset.target);
+        }
 
         window.addEventListener('resize', setFrameHeight);
         setFrameHeight();

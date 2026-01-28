@@ -4,15 +4,20 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
 from mes_dashboard.config.tables import TABLES_CONFIG
 from mes_dashboard.config.settings import get_config
 from mes_dashboard.core.cache import NoOpCache
 from mes_dashboard.core.database import get_table_data, get_table_columns, get_engine, init_db, start_keepalive
+from mes_dashboard.core.permissions import is_admin_logged_in
 from mes_dashboard.routes import register_routes
+from mes_dashboard.routes.auth_routes import auth_bp
+from mes_dashboard.routes.admin_routes import admin_bp
+from mes_dashboard.services.page_registry import get_page_status, is_api_public
 
 
 def _configure_logging(app: Flask) -> None:
@@ -50,6 +55,9 @@ def create_app(config_name: str | None = None) -> Flask:
     config_class = get_config(config_name)
     app.config.from_object(config_class)
 
+    # Session configuration
+    app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-prod")
+
     # Configure logging first
     _configure_logging(app)
 
@@ -64,6 +72,74 @@ def create_app(config_name: str | None = None) -> Flask:
 
     # Register API routes
     register_routes(app)
+
+    # Register auth and admin routes
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(admin_bp)
+
+    # ========================================================
+    # Permission Middleware
+    # ========================================================
+
+    @app.before_request
+    def check_page_access():
+        """Check page access permissions before each request."""
+        # Skip static files
+        if request.endpoint == "static":
+            return None
+
+        # API endpoints check
+        if request.path.startswith("/api/"):
+            if is_api_public():
+                return None
+            if not is_admin_logged_in():
+                return jsonify({"error": "Unauthorized"}), 401
+            return None
+
+        # Skip auth-related pages (login/logout)
+        if request.path.startswith("/admin/login") or request.path.startswith("/admin/logout"):
+            return None
+
+        # Admin pages require login
+        if request.path.startswith("/admin/"):
+            if not is_admin_logged_in():
+                return redirect(url_for("auth.login", next=request.url))
+            return None
+
+        # Check page status for registered pages only
+        # Unregistered pages pass through to Flask routing (may return 404)
+        page_status = get_page_status(request.path)
+        if page_status == "dev" and not is_admin_logged_in():
+            return render_template("403.html"), 403
+
+        return None
+
+    # ========================================================
+    # Template Context Processor
+    # ========================================================
+
+    @app.context_processor
+    def inject_admin():
+        """Inject admin info into all templates."""
+        admin = is_admin_logged_in()
+
+        def can_view_page(route: str) -> bool:
+            """Check if current user can view a page."""
+            status = get_page_status(route)
+            # Unregistered pages (None) are viewable
+            if status is None:
+                return True
+            # Released pages are viewable by all
+            if status == "released":
+                return True
+            # Dev pages only viewable by admin
+            return admin
+
+        return {
+            "is_admin": admin,
+            "admin_user": session.get("admin"),
+            "can_view_page": can_view_page,
+        }
 
     # ========================================================
     # Page Routes

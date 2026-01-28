@@ -1,0 +1,40 @@
+{
+  "pages": [
+    {
+      "route": "/",
+      "name": "首頁",
+      "status": "released"
+    },
+    {
+      "route": "/wip-overview",
+      "name": "WIP 即時概況",
+      "status": "released"
+    },
+    {
+      "route": "/wip-detail",
+      "name": "WIP 明細",
+      "status": "released"
+    },
+    {
+      "route": "/hold-detail",
+      "name": "Hold 明細",
+      "status": "released"
+    },
+    {
+      "route": "/tables",
+      "name": "表格總覽",
+      "status": "dev"
+    },
+    {
+      "route": "/resource",
+      "name": "機台狀態",
+      "status": "dev"
+    },
+    {
+      "route": "/excel-query",
+      "name": "Excel 批次查詢",
+      "status": "dev"
+    }
+  ],
+  "api_public": true
+}

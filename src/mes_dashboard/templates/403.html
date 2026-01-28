@@ -1,0 +1,87 @@
+{% extends "_base.html" %}
+
+{% block title %}頁面開發中 - MES Dashboard{% endblock %}
+
+{% block head_extra %}
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #222;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .error-container {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .error-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .error-title {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .home-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            text-decoration: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .home-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .admin-link {
+            display: block;
+            margin-top: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .admin-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="error-container">
+        <div class="error-icon">🚧</div>
+        <h1 class="error-title">頁面開發中</h1>
+        <p class="error-message">
+            此頁面尚未發布，目前僅供管理員存取。<br>
+            如需查看，請聯繫系統管理員。
+        </p>
+        <a href="{{ url_for('portal_index') }}" class="home-btn">返回首頁</a>
+        <a href="{{ url_for('auth.login') }}" class="admin-link">管理員登入</a>
+    </div>
+{% endblock %}
