@@ -1,253 +1,322 @@
-﻿# MES 報表查詢系統
+# MES Dashboard 報表系統
 
-基於 Vite/React + Python FastAPI 的 MES 數據報表查詢與可視化系統
+基於 Flask + Gunicorn 的 MES 數據報表查詢與可視化系統
 
 ---
 
 ## 專案狀態
 
-- ✅ 數據庫分析完成
-- ✅ 系統架構設計完成
-- ✅ 數據查詢工具完成
-- ⏳ 待提供 Power BI 報表設計參考
-- ⏳ 系統開發進行中
+| 功能 | 狀態 |
+|------|------|
+| WIP 即時概況 | ✅ 已完成 |
+| WIP 明細查詢 | ✅ 已完成 |
+| Hold 狀態分析 | ✅ 已完成 |
+| 數據表查詢工具 | ✅ 已完成 |
+| 管理員認證系統 | ✅ 已完成 |
+| 頁面狀態管理 | ✅ 已完成 |
+| 部署自動化 | ✅ 已完成 |
 
 ---
 
 ## 快速開始
 
-### 1. WIP 在制品報表（當前可用）⭐
-
-查詢當前在制品的數量統計，支援按工序、工作中心、產品線分組查看。
+### 首次部署
 
 ```bash
-# 雙擊運行
-scripts\啟動Dashboard.bat
+# 1. 執行部署腳本
+./scripts/deploy.sh
+
+# 2. 編輯環境設定
+nano .env
+
+# 3. 啟動服務
+./scripts/start_server.sh start
 ```
 
-然後訪問: **http://localhost:5000**
-入口頁面可用上方 Tab 切換「WIP 報表 / 數據表查詢工具」。
+### 日常操作
 
-**功能**:
-- 📊 總覽統計（總 LOT 數、總數量、總片數）
-- 🔍 按 SPEC 和 WORKCENTER 統計
-- 📈 按產品線統計（匯總 + 明細）
-- ⏱️ 可選時間範圍（1-30 天）
-- 🎨 美觀的 Web UI
+```bash
+# 啟動服務（背景執行）
+./scripts/start_server.sh start
 
-詳細說明: [WIP報表說明.md](docs/WIP報表說明.md)
+# 停止服務
+./scripts/start_server.sh stop
+
+# 重啟服務
+./scripts/start_server.sh restart
+
+# 查看狀態
+./scripts/start_server.sh status
+
+# 查看日誌
+./scripts/start_server.sh logs follow
+```
+
+訪問網址: **http://localhost:8080** （可在 .env 中配置）
 
 ---
 
-### 2. 查看數據表內容（當前可用）
+## 部署指南
 
-#### 方法 A: 自動初始化（推薦，首次使用）
+### 環境需求
 
-```bash
-# 步驟 1: 初始化環境（只需執行一次）
-雙擊運行: scripts\0_初始化環境.bat
+- Python 3.11+
+- Conda (Miniconda/Anaconda)
+- Oracle Database 連線
 
-# 步驟 2: 啟動服務器
-雙擊運行: scripts\啟動Dashboard.bat
-```
+### 部署步驟
 
-#### 方法 B: 使用 Python 直接啟動
+#### 1. 自動部署（推薦）
 
 ```bash
-# 如果您的環境已安裝 Flask, Pandas, oracledb
-python apps\快速啟動.py
+./scripts/deploy.sh
 ```
 
-#### 方法 C: 手動啟動
+此腳本會自動：
+- 檢查 Conda 環境
+- 建立 `mes-dashboard` 虛擬環境
+- 安裝依賴套件
+- 複製 `.env.example` 到 `.env`
+- 驗證資料庫連線
+
+#### 2. 手動部署
 
 ```bash
-# 1. 創建虛擬環境（首次）
-python -m venv venv
+# 建立 Conda 環境
+conda create -n mes-dashboard python=3.11 -y
+conda activate mes-dashboard
 
-# 2. 安裝依賴（首次）
-venv\Scripts\pip.exe install -r requirements.txt
+# 安裝依賴
+pip install -r requirements.txt
 
-# 3. 啟動服務器
-venv\Scripts\python.exe apps\portal.py
+# 設定環境變數
+cp .env.example .env
+nano .env  # 編輯資料庫連線等設定
+
+# 啟動服務
+./scripts/start_server.sh start
 ```
 
-然後訪問: **http://localhost:5000**
+### 環境變數設定
 
-**功能**:
-- 📊 按表性質分類（現況表/歷史表/輔助表）
-- 🔍 查看各表最後 1000 筆資料
-- ⏱️ 大表自動按時間欄位排序
-- 📋 顯示欄位列表和數據樣本
+編輯 `.env` 檔案：
+
+```bash
+# 資料庫設定（必填）
+DB_HOST=10.1.1.58
+DB_PORT=1521
+DB_SERVICE=DWDB
+DB_USER=your_username
+DB_PASSWORD=your_password
+
+# Flask 設定
+FLASK_ENV=production          # production | development
+SECRET_KEY=your-secret-key    # 生產環境請更換
+
+# Gunicorn 設定
+GUNICORN_BIND=0.0.0.0:8080    # 服務監聽位址
+GUNICORN_WORKERS=2             # Worker 數量
+GUNICORN_THREADS=4             # 每個 Worker 的執行緒數
+
+# 管理員設定
+ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
+```
+
+### 生產環境注意事項
+
+1. **SECRET_KEY**: 必須設定為隨機字串
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+
+2. **FLASK_ENV**: 設定為 `production`
+
+3. **防火牆**: 開放服務端口（預設 8080）
 
 ---
 
-## 文檔結構
+## 功能說明
 
-### 核心文檔
+### Portal 入口頁面
 
-| 文檔 | 用途 | 適用對象 |
-|------|------|---------|
-| **[System_Architecture_Design.md](docs/System_Architecture_Design.md)** | 系統架構設計完整文檔 | 架構師、開發者 |
-| **[MES_Core_Tables_Analysis_Report.md](docs/MES_Core_Tables_Analysis_Report.md)** | 核心表深度分析報告 ⭐ | 開發者、數據分析師 |
-| **[MES_Database_Reference.md](docs/MES_Database_Reference.md)** | 數據庫完整結構參考 | 開發者 |
+透過 Tab 切換各功能模組：
+- WIP 即時概況
+- WIP 明細查詢
+- Hold 狀態分析
+- 數據表查詢工具
 
-### 文檔關係
+### WIP 即時概況
 
-```
-docs/System_Architecture_Design.md (系統設計總覽)
-    ↓ 引用
-docs/MES_Core_Tables_Analysis_Report.md (表詳細分析)
-    ↓ 引用
-docs/MES_Database_Reference.md (表結構參考)
-```
+- 總覽統計（總 LOT 數、總數量、總片數）
+- 按 SPEC 和 WORKCENTER 統計
+- 按產品線統計（匯總 + 明細）
+- Hold 狀態分類（品質異常/非品質異常）
 
----
+### WIP 明細查詢
 
-## 關鍵發現總結
+- 依工作中心篩選
+- 依 Package 篩選
+- 依 Hold 狀態篩選
+- 依製程站點篩選
+- 支援 Excel 匯出
 
-### 1. 表性質分類
+### Hold 狀態分析
 
-經過深入分析，16 張核心表分為：
+- Hold 批次總覽
+- 按 Hold 原因分類
+- Hold 明細查詢
+- 品質異常分類統計
 
-- **現況快照表（4張）**: WIP, RESOURCE, CONTAINER, JOB
-- **歷史累積表（10張）**: RESOURCESTATUS, LOTWIPHISTORY 等
-- **輔助表（2張）**: PARTREQUESTORDER, PJ_COMBINEDASSYLOTS
+### 管理員功能
 
-### 2. 重要認知更新
-
-⚠️ **DW_MES_WIP** 雖名為"在制品表"，但實際包含 **7700 萬行歷史累積數據**
-
-⚠️ **DW_MES_RESOURCESTATUS** 記錄設備狀態每次變更，需用兩個時間欄位計算持續時間：
-```sql
-狀態持續時間 = (LASTSTATUSCHANGEDATE - OLDLASTSTATUSCHANGEDATE) * 24 小時
-```
-
-### 3. 查詢優化鐵律
-
-**所有超過 1000 萬行的表，查詢時必須加入時間範圍限制！**
-
-```sql
--- DW_MES_WIP (7700萬行)
-WHERE TXNDATE >= TRUNC(SYSDATE) - 7
-
--- DW_MES_RESOURCESTATUS (6500萬行)
-WHERE OLDLASTSTATUSCHANGEDATE >= TRUNC(SYSDATE) - 7
-
--- DW_MES_LOTWIPHISTORY (5300萬行)
-WHERE TRACKINTIMESTAMP >= TRUNC(SYSDATE) - 7
-```
-
-**建議時間範圍**:
-- 儀表板查詢: 最近 **7 天**
-- 報表查詢: 最多 **30 天**
-- 歷史趨勢: 最多 **90 天**
-
----
-
-## 核心業務場景
-
-基於表分析，系統應重點支援：
-
-1. ✅ **在制品（WIP）看板** - 使用 DW_MES_WIP
-2. ⭐ **設備稼動率（OEE）報表** - 使用 DW_MES_RESOURCESTATUS
-3. ✅ **批次生產履歷追溯** - 使用 DW_MES_LOTWIPHISTORY
-4. ✅ **工序 Cycle Time 分析** - 使用 DW_MES_LOTWIPHISTORY
-5. ✅ **設備產出與效率分析** - 使用 DW_MES_HM_LOTMOVEOUT
-6. ✅ **Hold 批次分析** - 使用 DW_MES_WIP + DW_MES_HOLDRELEASEHISTORY
-7. ✅ **設備維修工單進度追蹤** - 使用 DW_MES_JOB
-8. ✅ **良率分析** - 使用 DW_MES_LOTREJECTHISTORY
+- LDAP 認證登入
+- 頁面狀態管理（released/dev）
+- Dev 頁面僅管理員可見
 
 ---
 
 ## 技術架構
 
-### 前端技術棧
-- React 18 + TypeScript
-- Vite 5.x (構建工具)
-- Ant Design 5.x (UI 組件庫)
-- ECharts 5.x (圖表庫)
-- React Query 5.x (數據管理)
-
 ### 後端技術棧
-- Python 3.11+
-- FastAPI (Web 框架)
-- oracledb 2.x (Oracle 驅動)
-- Pandas 2.x (數據處理)
 
-### 數據庫
+| 技術 | 版本 | 用途 |
+|------|------|------|
+| Python | 3.11+ | 程式語言 |
+| Flask | 3.x | Web 框架 |
+| Gunicorn | 23.x | WSGI 伺服器 |
+| SQLAlchemy | 2.x | ORM |
+| oracledb | 2.x | Oracle 驅動 |
+| Pandas | 2.x | 資料處理 |
+
+### 前端技術棧
+
+| 技術 | 用途 |
+|------|------|
+| Jinja2 | 模板引擎 |
+| Bootstrap 5 | UI 框架 |
+| Chart.js | 圖表庫 |
+| Vanilla JS | 互動功能 |
+
+### 資料庫
+
 - Oracle Database 19c Enterprise Edition
 - 主機: 10.1.1.58:1521
 - 服務名: DWDB
-- 用戶: MBU1_R (只讀)
 
 ---
 
-## 開發計劃
-
-### Phase 1: 環境搭建與基礎架構 ⏳
-- [ ] 初始化 FastAPI 項目
-- [ ] 初始化 Vite + React 項目
-- [ ] 建立數據庫連接池
-- [ ] 實現基礎 API 結構
-
-### Phase 2: 儀表板開發 ⏳
-- [ ] 實現儀表板 API
-- [ ] 開發儀表板前端頁面
-- [ ] 實現圖表組件
-
-### Phase 3: 報表查詢模塊開發 ⏳
-待 Power BI 截圖確認
-
-### Phase 4: 匯出功能開發 ⏳
-- [ ] 實現 Excel 匯出
-- [ ] 實現異步匯出
-
-### Phase 5: 優化與測試 ⏳
-- [ ] 性能優化
-- [ ] 測試
-
-### Phase 6: 部署上線 ⏳
-- [ ] 準備部署環境
-- [ ] 部署
-
----
-
-## 專案文件
+## 專案結構
 
 ```
 DashBoard/
-├── README.md                           # 本文件
-├── docs/                               # 專案文檔
-├── scripts/                            # 啟動腳本
-├── apps/                               # 可執行應用
-│   └── templates/                      # Web UI 模板
-├── tools/                              # 工具腳本
-├── data/                               # 產出資料
-├── requirements.txt                    # Python 依賴
-├── venv/                               # Python 虛擬環境
-│
-├── backend/                            # 後端（待開發）
-└── frontend/                           # 前端（待開發）
+├── src/mes_dashboard/          # 主程式
+│   ├── app.py                  # Flask 應用
+│   ├── config/                 # 設定
+│   ├── core/                   # 核心模組
+│   ├── routes/                 # 路由
+│   ├── services/               # 服務層
+│   └── templates/              # HTML 模板
+├── scripts/                    # 腳本
+│   ├── deploy.sh               # 部署腳本
+│   └── start_server.sh         # 服務管理腳本
+├── tests/                      # 測試
+├── data/                       # 資料檔案
+├── logs/                       # 日誌
+├── docs/                       # 文檔
+├── openspec/                   # 變更管理
+├── .env.example                # 環境變數範例
+├── requirements.txt            # Python 依賴
+└── gunicorn.conf.py            # Gunicorn 設定
 ```
 
 ---
 
-## 待確認事項
+## 測試
 
-1. ⏳ **Power BI 報表截圖** - 用於前端 UI 設計參考
-2. ⏳ **具體報表類型** - 從 8 個業務場景中選擇優先開發的 3-5 個
-3. ⏳ **部署環境** - 是否有專用服務器，是否使用 Docker
-4. ⏳ **並發用戶數** - 預計同時使用的用戶數量
+```bash
+# 執行所有測試
+pytest tests/ -v
+
+# 執行單元測試
+pytest tests/test_*.py -v --ignore=tests/e2e --ignore=tests/stress
+
+# 執行整合測試
+pytest tests/test_*_integration.py -v
+
+# 執行 E2E 測試
+pytest tests/e2e/ -v
+
+# 執行壓力測試
+pytest tests/stress/ -v
+```
+
+---
+
+## 故障排除
+
+### 服務無法啟動
+
+1. 檢查 Conda 環境：
+   ```bash
+   conda activate mes-dashboard
+   ```
+
+2. 檢查依賴：
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. 檢查日誌：
+   ```bash
+   ./scripts/start_server.sh logs error
+   ```
+
+### 資料庫連線失敗
+
+1. 確認 `.env` 中的資料庫設定正確
+2. 確認網路可連線到資料庫伺服器
+3. 確認資料庫帳號密碼正確
+
+### Port 被占用
+
+1. 檢查 port 使用狀況：
+   ```bash
+   lsof -i :8080
+   ```
+
+2. 修改 `.env` 中的 `GUNICORN_BIND` 設定
+
+---
+
+## 變更日誌
+
+### 2026-01-28
+
+- 新增管理員認證系統（LDAP 整合）
+- 新增頁面狀態管理（released/dev）
+- 新增部署腳本 `deploy.sh`
+- 更新啟動腳本自動載入 `.env`
+- 新增完整測試套件（57 個測試）
+
+### 2026-01-27
+
+- 新增 Hold Detail 頁面
+- WIP 查詢排除原物料
+- Hold 狀態分類（品質異常/非品質異常）
+
+### 2026-01-26
+
+- 重構為 Flask App Factory 模式
+- 新增全域連線管理
+- 新增 WIP 篩選增強功能
 
 ---
 
 ## 聯絡方式
 
-如有技術問題或需求變更，請及時更新相關文檔。
+如有技術問題或需求變更，請聯繫系統管理員。
 
 ---
 
-**文檔版本**: 1.0
-**最後更新**: 2026-01-14
-
-
+**文檔版本**: 2.0
+**最後更新**: 2026-01-28
