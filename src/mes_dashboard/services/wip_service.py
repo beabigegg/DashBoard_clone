@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """WIP (Work In Progress) query services for MES Dashboard.
 
-Provides functions to query WIP data from DW_MES_LOT_V view.
+Provides functions to query WIP data from DWH.DW_MES_LOT_V view.
 This view provides real-time WIP information updated every 5 minutes.
 
 Now uses Redis cache when available, with fallback to Oracle direct query.
@@ -115,7 +115,7 @@ def _build_hold_type_sql_list() -> str:
 # Data Source Configuration
 # ============================================================
 # WIP view for real-time lot data
-WIP_VIEW = "DW_MES_LOT_V"
+WIP_VIEW = "DWH.DW_MES_LOT_V"
 
 
 # ============================================================

@@ -41,7 +41,7 @@ E10_STATUSES = ['PRD', 'SBY', 'UDT', 'SDT', 'EGT', 'NST']
 def get_filter_options() -> Optional[Dict[str, Any]]:
     """Get filter options from cache.
 
-    Uses cached workcenter groups from DW_MES_LOT_V and resource families from resource_cache.
+    Uses cached workcenter groups from DWH.DW_MES_LOT_V and resource families from resource_cache.
 
     Returns:
         Dict with:
@@ -118,7 +118,7 @@ def query_summary(
         base_cte = f"""
             WITH shift_data AS (
                 SELECT /*+ MATERIALIZE */ HISTORYID, TXNDATE, OLDSTATUSNAME, HOURS
-                FROM DW_MES_RESOURCESTATUS_SHIFT
+                FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
                 WHERE TXNDATE >= TO_DATE('{start_date}', 'YYYY-MM-DD')
                   AND TXNDATE < TO_DATE('{end_date}', 'YYYY-MM-DD') + 1
             )
@@ -146,7 +146,7 @@ def query_summary(
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'NST' THEN ss.HOURS ELSE 0 END) as NST_HOURS,
                 COUNT(DISTINCT ss.HISTORYID) as MACHINE_COUNT
             FROM shift_data ss
-            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
             {common_filters}
         """
 
@@ -162,7 +162,7 @@ def query_summary(
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'NST' THEN ss.HOURS ELSE 0 END) as NST_HOURS,
                 COUNT(DISTINCT ss.HISTORYID) as MACHINE_COUNT
             FROM shift_data ss
-            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
             {common_filters}
             GROUP BY {date_trunc}
             ORDER BY DATA_DATE
@@ -179,7 +179,7 @@ def query_summary(
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS
             FROM shift_data ss
-            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
             WHERE r.WORKCENTERNAME IS NOT NULL
               AND {EQUIPMENT_TYPE_FILTER}
               {location_filter}
@@ -202,7 +202,7 @@ def query_summary(
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS,
                 COUNT(DISTINCT ss.HISTORYID) as MACHINE_COUNT
             FROM shift_data ss
-            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
             WHERE r.WORKCENTERNAME IS NOT NULL
               AND {EQUIPMENT_TYPE_FILTER}
               {location_filter}
@@ -304,7 +304,7 @@ def query_detail(
         base_cte = f"""
             WITH shift_data AS (
                 SELECT /*+ MATERIALIZE */ HISTORYID, OLDSTATUSNAME, HOURS
-                FROM DW_MES_RESOURCESTATUS_SHIFT
+                FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
                 WHERE TXNDATE >= TO_DATE('{start_date}', 'YYYY-MM-DD')
                   AND TXNDATE < TO_DATE('{end_date}', 'YYYY-MM-DD') + 1
             )
@@ -335,7 +335,7 @@ def query_detail(
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'NST' THEN ss.HOURS ELSE 0 END) as NST_HOURS,
                 SUM(ss.HOURS) as TOTAL_HOURS
             FROM shift_data ss
-            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
             {common_filters}
             GROUP BY r.WORKCENTERNAME, r.RESOURCEFAMILYNAME, r.RESOURCENAME
             ORDER BY r.WORKCENTERNAME, r.RESOURCEFAMILYNAME, r.RESOURCENAME
@@ -408,7 +408,7 @@ def export_csv(
         sql = f"""
             WITH shift_data AS (
                 SELECT /*+ MATERIALIZE */ HISTORYID, OLDSTATUSNAME, HOURS
-                FROM DW_MES_RESOURCESTATUS_SHIFT
+                FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
                 WHERE TXNDATE >= TO_DATE('{start_date}', 'YYYY-MM-DD')
                   AND TXNDATE < TO_DATE('{end_date}', 'YYYY-MM-DD') + 1
             )
@@ -424,7 +424,7 @@ def export_csv(
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'NST' THEN ss.HOURS ELSE 0 END) as NST_HOURS,
                 SUM(ss.HOURS) as TOTAL_HOURS
             FROM shift_data ss
-            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
             WHERE {EQUIPMENT_TYPE_FILTER}
               {location_filter}
               {asset_status_filter}

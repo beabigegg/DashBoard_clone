@@ -28,7 +28,7 @@ logger = logging.getLogger('mes_dashboard.cache_updater')
 # ============================================================
 
 CACHE_CHECK_INTERVAL = int(os.getenv('CACHE_CHECK_INTERVAL', '600'))  # 10 minutes
-WIP_VIEW = "DW_MES_LOT_V"
+WIP_VIEW = "DWH.DW_MES_LOT_V"
 
 # Resource cache sync interval (default: 4 hours)
 RESOURCE_SYNC_INTERVAL = int(os.getenv('RESOURCE_SYNC_INTERVAL', '14400'))
@@ -192,7 +192,7 @@ class CacheUpdater:
             return None
 
     def _load_full_table(self) -> Optional[pd.DataFrame]:
-        """Load entire DW_MES_LOT_V table from Oracle.
+        """Load entire DWH.DW_MES_LOT_V table from Oracle.
 
         Returns:
             DataFrame with all rows, or None if failed.

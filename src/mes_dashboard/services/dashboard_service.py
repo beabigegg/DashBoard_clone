@@ -329,9 +329,9 @@ def query_resource_detail_with_job(
     """Query resource detail with JOB info for SDT/UDT drill-down.
 
     Field sources:
-    - PJ_LOTID: From DW_MES_RESOURCE.PJ_LOTID
-    - SYMPTOMCODENAME: From DW_MES_JOB via JOBID
-    - CAUSECODENAME: From DW_MES_JOB via JOBID
+    - PJ_LOTID: From DWH.DW_MES_RESOURCE.PJ_LOTID
+    - SYMPTOMCODENAME: From DWH.DW_MES_JOB via JOBID
+    - CAUSECODENAME: From DWH.DW_MES_JOB via JOBID
     - DOWN_MINUTES: Calculated from MAX(LASTSTATUSCHANGEDATE) - resource's LASTSTATUSCHANGEDATE
 
     Args:
@@ -409,7 +409,7 @@ def query_resource_detail_with_job(
         sql = f"""
             WITH latest_txn AS (
                 SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
-                FROM DW_MES_RESOURCESTATUS
+                FROM DWH.DW_MES_RESOURCESTATUS
             ),
             base_data AS (
                 SELECT *
@@ -444,8 +444,8 @@ def query_resource_detail_with_job(
                             ORDER BY s.LASTSTATUSCHANGEDATE DESC NULLS LAST,
                                      COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) DESC
                         ) AS rn
-                    FROM DW_MES_RESOURCE r
-                    JOIN DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
+                    FROM DWH.DW_MES_RESOURCE r
+                    JOIN DWH.DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
                     CROSS JOIN latest_txn lt
                     WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
                         OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
@@ -494,7 +494,7 @@ def query_resource_detail_with_job(
                     ) AS rn
                 FROM base_data rs
                 CROSS JOIN max_time mt
-                LEFT JOIN DW_MES_JOB j ON j.RESOURCEID = rs.RESOURCEID
+                LEFT JOIN DWH.DW_MES_JOB j ON j.RESOURCEID = rs.RESOURCEID
                                        AND j.CREATEDATE = rs.LASTSTATUSCHANGEDATE
                 WHERE {where_clause}
             ) WHERE rn BETWEEN {start_row} AND {end_row}
@@ -574,8 +574,8 @@ def query_ou_trend(days: int = 7, filters: Optional[Dict] = None) -> Optional[Li
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS,
                 SUM(ss.HOURS) as TOTAL_HOURS
-            FROM DW_MES_RESOURCESTATUS_SHIFT ss
-            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            FROM DWH.DW_MES_RESOURCESTATUS_SHIFT ss
+            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
             WHERE ss.TXNDATE >= TRUNC(SYSDATE) - {days}
               AND ss.TXNDATE < TRUNC(SYSDATE)
               AND ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
@@ -667,8 +667,8 @@ def query_utilization_heatmap(days: int = 7, filters: Optional[Dict] = None) -> 
                 TRUNC(ss.TXNDATE) as DATA_DATE,
                 SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
                 SUM(CASE WHEN ss.OLDSTATUSNAME IN ('PRD', 'SBY', 'UDT', 'SDT', 'EGT') THEN ss.HOURS ELSE 0 END) as AVAIL_HOURS
-            FROM DW_MES_RESOURCESTATUS_SHIFT ss
-            JOIN DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
+            FROM DWH.DW_MES_RESOURCESTATUS_SHIFT ss
+            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
             WHERE ss.TXNDATE >= TRUNC(SYSDATE) - {days}
               AND ss.TXNDATE < TRUNC(SYSDATE)
               AND ss.WORKCENTERNAME IS NOT NULL

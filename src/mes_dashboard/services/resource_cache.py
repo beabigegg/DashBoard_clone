@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Resource Cache - DW_MES_RESOURCE 全表快取模組.
+"""Resource Cache - DWH.DW_MES_RESOURCE 全表快取模組.
 
 全表快取套用全域篩選後的設備主檔資料至 Redis。
 提供統一 API 供各模組取用設備資料和篩選器選項。
@@ -78,7 +78,7 @@ def _load_from_oracle() -> Optional[pd.DataFrame]:
     filter_sql = _build_filter_sql()
     sql = f"""
         SELECT *
-        FROM DW_MES_RESOURCE
+        FROM DWH.DW_MES_RESOURCE
         WHERE {filter_sql}
     """
     try:
@@ -100,7 +100,7 @@ def _get_version_from_oracle() -> Optional[str]:
     filter_sql = _build_filter_sql()
     sql = f"""
         SELECT MAX(LASTCHANGEDATE) as VERSION
-        FROM DW_MES_RESOURCE
+        FROM DWH.DW_MES_RESOURCE
         WHERE {filter_sql}
     """
     try:

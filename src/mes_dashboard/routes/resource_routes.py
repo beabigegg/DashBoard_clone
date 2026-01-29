@@ -132,7 +132,7 @@ def api_resource_status_values():
     try:
         sql = """
             SELECT DISTINCT NEWSTATUSNAME, COUNT(*) as CNT
-            FROM DW_MES_RESOURCESTATUS
+            FROM DWH.DW_MES_RESOURCESTATUS
             WHERE NEWSTATUSNAME IS NOT NULL
               AND LASTSTATUSCHANGEDATE >= SYSDATE - 30
             GROUP BY NEWSTATUSNAME

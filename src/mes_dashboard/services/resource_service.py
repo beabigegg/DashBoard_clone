@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Resource (Equipment) query services for MES Dashboard.
 
-Provides functions to query equipment status from DW_MES_RESOURCE and DW_MES_RESOURCESTATUS tables.
+Provides functions to query equipment status from DWH.DW_MES_RESOURCE and DWH.DW_MES_RESOURCESTATUS tables.
 """
 
 import pandas as pd
@@ -53,7 +53,7 @@ def get_resource_latest_status_subquery(days_back: int = 30) -> str:
     return f"""
           WITH latest_txn AS (
               SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
-              FROM DW_MES_RESOURCESTATUS
+              FROM DWH.DW_MES_RESOURCESTATUS
           )
           SELECT *
           FROM (
@@ -87,8 +87,8 @@ def get_resource_latest_status_subquery(days_back: int = 30) -> str:
                       ORDER BY s.LASTSTATUSCHANGEDATE DESC NULLS LAST,
                                COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) DESC
                   ) AS rn
-              FROM DW_MES_RESOURCE r
-              JOIN DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
+              FROM DWH.DW_MES_RESOURCE r
+              JOIN DWH.DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
               CROSS JOIN latest_txn lt
               WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
                   OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
@@ -373,11 +373,11 @@ def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
         sql_statuses = f"""
             WITH latest_txn AS (
                 SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
-                FROM DW_MES_RESOURCESTATUS
+                FROM DWH.DW_MES_RESOURCESTATUS
             )
             SELECT DISTINCT s.NEWSTATUSNAME
-            FROM DW_MES_RESOURCE r
-            JOIN DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
+            FROM DWH.DW_MES_RESOURCE r
+            JOIN DWH.DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
             CROSS JOIN latest_txn lt
             WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
                 OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))

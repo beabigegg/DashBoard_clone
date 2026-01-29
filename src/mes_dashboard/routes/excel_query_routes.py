@@ -118,7 +118,7 @@ def execute_query():
 
     Expects JSON body:
     {
-        "table_name": "DW_MES_WIP",
+        "table_name": "DWH.DW_MES_WIP",
         "search_column": "LOT_ID",
         "return_columns": ["LOT_ID", "SPEC", "QTY"],
         "search_values": ["val1", "val2", ...]

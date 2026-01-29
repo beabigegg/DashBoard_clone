@@ -19,7 +19,7 @@ logger = logging.getLogger('mes_dashboard.filter_cache')
 # ============================================================
 
 CACHE_TTL_SECONDS = 3600  # 1 hour cache TTL
-WIP_VIEW = "DW_MES_LOT_V"
+WIP_VIEW = "DWH.DW_MES_LOT_V"
 
 # ============================================================
 # Cache Storage
@@ -144,7 +144,7 @@ def _load_cache() -> bool:
         _CACHE['is_loading'] = True
 
     try:
-        # Load workcenter groups from DW_MES_LOT_V
+        # Load workcenter groups from DWH.DW_MES_LOT_V
         wc_groups, wc_mapping = _load_workcenter_data()
 
         with _CACHE_LOCK:
@@ -199,7 +199,7 @@ def _load_workcenter_data():
         df = read_sql_df(sql)
 
         if df is None or df.empty:
-            logger.warning("No workcenter data found in DW_MES_LOT_V")
+            logger.warning("No workcenter data found in DWH.DW_MES_LOT_V")
             return [], {}
 
         return _extract_workcenter_data_from_df(df)
