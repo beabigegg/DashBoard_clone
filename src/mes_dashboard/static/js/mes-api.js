@@ -173,8 +173,18 @@ const MesApi = (function() {
                         Toast.dismiss(loadingToastId);
                     }
 
-                    const data = await response.json();
-                    return data;
+                    try {
+                        const data = await response.json();
+                        return data;
+                    } catch (parseError) {
+                        // JSON parse error on successful response - don't retry
+                        console.error(`[MesApi] ${reqId} ✗ JSON parse failed:`, parseError.message);
+                        if (!silent) {
+                            Toast.error('回應資料解析失敗，資料量可能過大');
+                        }
+                        parseError.isParseError = true;
+                        throw parseError;
+                    }
                 }
 
                 // Non-OK response
@@ -199,6 +209,14 @@ const MesApi = (function() {
                 // User abort - don't retry, no toast
                 if (error.isUserAbort) {
                     console.log(`[MesApi] ${reqId} ⊘ Aborted`);
+                    if (loadingToastId) {
+                        Toast.dismiss(loadingToastId);
+                    }
+                    throw error;
+                }
+
+                // JSON parse error on successful response - don't retry
+                if (error.isParseError) {
                     if (loadingToastId) {
                         Toast.dismiss(loadingToastId);
                     }

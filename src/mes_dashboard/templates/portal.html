@@ -154,6 +154,9 @@
             {% if can_view_page('/excel-query') %}
             <button class="tab" data-target="excelQueryFrame">Excel 批次查詢</button>
             {% endif %}
+            {% if can_view_page('/resource-history') %}
+            <button class="tab" data-target="resourceHistoryFrame">機台歷史分析</button>
+            {% endif %}
         </div>
 
         <div class="panel">
@@ -169,6 +172,9 @@
             {% endif %}
             {% if can_view_page('/excel-query') %}
             <iframe id="excelQueryFrame" data-src="/excel-query" title="Excel 批次查詢"></iframe>
+            {% endif %}
+            {% if can_view_page('/resource-history') %}
+            <iframe id="resourceHistoryFrame" data-src="/resource-history" title="機台歷史分析"></iframe>
             {% endif %}
         </div>
     </div>

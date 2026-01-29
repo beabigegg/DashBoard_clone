@@ -11,6 +11,7 @@ from .excel_query_routes import excel_query_bp
 from .hold_routes import hold_bp
 from .auth_routes import auth_bp
 from .admin_routes import admin_bp
+from .resource_history_routes import resource_history_bp
 
 
 def register_routes(app) -> None:
@@ -20,6 +21,7 @@ def register_routes(app) -> None:
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(excel_query_bp)
     app.register_blueprint(hold_bp)
+    app.register_blueprint(resource_history_bp)
 
 __all__ = [
     'wip_bp',
@@ -29,5 +31,6 @@ __all__ = [
     'hold_bp',
     'auth_bp',
     'admin_bp',
+    'resource_history_bp',
     'register_routes',
 ]

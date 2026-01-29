@@ -175,6 +175,11 @@ def create_app(config_name: str | None = None) -> Flask:
         """Excel batch query tool page."""
         return render_template('excel_query.html')
 
+    @app.route('/resource-history')
+    def resource_history_page():
+        """Resource history analysis page."""
+        return render_template('resource_history.html')
+
     # ========================================================
     # Table Query APIs (for table_data_viewer)
     # ========================================================
