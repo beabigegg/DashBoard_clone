@@ -92,6 +92,15 @@ def get_key(key: str) -> str:
     return f"{REDIS_KEY_PREFIX}:{key}"
 
 
+def get_key_prefix() -> str:
+    """Get the Redis key prefix.
+
+    Returns:
+        The configured key prefix (e.g., "mes_wip")
+    """
+    return REDIS_KEY_PREFIX
+
+
 def close_redis() -> None:
     """Close Redis connection.
 

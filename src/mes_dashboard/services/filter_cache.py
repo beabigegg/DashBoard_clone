@@ -20,6 +20,7 @@ logger = logging.getLogger('mes_dashboard.filter_cache')
 
 CACHE_TTL_SECONDS = 3600  # 1 hour cache TTL
 WIP_VIEW = "DWH.DW_MES_LOT_V"
+SPEC_WORKCENTER_VIEW = "DWH.DW_MES_SPEC_WORKCENTER_V"
 
 # ============================================================
 # Cache Storage
@@ -28,6 +29,7 @@ WIP_VIEW = "DWH.DW_MES_LOT_V"
 _CACHE = {
     'workcenter_groups': None,      # List of {name, sequence}
     'workcenter_mapping': None,     # Dict {workcentername: {group, sequence}}
+    'workcenter_to_short': None,    # Dict {workcentername: short_name}
     'last_refresh': None,
     'is_loading': False,
 }
@@ -77,6 +79,57 @@ def get_workcenters_for_groups(groups: List[str]) -> List[str]:
         if info.get('group') in groups:
             result.append(wc_name)
     return result
+
+
+def get_workcenter_group(workcenter_name: str) -> Optional[str]:
+    """Get workcenter group for a workcenter name.
+
+    Args:
+        workcenter_name: The workcenter name to look up.
+
+    Returns:
+        The WORK_CENTER_GROUP, or None if not found.
+    """
+    mapping = get_workcenter_mapping()
+    if not mapping or workcenter_name not in mapping:
+        return None
+    return mapping[workcenter_name].get('group')
+
+
+def get_workcenter_short(workcenter_name: str) -> Optional[str]:
+    """Get workcenter short name for a workcenter name.
+
+    Args:
+        workcenter_name: The workcenter name to look up.
+
+    Returns:
+        The WORK_CENTER_SHORT (e.g., DB, WB, Mold), or None if not found.
+    """
+    _ensure_cache_loaded()
+    short_mapping = _CACHE.get('workcenter_to_short')
+    if not short_mapping or workcenter_name not in short_mapping:
+        return None
+    return short_mapping.get(workcenter_name)
+
+
+def get_workcenters_by_group(group_name: str) -> List[str]:
+    """Get all workcenter names that belong to a specific group.
+
+    Args:
+        group_name: The WORKCENTER_GROUP name.
+
+    Returns:
+        List of workcenter names in that group.
+    """
+    mapping = get_workcenter_mapping()
+    if not mapping:
+        return []
+
+    return [
+        wc_name
+        for wc_name, info in mapping.items()
+        if info.get('group') == group_name
+    ]
 
 
 # ============================================================
@@ -144,12 +197,13 @@ def _load_cache() -> bool:
         _CACHE['is_loading'] = True
 
     try:
-        # Load workcenter groups from DWH.DW_MES_LOT_V
-        wc_groups, wc_mapping = _load_workcenter_data()
+        # Load workcenter groups - prioritize SPEC_WORKCENTER_V
+        wc_groups, wc_mapping, wc_short = _load_workcenter_data()
 
         with _CACHE_LOCK:
             _CACHE['workcenter_groups'] = wc_groups
             _CACHE['workcenter_mapping'] = wc_mapping
+            _CACHE['workcenter_to_short'] = wc_short
             _CACHE['last_refresh'] = datetime.now()
             _CACHE['is_loading'] = False
 
@@ -167,24 +221,32 @@ def _load_cache() -> bool:
 
 
 def _load_workcenter_data():
-    """Load workcenter group data from WIP cache (Redis) or fallback to Oracle.
+    """Load workcenter group data from SPEC_WORKCENTER_V (preferred) or fallback to WIP.
 
     Returns:
-        Tuple of (groups_list, mapping_dict)
+        Tuple of (groups_list, mapping_dict, short_mapping_dict)
     """
-    # Try to load from WIP Redis cache first
+    # Try to load from SPEC_WORKCENTER_V first (authoritative source)
+    result = _load_workcenter_mapping_from_spec()
+    if result[0]:  # If groups are loaded
+        logger.debug("Loaded workcenter groups from SPEC_WORKCENTER_V")
+        return result
+
+    # Fallback to WIP cache
+    logger.warning("Falling back to WIP source for workcenter groups")
     try:
         from mes_dashboard.core.cache import get_cached_wip_data
 
         df = get_cached_wip_data()
         if df is not None and not df.empty:
             logger.debug("Loading workcenter groups from WIP cache")
-            return _extract_workcenter_data_from_df(df)
+            groups, mapping = _extract_workcenter_data_from_df(df)
+            return groups, mapping, {}
     except Exception as exc:
         logger.warning(f"Failed to load from WIP cache: {exc}")
 
-    # Fallback to Oracle direct query
-    logger.debug("Falling back to Oracle for workcenter groups")
+    # Fallback to Oracle WIP view direct query
+    logger.debug("Falling back to Oracle WIP view for workcenter groups")
     try:
         sql = f"""
             SELECT DISTINCT
@@ -200,13 +262,72 @@ def _load_workcenter_data():
 
         if df is None or df.empty:
             logger.warning("No workcenter data found in DWH.DW_MES_LOT_V")
-            return [], {}
+            return [], {}, {}
 
-        return _extract_workcenter_data_from_df(df)
+        groups, mapping = _extract_workcenter_data_from_df(df)
+        return groups, mapping, {}
 
     except Exception as exc:
         logger.error(f"Failed to load workcenter data: {exc}")
-        return [], {}
+        return [], {}, {}
+
+
+def _load_workcenter_mapping_from_spec():
+    """Load workcenter mapping from DW_MES_SPEC_WORKCENTER_V.
+
+    This is the authoritative source for workcenter -> group mapping.
+
+    Returns:
+        Tuple of (groups_list, mapping_dict, short_mapping_dict)
+    """
+    try:
+        sql = f"""
+            SELECT DISTINCT
+                WORK_CENTER,
+                WORK_CENTER_GROUP,
+                WORKCENTERSEQUENCE_GROUP,
+                WORK_CENTER_SHORT
+            FROM {SPEC_WORKCENTER_VIEW}
+            WHERE WORK_CENTER IS NOT NULL
+        """
+        df = read_sql_df(sql)
+
+        if df is None or df.empty:
+            logger.warning("No data found in SPEC_WORKCENTER_V")
+            return [], {}, {}
+
+        # Build groups list (unique groups, take minimum sequence for each group)
+        groups_df = df.groupby('WORK_CENTER_GROUP')['WORKCENTERSEQUENCE_GROUP'].min().reset_index()
+        groups_df = groups_df.sort_values('WORKCENTERSEQUENCE_GROUP')
+
+        groups = []
+        for _, row in groups_df.iterrows():
+            group_name = row['WORK_CENTER_GROUP']
+            if group_name:
+                groups.append({
+                    'name': group_name,
+                    'sequence': int(row['WORKCENTERSEQUENCE_GROUP'] or 999)
+                })
+
+        # Build mapping dict (WORK_CENTER -> group info)
+        mapping = {}
+        short_mapping = {}
+        for _, row in df.iterrows():
+            wc_name = row['WORK_CENTER']
+            if wc_name:
+                mapping[wc_name] = {
+                    'group': row['WORK_CENTER_GROUP'],
+                    'sequence': int(row['WORKCENTERSEQUENCE_GROUP'] or 999)
+                }
+                if row.get('WORK_CENTER_SHORT'):
+                    short_mapping[wc_name] = row['WORK_CENTER_SHORT']
+
+        logger.info(f"Loaded {len(mapping)} workcenters from SPEC_WORKCENTER_V")
+        return groups, mapping, short_mapping
+
+    except Exception as exc:
+        logger.error(f"Failed to load from SPEC_WORKCENTER_V: {exc}")
+        return [], {}, {}
 
 
 def _extract_workcenter_data_from_df(df):

@@ -13,6 +13,17 @@ from mes_dashboard.config.constants import (
     EXCLUDED_LOCATIONS,
     EXCLUDED_ASSET_STATUSES,
     DEFAULT_DAYS_BACK,
+    STATUS_CATEGORIES,
+)
+from mes_dashboard.services.resource_cache import get_all_resources
+from mes_dashboard.services.realtime_equipment_cache import (
+    get_all_equipment_status,
+    get_equipment_status_by_id,
+)
+from mes_dashboard.services.filter_cache import (
+    get_workcenter_group,
+    get_workcenter_short,
+    get_workcenter_groups,
 )
 
 
@@ -401,3 +412,243 @@ def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
         import traceback
         traceback.print_exc()
         return None
+
+
+# ============================================================
+# Merged Resource Status Query (Three-Layer Cache)
+# ============================================================
+
+def get_merged_resource_status(
+    workcenter_groups: Optional[List[str]] = None,
+    is_production: Optional[bool] = None,
+    is_key: Optional[bool] = None,
+    is_monitor: Optional[bool] = None,
+    status_categories: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Get merged resource status from three cache layers.
+
+    Combines:
+    - resource-cache: Equipment master data (RESOURCENAME, WORKCENTERNAME, etc.)
+    - realtime-equipment-cache: Real-time status (EQUIPMENTASSETSSTATUS, JOBORDER, etc.)
+    - workcenter-mapping: WORKCENTER_GROUP, WORKCENTER_SHORT
+
+    Args:
+        workcenter_groups: Filter by WORKCENTER_GROUP (e.g., ['焊接', '成型'])
+        is_production: Filter by PJ_ISPRODUCTION flag
+        is_key: Filter by PJ_ISKEY flag
+        is_monitor: Filter by PJ_ISMONITOR flag
+        status_categories: Filter by STATUS_CATEGORY (e.g., ['PRODUCTIVE', 'DOWN'])
+
+    Returns:
+        List of merged equipment status records.
+    """
+    import logging
+    logger = logging.getLogger('mes_dashboard.resource_service')
+
+    # Get resource master data from cache
+    resources = get_all_resources()
+    if not resources:
+        logger.warning("No resources from resource-cache")
+        return []
+
+    # Get realtime status from cache
+    equipment_status = get_all_equipment_status()
+
+    # Build status lookup by RESOURCEID
+    status_lookup = {
+        s['RESOURCEID']: s
+        for s in equipment_status
+    } if equipment_status else {}
+
+    # Merge data
+    merged = []
+    for resource in resources:
+        resource_id = resource.get('RESOURCEID')
+        workcenter_name = resource.get('WORKCENTERNAME')
+
+        # Get realtime status
+        realtime = status_lookup.get(resource_id, {})
+
+        # Get workcenter mapping
+        wc_group = get_workcenter_group(workcenter_name) if workcenter_name else None
+        wc_short = get_workcenter_short(workcenter_name) if workcenter_name else None
+
+        # Build merged record
+        record = {
+            # From resource-cache
+            'RESOURCEID': resource_id,
+            'RESOURCENAME': resource.get('RESOURCENAME'),
+            'WORKCENTERNAME': workcenter_name,
+            'RESOURCEFAMILYNAME': resource.get('RESOURCEFAMILYNAME'),
+            'PJ_DEPARTMENT': resource.get('PJ_DEPARTMENT'),
+            'PJ_ASSETSSTATUS': resource.get('PJ_ASSETSSTATUS'),
+            'PJ_ISPRODUCTION': resource.get('PJ_ISPRODUCTION'),
+            'PJ_ISKEY': resource.get('PJ_ISKEY'),
+            'PJ_ISMONITOR': resource.get('PJ_ISMONITOR'),
+            'VENDORNAME': resource.get('VENDORNAME'),
+            'VENDORMODEL': resource.get('VENDORMODEL'),
+            'LOCATIONNAME': resource.get('LOCATIONNAME'),
+            # From workcenter-mapping
+            'WORKCENTER_GROUP': wc_group,
+            'WORKCENTER_SHORT': wc_short,
+            # From realtime-equipment-cache
+            'EQUIPMENTASSETSSTATUS': realtime.get('EQUIPMENTASSETSSTATUS'),
+            'EQUIPMENTASSETSSTATUSREASON': realtime.get('EQUIPMENTASSETSSTATUSREASON'),
+            'STATUS_CATEGORY': realtime.get('STATUS_CATEGORY'),
+            'JOBORDER': realtime.get('JOBORDER'),
+            'JOBSTATUS': realtime.get('JOBSTATUS'),
+            'SYMPTOMCODE': realtime.get('SYMPTOMCODE'),
+            'CAUSECODE': realtime.get('CAUSECODE'),
+            'REPAIRCODE': realtime.get('REPAIRCODE'),
+            'LOT_COUNT': realtime.get('LOT_COUNT'),
+            'TOTAL_TRACKIN_QTY': realtime.get('TOTAL_TRACKIN_QTY'),
+            'LATEST_TRACKIN_TIME': realtime.get('LATEST_TRACKIN_TIME'),
+        }
+
+        # Apply filters
+        if workcenter_groups and wc_group not in workcenter_groups:
+            continue
+        if is_production is not None:
+            if bool(resource.get('PJ_ISPRODUCTION')) != is_production:
+                continue
+        if is_key is not None:
+            if bool(resource.get('PJ_ISKEY')) != is_key:
+                continue
+        if is_monitor is not None:
+            if bool(resource.get('PJ_ISMONITOR')) != is_monitor:
+                continue
+        if status_categories:
+            if record.get('STATUS_CATEGORY') not in status_categories:
+                continue
+
+        merged.append(record)
+
+    logger.debug(f"Merged {len(merged)} resource status records")
+    return merged
+
+
+def get_resource_status_summary(
+    workcenter_groups: Optional[List[str]] = None,
+    is_production: Optional[bool] = None,
+    is_key: Optional[bool] = None,
+    is_monitor: Optional[bool] = None,
+) -> Dict[str, Any]:
+    """Get resource status summary statistics.
+
+    Args:
+        workcenter_groups: Filter by WORKCENTER_GROUP
+        is_production: Filter by PJ_ISPRODUCTION flag
+        is_key: Filter by PJ_ISKEY flag
+        is_monitor: Filter by PJ_ISMONITOR flag
+
+    Returns:
+        Dict with summary statistics.
+    """
+    # Get merged data with filters (except status_categories)
+    data = get_merged_resource_status(
+        workcenter_groups=workcenter_groups,
+        is_production=is_production,
+        is_key=is_key,
+        is_monitor=is_monitor,
+    )
+
+    if not data:
+        return {
+            'total_count': 0,
+            'by_status_category': {},
+            'by_workcenter_group': {},
+            'with_active_job': 0,
+            'with_wip': 0,
+        }
+
+    # Count by status category
+    by_status_category = {}
+    for record in data:
+        cat = record.get('STATUS_CATEGORY') or 'UNKNOWN'
+        by_status_category[cat] = by_status_category.get(cat, 0) + 1
+
+    # Count by workcenter group
+    by_workcenter_group = {}
+    for record in data:
+        group = record.get('WORKCENTER_GROUP') or 'UNKNOWN'
+        by_workcenter_group[group] = by_workcenter_group.get(group, 0) + 1
+
+    # Count with active job
+    with_active_job = sum(1 for r in data if r.get('JOBORDER'))
+
+    # Count with WIP
+    with_wip = sum(1 for r in data if (r.get('LOT_COUNT') or 0) > 0)
+
+    return {
+        'total_count': len(data),
+        'by_status_category': by_status_category,
+        'by_workcenter_group': by_workcenter_group,
+        'with_active_job': with_active_job,
+        'with_wip': with_wip,
+    }
+
+
+def get_workcenter_status_matrix(
+    is_production: Optional[bool] = None,
+    is_key: Optional[bool] = None,
+    is_monitor: Optional[bool] = None,
+) -> List[Dict[str, Any]]:
+    """Get workcenter × status matrix.
+
+    Returns count of equipment by workcenter group and status.
+
+    Args:
+        is_production: Filter by PJ_ISPRODUCTION flag
+        is_key: Filter by PJ_ISKEY flag
+        is_monitor: Filter by PJ_ISMONITOR flag
+
+    Returns:
+        List of dicts with workcenter_group and status counts.
+    """
+    # Get merged data
+    data = get_merged_resource_status(
+        is_production=is_production,
+        is_key=is_key,
+        is_monitor=is_monitor,
+    )
+
+    if not data:
+        return []
+
+    # Get all workcenter groups with sequence
+    all_groups = get_workcenter_groups() or []
+    group_sequence = {g['name']: g['sequence'] for g in all_groups}
+
+    # Build matrix
+    matrix = {}
+    for record in data:
+        group = record.get('WORKCENTER_GROUP') or 'UNKNOWN'
+        status = record.get('EQUIPMENTASSETSSTATUS') or 'UNKNOWN'
+
+        if group not in matrix:
+            matrix[group] = {
+                'workcenter_group': group,
+                'workcenter_sequence': group_sequence.get(group, 999),
+                'total': 0,
+                'PRD': 0,
+                'SBY': 0,
+                'UDT': 0,
+                'SDT': 0,
+                'EGT': 0,
+                'NST': 0,
+                'OTHER': 0,
+            }
+
+        matrix[group]['total'] += 1
+
+        # Categorize status
+        if status in ('PRD', 'SBY', 'UDT', 'SDT', 'EGT', 'NST'):
+            matrix[group][status] += 1
+        else:
+            matrix[group]['OTHER'] += 1
+
+    # Convert to list and sort by sequence
+    result = list(matrix.values())
+    result.sort(key=lambda x: x['workcenter_sequence'])
+
+    return result

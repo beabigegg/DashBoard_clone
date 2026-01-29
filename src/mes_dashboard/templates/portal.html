@@ -262,7 +262,7 @@
         <div class="header">
             <div class="header-left">
                 <h1>MES 報表入口</h1>
-                <p>統一入口：WIP 即時看板、機台狀態報表與數據表查詢工具</p>
+                <p>統一入口：WIP 即時看板、設備即時概況與數據表查詢工具</p>
             </div>
             <div class="header-right">
                 <!-- Health Status Indicator -->
@@ -310,7 +310,7 @@
             <button class="tab" data-target="wipOverviewFrame">WIP 即時概況</button>
             {% endif %}
             {% if can_view_page('/resource') %}
-            <button class="tab" data-target="resourceFrame">機台狀態報表</button>
+            <button class="tab" data-target="resourceFrame">設備即時概況</button>
             {% endif %}
             {% if can_view_page('/tables') %}
             <button class="tab" data-target="tableFrame">數據表查詢工具</button>
@@ -329,7 +329,7 @@
             <iframe id="wipOverviewFrame" data-src="/wip-overview" title="WIP 即時概況"></iframe>
             {% endif %}
             {% if can_view_page('/resource') %}
-            <iframe id="resourceFrame" data-src="/resource" title="機台狀態報表"></iframe>
+            <iframe id="resourceFrame" data-src="/resource" title="設備即時概況"></iframe>
             {% endif %}
             {% if can_view_page('/tables') %}
             <iframe id="tableFrame" data-src="/tables" title="數據表查詢工具"></iframe>

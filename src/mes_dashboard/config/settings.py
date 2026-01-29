@@ -32,6 +32,15 @@ class Config:
     # Session configuration
     PERMANENT_SESSION_LIFETIME = _int_env("SESSION_LIFETIME", 28800)  # 8 hours
 
+    # Realtime Equipment Status Cache
+    REALTIME_EQUIPMENT_CACHE_ENABLED = os.getenv(
+        "REALTIME_EQUIPMENT_CACHE_ENABLED", "true"
+    ).lower() in ("true", "1", "yes")
+    EQUIPMENT_STATUS_SYNC_INTERVAL = _int_env("EQUIPMENT_STATUS_SYNC_INTERVAL", 300)  # 5 minutes
+
+    # Workcenter Mapping Cache
+    WORKCENTER_MAPPING_SYNC_INTERVAL = _int_env("WORKCENTER_MAPPING_SYNC_INTERVAL", 86400)  # 24 hours
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""

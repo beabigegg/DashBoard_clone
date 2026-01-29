@@ -19,14 +19,14 @@ TABLES_CONFIG = {
             'display_name': '設備狀態+WIP 視圖 (DWH.DW_MES_EQUIPMENTSTATUS_WIP_V)',
             'row_count': 2631,
             'time_field': None,
-            'description': '設備狀態與 WIP 關聯視圖 - 設備當前狀態、維修工單、資產狀態等 32 欄位'
+            'description': '設備即時狀態視圖 - 透過 DB Link 取得即時設備狀態、維修工單、資產狀態等 32 欄位。用於 realtime-equipment-cache（5 分鐘同步）'
         },
         {
             'name': 'DWH.DW_MES_SPEC_WORKCENTER_V',
             'display_name': '規格工站對照 (DWH.DW_MES_SPEC_WORKCENTER_V)',
             'row_count': 230,
             'time_field': None,
-            'description': '規格與工站對照視圖 - 規格順序、工站群組、工站順序等 9 欄位'
+            'description': '工站分組對照視圖 - WORK_CENTER 到 WORK_CENTER_GROUP 映射，含 WORKCENTERSEQUENCE_GROUP 排序。用於 filter-cache 的工站分組（每日同步）'
         }
     ],
     '現況快照表': [

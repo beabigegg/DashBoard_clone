@@ -95,6 +95,40 @@ def get_resource_cache_status() -> dict:
     return get_res_cache_status()
 
 
+def get_equipment_status_cache_status() -> dict:
+    """Get current realtime equipment status cache status.
+
+    Returns:
+        Dict with equipment status cache information.
+    """
+    from flask import current_app
+    from mes_dashboard.services.realtime_equipment_cache import (
+        get_equipment_status_cache_status as get_eq_cache_status,
+    )
+
+    enabled = current_app.config.get('REALTIME_EQUIPMENT_CACHE_ENABLED', True)
+    if not enabled:
+        return {'enabled': False}
+
+    return get_eq_cache_status()
+
+
+def get_workcenter_mapping_status() -> dict:
+    """Get current workcenter mapping cache status.
+
+    Returns:
+        Dict with workcenter mapping cache information.
+    """
+    from mes_dashboard.services.filter_cache import get_cache_status
+
+    status = get_cache_status()
+    return {
+        'loaded': status.get('loaded', False),
+        'workcenter_count': status.get('workcenter_mapping_count', 0),
+        'group_count': status.get('workcenter_groups_count', 0),
+    }
+
+
 @health_bp.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint.
@@ -134,11 +168,21 @@ def health_check():
     if resource_cache.get('enabled') and not resource_cache.get('loaded'):
         warnings.append("Resource cache not loaded")
 
+    # Check equipment status cache
+    equipment_status_cache = get_equipment_status_cache_status()
+    if equipment_status_cache.get('enabled') and not equipment_status_cache.get('loaded'):
+        warnings.append("Equipment status cache not loaded")
+
+    # Check workcenter mapping
+    workcenter_mapping = get_workcenter_mapping_status()
+
     response = {
         'status': status,
         'services': services,
         'cache': get_cache_status(),
-        'resource_cache': resource_cache
+        'resource_cache': resource_cache,
+        'equipment_status_cache': equipment_status_cache,
+        'workcenter_mapping': workcenter_mapping,
     }
 
     if errors:

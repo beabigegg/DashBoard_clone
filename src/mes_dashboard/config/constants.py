@@ -81,3 +81,42 @@ STATUS_DISPLAY_NAMES = {
 
 # WIP status codes to exclude (completed/scrapped)
 WIP_EXCLUDED_STATUS = (8, 128)
+
+
+# ============================================================
+# Redis Key Prefixes - Realtime Equipment Status
+# ============================================================
+
+EQUIPMENT_STATUS_DATA_KEY = "equipment_status:data"
+EQUIPMENT_STATUS_INDEX_KEY = "equipment_status:index"
+EQUIPMENT_STATUS_META_UPDATED_KEY = "equipment_status:meta:updated"
+EQUIPMENT_STATUS_META_COUNT_KEY = "equipment_status:meta:count"
+
+
+# ============================================================
+# Status Category Classification
+# ============================================================
+
+# Map equipment status to category for grouping/display
+STATUS_CATEGORY_MAP = {
+    'PRD': 'PRODUCTIVE',
+    'SBY': 'STANDBY',
+    'UDT': 'DOWN',
+    'SDT': 'DOWN',
+    'EGT': 'ENGINEERING',
+    'NST': 'NOT_SCHEDULED',
+    'SCRAP': 'INACTIVE',
+    '設備-LOST': 'INACTIVE',
+    '設備-RUN': 'PRODUCTIVE',
+}
+
+# All possible status categories
+STATUS_CATEGORIES = [
+    'PRODUCTIVE',
+    'STANDBY',
+    'DOWN',
+    'ENGINEERING',
+    'NOT_SCHEDULED',
+    'INACTIVE',
+    'OTHER',
+]

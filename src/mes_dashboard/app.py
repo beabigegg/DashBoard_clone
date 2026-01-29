@@ -20,6 +20,7 @@ from mes_dashboard.routes.admin_routes import admin_bp
 from mes_dashboard.routes.health_routes import health_bp
 from mes_dashboard.services.page_registry import get_page_status, is_api_public
 from mes_dashboard.core.cache_updater import start_cache_updater, stop_cache_updater
+from mes_dashboard.services.realtime_equipment_cache import init_realtime_equipment_cache
 
 
 def _configure_logging(app: Flask) -> None:
@@ -72,6 +73,7 @@ def create_app(config_name: str | None = None) -> Flask:
         get_engine()
         start_keepalive()  # Keep database connections alive
         start_cache_updater()  # Start Redis cache updater
+        init_realtime_equipment_cache(app)  # Start realtime equipment status cache
 
     # Register API routes
     register_routes(app)

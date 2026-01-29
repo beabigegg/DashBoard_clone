@@ -1,906 +1,811 @@
 {% extends "_base.html" %}
 
-{% block title %}全廠機況 Dashboard{% endblock %}
+{% block title %}設備即時概況{% endblock %}
 
 {% block head_extra %}
-    <script src="/static/js/echarts.min.js"></script>
+<style>
+    :root {
+        --bg: #f8fafc;
+        --card-bg: #ffffff;
+        --text: #1e293b;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --primary: #3b82f6;
+        --primary-dark: #2563eb;
+        --success: #22c55e;
+        --danger: #ef4444;
+        --warning: #f59e0b;
+        --info: #06b6d4;
+        --purple: #8b5cf6;
+        --shadow: 0 1px 3px rgba(0,0,0,0.1);
+        --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
 
-    <style>
-        :root {
-            --bg: #f5f7fa;
-            --card-bg: #ffffff;
-            --text: #222;
-            --muted: #666;
-            --border: #e2e6ef;
-            --primary: #667eea;
-            --primary-dark: #5568d3;
-            --shadow: 0 2px 10px rgba(0,0,0,0.08);
-            --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
-            --success: #22c55e;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --info: #3b82f6;
-            --neutral: #64748b;
-        }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    body {
+        font-family: 'Microsoft JhengHei', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+    }
 
-        body {
-            font-family: 'Microsoft JhengHei', Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
+    .dashboard {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 16px;
+    }
 
-        .dashboard {
-            max-width: 1800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+    /* Header */
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 16px 20px;
+        background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        border-radius: 12px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow-md);
+    }
 
-        /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
-            padding: 18px 22px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 10px;
-            margin-bottom: 16px;
-            box-shadow: var(--shadow-strong);
-        }
+    .header h1 {
+        font-size: 22px;
+        color: #fff;
+        font-weight: 600;
+    }
 
-        .header h1 {
-            font-size: 24px;
-            color: #fff;
-        }
+    .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: rgba(255,255,255,0.9);
+        font-size: 13px;
+    }
 
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
+    .cache-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
 
-        .last-update {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 13px;
-        }
+    .cache-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #22c55e;
+    }
 
-        /* Filters */
-        .filters {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px 14px;
-            border-radius: 10px;
-            box-shadow: var(--shadow);
-        }
+    .cache-dot.loading { background: #f59e0b; }
+    .cache-dot.error { background: #ef4444; }
 
-        .filter-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+    /* Filters */
+    .filters-bar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        background: var(--card-bg);
+        padding: 12px 16px;
+        border-radius: 10px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+    }
 
-        .filter-group label {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            color: var(--text);
-        }
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 
-        .filter-group input[type="checkbox"] {
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-            accent-color: var(--primary);
-        }
+    .filter-group label {
+        font-size: 13px;
+        color: var(--muted);
+    }
 
-        .btn-query {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 9px 20px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
+    .filter-select {
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 13px;
+        min-width: 140px;
+        background: #fff;
+    }
 
-        .btn-query:hover {
-            background: var(--primary-dark);
-        }
+    .filter-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: #f1f5f9;
+        transition: background 0.2s;
+    }
 
-        .btn-query:disabled {
-            background: #a6b0f5;
-            cursor: not-allowed;
-        }
+    .filter-checkbox:hover { background: #e2e8f0; }
+    .filter-checkbox.active { background: #dbeafe; color: var(--primary); }
 
-        /* KPI Cards */
-        .kpi-row {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 14px;
-            margin-bottom: 16px;
-        }
+    .filter-checkbox input { display: none; }
 
-        .kpi-card {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 18px;
-            text-align: center;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-        }
+    .btn-refresh {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.2s;
+        margin-left: auto;
+    }
 
-        .kpi-label {
-            font-size: 13px;
-            color: var(--muted);
-            margin-bottom: 6px;
-        }
+    .btn-refresh:hover { background: var(--primary-dark); }
+    .btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
 
-        .kpi-value {
-            font-size: 30px;
-            font-weight: bold;
-        }
+    /* Summary Cards */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }
 
-        .kpi-value.green { color: var(--success); }
-        .kpi-value.blue { color: var(--primary); }
-        .kpi-value.red { color: var(--danger); }
-        .kpi-value.yellow { color: var(--warning); }
+    .summary-card {
+        background: var(--card-bg);
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+    }
 
-        .kpi-sub {
-            font-size: 12px;
-            color: var(--muted);
-            margin-top: 4px;
-        }
+    .summary-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+    }
 
-        /* Workcenter Cards Grid */
-        .workcenter-section {
-            margin-bottom: 16px;
-        }
+    .summary-card.total::before { background: var(--primary); }
+    .summary-card.productive::before { background: var(--success); }
+    .summary-card.standby::before { background: var(--info); }
+    .summary-card.down::before { background: var(--danger); }
+    .summary-card.engineering::before { background: var(--purple); }
+    .summary-card.other::before { background: var(--muted); }
 
-        .section-title {
-            font-size: 16px;
-            color: var(--primary);
-            margin-bottom: 10px;
-            padding-left: 10px;
-            border-left: 3px solid var(--primary);
-        }
+    .summary-label {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 
-        .workcenter-grid {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 12px;
-        }
+    .summary-value {
+        font-size: 28px;
+        font-weight: 700;
+    }
 
-        .wc-card {
-            background: var(--card-bg);
-            border-radius: 8px;
-            padding: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-        }
+    .summary-card.total .summary-value { color: var(--primary); }
+    .summary-card.productive .summary-value { color: var(--success); }
+    .summary-card.standby .summary-value { color: var(--info); }
+    .summary-card.down .summary-value { color: var(--danger); }
+    .summary-card.engineering .summary-value { color: var(--purple); }
+    .summary-card.other .summary-value { color: var(--muted); }
 
-        .wc-card:hover {
-            border-color: var(--primary);
-            transform: translateY(-2px);
-        }
+    .summary-pct {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+    }
 
-        .wc-card.selected {
-            border-color: var(--success);
-            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
-        }
+    /* Matrix Section */
+    .section {
+        background: var(--card-bg);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+    }
 
-        .wc-card.has-issue {
-            border-left: 4px solid var(--danger);
-        }
+    .section-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 
-        .wc-name {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text);
-            margin-bottom: 8px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+    .section-title::before {
+        content: '';
+        width: 4px;
+        height: 16px;
+        background: var(--primary);
+        border-radius: 2px;
+    }
 
-        .wc-stats {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    /* Matrix Table */
+    .matrix-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
 
-        .wc-ou {
-            font-size: 22px;
-            font-weight: bold;
-        }
+    .matrix-table th,
+    .matrix-table td {
+        padding: 10px 12px;
+        text-align: center;
+        border-bottom: 1px solid var(--border);
+    }
 
-        .wc-ou.high { color: var(--success); }
-        .wc-ou.medium { color: var(--warning); }
-        .wc-ou.low { color: var(--danger); }
+    .matrix-table th {
+        background: #f8fafc;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+    }
 
-        .wc-counts {
-            text-align: right;
-            font-size: 11px;
-            color: var(--muted);
-        }
+    .matrix-table th:first-child,
+    .matrix-table td:first-child {
+        text-align: left;
+        font-weight: 600;
+    }
 
-        .wc-counts .down {
-            color: var(--danger);
-            font-weight: bold;
-        }
+    .matrix-table tbody tr:hover {
+        background: #f8fafc;
+    }
 
-        .wc-mini-chart {
-            height: 34px;
-            margin-top: 8px;
-        }
+    .matrix-table .col-total { color: var(--text); font-weight: 600; }
+    .matrix-table .col-prd { color: var(--success); }
+    .matrix-table .col-sby { color: var(--info); }
+    .matrix-table .col-udt { color: var(--danger); }
+    .matrix-table .col-sdt { color: var(--warning); }
+    .matrix-table .col-egt { color: var(--purple); }
+    .matrix-table .col-nst { color: #9ca3af; }
+    .matrix-table .col-other { color: var(--muted); }
 
-        /* Charts Section */
-        .charts-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 16px;
-        }
+    .matrix-table .zero { color: #d1d5db; }
 
-        .chart-card {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 16px;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-        }
+    .ou-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
 
-        .chart-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--primary);
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
+    .ou-badge.high { background: #dcfce7; color: #16a34a; }
+    .ou-badge.medium { background: #fef3c7; color: #d97706; }
+    .ou-badge.low { background: #fee2e2; color: #dc2626; }
 
-        .chart-title select {
-            font-size: 12px;
-            padding: 4px 8px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            background: white;
-            cursor: pointer;
-        }
+    /* Equipment List */
+    .equipment-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 12px;
+        max-height: 500px;
+        overflow-y: auto;
+    }
 
-        .chart-container {
-            height: 280px;
-        }
+    .equipment-card {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        transition: all 0.2s;
+    }
 
-        @media (max-width: 1200px) {
-            .charts-row {
-                grid-template-columns: 1fr;
-            }
-        }
+    .equipment-card:hover {
+        border-color: var(--primary);
+        box-shadow: var(--shadow);
+    }
 
-        /* Loading */
-        .loading-spinner {
-            display: inline-block;
-            width: 18px;
-            height: 18px;
-            border: 2px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
+    .equipment-card.status-productive { border-left: 3px solid var(--success); }
+    .equipment-card.status-standby { border-left: 3px solid var(--info); }
+    .equipment-card.status-down { border-left: 3px solid var(--danger); }
+    .equipment-card.status-engineering { border-left: 3px solid var(--purple); }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+    .eq-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
 
-        .loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.85);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-            border-radius: 10px;
-        }
+    .eq-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--text);
+    }
 
-        .loading-text {
-            color: var(--primary);
-            font-size: 14px;
-        }
+    .eq-status {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 500;
+    }
 
-        .placeholder {
-            text-align: center;
-            padding: 40px;
-            color: var(--muted);
-        }
+    .eq-status.productive { background: #dcfce7; color: #16a34a; }
+    .eq-status.standby { background: #cffafe; color: #0891b2; }
+    .eq-status.down { background: #fee2e2; color: #dc2626; }
+    .eq-status.engineering { background: #ede9fe; color: #7c3aed; }
+    .eq-status.other { background: #f1f5f9; color: #64748b; }
 
-        /* Responsive */
-        @media (max-width: 1400px) {
-            .kpi-row {
-                grid-template-columns: repeat(5, 1fr);
-            }
-            .workcenter-grid {
-                grid-template-columns: repeat(4, 1fr);
-            }
-        }
+    .eq-info {
+        font-size: 12px;
+        color: var(--muted);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+    }
 
-        @media (max-width: 1200px) {
-            .kpi-row {
-                grid-template-columns: repeat(3, 1fr);
-            }
-            .workcenter-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
+    .eq-info span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
 
-        @media (max-width: 768px) {
-            .kpi-row {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .workcenter-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .header {
-                align-items: flex-start;
-            }
-        }
-    </style>
+    /* Loading & Empty */
+    .loading-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        color: var(--muted);
+    }
+
+    .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid var(--border);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-right: 10px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: var(--muted);
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+        .summary-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+        .summary-grid { grid-template-columns: repeat(2, 1fr); }
+        .filters-bar { flex-direction: column; align-items: stretch; }
+        .btn-refresh { margin-left: 0; width: 100%; justify-content: center; }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-    <div class="dashboard">
-        <!-- Header -->
-        <div class="header">
-            <h1>全廠機況 Dashboard</h1>
-            <div class="header-right">
-                <div class="filters">
-                    <div class="filter-group">
-                        <label><input type="checkbox" id="filterProduction"> 生產設備</label>
-                        <label><input type="checkbox" id="filterKey"> 關鍵設備</label>
-                        <label><input type="checkbox" id="filterMonitor"> 監控設備</label>
-                    </div>
-
-
-                    <button id="btnQuery" class="btn-query" onclick="loadDashboard()">查詢</button>
-                </div>
-                <span id="lastUpdate" class="last-update"></span>
+<div class="dashboard">
+    <!-- Header -->
+    <div class="header">
+        <h1>設備即時概況</h1>
+        <div class="header-meta">
+            <div class="cache-status">
+                <span class="cache-dot" id="cacheDot"></span>
+                <span id="cacheStatus">檢查中...</span>
             </div>
+            <span id="lastUpdate">--</span>
         </div>
-
-        <!-- KPI Row: OU / RUN / DOWN / IDLE / ENG -->
-        <div class="kpi-row">
-            <div class="kpi-card">
-                <div class="kpi-label">OU%</div>
-                <div class="kpi-value green" id="kpiOu">-</div>
-                <div class="kpi-sub" id="kpiOuFormula">PRD / (PRD+SBY+EGT+SDT+UDT)</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">RUN (PRD)</div>
-                <div class="kpi-value green" id="kpiRun">-</div>
-                <div class="kpi-sub" id="kpiRunCount">RUN: -</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">DOWN (UDT+SDT)</div>
-                <div class="kpi-value red" id="kpiDown">-</div>
-                <div class="kpi-sub" id="kpiDownDetail">UDT: - / SDT: -</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">IDLE (SBY+NST)</div>
-                <div class="kpi-value yellow" id="kpiIdle">-</div>
-                <div class="kpi-sub" id="kpiIdleDetail">SBY: - / NST: -</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">ENG (EGT)</div>
-                <div class="kpi-value blue" id="kpiEng">-</div>
-                <div class="kpi-sub" id="kpiEngCount">EGT: -</div>
-            </div>
-        </div>
-
-        <!-- Charts Row: Trend + Heatmap -->
-        <div class="charts-row">
-            <div class="chart-card">
-                <div class="chart-title">
-                    <span>稼動率趨勢 (OU%)</span>
-                    <select id="trendDays" onchange="loadOuTrend()">
-                        <option value="7" selected>過去 7 天</option>
-                        <option value="14">過去 14 天</option>
-                        <option value="30">過去 30 天</option>
-                    </select>
-                </div>
-                <div class="chart-container" id="ouTrendChart"></div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-title">
-                    <span>工站利用率熱力圖</span>
-                    <select id="heatmapDays" onchange="loadHeatmap()">
-                        <option value="7" selected>過去 7 天</option>
-                        <option value="14">過去 14 天</option>
-                        <option value="30">過去 30 天</option>
-                    </select>
-                </div>
-                <div class="chart-container" id="heatmapChart"></div>
-            </div>
-        </div>
-
-        <!-- Workcenter Cards -->
-        <div class="workcenter-section">
-            <div class="section-title">各工站即時狀態</div>
-            <div class="workcenter-grid" id="workcenterGrid">
-                <div class="placeholder">請點擊「查詢」載入資料</div>
-            </div>
-        </div>
-
     </div>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label>工站群組：</label>
+            <select id="filterGroup" class="filter-select" onchange="loadData()">
+                <option value="">全部群組</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>狀態：</label>
+            <select id="filterStatus" class="filter-select" onchange="loadData()">
+                <option value="">全部狀態</option>
+                <option value="PRODUCTIVE">生產中 (PRD)</option>
+                <option value="STANDBY">待機 (SBY)</option>
+                <option value="DOWN">停機 (UDT/SDT)</option>
+                <option value="ENGINEERING">工程 (EGT)</option>
+                <option value="NOT_SCHEDULED">未排程 (NST)</option>
+            </select>
+        </div>
+
+        <label class="filter-checkbox" id="chkProduction">
+            <input type="checkbox" onchange="toggleFilter(this, 'chkProduction')"> 生產設備
+        </label>
+
+        <label class="filter-checkbox" id="chkKey">
+            <input type="checkbox" onchange="toggleFilter(this, 'chkKey')"> 關鍵設備
+        </label>
+
+        <label class="filter-checkbox" id="chkMonitor">
+            <input type="checkbox" onchange="toggleFilter(this, 'chkMonitor')"> 監控設備
+        </label>
+
+        <button id="btnRefresh" class="btn-refresh" onclick="loadData()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+            </svg>
+            重新整理
+        </button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+        <div class="summary-card total">
+            <div class="summary-label">總設備數</div>
+            <div class="summary-value" id="totalCount">--</div>
+        </div>
+        <div class="summary-card productive">
+            <div class="summary-label">生產中 (PRD)</div>
+            <div class="summary-value" id="productiveCount">--</div>
+            <div class="summary-pct" id="productivePct">--</div>
+        </div>
+        <div class="summary-card standby">
+            <div class="summary-label">待機 (SBY)</div>
+            <div class="summary-value" id="standbyCount">--</div>
+            <div class="summary-pct" id="standbyPct">--</div>
+        </div>
+        <div class="summary-card down">
+            <div class="summary-label">停機 (UDT/SDT)</div>
+            <div class="summary-value" id="downCount">--</div>
+            <div class="summary-pct" id="downPct">--</div>
+        </div>
+        <div class="summary-card engineering">
+            <div class="summary-label">工程 (EGT)</div>
+            <div class="summary-value" id="engCount">--</div>
+            <div class="summary-pct" id="engPct">--</div>
+        </div>
+        <div class="summary-card other">
+            <div class="summary-label">其他/未排程</div>
+            <div class="summary-value" id="otherCount">--</div>
+            <div class="summary-pct" id="otherPct">--</div>
+        </div>
+    </div>
+
+    <!-- Matrix Section -->
+    <div class="section">
+        <div class="section-title">工站狀態矩陣</div>
+        <div id="matrixContainer">
+            <div class="loading-container">
+                <span class="spinner"></span> 載入中...
+            </div>
+        </div>
+    </div>
+
+    <!-- Equipment List -->
+    <div class="section">
+        <div class="section-title">設備清單 (<span id="equipmentCount">0</span> 台)</div>
+        <div id="equipmentContainer">
+            <div class="loading-container">
+                <span class="spinner"></span> 載入中...
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
-    <script>
-        let selectedWorkcenter = null;
-        let selectedOriginalWcs = null;
-        let workcenterData = {};
-        let isLoading = false;
-        let miniCharts = {};
-        let ouTrendChart = null;
-        let heatmapChart = null;
+<script>
+    let allEquipment = [];
+    let workcenterGroups = [];
 
-        const STATUS_COLORS = {
-            PRD: '#00ff88',
-            SBY: '#17a2b8',
-            UDT: '#ff4757',
-            SDT: '#ffc107',
-            EGT: '#6c757d',
-            NST: '#9b59b6'
+    function toggleFilter(checkbox, id) {
+        const label = document.getElementById(id);
+        if (checkbox.checked) {
+            label.classList.add('active');
+        } else {
+            label.classList.remove('active');
+        }
+        loadData();
+    }
+
+    function getFilters() {
+        const params = new URLSearchParams();
+
+        const group = document.getElementById('filterGroup').value;
+        if (group) params.append('workcenter_groups', group);
+
+        const status = document.getElementById('filterStatus').value;
+        if (status) params.append('status_categories', status);
+
+        if (document.querySelector('#chkProduction input').checked) {
+            params.append('is_production', 'true');
+        }
+        if (document.querySelector('#chkKey input').checked) {
+            params.append('is_key', 'true');
+        }
+        if (document.querySelector('#chkMonitor input').checked) {
+            params.append('is_monitor', 'true');
+        }
+
+        return params.toString();
+    }
+
+    async function loadOptions() {
+        try {
+            const resp = await fetch('/api/resource/status/options');
+            const result = await resp.json();
+
+            if (result.success) {
+                const select = document.getElementById('filterGroup');
+                workcenterGroups = result.data.workcenter_groups || [];
+
+                workcenterGroups.forEach(group => {
+                    const opt = document.createElement('option');
+                    opt.value = group;
+                    opt.textContent = group;
+                    select.appendChild(opt);
+                });
+            }
+        } catch (e) {
+            console.error('載入選項失敗:', e);
+        }
+    }
+
+    async function loadSummary() {
+        try {
+            const queryString = getFilters();
+            const resp = await fetch(`/api/resource/status/summary?${queryString}`);
+            const result = await resp.json();
+
+            if (result.success) {
+                const d = result.data;
+                const total = d.total_count || 0;
+                const cats = d.by_status_category || {};
+
+                const productive = cats.PRODUCTIVE || 0;
+                const standby = cats.STANDBY || 0;
+                const down = (cats.DOWN || 0);
+                const eng = cats.ENGINEERING || 0;
+                const other = (cats.NOT_SCHEDULED || 0) + (cats.INACTIVE || 0) + (cats.OTHER || 0) + (cats.UNKNOWN || 0);
+
+                document.getElementById('totalCount').textContent = total;
+                document.getElementById('productiveCount').textContent = productive;
+                document.getElementById('productivePct').textContent = total ? `${((productive/total)*100).toFixed(1)}%` : '--';
+                document.getElementById('standbyCount').textContent = standby;
+                document.getElementById('standbyPct').textContent = total ? `${((standby/total)*100).toFixed(1)}%` : '--';
+                document.getElementById('downCount').textContent = down;
+                document.getElementById('downPct').textContent = total ? `${((down/total)*100).toFixed(1)}%` : '--';
+                document.getElementById('engCount').textContent = eng;
+                document.getElementById('engPct').textContent = total ? `${((eng/total)*100).toFixed(1)}%` : '--';
+                document.getElementById('otherCount').textContent = other;
+                document.getElementById('otherPct').textContent = total ? `${((other/total)*100).toFixed(1)}%` : '--';
+            }
+        } catch (e) {
+            console.error('載入摘要失敗:', e);
+        }
+    }
+
+    async function loadMatrix() {
+        const container = document.getElementById('matrixContainer');
+
+        try {
+            const queryString = getFilters();
+            const resp = await fetch(`/api/resource/status/matrix?${queryString}`);
+            const result = await resp.json();
+
+            if (result.success && result.data.length > 0) {
+                let html = `
+                    <table class="matrix-table">
+                        <thead>
+                            <tr>
+                                <th>工站群組</th>
+                                <th>總數</th>
+                                <th>PRD</th>
+                                <th>SBY</th>
+                                <th>UDT</th>
+                                <th>SDT</th>
+                                <th>EGT</th>
+                                <th>NST</th>
+                                <th>OTHER</th>
+                                <th>OU%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                result.data.forEach(row => {
+                    const total = row.total || 1;
+                    const avail = row.PRD + row.SBY + row.UDT + row.SDT + row.EGT;
+                    const ou = avail > 0 ? ((row.PRD / avail) * 100).toFixed(1) : 0;
+                    const ouClass = ou >= 80 ? 'high' : (ou >= 50 ? 'medium' : 'low');
+
+                    html += `
+                        <tr>
+                            <td>${row.workcenter_group}</td>
+                            <td class="col-total">${row.total}</td>
+                            <td class="col-prd ${row.PRD === 0 ? 'zero' : ''}">${row.PRD}</td>
+                            <td class="col-sby ${row.SBY === 0 ? 'zero' : ''}">${row.SBY}</td>
+                            <td class="col-udt ${row.UDT === 0 ? 'zero' : ''}">${row.UDT}</td>
+                            <td class="col-sdt ${row.SDT === 0 ? 'zero' : ''}">${row.SDT}</td>
+                            <td class="col-egt ${row.EGT === 0 ? 'zero' : ''}">${row.EGT}</td>
+                            <td class="col-nst ${row.NST === 0 ? 'zero' : ''}">${row.NST}</td>
+                            <td class="col-other ${row.OTHER === 0 ? 'zero' : ''}">${row.OTHER}</td>
+                            <td><span class="ou-badge ${ouClass}">${ou}%</span></td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '<div class="empty-state">無資料</div>';
+            }
+        } catch (e) {
+            console.error('載入矩陣失敗:', e);
+            container.innerHTML = '<div class="empty-state">載入失敗</div>';
+        }
+    }
+
+    async function loadEquipment() {
+        const container = document.getElementById('equipmentContainer');
+
+        try {
+            const queryString = getFilters();
+            const resp = await fetch(`/api/resource/status?${queryString}`);
+            const result = await resp.json();
+
+            if (result.success && result.data.length > 0) {
+                allEquipment = result.data;
+                document.getElementById('equipmentCount').textContent = result.count;
+                renderEquipmentList(allEquipment);
+            } else {
+                allEquipment = [];
+                document.getElementById('equipmentCount').textContent = 0;
+                container.innerHTML = '<div class="empty-state">無符合條件的設備</div>';
+            }
+        } catch (e) {
+            console.error('載入設備失敗:', e);
+            container.innerHTML = '<div class="empty-state">載入失敗</div>';
+        }
+    }
+
+    function renderEquipmentList(equipment) {
+        const container = document.getElementById('equipmentContainer');
+
+        if (equipment.length === 0) {
+            container.innerHTML = '<div class="empty-state">無符合條件的設備</div>';
+            return;
+        }
+
+        let html = '<div class="equipment-grid">';
+
+        equipment.forEach(eq => {
+            const statusCat = (eq.STATUS_CATEGORY || 'OTHER').toLowerCase();
+            const statusDisplay = getStatusDisplay(eq.EQUIPMENTASSETSSTATUS, eq.STATUS_CATEGORY);
+
+            html += `
+                <div class="equipment-card status-${statusCat}">
+                    <div class="eq-header">
+                        <div class="eq-name">${eq.RESOURCENAME || eq.RESOURCEID || '--'}</div>
+                        <span class="eq-status ${statusCat}">${statusDisplay}</span>
+                    </div>
+                    <div class="eq-info">
+                        <span title="工站">📍 ${eq.WORKCENTERNAME || '--'}</span>
+                        <span title="群組">🏭 ${eq.WORKCENTER_GROUP || '--'}</span>
+                        <span title="家族">🔧 ${eq.RESOURCEFAMILYNAME || '--'}</span>
+                        <span title="部門">🏢 ${eq.PJ_DEPARTMENT || '--'}</span>
+                        ${eq.LOT_COUNT > 0 ? `<span title="在製批數">📦 ${eq.LOT_COUNT} 批</span>` : ''}
+                        ${eq.JOBORDER ? `<span title="工單">📋 ${eq.JOBORDER}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function getStatusDisplay(status, category) {
+        const statusMap = {
+            'PRD': '生產中',
+            'SBY': '待機',
+            'UDT': '非計畫停機',
+            'SDT': '計畫停機',
+            'EGT': '工程',
+            'NST': '未排程'
         };
 
-        function getFilters() {
-            const filters = {};
-            if (document.getElementById('filterProduction').checked) filters.isProduction = true;
-            if (document.getElementById('filterKey').checked) filters.isKey = true;
-            if (document.getElementById('filterMonitor').checked) filters.isMonitor = true;
-            filters.days_back = 365;
-            return Object.keys(filters).length > 0 ? filters : null;
+        if (status && statusMap[status]) {
+            return statusMap[status];
         }
 
-        function formatNumber(num) {
-            if (num === null || num === undefined) return '-';
-            return num.toLocaleString('zh-TW');
-        }
+        const catMap = {
+            'PRODUCTIVE': '生產中',
+            'STANDBY': '待機',
+            'DOWN': '停機',
+            'ENGINEERING': '工程',
+            'NOT_SCHEDULED': '未排程',
+            'INACTIVE': '停用'
+        };
 
-        function getOuClass(ouPct) {
-            if (ouPct >= 80) return 'high';
-            if (ouPct >= 50) return 'medium';
-            return 'low';
-        }
+        return catMap[category] || status || '--';
+    }
 
-        async function loadKPI() {
-            try {
-                const result = await MesApi.post('/api/dashboard/kpi', { filters: getFilters() });
+    async function checkCacheStatus() {
+        try {
+            const resp = await fetch('/health');
+            const data = await resp.json();
 
-                if (result.success) {
-                    const d = result.data;
-                    const total = d.total || 1;
-                    const runPct = ((d.run / total) * 100).toFixed(1);
-                    const downPct = ((d.down / total) * 100).toFixed(1);
-                    const idlePct = ((d.idle / total) * 100).toFixed(1);
-                    const engPct = ((d.eng / total) * 100).toFixed(1);
+            const dot = document.getElementById('cacheDot');
+            const status = document.getElementById('cacheStatus');
+            const eqCache = data.equipment_status_cache || {};
 
-                    document.getElementById('kpiOu').textContent = d.ou_pct + '%';
-                    document.getElementById('kpiOuFormula').textContent = `PRD / (PRD+SBY+EGT+SDT+UDT)`;
-                    document.getElementById('kpiRun').textContent = runPct + '%';
-                    document.getElementById('kpiRunCount').textContent = `RUN: ${formatNumber(d.run)}`;
-                    document.getElementById('kpiDown').textContent = downPct + '%';
-                    document.getElementById('kpiDownDetail').textContent = `UDT: ${formatNumber(d.udt)} / SDT: ${formatNumber(d.sdt)}`;
-                    document.getElementById('kpiIdle').textContent = idlePct + '%';
-                    document.getElementById('kpiIdleDetail').textContent = `SBY: ${formatNumber(d.sby)} / NST: ${formatNumber(d.nst)}`;
-                    document.getElementById('kpiEng').textContent = engPct + '%';
-                    document.getElementById('kpiEngCount').textContent = `EGT: ${formatNumber(d.eng)}`;
-                }
-            } catch (error) {
-                console.error('KPI 載入失敗:', error);
-            }
-        }
-
-        async function loadWorkcenterCards() {
-            const grid = document.getElementById('workcenterGrid');
-            grid.innerHTML = '<div class="placeholder"><span class="loading-spinner"></span>載入中...</div>';
-
-            try {
-                const result = await MesApi.post('/api/dashboard/workcenter_cards', { filters: getFilters() });
-
-                if (result.success && result.data.length > 0) {
-                    workcenterData = {};
-                    result.data.forEach(wc => {
-                        workcenterData[wc.workcenter] = wc;
-                    });
-
-                    let html = '';
-                    result.data.forEach(wc => {
-                        const ouClass = getOuClass(wc.ou_pct);
-                        const hasIssue = wc.udt > 0 || wc.sdt > 0;
-                        const selectedClass = selectedWorkcenter === wc.workcenter ? 'selected' : '';
-                        const tooltip = wc.original_wcs && wc.original_wcs.length > 1
-                            ? `${wc.workcenter} (含: ${wc.original_wcs.join(', ')})`
-                            : wc.workcenter;
-
-                        html += `
-                            <div class="wc-card ${hasIssue ? 'has-issue' : ''} ${selectedClass}"
-                                 onclick="selectWorkcenter('${wc.workcenter}')">
-                                <div class="wc-name" title="${tooltip}">${wc.workcenter}</div>
-                                <div class="wc-stats">
-                                    <div class="wc-ou ${ouClass}">${wc.ou_pct}%</div>
-                                    <div class="wc-counts">
-                                        <div>Total: ${wc.total}</div>
-                                        <div>RUN: ${wc.prd}</div>
-                                        ${wc.down > 0 ? `<div class="down">Down: ${wc.down}</div>` : ''}
-                                    </div>
-                                </div>
-                                <div class="wc-mini-chart" id="miniChart_${encodeURIComponent(wc.workcenter)}"></div>
-                            </div>
-                        `;
-                    });
-                    grid.innerHTML = html;
-
-                    result.data.forEach(wc => {
-                        renderMiniChart(wc);
-                    });
-                } else {
-                    grid.innerHTML = '<div class="placeholder">查無資料</div>';
-                }
-            } catch (error) {
-                console.error('工站卡片載入失敗:', error);
-                grid.innerHTML = '<div class="placeholder">載入失敗</div>';
-            }
-        }
-
-        function renderMiniChart(wc, retryCount = 0) {
-            const chartId = `miniChart_${encodeURIComponent(wc.workcenter)}`;
-            const chartDom = document.getElementById(chartId);
-            if (!chartDom) {
-                console.warn(`圖表容器不存在: ${chartId}`);
-                return;
-            }
-
-            if (miniCharts[chartId]) {
-                miniCharts[chartId].dispose();
-            }
-
-            if (chartDom.offsetWidth === 0 || chartDom.offsetHeight === 0) {
-                if (retryCount < 3) {
-                    setTimeout(() => renderMiniChart(wc, retryCount + 1), 100);
-                }
-                return;
-            }
-
-            const chart = echarts.init(chartDom);
-            miniCharts[chartId] = chart;
-
-            const total = wc.total || 1;
-            const calcPct = (val) => ((val / total) * 100).toFixed(1);
-
-            const option = {
-                tooltip: {
-                    trigger: 'item',
-                    formatter: function(params) {
-                        const statusMap = {
-                            'PRD': '生產中',
-                            'SBY': '待機',
-                            'UDT': '非計畫停機',
-                            'SDT': '計畫停機',
-                            'EGT': '工程時間',
-                            'NST': '未排單'
-                        };
-                        const statusName = statusMap[params.seriesName] || params.seriesName;
-                        const count = params.value;
-                        const pct = calcPct(count);
-                        return `<div style="font-weight:bold;margin-bottom:5px;">${statusName}</div>
-                                <div>機台數: ${count}</div>
-                                <div>佔比: ${pct}%</div>`;
-                    },
-                    backgroundColor: 'rgba(22, 33, 62, 0.95)',
-                    borderColor: '#00d4ff',
-                    borderWidth: 1,
-                    textStyle: { color: '#eee', fontSize: 12 },
-                    padding: [8, 12]
-                },
-                grid: { left: 0, right: 0, top: 0, bottom: 0 },
-                xAxis: { type: 'value', show: false, max: total },
-                yAxis: { type: 'category', show: false, data: [''] },
-                series: [
-                    { name: 'PRD', type: 'bar', stack: 'total', data: [wc.prd], itemStyle: { color: STATUS_COLORS.PRD }, barWidth: '100%' },
-                    { name: 'SBY', type: 'bar', stack: 'total', data: [wc.sby], itemStyle: { color: STATUS_COLORS.SBY }, barWidth: '100%' },
-                    { name: 'UDT', type: 'bar', stack: 'total', data: [wc.udt], itemStyle: { color: STATUS_COLORS.UDT }, barWidth: '100%' },
-                    { name: 'SDT', type: 'bar', stack: 'total', data: [wc.sdt], itemStyle: { color: STATUS_COLORS.SDT }, barWidth: '100%' },
-                    { name: 'EGT', type: 'bar', stack: 'total', data: [wc.egt], itemStyle: { color: STATUS_COLORS.EGT }, barWidth: '100%' },
-                    { name: 'NST', type: 'bar', stack: 'total', data: [wc.nst], itemStyle: { color: STATUS_COLORS.NST }, barWidth: '100%' }
-                ]
-            };
-            chart.setOption(option);
-        }
-
-        window.addEventListener('resize', () => {
-            Object.values(miniCharts).forEach(chart => {
-                if (chart && !chart.isDisposed()) {
-                    chart.resize();
-                }
-            });
-        });
-
-        function selectWorkcenter(workcenter) {
-            if (selectedWorkcenter === workcenter) {
-                selectedWorkcenter = null;
-                selectedOriginalWcs = null;
+            if (eqCache.enabled && eqCache.loaded) {
+                dot.className = 'cache-dot';
+                status.textContent = `快取正常 (${eqCache.count} 筆)`;
+            } else if (eqCache.enabled) {
+                dot.className = 'cache-dot loading';
+                status.textContent = '快取載入中...';
             } else {
-                selectedWorkcenter = workcenter;
-                if (workcenterData[workcenter] && workcenterData[workcenter].original_wcs) {
-                    selectedOriginalWcs = workcenterData[workcenter].original_wcs;
-                } else {
-                    selectedOriginalWcs = [workcenter];
-                }
+                dot.className = 'cache-dot error';
+                status.textContent = '快取未啟用';
             }
 
-            document.querySelectorAll('.wc-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            if (selectedWorkcenter) {
-                const cards = document.querySelectorAll('.wc-card');
-                cards.forEach(card => {
-                    if (card.querySelector('.wc-name').textContent === selectedWorkcenter) {
-                        card.classList.add('selected');
-                    }
-                });
+            if (eqCache.updated_at) {
+                document.getElementById('lastUpdate').textContent =
+                    `更新: ${new Date(eqCache.updated_at).toLocaleString('zh-TW')}`;
             }
+        } catch (e) {
+            document.getElementById('cacheDot').className = 'cache-dot error';
+            document.getElementById('cacheStatus').textContent = '無法連線';
         }
+    }
 
-        async function loadOuTrend() {
-            const days = parseInt(document.getElementById('trendDays').value);
-            const chartDom = document.getElementById('ouTrendChart');
+    async function loadData() {
+        const btn = document.getElementById('btnRefresh');
+        btn.disabled = true;
 
-            try {
-                const result = await MesApi.post('/api/dashboard/ou_trend', { filters: getFilters(), days: days });
-
-                if (result.success && result.data.length > 0) {
-                    renderOuTrendChart(result.data);
-                } else {
-                    chartDom.innerHTML = '<div class="placeholder">查無資料</div>';
-                }
-            } catch (error) {
-                console.error('OU趨勢載入失敗:', error);
-                chartDom.innerHTML = '<div class="placeholder">載入失敗</div>';
-            }
+        try {
+            await Promise.all([
+                loadSummary(),
+                loadMatrix(),
+                loadEquipment()
+            ]);
+        } finally {
+            btn.disabled = false;
         }
+    }
 
-        function renderOuTrendChart(data) {
-            const chartDom = document.getElementById('ouTrendChart');
-            if (ouTrendChart) {
-                ouTrendChart.dispose();
-            }
-            ouTrendChart = echarts.init(chartDom);
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadOptions();
+        await checkCacheStatus();
+        await loadData();
 
-            const dates = data.map(d => d.date.substring(5));
-            const ouValues = data.map(d => d.ou_pct);
-
-            const option = {
-                tooltip: {
-                    trigger: 'axis',
-                    formatter: function(params) {
-                        const idx = params[0].dataIndex;
-                        const d = data[idx];
-                        return `<b>${d.date}</b><br/>
-                                OU%: <b>${d.ou_pct}%</b><br/>
-                                PRD: ${d.prd_hours}h<br/>
-                                SBY: ${d.sby_hours}h<br/>
-                                UDT: ${d.udt_hours}h<br/>
-                                SDT: ${d.sdt_hours}h<br/>
-                                EGT: ${d.egt_hours}h`;
-                    }
-                },
-                grid: { left: 50, right: 20, top: 30, bottom: 30 },
-                xAxis: {
-                    type: 'category',
-                    data: dates,
-                    axisLabel: { fontSize: 11, color: '#666' }
-                },
-                yAxis: {
-                    type: 'value',
-                    min: 0,
-                    max: 100,
-                    axisLabel: { formatter: '{value}%', fontSize: 11, color: '#666' }
-                },
-                series: [{
-                    name: 'OU%',
-                    type: 'line',
-                    data: ouValues,
-                    smooth: true,
-                    symbol: 'circle',
-                    symbolSize: 8,
-                    lineStyle: { width: 3, color: '#667eea' },
-                    itemStyle: { color: '#667eea' },
-                    areaStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: 'rgba(102, 126, 234, 0.3)' },
-                            { offset: 1, color: 'rgba(102, 126, 234, 0.05)' }
-                        ])
-                    },
-                    markLine: {
-                        silent: true,
-                        data: [
-                            { yAxis: 80, lineStyle: { color: '#22c55e', type: 'dashed' }, label: { formatter: '80%', position: 'end' } },
-                            { yAxis: 50, lineStyle: { color: '#f59e0b', type: 'dashed' }, label: { formatter: '50%', position: 'end' } }
-                        ]
-                    }
-                }]
-            };
-            ouTrendChart.setOption(option);
-        }
-
-        async function loadHeatmap() {
-            const days = parseInt(document.getElementById('heatmapDays').value);
-            const chartDom = document.getElementById('heatmapChart');
-
-            try {
-                const result = await MesApi.post('/api/dashboard/utilization_heatmap', { filters: getFilters(), days: days });
-
-                if (result.success && result.data.length > 0) {
-                    renderHeatmapChart(result.data, days);
-                } else {
-                    chartDom.innerHTML = '<div class="placeholder">查無資料</div>';
-                }
-            } catch (error) {
-                console.error('熱力圖載入失敗:', error);
-                chartDom.innerHTML = '<div class="placeholder">載入失敗</div>';
-            }
-        }
-
-        function renderHeatmapChart(data, days) {
-            const chartDom = document.getElementById('heatmapChart');
-            if (heatmapChart) {
-                heatmapChart.dispose();
-            }
-            heatmapChart = echarts.init(chartDom);
-
-            const GROUP_ORDER = {
-                '切割': 0, '焊接_DB': 1, '焊接_WB': 2, '焊接_DW': 3, '成型': 4,
-                '去膠': 5, '水吹砂': 6, '電鍍': 7, '移印': 8, '切彎腳': 9,
-                '元件切割': 10, '測試': 11
-            };
-
-            function getGroupOrder(groupName) {
-                return GROUP_ORDER.hasOwnProperty(groupName) ? GROUP_ORDER[groupName] : 999;
-            }
-
-            const groupedData = {};
-            const allDates = new Set();
-
-            data.forEach(d => {
-                const group = d.group || d.workcenter;
-                if (!groupedData[group]) groupedData[group] = {};
-                if (!groupedData[group][d.date]) groupedData[group][d.date] = { prd: 0, avail: 0 };
-                groupedData[group][d.date].prd += d.prd_hours;
-                groupedData[group][d.date].avail += d.avail_hours;
-                allDates.add(d.date);
-            });
-
-            const dates = Array.from(allDates).sort();
-            const groups = Object.keys(groupedData).sort((a, b) => {
-                const orderA = getGroupOrder(a);
-                const orderB = getGroupOrder(b);
-                if (orderA !== orderB) return orderB - orderA;
-                return a.localeCompare(b);
-            });
-
-            const heatmapData = [];
-            groups.forEach((group, yIdx) => {
-                dates.forEach((date, xIdx) => {
-                    const cell = groupedData[group][date];
-                    if (cell && cell.avail > 0) {
-                        const pct = Math.round(cell.prd / cell.avail * 10000) / 100;
-                        heatmapData.push([xIdx, yIdx, pct]);
-                    } else {
-                        heatmapData.push([xIdx, yIdx, '-']);
-                    }
-                });
-            });
-
-            const option = {
-                tooltip: {
-                    position: 'top',
-                    formatter: function(params) {
-                        const xIdx = params.data[0];
-                        const yIdx = params.data[1];
-                        const val = params.data[2];
-                        const date = dates[xIdx];
-                        const group = groups[yIdx];
-                        const cell = groupedData[group][date];
-                        if (val === '-') return `${group}<br/>${date}<br/>無資料`;
-                        return `<b>${group}</b><br/>${date}<br/>OU%: <b>${val}%</b><br/>PRD: ${cell?.prd?.toFixed(1) || 0}h`;
-                    }
-                },
-                grid: { left: 100, right: 40, top: 10, bottom: 30 },
-                xAxis: {
-                    type: 'category',
-                    data: dates.map(d => d.substring(5)),
-                    splitArea: { show: true },
-                    axisLabel: { fontSize: 10, color: '#666' }
-                },
-                yAxis: {
-                    type: 'category',
-                    data: groups,
-                    splitArea: { show: true },
-                    axisLabel: { fontSize: 10, color: '#666', width: 80, overflow: 'truncate' }
-                },
-                visualMap: {
-                    min: 0, max: 100, calculable: true, orient: 'vertical',
-                    right: 0, top: 'center', itemHeight: 120,
-                    inRange: { color: ['#fee2e2', '#fef3c7', '#bbf7d0', '#22c55e'] },
-                    formatter: '{value}%'
-                },
-                series: [{
-                    type: 'heatmap',
-                    data: heatmapData,
-                    label: {
-                        show: days <= 7,
-                        fontSize: 9,
-                        formatter: params => params.data[2] === '-' ? '' : params.data[2]
-                    },
-                    emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
-                }]
-            };
-            heatmapChart.setOption(option);
-        }
-
-        async function loadDashboard() {
-            if (isLoading) return;
-            isLoading = true;
-
-            const btn = document.getElementById('btnQuery');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="loading-spinner"></span>查詢中...';
-
-            try {
-                await Promise.all([
-                    loadKPI(),
-                    loadWorkcenterCards(),
-                    loadOuTrend(),
-                    loadHeatmap()
-                ]);
-                document.getElementById('lastUpdate').textContent = `Last Update: ${new Date().toLocaleString('zh-TW')}`;
-            } finally {
-                isLoading = false;
-                btn.disabled = false;
-                btn.textContent = '查詢';
-            }
-        }
-
-        window.addEventListener('resize', () => {
-            if (ouTrendChart && !ouTrendChart.isDisposed()) ouTrendChart.resize();
-            if (heatmapChart && !heatmapChart.isDisposed()) heatmapChart.resize();
-            Object.values(miniCharts).forEach(chart => {
-                if (chart && !chart.isDisposed()) chart.resize();
-            });
-        });
-    </script>
+        // Auto-refresh every 5 minutes
+        setInterval(() => {
+            checkCacheStatus();
+            loadData();
+        }, 5 * 60 * 1000);
+    });
+</script>
 {% endblock %}
