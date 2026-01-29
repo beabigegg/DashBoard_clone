@@ -19,6 +19,9 @@ STARTUP_LOG="${LOG_DIR}/startup.log"
 DEFAULT_PORT="${GUNICORN_BIND:-0.0.0.0:8080}"
 PORT=$(echo "$DEFAULT_PORT" | cut -d: -f2)
 
+# Redis configuration
+REDIS_ENABLED="${REDIS_ENABLED:-true}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -149,6 +152,107 @@ with engine.connect() as conn:
     fi
 }
 
+# ============================================================
+# Redis Management Functions
+# ============================================================
+check_redis() {
+    if [ "$REDIS_ENABLED" != "true" ]; then
+        log_info "Redis is disabled (REDIS_ENABLED=${REDIS_ENABLED})"
+        return 0
+    fi
+
+    if ! command -v redis-cli &> /dev/null; then
+        log_warn "Redis CLI not found (Redis features will be disabled)"
+        return 0
+    fi
+
+    if redis-cli ping &>/dev/null; then
+        log_success "Redis connection OK"
+        return 0
+    else
+        log_warn "Redis not responding (will attempt to start)"
+        return 1
+    fi
+}
+
+start_redis() {
+    if [ "$REDIS_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    if ! command -v redis-cli &> /dev/null; then
+        return 0
+    fi
+
+    # Check if Redis is already running
+    if redis-cli ping &>/dev/null; then
+        log_success "Redis is already running"
+        return 0
+    fi
+
+    # Try to start Redis via systemctl
+    if command -v systemctl &> /dev/null; then
+        log_info "Starting Redis service..."
+        if sudo systemctl start redis-server 2>/dev/null; then
+            sleep 1
+            if redis-cli ping &>/dev/null; then
+                log_success "Redis service started"
+                return 0
+            fi
+        fi
+    fi
+
+    log_warn "Could not start Redis (fallback mode will be used)"
+    return 0
+}
+
+stop_redis() {
+    if [ "$REDIS_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    if ! command -v redis-cli &> /dev/null; then
+        return 0
+    fi
+
+    # Check if Redis is running
+    if ! redis-cli ping &>/dev/null; then
+        log_info "Redis is not running"
+        return 0
+    fi
+
+    # Stop Redis via systemctl
+    if command -v systemctl &> /dev/null; then
+        log_info "Stopping Redis service..."
+        if sudo systemctl stop redis-server 2>/dev/null; then
+            log_success "Redis service stopped"
+            return 0
+        fi
+    fi
+
+    log_warn "Could not stop Redis service"
+    return 0
+}
+
+redis_status() {
+    if [ "$REDIS_ENABLED" != "true" ]; then
+        echo -e "  Redis:   ${YELLOW}DISABLED${NC}"
+        return 0
+    fi
+
+    if ! command -v redis-cli &> /dev/null; then
+        echo -e "  Redis:   ${YELLOW}NOT INSTALLED${NC}"
+        return 0
+    fi
+
+    if redis-cli ping &>/dev/null; then
+        local info=$(redis-cli info memory 2>/dev/null | grep "used_memory_human" | cut -d: -f2 | tr -d '\r')
+        echo -e "  Redis:   ${GREEN}RUNNING${NC} (Memory: ${info:-unknown})"
+    else
+        echo -e "  Redis:   ${RED}STOPPED${NC}"
+    fi
+}
+
 run_all_checks() {
     log_info "Running environment checks..."
     echo ""
@@ -158,6 +262,7 @@ run_all_checks() {
     check_env_file
     check_port || return 1
     check_database
+    check_redis
 
     echo ""
     log_success "All checks passed"
@@ -237,6 +342,10 @@ do_start() {
     run_all_checks || return 1
 
     echo ""
+
+    # Start Redis if enabled
+    start_redis
+
     log_info "Starting ${APP_NAME} server..."
 
     ensure_dirs
@@ -340,6 +449,9 @@ do_restart() {
 }
 
 do_status() {
+    # Load environment to get REDIS_ENABLED
+    load_env
+
     echo ""
     echo "=========================================="
     echo "  ${APP_NAME} Server Status"
@@ -348,13 +460,22 @@ do_status() {
 
     if is_running; then
         local pid=$(get_pid)
-        echo -e "  Status:  ${GREEN}RUNNING${NC}"
+        echo -e "  Server:  ${GREEN}RUNNING${NC}"
         echo "  PID:     ${pid}"
         echo "  Port:    ${PORT}"
         echo "  URL:     http://localhost:${PORT}"
+    else
+        echo -e "  Server:  ${RED}STOPPED${NC}"
+    fi
+
+    # Show Redis status
+    redis_status
+
+    if is_running; then
         echo ""
 
         # Show process info
+        local pid=$(get_pid)
         if command -v ps &>/dev/null; then
             echo "  Process Info:"
             ps -p "$pid" -o pid,ppid,%cpu,%mem,etime,cmd --no-headers 2>/dev/null | \
@@ -368,7 +489,6 @@ do_status() {
             tail -3 "$ERROR_LOG" 2>/dev/null | sed 's/^/    /'
         fi
     else
-        echo -e "  Status:  ${RED}STOPPED${NC}"
         echo ""
         echo "  Start with: $0 start"
     fi
@@ -424,13 +544,13 @@ show_help() {
     echo "  start [-f]     Start the server (-f for foreground mode)"
     echo "  stop           Stop the server gracefully"
     echo "  restart        Restart the server"
-    echo "  status         Show server status"
+    echo "  status         Show server and Redis status"
     echo "  logs [type]    View logs (access|error|follow|all)"
     echo "  check          Run environment checks only"
     echo "  help           Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0 start           # Start in background"
+    echo "  $0 start           # Start in background (with Redis)"
     echo "  $0 start -f        # Start in foreground"
     echo "  $0 logs follow     # Follow logs in real-time"
     echo "  $0 logs error 100  # Show last 100 error log lines"
@@ -439,6 +559,8 @@ show_help() {
     echo "  GUNICORN_BIND      Bind address (default: 0.0.0.0:8080)"
     echo "  GUNICORN_WORKERS   Number of workers (default: 1)"
     echo "  GUNICORN_THREADS   Threads per worker (default: 4)"
+    echo "  REDIS_ENABLED      Enable Redis cache (default: true)"
+    echo "  REDIS_URL          Redis connection URL"
     echo ""
 }
 

@@ -74,6 +74,142 @@
             opacity: 0.9;
         }
 
+        /* Health Status Indicator */
+        .health-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .health-status:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .health-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9ca3af;
+            transition: background 0.3s ease;
+        }
+
+        .health-dot.healthy {
+            background: #22c55e;
+            box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+        }
+
+        .health-dot.degraded {
+            background: #f59e0b;
+            box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+        }
+
+        .health-dot.unhealthy {
+            background: #ef4444;
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+        }
+
+        .health-dot.loading {
+            background: #9ca3af;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .health-label {
+            opacity: 0.9;
+        }
+
+        /* Health Popup */
+        .health-popup {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            padding: 16px;
+            min-width: 280px;
+            z-index: 1000;
+            display: none;
+            color: #333;
+        }
+
+        .health-popup.show {
+            display: block;
+        }
+
+        .health-popup h4 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: #667eea;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 8px;
+        }
+
+        .health-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 13px;
+        }
+
+        .health-item:not(:last-child) {
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .health-item-label {
+            color: #6b7280;
+        }
+
+        .health-item-value {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .health-item-value.ok {
+            color: #22c55e;
+        }
+
+        .health-item-value.error {
+            color: #ef4444;
+        }
+
+        .health-item-value.disabled {
+            color: #9ca3af;
+        }
+
+        .health-cache-info {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .health-cache-info div {
+            margin-bottom: 4px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+        }
+
         .tabs {
             display: flex;
             gap: 10px;
@@ -129,6 +265,27 @@
                 <p>統一入口：WIP 即時看板、機台狀態報表與數據表查詢工具</p>
             </div>
             <div class="header-right">
+                <!-- Health Status Indicator -->
+                <div class="health-status" id="healthStatus" onclick="toggleHealthPopup()">
+                    <span class="health-dot loading" id="healthDot"></span>
+                    <span class="health-label" id="healthLabel">檢查中...</span>
+                </div>
+                <div class="health-popup" id="healthPopup">
+                    <h4>系統連線狀態</h4>
+                    <div class="health-item">
+                        <span class="health-item-label">資料庫 (Oracle)</span>
+                        <span class="health-item-value" id="dbStatus">--</span>
+                    </div>
+                    <div class="health-item">
+                        <span class="health-item-label">快取 (Redis)</span>
+                        <span class="health-item-value" id="redisStatus">--</span>
+                    </div>
+                    <div class="health-cache-info" id="cacheInfo">
+                        <div>快取狀態：<span id="cacheEnabled">--</span></div>
+                        <div>資料更新時間：<span id="cacheSysDate">--</span></div>
+                        <div>最後同步：<span id="cacheUpdatedAt">--</span></div>
+                    </div>
+                </div>
                 <div class="admin-status">
                     {% if is_admin %}
                         <span class="admin-name">{{ admin_user.displayName }}</span>
@@ -228,5 +385,113 @@
 
         window.addEventListener('resize', setFrameHeight);
         setFrameHeight();
+
+        // ============================================================
+        // Health Status Indicator
+        // ============================================================
+        const healthDot = document.getElementById('healthDot');
+        const healthLabel = document.getElementById('healthLabel');
+        const healthPopup = document.getElementById('healthPopup');
+        const dbStatus = document.getElementById('dbStatus');
+        const redisStatus = document.getElementById('redisStatus');
+        const cacheEnabled = document.getElementById('cacheEnabled');
+        const cacheSysDate = document.getElementById('cacheSysDate');
+        const cacheUpdatedAt = document.getElementById('cacheUpdatedAt');
+
+        function toggleHealthPopup() {
+            healthPopup.classList.toggle('show');
+        }
+
+        // Close popup when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#healthStatus') && !e.target.closest('#healthPopup')) {
+                healthPopup.classList.remove('show');
+            }
+        });
+
+        function formatStatus(status) {
+            const icons = {
+                'ok': '✓',
+                'error': '✗',
+                'disabled': '○'
+            };
+            return icons[status] || status;
+        }
+
+        function setStatusClass(element, status) {
+            element.classList.remove('ok', 'error', 'disabled');
+            element.classList.add(status === 'ok' ? 'ok' : status === 'error' ? 'error' : 'disabled');
+        }
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '--';
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return dateStr;
+                return date.toLocaleString('zh-TW', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch {
+                return dateStr;
+            }
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health', { timeout: 10000 });
+                const data = await response.json();
+
+                // Update main indicator
+                healthDot.classList.remove('loading', 'healthy', 'degraded', 'unhealthy');
+
+                if (data.status === 'healthy') {
+                    healthDot.classList.add('healthy');
+                    healthLabel.textContent = '連線正常';
+                } else if (data.status === 'degraded') {
+                    healthDot.classList.add('degraded');
+                    healthLabel.textContent = '部分降級';
+                } else {
+                    healthDot.classList.add('unhealthy');
+                    healthLabel.textContent = '連線異常';
+                }
+
+                // Update database status
+                const dbState = data.services?.database || 'error';
+                dbStatus.innerHTML = `${formatStatus(dbState)} ${dbState === 'ok' ? '正常' : '異常'}`;
+                setStatusClass(dbStatus, dbState);
+
+                // Update Redis status
+                const redisState = data.services?.redis || 'disabled';
+                let redisText = redisState === 'ok' ? '正常' : redisState === 'disabled' ? '未啟用' : '異常';
+                redisStatus.innerHTML = `${formatStatus(redisState)} ${redisText}`;
+                setStatusClass(redisStatus, redisState);
+
+                // Update cache info
+                const cache = data.cache || {};
+                cacheEnabled.textContent = cache.enabled ? '已啟用' : '未啟用';
+                cacheSysDate.textContent = cache.sys_date || '--';
+                cacheUpdatedAt.textContent = formatDateTime(cache.updated_at);
+
+            } catch (error) {
+                console.error('Health check failed:', error);
+                healthDot.classList.remove('loading', 'healthy', 'degraded');
+                healthDot.classList.add('unhealthy');
+                healthLabel.textContent = '無法連線';
+
+                dbStatus.innerHTML = '✗ 無法確認';
+                setStatusClass(dbStatus, 'error');
+                redisStatus.innerHTML = '✗ 無法確認';
+                setStatusClass(redisStatus, 'error');
+            }
+        }
+
+        // Initial check
+        checkHealth();
+
+        // Periodic check every 30 seconds
+        setInterval(checkHealth, 30000);
     </script>
 {% endblock %}

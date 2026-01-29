@@ -15,7 +15,7 @@ def app_server() -> str:
 
     Uses environment variable E2E_BASE_URL or defaults to production server.
     """
-    return os.environ.get('E2E_BASE_URL', 'http://127.0.0.1:5000')
+    return os.environ.get('E2E_BASE_URL', 'http://127.0.0.1:8080')
 
 
 @pytest.fixture(scope="session")
@@ -33,3 +33,18 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "e2e: mark test as end-to-end test (requires running server)"
     )
+    config.addinivalue_line(
+        "markers", "redis: mark test as requiring Redis connection"
+    )
+
+
+@pytest.fixture(scope="session")
+def api_base_url(app_server):
+    """Get the API base URL."""
+    return f"{app_server}/api"
+
+
+@pytest.fixture(scope="session")
+def health_url(app_server):
+    """Get the health check URL."""
+    return f"{app_server}/health"

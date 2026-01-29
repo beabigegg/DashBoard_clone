@@ -17,7 +17,9 @@ from mes_dashboard.core.permissions import is_admin_logged_in
 from mes_dashboard.routes import register_routes
 from mes_dashboard.routes.auth_routes import auth_bp
 from mes_dashboard.routes.admin_routes import admin_bp
+from mes_dashboard.routes.health_routes import health_bp
 from mes_dashboard.services.page_registry import get_page_status, is_api_public
+from mes_dashboard.core.cache_updater import start_cache_updater, stop_cache_updater
 
 
 def _configure_logging(app: Flask) -> None:
@@ -69,13 +71,15 @@ def create_app(config_name: str | None = None) -> Flask:
     with app.app_context():
         get_engine()
         start_keepalive()  # Keep database connections alive
+        start_cache_updater()  # Start Redis cache updater
 
     # Register API routes
     register_routes(app)
 
-    # Register auth and admin routes
+    # Register auth, admin, and health routes
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(health_bp)
 
     # ========================================================
     # Permission Middleware
@@ -86,6 +90,10 @@ def create_app(config_name: str | None = None) -> Flask:
         """Check page access permissions before each request."""
         # Skip static files
         if request.endpoint == "static":
+            return None
+
+        # Health check endpoint - no auth required
+        if request.path == "/health":
             return None
 
         # API endpoints check

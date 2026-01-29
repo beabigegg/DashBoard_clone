@@ -3,13 +3,20 @@
 
 Provides functions to query WIP data from DWH.DW_PJ_LOT_V view.
 This view provides real-time WIP information updated every 5 minutes.
+
+Now uses Redis cache when available, with fallback to Oracle direct query.
 """
 
+import logging
 from typing import Optional, Dict, List, Any
 
+import numpy as np
 import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.core.cache import get_cached_wip_data, get_cached_sys_date
+
+logger = logging.getLogger('mes_dashboard.wip_service')
 
 
 def _safe_value(val):
@@ -112,6 +119,94 @@ WIP_VIEW = "DWH.DW_PJ_LOT_V"
 
 
 # ============================================================
+# Cache Data Helper Functions
+# ============================================================
+
+def _get_wip_dataframe() -> Optional[pd.DataFrame]:
+    """Get WIP data from cache or return None if unavailable.
+
+    Returns:
+        DataFrame with WIP data from Redis cache, or None if cache miss.
+    """
+    df = get_cached_wip_data()
+    if df is not None and not df.empty:
+        logger.debug(f"Using cached WIP data ({len(df)} rows)")
+        return df
+    return None
+
+
+def _add_wip_status_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Add computed WIP status columns to DataFrame.
+
+    Adds columns:
+    - WIP_STATUS: 'RUN', 'HOLD', or 'QUEUE'
+    - IS_QUALITY_HOLD: True if quality hold
+    - IS_NON_QUALITY_HOLD: True if non-quality hold
+
+    Args:
+        df: DataFrame with EQUIPMENTCOUNT, CURRENTHOLDCOUNT, HOLDREASONNAME columns
+
+    Returns:
+        DataFrame with additional status columns
+    """
+    df = df.copy()
+
+    # Ensure numeric columns
+    df['EQUIPMENTCOUNT'] = pd.to_numeric(df['EQUIPMENTCOUNT'], errors='coerce').fillna(0)
+    df['CURRENTHOLDCOUNT'] = pd.to_numeric(df['CURRENTHOLDCOUNT'], errors='coerce').fillna(0)
+    df['QTY'] = pd.to_numeric(df['QTY'], errors='coerce').fillna(0)
+
+    # Compute WIP status
+    df['WIP_STATUS'] = 'QUEUE'  # Default
+    df.loc[df['EQUIPMENTCOUNT'] > 0, 'WIP_STATUS'] = 'RUN'
+    df.loc[(df['EQUIPMENTCOUNT'] == 0) & (df['CURRENTHOLDCOUNT'] > 0), 'WIP_STATUS'] = 'HOLD'
+
+    # Compute hold type
+    df['IS_NON_QUALITY_HOLD'] = df['HOLDREASONNAME'].isin(NON_QUALITY_HOLD_REASONS)
+    df['IS_QUALITY_HOLD'] = (df['WIP_STATUS'] == 'HOLD') & ~df['IS_NON_QUALITY_HOLD']
+    df['IS_NON_QUALITY_HOLD'] = (df['WIP_STATUS'] == 'HOLD') & df['IS_NON_QUALITY_HOLD']
+
+    return df
+
+
+def _filter_base_conditions(
+    df: pd.DataFrame,
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None
+) -> pd.DataFrame:
+    """Apply base filter conditions to DataFrame.
+
+    Args:
+        df: DataFrame to filter
+        include_dummy: If False (default), exclude LOTID containing 'DUMMY'
+        workorder: Optional WORKORDER filter (fuzzy match)
+        lotid: Optional LOTID filter (fuzzy match)
+
+    Returns:
+        Filtered DataFrame
+    """
+    df = df.copy()
+
+    # Exclude NULL WORKORDER (raw materials)
+    df = df[df['WORKORDER'].notna()]
+
+    # DUMMY exclusion
+    if not include_dummy:
+        df = df[~df['LOTID'].str.contains('DUMMY', case=False, na=False)]
+
+    # WORKORDER filter (fuzzy match)
+    if workorder:
+        df = df[df['WORKORDER'].str.contains(workorder, case=False, na=False)]
+
+    # LOTID filter (fuzzy match)
+    if lotid:
+        df = df[df['LOTID'].str.contains(lotid, case=False, na=False)]
+
+    return df
+
+
+# ============================================================
 # Overview API Functions
 # ============================================================
 
@@ -121,6 +216,8 @@ def get_wip_summary(
     lotid: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Get WIP KPI summary for overview dashboard.
+
+    Uses Redis cache when available, falls back to Oracle direct query.
 
     Args:
         include_dummy: If True, include DUMMY lots (default: False)
@@ -134,6 +231,74 @@ def get_wip_summary(
         - byWipStatus: Grouped counts for RUN/QUEUE/HOLD
         - dataUpdateDate: Data timestamp
     """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
+            df = _add_wip_status_columns(df)
+
+            if df.empty:
+                return {
+                    'totalLots': 0,
+                    'totalQtyPcs': 0,
+                    'byWipStatus': {
+                        'run': {'lots': 0, 'qtyPcs': 0},
+                        'queue': {'lots': 0, 'qtyPcs': 0},
+                        'hold': {'lots': 0, 'qtyPcs': 0},
+                        'qualityHold': {'lots': 0, 'qtyPcs': 0},
+                        'nonQualityHold': {'lots': 0, 'qtyPcs': 0}
+                    },
+                    'dataUpdateDate': get_cached_sys_date()
+                }
+
+            # Calculate summary from cached data
+            run_df = df[df['WIP_STATUS'] == 'RUN']
+            queue_df = df[df['WIP_STATUS'] == 'QUEUE']
+            hold_df = df[df['WIP_STATUS'] == 'HOLD']
+            quality_hold_df = df[df['IS_QUALITY_HOLD']]
+            non_quality_hold_df = df[df['IS_NON_QUALITY_HOLD']]
+
+            return {
+                'totalLots': len(df),
+                'totalQtyPcs': int(df['QTY'].sum()),
+                'byWipStatus': {
+                    'run': {
+                        'lots': len(run_df),
+                        'qtyPcs': int(run_df['QTY'].sum())
+                    },
+                    'queue': {
+                        'lots': len(queue_df),
+                        'qtyPcs': int(queue_df['QTY'].sum())
+                    },
+                    'hold': {
+                        'lots': len(hold_df),
+                        'qtyPcs': int(hold_df['QTY'].sum())
+                    },
+                    'qualityHold': {
+                        'lots': len(quality_hold_df),
+                        'qtyPcs': int(quality_hold_df['QTY'].sum())
+                    },
+                    'nonQualityHold': {
+                        'lots': len(non_quality_hold_df),
+                        'qtyPcs': int(non_quality_hold_df['QTY'].sum())
+                    }
+                },
+                'dataUpdateDate': get_cached_sys_date()
+            }
+        except Exception as exc:
+            logger.warning(f"Cache-based summary calculation failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_wip_summary_from_oracle(include_dummy, workorder, lotid)
+
+
+def _get_wip_summary_from_oracle(
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Get WIP summary directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy, workorder, lotid)
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
@@ -207,7 +372,7 @@ def get_wip_summary(
             'dataUpdateDate': str(row['DATA_UPDATE_DATE']) if row['DATA_UPDATE_DATE'] else None
         }
     except Exception as exc:
-        print(f"WIP summary query failed: {exc}")
+        logger.error(f"WIP summary query failed: {exc}")
         return None
 
 
@@ -219,6 +384,8 @@ def get_wip_matrix(
     hold_type: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Get workcenter x product line matrix for overview dashboard.
+
+    Uses Redis cache when available, falls back to Oracle direct query.
 
     Args:
         include_dummy: If True, include DUMMY lots (default: False)
@@ -237,6 +404,107 @@ def get_wip_matrix(
         - package_totals: Dict of {package: total_qty}
         - grand_total: Overall total
     """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
+            df = _add_wip_status_columns(df)
+
+            # Filter by WORKCENTER_GROUP and PRODUCTLINENAME
+            df = df[df['WORKCENTER_GROUP'].notna() & df['PRODUCTLINENAME'].notna()]
+
+            # WIP status filter
+            if status:
+                status_upper = status.upper()
+                df = df[df['WIP_STATUS'] == status_upper]
+
+                # Hold type sub-filter
+                if status_upper == 'HOLD' and hold_type:
+                    if hold_type == 'quality':
+                        df = df[df['IS_QUALITY_HOLD']]
+                    elif hold_type == 'non-quality':
+                        df = df[df['IS_NON_QUALITY_HOLD']]
+
+            if df.empty:
+                return {
+                    'workcenters': [],
+                    'packages': [],
+                    'matrix': {},
+                    'workcenter_totals': {},
+                    'package_totals': {},
+                    'grand_total': 0
+                }
+
+            return _build_matrix_result(df)
+        except Exception as exc:
+            logger.warning(f"Cache-based matrix calculation failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_wip_matrix_from_oracle(include_dummy, workorder, lotid, status, hold_type)
+
+
+def _build_matrix_result(df: pd.DataFrame) -> Dict[str, Any]:
+    """Build matrix result from DataFrame."""
+    # Group by workcenter and package
+    grouped = df.groupby(['WORKCENTER_GROUP', 'WORKCENTERSEQUENCE_GROUP', 'PRODUCTLINENAME'])['QTY'].sum().reset_index()
+
+    if grouped.empty:
+        return {
+            'workcenters': [],
+            'packages': [],
+            'matrix': {},
+            'workcenter_totals': {},
+            'package_totals': {},
+            'grand_total': 0
+        }
+
+    # Build matrix
+    matrix = {}
+    workcenter_totals = {}
+    package_totals = {}
+
+    # Get unique workcenters sorted by sequence
+    wc_order = grouped.drop_duplicates('WORKCENTER_GROUP')[['WORKCENTER_GROUP', 'WORKCENTERSEQUENCE_GROUP']]
+    wc_order = wc_order.sort_values('WORKCENTERSEQUENCE_GROUP')
+    workcenters = wc_order['WORKCENTER_GROUP'].tolist()
+
+    # Build matrix and totals
+    for _, row in grouped.iterrows():
+        wc = row['WORKCENTER_GROUP']
+        pkg = row['PRODUCTLINENAME']
+        qty = int(row['QTY'] or 0)
+
+        if wc not in matrix:
+            matrix[wc] = {}
+        matrix[wc][pkg] = qty
+
+        workcenter_totals[wc] = workcenter_totals.get(wc, 0) + qty
+        package_totals[pkg] = package_totals.get(pkg, 0) + qty
+
+    # Sort packages by total qty desc
+    packages = sorted(package_totals.keys(), key=lambda x: package_totals[x], reverse=True)
+
+    grand_total = sum(workcenter_totals.values())
+
+    return {
+        'workcenters': workcenters,
+        'packages': packages,
+        'matrix': matrix,
+        'workcenter_totals': workcenter_totals,
+        'package_totals': package_totals,
+        'grand_total': grand_total
+    }
+
+
+def _get_wip_matrix_from_oracle(
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    status: Optional[str] = None,
+    hold_type: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Get WIP matrix directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy, workorder, lotid)
         conditions.append("WORKCENTER_GROUP IS NOT NULL")
@@ -285,44 +553,9 @@ def get_wip_matrix(
                 'grand_total': 0
             }
 
-        # Build matrix
-        matrix = {}
-        workcenter_totals = {}
-        package_totals = {}
-
-        # Get unique workcenters sorted by sequence
-        wc_order = df.drop_duplicates('WORKCENTER_GROUP')[['WORKCENTER_GROUP', 'WORKCENTERSEQUENCE_GROUP']]
-        wc_order = wc_order.sort_values('WORKCENTERSEQUENCE_GROUP')
-        workcenters = wc_order['WORKCENTER_GROUP'].tolist()
-
-        # Build matrix and totals
-        for _, row in df.iterrows():
-            wc = row['WORKCENTER_GROUP']
-            pkg = row['PRODUCTLINENAME']
-            qty = int(row['QTY'] or 0)
-
-            if wc not in matrix:
-                matrix[wc] = {}
-            matrix[wc][pkg] = qty
-
-            workcenter_totals[wc] = workcenter_totals.get(wc, 0) + qty
-            package_totals[pkg] = package_totals.get(pkg, 0) + qty
-
-        # Sort packages by total qty desc
-        packages = sorted(package_totals.keys(), key=lambda x: package_totals[x], reverse=True)
-
-        grand_total = sum(workcenter_totals.values())
-
-        return {
-            'workcenters': workcenters,
-            'packages': packages,
-            'matrix': matrix,
-            'workcenter_totals': workcenter_totals,
-            'package_totals': package_totals,
-            'grand_total': grand_total
-        }
+        return _build_matrix_result(df)
     except Exception as exc:
-        print(f"WIP matrix query failed: {exc}")
+        logger.error(f"WIP matrix query failed: {exc}")
         import traceback
         traceback.print_exc()
         return None
@@ -335,6 +568,8 @@ def get_wip_hold_summary(
 ) -> Optional[Dict[str, Any]]:
     """Get hold summary grouped by hold reason.
 
+    Uses Redis cache when available, falls back to Oracle direct query.
+
     Args:
         include_dummy: If True, include DUMMY lots (default: False)
         workorder: Optional WORKORDER filter (fuzzy match)
@@ -344,6 +579,51 @@ def get_wip_hold_summary(
         Dict with hold items sorted by lots desc:
         - items: List of {reason, lots, qty}
     """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
+            df = _add_wip_status_columns(df)
+
+            # Filter for HOLD status with reason
+            df = df[(df['WIP_STATUS'] == 'HOLD') & df['HOLDREASONNAME'].notna()]
+
+            if df.empty:
+                return {'items': []}
+
+            # Group by hold reason
+            grouped = df.groupby('HOLDREASONNAME').agg({
+                'LOTID': 'count',
+                'QTY': 'sum'
+            }).reset_index()
+            grouped.columns = ['REASON', 'LOTS', 'QTY']
+            grouped = grouped.sort_values('LOTS', ascending=False)
+
+            items = []
+            for _, row in grouped.iterrows():
+                reason = row['REASON']
+                items.append({
+                    'reason': reason,
+                    'lots': int(row['LOTS'] or 0),
+                    'qty': int(row['QTY'] or 0),
+                    'holdType': 'quality' if is_quality_hold(reason) else 'non-quality'
+                })
+
+            return {'items': items}
+        except Exception as exc:
+            logger.warning(f"Cache-based hold summary calculation failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_wip_hold_summary_from_oracle(include_dummy, workorder, lotid)
+
+
+def _get_wip_hold_summary_from_oracle(
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Get WIP hold summary directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy, workorder, lotid)
         conditions.append("STATUS = 'HOLD'")
@@ -377,7 +657,7 @@ def get_wip_hold_summary(
 
         return {'items': items}
     except Exception as exc:
-        print(f"WIP hold summary query failed: {exc}")
+        logger.error(f"WIP hold summary query failed: {exc}")
         return None
 
 
@@ -397,6 +677,8 @@ def get_wip_detail(
     page_size: int = 100
 ) -> Optional[Dict[str, Any]]:
     """Get WIP detail for a specific workcenter group.
+
+    Uses Redis cache when available, falls back to Oracle direct query.
 
     Args:
         workcenter: WORKCENTER_GROUP name
@@ -419,6 +701,109 @@ def get_wip_detail(
         - pagination: {page, page_size, total_count, total_pages}
         - sys_date: Data timestamp
     """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
+            df = _add_wip_status_columns(df)
+
+            # Filter by workcenter
+            df = df[df['WORKCENTER_GROUP'] == workcenter]
+
+            if package:
+                df = df[df['PRODUCTLINENAME'] == package]
+
+            # Calculate summary before status filter
+            summary_df = df.copy()
+            run_lots = len(summary_df[summary_df['WIP_STATUS'] == 'RUN'])
+            queue_lots = len(summary_df[summary_df['WIP_STATUS'] == 'QUEUE'])
+            hold_lots = len(summary_df[summary_df['WIP_STATUS'] == 'HOLD'])
+            quality_hold_lots = len(summary_df[summary_df['IS_QUALITY_HOLD']])
+            non_quality_hold_lots = len(summary_df[summary_df['IS_NON_QUALITY_HOLD']])
+            total_lots = len(summary_df)
+
+            summary = {
+                'totalLots': total_lots,
+                'runLots': run_lots,
+                'queueLots': queue_lots,
+                'holdLots': hold_lots,
+                'qualityHoldLots': quality_hold_lots,
+                'nonQualityHoldLots': non_quality_hold_lots
+            }
+
+            # Apply status filter for lots list
+            if status:
+                status_upper = status.upper()
+                df = df[df['WIP_STATUS'] == status_upper]
+
+                if status_upper == 'HOLD' and hold_type:
+                    if hold_type == 'quality':
+                        df = df[df['IS_QUALITY_HOLD']]
+                    elif hold_type == 'non-quality':
+                        df = df[df['IS_NON_QUALITY_HOLD']]
+
+            # Get specs (sorted by SPECSEQUENCE if available)
+            specs_df = df[df['SPECNAME'].notna()][['SPECNAME', 'SPECSEQUENCE']].drop_duplicates()
+            if 'SPECSEQUENCE' in specs_df.columns:
+                specs_df = specs_df.sort_values('SPECSEQUENCE')
+            specs = specs_df['SPECNAME'].tolist() if not specs_df.empty else []
+
+            # Pagination
+            filtered_count = len(df)
+            total_pages = (filtered_count + page_size - 1) // page_size if filtered_count > 0 else 1
+            offset = (page - 1) * page_size
+
+            # Sort by LOTID and paginate
+            df = df.sort_values('LOTID')
+            page_df = df.iloc[offset:offset + page_size]
+
+            lots = []
+            for _, row in page_df.iterrows():
+                lots.append({
+                    'lotId': _safe_value(row.get('LOTID')),
+                    'equipment': _safe_value(row.get('EQUIPMENTS')),
+                    'wipStatus': _safe_value(row.get('WIP_STATUS')),
+                    'holdReason': _safe_value(row.get('HOLDREASONNAME')),
+                    'qty': int(row.get('QTY', 0) or 0),
+                    'package': _safe_value(row.get('PRODUCTLINENAME')),
+                    'spec': _safe_value(row.get('SPECNAME'))
+                })
+
+            return {
+                'workcenter': workcenter,
+                'summary': summary,
+                'specs': specs,
+                'lots': lots,
+                'pagination': {
+                    'page': page,
+                    'page_size': page_size,
+                    'total_count': filtered_count,
+                    'total_pages': total_pages
+                },
+                'sys_date': get_cached_sys_date()
+            }
+        except Exception as exc:
+            logger.warning(f"Cache-based detail calculation failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_wip_detail_from_oracle(
+        workcenter, package, status, hold_type, workorder, lotid, include_dummy, page, page_size
+    )
+
+
+def _get_wip_detail_from_oracle(
+    workcenter: str,
+    package: Optional[str] = None,
+    status: Optional[str] = None,
+    hold_type: Optional[str] = None,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    include_dummy: bool = False,
+    page: int = 1,
+    page_size: int = 100
+) -> Optional[Dict[str, Any]]:
+    """Get WIP detail directly from Oracle (fallback)."""
     try:
         # Build WHERE conditions
         conditions = _build_base_conditions(include_dummy, workorder, lotid)
@@ -603,12 +988,45 @@ def get_wip_detail(
 def get_workcenters(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
     """Get list of workcenter groups with lot counts.
 
+    Uses Redis cache when available, falls back to Oracle direct query.
+
     Args:
         include_dummy: If True, include DUMMY lots (default: False)
 
     Returns:
         List of {name, lot_count} sorted by WORKCENTERSEQUENCE_GROUP
     """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy)
+            df = df[df['WORKCENTER_GROUP'].notna()]
+
+            if df.empty:
+                return []
+
+            # Group by workcenter with sequence
+            grouped = df.groupby(['WORKCENTER_GROUP', 'WORKCENTERSEQUENCE_GROUP']).size().reset_index(name='LOT_COUNT')
+            grouped = grouped.sort_values('WORKCENTERSEQUENCE_GROUP')
+
+            result = []
+            for _, row in grouped.iterrows():
+                result.append({
+                    'name': row['WORKCENTER_GROUP'],
+                    'lot_count': int(row['LOT_COUNT'] or 0)
+                })
+
+            return result
+        except Exception as exc:
+            logger.warning(f"Cache-based workcenters calculation failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_workcenters_from_oracle(include_dummy)
+
+
+def _get_workcenters_from_oracle(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
+    """Get workcenters directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy)
         conditions.append("WORKCENTER_GROUP IS NOT NULL")
@@ -638,12 +1056,14 @@ def get_workcenters(include_dummy: bool = False) -> Optional[List[Dict[str, Any]
 
         return result
     except Exception as exc:
-        print(f"Workcenters query failed: {exc}")
+        logger.error(f"Workcenters query failed: {exc}")
         return None
 
 
 def get_packages(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
     """Get list of packages (product lines) with lot counts.
+
+    Uses Redis cache when available, falls back to Oracle direct query.
 
     Args:
         include_dummy: If True, include DUMMY lots (default: False)
@@ -651,6 +1071,37 @@ def get_packages(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
     Returns:
         List of {name, lot_count} sorted by lot_count desc
     """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy)
+            df = df[df['PRODUCTLINENAME'].notna()]
+
+            if df.empty:
+                return []
+
+            # Group by package and count
+            grouped = df.groupby('PRODUCTLINENAME').size().reset_index(name='LOT_COUNT')
+            grouped = grouped.sort_values('LOT_COUNT', ascending=False)
+
+            result = []
+            for _, row in grouped.iterrows():
+                result.append({
+                    'name': row['PRODUCTLINENAME'],
+                    'lot_count': int(row['LOT_COUNT'] or 0)
+                })
+
+            return result
+        except Exception as exc:
+            logger.warning(f"Cache-based packages calculation failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_packages_from_oracle(include_dummy)
+
+
+def _get_packages_from_oracle(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
+    """Get packages directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy)
         conditions.append("PRODUCTLINENAME IS NOT NULL")
@@ -679,7 +1130,7 @@ def get_packages(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
 
         return result
     except Exception as exc:
-        print(f"Packages query failed: {exc}")
+        logger.error(f"Packages query failed: {exc}")
         return None
 
 
@@ -694,6 +1145,8 @@ def search_workorders(
 ) -> Optional[List[str]]:
     """Search for WORKORDER values matching the query.
 
+    Uses Redis cache when available, falls back to Oracle direct query.
+
     Args:
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
@@ -702,13 +1155,42 @@ def search_workorders(
     Returns:
         List of matching WORKORDER values (distinct)
     """
+    # Validate input
+    if not q or len(q) < 2:
+        return []
+
+    limit = min(limit, 50)  # Cap at 50
+
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy)
+            df = df[df['WORKORDER'].notna()]
+
+            # Filter by search query (case-insensitive)
+            df = df[df['WORKORDER'].str.contains(q, case=False, na=False)]
+
+            if df.empty:
+                return []
+
+            # Get distinct, sorted, limited results
+            result = df['WORKORDER'].drop_duplicates().sort_values().head(limit).tolist()
+            return result
+        except Exception as exc:
+            logger.warning(f"Cache-based workorder search failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _search_workorders_from_oracle(q, limit, include_dummy)
+
+
+def _search_workorders_from_oracle(
+    q: str,
+    limit: int = 20,
+    include_dummy: bool = False
+) -> Optional[List[str]]:
+    """Search workorders directly from Oracle (fallback)."""
     try:
-        # Validate input
-        if not q or len(q) < 2:
-            return []
-
-        limit = min(limit, 50)  # Cap at 50
-
         conditions = _build_base_conditions(include_dummy)
         conditions.append(f"WORKORDER LIKE '%{_escape_sql(q)}%'")
         conditions.append("WORKORDER IS NOT NULL")
@@ -728,7 +1210,7 @@ def search_workorders(
 
         return df['WORKORDER'].tolist()
     except Exception as exc:
-        print(f"Search workorders failed: {exc}")
+        logger.error(f"Search workorders failed: {exc}")
         return None
 
 
@@ -739,6 +1221,8 @@ def search_lot_ids(
 ) -> Optional[List[str]]:
     """Search for LOTID values matching the query.
 
+    Uses Redis cache when available, falls back to Oracle direct query.
+
     Args:
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
@@ -747,13 +1231,41 @@ def search_lot_ids(
     Returns:
         List of matching LOTID values
     """
+    # Validate input
+    if not q or len(q) < 2:
+        return []
+
+    limit = min(limit, 50)  # Cap at 50
+
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy)
+
+            # Filter by search query (case-insensitive)
+            df = df[df['LOTID'].str.contains(q, case=False, na=False)]
+
+            if df.empty:
+                return []
+
+            # Get sorted, limited results
+            result = df['LOTID'].sort_values().head(limit).tolist()
+            return result
+        except Exception as exc:
+            logger.warning(f"Cache-based lot ID search failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _search_lot_ids_from_oracle(q, limit, include_dummy)
+
+
+def _search_lot_ids_from_oracle(
+    q: str,
+    limit: int = 20,
+    include_dummy: bool = False
+) -> Optional[List[str]]:
+    """Search lot IDs directly from Oracle (fallback)."""
     try:
-        # Validate input
-        if not q or len(q) < 2:
-            return []
-
-        limit = min(limit, 50)  # Cap at 50
-
         conditions = _build_base_conditions(include_dummy)
         conditions.append(f"LOTID LIKE '%{_escape_sql(q)}%'")
         where_clause = f"WHERE {' AND '.join(conditions)}"
@@ -772,7 +1284,7 @@ def search_lot_ids(
 
         return df['LOTID'].tolist()
     except Exception as exc:
-        print(f"Search lot IDs failed: {exc}")
+        logger.error(f"Search lot IDs failed: {exc}")
         return None
 
 
@@ -786,6 +1298,8 @@ def get_hold_detail_summary(
 ) -> Optional[Dict[str, Any]]:
     """Get summary statistics for a specific hold reason.
 
+    Uses Redis cache when available, falls back to Oracle direct query.
+
     Args:
         reason: The HOLDREASONNAME to filter by
         include_dummy: If True, include DUMMY lots (default: False)
@@ -793,6 +1307,47 @@ def get_hold_detail_summary(
     Returns:
         Dict with totalLots, totalQty, avgAge, maxAge, workcenterCount
     """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy)
+            df = _add_wip_status_columns(df)
+
+            # Filter for HOLD status with matching reason
+            df = df[(df['WIP_STATUS'] == 'HOLD') & (df['HOLDREASONNAME'] == reason)]
+
+            if df.empty:
+                return {
+                    'totalLots': 0,
+                    'totalQty': 0,
+                    'avgAge': 0,
+                    'maxAge': 0,
+                    'workcenterCount': 0
+                }
+
+            # Ensure AGEBYDAYS is numeric
+            df['AGEBYDAYS'] = pd.to_numeric(df['AGEBYDAYS'], errors='coerce').fillna(0)
+
+            return {
+                'totalLots': len(df),
+                'totalQty': int(df['QTY'].sum()),
+                'avgAge': round(float(df['AGEBYDAYS'].mean()), 1),
+                'maxAge': float(df['AGEBYDAYS'].max()),
+                'workcenterCount': df['WORKCENTER_GROUP'].nunique()
+            }
+        except Exception as exc:
+            logger.warning(f"Cache-based hold detail summary failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_hold_detail_summary_from_oracle(reason, include_dummy)
+
+
+def _get_hold_detail_summary_from_oracle(
+    reason: str,
+    include_dummy: bool = False
+) -> Optional[Dict[str, Any]]:
+    """Get hold detail summary directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy)
         conditions.append("STATUS = 'HOLD'")
@@ -824,7 +1379,7 @@ def get_hold_detail_summary(
             'workcenterCount': int(row['WORKCENTER_COUNT'] or 0)
         }
     except Exception as exc:
-        print(f"Hold detail summary query failed: {exc}")
+        logger.error(f"Hold detail summary query failed: {exc}")
         import traceback
         traceback.print_exc()
         return None
@@ -836,6 +1391,8 @@ def get_hold_detail_distribution(
 ) -> Optional[Dict[str, Any]]:
     """Get distribution statistics for a specific hold reason.
 
+    Uses Redis cache when available, falls back to Oracle direct query.
+
     Args:
         reason: The HOLDREASONNAME to filter by
         include_dummy: If True, include DUMMY lots (default: False)
@@ -843,6 +1400,130 @@ def get_hold_detail_distribution(
     Returns:
         Dict with byWorkcenter, byPackage, byAge distributions
     """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy)
+            df = _add_wip_status_columns(df)
+
+            # Filter for HOLD status with matching reason
+            df = df[(df['WIP_STATUS'] == 'HOLD') & (df['HOLDREASONNAME'] == reason)]
+
+            total_lots = len(df)
+
+            if total_lots == 0:
+                return {
+                    'byWorkcenter': [],
+                    'byPackage': [],
+                    'byAge': []
+                }
+
+            # Ensure numeric columns
+            df['AGEBYDAYS'] = pd.to_numeric(df['AGEBYDAYS'], errors='coerce').fillna(0)
+
+            # By Workcenter
+            wc_df = df[df['WORKCENTER_GROUP'].notna()].groupby('WORKCENTER_GROUP').agg({
+                'LOTID': 'count',
+                'QTY': 'sum'
+            }).reset_index()
+            wc_df.columns = ['NAME', 'LOTS', 'QTY']
+            wc_df = wc_df.sort_values('LOTS', ascending=False)
+
+            by_workcenter = []
+            for _, row in wc_df.iterrows():
+                lots = int(row['LOTS'] or 0)
+                by_workcenter.append({
+                    'name': row['NAME'],
+                    'lots': lots,
+                    'qty': int(row['QTY'] or 0),
+                    'percentage': round(lots / total_lots * 100, 1) if total_lots > 0 else 0
+                })
+
+            # By Package
+            pkg_df = df[df['PRODUCTLINENAME'].notna()].groupby('PRODUCTLINENAME').agg({
+                'LOTID': 'count',
+                'QTY': 'sum'
+            }).reset_index()
+            pkg_df.columns = ['NAME', 'LOTS', 'QTY']
+            pkg_df = pkg_df.sort_values('LOTS', ascending=False)
+
+            by_package = []
+            for _, row in pkg_df.iterrows():
+                lots = int(row['LOTS'] or 0)
+                by_package.append({
+                    'name': row['NAME'],
+                    'lots': lots,
+                    'qty': int(row['QTY'] or 0),
+                    'percentage': round(lots / total_lots * 100, 1) if total_lots > 0 else 0
+                })
+
+            # By Age - compute age range
+            def get_age_range(age):
+                if age < 1:
+                    return '0-1'
+                elif age < 3:
+                    return '1-3'
+                elif age < 7:
+                    return '3-7'
+                else:
+                    return '7+'
+
+            df['AGE_RANGE'] = df['AGEBYDAYS'].apply(get_age_range)
+
+            age_df = df.groupby('AGE_RANGE').agg({
+                'LOTID': 'count',
+                'QTY': 'sum'
+            }).reset_index()
+            age_df.columns = ['AGE_RANGE', 'LOTS', 'QTY']
+
+            # Define age ranges in order
+            age_labels = {
+                '0-1': '0-1天',
+                '1-3': '1-3天',
+                '3-7': '3-7天',
+                '7+': '7+天'
+            }
+            age_order = ['0-1', '1-3', '3-7', '7+']
+
+            # Build age distribution with all ranges (even if 0)
+            age_data = {r: {'lots': 0, 'qty': 0} for r in age_order}
+            for _, row in age_df.iterrows():
+                range_key = row['AGE_RANGE']
+                if range_key in age_data:
+                    age_data[range_key] = {
+                        'lots': int(row['LOTS'] or 0),
+                        'qty': int(row['QTY'] or 0)
+                    }
+
+            by_age = []
+            for r in age_order:
+                lots = age_data[r]['lots']
+                by_age.append({
+                    'range': r,
+                    'label': age_labels[r],
+                    'lots': lots,
+                    'qty': age_data[r]['qty'],
+                    'percentage': round(lots / total_lots * 100, 1) if total_lots > 0 else 0
+                })
+
+            return {
+                'byWorkcenter': by_workcenter,
+                'byPackage': by_package,
+                'byAge': by_age
+            }
+        except Exception as exc:
+            logger.warning(f"Cache-based hold detail distribution failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_hold_detail_distribution_from_oracle(reason, include_dummy)
+
+
+def _get_hold_detail_distribution_from_oracle(
+    reason: str,
+    include_dummy: bool = False
+) -> Optional[Dict[str, Any]]:
+    """Get hold detail distribution directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy)
         conditions.append("STATUS = 'HOLD'")
@@ -973,7 +1654,7 @@ def get_hold_detail_distribution(
             'byAge': by_age
         }
     except Exception as exc:
-        print(f"Hold detail distribution query failed: {exc}")
+        logger.error(f"Hold detail distribution query failed: {exc}")
         import traceback
         traceback.print_exc()
         return None
@@ -990,6 +1671,8 @@ def get_hold_detail_lots(
 ) -> Optional[Dict[str, Any]]:
     """Get paginated lot details for a specific hold reason.
 
+    Uses Redis cache when available, falls back to Oracle direct query.
+
     Args:
         reason: The HOLDREASONNAME to filter by
         workcenter: Optional WORKCENTER_GROUP filter
@@ -1002,6 +1685,93 @@ def get_hold_detail_lots(
     Returns:
         Dict with lots list, pagination info, and active filters
     """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy)
+            df = _add_wip_status_columns(df)
+
+            # Filter for HOLD status with matching reason
+            df = df[(df['WIP_STATUS'] == 'HOLD') & (df['HOLDREASONNAME'] == reason)]
+
+            # Ensure numeric columns
+            df['AGEBYDAYS'] = pd.to_numeric(df['AGEBYDAYS'], errors='coerce').fillna(0)
+
+            # Optional filters
+            if workcenter:
+                df = df[df['WORKCENTER_GROUP'] == workcenter]
+            if package:
+                df = df[df['PRODUCTLINENAME'] == package]
+            if age_range:
+                if age_range == '0-1':
+                    df = df[(df['AGEBYDAYS'] >= 0) & (df['AGEBYDAYS'] < 1)]
+                elif age_range == '1-3':
+                    df = df[(df['AGEBYDAYS'] >= 1) & (df['AGEBYDAYS'] < 3)]
+                elif age_range == '3-7':
+                    df = df[(df['AGEBYDAYS'] >= 3) & (df['AGEBYDAYS'] < 7)]
+                elif age_range == '7+':
+                    df = df[df['AGEBYDAYS'] >= 7]
+
+            total = len(df)
+
+            # Sort by age descending, then LOTID
+            df = df.sort_values(['AGEBYDAYS', 'LOTID'], ascending=[False, True])
+
+            # Pagination
+            offset = (page - 1) * page_size
+            page_df = df.iloc[offset:offset + page_size]
+
+            lots = []
+            for _, row in page_df.iterrows():
+                lots.append({
+                    'lotId': _safe_value(row.get('LOTID')),
+                    'workorder': _safe_value(row.get('WORKORDER')),
+                    'qty': int(row.get('QTY', 0) or 0),
+                    'package': _safe_value(row.get('PRODUCTLINENAME')),
+                    'workcenter': _safe_value(row.get('WORKCENTER_GROUP')),
+                    'spec': _safe_value(row.get('SPECNAME')),
+                    'age': round(float(row.get('AGEBYDAYS', 0) or 0), 1),
+                    'holdBy': _safe_value(row.get('HOLDEMP')),
+                    'dept': _safe_value(row.get('DEPTNAME')),
+                    'holdComment': _safe_value(row.get('COMMENT_HOLD'))
+                })
+
+            total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+
+            return {
+                'lots': lots,
+                'pagination': {
+                    'page': page,
+                    'perPage': page_size,
+                    'total': total,
+                    'totalPages': total_pages
+                },
+                'filters': {
+                    'workcenter': workcenter,
+                    'package': package,
+                    'ageRange': age_range
+                }
+            }
+        except Exception as exc:
+            logger.warning(f"Cache-based hold detail lots failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_hold_detail_lots_from_oracle(
+        reason, workcenter, package, age_range, include_dummy, page, page_size
+    )
+
+
+def _get_hold_detail_lots_from_oracle(
+    reason: str,
+    workcenter: Optional[str] = None,
+    package: Optional[str] = None,
+    age_range: Optional[str] = None,
+    include_dummy: bool = False,
+    page: int = 1,
+    page_size: int = 50
+) -> Optional[Dict[str, Any]]:
+    """Get hold detail lots directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy)
         conditions.append("STATUS = 'HOLD'")
@@ -1091,7 +1861,7 @@ def get_hold_detail_lots(
             }
         }
     except Exception as exc:
-        print(f"Hold detail lots query failed: {exc}")
+        logger.error(f"Hold detail lots query failed: {exc}")
         import traceback
         traceback.print_exc()
         return None

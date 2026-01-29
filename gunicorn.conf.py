@@ -6,9 +6,13 @@ threads = int(os.getenv("GUNICORN_THREADS", "4"))
 worker_class = "gthread"
 
 # Timeout settings - critical for dashboard stability
-timeout = 60          # Worker timeout: 60 seconds max per request
+timeout = 65          # Worker timeout: must be > call_timeout (55s)
 graceful_timeout = 10 # Graceful shutdown timeout (reduced for faster restart)
 keepalive = 5         # Keep-alive connections timeout
+
+# Worker lifecycle management - prevent state accumulation
+max_requests = 1000       # Restart worker after N requests
+max_requests_jitter = 100 # Random jitter to prevent simultaneous restarts
 
 
 # ============================================================

@@ -71,7 +71,10 @@ def _register_pool_events(engine):
 
     @event.listens_for(engine, "checkout")
     def on_checkout(dbapi_conn, connection_record, connection_proxy):
-        logger.debug("Connection checked out from pool")
+        # Set call_timeout to prevent queries from blocking workers indefinitely
+        # 55 seconds (must be less than Gunicorn's 60s worker timeout)
+        dbapi_conn.call_timeout = 55000  # milliseconds
+        logger.debug("Connection checked out from pool (call_timeout=55s)")
 
     @event.listens_for(engine, "checkin")
     def on_checkin(dbapi_conn, connection_record):

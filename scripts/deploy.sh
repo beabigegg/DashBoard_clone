@@ -11,6 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONDA_ENV="mes-dashboard"
 PYTHON_VERSION="3.11"
+REDIS_CONF="/etc/redis/redis.conf"
 
 # Colors for output
 RED='\033[0;31m'
@@ -59,6 +60,48 @@ check_prerequisites() {
 
     # Source conda
     source "$(conda info --base)/etc/profile.d/conda.sh"
+}
+
+check_redis() {
+    log_info "Checking Redis installation..."
+
+    # Check if redis-server is installed
+    if ! command -v redis-server &> /dev/null; then
+        log_error "Redis server not found."
+        log_info "Install with: sudo apt install redis-server"
+        exit 1
+    fi
+    log_success "Redis server found"
+
+    # Check if redis-cli is installed
+    if ! command -v redis-cli &> /dev/null; then
+        log_error "Redis CLI not found."
+        exit 1
+    fi
+    log_success "Redis CLI found"
+
+    # Check if Redis service is enabled
+    if systemctl is-enabled redis-server &>/dev/null; then
+        log_success "Redis service is enabled"
+    else
+        log_warn "Redis service is not enabled for auto-start"
+        log_info "Enable with: sudo systemctl enable redis-server"
+    fi
+
+    # Check if Redis is running
+    if systemctl is-active redis-server &>/dev/null; then
+        log_success "Redis service is running"
+    else
+        log_warn "Redis service is not running"
+        log_info "Start with: sudo systemctl start redis-server"
+    fi
+
+    # Test Redis connectivity
+    if redis-cli ping &>/dev/null; then
+        log_success "Redis connectivity OK (PONG received)"
+    else
+        log_warn "Cannot connect to Redis (service may need to be started)"
+    fi
 }
 
 setup_conda_env() {
@@ -207,6 +250,7 @@ main() {
     echo ""
 
     check_prerequisites
+    check_redis
     setup_conda_env
     install_dependencies
     setup_env_file
