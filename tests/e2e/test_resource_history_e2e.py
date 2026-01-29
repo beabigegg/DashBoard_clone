@@ -66,6 +66,7 @@ class TestResourceHistoryPageAccess:
         content = response.data.decode('utf-8')
 
         assert 'kpiOuPct' in content
+        assert 'kpiAvailabilityPct' in content
         assert 'kpiPrdHours' in content
         assert 'kpiUdtHours' in content
         assert 'kpiSdtHours' in content
@@ -173,10 +174,14 @@ class TestResourceHistoryAPIWorkflow:
 
         # Verify KPI
         assert data['data']['kpi']['ou_pct'] == 80.0
+        # Availability% = (8000+1000+200) / (8000+1000+200+300+500+1000) * 100 = 9200/11000 = 83.6%
+        assert data['data']['kpi']['availability_pct'] == 83.6
         assert data['data']['kpi']['machine_count'] == 100
 
         # Verify trend
         assert len(data['data']['trend']) == 2
+        # Trend should also have availability_pct
+        assert 'availability_pct' in data['data']['trend'][0]
 
         # Verify heatmap
         assert len(data['data']['heatmap']) == 2
@@ -217,6 +222,7 @@ class TestResourceHistoryAPIWorkflow:
         assert 'family' in first_row
         assert 'resource' in first_row
         assert 'ou_pct' in first_row
+        assert 'availability_pct' in first_row
         assert 'prd_hours' in first_row
         assert 'prd_pct' in first_row
 
@@ -248,6 +254,7 @@ class TestResourceHistoryAPIWorkflow:
         header = lines[0]
         assert '站點' in header
         assert 'OU%' in header
+        assert 'Availability%' in header
 
 
 class TestResourceHistoryValidation:

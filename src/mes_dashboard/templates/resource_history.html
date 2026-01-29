@@ -290,7 +290,7 @@
         /* KPI Cards */
         .kpi-row {
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(7, 1fr);
             gap: 14px;
             margin-bottom: 16px;
         }
@@ -504,6 +504,12 @@
         }
 
         /* Responsive */
+        @media (max-width: 1400px) {
+            .kpi-row {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
         @media (max-width: 1200px) {
             .kpi-row {
                 grid-template-columns: repeat(3, 1fr);
@@ -599,12 +605,17 @@
         <div class="kpi-row" id="kpiRow">
             <div class="kpi-card">
                 <div class="kpi-label">OU%</div>
-                <div class="kpi-value green" id="kpiOuPct">--</div>
+                <div class="kpi-value blue" id="kpiOuPct">--</div>
                 <div class="kpi-sub">稼動率</div>
             </div>
             <div class="kpi-card">
+                <div class="kpi-label">Availability%</div>
+                <div class="kpi-value green" id="kpiAvailabilityPct">--</div>
+                <div class="kpi-sub">可用率</div>
+            </div>
+            <div class="kpi-card">
                 <div class="kpi-label">PRD 時數</div>
-                <div class="kpi-value blue" id="kpiPrdHours">--</div>
+                <div class="kpi-value" style="color: #3B82F6;" id="kpiPrdHours">--</div>
                 <div class="kpi-sub">生產時間</div>
             </div>
             <div class="kpi-card">
@@ -632,7 +643,7 @@
         <!-- Charts Row 1 -->
         <div class="charts-row">
             <div class="chart-card">
-                <div class="chart-title">OU% 趨勢</div>
+                <div class="chart-title">OU% / Availability% 趨勢</div>
                 <div class="chart-container" id="trendChart"></div>
             </div>
             <div class="chart-card">
@@ -990,6 +1001,7 @@
     // ============================================================
     function updateKpiCards(kpi) {
         document.getElementById('kpiOuPct').textContent = kpi.ou_pct + '%';
+        document.getElementById('kpiAvailabilityPct').textContent = kpi.availability_pct + '%';
         document.getElementById('kpiPrdHours').textContent = formatHours(kpi.prd_hours);
         document.getElementById('kpiUdtHours').textContent = formatHours(kpi.udt_hours);
         document.getElementById('kpiSdtHours').textContent = formatHours(kpi.sdt_hours);
@@ -1010,6 +1022,7 @@
     function updateTrendChart(trend) {
         const dates = trend.map(t => t.date);
         const ouPcts = trend.map(t => t.ou_pct);
+        const availabilityPcts = trend.map(t => t.availability_pct);
 
         charts.trend.setOption({
             tooltip: {
@@ -1017,11 +1030,17 @@
                 formatter: function(params) {
                     const d = trend[params[0].dataIndex];
                     return `${d.date}<br/>
-                        OU%: <b>${d.ou_pct}%</b><br/>
+                        <span style="color:#3B82F6">●</span> OU%: <b>${d.ou_pct}%</b><br/>
+                        <span style="color:#10B981">●</span> Availability%: <b>${d.availability_pct}%</b><br/>
                         PRD: ${d.prd_hours}h<br/>
                         SBY: ${d.sby_hours}h<br/>
                         UDT: ${d.udt_hours}h`;
                 }
+            },
+            legend: {
+                data: ['OU%', 'Availability%'],
+                bottom: 0,
+                textStyle: { fontSize: 11 }
             },
             xAxis: {
                 type: 'category',
@@ -1030,19 +1049,31 @@
             },
             yAxis: {
                 type: 'value',
-                name: 'OU%',
+                name: '%',
                 max: 100,
                 axisLabel: { formatter: '{value}%' }
             },
-            series: [{
-                data: ouPcts,
-                type: 'line',
-                smooth: true,
-                areaStyle: { opacity: 0.3 },
-                itemStyle: { color: '#667eea' },
-                lineStyle: { width: 2 }
-            }],
-            grid: { left: 50, right: 20, top: 30, bottom: 30 }
+            series: [
+                {
+                    name: 'OU%',
+                    data: ouPcts,
+                    type: 'line',
+                    smooth: true,
+                    areaStyle: { opacity: 0.2 },
+                    itemStyle: { color: '#3B82F6' },
+                    lineStyle: { width: 2 }
+                },
+                {
+                    name: 'Availability%',
+                    data: availabilityPcts,
+                    type: 'line',
+                    smooth: true,
+                    areaStyle: { opacity: 0.2 },
+                    itemStyle: { color: '#10B981' },
+                    lineStyle: { width: 2 }
+                }
+            ],
+            grid: { left: 50, right: 20, top: 30, bottom: 50 }
         });
     }
 

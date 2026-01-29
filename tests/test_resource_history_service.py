@@ -22,6 +22,7 @@ from mes_dashboard.services.resource_history_service import (
     _validate_date_range,
     _get_date_trunc,
     _calc_ou_pct,
+    _calc_availability_pct,
     _build_kpi_from_df,
     _build_detail_from_df,
     MAX_QUERY_DAYS,
@@ -112,6 +113,45 @@ class TestCalcOuPct(unittest.TestCase):
         self.assertEqual(result, 0)
 
 
+class TestCalcAvailabilityPct(unittest.TestCase):
+    """Test Availability% calculation."""
+
+    def test_normal_calculation(self):
+        """Availability% should be calculated correctly."""
+        # PRD=800, SBY=100, UDT=50, SDT=30, EGT=20, NST=100
+        # Availability% = (800+100+20) / (800+100+20+30+50+100) * 100 = 920 / 1100 * 100 = 83.6%
+        result = _calc_availability_pct(800, 100, 50, 30, 20, 100)
+        self.assertEqual(result, 83.6)
+
+    def test_zero_denominator(self):
+        """Zero denominator should return 0, not error."""
+        result = _calc_availability_pct(0, 0, 0, 0, 0, 0)
+        self.assertEqual(result, 0)
+
+    def test_all_available(self):
+        """100% available (no SDT, UDT, NST) should result in 100%."""
+        # PRD=100, SBY=50, EGT=50, no SDT/UDT/NST
+        # Availability% = (100+50+50) / (100+50+50+0+0+0) * 100 = 100%
+        result = _calc_availability_pct(100, 50, 0, 0, 50, 0)
+        self.assertEqual(result, 100.0)
+
+    def test_no_available_time(self):
+        """No available time (all SDT/UDT/NST) should result in 0%."""
+        # PRD=0, SBY=0, EGT=0, SDT=50, UDT=30, NST=20
+        # Availability% = 0 / (0+0+0+50+30+20) * 100 = 0%
+        result = _calc_availability_pct(0, 0, 50, 30, 0, 20)
+        self.assertEqual(result, 0)
+
+    def test_mixed_scenario(self):
+        """Mixed scenario with partial availability."""
+        # PRD=500, SBY=200, UDT=100, SDT=100, EGT=50, NST=50
+        # Numerator = PRD + SBY + EGT = 500 + 200 + 50 = 750
+        # Denominator = 500 + 200 + 50 + 100 + 100 + 50 = 1000
+        # Availability% = 750 / 1000 * 100 = 75%
+        result = _calc_availability_pct(500, 200, 100, 100, 50, 50)
+        self.assertEqual(result, 75.0)
+
+
 class TestBuildKpiFromDf(unittest.TestCase):
     """Test KPI building from DataFrame."""
 
@@ -121,6 +161,7 @@ class TestBuildKpiFromDf(unittest.TestCase):
         result = _build_kpi_from_df(df)
 
         self.assertEqual(result['ou_pct'], 0)
+        self.assertEqual(result['availability_pct'], 0)
         self.assertEqual(result['prd_hours'], 0)
         self.assertEqual(result['machine_count'], 0)
 
@@ -138,6 +179,8 @@ class TestBuildKpiFromDf(unittest.TestCase):
         result = _build_kpi_from_df(df)
 
         self.assertEqual(result['ou_pct'], 80.0)
+        # Availability% = (800+100+20) / (800+100+20+30+50+100) * 100 = 920/1100 = 83.6%
+        self.assertEqual(result['availability_pct'], 83.6)
         self.assertEqual(result['prd_hours'], 800)
         self.assertEqual(result['machine_count'], 10)
 
@@ -155,6 +198,7 @@ class TestBuildKpiFromDf(unittest.TestCase):
         result = _build_kpi_from_df(df)
 
         self.assertEqual(result['ou_pct'], 0)
+        self.assertEqual(result['availability_pct'], 0)
         self.assertEqual(result['prd_hours'], 0)
         self.assertEqual(result['machine_count'], 0)
 
@@ -197,7 +241,7 @@ class TestGetFilterOptions(unittest.TestCase):
     """Test filter options retrieval."""
 
     @patch('mes_dashboard.services.filter_cache.get_workcenter_groups')
-    @patch('mes_dashboard.services.filter_cache.get_resource_families')
+    @patch('mes_dashboard.services.resource_cache.get_resource_families')
     def test_cache_failure(self, mock_families, mock_groups):
         """Cache failure should return None."""
         mock_groups.return_value = None
@@ -206,7 +250,7 @@ class TestGetFilterOptions(unittest.TestCase):
         self.assertIsNone(result)
 
     @patch('mes_dashboard.services.filter_cache.get_workcenter_groups')
-    @patch('mes_dashboard.services.filter_cache.get_resource_families')
+    @patch('mes_dashboard.services.resource_cache.get_resource_families')
     def test_successful_query(self, mock_families, mock_groups):
         """Successful query should return workcenter groups and families."""
         mock_groups.return_value = [

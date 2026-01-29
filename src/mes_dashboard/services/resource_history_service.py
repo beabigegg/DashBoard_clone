@@ -444,7 +444,7 @@ def export_csv(
         output = io.StringIO()
         writer = csv.writer(output)
         headers = [
-            '站點', '型號', '機台', 'OU%',
+            '站點', '型號', '機台', 'OU%', 'Availability%',
             'PRD(h)', 'PRD(%)', 'SBY(h)', 'SBY(%)',
             'UDT(h)', 'UDT(%)', 'SDT(h)', 'SDT(%)',
             'EGT(h)', 'EGT(%)', 'NST(h)', 'NST(%)'
@@ -471,6 +471,7 @@ def export_csv(
 
             # Calculate percentages
             ou_pct = _calc_ou_pct(prd, sby, udt, sdt, egt)
+            availability_pct = _calc_availability_pct(prd, sby, udt, sdt, egt, nst)
             prd_pct = round(prd / total * 100, 1) if total > 0 else 0
             sby_pct = round(sby / total * 100, 1) if total > 0 else 0
             udt_pct = round(udt / total * 100, 1) if total > 0 else 0
@@ -483,6 +484,7 @@ def export_csv(
                 row['RESOURCEFAMILYNAME'],
                 row['RESOURCENAME'],
                 f"{ou_pct}%",
+                f"{availability_pct}%",
                 round(prd, 1), f"{prd_pct}%",
                 round(sby, 1), f"{sby_pct}%",
                 round(udt, 1), f"{udt_pct}%",
@@ -623,11 +625,19 @@ def _calc_ou_pct(prd: float, sby: float, udt: float, sdt: float, egt: float) -> 
     return round(prd / denominator * 100, 1) if denominator > 0 else 0
 
 
+def _calc_availability_pct(prd: float, sby: float, udt: float, sdt: float, egt: float, nst: float) -> float:
+    """Calculate Availability% = (PRD + SBY + EGT) / (PRD + SBY + EGT + SDT + UDT + NST) * 100."""
+    numerator = prd + sby + egt
+    denominator = prd + sby + egt + sdt + udt + nst
+    return round(numerator / denominator * 100, 1) if denominator > 0 else 0
+
+
 def _build_kpi_from_df(df: pd.DataFrame) -> Dict[str, Any]:
     """Build KPI dict from query result DataFrame."""
     if df is None or len(df) == 0:
         return {
             'ou_pct': 0,
+            'availability_pct': 0,
             'prd_hours': 0,
             'sby_hours': 0,
             'udt_hours': 0,
@@ -648,6 +658,7 @@ def _build_kpi_from_df(df: pd.DataFrame) -> Dict[str, Any]:
 
     return {
         'ou_pct': _calc_ou_pct(prd, sby, udt, sdt, egt),
+        'availability_pct': _calc_availability_pct(prd, sby, udt, sdt, egt, nst),
         'prd_hours': round(prd, 1),
         'sby_hours': round(sby, 1),
         'udt_hours': round(udt, 1),
@@ -690,6 +701,7 @@ def _build_trend_from_df(df: pd.DataFrame, granularity: str) -> List[Dict]:
         result.append({
             'date': _format_date(row['DATA_DATE'], granularity),
             'ou_pct': _calc_ou_pct(prd, sby, udt, sdt, egt),
+            'availability_pct': _calc_availability_pct(prd, sby, udt, sdt, egt, nst),
             'prd_hours': round(prd, 1),
             'sby_hours': round(sby, 1),
             'udt_hours': round(udt, 1),
@@ -824,6 +836,7 @@ def _build_detail_from_df(df: pd.DataFrame) -> List[Dict]:
             'family': family if not pd.isna(family) else '',
             'resource': resource if not pd.isna(resource) else '',
             'ou_pct': _calc_ou_pct(prd, sby, udt, sdt, egt),
+            'availability_pct': _calc_availability_pct(prd, sby, udt, sdt, egt, nst),
             'prd_hours': round(prd, 1),
             'prd_pct': round(prd / total * 100, 1) if total > 0 else 0,
             'sby_hours': round(sby, 1),
