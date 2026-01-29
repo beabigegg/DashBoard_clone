@@ -66,16 +66,33 @@ def check_redis() -> tuple[str, str | None]:
 
 
 def get_cache_status() -> dict:
-    """Get current cache status.
+    """Get current WIP cache status.
 
     Returns:
-        Dict with cache status information.
+        Dict with WIP cache status information.
     """
     return {
         'enabled': REDIS_ENABLED,
         'sys_date': get_cached_sys_date(),
         'updated_at': get_cache_updated_at()
     }
+
+
+def get_resource_cache_status() -> dict:
+    """Get current resource cache status.
+
+    Returns:
+        Dict with resource cache status information.
+    """
+    from mes_dashboard.services.resource_cache import (
+        get_cache_status as get_res_cache_status,
+        RESOURCE_CACHE_ENABLED,
+    )
+
+    if not RESOURCE_CACHE_ENABLED:
+        return {'enabled': False}
+
+    return get_res_cache_status()
 
 
 @health_bp.route('/health', methods=['GET'])
@@ -112,10 +129,16 @@ def health_check():
         status = 'healthy'
         http_code = 200
 
+    # Check resource cache status
+    resource_cache = get_resource_cache_status()
+    if resource_cache.get('enabled') and not resource_cache.get('loaded'):
+        warnings.append("Resource cache not loaded")
+
     response = {
         'status': status,
         'services': services,
-        'cache': get_cache_status()
+        'cache': get_cache_status(),
+        'resource_cache': resource_cache
     }
 
     if errors:

@@ -5,11 +5,11 @@
 TABLES_CONFIG = {
     '即時數據表 (DWH)': [
         {
-            'name': 'DWH.DW_PJ_LOT_V',
-            'display_name': 'WIP 即時批次 (DW_PJ_LOT_V)',
+            'name': 'DW_MES_LOT_V',
+            'display_name': 'WIP 即時批次 (DW_MES_LOT_V)',
             'row_count': 10000,  # 動態變化，約 9000-12000
             'time_field': 'SYS_DATE',
-            'description': 'DWH 即時 WIP View - 每 5 分鐘更新，包含完整批次狀態、工站、設備、Hold 原因等 70 欄位'
+            'description': 'MES 即時 WIP View - 每 5 分鐘更新，包含完整批次狀態、工站、設備、Hold 原因等 70 欄位'
         }
     ],
     '現況快照表': [

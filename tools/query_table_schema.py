@@ -6,9 +6,11 @@
 import sys
 import io
 import os
-import oracledb
 import json
+import argparse
 from pathlib import Path
+
+import oracledb
 
 # 设置 UTF-8 编码输出
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -34,7 +36,7 @@ DB_CONFIG = {
     'dsn': f'(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST={DB_HOST})(PORT={DB_PORT})))(CONNECT_DATA=(SERVICE_NAME={DB_SERVICE})))'
 }
 
-# MES 表列表
+# MES 表列表（預設清單）
 MES_TABLES = [
     'DW_MES_CONTAINER',
     'DW_MES_HOLDRELEASEHISTORY',
@@ -54,8 +56,7 @@ MES_TABLES = [
     'DW_MES_RESOURCE'
 ]
 
-
-def get_table_schema(cursor, table_name):
+def get_table_schema(cursor, table_name, owner=None):
     """获取表的结构信息"""
     query = """
         SELECT
@@ -69,9 +70,13 @@ def get_table_schema(cursor, table_name):
             COLUMN_ID
         FROM ALL_TAB_COLUMNS
         WHERE TABLE_NAME = :table_name
-        ORDER BY COLUMN_ID
     """
-    cursor.execute(query, table_name=table_name)
+    if owner:
+        query += " AND OWNER = :owner ORDER BY COLUMN_ID"
+        cursor.execute(query, table_name=table_name, owner=owner)
+    else:
+        query += " ORDER BY COLUMN_ID"
+        cursor.execute(query, table_name=table_name)
     columns = cursor.fetchall()
 
     schema = []
@@ -91,29 +96,39 @@ def get_table_schema(cursor, table_name):
     return schema
 
 
-def get_table_comments(cursor, table_name):
+def get_table_comments(cursor, table_name, owner=None):
     """获取表和列的注释"""
     # 获取表注释
-    cursor.execute("""
+    table_query = """
         SELECT COMMENTS
         FROM ALL_TAB_COMMENTS
         WHERE TABLE_NAME = :table_name
-    """, table_name=table_name)
+    """
+    if owner:
+        table_query += " AND OWNER = :owner"
+        cursor.execute(table_query, table_name=table_name, owner=owner)
+    else:
+        cursor.execute(table_query, table_name=table_name)
     table_comment = cursor.fetchone()
 
     # 获取列注释
-    cursor.execute("""
+    col_query = """
         SELECT COLUMN_NAME, COMMENTS
         FROM ALL_COL_COMMENTS
         WHERE TABLE_NAME = :table_name
-        ORDER BY COLUMN_NAME
-    """, table_name=table_name)
+    """
+    if owner:
+        col_query += " AND OWNER = :owner ORDER BY COLUMN_NAME"
+        cursor.execute(col_query, table_name=table_name, owner=owner)
+    else:
+        col_query += " ORDER BY COLUMN_NAME"
+        cursor.execute(col_query, table_name=table_name)
     column_comments = {row[0]: row[1] for row in cursor.fetchall()}
 
     return table_comment[0] if table_comment else None, column_comments
 
 
-def get_table_indexes(cursor, table_name):
+def get_table_indexes(cursor, table_name, owner=None):
     """获取表的索引信息"""
     query = """
         SELECT
@@ -126,14 +141,24 @@ def get_table_indexes(cursor, table_name):
         GROUP BY i.INDEX_NAME, i.UNIQUENESS
         ORDER BY i.INDEX_NAME
     """
-    cursor.execute(query, table_name=table_name)
+    if owner:
+        query = query.replace(
+            "WHERE i.TABLE_NAME = :table_name",
+            "WHERE i.TABLE_NAME = :table_name AND i.TABLE_OWNER = :owner",
+        )
+        cursor.execute(query, table_name=table_name, owner=owner)
+    else:
+        cursor.execute(query, table_name=table_name)
     return cursor.fetchall()
 
 
-def get_sample_data(cursor, table_name, limit=5):
+def get_sample_data(cursor, table_name, owner=None, limit=5):
     """获取表的示例数据"""
     try:
-        cursor.execute(f"SELECT * FROM {table_name} WHERE ROWNUM <= {limit}")
+        if owner:
+            cursor.execute(f"SELECT * FROM {owner}.{table_name} WHERE ROWNUM <= {limit}")
+        else:
+            cursor.execute(f"SELECT * FROM {table_name} WHERE ROWNUM <= {limit}")
         columns = [col[0] for col in cursor.description]
         rows = cursor.fetchall()
         return columns, rows
@@ -143,35 +168,67 @@ def get_sample_data(cursor, table_name, limit=5):
 
 def main():
     """主函数"""
+    parser = argparse.ArgumentParser(description="Query Oracle table/view schema information")
+    parser.add_argument(
+        "--schema",
+        help="Schema/owner to scan (e.g. DWH). If set, scans all TABLE/VIEW in that schema.",
+    )
+    parser.add_argument(
+        "--output",
+        help="Output JSON path (default: data/table_schema_info.json)",
+        default=None,
+    )
+    args = parser.parse_args()
+
     print("Connecting to database...")
     connection = oracledb.connect(**DB_CONFIG)
     cursor = connection.cursor()
 
     all_table_info = {}
 
-    print(f"\nQuerying schema information for {len(MES_TABLES)} tables...\n")
+    owner = args.schema.strip().upper() if args.schema else None
+    if owner:
+        cursor.execute(
+            """
+            SELECT OBJECT_NAME
+            FROM ALL_OBJECTS
+            WHERE OWNER = :owner
+              AND OBJECT_TYPE IN ('TABLE', 'VIEW')
+            ORDER BY OBJECT_NAME
+            """,
+            owner=owner,
+        )
+        table_list = [row[0] for row in cursor.fetchall()]
+    else:
+        table_list = MES_TABLES
 
-    for idx, table_name in enumerate(MES_TABLES, 1):
-        print(f"[{idx}/{len(MES_TABLES)}] Processing {table_name}...")
+    print(f"\nQuerying schema information for {len(table_list)} objects...\n")
+
+    for idx, table_name in enumerate(table_list, 1):
+        print(f"[{idx}/{len(table_list)}] Processing {table_name}...")
 
         try:
             # 获取表结构
-            schema = get_table_schema(cursor, table_name)
+            schema = get_table_schema(cursor, table_name, owner=owner)
 
             # 获取注释
-            table_comment, column_comments = get_table_comments(cursor, table_name)
+            table_comment, column_comments = get_table_comments(cursor, table_name, owner=owner)
 
             # 获取索引
-            indexes = get_table_indexes(cursor, table_name)
+            indexes = get_table_indexes(cursor, table_name, owner=owner)
 
             # 获取行数
-            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            if owner:
+                cursor.execute(f"SELECT COUNT(*) FROM {owner}.{table_name}")
+            else:
+                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
             row_count = cursor.fetchone()[0]
 
             # 获取示例数据
-            sample_columns, sample_data = get_sample_data(cursor, table_name, limit=3)
+            sample_columns, sample_data = get_sample_data(cursor, table_name, owner=owner, limit=3)
 
             all_table_info[table_name] = {
+                'owner': owner,
                 'table_comment': table_comment,
                 'row_count': row_count,
                 'schema': schema,
@@ -186,7 +243,10 @@ def main():
             all_table_info[table_name] = {'error': str(e)}
 
     # 保存到 JSON 文件
-    output_file = Path(__file__).resolve().parent.parent / 'data' / 'table_schema_info.json'
+    if args.output:
+        output_file = Path(args.output)
+    else:
+        output_file = Path(__file__).resolve().parent.parent / 'data' / 'table_schema_info.json'
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(all_table_info, f, ensure_ascii=False, indent=2, default=str)
 
@@ -199,4 +259,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -36,5 +36,11 @@
       "status": "dev"
     }
   ],
-  "api_public": true
+  "api_public": true,
+  "db_scan": {
+    "schema": "DWH",
+    "updated_at": "2026-01-29 13:49:59",
+    "object_count": 19,
+    "source": "tools/query_table_schema.py"
+  }
 }

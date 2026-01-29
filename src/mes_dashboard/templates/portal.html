@@ -281,9 +281,16 @@
                         <span class="health-item-value" id="redisStatus">--</span>
                     </div>
                     <div class="health-cache-info" id="cacheInfo">
-                        <div>快取狀態：<span id="cacheEnabled">--</span></div>
+                        <h5 style="margin: 8px 0 4px 0; font-size: 12px; color: #667eea;">WIP 快取</h5>
+                        <div>狀態：<span id="cacheEnabled">--</span></div>
                         <div>資料更新時間：<span id="cacheSysDate">--</span></div>
                         <div>最後同步：<span id="cacheUpdatedAt">--</span></div>
+                    </div>
+                    <div class="health-cache-info" id="resourceCacheInfo">
+                        <h5 style="margin: 8px 0 4px 0; font-size: 12px; color: #667eea;">設備主檔快取</h5>
+                        <div>狀態：<span id="resourceCacheEnabled">--</span></div>
+                        <div>資料筆數：<span id="resourceCacheCount">--</span></div>
+                        <div>最後同步：<span id="resourceCacheUpdatedAt">--</span></div>
                     </div>
                 </div>
                 <div class="admin-status">
@@ -312,7 +319,7 @@
             <button class="tab" data-target="excelQueryFrame">Excel 批次查詢</button>
             {% endif %}
             {% if can_view_page('/resource-history') %}
-            <button class="tab" data-target="resourceHistoryFrame">機台歷史分析</button>
+            <button class="tab" data-target="resourceHistoryFrame">設備歷史績效</button>
             {% endif %}
         </div>
 
@@ -331,7 +338,7 @@
             <iframe id="excelQueryFrame" data-src="/excel-query" title="Excel 批次查詢"></iframe>
             {% endif %}
             {% if can_view_page('/resource-history') %}
-            <iframe id="resourceHistoryFrame" data-src="/resource-history" title="機台歷史分析"></iframe>
+            <iframe id="resourceHistoryFrame" data-src="/resource-history" title="設備歷史績效"></iframe>
             {% endif %}
         </div>
     </div>
@@ -397,6 +404,9 @@
         const cacheEnabled = document.getElementById('cacheEnabled');
         const cacheSysDate = document.getElementById('cacheSysDate');
         const cacheUpdatedAt = document.getElementById('cacheUpdatedAt');
+        const resourceCacheEnabled = document.getElementById('resourceCacheEnabled');
+        const resourceCacheCount = document.getElementById('resourceCacheCount');
+        const resourceCacheUpdatedAt = document.getElementById('resourceCacheUpdatedAt');
 
         function toggleHealthPopup() {
             healthPopup.classList.toggle('show');
@@ -469,11 +479,25 @@
                 redisStatus.innerHTML = `${formatStatus(redisState)} ${redisText}`;
                 setStatusClass(redisStatus, redisState);
 
-                // Update cache info
+                // Update WIP cache info
                 const cache = data.cache || {};
                 cacheEnabled.textContent = cache.enabled ? '已啟用' : '未啟用';
                 cacheSysDate.textContent = cache.sys_date || '--';
                 cacheUpdatedAt.textContent = formatDateTime(cache.updated_at);
+
+                // Update resource cache info
+                const resCache = data.resource_cache || {};
+                if (resCache.enabled) {
+                    resourceCacheEnabled.textContent = resCache.loaded ? '已載入' : '未載入';
+                    resourceCacheEnabled.style.color = resCache.loaded ? '#22c55e' : '#f59e0b';
+                    resourceCacheCount.textContent = resCache.count ? `${resCache.count} 筆` : '--';
+                    resourceCacheUpdatedAt.textContent = formatDateTime(resCache.updated_at);
+                } else {
+                    resourceCacheEnabled.textContent = '未啟用';
+                    resourceCacheEnabled.style.color = '#9ca3af';
+                    resourceCacheCount.textContent = '--';
+                    resourceCacheUpdatedAt.textContent = '--';
+                }
 
             } catch (error) {
                 console.error('Health check failed:', error);

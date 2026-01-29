@@ -2,7 +2,7 @@
 """WIP API routes for MES Dashboard.
 
 Contains Flask Blueprint for WIP-related API endpoints.
-Uses DWH.DW_PJ_LOT_V view for real-time WIP data.
+Uses DW_MES_LOT_V view for real-time WIP data.
 """
 
 from flask import Blueprint, jsonify, request

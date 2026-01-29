@@ -11,11 +11,6 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
 
 from mes_dashboard.core.database import read_sql_df
-from mes_dashboard.config.constants import (
-    EXCLUDED_LOCATIONS,
-    EXCLUDED_ASSET_STATUSES,
-    EQUIPMENT_TYPE_FILTER,
-)
 
 logger = logging.getLogger('mes_dashboard.filter_cache')
 
@@ -24,7 +19,7 @@ logger = logging.getLogger('mes_dashboard.filter_cache')
 # ============================================================
 
 CACHE_TTL_SECONDS = 3600  # 1 hour cache TTL
-WIP_VIEW = "DWH.DW_PJ_LOT_V"
+WIP_VIEW = "DW_MES_LOT_V"
 
 # ============================================================
 # Cache Storage
@@ -33,7 +28,6 @@ WIP_VIEW = "DWH.DW_PJ_LOT_V"
 _CACHE = {
     'workcenter_groups': None,      # List of {name, sequence}
     'workcenter_mapping': None,     # Dict {workcentername: {group, sequence}}
-    'resource_families': None,      # List of family names
     'last_refresh': None,
     'is_loading': False,
 }
@@ -86,20 +80,6 @@ def get_workcenters_for_groups(groups: List[str]) -> List[str]:
 
 
 # ============================================================
-# Resource Family Functions
-# ============================================================
-
-def get_resource_families(force_refresh: bool = False) -> Optional[List[str]]:
-    """Get list of resource family names.
-
-    Returns:
-        Sorted list of RESOURCEFAMILYNAME values, or None if loading fails.
-    """
-    _ensure_cache_loaded(force_refresh)
-    return _CACHE.get('resource_families')
-
-
-# ============================================================
 # Cache Management
 # ============================================================
 
@@ -117,7 +97,6 @@ def get_cache_status() -> Dict[str, Any]:
             'is_loading': _CACHE.get('is_loading', False),
             'workcenter_groups_count': len(_CACHE.get('workcenter_groups') or []),
             'workcenter_mapping_count': len(_CACHE.get('workcenter_mapping') or {}),
-            'resource_families_count': len(_CACHE.get('resource_families') or []),
         }
 
 
@@ -165,22 +144,18 @@ def _load_cache() -> bool:
         _CACHE['is_loading'] = True
 
     try:
-        # Load workcenter groups from DW_PJ_LOT_V
+        # Load workcenter groups from DW_MES_LOT_V
         wc_groups, wc_mapping = _load_workcenter_data()
-
-        # Load resource families from DW_MES_RESOURCE
-        families = _load_resource_families()
 
         with _CACHE_LOCK:
             _CACHE['workcenter_groups'] = wc_groups
             _CACHE['workcenter_mapping'] = wc_mapping
-            _CACHE['resource_families'] = families
             _CACHE['last_refresh'] = datetime.now()
             _CACHE['is_loading'] = False
 
         logger.info(
             f"Filter cache refreshed: {len(wc_groups or [])} groups, "
-            f"{len(wc_mapping or {})} workcenters, {len(families or [])} families"
+            f"{len(wc_mapping or {})} workcenters"
         )
         return True
 
@@ -192,11 +167,24 @@ def _load_cache() -> bool:
 
 
 def _load_workcenter_data():
-    """Load workcenter group data from DW_PJ_LOT_V.
+    """Load workcenter group data from WIP cache (Redis) or fallback to Oracle.
 
     Returns:
         Tuple of (groups_list, mapping_dict)
     """
+    # Try to load from WIP Redis cache first
+    try:
+        from mes_dashboard.core.cache import get_cached_wip_data
+
+        df = get_cached_wip_data()
+        if df is not None and not df.empty:
+            logger.debug("Loading workcenter groups from WIP cache")
+            return _extract_workcenter_data_from_df(df)
+    except Exception as exc:
+        logger.warning(f"Failed to load from WIP cache: {exc}")
+
+    # Fallback to Oracle direct query
+    logger.debug("Falling back to Oracle for workcenter groups")
     try:
         sql = f"""
             SELECT DISTINCT
@@ -211,72 +199,53 @@ def _load_workcenter_data():
         df = read_sql_df(sql)
 
         if df is None or df.empty:
-            logger.warning("No workcenter data found in DW_PJ_LOT_V")
+            logger.warning("No workcenter data found in DW_MES_LOT_V")
             return [], {}
 
-        # Build groups list (unique groups, take minimum sequence for each group)
-        groups_df = df.groupby('WORKCENTER_GROUP')['WORKCENTERSEQUENCE_GROUP'].min().reset_index()
-        groups_df = groups_df.sort_values('WORKCENTERSEQUENCE_GROUP')
-
-        groups = []
-        for _, row in groups_df.iterrows():
-            groups.append({
-                'name': row['WORKCENTER_GROUP'],
-                'sequence': int(row['WORKCENTERSEQUENCE_GROUP'] or 999)
-            })
-
-        # Build mapping dict
-        mapping = {}
-        for _, row in df.iterrows():
-            wc_name = row['WORKCENTERNAME']
-            mapping[wc_name] = {
-                'id': row.get('WORKCENTERID'),
-                'group': row['WORKCENTER_GROUP'],
-                'sequence': int(row['WORKCENTERSEQUENCE_GROUP'] or 999)
-            }
-
-        return groups, mapping
+        return _extract_workcenter_data_from_df(df)
 
     except Exception as exc:
         logger.error(f"Failed to load workcenter data: {exc}")
         return [], {}
 
 
-def _load_resource_families():
-    """Load resource family data from DW_MES_RESOURCE.
+def _extract_workcenter_data_from_df(df):
+    """Extract workcenter groups and mapping from DataFrame.
+
+    Args:
+        df: DataFrame with WORKCENTERNAME, WORKCENTER_GROUP, WORKCENTERSEQUENCE_GROUP columns
 
     Returns:
-        Sorted list of family names
+        Tuple of (groups_list, mapping_dict)
     """
-    try:
-        # Build exclusion filters (note: column name is LOCATIONNAME, not LOCATION)
-        location_list = ", ".join(f"'{loc}'" for loc in EXCLUDED_LOCATIONS)
-        location_filter = f"AND (r.LOCATIONNAME IS NULL OR r.LOCATIONNAME NOT IN ({location_list}))" if EXCLUDED_LOCATIONS else ""
+    # Filter to rows with valid workcenter group
+    df = df[df['WORKCENTER_GROUP'].notna() & df['WORKCENTERNAME'].notna()]
 
-        # Note: Column name is PJ_ASSETSSTATUS (double S), not ASSETSTATUS
-        status_list = ", ".join(f"'{s}'" for s in EXCLUDED_ASSET_STATUSES)
-        asset_status_filter = f"AND r.PJ_ASSETSSTATUS NOT IN ({status_list})" if EXCLUDED_ASSET_STATUSES else ""
+    if df.empty:
+        return [], {}
 
-        sql = f"""
-            SELECT DISTINCT RESOURCEFAMILYNAME
-            FROM DW_MES_RESOURCE r
-            WHERE {EQUIPMENT_TYPE_FILTER}
-              {location_filter}
-              {asset_status_filter}
-              AND RESOURCEFAMILYNAME IS NOT NULL
-        """
-        df = read_sql_df(sql)
+    # Build groups list (unique groups, take minimum sequence for each group)
+    groups_df = df.groupby('WORKCENTER_GROUP')['WORKCENTERSEQUENCE_GROUP'].min().reset_index()
+    groups_df = groups_df.sort_values('WORKCENTERSEQUENCE_GROUP')
 
-        if df is None or df.empty:
-            logger.warning("No resource family data found")
-            return []
+    groups = []
+    for _, row in groups_df.iterrows():
+        groups.append({
+            'name': row['WORKCENTER_GROUP'],
+            'sequence': int(row['WORKCENTERSEQUENCE_GROUP'] or 999)
+        })
 
-        families = df['RESOURCEFAMILYNAME'].dropna().unique().tolist()
-        return sorted(families)
+    # Build mapping dict
+    mapping = {}
+    for _, row in df.iterrows():
+        wc_name = row['WORKCENTERNAME']
+        mapping[wc_name] = {
+            'id': row.get('WORKCENTERID'),
+            'group': row['WORKCENTER_GROUP'],
+            'sequence': int(row['WORKCENTERSEQUENCE_GROUP'] or 999)
+        }
 
-    except Exception as exc:
-        logger.error(f"Failed to load resource families: {exc}")
-        return []
+    return groups, mapping
 
 
 # ============================================================

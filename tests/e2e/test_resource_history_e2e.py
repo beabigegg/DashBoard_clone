@@ -43,7 +43,7 @@ class TestResourceHistoryPageAccess:
 
         assert response.status_code == 200
         content = response.data.decode('utf-8')
-        assert '機台歷史表現分析' in content
+        assert '設備歷史績效' in content
 
     def test_page_contains_filter_elements(self, client):
         """Page should contain all filter elements."""
@@ -304,7 +304,7 @@ class TestResourceHistoryNavigation:
         response = client.get('/')
         content = response.data.decode('utf-8')
 
-        assert '機台歷史分析' in content
+        assert '設備歷史績效' in content
         assert 'resourceHistoryFrame' in content
 
 

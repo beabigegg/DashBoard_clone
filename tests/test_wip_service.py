@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """Unit tests for WIP service layer.
 
-Tests the WIP query functions that use DWH.DW_PJ_LOT_V view.
+Tests the WIP query functions that use DW_MES_LOT_V view.
 """
 
 import unittest
 from unittest.mock import patch, MagicMock
+from functools import wraps
 import pandas as pd
 
 from mes_dashboard.services.wip_service import (
@@ -23,13 +24,22 @@ from mes_dashboard.services.wip_service import (
 )
 
 
+def disable_cache(func):
+    """Decorator to disable Redis cache for Oracle fallback tests."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with patch('mes_dashboard.services.wip_service.get_cached_wip_data', return_value=None):
+            with patch('mes_dashboard.services.wip_service.get_cached_sys_date', return_value=None):
+                return func(*args, **kwargs)
+    return wrapper
+
+
 class TestWipServiceConfig(unittest.TestCase):
     """Test WIP service configuration."""
 
-    def test_wip_view_has_schema_prefix(self):
-        """WIP_VIEW should include DWH schema prefix."""
-        self.assertEqual(WIP_VIEW, "DWH.DW_PJ_LOT_V")
-        self.assertTrue(WIP_VIEW.startswith("DWH."))
+    def test_wip_view_configured(self):
+        """WIP_VIEW should be configured correctly."""
+        self.assertEqual(WIP_VIEW, "DW_MES_LOT_V")
 
 
 class TestEscapeSql(unittest.TestCase):
@@ -91,6 +101,7 @@ class TestBuildBaseConditions(unittest.TestCase):
 class TestGetWipSummary(unittest.TestCase):
     """Test get_wip_summary function."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_none_on_empty_result(self, mock_read_sql):
         """Should return None when query returns empty DataFrame."""
@@ -100,6 +111,7 @@ class TestGetWipSummary(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_none_on_exception(self, mock_read_sql):
         """Should return None when query raises exception."""
@@ -114,6 +126,7 @@ class TestGetWipSummary(unittest.TestCase):
 class TestGetWipMatrix(unittest.TestCase):
     """Test get_wip_matrix function."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_matrix_structure(self, mock_read_sql):
         """Should return dict with matrix structure."""
@@ -135,6 +148,7 @@ class TestGetWipMatrix(unittest.TestCase):
         self.assertIn('package_totals', result)
         self.assertIn('grand_total', result)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_workcenters_sorted_by_sequence(self, mock_read_sql):
         """Workcenters should be sorted by WORKCENTERSEQUENCE_GROUP."""
@@ -150,6 +164,7 @@ class TestGetWipMatrix(unittest.TestCase):
 
         self.assertEqual(result['workcenters'], ['切割', '焊接_DB'])
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_packages_sorted_by_qty_desc(self, mock_read_sql):
         """Packages should be sorted by total QTY descending."""
@@ -165,6 +180,7 @@ class TestGetWipMatrix(unittest.TestCase):
 
         self.assertEqual(result['packages'][0], 'SOT-23')  # Higher QTY first
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_empty_structure_on_empty_result(self, mock_read_sql):
         """Should return empty structure when no data."""
@@ -177,6 +193,7 @@ class TestGetWipMatrix(unittest.TestCase):
         self.assertEqual(result['packages'], [])
         self.assertEqual(result['grand_total'], 0)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_calculates_totals_correctly(self, mock_read_sql):
         """Should calculate workcenter and package totals correctly."""
@@ -198,6 +215,7 @@ class TestGetWipMatrix(unittest.TestCase):
 class TestGetWipHoldSummary(unittest.TestCase):
     """Test get_wip_hold_summary function."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_hold_items(self, mock_read_sql):
         """Should return list of hold items."""
@@ -216,6 +234,7 @@ class TestGetWipHoldSummary(unittest.TestCase):
         self.assertEqual(result['items'][0]['reason'], 'YieldLimit')
         self.assertEqual(result['items'][0]['lots'], 21)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_empty_items_on_no_holds(self, mock_read_sql):
         """Should return empty items list when no holds."""
@@ -230,6 +249,7 @@ class TestGetWipHoldSummary(unittest.TestCase):
 class TestGetWipDetail(unittest.TestCase):
     """Test get_wip_detail function."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_none_on_empty_summary(self, mock_read_sql):
         """Should return None when summary query returns empty."""
@@ -243,6 +263,7 @@ class TestGetWipDetail(unittest.TestCase):
 class TestGetWorkcenters(unittest.TestCase):
     """Test get_workcenters function."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_workcenter_list(self, mock_read_sql):
         """Should return list of workcenters with lot counts."""
@@ -260,6 +281,7 @@ class TestGetWorkcenters(unittest.TestCase):
         self.assertEqual(result[0]['name'], '切割')
         self.assertEqual(result[0]['lot_count'], 1377)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_empty_list_on_no_data(self, mock_read_sql):
         """Should return empty list when no workcenters."""
@@ -269,6 +291,7 @@ class TestGetWorkcenters(unittest.TestCase):
 
         self.assertEqual(result, [])
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_none_on_exception(self, mock_read_sql):
         """Should return None on exception."""
@@ -282,6 +305,7 @@ class TestGetWorkcenters(unittest.TestCase):
 class TestGetPackages(unittest.TestCase):
     """Test get_packages function."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_package_list(self, mock_read_sql):
         """Should return list of packages with lot counts."""
@@ -298,6 +322,7 @@ class TestGetPackages(unittest.TestCase):
         self.assertEqual(result[0]['name'], 'SOT-23')
         self.assertEqual(result[0]['lot_count'], 2234)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_empty_list_on_no_data(self, mock_read_sql):
         """Should return empty list when no packages."""
@@ -311,6 +336,7 @@ class TestGetPackages(unittest.TestCase):
 class TestSearchWorkorders(unittest.TestCase):
     """Test search_workorders function."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_matching_workorders(self, mock_read_sql):
         """Should return list of matching WORKORDER values."""
@@ -325,6 +351,7 @@ class TestSearchWorkorders(unittest.TestCase):
         self.assertEqual(len(result), 3)
         self.assertEqual(result[0], 'GA26012001')
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_empty_list_for_short_query(self, mock_read_sql):
         """Should return empty list for query < 2 characters."""
@@ -333,6 +360,7 @@ class TestSearchWorkorders(unittest.TestCase):
         self.assertEqual(result, [])
         mock_read_sql.assert_not_called()
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_empty_list_for_empty_query(self, mock_read_sql):
         """Should return empty list for empty query."""
@@ -341,6 +369,7 @@ class TestSearchWorkorders(unittest.TestCase):
         self.assertEqual(result, [])
         mock_read_sql.assert_not_called()
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_empty_list_on_no_matches(self, mock_read_sql):
         """Should return empty list when no matches found."""
@@ -350,6 +379,7 @@ class TestSearchWorkorders(unittest.TestCase):
 
         self.assertEqual(result, [])
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_respects_limit_parameter(self, mock_read_sql):
         """Should respect the limit parameter."""
@@ -362,6 +392,7 @@ class TestSearchWorkorders(unittest.TestCase):
 
         self.assertEqual(len(result), 2)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_caps_limit_at_50(self, mock_read_sql):
         """Should cap limit at 50."""
@@ -374,6 +405,7 @@ class TestSearchWorkorders(unittest.TestCase):
         call_args = mock_read_sql.call_args[0][0]
         self.assertIn('FETCH FIRST 50 ROWS ONLY', call_args)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_none_on_exception(self, mock_read_sql):
         """Should return None on exception."""
@@ -383,6 +415,7 @@ class TestSearchWorkorders(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_excludes_dummy_by_default(self, mock_read_sql):
         """Should exclude DUMMY lots by default."""
@@ -394,6 +427,7 @@ class TestSearchWorkorders(unittest.TestCase):
         call_args = mock_read_sql.call_args[0][0]
         self.assertIn("LOTID NOT LIKE '%DUMMY%'", call_args)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_includes_dummy_when_specified(self, mock_read_sql):
         """Should include DUMMY lots when include_dummy=True."""
@@ -409,6 +443,7 @@ class TestSearchWorkorders(unittest.TestCase):
 class TestSearchLotIds(unittest.TestCase):
     """Test search_lot_ids function."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_matching_lotids(self, mock_read_sql):
         """Should return list of matching LOTID values."""
@@ -423,6 +458,7 @@ class TestSearchLotIds(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0], 'GA26012345-A00-001')
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_empty_list_for_short_query(self, mock_read_sql):
         """Should return empty list for query < 2 characters."""
@@ -431,6 +467,7 @@ class TestSearchLotIds(unittest.TestCase):
         self.assertEqual(result, [])
         mock_read_sql.assert_not_called()
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_empty_list_on_no_matches(self, mock_read_sql):
         """Should return empty list when no matches found."""
@@ -440,6 +477,7 @@ class TestSearchLotIds(unittest.TestCase):
 
         self.assertEqual(result, [])
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_returns_none_on_exception(self, mock_read_sql):
         """Should return None on exception."""
@@ -449,6 +487,7 @@ class TestSearchLotIds(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_excludes_dummy_by_default(self, mock_read_sql):
         """Should exclude DUMMY lots by default."""
@@ -464,6 +503,7 @@ class TestSearchLotIds(unittest.TestCase):
 class TestDummyExclusionInAllFunctions(unittest.TestCase):
     """Test DUMMY exclusion is applied in all WIP functions."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_wip_summary_excludes_dummy_by_default(self, mock_read_sql):
         """get_wip_summary should exclude DUMMY by default."""
@@ -485,6 +525,7 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
         call_args = mock_read_sql.call_args[0][0]
         self.assertIn("LOTID NOT LIKE '%DUMMY%'", call_args)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_wip_summary_includes_dummy_when_specified(self, mock_read_sql):
         """get_wip_summary should include DUMMY when specified."""
@@ -506,6 +547,7 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
         call_args = mock_read_sql.call_args[0][0]
         self.assertNotIn("LOTID NOT LIKE '%DUMMY%'", call_args)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_wip_matrix_excludes_dummy_by_default(self, mock_read_sql):
         """get_wip_matrix should exclude DUMMY by default."""
@@ -522,6 +564,7 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
         call_args = mock_read_sql.call_args[0][0]
         self.assertIn("LOTID NOT LIKE '%DUMMY%'", call_args)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_wip_hold_summary_excludes_dummy_by_default(self, mock_read_sql):
         """get_wip_hold_summary should exclude DUMMY by default."""
@@ -535,6 +578,7 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
         call_args = mock_read_sql.call_args[0][0]
         self.assertIn("LOTID NOT LIKE '%DUMMY%'", call_args)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_workcenters_excludes_dummy_by_default(self, mock_read_sql):
         """get_workcenters should exclude DUMMY by default."""
@@ -550,6 +594,7 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
         call_args = mock_read_sql.call_args[0][0]
         self.assertIn("LOTID NOT LIKE '%DUMMY%'", call_args)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_packages_excludes_dummy_by_default(self, mock_read_sql):
         """get_packages should exclude DUMMY by default."""
@@ -567,6 +612,7 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
 class TestMultipleFilterConditions(unittest.TestCase):
     """Test multiple filter conditions work together."""
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_wip_summary_with_all_filters(self, mock_read_sql):
         """get_wip_summary should combine all filter conditions."""
@@ -590,6 +636,7 @@ class TestMultipleFilterConditions(unittest.TestCase):
         self.assertIn("LOTID LIKE '%A00%'", call_args)
         self.assertIn("LOTID NOT LIKE '%DUMMY%'", call_args)
 
+    @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_wip_matrix_with_all_filters(self, mock_read_sql):
         """get_wip_matrix should combine all filter conditions."""

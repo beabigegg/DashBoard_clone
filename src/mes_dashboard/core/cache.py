@@ -84,7 +84,7 @@ def get_cached_wip_data() -> Optional[pd.DataFrame]:
     """Get cached WIP data from Redis.
 
     Returns:
-        DataFrame with full DW_PJ_LOT_V data, or None if cache miss.
+        DataFrame with full DW_MES_LOT_V data, or None if cache miss.
     """
     if not REDIS_ENABLED:
         return None

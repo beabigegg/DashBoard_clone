@@ -41,7 +41,7 @@ E10_STATUSES = ['PRD', 'SBY', 'UDT', 'SDT', 'EGT', 'NST']
 def get_filter_options() -> Optional[Dict[str, Any]]:
     """Get filter options from cache.
 
-    Uses cached workcenter groups from DW_PJ_LOT_V and resource families from DW_MES_RESOURCE.
+    Uses cached workcenter groups from DW_MES_LOT_V and resource families from resource_cache.
 
     Returns:
         Dict with:
@@ -49,10 +49,8 @@ def get_filter_options() -> Optional[Dict[str, Any]]:
         - 'families': List of family names sorted alphabetically
         Or None if cache loading fails.
     """
-    from mes_dashboard.services.filter_cache import (
-        get_workcenter_groups,
-        get_resource_families,
-    )
+    from mes_dashboard.services.filter_cache import get_workcenter_groups
+    from mes_dashboard.services.resource_cache import get_resource_families
 
     try:
         groups = get_workcenter_groups()

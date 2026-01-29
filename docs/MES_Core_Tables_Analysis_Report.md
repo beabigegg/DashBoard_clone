@@ -1,8 +1,8 @@
 ﻿# MES 核心表詳細分析報告
 
-**生成時間**: 2026-01-14（最後更新: 2026-01-27）
-**分析範圍**: 17 張 MES 核心表（含 1 張 DWH 即時視圖）
-**資料來源**: MES_Database_Reference.md, DWH.DW_PJ_LOT_V 實際數據分析
+**生成時間**: 2026-01-14（最後更新: 2026-01-29）
+**分析範圍**: 19 張 MES 核心表（含 2 張 DWH 即時視圖 + 1 張工站對照視圖）
+**資料來源**: MES_Database_Reference.md, DW_MES_LOT_V 實際數據分析, DW_MES_EQUIPMENTSTATUS_WIP_V 實際數據分析, DW_MES_SPEC_WORKCENTER_V 實際數據分析
 
 ---
 
@@ -20,58 +20,60 @@
 ## 表性質分類總覽
 
 ### 即時數據表（Real-time Views）
-透過 DB Link 從 DWH 取得的即時 WIP 視圖，每 5 分鐘自動更新
+透過 DB Link 從 DWH 取得的即時 WIP / 設備狀態視圖，依來源更新頻率提供
 
 | 表名 | 數據量 | 主要用途 | 更新方式 |
 |------|--------|---------|---------|
-| **DWH.DW_PJ_LOT_V** | ~9,000-12,000 | 即時 WIP 分布（70欄位） | 每 5 分鐘從 DWH 同步 |
+| **DW_MES_LOT_V** | ~9,468 | 即時 WIP 分布（70欄位） | DB Link 即時查詢（依 PJ_LOT_MV 更新頻率） |
+| **DW_MES_EQUIPMENTSTATUS_WIP_V** | ~2,631 | 設備資產狀態 + WIP 追蹤（32欄位） | DB Link 即時查詢（真正即時表） |
 
 ### 現況快照表（Snapshot Tables）
 存儲當前狀態的數據，數據會被更新或覆蓋
 
 | 表名 | 數據量 | 主要用途 | 更新方式 |
 |------|--------|---------|---------|
-| **DW_MES_WIP** | 77,470,834 | 在制品現況（含歷史累積） | 隨生產流程更新 |
-| **DW_MES_RESOURCE** | 90,620 | 資源主檔（設備/工位） | 異動時更新 |
-| **DW_MES_CONTAINER** | 5,185,532 | 容器當前狀態 | 隨批次流轉更新 |
-| **DW_MES_JOB** | 1,239,659 | 設備維修工單當前狀態 | 維修工單狀態變更時更新 |
+| **DW_MES_WIP** | 79,058,085 | 在制品現況（含歷史累積） | 隨生產流程更新 |
+| **DW_MES_RESOURCE** | 91,329 | 資源主檔（設備/工位） | 異動時更新 |
+| **DW_MES_CONTAINER** | 5,218,406 | 容器當前狀態 | 隨批次流轉更新 |
+| **DW_MES_JOB** | 1,248,622 | 設備維修工單當前狀態 | 維修工單狀態變更時更新 |
 
 ### 歷史累積表（Historical Tables）
 只新增不修改，記錄完整的歷史軌跡
 
 | 表名 | 數據量 | 主要用途 | 累積方式 |
 |------|--------|---------|---------|
-| **DW_MES_RESOURCESTATUS** | 65,139,825 | 資源狀態變更歷史 | 狀態變更時新增記錄 |
-| **DW_MES_RESOURCESTATUS_SHIFT** | 74,155,046 | 資源班次狀態歷史 | 班次資料匯總新增 |
-| **DW_MES_LOTWIPHISTORY** | 53,085,425 | 批次流轉歷史 | 每次移出/移入新增 |
-| **DW_MES_LOTWIPDATAHISTORY** | 77,168,503 | 批次數據變更歷史 | 數據採集時新增 |
-| **DW_MES_HM_LOTMOVEOUT** | 48,374,309 | 批次移出事件 | 移出操作時新增 |
-| **DW_MES_JOBTXNHISTORY** | 9,488,096 | 維修工單交易歷史 | 維修工單狀態變更新增 |
-| **DW_MES_LOTREJECTHISTORY** | 15,678,513 | 批次拒絕歷史 | 報廢操作時新增 |
-| **DW_MES_LOTMATERIALSHISTORY** | 17,702,828 | 物料消耗歷史 | 物料使用時新增 |
-| **DW_MES_HOLDRELEASEHISTORY** | 310,033 | 暫停/釋放歷史 | Hold/Release時新增 |
-| **DW_MES_MAINTENANCE** | 50,954,850 | 設備維護歷史 | 維護活動時新增 |
+| **DW_MES_RESOURCESTATUS** | 65,742,614 | 資源狀態變更歷史 | 狀態變更時新增記錄 |
+| **DW_MES_RESOURCESTATUS_SHIFT** | 74,820,134 | 資源班次狀態歷史 | 班次資料匯總新增 |
+| **DW_MES_LOTWIPHISTORY** | 53,454,213 | 批次流轉歷史 | 每次移出/移入新增 |
+| **DW_MES_LOTWIPDATAHISTORY** | 77,960,216 | 批次數據變更歷史 | 數據採集時新增 |
+| **DW_MES_HM_LOTMOVEOUT** | 48,645,692 | 批次移出事件 | 移出操作時新增 |
+| **DW_MES_JOBTXNHISTORY** | 9,554,723 | 維修工單交易歷史 | 維修工單狀態變更新增 |
+| **DW_MES_LOTREJECTHISTORY** | 15,786,025 | 批次拒絕歷史 | 報廢操作時新增 |
+| **DW_MES_LOTMATERIALSHISTORY** | 17,829,931 | 物料消耗歷史 | 物料使用時新增 |
+| **DW_MES_HOLDRELEASEHISTORY** | 310,737 | 暫停/釋放歷史 | Hold/Release時新增 |
+| **DW_MES_MAINTENANCE** | 52,060,026 | 設備維護歷史 | 維護活動時新增 |
 
 ### 輔助表（Auxiliary Tables）
 
 | 表名 | 數據量 | 主要用途 |
 |------|--------|---------|
 | **DW_MES_PARTREQUESTORDER** | 61,396 | 物料請求訂單 |
-| **DW_MES_PJ_COMBINEDASSYLOTS** | 1,955,691 | 組合裝配批次 |
+| **DW_MES_PJ_COMBINEDASSYLOTS** | 1,965,425 | 組合裝配批次 |
+| **DW_MES_SPEC_WORKCENTER_V** | 230 | 工站/工序對照視圖 |
 
 ---
 
 ## 即時數據表分析
 
-### DWH.DW_PJ_LOT_V（即時 WIP 批次視圖）⭐⭐⭐
+### DW_MES_LOT_V（即時 WIP 批次視圖）⭐⭐⭐
 
 **表性質**: 即時數據視圖（Real-time View）
 
-**業務定義**: DWH 提供的即時 WIP 視圖，透過 DB Link 從 `PJ_LOT_MV@DWDB_MESDB` 取得，每 5 分鐘自動更新。包含完整的批次狀態、工站位置、設備資訊、Hold 原因等 70 個欄位，是 WIP Dashboard 的主要數據源。
+**業務定義**: DWH 提供的即時 WIP 視圖，透過 DB Link 從 `PJ_LOT_MV@DWDB_MESDB` 取得，依 PJ_LOT_MV 更新頻率提供。包含完整的批次狀態、工站位置、設備資訊、Hold 原因等 70 個欄位，是 WIP Dashboard 的主要數據源。
 
 **數據來源**: `PJ_LOT_MV@DWDB_MESDB`（DB Link 連線）
 
-**數據量**: 約 9,000 - 12,000 筆（動態變化）
+**數據量**: 約 9,468 筆（2026-01-29 查詢）
 
 #### 欄位分類總覽（70 欄位）
 
@@ -210,7 +212,7 @@ SELECT
     SUM(QTY) as TOTAL_QTY,
     SUM(CASE WHEN STATUS = 'HOLD' THEN 1 ELSE 0 END) as HOLD_LOTS,
     SUM(CASE WHEN STATUS = 'HOLD' THEN QTY ELSE 0 END) as HOLD_QTY
-FROM DWH.DW_PJ_LOT_V
+FROM DW_MES_LOT_V
 WHERE OWNER NOT IN ('DUMMY')  -- 排除 DUMMY 批次
 GROUP BY WORKCENTER_GROUP, WORKCENTER_SHORT, WORKCENTERSEQUENCE_GROUP
 ORDER BY TO_NUMBER(WORKCENTERSEQUENCE_GROUP);
@@ -223,7 +225,7 @@ SELECT
     PRODUCTLINENAME,
     COUNT(*) as LOT_COUNT,
     SUM(QTY) as TOTAL_QTY
-FROM DWH.DW_PJ_LOT_V
+FROM DW_MES_LOT_V
 WHERE OWNER NOT IN ('DUMMY')
 GROUP BY WORKCENTER_GROUP, PRODUCTLINENAME
 ORDER BY WORKCENTER_GROUP, LOT_COUNT DESC;
@@ -241,7 +243,7 @@ SELECT
     HOLDEMP,
     COMMENT_HOLD,
     AGEBYDAYS
-FROM DWH.DW_PJ_LOT_V
+FROM DW_MES_LOT_V
 WHERE STATUS = 'HOLD'
 ORDER BY AGEBYDAYS DESC;
 ```
@@ -254,7 +256,7 @@ SELECT
     COALESCE(EQUIPMENTNAME, EQUIPMENTS) as EQUIPMENT_INFO,
     EQUIPMENTCOUNT,
     QTY
-FROM DWH.DW_PJ_LOT_V
+FROM DW_MES_LOT_V
 WHERE COALESCE(EQUIPMENTNAME, EQUIPMENTS) IS NOT NULL
 ORDER BY WORKCENTERNAME;
 ```
@@ -281,7 +283,7 @@ SELECT
     OWNER,
     COALESCE(EQUIPMENTNAME, EQUIPMENTS) as EQUIPMENT,
     SYS_DATE
-FROM DWH.DW_PJ_LOT_V
+FROM DW_MES_LOT_V
 WHERE LOTID LIKE 'GA26011%'  -- 工單篩選
 ORDER BY WORKCENTERSEQUENCE;
 ```
@@ -305,6 +307,237 @@ ORDER BY WORKCENTERSEQUENCE;
 ⚠️ **時間欄位**: `UTS` 為 VARCHAR2 格式 'YYYY/MM/DD'，需轉換後才能計算
 
 ⚠️ **無資料庫備註**: 此視圖無 Oracle 欄位備註（ALL_COL_COMMENTS 為空），欄位說明請參考本文件
+
+---
+
+### DW_MES_EQUIPMENTSTATUS_WIP_V（設備狀態 + WIP 追蹤視圖）⭐⭐
+
+**表性質**: 即時數據視圖（Real-time View）
+
+**業務定義**: DWH 提供設備資產狀態與 WIP 追蹤資料的即時視圖，透過 DB Link 直接查詢 `PJ_EquipmentStatus_WIP_V@DWDB_MESDB`，屬於真正即時表（非同步快照）。整合設備狀態、維修工單與批次 Track-In 及 Wafer/封裝資訊，適合做設備狀態與當前 WIP 關聯分析。
+
+**數據來源**: `PJ_EquipmentStatus_WIP_V@DWDB_MESDB`（DB Link 連線）
+
+**數據量**: 約 2,631 筆（2026-01-29 查詢）
+
+#### 欄位分類總覽（32 欄位）
+
+| 分類 | 欄位數 | 說明 |
+|------|--------|------|
+| 設備/資源識別 | 3 | RESOURCEID, EQUIPMENTID, OBJECTCATEGORY |
+| 設備狀態 | 2 | EQUIPMENTASSETSSTATUS, EQUIPMENTASSETSSTATUSREASON |
+| 維修工單 | 11 | JOBORDER, JOBMODEL, JOBSTAGE, JOBID, JOBSTATUS, CREATEDATE, CREATEUSERNAME, CREATEUSER, SYMPTOMCODE, CAUSECODE, REPAIRCODE |
+| WIP/產品 | 7 | RUNCARDLOTID, "Package", PACKAGE_LF, "Function", TYPE, BOP, SPEC |
+| Wafer/材料 | 6 | WAFERLOTID, WAFERPN, WAFERLOTID_PREFIX, LFOPTIONID, WIREDESCRIPTION, WAFERMIL |
+| Track-In | 3 | LOTTRACKINQTY_PCS, LOTTRACKINTIME, LOTTRACKINEMPLOYEE |
+
+#### 關鍵欄位說明
+
+#### 欄位清單與說明（32 欄位）
+
+| 欄位名 | 類型 | 欄位功能說明 |
+|--------|------|--------------|
+| `RESOURCEID` | CHAR(16) | 資源/設備資源 ID（資源主檔識別碼） |
+| `EQUIPMENTID` | VARCHAR2(40) | 設備編號（機台代號） |
+| `OBJECTCATEGORY` | VARCHAR2(40) | 類別/製程分類（如 ASSEMBLY） |
+| `EQUIPMENTASSETSSTATUS` | VARCHAR2(40) | 設備資產狀態（如 PRD、IDLE） |
+| `EQUIPMENTASSETSSTATUSREASON` | VARCHAR2(40) | 設備狀態原因/說明（如 Production RUN） |
+| `JOBORDER` | VARCHAR2(40) | 維修工單號 |
+| `JOBMODEL` | VARCHAR2(40) | 維修工單機型/型號 |
+| `JOBSTAGE` | VARCHAR2(40) | 維修工單階段 |
+| `JOBID` | CHAR(16) | 維修工單內部 ID |
+| `JOBSTATUS` | VARCHAR2(40) | 維修工單狀態 |
+| `CREATEDATE` | DATE | 工單建立時間 |
+| `CREATEUSERNAME` | VARCHAR2(40) | 建立者帳號 |
+| `CREATEUSER` | VARCHAR2(255) | 建立者姓名/顯示名稱 |
+| `SYMPTOMCODE` | VARCHAR2(40) | 維修症狀代碼 |
+| `CAUSECODE` | VARCHAR2(40) | 故障原因代碼 |
+| `REPAIRCODE` | VARCHAR2(40) | 維修處置代碼 |
+| `RUNCARDLOTID` | VARCHAR2(40) | 批次號（Run card lot id） |
+| `"Package"` | VARCHAR2(40) | 封裝型號（需雙引號保留大小寫） |
+| `PACKAGE_LF` | VARCHAR2(4000) | 封裝/Leadframe 類型或描述 |
+| `"Function"` | VARCHAR2(40) | 產品功能分類（需雙引號保留大小寫） |
+| `TYPE` | VARCHAR2(40) | 產品型號 |
+| `BOP` | VARCHAR2(40) | BOP 代碼 |
+| `WAFERLOTID` | VARCHAR2(40) | Wafer Lot 編號 |
+| `WAFERPN` | VARCHAR2(40) | Wafer 料號 |
+| `WAFERLOTID_PREFIX` | VARCHAR2(160) | Wafer Lot 前綴 |
+| `SPEC` | VARCHAR2(40) | 製程/工序規格 |
+| `LFOPTIONID` | VARCHAR2(4000) | Leadframe Option |
+| `WIREDESCRIPTION` | VARCHAR2(4000) | Wire 描述 |
+| `WAFERMIL` | VARCHAR2(3062) | Wafer 規格/厚度 |
+| `LOTTRACKINQTY_PCS` | NUMBER | Track-In 數量（PCS） |
+| `LOTTRACKINTIME` | DATE | Track-In 時間 |
+| `LOTTRACKINEMPLOYEE` | VARCHAR2(255) | Track-In 人員 |
+
+##### 設備狀態欄位
+
+| 欄位名 | 類型 | 說明 | 範例值 |
+|--------|------|------|--------|
+| `EQUIPMENTASSETSSTATUS` | VARCHAR2(40) | 設備資產狀態 | `PRD` |
+| `EQUIPMENTASSETSSTATUSREASON` | VARCHAR2(40) | 狀態原因 | `Production RUN` |
+| `OBJECTCATEGORY` | VARCHAR2(40) | 類別/製程分類 | `ASSEMBLY` |
+
+##### 批次與產品欄位
+
+| 欄位名 | 類型 | 說明 | 範例值 |
+|--------|------|------|--------|
+| `RUNCARDLOTID` | VARCHAR2(40) | 批次號（Run card lot id） | `GA26011480-A00-006` |
+| `"Package"` | VARCHAR2(40) | 封裝型號 | `DFN2510-10L` |
+| `"Function"` | VARCHAR2(40) | 產品功能分類 | `TVS/ESD` |
+| `TYPE` | VARCHAR2(40) | 產品型號 | `PE1605M4AQ` |
+| `BOP` | VARCHAR2(40) | BOP 代碼 | `ECA08` |
+| `SPEC` | VARCHAR2(40) | 工序規格 | `元件切割` |
+
+##### Track-In 與 Wafer 欄位
+
+| 欄位名 | 類型 | 說明 |
+|--------|------|------|
+| `LOTTRACKINQTY_PCS` | NUMBER | Track-In 數量（PCS） |
+| `LOTTRACKINTIME` | DATE | Track-In 時間 |
+| `LOTTRACKINEMPLOYEE` | VARCHAR2(255) | Track-In 人員 |
+| `WAFERLOTID` | VARCHAR2(40) | Wafer Lot |
+| `WAFERPN` | VARCHAR2(40) | Wafer 料號 |
+| `WAFERLOTID_PREFIX` | VARCHAR2(160) | Wafer Lot 前綴 |
+| `LFOPTIONID` | VARCHAR2(4000) | Leadframe Option |
+| `WIREDESCRIPTION` | VARCHAR2(4000) | Wire 描述 |
+| `WAFERMIL` | VARCHAR2(3062) | Wafer 厚度/規格 |
+
+#### 查詢策略
+
+**1. 設備狀態分布**
+```sql
+SELECT
+    OBJECTCATEGORY,
+    EQUIPMENTASSETSSTATUS,
+    EQUIPMENTASSETSSTATUSREASON,
+    COUNT(*) as EQUIPMENT_COUNT
+FROM DW_MES_EQUIPMENTSTATUS_WIP_V
+GROUP BY OBJECTCATEGORY, EQUIPMENTASSETSSTATUS, EQUIPMENTASSETSSTATUSREASON
+ORDER BY OBJECTCATEGORY, EQUIPMENT_COUNT DESC;
+```
+
+**2. 設備對應 WIP 批次（含 Track-In）**
+```sql
+SELECT
+    EQUIPMENTID,
+    RUNCARDLOTID,
+    "Package" as PACKAGE,
+    "Function" as FUNCTION,
+    TYPE,
+    BOP,
+    SPEC,
+    LOTTRACKINQTY_PCS,
+    LOTTRACKINTIME
+FROM DW_MES_EQUIPMENTSTATUS_WIP_V
+WHERE RUNCARDLOTID IS NOT NULL
+ORDER BY LOTTRACKINTIME DESC;
+```
+
+**3. 維修工單清單**
+```sql
+SELECT
+    EQUIPMENTID,
+    JOBORDER,
+    JOBMODEL,
+    JOBSTAGE,
+    JOBSTATUS,
+    CREATEDATE,
+    SYMPTOMCODE,
+    CAUSECODE,
+    REPAIRCODE
+FROM DW_MES_EQUIPMENTSTATUS_WIP_V
+WHERE JOBORDER IS NOT NULL
+ORDER BY CREATEDATE DESC;
+```
+
+**4. Wafer/材料分布**
+```sql
+SELECT
+    WAFERPN,
+    WAFERLOTID_PREFIX,
+    COUNT(*) as LOT_COUNT
+FROM DW_MES_EQUIPMENTSTATUS_WIP_V
+WHERE WAFERPN IS NOT NULL
+GROUP BY WAFERPN, WAFERLOTID_PREFIX
+ORDER BY LOT_COUNT DESC;
+```
+
+#### 與其他表的關聯
+
+| 關聯表 | 關聯欄位 | 用途 |
+|--------|---------|------|
+| DW_MES_LOT_V | RUNCARDLOTID ↔ LOTID | 對照批次狀態/工站資訊 |
+| DW_MES_WIP | RUNCARDLOTID ↔ CONTAINERNAME | 取得批次現況與工單資訊 |
+| DW_MES_RESOURCE | EQUIPMENTID / RESOURCEID | 取得設備主檔/資源資訊 |
+
+#### 重要注意事項
+
+⚠️ **資料更新頻率**: DB Link 即時查詢，查詢時可搭配 `LOTTRACKINTIME` 判斷新鮮度
+
+⚠️ **欄位大小寫**: `"Package"`、`"Function"` 為**引用欄位**，查詢需使用雙引號保留大小寫
+
+⚠️ **欄位空值**: 維修工單與 Wafer/材料欄位常為 NULL，需依使用情境加條件
+
+⚠️ **無資料庫備註**: 此視圖無 Oracle 欄位備註（ALL_COL_COMMENTS 為空），欄位說明請參考本文件
+
+---
+
+### DW_MES_SPEC_WORKCENTER_V（工站/工序對照視圖）⭐
+
+**表性質**: 對照視圖（Mapping View）
+
+**業務定義**: 由 `MES_SPEC`、`MES_OPERATION`、`MES_WORKCENTER` 組合，提供 SPEC 與工站名稱、分組與排序欄位的對照表。可用於統一工站命名與排序規則，補足報表分群需求。
+
+**數據來源**: `MES_SPEC`, `MES_OPERATION`, `MES_WORKCENTER`（DWH 本地表）
+
+**數據量**: 230 筆（2026-01-29 查詢）
+
+#### 欄位說明（9 欄位）
+
+| 欄位名 | 類型 | 說明 |
+|--------|------|------|
+| `SPEC` | VARCHAR2(40) | SPEC 名稱 |
+| `SPECSEQUENCE` | NUMBER | SPEC 順序（PJ_SEQUENCE） |
+| `SPEC_ORDER` | VARCHAR2(200) | 排序欄位（SPECSEQUENCE + '_' + SPEC） |
+| `WORK_CENTER` | VARCHAR2(100) | 工站名稱 |
+| `WORK_CENTER_SEQUENCE` | VARCHAR2(40) | 工站順序碼（取自 WORKCENTER.Description） |
+| `WORK_CENTER_GROUP` | VARCHAR2(100) | 工站分組名稱（依規則合併，如焊接/成型/電鍍） |
+| `WORKCENTERSEQUENCE_GROUP` | VARCHAR2(40) | 工站群組順序碼（依規則統一） |
+| `WORKCENTERGROUP_ORDER` | VARCHAR2(200) | 群組排序欄位（序號 + '_' + 群組名） |
+| `WORK_CENTER_SHORT` | VARCHAR2(40) | 工站簡稱（如 DB/WB/Mold） |
+
+#### 查詢策略
+
+**1. SPEC 對應工站分組**
+```sql
+SELECT
+    SPEC,
+    WORK_CENTER,
+    WORK_CENTER_GROUP,
+    WORK_CENTER_SHORT,
+    WORKCENTERSEQUENCE_GROUP
+FROM DWH.DW_MES_SPEC_WORKCENTER_V
+ORDER BY WORKCENTERSEQUENCE_GROUP, SPEC;
+```
+
+**2. 與 WIP 視圖對照（補足工站分組）**
+```sql
+SELECT
+    l.LOTID,
+    l.SPECNAME,
+    l.WORKCENTERNAME,
+    s.WORK_CENTER_GROUP,
+    s.WORK_CENTER_SHORT
+FROM DWH.DW_MES_LOT_V l
+LEFT JOIN DWH.DW_MES_SPEC_WORKCENTER_V s
+  ON l.SPECNAME = s.SPEC
+ORDER BY l.WORKCENTERSEQUENCE_GROUP, l.LOTID;
+```
+
+#### 重要注意事項
+
+⚠️ **分組規則**: `WORK_CENTER_GROUP` 與 `WORKCENTERSEQUENCE_GROUP` 由 CASE 規則產生，若工站命名異動需同步檢查
 
 ---
 
@@ -1196,7 +1429,7 @@ ORDER BY TXNTIMESTAMP DESC;
 
 #### 重要注意事項
 
-⚠️ **大數據量表**: 7700萬筆資料，務必加時間條件
+⚠️ **大數據量表**: 約 7,796 萬筆資料，務必加時間條件
 
 ⚠️ **與LOTWIPHISTORY關聯**: 通過`WIPLOTHISTORYID`關聯
 
@@ -1326,7 +1559,7 @@ ORDER BY TOTAL_OUTPUT DESC;
 
 #### 重要注意事項
 
-⚠️ **大數據量**: 4800萬筆，必須加時間條件
+⚠️ **大數據量**: 約 4,865 萬筆，必須加時間條件
 
 ⚠️ **與LOTWIPHISTORY差異**:
 - HM_LOTMOVEOUT: 只記錄MoveOut事件
@@ -2091,9 +2324,9 @@ WHERE RN > 0;
 
 ---
 
-**文檔版本**: v1.1
-**最後更新**: 2026-01-27
-**更新內容**: 新增 DWH.DW_PJ_LOT_V 即時 WIP 視圖詳細分析（70 欄位）
+**文檔版本**: v1.2
+**最後更新**: 2026-01-29
+**更新內容**: DWH 全表掃描更新數據量、補充 DW_MES_SPEC_WORKCENTER_V 工站對照視圖與查詢策略
 **建議更新週期**: 每季度或表結構變更時
 
 

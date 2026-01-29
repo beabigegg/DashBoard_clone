@@ -343,7 +343,8 @@ def query_resource_workcenter_status_matrix(days_back: int = 30) -> Optional[pd.
 def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
     """Get available filter options for resource queries.
 
-    Optimized: combines multiple queries into fewer database calls.
+    Uses resource_cache for static resource data (workcenters, families, departments, locations).
+    Only queries Oracle for dynamic status data.
 
     Args:
         days_back: Number of days to look back
@@ -351,36 +352,41 @@ def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
     Returns:
         Dict with filter options or None if query fails.
     """
+    from mes_dashboard.services.resource_cache import (
+        get_workcenters,
+        get_resource_families,
+        get_departments,
+        get_locations,
+        get_distinct_values,
+    )
+
     try:
-        # Query from latest status data
-        sql_latest = f"""
-            SELECT
-                WORKCENTERNAME,
-                NEWSTATUSNAME,
-                RESOURCEFAMILYNAME,
-                PJ_DEPARTMENT
-            FROM ({get_resource_latest_status_subquery(days_back)}) rs
-        """
-        latest_df = read_sql_df(sql_latest)
+        # Get static filter options from resource cache
+        workcenters = get_workcenters()
+        families = get_resource_families()
+        departments = get_departments()
+        locations = get_locations()
+        assets_statuses = get_distinct_values('PJ_ASSETSSTATUS')
 
-        # Query from resource table for location and asset status
-        sql_resource = """
-            SELECT
-                LOCATIONNAME,
-                PJ_ASSETSSTATUS
+        # Query only dynamic status data from Oracle
+        # Note: Can't wrap CTE in subquery, so use inline approach
+        sql_statuses = f"""
+            WITH latest_txn AS (
+                SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
+                FROM DW_MES_RESOURCESTATUS
+            )
+            SELECT DISTINCT s.NEWSTATUSNAME
             FROM DW_MES_RESOURCE r
+            JOIN DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
+            CROSS JOIN latest_txn lt
             WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
-               OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
+                OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
+              AND COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) >= lt.MAX_TXNDATE - {days_back}
+              AND s.NEWSTATUSNAME IS NOT NULL
+            ORDER BY s.NEWSTATUSNAME
         """
-        resource_df = read_sql_df(sql_resource)
-
-        # Extract unique values
-        workcenters = sorted(latest_df['WORKCENTERNAME'].dropna().unique().tolist())
-        statuses = sorted(latest_df['NEWSTATUSNAME'].dropna().unique().tolist())
-        families = sorted(latest_df['RESOURCEFAMILYNAME'].dropna().unique().tolist())
-        departments = sorted(latest_df['PJ_DEPARTMENT'].dropna().unique().tolist())
-        locations = sorted(resource_df['LOCATIONNAME'].dropna().unique().tolist())
-        assets_statuses = sorted(resource_df['PJ_ASSETSSTATUS'].dropna().unique().tolist())
+        status_df = read_sql_df(sql_statuses)
+        statuses = status_df['NEWSTATUSNAME'].tolist() if status_df is not None else []
 
         return {
             'workcenters': workcenters,

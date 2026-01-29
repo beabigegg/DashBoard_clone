@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Background task for updating WIP cache from Oracle to Redis."""
+"""Background task for updating WIP and Resource cache from Oracle to Redis."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import threading
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -27,7 +28,10 @@ logger = logging.getLogger('mes_dashboard.cache_updater')
 # ============================================================
 
 CACHE_CHECK_INTERVAL = int(os.getenv('CACHE_CHECK_INTERVAL', '600'))  # 10 minutes
-WIP_VIEW = "DWH.DW_PJ_LOT_V"
+WIP_VIEW = "DW_MES_LOT_V"
+
+# Resource cache sync interval (default: 4 hours)
+RESOURCE_SYNC_INTERVAL = int(os.getenv('RESOURCE_SYNC_INTERVAL', '14400'))
 
 # ============================================================
 # Cache Updater Class
@@ -44,9 +48,11 @@ class CacheUpdater:
             interval: Check interval in seconds (default: 600)
         """
         self.interval = interval
+        self.resource_sync_interval = RESOURCE_SYNC_INTERVAL
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._is_running = False
+        self._last_resource_sync: Optional[float] = None
 
     def start(self) -> None:
         """Start the background update thread."""
@@ -96,10 +102,14 @@ class CacheUpdater:
         logger.info("Performing initial cache load...")
         self._check_and_update(force=True)
 
+        # Initial resource cache load
+        self._check_resource_update(force=True)
+
         # Periodic updates
         while not self._stop_event.wait(self.interval):
             try:
                 self._check_and_update()
+                self._check_resource_update()
             except Exception as e:
                 logger.error(f"Cache update failed: {e}", exc_info=True)
 
@@ -182,7 +192,7 @@ class CacheUpdater:
             return None
 
     def _load_full_table(self) -> Optional[pd.DataFrame]:
-        """Load entire DW_PJ_LOT_V table from Oracle.
+        """Load entire DW_MES_LOT_V table from Oracle.
 
         Returns:
             DataFrame with all rows, or None if failed.
@@ -232,6 +242,43 @@ class CacheUpdater:
             return True
         except Exception as e:
             logger.error(f"Failed to update Redis cache: {e}")
+            return False
+
+    def _check_resource_update(self, force: bool = False) -> bool:
+        """Check and update resource cache if needed.
+
+        Args:
+            force: If True, update regardless of interval.
+
+        Returns:
+            True if cache was updated.
+        """
+        from mes_dashboard.services.resource_cache import (
+            refresh_cache as refresh_resource_cache,
+            RESOURCE_CACHE_ENABLED,
+        )
+
+        if not RESOURCE_CACHE_ENABLED:
+            return False
+
+        # Check if sync is needed based on interval
+        now = time.time()
+        if not force and self._last_resource_sync is not None:
+            elapsed = now - self._last_resource_sync
+            if elapsed < self.resource_sync_interval:
+                logger.debug(
+                    f"Resource sync not due yet ({elapsed:.0f}s < {self.resource_sync_interval}s)"
+                )
+                return False
+
+        # Perform sync
+        logger.info("Checking resource cache for updates...")
+        try:
+            updated = refresh_resource_cache(force=force)
+            self._last_resource_sync = now
+            return updated
+        except Exception as e:
+            logger.error(f"Resource cache update failed: {e}", exc_info=True)
             return False
 
 
