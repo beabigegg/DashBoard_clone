@@ -23,7 +23,7 @@
     {
       "route": "/resource-history",
       "name": "設備歷史績效",
-      "status": "dev"
+      "status": "released"
     },
     {
       "route": "/tables",
