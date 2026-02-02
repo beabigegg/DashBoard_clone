@@ -18,6 +18,7 @@ from mes_dashboard.services.wip_service import (
     search_lot_ids,
     search_packages,
     search_types,
+    get_lot_detail,
 )
 
 # Create Blueprint
@@ -211,6 +212,23 @@ def api_detail(workcenter: str):
     if result is not None:
         return jsonify({'success': True, 'data': result})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+@wip_bp.route('/lot/<lotid>')
+def api_lot_detail(lotid: str):
+    """API: Get detailed information for a specific lot.
+
+    Args:
+        lotid: LOTID (URL path parameter)
+
+    Returns:
+        JSON with lot details including all fields from DW_MES_LOT_V
+    """
+    result = get_lot_detail(lotid)
+
+    if result is not None:
+        return jsonify({'success': True, 'data': result})
+    return jsonify({'success': False, 'error': '找不到此批號'}), 404
 
 
 # ============================================================

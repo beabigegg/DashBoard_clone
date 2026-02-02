@@ -20,9 +20,12 @@ logger = logging.getLogger('mes_dashboard.wip_service')
 
 
 def _safe_value(val):
-    """Convert pandas NaN/NaT to None for JSON serialization."""
+    """Convert pandas NaN/NaT to None and numpy types to native Python types for JSON serialization."""
     if pd.isna(val):
         return None
+    # Convert numpy types to native Python types for JSON serialization
+    if hasattr(val, 'item'):  # numpy scalar types have .item() method
+        return val.item()
     return val
 
 
@@ -2145,3 +2148,276 @@ def _get_hold_detail_lots_from_oracle(
         import traceback
         traceback.print_exc()
         return None
+
+
+# ============================================================
+# Lot Detail API Functions
+# ============================================================
+
+# Field labels mapping for lot detail display (PowerBI naming convention)
+LOT_DETAIL_FIELD_LABELS = {
+    'lotId': 'Run Card Lot ID',
+    'workorder': 'Work Order ID',
+    'qty': 'Lot Qty(pcs)',
+    'qty2': 'Lot Qty(Wafer pcs)',
+    'status': 'Run Card Status',
+    'holdReason': 'Hold Reason',
+    'holdCount': 'Hold Count',
+    'owner': 'Work Order Owner',
+    'startDate': 'Run Card Start Date',
+    'uts': 'UTS',
+    'product': 'Product P/N',
+    'productLine': 'Package',
+    'packageLef': 'Package(LF)',
+    'pjFunction': 'Product Function',
+    'pjType': 'Product Type',
+    'bop': 'BOP',
+    'waferLotId': 'Wafer Lot ID',
+    'waferPn': 'Wafer P/N',
+    'waferLotPrefix': 'Wafer Lot ID(Prefix)',
+    'spec': 'Spec',
+    'specSequence': 'Spec Sequence',
+    'workcenter': 'Work Center',
+    'workcenterSequence': 'Work Center Sequence',
+    'workcenterGroup': 'Work Center(Group)',
+    'workcenterShort': 'Work Center(Short)',
+    'ageByDays': 'Age By Days',
+    'equipment': 'Equipment ID',
+    'equipmentCount': 'Equipment Count',
+    'workflow': 'Work Flow Name',
+    'dateCode': 'Product Date Code',
+    'leadframeName': 'LF Material Part',
+    'leadframeOption': 'LF Option ID',
+    'compoundName': 'Compound Material Part',
+    'location': 'Run Card Location',
+    'ncrId': 'NCR ID',
+    'ncrDate': 'NCR-issued Time',
+    'releaseTime': 'Release Time',
+    'releaseEmp': 'Release Employee',
+    'releaseComment': 'Release Comment',
+    'holdComment': 'Hold Comment',
+    'comment': 'Comment',
+    'commentDate': 'Run Card Comment',
+    'commentEmp': 'Run Card Comment Employee',
+    'futureHoldComment': 'Future Hold Comment',
+    'holdEmp': 'Hold Employee',
+    'holdDept': 'Hold Employee Dept',
+    'produceRegion': 'Produce Region',
+    'priority': 'Work Order Priority',
+    'tmttRemaining': 'TMTT Remaining',
+    'dieConsumption': 'Die Consumption Qty',
+    'wipStatus': 'WIP Status',
+    'dataUpdateDate': 'Data Update Date'
+}
+
+
+def get_lot_detail(lotid: str) -> Optional[Dict[str, Any]]:
+    """Get detailed information for a specific lot.
+
+    Uses Redis cache when available, falls back to Oracle direct query.
+
+    Args:
+        lotid: The LOTID to retrieve
+
+    Returns:
+        Dict with lot details or None if not found
+    """
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = cached_df[cached_df['LOTID'] == lotid]
+
+            if df.empty:
+                return None
+
+            row = df.iloc[0]
+            return _build_lot_detail_response(row)
+        except Exception as exc:
+            logger.warning(f"Cache-based lot detail failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _get_lot_detail_from_oracle(lotid)
+
+
+def _get_lot_detail_from_oracle(lotid: str) -> Optional[Dict[str, Any]]:
+    """Get lot detail directly from Oracle (fallback)."""
+    try:
+        sql = f"""
+            SELECT
+                LOTID,
+                WORKORDER,
+                QTY,
+                QTY2,
+                STATUS,
+                HOLDREASONNAME,
+                CURRENTHOLDCOUNT,
+                OWNER,
+                STARTDATE,
+                UTS,
+                PRODUCT,
+                PRODUCTLINENAME,
+                PACKAGE_LEF,
+                PJ_FUNCTION,
+                PJ_TYPE,
+                BOP,
+                FIRSTNAME,
+                WAFERNAME,
+                WAFERLOT,
+                SPECNAME,
+                SPECSEQUENCE,
+                WORKCENTERNAME,
+                WORKCENTERSEQUENCE,
+                WORKCENTER_GROUP,
+                WORKCENTER_SHORT,
+                AGEBYDAYS,
+                EQUIPMENTS,
+                EQUIPMENTCOUNT,
+                WORKFLOWNAME,
+                DATECODE,
+                LEADFRAMENAME,
+                LEADFRAMEOPTION,
+                COMNAME,
+                LOCATIONNAME,
+                EVENTNAME,
+                OCCURRENCEDATE,
+                RELEASETIME,
+                RELEASEEMP,
+                RELEASEREASON,
+                COMMENT_HOLD,
+                CONTAINERCOMMENTS,
+                COMMENT_DATE,
+                COMMENT_EMP,
+                COMMENT_FUTURE,
+                HOLDEMP,
+                DEPTNAME,
+                PJ_PRODUCEREGION,
+                PRIORITYCODENAME,
+                TMTT_R,
+                WAFER_FACTOR,
+                SYS_DATE
+            FROM {WIP_VIEW}
+            WHERE LOTID = '{_escape_sql(lotid)}'
+        """
+        df = read_sql_df(sql)
+
+        if df is None or df.empty:
+            return None
+
+        row = df.iloc[0]
+        return _build_lot_detail_response(row)
+    except Exception as exc:
+        logger.error(f"Lot detail query failed: {exc}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def _build_lot_detail_response(row) -> Dict[str, Any]:
+    """Build lot detail response from DataFrame row."""
+    # Helper to safely get value from row (handles NaN and missing columns)
+    def safe_get(col, default=None):
+        try:
+            val = row.get(col)
+            if pd.isna(val):
+                return default
+            return val
+        except Exception:
+            return default
+
+    # Helper to safely get int value
+    def safe_int(col, default=0):
+        val = safe_get(col)
+        if val is None:
+            return default
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return default
+
+    # Helper to safely get float value
+    def safe_float(col, default=0.0):
+        val = safe_get(col)
+        if val is None:
+            return default
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return default
+
+    # Helper to format date value
+    def format_date(col):
+        val = safe_get(col)
+        if val is None:
+            return None
+        try:
+            return str(val)
+        except Exception:
+            return None
+
+    # Compute WIP status
+    equipment_count = safe_int('EQUIPMENTCOUNT')
+    hold_count = safe_int('CURRENTHOLDCOUNT')
+
+    if equipment_count > 0:
+        wip_status = 'RUN'
+    elif hold_count > 0:
+        wip_status = 'HOLD'
+    else:
+        wip_status = 'QUEUE'
+
+    return {
+        'lotId': _safe_value(safe_get('LOTID')),
+        'workorder': _safe_value(safe_get('WORKORDER')),
+        'qty': safe_int('QTY'),
+        'qty2': safe_int('QTY2') if safe_get('QTY2') is not None else None,
+        'status': _safe_value(safe_get('STATUS')),
+        'holdReason': _safe_value(safe_get('HOLDREASONNAME')),
+        'holdCount': hold_count,
+        'owner': _safe_value(safe_get('OWNER')),
+        'startDate': format_date('STARTDATE'),
+        'uts': _safe_value(safe_get('UTS')),
+        'product': _safe_value(safe_get('PRODUCT')),
+        'productLine': _safe_value(safe_get('PRODUCTLINENAME')),
+        'packageLef': _safe_value(safe_get('PACKAGE_LEF')),
+        'pjFunction': _safe_value(safe_get('PJ_FUNCTION')),
+        'pjType': _safe_value(safe_get('PJ_TYPE')),
+        'bop': _safe_value(safe_get('BOP')),
+        'waferLotId': _safe_value(safe_get('FIRSTNAME')),
+        'waferPn': _safe_value(safe_get('WAFERNAME')),
+        'waferLotPrefix': _safe_value(safe_get('WAFERLOT')),
+        'spec': _safe_value(safe_get('SPECNAME')),
+        'specSequence': safe_int('SPECSEQUENCE') if safe_get('SPECSEQUENCE') is not None else None,
+        'workcenter': _safe_value(safe_get('WORKCENTERNAME')),
+        'workcenterSequence': safe_int('WORKCENTERSEQUENCE') if safe_get('WORKCENTERSEQUENCE') is not None else None,
+        'workcenterGroup': _safe_value(safe_get('WORKCENTER_GROUP')),
+        'workcenterShort': _safe_value(safe_get('WORKCENTER_SHORT')),
+        'ageByDays': round(safe_float('AGEBYDAYS'), 2),
+        'equipment': _safe_value(safe_get('EQUIPMENTS')),
+        'equipmentCount': equipment_count,
+        'workflow': _safe_value(safe_get('WORKFLOWNAME')),
+        'dateCode': _safe_value(safe_get('DATECODE')),
+        'leadframeName': _safe_value(safe_get('LEADFRAMENAME')),
+        'leadframeOption': _safe_value(safe_get('LEADFRAMEOPTION')),
+        'compoundName': _safe_value(safe_get('COMNAME')),
+        'location': _safe_value(safe_get('LOCATIONNAME')),
+        'ncrId': _safe_value(safe_get('EVENTNAME')),
+        'ncrDate': format_date('OCCURRENCEDATE'),
+        'releaseTime': format_date('RELEASETIME'),
+        'releaseEmp': _safe_value(safe_get('RELEASEEMP')),
+        'releaseComment': _safe_value(safe_get('RELEASEREASON')),
+        'holdComment': _safe_value(safe_get('COMMENT_HOLD')),
+        'comment': _safe_value(safe_get('CONTAINERCOMMENTS')),
+        'commentDate': _safe_value(safe_get('COMMENT_DATE')),
+        'commentEmp': _safe_value(safe_get('COMMENT_EMP')),
+        'futureHoldComment': _safe_value(safe_get('COMMENT_FUTURE')),
+        'holdEmp': _safe_value(safe_get('HOLDEMP')),
+        'holdDept': _safe_value(safe_get('DEPTNAME')),
+        'produceRegion': _safe_value(safe_get('PJ_PRODUCEREGION')),
+        'priority': _safe_value(safe_get('PRIORITYCODENAME')),
+        'tmttRemaining': _safe_value(safe_get('TMTT_R')),
+        'dieConsumption': safe_int('WAFER_FACTOR') if safe_get('WAFER_FACTOR') is not None else None,
+        'wipStatus': wip_status,
+        'dataUpdateDate': format_date('SYS_DATE'),
+        'fieldLabels': LOT_DETAIL_FIELD_LABELS
+    }
