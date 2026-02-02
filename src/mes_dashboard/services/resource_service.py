@@ -22,6 +22,7 @@ from mes_dashboard.services.realtime_equipment_cache import (
 )
 from mes_dashboard.services.filter_cache import (
     get_workcenter_group,
+    get_workcenter_group_sequence,
     get_workcenter_short,
     get_workcenter_groups,
 )
@@ -498,6 +499,7 @@ def get_merged_resource_status(
 
         # Get workcenter mapping
         wc_group = get_workcenter_group(workcenter_name) if workcenter_name else None
+        wc_group_seq = get_workcenter_group_sequence(workcenter_name) if workcenter_name else None
         wc_short = get_workcenter_short(workcenter_name) if workcenter_name else None
 
         # Build merged record
@@ -517,6 +519,7 @@ def get_merged_resource_status(
             'LOCATIONNAME': resource.get('LOCATIONNAME'),
             # From workcenter-mapping
             'WORKCENTER_GROUP': wc_group,
+            'WORKCENTER_GROUP_SEQ': wc_group_seq,
             'WORKCENTER_SHORT': wc_short,
             # From realtime-equipment-cache
             'EQUIPMENTASSETSSTATUS': realtime.get('EQUIPMENTASSETSSTATUS'),

@@ -96,6 +96,21 @@ def get_workcenter_group(workcenter_name: str) -> Optional[str]:
     return mapping[workcenter_name].get('group')
 
 
+def get_workcenter_group_sequence(workcenter_name: str) -> Optional[int]:
+    """Get workcenter group sequence for a workcenter name.
+
+    Args:
+        workcenter_name: The workcenter name to look up.
+
+    Returns:
+        The WORKCENTERSEQUENCE_GROUP, or None if not found.
+    """
+    mapping = get_workcenter_mapping()
+    if not mapping or workcenter_name not in mapping:
+        return None
+    return mapping[workcenter_name].get('sequence')
+
+
 def get_workcenter_short(workcenter_name: str) -> Optional[str]:
     """Get workcenter short name for a workcenter name.
 

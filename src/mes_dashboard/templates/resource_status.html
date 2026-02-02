@@ -259,6 +259,30 @@
         border-radius: 2px;
     }
 
+    /* Matrix Actions */
+    .matrix-actions {
+        display: flex;
+        gap: 8px;
+        margin-left: auto;
+    }
+
+    .btn-matrix-action {
+        padding: 4px 10px;
+        font-size: 12px;
+        background: #f1f5f9;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        cursor: pointer;
+        color: var(--muted);
+        transition: all 0.2s;
+    }
+
+    .btn-matrix-action:hover {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+    }
+
     /* Matrix Table */
     .matrix-table {
         width: 100%;
@@ -316,6 +340,70 @@
     .matrix-table td.clickable.selected {
         background: #dbeafe;
         box-shadow: inset 0 0 0 2px var(--primary);
+    }
+
+    /* Clickable equipment rows */
+    .matrix-table tr.clickable-row {
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .matrix-table tr.clickable-row:hover {
+        background: #f0f4ff !important;
+    }
+
+    .matrix-table tr.clickable-row.selected {
+        background: #dbeafe !important;
+        box-shadow: inset 0 0 0 2px var(--primary);
+    }
+
+    /* Hierarchical Matrix Rows */
+    .matrix-table .row-level-0 {
+        background: #f8f9fb;
+        font-weight: 600;
+    }
+
+    .matrix-table .row-level-1 {
+        background: #fafbfc;
+    }
+
+    .matrix-table .row-level-2 {
+        background: #fff;
+        font-size: 12px;
+    }
+
+    .matrix-table .expand-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 2px 6px;
+        font-size: 10px;
+        color: var(--primary);
+        transition: transform 0.2s;
+        display: inline-block;
+        width: 20px;
+    }
+
+    .matrix-table .expand-btn:hover {
+        color: var(--primary-dark);
+    }
+
+    .matrix-table .expand-btn.expanded {
+        transform: rotate(90deg);
+    }
+
+    .matrix-table .expand-placeholder {
+        display: inline-block;
+        width: 20px;
+    }
+
+    .matrix-table .indent-1 td:first-child { padding-left: 30px; }
+    .matrix-table .indent-2 td:first-child { padding-left: 50px; }
+
+    .matrix-table .row-name {
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
 
     /* Matrix filter indicator */
@@ -663,7 +751,7 @@
             <div class="summary-pct">稼動率</div>
         </div>
         <div class="summary-card availability">
-            <div class="summary-label">Availability%</div>
+            <div class="summary-label">AVAIL%</div>
             <div class="summary-value" id="availabilityPct">--</div>
             <div class="summary-pct">可用率</div>
         </div>
@@ -711,7 +799,13 @@
 
     <!-- Matrix Section -->
     <div class="section">
-        <div class="section-title">工站狀態矩陣</div>
+        <div class="section-title">
+            工站狀態矩陣
+            <div class="matrix-actions">
+                <button class="btn-matrix-action" onclick="toggleAllMatrixRows(true)">全部展開</button>
+                <button class="btn-matrix-action" onclick="toggleAllMatrixRows(false)">全部收合</button>
+            </div>
+        </div>
         <div id="matrixContainer">
             <div class="loading-container">
                 <span class="spinner"></span> 載入中...
@@ -750,6 +844,235 @@
     let allEquipment = [];
     let workcenterGroups = [];
     let matrixFilter = null; // { workcenter_group, status }
+    let matrixHierarchyState = {}; // Track expanded/collapsed state for matrix rows
+
+    // ============================================================
+    // Hierarchical Matrix Functions
+    // ============================================================
+
+    function buildMatrixHierarchy(equipment) {
+        // Build hierarchy: workcenter_group -> resourcefamily -> equipment
+        const groupMap = {};
+
+        equipment.forEach(eq => {
+            const group = eq.WORKCENTER_GROUP || 'UNKNOWN';
+            const family = eq.RESOURCEFAMILYNAME || 'UNKNOWN';
+            const status = eq.EQUIPMENTASSETSSTATUS || 'OTHER';
+            const groupSeq = eq.WORKCENTER_GROUP_SEQ ?? 999;
+
+            // Initialize group
+            if (!groupMap[group]) {
+                groupMap[group] = {
+                    name: group,
+                    sequence: groupSeq,
+                    families: {},
+                    counts: { total: 0, PRD: 0, SBY: 0, UDT: 0, SDT: 0, EGT: 0, NST: 0, OTHER: 0 }
+                };
+            }
+
+            // Initialize family
+            if (!groupMap[group].families[family]) {
+                groupMap[group].families[family] = {
+                    name: family,
+                    equipment: [],
+                    counts: { total: 0, PRD: 0, SBY: 0, UDT: 0, SDT: 0, EGT: 0, NST: 0, OTHER: 0 }
+                };
+            }
+
+            // Add equipment to family
+            groupMap[group].families[family].equipment.push(eq);
+
+            // Map status to count key
+            let statusKey = 'OTHER';
+            if (['PRD'].includes(status)) statusKey = 'PRD';
+            else if (['SBY'].includes(status)) statusKey = 'SBY';
+            else if (['UDT', 'PM', 'BKD'].includes(status)) statusKey = 'UDT';
+            else if (['SDT'].includes(status)) statusKey = 'SDT';
+            else if (['EGT', 'ENG'].includes(status)) statusKey = 'EGT';
+            else if (['NST', 'OFF'].includes(status)) statusKey = 'NST';
+
+            // Update counts
+            groupMap[group].counts.total++;
+            groupMap[group].counts[statusKey]++;
+            groupMap[group].families[family].counts.total++;
+            groupMap[group].families[family].counts[statusKey]++;
+        });
+
+        // Convert to array structure
+        // Sort groups by sequence ascending (smaller sequence first, e.g. 點測 before TMTT)
+        // Sort families by total count descending
+        const hierarchy = Object.values(groupMap).map(g => ({
+            ...g,
+            families: Object.values(g.families).sort((a, b) => b.counts.total - a.counts.total)
+        })).sort((a, b) => a.sequence - b.sequence);
+
+        return hierarchy;
+    }
+
+    function toggleMatrixRow(rowId) {
+        matrixHierarchyState[rowId] = !matrixHierarchyState[rowId];
+        renderMatrixHierarchy();
+    }
+
+    function toggleAllMatrixRows(expand) {
+        const hierarchy = buildMatrixHierarchy(allEquipment);
+        hierarchy.forEach(group => {
+            matrixHierarchyState[`grp_${group.name}`] = expand;
+            group.families.forEach(fam => {
+                matrixHierarchyState[`fam_${group.name}_${fam.name}`] = expand;
+            });
+        });
+        renderMatrixHierarchy();
+    }
+
+    function renderMatrixHierarchy() {
+        const container = document.getElementById('matrixContainer');
+        const hierarchy = buildMatrixHierarchy(allEquipment);
+
+        if (hierarchy.length === 0) {
+            container.innerHTML = '<div class="empty-state">無資料</div>';
+            return;
+        }
+
+        let html = `
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>工站群組 / 型號 / 機台</th>
+                        <th>總數</th>
+                        <th>PRD</th>
+                        <th>SBY</th>
+                        <th>UDT</th>
+                        <th>SDT</th>
+                        <th>EGT</th>
+                        <th>NST</th>
+                        <th>OTHER</th>
+                        <th>OU%</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        hierarchy.forEach(group => {
+            const grpId = `grp_${group.name}`;
+            const isGroupExpanded = matrixHierarchyState[grpId];
+            const hasChildren = group.families.length > 0;
+
+            // Calculate OU%
+            const avail = group.counts.PRD + group.counts.SBY + group.counts.UDT + group.counts.SDT + group.counts.EGT;
+            const ou = avail > 0 ? ((group.counts.PRD / avail) * 100).toFixed(1) : 0;
+            const ouClass = ou >= 80 ? 'high' : (ou >= 50 ? 'medium' : 'low');
+
+            // Group row (Level 0)
+            const expandBtn = hasChildren
+                ? `<button class="expand-btn ${isGroupExpanded ? 'expanded' : ''}" onclick="toggleMatrixRow('${grpId}')">▶</button>`
+                : '<span class="expand-placeholder"></span>';
+
+            // Helper to check if this cell is selected (supports all levels)
+            const isSelected = (wg, st, fam = null, res = null) => {
+                if (!matrixFilter) return false;
+                if (matrixFilter.workcenter_group !== wg) return false;
+                if (matrixFilter.status !== st) return false;
+                if (fam !== null && matrixFilter.family !== fam) return false;
+                if (res !== null && matrixFilter.resource !== res) return false;
+                // Match level: if matrixFilter has family but we're checking group level, no match
+                if (matrixFilter.family && fam === null) return false;
+                if (matrixFilter.resource && res === null) return false;
+                return true;
+            };
+            const grpName = group.name;
+
+            html += `
+                <tr class="row-level-0">
+                    <td><span class="row-name">${expandBtn}${group.name}</span></td>
+                    <td class="col-total">${group.counts.total}</td>
+                    <td class="col-prd clickable ${group.counts.PRD === 0 ? 'zero' : ''} ${isSelected(grpName, 'PRD') ? 'selected' : ''}" data-wg="${grpName}" data-status="PRD" onclick="filterByMatrixCell('${grpName}', 'PRD')">${group.counts.PRD}</td>
+                    <td class="col-sby clickable ${group.counts.SBY === 0 ? 'zero' : ''} ${isSelected(grpName, 'SBY') ? 'selected' : ''}" data-wg="${grpName}" data-status="SBY" onclick="filterByMatrixCell('${grpName}', 'SBY')">${group.counts.SBY}</td>
+                    <td class="col-udt clickable ${group.counts.UDT === 0 ? 'zero' : ''} ${isSelected(grpName, 'UDT') ? 'selected' : ''}" data-wg="${grpName}" data-status="UDT" onclick="filterByMatrixCell('${grpName}', 'UDT')">${group.counts.UDT}</td>
+                    <td class="col-sdt clickable ${group.counts.SDT === 0 ? 'zero' : ''} ${isSelected(grpName, 'SDT') ? 'selected' : ''}" data-wg="${grpName}" data-status="SDT" onclick="filterByMatrixCell('${grpName}', 'SDT')">${group.counts.SDT}</td>
+                    <td class="col-egt clickable ${group.counts.EGT === 0 ? 'zero' : ''} ${isSelected(grpName, 'EGT') ? 'selected' : ''}" data-wg="${grpName}" data-status="EGT" onclick="filterByMatrixCell('${grpName}', 'EGT')">${group.counts.EGT}</td>
+                    <td class="col-nst clickable ${group.counts.NST === 0 ? 'zero' : ''} ${isSelected(grpName, 'NST') ? 'selected' : ''}" data-wg="${grpName}" data-status="NST" onclick="filterByMatrixCell('${grpName}', 'NST')">${group.counts.NST}</td>
+                    <td class="col-other clickable ${group.counts.OTHER === 0 ? 'zero' : ''} ${isSelected(grpName, 'OTHER') ? 'selected' : ''}" data-wg="${grpName}" data-status="OTHER" onclick="filterByMatrixCell('${grpName}', 'OTHER')">${group.counts.OTHER}</td>
+                    <td><span class="ou-badge ${ouClass}">${ou}%</span></td>
+                </tr>
+            `;
+
+            // Family rows (Level 1)
+            if (isGroupExpanded) {
+                group.families.forEach(fam => {
+                    const famId = `fam_${group.name}_${fam.name}`;
+                    const isFamExpanded = matrixHierarchyState[famId];
+                    const hasEquipment = fam.equipment.length > 0;
+
+                    const famAvail = fam.counts.PRD + fam.counts.SBY + fam.counts.UDT + fam.counts.SDT + fam.counts.EGT;
+                    const famOu = famAvail > 0 ? ((fam.counts.PRD / famAvail) * 100).toFixed(1) : 0;
+                    const famOuClass = famOu >= 80 ? 'high' : (famOu >= 50 ? 'medium' : 'low');
+
+                    const famExpandBtn = hasEquipment
+                        ? `<button class="expand-btn ${isFamExpanded ? 'expanded' : ''}" onclick="toggleMatrixRow('${famId}')">▶</button>`
+                        : '<span class="expand-placeholder"></span>';
+
+                    const famName = fam.name;
+                    const escFamName = famName.replace(/'/g, "\\'");
+
+                    html += `
+                        <tr class="row-level-1 indent-1">
+                            <td><span class="row-name">${famExpandBtn}${fam.name}</span></td>
+                            <td class="col-total">${fam.counts.total}</td>
+                            <td class="col-prd clickable ${fam.counts.PRD === 0 ? 'zero' : ''} ${isSelected(grpName, 'PRD', famName) ? 'selected' : ''}" data-wg="${grpName}" data-fam="${famName}" data-status="PRD" onclick="filterByMatrixCell('${grpName}', 'PRD', '${escFamName}')">${fam.counts.PRD}</td>
+                            <td class="col-sby clickable ${fam.counts.SBY === 0 ? 'zero' : ''} ${isSelected(grpName, 'SBY', famName) ? 'selected' : ''}" data-wg="${grpName}" data-fam="${famName}" data-status="SBY" onclick="filterByMatrixCell('${grpName}', 'SBY', '${escFamName}')">${fam.counts.SBY}</td>
+                            <td class="col-udt clickable ${fam.counts.UDT === 0 ? 'zero' : ''} ${isSelected(grpName, 'UDT', famName) ? 'selected' : ''}" data-wg="${grpName}" data-fam="${famName}" data-status="UDT" onclick="filterByMatrixCell('${grpName}', 'UDT', '${escFamName}')">${fam.counts.UDT}</td>
+                            <td class="col-sdt clickable ${fam.counts.SDT === 0 ? 'zero' : ''} ${isSelected(grpName, 'SDT', famName) ? 'selected' : ''}" data-wg="${grpName}" data-fam="${famName}" data-status="SDT" onclick="filterByMatrixCell('${grpName}', 'SDT', '${escFamName}')">${fam.counts.SDT}</td>
+                            <td class="col-egt clickable ${fam.counts.EGT === 0 ? 'zero' : ''} ${isSelected(grpName, 'EGT', famName) ? 'selected' : ''}" data-wg="${grpName}" data-fam="${famName}" data-status="EGT" onclick="filterByMatrixCell('${grpName}', 'EGT', '${escFamName}')">${fam.counts.EGT}</td>
+                            <td class="col-nst clickable ${fam.counts.NST === 0 ? 'zero' : ''} ${isSelected(grpName, 'NST', famName) ? 'selected' : ''}" data-wg="${grpName}" data-fam="${famName}" data-status="NST" onclick="filterByMatrixCell('${grpName}', 'NST', '${escFamName}')">${fam.counts.NST}</td>
+                            <td class="col-other clickable ${fam.counts.OTHER === 0 ? 'zero' : ''} ${isSelected(grpName, 'OTHER', famName) ? 'selected' : ''}" data-wg="${grpName}" data-fam="${famName}" data-status="OTHER" onclick="filterByMatrixCell('${grpName}', 'OTHER', '${escFamName}')">${fam.counts.OTHER}</td>
+                            <td><span class="ou-badge ${famOuClass}">${famOu}%</span></td>
+                        </tr>
+                    `;
+
+                    // Equipment rows (Level 2)
+                    if (isFamExpanded) {
+                        fam.equipment.forEach(eq => {
+                            const status = eq.EQUIPMENTASSETSSTATUS || '--';
+                            const statusCat = (eq.STATUS_CATEGORY || 'OTHER').toLowerCase();
+                            const resId = eq.RESOURCEID || '';
+                            const resName = eq.RESOURCENAME || eq.RESOURCEID || '--';
+                            const escResId = resId.replace(/'/g, "\\'");
+
+                            // Determine status category key for this equipment
+                            let eqStatusKey = 'OTHER';
+                            if (['PRD'].includes(status)) eqStatusKey = 'PRD';
+                            else if (['SBY'].includes(status)) eqStatusKey = 'SBY';
+                            else if (['UDT', 'PM', 'BKD'].includes(status)) eqStatusKey = 'UDT';
+                            else if (['SDT'].includes(status)) eqStatusKey = 'SDT';
+                            else if (['EGT', 'ENG'].includes(status)) eqStatusKey = 'EGT';
+                            else if (['NST', 'OFF'].includes(status)) eqStatusKey = 'NST';
+
+                            const isEqSelected = isSelected(grpName, eqStatusKey, famName, resId);
+
+                            html += `
+                                <tr class="row-level-2 indent-2 clickable-row ${isEqSelected ? 'selected' : ''}" data-wg="${grpName}" data-fam="${famName}" data-res="${resId}" onclick="filterByMatrixCell('${grpName}', '${eqStatusKey}', '${escFamName}', '${escResId}')">
+                                    <td><span class="row-name"><span class="expand-placeholder"></span>${resName}</span></td>
+                                    <td>1</td>
+                                    <td class="col-prd ${status !== 'PRD' ? 'zero' : ''}">${status === 'PRD' ? '●' : '-'}</td>
+                                    <td class="col-sby ${status !== 'SBY' ? 'zero' : ''}">${status === 'SBY' ? '●' : '-'}</td>
+                                    <td class="col-udt ${!['UDT', 'PM', 'BKD'].includes(status) ? 'zero' : ''}">${['UDT', 'PM', 'BKD'].includes(status) ? '●' : '-'}</td>
+                                    <td class="col-sdt ${status !== 'SDT' ? 'zero' : ''}">${status === 'SDT' ? '●' : '-'}</td>
+                                    <td class="col-egt ${!['EGT', 'ENG'].includes(status) ? 'zero' : ''}">${['EGT', 'ENG'].includes(status) ? '●' : '-'}</td>
+                                    <td class="col-nst ${!['NST', 'OFF'].includes(status) ? 'zero' : ''}">${['NST', 'OFF'].includes(status) ? '●' : '-'}</td>
+                                    <td class="col-other">${!['PRD', 'SBY', 'UDT', 'PM', 'BKD', 'SDT', 'EGT', 'ENG', 'NST', 'OFF'].includes(status) ? '●' : '-'}</td>
+                                    <td><span class="eq-status ${statusCat}">${status}</span></td>
+                                </tr>
+                            `;
+                        });
+                    }
+                });
+            }
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
 
     function toggleFilter(checkbox, id) {
         const label = document.getElementById(id);
@@ -823,7 +1146,7 @@
                 // Calculate percentage denominator (includes NST)
                 const totalStatus = prd + sby + udt + sdt + egt + nst;
 
-                // Update OU% and Availability%
+                // Update OU% and AVAIL%
                 document.getElementById('ouPct').textContent = d.ou_pct ? `${d.ou_pct}%` : '--';
                 document.getElementById('availabilityPct').textContent = d.availability_pct ? `${d.availability_pct}%` : '--';
 
@@ -858,75 +1181,10 @@
         }
     }
 
-    async function loadMatrix() {
-        const container = document.getElementById('matrixContainer');
-
-        try {
-            const queryString = getFilters();
-            const resp = await fetch(`/api/resource/status/matrix?${queryString}`);
-            const result = await resp.json();
-
-            if (result.success && result.data.length > 0) {
-                let html = `
-                    <table class="matrix-table">
-                        <thead>
-                            <tr>
-                                <th>工站群組</th>
-                                <th>總數</th>
-                                <th>PRD</th>
-                                <th>SBY</th>
-                                <th>UDT</th>
-                                <th>SDT</th>
-                                <th>EGT</th>
-                                <th>NST</th>
-                                <th>OTHER</th>
-                                <th>OU%</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-
-                result.data.forEach(row => {
-                    const total = row.total || 1;
-                    const avail = row.PRD + row.SBY + row.UDT + row.SDT + row.EGT;
-                    const ou = avail > 0 ? ((row.PRD / avail) * 100).toFixed(1) : 0;
-                    const ouClass = ou >= 80 ? 'high' : (ou >= 50 ? 'medium' : 'low');
-                    const wg = row.workcenter_group;
-
-                    // Helper to render clickable cell
-                    const renderCell = (status, value, colClass) => {
-                        if (value === 0) {
-                            return `<td class="clickable ${colClass} zero" data-wg="${wg}" data-status="${status}">${value}</td>`;
-                        }
-                        const selected = matrixFilter && matrixFilter.workcenter_group === wg && matrixFilter.status === status ? 'selected' : '';
-                        return `<td class="clickable ${colClass} ${selected}" data-wg="${wg}" data-status="${status}" onclick="filterByMatrixCell('${wg}', '${status}')">${value}</td>`;
-                    };
-
-                    html += `
-                        <tr>
-                            <td>${wg}</td>
-                            <td class="col-total">${row.total}</td>
-                            ${renderCell('PRD', row.PRD, 'col-prd')}
-                            ${renderCell('SBY', row.SBY, 'col-sby')}
-                            ${renderCell('UDT', row.UDT, 'col-udt')}
-                            ${renderCell('SDT', row.SDT, 'col-sdt')}
-                            ${renderCell('EGT', row.EGT, 'col-egt')}
-                            ${renderCell('NST', row.NST, 'col-nst')}
-                            ${renderCell('OTHER', row.OTHER, 'col-other')}
-                            <td><span class="ou-badge ${ouClass}">${ou}%</span></td>
-                        </tr>
-                    `;
-                });
-
-                html += '</tbody></table>';
-                container.innerHTML = html;
-            } else {
-                container.innerHTML = '<div class="empty-state">無資料</div>';
-            }
-        } catch (e) {
-            console.error('載入矩陣失敗:', e);
-            container.innerHTML = '<div class="empty-state">載入失敗</div>';
-        }
+    function loadMatrix() {
+        // Matrix is now rendered from allEquipment data using hierarchy
+        // This function is called after loadEquipment populates allEquipment
+        renderMatrixHierarchy();
     }
 
     async function loadEquipment() {
@@ -1146,7 +1404,7 @@
         container.innerHTML = html;
     }
 
-    function filterByMatrixCell(workcenterGroup, status) {
+    function filterByMatrixCell(workcenterGroup, status, family = null, resource = null) {
         // Status mapping from matrix column to STATUS_CATEGORY or EQUIPMENTASSETSSTATUS
         const statusMap = {
             'PRD': 'PRODUCTIVE',
@@ -1158,23 +1416,51 @@
             'OTHER': 'OTHER'
         };
 
-        // Toggle off if clicking same cell
-        if (matrixFilter && matrixFilter.workcenter_group === workcenterGroup && matrixFilter.status === status) {
+        // Toggle off if clicking same cell (exact match including family and resource)
+        if (matrixFilter &&
+            matrixFilter.workcenter_group === workcenterGroup &&
+            matrixFilter.status === status &&
+            matrixFilter.family === family &&
+            matrixFilter.resource === resource) {
             clearMatrixFilter();
             return;
         }
 
-        matrixFilter = { workcenter_group: workcenterGroup, status: status };
+        matrixFilter = {
+            workcenter_group: workcenterGroup,
+            status: status,
+            family: family,
+            resource: resource
+        };
 
-        // Update selected cell highlighting
+        // Update selected cell highlighting for group and family level cells
         document.querySelectorAll('.matrix-table td.clickable').forEach(cell => {
             cell.classList.remove('selected');
-            if (cell.dataset.wg === workcenterGroup && cell.dataset.status === status) {
-                cell.classList.add('selected');
+            const cellWg = cell.dataset.wg;
+            const cellStatus = cell.dataset.status;
+            const cellFam = cell.dataset.fam || null;
+
+            // Match based on level
+            if (cellWg === workcenterGroup && cellStatus === status) {
+                if (family === null && cellFam === undefined) {
+                    // Group level match
+                    cell.classList.add('selected');
+                } else if (family !== null && cellFam === family && resource === null) {
+                    // Family level match
+                    cell.classList.add('selected');
+                }
             }
         });
 
-        // Show filter indicator
+        // Update selected row highlighting for equipment level
+        document.querySelectorAll('.matrix-table tr.clickable-row').forEach(row => {
+            row.classList.remove('selected');
+            if (resource !== null && row.dataset.res === resource) {
+                row.classList.add('selected');
+            }
+        });
+
+        // Show filter indicator with hierarchical label
         const statusLabels = {
             'PRD': '生產中',
             'SBY': '待機',
@@ -1184,26 +1470,51 @@
             'NST': '未排程',
             'OTHER': '其他'
         };
-        document.getElementById('matrixFilterText').textContent = `${workcenterGroup} - ${statusLabels[status] || status}`;
+
+        let filterLabel = workcenterGroup;
+        if (family) filterLabel += ` / ${family}`;
+        if (resource) {
+            // Find resource name from allEquipment
+            const eqInfo = allEquipment.find(e => e.RESOURCEID === resource);
+            const resName = eqInfo ? (eqInfo.RESOURCENAME || resource) : resource;
+            filterLabel += ` / ${resName}`;
+        }
+        filterLabel += ` - ${statusLabels[status] || status}`;
+
+        document.getElementById('matrixFilterText').textContent = filterLabel;
         document.getElementById('matrixFilterIndicator').classList.add('active');
 
         // Filter and render equipment list
-        const standardStatuses = ['PRD', 'SBY', 'UDT', 'SDT', 'EGT', 'NST'];
+        // Use same grouping logic as buildMatrixHierarchy
         const filtered = allEquipment.filter(eq => {
             // Match workcenter group
-            // Note: If matrix shows "UNKNOWN", it means equipment has no WORKCENTER_GROUP
             const eqGroup = eq.WORKCENTER_GROUP || 'UNKNOWN';
             if (eqGroup !== workcenterGroup) return false;
 
+            // Match family if specified
+            if (family !== null) {
+                const eqFamily = eq.RESOURCEFAMILYNAME || 'UNKNOWN';
+                if (eqFamily !== family) return false;
+            }
+
+            // Match resource if specified
+            if (resource !== null) {
+                if (eq.RESOURCEID !== resource) return false;
+            }
+
             // Match status based on EQUIPMENTASSETSSTATUS (same logic as matrix calculation)
             const eqStatus = eq.EQUIPMENTASSETSSTATUS || '';
-            if (status === 'OTHER') {
-                // OTHER = any status NOT in the standard set
-                return !standardStatuses.includes(eqStatus);
-            } else {
-                // For standard statuses, match exact EQUIPMENTASSETSSTATUS
-                return eqStatus === status;
-            }
+
+            // Map equipment status to matrix status category (same as buildMatrixHierarchy)
+            let eqStatusKey = 'OTHER';
+            if (['PRD'].includes(eqStatus)) eqStatusKey = 'PRD';
+            else if (['SBY'].includes(eqStatus)) eqStatusKey = 'SBY';
+            else if (['UDT', 'PM', 'BKD'].includes(eqStatus)) eqStatusKey = 'UDT';
+            else if (['SDT'].includes(eqStatus)) eqStatusKey = 'SDT';
+            else if (['EGT', 'ENG'].includes(eqStatus)) eqStatusKey = 'EGT';
+            else if (['NST', 'OFF'].includes(eqStatus)) eqStatusKey = 'NST';
+
+            return eqStatusKey === status;
         });
 
         document.getElementById('equipmentCount').textContent = filtered.length;
@@ -1213,9 +1524,14 @@
     function clearMatrixFilter() {
         matrixFilter = null;
 
-        // Remove selected highlighting
+        // Remove selected highlighting from cells
         document.querySelectorAll('.matrix-table td.clickable').forEach(cell => {
             cell.classList.remove('selected');
+        });
+
+        // Remove selected highlighting from rows
+        document.querySelectorAll('.matrix-table tr.clickable-row').forEach(row => {
+            row.classList.remove('selected');
         });
 
         // Hide filter indicator
@@ -1290,11 +1606,14 @@
         btn.disabled = true;
 
         try {
+            // loadSummary can run in parallel
+            // loadEquipment must complete before loadMatrix (matrix uses allEquipment data)
             await Promise.all([
                 loadSummary(),
-                loadMatrix(),
                 loadEquipment()
             ]);
+            // Now render the matrix from the loaded equipment data
+            loadMatrix();
         } finally {
             btn.disabled = false;
         }

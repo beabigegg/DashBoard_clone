@@ -801,6 +801,8 @@ def _build_heatmap_from_raw_df(
     wc_mapping = get_workcenter_mapping() or {}
 
     # Aggregate data by WORKCENTER_GROUP and date
+    # Track sequence for each workcenter group
+    wc_seq_map = {}
     aggregated = {}
     for _, row in df.iterrows():
         historyid = row['HISTORYID']
@@ -816,6 +818,8 @@ def _build_heatmap_from_raw_df(
 
         wc_info = wc_mapping.get(wc_name, {})
         wc_group = wc_info.get('group', wc_name)
+        wc_seq = wc_info.get('sequence', 999)
+        wc_seq_map[wc_group] = wc_seq  # Store sequence for this group
         date_str = _format_date(row['DATA_DATE'], granularity)
         key = (wc_group, date_str)
 
@@ -832,12 +836,13 @@ def _build_heatmap_from_raw_df(
     for (wc_group, date_str), data in aggregated.items():
         result.append({
             'workcenter': wc_group,
+            'workcenter_seq': wc_seq_map.get(wc_group, 999),
             'date': date_str,
             'ou_pct': _calc_ou_pct(data['prd'], data['sby'], data['udt'], data['sdt'], data['egt'])
         })
 
-    # Sort by workcenter and date
-    result.sort(key=lambda x: (x['workcenter'], x['date'] or ''))
+    # Sort by workcenter sequence (ascending, smaller first) and date
+    result.sort(key=lambda x: (x['workcenter_seq'], x['date'] or ''))
     return result
 
 
@@ -959,11 +964,13 @@ def _build_detail_from_raw_df(
         wc_name = resource_info.get('WORKCENTERNAME', '')
         wc_info = wc_mapping.get(wc_name, {})
         wc_group = wc_info.get('group', wc_name)  # Fallback to workcentername if no mapping
+        wc_seq = wc_info.get('sequence', 999)  # Get sequence for sorting
         family = resource_info.get('RESOURCEFAMILYNAME', '')
         resource_name = resource_info.get('RESOURCENAME', '')
 
         result.append({
             'workcenter': wc_group,
+            'workcenter_seq': wc_seq,
             'family': family or '',
             'resource': resource_name or '',
             'ou_pct': _calc_ou_pct(prd, sby, udt, sdt, egt),
@@ -983,6 +990,6 @@ def _build_detail_from_raw_df(
             'machine_count': 1
         })
 
-    # Sort by workcenter, family, resource
-    result.sort(key=lambda x: (x['workcenter'], x['family'], x['resource']))
+    # Sort by workcenter sequence (ascending, smaller first), then family, resource
+    result.sort(key=lambda x: (x['workcenter_seq'], x['family'], x['resource']))
     return result

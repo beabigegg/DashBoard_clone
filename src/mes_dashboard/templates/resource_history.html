@@ -631,7 +631,7 @@
                 <div class="kpi-sub">稼動率</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">Availability%</div>
+                <div class="kpi-label">AVAIL%</div>
                 <div class="kpi-value green" id="kpiAvailabilityPct">--</div>
                 <div class="kpi-sub">可用率</div>
             </div>
@@ -675,7 +675,7 @@
         <!-- Charts Row 1 -->
         <div class="charts-row">
             <div class="chart-card">
-                <div class="chart-title">OU% / Availability% 趨勢</div>
+                <div class="chart-title">OU% / AVAIL% 趨勢</div>
                 <div class="chart-container" id="trendChart"></div>
             </div>
             <div class="chart-card">
@@ -1032,7 +1032,7 @@
     // KPI Cards
     // ============================================================
     function updateKpiCards(kpi) {
-        // OU% and Availability%
+        // OU% and AVAIL%
         document.getElementById('kpiOuPct').textContent = kpi.ou_pct + '%';
         document.getElementById('kpiAvailabilityPct').textContent = kpi.availability_pct + '%';
 
@@ -1086,14 +1086,14 @@
                     const d = trend[params[0].dataIndex];
                     return `${d.date}<br/>
                         <span style="color:#3B82F6">●</span> OU%: <b>${d.ou_pct}%</b><br/>
-                        <span style="color:#10B981">●</span> Availability%: <b>${d.availability_pct}%</b><br/>
+                        <span style="color:#10B981">●</span> AVAIL%: <b>${d.availability_pct}%</b><br/>
                         PRD: ${d.prd_hours}h<br/>
                         SBY: ${d.sby_hours}h<br/>
                         UDT: ${d.udt_hours}h`;
                 }
             },
             legend: {
-                data: ['OU%', 'Availability%'],
+                data: ['OU%', 'AVAIL%'],
                 bottom: 0,
                 textStyle: { fontSize: 11 }
             },
@@ -1119,7 +1119,7 @@
                     lineStyle: { width: 2 }
                 },
                 {
-                    name: 'Availability%',
+                    name: 'AVAIL%',
                     data: availabilityPcts,
                     type: 'line',
                     smooth: true,
@@ -1229,8 +1229,15 @@
             return;
         }
 
-        // Get unique workcenters and dates
-        const workcenters = [...new Set(heatmap.map(h => h.workcenter))];
+        // Build workcenter list with sequence for sorting
+        const wcSeqMap = {};
+        heatmap.forEach(h => {
+            wcSeqMap[h.workcenter] = h.workcenter_seq ?? 999;
+        });
+
+        // Get unique workcenters sorted by sequence ascending (smaller sequence first, e.g. 點測 before TMTT)
+        const workcenters = [...new Set(heatmap.map(h => h.workcenter))]
+            .sort((a, b) => wcSeqMap[a] - wcSeqMap[b]);
         const dates = [...new Set(heatmap.map(h => h.date))].sort();
 
         // Build data matrix
@@ -1338,11 +1345,13 @@
         data.forEach(item => {
             const wc = item.workcenter;
             const fam = item.family;
+            const wcSeq = item.workcenter_seq ?? 999;
 
             if (!wcMap[wc]) {
                 wcMap[wc] = {
                     workcenter: wc,
                     name: wc,
+                    sequence: wcSeq,
                     families: [],
                     familyMap: {},
                     ou_pct: 0, prd_hours: 0, prd_pct: 0,
@@ -1399,7 +1408,8 @@
             });
         });
 
-        return Object.values(wcMap).sort((a, b) => b.ou_pct - a.ou_pct);
+        // Sort by workcenter sequence ascending (smaller sequence first, e.g. 點測 before TMTT)
+        return Object.values(wcMap).sort((a, b) => a.sequence - b.sequence);
     }
 
     function calcPercentages(obj) {
