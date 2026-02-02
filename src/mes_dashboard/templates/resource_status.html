@@ -283,6 +283,58 @@
 
     .matrix-table .zero { color: #d1d5db; }
 
+    /* Clickable matrix cells */
+    .matrix-table td.clickable {
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .matrix-table td.clickable:hover {
+        background: #e0e7ff;
+    }
+
+    .matrix-table td.clickable.selected {
+        background: #dbeafe;
+        box-shadow: inset 0 0 0 2px var(--primary);
+    }
+
+    /* Matrix filter indicator */
+    .matrix-filter-indicator {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: #dbeafe;
+        border-radius: 6px;
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--primary-dark);
+    }
+
+    .matrix-filter-indicator.active {
+        display: inline-flex;
+    }
+
+    .matrix-filter-indicator .filter-text {
+        font-weight: 500;
+    }
+
+    .btn-clear-filter {
+        background: transparent;
+        border: 1px solid var(--primary);
+        color: var(--primary);
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-clear-filter:hover {
+        background: var(--primary);
+        color: white;
+    }
+
     .ou-badge {
         display: inline-block;
         padding: 2px 8px;
@@ -387,6 +439,86 @@
         text-align: center;
         padding: 40px;
         color: var(--muted);
+    }
+
+    /* LOT Tooltip */
+    .lot-info {
+        position: relative;
+        cursor: pointer;
+    }
+
+    .lot-info:hover .lot-tooltip {
+        display: block;
+    }
+
+    .lot-tooltip {
+        display: none;
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        background: #1e293b;
+        color: #fff;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        white-space: nowrap;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        min-width: 280px;
+        max-width: 400px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .lot-tooltip::after {
+        content: '';
+        position: absolute;
+        bottom: 100%;
+        left: 20px;
+        border: 6px solid transparent;
+        border-bottom-color: #1e293b;
+    }
+
+    .lot-tooltip-title {
+        font-weight: 600;
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #475569;
+        color: #94a3b8;
+    }
+
+    .lot-item {
+        padding: 6px 0;
+        border-bottom: 1px solid #334155;
+    }
+
+    .lot-item:last-child {
+        border-bottom: none;
+    }
+
+    .lot-item-header {
+        font-weight: 600;
+        color: #60a5fa;
+        margin-bottom: 4px;
+    }
+
+    .lot-item-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .lot-item-field {
+        display: flex;
+        gap: 4px;
+    }
+
+    .lot-item-label {
+        color: #94a3b8;
+    }
+
+    .lot-item-value {
+        color: #e2e8f0;
     }
 
     /* Responsive */
@@ -498,6 +630,11 @@
                 <span class="spinner"></span> 載入中...
             </div>
         </div>
+        <div id="matrixFilterIndicator" class="matrix-filter-indicator">
+            <span>篩選中：</span>
+            <span class="filter-text" id="matrixFilterText"></span>
+            <button class="btn-clear-filter" onclick="clearMatrixFilter()">清除篩選</button>
+        </div>
     </div>
 
     <!-- Equipment List -->
@@ -516,6 +653,7 @@
 <script>
     let allEquipment = [];
     let workcenterGroups = [];
+    let matrixFilter = null; // { workcenter_group, status }
 
     function toggleFilter(checkbox, id) {
         const label = document.getElementById(id);
@@ -637,18 +775,28 @@
                     const avail = row.PRD + row.SBY + row.UDT + row.SDT + row.EGT;
                     const ou = avail > 0 ? ((row.PRD / avail) * 100).toFixed(1) : 0;
                     const ouClass = ou >= 80 ? 'high' : (ou >= 50 ? 'medium' : 'low');
+                    const wg = row.workcenter_group;
+
+                    // Helper to render clickable cell
+                    const renderCell = (status, value, colClass) => {
+                        if (value === 0) {
+                            return `<td class="clickable ${colClass} zero" data-wg="${wg}" data-status="${status}">${value}</td>`;
+                        }
+                        const selected = matrixFilter && matrixFilter.workcenter_group === wg && matrixFilter.status === status ? 'selected' : '';
+                        return `<td class="clickable ${colClass} ${selected}" data-wg="${wg}" data-status="${status}" onclick="filterByMatrixCell('${wg}', '${status}')">${value}</td>`;
+                    };
 
                     html += `
                         <tr>
-                            <td>${row.workcenter_group}</td>
+                            <td>${wg}</td>
                             <td class="col-total">${row.total}</td>
-                            <td class="col-prd ${row.PRD === 0 ? 'zero' : ''}">${row.PRD}</td>
-                            <td class="col-sby ${row.SBY === 0 ? 'zero' : ''}">${row.SBY}</td>
-                            <td class="col-udt ${row.UDT === 0 ? 'zero' : ''}">${row.UDT}</td>
-                            <td class="col-sdt ${row.SDT === 0 ? 'zero' : ''}">${row.SDT}</td>
-                            <td class="col-egt ${row.EGT === 0 ? 'zero' : ''}">${row.EGT}</td>
-                            <td class="col-nst ${row.NST === 0 ? 'zero' : ''}">${row.NST}</td>
-                            <td class="col-other ${row.OTHER === 0 ? 'zero' : ''}">${row.OTHER}</td>
+                            ${renderCell('PRD', row.PRD, 'col-prd')}
+                            ${renderCell('SBY', row.SBY, 'col-sby')}
+                            ${renderCell('UDT', row.UDT, 'col-udt')}
+                            ${renderCell('SDT', row.SDT, 'col-sdt')}
+                            ${renderCell('EGT', row.EGT, 'col-egt')}
+                            ${renderCell('NST', row.NST, 'col-nst')}
+                            ${renderCell('OTHER', row.OTHER, 'col-other')}
                             <td><span class="ou-badge ${ouClass}">${ou}%</span></td>
                         </tr>
                     `;
@@ -667,6 +815,10 @@
 
     async function loadEquipment() {
         const container = document.getElementById('equipmentContainer');
+
+        // Clear matrix filter when reloading data
+        matrixFilter = null;
+        document.getElementById('matrixFilterIndicator').classList.remove('active');
 
         try {
             const queryString = getFilters();
@@ -688,6 +840,30 @@
         }
     }
 
+    function renderLotTooltip(lotDetails) {
+        if (!lotDetails || lotDetails.length === 0) return '';
+
+        let tooltipHtml = '<div class="lot-tooltip"><div class="lot-tooltip-title">在製批次明細</div>';
+
+        lotDetails.forEach(lot => {
+            const trackinTime = lot.LOTTRACKINTIME ? new Date(lot.LOTTRACKINTIME).toLocaleString('zh-TW') : '--';
+            const qty = lot.LOTTRACKINQTY_PCS != null ? lot.LOTTRACKINQTY_PCS.toLocaleString() : '--';
+            tooltipHtml += `
+                <div class="lot-item">
+                    <div class="lot-item-header">${lot.RUNCARDLOTID || '--'}</div>
+                    <div class="lot-item-row">
+                        <div class="lot-item-field"><span class="lot-item-label">數量:</span><span class="lot-item-value">${qty} pcs</span></div>
+                        <div class="lot-item-field"><span class="lot-item-label">TrackIn:</span><span class="lot-item-value">${trackinTime}</span></div>
+                        <div class="lot-item-field"><span class="lot-item-label">操作員:</span><span class="lot-item-value">${lot.LOTTRACKINEMPLOYEE || '--'}</span></div>
+                    </div>
+                </div>
+            `;
+        });
+
+        tooltipHtml += '</div>';
+        return tooltipHtml;
+    }
+
     function renderEquipmentList(equipment) {
         const container = document.getElementById('equipmentContainer');
 
@@ -702,6 +878,13 @@
             const statusCat = (eq.STATUS_CATEGORY || 'OTHER').toLowerCase();
             const statusDisplay = getStatusDisplay(eq.EQUIPMENTASSETSSTATUS, eq.STATUS_CATEGORY);
 
+            // Build LOT info with tooltip
+            let lotHtml = '';
+            if (eq.LOT_COUNT > 0) {
+                const tooltipHtml = renderLotTooltip(eq.LOT_DETAILS);
+                lotHtml = `<span class="lot-info">📦 ${eq.LOT_COUNT} 批${tooltipHtml}</span>`;
+            }
+
             html += `
                 <div class="equipment-card status-${statusCat}">
                     <div class="eq-header">
@@ -712,8 +895,8 @@
                         <span title="工站">📍 ${eq.WORKCENTERNAME || '--'}</span>
                         <span title="群組">🏭 ${eq.WORKCENTER_GROUP || '--'}</span>
                         <span title="家族">🔧 ${eq.RESOURCEFAMILYNAME || '--'}</span>
-                        <span title="部門">🏢 ${eq.PJ_DEPARTMENT || '--'}</span>
-                        ${eq.LOT_COUNT > 0 ? `<span title="在製批數">📦 ${eq.LOT_COUNT} 批</span>` : ''}
+                        <span title="區域">🏢 ${eq.LOCATIONNAME || '--'}</span>
+                        ${lotHtml}
                         ${eq.JOBORDER ? `<span title="工單">📋 ${eq.JOBORDER}</span>` : ''}
                     </div>
                 </div>
@@ -722,6 +905,86 @@
 
         html += '</div>';
         container.innerHTML = html;
+    }
+
+    function filterByMatrixCell(workcenterGroup, status) {
+        // Status mapping from matrix column to STATUS_CATEGORY or EQUIPMENTASSETSSTATUS
+        const statusMap = {
+            'PRD': 'PRODUCTIVE',
+            'SBY': 'STANDBY',
+            'UDT': 'DOWN',
+            'SDT': 'DOWN',
+            'EGT': 'ENGINEERING',
+            'NST': 'NOT_SCHEDULED',
+            'OTHER': 'OTHER'
+        };
+
+        // Toggle off if clicking same cell
+        if (matrixFilter && matrixFilter.workcenter_group === workcenterGroup && matrixFilter.status === status) {
+            clearMatrixFilter();
+            return;
+        }
+
+        matrixFilter = { workcenter_group: workcenterGroup, status: status };
+
+        // Update selected cell highlighting
+        document.querySelectorAll('.matrix-table td.clickable').forEach(cell => {
+            cell.classList.remove('selected');
+            if (cell.dataset.wg === workcenterGroup && cell.dataset.status === status) {
+                cell.classList.add('selected');
+            }
+        });
+
+        // Show filter indicator
+        const statusLabels = {
+            'PRD': '生產中',
+            'SBY': '待機',
+            'UDT': '非計畫停機',
+            'SDT': '計畫停機',
+            'EGT': '工程',
+            'NST': '未排程',
+            'OTHER': '其他'
+        };
+        document.getElementById('matrixFilterText').textContent = `${workcenterGroup} - ${statusLabels[status] || status}`;
+        document.getElementById('matrixFilterIndicator').classList.add('active');
+
+        // Filter and render equipment list
+        const standardStatuses = ['PRD', 'SBY', 'UDT', 'SDT', 'EGT', 'NST'];
+        const filtered = allEquipment.filter(eq => {
+            // Match workcenter group
+            // Note: If matrix shows "UNKNOWN", it means equipment has no WORKCENTER_GROUP
+            const eqGroup = eq.WORKCENTER_GROUP || 'UNKNOWN';
+            if (eqGroup !== workcenterGroup) return false;
+
+            // Match status based on EQUIPMENTASSETSSTATUS (same logic as matrix calculation)
+            const eqStatus = eq.EQUIPMENTASSETSSTATUS || '';
+            if (status === 'OTHER') {
+                // OTHER = any status NOT in the standard set
+                return !standardStatuses.includes(eqStatus);
+            } else {
+                // For standard statuses, match exact EQUIPMENTASSETSSTATUS
+                return eqStatus === status;
+            }
+        });
+
+        document.getElementById('equipmentCount').textContent = filtered.length;
+        renderEquipmentList(filtered);
+    }
+
+    function clearMatrixFilter() {
+        matrixFilter = null;
+
+        // Remove selected highlighting
+        document.querySelectorAll('.matrix-table td.clickable').forEach(cell => {
+            cell.classList.remove('selected');
+        });
+
+        // Hide filter indicator
+        document.getElementById('matrixFilterIndicator').classList.remove('active');
+
+        // Show all equipment
+        document.getElementById('equipmentCount').textContent = allEquipment.length;
+        renderEquipmentList(allEquipment);
     }
 
     function getStatusDisplay(status, category) {

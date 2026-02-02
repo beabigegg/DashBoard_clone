@@ -501,6 +501,7 @@ def get_merged_resource_status(
             'CAUSECODE': realtime.get('CAUSECODE'),
             'REPAIRCODE': realtime.get('REPAIRCODE'),
             'LOT_COUNT': realtime.get('LOT_COUNT'),
+            'LOT_DETAILS': realtime.get('LOT_DETAILS'),  # LOT details for tooltip
             'TOTAL_TRACKIN_QTY': realtime.get('TOTAL_TRACKIN_QTY'),
             'LATEST_TRACKIN_TIME': realtime.get('LATEST_TRACKIN_TIME'),
         }

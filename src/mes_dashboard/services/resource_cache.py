@@ -52,6 +52,9 @@ def _build_filter_sql() -> str:
     """Build SQL WHERE clause for global filters."""
     conditions = [EQUIPMENT_TYPE_FILTER.strip()]
 
+    # Workcenter filter - exclude resources without WORKCENTERNAME
+    conditions.append("WORKCENTERNAME IS NOT NULL")
+
     # Location filter
     if EXCLUDED_LOCATIONS:
         locations_list = ", ".join(f"'{loc}'" for loc in EXCLUDED_LOCATIONS)

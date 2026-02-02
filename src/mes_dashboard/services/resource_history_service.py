@@ -6,24 +6,23 @@ Provides functions for querying historical equipment performance data including:
 - Summary data (KPI, trend, heatmap, workcenter comparison)
 - Hierarchical detail data (workcenter → family → resource)
 - CSV export with streaming
+
+Architecture:
+- Uses resource_cache as the single source of truth for equipment master data
+- Queries DW_MES_RESOURCESTATUS_SHIFT only for valid cached resource IDs
+- Merges dimension data (WORKCENTERNAME, RESOURCEFAMILYNAME, etc.) from cache
 """
 
 import io
 import csv
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Dict, List, Any, Generator
 
 import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df
-from mes_dashboard.config.constants import (
-    EXCLUDED_LOCATIONS,
-    EXCLUDED_ASSET_STATUSES,
-    EQUIPMENT_TYPE_FILTER,
-    EQUIPMENT_FLAG_FILTERS,
-)
 
 logger = logging.getLogger('mes_dashboard.resource_history')
 
@@ -32,6 +31,139 @@ MAX_QUERY_DAYS = 730
 
 # E10 Status definitions
 E10_STATUSES = ['PRD', 'SBY', 'UDT', 'SDT', 'EGT', 'NST']
+
+
+# ============================================================
+# Resource Cache Integration
+# ============================================================
+
+def _get_filtered_resources(
+    workcenter_groups: Optional[List[str]] = None,
+    families: Optional[List[str]] = None,
+    is_production: bool = False,
+    is_key: bool = False,
+    is_monitor: bool = False,
+) -> List[Dict[str, Any]]:
+    """Get filtered resources from resource_cache.
+
+    Applies additional filters on top of the cache's pre-applied global filters.
+
+    Args:
+        workcenter_groups: Optional list of WORKCENTER_GROUP names
+        families: Optional list of RESOURCEFAMILYNAME values
+        is_production: Filter by production flag
+        is_key: Filter by key equipment flag
+        is_monitor: Filter by monitor flag
+
+    Returns:
+        List of resource dicts matching the filters.
+    """
+    from mes_dashboard.services.resource_cache import get_all_resources
+    from mes_dashboard.services.filter_cache import get_workcenter_mapping
+
+    resources = get_all_resources()
+    if not resources:
+        logger.warning("No resources available from cache")
+        return []
+
+    # Get workcenter mapping for group filtering
+    wc_mapping = get_workcenter_mapping() or {}
+
+    # Build set of workcenters if filtering by groups
+    allowed_workcenters = None
+    if workcenter_groups:
+        allowed_workcenters = set()
+        for wc_name, info in wc_mapping.items():
+            if info.get('group') in workcenter_groups:
+                allowed_workcenters.add(wc_name)
+
+    # Apply filters
+    filtered = []
+    for r in resources:
+        # Workcenter group filter
+        if allowed_workcenters is not None:
+            if r.get('WORKCENTERNAME') not in allowed_workcenters:
+                continue
+
+        # Family filter
+        if families and r.get('RESOURCEFAMILYNAME') not in families:
+            continue
+
+        # Equipment flags filter
+        if is_production and r.get('PJ_ISPRODUCTION') != 1:
+            continue
+        if is_key and r.get('PJ_ISKEY') != 1:
+            continue
+        if is_monitor and r.get('PJ_ISMONITOR') != 1:
+            continue
+
+        filtered.append(r)
+
+    logger.debug(f"Filtered {len(resources)} resources to {len(filtered)}")
+    return filtered
+
+
+def _build_resource_lookup(resources: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Build a lookup dict from RESOURCEID to resource info.
+
+    Args:
+        resources: List of resource dicts from cache.
+
+    Returns:
+        Dict mapping RESOURCEID to resource dict.
+    """
+    return {r['RESOURCEID']: r for r in resources if r.get('RESOURCEID')}
+
+
+def _get_resource_ids_sql_list(resources: List[Dict[str, Any]], max_chunk_size: int = 1000) -> List[str]:
+    """Build SQL IN clause lists for resource IDs.
+
+    Oracle has a limit of ~1000 items per IN clause, so we chunk if needed.
+
+    Args:
+        resources: List of resource dicts.
+        max_chunk_size: Maximum items per IN clause.
+
+    Returns:
+        List of SQL IN clause strings (e.g., "'ID1', 'ID2', 'ID3'").
+    """
+    resource_ids = [r['RESOURCEID'] for r in resources if r.get('RESOURCEID')]
+    if not resource_ids:
+        return []
+
+    # Escape single quotes
+    escaped_ids = [rid.replace("'", "''") for rid in resource_ids]
+
+    # Chunk into groups
+    chunks = []
+    for i in range(0, len(escaped_ids), max_chunk_size):
+        chunk = escaped_ids[i:i + max_chunk_size]
+        chunks.append("'" + "', '".join(chunk) + "'")
+
+    return chunks
+
+
+def _build_historyid_filter(resources: List[Dict[str, Any]]) -> str:
+    """Build SQL WHERE clause for HISTORYID filtering.
+
+    Handles chunking for large resource lists.
+
+    Args:
+        resources: List of resource dicts.
+
+    Returns:
+        SQL condition string (e.g., "HISTORYID IN ('ID1', 'ID2') OR HISTORYID IN ('ID3', 'ID4')").
+    """
+    chunks = _get_resource_ids_sql_list(resources)
+    if not chunks:
+        return "1=0"  # No resources = no results
+
+    if len(chunks) == 1:
+        return f"HISTORYID IN ({chunks[0]})"
+
+    # Multiple chunks need OR
+    conditions = [f"HISTORYID IN ({chunk})" for chunk in chunks]
+    return "(" + " OR ".join(conditions) + ")"
 
 
 # ============================================================
@@ -85,6 +217,9 @@ def query_summary(
 ) -> Optional[Dict[str, Any]]:
     """Query summary data including KPI, trend, heatmap, and workcenter comparison.
 
+    Uses resource_cache as the source for equipment master data.
+    Queries only DW_MES_RESOURCESTATUS_SHIFT for SHIFT data.
+
     Args:
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
@@ -105,123 +240,96 @@ def query_summary(
         return {'error': validation}
 
     try:
+        # Get filtered resources from cache
+        resources = _get_filtered_resources(
+            workcenter_groups=workcenter_groups,
+            families=families,
+            is_production=is_production,
+            is_key=is_key,
+            is_monitor=is_monitor,
+        )
+
+        if not resources:
+            logger.warning("No resources match the filter criteria")
+            return {
+                'kpi': _build_kpi_from_df(pd.DataFrame()),
+                'trend': [],
+                'heatmap': [],
+                'workcenter_comparison': []
+            }
+
+        # Build resource lookup for dimension merging
+        resource_lookup = _build_resource_lookup(resources)
+        historyid_filter = _build_historyid_filter(resources)
+
         # Build SQL components
         date_trunc = _get_date_trunc(granularity)
-        location_filter = _build_location_filter('r')
-        asset_status_filter = _build_asset_status_filter('r')
-        equipment_filter = _build_equipment_flags_filter(is_production, is_key, is_monitor, 'r')
-        workcenter_filter = _build_workcenter_groups_filter(workcenter_groups, 'r')
-        family_filter = _build_families_filter(families, 'r')
 
-        # Common CTE with MATERIALIZE hint to force Oracle to materialize the subquery
-        # This prevents the optimizer from inlining the CTE multiple times
+        # Base CTE with resource filter
         base_cte = f"""
             WITH shift_data AS (
                 SELECT /*+ MATERIALIZE */ HISTORYID, TXNDATE, OLDSTATUSNAME, HOURS
                 FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
                 WHERE TXNDATE >= TO_DATE('{start_date}', 'YYYY-MM-DD')
                   AND TXNDATE < TO_DATE('{end_date}', 'YYYY-MM-DD') + 1
+                  AND {historyid_filter}
             )
         """
 
-        # Common filter conditions
-        common_filters = f"""
-            WHERE {EQUIPMENT_TYPE_FILTER}
-              {location_filter}
-              {asset_status_filter}
-              {equipment_filter}
-              {workcenter_filter}
-              {family_filter}
-        """
-
-        # Build all 4 SQL queries
+        # KPI query - aggregate all
         kpi_sql = f"""
             {base_cte}
             SELECT
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SBY' THEN ss.HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'UDT' THEN ss.HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'NST' THEN ss.HOURS ELSE 0 END) as NST_HOURS,
-                COUNT(DISTINCT ss.HISTORYID) as MACHINE_COUNT
-            FROM shift_data ss
-            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
-            {common_filters}
+                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'NST' THEN HOURS ELSE 0 END) as NST_HOURS,
+                COUNT(DISTINCT HISTORYID) as MACHINE_COUNT
+            FROM shift_data
         """
 
+        # Trend query - group by date
         trend_sql = f"""
             {base_cte}
             SELECT
                 {date_trunc} as DATA_DATE,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SBY' THEN ss.HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'UDT' THEN ss.HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'NST' THEN ss.HOURS ELSE 0 END) as NST_HOURS,
-                COUNT(DISTINCT ss.HISTORYID) as MACHINE_COUNT
-            FROM shift_data ss
-            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
-            {common_filters}
+                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'NST' THEN HOURS ELSE 0 END) as NST_HOURS,
+                COUNT(DISTINCT HISTORYID) as MACHINE_COUNT
+            FROM shift_data
             GROUP BY {date_trunc}
             ORDER BY DATA_DATE
         """
 
-        heatmap_sql = f"""
+        # Heatmap/Comparison query - group by HISTORYID and date, merge dimension in Python
+        heatmap_raw_sql = f"""
             {base_cte}
             SELECT
-                r.WORKCENTERNAME,
+                HISTORYID,
                 {date_trunc} as DATA_DATE,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SBY' THEN ss.HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'UDT' THEN ss.HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS
-            FROM shift_data ss
-            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
-            WHERE r.WORKCENTERNAME IS NOT NULL
-              AND {EQUIPMENT_TYPE_FILTER}
-              {location_filter}
-              {asset_status_filter}
-              {equipment_filter}
-              {workcenter_filter}
-              {family_filter}
-            GROUP BY r.WORKCENTERNAME, {date_trunc}
-            ORDER BY r.WORKCENTERNAME, DATA_DATE
+                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS
+            FROM shift_data
+            GROUP BY HISTORYID, {date_trunc}
+            ORDER BY HISTORYID, DATA_DATE
         """
 
-        comparison_sql = f"""
-            {base_cte}
-            SELECT
-                r.WORKCENTERNAME,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SBY' THEN ss.HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'UDT' THEN ss.HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS,
-                COUNT(DISTINCT ss.HISTORYID) as MACHINE_COUNT
-            FROM shift_data ss
-            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
-            WHERE r.WORKCENTERNAME IS NOT NULL
-              AND {EQUIPMENT_TYPE_FILTER}
-              {location_filter}
-              {asset_status_filter}
-              {equipment_filter}
-              {workcenter_filter}
-              {family_filter}
-            GROUP BY r.WORKCENTERNAME
-            ORDER BY PRD_HOURS DESC
-        """
-
-        # Execute all 4 queries in parallel using ThreadPoolExecutor
+        # Execute queries in parallel
         results = {}
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {
                 executor.submit(read_sql_df, kpi_sql): 'kpi',
                 executor.submit(read_sql_df, trend_sql): 'trend',
-                executor.submit(read_sql_df, heatmap_sql): 'heatmap',
-                executor.submit(read_sql_df, comparison_sql): 'comparison',
+                executor.submit(read_sql_df, heatmap_raw_sql): 'heatmap_raw',
             }
             for future in as_completed(futures):
                 query_name = futures[future]
@@ -234,8 +342,11 @@ def query_summary(
         # Build response from results
         kpi = _build_kpi_from_df(results.get('kpi', pd.DataFrame()))
         trend = _build_trend_from_df(results.get('trend', pd.DataFrame()), granularity)
-        heatmap = _build_heatmap_from_df(results.get('heatmap', pd.DataFrame()), granularity)
-        workcenter_comparison = _build_comparison_from_df(results.get('comparison', pd.DataFrame()))
+
+        # Build heatmap and comparison from raw data with dimension merge
+        heatmap_raw_df = results.get('heatmap_raw', pd.DataFrame())
+        heatmap = _build_heatmap_from_raw_df(heatmap_raw_df, resource_lookup, granularity)
+        workcenter_comparison = _build_comparison_from_raw_df(heatmap_raw_df, resource_lookup)
 
         return {
             'kpi': kpi,
@@ -254,10 +365,6 @@ def query_summary(
 # Detail Query
 # ============================================================
 
-# Maximum records limit for detail query (disabled - no limit)
-# MAX_DETAIL_RECORDS = 5000
-
-
 def query_detail(
     start_date: str,
     end_date: str,
@@ -270,6 +377,7 @@ def query_detail(
 ) -> Optional[Dict[str, Any]]:
     """Query hierarchical detail data.
 
+    Uses resource_cache as the source for equipment master data.
     Returns flat data with workcenter, family, resource dimensions.
     Frontend handles hierarchy assembly.
 
@@ -293,58 +401,56 @@ def query_detail(
         return {'error': validation}
 
     try:
-        # Build SQL components
-        location_filter = _build_location_filter('r')
-        asset_status_filter = _build_asset_status_filter('r')
-        equipment_filter = _build_equipment_flags_filter(is_production, is_key, is_monitor, 'r')
-        workcenter_filter = _build_workcenter_groups_filter(workcenter_groups, 'r')
-        family_filter = _build_families_filter(families, 'r')
+        # Get filtered resources from cache
+        resources = _get_filtered_resources(
+            workcenter_groups=workcenter_groups,
+            families=families,
+            is_production=is_production,
+            is_key=is_key,
+            is_monitor=is_monitor,
+        )
 
-        # Common CTE with MATERIALIZE hint
-        base_cte = f"""
+        if not resources:
+            logger.warning("No resources match the filter criteria")
+            return {
+                'data': [],
+                'total': 0,
+                'truncated': False,
+                'max_records': None
+            }
+
+        # Build resource lookup for dimension merging
+        resource_lookup = _build_resource_lookup(resources)
+        historyid_filter = _build_historyid_filter(resources)
+
+        # Query SHIFT data grouped by HISTORYID
+        detail_sql = f"""
             WITH shift_data AS (
                 SELECT /*+ MATERIALIZE */ HISTORYID, OLDSTATUSNAME, HOURS
                 FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
                 WHERE TXNDATE >= TO_DATE('{start_date}', 'YYYY-MM-DD')
                   AND TXNDATE < TO_DATE('{end_date}', 'YYYY-MM-DD') + 1
+                  AND {historyid_filter}
             )
-        """
-
-        # Common filter conditions
-        common_filters = f"""
-            WHERE {EQUIPMENT_TYPE_FILTER}
-              {location_filter}
-              {asset_status_filter}
-              {equipment_filter}
-              {workcenter_filter}
-              {family_filter}
-        """
-
-        # Query all detail data (no pagination)
-        detail_sql = f"""
-            {base_cte}
             SELECT
-                r.WORKCENTERNAME,
-                r.RESOURCEFAMILYNAME,
-                r.RESOURCENAME,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SBY' THEN ss.HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'UDT' THEN ss.HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'NST' THEN ss.HOURS ELSE 0 END) as NST_HOURS,
-                SUM(ss.HOURS) as TOTAL_HOURS
-            FROM shift_data ss
-            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
-            {common_filters}
-            GROUP BY r.WORKCENTERNAME, r.RESOURCEFAMILYNAME, r.RESOURCENAME
-            ORDER BY r.WORKCENTERNAME, r.RESOURCEFAMILYNAME, r.RESOURCENAME
+                HISTORYID,
+                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'NST' THEN HOURS ELSE 0 END) as NST_HOURS,
+                SUM(HOURS) as TOTAL_HOURS
+            FROM shift_data
+            GROUP BY HISTORYID
+            ORDER BY HISTORYID
         """
 
         detail_df = read_sql_df(detail_sql)
-        total = len(detail_df) if detail_df is not None else 0
 
-        data = _build_detail_from_df(detail_df)
+        # Build detail data with dimension merge from cache
+        data = _build_detail_from_raw_df(detail_df, resource_lookup)
+        total = len(data)
 
         return {
             'data': data,
@@ -375,6 +481,7 @@ def export_csv(
 ) -> Generator[str, None, None]:
     """Generate CSV data as a stream for export.
 
+    Uses resource_cache as the source for equipment master data.
     Yields CSV rows one at a time to avoid memory issues with large datasets.
 
     Args:
@@ -397,48 +504,50 @@ def export_csv(
         return
 
     try:
-        # Build SQL components
-        location_filter = _build_location_filter('r')
-        asset_status_filter = _build_asset_status_filter('r')
-        equipment_filter = _build_equipment_flags_filter(is_production, is_key, is_monitor, 'r')
-        workcenter_filter = _build_workcenter_groups_filter(workcenter_groups, 'r')
-        family_filter = _build_families_filter(families, 'r')
+        # Get filtered resources from cache
+        resources = _get_filtered_resources(
+            workcenter_groups=workcenter_groups,
+            families=families,
+            is_production=is_production,
+            is_key=is_key,
+            is_monitor=is_monitor,
+        )
 
-        # Query all data with CTE and MATERIALIZE hint for performance optimization
+        if not resources:
+            yield "Error: No resources match the filter criteria\n"
+            return
+
+        # Build resource lookup for dimension merging
+        resource_lookup = _build_resource_lookup(resources)
+        historyid_filter = _build_historyid_filter(resources)
+
+        # Get workcenter mapping for WORKCENTER_GROUP
+        from mes_dashboard.services.filter_cache import get_workcenter_mapping
+        wc_mapping = get_workcenter_mapping() or {}
+
+        # Query SHIFT data grouped by HISTORYID
         sql = f"""
             WITH shift_data AS (
                 SELECT /*+ MATERIALIZE */ HISTORYID, OLDSTATUSNAME, HOURS
                 FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
                 WHERE TXNDATE >= TO_DATE('{start_date}', 'YYYY-MM-DD')
                   AND TXNDATE < TO_DATE('{end_date}', 'YYYY-MM-DD') + 1
+                  AND {historyid_filter}
             )
             SELECT
-                r.WORKCENTERNAME,
-                r.RESOURCEFAMILYNAME,
-                r.RESOURCENAME,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SBY' THEN ss.HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'UDT' THEN ss.HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'NST' THEN ss.HOURS ELSE 0 END) as NST_HOURS,
-                SUM(ss.HOURS) as TOTAL_HOURS
-            FROM shift_data ss
-            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
-            WHERE {EQUIPMENT_TYPE_FILTER}
-              {location_filter}
-              {asset_status_filter}
-              {equipment_filter}
-              {workcenter_filter}
-              {family_filter}
-            GROUP BY r.WORKCENTERNAME, r.RESOURCEFAMILYNAME, r.RESOURCENAME
-            ORDER BY r.WORKCENTERNAME, r.RESOURCEFAMILYNAME, r.RESOURCENAME
+                HISTORYID,
+                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS,
+                SUM(CASE WHEN OLDSTATUSNAME = 'NST' THEN HOURS ELSE 0 END) as NST_HOURS,
+                SUM(HOURS) as TOTAL_HOURS
+            FROM shift_data
+            GROUP BY HISTORYID
+            ORDER BY HISTORYID
         """
         df = read_sql_df(sql)
-
-        # Get workcenter mapping to convert WORKCENTERNAME to WORKCENTER_GROUP
-        from mes_dashboard.services.filter_cache import get_workcenter_mapping
-        wc_mapping = get_workcenter_mapping() or {}
 
         # Write CSV header
         output = io.StringIO()
@@ -455,47 +564,57 @@ def export_csv(
         output.seek(0)
 
         # Write data rows
-        for _, row in df.iterrows():
-            prd = float(row['PRD_HOURS'] or 0)
-            sby = float(row['SBY_HOURS'] or 0)
-            udt = float(row['UDT_HOURS'] or 0)
-            sdt = float(row['SDT_HOURS'] or 0)
-            egt = float(row['EGT_HOURS'] or 0)
-            nst = float(row['NST_HOURS'] or 0)
-            total = float(row['TOTAL_HOURS'] or 0)
+        if df is not None:
+            for _, row in df.iterrows():
+                historyid = row['HISTORYID']
+                resource_info = resource_lookup.get(historyid, {})
 
-            # Map WORKCENTERNAME to WORKCENTER_GROUP
-            wc_name = row['WORKCENTERNAME']
-            wc_info = wc_mapping.get(wc_name, {})
-            wc_group = wc_info.get('group', wc_name)  # Fallback to workcentername if no mapping
+                # Skip if no resource info found
+                if not resource_info:
+                    continue
 
-            # Calculate percentages
-            ou_pct = _calc_ou_pct(prd, sby, udt, sdt, egt)
-            availability_pct = _calc_availability_pct(prd, sby, udt, sdt, egt, nst)
-            prd_pct = round(prd / total * 100, 1) if total > 0 else 0
-            sby_pct = round(sby / total * 100, 1) if total > 0 else 0
-            udt_pct = round(udt / total * 100, 1) if total > 0 else 0
-            sdt_pct = round(sdt / total * 100, 1) if total > 0 else 0
-            egt_pct = round(egt / total * 100, 1) if total > 0 else 0
-            nst_pct = round(nst / total * 100, 1) if total > 0 else 0
+                prd = float(row['PRD_HOURS'] or 0)
+                sby = float(row['SBY_HOURS'] or 0)
+                udt = float(row['UDT_HOURS'] or 0)
+                sdt = float(row['SDT_HOURS'] or 0)
+                egt = float(row['EGT_HOURS'] or 0)
+                nst = float(row['NST_HOURS'] or 0)
+                total = float(row['TOTAL_HOURS'] or 0)
 
-            csv_row = [
-                wc_group,
-                row['RESOURCEFAMILYNAME'],
-                row['RESOURCENAME'],
-                f"{ou_pct}%",
-                f"{availability_pct}%",
-                round(prd, 1), f"{prd_pct}%",
-                round(sby, 1), f"{sby_pct}%",
-                round(udt, 1), f"{udt_pct}%",
-                round(sdt, 1), f"{sdt_pct}%",
-                round(egt, 1), f"{egt_pct}%",
-                round(nst, 1), f"{nst_pct}%"
-            ]
-            writer.writerow(csv_row)
-            yield output.getvalue()
-            output.truncate(0)
-            output.seek(0)
+                # Get dimension data from cache
+                wc_name = resource_info.get('WORKCENTERNAME', '')
+                wc_info = wc_mapping.get(wc_name, {})
+                wc_group = wc_info.get('group', wc_name)
+                family = resource_info.get('RESOURCEFAMILYNAME', '')
+                resource_name = resource_info.get('RESOURCENAME', '')
+
+                # Calculate percentages
+                ou_pct = _calc_ou_pct(prd, sby, udt, sdt, egt)
+                availability_pct = _calc_availability_pct(prd, sby, udt, sdt, egt, nst)
+                prd_pct = round(prd / total * 100, 1) if total > 0 else 0
+                sby_pct = round(sby / total * 100, 1) if total > 0 else 0
+                udt_pct = round(udt / total * 100, 1) if total > 0 else 0
+                sdt_pct = round(sdt / total * 100, 1) if total > 0 else 0
+                egt_pct = round(egt / total * 100, 1) if total > 0 else 0
+                nst_pct = round(nst / total * 100, 1) if total > 0 else 0
+
+                csv_row = [
+                    wc_group,
+                    family,
+                    resource_name,
+                    f"{ou_pct}%",
+                    f"{availability_pct}%",
+                    round(prd, 1), f"{prd_pct}%",
+                    round(sby, 1), f"{sby_pct}%",
+                    round(udt, 1), f"{udt_pct}%",
+                    round(sdt, 1), f"{sdt_pct}%",
+                    round(egt, 1), f"{egt_pct}%",
+                    round(nst, 1), f"{nst_pct}%"
+                ]
+                writer.writerow(csv_row)
+                yield output.getvalue()
+                output.truncate(0)
+                output.seek(0)
 
     except Exception as exc:
         logger.error(f"CSV export failed: {exc}")
@@ -523,93 +642,17 @@ def _validate_date_range(start_date: str, end_date: str) -> Optional[str]:
 
 
 def _get_date_trunc(granularity: str) -> str:
-    """Get Oracle TRUNC expression for date granularity."""
+    """Get Oracle TRUNC expression for date granularity.
+
+    Note: Uses 'ss' as alias for shift_data CTE.
+    """
     trunc_map = {
-        'day': "TRUNC(ss.TXNDATE)",
-        'week': "TRUNC(ss.TXNDATE, 'IW')",
-        'month': "TRUNC(ss.TXNDATE, 'MM')",
-        'year': "TRUNC(ss.TXNDATE, 'YYYY')"
+        'day': "TRUNC(TXNDATE)",
+        'week': "TRUNC(TXNDATE, 'IW')",
+        'month': "TRUNC(TXNDATE, 'MM')",
+        'year': "TRUNC(TXNDATE, 'YYYY')"
     }
-    return trunc_map.get(granularity, "TRUNC(ss.TXNDATE)")
-
-
-def _build_location_filter(alias: str) -> str:
-    """Build SQL filter for excluded locations."""
-    if not EXCLUDED_LOCATIONS:
-        return ""
-    excluded = "', '".join(EXCLUDED_LOCATIONS)
-    return f"AND ({alias}.LOCATIONNAME IS NULL OR {alias}.LOCATIONNAME NOT IN ('{excluded}'))"
-
-
-def _build_asset_status_filter(alias: str) -> str:
-    """Build SQL filter for excluded asset statuses."""
-    if not EXCLUDED_ASSET_STATUSES:
-        return ""
-    excluded = "', '".join(EXCLUDED_ASSET_STATUSES)
-    return f"AND ({alias}.PJ_ASSETSSTATUS IS NULL OR {alias}.PJ_ASSETSSTATUS NOT IN ('{excluded}'))"
-
-
-def _build_equipment_flags_filter(
-    is_production: bool,
-    is_key: bool,
-    is_monitor: bool,
-    alias: str
-) -> str:
-    """Build SQL filter for equipment flags."""
-    conditions = []
-    if is_production:
-        conditions.append(f"NVL({alias}.PJ_ISPRODUCTION, 0) = 1")
-    if is_key:
-        conditions.append(f"NVL({alias}.PJ_ISKEY, 0) = 1")
-    if is_monitor:
-        conditions.append(f"NVL({alias}.PJ_ISMONITOR, 0) = 1")
-    return "AND " + " AND ".join(conditions) if conditions else ""
-
-
-def _build_workcenter_groups_filter(groups: Optional[List[str]], alias: str) -> str:
-    """Build SQL filter for workcenter groups.
-
-    Uses filter_cache to get workcentername list for selected groups.
-
-    Args:
-        groups: List of WORKCENTER_GROUP names, or None for no filter
-        alias: Table alias for WORKCENTERNAME column
-
-    Returns:
-        SQL filter clause (empty string if no filter)
-    """
-    if not groups:
-        return ""
-
-    from mes_dashboard.services.filter_cache import get_workcenters_for_groups
-    workcenters = get_workcenters_for_groups(groups)
-
-    if not workcenters:
-        return ""
-
-    # Escape single quotes and build IN clause
-    escaped = [wc.replace("'", "''") for wc in workcenters]
-    in_list = "', '".join(escaped)
-    return f"AND {alias}.WORKCENTERNAME IN ('{in_list}')"
-
-
-def _build_families_filter(families: Optional[List[str]], alias: str) -> str:
-    """Build SQL filter for resource families.
-
-    Args:
-        families: List of RESOURCEFAMILYNAME values, or None for no filter
-        alias: Table alias for RESOURCEFAMILYNAME column
-
-    Returns:
-        SQL filter clause (empty string if no filter)
-    """
-    if not families:
-        return ""
-
-    # Escape single quotes and build IN clause
-    escaped = [f.replace("'", "''") for f in families]
-    in_list = "', '".join(escaped)
-    return f"AND {alias}.RESOURCEFAMILYNAME IN ('{in_list}')"
+    return trunc_map.get(granularity, "TRUNC(TXNDATE)")
 
 
 def _safe_float(value, default=0.0) -> float:
@@ -713,8 +756,23 @@ def _build_trend_from_df(df: pd.DataFrame, granularity: str) -> List[Dict]:
     return result
 
 
-def _build_heatmap_from_df(df: pd.DataFrame, granularity: str) -> List[Dict]:
-    """Build heatmap data from query result DataFrame."""
+def _build_heatmap_from_raw_df(
+    df: pd.DataFrame,
+    resource_lookup: Dict[str, Dict[str, Any]],
+    granularity: str
+) -> List[Dict]:
+    """Build heatmap data from raw SHIFT query grouped by HISTORYID.
+
+    Merges dimension data from resource_lookup.
+
+    Args:
+        df: DataFrame with HISTORYID, DATA_DATE, and status hours.
+        resource_lookup: Dict mapping RESOURCEID to resource info.
+        granularity: Time granularity for date formatting.
+
+    Returns:
+        List of heatmap data dicts.
+    """
     if df is None or len(df) == 0:
         return []
 
@@ -725,10 +783,17 @@ def _build_heatmap_from_df(df: pd.DataFrame, granularity: str) -> List[Dict]:
     # Aggregate data by WORKCENTER_GROUP and date
     aggregated = {}
     for _, row in df.iterrows():
-        wc_name = row['WORKCENTERNAME']
-        # Skip rows with NaN workcenter name
-        if pd.isna(wc_name):
+        historyid = row['HISTORYID']
+        resource_info = resource_lookup.get(historyid, {})
+
+        # Skip if no resource info
+        if not resource_info:
             continue
+
+        wc_name = resource_info.get('WORKCENTERNAME', '')
+        if not wc_name:
+            continue
+
         wc_info = wc_mapping.get(wc_name, {})
         wc_group = wc_info.get('group', wc_name)
         date_str = _format_date(row['DATA_DATE'], granularity)
@@ -756,8 +821,21 @@ def _build_heatmap_from_df(df: pd.DataFrame, granularity: str) -> List[Dict]:
     return result
 
 
-def _build_comparison_from_df(df: pd.DataFrame) -> List[Dict]:
-    """Build workcenter comparison data from query result DataFrame."""
+def _build_comparison_from_raw_df(
+    df: pd.DataFrame,
+    resource_lookup: Dict[str, Dict[str, Any]]
+) -> List[Dict]:
+    """Build workcenter comparison data from raw SHIFT query grouped by HISTORYID.
+
+    Merges dimension data from resource_lookup.
+
+    Args:
+        df: DataFrame with HISTORYID and status hours (may have DATA_DATE if from heatmap query).
+        resource_lookup: Dict mapping RESOURCEID to resource info.
+
+    Returns:
+        List of comparison data dicts.
+    """
     if df is None or len(df) == 0:
         return []
 
@@ -765,25 +843,44 @@ def _build_comparison_from_df(df: pd.DataFrame) -> List[Dict]:
     from mes_dashboard.services.filter_cache import get_workcenter_mapping
     wc_mapping = get_workcenter_mapping() or {}
 
-    # Aggregate data by WORKCENTER_GROUP
-    aggregated = {}
+    # First aggregate by HISTORYID (in case df is by HISTORYID + date)
+    by_resource = {}
     for _, row in df.iterrows():
-        wc_name = row['WORKCENTERNAME']
-        # Skip rows with NaN workcenter name
-        if pd.isna(wc_name):
+        historyid = row['HISTORYID']
+        if historyid not in by_resource:
+            by_resource[historyid] = {'prd': 0, 'sby': 0, 'udt': 0, 'sdt': 0, 'egt': 0}
+
+        by_resource[historyid]['prd'] += _safe_float(row['PRD_HOURS'])
+        by_resource[historyid]['sby'] += _safe_float(row['SBY_HOURS'])
+        by_resource[historyid]['udt'] += _safe_float(row['UDT_HOURS'])
+        by_resource[historyid]['sdt'] += _safe_float(row['SDT_HOURS'])
+        by_resource[historyid]['egt'] += _safe_float(row['EGT_HOURS'])
+
+    # Then aggregate by WORKCENTER_GROUP
+    aggregated = {}
+    for historyid, hours in by_resource.items():
+        resource_info = resource_lookup.get(historyid, {})
+
+        # Skip if no resource info
+        if not resource_info:
             continue
+
+        wc_name = resource_info.get('WORKCENTERNAME', '')
+        if not wc_name:
+            continue
+
         wc_info = wc_mapping.get(wc_name, {})
         wc_group = wc_info.get('group', wc_name)
 
         if wc_group not in aggregated:
             aggregated[wc_group] = {'prd': 0, 'sby': 0, 'udt': 0, 'sdt': 0, 'egt': 0, 'machine_count': 0}
 
-        aggregated[wc_group]['prd'] += _safe_float(row['PRD_HOURS'])
-        aggregated[wc_group]['sby'] += _safe_float(row['SBY_HOURS'])
-        aggregated[wc_group]['udt'] += _safe_float(row['UDT_HOURS'])
-        aggregated[wc_group]['sdt'] += _safe_float(row['SDT_HOURS'])
-        aggregated[wc_group]['egt'] += _safe_float(row['EGT_HOURS'])
-        aggregated[wc_group]['machine_count'] += int(_safe_float(row['MACHINE_COUNT']))
+        aggregated[wc_group]['prd'] += hours['prd']
+        aggregated[wc_group]['sby'] += hours['sby']
+        aggregated[wc_group]['udt'] += hours['udt']
+        aggregated[wc_group]['sdt'] += hours['sdt']
+        aggregated[wc_group]['egt'] += hours['egt']
+        aggregated[wc_group]['machine_count'] += 1
 
     result = []
     for wc_group, data in aggregated.items():
@@ -799,8 +896,21 @@ def _build_comparison_from_df(df: pd.DataFrame) -> List[Dict]:
     return result
 
 
-def _build_detail_from_df(df: pd.DataFrame) -> List[Dict]:
-    """Build detail data from query result DataFrame."""
+def _build_detail_from_raw_df(
+    df: pd.DataFrame,
+    resource_lookup: Dict[str, Dict[str, Any]]
+) -> List[Dict]:
+    """Build detail data from raw SHIFT query grouped by HISTORYID.
+
+    Merges dimension data from resource_lookup.
+
+    Args:
+        df: DataFrame with HISTORYID and status hours.
+        resource_lookup: Dict mapping RESOURCEID to resource info.
+
+    Returns:
+        List of detail data dicts.
+    """
     if df is None or len(df) == 0:
         return []
 
@@ -810,9 +920,11 @@ def _build_detail_from_df(df: pd.DataFrame) -> List[Dict]:
 
     result = []
     for _, row in df.iterrows():
-        # Skip rows with NaN workcenter name
-        wc_name = row['WORKCENTERNAME']
-        if pd.isna(wc_name):
+        historyid = row['HISTORYID']
+        resource_info = resource_lookup.get(historyid, {})
+
+        # Skip if no resource info
+        if not resource_info:
             continue
 
         prd = _safe_float(row['PRD_HOURS'])
@@ -823,18 +935,17 @@ def _build_detail_from_df(df: pd.DataFrame) -> List[Dict]:
         nst = _safe_float(row['NST_HOURS'])
         total = _safe_float(row['TOTAL_HOURS'])
 
-        # Map WORKCENTERNAME to WORKCENTER_GROUP
+        # Get dimension data from cache
+        wc_name = resource_info.get('WORKCENTERNAME', '')
         wc_info = wc_mapping.get(wc_name, {})
         wc_group = wc_info.get('group', wc_name)  # Fallback to workcentername if no mapping
-
-        # Handle NaN in string fields
-        family = row['RESOURCEFAMILYNAME']
-        resource = row['RESOURCENAME']
+        family = resource_info.get('RESOURCEFAMILYNAME', '')
+        resource_name = resource_info.get('RESOURCENAME', '')
 
         result.append({
             'workcenter': wc_group,
-            'family': family if not pd.isna(family) else '',
-            'resource': resource if not pd.isna(resource) else '',
+            'family': family or '',
+            'resource': resource_name or '',
             'ou_pct': _calc_ou_pct(prd, sby, udt, sdt, egt),
             'availability_pct': _calc_availability_pct(prd, sby, udt, sdt, egt, nst),
             'prd_hours': round(prd, 1),
@@ -852,4 +963,6 @@ def _build_detail_from_df(df: pd.DataFrame) -> List[Dict]:
             'machine_count': 1
         })
 
+    # Sort by workcenter, family, resource
+    result.sort(key=lambda x: (x['workcenter'], x['family'], x['resource']))
     return result

@@ -4,10 +4,43 @@
 Contains Flask Blueprint for resource/equipment-related API endpoints.
 """
 
+import math
 from flask import Blueprint, jsonify, request
 
 from mes_dashboard.core.database import get_db_connection
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
+
+
+def _clean_nan_values(data):
+    """Convert NaN and NaT values to None for JSON serialization.
+
+    Args:
+        data: List of dicts or single dict.
+
+    Returns:
+        Cleaned data with NaN/NaT replaced by None.
+    """
+    if isinstance(data, list):
+        return [_clean_nan_values(item) for item in data]
+    elif isinstance(data, dict):
+        cleaned = {}
+        for key, value in data.items():
+            if isinstance(value, float) and math.isnan(value):
+                cleaned[key] = None
+            elif isinstance(value, str) and value == 'NaT':
+                cleaned[key] = None
+            elif value != value:  # NaN check (NaN != NaN)
+                cleaned[key] = None
+            elif isinstance(value, list):
+                # Recursively clean nested lists (e.g., LOT_DETAILS)
+                cleaned[key] = _clean_nan_values(value)
+            elif isinstance(value, dict):
+                # Recursively clean nested dicts
+                cleaned[key] = _clean_nan_values(value)
+            else:
+                cleaned[key] = value
+        return cleaned
+    return data
 from mes_dashboard.core.utils import get_days_back
 from mes_dashboard.services.resource_service import (
     query_resource_status_summary,
@@ -202,10 +235,12 @@ def api_resource_status():
             is_monitor=is_monitor,
             status_categories=status_categories,
         )
+        # Clean NaN/NaT values for valid JSON
+        cleaned_data = _clean_nan_values(data)
         return jsonify({
             'success': True,
-            'data': data,
-            'count': len(data),
+            'data': cleaned_data,
+            'count': len(cleaned_data),
         })
     except Exception as exc:
         return jsonify({'success': False, 'error': str(exc)}), 500
@@ -264,7 +299,9 @@ def api_resource_status_summary():
             is_key=is_key,
             is_monitor=is_monitor,
         )
-        return jsonify({'success': True, 'data': data})
+        # Clean NaN/NaT values for valid JSON
+        cleaned_data = _clean_nan_values(data)
+        return jsonify({'success': True, 'data': cleaned_data})
     except Exception as exc:
         return jsonify({'success': False, 'error': str(exc)}), 500
 
@@ -299,6 +336,8 @@ def api_resource_status_matrix():
             is_key=is_key,
             is_monitor=is_monitor,
         )
-        return jsonify({'success': True, 'data': data})
+        # Clean NaN/NaT values for valid JSON
+        cleaned_data = _clean_nan_values(data)
+        return jsonify({'success': True, 'data': cleaned_data})
     except Exception as exc:
         return jsonify({'success': False, 'error': str(exc)}), 500

@@ -109,12 +109,35 @@ def _classify_status(status: Optional[str]) -> str:
     return STATUS_CATEGORY_MAP.get(status, 'OTHER')
 
 
+def _is_valid_value(value) -> bool:
+    """Check if a value is valid (not None, not NaN, not empty string).
+
+    Args:
+        value: The value to check.
+
+    Returns:
+        True if valid, False otherwise.
+    """
+    if value is None:
+        return False
+    if isinstance(value, str) and (not value.strip() or value == 'NaT'):
+        return False
+    # Check for NaN (pandas NaN or float NaN)
+    try:
+        if value != value:  # NaN != NaN is True
+            return False
+    except (TypeError, ValueError):
+        pass
+    return True
+
+
 def _aggregate_by_resourceid(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Aggregate equipment status records by RESOURCEID.
 
     For each RESOURCEID:
     - Status fields: take first (should be same for all records)
-    - LOT_COUNT: count of records
+    - LOT_COUNT: count of distinct RUNCARDLOTID values
+    - LOT_DETAILS: list of LOT information for tooltip display
     - TOTAL_TRACKIN_QTY: sum of LOTTRACKINQTY_PCS
     - LATEST_TRACKIN_TIME: max of LOTTRACKINTIME
 
@@ -141,12 +164,29 @@ def _aggregate_by_resourceid(records: List[Dict[str, Any]]) -> List[Dict[str, An
     for resource_id, group in grouped.items():
         first = group[0]
 
-        # Calculate aggregates
-        lot_count = len(group)
-        total_qty = sum(
-            r.get('LOTTRACKINQTY_PCS') or 0
-            for r in group
-        )
+        # Collect unique LOTs by RUNCARDLOTID
+        seen_lots = set()
+        lot_details = []
+        total_qty = 0
+
+        for r in group:
+            lot_id = r.get('RUNCARDLOTID')
+            qty = r.get('LOTTRACKINQTY_PCS')
+            # Sum only valid quantities
+            if _is_valid_value(qty):
+                total_qty += qty
+
+            # Only add unique LOTs with valid RUNCARDLOTID
+            if _is_valid_value(lot_id) and lot_id not in seen_lots:
+                seen_lots.add(lot_id)
+                trackin_time = r.get('LOTTRACKINTIME')
+                trackin_employee = r.get('LOTTRACKINEMPLOYEE')
+                lot_details.append({
+                    'RUNCARDLOTID': lot_id,
+                    'LOTTRACKINQTY_PCS': qty if _is_valid_value(qty) else None,
+                    'LOTTRACKINTIME': trackin_time if _is_valid_value(trackin_time) else None,
+                    'LOTTRACKINEMPLOYEE': trackin_employee if _is_valid_value(trackin_employee) else None,
+                })
 
         # Find latest trackin time
         trackin_times = [
@@ -170,7 +210,8 @@ def _aggregate_by_resourceid(records: List[Dict[str, Any]]) -> List[Dict[str, An
             'SYMPTOMCODE': first.get('SYMPTOMCODE'),
             'CAUSECODE': first.get('CAUSECODE'),
             'REPAIRCODE': first.get('REPAIRCODE'),
-            'LOT_COUNT': lot_count,
+            'LOT_COUNT': len(seen_lots),  # Count distinct RUNCARDLOTID
+            'LOT_DETAILS': lot_details,   # LOT details for tooltip
             'TOTAL_TRACKIN_QTY': total_qty,
             'LATEST_TRACKIN_TIME': latest_trackin,
         })
