@@ -3,6 +3,7 @@
 {% block title %}WIP Overview Dashboard{% endblock %}
 
 {% block head_extra %}
+    <script src="/static/js/echarts.min.js"></script>
     <style>
         :root {
             --bg: #f5f7fa;
@@ -436,8 +437,8 @@
 
         /* Content Grid */
         .content-grid {
-            display: grid;
-            grid-template-columns: 3fr 1fr;
+            display: flex;
+            flex-direction: column;
             gap: 16px;
         }
 
@@ -612,6 +613,139 @@
             color: #9A3412;
         }
 
+        /* Pareto Chart Styles */
+        .pareto-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .pareto-section {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .pareto-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            background: #fafbfc;
+        }
+
+        .pareto-header.quality {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border-bottom-color: #fca5a5;
+        }
+
+        .pareto-header.non-quality {
+            background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+            border-bottom-color: #fdba74;
+        }
+
+        .pareto-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pareto-header.quality .pareto-title {
+            color: #991B1B;
+        }
+
+        .pareto-header.non-quality .pareto-title {
+            color: #9A3412;
+        }
+
+        .pareto-title .badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .pareto-body {
+            padding: 12px;
+        }
+
+        .pareto-chart {
+            width: 100%;
+            height: 280px;
+        }
+
+        .pareto-no-data {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 280px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .pareto-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+
+        .pareto-table th,
+        .pareto-table td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .pareto-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        .pareto-table td:nth-child(2),
+        .pareto-table td:nth-child(3),
+        .pareto-table td:nth-child(4) {
+            text-align: right;
+        }
+
+        .pareto-table th:nth-child(2),
+        .pareto-table th:nth-child(3),
+        .pareto-table th:nth-child(4) {
+            text-align: right;
+        }
+
+        .pareto-table tbody tr:hover {
+            background: #f3f4f6;
+        }
+
+        .pareto-table .reason-link {
+            color: var(--primary);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .pareto-table .reason-link:hover {
+            text-decoration: underline;
+            color: var(--primary-dark);
+        }
+
+        .pareto-table .cumulative {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        /* Responsive: stack on smaller screens */
+        @media (max-width: 1200px) {
+            .pareto-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* Loading */
         .loading-overlay {
             position: fixed;
@@ -784,14 +918,34 @@
                 </div>
             </div>
 
-            <!-- Hold Summary -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">Hold Summary</div>
+            <!-- Hold Summary - Pareto Charts -->
+            <div class="pareto-grid" id="holdParetoContainer">
+                <!-- Quality Hold Pareto -->
+                <div class="pareto-section">
+                    <div class="pareto-header quality">
+                        <div class="pareto-title">
+                            品質異常 Hold
+                            <span class="badge" id="qualityHoldCount">0 項</span>
+                        </div>
+                    </div>
+                    <div class="pareto-body">
+                        <div id="qualityParetoChart" class="pareto-chart"></div>
+                        <div id="qualityParetoNoData" class="pareto-no-data" style="display: none;">目前無資料</div>
+                        <div id="qualityParetoTable"></div>
+                    </div>
                 </div>
-                <div class="card-body" style="max-height: 500px; overflow: auto;">
-                    <div id="holdContainer">
-                        <div class="placeholder">Loading...</div>
+                <!-- Non-Quality Hold Pareto -->
+                <div class="pareto-section">
+                    <div class="pareto-header non-quality">
+                        <div class="pareto-title">
+                            非品質異常 Hold
+                            <span class="badge" id="nonQualityHoldCount">0 項</span>
+                        </div>
+                    </div>
+                    <div class="pareto-body">
+                        <div id="nonQualityParetoChart" class="pareto-chart"></div>
+                        <div id="nonQualityParetoNoData" class="pareto-no-data" style="display: none;">目前無資料</div>
+                        <div id="nonQualityParetoTable"></div>
                     </div>
                 </div>
             </div>
@@ -1305,37 +1459,239 @@
             container.innerHTML = html;
         }
 
-        function renderHold(data) {
-            const container = document.getElementById('holdContainer');
+        // ============================================================
+        // Pareto Chart Functions
+        // ============================================================
+        let paretoCharts = {
+            quality: null,
+            nonQuality: null
+        };
 
-            if (!data || !data.items || data.items.length === 0) {
-                container.innerHTML = '<div class="placeholder">No hold lots</div>';
+        // Task 2.1: Split hold data by type
+        function splitHoldByType(data) {
+            if (!data || !data.items) {
+                return { quality: [], nonQuality: [] };
+            }
+            const quality = data.items.filter(item => item.holdType === 'quality');
+            const nonQuality = data.items.filter(item => item.holdType !== 'quality');
+            return { quality, nonQuality };
+        }
+
+        // Task 2.2: Prepare Pareto data (sort by QTY desc, calculate cumulative %)
+        function prepareParetoData(items) {
+            if (!items || items.length === 0) {
+                return { reasons: [], qtys: [], lots: [], cumulative: [], totalQty: 0 };
+            }
+
+            // Sort by QTY descending
+            const sorted = [...items].sort((a, b) => (b.qty || 0) - (a.qty || 0));
+
+            const reasons = sorted.map(item => item.reason || '未知');
+            const qtys = sorted.map(item => item.qty || 0);
+            const lots = sorted.map(item => item.lots || 0);
+            const totalQty = qtys.reduce((sum, q) => sum + q, 0);
+
+            // Calculate cumulative percentage
+            const cumulative = [];
+            let runningSum = 0;
+            qtys.forEach(qty => {
+                runningSum += qty;
+                cumulative.push(totalQty > 0 ? Math.round((runningSum / totalQty) * 100) : 0);
+            });
+
+            return { reasons, qtys, lots, cumulative, totalQty, items: sorted };
+        }
+
+        // Task 3.1: Initialize Pareto charts
+        function initParetoCharts() {
+            const qualityEl = document.getElementById('qualityParetoChart');
+            const nonQualityEl = document.getElementById('nonQualityParetoChart');
+
+            if (qualityEl && !paretoCharts.quality) {
+                paretoCharts.quality = echarts.init(qualityEl);
+            }
+            if (nonQualityEl && !paretoCharts.nonQuality) {
+                paretoCharts.nonQuality = echarts.init(nonQualityEl);
+            }
+        }
+
+        // Task 3.2: Render Pareto chart with ECharts
+        function renderParetoChart(chart, paretoData, colorTheme) {
+            if (!chart) return;
+
+            const barColor = colorTheme === 'quality' ? '#ef4444' : '#f97316';
+            const lineColor = colorTheme === 'quality' ? '#991B1B' : '#9A3412';
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    formatter: function(params) {
+                        const reason = params[0].name;
+                        const qty = params[0].value;
+                        const cumPct = params[1] ? params[1].value : 0;
+                        return `<strong>${reason}</strong><br/>QTY: ${formatNumber(qty)}<br/>累計: ${cumPct}%`;
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '15%',
+                    top: '10%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: paretoData.reasons,
+                    axisLabel: {
+                        rotate: 30,
+                        interval: 0,
+                        fontSize: 10,
+                        formatter: function(value) {
+                            return value.length > 12 ? value.slice(0, 12) + '...' : value;
+                        }
+                    },
+                    axisTick: { alignWithLabel: true }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: 'QTY',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: function(val) {
+                                return val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val;
+                            }
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '累計%',
+                        position: 'right',
+                        min: 0,
+                        max: 100,
+                        axisLabel: { formatter: '{value}%' }
+                    }
+                ],
+                series: [
+                    {
+                        name: 'QTY',
+                        type: 'bar',
+                        data: paretoData.qtys,
+                        itemStyle: { color: barColor },
+                        emphasis: {
+                            itemStyle: { color: barColor, opacity: 0.8 }
+                        }
+                    },
+                    {
+                        name: '累計%',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: paretoData.cumulative,
+                        symbol: 'circle',
+                        symbolSize: 6,
+                        lineStyle: { color: lineColor, width: 2 },
+                        itemStyle: { color: lineColor }
+                    }
+                ]
+            };
+
+            chart.setOption(option);
+
+            // Task 3.3: Add click event for drill-down
+            chart.off('click');  // Remove existing handlers
+            chart.on('click', function(params) {
+                if (params.componentType === 'series' && params.seriesType === 'bar') {
+                    const reason = paretoData.reasons[params.dataIndex];
+                    if (reason && reason !== '未知') {
+                        window.location.href = `/hold-detail?reason=${encodeURIComponent(reason)}`;
+                    }
+                }
+            });
+        }
+
+        // Task 4.1 & 4.2: Render Pareto table with drill-down links
+        function renderParetoTable(containerId, paretoData) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            if (!paretoData.items || paretoData.items.length === 0) {
+                container.innerHTML = '';
                 return;
             }
 
-            let html = '<table class="hold-table"><thead><tr>';
+            let html = '<table class="pareto-table"><thead><tr>';
             html += '<th>Hold Reason</th>';
             html += '<th>Lots</th>';
             html += '<th>QTY</th>';
+            html += '<th>累計%</th>';
             html += '</tr></thead><tbody>';
 
-            data.items.forEach(item => {
-                const badgeClass = item.holdType === 'quality' ? 'quality' : 'non-quality';
-                const badgeText = item.holdType === 'quality' ? '品質' : '非品質';
-                const reasonText = item.reason || '-';
+            paretoData.items.forEach((item, idx) => {
+                const reason = item.reason || '未知';
                 const reasonLink = item.reason
-                    ? `<a href="/hold-detail?reason=${encodeURIComponent(item.reason)}" class="hold-reason-link">${reasonText}</a>`
-                    : reasonText;
+                    ? `<a href="/hold-detail?reason=${encodeURIComponent(item.reason)}" class="reason-link">${reason}</a>`
+                    : reason;
                 html += '<tr>';
-                html += `<td><span class="hold-type-badge ${badgeClass}">${badgeText}</span>${reasonLink}</td>`;
+                html += `<td>${reasonLink}</td>`;
                 html += `<td>${formatNumber(item.lots)}</td>`;
                 html += `<td>${formatNumber(item.qty)}</td>`;
+                html += `<td class="cumulative">${paretoData.cumulative[idx]}%</td>`;
                 html += '</tr>';
             });
 
             html += '</tbody></table>';
             container.innerHTML = html;
         }
+
+        // Task 3.4: Handle no data state
+        function showParetoNoData(type, show) {
+            const chartEl = document.getElementById(`${type}ParetoChart`);
+            const noDataEl = document.getElementById(`${type}ParetoNoData`);
+            if (chartEl) chartEl.style.display = show ? 'none' : 'block';
+            if (noDataEl) noDataEl.style.display = show ? 'flex' : 'none';
+        }
+
+        // Main render function for Hold data
+        function renderHold(data) {
+            initParetoCharts();
+
+            const { quality, nonQuality } = splitHoldByType(data);
+            const qualityData = prepareParetoData(quality);
+            const nonQualityData = prepareParetoData(nonQuality);
+
+            // Update counts in header
+            document.getElementById('qualityHoldCount').textContent = `${quality.length} 項`;
+            document.getElementById('nonQualityHoldCount').textContent = `${nonQuality.length} 項`;
+
+            // Quality Pareto
+            if (quality.length > 0) {
+                showParetoNoData('quality', false);
+                renderParetoChart(paretoCharts.quality, qualityData, 'quality');
+                renderParetoTable('qualityParetoTable', qualityData);
+            } else {
+                showParetoNoData('quality', true);
+                if (paretoCharts.quality) paretoCharts.quality.clear();
+                document.getElementById('qualityParetoTable').innerHTML = '';
+            }
+
+            // Non-Quality Pareto
+            if (nonQuality.length > 0) {
+                showParetoNoData('nonQuality', false);
+                renderParetoChart(paretoCharts.nonQuality, nonQualityData, 'non-quality');
+                renderParetoTable('nonQualityParetoTable', nonQualityData);
+            } else {
+                showParetoNoData('nonQuality', true);
+                if (paretoCharts.nonQuality) paretoCharts.nonQuality.clear();
+                document.getElementById('nonQualityParetoTable').innerHTML = '';
+            }
+        }
+
+        // Task 5.3: Window resize handler for charts
+        window.addEventListener('resize', function() {
+            if (paretoCharts.quality) paretoCharts.quality.resize();
+            if (paretoCharts.nonQuality) paretoCharts.nonQuality.resize();
+        });
 
         // ============================================================
         // Navigation
