@@ -153,7 +153,7 @@
     /* Summary Cards */
     .summary-grid {
         display: grid;
-        grid-template-columns: repeat(9, 1fr);
+        grid-template-columns: repeat(10, 1fr);
         gap: 10px;
         margin-bottom: 16px;
     }
@@ -198,6 +198,7 @@
     .summary-card.sdt::before { background: var(--warning); }
     .summary-card.engineering::before { background: var(--purple); }
     .summary-card.nst::before { background: #94a3b8; }
+    .summary-card.job::before { background: #f97316; }
     .summary-card.total::before { background: var(--muted); }
 
     .summary-label {
@@ -221,6 +222,7 @@
     .summary-card.sdt .summary-value { color: var(--warning); }
     .summary-card.engineering .summary-value { color: var(--purple); }
     .summary-card.nst .summary-value { color: #94a3b8; }
+    .summary-card.job .summary-value { color: #f97316; }
     .summary-card.total .summary-value { color: var(--muted); }
 
     .summary-pct {
@@ -459,76 +461,101 @@
         color: var(--muted);
     }
 
-    /* LOT Tooltip */
-    .lot-info {
-        position: relative;
+    /* Shared Tooltip Styles */
+    .info-trigger {
         cursor: pointer;
+        text-decoration: underline;
+        text-decoration-style: dotted;
+        text-underline-offset: 2px;
     }
 
-    .lot-info:hover .lot-tooltip {
-        display: block;
+    .info-trigger:hover {
+        color: var(--primary);
     }
 
-    .lot-tooltip {
+    .floating-tooltip {
         display: none;
-        position: absolute;
-        top: calc(100% + 8px);
-        left: 0;
+        position: fixed;
         background: #1e293b;
         color: #fff;
-        padding: 12px;
-        border-radius: 8px;
-        font-size: 11px;
-        white-space: nowrap;
-        z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        min-width: 280px;
-        max-width: 400px;
-        max-height: 300px;
+        padding: 14px;
+        border-radius: 10px;
+        font-size: 12px;
+        z-index: 9999;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        max-width: 420px;
+        max-height: 400px;
         overflow-y: auto;
     }
 
-    .lot-tooltip::after {
-        content: '';
-        position: absolute;
-        bottom: 100%;
-        left: 20px;
-        border: 6px solid transparent;
-        border-bottom-color: #1e293b;
+    .floating-tooltip.show {
+        display: block;
     }
 
-    .lot-tooltip-title {
-        font-weight: 600;
-        margin-bottom: 8px;
-        padding-bottom: 6px;
+    .floating-tooltip-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
         border-bottom: 1px solid #475569;
+    }
+
+    .floating-tooltip-title {
+        font-weight: 600;
         color: #94a3b8;
+        font-size: 13px;
+    }
+
+    .floating-tooltip-close {
+        background: #475569;
+        border: none;
+        color: #fff;
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .floating-tooltip-close:hover {
+        background: #64748b;
+    }
+
+    /* LOT Tooltip Content */
+    .lot-tooltip-content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
     }
 
     .lot-item {
-        padding: 6px 0;
-        border-bottom: 1px solid #334155;
-    }
-
-    .lot-item:last-child {
-        border-bottom: none;
+        padding: 8px;
+        background: #334155;
+        border-radius: 6px;
     }
 
     .lot-item-header {
         font-weight: 600;
         color: #60a5fa;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
+        font-size: 13px;
     }
 
     .lot-item-row {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
     }
 
     .lot-item-field {
         display: flex;
         gap: 4px;
+        font-size: 11px;
     }
 
     .lot-item-label {
@@ -537,6 +564,39 @@
 
     .lot-item-value {
         color: #e2e8f0;
+    }
+
+    /* JOB Tooltip Content */
+    .job-detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .job-detail-field {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .job-detail-field.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .job-detail-label {
+        color: #94a3b8;
+        font-size: 10px;
+        text-transform: uppercase;
+    }
+
+    .job-detail-value {
+        color: #e2e8f0;
+        font-size: 13px;
+    }
+
+    .job-detail-value.highlight {
+        color: #f59e0b;
+        font-weight: 600;
     }
 
     /* Responsive */
@@ -572,18 +632,6 @@
             <label>工站群組：</label>
             <select id="filterGroup" class="filter-select" onchange="loadData()">
                 <option value="">全部群組</option>
-            </select>
-        </div>
-
-        <div class="filter-group">
-            <label>狀態：</label>
-            <select id="filterStatus" class="filter-select" onchange="loadData()">
-                <option value="">全部狀態</option>
-                <option value="PRODUCTIVE">生產中 (PRD)</option>
-                <option value="STANDBY">待機 (SBY)</option>
-                <option value="DOWN">停機 (UDT/SDT)</option>
-                <option value="ENGINEERING">工程 (EGT)</option>
-                <option value="NOT_SCHEDULED">未排程 (NST)</option>
             </select>
         </div>
 
@@ -649,6 +697,11 @@
             <div class="summary-value" id="nstCount">--</div>
             <div class="summary-pct" id="nstPct">未排程</div>
         </div>
+        <div class="summary-card job">
+            <div class="summary-label">JOB</div>
+            <div class="summary-value" id="jobCount">--</div>
+            <div class="summary-pct">有維修單</div>
+        </div>
         <div class="summary-card total">
             <div class="summary-label">機台數</div>
             <div class="summary-value" id="totalCount">--</div>
@@ -680,6 +733,15 @@
             </div>
         </div>
     </div>
+
+    <!-- Floating Tooltip (shared) -->
+    <div class="floating-tooltip" id="floatingTooltip">
+        <div class="floating-tooltip-header">
+            <span class="floating-tooltip-title" id="tooltipTitle"></span>
+            <button class="floating-tooltip-close" onclick="hideTooltip()">&times;</button>
+        </div>
+        <div id="tooltipContent"></div>
+    </div>
 </div>
 {% endblock %}
 
@@ -704,9 +766,6 @@
 
         const group = document.getElementById('filterGroup').value;
         if (group) params.append('workcenter_groups', group);
-
-        const status = document.getElementById('filterStatus').value;
-        if (status) params.append('status_categories', status);
 
         if (document.querySelector('#chkProduction input').checked) {
             params.append('is_production', 'true');
@@ -786,6 +845,10 @@
 
                 document.getElementById('nstCount').textContent = nst;
                 document.getElementById('nstPct').textContent = totalStatus ? `未排程 (${((nst/totalStatus)*100).toFixed(1)}%)` : '未排程';
+
+                // Update JOB count (equipment with active maintenance/repair job)
+                const jobCount = d.with_active_job || 0;
+                document.getElementById('jobCount').textContent = jobCount;
 
                 // Update total count
                 document.getElementById('totalCount').textContent = total;
@@ -893,15 +956,95 @@
         }
     }
 
-    function renderLotTooltip(lotDetails) {
-        if (!lotDetails || lotDetails.length === 0) return '';
+    // ============================================================
+    // Floating Tooltip Functions
+    // ============================================================
+    let currentTooltipData = null;
 
-        let tooltipHtml = '<div class="lot-tooltip"><div class="lot-tooltip-title">在製批次明細</div>';
+    function showTooltip(event, type, data) {
+        event.stopPropagation();
+        const tooltip = document.getElementById('floatingTooltip');
+        const titleEl = document.getElementById('tooltipTitle');
+        const contentEl = document.getElementById('tooltipContent');
 
+        // Set content based on type
+        if (type === 'lot') {
+            titleEl.textContent = '在製批次明細';
+            contentEl.innerHTML = renderLotContent(data);
+        } else if (type === 'job') {
+            titleEl.textContent = 'JOB 單詳細資訊';
+            contentEl.innerHTML = renderJobContent(data);
+        }
+
+        // Position the tooltip
+        tooltip.classList.add('show');
+
+        // Get dimensions
+        const rect = tooltip.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        // Calculate initial position near the click
+        let x = event.clientX + 10;
+        let y = event.clientY + 10;
+
+        // Adjust if overflowing right
+        if (x + rect.width > viewportWidth - 20) {
+            x = event.clientX - rect.width - 10;
+        }
+
+        // Adjust if overflowing bottom
+        if (y + rect.height > viewportHeight - 20) {
+            y = viewportHeight - rect.height - 20;
+        }
+
+        // Ensure not off-screen left or top
+        x = Math.max(10, x);
+        y = Math.max(10, y);
+
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+
+        currentTooltipData = { type, data };
+    }
+
+    function hideTooltip() {
+        const tooltip = document.getElementById('floatingTooltip');
+        tooltip.classList.remove('show');
+        currentTooltipData = null;
+    }
+
+    // Close tooltip when clicking outside
+    document.addEventListener('click', (e) => {
+        const tooltip = document.getElementById('floatingTooltip');
+        if (tooltip && !tooltip.contains(e.target) && !e.target.classList.contains('info-trigger')) {
+            hideTooltip();
+        }
+    });
+
+    // Helper functions to show specific tooltip types
+    function showLotTooltip(event, resourceId) {
+        const eq = allEquipment.find(e => e.RESOURCEID === resourceId);
+        if (eq && eq.LOT_DETAILS) {
+            showTooltip(event, 'lot', eq.LOT_DETAILS);
+        }
+    }
+
+    function showJobTooltip(event, resourceId) {
+        const eq = allEquipment.find(e => e.RESOURCEID === resourceId);
+        if (eq && eq.JOBORDER) {
+            showTooltip(event, 'job', eq);
+        }
+    }
+
+    function renderLotContent(lotDetails) {
+        if (!lotDetails || lotDetails.length === 0) return '<div style="color: #94a3b8;">無批次資料</div>';
+
+        let html = '<div class="lot-tooltip-content">';
         lotDetails.forEach(lot => {
             const trackinTime = lot.LOTTRACKINTIME ? new Date(lot.LOTTRACKINTIME).toLocaleString('zh-TW') : '--';
             const qty = lot.LOTTRACKINQTY_PCS != null ? lot.LOTTRACKINQTY_PCS.toLocaleString() : '--';
-            tooltipHtml += `
+            html += `
                 <div class="lot-item">
                     <div class="lot-item-header">${lot.RUNCARDLOTID || '--'}</div>
                     <div class="lot-item-row">
@@ -912,9 +1055,45 @@
                 </div>
             `;
         });
+        html += '</div>';
+        return html;
+    }
 
-        tooltipHtml += '</div>';
-        return tooltipHtml;
+    function renderJobContent(eq) {
+        const formatDate = (dateStr) => {
+            if (!dateStr) return '--';
+            try {
+                return new Date(dateStr).toLocaleString('zh-TW');
+            } catch {
+                return dateStr;
+            }
+        };
+
+        const field = (label, value, isHighlight = false) => {
+            const valueClass = isHighlight ? 'highlight' : '';
+            return `
+                <div class="job-detail-field">
+                    <span class="job-detail-label">${label}</span>
+                    <span class="job-detail-value ${valueClass}">${value || '--'}</span>
+                </div>
+            `;
+        };
+
+        return `
+            <div class="job-detail-grid">
+                ${field('JOBORDER', eq.JOBORDER, true)}
+                ${field('JOBSTATUS', eq.JOBSTATUS, true)}
+                ${field('JOBMODEL', eq.JOBMODEL)}
+                ${field('JOBSTAGE', eq.JOBSTAGE)}
+                ${field('JOBID', eq.JOBID)}
+                ${field('建立時間', formatDate(eq.CREATEDATE))}
+                ${field('建立人員', eq.CREATEUSERNAME || eq.CREATEUSER)}
+                ${field('技術員', eq.TECHNICIANUSERNAME || eq.TECHNICIANUSER)}
+                ${field('症狀碼', eq.SYMPTOMCODE)}
+                ${field('原因碼', eq.CAUSECODE)}
+                ${field('維修碼', eq.REPAIRCODE)}
+            </div>
+        `;
     }
 
     function renderEquipmentList(equipment) {
@@ -927,15 +1106,22 @@
 
         let html = '<div class="equipment-grid">';
 
-        equipment.forEach(eq => {
+        equipment.forEach((eq) => {
             const statusCat = (eq.STATUS_CATEGORY || 'OTHER').toLowerCase();
             const statusDisplay = getStatusDisplay(eq.EQUIPMENTASSETSSTATUS, eq.STATUS_CATEGORY);
+            const resourceId = eq.RESOURCEID || '';
+            const escapedResourceId = resourceId.replace(/'/g, "\\'");
 
-            // Build LOT info with tooltip
+            // Build LOT info with click trigger
             let lotHtml = '';
             if (eq.LOT_COUNT > 0) {
-                const tooltipHtml = renderLotTooltip(eq.LOT_DETAILS);
-                lotHtml = `<span class="lot-info">📦 ${eq.LOT_COUNT} 批${tooltipHtml}</span>`;
+                lotHtml = `<span class="info-trigger" onclick="showLotTooltip(event, '${escapedResourceId}')" title="點擊查看批次詳情">📦 ${eq.LOT_COUNT} 批</span>`;
+            }
+
+            // Build JOB info with click trigger
+            let jobHtml = '';
+            if (eq.JOBORDER) {
+                jobHtml = `<span class="info-trigger" onclick="showJobTooltip(event, '${escapedResourceId}')" title="點擊查看JOB詳情">📋 ${eq.JOBORDER}</span>`;
             }
 
             html += `
@@ -950,7 +1136,7 @@
                         <span title="家族">🔧 ${eq.RESOURCEFAMILYNAME || '--'}</span>
                         <span title="區域">🏢 ${eq.LOCATIONNAME || '--'}</span>
                         ${lotHtml}
-                        ${eq.JOBORDER ? `<span title="工單">📋 ${eq.JOBORDER}</span>` : ''}
+                        ${jobHtml}
                     </div>
                 </div>
             `;

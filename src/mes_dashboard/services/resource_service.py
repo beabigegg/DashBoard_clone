@@ -28,6 +28,33 @@ from mes_dashboard.services.filter_cache import (
 
 
 # ============================================================
+# Helper Functions
+# ============================================================
+
+
+def _is_valid_value(value) -> bool:
+    """Check if a value is valid (not None, not NaN, not empty string).
+
+    Args:
+        value: The value to check.
+
+    Returns:
+        True if valid, False otherwise.
+    """
+    if value is None:
+        return False
+    if isinstance(value, str) and (not value.strip() or value == 'NaT'):
+        return False
+    # Check for NaN (pandas NaN or float NaN)
+    try:
+        if value != value:  # NaN != NaN is True
+            return False
+    except (TypeError, ValueError):
+        pass
+    return True
+
+
+# ============================================================
 # Resource Base Subquery
 # ============================================================
 
@@ -495,13 +522,23 @@ def get_merged_resource_status(
             'EQUIPMENTASSETSSTATUS': realtime.get('EQUIPMENTASSETSSTATUS'),
             'EQUIPMENTASSETSSTATUSREASON': realtime.get('EQUIPMENTASSETSSTATUSREASON'),
             'STATUS_CATEGORY': realtime.get('STATUS_CATEGORY'),
+            # JOB related fields
             'JOBORDER': realtime.get('JOBORDER'),
+            'JOBMODEL': realtime.get('JOBMODEL'),
+            'JOBSTAGE': realtime.get('JOBSTAGE'),
+            'JOBID': realtime.get('JOBID'),
             'JOBSTATUS': realtime.get('JOBSTATUS'),
+            'CREATEDATE': realtime.get('CREATEDATE'),
+            'CREATEUSERNAME': realtime.get('CREATEUSERNAME'),
+            'CREATEUSER': realtime.get('CREATEUSER'),
+            'TECHNICIANUSERNAME': realtime.get('TECHNICIANUSERNAME'),
+            'TECHNICIANUSER': realtime.get('TECHNICIANUSER'),
             'SYMPTOMCODE': realtime.get('SYMPTOMCODE'),
             'CAUSECODE': realtime.get('CAUSECODE'),
             'REPAIRCODE': realtime.get('REPAIRCODE'),
+            # LOT related fields
             'LOT_COUNT': realtime.get('LOT_COUNT'),
-            'LOT_DETAILS': realtime.get('LOT_DETAILS'),  # LOT details for tooltip
+            'LOT_DETAILS': realtime.get('LOT_DETAILS'),
             'TOTAL_TRACKIN_QTY': realtime.get('TOTAL_TRACKIN_QTY'),
             'LATEST_TRACKIN_TIME': realtime.get('LATEST_TRACKIN_TIME'),
         }
@@ -586,8 +623,8 @@ def get_resource_status_summary(
         group = record.get('WORKCENTER_GROUP') or 'UNKNOWN'
         by_workcenter_group[group] = by_workcenter_group.get(group, 0) + 1
 
-    # Count with active job
-    with_active_job = sum(1 for r in data if r.get('JOBORDER'))
+    # Count with active job (use _is_valid_value to exclude NaN/None/empty)
+    with_active_job = sum(1 for r in data if _is_valid_value(r.get('JOBORDER')))
 
     # Count with WIP
     with_wip = sum(1 for r in data if (r.get('LOT_COUNT') or 0) > 0)

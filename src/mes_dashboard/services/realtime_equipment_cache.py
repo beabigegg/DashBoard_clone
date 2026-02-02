@@ -56,6 +56,10 @@ def _load_equipment_status_from_oracle() -> Optional[List[Dict[str, Any]]]:
             JOBID,
             JOBSTATUS,
             CREATEDATE,
+            CREATEUSERNAME,
+            CREATEUSER,
+            TECHNICIANUSERNAME,
+            TECHNICIANUSER,
             SYMPTOMCODE,
             CAUSECODE,
             REPAIRCODE,
@@ -205,11 +209,21 @@ def _aggregate_by_resourceid(records: List[Dict[str, Any]]) -> List[Dict[str, An
             'EQUIPMENTASSETSSTATUS': status,
             'EQUIPMENTASSETSSTATUSREASON': first.get('EQUIPMENTASSETSSTATUSREASON'),
             'STATUS_CATEGORY': _classify_status(status),
+            # JOB related fields
             'JOBORDER': first.get('JOBORDER'),
+            'JOBMODEL': first.get('JOBMODEL'),
+            'JOBSTAGE': first.get('JOBSTAGE'),
+            'JOBID': first.get('JOBID'),
             'JOBSTATUS': first.get('JOBSTATUS'),
+            'CREATEDATE': first.get('CREATEDATE'),
+            'CREATEUSERNAME': first.get('CREATEUSERNAME'),
+            'CREATEUSER': first.get('CREATEUSER'),
+            'TECHNICIANUSERNAME': first.get('TECHNICIANUSERNAME'),
+            'TECHNICIANUSER': first.get('TECHNICIANUSER'),
             'SYMPTOMCODE': first.get('SYMPTOMCODE'),
             'CAUSECODE': first.get('CAUSECODE'),
             'REPAIRCODE': first.get('REPAIRCODE'),
+            # LOT related fields
             'LOT_COUNT': len(seen_lots),  # Count distinct RUNCARDLOTID
             'LOT_DETAILS': lot_details,   # LOT details for tooltip
             'TOTAL_TRACKIN_QTY': total_qty,
