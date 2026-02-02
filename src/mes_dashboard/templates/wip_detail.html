@@ -678,10 +678,18 @@
                 </div>
             </div>
             <div class="filter-group">
-                <label>Package</label>
-                <select id="filterPackage" onchange="applyFilters()">
-                    <option value="">All</option>
-                </select>
+                <label>PACKAGE</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="filterPackage" placeholder="Search..." autocomplete="off">
+                    <div class="autocomplete-dropdown" id="packageDropdown"></div>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>TYPE</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="filterType" placeholder="Search..." autocomplete="off">
+                    <div class="autocomplete-dropdown" id="typeDropdown"></div>
+                </div>
             </div>
             <button class="btn-primary" onclick="applyFilters()">Apply</button>
             <button class="btn-secondary" onclick="clearFilters()">Clear</button>
@@ -748,6 +756,7 @@
             pageSize: 100,
             filters: {
                 package: '',
+                type: '',
                 workorder: '',
                 lotid: ''
             },
@@ -811,6 +820,9 @@
             if (state.filters.package) {
                 params.package = state.filters.package;
             }
+            if (state.filters.type) {
+                params.type = state.filters.type;
+            }
             if (activeStatusFilter) {
                 // Handle hold type filters
                 if (activeStatusFilter === 'quality-hold') {
@@ -854,9 +866,19 @@
             if (!query || query.length < 2) {
                 return [];
             }
+
+            // Map internal type to API field name
+            const fieldMap = {
+                'workorder': 'workorder',
+                'lotid': 'lotid',
+                'package': 'package',
+                'type': 'pj_type'
+            };
+            const field = fieldMap[type] || type;
+
             try {
                 const result = await MesApi.get('/api/wip/meta/search', {
-                    params: { type, q: query, limit: 20 },
+                    params: { field, q: query, limit: 20 },
                     silent: true,
                     retries: 0  // No retry for autocomplete
                 });
@@ -896,7 +918,7 @@
 
             let html = '<table><thead><tr>';
             // Fixed columns
-            html += '<th class="fixed-col">Lot ID</th>';
+            html += '<th class="fixed-col">LOT ID</th>';
             html += '<th class="fixed-col">Equipment</th>';
             html += '<th class="fixed-col">WIP Status</th>';
             html += '<th class="fixed-col">Package</th>';
@@ -1229,7 +1251,8 @@
         function applyFilters() {
             state.filters.workorder = document.getElementById('filterWorkorder').value.trim();
             state.filters.lotid = document.getElementById('filterLotid').value.trim();
-            state.filters.package = document.getElementById('filterPackage').value;
+            state.filters.package = document.getElementById('filterPackage').value.trim();
+            state.filters.type = document.getElementById('filterType').value.trim();
             state.page = 1;
             loadAllData(false);
         }
@@ -1238,7 +1261,8 @@
             document.getElementById('filterWorkorder').value = '';
             document.getElementById('filterLotid').value = '';
             document.getElementById('filterPackage').value = '';
-            state.filters = { package: '', workorder: '', lotid: '' };
+            document.getElementById('filterType').value = '';
+            state.filters = { package: '', type: '', workorder: '', lotid: '' };
 
             // Also clear status filter
             activeStatusFilter = null;
@@ -1286,9 +1310,11 @@
         // Initialize
         // ============================================================
         async function init() {
-            // Setup autocomplete for WORKORDER and LOT ID
+            // Setup autocomplete for WORKORDER, LOT ID, PACKAGE, and TYPE
             setupAutocomplete('filterWorkorder', 'workorderDropdown', 'workorder');
             setupAutocomplete('filterLotid', 'lotidDropdown', 'lotid');
+            setupAutocomplete('filterPackage', 'packageDropdown', 'package');
+            setupAutocomplete('filterType', 'typeDropdown', 'type');
 
             // Allow Enter key to trigger filter
             document.getElementById('filterWorkorder').addEventListener('keypress', (e) => {
@@ -1297,9 +1323,37 @@
             document.getElementById('filterLotid').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') applyFilters();
             });
+            document.getElementById('filterPackage').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
+            document.getElementById('filterType').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
 
             // Get workcenter from URL or use first available
             state.workcenter = getUrlParam('workcenter');
+
+            // Get filters from URL params (passed from wip_overview)
+            const urlWorkorder = getUrlParam('workorder');
+            const urlLotid = getUrlParam('lotid');
+            const urlPackage = getUrlParam('package');
+            const urlType = getUrlParam('type');
+            if (urlWorkorder) {
+                state.filters.workorder = urlWorkorder;
+                document.getElementById('filterWorkorder').value = urlWorkorder;
+            }
+            if (urlLotid) {
+                state.filters.lotid = urlLotid;
+                document.getElementById('filterLotid').value = urlLotid;
+            }
+            if (urlPackage) {
+                state.filters.package = urlPackage;
+                document.getElementById('filterPackage').value = urlPackage;
+            }
+            if (urlType) {
+                state.filters.type = urlType;
+                document.getElementById('filterType').value = urlType;
+            }
 
             if (!state.workcenter) {
                 // Fetch workcenters and use first one

@@ -698,16 +698,28 @@
         <!-- Filters -->
         <div class="filters">
             <div class="filter-group">
-                <label>Work Order</label>
-                <input type="text" id="filterWorkorder" placeholder="輸入 Work Order..." autocomplete="off">
+                <label>WORKORDER</label>
+                <input type="text" id="filterWorkorder" placeholder="輸入 WORKORDER..." autocomplete="off">
                 <span class="search-loading" id="workorderLoading"></span>
                 <div class="autocomplete-dropdown" id="workorderDropdown"></div>
             </div>
             <div class="filter-group">
-                <label>Lot ID</label>
-                <input type="text" id="filterLotid" placeholder="輸入 Lot ID..." autocomplete="off">
+                <label>LOT ID</label>
+                <input type="text" id="filterLotid" placeholder="輸入 LOT ID..." autocomplete="off">
                 <span class="search-loading" id="lotidLoading"></span>
                 <div class="autocomplete-dropdown" id="lotidDropdown"></div>
+            </div>
+            <div class="filter-group">
+                <label>PACKAGE</label>
+                <input type="text" id="filterPackage" placeholder="輸入 PACKAGE..." autocomplete="off">
+                <span class="search-loading" id="packageLoading"></span>
+                <div class="autocomplete-dropdown" id="packageDropdown"></div>
+            </div>
+            <div class="filter-group">
+                <label>TYPE</label>
+                <input type="text" id="filterType" placeholder="輸入 TYPE..." autocomplete="off">
+                <span class="search-loading" id="typeLoading"></span>
+                <div class="autocomplete-dropdown" id="typeDropdown"></div>
             </div>
             <button class="btn-primary" onclick="applyFilters()">套用篩選</button>
             <button class="btn-secondary" onclick="clearFilters()">清除篩選</button>
@@ -808,11 +820,15 @@
             REFRESH_INTERVAL: 10 * 60 * 1000,  // 10 minutes
             filters: {
                 workorder: '',
-                lotid: ''
+                lotid: '',
+                package: '',
+                type: ''
             },
             searchTimers: {
                 workorder: null,
-                lotid: null
+                lotid: null,
+                package: null,
+                type: null
             }
         };
 
@@ -865,6 +881,12 @@
             }
             if (state.filters.lotid) {
                 params.lotid = state.filters.lotid;
+            }
+            if (state.filters.package) {
+                params.package = state.filters.package;
+            }
+            if (state.filters.type) {
+                params.type = state.filters.type;
             }
             return params;
         }
@@ -936,9 +958,18 @@
             const loadingEl = document.getElementById(`${type}Loading`);
             loadingEl.classList.add('active');
 
+            // Map internal type to API field name
+            const fieldMap = {
+                'workorder': 'workorder',
+                'lotid': 'lotid',
+                'package': 'package',
+                'type': 'pj_type'
+            };
+            const field = fieldMap[type] || type;
+
             try {
                 const result = await MesApi.get('/api/wip/meta/search', {
-                    params: { type, q: query, limit: 20 },
+                    params: { field, q: query, limit: 20 },
                     silent: true,
                     retries: 0  // No retry for autocomplete
                 });
@@ -1021,6 +1052,8 @@
         function applyFilters() {
             state.filters.workorder = document.getElementById('filterWorkorder').value.trim();
             state.filters.lotid = document.getElementById('filterLotid').value.trim();
+            state.filters.package = document.getElementById('filterPackage').value.trim();
+            state.filters.type = document.getElementById('filterType').value.trim();
 
             updateActiveFiltersDisplay();
             loadAllData(false);
@@ -1029,8 +1062,12 @@
         function clearFilters() {
             document.getElementById('filterWorkorder').value = '';
             document.getElementById('filterLotid').value = '';
+            document.getElementById('filterPackage').value = '';
+            document.getElementById('filterType').value = '';
             state.filters.workorder = '';
             state.filters.lotid = '';
+            state.filters.package = '';
+            state.filters.type = '';
 
             updateActiveFiltersDisplay();
             loadAllData(false);
@@ -1052,6 +1089,12 @@
             }
             if (state.filters.lotid) {
                 html += `<span class="filter-tag">Lot: ${state.filters.lotid} <span class="remove" onclick="removeFilter('lotid')">×</span></span>`;
+            }
+            if (state.filters.package) {
+                html += `<span class="filter-tag">Pkg: ${state.filters.package} <span class="remove" onclick="removeFilter('package')">×</span></span>`;
+            }
+            if (state.filters.type) {
+                html += `<span class="filter-tag">Type: ${state.filters.type} <span class="remove" onclick="removeFilter('type')">×</span></span>`;
             }
 
             container.innerHTML = html;
@@ -1279,6 +1322,8 @@
             params.append('workcenter', workcenter);
             if (state.filters.workorder) params.append('workorder', state.filters.workorder);
             if (state.filters.lotid) params.append('lotid', state.filters.lotid);
+            if (state.filters.package) params.append('package', state.filters.package);
+            if (state.filters.type) params.append('type', state.filters.type);
             window.location.href = `/wip-detail?${params.toString()}`;
         }
 
@@ -1387,6 +1432,8 @@
         window.onload = function() {
             setupAutocomplete('workorder');
             setupAutocomplete('lotid');
+            setupAutocomplete('package');
+            setupAutocomplete('type');
             loadAllData(true);
             startAutoRefresh();
         };

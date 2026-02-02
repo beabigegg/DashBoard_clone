@@ -16,6 +16,8 @@ from mes_dashboard.services.wip_service import (
     get_packages,
     search_workorders,
     search_lot_ids,
+    search_packages,
+    search_types,
 )
 
 # Create Blueprint
@@ -38,6 +40,8 @@ def api_overview_summary():
     Query Parameters:
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
+        package: Optional PACKAGE_LEF filter (exact match)
+        pj_type: Optional PJ_TYPE filter (exact match)
         include_dummy: Include DUMMY lots (default: false)
 
     Returns:
@@ -45,12 +49,16 @@ def api_overview_summary():
     """
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
+    package = request.args.get('package', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
     include_dummy = _parse_bool(request.args.get('include_dummy', ''))
 
     result = get_wip_summary(
         include_dummy=include_dummy,
         workorder=workorder,
-        lotid=lotid
+        lotid=lotid,
+        package=package,
+        pj_type=pj_type
     )
     if result is not None:
         return jsonify({'success': True, 'data': result})
@@ -64,6 +72,8 @@ def api_overview_matrix():
     Query Parameters:
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
+        package: Optional PACKAGE_LEF filter (exact match)
+        pj_type: Optional PJ_TYPE filter (exact match)
         include_dummy: Include DUMMY lots (default: false)
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
@@ -75,6 +85,8 @@ def api_overview_matrix():
     """
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
+    package = request.args.get('package', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
     include_dummy = _parse_bool(request.args.get('include_dummy', ''))
     status = request.args.get('status', '').strip().upper() or None
     hold_type = request.args.get('hold_type', '').strip().lower() or None
@@ -98,7 +110,9 @@ def api_overview_matrix():
         workorder=workorder,
         lotid=lotid,
         status=status,
-        hold_type=hold_type
+        hold_type=hold_type,
+        package=package,
+        pj_type=pj_type
     )
     if result is not None:
         return jsonify({'success': True, 'data': result})
@@ -241,10 +255,10 @@ def api_meta_packages():
 
 @wip_bp.route('/meta/search')
 def api_meta_search():
-    """API: Search for WORKORDER or LOTID values.
+    """API: Search for WORKORDER, LOTID, PACKAGE, or PJ_TYPE values.
 
     Query Parameters:
-        type: Search type ('workorder' or 'lotid')
+        field: Field to search ('workorder', 'lotid', 'package', or 'pj_type')
         q: Search query (minimum 2 characters)
         limit: Maximum results (default: 20, max: 50)
         include_dummy: Include DUMMY lots (default: false)
@@ -252,16 +266,16 @@ def api_meta_search():
     Returns:
         JSON with items list containing matching values
     """
-    search_type = request.args.get('type', '').strip().lower()
+    search_field = request.args.get('field', '').strip().lower()
     q = request.args.get('q', '').strip()
     limit = min(request.args.get('limit', 20, type=int), 50)
     include_dummy = _parse_bool(request.args.get('include_dummy', ''))
 
-    # Validate search type
-    if search_type not in ('workorder', 'lotid'):
+    # Validate search field
+    if search_field not in ('workorder', 'lotid', 'package', 'pj_type'):
         return jsonify({
             'success': False,
-            'error': 'Invalid type. Use "workorder" or "lotid"'
+            'error': 'Invalid field. Use "workorder", "lotid", "package", or "pj_type"'
         }), 400
 
     # Validate query length
@@ -269,10 +283,14 @@ def api_meta_search():
         return jsonify({'success': True, 'data': {'items': []}})
 
     # Perform search
-    if search_type == 'workorder':
+    if search_field == 'workorder':
         result = search_workorders(q=q, limit=limit, include_dummy=include_dummy)
-    else:
+    elif search_field == 'lotid':
         result = search_lot_ids(q=q, limit=limit, include_dummy=include_dummy)
+    elif search_field == 'package':
+        result = search_packages(q=q, limit=limit, include_dummy=include_dummy)
+    else:  # pj_type
+        result = search_types(q=q, limit=limit, include_dummy=include_dummy)
 
     if result is not None:
         return jsonify({'success': True, 'data': {'items': result}})

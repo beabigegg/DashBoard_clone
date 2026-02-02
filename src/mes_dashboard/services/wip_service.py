@@ -213,7 +213,9 @@ def _filter_base_conditions(
 def get_wip_summary(
     include_dummy: bool = False,
     workorder: Optional[str] = None,
-    lotid: Optional[str] = None
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Get WIP KPI summary for overview dashboard.
 
@@ -223,6 +225,8 @@ def get_wip_summary(
         include_dummy: If True, include DUMMY lots (default: False)
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
+        package: Optional PACKAGE_LEF filter (exact match)
+        pj_type: Optional PJ_TYPE filter (exact match)
 
     Returns:
         Dict with summary stats (camelCase):
@@ -237,6 +241,14 @@ def get_wip_summary(
         try:
             df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
             df = _add_wip_status_columns(df)
+
+            # Apply package filter
+            if package and 'PACKAGE_LEF' in df.columns:
+                df = df[df['PACKAGE_LEF'] == package]
+
+            # Apply pj_type filter
+            if pj_type and 'PJ_TYPE' in df.columns:
+                df = df[df['PJ_TYPE'] == pj_type]
 
             if df.empty:
                 return {
@@ -290,17 +302,23 @@ def get_wip_summary(
             logger.warning(f"Cache-based summary calculation failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _get_wip_summary_from_oracle(include_dummy, workorder, lotid)
+    return _get_wip_summary_from_oracle(include_dummy, workorder, lotid, package, pj_type)
 
 
 def _get_wip_summary_from_oracle(
     include_dummy: bool = False,
     workorder: Optional[str] = None,
-    lotid: Optional[str] = None
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Get WIP summary directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy, workorder, lotid)
+        if package:
+            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+        if pj_type:
+            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         non_quality_list = _build_hold_type_sql_list()
 
@@ -381,7 +399,9 @@ def get_wip_matrix(
     workorder: Optional[str] = None,
     lotid: Optional[str] = None,
     status: Optional[str] = None,
-    hold_type: Optional[str] = None
+    hold_type: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Get workcenter x product line matrix for overview dashboard.
 
@@ -394,6 +414,8 @@ def get_wip_matrix(
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
+        package: Optional PACKAGE_LEF filter (exact match)
+        pj_type: Optional PJ_TYPE filter (exact match)
 
     Returns:
         Dict with matrix data:
@@ -411,8 +433,16 @@ def get_wip_matrix(
             df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
             df = _add_wip_status_columns(df)
 
-            # Filter by WORKCENTER_GROUP and PRODUCTLINENAME
-            df = df[df['WORKCENTER_GROUP'].notna() & df['PRODUCTLINENAME'].notna()]
+            # Filter by WORKCENTER_GROUP and PACKAGE_LEF
+            df = df[df['WORKCENTER_GROUP'].notna() & df['PACKAGE_LEF'].notna()]
+
+            # Apply package filter
+            if package:
+                df = df[df['PACKAGE_LEF'] == package]
+
+            # Apply pj_type filter
+            if pj_type and 'PJ_TYPE' in df.columns:
+                df = df[df['PJ_TYPE'] == pj_type]
 
             # WIP status filter
             if status:
@@ -441,13 +471,13 @@ def get_wip_matrix(
             logger.warning(f"Cache-based matrix calculation failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _get_wip_matrix_from_oracle(include_dummy, workorder, lotid, status, hold_type)
+    return _get_wip_matrix_from_oracle(include_dummy, workorder, lotid, status, hold_type, package, pj_type)
 
 
 def _build_matrix_result(df: pd.DataFrame) -> Dict[str, Any]:
     """Build matrix result from DataFrame."""
     # Group by workcenter and package
-    grouped = df.groupby(['WORKCENTER_GROUP', 'WORKCENTERSEQUENCE_GROUP', 'PRODUCTLINENAME'])['QTY'].sum().reset_index()
+    grouped = df.groupby(['WORKCENTER_GROUP', 'WORKCENTERSEQUENCE_GROUP', 'PACKAGE_LEF'])['QTY'].sum().reset_index()
 
     if grouped.empty:
         return {
@@ -472,7 +502,7 @@ def _build_matrix_result(df: pd.DataFrame) -> Dict[str, Any]:
     # Build matrix and totals
     for _, row in grouped.iterrows():
         wc = row['WORKCENTER_GROUP']
-        pkg = row['PRODUCTLINENAME']
+        pkg = row['PACKAGE_LEF']
         qty = int(row['QTY'] or 0)
 
         if wc not in matrix:
@@ -502,13 +532,19 @@ def _get_wip_matrix_from_oracle(
     workorder: Optional[str] = None,
     lotid: Optional[str] = None,
     status: Optional[str] = None,
-    hold_type: Optional[str] = None
+    hold_type: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Get WIP matrix directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy, workorder, lotid)
         conditions.append("WORKCENTER_GROUP IS NOT NULL")
-        conditions.append("PRODUCTLINENAME IS NOT NULL")
+        conditions.append("PACKAGE_LEF IS NOT NULL")
+        if package:
+            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+        if pj_type:
+            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
 
         # WIP status filter
         if status:
@@ -534,12 +570,12 @@ def _get_wip_matrix_from_oracle(
             SELECT
                 WORKCENTER_GROUP,
                 WORKCENTERSEQUENCE_GROUP,
-                PRODUCTLINENAME,
+                PACKAGE_LEF,
                 SUM(QTY) as QTY
             FROM {WIP_VIEW}
             {where_clause}
-            GROUP BY WORKCENTER_GROUP, WORKCENTERSEQUENCE_GROUP, PRODUCTLINENAME
-            ORDER BY WORKCENTERSEQUENCE_GROUP, PRODUCTLINENAME
+            GROUP BY WORKCENTER_GROUP, WORKCENTERSEQUENCE_GROUP, PACKAGE_LEF
+            ORDER BY WORKCENTERSEQUENCE_GROUP, PACKAGE_LEF
         """
         df = read_sql_df(sql)
 
@@ -682,7 +718,7 @@ def get_wip_detail(
 
     Args:
         workcenter: WORKCENTER_GROUP name
-        package: Optional PRODUCTLINENAME filter
+        package: Optional PACKAGE_LEF filter
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
@@ -712,7 +748,7 @@ def get_wip_detail(
             df = df[df['WORKCENTER_GROUP'] == workcenter]
 
             if package:
-                df = df[df['PRODUCTLINENAME'] == package]
+                df = df[df['PACKAGE_LEF'] == package]
 
             # Calculate summary before status filter
             summary_df = df.copy()
@@ -766,7 +802,7 @@ def get_wip_detail(
                     'wipStatus': _safe_value(row.get('WIP_STATUS')),
                     'holdReason': _safe_value(row.get('HOLDREASONNAME')),
                     'qty': int(row.get('QTY', 0) or 0),
-                    'package': _safe_value(row.get('PRODUCTLINENAME')),
+                    'package': _safe_value(row.get('PACKAGE_LEF')),
                     'spec': _safe_value(row.get('SPECNAME'))
                 })
 
@@ -810,7 +846,7 @@ def _get_wip_detail_from_oracle(
         conditions.append(f"WORKCENTER_GROUP = '{_escape_sql(workcenter)}'")
 
         if package:
-            conditions.append(f"PRODUCTLINENAME = '{_escape_sql(package)}'")
+            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
 
         # WIP status filter (RUN/QUEUE/HOLD based on EQUIPMENTCOUNT and CURRENTHOLDCOUNT)
         if status:
@@ -838,7 +874,7 @@ def _get_wip_detail_from_oracle(
         summary_conditions = _build_base_conditions(include_dummy, workorder, lotid)
         summary_conditions.append(f"WORKCENTER_GROUP = '{_escape_sql(workcenter)}'")
         if package:
-            summary_conditions.append(f"PRODUCTLINENAME = '{_escape_sql(package)}'")
+            summary_conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
         summary_where = f"WHERE {' AND '.join(summary_conditions)}"
         non_quality_list = _build_hold_type_sql_list()
 
@@ -931,7 +967,7 @@ def _get_wip_detail_from_oracle(
                     STATUS,
                     HOLDREASONNAME,
                     QTY,
-                    PRODUCTLINENAME,
+                    PACKAGE_LEF,
                     SPECNAME,
                     CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) > 0 THEN 'RUN'
                          WHEN COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN 'HOLD'
@@ -955,7 +991,7 @@ def _get_wip_detail_from_oracle(
                     'wipStatus': _safe_value(row['WIP_STATUS']),
                     'holdReason': _safe_value(row['HOLDREASONNAME']),
                     'qty': int(row['QTY'] or 0),
-                    'package': _safe_value(row['PRODUCTLINENAME']),
+                    'package': _safe_value(row['PACKAGE_LEF']),
                     'spec': _safe_value(row['SPECNAME'])
                 })
 
@@ -1076,19 +1112,19 @@ def get_packages(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
     if cached_df is not None:
         try:
             df = _filter_base_conditions(cached_df, include_dummy)
-            df = df[df['PRODUCTLINENAME'].notna()]
+            df = df[df['PACKAGE_LEF'].notna()]
 
             if df.empty:
                 return []
 
             # Group by package and count
-            grouped = df.groupby('PRODUCTLINENAME').size().reset_index(name='LOT_COUNT')
+            grouped = df.groupby('PACKAGE_LEF').size().reset_index(name='LOT_COUNT')
             grouped = grouped.sort_values('LOT_COUNT', ascending=False)
 
             result = []
             for _, row in grouped.iterrows():
                 result.append({
-                    'name': row['PRODUCTLINENAME'],
+                    'name': row['PACKAGE_LEF'],
                     'lot_count': int(row['LOT_COUNT'] or 0)
                 })
 
@@ -1104,16 +1140,16 @@ def _get_packages_from_oracle(include_dummy: bool = False) -> Optional[List[Dict
     """Get packages directly from Oracle (fallback)."""
     try:
         conditions = _build_base_conditions(include_dummy)
-        conditions.append("PRODUCTLINENAME IS NOT NULL")
+        conditions.append("PACKAGE_LEF IS NOT NULL")
         where_clause = f"WHERE {' AND '.join(conditions)}"
 
         sql = f"""
             SELECT
-                PRODUCTLINENAME,
+                PACKAGE_LEF,
                 COUNT(*) as LOT_COUNT
             FROM {WIP_VIEW}
             {where_clause}
-            GROUP BY PRODUCTLINENAME
+            GROUP BY PACKAGE_LEF
             ORDER BY COUNT(*) DESC
         """
         df = read_sql_df(sql)
@@ -1124,7 +1160,7 @@ def _get_packages_from_oracle(include_dummy: bool = False) -> Optional[List[Dict
         result = []
         for _, row in df.iterrows():
             result.append({
-                'name': row['PRODUCTLINENAME'],
+                'name': row['PACKAGE_LEF'],
                 'lot_count': int(row['LOT_COUNT'] or 0)
             })
 
@@ -1288,6 +1324,170 @@ def _search_lot_ids_from_oracle(
         return None
 
 
+def search_packages(
+    q: str,
+    limit: int = 20,
+    include_dummy: bool = False
+) -> Optional[List[str]]:
+    """Search for PACKAGE_LEF values matching the query.
+
+    Uses Redis cache when available, falls back to Oracle direct query.
+
+    Args:
+        q: Search query (minimum 2 characters)
+        limit: Maximum number of results (default: 20, max: 50)
+        include_dummy: If True, include DUMMY lots (default: False)
+
+    Returns:
+        List of matching PACKAGE_LEF values (distinct)
+    """
+    # Validate input
+    if not q or len(q) < 2:
+        return []
+
+    limit = min(limit, 50)  # Cap at 50
+
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy)
+
+            # Check if PACKAGE_LEF column exists
+            if 'PACKAGE_LEF' not in df.columns:
+                logger.warning("PACKAGE_LEF column not found in cache")
+                return _search_packages_from_oracle(q, limit, include_dummy)
+
+            df = df[df['PACKAGE_LEF'].notna()]
+
+            # Filter by search query (case-insensitive)
+            df = df[df['PACKAGE_LEF'].str.contains(q, case=False, na=False)]
+
+            if df.empty:
+                return []
+
+            # Get distinct values sorted
+            result = df['PACKAGE_LEF'].drop_duplicates().sort_values().head(limit).tolist()
+            return result
+        except Exception as exc:
+            logger.warning(f"Cache-based package search failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _search_packages_from_oracle(q, limit, include_dummy)
+
+
+def _search_packages_from_oracle(
+    q: str,
+    limit: int = 20,
+    include_dummy: bool = False
+) -> Optional[List[str]]:
+    """Search packages directly from Oracle (fallback)."""
+    try:
+        conditions = _build_base_conditions(include_dummy)
+        conditions.append(f"PACKAGE_LEF LIKE '%{_escape_sql(q)}%'")
+        conditions.append("PACKAGE_LEF IS NOT NULL")
+        where_clause = f"WHERE {' AND '.join(conditions)}"
+
+        sql = f"""
+            SELECT DISTINCT PACKAGE_LEF
+            FROM {WIP_VIEW}
+            {where_clause}
+            ORDER BY PACKAGE_LEF
+            FETCH FIRST {limit} ROWS ONLY
+        """
+        df = read_sql_df(sql)
+
+        if df is None or df.empty:
+            return []
+
+        return df['PACKAGE_LEF'].tolist()
+    except Exception as exc:
+        logger.error(f"Search packages failed: {exc}")
+        return None
+
+
+def search_types(
+    q: str,
+    limit: int = 20,
+    include_dummy: bool = False
+) -> Optional[List[str]]:
+    """Search for PJ_TYPE values matching the query.
+
+    Uses Redis cache when available, falls back to Oracle direct query.
+
+    Args:
+        q: Search query (minimum 2 characters)
+        limit: Maximum number of results (default: 20, max: 50)
+        include_dummy: If True, include DUMMY lots (default: False)
+
+    Returns:
+        List of matching PJ_TYPE values (distinct)
+    """
+    # Validate input
+    if not q or len(q) < 2:
+        return []
+
+    limit = min(limit, 50)  # Cap at 50
+
+    # Try cache first
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _filter_base_conditions(cached_df, include_dummy)
+
+            # Check if PJ_TYPE column exists
+            if 'PJ_TYPE' not in df.columns:
+                logger.warning("PJ_TYPE column not found in cache")
+                return _search_types_from_oracle(q, limit, include_dummy)
+
+            df = df[df['PJ_TYPE'].notna()]
+
+            # Filter by search query (case-insensitive)
+            df = df[df['PJ_TYPE'].str.contains(q, case=False, na=False)]
+
+            if df.empty:
+                return []
+
+            # Get distinct values sorted
+            result = df['PJ_TYPE'].drop_duplicates().sort_values().head(limit).tolist()
+            return result
+        except Exception as exc:
+            logger.warning(f"Cache-based type search failed, falling back to Oracle: {exc}")
+
+    # Fallback to Oracle direct query
+    return _search_types_from_oracle(q, limit, include_dummy)
+
+
+def _search_types_from_oracle(
+    q: str,
+    limit: int = 20,
+    include_dummy: bool = False
+) -> Optional[List[str]]:
+    """Search types directly from Oracle (fallback)."""
+    try:
+        conditions = _build_base_conditions(include_dummy)
+        conditions.append(f"PJ_TYPE LIKE '%{_escape_sql(q)}%'")
+        conditions.append("PJ_TYPE IS NOT NULL")
+        where_clause = f"WHERE {' AND '.join(conditions)}"
+
+        sql = f"""
+            SELECT DISTINCT PJ_TYPE
+            FROM {WIP_VIEW}
+            {where_clause}
+            ORDER BY PJ_TYPE
+            FETCH FIRST {limit} ROWS ONLY
+        """
+        df = read_sql_df(sql)
+
+        if df is None or df.empty:
+            return []
+
+        return df['PJ_TYPE'].tolist()
+    except Exception as exc:
+        logger.error(f"Search types failed: {exc}")
+        return None
+
+
 # ============================================================
 # Hold Detail API Functions
 # ============================================================
@@ -1441,7 +1641,7 @@ def get_hold_detail_distribution(
                 })
 
             # By Package
-            pkg_df = df[df['PRODUCTLINENAME'].notna()].groupby('PRODUCTLINENAME').agg({
+            pkg_df = df[df['PACKAGE_LEF'].notna()].groupby('PACKAGE_LEF').agg({
                 'LOTID': 'count',
                 'QTY': 'sum'
             }).reset_index()
@@ -1574,13 +1774,13 @@ def _get_hold_detail_distribution_from_oracle(
         # By Package
         pkg_sql = f"""
             SELECT
-                PRODUCTLINENAME AS NAME,
+                PACKAGE_LEF AS NAME,
                 COUNT(*) AS LOTS,
                 SUM(QTY) AS QTY
             FROM {WIP_VIEW}
             {where_clause}
-              AND PRODUCTLINENAME IS NOT NULL
-            GROUP BY PRODUCTLINENAME
+              AND PACKAGE_LEF IS NOT NULL
+            GROUP BY PACKAGE_LEF
             ORDER BY COUNT(*) DESC
         """
         pkg_df = read_sql_df(pkg_sql)
@@ -1676,7 +1876,7 @@ def get_hold_detail_lots(
     Args:
         reason: The HOLDREASONNAME to filter by
         workcenter: Optional WORKCENTER_GROUP filter
-        package: Optional PRODUCTLINENAME filter
+        package: Optional PACKAGE_LEF filter
         age_range: Optional age range filter ('0-1', '1-3', '3-7', '7+')
         include_dummy: If True, include DUMMY lots (default: False)
         page: Page number (1-based)
@@ -1702,7 +1902,7 @@ def get_hold_detail_lots(
             if workcenter:
                 df = df[df['WORKCENTER_GROUP'] == workcenter]
             if package:
-                df = df[df['PRODUCTLINENAME'] == package]
+                df = df[df['PACKAGE_LEF'] == package]
             if age_range:
                 if age_range == '0-1':
                     df = df[(df['AGEBYDAYS'] >= 0) & (df['AGEBYDAYS'] < 1)]
@@ -1728,7 +1928,7 @@ def get_hold_detail_lots(
                     'lotId': _safe_value(row.get('LOTID')),
                     'workorder': _safe_value(row.get('WORKORDER')),
                     'qty': int(row.get('QTY', 0) or 0),
-                    'package': _safe_value(row.get('PRODUCTLINENAME')),
+                    'package': _safe_value(row.get('PACKAGE_LEF')),
                     'workcenter': _safe_value(row.get('WORKCENTER_GROUP')),
                     'spec': _safe_value(row.get('SPECNAME')),
                     'age': round(float(row.get('AGEBYDAYS', 0) or 0), 1),
@@ -1782,7 +1982,7 @@ def _get_hold_detail_lots_from_oracle(
         if workcenter:
             conditions.append(f"WORKCENTER_GROUP = '{_escape_sql(workcenter)}'")
         if package:
-            conditions.append(f"PRODUCTLINENAME = '{_escape_sql(package)}'")
+            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
         if age_range:
             if age_range == '0-1':
                 conditions.append("AGEBYDAYS >= 0 AND AGEBYDAYS < 1")
@@ -1812,7 +2012,7 @@ def _get_hold_detail_lots_from_oracle(
                     LOTID,
                     WORKORDER,
                     QTY,
-                    PRODUCTLINENAME AS PACKAGE,
+                    PACKAGE_LEF AS PACKAGE,
                     WORKCENTER_GROUP AS WORKCENTER,
                     SPECNAME AS SPEC,
                     ROUND(AGEBYDAYS, 1) AS AGE,
