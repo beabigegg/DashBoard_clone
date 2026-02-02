@@ -77,8 +77,8 @@ def sanitize_column_name(name: str) -> str:
 
 
 def validate_table_name(table_name: str) -> bool:
-    """Validate table name format."""
-    return bool(re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', table_name))
+    """Validate table name format (supports schema.table format)."""
+    return bool(re.match(r'^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$', table_name))
 
 
 def execute_batch_query(
