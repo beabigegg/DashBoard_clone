@@ -263,6 +263,12 @@ def api_meta_search():
         limit: Maximum results (default: 20, max: 50)
         include_dummy: Include DUMMY lots (default: false)
 
+        Cross-filter parameters (for interdependent filter suggestions):
+        workorder: Optional WORKORDER cross-filter (fuzzy match)
+        lotid: Optional LOTID cross-filter (fuzzy match)
+        package: Optional PACKAGE_LEF cross-filter (exact match)
+        type: Optional PJ_TYPE cross-filter (exact match)
+
     Returns:
         JSON with items list containing matching values
     """
@@ -270,6 +276,12 @@ def api_meta_search():
     q = request.args.get('q', '').strip()
     limit = min(request.args.get('limit', 20, type=int), 50)
     include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+
+    # Cross-filter parameters
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    package = request.args.get('package', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
 
     # Validate search field
     if search_field not in ('workorder', 'lotid', 'package', 'pj_type'):
@@ -282,15 +294,27 @@ def api_meta_search():
     if len(q) < 2:
         return jsonify({'success': True, 'data': {'items': []}})
 
-    # Perform search
+    # Perform search with cross-filters (exclude the field being searched)
     if search_field == 'workorder':
-        result = search_workorders(q=q, limit=limit, include_dummy=include_dummy)
+        result = search_workorders(
+            q=q, limit=limit, include_dummy=include_dummy,
+            lotid=lotid, package=package, pj_type=pj_type
+        )
     elif search_field == 'lotid':
-        result = search_lot_ids(q=q, limit=limit, include_dummy=include_dummy)
+        result = search_lot_ids(
+            q=q, limit=limit, include_dummy=include_dummy,
+            workorder=workorder, package=package, pj_type=pj_type
+        )
     elif search_field == 'package':
-        result = search_packages(q=q, limit=limit, include_dummy=include_dummy)
+        result = search_packages(
+            q=q, limit=limit, include_dummy=include_dummy,
+            workorder=workorder, lotid=lotid, pj_type=pj_type
+        )
     else:  # pj_type
-        result = search_types(q=q, limit=limit, include_dummy=include_dummy)
+        result = search_types(
+            q=q, limit=limit, include_dummy=include_dummy,
+            workorder=workorder, lotid=lotid, package=package
+        )
 
     if result is not None:
         return jsonify({'success': True, 'data': {'items': result}})

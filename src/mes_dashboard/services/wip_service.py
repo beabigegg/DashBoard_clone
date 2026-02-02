@@ -1177,7 +1177,10 @@ def _get_packages_from_oracle(include_dummy: bool = False) -> Optional[List[Dict
 def search_workorders(
     q: str,
     limit: int = 20,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[List[str]]:
     """Search for WORKORDER values matching the query.
 
@@ -1187,6 +1190,9 @@ def search_workorders(
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
         include_dummy: If True, include DUMMY lots (default: False)
+        lotid: Optional LOTID cross-filter (fuzzy match)
+        package: Optional PACKAGE_LEF cross-filter (exact match)
+        pj_type: Optional PJ_TYPE cross-filter (exact match)
 
     Returns:
         List of matching WORKORDER values (distinct)
@@ -1201,8 +1207,14 @@ def search_workorders(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy)
+            df = _filter_base_conditions(cached_df, include_dummy, lotid=lotid)
             df = df[df['WORKORDER'].notna()]
+
+            # Apply cross-filters
+            if package and 'PACKAGE_LEF' in df.columns:
+                df = df[df['PACKAGE_LEF'] == package]
+            if pj_type and 'PJ_TYPE' in df.columns:
+                df = df[df['PJ_TYPE'] == pj_type]
 
             # Filter by search query (case-insensitive)
             df = df[df['WORKORDER'].str.contains(q, case=False, na=False)]
@@ -1217,19 +1229,29 @@ def search_workorders(
             logger.warning(f"Cache-based workorder search failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _search_workorders_from_oracle(q, limit, include_dummy)
+    return _search_workorders_from_oracle(q, limit, include_dummy, lotid, package, pj_type)
 
 
 def _search_workorders_from_oracle(
     q: str,
     limit: int = 20,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[List[str]]:
     """Search workorders directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy)
+        conditions = _build_base_conditions(include_dummy, lotid=lotid)
         conditions.append(f"WORKORDER LIKE '%{_escape_sql(q)}%'")
         conditions.append("WORKORDER IS NOT NULL")
+
+        # Apply cross-filters
+        if package:
+            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+        if pj_type:
+            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
+
         where_clause = f"WHERE {' AND '.join(conditions)}"
 
         sql = f"""
@@ -1253,7 +1275,10 @@ def _search_workorders_from_oracle(
 def search_lot_ids(
     q: str,
     limit: int = 20,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[List[str]]:
     """Search for LOTID values matching the query.
 
@@ -1263,6 +1288,9 @@ def search_lot_ids(
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
         include_dummy: If True, include DUMMY lots (default: False)
+        workorder: Optional WORKORDER cross-filter (fuzzy match)
+        package: Optional PACKAGE_LEF cross-filter (exact match)
+        pj_type: Optional PJ_TYPE cross-filter (exact match)
 
     Returns:
         List of matching LOTID values
@@ -1277,7 +1305,13 @@ def search_lot_ids(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy)
+            df = _filter_base_conditions(cached_df, include_dummy, workorder=workorder)
+
+            # Apply cross-filters
+            if package and 'PACKAGE_LEF' in df.columns:
+                df = df[df['PACKAGE_LEF'] == package]
+            if pj_type and 'PJ_TYPE' in df.columns:
+                df = df[df['PJ_TYPE'] == pj_type]
 
             # Filter by search query (case-insensitive)
             df = df[df['LOTID'].str.contains(q, case=False, na=False)]
@@ -1292,18 +1326,28 @@ def search_lot_ids(
             logger.warning(f"Cache-based lot ID search failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _search_lot_ids_from_oracle(q, limit, include_dummy)
+    return _search_lot_ids_from_oracle(q, limit, include_dummy, workorder, package, pj_type)
 
 
 def _search_lot_ids_from_oracle(
     q: str,
     limit: int = 20,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[List[str]]:
     """Search lot IDs directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy)
+        conditions = _build_base_conditions(include_dummy, workorder=workorder)
         conditions.append(f"LOTID LIKE '%{_escape_sql(q)}%'")
+
+        # Apply cross-filters
+        if package:
+            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+        if pj_type:
+            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
+
         where_clause = f"WHERE {' AND '.join(conditions)}"
 
         sql = f"""
@@ -1327,7 +1371,10 @@ def _search_lot_ids_from_oracle(
 def search_packages(
     q: str,
     limit: int = 20,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[List[str]]:
     """Search for PACKAGE_LEF values matching the query.
 
@@ -1337,6 +1384,9 @@ def search_packages(
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
         include_dummy: If True, include DUMMY lots (default: False)
+        workorder: Optional WORKORDER cross-filter (fuzzy match)
+        lotid: Optional LOTID cross-filter (fuzzy match)
+        pj_type: Optional PJ_TYPE cross-filter (exact match)
 
     Returns:
         List of matching PACKAGE_LEF values (distinct)
@@ -1351,14 +1401,18 @@ def search_packages(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy)
+            df = _filter_base_conditions(cached_df, include_dummy, workorder=workorder, lotid=lotid)
 
             # Check if PACKAGE_LEF column exists
             if 'PACKAGE_LEF' not in df.columns:
                 logger.warning("PACKAGE_LEF column not found in cache")
-                return _search_packages_from_oracle(q, limit, include_dummy)
+                return _search_packages_from_oracle(q, limit, include_dummy, workorder, lotid, pj_type)
 
             df = df[df['PACKAGE_LEF'].notna()]
+
+            # Apply cross-filter
+            if pj_type and 'PJ_TYPE' in df.columns:
+                df = df[df['PJ_TYPE'] == pj_type]
 
             # Filter by search query (case-insensitive)
             df = df[df['PACKAGE_LEF'].str.contains(q, case=False, na=False)]
@@ -1373,19 +1427,27 @@ def search_packages(
             logger.warning(f"Cache-based package search failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _search_packages_from_oracle(q, limit, include_dummy)
+    return _search_packages_from_oracle(q, limit, include_dummy, workorder, lotid, pj_type)
 
 
 def _search_packages_from_oracle(
     q: str,
     limit: int = 20,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    pj_type: Optional[str] = None
 ) -> Optional[List[str]]:
     """Search packages directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy)
+        conditions = _build_base_conditions(include_dummy, workorder=workorder, lotid=lotid)
         conditions.append(f"PACKAGE_LEF LIKE '%{_escape_sql(q)}%'")
         conditions.append("PACKAGE_LEF IS NOT NULL")
+
+        # Apply cross-filter
+        if pj_type:
+            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
+
         where_clause = f"WHERE {' AND '.join(conditions)}"
 
         sql = f"""
@@ -1409,7 +1471,10 @@ def _search_packages_from_oracle(
 def search_types(
     q: str,
     limit: int = 20,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None
 ) -> Optional[List[str]]:
     """Search for PJ_TYPE values matching the query.
 
@@ -1419,6 +1484,9 @@ def search_types(
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
         include_dummy: If True, include DUMMY lots (default: False)
+        workorder: Optional WORKORDER cross-filter (fuzzy match)
+        lotid: Optional LOTID cross-filter (fuzzy match)
+        package: Optional PACKAGE_LEF cross-filter (exact match)
 
     Returns:
         List of matching PJ_TYPE values (distinct)
@@ -1433,14 +1501,18 @@ def search_types(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy)
+            df = _filter_base_conditions(cached_df, include_dummy, workorder=workorder, lotid=lotid)
 
             # Check if PJ_TYPE column exists
             if 'PJ_TYPE' not in df.columns:
                 logger.warning("PJ_TYPE column not found in cache")
-                return _search_types_from_oracle(q, limit, include_dummy)
+                return _search_types_from_oracle(q, limit, include_dummy, workorder, lotid, package)
 
             df = df[df['PJ_TYPE'].notna()]
+
+            # Apply cross-filter
+            if package and 'PACKAGE_LEF' in df.columns:
+                df = df[df['PACKAGE_LEF'] == package]
 
             # Filter by search query (case-insensitive)
             df = df[df['PJ_TYPE'].str.contains(q, case=False, na=False)]
@@ -1455,19 +1527,27 @@ def search_types(
             logger.warning(f"Cache-based type search failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _search_types_from_oracle(q, limit, include_dummy)
+    return _search_types_from_oracle(q, limit, include_dummy, workorder, lotid, package)
 
 
 def _search_types_from_oracle(
     q: str,
     limit: int = 20,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None
 ) -> Optional[List[str]]:
     """Search types directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy)
+        conditions = _build_base_conditions(include_dummy, workorder=workorder, lotid=lotid)
         conditions.append(f"PJ_TYPE LIKE '%{_escape_sql(q)}%'")
         conditions.append("PJ_TYPE IS NOT NULL")
+
+        # Apply cross-filter
+        if package:
+            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+
         where_clause = f"WHERE {' AND '.join(conditions)}"
 
         sql = f"""

@@ -967,9 +967,32 @@
             };
             const field = fieldMap[type] || type;
 
+            // Build cross-filter parameters (exclude current field being searched)
+            // Get current input values for cross-filtering
+            const currentWorkorder = document.getElementById('filterWorkorder').value.trim();
+            const currentLotid = document.getElementById('filterLotid').value.trim();
+            const currentPackage = document.getElementById('filterPackage').value.trim();
+            const currentType = document.getElementById('filterType').value.trim();
+
+            const params = { field, q: query, limit: 20 };
+
+            // Add cross-filters (exclude the field being searched)
+            if (type !== 'workorder' && currentWorkorder) {
+                params.workorder = currentWorkorder;
+            }
+            if (type !== 'lotid' && currentLotid) {
+                params.lotid = currentLotid;
+            }
+            if (type !== 'package' && currentPackage) {
+                params.package = currentPackage;
+            }
+            if (type !== 'type' && currentType) {
+                params.type = currentType;
+            }
+
             try {
                 const result = await MesApi.get('/api/wip/meta/search', {
-                    params: { field, q: query, limit: 20 },
+                    params,
                     silent: true,
                     retries: 0  // No retry for autocomplete
                 });
