@@ -543,7 +543,7 @@ def get_resource_status_summary(
         is_monitor: Filter by PJ_ISMONITOR flag
 
     Returns:
-        Dict with summary statistics.
+        Dict with summary statistics including OU%, Availability%, and per-status counts.
     """
     # Get merged data with filters (except status_categories)
     data = get_merged_resource_status(
@@ -557,16 +557,28 @@ def get_resource_status_summary(
         return {
             'total_count': 0,
             'by_status_category': {},
+            'by_status': {},
             'by_workcenter_group': {},
             'with_active_job': 0,
             'with_wip': 0,
+            'ou_pct': 0,
+            'availability_pct': 0,
         }
 
-    # Count by status category
+    # Count by status category (for backward compatibility)
     by_status_category = {}
     for record in data:
         cat = record.get('STATUS_CATEGORY') or 'UNKNOWN'
         by_status_category[cat] = by_status_category.get(cat, 0) + 1
+
+    # Count by individual E10 status (PRD, SBY, UDT, SDT, EGT, NST)
+    by_status = {'PRD': 0, 'SBY': 0, 'UDT': 0, 'SDT': 0, 'EGT': 0, 'NST': 0, 'OTHER': 0}
+    for record in data:
+        status = record.get('EQUIPMENTASSETSSTATUS') or 'UNKNOWN'
+        if status in by_status:
+            by_status[status] += 1
+        else:
+            by_status['OTHER'] += 1
 
     # Count by workcenter group
     by_workcenter_group = {}
@@ -580,12 +592,30 @@ def get_resource_status_summary(
     # Count with WIP
     with_wip = sum(1 for r in data if (r.get('LOT_COUNT') or 0) > 0)
 
+    # Calculate OU% = PRD / (PRD + SBY + UDT + SDT + EGT) * 100
+    prd = by_status['PRD']
+    sby = by_status['SBY']
+    udt = by_status['UDT']
+    sdt = by_status['SDT']
+    egt = by_status['EGT']
+    nst = by_status['NST']
+
+    ou_denominator = prd + sby + udt + sdt + egt
+    ou_pct = round(prd / ou_denominator * 100, 1) if ou_denominator > 0 else 0
+
+    # Calculate Availability% = (PRD + SBY + EGT) / total * 100
+    total_count = len(data)
+    availability_pct = round((prd + sby + egt) / total_count * 100, 1) if total_count > 0 else 0
+
     return {
-        'total_count': len(data),
+        'total_count': total_count,
         'by_status_category': by_status_category,
+        'by_status': by_status,
         'by_workcenter_group': by_workcenter_group,
         'with_active_job': with_active_job,
         'with_wip': with_wip,
+        'ou_pct': ou_pct,
+        'availability_pct': availability_pct,
     }
 
 

@@ -290,41 +290,63 @@
         /* KPI Cards */
         .kpi-row {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 14px;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 12px;
             margin-bottom: 16px;
+        }
+
+        @media (max-width: 1400px) {
+            .kpi-row {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .kpi-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
         }
 
         .kpi-card {
             background: var(--card-bg);
             border-radius: 10px;
-            padding: 18px;
+            padding: 14px 10px;
             text-align: center;
             border: 1px solid var(--border);
             box-shadow: var(--shadow);
         }
 
         .kpi-label {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--muted);
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .kpi-value {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
         }
 
         .kpi-value.green { color: var(--success); }
         .kpi-value.blue { color: var(--primary); }
+        .kpi-value.prd { color: #3B82F6; }
+        .kpi-value.cyan { color: #06b6d4; }
         .kpi-value.red { color: var(--danger); }
         .kpi-value.yellow { color: var(--warning); }
+        .kpi-value.purple { color: #8b5cf6; }
+        .kpi-value.slate { color: #94a3b8; }
         .kpi-value.gray { color: var(--neutral); }
 
         .kpi-sub {
+            font-size: 10px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .kpi-pct {
             font-size: 11px;
             color: var(--muted);
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         /* Charts Row */
@@ -614,29 +636,39 @@
                 <div class="kpi-sub">可用率</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">PRD 時數</div>
-                <div class="kpi-value" style="color: #3B82F6;" id="kpiPrdHours">--</div>
-                <div class="kpi-sub">生產時間</div>
+                <div class="kpi-label">PRD</div>
+                <div class="kpi-value prd" id="kpiPrdHours">--</div>
+                <div class="kpi-pct" id="kpiPrdPct">生產</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">UDT 時數</div>
+                <div class="kpi-label">SBY</div>
+                <div class="kpi-value cyan" id="kpiSbyHours">--</div>
+                <div class="kpi-pct" id="kpiSbyPct">待機</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">UDT</div>
                 <div class="kpi-value red" id="kpiUdtHours">--</div>
-                <div class="kpi-sub">非計畫停機</div>
+                <div class="kpi-pct" id="kpiUdtPct">非計畫停機</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">SDT 時數</div>
+                <div class="kpi-label">SDT</div>
                 <div class="kpi-value yellow" id="kpiSdtHours">--</div>
-                <div class="kpi-sub">計畫停機</div>
+                <div class="kpi-pct" id="kpiSdtPct">計畫停機</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">EGT 時數</div>
-                <div class="kpi-value" style="color: #8b5cf6;" id="kpiEgtHours">--</div>
-                <div class="kpi-sub">工程時間</div>
+                <div class="kpi-label">EGT</div>
+                <div class="kpi-value purple" id="kpiEgtHours">--</div>
+                <div class="kpi-pct" id="kpiEgtPct">工程</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">NST</div>
+                <div class="kpi-value slate" id="kpiNstHours">--</div>
+                <div class="kpi-pct" id="kpiNstPct">未排程</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">機台數</div>
                 <div class="kpi-value gray" id="kpiMachineCount">--</div>
-                <div class="kpi-sub">不重複機台</div>
+                <div class="kpi-sub">設備總數</div>
             </div>
         </div>
 
@@ -1000,12 +1032,35 @@
     // KPI Cards
     // ============================================================
     function updateKpiCards(kpi) {
+        // OU% and Availability%
         document.getElementById('kpiOuPct').textContent = kpi.ou_pct + '%';
         document.getElementById('kpiAvailabilityPct').textContent = kpi.availability_pct + '%';
+
+        // PRD
         document.getElementById('kpiPrdHours').textContent = formatHours(kpi.prd_hours);
+        document.getElementById('kpiPrdPct').textContent = `生產 (${kpi.prd_pct || 0}%)`;
+
+        // SBY
+        document.getElementById('kpiSbyHours').textContent = formatHours(kpi.sby_hours);
+        document.getElementById('kpiSbyPct').textContent = `待機 (${kpi.sby_pct || 0}%)`;
+
+        // UDT
         document.getElementById('kpiUdtHours').textContent = formatHours(kpi.udt_hours);
+        document.getElementById('kpiUdtPct').textContent = `非計畫停機 (${kpi.udt_pct || 0}%)`;
+
+        // SDT
         document.getElementById('kpiSdtHours').textContent = formatHours(kpi.sdt_hours);
+        document.getElementById('kpiSdtPct').textContent = `計畫停機 (${kpi.sdt_pct || 0}%)`;
+
+        // EGT
         document.getElementById('kpiEgtHours').textContent = formatHours(kpi.egt_hours);
+        document.getElementById('kpiEgtPct').textContent = `工程 (${kpi.egt_pct || 0}%)`;
+
+        // NST
+        document.getElementById('kpiNstHours').textContent = formatHours(kpi.nst_hours);
+        document.getElementById('kpiNstPct').textContent = `未排程 (${kpi.nst_pct || 0}%)`;
+
+        // Machine count
         document.getElementById('kpiMachineCount').textContent = kpi.machine_count.toLocaleString();
     }
 

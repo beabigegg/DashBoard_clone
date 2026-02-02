@@ -153,15 +153,27 @@
     /* Summary Cards */
     .summary-grid {
         display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 12px;
+        grid-template-columns: repeat(9, 1fr);
+        gap: 10px;
         margin-bottom: 16px;
+    }
+
+    @media (max-width: 1400px) {
+        .summary-grid {
+            grid-template-columns: repeat(5, 1fr);
+        }
+    }
+
+    @media (max-width: 900px) {
+        .summary-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
     }
 
     .summary-card {
         background: var(--card-bg);
         border-radius: 10px;
-        padding: 16px;
+        padding: 14px 10px;
         text-align: center;
         border: 1px solid var(--border);
         box-shadow: var(--shadow);
@@ -178,12 +190,15 @@
         height: 3px;
     }
 
-    .summary-card.total::before { background: var(--primary); }
-    .summary-card.productive::before { background: var(--success); }
+    .summary-card.ou::before { background: var(--primary); }
+    .summary-card.availability::before { background: var(--success); }
+    .summary-card.productive::before { background: #3B82F6; }
     .summary-card.standby::before { background: var(--info); }
-    .summary-card.down::before { background: var(--danger); }
+    .summary-card.udt::before { background: var(--danger); }
+    .summary-card.sdt::before { background: var(--warning); }
     .summary-card.engineering::before { background: var(--purple); }
-    .summary-card.other::before { background: var(--muted); }
+    .summary-card.nst::before { background: #94a3b8; }
+    .summary-card.total::before { background: var(--muted); }
 
     .summary-label {
         font-size: 12px;
@@ -198,12 +213,15 @@
         font-weight: 700;
     }
 
-    .summary-card.total .summary-value { color: var(--primary); }
-    .summary-card.productive .summary-value { color: var(--success); }
+    .summary-card.ou .summary-value { color: var(--primary); }
+    .summary-card.availability .summary-value { color: var(--success); }
+    .summary-card.productive .summary-value { color: #3B82F6; }
     .summary-card.standby .summary-value { color: var(--info); }
-    .summary-card.down .summary-value { color: var(--danger); }
+    .summary-card.udt .summary-value { color: var(--danger); }
+    .summary-card.sdt .summary-value { color: var(--warning); }
     .summary-card.engineering .summary-value { color: var(--purple); }
-    .summary-card.other .summary-value { color: var(--muted); }
+    .summary-card.nst .summary-value { color: #94a3b8; }
+    .summary-card.total .summary-value { color: var(--muted); }
 
     .summary-pct {
         font-size: 12px;
@@ -591,34 +609,50 @@
 
     <!-- Summary Cards -->
     <div class="summary-grid">
-        <div class="summary-card total">
-            <div class="summary-label">總設備數</div>
-            <div class="summary-value" id="totalCount">--</div>
+        <div class="summary-card ou">
+            <div class="summary-label">OU%</div>
+            <div class="summary-value" id="ouPct">--</div>
+            <div class="summary-pct">稼動率</div>
+        </div>
+        <div class="summary-card availability">
+            <div class="summary-label">Availability%</div>
+            <div class="summary-value" id="availabilityPct">--</div>
+            <div class="summary-pct">可用率</div>
         </div>
         <div class="summary-card productive">
-            <div class="summary-label">生產中 (PRD)</div>
-            <div class="summary-value" id="productiveCount">--</div>
-            <div class="summary-pct" id="productivePct">--</div>
+            <div class="summary-label">PRD</div>
+            <div class="summary-value" id="prdCount">--</div>
+            <div class="summary-pct" id="prdPct">生產</div>
         </div>
         <div class="summary-card standby">
-            <div class="summary-label">待機 (SBY)</div>
-            <div class="summary-value" id="standbyCount">--</div>
-            <div class="summary-pct" id="standbyPct">--</div>
+            <div class="summary-label">SBY</div>
+            <div class="summary-value" id="sbyCount">--</div>
+            <div class="summary-pct" id="sbyPct">待機</div>
         </div>
-        <div class="summary-card down">
-            <div class="summary-label">停機 (UDT/SDT)</div>
-            <div class="summary-value" id="downCount">--</div>
-            <div class="summary-pct" id="downPct">--</div>
+        <div class="summary-card udt">
+            <div class="summary-label">UDT</div>
+            <div class="summary-value" id="udtCount">--</div>
+            <div class="summary-pct" id="udtPct">非計畫停機</div>
+        </div>
+        <div class="summary-card sdt">
+            <div class="summary-label">SDT</div>
+            <div class="summary-value" id="sdtCount">--</div>
+            <div class="summary-pct" id="sdtPct">計畫停機</div>
         </div>
         <div class="summary-card engineering">
-            <div class="summary-label">工程 (EGT)</div>
-            <div class="summary-value" id="engCount">--</div>
-            <div class="summary-pct" id="engPct">--</div>
+            <div class="summary-label">EGT</div>
+            <div class="summary-value" id="egtCount">--</div>
+            <div class="summary-pct" id="egtPct">工程</div>
         </div>
-        <div class="summary-card other">
-            <div class="summary-label">其他/未排程</div>
-            <div class="summary-value" id="otherCount">--</div>
-            <div class="summary-pct" id="otherPct">--</div>
+        <div class="summary-card nst">
+            <div class="summary-label">NST</div>
+            <div class="summary-value" id="nstCount">--</div>
+            <div class="summary-pct" id="nstPct">未排程</div>
+        </div>
+        <div class="summary-card total">
+            <div class="summary-label">機台數</div>
+            <div class="summary-value" id="totalCount">--</div>
+            <div class="summary-pct">設備總數</div>
         </div>
     </div>
 
@@ -717,25 +751,44 @@
             if (result.success) {
                 const d = result.data;
                 const total = d.total_count || 0;
-                const cats = d.by_status_category || {};
+                const status = d.by_status || {};
 
-                const productive = cats.PRODUCTIVE || 0;
-                const standby = cats.STANDBY || 0;
-                const down = (cats.DOWN || 0);
-                const eng = cats.ENGINEERING || 0;
-                const other = (cats.NOT_SCHEDULED || 0) + (cats.INACTIVE || 0) + (cats.OTHER || 0) + (cats.UNKNOWN || 0);
+                // Get individual status counts
+                const prd = status.PRD || 0;
+                const sby = status.SBY || 0;
+                const udt = status.UDT || 0;
+                const sdt = status.SDT || 0;
+                const egt = status.EGT || 0;
+                const nst = status.NST || 0;
 
+                // Calculate percentage denominator (includes NST)
+                const totalStatus = prd + sby + udt + sdt + egt + nst;
+
+                // Update OU% and Availability%
+                document.getElementById('ouPct').textContent = d.ou_pct ? `${d.ou_pct}%` : '--';
+                document.getElementById('availabilityPct').textContent = d.availability_pct ? `${d.availability_pct}%` : '--';
+
+                // Update status cards with count and percentage
+                document.getElementById('prdCount').textContent = prd;
+                document.getElementById('prdPct').textContent = totalStatus ? `生產 (${((prd/totalStatus)*100).toFixed(1)}%)` : '生產';
+
+                document.getElementById('sbyCount').textContent = sby;
+                document.getElementById('sbyPct').textContent = totalStatus ? `待機 (${((sby/totalStatus)*100).toFixed(1)}%)` : '待機';
+
+                document.getElementById('udtCount').textContent = udt;
+                document.getElementById('udtPct').textContent = totalStatus ? `非計畫停機 (${((udt/totalStatus)*100).toFixed(1)}%)` : '非計畫停機';
+
+                document.getElementById('sdtCount').textContent = sdt;
+                document.getElementById('sdtPct').textContent = totalStatus ? `計畫停機 (${((sdt/totalStatus)*100).toFixed(1)}%)` : '計畫停機';
+
+                document.getElementById('egtCount').textContent = egt;
+                document.getElementById('egtPct').textContent = totalStatus ? `工程 (${((egt/totalStatus)*100).toFixed(1)}%)` : '工程';
+
+                document.getElementById('nstCount').textContent = nst;
+                document.getElementById('nstPct').textContent = totalStatus ? `未排程 (${((nst/totalStatus)*100).toFixed(1)}%)` : '未排程';
+
+                // Update total count
                 document.getElementById('totalCount').textContent = total;
-                document.getElementById('productiveCount').textContent = productive;
-                document.getElementById('productivePct').textContent = total ? `${((productive/total)*100).toFixed(1)}%` : '--';
-                document.getElementById('standbyCount').textContent = standby;
-                document.getElementById('standbyPct').textContent = total ? `${((standby/total)*100).toFixed(1)}%` : '--';
-                document.getElementById('downCount').textContent = down;
-                document.getElementById('downPct').textContent = total ? `${((down/total)*100).toFixed(1)}%` : '--';
-                document.getElementById('engCount').textContent = eng;
-                document.getElementById('engPct').textContent = total ? `${((eng/total)*100).toFixed(1)}%` : '--';
-                document.getElementById('otherCount').textContent = other;
-                document.getElementById('otherPct').textContent = total ? `${((other/total)*100).toFixed(1)}%` : '--';
             }
         } catch (e) {
             console.error('載入摘要失敗:', e);
@@ -1020,12 +1073,14 @@
 
             const dot = document.getElementById('cacheDot');
             const status = document.getElementById('cacheStatus');
+            const resCache = data.resource_cache || {};
             const eqCache = data.equipment_status_cache || {};
 
-            if (eqCache.enabled && eqCache.loaded) {
+            // 使用 resource_cache 的數量（過濾後的設備數）
+            if (resCache.enabled && resCache.loaded) {
                 dot.className = 'cache-dot';
-                status.textContent = `快取正常 (${eqCache.count} 筆)`;
-            } else if (eqCache.enabled) {
+                status.textContent = `快取正常 (${resCache.count} 筆)`;
+            } else if (resCache.enabled) {
                 dot.className = 'cache-dot loading';
                 status.textContent = '快取載入中...';
             } else {
@@ -1033,6 +1088,7 @@
                 status.textContent = '快取未啟用';
             }
 
+            // 使用 equipment_status_cache 的更新時間（即時狀態更新時間）
             if (eqCache.updated_at) {
                 document.getElementById('lastUpdate').textContent =
                     `更新: ${new Date(eqCache.updated_at).toLocaleString('zh-TW')}`;

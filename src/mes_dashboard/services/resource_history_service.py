@@ -675,6 +675,11 @@ def _calc_availability_pct(prd: float, sby: float, udt: float, sdt: float, egt: 
     return round(numerator / denominator * 100, 1) if denominator > 0 else 0
 
 
+def _calc_status_pct(value: float, total: float) -> float:
+    """Calculate status percentage = value / total * 100."""
+    return round(value / total * 100, 1) if total > 0 else 0
+
+
 def _build_kpi_from_df(df: pd.DataFrame) -> Dict[str, Any]:
     """Build KPI dict from query result DataFrame."""
     if df is None or len(df) == 0:
@@ -682,11 +687,17 @@ def _build_kpi_from_df(df: pd.DataFrame) -> Dict[str, Any]:
             'ou_pct': 0,
             'availability_pct': 0,
             'prd_hours': 0,
+            'prd_pct': 0,
             'sby_hours': 0,
+            'sby_pct': 0,
             'udt_hours': 0,
+            'udt_pct': 0,
             'sdt_hours': 0,
+            'sdt_pct': 0,
             'egt_hours': 0,
+            'egt_pct': 0,
             'nst_hours': 0,
+            'nst_pct': 0,
             'machine_count': 0
         }
 
@@ -699,15 +710,24 @@ def _build_kpi_from_df(df: pd.DataFrame) -> Dict[str, Any]:
     nst = _safe_float(row['NST_HOURS'])
     machine_count = int(_safe_float(row['MACHINE_COUNT']))
 
+    # Total hours for percentage calculation (includes NST)
+    total_hours = prd + sby + udt + sdt + egt + nst
+
     return {
         'ou_pct': _calc_ou_pct(prd, sby, udt, sdt, egt),
         'availability_pct': _calc_availability_pct(prd, sby, udt, sdt, egt, nst),
         'prd_hours': round(prd, 1),
+        'prd_pct': _calc_status_pct(prd, total_hours),
         'sby_hours': round(sby, 1),
+        'sby_pct': _calc_status_pct(sby, total_hours),
         'udt_hours': round(udt, 1),
+        'udt_pct': _calc_status_pct(udt, total_hours),
         'sdt_hours': round(sdt, 1),
+        'sdt_pct': _calc_status_pct(sdt, total_hours),
         'egt_hours': round(egt, 1),
+        'egt_pct': _calc_status_pct(egt, total_hours),
         'nst_hours': round(nst, 1),
+        'nst_pct': _calc_status_pct(nst, total_hours),
         'machine_count': machine_count
     }
 
