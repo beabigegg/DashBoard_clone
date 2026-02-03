@@ -42,7 +42,7 @@ class AppFactoryTests(unittest.TestCase):
             "/api/wip/detail/<workcenter>",
             "/api/wip/meta/workcenters",
             "/api/wip/meta/packages",
-            "/api/resource/summary",
+            "/api/resource/status/summary",
             "/api/dashboard/kpi",
             "/api/excel-query/upload",
         }

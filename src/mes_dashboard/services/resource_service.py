@@ -105,38 +105,6 @@ def get_resource_latest_status_subquery(days_back: int = 30) -> str:
 # Resource Summary Queries
 # ============================================================
 
-def query_resource_status_summary(days_back: int = 30) -> Optional[Dict]:
-    """Query resource status summary statistics.
-
-    Args:
-        days_back: Number of days to look back
-
-    Returns:
-        Dict with summary stats or None if query fails.
-    """
-    try:
-        base_sql = get_resource_latest_status_subquery(days_back)
-
-        # Load SQL from file and replace placeholder
-        sql = SQLLoader.load("resource/status_summary")
-        sql = sql.replace("{{ LATEST_STATUS_SUBQUERY }}", base_sql)
-
-        df = read_sql_df(sql)
-        if df is None or df.empty:
-            return None
-
-        row = df.iloc[0]
-        return {
-            'total_count': int(row['TOTAL_COUNT'] or 0),
-            'workcenter_count': int(row['WORKCENTER_COUNT'] or 0),
-            'family_count': int(row['FAMILY_COUNT'] or 0),
-            'dept_count': int(row['DEPT_COUNT'] or 0)
-        }
-    except Exception as exc:
-        print(f"Resource summary query failed: {exc}")
-        return None
-
-
 def query_resource_by_status(days_back: int = 30) -> Optional[pd.DataFrame]:
     """Query resource count grouped by status.
 

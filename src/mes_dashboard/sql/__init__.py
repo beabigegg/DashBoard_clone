@@ -23,7 +23,6 @@ Directory Structure:
     │   └── resource_detail_with_job.sql
     ├── resource/            # Resource status SQL files
     │   ├── latest_status.sql
-    │   ├── status_summary.sql
     │   ├── by_status.sql
     │   ├── by_workcenter.sql
     │   ├── detail.sql

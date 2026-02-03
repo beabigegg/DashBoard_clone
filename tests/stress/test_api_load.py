@@ -109,9 +109,9 @@ class TestAPILoadConcurrent:
         assert result.avg_response_time < 15.0, f"Avg response time {result.avg_response_time:.2f}s exceeds 15s"
 
     def test_resource_summary_concurrent_load(self, base_url: str, stress_config: dict, stress_result):
-        """Test resource summary API under concurrent load."""
-        result = stress_result("Resource Summary Concurrent Load")
-        url = f"{base_url}/api/resource/summary"
+        """Test resource status summary API under concurrent load."""
+        result = stress_result("Resource Status Summary Concurrent Load")
+        url = f"{base_url}/api/resource/status/summary"
         concurrent_users = stress_config['concurrent_users']
         requests_per_user = stress_config['requests_per_user']
         timeout = stress_config['timeout']
@@ -146,7 +146,7 @@ class TestAPILoadConcurrent:
             f"{base_url}/api/wip/overview/matrix",
             f"{base_url}/api/wip/overview/hold",
             f"{base_url}/api/wip/meta/workcenters",
-            f"{base_url}/api/resource/summary",
+            f"{base_url}/api/resource/status/summary",
         ]
         concurrent_users = stress_config['concurrent_users']
         timeout = stress_config['timeout']

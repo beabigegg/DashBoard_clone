@@ -43,7 +43,6 @@ def _clean_nan_values(data):
     return data
 from mes_dashboard.core.utils import get_days_back
 from mes_dashboard.services.resource_service import (
-    query_resource_status_summary,
     query_resource_by_status,
     query_resource_by_workcenter,
     query_resource_detail,
@@ -58,21 +57,6 @@ from mes_dashboard.config.constants import STATUS_CATEGORIES
 
 # Create Blueprint
 resource_bp = Blueprint('resource', __name__, url_prefix='/api/resource')
-
-
-@resource_bp.route('/summary')
-def api_resource_summary():
-    """API: Resource status summary."""
-    days_back = request.args.get('days_back', 30, type=int)
-    cache_key = make_cache_key("resource_summary", days_back)
-    summary = cache_get(cache_key)
-    if summary is None:
-        summary = query_resource_status_summary(days_back)
-        if summary:
-            cache_set(cache_key, summary)
-    if summary:
-        return jsonify({'success': True, 'data': summary})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
 
 
 @resource_bp.route('/by_status')

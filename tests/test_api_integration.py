@@ -221,19 +221,21 @@ class TestResourceAPIIntegration(unittest.TestCase):
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
 
-    @patch('mes_dashboard.routes.resource_routes.query_resource_status_summary')
-    def test_resource_summary_response_format(self, mock_summary):
-        """Resource summary should return consistent JSON structure."""
+    @patch('mes_dashboard.routes.resource_routes.get_resource_status_summary')
+    def test_resource_status_summary_response_format(self, mock_summary):
+        """Resource status summary should return consistent JSON structure."""
         mock_summary.return_value = {
-            'total_equipment': 100,
-            'by_status': {
-                'RUN': 60,
-                'IDLE': 30,
-                'DOWN': 10
-            }
+            'total_count': 100,
+            'by_status_category': {'PRODUCTIVE': 60, 'STANDBY': 30, 'DOWN': 10},
+            'by_status': {'PRD': 60, 'SBY': 30, 'UDT': 5, 'SDT': 5, 'EGT': 0, 'NST': 0, 'OTHER': 0},
+            'by_workcenter_group': {'焊接': 50, '成型': 50},
+            'with_active_job': 40,
+            'with_wip': 35,
+            'ou_pct': 63.2,
+            'availability_pct': 90.0,
         }
 
-        response = self.client.get('/api/resource/summary')
+        response = self.client.get('/api/resource/status/summary')
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
@@ -241,6 +243,8 @@ class TestResourceAPIIntegration(unittest.TestCase):
         # Verify response structure
         self.assertIn('success', data)
         self.assertTrue(data['success'])
+        self.assertIn('data', data)
+        self.assertIn('total_count', data['data'])
 
 
 class TestAPIContentType(unittest.TestCase):
