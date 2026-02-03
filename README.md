@@ -1,6 +1,6 @@
 # MES Dashboard 報表系統
 
-基於 Flask + Gunicorn 的 MES 數據報表查詢與可視化系統
+基於 Flask + Gunicorn + Redis 的 MES 數據報表查詢與可視化系統
 
 ---
 
@@ -12,8 +12,12 @@
 | WIP 明細查詢 | ✅ 已完成 |
 | Hold 狀態分析 | ✅ 已完成 |
 | 數據表查詢工具 | ✅ 已完成 |
+| 設備狀態監控 | ✅ 已完成 |
+| 設備歷史查詢 | ✅ 已完成 |
 | 管理員認證系統 | ✅ 已完成 |
 | 頁面狀態管理 | ✅ 已完成 |
+| Redis 快取系統 | ✅ 已完成 |
+| SQL 查詢安全架構 | ✅ 已完成 |
 | 部署自動化 | ✅ 已完成 |
 
 ---
@@ -63,6 +67,7 @@ nano .env
 - Python 3.11+
 - Conda (Miniconda/Anaconda)
 - Oracle Database 連線
+- Redis Server 7.x+ （設備狀態快取）
 
 ### 部署步驟
 
@@ -118,6 +123,11 @@ GUNICORN_BIND=0.0.0.0:8080    # 服務監聽位址
 GUNICORN_WORKERS=2             # Worker 數量
 GUNICORN_THREADS=4             # 每個 Worker 的執行緒數
 
+# Redis 設定
+REDIS_HOST=localhost          # Redis 伺服器位址
+REDIS_PORT=6379               # Redis 端口
+REDIS_DB=0                    # Redis 資料庫編號
+
 # 管理員設定
 ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
 ```
@@ -143,6 +153,8 @@ ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
 - WIP 即時概況
 - WIP 明細查詢
 - Hold 狀態分析
+- 設備狀態監控
+- 設備歷史查詢
 - 數據表查詢工具
 
 ### WIP 即時概況
@@ -151,6 +163,7 @@ ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
 - 按 SPEC 和 WORKCENTER 統計
 - 按產品線統計（匯總 + 明細）
 - Hold 狀態分類（品質異常/非品質異常）
+- 柏拉圖視覺化圖表
 
 ### WIP 明細查詢
 
@@ -167,9 +180,24 @@ ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
 - Hold 明細查詢
 - 品質異常分類統計
 
+### 設備狀態監控
+
+- 即時設備狀態總覽（PRD/SBY/UDT/SDT/EGT/NST）
+- 按工作中心群組統計
+- 設備稼動率（OU%）與運轉率（RUN%）
+- 階層篩選（廠區/產線/重點設備/監控設備）
+- Redis 快取自動更新（30 秒間隔）
+
+### 設備歷史查詢
+
+- 歷史狀態趨勢分析
+- 稼動率熱力圖視覺化
+- 設備狀態明細查詢
+- 支援 CSV 匯出
+
 ### 管理員功能
 
-- LDAP 認證登入
+- LDAP 認證登入（支援本地測試模式）
 - 頁面狀態管理（released/dev）
 - Dev 頁面僅管理員可見
 
@@ -186,6 +214,7 @@ ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
 | Gunicorn | 23.x | WSGI 伺服器 |
 | SQLAlchemy | 2.x | ORM |
 | oracledb | 2.x | Oracle 驅動 |
+| Redis | 7.x | 快取伺服器 |
 | Pandas | 2.x | 資料處理 |
 
 ### 前端技術棧
@@ -212,9 +241,32 @@ DashBoard/
 ├── src/mes_dashboard/          # 主程式
 │   ├── app.py                  # Flask 應用
 │   ├── config/                 # 設定
+│   │   ├── settings.py         # 環境設定
+│   │   ├── constants.py        # 常數定義
+│   │   └── workcenter_groups.py # 工作中心群組設定
 │   ├── core/                   # 核心模組
+│   │   ├── database.py         # 資料庫連線
+│   │   ├── redis_client.py     # Redis 客戶端
+│   │   ├── cache.py            # 快取管理
+│   │   └── cache_updater.py    # 快取自動更新
 │   ├── routes/                 # 路由
+│   │   ├── wip_routes.py       # WIP 相關 API
+│   │   ├── resource_routes.py  # 設備狀態 API
+│   │   ├── dashboard_routes.py # 儀表板 API
+│   │   └── ...                 # 其他路由
 │   ├── services/               # 服務層
+│   │   ├── wip_service.py      # WIP 業務邏輯
+│   │   ├── resource_service.py # 設備狀態邏輯
+│   │   ├── resource_cache.py   # 設備快取服務
+│   │   └── ...                 # 其他服務
+│   ├── sql/                    # SQL 查詢管理
+│   │   ├── loader.py           # SQLLoader (LRU 快取)
+│   │   ├── builder.py          # QueryBuilder (參數化)
+│   │   ├── filters.py          # CommonFilters
+│   │   ├── dashboard/          # 儀表板查詢
+│   │   ├── resource/           # 設備查詢
+│   │   ├── wip/                # WIP 查詢
+│   │   └── resource_history/   # 設備歷史查詢
 │   └── templates/              # HTML 模板
 ├── scripts/                    # 腳本
 │   ├── deploy.sh               # 部署腳本
@@ -290,6 +342,29 @@ pytest tests/stress/ -v
 
 ## 變更日誌
 
+### 2026-02-03
+
+- 重構 SQL 查詢管理架構，提升安全性與效能
+- 新增 SQLLoader (LRU 快取)、QueryBuilder (參數化)、CommonFilters 模組
+- 抽取 20 個 SQL 檔案至 `src/mes_dashboard/sql/` 目錄
+- 修復所有 SQL 注入風險（LIKE 萬用字元跳脫、IN 條件參數化）
+- 優化 workcenter_cards API 回應時間（55s → 0.1s）
+
+### 2026-02-02
+
+- 新增 Hold Summary 柏拉圖視覺化圖表
+- 設備頁面統一排序、階層篩選與標籤優化
+
+### 2026-01-30
+
+- 新增本地認證模式支援開發測試環境
+
+### 2026-01-29
+
+- 新增設備狀態監控頁面
+- 新增設備歷史查詢頁面
+- 整合 Redis 快取系統（30 秒自動更新）
+
 ### 2026-01-28
 
 - 新增管理員認證系統（LDAP 整合）
@@ -318,5 +393,5 @@ pytest tests/stress/ -v
 
 ---
 
-**文檔版本**: 2.0
-**最後更新**: 2026-01-28
+**文檔版本**: 3.0
+**最後更新**: 2026-02-03
