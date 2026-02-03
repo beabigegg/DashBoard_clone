@@ -451,7 +451,7 @@
 
         async function checkHealth() {
             try {
-                const response = await fetch('/health', { timeout: 10000 });
+                const response = await fetch('/health', { cache: 'no-store' });
                 const data = await response.json();
 
                 // Update main indicator

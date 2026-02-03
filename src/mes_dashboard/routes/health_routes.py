@@ -7,7 +7,7 @@ Provides /health endpoint for monitoring service status.
 from __future__ import annotations
 
 import logging
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, make_response
 
 from mes_dashboard.core.database import get_engine
 from mes_dashboard.core.redis_client import (
@@ -190,4 +190,9 @@ def health_check():
     if warnings:
         response['warnings'] = warnings
 
-    return jsonify(response), http_code
+    # Add no-cache headers to prevent browser caching
+    resp = make_response(jsonify(response), http_code)
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp

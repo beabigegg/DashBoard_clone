@@ -1570,7 +1570,7 @@
 
     async function checkCacheStatus() {
         try {
-            const resp = await fetch('/health');
+            const resp = await fetch('/health', { cache: 'no-store' });
             const data = await resp.json();
 
             const dot = document.getElementById('cacheDot');
