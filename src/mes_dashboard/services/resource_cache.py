@@ -11,8 +11,10 @@ import io
 import json
 import logging
 import os
+import threading
+import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -31,6 +33,44 @@ from mes_dashboard.config.constants import (
 from mes_dashboard.sql import QueryBuilder
 
 logger = logging.getLogger('mes_dashboard.resource_cache')
+
+# ============================================================
+# Process-Level Cache (Prevents redundant JSON parsing)
+# ============================================================
+
+class _ProcessLevelCache:
+    """Thread-safe process-level cache for parsed DataFrames."""
+
+    def __init__(self, ttl_seconds: int = 30):
+        self._cache: Dict[str, Tuple[pd.DataFrame, float]] = {}
+        self._lock = threading.Lock()
+        self._ttl = ttl_seconds
+
+    def get(self, key: str) -> Optional[pd.DataFrame]:
+        """Get cached DataFrame if not expired."""
+        with self._lock:
+            if key not in self._cache:
+                return None
+            df, timestamp = self._cache[key]
+            if time.time() - timestamp > self._ttl:
+                del self._cache[key]
+                return None
+            return df
+
+    def set(self, key: str, df: pd.DataFrame) -> None:
+        """Cache a DataFrame with current timestamp."""
+        with self._lock:
+            self._cache[key] = (df, time.time())
+
+    def invalidate(self, key: str) -> None:
+        """Remove a key from cache."""
+        with self._lock:
+            self._cache.pop(key, None)
+
+
+# Global process-level cache for resource data (30s TTL)
+_resource_df_cache = _ProcessLevelCache(ttl_seconds=30)
+_resource_parse_lock = threading.Lock()
 
 # ============================================================
 # Configuration
@@ -179,6 +219,9 @@ def _sync_to_redis(df: pd.DataFrame, version: str) -> bool:
         pipe.set(_get_key("meta:count"), str(len(df)))
         pipe.execute()
 
+        # Invalidate process-level cache so next request picks up new data
+        _resource_df_cache.invalidate("resource_data")
+
         logger.info(f"Resource cache synced: {len(df)} rows, version={version}")
         return True
     except Exception as e:
@@ -187,11 +230,26 @@ def _sync_to_redis(df: pd.DataFrame, version: str) -> bool:
 
 
 def _get_cached_data() -> Optional[pd.DataFrame]:
-    """Get cached resource data from Redis.
+    """Get cached resource data from Redis with process-level caching.
+
+    Uses a two-tier cache strategy:
+    1. Process-level cache: Parsed DataFrame (30s TTL) - fast, no parsing
+    2. Redis cache: Raw JSON data - shared across workers
+
+    This prevents redundant JSON parsing across concurrent requests.
 
     Returns:
         DataFrame with resource data, or None if cache miss.
     """
+    cache_key = "resource_data"
+
+    # Tier 1: Check process-level cache first (fast path)
+    cached_df = _resource_df_cache.get(cache_key)
+    if cached_df is not None:
+        logger.debug(f"Process cache hit: {len(cached_df)} rows")
+        return cached_df
+
+    # Tier 2: Parse from Redis (slow path - needs lock)
     if not REDIS_ENABLED or not RESOURCE_CACHE_ENABLED:
         return None
 
@@ -199,18 +257,32 @@ def _get_cached_data() -> Optional[pd.DataFrame]:
     if client is None:
         return None
 
-    try:
-        data_json = client.get(_get_key("data"))
-        if data_json is None:
-            logger.debug("Resource cache miss: no data in Redis")
-            return None
+    # Use lock to prevent multiple threads from parsing simultaneously
+    with _resource_parse_lock:
+        # Double-check after acquiring lock
+        cached_df = _resource_df_cache.get(cache_key)
+        if cached_df is not None:
+            logger.debug(f"Process cache hit (after lock): {len(cached_df)} rows")
+            return cached_df
 
-        df = pd.read_json(io.StringIO(data_json), orient='records')
-        logger.debug(f"Resource cache hit: loaded {len(df)} rows from Redis")
-        return df
-    except Exception as e:
-        logger.warning(f"Failed to read resource cache: {e}")
-        return None
+        try:
+            start_time = time.time()
+            data_json = client.get(_get_key("data"))
+            if data_json is None:
+                logger.debug("Resource cache miss: no data in Redis")
+                return None
+
+            df = pd.read_json(io.StringIO(data_json), orient='records')
+            parse_time = time.time() - start_time
+
+            # Store in process-level cache
+            _resource_df_cache.set(cache_key, df)
+
+            logger.debug(f"Resource cache hit: loaded {len(df)} rows from Redis (parsed in {parse_time:.2f}s)")
+            return df
+        except Exception as e:
+            logger.warning(f"Failed to read resource cache: {e}")
+            return None
 
 
 # ============================================================

@@ -10,7 +10,7 @@ import logging
 import threading
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.redis_client import get_redis_client, get_key_prefix
@@ -23,6 +23,44 @@ from mes_dashboard.config.constants import (
 )
 
 logger = logging.getLogger('mes_dashboard.realtime_equipment_cache')
+
+# ============================================================
+# Process-Level Cache (Prevents redundant JSON parsing)
+# ============================================================
+
+class _ProcessLevelCache:
+    """Thread-safe process-level cache for parsed equipment status data."""
+
+    def __init__(self, ttl_seconds: int = 30):
+        self._cache: Dict[str, Tuple[List[Dict[str, Any]], float]] = {}
+        self._lock = threading.Lock()
+        self._ttl = ttl_seconds
+
+    def get(self, key: str) -> Optional[List[Dict[str, Any]]]:
+        """Get cached data if not expired."""
+        with self._lock:
+            if key not in self._cache:
+                return None
+            data, timestamp = self._cache[key]
+            if time.time() - timestamp > self._ttl:
+                del self._cache[key]
+                return None
+            return data
+
+    def set(self, key: str, data: List[Dict[str, Any]]) -> None:
+        """Cache data with current timestamp."""
+        with self._lock:
+            self._cache[key] = (data, time.time())
+
+    def invalidate(self, key: str) -> None:
+        """Remove a key from cache."""
+        with self._lock:
+            self._cache.pop(key, None)
+
+
+# Global process-level cache for equipment status (30s TTL)
+_equipment_status_cache = _ProcessLevelCache(ttl_seconds=30)
+_equipment_status_parse_lock = threading.Lock()
 
 # ============================================================
 # Module State
@@ -282,6 +320,9 @@ def _save_to_redis(aggregated: List[Dict[str, Any]]) -> bool:
         pipe.set(count_key, str(count))
         pipe.execute()
 
+        # Invalidate process-level cache so next request picks up new data
+        _equipment_status_cache.invalidate("equipment_status_all")
+
         logger.info(f"Saved {count} equipment status records to Redis")
         return True
 
@@ -295,30 +336,61 @@ def _save_to_redis(aggregated: List[Dict[str, Any]]) -> bool:
 # ============================================================
 
 def get_all_equipment_status() -> List[Dict[str, Any]]:
-    """Get all equipment status from cache.
+    """Get all equipment status from cache with process-level caching.
+
+    Uses a two-tier cache strategy:
+    1. Process-level cache: Parsed data (30s TTL) - fast, no parsing
+    2. Redis cache: Raw JSON data - shared across workers
+
+    This prevents redundant JSON parsing across concurrent requests.
 
     Returns:
         List of equipment status records, or empty list if unavailable.
     """
+    cache_key = "equipment_status_all"
+
+    # Tier 1: Check process-level cache first (fast path)
+    cached_data = _equipment_status_cache.get(cache_key)
+    if cached_data is not None:
+        logger.debug(f"Process cache hit: {len(cached_data)} records")
+        return cached_data
+
+    # Tier 2: Parse from Redis (slow path - needs lock)
     redis_client = get_redis_client()
     if not redis_client:
         logger.warning("Redis client not available for equipment status query")
         return []
 
-    try:
-        prefix = get_key_prefix()
-        data_key = f"{prefix}:{EQUIPMENT_STATUS_DATA_KEY}"
+    # Use lock to prevent multiple threads from parsing simultaneously
+    with _equipment_status_parse_lock:
+        # Double-check after acquiring lock
+        cached_data = _equipment_status_cache.get(cache_key)
+        if cached_data is not None:
+            logger.debug(f"Process cache hit (after lock): {len(cached_data)} records")
+            return cached_data
 
-        data_json = redis_client.get(data_key)
-        if not data_json:
-            logger.debug("No equipment status data in cache")
+        try:
+            start_time = time.time()
+            prefix = get_key_prefix()
+            data_key = f"{prefix}:{EQUIPMENT_STATUS_DATA_KEY}"
+
+            data_json = redis_client.get(data_key)
+            if not data_json:
+                logger.debug("No equipment status data in cache")
+                return []
+
+            data = json.loads(data_json)
+            parse_time = time.time() - start_time
+
+            # Store in process-level cache
+            _equipment_status_cache.set(cache_key, data)
+
+            logger.debug(f"Equipment status cache hit: {len(data)} records (parsed in {parse_time:.2f}s)")
+            return data
+
+        except Exception as exc:
+            logger.error(f"Failed to get equipment status from cache: {exc}")
             return []
-
-        return json.loads(data_json)
-
-    except Exception as exc:
-        logger.error(f"Failed to get equipment status from cache: {exc}")
-        return []
 
 
 def get_equipment_status_by_id(resource_id: str) -> Optional[Dict[str, Any]]:

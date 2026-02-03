@@ -15,11 +15,15 @@ class TestGetCachedWipData:
 
     @pytest.fixture(autouse=True)
     def reset_redis(self):
-        """Reset Redis client state."""
+        """Reset Redis client state and process-level cache."""
         import mes_dashboard.core.redis_client as rc
+        import mes_dashboard.core.cache as cache
         rc._REDIS_CLIENT = None
+        # Clear process-level cache to avoid test interference
+        cache._wip_df_cache.clear()
         yield
         rc._REDIS_CLIENT = None
+        cache._wip_df_cache.clear()
 
     def test_returns_none_when_redis_disabled(self):
         """Test returns None when Redis is disabled."""
