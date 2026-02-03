@@ -1,0 +1,12 @@
+-- Resource count by workcenter and status
+-- Placeholders:
+--   LATEST_STATUS_SUBQUERY - Base subquery for latest resource status
+
+SELECT
+    WORKCENTERNAME,
+    NEWSTATUSNAME,
+    COUNT(*) as COUNT
+FROM ({{ LATEST_STATUS_SUBQUERY }}) rs
+WHERE WORKCENTERNAME IS NOT NULL
+GROUP BY WORKCENTERNAME, NEWSTATUSNAME
+ORDER BY WORKCENTERNAME, COUNT DESC

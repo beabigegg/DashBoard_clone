@@ -28,6 +28,7 @@ from mes_dashboard.config.constants import (
     EXCLUDED_ASSET_STATUSES,
     EQUIPMENT_TYPE_FILTER,
 )
+from mes_dashboard.sql import QueryBuilder
 
 logger = logging.getLogger('mes_dashboard.resource_cache')
 
@@ -48,28 +49,37 @@ def _get_key(key: str) -> str:
 # Internal: Oracle Load Functions
 # ============================================================
 
-def _build_filter_sql() -> str:
-    """Build SQL WHERE clause for global filters."""
-    conditions = [EQUIPMENT_TYPE_FILTER.strip()]
+def _build_filter_builder() -> QueryBuilder:
+    """Build QueryBuilder with global filter conditions.
+
+    Returns:
+        QueryBuilder instance with filter conditions applied.
+    """
+    builder = QueryBuilder()
+
+    # Equipment type filter - raw SQL condition from config
+    builder.add_condition(EQUIPMENT_TYPE_FILTER.strip())
 
     # Workcenter filter - exclude resources without WORKCENTERNAME
-    conditions.append("WORKCENTERNAME IS NOT NULL")
+    builder.add_is_not_null("WORKCENTERNAME")
 
-    # Location filter
+    # Location filter - exclude locations, allow NULL
     if EXCLUDED_LOCATIONS:
-        locations_list = ", ".join(f"'{loc}'" for loc in EXCLUDED_LOCATIONS)
-        conditions.append(
-            f"(LOCATIONNAME IS NULL OR LOCATIONNAME NOT IN ({locations_list}))"
+        builder.add_not_in_condition(
+            "LOCATIONNAME",
+            list(EXCLUDED_LOCATIONS),
+            allow_null=True
         )
 
-    # Asset status filter
+    # Asset status filter - exclude statuses, allow NULL
     if EXCLUDED_ASSET_STATUSES:
-        status_list = ", ".join(f"'{s}'" for s in EXCLUDED_ASSET_STATUSES)
-        conditions.append(
-            f"(PJ_ASSETSSTATUS IS NULL OR PJ_ASSETSSTATUS NOT IN ({status_list}))"
+        builder.add_not_in_condition(
+            "PJ_ASSETSSTATUS",
+            list(EXCLUDED_ASSET_STATUSES),
+            allow_null=True
         )
 
-    return " AND ".join(conditions)
+    return builder
 
 
 def _load_from_oracle() -> Optional[pd.DataFrame]:
@@ -78,14 +88,12 @@ def _load_from_oracle() -> Optional[pd.DataFrame]:
     Returns:
         DataFrame with all columns, or None if query failed.
     """
-    filter_sql = _build_filter_sql()
-    sql = f"""
-        SELECT *
-        FROM DWH.DW_MES_RESOURCE
-        WHERE {filter_sql}
-    """
+    builder = _build_filter_builder()
+    builder.base_sql = "SELECT * FROM DWH.DW_MES_RESOURCE {{ WHERE_CLAUSE }}"
+    sql, params = builder.build()
+
     try:
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
         if df is not None:
             logger.info(f"Loaded {len(df)} resources from Oracle")
         return df
@@ -100,14 +108,12 @@ def _get_version_from_oracle() -> Optional[str]:
     Returns:
         Version string (ISO format), or None if query failed.
     """
-    filter_sql = _build_filter_sql()
-    sql = f"""
-        SELECT MAX(LASTCHANGEDATE) as VERSION
-        FROM DWH.DW_MES_RESOURCE
-        WHERE {filter_sql}
-    """
+    builder = _build_filter_builder()
+    builder.base_sql = "SELECT MAX(LASTCHANGEDATE) as VERSION FROM DWH.DW_MES_RESOURCE {{ WHERE_CLAUSE }}"
+    sql, params = builder.build()
+
     try:
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
         if df is not None and not df.empty:
             version = df.iloc[0]['VERSION']
             if version is not None:

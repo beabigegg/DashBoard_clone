@@ -2,8 +2,12 @@
 """Utility functions for MES Dashboard.
 
 Common helper functions used across services.
+
+Note: SQL filter building functions in this module are DEPRECATED.
+Use mes_dashboard.sql.CommonFilters with QueryBuilder instead.
 """
 
+import warnings
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -30,7 +34,8 @@ def get_days_back(filters: Optional[Dict] = None, default: int = DEFAULT_DAYS_BA
 
 
 # ============================================================
-# SQL Filter Building
+# SQL Filter Building (DEPRECATED)
+# Use mes_dashboard.sql.CommonFilters with QueryBuilder instead.
 # ============================================================
 
 
@@ -38,7 +43,17 @@ def build_filter_conditions(
     filters: Optional[Dict],
     field_mapping: Optional[Dict[str, str]] = None,
 ) -> List[str]:
-    """Build SQL WHERE conditions from filters dict."""
+    """Build SQL WHERE conditions from filters dict.
+
+    .. deprecated::
+        Use QueryBuilder with add_in_condition() or add_param_condition() instead.
+        This function uses string formatting which may be vulnerable to SQL injection.
+    """
+    warnings.warn(
+        "build_filter_conditions is deprecated. Use QueryBuilder with add_in_condition() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if not filters:
         return []
 
@@ -58,7 +73,12 @@ def build_filter_conditions(
 
 
 def build_equipment_filter_sql(filters: Optional[Dict]) -> List[str]:
-    """Build SQL conditions for equipment flag filters."""
+    """Build SQL conditions for equipment flag filters.
+
+    Note: This function is safe as it uses static conditions from config,
+    but consider migrating to CommonFilters.add_equipment_flag_filters()
+    for consistency with the new architecture.
+    """
     if not filters:
         return []
 
@@ -75,7 +95,17 @@ def build_location_filter_sql(
     filters: Optional[Dict],
     column_name: str = 'LOCATIONNAME',
 ) -> Optional[str]:
-    """Build SQL condition for location filtering."""
+    """Build SQL condition for location filtering.
+
+    .. deprecated::
+        Use QueryBuilder.add_in_condition() instead.
+        This function uses string formatting which may be vulnerable to SQL injection.
+    """
+    warnings.warn(
+        "build_location_filter_sql is deprecated. Use QueryBuilder.add_in_condition() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if not filters:
         return None
 
@@ -91,7 +121,17 @@ def build_asset_status_filter_sql(
     filters: Optional[Dict],
     column_name: str = 'PJ_ASSETSSTATUS',
 ) -> Optional[str]:
-    """Build SQL condition for asset status filtering."""
+    """Build SQL condition for asset status filtering.
+
+    .. deprecated::
+        Use QueryBuilder.add_in_condition() instead.
+        This function uses string formatting which may be vulnerable to SQL injection.
+    """
+    warnings.warn(
+        "build_asset_status_filter_sql is deprecated. Use QueryBuilder.add_in_condition() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if not filters:
         return None
 
@@ -109,7 +149,17 @@ def build_exclusion_sql(
     location_column: str = 'LOCATIONNAME',
     status_column: str = 'PJ_ASSETSSTATUS',
 ) -> List[str]:
-    """Build SQL conditions for excluding specific locations and statuses."""
+    """Build SQL conditions for excluding specific locations and statuses.
+
+    .. deprecated::
+        Use CommonFilters.add_location_exclusion() and
+        CommonFilters.add_asset_status_exclusion() instead.
+    """
+    warnings.warn(
+        "build_exclusion_sql is deprecated. Use CommonFilters with QueryBuilder instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     conditions = []
 
     loc_list = locations if locations is not None else EXCLUDED_LOCATIONS

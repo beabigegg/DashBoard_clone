@@ -15,6 +15,8 @@ import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.cache import get_cached_wip_data, get_cached_sys_date
+from mes_dashboard.sql import SQLLoader, QueryBuilder
+from mes_dashboard.sql.filters import CommonFilters, NON_QUALITY_HOLD_REASONS
 
 logger = logging.getLogger('mes_dashboard.wip_service')
 
@@ -29,89 +31,82 @@ def _safe_value(val):
     return val
 
 
-def _escape_sql(value: str) -> str:
-    """Escape single quotes in SQL string values."""
-    if value is None:
-        return None
-    return value.replace("'", "''")
-
-
-def _build_base_conditions(
+def _build_base_conditions_builder(
     include_dummy: bool = False,
     workorder: Optional[str] = None,
-    lotid: Optional[str] = None
-) -> List[str]:
-    """Build base WHERE conditions for WIP queries.
+    lotid: Optional[str] = None,
+    builder: Optional[QueryBuilder] = None
+) -> QueryBuilder:
+    """Build base WHERE conditions for WIP queries using QueryBuilder.
 
     Args:
         include_dummy: If False (default), exclude LOTID containing 'DUMMY'
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
+        builder: Optional existing QueryBuilder to add conditions to
 
     Returns:
-        List of SQL condition strings
+        QueryBuilder with base conditions and parameters
     """
-    conditions = []
+    if builder is None:
+        builder = QueryBuilder()
 
     # Exclude raw materials (NULL WORKORDER)
-    conditions.append("WORKORDER IS NOT NULL")
+    builder.add_is_not_null("WORKORDER")
 
     # DUMMY exclusion (default behavior)
     if not include_dummy:
-        conditions.append("LOTID NOT LIKE '%DUMMY%'")
+        builder.add_condition("LOTID NOT LIKE '%DUMMY%'")
 
     # WORKORDER filter (fuzzy match)
     if workorder:
-        conditions.append(f"WORKORDER LIKE '%{_escape_sql(workorder)}%'")
+        builder.add_like_condition("WORKORDER", workorder, position="both")
 
     # LOTID filter (fuzzy match)
     if lotid:
-        conditions.append(f"LOTID LIKE '%{_escape_sql(lotid)}%'")
+        builder.add_like_condition("LOTID", lotid, position="both")
 
-    return conditions
+    return builder
 
 
 # ============================================================
 # Hold Type Classification
 # ============================================================
-# Non-quality hold reasons (all other reasons are quality holds)
-NON_QUALITY_HOLD_REASONS = {
-    'IQC檢驗(久存品驗證)(QC)',
-    '大中/安波幅50pcs樣品留樣(PD)',
-    '工程驗證(PE)',
-    '工程驗證(RD)',
-    '指定機台生產',
-    '特殊需求(X-Ray全檢)',
-    '特殊需求管控',
-    '第一次量產QC品質確認(QC)',
-    '需綁尾數(PD)',
-    '樣品需求留存打樣(樣品)',
-    '盤點(收線)需求',
-}
+# NON_QUALITY_HOLD_REASONS is imported from sql.filters
 
 
 def is_quality_hold(reason: str) -> bool:
     """Check if a hold reason is quality-related.
 
+    Wrapper for CommonFilters.is_quality_hold for backwards compatibility.
+    """
+    return CommonFilters.is_quality_hold(reason)
+
+
+def _add_hold_type_conditions(
+    builder: QueryBuilder,
+    hold_type: Optional[str] = None
+) -> QueryBuilder:
+    """Add hold type filter conditions to QueryBuilder.
+
     Args:
-        reason: The HOLDREASONNAME value
+        builder: QueryBuilder to add conditions to
+        hold_type: 'quality' for quality holds, 'non-quality' for non-quality holds
 
     Returns:
-        True if this is a quality hold, False if non-quality hold
+        QueryBuilder with hold type conditions added
     """
-    if reason is None:
-        return True  # Default to quality if reason is unknown
-    return reason not in NON_QUALITY_HOLD_REASONS
-
-
-def _build_hold_type_sql_list() -> str:
-    """Build SQL IN clause list for non-quality hold reasons.
-
-    Returns:
-        Comma-separated string of escaped reason names for SQL IN clause
-    """
-    escaped = [f"'{_escape_sql(r)}'" for r in NON_QUALITY_HOLD_REASONS]
-    return ', '.join(escaped)
+    if hold_type == 'quality':
+        # Quality hold: HOLDREASONNAME is NULL or NOT in non-quality list
+        builder.add_not_in_condition(
+            "HOLDREASONNAME",
+            list(NON_QUALITY_HOLD_REASONS),
+            allow_null=True
+        )
+    elif hold_type == 'non-quality':
+        # Non-quality hold: HOLDREASONNAME is in non-quality list
+        builder.add_in_condition("HOLDREASONNAME", list(NON_QUALITY_HOLD_REASONS))
+    return builder
 
 
 # ============================================================
@@ -317,49 +312,24 @@ def _get_wip_summary_from_oracle(
 ) -> Optional[Dict[str, Any]]:
     """Get WIP summary directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy, workorder, lotid)
-        if package:
-            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
-        if pj_type:
-            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        non_quality_list = _build_hold_type_sql_list()
+        # Build conditions using QueryBuilder
+        builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
 
-        sql = f"""
-            SELECT
-                COUNT(*) as TOTAL_LOTS,
-                SUM(QTY) as TOTAL_QTY_PCS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) > 0 THEN 1 ELSE 0 END) as RUN_LOTS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) > 0 THEN QTY ELSE 0 END) as RUN_QTY_PCS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
-                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN 1 ELSE 0 END) as HOLD_LOTS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
-                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN QTY ELSE 0 END) as HOLD_QTY_PCS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
-                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
-                          AND (HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ({non_quality_list}))
-                          THEN 1 ELSE 0 END) as QUALITY_HOLD_LOTS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
-                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
-                          AND (HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ({non_quality_list}))
-                          THEN QTY ELSE 0 END) as QUALITY_HOLD_QTY_PCS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
-                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
-                          AND HOLDREASONNAME IN ({non_quality_list})
-                          THEN 1 ELSE 0 END) as NON_QUALITY_HOLD_LOTS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
-                          AND COALESCE(CURRENTHOLDCOUNT, 0) > 0
-                          AND HOLDREASONNAME IN ({non_quality_list})
-                          THEN QTY ELSE 0 END) as NON_QUALITY_HOLD_QTY_PCS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
-                          AND COALESCE(CURRENTHOLDCOUNT, 0) = 0 THEN 1 ELSE 0 END) as QUEUE_LOTS,
-                SUM(CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) = 0
-                          AND COALESCE(CURRENTHOLDCOUNT, 0) = 0 THEN QTY ELSE 0 END) as QUEUE_QTY_PCS,
-                MAX(SYS_DATE) as DATA_UPDATE_DATE
-            FROM {WIP_VIEW}
-            {where_clause}
-        """
-        df = read_sql_df(sql)
+        if package:
+            builder.add_param_condition("PACKAGE_LEF", package)
+        if pj_type:
+            builder.add_param_condition("PJ_TYPE", pj_type)
+
+        # Load SQL template and build query
+        base_sql = SQLLoader.load("wip/summary")
+        builder.base_sql = base_sql
+
+        # Replace NON_QUALITY_REASONS placeholder (must be literal values for CASE expressions)
+        non_quality_list = CommonFilters.get_non_quality_reasons_sql()
+        builder.base_sql = builder.base_sql.replace("{{ NON_QUALITY_REASONS }}", non_quality_list)
+
+        sql, params = builder.build()
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return None
@@ -541,46 +511,35 @@ def _get_wip_matrix_from_oracle(
 ) -> Optional[Dict[str, Any]]:
     """Get WIP matrix directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy, workorder, lotid)
-        conditions.append("WORKCENTER_GROUP IS NOT NULL")
-        conditions.append("PACKAGE_LEF IS NOT NULL")
+        # Build conditions using QueryBuilder
+        builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
+        builder.add_is_not_null("WORKCENTER_GROUP")
+        builder.add_is_not_null("PACKAGE_LEF")
+
         if package:
-            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+            builder.add_param_condition("PACKAGE_LEF", package)
         if pj_type:
-            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
+            builder.add_param_condition("PJ_TYPE", pj_type)
 
         # WIP status filter
         if status:
             status_upper = status.upper()
             if status_upper == 'RUN':
-                conditions.append("EQUIPMENTCOUNT > 0")
+                builder.add_condition("COALESCE(EQUIPMENTCOUNT, 0) > 0")
             elif status_upper == 'HOLD':
-                conditions.append("EQUIPMENTCOUNT = 0 AND CURRENTHOLDCOUNT > 0")
+                builder.add_condition("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) > 0")
                 # Hold type sub-filter
                 if hold_type:
-                    non_quality_list = _build_hold_type_sql_list()
-                    if hold_type == 'quality':
-                        conditions.append(
-                            f"(HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ({non_quality_list}))"
-                        )
-                    elif hold_type == 'non-quality':
-                        conditions.append(f"HOLDREASONNAME IN ({non_quality_list})")
+                    _add_hold_type_conditions(builder, hold_type)
             elif status_upper == 'QUEUE':
-                conditions.append("EQUIPMENTCOUNT = 0 AND CURRENTHOLDCOUNT = 0")
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+                builder.add_condition("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) = 0")
 
-        sql = f"""
-            SELECT
-                WORKCENTER_GROUP,
-                WORKCENTERSEQUENCE_GROUP,
-                PACKAGE_LEF,
-                SUM(QTY) as QTY
-            FROM {WIP_VIEW}
-            {where_clause}
-            GROUP BY WORKCENTER_GROUP, WORKCENTERSEQUENCE_GROUP, PACKAGE_LEF
-            ORDER BY WORKCENTERSEQUENCE_GROUP, PACKAGE_LEF
-        """
-        df = read_sql_df(sql)
+        # Load SQL template and build query
+        base_sql = SQLLoader.load("wip/matrix")
+        builder.base_sql = base_sql
+        sql, params = builder.build()
+
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return {
@@ -664,10 +623,12 @@ def _get_wip_hold_summary_from_oracle(
 ) -> Optional[Dict[str, Any]]:
     """Get WIP hold summary directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy, workorder, lotid)
-        conditions.append("STATUS = 'HOLD'")
-        conditions.append("HOLDREASONNAME IS NOT NULL")
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        # Build conditions using QueryBuilder
+        builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
+        builder.add_param_condition("STATUS", "HOLD")
+        builder.add_is_not_null("HOLDREASONNAME")
+
+        where_clause, params = builder.build_where_only()
 
         sql = f"""
             SELECT
@@ -679,7 +640,7 @@ def _get_wip_hold_summary_from_oracle(
             GROUP BY HOLDREASONNAME
             ORDER BY COUNT(*) DESC
         """
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return {'items': []}
@@ -844,42 +805,36 @@ def _get_wip_detail_from_oracle(
 ) -> Optional[Dict[str, Any]]:
     """Get WIP detail directly from Oracle (fallback)."""
     try:
-        # Build WHERE conditions
-        conditions = _build_base_conditions(include_dummy, workorder, lotid)
-        conditions.append(f"WORKCENTER_GROUP = '{_escape_sql(workcenter)}'")
+        # Build WHERE conditions using QueryBuilder
+        builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
+        builder.add_param_condition("WORKCENTER_GROUP", workcenter)
 
         if package:
-            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+            builder.add_param_condition("PACKAGE_LEF", package)
 
         # WIP status filter (RUN/QUEUE/HOLD based on EQUIPMENTCOUNT and CURRENTHOLDCOUNT)
         if status:
             status_upper = status.upper()
             if status_upper == 'RUN':
-                conditions.append("COALESCE(EQUIPMENTCOUNT, 0) > 0")
+                builder.add_condition("COALESCE(EQUIPMENTCOUNT, 0) > 0")
             elif status_upper == 'HOLD':
-                conditions.append("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) > 0")
+                builder.add_condition("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) > 0")
                 # Hold type sub-filter
                 if hold_type:
-                    non_quality_list = _build_hold_type_sql_list()
-                    if hold_type == 'quality':
-                        conditions.append(
-                            f"(HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ({non_quality_list}))"
-                        )
-                    elif hold_type == 'non-quality':
-                        conditions.append(f"HOLDREASONNAME IN ({non_quality_list})")
+                    _add_hold_type_conditions(builder, hold_type)
             elif status_upper == 'QUEUE':
-                conditions.append("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) = 0")
+                builder.add_condition("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) = 0")
 
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        where_clause, params = builder.build_where_only()
 
-        # Get summary with RUN/QUEUE/HOLD classification (IT standard)
-        # Note: summary always uses base_conditions (without hold_type filter) to show full breakdown
-        summary_conditions = _build_base_conditions(include_dummy, workorder, lotid)
-        summary_conditions.append(f"WORKCENTER_GROUP = '{_escape_sql(workcenter)}'")
+        # Build summary conditions (without status/hold_type filter for full breakdown)
+        summary_builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
+        summary_builder.add_param_condition("WORKCENTER_GROUP", workcenter)
         if package:
-            summary_conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
-        summary_where = f"WHERE {' AND '.join(summary_conditions)}"
-        non_quality_list = _build_hold_type_sql_list()
+            summary_builder.add_param_condition("PACKAGE_LEF", package)
+
+        summary_where, summary_params = summary_builder.build_where_only()
+        non_quality_list = CommonFilters.get_non_quality_reasons_sql()
 
         summary_sql = f"""
             SELECT
@@ -902,7 +857,7 @@ def _get_wip_detail_from_oracle(
             {summary_where}
         """
 
-        summary_df = read_sql_df(summary_sql)
+        summary_df = read_sql_df(summary_sql, summary_params)
 
         if summary_df is None or summary_df.empty:
             return None
@@ -919,7 +874,6 @@ def _get_wip_detail_from_oracle(
         non_quality_hold_lots = int(summary_row['NON_QUALITY_HOLD_LOTS'] or 0)
 
         # Determine filtered count based on status filter
-        # When a status filter is applied, use the corresponding count for pagination
         if status:
             status_upper = status.upper()
             if status_upper == 'RUN':
@@ -927,7 +881,6 @@ def _get_wip_detail_from_oracle(
             elif status_upper == 'QUEUE':
                 filtered_count = queue_lots
             elif status_upper == 'HOLD':
-                # Further filter by hold_type if specified
                 if hold_type == 'quality':
                     filtered_count = quality_hold_lots
                 elif hold_type == 'non-quality':
@@ -957,33 +910,20 @@ def _get_wip_detail_from_oracle(
             ORDER BY SPECSEQUENCE
         """
 
-        specs_df = read_sql_df(specs_sql)
+        specs_df = read_sql_df(specs_sql, params)
         specs = specs_df['SPECNAME'].tolist() if specs_df is not None and not specs_df.empty else []
 
-        # Get paginated lot details with WIP Status (IT standard)
+        # Get paginated lot details using SQL file with bind variables
         offset = (page - 1) * page_size
-        lots_sql = f"""
-            SELECT * FROM (
-                SELECT
-                    LOTID,
-                    EQUIPMENTS,
-                    STATUS,
-                    HOLDREASONNAME,
-                    QTY,
-                    PACKAGE_LEF,
-                    SPECNAME,
-                    CASE WHEN COALESCE(EQUIPMENTCOUNT, 0) > 0 THEN 'RUN'
-                         WHEN COALESCE(CURRENTHOLDCOUNT, 0) > 0 THEN 'HOLD'
-                         ELSE 'QUEUE' END AS WIP_STATUS,
-                    ROW_NUMBER() OVER (ORDER BY LOTID) as RN
-                FROM {WIP_VIEW}
-                {where_clause}
-            )
-            WHERE RN > {offset} AND RN <= {offset + page_size}
-            ORDER BY RN
-        """
+        base_detail_sql = SQLLoader.load("wip/detail")
+        detail_sql = base_detail_sql.replace("{{ WHERE_CLAUSE }}", where_clause)
 
-        lots_df = read_sql_df(lots_sql)
+        # Add pagination params to existing params
+        detail_params = params.copy()
+        detail_params['offset'] = offset
+        detail_params['limit'] = page_size
+
+        lots_df = read_sql_df(detail_sql, detail_params)
 
         lots = []
         if lots_df is not None and not lots_df.empty:
@@ -1014,7 +954,7 @@ def _get_wip_detail_from_oracle(
             'sys_date': sys_date
         }
     except Exception as exc:
-        print(f"WIP detail query failed: {exc}")
+        logger.error(f"WIP detail query failed: {exc}")
         import traceback
         traceback.print_exc()
         return None
@@ -1067,9 +1007,9 @@ def get_workcenters(include_dummy: bool = False) -> Optional[List[Dict[str, Any]
 def _get_workcenters_from_oracle(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
     """Get workcenters directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy)
-        conditions.append("WORKCENTER_GROUP IS NOT NULL")
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        builder = _build_base_conditions_builder(include_dummy)
+        builder.add_is_not_null("WORKCENTER_GROUP")
+        where_clause, params = builder.build_where_only()
 
         sql = f"""
             SELECT
@@ -1081,7 +1021,7 @@ def _get_workcenters_from_oracle(include_dummy: bool = False) -> Optional[List[D
             GROUP BY WORKCENTER_GROUP, WORKCENTERSEQUENCE_GROUP
             ORDER BY WORKCENTERSEQUENCE_GROUP
         """
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return []
@@ -1142,9 +1082,9 @@ def get_packages(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
 def _get_packages_from_oracle(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
     """Get packages directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy)
-        conditions.append("PACKAGE_LEF IS NOT NULL")
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        builder = _build_base_conditions_builder(include_dummy)
+        builder.add_is_not_null("PACKAGE_LEF")
+        where_clause, params = builder.build_where_only()
 
         sql = f"""
             SELECT
@@ -1155,7 +1095,7 @@ def _get_packages_from_oracle(include_dummy: bool = False) -> Optional[List[Dict
             GROUP BY PACKAGE_LEF
             ORDER BY COUNT(*) DESC
         """
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return []
@@ -1245,26 +1185,27 @@ def _search_workorders_from_oracle(
 ) -> Optional[List[str]]:
     """Search workorders directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy, lotid=lotid)
-        conditions.append(f"WORKORDER LIKE '%{_escape_sql(q)}%'")
-        conditions.append("WORKORDER IS NOT NULL")
+        builder = _build_base_conditions_builder(include_dummy, lotid=lotid)
+        builder.add_like_condition("WORKORDER", q, position="both")
+        builder.add_is_not_null("WORKORDER")
 
         # Apply cross-filters
         if package:
-            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+            builder.add_param_condition("PACKAGE_LEF", package)
         if pj_type:
-            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
+            builder.add_param_condition("PJ_TYPE", pj_type)
 
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        where_clause, params = builder.build_where_only()
+        params['row_limit'] = limit
 
         sql = f"""
             SELECT DISTINCT WORKORDER
             FROM {WIP_VIEW}
             {where_clause}
             ORDER BY WORKORDER
-            FETCH FIRST {limit} ROWS ONLY
+            FETCH FIRST :row_limit ROWS ONLY
         """
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return []
@@ -1342,25 +1283,26 @@ def _search_lot_ids_from_oracle(
 ) -> Optional[List[str]]:
     """Search lot IDs directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy, workorder=workorder)
-        conditions.append(f"LOTID LIKE '%{_escape_sql(q)}%'")
+        builder = _build_base_conditions_builder(include_dummy, workorder=workorder)
+        builder.add_like_condition("LOTID", q, position="both")
 
         # Apply cross-filters
         if package:
-            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+            builder.add_param_condition("PACKAGE_LEF", package)
         if pj_type:
-            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
+            builder.add_param_condition("PJ_TYPE", pj_type)
 
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        where_clause, params = builder.build_where_only()
+        params['row_limit'] = limit
 
         sql = f"""
             SELECT LOTID
             FROM {WIP_VIEW}
             {where_clause}
             ORDER BY LOTID
-            FETCH FIRST {limit} ROWS ONLY
+            FETCH FIRST :row_limit ROWS ONLY
         """
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return []
@@ -1443,24 +1385,25 @@ def _search_packages_from_oracle(
 ) -> Optional[List[str]]:
     """Search packages directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy, workorder=workorder, lotid=lotid)
-        conditions.append(f"PACKAGE_LEF LIKE '%{_escape_sql(q)}%'")
-        conditions.append("PACKAGE_LEF IS NOT NULL")
+        builder = _build_base_conditions_builder(include_dummy, workorder=workorder, lotid=lotid)
+        builder.add_like_condition("PACKAGE_LEF", q, position="both")
+        builder.add_is_not_null("PACKAGE_LEF")
 
         # Apply cross-filter
         if pj_type:
-            conditions.append(f"PJ_TYPE = '{_escape_sql(pj_type)}'")
+            builder.add_param_condition("PJ_TYPE", pj_type)
 
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        where_clause, params = builder.build_where_only()
+        params['row_limit'] = limit
 
         sql = f"""
             SELECT DISTINCT PACKAGE_LEF
             FROM {WIP_VIEW}
             {where_clause}
             ORDER BY PACKAGE_LEF
-            FETCH FIRST {limit} ROWS ONLY
+            FETCH FIRST :row_limit ROWS ONLY
         """
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return []
@@ -1543,24 +1486,25 @@ def _search_types_from_oracle(
 ) -> Optional[List[str]]:
     """Search types directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy, workorder=workorder, lotid=lotid)
-        conditions.append(f"PJ_TYPE LIKE '%{_escape_sql(q)}%'")
-        conditions.append("PJ_TYPE IS NOT NULL")
+        builder = _build_base_conditions_builder(include_dummy, workorder=workorder, lotid=lotid)
+        builder.add_like_condition("PJ_TYPE", q, position="both")
+        builder.add_is_not_null("PJ_TYPE")
 
         # Apply cross-filter
         if package:
-            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+            builder.add_param_condition("PACKAGE_LEF", package)
 
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        where_clause, params = builder.build_where_only()
+        params['row_limit'] = limit
 
         sql = f"""
             SELECT DISTINCT PJ_TYPE
             FROM {WIP_VIEW}
             {where_clause}
             ORDER BY PJ_TYPE
-            FETCH FIRST {limit} ROWS ONLY
+            FETCH FIRST :row_limit ROWS ONLY
         """
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return []
@@ -1632,11 +1576,11 @@ def _get_hold_detail_summary_from_oracle(
 ) -> Optional[Dict[str, Any]]:
     """Get hold detail summary directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy)
-        conditions.append("STATUS = 'HOLD'")
-        conditions.append("CURRENTHOLDCOUNT > 0")
-        conditions.append(f"HOLDREASONNAME = '{_escape_sql(reason)}'")
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        builder = _build_base_conditions_builder(include_dummy)
+        builder.add_param_condition("STATUS", "HOLD")
+        builder.add_condition("CURRENTHOLDCOUNT > 0")
+        builder.add_param_condition("HOLDREASONNAME", reason)
+        where_clause, params = builder.build_where_only()
 
         sql = f"""
             SELECT
@@ -1648,7 +1592,7 @@ def _get_hold_detail_summary_from_oracle(
             FROM {WIP_VIEW}
             {where_clause}
         """
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, params)
 
         if df is None or df.empty:
             return None
@@ -1808,11 +1752,11 @@ def _get_hold_detail_distribution_from_oracle(
 ) -> Optional[Dict[str, Any]]:
     """Get hold detail distribution directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy)
-        conditions.append("STATUS = 'HOLD'")
-        conditions.append("CURRENTHOLDCOUNT > 0")
-        conditions.append(f"HOLDREASONNAME = '{_escape_sql(reason)}'")
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        builder = _build_base_conditions_builder(include_dummy)
+        builder.add_param_condition("STATUS", "HOLD")
+        builder.add_condition("CURRENTHOLDCOUNT > 0")
+        builder.add_param_condition("HOLDREASONNAME", reason)
+        where_clause, params = builder.build_where_only()
 
         # Get total for percentage calculation
         total_sql = f"""
@@ -1820,7 +1764,7 @@ def _get_hold_detail_distribution_from_oracle(
             FROM {WIP_VIEW}
             {where_clause}
         """
-        total_df = read_sql_df(total_sql)
+        total_df = read_sql_df(total_sql, params)
         total_lots = int(total_df.iloc[0]['TOTAL_LOTS'] or 0) if total_df is not None else 0
 
         if total_lots == 0:
@@ -1842,7 +1786,7 @@ def _get_hold_detail_distribution_from_oracle(
             GROUP BY WORKCENTER_GROUP
             ORDER BY COUNT(*) DESC
         """
-        wc_df = read_sql_df(wc_sql)
+        wc_df = read_sql_df(wc_sql, params)
         by_workcenter = []
         if wc_df is not None and not wc_df.empty:
             for _, row in wc_df.iterrows():
@@ -1866,7 +1810,7 @@ def _get_hold_detail_distribution_from_oracle(
             GROUP BY PACKAGE_LEF
             ORDER BY COUNT(*) DESC
         """
-        pkg_df = read_sql_df(pkg_sql)
+        pkg_df = read_sql_df(pkg_sql, params)
         by_package = []
         if pkg_df is not None and not pkg_df.empty:
             for _, row in pkg_df.iterrows():
@@ -1898,7 +1842,7 @@ def _get_hold_detail_distribution_from_oracle(
                 ELSE '7+'
             END
         """
-        age_df = read_sql_df(age_sql)
+        age_df = read_sql_df(age_sql, params)
 
         # Define age ranges in order
         age_labels = {
@@ -2056,27 +2000,27 @@ def _get_hold_detail_lots_from_oracle(
 ) -> Optional[Dict[str, Any]]:
     """Get hold detail lots directly from Oracle (fallback)."""
     try:
-        conditions = _build_base_conditions(include_dummy)
-        conditions.append("STATUS = 'HOLD'")
-        conditions.append("CURRENTHOLDCOUNT > 0")
-        conditions.append(f"HOLDREASONNAME = '{_escape_sql(reason)}'")
+        builder = _build_base_conditions_builder(include_dummy)
+        builder.add_param_condition("STATUS", "HOLD")
+        builder.add_condition("CURRENTHOLDCOUNT > 0")
+        builder.add_param_condition("HOLDREASONNAME", reason)
 
         # Optional filters
         if workcenter:
-            conditions.append(f"WORKCENTER_GROUP = '{_escape_sql(workcenter)}'")
+            builder.add_param_condition("WORKCENTER_GROUP", workcenter)
         if package:
-            conditions.append(f"PACKAGE_LEF = '{_escape_sql(package)}'")
+            builder.add_param_condition("PACKAGE_LEF", package)
         if age_range:
             if age_range == '0-1':
-                conditions.append("AGEBYDAYS >= 0 AND AGEBYDAYS < 1")
+                builder.add_condition("AGEBYDAYS >= 0 AND AGEBYDAYS < 1")
             elif age_range == '1-3':
-                conditions.append("AGEBYDAYS >= 1 AND AGEBYDAYS < 3")
+                builder.add_condition("AGEBYDAYS >= 1 AND AGEBYDAYS < 3")
             elif age_range == '3-7':
-                conditions.append("AGEBYDAYS >= 3 AND AGEBYDAYS < 7")
+                builder.add_condition("AGEBYDAYS >= 3 AND AGEBYDAYS < 7")
             elif age_range == '7+':
-                conditions.append("AGEBYDAYS >= 7")
+                builder.add_condition("AGEBYDAYS >= 7")
 
-        where_clause = f"WHERE {' AND '.join(conditions)}"
+        where_clause, params = builder.build_where_only()
 
         # Get total count
         count_sql = f"""
@@ -2084,11 +2028,15 @@ def _get_hold_detail_lots_from_oracle(
             FROM {WIP_VIEW}
             {where_clause}
         """
-        count_df = read_sql_df(count_sql)
+        count_df = read_sql_df(count_sql, params)
         total = int(count_df.iloc[0]['TOTAL'] or 0) if count_df is not None else 0
 
-        # Get paginated lots
+        # Get paginated lots with bind variables
         offset = (page - 1) * page_size
+        lots_params = params.copy()
+        lots_params['offset'] = offset
+        lots_params['limit'] = page_size
+
         lots_sql = f"""
             SELECT * FROM (
                 SELECT
@@ -2106,10 +2054,10 @@ def _get_hold_detail_lots_from_oracle(
                 FROM {WIP_VIEW}
                 {where_clause}
             )
-            WHERE RN > {offset} AND RN <= {offset + page_size}
+            WHERE RN > :offset AND RN <= :offset + :limit
             ORDER BY RN
         """
-        lots_df = read_sql_df(lots_sql)
+        lots_df = read_sql_df(lots_sql, lots_params)
 
         lots = []
         if lots_df is not None and not lots_df.empty:
@@ -2297,9 +2245,9 @@ def _get_lot_detail_from_oracle(lotid: str) -> Optional[Dict[str, Any]]:
                 WAFER_FACTOR,
                 SYS_DATE
             FROM {WIP_VIEW}
-            WHERE LOTID = '{_escape_sql(lotid)}'
+            WHERE LOTID = :lotid
         """
-        df = read_sql_df(sql)
+        df = read_sql_df(sql, {'lotid': lotid})
 
         if df is None or df.empty:
             return None

@@ -456,30 +456,42 @@ class TestRefreshCache:
                                     mock_sync.assert_called_once()
 
 
-class TestBuildFilterSql:
-    """Test _build_filter_sql function."""
+class TestBuildFilterBuilder:
+    """Test _build_filter_builder function."""
 
     def test_includes_equipment_type_filter(self):
         """Test includes equipment type filter."""
         import mes_dashboard.services.resource_cache as rc
 
-        sql = rc._build_filter_sql()
+        builder = rc._build_filter_builder()
+        builder.base_sql = "SELECT * FROM DWH.DW_MES_RESOURCE {{ WHERE_CLAUSE }}"
+        sql, params = builder.build()
 
         assert 'OBJECTCATEGORY' in sql
         assert 'ASSEMBLY' in sql or 'WAFERSORT' in sql
 
     def test_includes_location_filter(self):
-        """Test includes location exclusion filter."""
+        """Test includes location exclusion filter with parameterization."""
         import mes_dashboard.services.resource_cache as rc
 
-        sql = rc._build_filter_sql()
+        builder = rc._build_filter_builder()
+        builder.base_sql = "SELECT * FROM DWH.DW_MES_RESOURCE {{ WHERE_CLAUSE }}"
+        sql, params = builder.build()
 
+        # Check SQL contains LOCATIONNAME condition
         assert 'LOCATIONNAME' in sql
+        # Parameterized query should have bind variables
+        assert len(params) > 0
 
     def test_includes_asset_status_filter(self):
-        """Test includes asset status exclusion filter."""
+        """Test includes asset status exclusion filter with parameterization."""
         import mes_dashboard.services.resource_cache as rc
 
-        sql = rc._build_filter_sql()
+        builder = rc._build_filter_builder()
+        builder.base_sql = "SELECT * FROM DWH.DW_MES_RESOURCE {{ WHERE_CLAUSE }}"
+        sql, params = builder.build()
 
+        # Check SQL contains PJ_ASSETSSTATUS condition
         assert 'PJ_ASSETSSTATUS' in sql
+        # Parameterized query should have bind variables
+        assert len(params) > 0

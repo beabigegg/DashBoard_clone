@@ -1,5 +1,33 @@
 # -*- coding: utf-8 -*-
-"""Database connection and query utilities for MES Dashboard."""
+"""Database connection and query utilities for MES Dashboard.
+
+Connection Management:
+    - Uses SQLAlchemy with QueuePool for connection pooling
+    - Background keep-alive thread prevents idle connection drops
+    - Request-scoped connections via Flask g object
+
+Query Execution (Recommended Pattern):
+    Use SQLLoader + QueryBuilder for safe, parameterized queries:
+
+    >>> from mes_dashboard.sql import SQLLoader, QueryBuilder
+    >>> from mes_dashboard.core.database import read_sql_df
+    >>>
+    >>> # Load SQL template from file
+    >>> sql = SQLLoader.load("resource/by_status")
+    >>>
+    >>> # Build conditions with parameters (SQL injection safe)
+    >>> builder = QueryBuilder()
+    >>> builder.add_in_condition("STATUS", ["PRD", "SBY"])
+    >>> builder.add_param_condition("LOCATION", "FAB1")
+    >>> where_clause, params = builder.build_where_only()
+    >>>
+    >>> # Replace placeholders and execute
+    >>> sql = sql.replace("{{ WHERE_CLAUSE }}", where_clause)
+    >>> df = read_sql_df(sql, params)
+
+    SQL files are stored in src/mes_dashboard/sql/<module>/<query>.sql
+    with LRU caching (max 100 files).
+"""
 
 from __future__ import annotations
 
@@ -213,7 +241,26 @@ def _extract_ora_code(exc: Exception) -> str:
 def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
     """Execute SQL query and return results as a DataFrame.
 
-    Includes query timing and error logging with ORA codes.
+    Args:
+        sql: SQL query string. Can include Oracle bind variables (:param_name)
+            for parameterized queries. Use SQLLoader to load SQL from files.
+        params: Optional dict of parameter values to bind to the query.
+            Use QueryBuilder to construct safe parameterized conditions.
+
+    Returns:
+        DataFrame with query results. Column names are uppercased.
+
+    Raises:
+        Exception: If query execution fails. ORA code is logged.
+
+    Example:
+        >>> sql = "SELECT * FROM users WHERE status = :status"
+        >>> df = read_sql_df(sql, {"status": "active"})
+
+    Note:
+        - Slow queries (>1s) are logged as warnings
+        - All queries use connection pooling via SQLAlchemy
+        - Call timeout is set to 55s to prevent worker blocking
     """
     start_time = time.time()
     engine = get_engine()

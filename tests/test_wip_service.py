@@ -11,8 +11,6 @@ import pandas as pd
 
 from mes_dashboard.services.wip_service import (
     WIP_VIEW,
-    _escape_sql,
-    _build_base_conditions,
     get_wip_summary,
     get_wip_matrix,
     get_wip_hold_summary,
@@ -39,63 +37,7 @@ class TestWipServiceConfig(unittest.TestCase):
 
     def test_wip_view_configured(self):
         """WIP_VIEW should be configured correctly."""
-        self.assertEqual(WIP_VIEW, "DW_MES_LOT_V")
-
-
-class TestEscapeSql(unittest.TestCase):
-    """Test _escape_sql function for SQL injection prevention."""
-
-    def test_escapes_single_quotes(self):
-        """Should escape single quotes."""
-        self.assertEqual(_escape_sql("O'Brien"), "O''Brien")
-
-    def test_escapes_multiple_quotes(self):
-        """Should escape multiple single quotes."""
-        self.assertEqual(_escape_sql("It's Bob's"), "It''s Bob''s")
-
-    def test_handles_none(self):
-        """Should return None for None input."""
-        self.assertIsNone(_escape_sql(None))
-
-    def test_no_change_for_safe_string(self):
-        """Should not modify strings without quotes."""
-        self.assertEqual(_escape_sql("GA26012345"), "GA26012345")
-
-
-class TestBuildBaseConditions(unittest.TestCase):
-    """Test _build_base_conditions function."""
-
-    def test_default_excludes_dummy(self):
-        """Default behavior should exclude DUMMY lots."""
-        conditions = _build_base_conditions()
-        self.assertIn("LOTID NOT LIKE '%DUMMY%'", conditions)
-
-    def test_include_dummy_true(self):
-        """include_dummy=True should not add DUMMY exclusion."""
-        conditions = _build_base_conditions(include_dummy=True)
-        self.assertNotIn("LOTID NOT LIKE '%DUMMY%'", conditions)
-
-    def test_workorder_filter(self):
-        """Should add WORKORDER LIKE condition."""
-        conditions = _build_base_conditions(workorder='GA26')
-        self.assertTrue(any("WORKORDER LIKE '%GA26%'" in c for c in conditions))
-
-    def test_lotid_filter(self):
-        """Should add LOTID LIKE condition."""
-        conditions = _build_base_conditions(lotid='12345')
-        self.assertTrue(any("LOTID LIKE '%12345%'" in c for c in conditions))
-
-    def test_escapes_sql_in_workorder(self):
-        """Should escape SQL special characters in workorder."""
-        conditions = _build_base_conditions(workorder="test'value")
-        # Should have escaped the quote
-        self.assertTrue(any("test''value" in c for c in conditions))
-
-    def test_escapes_sql_in_lotid(self):
-        """Should escape SQL special characters in lotid."""
-        conditions = _build_base_conditions(lotid="lot'id")
-        # Should have escaped the quote
-        self.assertTrue(any("lot''id" in c for c in conditions))
+        self.assertEqual(WIP_VIEW, "DWH.DW_MES_LOT_V")
 
 
 class TestGetWipSummary(unittest.TestCase):
@@ -133,7 +75,7 @@ class TestGetWipMatrix(unittest.TestCase):
         mock_df = pd.DataFrame({
             'WORKCENTER_GROUP': ['切割', '切割', '焊接_DB'],
             'WORKCENTERSEQUENCE_GROUP': [1, 1, 2],
-            'PRODUCTLINENAME': ['SOT-23', 'SOD-323', 'SOT-23'],
+            'PACKAGE_LEF': ['SOT-23', 'SOD-323', 'SOT-23'],
             'QTY': [50000000, 30000000, 40000000]
         })
         mock_read_sql.return_value = mock_df
@@ -155,7 +97,7 @@ class TestGetWipMatrix(unittest.TestCase):
         mock_df = pd.DataFrame({
             'WORKCENTER_GROUP': ['焊接_DB', '切割'],
             'WORKCENTERSEQUENCE_GROUP': [2, 1],
-            'PRODUCTLINENAME': ['SOT-23', 'SOT-23'],
+            'PACKAGE_LEF': ['SOT-23', 'SOT-23'],
             'QTY': [40000000, 50000000]
         })
         mock_read_sql.return_value = mock_df
@@ -171,7 +113,7 @@ class TestGetWipMatrix(unittest.TestCase):
         mock_df = pd.DataFrame({
             'WORKCENTER_GROUP': ['切割', '切割'],
             'WORKCENTERSEQUENCE_GROUP': [1, 1],
-            'PRODUCTLINENAME': ['SOD-323', 'SOT-23'],
+            'PACKAGE_LEF': ['SOD-323', 'SOT-23'],
             'QTY': [30000000, 50000000]
         })
         mock_read_sql.return_value = mock_df
@@ -200,7 +142,7 @@ class TestGetWipMatrix(unittest.TestCase):
         mock_df = pd.DataFrame({
             'WORKCENTER_GROUP': ['切割', '切割'],
             'WORKCENTERSEQUENCE_GROUP': [1, 1],
-            'PRODUCTLINENAME': ['SOT-23', 'SOD-323'],
+            'PACKAGE_LEF': ['SOT-23', 'SOD-323'],
             'QTY': [50000000, 30000000]
         })
         mock_read_sql.return_value = mock_df
@@ -310,7 +252,7 @@ class TestGetPackages(unittest.TestCase):
     def test_returns_package_list(self, mock_read_sql):
         """Should return list of packages with lot counts."""
         mock_df = pd.DataFrame({
-            'PRODUCTLINENAME': ['SOT-23', 'SOD-323'],
+            'PACKAGE_LEF': ['SOT-23', 'SOD-323'],
             'LOT_COUNT': [2234, 1392]
         })
         mock_read_sql.return_value = mock_df
@@ -401,9 +343,10 @@ class TestSearchWorkorders(unittest.TestCase):
 
         search_workorders('GA26', limit=100)
 
-        # Verify SQL contains FETCH FIRST 50
-        call_args = mock_read_sql.call_args[0][0]
-        self.assertIn('FETCH FIRST 50 ROWS ONLY', call_args)
+        # Verify params contain row_limit=50 (capped from 100)
+        call_args = mock_read_sql.call_args
+        params = call_args[0][1] if len(call_args[0]) > 1 else call_args[1].get('params', {})
+        self.assertEqual(params.get('row_limit'), 50)
 
     @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
@@ -554,7 +497,7 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
         mock_df = pd.DataFrame({
             'WORKCENTER_GROUP': ['切割'],
             'WORKCENTERSEQUENCE_GROUP': [1],
-            'PRODUCTLINENAME': ['SOT-23'],
+            'PACKAGE_LEF': ['SOT-23'],
             'QTY': [1000]
         })
         mock_read_sql.return_value = mock_df
@@ -599,7 +542,7 @@ class TestDummyExclusionInAllFunctions(unittest.TestCase):
     def test_get_packages_excludes_dummy_by_default(self, mock_read_sql):
         """get_packages should exclude DUMMY by default."""
         mock_df = pd.DataFrame({
-            'PRODUCTLINENAME': ['SOT-23'], 'LOT_COUNT': [100]
+            'PACKAGE_LEF': ['SOT-23'], 'LOT_COUNT': [100]
         })
         mock_read_sql.return_value = mock_df
 
@@ -615,7 +558,7 @@ class TestMultipleFilterConditions(unittest.TestCase):
     @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_wip_summary_with_all_filters(self, mock_read_sql):
-        """get_wip_summary should combine all filter conditions."""
+        """get_wip_summary should combine all filter conditions via parameterized queries."""
         mock_df = pd.DataFrame({
             'TOTAL_LOTS': [50],
             'TOTAL_QTY_PCS': [500],
@@ -625,36 +568,54 @@ class TestMultipleFilterConditions(unittest.TestCase):
             'QUEUE_QTY_PCS': [50],
             'HOLD_LOTS': [5],
             'HOLD_QTY_PCS': [50],
+            'QUALITY_HOLD_LOTS': [3],
+            'QUALITY_HOLD_QTY_PCS': [30],
+            'NON_QUALITY_HOLD_LOTS': [2],
+            'NON_QUALITY_HOLD_QTY_PCS': [20],
             'DATA_UPDATE_DATE': ['2026-01-26']
         })
         mock_read_sql.return_value = mock_df
 
         get_wip_summary(workorder='GA26', lotid='A00')
 
-        call_args = mock_read_sql.call_args[0][0]
-        self.assertIn("WORKORDER LIKE '%GA26%'", call_args)
-        self.assertIn("LOTID LIKE '%A00%'", call_args)
-        self.assertIn("LOTID NOT LIKE '%DUMMY%'", call_args)
+        # Check SQL contains parameterized LIKE conditions
+        call_args = mock_read_sql.call_args
+        sql = call_args[0][0]
+        params = call_args[0][1] if len(call_args[0]) > 1 else {}
+
+        self.assertIn("WORKORDER LIKE", sql)
+        self.assertIn("LOTID LIKE", sql)
+        self.assertIn("LOTID NOT LIKE '%DUMMY%'", sql)
+        # Verify params contain the search patterns
+        self.assertTrue(any('%GA26%' in str(v) for v in params.values()))
+        self.assertTrue(any('%A00%' in str(v) for v in params.values()))
 
     @disable_cache
     @patch('mes_dashboard.services.wip_service.read_sql_df')
     def test_get_wip_matrix_with_all_filters(self, mock_read_sql):
-        """get_wip_matrix should combine all filter conditions."""
+        """get_wip_matrix should combine all filter conditions via parameterized queries."""
         mock_df = pd.DataFrame({
             'WORKCENTER_GROUP': ['切割'],
             'WORKCENTERSEQUENCE_GROUP': [1],
-            'PRODUCTLINENAME': ['SOT-23'],
+            'PACKAGE_LEF': ['SOT-23'],
             'QTY': [500]
         })
         mock_read_sql.return_value = mock_df
 
         get_wip_matrix(workorder='GA26', lotid='A00', include_dummy=True)
 
-        call_args = mock_read_sql.call_args[0][0]
-        self.assertIn("WORKORDER LIKE '%GA26%'", call_args)
-        self.assertIn("LOTID LIKE '%A00%'", call_args)
+        # Check SQL contains parameterized LIKE conditions
+        call_args = mock_read_sql.call_args
+        sql = call_args[0][0]
+        params = call_args[0][1] if len(call_args[0]) > 1 else {}
+
+        self.assertIn("WORKORDER LIKE", sql)
+        self.assertIn("LOTID LIKE", sql)
         # Should NOT contain DUMMY exclusion since include_dummy=True
-        self.assertNotIn("LOTID NOT LIKE '%DUMMY%'", call_args)
+        self.assertNotIn("LOTID NOT LIKE '%DUMMY%'", sql)
+        # Verify params contain the search patterns
+        self.assertTrue(any('%GA26%' in str(v) for v in params.values()))
+        self.assertTrue(any('%A00%' in str(v) for v in params.values()))
 
 
 

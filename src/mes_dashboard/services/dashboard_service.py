@@ -16,7 +16,13 @@ from mes_dashboard.config.constants import (
     DEFAULT_DAYS_BACK,
 )
 from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS, get_workcenter_group
-from mes_dashboard.services.resource_service import get_resource_latest_status_subquery
+from mes_dashboard.services.resource_service import (
+    get_resource_latest_status_subquery,
+    get_resource_status_summary,
+    get_workcenter_status_matrix,
+)
+from mes_dashboard.sql import SQLLoader, QueryBuilder
+from mes_dashboard.sql.filters import CommonFilters
 
 
 # ============================================================
@@ -24,7 +30,7 @@ from mes_dashboard.services.resource_service import get_resource_latest_status_s
 # ============================================================
 
 def query_dashboard_kpi(filters: Optional[Dict] = None) -> Optional[Dict]:
-    """Query overall KPI for dashboard header.
+    """Query overall KPI for dashboard header using cached resource data.
 
     Status categories:
     - RUN: PRD (Production)
@@ -34,68 +40,47 @@ def query_dashboard_kpi(filters: Optional[Dict] = None) -> Optional[Dict]:
 
     OU% = PRD / (PRD + SBY + EGT + SDT + UDT) * 100
 
+    Uses get_resource_status_summary() for fast, cached data from Redis.
+
     Args:
-        filters: Optional filter values
+        filters: Optional filter values (is_production, is_key, is_monitor)
 
     Returns:
         Dict with KPI data or None if query fails.
     """
-    connection = get_db_connection()
-    if not connection:
-        return None
-
     try:
-        days_back = get_days_back(filters)
-        base_sql = get_resource_latest_status_subquery(days_back)
-
-        # Build filter conditions
-        where_conditions = []
+        # Extract flag filters for cached query
+        is_production = None
+        is_key = None
+        is_monitor = None
         if filters:
-            # Equipment flag filters
-            where_conditions.extend(build_equipment_filter_sql(filters))
+            if filters.get('isProduction'):
+                is_production = True
+            if filters.get('isKey'):
+                is_key = True
+            if filters.get('isMonitor'):
+                is_monitor = True
 
-            # Multi-select location filter
-            if filters.get('locations') and len(filters['locations']) > 0:
-                loc_list = "', '".join(filters['locations'])
-                where_conditions.append(f"LOCATIONNAME IN ('{loc_list}')")
+        # Use cached resource status summary for fast response
+        summary = get_resource_status_summary(
+            is_production=is_production,
+            is_key=is_key,
+            is_monitor=is_monitor,
+        )
 
-            # Multi-select asset status filter
-            if filters.get('assetsStatuses') and len(filters['assetsStatuses']) > 0:
-                status_list = "', '".join(filters['assetsStatuses'])
-                where_conditions.append(f"PJ_ASSETSSTATUS IN ('{status_list}')")
-
-        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
-
-        sql = f"""
-            SELECT
-                COUNT(*) as TOTAL,
-                SUM(CASE WHEN NEWSTATUSNAME = 'PRD' THEN 1 ELSE 0 END) as PRD_COUNT,
-                SUM(CASE WHEN NEWSTATUSNAME = 'SBY' THEN 1 ELSE 0 END) as SBY_COUNT,
-                SUM(CASE WHEN NEWSTATUSNAME = 'UDT' THEN 1 ELSE 0 END) as UDT_COUNT,
-                SUM(CASE WHEN NEWSTATUSNAME = 'SDT' THEN 1 ELSE 0 END) as SDT_COUNT,
-                SUM(CASE WHEN NEWSTATUSNAME = 'EGT' THEN 1 ELSE 0 END) as EGT_COUNT,
-                SUM(CASE WHEN NEWSTATUSNAME = 'NST' THEN 1 ELSE 0 END) as NST_COUNT,
-                SUM(CASE WHEN NEWSTATUSNAME NOT IN ('PRD','SBY','UDT','SDT','EGT','NST') THEN 1 ELSE 0 END) as OTHER_COUNT
-            FROM ({base_sql}) rs
-            WHERE {where_clause}
-        """
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        row = cursor.fetchone()
-        cursor.close()
-        connection.close()
-
-        if not row:
+        if not summary or summary.get('total_count', 0) == 0:
             return None
 
-        total = row[0] or 0
-        prd = row[1] or 0
-        sby = row[2] or 0
-        udt = row[3] or 0
-        sdt = row[4] or 0
-        egt = row[5] or 0
-        nst = row[6] or 0
-        other = row[7] or 0
+        # Extract counts from summary
+        by_status = summary.get('by_status', {})
+        total = summary.get('total_count', 0)
+        prd = by_status.get('PRD', 0)
+        sby = by_status.get('SBY', 0)
+        udt = by_status.get('UDT', 0)
+        sdt = by_status.get('SDT', 0)
+        egt = by_status.get('EGT', 0)
+        nst = by_status.get('NST', 0)
+        other = by_status.get('OTHER', 0)
 
         # Status categories
         run_count = prd                    # RUN = PRD
@@ -103,10 +88,8 @@ def query_dashboard_kpi(filters: Optional[Dict] = None) -> Optional[Dict]:
         idle_count = sby + nst             # IDLE = SBY + NST
         eng_count = egt                    # ENG = EGT
 
-        # OU% = PRD / (PRD + SBY + EGT + SDT + UDT) * 100
-        # Denominator excludes NST and OTHER
-        operational = prd + sby + egt + sdt + udt
-        ou_pct = round(prd / operational * 100, 1) if operational > 0 else 0
+        # OU% from cached summary (already calculated)
+        ou_pct = summary.get('ou_pct', 0)
 
         # Run% = PRD / Total * 100
         run_pct = round(prd / total * 100, 1) if total > 0 else 0
@@ -130,8 +113,6 @@ def query_dashboard_kpi(filters: Optional[Dict] = None) -> Optional[Dict]:
             'run_pct': run_pct
         }
     except Exception as exc:
-        if connection:
-            connection.close()
         print(f"KPI query failed: {exc}")
         return None
 
@@ -143,116 +124,50 @@ def query_dashboard_kpi(filters: Optional[Dict] = None) -> Optional[Dict]:
 def query_workcenter_cards(filters: Optional[Dict] = None) -> Optional[List[Dict]]:
     """Query workcenter status cards for dashboard with grouping.
 
-    Workcenter groups order:
-    0: Cutting (切割)
-    1: DB Bonding (焊接_DB)
-    2: WB Bonding (焊接_WB)
-    3: DW Bonding (焊接_DW)
-    4: Molding (成型)
-    5: Deflash (去膠)
-    6: Blast (水吹砂)
-    7: Plating (電鍍)
-    8: Marking (移印)
-    9: Trim/Form (切彎腳)
-    10: PKG SAW (元件切割)
-    11: Test (測試)
+    Uses cached resource data from Redis for fast response times.
+    Data is pre-grouped by workcenter group in the cache.
 
     Args:
-        filters: Optional filter values
+        filters: Optional filter values (isProduction, isKey, isMonitor)
 
     Returns:
         List of workcenter card data or None if query fails.
     """
     try:
-        days_back = get_days_back(filters)
-        base_sql = get_resource_latest_status_subquery(days_back)
-
-        # Build filter conditions
-        where_conditions = []
+        # Extract flag filters for cached query
+        is_production = None
+        is_key = None
+        is_monitor = None
         if filters:
-            where_conditions.extend(build_equipment_filter_sql(filters))
+            if filters.get('isProduction'):
+                is_production = True
+            if filters.get('isKey'):
+                is_key = True
+            if filters.get('isMonitor'):
+                is_monitor = True
 
-            if filters.get('locations') and len(filters['locations']) > 0:
-                loc_list = "', '".join(filters['locations'])
-                where_conditions.append(f"LOCATIONNAME IN ('{loc_list}')")
+        # Use cached workcenter matrix for fast response
+        matrix = get_workcenter_status_matrix(
+            is_production=is_production,
+            is_key=is_key,
+            is_monitor=is_monitor,
+        )
 
-            if filters.get('assetsStatuses') and len(filters['assetsStatuses']) > 0:
-                status_list = "', '".join(filters['assetsStatuses'])
-                where_conditions.append(f"PJ_ASSETSSTATUS IN ('{status_list}')")
+        if not matrix:
+            return None
 
-        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
-
-        sql = f"""
-            SELECT
-                WORKCENTERNAME,
-                COUNT(*) as TOTAL,
-                SUM(CASE WHEN NEWSTATUSNAME = 'PRD' THEN 1 ELSE 0 END) as PRD,
-                SUM(CASE WHEN NEWSTATUSNAME = 'SBY' THEN 1 ELSE 0 END) as SBY,
-                SUM(CASE WHEN NEWSTATUSNAME = 'UDT' THEN 1 ELSE 0 END) as UDT,
-                SUM(CASE WHEN NEWSTATUSNAME = 'SDT' THEN 1 ELSE 0 END) as SDT,
-                SUM(CASE WHEN NEWSTATUSNAME = 'EGT' THEN 1 ELSE 0 END) as EGT,
-                SUM(CASE WHEN NEWSTATUSNAME = 'NST' THEN 1 ELSE 0 END) as NST
-            FROM ({base_sql}) rs
-            WHERE WORKCENTERNAME IS NOT NULL AND {where_clause}
-            GROUP BY WORKCENTERNAME
-        """
-        df = read_sql_df(sql)
-
-        # Group workcenters
-        grouped_data = {}
-        ungrouped_data = []
-
-        for _, row in df.iterrows():
-            wc_name = row['WORKCENTERNAME']
-            group_name, order = get_workcenter_group(wc_name)
-
-            if group_name:
-                if group_name not in grouped_data:
-                    grouped_data[group_name] = {
-                        'order': order,
-                        'original_wcs': [],
-                        'total': 0,
-                        'prd': 0,
-                        'sby': 0,
-                        'udt': 0,
-                        'sdt': 0,
-                        'egt': 0,
-                        'nst': 0
-                    }
-                grouped_data[group_name]['original_wcs'].append(wc_name)
-                grouped_data[group_name]['total'] += int(row['TOTAL'])
-                grouped_data[group_name]['prd'] += int(row['PRD'])
-                grouped_data[group_name]['sby'] += int(row['SBY'])
-                grouped_data[group_name]['udt'] += int(row['UDT'])
-                grouped_data[group_name]['sdt'] += int(row['SDT'])
-                grouped_data[group_name]['egt'] += int(row['EGT'])
-                grouped_data[group_name]['nst'] += int(row['NST'])
-            else:
-                # Ungrouped workcenter
-                ungrouped_data.append({
-                    'workcenter': wc_name,
-                    'original_wcs': [wc_name],
-                    'order': 999,
-                    'total': int(row['TOTAL']),
-                    'prd': int(row['PRD']),
-                    'sby': int(row['SBY']),
-                    'udt': int(row['UDT']),
-                    'sdt': int(row['SDT']),
-                    'egt': int(row['EGT']),
-                    'nst': int(row['NST'])
-                })
-
-        # Calculate OU% and build result
+        # Transform matrix data to expected card format
         result = []
-
-        # Add grouped workcenters
-        for group_name, data in grouped_data.items():
-            prd = data['prd']
-            sby = data['sby']
-            egt = data['egt']
-            sdt = data['sdt']
-            udt = data['udt']
-            total = data['total']
+        for row in matrix:
+            group_name = row['workcenter_group']
+            order = row['workcenter_sequence']
+            total = row['total']
+            prd = row['PRD']
+            sby = row['SBY']
+            udt = row['UDT']
+            sdt = row['SDT']
+            egt = row['EGT']
+            nst = row['NST']
 
             # OU% = PRD / (PRD + SBY + EGT + SDT + UDT) * 100
             operational = prd + sby + egt + sdt + udt
@@ -261,54 +176,23 @@ def query_workcenter_cards(filters: Optional[Dict] = None) -> Optional[List[Dict
 
             result.append({
                 'workcenter': group_name,
-                'original_wcs': data['original_wcs'],
-                'order': data['order'],
+                'original_wcs': [],  # Not available from cache (aggregated by group)
+                'order': order,
                 'total': total,
                 'prd': prd,
                 'sby': sby,
                 'udt': udt,
                 'sdt': sdt,
                 'egt': egt,
-                'nst': data['nst'],
+                'nst': nst,
                 'ou_pct': ou_pct,
                 'run_pct': run_pct,
                 'down': udt + sdt,
-                'idle': sby + data['nst'],
+                'idle': sby + nst,
                 'eng': egt
             })
 
-        # Add ungrouped workcenters
-        for data in ungrouped_data:
-            prd = data['prd']
-            sby = data['sby']
-            egt = data['egt']
-            sdt = data['sdt']
-            udt = data['udt']
-            total = data['total']
-
-            operational = prd + sby + egt + sdt + udt
-            ou_pct = round(prd / operational * 100, 1) if operational > 0 else 0
-            run_pct = round(prd / total * 100, 1) if total > 0 else 0
-
-            result.append({
-                'workcenter': data['workcenter'],
-                'original_wcs': data['original_wcs'],
-                'order': data['order'],
-                'total': total,
-                'prd': prd,
-                'sby': sby,
-                'udt': udt,
-                'sdt': sdt,
-                'egt': egt,
-                'nst': data['nst'],
-                'ou_pct': ou_pct,
-                'run_pct': run_pct,
-                'down': udt + sdt,
-                'idle': sby + data['nst'],
-                'eng': egt
-            })
-
-        # Sort by order
+        # Sort by order (already sorted by sequence, but ensure consistency)
         result.sort(key=lambda x: (x['order'], -x['total']))
 
         return result
@@ -345,18 +229,21 @@ def query_resource_detail_with_job(
     try:
         days_back = get_days_back(filters)
 
-        # Build exclusion filters
-        location_filter = ""
-        if EXCLUDED_LOCATIONS:
-            excluded_locations = "', '".join(EXCLUDED_LOCATIONS)
-            location_filter = f"AND (r.LOCATIONNAME IS NULL OR r.LOCATIONNAME NOT IN ('{excluded_locations}'))"
+        # Build exclusion filters using CommonFilters (legacy format for SQL placeholders)
+        location_filter = CommonFilters.build_location_filter_legacy(
+            excluded_locations=list(EXCLUDED_LOCATIONS) if EXCLUDED_LOCATIONS else None
+        )
+        if location_filter:
+            location_filter = f"AND {location_filter.replace('LOCATIONNAME', 'r.LOCATIONNAME')}"
 
-        asset_status_filter = ""
-        if EXCLUDED_ASSET_STATUSES:
-            excluded_assets = "', '".join(EXCLUDED_ASSET_STATUSES)
-            asset_status_filter = f"AND (r.PJ_ASSETSSTATUS IS NULL OR r.PJ_ASSETSSTATUS NOT IN ('{excluded_assets}'))"
+        asset_status_filter = CommonFilters.build_asset_status_filter_legacy(
+            excluded_statuses=list(EXCLUDED_ASSET_STATUSES) if EXCLUDED_ASSET_STATUSES else None
+        )
+        if asset_status_filter:
+            asset_status_filter = f"AND {asset_status_filter.replace('PJ_ASSETSSTATUS', 'r.PJ_ASSETSSTATUS')}"
 
-        where_conditions = []
+        # Build filter conditions using QueryBuilder for safety
+        builder = QueryBuilder()
         if filters:
             # Support workcenter group filter
             if filters.get('workcenter'):
@@ -364,142 +251,58 @@ def query_resource_detail_with_job(
                 # Check if it's a merged group
                 if wc_filter in WORKCENTER_GROUPS:
                     patterns = WORKCENTER_GROUPS[wc_filter]['patterns']
-                    pattern_conditions = []
-                    for p in patterns:
-                        pattern_conditions.append(f"UPPER(rs.WORKCENTERNAME) LIKE '%{p.upper()}%'")
-                    where_conditions.append(f"({' OR '.join(pattern_conditions)})")
+                    # Use parameterized OR LIKE conditions (safe escaping)
+                    builder.add_or_like_conditions(
+                        'rs.WORKCENTERNAME',
+                        patterns,
+                        case_insensitive=True,
+                    )
                 else:
-                    where_conditions.append(f"rs.WORKCENTERNAME = '{wc_filter}'")
+                    builder.add_param_condition('rs.WORKCENTERNAME', wc_filter)
 
             if filters.get('original_wcs'):
                 # If original workcenter list provided, use IN query
-                wcs = filters['original_wcs']
-                wc_list = "', '".join(wcs)
-                where_conditions.append(f"rs.WORKCENTERNAME IN ('{wc_list}')")
+                builder.add_in_condition('rs.WORKCENTERNAME', list(filters['original_wcs']))
 
             if filters.get('status'):
-                where_conditions.append(f"rs.NEWSTATUSNAME = '{filters['status']}'")
+                builder.add_param_condition('rs.NEWSTATUSNAME', filters['status'])
 
-            # Equipment flag filters
+            # Equipment flag filters (safe - boolean values)
             if filters.get('isProduction'):
-                where_conditions.append("NVL(rs.PJ_ISPRODUCTION, 0) = 1")
+                builder.add_condition("NVL(rs.PJ_ISPRODUCTION, 0) = 1")
             if filters.get('isKey'):
-                where_conditions.append("NVL(rs.PJ_ISKEY, 0) = 1")
+                builder.add_condition("NVL(rs.PJ_ISKEY, 0) = 1")
             if filters.get('isMonitor'):
-                where_conditions.append("NVL(rs.PJ_ISMONITOR, 0) = 1")
+                builder.add_condition("NVL(rs.PJ_ISMONITOR, 0) = 1")
 
-            # Multi-select location filter
+            # Multi-select location filter (parameterized)
             if filters.get('locations') and len(filters['locations']) > 0:
-                loc_list = "', '".join(filters['locations'])
-                where_conditions.append(f"rs.LOCATIONNAME IN ('{loc_list}')")
+                builder.add_in_condition('rs.LOCATIONNAME', list(filters['locations']))
 
-            # Multi-select asset status filter
+            # Multi-select asset status filter (parameterized)
             if filters.get('assetsStatuses') and len(filters['assetsStatuses']) > 0:
-                status_list = "', '".join(filters['assetsStatuses'])
-                where_conditions.append(f"rs.PJ_ASSETSSTATUS IN ('{status_list}')")
+                builder.add_in_condition('rs.PJ_ASSETSSTATUS', list(filters['assetsStatuses']))
 
         # Default to showing only DOWN status (UDT, SDT)
-        where_conditions.append("rs.NEWSTATUSNAME IN ('UDT', 'SDT')")
+        builder.add_in_condition('rs.NEWSTATUSNAME', ['UDT', 'SDT'])
 
-        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+        conditions_sql = builder.get_conditions_sql()
+        params = builder.params.copy()
+        where_clause = conditions_sql if conditions_sql else "1=1"
 
-        # Left join with JOB table for SDT/UDT details
+        # Add pagination parameters
         start_row = offset + 1
         end_row = offset + limit
-        sql = f"""
-            WITH latest_txn AS (
-                SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
-                FROM DWH.DW_MES_RESOURCESTATUS
-            ),
-            base_data AS (
-                SELECT *
-                FROM (
-                    SELECT
-                        r.RESOURCEID,
-                        r.RESOURCENAME,
-                        r.OBJECTCATEGORY,
-                        r.OBJECTTYPE,
-                        r.RESOURCEFAMILYNAME,
-                        r.WORKCENTERNAME,
-                        r.LOCATIONNAME,
-                        r.VENDORNAME,
-                        r.VENDORMODEL,
-                        r.PJ_DEPARTMENT,
-                        r.PJ_ASSETSSTATUS,
-                        r.PJ_ISPRODUCTION,
-                        r.PJ_ISKEY,
-                        r.PJ_ISMONITOR,
-                        r.PJ_LOTID,
-                        r.DESCRIPTION,
-                        s.NEWSTATUSNAME,
-                        s.NEWREASONNAME,
-                        s.LASTSTATUSCHANGEDATE,
-                        s.OLDSTATUSNAME,
-                        s.OLDREASONNAME,
-                        s.AVAILABILITY,
-                        s.JOBID,
-                        s.TXNDATE,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY r.RESOURCEID
-                            ORDER BY s.LASTSTATUSCHANGEDATE DESC NULLS LAST,
-                                     COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) DESC
-                        ) AS rn
-                    FROM DWH.DW_MES_RESOURCE r
-                    JOIN DWH.DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
-                    CROSS JOIN latest_txn lt
-                    WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
-                        OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
-                      AND COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) >= lt.MAX_TXNDATE - {days_back}
-                      {location_filter}
-                      {asset_status_filter}
-                )
-                WHERE rn = 1
-            ),
-            max_time AS (
-                SELECT MAX(LASTSTATUSCHANGEDATE) AS MAX_STATUS_TIME FROM base_data
-            )
-            SELECT * FROM (
-                SELECT
-                    rs.RESOURCENAME,
-                    rs.WORKCENTERNAME,
-                    rs.RESOURCEFAMILYNAME,
-                    rs.NEWSTATUSNAME,
-                    rs.NEWREASONNAME,
-                    rs.LASTSTATUSCHANGEDATE,
-                    rs.PJ_DEPARTMENT,
-                    rs.VENDORNAME,
-                    rs.VENDORMODEL,
-                    rs.PJ_ISPRODUCTION,
-                    rs.PJ_ISKEY,
-                    rs.PJ_ISMONITOR,
-                    j.JOBID,
-                    rs.PJ_LOTID,
-                    j.JOBORDERNAME,
-                    j.JOBSTATUS,
-                    j.SYMPTOMCODENAME,
-                    j.CAUSECODENAME,
-                    j.REPAIRCODENAME,
-                    j.CREATEDATE as JOB_CREATEDATE,
-                    j.FIRSTCLOCKONDATE,
-                    mt.MAX_STATUS_TIME,
-                    ROUND((mt.MAX_STATUS_TIME - rs.LASTSTATUSCHANGEDATE) * 24 * 60, 0) as DOWN_MINUTES,
-                    ROW_NUMBER() OVER (
-                        ORDER BY
-                            CASE rs.NEWSTATUSNAME
-                                WHEN 'UDT' THEN 1
-                                WHEN 'SDT' THEN 2
-                                ELSE 3
-                            END,
-                            rs.LASTSTATUSCHANGEDATE DESC NULLS LAST
-                    ) AS rn
-                FROM base_data rs
-                CROSS JOIN max_time mt
-                LEFT JOIN DWH.DW_MES_JOB j ON j.RESOURCEID = rs.RESOURCEID
-                                       AND j.CREATEDATE = rs.LASTSTATUSCHANGEDATE
-                WHERE {where_clause}
-            ) WHERE rn BETWEEN {start_row} AND {end_row}
-        """
-        df = read_sql_df(sql)
+        params['start_row'] = start_row
+        params['end_row'] = end_row
+
+        # Load SQL from file and replace placeholders
+        sql = SQLLoader.load("dashboard/resource_detail_with_job")
+        sql = sql.replace("{{ DAYS_BACK }}", str(days_back))
+        sql = sql.replace("{{ LOCATION_FILTER }}", location_filter if location_filter else "")
+        sql = sql.replace("{{ ASSET_STATUS_FILTER }}", asset_status_filter if asset_status_filter else "")
+        sql = sql.replace("{{ WHERE_CLAUSE }}", where_clause)
+        df = read_sql_df(sql, params)
 
         # Get max_status_time for Last Update display
         max_status_time = None
@@ -540,18 +343,20 @@ def query_ou_trend(days: int = 7, filters: Optional[Dict] = None) -> Optional[Li
         List of {date, ou_pct, prd_hours, total_hours} records or None if query fails.
     """
     try:
-        # Build location and asset status filters
-        location_filter = ""
-        if EXCLUDED_LOCATIONS:
-            excluded_locations = "', '".join(EXCLUDED_LOCATIONS)
-            location_filter = f"AND (ss.LOCATIONNAME IS NULL OR ss.LOCATIONNAME NOT IN ('{excluded_locations}'))"
+        # Build exclusion filters using CommonFilters (legacy format for SQL placeholders)
+        location_filter = CommonFilters.build_location_filter_legacy(
+            excluded_locations=list(EXCLUDED_LOCATIONS) if EXCLUDED_LOCATIONS else None
+        )
+        if location_filter:
+            location_filter = f"AND {location_filter.replace('LOCATIONNAME', 'ss.LOCATIONNAME')}"
 
-        asset_status_filter = ""
-        if EXCLUDED_ASSET_STATUSES:
-            excluded_assets = "', '".join(EXCLUDED_ASSET_STATUSES)
-            asset_status_filter = f"AND (ss.PJ_ASSETSSTATUS IS NULL OR ss.PJ_ASSETSSTATUS NOT IN ('{excluded_assets}'))"
+        asset_status_filter = CommonFilters.build_asset_status_filter_legacy(
+            excluded_statuses=list(EXCLUDED_ASSET_STATUSES) if EXCLUDED_ASSET_STATUSES else None
+        )
+        if asset_status_filter:
+            asset_status_filter = f"AND {asset_status_filter.replace('PJ_ASSETSSTATUS', 'ss.PJ_ASSETSSTATUS')}"
 
-        # Build filter conditions for equipment flags
+        # Build filter conditions for equipment flags (safe - boolean values)
         flag_conditions = []
         if filters:
             if filters.get('isProduction'):
@@ -565,28 +370,13 @@ def query_ou_trend(days: int = 7, filters: Optional[Dict] = None) -> Optional[Li
         if flag_conditions:
             flag_filter = "AND " + " AND ".join(flag_conditions)
 
-        sql = f"""
-            SELECT
-                TRUNC(ss.TXNDATE) as DATA_DATE,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SBY' THEN ss.HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'UDT' THEN ss.HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'SDT' THEN ss.HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'EGT' THEN ss.HOURS ELSE 0 END) as EGT_HOURS,
-                SUM(ss.HOURS) as TOTAL_HOURS
-            FROM DWH.DW_MES_RESOURCESTATUS_SHIFT ss
-            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
-            WHERE ss.TXNDATE >= TRUNC(SYSDATE) - {days}
-              AND ss.TXNDATE < TRUNC(SYSDATE)
-              AND ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
-                   OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
-              {location_filter}
-              {asset_status_filter}
-              {flag_filter}
-            GROUP BY TRUNC(ss.TXNDATE)
-            ORDER BY DATA_DATE
-        """
-        df = read_sql_df(sql)
+        # Load SQL from file and replace placeholders
+        sql = SQLLoader.load("dashboard/ou_trend")
+        sql = sql.replace("{{ LOCATION_FILTER }}", location_filter if location_filter else "")
+        sql = sql.replace("{{ ASSET_STATUS_FILTER }}", asset_status_filter if asset_status_filter else "")
+        sql = sql.replace("{{ FLAG_FILTER }}", flag_filter)
+
+        df = read_sql_df(sql, {'days': days})
 
         result = []
         for _, row in df.iterrows():
@@ -636,18 +426,24 @@ def query_utilization_heatmap(days: int = 7, filters: Optional[Dict] = None) -> 
         List of {workcenter, date, prd_pct, prd_hours, avail_hours} records or None if query fails.
     """
     try:
-        # Build location and asset status filters
-        location_filter = ""
-        if EXCLUDED_LOCATIONS:
-            excluded_locations = "', '".join(EXCLUDED_LOCATIONS)
-            location_filter = f"AND (ss.LOCATIONNAME IS NULL OR ss.LOCATIONNAME NOT IN ('{excluded_locations}'))"
+        # Build exclusion filters using CommonFilters (legacy format for SQL placeholders)
+        location_filter = CommonFilters.build_location_filter_legacy(
+            excluded_locations=list(EXCLUDED_LOCATIONS) if EXCLUDED_LOCATIONS else None
+        )
+        if location_filter:
+            location_filter = f"AND {location_filter.replace('LOCATIONNAME', 'r.LOCATIONNAME')}"
+        else:
+            location_filter = ""
 
-        asset_status_filter = ""
-        if EXCLUDED_ASSET_STATUSES:
-            excluded_assets = "', '".join(EXCLUDED_ASSET_STATUSES)
-            asset_status_filter = f"AND (ss.PJ_ASSETSSTATUS IS NULL OR ss.PJ_ASSETSSTATUS NOT IN ('{excluded_assets}'))"
+        asset_status_filter = CommonFilters.build_asset_status_filter_legacy(
+            excluded_statuses=list(EXCLUDED_ASSET_STATUSES) if EXCLUDED_ASSET_STATUSES else None
+        )
+        if asset_status_filter:
+            asset_status_filter = f"AND {asset_status_filter.replace('PJ_ASSETSSTATUS', 'r.PJ_ASSETSSTATUS')}"
+        else:
+            asset_status_filter = ""
 
-        # Build filter conditions for equipment flags
+        # Build filter conditions for equipment flags (safe - boolean values)
         flag_conditions = []
         if filters:
             if filters.get('isProduction'):
@@ -661,26 +457,13 @@ def query_utilization_heatmap(days: int = 7, filters: Optional[Dict] = None) -> 
         if flag_conditions:
             flag_filter = "AND " + " AND ".join(flag_conditions)
 
-        sql = f"""
-            SELECT
-                ss.WORKCENTERNAME,
-                TRUNC(ss.TXNDATE) as DATA_DATE,
-                SUM(CASE WHEN ss.OLDSTATUSNAME = 'PRD' THEN ss.HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN ss.OLDSTATUSNAME IN ('PRD', 'SBY', 'UDT', 'SDT', 'EGT') THEN ss.HOURS ELSE 0 END) as AVAIL_HOURS
-            FROM DWH.DW_MES_RESOURCESTATUS_SHIFT ss
-            JOIN DWH.DW_MES_RESOURCE r ON ss.HISTORYID = r.RESOURCEID
-            WHERE ss.TXNDATE >= TRUNC(SYSDATE) - {days}
-              AND ss.TXNDATE < TRUNC(SYSDATE)
-              AND ss.WORKCENTERNAME IS NOT NULL
-              AND ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
-                   OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
-              {location_filter}
-              {asset_status_filter}
-              {flag_filter}
-            GROUP BY ss.WORKCENTERNAME, TRUNC(ss.TXNDATE)
-            ORDER BY ss.WORKCENTERNAME, DATA_DATE
-        """
-        df = read_sql_df(sql)
+        # Load SQL from file and replace placeholders
+        sql = SQLLoader.load("dashboard/heatmap")
+        sql = sql.replace("{{ LOCATION_FILTER }}", location_filter)
+        sql = sql.replace("{{ ASSET_STATUS_FILTER }}", asset_status_filter)
+        sql = sql.replace("{{ FLAG_FILTER }}", flag_filter)
+
+        df = read_sql_df(sql, {'days': days})
 
         # Group by workcenter for heatmap format
         result = []

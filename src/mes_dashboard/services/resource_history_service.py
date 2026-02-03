@@ -23,6 +23,7 @@ from typing import Optional, Dict, List, Any, Generator
 import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.sql import QueryBuilder, SQLLoader
 
 logger = logging.getLogger('mes_dashboard.resource_history')
 
@@ -265,71 +266,28 @@ def query_summary(
         # Build SQL components
         date_trunc = _get_date_trunc(granularity)
 
-        # Base CTE with resource filter
-        base_cte = f"""
-            WITH shift_data AS (
-                SELECT /*+ MATERIALIZE */ HISTORYID, TXNDATE, OLDSTATUSNAME, HOURS
-                FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
-                WHERE TXNDATE >= TO_DATE('{start_date}', 'YYYY-MM-DD')
-                  AND TXNDATE < TO_DATE('{end_date}', 'YYYY-MM-DD') + 1
-                  AND {historyid_filter}
-            )
-        """
+        # Common parameters for all queries (dates are parameterized for safety)
+        params = {'start_date': start_date, 'end_date': end_date}
 
-        # KPI query - aggregate all
-        kpi_sql = f"""
-            {base_cte}
-            SELECT
-                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'NST' THEN HOURS ELSE 0 END) as NST_HOURS,
-                COUNT(DISTINCT HISTORYID) as MACHINE_COUNT
-            FROM shift_data
-        """
+        # Load SQL templates and replace placeholders
+        kpi_sql = SQLLoader.load("resource_history/kpi")
+        kpi_sql = kpi_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
 
-        # Trend query - group by date
-        trend_sql = f"""
-            {base_cte}
-            SELECT
-                {date_trunc} as DATA_DATE,
-                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'NST' THEN HOURS ELSE 0 END) as NST_HOURS,
-                COUNT(DISTINCT HISTORYID) as MACHINE_COUNT
-            FROM shift_data
-            GROUP BY {date_trunc}
-            ORDER BY DATA_DATE
-        """
+        trend_sql = SQLLoader.load("resource_history/trend")
+        trend_sql = trend_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
+        trend_sql = trend_sql.replace("{{ DATE_TRUNC }}", date_trunc)
 
-        # Heatmap/Comparison query - group by HISTORYID and date, merge dimension in Python
-        heatmap_raw_sql = f"""
-            {base_cte}
-            SELECT
-                HISTORYID,
-                {date_trunc} as DATA_DATE,
-                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS
-            FROM shift_data
-            GROUP BY HISTORYID, {date_trunc}
-            ORDER BY HISTORYID, DATA_DATE
-        """
+        heatmap_raw_sql = SQLLoader.load("resource_history/heatmap")
+        heatmap_raw_sql = heatmap_raw_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
+        heatmap_raw_sql = heatmap_raw_sql.replace("{{ DATE_TRUNC }}", date_trunc)
 
-        # Execute queries in parallel
+        # Execute queries in parallel with params
         results = {}
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {
-                executor.submit(read_sql_df, kpi_sql): 'kpi',
-                executor.submit(read_sql_df, trend_sql): 'trend',
-                executor.submit(read_sql_df, heatmap_raw_sql): 'heatmap_raw',
+                executor.submit(read_sql_df, kpi_sql, params): 'kpi',
+                executor.submit(read_sql_df, trend_sql, params): 'trend',
+                executor.submit(read_sql_df, heatmap_raw_sql, params): 'heatmap_raw',
             }
             for future in as_completed(futures):
                 query_name = futures[future]
@@ -423,30 +381,14 @@ def query_detail(
         resource_lookup = _build_resource_lookup(resources)
         historyid_filter = _build_historyid_filter(resources)
 
-        # Query SHIFT data grouped by HISTORYID
-        detail_sql = f"""
-            WITH shift_data AS (
-                SELECT /*+ MATERIALIZE */ HISTORYID, OLDSTATUSNAME, HOURS
-                FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
-                WHERE TXNDATE >= TO_DATE('{start_date}', 'YYYY-MM-DD')
-                  AND TXNDATE < TO_DATE('{end_date}', 'YYYY-MM-DD') + 1
-                  AND {historyid_filter}
-            )
-            SELECT
-                HISTORYID,
-                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'NST' THEN HOURS ELSE 0 END) as NST_HOURS,
-                SUM(HOURS) as TOTAL_HOURS
-            FROM shift_data
-            GROUP BY HISTORYID
-            ORDER BY HISTORYID
-        """
+        # Query SHIFT data grouped by HISTORYID (dates parameterized for safety)
+        params = {'start_date': start_date, 'end_date': end_date}
 
-        detail_df = read_sql_df(detail_sql)
+        # Load SQL template and replace placeholder
+        detail_sql = SQLLoader.load("resource_history/detail")
+        detail_sql = detail_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
+
+        detail_df = read_sql_df(detail_sql, params)
 
         # Build detail data with dimension merge from cache
         data = _build_detail_from_raw_df(detail_df, resource_lookup)
@@ -525,29 +467,14 @@ def export_csv(
         from mes_dashboard.services.filter_cache import get_workcenter_mapping
         wc_mapping = get_workcenter_mapping() or {}
 
-        # Query SHIFT data grouped by HISTORYID
-        sql = f"""
-            WITH shift_data AS (
-                SELECT /*+ MATERIALIZE */ HISTORYID, OLDSTATUSNAME, HOURS
-                FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
-                WHERE TXNDATE >= TO_DATE('{start_date}', 'YYYY-MM-DD')
-                  AND TXNDATE < TO_DATE('{end_date}', 'YYYY-MM-DD') + 1
-                  AND {historyid_filter}
-            )
-            SELECT
-                HISTORYID,
-                SUM(CASE WHEN OLDSTATUSNAME = 'PRD' THEN HOURS ELSE 0 END) as PRD_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SBY' THEN HOURS ELSE 0 END) as SBY_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'UDT' THEN HOURS ELSE 0 END) as UDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'SDT' THEN HOURS ELSE 0 END) as SDT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'EGT' THEN HOURS ELSE 0 END) as EGT_HOURS,
-                SUM(CASE WHEN OLDSTATUSNAME = 'NST' THEN HOURS ELSE 0 END) as NST_HOURS,
-                SUM(HOURS) as TOTAL_HOURS
-            FROM shift_data
-            GROUP BY HISTORYID
-            ORDER BY HISTORYID
-        """
-        df = read_sql_df(sql)
+        # Query SHIFT data grouped by HISTORYID (dates parameterized for safety)
+        params = {'start_date': start_date, 'end_date': end_date}
+
+        # Load SQL template and replace placeholder (reuse detail.sql)
+        sql = SQLLoader.load("resource_history/detail")
+        sql = sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
+
+        df = read_sql_df(sql, params)
 
         # Write CSV header
         output = io.StringIO()

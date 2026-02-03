@@ -24,7 +24,7 @@ from mes_dashboard.services.resource_history_service import (
     _calc_ou_pct,
     _calc_availability_pct,
     _build_kpi_from_df,
-    _build_detail_from_df,
+    _build_detail_from_raw_df,
     MAX_QUERY_DAYS,
 )
 
@@ -62,7 +62,7 @@ class TestGetDateTrunc(unittest.TestCase):
     def test_day_granularity(self):
         """Day granularity should use TRUNC without format."""
         result = _get_date_trunc('day')
-        self.assertIn('TRUNC(ss.TXNDATE)', result)
+        self.assertIn('TRUNC(TXNDATE)', result)
         self.assertNotIn('IW', result)
 
     def test_week_granularity(self):
@@ -83,7 +83,7 @@ class TestGetDateTrunc(unittest.TestCase):
     def test_unknown_granularity(self):
         """Unknown granularity should default to day."""
         result = _get_date_trunc('unknown')
-        self.assertIn('TRUNC(ss.TXNDATE)', result)
+        self.assertIn('TRUNC(TXNDATE)', result)
         self.assertNotIn("'IW'", result)
 
 
@@ -209,15 +209,18 @@ class TestBuildDetailFromDf(unittest.TestCase):
     def test_empty_dataframe(self):
         """Empty DataFrame should return empty list."""
         df = pd.DataFrame()
-        result = _build_detail_from_df(df)
+        resource_lookup = {}
+        result = _build_detail_from_raw_df(df, resource_lookup)
         self.assertEqual(result, [])
 
-    def test_normal_dataframe(self):
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
+    def test_normal_dataframe(self, mock_wc_mapping):
         """Normal DataFrame should build correct detail data."""
+        mock_wc_mapping.return_value = {
+            'WC01': {'group': 'Group01', 'sequence': 1}
+        }
         df = pd.DataFrame([{
-            'WORKCENTERNAME': 'WC01',
-            'RESOURCEFAMILYNAME': 'FAM01',
-            'RESOURCENAME': 'RES01',
+            'HISTORYID': 'RES01',
             'PRD_HOURS': 80,
             'SBY_HOURS': 10,
             'UDT_HOURS': 5,
@@ -226,10 +229,18 @@ class TestBuildDetailFromDf(unittest.TestCase):
             'NST_HOURS': 10,
             'TOTAL_HOURS': 110
         }])
-        result = _build_detail_from_df(df)
+        resource_lookup = {
+            'RES01': {
+                'RESOURCEID': 'RES01',
+                'WORKCENTERNAME': 'WC01',
+                'RESOURCEFAMILYNAME': 'FAM01',
+                'RESOURCENAME': 'RES01'
+            }
+        }
+        result = _build_detail_from_raw_df(df, resource_lookup)
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['workcenter'], 'WC01')
+        self.assertEqual(result[0]['workcenter'], 'Group01')
         self.assertEqual(result[0]['family'], 'FAM01')
         self.assertEqual(result[0]['resource'], 'RES01')
         self.assertEqual(result[0]['machine_count'], 1)
@@ -350,14 +361,23 @@ class TestQueryDetail(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertIn('error', result)
 
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_history_service._get_filtered_resources')
     @patch('mes_dashboard.services.resource_history_service.read_sql_df')
-    def test_successful_query(self, mock_read_sql):
+    def test_successful_query(self, mock_read_sql, mock_get_resources, mock_wc_mapping):
         """Successful query should return data with total count."""
-        # Mock detail query
+        # Mock filtered resources
+        mock_get_resources.return_value = [
+            {'RESOURCEID': 'RES01', 'WORKCENTERNAME': 'WC01',
+             'RESOURCEFAMILYNAME': 'FAM01', 'RESOURCENAME': 'RES01'}
+        ]
+        mock_wc_mapping.return_value = {
+            'WC01': {'group': 'Group01', 'sequence': 1}
+        }
+
+        # Mock detail query with HISTORYID column
         detail_df = pd.DataFrame([{
-            'WORKCENTERNAME': 'WC01',
-            'RESOURCEFAMILYNAME': 'FAM01',
-            'RESOURCENAME': 'RES01',
+            'HISTORYID': 'RES01',
             'PRD_HOURS': 80, 'SBY_HOURS': 10, 'UDT_HOURS': 5,
             'SDT_HOURS': 3, 'EGT_HOURS': 2, 'NST_HOURS': 10,
             'TOTAL_HOURS': 110

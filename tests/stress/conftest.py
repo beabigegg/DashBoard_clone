@@ -86,7 +86,7 @@ class StressTestResult:
 @pytest.fixture(scope="session")
 def base_url() -> str:
     """Get the base URL for stress testing."""
-    return os.environ.get('STRESS_TEST_URL', 'http://127.0.0.1:5000')
+    return os.environ.get('STRESS_TEST_URL', 'http://127.0.0.1:8080')
 
 
 @pytest.fixture(scope="session")

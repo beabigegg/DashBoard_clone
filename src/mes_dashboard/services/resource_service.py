@@ -15,6 +15,8 @@ from mes_dashboard.config.constants import (
     DEFAULT_DAYS_BACK,
     STATUS_CATEGORIES,
 )
+from mes_dashboard.sql import SQLLoader, QueryBuilder
+from mes_dashboard.sql.filters import CommonFilters
 from mes_dashboard.services.resource_cache import get_all_resources
 from mes_dashboard.services.realtime_equipment_cache import (
     get_all_equipment_status,
@@ -78,65 +80,25 @@ def get_resource_latest_status_subquery(days_back: int = 30) -> str:
     Returns:
         SQL subquery string for latest resource status.
     """
-    # Build exclusion filters
-    location_filter = ""
-    if EXCLUDED_LOCATIONS:
-        excluded_locations = "', '".join(EXCLUDED_LOCATIONS)
-        location_filter = f"AND (r.LOCATIONNAME IS NULL OR r.LOCATIONNAME NOT IN ('{excluded_locations}'))"
+    # Build exclusion filters using CommonFilters (legacy format for SQL placeholders)
+    location_filter = CommonFilters.build_location_filter_legacy(
+        excluded_locations=list(EXCLUDED_LOCATIONS) if EXCLUDED_LOCATIONS else None
+    )
+    if location_filter:
+        location_filter = f"AND {location_filter.replace('LOCATIONNAME', 'r.LOCATIONNAME')}"
 
-    asset_status_filter = ""
-    if EXCLUDED_ASSET_STATUSES:
-        excluded_assets = "', '".join(EXCLUDED_ASSET_STATUSES)
-        asset_status_filter = f"AND (r.PJ_ASSETSSTATUS IS NULL OR r.PJ_ASSETSSTATUS NOT IN ('{excluded_assets}'))"
+    asset_status_filter = CommonFilters.build_asset_status_filter_legacy(
+        excluded_statuses=list(EXCLUDED_ASSET_STATUSES) if EXCLUDED_ASSET_STATUSES else None
+    )
+    if asset_status_filter:
+        asset_status_filter = f"AND {asset_status_filter.replace('PJ_ASSETSSTATUS', 'r.PJ_ASSETSSTATUS')}"
 
-    return f"""
-          WITH latest_txn AS (
-              SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
-              FROM DWH.DW_MES_RESOURCESTATUS
-          )
-          SELECT *
-          FROM (
-              SELECT
-                r.RESOURCEID,
-                r.RESOURCENAME,
-                r.OBJECTCATEGORY,
-                r.OBJECTTYPE,
-                r.RESOURCEFAMILYNAME,
-                r.WORKCENTERNAME,
-                r.LOCATIONNAME,
-                r.VENDORNAME,
-                r.VENDORMODEL,
-                r.PJ_DEPARTMENT,
-                r.PJ_ASSETSSTATUS,
-                r.PJ_ISPRODUCTION,
-                r.PJ_ISKEY,
-                r.PJ_ISMONITOR,
-                r.PJ_LOTID,
-                r.DESCRIPTION,
-                  s.NEWSTATUSNAME,
-                  s.NEWREASONNAME,
-                  s.LASTSTATUSCHANGEDATE,
-                  s.OLDSTATUSNAME,
-                s.OLDREASONNAME,
-                  s.AVAILABILITY,
-                  s.JOBID,
-                  s.TXNDATE,
-                  ROW_NUMBER() OVER (
-                      PARTITION BY r.RESOURCEID
-                      ORDER BY s.LASTSTATUSCHANGEDATE DESC NULLS LAST,
-                               COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) DESC
-                  ) AS rn
-              FROM DWH.DW_MES_RESOURCE r
-              JOIN DWH.DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
-              CROSS JOIN latest_txn lt
-              WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
-                  OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
-                AND COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) >= lt.MAX_TXNDATE - {days_back}
-                {location_filter}
-                {asset_status_filter}
-          )
-          WHERE rn = 1
-      """
+    return SQLLoader.load_with_params(
+        "resource/latest_status",
+        days_back=days_back,
+        LOCATION_FILTER=location_filter,
+        ASSET_STATUS_FILTER=asset_status_filter,
+    )
 
 
 # ============================================================
@@ -152,36 +114,25 @@ def query_resource_status_summary(days_back: int = 30) -> Optional[Dict]:
     Returns:
         Dict with summary stats or None if query fails.
     """
-    connection = get_db_connection()
-    if not connection:
-        return None
-
     try:
-        sql = f"""
-            SELECT
-                COUNT(*) as TOTAL_COUNT,
-                COUNT(DISTINCT WORKCENTERNAME) as WORKCENTER_COUNT,
-                COUNT(DISTINCT RESOURCEFAMILYNAME) as FAMILY_COUNT,
-                COUNT(DISTINCT PJ_DEPARTMENT) as DEPT_COUNT
-            FROM ({get_resource_latest_status_subquery(days_back)}) rs
-        """
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        result = cursor.fetchone()
-        cursor.close()
-        connection.close()
+        base_sql = get_resource_latest_status_subquery(days_back)
 
-        if not result:
+        # Load SQL from file and replace placeholder
+        sql = SQLLoader.load("resource/status_summary")
+        sql = sql.replace("{{ LATEST_STATUS_SUBQUERY }}", base_sql)
+
+        df = read_sql_df(sql)
+        if df is None or df.empty:
             return None
+
+        row = df.iloc[0]
         return {
-            'total_count': result[0] or 0,
-            'workcenter_count': result[1] or 0,
-            'family_count': result[2] or 0,
-            'dept_count': result[3] or 0
+            'total_count': int(row['TOTAL_COUNT'] or 0),
+            'workcenter_count': int(row['WORKCENTER_COUNT'] or 0),
+            'family_count': int(row['FAMILY_COUNT'] or 0),
+            'dept_count': int(row['DEPT_COUNT'] or 0)
         }
     except Exception as exc:
-        if connection:
-            connection.close()
         print(f"Resource summary query failed: {exc}")
         return None
 
@@ -196,15 +147,9 @@ def query_resource_by_status(days_back: int = 30) -> Optional[pd.DataFrame]:
         DataFrame with status counts or None if query fails.
     """
     try:
-        sql = f"""
-            SELECT
-                NEWSTATUSNAME,
-                COUNT(*) as COUNT
-            FROM ({get_resource_latest_status_subquery(days_back)}) rs
-            WHERE NEWSTATUSNAME IS NOT NULL
-            GROUP BY NEWSTATUSNAME
-            ORDER BY COUNT DESC
-        """
+        base_sql = get_resource_latest_status_subquery(days_back)
+        sql = SQLLoader.load("resource/by_status")
+        sql = sql.replace("{{ LATEST_STATUS_SUBQUERY }}", base_sql)
         return read_sql_df(sql)
     except Exception as exc:
         print(f"Resource by status query failed: {exc}")
@@ -221,16 +166,9 @@ def query_resource_by_workcenter(days_back: int = 30) -> Optional[pd.DataFrame]:
         DataFrame with workcenter/status counts or None if query fails.
     """
     try:
-        sql = f"""
-            SELECT
-                WORKCENTERNAME,
-                NEWSTATUSNAME,
-                COUNT(*) as COUNT
-            FROM ({get_resource_latest_status_subquery(days_back)}) rs
-            WHERE WORKCENTERNAME IS NOT NULL
-            GROUP BY WORKCENTERNAME, NEWSTATUSNAME
-            ORDER BY WORKCENTERNAME, COUNT DESC
-        """
+        base_sql = get_resource_latest_status_subquery(days_back)
+        sql = SQLLoader.load("resource/by_workcenter")
+        sql = sql.replace("{{ LATEST_STATUS_SUBQUERY }}", base_sql)
         return read_sql_df(sql)
     except Exception as exc:
         print(f"Resource by workcenter query failed: {exc}")
@@ -257,60 +195,50 @@ def query_resource_detail(
     try:
         base_sql = get_resource_latest_status_subquery(days_back)
 
-        where_conditions = []
+        # Use QueryBuilder for safe parameterized conditions
+        builder = QueryBuilder()
         if filters:
             if filters.get('workcenter'):
-                where_conditions.append(f"WORKCENTERNAME = '{filters['workcenter']}'")
+                builder.add_param_condition('WORKCENTERNAME', filters['workcenter'])
             if filters.get('status'):
-                where_conditions.append(f"NEWSTATUSNAME = '{filters['status']}'")
+                builder.add_param_condition('NEWSTATUSNAME', filters['status'])
             if filters.get('family'):
-                where_conditions.append(f"RESOURCEFAMILYNAME = '{filters['family']}'")
+                builder.add_param_condition('RESOURCEFAMILYNAME', filters['family'])
             if filters.get('department'):
-                where_conditions.append(f"PJ_DEPARTMENT = '{filters['department']}'")
+                builder.add_param_condition('PJ_DEPARTMENT', filters['department'])
 
-            # Equipment flag filters
+            # Equipment flag filters (boolean to 0/1)
             if filters.get('isProduction') is not None:
-                where_conditions.append(
+                builder.add_condition(
                     f"NVL(PJ_ISPRODUCTION, 0) = {1 if filters['isProduction'] else 0}"
                 )
             if filters.get('isKey') is not None:
-                where_conditions.append(
+                builder.add_condition(
                     f"NVL(PJ_ISKEY, 0) = {1 if filters['isKey'] else 0}"
                 )
             if filters.get('isMonitor') is not None:
-                where_conditions.append(
+                builder.add_condition(
                     f"NVL(PJ_ISMONITOR, 0) = {1 if filters['isMonitor'] else 0}"
                 )
 
-        where_clause = " AND " + " AND ".join(where_conditions) if where_conditions else ""
+        # Build WHERE clause and get parameters
+        conditions_sql = builder.get_conditions_sql()
+        params = builder.params.copy()
 
+        # Add pagination parameters
         start_row = offset + 1
         end_row = offset + limit
-        sql = f"""
-            SELECT * FROM (
-                SELECT
-                    RESOURCENAME,
-                    WORKCENTERNAME,
-                    RESOURCEFAMILYNAME,
-                    NEWSTATUSNAME,
-                    NEWREASONNAME,
-                    LASTSTATUSCHANGEDATE,
-                    PJ_DEPARTMENT,
-                    VENDORNAME,
-                    VENDORMODEL,
-                    PJ_ASSETSSTATUS,
-                    AVAILABILITY,
-                    PJ_ISPRODUCTION,
-                    PJ_ISKEY,
-                    PJ_ISMONITOR,
-                    ROW_NUMBER() OVER (
-                        ORDER BY LASTSTATUSCHANGEDATE DESC NULLS LAST
-                    ) AS rn
-                FROM ({base_sql}) rs
-                WHERE 1=1 {where_clause}
-            ) WHERE rn BETWEEN {start_row} AND {end_row}
-        """
-        df = read_sql_df(sql)
+        params['start_row'] = start_row
+        params['end_row'] = end_row
+
+        where_clause = f" AND {conditions_sql}" if conditions_sql else ""
+
+        # Load SQL from file and replace placeholders
+        sql = SQLLoader.load("resource/detail")
+        sql = sql.replace("{{ LATEST_STATUS_SUBQUERY }}", base_sql)
+        sql = sql.replace("{{ WHERE_CLAUSE }}", where_clause)
+
+        df = read_sql_df(sql, params)
 
         # Convert datetime to string
         if 'LASTSTATUSCHANGEDATE' in df.columns:
@@ -342,37 +270,9 @@ def query_resource_workcenter_status_matrix(days_back: int = 30) -> Optional[pd.
         DataFrame with workcenter/status matrix or None if query fails.
     """
     try:
-        sql = f"""
-            SELECT
-                WORKCENTERNAME,
-                CASE NEWSTATUSNAME
-                    WHEN 'PRD' THEN 'PRD'
-                    WHEN 'SBY' THEN 'SBY'
-                    WHEN 'UDT' THEN 'UDT'
-                    WHEN 'SDT' THEN 'SDT'
-                    WHEN 'EGT' THEN 'EGT'
-                    WHEN 'NST' THEN 'NST'
-                    WHEN 'SCRAP' THEN 'SCRAP'
-                    ELSE 'OTHER'
-                END as STATUS_CATEGORY,
-                NEWSTATUSNAME,
-                COUNT(*) as COUNT
-            FROM ({get_resource_latest_status_subquery(days_back)}) rs
-            WHERE WORKCENTERNAME IS NOT NULL
-            GROUP BY WORKCENTERNAME,
-                CASE NEWSTATUSNAME
-                    WHEN 'PRD' THEN 'PRD'
-                    WHEN 'SBY' THEN 'SBY'
-                    WHEN 'UDT' THEN 'UDT'
-                    WHEN 'SDT' THEN 'SDT'
-                    WHEN 'EGT' THEN 'EGT'
-                    WHEN 'NST' THEN 'NST'
-                    WHEN 'SCRAP' THEN 'SCRAP'
-                    ELSE 'OTHER'
-                END,
-                NEWSTATUSNAME
-            ORDER BY WORKCENTERNAME, STATUS_CATEGORY
-        """
+        base_sql = get_resource_latest_status_subquery(days_back)
+        sql = SQLLoader.load("resource/workcenter_status_matrix")
+        sql = sql.replace("{{ LATEST_STATUS_SUBQUERY }}", base_sql)
         return read_sql_df(sql)
     except Exception as exc:
         print(f"Resource status matrix query failed: {exc}")
@@ -407,24 +307,9 @@ def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
         locations = get_locations()
         assets_statuses = get_distinct_values('PJ_ASSETSSTATUS')
 
-        # Query only dynamic status data from Oracle
-        # Note: Can't wrap CTE in subquery, so use inline approach
-        sql_statuses = f"""
-            WITH latest_txn AS (
-                SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
-                FROM DWH.DW_MES_RESOURCESTATUS
-            )
-            SELECT DISTINCT s.NEWSTATUSNAME
-            FROM DWH.DW_MES_RESOURCE r
-            JOIN DWH.DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
-            CROSS JOIN latest_txn lt
-            WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
-                OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
-              AND COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) >= lt.MAX_TXNDATE - {days_back}
-              AND s.NEWSTATUSNAME IS NOT NULL
-            ORDER BY s.NEWSTATUSNAME
-        """
-        status_df = read_sql_df(sql_statuses)
+        # Query only dynamic status data from Oracle using SQLLoader
+        sql_statuses = SQLLoader.load("resource/distinct_statuses")
+        status_df = read_sql_df(sql_statuses, {'days_back': days_back})
         statuses = status_df['NEWSTATUSNAME'].tolist() if status_df is not None else []
 
         return {
