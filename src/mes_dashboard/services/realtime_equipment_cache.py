@@ -13,7 +13,12 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from mes_dashboard.core.database import read_sql_df
-from mes_dashboard.core.redis_client import get_redis_client, get_key_prefix
+from mes_dashboard.core.redis_client import (
+    get_redis_client,
+    get_key_prefix,
+    try_acquire_lock,
+    release_lock,
+)
 from mes_dashboard.config.constants import (
     EQUIPMENT_STATUS_DATA_KEY,
     EQUIPMENT_STATUS_INDEX_KEY,
@@ -541,35 +546,45 @@ def get_equipment_status_cache_status() -> Dict[str, Any]:
 def refresh_equipment_status_cache(force: bool = False) -> bool:
     """Refresh equipment status cache.
 
+    Uses distributed lock to prevent multiple workers from refreshing simultaneously.
+
     Args:
         force: If True, refresh immediately regardless of state.
 
     Returns:
         True if refresh succeeded, False otherwise.
     """
-    with _SYNC_LOCK:
-        logger.info("Refreshing equipment status cache...")
-        start_time = time.time()
+    # Try to acquire distributed lock (non-blocking)
+    if not try_acquire_lock("equipment_status_cache_update", ttl_seconds=120):
+        logger.debug("Another worker is refreshing equipment status cache, skipping")
+        return False
 
-        # Load from Oracle
-        records = _load_equipment_status_from_oracle()
-        if records is None:
-            logger.error("Failed to load equipment status from Oracle")
-            return False
+    try:
+        with _SYNC_LOCK:
+            logger.info("Refreshing equipment status cache...")
+            start_time = time.time()
 
-        # Aggregate
-        aggregated = _aggregate_by_resourceid(records)
+            # Load from Oracle
+            records = _load_equipment_status_from_oracle()
+            if records is None:
+                logger.error("Failed to load equipment status from Oracle")
+                return False
 
-        # Save to Redis
-        success = _save_to_redis(aggregated)
+            # Aggregate
+            aggregated = _aggregate_by_resourceid(records)
 
-        elapsed = time.time() - start_time
-        if success:
-            logger.info(f"Equipment status cache refreshed in {elapsed:.2f}s")
-        else:
-            logger.error(f"Equipment status cache refresh failed after {elapsed:.2f}s")
+            # Save to Redis
+            success = _save_to_redis(aggregated)
 
-        return success
+            elapsed = time.time() - start_time
+            if success:
+                logger.info(f"Equipment status cache refreshed in {elapsed:.2f}s")
+            else:
+                logger.error(f"Equipment status cache refresh failed after {elapsed:.2f}s")
+
+            return success
+    finally:
+        release_lock("equipment_status_cache_update")
 
 
 def _sync_worker(interval: int):

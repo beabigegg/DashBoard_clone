@@ -116,3 +116,55 @@ def close_redis() -> None:
             logger.warning(f"Error closing Redis connection: {e}")
         finally:
             _REDIS_CLIENT = None
+
+
+def try_acquire_lock(lock_name: str, ttl_seconds: int = 60) -> bool:
+    """Try to acquire a distributed lock using Redis SET NX.
+
+    This is a non-blocking lock acquisition. If the lock is already held,
+    returns False immediately without waiting.
+
+    Args:
+        lock_name: Name of the lock (will be prefixed with key prefix).
+        ttl_seconds: Lock expiration time in seconds (prevents deadlocks).
+
+    Returns:
+        True if lock was acquired, False if already held by another process.
+    """
+    client = get_redis_client()
+    if client is None:
+        # Redis unavailable - allow operation to proceed (fail-open)
+        logger.warning(f"Redis unavailable, skipping lock for {lock_name}")
+        return True
+
+    try:
+        lock_key = f"{REDIS_KEY_PREFIX}:lock:{lock_name}"
+        # SET NX EX is atomic: only sets if key doesn't exist
+        acquired = client.set(lock_key, str(os.getpid()), nx=True, ex=ttl_seconds)
+        if acquired:
+            logger.debug(f"Acquired lock: {lock_name}")
+        else:
+            logger.debug(f"Lock already held: {lock_name}")
+        return bool(acquired)
+    except Exception as e:
+        logger.warning(f"Failed to acquire lock {lock_name}: {e}")
+        # Fail-open: allow operation if Redis has issues
+        return True
+
+
+def release_lock(lock_name: str) -> None:
+    """Release a distributed lock.
+
+    Args:
+        lock_name: Name of the lock to release.
+    """
+    client = get_redis_client()
+    if client is None:
+        return
+
+    try:
+        lock_key = f"{REDIS_KEY_PREFIX}:lock:{lock_name}"
+        client.delete(lock_key)
+        logger.debug(f"Released lock: {lock_name}")
+    except Exception as e:
+        logger.warning(f"Failed to release lock {lock_name}: {e}")

@@ -17,7 +17,9 @@ from mes_dashboard.core.redis_client import (
     get_redis_client,
     get_key,
     redis_available,
-    REDIS_ENABLED
+    REDIS_ENABLED,
+    try_acquire_lock,
+    release_lock,
 )
 from mes_dashboard.core.database import read_sql_df
 
@@ -116,6 +118,8 @@ class CacheUpdater:
     def _check_and_update(self, force: bool = False) -> bool:
         """Check SYS_DATE and update cache if needed.
 
+        Uses distributed lock to prevent multiple workers from updating simultaneously.
+
         Args:
             force: If True, update regardless of SYS_DATE.
 
@@ -124,6 +128,11 @@ class CacheUpdater:
         """
         if not redis_available():
             logger.warning("Redis not available, skipping cache update")
+            return False
+
+        # Try to acquire distributed lock (non-blocking)
+        if not try_acquire_lock("wip_cache_update", ttl_seconds=120):
+            logger.debug("Another worker is updating WIP cache, skipping")
             return False
 
         try:
@@ -157,6 +166,8 @@ class CacheUpdater:
         except Exception as e:
             logger.error(f"Error in cache update: {e}", exc_info=True)
             return False
+        finally:
+            release_lock("wip_cache_update")
 
     def _check_sys_date(self) -> Optional[str]:
         """Query Oracle for MAX(SYS_DATE).
@@ -247,6 +258,8 @@ class CacheUpdater:
     def _check_resource_update(self, force: bool = False) -> bool:
         """Check and update resource cache if needed.
 
+        Uses distributed lock to prevent multiple workers from updating simultaneously.
+
         Args:
             force: If True, update regardless of interval.
 
@@ -271,6 +284,11 @@ class CacheUpdater:
                 )
                 return False
 
+        # Try to acquire distributed lock (non-blocking)
+        if not try_acquire_lock("resource_cache_update", ttl_seconds=300):
+            logger.debug("Another worker is updating resource cache, skipping")
+            return False
+
         # Perform sync
         logger.info("Checking resource cache for updates...")
         try:
@@ -280,6 +298,8 @@ class CacheUpdater:
         except Exception as e:
             logger.error(f"Resource cache update failed: {e}", exc_info=True)
             return False
+        finally:
+            release_lock("resource_cache_update")
 
 
 # ============================================================
