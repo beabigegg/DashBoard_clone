@@ -1619,17 +1619,46 @@
         }
     }
 
+    // ============================================================
+    // Auto-refresh
+    // ============================================================
+    const REFRESH_INTERVAL = 5 * 60 * 1000;  // 5 minutes
+    let refreshTimer = null;
+
+    function startAutoRefresh() {
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+        }
+        console.log('[Resource Status] Auto-refresh started, interval:', REFRESH_INTERVAL / 1000, 'seconds');
+        refreshTimer = setInterval(() => {
+            if (!document.hidden) {
+                console.log('[Resource Status] Auto-refresh triggered at', new Date().toLocaleTimeString());
+                checkCacheStatus();
+                loadData();
+            } else {
+                console.log('[Resource Status] Auto-refresh skipped (tab hidden)');
+            }
+        }, REFRESH_INTERVAL);
+    }
+
+    // Handle page visibility - refresh when tab becomes visible
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            console.log('[Resource Status] Tab became visible, refreshing...');
+            checkCacheStatus();
+            loadData();
+            startAutoRefresh();
+        }
+    });
+
     // Initialize
     document.addEventListener('DOMContentLoaded', async () => {
         await loadOptions();
         await checkCacheStatus();
         await loadData();
 
-        // Auto-refresh every 5 minutes
-        setInterval(() => {
-            checkCacheStatus();
-            loadData();
-        }, 5 * 60 * 1000);
+        // Start auto-refresh
+        startAutoRefresh();
     });
 </script>
 {% endblock %}
