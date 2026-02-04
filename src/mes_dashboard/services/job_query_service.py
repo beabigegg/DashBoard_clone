@@ -282,13 +282,13 @@ def export_jobs_with_history(
         output = io.StringIO()
         output.write('\ufeff')  # UTF-8 BOM
 
-        # Define column headers (Chinese labels)
+        # Define column headers (use original column names)
         headers = [
-            '設備名稱', '工單ID', '工單最終狀態', '工單類型', '工單名稱',
-            '工單建立時間', '工單完成時間', '工單故障碼', '工單維修碼', '工單症狀碼',
-            '交易時間', '原狀態', '新狀態', '階段',
-            '交易故障碼', '交易維修碼', '交易症狀碼',
-            '操作者', '員工', '備註'
+            'RESOURCENAME', 'JOBID', 'JOB_FINAL_STATUS', 'JOBMODELNAME', 'JOBORDERNAME',
+            'JOB_CREATEDATE', 'JOB_COMPLETEDATE', 'JOB_CAUSECODE', 'JOB_REPAIRCODE', 'JOB_SYMPTOMCODE',
+            'TXNDATE', 'FROMJOBSTATUS', 'TXN_TO_STATUS', 'STAGENAME',
+            'TXN_CAUSECODE', 'TXN_REPAIRCODE', 'TXN_SYMPTOMCODE',
+            'USER_NAME', 'EMP_NAME', 'COMMENTS'
         ]
 
         writer = csv.writer(output)
