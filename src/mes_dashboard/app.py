@@ -27,6 +27,8 @@ def _configure_logging(app: Flask) -> None:
     """Configure application logging.
 
     Sets up logging to stderr (captured by Gunicorn's --capture-output).
+    Additionally sets up SQLite log store for admin dashboard queries.
+
     Log levels:
     - DEBUG: Query completion times, connection events
     - WARNING: Slow queries (>1s)
@@ -38,6 +40,7 @@ def _configure_logging(app: Flask) -> None:
 
     # Only add handler if not already configured (avoid duplicates)
     if not logger.handlers:
+        # Console handler (stderr - captured by Gunicorn)
         handler = logging.StreamHandler(sys.stderr)
         handler.setLevel(logging.DEBUG)
         formatter = logging.Formatter(
@@ -46,6 +49,17 @@ def _configure_logging(app: Flask) -> None:
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+
+        # SQLite log handler for admin dashboard (INFO level and above)
+        try:
+            from mes_dashboard.core.log_store import get_sqlite_log_handler, LOG_STORE_ENABLED
+            if LOG_STORE_ENABLED:
+                sqlite_handler = get_sqlite_log_handler()
+                sqlite_handler.setLevel(logging.INFO)
+                logger.addHandler(sqlite_handler)
+                logger.debug("SQLite log handler registered")
+        except Exception as e:
+            logger.warning(f"Failed to initialize SQLite log handler: {e}")
 
     # Prevent propagation to root logger (avoid duplicate logs)
     logger.propagate = False
@@ -103,7 +117,8 @@ def create_app(config_name: str | None = None) -> Flask:
             if is_api_public():
                 return None
             if not is_admin_logged_in():
-                return jsonify({"error": "Unauthorized"}), 401
+                from mes_dashboard.core.response import unauthorized_error
+                return unauthorized_error()
             return None
 
         # Skip auth-related pages (login/logout)
@@ -226,4 +241,81 @@ def create_app(config_name: str | None = None) -> Flask:
         """API: get tables config."""
         return jsonify(TABLES_CONFIG)
 
+    # ========================================================
+    # Global Error Handlers
+    # ========================================================
+    _register_error_handlers(app)
+
     return app
+
+
+def _register_error_handlers(app: Flask) -> None:
+    """Register global error handlers with standardized response format."""
+    from mes_dashboard.core.response import (
+        unauthorized_error,
+        forbidden_error,
+        not_found_error,
+        internal_error,
+        error_response,
+        INTERNAL_ERROR
+    )
+
+    @app.errorhandler(401)
+    def handle_unauthorized(e):
+        """Handle 401 Unauthorized errors."""
+        return unauthorized_error()
+
+    @app.errorhandler(403)
+    def handle_forbidden(e):
+        """Handle 403 Forbidden errors."""
+        return forbidden_error()
+
+    @app.errorhandler(404)
+    def handle_not_found(e):
+        """Handle 404 Not Found errors."""
+        # For API routes, return JSON; for pages, render template
+        if request.path.startswith('/api/'):
+            return not_found_error()
+        return render_template('404.html'), 404
+
+    def _is_api_request() -> bool:
+        """Check if the current request is an API request."""
+        return (request.path.startswith('/api/') or
+                '/api/' in request.path or
+                request.accept_mimetypes.best == 'application/json')
+
+    @app.errorhandler(500)
+    def handle_internal_error(e):
+        """Handle 500 Internal Server errors."""
+        logger = logging.getLogger('mes_dashboard')
+        logger.error(f"Internal server error: {e}", exc_info=True)
+        if _is_api_request():
+            return internal_error(str(e) if app.debug else None)
+        # Fallback to JSON if template not found
+        try:
+            return render_template('500.html'), 500
+        except Exception:
+            return internal_error(str(e) if app.debug else None)
+
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        """Handle uncaught exceptions."""
+        logger = logging.getLogger('mes_dashboard')
+        logger.error(f"Uncaught exception: {e}", exc_info=True)
+        if _is_api_request():
+            return error_response(
+                INTERNAL_ERROR,
+                "伺服器發生未預期的錯誤",
+                str(e) if app.debug else None,
+                status_code=500
+            )
+        # Fallback to JSON if template not found
+        try:
+            return render_template('500.html'), 500
+        except Exception:
+            return error_response(
+                INTERNAL_ERROR,
+                "伺服器發生未預期的錯誤",
+                str(e) if app.debug else None,
+                status_code=500
+            )

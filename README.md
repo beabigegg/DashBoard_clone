@@ -18,6 +18,9 @@
 | 頁面狀態管理 | ✅ 已完成 |
 | Redis 快取系統 | ✅ 已完成 |
 | SQL 查詢安全架構 | ✅ 已完成 |
+| 效能監控儀表板 | ✅ 已完成 |
+| 熔斷器保護機制 | ✅ 已完成 |
+| Worker 重啟控制 | ✅ 已完成 |
 | 部署自動化 | ✅ 已完成 |
 
 ---
@@ -143,6 +146,51 @@ ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
 
 3. **防火牆**: 開放服務端口（預設 8080）
 
+### Worker Watchdog 服務配置
+
+Watchdog 監控程式用於支援管理員從介面優雅重啟 Workers：
+
+```bash
+# 1. 複製 systemd 服務檔案
+sudo cp deploy/mes-dashboard-watchdog.service /etc/systemd/system/
+
+# 2. 編輯服務檔案，修改路徑和用戶
+sudo nano /etc/systemd/system/mes-dashboard-watchdog.service
+
+# 3. 重新載入 systemd
+sudo systemctl daemon-reload
+
+# 4. 啟動並設定開機自動啟動
+sudo systemctl start mes-dashboard-watchdog
+sudo systemctl enable mes-dashboard-watchdog
+
+# 5. 查看狀態
+sudo systemctl status mes-dashboard-watchdog
+```
+
+### Rollback 步驟
+
+如需回滾到先前版本：
+
+```bash
+# 1. 停止服務
+./scripts/start_server.sh stop
+sudo systemctl stop mes-dashboard-watchdog
+
+# 2. 回滾程式碼
+git checkout <previous-commit>
+
+# 3. 重新安裝依賴（如有變更）
+pip install -r requirements.txt
+
+# 4. 清理新版本資料（可選）
+rm -f logs/admin_logs.sqlite  # 清理 SQLite 日誌
+
+# 5. 重啟服務
+./scripts/start_server.sh start
+sudo systemctl start mes-dashboard-watchdog
+```
+
 ---
 
 ## 功能說明
@@ -201,6 +249,33 @@ ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
 - 頁面狀態管理（released/dev）
 - Dev 頁面僅管理員可見
 
+### 效能監控儀表板
+
+管理員專用的系統監控介面（`/admin/performance`）：
+
+- **系統狀態總覽**：Database、Redis、Circuit Breaker、Worker 狀態
+- **查詢效能指標**：P50/P95/P99 延遲、慢查詢統計、延遲分布圖
+- **系統日誌檢視**：即時日誌查詢、等級篩選、關鍵字搜尋
+- **日誌管理**：儲存統計、手動清理功能
+- **Worker 控制**：優雅重啟（透過 Watchdog 機制）
+- 自動更新（30 秒間隔）
+
+### 熔斷器保護機制
+
+Circuit Breaker 模式保護資料庫免於雪崩效應：
+
+- **CLOSED**：正常運作，請求通過
+- **OPEN**：失敗過多，請求立即拒絕
+- **HALF_OPEN**：測試恢復，允許有限請求
+
+配置方式：
+```bash
+CIRCUIT_BREAKER_ENABLED=true
+CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+CIRCUIT_BREAKER_FAILURE_RATE=0.5
+CIRCUIT_BREAKER_RECOVERY_TIMEOUT=30
+```
+
 ---
 
 ## 技術架構
@@ -248,7 +323,12 @@ DashBoard/
 │   │   ├── database.py         # 資料庫連線
 │   │   ├── redis_client.py     # Redis 客戶端
 │   │   ├── cache.py            # 快取管理
-│   │   └── cache_updater.py    # 快取自動更新
+│   │   ├── cache_updater.py    # 快取自動更新
+│   │   ├── circuit_breaker.py  # 熔斷器
+│   │   ├── metrics.py          # 效能指標收集
+│   │   ├── log_store.py        # SQLite 日誌儲存
+│   │   ├── response.py         # API 回應格式
+│   │   └── permissions.py      # 權限管理
 │   ├── routes/                 # 路由
 │   │   ├── wip_routes.py       # WIP 相關 API
 │   │   ├── resource_routes.py  # 設備狀態 API
@@ -270,7 +350,10 @@ DashBoard/
 │   └── templates/              # HTML 模板
 ├── scripts/                    # 腳本
 │   ├── deploy.sh               # 部署腳本
-│   └── start_server.sh         # 服務管理腳本
+│   ├── start_server.sh         # 服務管理腳本
+│   └── worker_watchdog.py      # Worker 監控程式
+├── deploy/                     # 部署設定
+│   └── mes-dashboard-watchdog.service  # Watchdog systemd 服務
 ├── tests/                      # 測試
 ├── data/                       # 資料檔案
 ├── logs/                       # 日誌
@@ -342,6 +425,20 @@ pytest tests/stress/ -v
 
 ## 變更日誌
 
+### 2026-02-04
+
+- 新增效能監控儀表板（`/admin/performance`）
+- 新增熔斷器保護機制（Circuit Breaker）
+- 新增效能指標收集（P50/P95/P99 延遲、慢查詢統計）
+- 新增 SQLite 日誌儲存與管理功能
+- 新增 Worker Watchdog 重啟機制
+- 新增統一 API 回應格式（success_response/error_response）
+- 新增 404/500 錯誤頁面模板
+- 修復熔斷器 get_status() 死鎖問題
+- 修復 health_routes.py 模組匯入錯誤
+- 新增 psutil 依賴用於 Worker 狀態監控
+- 新增完整測試套件（59 個效能相關測試）
+
 ### 2026-02-03
 
 - 重構 SQL 查詢管理架構，提升安全性與效能
@@ -393,5 +490,5 @@ pytest tests/stress/ -v
 
 ---
 
-**文檔版本**: 3.0
-**最後更新**: 2026-02-03
+**文檔版本**: 4.0
+**最後更新**: 2026-02-04

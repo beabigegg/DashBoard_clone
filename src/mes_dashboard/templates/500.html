@@ -1,0 +1,101 @@
+{% extends "_base.html" %}
+
+{% block title %}系統錯誤 - MES Dashboard{% endblock %}
+
+{% block head_extra %}
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #222;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .error-container {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .error-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .error-code {
+            font-size: 72px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 10px;
+        }
+
+        .error-title {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .home-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            text-decoration: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .home-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .retry-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            color: #667eea;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-left: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .retry-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="error-container">
+        <div class="error-code">500</div>
+        <h1 class="error-title">系統發生錯誤</h1>
+        <p class="error-message">
+            很抱歉，系統發生了內部錯誤。<br>
+            我們的技術團隊已收到通知，請稍後再試。
+        </p>
+        <a href="{{ url_for('portal_index') }}" class="home-btn">返回首頁</a>
+        <button class="retry-btn" onclick="location.reload()">重試</button>
+    </div>
+{% endblock %}

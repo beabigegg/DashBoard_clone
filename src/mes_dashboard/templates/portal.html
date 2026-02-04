@@ -297,6 +297,7 @@
                     {% if is_admin %}
                         <span class="admin-name">{{ admin_user.displayName }}</span>
                         <a href="{{ url_for('admin.pages') }}">頁面管理</a>
+                        <a href="{{ url_for('admin.performance') }}">效能監控</a>
                         <a href="{{ url_for('auth.logout') }}">登出</a>
                     {% else %}
                         <a href="{{ url_for('auth.login') }}">管理員登入</a>

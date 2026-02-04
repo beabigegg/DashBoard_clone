@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """Health check endpoints for MES Dashboard.
 
-Provides /health endpoint for monitoring service status.
+Provides /health and /health/deep endpoints for monitoring service status.
 """
 
 from __future__ import annotations
 
 import logging
+import time
+from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, make_response
 
 from mes_dashboard.core.database import get_engine
@@ -24,6 +26,13 @@ from sqlalchemy import text
 logger = logging.getLogger('mes_dashboard.health')
 
 health_bp = Blueprint('health', __name__)
+
+# ============================================================
+# Warning Thresholds
+# ============================================================
+
+DB_LATENCY_WARNING_MS = 100  # Database latency > 100ms is slow
+CACHE_STALE_MINUTES = 2  # Cache update > 2 minutes is stale
 
 
 def check_database() -> tuple[str, str | None]:
@@ -191,6 +200,137 @@ def health_check():
         response['warnings'] = warnings
 
     # Add no-cache headers to prevent browser caching
+    resp = make_response(jsonify(response), http_code)
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+
+@health_bp.route('/health/deep', methods=['GET'])
+def deep_health_check():
+    """Deep health check endpoint with detailed metrics.
+
+    Requires admin authentication.
+
+    Returns:
+        - 200 OK with detailed health information
+        - 503 if database is unhealthy
+    """
+    from mes_dashboard.core.permissions import is_admin_logged_in
+    from mes_dashboard.core.circuit_breaker import get_circuit_breaker_status
+    from mes_dashboard.core.metrics import get_metrics_summary
+    from flask import redirect, url_for, request
+
+    # Require admin authentication - redirect to login for consistency
+    if not is_admin_logged_in():
+        return redirect(url_for("auth.login", next=request.url))
+
+    # Check database with latency measurement
+    db_start = time.time()
+    db_status, db_error = check_database()
+    db_latency_ms = round((time.time() - db_start) * 1000, 2)
+
+    # Check Redis with latency measurement
+    redis_latency_ms = None
+    if REDIS_ENABLED:
+        redis_start = time.time()
+        redis_status, redis_error = check_redis()
+        redis_latency_ms = round((time.time() - redis_start) * 1000, 2)
+    else:
+        redis_status = 'disabled'
+
+    # Get circuit breaker status
+    circuit_breaker = get_circuit_breaker_status()
+
+    # Get performance metrics
+    metrics = get_metrics_summary()
+
+    # Get cache freshness
+    cache_status = get_cache_status()
+    cache_updated_at = cache_status.get('updated_at')
+    cache_is_stale = False
+    if cache_updated_at:
+        try:
+            updated_time = datetime.fromisoformat(cache_updated_at)
+            cache_is_stale = datetime.now() - updated_time > timedelta(minutes=CACHE_STALE_MINUTES)
+        except (ValueError, TypeError):
+            pass
+
+    # Determine overall status with thresholds
+    warnings = []
+    status = 'healthy'
+    http_code = 200
+
+    if db_status == 'error':
+        status = 'unhealthy'
+        http_code = 503
+    elif circuit_breaker.get('state') == 'OPEN':
+        status = 'degraded'
+        warnings.append("Circuit breaker is OPEN")
+    elif redis_status == 'error':
+        status = 'degraded'
+        warnings.append("Redis unavailable")
+
+    # Check latency thresholds
+    db_latency_status = 'healthy'
+    if db_latency_ms > DB_LATENCY_WARNING_MS:
+        db_latency_status = 'slow'
+        warnings.append(f"Database latency is slow ({db_latency_ms}ms)")
+
+    # Check cache staleness
+    cache_freshness = 'fresh'
+    if cache_is_stale:
+        cache_freshness = 'stale'
+        warnings.append("Cache data may be stale")
+
+    # Get connection pool status
+    try:
+        engine = get_engine()
+        pool = engine.pool
+        pool_status = {
+            'size': pool.size(),
+            'checked_out': pool.checkedout(),
+            'overflow': pool.overflow(),
+            'checked_in': pool.checkedin()
+        }
+    except Exception:
+        pool_status = None
+
+    response = {
+        'status': status,
+        'checks': {
+            'database': {
+                'status': db_latency_status if db_status == 'ok' else 'error',
+                'latency_ms': db_latency_ms,
+                'pool': pool_status
+            },
+            'redis': {
+                'status': 'healthy' if redis_status == 'ok' else redis_status,
+                'latency_ms': redis_latency_ms
+            },
+            'circuit_breaker': circuit_breaker,
+            'cache': {
+                'freshness': cache_freshness,
+                'updated_at': cache_updated_at,
+                'sys_date': cache_status.get('sys_date')
+            }
+        },
+        'metrics': {
+            'query_p50_ms': metrics.get('p50_ms'),
+            'query_p95_ms': metrics.get('p95_ms'),
+            'query_p99_ms': metrics.get('p99_ms'),
+            'query_count': metrics.get('count'),
+            'slow_query_count': metrics.get('slow_count'),
+            'slow_query_rate': metrics.get('slow_rate'),
+            'worker_pid': metrics.get('worker_pid')
+        }
+    }
+
+    if warnings:
+        response['warnings'] = warnings
+
+    # Add no-cache headers
     resp = make_response(jsonify(response), http_code)
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     resp.headers['Pragma'] = 'no-cache'

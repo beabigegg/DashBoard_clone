@@ -1,0 +1,36 @@
+[Unit]
+Description=MES Dashboard Worker Watchdog
+Documentation=https://github.com/your-org/mes-dashboard
+After=network.target mes-dashboard.service
+Requires=mes-dashboard.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mes-dashboard
+Environment="PYTHONPATH=/opt/mes-dashboard/src"
+Environment="WATCHDOG_CHECK_INTERVAL=5"
+Environment="WATCHDOG_RESTART_FLAG=/tmp/mes_dashboard_restart.flag"
+Environment="WATCHDOG_PID_FILE=/tmp/mes_dashboard_gunicorn.pid"
+Environment="WATCHDOG_STATE_FILE=/tmp/mes_dashboard_restart_state.json"
+
+ExecStart=/opt/mes-dashboard/venv/bin/python scripts/worker_watchdog.py
+
+# Restart policy
+Restart=always
+RestartSec=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mes-watchdog
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/tmp
+
+[Install]
+WantedBy=multi-user.target

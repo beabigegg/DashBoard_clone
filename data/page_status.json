@@ -33,7 +33,7 @@
     {
       "route": "/resource",
       "name": "機台狀態",
-      "status": "dev"
+      "status": "released"
     },
     {
       "route": "/excel-query",

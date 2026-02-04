@@ -252,6 +252,7 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
 
     Raises:
         Exception: If query execution fails. ORA code is logged.
+        RuntimeError: If circuit breaker is open (service degraded).
 
     Example:
         >>> sql = "SELECT * FROM users WHERE status = :status"
@@ -261,7 +262,21 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
         - Slow queries (>1s) are logged as warnings
         - All queries use connection pooling via SQLAlchemy
         - Call timeout is set to 55s to prevent worker blocking
+        - Circuit breaker protects against cascading failures
+        - Query latency is recorded for metrics
     """
+    from mes_dashboard.core.circuit_breaker import (
+        get_database_circuit_breaker,
+        CIRCUIT_BREAKER_ENABLED
+    )
+    from mes_dashboard.core.metrics import record_query_latency
+
+    # Check circuit breaker before executing
+    circuit_breaker = get_database_circuit_breaker()
+    if not circuit_breaker.allow_request():
+        logger.warning("Circuit breaker OPEN - rejecting database query")
+        raise RuntimeError("Database service is temporarily unavailable (circuit breaker open)")
+
     start_time = time.time()
     engine = get_engine()
 
@@ -271,6 +286,14 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
             df.columns = [str(c).upper() for c in df.columns]
 
             elapsed = time.time() - start_time
+
+            # Record metrics
+            record_query_latency(elapsed)
+
+            # Record success to circuit breaker
+            if CIRCUIT_BREAKER_ENABLED:
+                circuit_breaker.record_success()
+
             # Log slow queries (>1 second) as warnings
             if elapsed > 1.0:
                 # Truncate SQL for logging (first 100 chars)
@@ -283,6 +306,14 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
 
     except Exception as exc:
         elapsed = time.time() - start_time
+
+        # Record metrics even for failed queries
+        record_query_latency(elapsed)
+
+        # Record failure to circuit breaker
+        if CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker.record_failure()
+
         ora_code = _extract_ora_code(exc)
         sql_preview = sql.strip().replace('\n', ' ')[:100]
         logger.error(
