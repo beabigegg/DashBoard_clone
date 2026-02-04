@@ -701,6 +701,24 @@
         const PAGE_SIZE = 50;
         let currentPage = 1;
         let totalLogs = 0;
+        let authErrorShown = false;
+
+        // ============================================================
+        // Auth Helper
+        // ============================================================
+        async function fetchWithAuth(url, options = {}) {
+            const resp = await fetch(url, { ...options, cache: 'no-store' });
+            if (resp.status === 401) {
+                const json = await resp.json().catch(() => ({}));
+                if (!authErrorShown) {
+                    authErrorShown = true;
+                    alert('登入已過期，請重新登入');
+                    window.location.href = '/auth/login?next=' + encodeURIComponent(window.location.pathname);
+                }
+                throw new Error('需要重新登入');
+            }
+            return resp;
+        }
 
         // ============================================================
         // Chart Setup
@@ -755,7 +773,7 @@
         // ============================================================
         async function loadSystemStatus() {
             try {
-                const resp = await fetch('/admin/api/system-status', { cache: 'no-store' });
+                const resp = await fetchWithAuth('/admin/api/system-status');
                 const json = await resp.json();
                 if (!json.success) throw new Error(json.error);
 
@@ -804,7 +822,7 @@
 
         async function loadMetrics() {
             try {
-                const resp = await fetch('/admin/api/metrics', { cache: 'no-store' });
+                const resp = await fetchWithAuth('/admin/api/metrics');
                 const json = await resp.json();
                 if (!json.success) throw new Error(json.error);
 
@@ -841,7 +859,7 @@
                 if (level) url += `&level=${encodeURIComponent(level)}`;
                 if (q) url += `&q=${encodeURIComponent(q)}`;
 
-                const resp = await fetch(url, { cache: 'no-store' });
+                const resp = await fetchWithAuth(url);
                 const json = await resp.json();
                 if (!json.success) throw new Error(json.error);
 
@@ -933,7 +951,7 @@
         // ============================================================
         async function loadWorkerStatus() {
             try {
-                const resp = await fetch('/admin/api/worker/status', { cache: 'no-store' });
+                const resp = await fetchWithAuth('/admin/api/worker/status');
                 const json = await resp.json();
                 if (!json.success) throw new Error(json.error);
 
@@ -999,10 +1017,9 @@
             btn.style.opacity = '0.5';
 
             try {
-                const resp = await fetch('/admin/api/worker/restart', {
+                const resp = await fetchWithAuth('/admin/api/worker/restart', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    cache: 'no-store'
+                    headers: { 'Content-Type': 'application/json' }
                 });
                 const json = await resp.json();
 
@@ -1062,10 +1079,9 @@
             btn.style.opacity = '0.5';
 
             try {
-                const resp = await fetch('/admin/api/logs/cleanup', {
+                const resp = await fetchWithAuth('/admin/api/logs/cleanup', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    cache: 'no-store'
+                    headers: { 'Content-Type': 'application/json' }
                 });
                 const json = await resp.json();
 

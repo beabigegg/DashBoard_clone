@@ -1,0 +1,35 @@
+-- Job Transaction Export (Full History)
+-- Joins JOB and JOBTXNHISTORY for complete CSV export
+-- Placeholders:
+--   RESOURCE_FILTER - Resource ID filter condition (e.g., j.RESOURCEID IN (...))
+-- Parameters:
+--   :start_date - Start date (YYYY-MM-DD)
+--   :end_date   - End date (YYYY-MM-DD)
+
+SELECT
+    j.RESOURCENAME,
+    j.JOBID,
+    j.JOBSTATUS as JOB_FINAL_STATUS,
+    j.JOBMODELNAME,
+    j.JOBORDERNAME,
+    j.CREATEDATE as JOB_CREATEDATE,
+    j.COMPLETEDATE as JOB_COMPLETEDATE,
+    j.CAUSECODENAME as JOB_CAUSECODE,
+    j.REPAIRCODENAME as JOB_REPAIRCODE,
+    j.SYMPTOMCODENAME as JOB_SYMPTOMCODE,
+    h.TXNDATE,
+    h.FROMJOBSTATUS,
+    h.JOBSTATUS as TXN_TO_STATUS,
+    h.STAGENAME,
+    h.CAUSECODENAME as TXN_CAUSECODE,
+    h.REPAIRCODENAME as TXN_REPAIRCODE,
+    h.SYMPTOMCODENAME as TXN_SYMPTOMCODE,
+    h.USER_NAME,
+    h.EMP_NAME,
+    h.COMMENTS
+FROM DWH.DW_MES_JOB j
+JOIN DWH.DW_MES_JOBTXNHISTORY h ON j.JOBID = h.JOBID
+WHERE {{ RESOURCE_FILTER }}
+  AND h.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
+  AND h.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
+ORDER BY j.RESOURCENAME, j.JOBID, h.TXNDATE

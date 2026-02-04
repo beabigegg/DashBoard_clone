@@ -39,6 +39,11 @@
       "route": "/excel-query",
       "name": "Excel 批次查詢",
       "status": "dev"
+    },
+    {
+      "route": "/job-query",
+      "name": "設備維修查詢",
+      "status": "released"
     }
   ],
   "api_public": true,

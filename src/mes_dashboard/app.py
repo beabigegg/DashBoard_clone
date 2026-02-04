@@ -13,7 +13,7 @@ from mes_dashboard.config.tables import TABLES_CONFIG
 from mes_dashboard.config.settings import get_config
 from mes_dashboard.core.cache import NoOpCache
 from mes_dashboard.core.database import get_table_data, get_table_columns, get_engine, init_db, start_keepalive
-from mes_dashboard.core.permissions import is_admin_logged_in
+from mes_dashboard.core.permissions import is_admin_logged_in, _is_ajax_request
 from mes_dashboard.routes import register_routes
 from mes_dashboard.routes.auth_routes import auth_bp
 from mes_dashboard.routes.admin_routes import admin_bp
@@ -128,6 +128,9 @@ def create_app(config_name: str | None = None) -> Flask:
         # Admin pages require login
         if request.path.startswith("/admin/"):
             if not is_admin_logged_in():
+                # For AJAX requests, return JSON error instead of redirect
+                if _is_ajax_request():
+                    return jsonify({"error": "請先登入管理員帳號", "login_required": True}), 401
                 return redirect(url_for("auth.login", next=request.url))
             return None
 
