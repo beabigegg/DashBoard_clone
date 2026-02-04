@@ -40,6 +40,7 @@ logs/
 # AI/LLM tools
 .claude/
 .codex/
+CLAUDE.md
 
 # Test artifacts
 .pytest_cache/
