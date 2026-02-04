@@ -5,8 +5,11 @@ Provides functions to query dashboard KPIs, workcenter cards,
 resource details with job info, OU trends, and utilization heatmap.
 """
 
+import logging
 import pandas as pd
 from typing import Optional, Dict, List, Any, Tuple
+
+logger = logging.getLogger('mes_dashboard.dashboard_service')
 
 from mes_dashboard.core.database import get_db_connection, read_sql_df
 from mes_dashboard.core.utils import get_days_back, build_equipment_filter_sql
@@ -113,7 +116,7 @@ def query_dashboard_kpi(filters: Optional[Dict] = None) -> Optional[Dict]:
             'run_pct': run_pct
         }
     except Exception as exc:
-        print(f"KPI query failed: {exc}")
+        logger.error(f"KPI query failed: {exc}")
         return None
 
 
@@ -197,7 +200,7 @@ def query_workcenter_cards(filters: Optional[Dict] = None) -> Optional[List[Dict
 
         return result
     except Exception as exc:
-        print(f"Workcenter cards query failed: {exc}")
+        logger.error(f"Workcenter cards query failed: {exc}")
         return None
 
 
@@ -321,7 +324,7 @@ def query_resource_detail_with_job(
 
         return df, max_status_time
     except Exception as exc:
-        print(f"Detail query failed: {exc}")
+        logger.error(f"Detail query failed: {exc}")
         return None, None
 
 
@@ -403,9 +406,7 @@ def query_ou_trend(days: int = 7, filters: Optional[Dict] = None) -> Optional[Li
 
         return result
     except Exception as exc:
-        print(f"OU trend query failed: {exc}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"OU trend query failed: {exc}", exc_info=True)
         return None
 
 
@@ -487,7 +488,5 @@ def query_utilization_heatmap(days: int = 7, filters: Optional[Dict] = None) -> 
 
         return result
     except Exception as exc:
-        print(f"Utilization heatmap query failed: {exc}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Utilization heatmap query failed: {exc}", exc_info=True)
         return None

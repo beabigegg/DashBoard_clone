@@ -75,6 +75,14 @@ def create_app(config_name: str | None = None) -> Flask:
     # Session configuration
     app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-prod")
 
+    # Session cookie security settings
+    # SECURE: Only send cookie over HTTPS (disable for local development)
+    app.config['SESSION_COOKIE_SECURE'] = os.environ.get("FLASK_ENV") == "production"
+    # HTTPONLY: Prevent JavaScript access to session cookie (XSS protection)
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    # SAMESITE: Prevent CSRF by restricting cross-site cookie sending
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
     # Configure logging first
     _configure_logging(app)
 

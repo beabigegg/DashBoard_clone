@@ -12,11 +12,12 @@ from mes_dashboard.services import auth_service
 
 
 class TestAuthenticate:
-    """Tests for authenticate function."""
+    """Tests for authenticate function via LDAP."""
 
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
     @patch('mes_dashboard.services.auth_service.requests.post')
     def test_authenticate_success(self, mock_post):
-        """Test successful authentication."""
+        """Test successful authentication via LDAP."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "success": True,
@@ -36,9 +37,10 @@ class TestAuthenticate:
         assert result["mail"] == "test@panjit.com.tw"
         mock_post.assert_called_once()
 
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
     @patch('mes_dashboard.services.auth_service.requests.post')
     def test_authenticate_invalid_credentials(self, mock_post):
-        """Test authentication with invalid credentials."""
+        """Test authentication with invalid credentials via LDAP."""
         mock_response = MagicMock()
         mock_response.json.return_value = {"success": False}
         mock_post.return_value = mock_response
@@ -47,6 +49,7 @@ class TestAuthenticate:
 
         assert result is None
 
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
     @patch('mes_dashboard.services.auth_service.requests.post')
     def test_authenticate_timeout(self, mock_post):
         """Test authentication timeout handling."""
@@ -57,6 +60,7 @@ class TestAuthenticate:
 
         assert result is None
 
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
     @patch('mes_dashboard.services.auth_service.requests.post')
     def test_authenticate_connection_error(self, mock_post):
         """Test authentication connection error handling."""
@@ -67,6 +71,7 @@ class TestAuthenticate:
 
         assert result is None
 
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
     @patch('mes_dashboard.services.auth_service.requests.post')
     def test_authenticate_invalid_json(self, mock_post):
         """Test authentication with invalid JSON response."""
@@ -75,6 +80,29 @@ class TestAuthenticate:
         mock_post.return_value = mock_response
 
         result = auth_service.authenticate("user", "pass")
+
+        assert result is None
+
+
+class TestLocalAuthenticate:
+    """Tests for local authentication."""
+
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', True)
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_USERNAME', 'testuser')
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_PASSWORD', 'testpass')
+    def test_local_auth_success(self):
+        """Test successful local authentication."""
+        result = auth_service.authenticate("testuser", "testpass")
+
+        assert result is not None
+        assert result["username"] == "testuser"
+
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', True)
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_USERNAME', 'testuser')
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_PASSWORD', 'testpass')
+    def test_local_auth_wrong_password(self):
+        """Test local authentication with wrong password."""
+        result = auth_service.authenticate("testuser", "wrongpass")
 
         assert result is None
 

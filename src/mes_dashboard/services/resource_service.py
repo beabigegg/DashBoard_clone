@@ -4,8 +4,11 @@
 Provides functions to query equipment status from DWH.DW_MES_RESOURCE and DWH.DW_MES_RESOURCESTATUS tables.
 """
 
+import logging
 import pandas as pd
 from typing import Optional, Dict, List, Any
+
+logger = logging.getLogger('mes_dashboard.resource_service')
 
 from mes_dashboard.core.database import get_db_connection, read_sql_df
 from mes_dashboard.core.utils import get_days_back, build_equipment_filter_sql
@@ -120,7 +123,7 @@ def query_resource_by_status(days_back: int = 30) -> Optional[pd.DataFrame]:
         sql = sql.replace("{{ LATEST_STATUS_SUBQUERY }}", base_sql)
         return read_sql_df(sql)
     except Exception as exc:
-        print(f"Resource by status query failed: {exc}")
+        logger.error(f"Resource by status query failed: {exc}")
         return None
 
 
@@ -139,7 +142,7 @@ def query_resource_by_workcenter(days_back: int = 30) -> Optional[pd.DataFrame]:
         sql = sql.replace("{{ LATEST_STATUS_SUBQUERY }}", base_sql)
         return read_sql_df(sql)
     except Exception as exc:
-        print(f"Resource by workcenter query failed: {exc}")
+        logger.error(f"Resource by workcenter query failed: {exc}")
         return None
 
 
@@ -216,7 +219,7 @@ def query_resource_detail(
 
         return df
     except Exception as exc:
-        print(f"Resource detail query failed: {exc}")
+        logger.error(f"Resource detail query failed: {exc}")
         return None
 
 
@@ -243,7 +246,7 @@ def query_resource_workcenter_status_matrix(days_back: int = 30) -> Optional[pd.
         sql = sql.replace("{{ LATEST_STATUS_SUBQUERY }}", base_sql)
         return read_sql_df(sql)
     except Exception as exc:
-        print(f"Resource status matrix query failed: {exc}")
+        logger.error(f"Resource status matrix query failed: {exc}")
         return None
 
 
@@ -289,9 +292,7 @@ def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
             'assets_statuses': assets_statuses
         }
     except Exception as exc:
-        print(f"Resource filter options query failed: {exc}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Resource filter options query failed: {exc}", exc_info=True)
         return None
 
 

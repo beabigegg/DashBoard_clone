@@ -69,9 +69,10 @@ class TestLoginRoute:
         assert response.status_code == 200
         assert "管理員登入" in response.data.decode("utf-8") or "login" in response.data.decode("utf-8").lower()
 
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
     @patch('mes_dashboard.services.auth_service.requests.post')
     def test_login_success(self, mock_post, client):
-        """Test successful login."""
+        """Test successful login via LDAP."""
         # Mock LDAP response
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -98,9 +99,10 @@ class TestLoginRoute:
             assert "admin" in sess
             assert sess["admin"]["username"] == "92367"
 
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
     @patch('mes_dashboard.services.auth_service.requests.post')
     def test_login_invalid_credentials(self, mock_post, client):
-        """Test login with invalid credentials."""
+        """Test login with invalid credentials via LDAP."""
         mock_response = MagicMock()
         mock_response.json.return_value = {"success": False}
         mock_post.return_value = mock_response
@@ -114,9 +116,10 @@ class TestLoginRoute:
         # Should show error message
         assert "錯誤" in response.data.decode("utf-8") or "error" in response.data.decode("utf-8").lower()
 
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
     @patch('mes_dashboard.services.auth_service.requests.post')
     def test_login_non_admin_user(self, mock_post, client):
-        """Test login with non-admin user."""
+        """Test login with non-admin user via LDAP."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "success": True,

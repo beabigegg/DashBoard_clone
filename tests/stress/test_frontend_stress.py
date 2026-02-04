@@ -20,7 +20,7 @@ from playwright.sync_api import Page, expect
 def app_server() -> str:
     """Get the base URL for stress testing."""
     import os
-    return os.environ.get('STRESS_TEST_URL', 'http://127.0.0.1:5000')
+    return os.environ.get('STRESS_TEST_URL', 'http://127.0.0.1:8080')
 
 
 @pytest.fixture(scope="session")
@@ -265,11 +265,12 @@ class TestPageNavigationStress:
         page.goto(app_server, wait_until='domcontentloaded', timeout=30000)
         page.wait_for_timeout(500)
 
+        # Only use released pages that are visible without admin login
         tabs = [
             '.tab:has-text("WIP 即時概況")',
-            '.tab:has-text("機台狀態報表")',
-            '.tab:has-text("數據表查詢工具")',
-            '.tab:has-text("Excel 批次查詢")',
+            '.tab:has-text("設備即時概況")',
+            '.tab:has-text("設備歷史績效")',
+            '.tab:has-text("設備維修查詢")',
         ]
 
         start_time = time.time()
@@ -292,12 +293,12 @@ class TestPageNavigationStress:
         page.goto(app_server, wait_until='domcontentloaded', timeout=30000)
         page.wait_for_timeout(500)
 
-        # Switch through all tabs
+        # Switch through released tabs (dev tabs hidden without admin login)
         tabs = [
             'WIP 即時概況',
-            '機台狀態報表',
-            '數據表查詢工具',
-            'Excel 批次查詢',
+            '設備即時概況',
+            '設備歷史績效',
+            '設備維修查詢',
         ]
 
         for tab_name in tabs:
