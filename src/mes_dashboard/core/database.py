@@ -434,3 +434,128 @@ def get_table_data(
         if connection:
             connection.close()
         return {'error': f'查詢失敗: {str(exc)}'}
+
+
+def get_table_column_metadata(table_name: str) -> Dict[str, Any]:
+    """Get column metadata from Oracle ALL_TAB_COLUMNS.
+
+    Args:
+        table_name: Table name in format 'SCHEMA.TABLE' or 'TABLE'
+
+    Returns:
+        Dict with 'columns' list containing column info:
+        - name: Column name
+        - data_type: Oracle data type (VARCHAR2, NUMBER, DATE, etc.)
+        - data_length: Max length for character types
+        - data_precision: Precision for numeric types
+        - data_scale: Scale for numeric types
+        - is_date: True if column is DATE or TIMESTAMP type
+        - is_number: True if column is NUMBER type
+    """
+    connection = get_db_connection()
+    if not connection:
+        return {'error': 'Database connection failed', 'columns': []}
+
+    try:
+        cursor = connection.cursor()
+
+        # Parse schema and table name
+        parts = table_name.split('.')
+        if len(parts) == 2:
+            owner, tbl_name = parts[0].upper(), parts[1].upper()
+        else:
+            owner = None
+            tbl_name = parts[0].upper()
+
+        # Query ALL_TAB_COLUMNS for metadata
+        if owner:
+            sql = """
+                SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH,
+                       DATA_PRECISION, DATA_SCALE, COLUMN_ID
+                FROM ALL_TAB_COLUMNS
+                WHERE OWNER = :owner AND TABLE_NAME = :table_name
+                ORDER BY COLUMN_ID
+            """
+            cursor.execute(sql, {'owner': owner, 'table_name': tbl_name})
+        else:
+            sql = """
+                SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH,
+                       DATA_PRECISION, DATA_SCALE, COLUMN_ID
+                FROM ALL_TAB_COLUMNS
+                WHERE TABLE_NAME = :table_name
+                ORDER BY COLUMN_ID
+            """
+            cursor.execute(sql, {'table_name': tbl_name})
+
+        rows = cursor.fetchall()
+        cursor.close()
+        connection.close()
+
+        if not rows:
+            # Fallback to basic column detection if no metadata found
+            logger.warning(
+                f"No metadata found for {table_name}, falling back to basic detection"
+            )
+            basic_columns = get_table_columns(table_name)
+            return {
+                'columns': [
+                    {
+                        'name': col,
+                        'data_type': 'UNKNOWN',
+                        'data_length': None,
+                        'data_precision': None,
+                        'data_scale': None,
+                        'is_date': False,
+                        'is_number': False
+                    }
+                    for col in basic_columns
+                ]
+            }
+
+        # Process results
+        columns = []
+        date_types = {'DATE', 'TIMESTAMP', 'TIMESTAMP WITH TIME ZONE',
+                      'TIMESTAMP WITH LOCAL TIME ZONE'}
+        number_types = {'NUMBER', 'FLOAT', 'BINARY_FLOAT', 'BINARY_DOUBLE',
+                        'INTEGER', 'SMALLINT'}
+
+        for row in rows:
+            col_name, data_type, data_length, data_precision, data_scale, _ = row
+            columns.append({
+                'name': col_name,
+                'data_type': data_type,
+                'data_length': data_length,
+                'data_precision': data_precision,
+                'data_scale': data_scale,
+                'is_date': data_type in date_types,
+                'is_number': data_type in number_types
+            })
+
+        logger.debug(f"Retrieved metadata for {table_name}: {len(columns)} columns")
+        return {'columns': columns}
+
+    except Exception as exc:
+        ora_code = _extract_ora_code(exc)
+        logger.warning(
+            f"get_table_column_metadata failed - ORA-{ora_code}: {exc}, "
+            f"falling back to basic detection"
+        )
+        if connection:
+            connection.close()
+
+        # Fallback to basic column detection
+        basic_columns = get_table_columns(table_name)
+        return {
+            'columns': [
+                {
+                    'name': col,
+                    'data_type': 'UNKNOWN',
+                    'data_length': None,
+                    'data_precision': None,
+                    'data_scale': None,
+                    'is_date': False,
+                    'is_number': False
+                }
+                for col in basic_columns
+            ]
+        }
