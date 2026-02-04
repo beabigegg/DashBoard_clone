@@ -809,7 +809,7 @@
                 }
                 document.getElementById('cbState').textContent = cb.state;
                 document.getElementById('cbDetail').textContent = cb.enabled
-                    ? `失敗: ${cb.failure_count}/${cb.total_count}`
+                    ? `失敗: ${cb.failure_count}/${cb.window_size}`
                     : '未啟用';
 
                 // Worker

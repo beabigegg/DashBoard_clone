@@ -294,6 +294,7 @@ def get_circuit_breaker_status() -> dict:
         "failure_count": status.failure_count,
         "success_count": status.success_count,
         "total_count": status.total_count,
+        "window_size": cb.window_size,
         "failure_rate": round(status.failure_rate, 2),
         "last_failure_time": status.last_failure_time,
         "open_until": status.open_until,
