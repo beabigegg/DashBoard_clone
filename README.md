@@ -111,9 +111,9 @@ nano .env  # 編輯資料庫連線等設定
 
 ```bash
 # 資料庫設定（必填）
-DB_HOST=10.1.1.58
+DB_HOST=your_database_host
 DB_PORT=1521
-DB_SERVICE=DWDB
+DB_SERVICE=your_service_name
 DB_USER=your_username
 DB_PASSWORD=your_password
 
@@ -304,8 +304,8 @@ CIRCUIT_BREAKER_RECOVERY_TIMEOUT=30
 ### 資料庫
 
 - Oracle Database 19c Enterprise Edition
-- 主機: 10.1.1.58:1521
-- 服務名: DWDB
+- 主機: 詳見 .env 檔案 (DB_HOST:DB_PORT)
+- 服務名: 詳見 .env 檔案 (DB_SERVICE)
 
 ---
 

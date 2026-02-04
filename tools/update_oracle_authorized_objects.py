@@ -35,9 +35,9 @@ def load_env() -> None:
 
 
 def get_connection():
-    host = os.getenv("DB_HOST", "10.1.1.58")
+    host = os.getenv("DB_HOST", "")
     port = os.getenv("DB_PORT", "1521")
-    service = os.getenv("DB_SERVICE", "DWDB")
+    service = os.getenv("DB_SERVICE", "")
     user = os.getenv("DB_USER", "")
     password = os.getenv("DB_PASSWORD", "")
     dsn = (

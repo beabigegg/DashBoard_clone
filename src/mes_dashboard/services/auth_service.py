@@ -10,11 +10,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# Configuration
-LDAP_API_BASE = os.environ.get("LDAP_API_URL", "https://adapi.panjit.com.tw")
-ADMIN_EMAILS = os.environ.get(
-    "ADMIN_EMAILS", "ymirliu@panjit.com.tw"
-).lower().split(",")
+# Configuration - MUST be set in .env file
+LDAP_API_BASE = os.environ.get("LDAP_API_URL", "")
+ADMIN_EMAILS = os.environ.get("ADMIN_EMAILS", "").lower().split(",")
 
 # Timeout for LDAP API requests
 LDAP_TIMEOUT = 10

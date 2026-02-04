@@ -21,10 +21,10 @@ try:
 except ImportError:
     pass
 
-# 数据库连接信息 (从环境变量读取)
-DB_HOST = os.getenv('DB_HOST', '10.1.1.58')
+# 数据库连接信息 (从环境变量读取，必须在 .env 中设置)
+DB_HOST = os.getenv('DB_HOST', '')
 DB_PORT = os.getenv('DB_PORT', '1521')
-DB_SERVICE = os.getenv('DB_SERVICE', 'DWDB')
+DB_SERVICE = os.getenv('DB_SERVICE', '')
 DB_USER = os.getenv('DB_USER', '')
 DB_PASSWORD = os.getenv('DB_PASSWORD', '')
 

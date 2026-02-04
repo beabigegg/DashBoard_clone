@@ -21,22 +21,27 @@
 | 参数 | 值 |
 |------|------|
 | 数据库类型 | Oracle Database 19c Enterprise Edition |
-| 主机地址 | 10.1.1.58 |
-| 端口 | 1521 |
-| 服务名 | DWDB |
-| 用户名 | MBU1_R |
-| 密码 | Pj2481mbu1 |
+| 主机地址 | 請參考 .env 檔案 (DB_HOST) |
+| 端口 | 請參考 .env 檔案 (DB_PORT) |
+| 服务名 | 請參考 .env 檔案 (DB_SERVICE) |
+| 用户名 | 請參考 .env 檔案 (DB_USER) |
+| 密码 | 請參考 .env 檔案 (DB_PASSWORD) |
 
 ### Python 连接示例
 
 ```python
+import os
 import oracledb
+from dotenv import load_dotenv
 
-# 连接配置
+# 載入環境變數
+load_dotenv()
+
+# 连接配置 (從環境變數讀取)
 DB_CONFIG = {
-    'user': 'MBU1_R',
-    'password': 'Pj2481mbu1',
-    'dsn': '(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=10.1.1.58)(PORT=1521)))(CONNECT_DATA=(SERVICE_NAME=DWDB)))'
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'dsn': f"(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST={os.getenv('DB_HOST')})(PORT={os.getenv('DB_PORT')})))(CONNECT_DATA=(SERVICE_NAME={os.getenv('DB_SERVICE')})))"
 }
 
 # 建立连接
@@ -55,7 +60,7 @@ connection.close()
 ### JDBC 连接字符串
 
 ```
-jdbc:oracle:thin:@10.1.1.58:1521:DWDB
+jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 ```
 
 ---
@@ -1287,7 +1292,7 @@ jdbc:oracle:thin:@10.1.1.58:1521:DWDB
 
 ### 数据权限
 
-- 当前账号 `MBU1_R` 为只读账号
+- 當前帳號為唯讀帳號 (詳見 .env 中的 DB_USER)
 - 仅可执行 SELECT 查询
 - 无法进行 INSERT, UPDATE, DELETE 操作
 

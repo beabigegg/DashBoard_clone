@@ -1,7 +1,7 @@
 # Oracle 可使用 TABLE/VIEW 清單（DWH）
 
 **產生時間**: 2026-01-29 13:34:22
-**使用者**: MBU1_R
+**使用者**: (詳見 .env 中的 DB_USER)
 **Schema**: DWH
 
 ## 摘要

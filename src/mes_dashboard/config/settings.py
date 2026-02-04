@@ -24,9 +24,9 @@ class Config:
     DB_POOL_SIZE = _int_env("DB_POOL_SIZE", 5)
     DB_MAX_OVERFLOW = _int_env("DB_MAX_OVERFLOW", 10)
 
-    # Auth configuration
-    LDAP_API_URL = os.getenv("LDAP_API_URL", "https://adapi.panjit.com.tw")
-    ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "ymirliu@panjit.com.tw")
+    # Auth configuration - MUST be set in .env file
+    LDAP_API_URL = os.getenv("LDAP_API_URL", "")
+    ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "")
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-prod")
 
     # Session configuration
