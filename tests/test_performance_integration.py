@@ -157,6 +157,38 @@ class TestLogsAPI:
         data = json.loads(response.data)
         assert data["success"] is True
 
+    def test_logs_api_pagination(self, admin_client):
+        """Logs API supports pagination with limit and offset."""
+        # Test with limit=10
+        response = admin_client.get('/admin/api/logs?limit=10&offset=0')
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["success"] is True
+        assert "total" in data["data"]
+        assert "logs" in data["data"]
+        assert len(data["data"]["logs"]) <= 10
+
+    def test_logs_api_pagination_offset(self, admin_client):
+        """Logs API offset skips entries correctly."""
+        # Get first page
+        response1 = admin_client.get('/admin/api/logs?limit=5&offset=0')
+        data1 = json.loads(response1.data)
+
+        # Get second page
+        response2 = admin_client.get('/admin/api/logs?limit=5&offset=5')
+        data2 = json.loads(response2.data)
+
+        # Total should be the same
+        assert data1["data"]["total"] == data2["data"]["total"]
+
+        # If there are enough logs, pages should be different
+        if data1["data"]["total"] > 5:
+            logs1_ids = [log.get("id") for log in data1["data"]["logs"]]
+            logs2_ids = [log.get("id") for log in data2["data"]["logs"]]
+            # No overlap between pages
+            assert not set(logs1_ids) & set(logs2_ids)
+
 
 class TestLogsCleanupAPI:
     """Test log cleanup API endpoint."""

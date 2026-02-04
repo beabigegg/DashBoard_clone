@@ -51,6 +51,22 @@
             gap: 16px;
         }
 
+        .back-link-header {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.2s ease;
+        }
+
+        .back-link-header:hover {
+            background: rgba(255, 255, 255, 0.3);
+            text-decoration: none;
+        }
+
         .refresh-controls {
             display: flex;
             align-items: center;
@@ -259,8 +275,39 @@
             font-size: 14px;
         }
 
-        .back-link:hover {
-            text-decoration: underline;
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s ease;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #f0f0f0;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            font-size: 13px;
+            color: #666;
+            padding: 0 12px;
         }
 
         .last-update {
@@ -289,6 +336,7 @@
                         立即重新整理
                     </button>
                 </div>
+                <a href="{{ url_for('portal_index') }}" class="back-link-header">← 返回首頁</a>
             </div>
         </div>
 
@@ -603,7 +651,7 @@
                 </div>
 
                 <div class="log-filters">
-                    <select id="logLevel" onchange="loadLogs()">
+                    <select id="logLevel" onchange="loadLogs(true)">
                         <option value="">所有等級</option>
                         <option value="ERROR">ERROR</option>
                         <option value="WARNING">WARNING</option>
@@ -626,10 +674,17 @@
                         </tbody>
                     </table>
                 </div>
+                <!-- Pagination -->
+                <div class="pagination">
+                    <button id="prevPageBtn" onclick="prevPage()" disabled>← 上一頁</button>
+                    <span class="page-info">
+                        第 <span id="currentPage">1</span> 頁，共 <span id="totalPages">1</span> 頁
+                        (<span id="displayedCount">0</span> / <span id="totalLogCount">0</span> 筆)
+                    </span>
+                    <button id="nextPageBtn" onclick="nextPage()" disabled>下一頁 →</button>
+                </div>
             </div>
         </div>
-
-        <a href="{{ url_for('portal_index') }}" class="back-link">返回首頁</a>
     </div>
 {% endblock %}
 
@@ -643,6 +698,9 @@
         let latencyChart = null;
         let logSearchTimeout = null;
         const REFRESH_INTERVAL = 30000; // 30 seconds
+        const PAGE_SIZE = 50;
+        let currentPage = 1;
+        let totalLogs = 0;
 
         // ============================================================
         // Chart Setup
@@ -769,12 +827,17 @@
             }
         }
 
-        async function loadLogs() {
+        async function loadLogs(resetPage = false) {
             try {
+                if (resetPage) {
+                    currentPage = 1;
+                }
+
                 const level = document.getElementById('logLevel').value;
                 const q = document.getElementById('logSearch').value;
+                const offset = (currentPage - 1) * PAGE_SIZE;
 
-                let url = '/admin/api/logs?limit=200';
+                let url = `/admin/api/logs?limit=${PAGE_SIZE}&offset=${offset}`;
                 if (level) url += `&level=${encodeURIComponent(level)}`;
                 if (q) url += `&q=${encodeURIComponent(q)}`;
 
@@ -788,6 +851,8 @@
                 // Update stats
                 if (data.enabled && data.stats) {
                     const stats = data.stats;
+                    // Use data.total for filtered count (respects level/search filters)
+                    totalLogs = data.total !== undefined ? data.total : (stats.count || 0);
                     document.getElementById('logStats').textContent =
                         `共 ${stats.count} 筆 (${formatBytes(stats.size_bytes)})`;
                     document.getElementById('logTotalCount').textContent = stats.count.toLocaleString();
@@ -805,7 +870,21 @@
                     document.getElementById('logOldest').textContent = '--';
                     document.getElementById('logRetention').textContent = '--';
                     document.getElementById('logMaxRows').textContent = '--';
+                    totalLogs = 0;
                 }
+
+                // Update pagination info
+                const totalPages = Math.max(1, Math.ceil(totalLogs / PAGE_SIZE));
+                const startIdx = totalLogs > 0 ? offset + 1 : 0;
+                const endIdx = data.logs ? Math.min(offset + data.logs.length, totalLogs) : 0;
+                document.getElementById('currentPage').textContent = currentPage;
+                document.getElementById('totalPages').textContent = totalPages;
+                document.getElementById('totalLogCount').textContent = totalLogs;
+                document.getElementById('displayedCount').textContent = `${startIdx}-${endIdx}`;
+
+                // Update pagination buttons
+                document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+                document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
 
                 // Render logs
                 if (!data.logs || data.logs.length === 0) {
@@ -829,9 +908,24 @@
             }
         }
 
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                loadLogs();
+            }
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(totalLogs / PAGE_SIZE);
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadLogs();
+            }
+        }
+
         function debounceLoadLogs() {
             if (logSearchTimeout) clearTimeout(logSearchTimeout);
-            logSearchTimeout = setTimeout(loadLogs, 300);
+            logSearchTimeout = setTimeout(() => loadLogs(true), 300);
         }
 
         // ============================================================

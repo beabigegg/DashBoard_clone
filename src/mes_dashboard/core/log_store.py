@@ -210,6 +210,7 @@ class LogStore:
         level: Optional[str] = None,
         q: Optional[str] = None,
         limit: int = 200,
+        offset: int = 0,
         since: Optional[str] = None,
         logger_name: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -219,6 +220,7 @@ class LogStore:
             level: Filter by log level (e.g., "ERROR", "WARNING").
             q: Search query for message content (case-insensitive).
             limit: Maximum number of logs to return (default: 200).
+            offset: Number of logs to skip (for pagination).
             since: ISO timestamp to filter logs after this time.
             logger_name: Filter by logger name prefix.
 
@@ -250,8 +252,9 @@ class LogStore:
             query += " AND logger_name LIKE ?"
             params.append(f"{logger_name}%")
 
-        query += " ORDER BY timestamp DESC LIMIT ?"
+        query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
         params.append(limit)
+        params.append(offset)
 
         try:
             with self._get_connection() as conn:
@@ -263,6 +266,59 @@ class LogStore:
         except Exception as e:
             logger.error(f"Failed to query logs: {e}")
             return []
+
+    def count_logs(
+        self,
+        level: Optional[str] = None,
+        q: Optional[str] = None,
+        since: Optional[str] = None,
+        logger_name: Optional[str] = None
+    ) -> int:
+        """Count logs matching the given filters.
+
+        Args:
+            level: Filter by log level (e.g., "ERROR", "WARNING").
+            q: Search query for message content (case-insensitive).
+            since: ISO timestamp to filter logs after this time.
+            logger_name: Filter by logger name prefix.
+
+        Returns:
+            Number of matching logs.
+        """
+        if not LOG_STORE_ENABLED:
+            return 0
+
+        if not self._initialized:
+            self.initialize()
+
+        query = "SELECT COUNT(*) FROM logs WHERE 1=1"
+        params: List[Any] = []
+
+        if level:
+            query += " AND level = ?"
+            params.append(level.upper())
+
+        if q:
+            query += " AND message LIKE ?"
+            params.append(f"%{q}%")
+
+        if since:
+            query += " AND timestamp >= ?"
+            params.append(since)
+
+        if logger_name:
+            query += " AND logger_name LIKE ?"
+            params.append(f"{logger_name}%")
+
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                row = cursor.fetchone()
+                return row[0] if row else 0
+        except Exception as e:
+            logger.error(f"Failed to count logs: {e}")
+            return 0
 
     def cleanup_old_logs(self) -> int:
         """Remove logs older than retention period or exceeding max rows.

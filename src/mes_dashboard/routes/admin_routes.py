@@ -133,21 +133,29 @@ def api_logs():
             "success": True,
             "data": {
                 "logs": [],
-                "enabled": False
+                "enabled": False,
+                "total": 0
             }
         })
 
     # Query parameters
     level = request.args.get("level")
     q = request.args.get("q")
-    limit = request.args.get("limit", 200, type=int)
+    limit = request.args.get("limit", 50, type=int)
+    offset = request.args.get("offset", 0, type=int)
     since = request.args.get("since")
 
     log_store = get_log_store()
+
+    # Get total count for pagination
+    total = log_store.count_logs(level=level, q=q, since=since)
+
+    # Get paginated logs
     logs = log_store.query_logs(
         level=level,
         q=q,
-        limit=min(limit, 500),  # Cap at 500
+        limit=min(limit, 100),  # Cap at 100 per page
+        offset=offset,
         since=since
     )
 
@@ -156,6 +164,7 @@ def api_logs():
         "data": {
             "logs": logs,
             "count": len(logs),
+            "total": total,
             "enabled": True,
             "stats": log_store.get_stats()
         }
