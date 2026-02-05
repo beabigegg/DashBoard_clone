@@ -104,15 +104,24 @@ def query_lot_history():
 
     Query params:
         container_id: CONTAINERID (16-char hex)
+        workcenter_groups: Optional comma-separated list of WORKCENTER_GROUP names
 
     Returns production history records.
     """
     container_id = request.args.get('container_id')
+    workcenter_groups_param = request.args.get('workcenter_groups')
 
     if not container_id:
         return jsonify({'error': '請指定 CONTAINERID'}), 400
 
-    result = get_lot_history(container_id)
+    # Parse workcenter_groups if provided
+    workcenter_groups = None
+    if workcenter_groups_param:
+        workcenter_groups = [
+            g.strip() for g in workcenter_groups_param.split(',') if g.strip()
+        ]
+
+    result = get_lot_history(container_id, workcenter_groups=workcenter_groups)
 
     if 'error' in result:
         return jsonify(result), 400
@@ -315,6 +324,33 @@ def get_equipment_list():
 
     except Exception as exc:
         return jsonify({'error': f'載入設備資料失敗: {str(exc)}'}), 500
+
+
+# ============================================================
+# Workcenter Groups API (for filtering)
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
+def get_workcenter_groups_list():
+    """Get available workcenter groups for filtering.
+
+    Returns workcenter groups list sorted by sequence.
+    Used for production history filtering UI.
+    """
+    from mes_dashboard.services.filter_cache import get_workcenter_groups
+
+    try:
+        groups = get_workcenter_groups()
+        if groups is None:
+            return jsonify({'error': '無法載入站點群組資料'}), 500
+
+        return jsonify({
+            'data': groups,
+            'total': len(groups)
+        })
+
+    except Exception as exc:
+        return jsonify({'error': f'載入站點群組失敗: {str(exc)}'}), 500
 
 
 # ============================================================

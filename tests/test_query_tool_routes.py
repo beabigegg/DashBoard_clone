@@ -536,3 +536,105 @@ class TestEquipmentListEndpoint:
         assert response.status_code == 500
         data = json.loads(response.data)
         assert 'error' in data
+
+
+class TestWorkcenterGroupsEndpoint:
+    """Tests for /api/query-tool/workcenter-groups endpoint."""
+
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_groups')
+    def test_returns_groups_list(self, mock_get_groups, client):
+        """Should return workcenter groups list."""
+        mock_get_groups.return_value = [
+            {'name': 'DB', 'sequence': 1},
+            {'name': 'WB', 'sequence': 2},
+        ]
+
+        response = client.get('/api/query-tool/workcenter-groups')
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'data' in data
+        assert len(data['data']) == 2
+        assert data['total'] == 2
+
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_groups')
+    def test_handles_cache_failure(self, mock_get_groups, client):
+        """Should return 500 when cache fails."""
+        mock_get_groups.return_value = None
+
+        response = client.get('/api/query-tool/workcenter-groups')
+
+        assert response.status_code == 500
+        data = json.loads(response.data)
+        assert 'error' in data
+
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_groups')
+    def test_handles_exception(self, mock_get_groups, client):
+        """Should handle exception gracefully."""
+        mock_get_groups.side_effect = Exception('Cache error')
+
+        response = client.get('/api/query-tool/workcenter-groups')
+
+        assert response.status_code == 500
+        data = json.loads(response.data)
+        assert 'error' in data
+
+
+class TestLotHistoryWithWorkcenterFilter:
+    """Tests for /api/query-tool/lot-history with workcenter filter."""
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    def test_accepts_workcenter_groups_param(self, mock_query, client):
+        """Should pass workcenter_groups parameter to service."""
+        mock_query.return_value = {
+            'data': [],
+            'total': 0,
+            'filtered_by_groups': ['DB', 'WB']
+        }
+
+        response = client.get(
+            '/api/query-tool/lot-history?'
+            'container_id=abc123&workcenter_groups=DB,WB'
+        )
+
+        assert response.status_code == 200
+        # Verify the service was called with workcenter_groups
+        call_args = mock_query.call_args
+        assert call_args[1].get('workcenter_groups') == ['DB', 'WB']
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    def test_empty_workcenter_groups_ignored(self, mock_query, client):
+        """Should ignore empty workcenter_groups parameter."""
+        mock_query.return_value = {
+            'data': [],
+            'total': 0,
+            'filtered_by_groups': []
+        }
+
+        response = client.get(
+            '/api/query-tool/lot-history?'
+            'container_id=abc123&workcenter_groups='
+        )
+
+        assert response.status_code == 200
+        # Verify workcenter_groups is None (not empty list)
+        call_args = mock_query.call_args
+        assert call_args[1].get('workcenter_groups') is None
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    def test_returns_filtered_by_groups_in_response(self, mock_query, client):
+        """Should include filtered_by_groups in response."""
+        mock_query.return_value = {
+            'data': [{'CONTAINERID': 'abc123'}],
+            'total': 1,
+            'filtered_by_groups': ['DB']
+        }
+
+        response = client.get(
+            '/api/query-tool/lot-history?'
+            'container_id=abc123&workcenter_groups=DB'
+        )
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data.get('filtered_by_groups') == ['DB']

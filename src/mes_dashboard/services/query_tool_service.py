@@ -432,11 +432,28 @@ def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
 # LOT History Functions
 # ============================================================
 
-def get_lot_history(container_id: str) -> Dict[str, Any]:
+def _get_workcenters_for_groups(groups: List[str]) -> List[str]:
+    """Get workcenter names for given groups using filter_cache.
+
+    Args:
+        groups: List of WORKCENTER_GROUP names
+
+    Returns:
+        List of WORKCENTERNAME values
+    """
+    from mes_dashboard.services.filter_cache import get_workcenters_for_groups
+    return get_workcenters_for_groups(groups)
+
+
+def get_lot_history(
+    container_id: str,
+    workcenter_groups: Optional[List[str]] = None
+) -> Dict[str, Any]:
     """Get production history for a LOT.
 
     Args:
         container_id: CONTAINERID (16-char hex)
+        workcenter_groups: Optional list of WORKCENTER_GROUP names to filter by
 
     Returns:
         Dict with 'data' (history records) and 'total', or 'error'.
@@ -448,6 +465,20 @@ def get_lot_history(container_id: str) -> Dict[str, Any]:
         sql = SQLLoader.load("query_tool/lot_history")
         params = {'container_id': container_id}
 
+        # Add workcenter filter if groups specified
+        workcenter_filter = ""
+        if workcenter_groups:
+            workcenters = _get_workcenters_for_groups(workcenter_groups)
+            if workcenters:
+                workcenter_filter = f"AND {_build_in_filter(workcenters, 'h.WORKCENTERNAME')}"
+                logger.debug(
+                    f"Filtering by {len(workcenter_groups)} groups "
+                    f"({len(workcenters)} workcenters)"
+                )
+
+        # Replace placeholder in SQL
+        sql = sql.replace("{{ WORKCENTER_FILTER }}", workcenter_filter)
+
         df = read_sql_df(sql, params)
         data = _df_to_records(df)
 
@@ -457,6 +488,7 @@ def get_lot_history(container_id: str) -> Dict[str, Any]:
             'data': data,
             'total': len(data),
             'container_id': container_id,
+            'filtered_by_groups': workcenter_groups or [],
         }
 
     except Exception as exc:

@@ -3,6 +3,7 @@
 --
 -- Parameters:
 --   :container_id - CONTAINERID to query (16-char hex)
+--   {{ WORKCENTER_FILTER }} - Optional workcenter name filter (replaced by service)
 --
 -- Note: Uses EQUIPMENTID/EQUIPMENTNAME (NOT RESOURCEID/RESOURCENAME)
 --       Time fields: TRACKINTIMESTAMP/TRACKOUTTIMESTAMP (NOT TXNDATETIME)
@@ -33,6 +34,7 @@ WITH ranked_history AS (
     WHERE h.CONTAINERID = :container_id
       AND h.EQUIPMENTID IS NOT NULL
       AND h.TRACKINTIMESTAMP IS NOT NULL
+      {{ WORKCENTER_FILTER }}
 )
 SELECT
     CONTAINERID,

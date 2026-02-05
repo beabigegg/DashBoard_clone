@@ -292,3 +292,129 @@ class TestServiceConstants:
     def test_max_equipments_is_reasonable(self):
         """Max equipments should be sensible."""
         assert 5 <= MAX_EQUIPMENTS <= 50
+
+
+class TestGetWorkcenterForGroups:
+    """Tests for _get_workcenters_for_groups helper function."""
+
+    def test_calls_filter_cache(self):
+        """Should call filter_cache.get_workcenters_for_groups."""
+        from unittest.mock import patch
+
+        with patch('mes_dashboard.services.filter_cache.get_workcenters_for_groups') as mock_get:
+            from mes_dashboard.services.query_tool_service import _get_workcenters_for_groups
+            mock_get.return_value = ['DB_1', 'DB_2']
+
+            result = _get_workcenters_for_groups(['DB'])
+
+            mock_get.assert_called_once_with(['DB'])
+            assert result == ['DB_1', 'DB_2']
+
+    def test_returns_empty_list_for_unknown_group(self):
+        """Should return empty list for unknown group."""
+        from unittest.mock import patch
+
+        with patch('mes_dashboard.services.filter_cache.get_workcenters_for_groups') as mock_get:
+            from mes_dashboard.services.query_tool_service import _get_workcenters_for_groups
+            mock_get.return_value = []
+
+            result = _get_workcenters_for_groups(['UNKNOWN'])
+
+            assert result == []
+
+
+class TestGetLotHistoryWithWorkcenterFilter:
+    """Tests for get_lot_history with workcenter_groups filter."""
+
+    def test_no_filter_returns_all(self):
+        """When no workcenter_groups, should not add filter to SQL."""
+        from unittest.mock import patch, MagicMock
+        import pandas as pd
+
+        with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.SQLLoader') as mock_loader:
+                from mes_dashboard.services.query_tool_service import get_lot_history
+
+                mock_loader.load.return_value = 'SELECT * FROM t WHERE c = :container_id {{ WORKCENTER_FILTER }}'
+                mock_read.return_value = pd.DataFrame({
+                    'CONTAINERID': ['abc123'],
+                    'WORKCENTERNAME': ['DB_1'],
+                })
+
+                result = get_lot_history('abc123', workcenter_groups=None)
+
+                assert 'error' not in result
+                assert result['filtered_by_groups'] == []
+                # Verify SQL does not contain WORKCENTERNAME IN
+                sql_called = mock_read.call_args[0][0]
+                assert 'WORKCENTERNAME IN' not in sql_called
+                assert '{{ WORKCENTER_FILTER }}' not in sql_called
+
+    def test_with_filter_adds_condition(self):
+        """When workcenter_groups provided, should filter by workcenters."""
+        from unittest.mock import patch
+        import pandas as pd
+
+        with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.SQLLoader') as mock_loader:
+                with patch('mes_dashboard.services.filter_cache.get_workcenters_for_groups') as mock_get_wc:
+                    from mes_dashboard.services.query_tool_service import get_lot_history
+
+                    mock_loader.load.return_value = 'SELECT * FROM t WHERE c = :container_id {{ WORKCENTER_FILTER }}'
+                    mock_get_wc.return_value = ['DB_1', 'DB_2']
+                    mock_read.return_value = pd.DataFrame({
+                        'CONTAINERID': ['abc123'],
+                        'WORKCENTERNAME': ['DB_1'],
+                    })
+
+                    result = get_lot_history('abc123', workcenter_groups=['DB'])
+
+                    mock_get_wc.assert_called_once_with(['DB'])
+                    assert result['filtered_by_groups'] == ['DB']
+                    # Verify SQL contains filter
+                    sql_called = mock_read.call_args[0][0]
+                    assert 'WORKCENTERNAME' in sql_called
+
+    def test_empty_groups_list_no_filter(self):
+        """Empty groups list should return all (no filter)."""
+        from unittest.mock import patch
+        import pandas as pd
+
+        with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.SQLLoader') as mock_loader:
+                from mes_dashboard.services.query_tool_service import get_lot_history
+
+                mock_loader.load.return_value = 'SELECT * FROM t WHERE c = :container_id {{ WORKCENTER_FILTER }}'
+                mock_read.return_value = pd.DataFrame({
+                    'CONTAINERID': ['abc123'],
+                    'WORKCENTERNAME': ['DB_1'],
+                })
+
+                result = get_lot_history('abc123', workcenter_groups=[])
+
+                assert result['filtered_by_groups'] == []
+                # Verify SQL does not contain WORKCENTERNAME IN
+                sql_called = mock_read.call_args[0][0]
+                assert 'WORKCENTERNAME IN' not in sql_called
+
+    def test_filter_with_empty_workcenters_result(self):
+        """When group has no workcenters, should not add filter."""
+        from unittest.mock import patch
+        import pandas as pd
+
+        with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.SQLLoader') as mock_loader:
+                with patch('mes_dashboard.services.filter_cache.get_workcenters_for_groups') as mock_get_wc:
+                    from mes_dashboard.services.query_tool_service import get_lot_history
+
+                    mock_loader.load.return_value = 'SELECT * FROM t WHERE c = :container_id {{ WORKCENTER_FILTER }}'
+                    mock_get_wc.return_value = []  # No workcenters for this group
+                    mock_read.return_value = pd.DataFrame({
+                        'CONTAINERID': ['abc123'],
+                        'WORKCENTERNAME': ['DB_1'],
+                    })
+
+                    result = get_lot_history('abc123', workcenter_groups=['UNKNOWN'])
+
+                    # Should still succeed, just no filter applied
+                    assert 'error' not in result

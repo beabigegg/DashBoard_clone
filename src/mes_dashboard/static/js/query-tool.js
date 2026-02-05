@@ -20,6 +20,10 @@ const QueryToolState = {
     timelineSelectedLots: new Set(),  // Set of indices for timeline display
     currentLotIndex: 0,  // For association highlight
 
+    // Workcenter group filter
+    workcenterGroups: [],  // All available groups [{name, sequence}]
+    selectedWorkcenterGroups: new Set(),  // Selected group names for filtering
+
     // Equipment query
     allEquipments: [],
     selectedEquipments: new Set(),
@@ -45,6 +49,13 @@ function clearQueryState() {
     QueryToolState.lotAssociations = {};
     QueryToolState.timelineSelectedLots = new Set();
     QueryToolState.currentLotIndex = 0;
+
+    // Clear workcenter group selection (keep workcenterGroups as it's reused)
+    QueryToolState.selectedWorkcenterGroups = new Set();
+
+    // Hide workcenter group selector
+    const wcContainer = document.getElementById('workcenterGroupSelectorContainer');
+    if (wcContainer) wcContainer.style.display = 'none';
 
     // Clear equipment query state
     QueryToolState.equipmentResults = null;
@@ -99,6 +110,7 @@ window.clearQueryState = clearQueryState;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadEquipments();
+    loadWorkcenterGroups();  // Load workcenter groups for filtering
     setLast30Days();
 
     // Close dropdowns when clicking outside
@@ -115,6 +127,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const lotSelector = document.getElementById('lotSelectorContainer');
         if (lotSelector && !lotSelector.contains(e.target)) {
             lotDropdown.classList.remove('show');
+        }
+
+        // Workcenter group dropdown
+        const wcDropdown = document.getElementById('wcGroupDropdown');
+        const wcSelector = document.getElementById('workcenterGroupSelectorContainer');
+        if (wcSelector && !wcSelector.contains(e.target)) {
+            if (wcDropdown) wcDropdown.classList.remove('show');
         }
     });
 
@@ -259,8 +278,14 @@ async function executeLotQuery() {
         // Initialize with empty selection - user must confirm
         QueryToolState.timelineSelectedLots = new Set();
 
+        // Clear workcenter group selection for new query
+        QueryToolState.selectedWorkcenterGroups = new Set();
+
         // Hide LOT info bar initially
         document.getElementById('lotInfoBar').style.display = 'none';
+
+        // Show workcenter group selector for filtering
+        showWorkcenterGroupSelector();
 
         if (resolveResult.data.length === 1) {
             // Single result - auto-select and show directly
@@ -372,8 +397,14 @@ async function confirmLotSelection() {
         return;
     }
 
-    // Close dropdown
+    // Close dropdowns
     document.getElementById('lotSelectorDropdown').classList.remove('show');
+    const wcDropdown = document.getElementById('wcGroupDropdown');
+    if (wcDropdown) wcDropdown.classList.remove('show');
+
+    // Build workcenter_groups parameter
+    const wcGroups = Array.from(QueryToolState.selectedWorkcenterGroups);
+    const wcGroupsParam = wcGroups.length > 0 ? wcGroups.join(',') : null;
 
     // Update display
     const count = selectedIndices.length;
@@ -383,24 +414,29 @@ async function confirmLotSelection() {
     document.getElementById('lotInfoBar').style.display = 'none';
 
     const panel = document.getElementById('lotResultsContent');
+    const filterInfo = wcGroupsParam ? ` (篩選: ${wcGroups.length} 個站點群組)` : '';
     panel.innerHTML = `
         <div class="loading">
             <div class="loading-spinner"></div>
-            <br>載入所選批次資料...
+            <br>載入所選批次資料...${filterInfo}
         </div>
     `;
 
-    // Load history for all selected lots
+    // Clear cached histories when filter changes
+    QueryToolState.lotHistories = {};
+
+    // Load history for all selected lots WITH workcenter filter
     try {
         await Promise.all(selectedIndices.map(async (idx) => {
             const lot = QueryToolState.resolvedLots[idx];
-            if (!QueryToolState.lotHistories[lot.container_id]) {
-                const result = await MesApi.get('/api/query-tool/lot-history', {
-                    params: { container_id: lot.container_id }
-                });
-                if (!result.error) {
-                    QueryToolState.lotHistories[lot.container_id] = result.data || [];
-                }
+            const params = { container_id: lot.container_id };
+            if (wcGroupsParam) {
+                params.workcenter_groups = wcGroupsParam;
+            }
+
+            const result = await MesApi.get('/api/query-tool/lot-history', { params });
+            if (!result.error) {
+                QueryToolState.lotHistories[lot.container_id] = result.data || [];
             }
         }));
 
@@ -2143,6 +2179,170 @@ async function showAdjacentLots(equipmentId, specName, targetTime) {
 
     } catch (error) {
         document.getElementById('adjacentLotsContent').innerHTML = `<div class="error">查詢失敗: ${error.message}</div>`;
+    }
+}
+
+// ============================================================
+// Workcenter Group Filter Functions
+// ============================================================
+
+async function loadWorkcenterGroups() {
+    try {
+        const result = await MesApi.get('/api/query-tool/workcenter-groups', {
+            silent: true
+        });
+        if (result.error) {
+            console.error('Failed to load workcenter groups:', result.error);
+            return;
+        }
+
+        QueryToolState.workcenterGroups = result.data || [];
+        console.log(`[QueryTool] Loaded ${QueryToolState.workcenterGroups.length} workcenter groups`);
+    } catch (error) {
+        console.error('Error loading workcenter groups:', error);
+    }
+}
+
+function renderWorkcenterGroupSelector() {
+    const container = document.getElementById('workcenterGroupSelector');
+    if (!container) return;
+
+    const groups = QueryToolState.workcenterGroups;
+    const selected = QueryToolState.selectedWorkcenterGroups;
+    const count = selected.size;
+
+    let html = `
+        <div class="wc-group-selector">
+            <button type="button" class="wc-group-btn" onclick="toggleWorkcenterGroupDropdown()">
+                <span id="wcGroupDisplay">${count === 0 ? '全部站點' : `${count} 個站點群組`}</span>
+                <span class="wc-group-badge" id="wcGroupBadge" style="display: ${count > 0 ? 'inline-block' : 'none'};">${count}</span>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="margin-left: auto;">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="wc-group-dropdown" id="wcGroupDropdown">
+                <div class="wc-group-header">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <input type="checkbox" id="wcGroupSelectAll" onchange="toggleAllWorkcenterGroups(this.checked)"
+                               ${selected.size === groups.length && groups.length > 0 ? 'checked' : ''}>
+                        全選
+                    </label>
+                    <span id="wcGroupSelectedCount">已選 ${count}</span>
+                </div>
+                <div class="wc-group-search">
+                    <input type="text" placeholder="搜尋站點群組..." oninput="filterWorkcenterGroups(this.value)">
+                </div>
+                <div class="wc-group-list" id="wcGroupList">
+    `;
+
+    groups.forEach(group => {
+        const isSelected = selected.has(group.name);
+        html += `
+            <div class="wc-group-item ${isSelected ? 'selected' : ''}" data-group="${group.name}">
+                <label onclick="event.stopPropagation();">
+                    <input type="checkbox" ${isSelected ? 'checked' : ''}
+                           onchange="toggleWorkcenterGroup('${group.name}', this.checked)">
+                    ${group.name}
+                </label>
+            </div>
+        `;
+    });
+
+    html += `
+                </div>
+                <div class="wc-group-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="clearWorkcenterGroups()">清除</button>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="closeWorkcenterGroupDropdown()">確定</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function toggleWorkcenterGroup(groupName, checked) {
+    if (checked) {
+        QueryToolState.selectedWorkcenterGroups.add(groupName);
+    } else {
+        QueryToolState.selectedWorkcenterGroups.delete(groupName);
+    }
+    updateWorkcenterGroupUI();
+}
+
+function toggleAllWorkcenterGroups(checked) {
+    if (checked) {
+        QueryToolState.workcenterGroups.forEach(g => {
+            QueryToolState.selectedWorkcenterGroups.add(g.name);
+        });
+    } else {
+        QueryToolState.selectedWorkcenterGroups.clear();
+    }
+    renderWorkcenterGroupSelector();
+}
+
+function clearWorkcenterGroups() {
+    QueryToolState.selectedWorkcenterGroups.clear();
+    renderWorkcenterGroupSelector();
+}
+
+function updateWorkcenterGroupUI() {
+    const count = QueryToolState.selectedWorkcenterGroups.size;
+    const display = document.getElementById('wcGroupDisplay');
+    const badge = document.getElementById('wcGroupBadge');
+    const countEl = document.getElementById('wcGroupSelectedCount');
+    const selectAll = document.getElementById('wcGroupSelectAll');
+
+    // Update item visual state
+    document.querySelectorAll('.wc-group-item').forEach(item => {
+        const groupName = item.dataset.group;
+        const isSelected = QueryToolState.selectedWorkcenterGroups.has(groupName);
+        item.classList.toggle('selected', isSelected);
+        const checkbox = item.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = isSelected;
+    });
+
+    // Update display text and badge
+    if (display) {
+        display.textContent = count === 0 ? '全部站點' : `${count} 個站點群組`;
+    }
+    if (badge) {
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+    if (countEl) {
+        countEl.textContent = `已選 ${count}`;
+    }
+    if (selectAll) {
+        selectAll.checked = count === QueryToolState.workcenterGroups.length && count > 0;
+    }
+}
+
+function toggleWorkcenterGroupDropdown() {
+    const dropdown = document.getElementById('wcGroupDropdown');
+    if (dropdown) dropdown.classList.toggle('show');
+}
+
+function closeWorkcenterGroupDropdown() {
+    const dropdown = document.getElementById('wcGroupDropdown');
+    if (dropdown) dropdown.classList.remove('show');
+}
+
+function filterWorkcenterGroups(searchText) {
+    const items = document.querySelectorAll('.wc-group-item');
+    const search = searchText.toLowerCase();
+
+    items.forEach(item => {
+        const groupName = item.dataset.group.toLowerCase();
+        item.style.display = groupName.includes(search) ? 'flex' : 'none';
+    });
+}
+
+function showWorkcenterGroupSelector() {
+    const container = document.getElementById('workcenterGroupSelectorContainer');
+    if (container && QueryToolState.workcenterGroups.length > 0) {
+        container.style.display = 'block';
+        renderWorkcenterGroupSelector();
     }
 }
 
