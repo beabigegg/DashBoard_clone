@@ -506,6 +506,7 @@ logs = store.query_logs(
 | hold | `/api/hold` | `hold_routes.py` |
 | resource_history | `/api/resource-history` | `resource_history_routes.py` |
 | job_query | `/api/job-query` | `job_query_routes.py` |
+| query_tool | `/api/query-tool` | `query_tool_routes.py` |
 | admin | `/admin` | `admin_routes.py` |
 | auth | `/admin` | `auth_routes.py` |
 | health | `/` | `health_routes.py` |
@@ -913,6 +914,155 @@ def read_sql_df(sql, params):
 
 ---
 
+## 23. 批次追蹤工具 (Query Tool)
+
+### 位置
+- 服務: `mes_dashboard.services.query_tool_service`
+- 路由: `mes_dashboard.routes.query_tool_routes`
+- SQL: `mes_dashboard/sql/query_tool/`
+
+### 功能概述
+提供批次追蹤和設備時段查詢功能：
+- **批次追蹤**: LOT ID / 流水號 / 工單 → 生產歷程 → 前後批 → 關聯資料
+- **設備時段查詢**: 設備狀態時數、批次清單、物料消耗、不良統計、JOB 紀錄
+
+### 核心概念：CONTAINERID vs CONTAINERNAME
+
+| 欄位 | 說明 | 用途 |
+|------|------|------|
+| CONTAINERID | 16 位 hex 內部 ID (例: `488103800029578b`) | 資料庫主鍵，所有歷史表使用 |
+| CONTAINERNAME | 用戶可見 LOT ID (例: `GA23100020-A00-011`) | 前端顯示 |
+
+歷史資料表（LOTWIPHISTORY、LOTMATERIALSHISTORY 等）使用 CONTAINERID 作為主鍵。
+查詢時需 JOIN DW_MES_CONTAINER 取得 CONTAINERNAME 顯示。
+
+### 設備 ID 關係
+
+```
+EQUIPMENTID (歷史表) = RESOURCEID (DW_MES_RESOURCE) = HISTORYID (狀態歷史表)
+```
+
+### 輸入限制
+
+| 類型 | 上限 | 說明 |
+|------|------|------|
+| LOT ID | 50 | 直接輸入批號 |
+| 流水號 | 50 | 可能一對多展開 |
+| 工單 | 10 | 一工單可展開 100+ 批次 |
+| 設備 | 20 | 時段查詢 |
+| 日期範圍 | 90 天 | 設備時段查詢 |
+
+### API 端點
+
+| 端點 | 方法 | 用途 |
+|------|------|------|
+| `/api/query-tool/resolve` | POST | 解析輸入為 CONTAINERID |
+| `/api/query-tool/lot-history` | GET | 取得 LOT 生產歷程 |
+| `/api/query-tool/adjacent-lots` | GET | 取得前後批 |
+| `/api/query-tool/lot-associations` | GET | 取得關聯資料 (物料/不良/HOLD/JOB) |
+| `/api/query-tool/equipment-period` | POST | 設備時段查詢 |
+| `/api/query-tool/equipment-list` | GET | 取得設備清單 |
+| `/api/query-tool/export-csv` | POST | CSV 匯出 |
+
+### SQL 檔案
+
+```
+sql/query_tool/
+├── lot_resolve_id.sql           # LOT ID → CONTAINERID
+├── lot_resolve_sn.sql           # 流水號 → CONTAINERID
+├── lot_resolve_wo.sql           # 工單 → CONTAINERID
+├── lot_history.sql              # LOT 生產歷程
+├── adjacent_lots.sql            # 前後批查詢 (ROW_NUMBER)
+├── lot_materials.sql            # LOT 物料消耗
+├── lot_rejects.sql              # LOT 不良紀錄
+├── lot_holds.sql                # LOT HOLD 紀錄
+├── lot_jobs.sql                 # LOT 相關 JOB
+├── lot_splits.sql               # TMTT 成品流水號對應
+├── lot_split_merge_history.sql  # 完整拆併批歷史 (DW_MES_HM_LOTMOVEOUT)
+├── equipment_status_hours.sql   # 設備狀態時數
+├── equipment_lots.sql           # 設備批次清單
+├── equipment_materials.sql      # 設備物料消耗彙總
+├── equipment_rejects.sql        # 設備不良統計
+└── equipment_jobs.sql           # 設備 JOB 紀錄
+```
+
+### 拆併批歷史追蹤
+
+資料來源：`DW_MES_HM_LOTMOVEOUT` (批次出站事件歷史表)
+
+篩選條件：
+- `CDONAME IN ('SplitLot', 'CombineLot')`
+
+操作類型 (CALLBYCDONAME)：
+| 值 | 說明 |
+|---|------|
+| AssemblyMotherLotSchePrep | 母批排程拆併批 |
+| LotSplit | 標準拆批 |
+| PJ_TMTTCombine | TMTT 併批 |
+
+關鍵欄位：
+| 欄位 | 說明 |
+|------|------|
+| CONTAINERID / CONTAINERNAME | 目標批次 |
+| FROMCONTAINERID / FROMCONTAINERNAME | 來源批次 |
+| FROMQTY / QTY | 操作前後數量 |
+| TXNDATE | 交易時間 |
+| WORKCENTER | 站點 |
+| EMPLOYEENAME | 操作人員 |
+
+### 前後批查詢邏輯
+
+使用 ROW_NUMBER() 窗口函數計算相對位置：
+
+```sql
+WITH ranked_lots AS (
+    SELECT
+        h.*,
+        ROW_NUMBER() OVER (
+            PARTITION BY h.EQUIPMENTID, h.SPECNAME
+            ORDER BY h.TRACKINTIMESTAMP
+        ) AS rn
+    FROM DWH.DW_MES_LOTWIPHISTORY h
+    WHERE h.EQUIPMENTID = :equipment_id
+      AND h.SPECNAME = :spec_name
+      AND h.TRACKINTIMESTAMP BETWEEN :time_start AND :time_end
+)
+SELECT *, r.rn - t.target_rn AS relative_position
+FROM ranked_lots r, target_lot t
+WHERE r.rn BETWEEN (t.target_rn - 3) AND (t.target_rn + 3)
+```
+
+### 服務函數
+
+```python
+from mes_dashboard.services.query_tool_service import (
+    # LOT 解析
+    resolve_lots,            # 統一入口
+
+    # LOT 查詢
+    get_lot_history,         # 生產歷程
+    get_adjacent_lots,       # 前後批
+    get_lot_materials,       # 物料消耗
+    get_lot_rejects,         # 不良紀錄
+    get_lot_holds,           # HOLD 紀錄
+    get_lot_jobs,            # JOB 紀錄
+
+    # 設備查詢
+    get_equipment_status_hours,  # 狀態時數
+    get_equipment_lots,          # 批次清單
+    get_equipment_materials,     # 物料消耗
+    get_equipment_rejects,       # 不良統計
+    get_equipment_jobs,          # JOB 紀錄
+
+    # 驗證
+    validate_date_range,
+    validate_lot_input,
+    validate_equipment_input,
+)
+```
+
+---
+
 ## 參考檔案索引
 
 | 功能 | 檔案位置 |
@@ -932,5 +1082,6 @@ def read_sql_df(sql, params):
 | 頁面狀態 | `src/mes_dashboard/services/page_registry.py` |
 | Filter 快取 | `src/mes_dashboard/services/filter_cache.py` |
 | 資源快取 | `src/mes_dashboard/services/resource_cache.py` |
+| 批次追蹤服務 | `src/mes_dashboard/services/query_tool_service.py` |
 | API 客戶端 | `src/mes_dashboard/static/js/mes-api.js` |
 | Toast 系統 | `src/mes_dashboard/static/js/toast.js` |

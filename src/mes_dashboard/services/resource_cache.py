@@ -13,7 +13,10 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Taiwan timezone (GMT+8)
+TW_TIMEZONE = timezone(timedelta(hours=8))
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -211,7 +214,7 @@ def _sync_to_redis(df: pd.DataFrame, version: str) -> bool:
         data_json = df_copy.to_json(orient='records', force_ascii=False)
 
         # Atomic update using pipeline
-        now = datetime.now().isoformat()
+        now = datetime.now(TW_TIMEZONE).isoformat()
         pipe = client.pipeline()
         pipe.set(_get_key("data"), data_json)
         pipe.set(_get_key("meta:version"), version)

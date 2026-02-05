@@ -325,6 +325,9 @@
             {% if can_view_page('/job-query') %}
             <button class="tab" data-target="jobQueryFrame">設備維修查詢</button>
             {% endif %}
+            {% if can_view_page('/query-tool') %}
+            <button class="tab" data-target="queryToolFrame">批次追蹤工具</button>
+            {% endif %}
         </div>
 
         <div class="panel">
@@ -346,6 +349,9 @@
             {% endif %}
             {% if can_view_page('/job-query') %}
             <iframe id="jobQueryFrame" data-src="/job-query" title="設備維修查詢"></iframe>
+            {% endif %}
+            {% if can_view_page('/query-tool') %}
+            <iframe id="queryToolFrame" data-src="/query-tool" title="批次追蹤工具"></iframe>
             {% endif %}
         </div>
     </div>

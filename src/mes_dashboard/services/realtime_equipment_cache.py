@@ -9,7 +9,10 @@ import json
 import logging
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Taiwan timezone (GMT+8)
+TW_TIMEZONE = timezone(timedelta(hours=8))
 from typing import Any, Dict, List, Optional, Tuple
 
 from mes_dashboard.core.database import read_sql_df
@@ -312,7 +315,7 @@ def _save_to_redis(aggregated: List[Dict[str, Any]]) -> bool:
 
         # Serialize data
         data_json = json.dumps(aggregated, ensure_ascii=False, default=str)
-        updated_at = datetime.now().isoformat()
+        updated_at = datetime.now(TW_TIMEZONE).isoformat()
         count = len(aggregated)
 
         # Atomic update using pipeline

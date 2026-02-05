@@ -208,11 +208,14 @@ def dispose_engine():
 # ============================================================
 
 
-def get_db_connection():
+def get_db_connection(call_timeout_ms: int = 55000):
     """Create a direct oracledb connection.
 
     Used for operations that need direct cursor access.
     Includes call_timeout to prevent long-running queries from blocking workers.
+
+    Args:
+        call_timeout_ms: Query timeout in milliseconds (default 55000 = 55s)
     """
     try:
         conn = oracledb.connect(
@@ -221,10 +224,10 @@ def get_db_connection():
             retry_count=1,           # Retry once on connection failure
             retry_delay=1,           # 1s delay between retries
         )
-        # Set call timeout to 55 seconds (must be less than Gunicorn's 60s worker timeout)
+        # Set call timeout (must be less than Gunicorn's 60s worker timeout)
         # This prevents queries from blocking workers indefinitely
-        conn.call_timeout = 55000  # milliseconds
-        logger.debug("Direct oracledb connection established (call_timeout=55s)")
+        conn.call_timeout = call_timeout_ms
+        logger.debug(f"Direct oracledb connection established (call_timeout={call_timeout_ms}ms)")
         return conn
     except Exception as exc:
         ora_code = _extract_ora_code(exc)
@@ -282,8 +285,12 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
 
     try:
         with engine.connect() as conn:
-            df = pd.read_sql(text(sql), conn, params=params)
-            df.columns = [str(c).upper() for c in df.columns]
+            # SQLAlchemy 2.0: execute text() with params dict, then convert to DataFrame
+            stmt = text(sql)
+            result = conn.execute(stmt, params or {})
+            rows = result.fetchall()
+            columns = [str(c).upper() for c in result.keys()]
+            df = pd.DataFrame(rows, columns=columns)
 
             elapsed = time.time() - start_time
 
@@ -320,6 +327,110 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
             f"Query failed after {elapsed:.2f}s - ORA-{ora_code}: {exc} | SQL: {sql_preview}..."
         )
         raise
+
+
+def read_sql_df_slow(
+    sql: str,
+    params: Optional[Dict[str, Any]] = None,
+    timeout_seconds: int = 90
+) -> pd.DataFrame:
+    """Execute slow SQL query with dedicated connection and timeout.
+
+    This function is designed for known slow queries that should not:
+    - Block the connection pool (uses direct connection)
+    - Affect circuit breaker state (timeouts are expected)
+
+    Args:
+        sql: SQL query string with Oracle bind variables (:param_name)
+        params: Optional dict of parameter values to bind
+        timeout_seconds: Query timeout in seconds (default 90s)
+
+    Returns:
+        DataFrame with query results. Column names are uppercased.
+
+    Raises:
+        TimeoutError: If query exceeds timeout (ORA-01013)
+        RuntimeError: If connection fails
+        Exception: Other database errors
+
+    Example:
+        >>> sql = "SELECT * FROM large_table WHERE id = :id"
+        >>> df = read_sql_df_slow(sql, {"id": "123"}, timeout_seconds=60)
+    """
+    from mes_dashboard.core.metrics import record_query_latency
+
+    start_time = time.time()
+
+    # Use dedicated connection with custom timeout (not from pool)
+    conn = get_db_connection(call_timeout_ms=timeout_seconds * 1000)
+    if conn is None:
+        raise RuntimeError("Failed to establish database connection for slow query")
+
+    try:
+        cursor = conn.cursor()
+
+        # Execute with bind parameters
+        if params:
+            cursor.execute(sql, params)
+        else:
+            cursor.execute(sql)
+
+        # Fetch results
+        columns = [desc[0].upper() for desc in cursor.description]
+        rows = cursor.fetchall()
+
+        # Convert to DataFrame
+        df = pd.DataFrame(rows, columns=columns)
+
+        elapsed = time.time() - start_time
+
+        # Record metrics (but not to circuit breaker - slow queries are expected)
+        record_query_latency(elapsed)
+
+        logger.info(f"Slow query completed in {elapsed:.2f}s, rows={len(df)}")
+        return df
+
+    except oracledb.DatabaseError as exc:
+        elapsed = time.time() - start_time
+        record_query_latency(elapsed)
+
+        error_obj = exc.args[0] if exc.args else None
+        ora_code = getattr(error_obj, 'code', None) or _extract_ora_code(exc)
+
+        sql_preview = sql.strip().replace('\n', ' ')[:100]
+
+        # ORA-01013: user requested cancel of current operation (timeout)
+        if ora_code == 1013 or str(ora_code) == '1013':
+            logger.warning(
+                f"Slow query timed out after {elapsed:.2f}s "
+                f"(limit: {timeout_seconds}s) | SQL: {sql_preview}..."
+            )
+            raise TimeoutError(
+                f"Query timed out after {timeout_seconds} seconds"
+            ) from exc
+        else:
+            logger.error(
+                f"Slow query failed after {elapsed:.2f}s - ORA-{ora_code}: {exc} | "
+                f"SQL: {sql_preview}..."
+            )
+            raise
+
+    except Exception as exc:
+        elapsed = time.time() - start_time
+        record_query_latency(elapsed)
+
+        sql_preview = sql.strip().replace('\n', ' ')[:100]
+        logger.error(
+            f"Slow query failed after {elapsed:.2f}s: {exc} | SQL: {sql_preview}..."
+        )
+        raise
+
+    finally:
+        try:
+            conn.close()
+            logger.debug("Slow query connection closed")
+        except Exception:
+            pass
 
 
 # ============================================================

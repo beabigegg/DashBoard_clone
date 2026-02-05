@@ -1,0 +1,473 @@
+# -*- coding: utf-8 -*-
+"""Query Tool API routes.
+
+Contains Flask Blueprint for batch tracing and equipment period query endpoints:
+- LOT resolution (LOT ID / Serial Number / Work Order → CONTAINERID)
+- LOT production history and adjacent lots
+- LOT associations (materials, rejects, holds, jobs)
+- Equipment period queries (status hours, lots, materials, rejects, jobs)
+- CSV export functionality
+"""
+
+from flask import Blueprint, jsonify, request, Response, render_template
+
+from mes_dashboard.services.query_tool_service import (
+    resolve_lots,
+    get_lot_history,
+    get_adjacent_lots,
+    get_lot_materials,
+    get_lot_rejects,
+    get_lot_holds,
+    get_lot_splits,
+    get_lot_jobs,
+    get_equipment_status_hours,
+    get_equipment_lots,
+    get_equipment_materials,
+    get_equipment_rejects,
+    get_equipment_jobs,
+    export_to_csv,
+    generate_csv_stream,
+    validate_date_range,
+    validate_lot_input,
+    validate_equipment_input,
+)
+
+# Create Blueprint
+query_tool_bp = Blueprint('query_tool', __name__)
+
+
+# ============================================================
+# Page Route
+# ============================================================
+
+@query_tool_bp.route('/query-tool')
+def query_tool_page():
+    """Render the query tool page."""
+    return render_template('query_tool.html')
+
+
+# ============================================================
+# LOT Resolution API
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/resolve', methods=['POST'])
+def resolve_lot_input():
+    """Resolve user input to CONTAINERID list.
+
+    Expects JSON body:
+    {
+        "input_type": "lot_id" | "serial_number" | "work_order",
+        "values": ["value1", "value2", ...]
+    }
+
+    Returns:
+    {
+        "data": [{"container_id": "...", "input_value": "..."}, ...],
+        "total": 10,
+        "input_count": 5,
+        "not_found": ["value3"]
+    }
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': '請求內容不可為空'}), 400
+
+    input_type = data.get('input_type')
+    values = data.get('values', [])
+
+    # Validate input type
+    valid_types = ['lot_id', 'serial_number', 'work_order']
+    if input_type not in valid_types:
+        return jsonify({'error': f'不支援的查詢類型: {input_type}'}), 400
+
+    # Validate values
+    validation_error = validate_lot_input(input_type, values)
+    if validation_error:
+        return jsonify({'error': validation_error}), 400
+
+    result = resolve_lots(input_type, values)
+
+    if 'error' in result:
+        return jsonify(result), 400
+
+    return jsonify(result)
+
+
+# ============================================================
+# LOT History API
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
+def query_lot_history():
+    """Query production history for a LOT.
+
+    Query params:
+        container_id: CONTAINERID (16-char hex)
+
+    Returns production history records.
+    """
+    container_id = request.args.get('container_id')
+
+    if not container_id:
+        return jsonify({'error': '請指定 CONTAINERID'}), 400
+
+    result = get_lot_history(container_id)
+
+    if 'error' in result:
+        return jsonify(result), 400
+
+    return jsonify(result)
+
+
+# ============================================================
+# Adjacent Lots API
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
+def query_adjacent_lots():
+    """Query adjacent lots (前後批) for a specific equipment and spec.
+
+    Query params:
+        equipment_id: Equipment ID
+        spec_name: Spec name
+        target_time: Target lot's TRACKINTIMESTAMP (ISO format)
+        time_window: Time window in hours (optional, default 24)
+
+    Returns adjacent lots with relative position.
+    """
+    equipment_id = request.args.get('equipment_id')
+    spec_name = request.args.get('spec_name')
+    target_time = request.args.get('target_time')
+    time_window = request.args.get('time_window', 24, type=int)
+
+    if not all([equipment_id, spec_name, target_time]):
+        return jsonify({'error': '請指定設備、規格和目標時間'}), 400
+
+    result = get_adjacent_lots(equipment_id, spec_name, target_time, time_window)
+
+    if 'error' in result:
+        return jsonify(result), 400
+
+    return jsonify(result)
+
+
+# ============================================================
+# LOT Associations API
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
+def query_lot_associations():
+    """Query association data for a LOT.
+
+    Query params:
+        container_id: CONTAINERID (16-char hex)
+        type: Association type ('materials', 'rejects', 'holds', 'jobs')
+        equipment_id: Equipment ID (required for 'jobs' type)
+        time_start: Start time (required for 'jobs' type)
+        time_end: End time (required for 'jobs' type)
+
+    Returns association records based on type.
+    """
+    container_id = request.args.get('container_id')
+    assoc_type = request.args.get('type')
+
+    if not container_id:
+        return jsonify({'error': '請指定 CONTAINERID'}), 400
+
+    valid_types = ['materials', 'rejects', 'holds', 'splits', 'jobs']
+    if assoc_type not in valid_types:
+        return jsonify({'error': f'不支援的關聯類型: {assoc_type}'}), 400
+
+    if assoc_type == 'materials':
+        result = get_lot_materials(container_id)
+    elif assoc_type == 'rejects':
+        result = get_lot_rejects(container_id)
+    elif assoc_type == 'holds':
+        result = get_lot_holds(container_id)
+    elif assoc_type == 'splits':
+        result = get_lot_splits(container_id)
+    elif assoc_type == 'jobs':
+        equipment_id = request.args.get('equipment_id')
+        time_start = request.args.get('time_start')
+        time_end = request.args.get('time_end')
+
+        if not all([equipment_id, time_start, time_end]):
+            return jsonify({'error': '查詢 JOB 需指定設備和時間範圍'}), 400
+
+        result = get_lot_jobs(equipment_id, time_start, time_end)
+
+    if 'error' in result:
+        return jsonify(result), 400
+
+    return jsonify(result)
+
+
+# ============================================================
+# Equipment Period Query API
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
+def query_equipment_period():
+    """Query equipment data for a time period.
+
+    Expects JSON body:
+    {
+        "equipment_ids": ["id1", "id2", ...],
+        "equipment_names": ["name1", "name2", ...],
+        "start_date": "2024-01-01",
+        "end_date": "2024-01-31",
+        "query_type": "status_hours" | "lots" | "materials" | "rejects" | "jobs"
+    }
+
+    Returns data based on query_type.
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': '請求內容不可為空'}), 400
+
+    equipment_ids = data.get('equipment_ids', [])
+    equipment_names = data.get('equipment_names', [])
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+    query_type = data.get('query_type')
+
+    # Validate date range
+    if not start_date or not end_date:
+        return jsonify({'error': '請指定日期範圍'}), 400
+
+    validation_error = validate_date_range(start_date, end_date)
+    if validation_error:
+        return jsonify({'error': validation_error}), 400
+
+    # Validate query type
+    valid_types = ['status_hours', 'lots', 'materials', 'rejects', 'jobs']
+    if query_type not in valid_types:
+        return jsonify({'error': f'不支援的查詢類型: {query_type}'}), 400
+
+    # Execute query based on type
+    if query_type == 'status_hours':
+        if not equipment_ids:
+            return jsonify({'error': '請選擇至少一台設備'}), 400
+        result = get_equipment_status_hours(equipment_ids, start_date, end_date)
+
+    elif query_type == 'lots':
+        if not equipment_ids:
+            return jsonify({'error': '請選擇至少一台設備'}), 400
+        result = get_equipment_lots(equipment_ids, start_date, end_date)
+
+    elif query_type == 'materials':
+        if not equipment_names:
+            return jsonify({'error': '請選擇至少一台設備'}), 400
+        result = get_equipment_materials(equipment_names, start_date, end_date)
+
+    elif query_type == 'rejects':
+        if not equipment_names:
+            return jsonify({'error': '請選擇至少一台設備'}), 400
+        result = get_equipment_rejects(equipment_names, start_date, end_date)
+
+    elif query_type == 'jobs':
+        if not equipment_ids:
+            return jsonify({'error': '請選擇至少一台設備'}), 400
+        result = get_equipment_jobs(equipment_ids, start_date, end_date)
+
+    if 'error' in result:
+        return jsonify(result), 400
+
+    return jsonify(result)
+
+
+# ============================================================
+# Equipment List API (for selection UI)
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
+def get_equipment_list():
+    """Get available equipment for selection.
+
+    Returns equipment from cache for equipment selection UI.
+    """
+    from mes_dashboard.services.resource_cache import get_all_resources
+
+    try:
+        resources = get_all_resources()
+        if not resources:
+            return jsonify({'error': '無法載入設備資料'}), 500
+
+        # Return minimal data for selection UI
+        data = []
+        for r in resources:
+            data.append({
+                'RESOURCEID': r.get('RESOURCEID'),
+                'RESOURCENAME': r.get('RESOURCENAME'),
+                'WORKCENTERNAME': r.get('WORKCENTERNAME'),
+                'RESOURCEFAMILYNAME': r.get('RESOURCEFAMILYNAME'),
+            })
+
+        # Sort by WORKCENTERNAME, then RESOURCENAME
+        data.sort(key=lambda x: (x.get('WORKCENTERNAME', ''), x.get('RESOURCENAME', '')))
+
+        return jsonify({
+            'data': data,
+            'total': len(data)
+        })
+
+    except Exception as exc:
+        return jsonify({'error': f'載入設備資料失敗: {str(exc)}'}), 500
+
+
+# ============================================================
+# CSV Export API
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
+def export_csv():
+    """Export query results as CSV.
+
+    Expects JSON body:
+    {
+        "export_type": "lot_history" | "adjacent_lots" | "lot_materials" |
+                       "lot_rejects" | "lot_holds" | "lot_jobs" |
+                       "equipment_status_hours" | "equipment_lots" |
+                       "equipment_materials" | "equipment_rejects" | "equipment_jobs",
+        "params": { ... query parameters ... }
+    }
+
+    Returns streaming CSV response.
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': '請求內容不可為空'}), 400
+
+    export_type = data.get('export_type')
+    params = data.get('params', {})
+
+    # Get data based on export type
+    result = None
+    filename = 'export.csv'
+
+    try:
+        if export_type == 'lot_history':
+            container_id = params.get('container_id')
+            if not container_id:
+                return jsonify({'error': '請指定 CONTAINERID'}), 400
+            result = get_lot_history(container_id)
+            filename = f'lot_history_{container_id}.csv'
+
+        elif export_type == 'adjacent_lots':
+            result = get_adjacent_lots(
+                params.get('equipment_id'),
+                params.get('spec_name'),
+                params.get('target_time'),
+                params.get('time_window', 24)
+            )
+            filename = 'adjacent_lots.csv'
+
+        elif export_type == 'lot_materials':
+            container_id = params.get('container_id')
+            result = get_lot_materials(container_id)
+            filename = f'lot_materials_{container_id}.csv'
+
+        elif export_type == 'lot_rejects':
+            container_id = params.get('container_id')
+            result = get_lot_rejects(container_id)
+            filename = f'lot_rejects_{container_id}.csv'
+
+        elif export_type == 'lot_holds':
+            container_id = params.get('container_id')
+            result = get_lot_holds(container_id)
+            filename = f'lot_holds_{container_id}.csv'
+
+        elif export_type == 'lot_splits':
+            container_id = params.get('container_id')
+            result = get_lot_splits(container_id)
+            # Flatten nested structure for CSV
+            if result and 'data' in result:
+                flat_data = []
+                for item in result['data']:
+                    serial_number = item.get('serial_number', '')
+                    txn_date = item.get('txn_date', '')
+                    for lot in item.get('lots', []):
+                        flat_data.append({
+                            '成品流水號': serial_number,
+                            'LOT ID': lot.get('lot_id', ''),
+                            '規格': lot.get('spec_name', ''),
+                            '數量': lot.get('qty', ''),
+                            '合併序號': lot.get('combine_seq', ''),
+                            '交易時間': txn_date,
+                        })
+                result['data'] = flat_data
+            filename = f'lot_splits_{container_id}.csv'
+
+        elif export_type == 'lot_jobs':
+            result = get_lot_jobs(
+                params.get('equipment_id'),
+                params.get('time_start'),
+                params.get('time_end')
+            )
+            filename = 'lot_jobs.csv'
+
+        elif export_type == 'equipment_status_hours':
+            result = get_equipment_status_hours(
+                params.get('equipment_ids', []),
+                params.get('start_date'),
+                params.get('end_date')
+            )
+            filename = 'equipment_status_hours.csv'
+
+        elif export_type == 'equipment_lots':
+            result = get_equipment_lots(
+                params.get('equipment_ids', []),
+                params.get('start_date'),
+                params.get('end_date')
+            )
+            filename = 'equipment_lots.csv'
+
+        elif export_type == 'equipment_materials':
+            result = get_equipment_materials(
+                params.get('equipment_names', []),
+                params.get('start_date'),
+                params.get('end_date')
+            )
+            filename = 'equipment_materials.csv'
+
+        elif export_type == 'equipment_rejects':
+            result = get_equipment_rejects(
+                params.get('equipment_names', []),
+                params.get('start_date'),
+                params.get('end_date')
+            )
+            filename = 'equipment_rejects.csv'
+
+        elif export_type == 'equipment_jobs':
+            result = get_equipment_jobs(
+                params.get('equipment_ids', []),
+                params.get('start_date'),
+                params.get('end_date')
+            )
+            filename = 'equipment_jobs.csv'
+
+        else:
+            return jsonify({'error': f'不支援的匯出類型: {export_type}'}), 400
+
+        if result is None or 'error' in result:
+            error_msg = result.get('error', '查詢失敗') if result else '查詢失敗'
+            return jsonify({'error': error_msg}), 400
+
+        export_data = result.get('data', [])
+        if not export_data:
+            return jsonify({'error': '查無資料'}), 404
+
+        # Stream CSV response
+        return Response(
+            generate_csv_stream(export_data),
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}'
+            }
+        )
+
+    except Exception as exc:
+        return jsonify({'error': f'匯出失敗: {str(exc)}'}), 500

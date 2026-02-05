@@ -13,6 +13,7 @@ from .auth_routes import auth_bp
 from .admin_routes import admin_bp
 from .resource_history_routes import resource_history_bp
 from .job_query_routes import job_query_bp
+from .query_tool_routes import query_tool_bp
 
 
 def register_routes(app) -> None:
@@ -24,6 +25,7 @@ def register_routes(app) -> None:
     app.register_blueprint(hold_bp)
     app.register_blueprint(resource_history_bp)
     app.register_blueprint(job_query_bp)
+    app.register_blueprint(query_tool_bp)
 
 __all__ = [
     'wip_bp',
@@ -35,5 +37,6 @@ __all__ = [
     'admin_bp',
     'resource_history_bp',
     'job_query_bp',
+    'query_tool_bp',
     'register_routes',
 ]
