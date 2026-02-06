@@ -135,25 +135,26 @@ def query_lot_history():
 
 @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
 def query_adjacent_lots():
-    """Query adjacent lots (前後批) for a specific equipment and spec.
+    """Query adjacent lots (前後批) for a specific equipment.
+
+    Finds lots before/after target on same equipment until different PJ_TYPE,
+    with minimum 3 lots in each direction.
 
     Query params:
         equipment_id: Equipment ID
-        spec_name: Spec name
         target_time: Target lot's TRACKINTIMESTAMP (ISO format)
         time_window: Time window in hours (optional, default 24)
 
     Returns adjacent lots with relative position.
     """
     equipment_id = request.args.get('equipment_id')
-    spec_name = request.args.get('spec_name')
     target_time = request.args.get('target_time')
     time_window = request.args.get('time_window', 24, type=int)
 
-    if not all([equipment_id, spec_name, target_time]):
-        return jsonify({'error': '請指定設備、規格和目標時間'}), 400
+    if not all([equipment_id, target_time]):
+        return jsonify({'error': '請指定設備和目標時間'}), 400
 
-    result = get_adjacent_lots(equipment_id, spec_name, target_time, time_window)
+    result = get_adjacent_lots(equipment_id, target_time, time_window)
 
     if 'error' in result:
         return jsonify(result), 400
@@ -395,7 +396,6 @@ def export_csv():
         elif export_type == 'adjacent_lots':
             result = get_adjacent_lots(
                 params.get('equipment_id'),
-                params.get('spec_name'),
                 params.get('target_time'),
                 params.get('time_window', 24)
             )

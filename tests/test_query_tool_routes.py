@@ -197,17 +197,7 @@ class TestAdjacentLotsEndpoint:
         """Should return error without equipment_id."""
         response = client.get(
             '/api/query-tool/adjacent-lots?'
-            'spec_name=SPEC-001&trackin_time=2024-01-15T10:30:00'
-        )
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert 'error' in data
-
-    def test_missing_spec_name(self, client):
-        """Should return error without spec_name."""
-        response = client.get(
-            '/api/query-tool/adjacent-lots?'
-            'equipment_id=EQ001&trackin_time=2024-01-15T10:30:00'
+            'target_time=2024-01-15T10:30:00'
         )
         assert response.status_code == 400
         data = json.loads(response.data)
@@ -217,7 +207,17 @@ class TestAdjacentLotsEndpoint:
         """Should return error without target_time."""
         response = client.get(
             '/api/query-tool/adjacent-lots?'
-            'equipment_id=EQ001&spec_name=SPEC-001'
+            'equipment_id=EQ001'
+        )
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert 'error' in data
+
+    def test_with_only_equipment_id(self, client):
+        """Should return error with only equipment_id (no target_time)."""
+        response = client.get(
+            '/api/query-tool/adjacent-lots?'
+            'equipment_id=EQ001'
         )
         assert response.status_code == 400
         data = json.loads(response.data)
@@ -249,12 +249,17 @@ class TestAdjacentLotsEndpoint:
 
         response = client.get(
             '/api/query-tool/adjacent-lots?'
-            'equipment_id=EQ001&spec_name=SPEC-001&target_time=2024-01-15T10:30:00'
+            'equipment_id=EQ001&target_time=2024-01-15T10:30:00'
         )
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
         assert data['total'] == 3
+        # Verify service was called without spec_name
+        mock_query.assert_called_once()
+        call_args = mock_query.call_args
+        assert call_args[0][0] == 'EQ001'  # equipment_id
+        assert '2024-01-15' in call_args[0][1]  # target_time
 
 
 class TestLotAssociationsEndpoint:

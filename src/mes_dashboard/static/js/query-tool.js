@@ -53,9 +53,9 @@ function clearQueryState() {
     // Clear workcenter group selection (keep workcenterGroups as it's reused)
     QueryToolState.selectedWorkcenterGroups = new Set();
 
-    // Hide workcenter group selector
-    const wcContainer = document.getElementById('workcenterGroupSelectorContainer');
-    if (wcContainer) wcContainer.style.display = 'none';
+    // Hide selection bar (contains LOT selector and workcenter filter)
+    const selectionBar = document.getElementById('selectionBar');
+    if (selectionBar) selectionBar.style.display = 'none';
 
     // Clear equipment query state
     QueryToolState.equipmentResults = null;
@@ -86,12 +86,9 @@ function clearQueryState() {
         lotEmptyState.style.display = 'block';
     }
 
-    // Hide LOT info bar and selector
+    // Hide LOT info bar
     const lotInfoBar = document.getElementById('lotInfoBar');
     if (lotInfoBar) lotInfoBar.style.display = 'none';
-
-    const lotSelectorContainer = document.getElementById('lotSelectorContainer');
-    if (lotSelectorContainer) lotSelectorContainer.style.display = 'none';
 
     console.log('[QueryTool] State cleared for memory management');
 }
@@ -240,9 +237,10 @@ async function executeLotQuery() {
         </div>
     `;
 
-    // Hide LOT info bar and selector during loading
+    // Hide LOT info bar and selection bar during loading
     document.getElementById('lotInfoBar').style.display = 'none';
-    document.getElementById('lotSelectorContainer').style.display = 'none';
+    const selectionBar = document.getElementById('selectionBar');
+    if (selectionBar) selectionBar.style.display = 'none';
 
     document.getElementById('lotQueryBtn').disabled = true;
 
@@ -290,11 +288,18 @@ async function executeLotQuery() {
         if (resolveResult.data.length === 1) {
             // Single result - auto-select and show directly
             QueryToolState.timelineSelectedLots.add(0);
-            document.getElementById('lotSelectorContainer').style.display = 'none';
+            // Hide LOT selector (not needed for single result), but show workcenter filter
+            const lotSelector = document.getElementById('lotSelectorContainer');
+            if (lotSelector) lotSelector.style.display = 'none';
+            // Update hint for single LOT
+            const hint = document.getElementById('selectionHint');
+            if (hint) hint.innerHTML = '<span>選擇站點後點擊「套用篩選」重新載入</span>';
             // Load and show the single lot's data
             confirmLotSelection();
         } else {
             // Multiple results - show selector for user to choose
+            const lotSelector = document.getElementById('lotSelectorContainer');
+            if (lotSelector) lotSelector.style.display = 'block';
             showLotSelector(resolveResult.data);
             // Render empty state
             renderLotResults(resolveResult);
@@ -599,6 +604,9 @@ function renderCombinedLotView(selectedIndices) {
                         <th style="min-width: 100px;">站點</th>
                         <th style="min-width: 100px;">設備</th>
                         <th style="min-width: 120px;">規格</th>
+                        <th style="min-width: 80px;">產品類型</th>
+                        <th style="min-width: 80px;">BOP</th>
+                        <th style="min-width: 100px;">Wafer Lot</th>
                         <th style="min-width: 150px;">上機時間</th>
                         <th style="min-width: 150px;">下機時間</th>
                         <th style="width: 70px;">入數</th>
@@ -616,12 +624,15 @@ function renderCombinedLotView(selectedIndices) {
                 <td>${step.WORKCENTERNAME || ''}</td>
                 <td>${step.EQUIPMENTNAME || ''}</td>
                 <td title="${step.SPECNAME || ''}">${truncateText(step.SPECNAME, 15)}</td>
+                <td>${step.PJ_TYPE || '-'}</td>
+                <td>${step.PJ_BOP || '-'}</td>
+                <td>${step.WAFER_LOT_ID || '-'}</td>
                 <td>${formatDateTime(step.TRACKINTIMESTAMP)}</td>
                 <td>${formatDateTime(step.TRACKOUTTIMESTAMP)}</td>
                 <td>${step.TRACKINQTY || ''}</td>
                 <td>${step.TRACKOUTQTY || ''}</td>
                 <td style="position: sticky; right: 0; background: white; box-shadow: -2px 0 4px rgba(0,0,0,0.1);">
-                    <button class="btn btn-secondary btn-sm" onclick="showAdjacentLots('${step.EQUIPMENTID}', '${step.SPECNAME}', '${step.TRACKINTIMESTAMP}')" title="查詢前後批">
+                    <button class="btn btn-secondary btn-sm" onclick="showAdjacentLots('${step.EQUIPMENTID}', '${step.EQUIPMENTNAME || step.EQUIPMENTID}', '${step.TRACKINTIMESTAMP}')" title="查詢前後批">
                         前後批
                     </button>
                 </td>
@@ -1104,6 +1115,9 @@ function renderLotDetail(index) {
                             <th style="min-width: 100px;">站點</th>
                             <th style="min-width: 100px;">設備</th>
                             <th style="min-width: 120px;">規格</th>
+                            <th style="min-width: 80px;">產品類型</th>
+                            <th style="min-width: 80px;">BOP</th>
+                            <th style="min-width: 100px;">Wafer Lot</th>
                             <th style="min-width: 150px;">上機時間</th>
                             <th style="min-width: 150px;">下機時間</th>
                             <th style="width: 70px;">入數</th>
@@ -1121,12 +1135,15 @@ function renderLotDetail(index) {
                     <td>${step.WORKCENTERNAME || ''}</td>
                     <td>${step.EQUIPMENTNAME || ''}</td>
                     <td title="${step.SPECNAME || ''}">${truncateText(step.SPECNAME, 12)}</td>
+                    <td>${step.PJ_TYPE || '-'}</td>
+                    <td>${step.PJ_BOP || '-'}</td>
+                    <td>${step.WAFER_LOT_ID || '-'}</td>
                     <td>${formatDateTime(step.TRACKINTIMESTAMP)}</td>
                     <td>${formatDateTime(step.TRACKOUTTIMESTAMP)}</td>
                     <td>${step.TRACKINQTY || ''}</td>
                     <td>${step.TRACKOUTQTY || ''}</td>
                     <td style="position: sticky; right: 0; background: white; box-shadow: -2px 0 4px rgba(0,0,0,0.1);">
-                        <button class="btn btn-secondary btn-sm" onclick="showAdjacentLots('${step.EQUIPMENTID}', '${step.SPECNAME}', '${step.TRACKINTIMESTAMP}')" title="查詢前後批">
+                        <button class="btn btn-secondary btn-sm" onclick="showAdjacentLots('${step.EQUIPMENTID}', '${step.EQUIPMENTNAME || step.EQUIPMENTID}', '${step.TRACKINTIMESTAMP}')" title="查詢前後批">
                             前後批
                         </button>
                     </td>
@@ -2039,7 +2056,7 @@ function showTimelineDetail(containerId, stepIndex) {
     }
 }
 
-async function showAdjacentLots(equipmentId, specName, targetTime) {
+async function showAdjacentLots(equipmentId, equipmentName, targetTime) {
     // Open modal or expand section to show adjacent lots
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -2051,7 +2068,7 @@ async function showAdjacentLots(equipmentId, specName, targetTime) {
             </div>
             <div class="modal-body">
                 <div class="info-box" style="margin-bottom: 15px;">
-                    設備: ${equipmentId} | 規格: ${specName} | 基準時間: ${formatDateTime(targetTime)}
+                    設備: ${equipmentName} | 基準時間: ${formatDateTime(targetTime)}
                 </div>
                 <div id="adjacentLotsContent">
                     <div class="loading"><div class="loading-spinner"></div></div>
@@ -2117,7 +2134,6 @@ async function showAdjacentLots(equipmentId, specName, targetTime) {
         const result = await MesApi.get('/api/query-tool/adjacent-lots', {
             params: {
                 equipment_id: equipmentId,
-                spec_name: specName,
                 target_time: targetTime,
                 time_window: 24
             }
@@ -2143,6 +2159,8 @@ async function showAdjacentLots(equipmentId, specName, targetTime) {
                             <th>相對位置</th>
                             <th>LOT ID</th>
                             <th>產品類型</th>
+                            <th>BOP</th>
+                            <th>Wafer Lot</th>
                             <th>工單</th>
                             <th>批次號</th>
                             <th>上機時間</th>
@@ -2164,6 +2182,8 @@ async function showAdjacentLots(equipmentId, specName, targetTime) {
                     <td><strong>${posLabel}</strong></td>
                     <td>${lot.CONTAINERNAME || '-'}</td>
                     <td>${lot.PJ_TYPE || '-'}</td>
+                    <td>${lot.PJ_BOP || '-'}</td>
+                    <td>${lot.WAFER_LOT_ID || '-'}</td>
                     <td>${lot.PJ_WORKORDER || '-'}</td>
                     <td>${lot.FINISHEDRUNCARD || ''}</td>
                     <td>${formatDateTime(lot.TRACKINTIMESTAMP)}</td>
@@ -2252,7 +2272,7 @@ function renderWorkcenterGroupSelector() {
                 </div>
                 <div class="wc-group-footer">
                     <button type="button" class="btn btn-sm btn-secondary" onclick="clearWorkcenterGroups()">清除</button>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="closeWorkcenterGroupDropdown()">確定</button>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="applyWorkcenterFilter()">套用篩選</button>
                 </div>
             </div>
         </div>
@@ -2328,6 +2348,27 @@ function closeWorkcenterGroupDropdown() {
     if (dropdown) dropdown.classList.remove('show');
 }
 
+function applyWorkcenterFilter() {
+    // Close dropdown
+    closeWorkcenterGroupDropdown();
+
+    // Check if we have selected lots
+    if (QueryToolState.timelineSelectedLots.size === 0) {
+        Toast.warning('請先選擇批次');
+        return;
+    }
+
+    const wcGroups = QueryToolState.selectedWorkcenterGroups;
+    if (wcGroups.size > 0) {
+        Toast.info(`套用 ${wcGroups.size} 個站點群組篩選...`);
+    } else {
+        Toast.info('顯示全部站點資料...');
+    }
+
+    // Re-run confirmLotSelection to apply the filter
+    confirmLotSelection();
+}
+
 function filterWorkcenterGroups(searchText) {
     const items = document.querySelectorAll('.wc-group-item');
     const search = searchText.toLowerCase();
@@ -2339,9 +2380,14 @@ function filterWorkcenterGroups(searchText) {
 }
 
 function showWorkcenterGroupSelector() {
-    const container = document.getElementById('workcenterGroupSelectorContainer');
-    if (container && QueryToolState.workcenterGroups.length > 0) {
-        container.style.display = 'block';
+    // Show the entire selection bar
+    const selectionBar = document.getElementById('selectionBar');
+    if (selectionBar) {
+        selectionBar.style.display = 'flex';
+    }
+
+    // Render the workcenter group selector if groups are available
+    if (QueryToolState.workcenterGroups.length > 0) {
         renderWorkcenterGroupSelector();
     }
 }
@@ -2753,7 +2799,7 @@ async function exportCombinedResults() {
     }
 
     // Generate CSV
-    const headers = ['LOT_ID', 'WORKCENTERNAME', 'EQUIPMENTNAME', 'SPECNAME', 'TRACKINTIMESTAMP', 'TRACKOUTTIMESTAMP', 'TRACKINQTY', 'TRACKOUTQTY'];
+    const headers = ['LOT_ID', 'WORKCENTERNAME', 'EQUIPMENTNAME', 'SPECNAME', 'PJ_TYPE', 'PJ_BOP', 'WAFER_LOT_ID', 'TRACKINTIMESTAMP', 'TRACKOUTTIMESTAMP', 'TRACKINQTY', 'TRACKOUTQTY'];
     let csv = headers.join(',') + '\n';
 
     allHistory.forEach(row => {

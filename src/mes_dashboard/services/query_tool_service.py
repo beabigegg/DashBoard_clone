@@ -35,7 +35,7 @@ MAX_SERIAL_NUMBERS = 50
 MAX_WORK_ORDERS = 10
 MAX_EQUIPMENTS = 20
 MAX_DATE_RANGE_DAYS = 90
-DEFAULT_TIME_WINDOW_HOURS = 24
+DEFAULT_TIME_WINDOW_HOURS = 168  # 1 week for better PJ_TYPE detection
 ADJACENT_LOTS_COUNT = 3
 
 
@@ -498,26 +498,24 @@ def get_lot_history(
 
 def get_adjacent_lots(
     equipment_id: str,
-    spec_name: str,
     target_trackin_time: str,
     time_window_hours: int = DEFAULT_TIME_WINDOW_HOURS
 ) -> Dict[str, Any]:
-    """Get adjacent lots (前後批) for a specific equipment and spec.
+    """Get adjacent lots (前後批) for a specific equipment.
 
-    Finds lots processed before and after the target lot on the same
-    equipment with the same spec, limited to ±time_window_hours.
+    Finds lots processed before and after the target lot on the same equipment.
+    Searches until finding a different PJ_TYPE, with minimum 3 lots in each direction.
 
     Args:
         equipment_id: Target equipment ID
-        spec_name: Target spec name
         target_trackin_time: Target lot's TRACKINTIMESTAMP (ISO format)
         time_window_hours: Time window in hours (default 24)
 
     Returns:
         Dict with 'data' (adjacent lots with relative_position) and metadata.
     """
-    if not all([equipment_id, spec_name, target_trackin_time]):
-        return {'error': '請指定設備、規格和目標時間'}
+    if not all([equipment_id, target_trackin_time]):
+        return {'error': '請指定設備和目標時間'}
 
     try:
         # Parse target time
@@ -526,13 +524,9 @@ def get_adjacent_lots(
         else:
             target_time = target_trackin_time
 
-        time_start = target_time - timedelta(hours=time_window_hours)
-        time_end = target_time + timedelta(hours=time_window_hours)
-
         sql = SQLLoader.load("query_tool/adjacent_lots")
         params = {
             'equipment_id': equipment_id,
-            'spec_name': spec_name,
             'target_trackin_time': target_time,
             'time_window_hours': time_window_hours,
         }
@@ -540,13 +534,12 @@ def get_adjacent_lots(
         df = read_sql_df(sql, params)
         data = _df_to_records(df)
 
-        logger.debug(f"Adjacent lots: {len(data)} records for {equipment_id}/{spec_name}")
+        logger.debug(f"Adjacent lots: {len(data)} records for {equipment_id}")
 
         return {
             'data': data,
             'total': len(data),
             'equipment_id': equipment_id,
-            'spec_name': spec_name,
             'target_time': target_trackin_time,
             'time_window_hours': time_window_hours,
         }

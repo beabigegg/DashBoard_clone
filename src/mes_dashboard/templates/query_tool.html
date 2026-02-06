@@ -101,6 +101,47 @@
             border-color: #4e54c8;
         }
 
+        /* Sticky selection bar for LOT and workcenter filter */
+        .selection-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #f8f9ff 0%, #eef1ff 100%);
+            border: 1px solid #d4d9ff;
+            border-radius: 8px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            flex-wrap: wrap;
+        }
+
+        .selection-bar .wc-filter-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .selection-bar .wc-filter-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #555;
+            white-space: nowrap;
+        }
+
+        .selection-bar .selection-hint {
+            margin-left: auto;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .selection-bar .selection-hint::before {
+            content: "💡";
+        }
+
         /* LOT selector dropdown */
         .lot-selector {
             position: relative;
@@ -1110,9 +1151,12 @@
                 <button class="btn btn-primary" onclick="executeLotQuery()" id="lotQueryBtn">
                     查詢
                 </button>
+            </div>
 
-                <!-- LOT Selector (appears after query) -->
-                <div class="lot-selector" id="lotSelectorContainer" style="display: none;">
+            <!-- Sticky Sub-bar for LOT Selection and Workcenter Filter -->
+            <div class="selection-bar" id="selectionBar" style="display: none;">
+                <!-- LOT Selector -->
+                <div class="lot-selector" id="lotSelectorContainer">
                     <div class="lot-selector-btn" onclick="toggleLotSelector()">
                         <span id="lotSelectorDisplay">選擇 LOT</span>
                         <span class="lot-count-badge" id="lotCountBadge">0</span>
@@ -1122,12 +1166,17 @@
                     </div>
                 </div>
 
-                <!-- Workcenter Group Filter (appears after query) -->
-                <div class="filter-item" id="workcenterGroupSelectorContainer" style="display: none;">
-                    <label>站點篩選</label>
+                <!-- Workcenter Group Filter -->
+                <div class="wc-filter-container" id="workcenterGroupSelectorContainer">
+                    <span class="wc-filter-label">站點篩選:</span>
                     <div id="workcenterGroupSelector">
                         <!-- Rendered by JS -->
                     </div>
+                </div>
+
+                <!-- Quick action hint -->
+                <div class="selection-hint" id="selectionHint">
+                    <span>選擇批次和站點後點擊「套用篩選」</span>
                 </div>
             </div>
 
