@@ -14,6 +14,7 @@ from .admin_routes import admin_bp
 from .resource_history_routes import resource_history_bp
 from .job_query_routes import job_query_bp
 from .query_tool_routes import query_tool_bp
+from .tmtt_defect_routes import tmtt_defect_bp
 
 
 def register_routes(app) -> None:
@@ -26,6 +27,7 @@ def register_routes(app) -> None:
     app.register_blueprint(resource_history_bp)
     app.register_blueprint(job_query_bp)
     app.register_blueprint(query_tool_bp)
+    app.register_blueprint(tmtt_defect_bp)
 
 __all__ = [
     'wip_bp',
@@ -38,5 +40,6 @@ __all__ = [
     'resource_history_bp',
     'job_query_bp',
     'query_tool_bp',
+    'tmtt_defect_bp',
     'register_routes',
 ]

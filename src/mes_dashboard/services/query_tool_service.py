@@ -19,6 +19,7 @@ import csv
 import io
 import logging
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Generator
 
 import pandas as pd
@@ -189,6 +190,8 @@ def _df_to_records(df: pd.DataFrame) -> List[Dict[str, Any]]:
                 record[col] = value.strftime('%Y-%m-%d %H:%M:%S')
             elif isinstance(value, pd.Timestamp):
                 record[col] = value.strftime('%Y-%m-%d %H:%M:%S')
+            elif isinstance(value, Decimal):
+                record[col] = float(value)
             else:
                 record[col] = value
         data.append(record)

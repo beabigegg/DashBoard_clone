@@ -328,6 +328,9 @@
             {% if can_view_page('/query-tool') %}
             <button class="tab" data-target="queryToolFrame">批次追蹤工具</button>
             {% endif %}
+            {% if can_view_page('/tmtt-defect') %}
+            <button class="tab" data-target="tmttDefectFrame">TMTT不良分析</button>
+            {% endif %}
         </div>
 
         <div class="panel">
@@ -352,6 +355,9 @@
             {% endif %}
             {% if can_view_page('/query-tool') %}
             <iframe id="queryToolFrame" data-src="/query-tool" title="批次追蹤工具"></iframe>
+            {% endif %}
+            {% if can_view_page('/tmtt-defect') %}
+            <iframe id="tmttDefectFrame" data-src="/tmtt-defect" title="TMTT不良分析"></iframe>
             {% endif %}
         </div>
     </div>

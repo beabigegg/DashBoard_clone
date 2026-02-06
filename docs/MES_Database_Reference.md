@@ -101,7 +101,8 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 容器/批次主檔 - 目前在製容器狀態、數量與流程資訊
 
-**数据量**: 5,218,406 行
+**数据量**: 5,218,406 行（文档生成时）
+**最新查詢**: 5,236,224 行（2026-02-06 直連 Oracle）
 
 #### 字段列表
 
@@ -200,6 +201,51 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 | `DW_C_PRODUCTBOMBASEID` | 普通索引 | PRODUCTBOMBASEID |
 | `DW_C_SCHEDULEDATAID` | 普通索引 | SCHEDULEDATAID |
 | `DW_MES_CONTAINER_PRODUCTLINENAME` | 普通索引 | PRODUCTLINENAME |
+
+
+#### 實際資料觀察（2026-02-06）
+
+**產品/材料欄位完整度與 distinct**
+
+| 欄位 | 非 NULL 筆數 | 佔比 | distinct 數 | 觀察 |
+|------|--------------|------|-------------|------|
+| `PRODUCTNAME` | 5,236,224 | 100.0% | 11,635 | 產品名稱（完整品號） |
+| `PRODUCTLINENAME` | 3,668,259 | 70.1% | 66 | 產品線/封裝類型 |
+| `PJ_TYPE` | 3,449,835 | 65.9% | 5,224 | 產品型號 |
+| `PJ_FUNCTION` | 3,449,835 | 65.9% | 19 | 產品功能分類 |
+| `PJ_BOP` | 3,427,782 | 65.5% | 125 | BOP 代碼 |
+| `PRODUCTBOMBASEID` | 3,534,058 | 67.5% | 10,581 | 產品 BOM 基準 |
+| `PRODUCTDESC` | 2,005,403 | 38.3% | 5,613 | 產品描述 |
+| `LEADFRAMENAME` | 3,427,527 | 65.5% | 102 | Leadframe/料號 |
+| `LEADFRAMEOPTION` | 3,427,017 | 65.4% | 33 | Leadframe option |
+| `LEADFRAMEDESC` | 3,427,527 | 65.5% | 97 | Leadframe 描述 |
+| `PJ_PRODUCEREGION` | 2,350,350 | 44.9% | 5 | 生產區域 |
+
+**拆併批欄位觀察**
+
+| 指標 | 筆數 | 佔比 | 解讀 |
+|------|------|------|------|
+| `SPLITFROMID` 非 NULL | 3,697,293 | 70.6% | 子批可回溯母批 |
+| `SPLITCOUNT` > 0 | 1,855,733 | 35.4% | 母批拆批數 |
+| `ORIGINALCONTAINERID = CONTAINERID` | 1,538,931 | 29.4% | 原始批 |
+| `ORIGINALCONTAINERID ≠ CONTAINERID` | 3,697,293 | 70.6% | 拆批衍生批 |
+| `FUTURECOMBINEPARENTLOTID` 非 NULL | 5 | ~0% | 少量併批規劃資料 |
+| `PARENTCONTAINERID` 非 NULL | 0 | 0% | 目前資料未使用 |
+
+**拆批追溯建議**
+
+`SPLITFROMID` 與 `SPLITCOUNT` 在資料中呈現「子批/母批」互補特性：子批多以 `SPLITFROMID` 指向母批，而母批以 `SPLITCOUNT` 顯示拆出數量。要追溯拆批關係，可用 `SPLITFROMID -> CONTAINERID` 自連結。
+
+```sql
+SELECT
+    c.CONTAINERNAME AS CHILD_CONTAINER,
+    p.CONTAINERNAME AS PARENT_CONTAINER,
+    c.SPLITFROMID
+FROM DWH.DW_MES_CONTAINER c
+LEFT JOIN DWH.DW_MES_CONTAINER p ON c.SPLITFROMID = p.CONTAINERID
+WHERE c.SPLITFROMID IS NOT NULL
+  AND ROWNUM <= 20;
+```
 
 ---
 

@@ -216,6 +216,11 @@ def create_app(config_name: str | None = None) -> Flask:
         """Resource history analysis page."""
         return render_template('resource_history.html')
 
+    @app.route('/tmtt-defect')
+    def tmtt_defect_page():
+        """TMTT printing & lead form defect analysis page."""
+        return render_template('tmtt_defect.html')
+
     # ========================================================
     # Table Query APIs (for table_data_viewer)
     # ========================================================

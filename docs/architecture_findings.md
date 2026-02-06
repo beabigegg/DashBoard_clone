@@ -63,7 +63,8 @@ sql/
 │   ├── by_status.sql
 │   └── detail.sql
 ├── resource_history/      # 歷史 SQL
-└── job_query/             # 維修工單 SQL
+├── job_query/             # 維修工單 SQL
+└── tmtt_defect/           # TMTT 不良分析 SQL
 ```
 
 ### SQLLoader 使用方式
@@ -507,6 +508,7 @@ logs = store.query_logs(
 | resource_history | `/api/resource-history` | `resource_history_routes.py` |
 | job_query | `/api/job-query` | `job_query_routes.py` |
 | query_tool | `/api/query-tool` | `query_tool_routes.py` |
+| tmtt_defect | `/api/tmtt-defect` | `tmtt_defect_routes.py` |
 | admin | `/admin` | `admin_routes.py` |
 | auth | `/admin` | `auth_routes.py` |
 | health | `/` | `health_routes.py` |
@@ -1063,6 +1065,83 @@ from mes_dashboard.services.query_tool_service import (
 
 ---
 
+## 24. TMTT 印字腳型不良分析
+
+### 位置
+- 服務: `mes_dashboard.services.tmtt_defect_service`
+- 路由: `mes_dashboard.routes.tmtt_defect_routes`
+- SQL: `mes_dashboard/sql/tmtt_defect/`
+- 頁面: `mes_dashboard/templates/tmtt_defect.html`
+
+### 功能概述
+分析 TMTT（測試）站的印字與腳型不良率，按多個維度產生 Pareto 圖表，支援圖表鑽取至明細表，支援 CSV 匯出。
+
+### 不良率計算
+不良率依 LOSSREASONNAME **分開計算**：
+- **印字不良率** = SUM(REJECTQTY WHERE LOSSREASONNAME='277_印字不良') / SUM(TRACKINQTY) × 100%
+- **腳型不良率** = SUM(REJECTQTY WHERE LOSSREASONNAME='276_腳型不良') / SUM(TRACKINQTY) × 100%
+- 分母 (INPUT) 需以 CONTAINERID 去重（同 LOT 可能有多筆不良行）
+
+### 資料來源
+
+| 資料表 | 用途 | 關鍵欄位 |
+|--------|------|---------|
+| DW_MES_LOTWIPHISTORY | TMTT 站投入記錄 | CONTAINERID, TRACKINQTY, EQUIPMENTID, WORKCENTERNAME |
+| DW_MES_LOTWIPHISTORY | MOLD 站設備回串 | CONTAINERID, EQUIPMENTNAME, TRACKINTIMESTAMP |
+| DW_MES_LOTREJECTHISTORY | 不良記錄 | CONTAINERID, LOSSREASONNAME, 不良數=SUM(REJECTQTY+STANDBYQTY+QTYTOPROCESS+INPROCESSQTY+PROCESSEDQTY) |
+| DW_MES_CONTAINER | 產品資訊 | CONTAINERID, PJ_TYPE, PRODUCTLINENAME |
+| DW_MES_WIP | WORKFLOW 名稱 | CONTAINERID, WORKFLOWNAME (排除 PRODUCTLINENAME='點測') |
+
+### SQL 查詢結構 (`sql/tmtt_defect/base_data.sql`)
+單一 CTE 查詢，Python 層聚合：
+```
+tmtt_records    → LOTWIPHISTORY 篩選 TMTT 站 (WORKCENTERNAME LIKE '%TMTT%' OR '%測試%')
+tmtt_deduped    → ROW_NUMBER 去重 (同 CONTAINERID 取最晚 TRACKOUTTIMESTAMP)
+tmtt_rejects    → LOTREJECTHISTORY 篩選 '276_腳型不良', '277_印字不良'，不良數=5欄位加總，按 CONTAINERID+LOSSREASONNAME 聚合
+mold_records    → LOTWIPHISTORY 篩選成型站，ROW_NUMBER 取最早上機
+mold_deduped    → 取 mold_rn=1
+product_info    → CONTAINER 取 PJ_TYPE, PRODUCTLINENAME
+workflow_info   → WIP 取 WORKFLOWNAME (排除 PRODUCTLINENAME='點測'，fallback SPECNAME)
+→ LEFT JOIN 全部
+```
+
+### API 端點
+
+| 端點 | 方法 | 參數 | 說明 |
+|------|------|------|------|
+| `/api/tmtt-defect/analysis` | GET | `start_date`, `end_date` | KPI + 5 維度圖表 + 明細 |
+| `/api/tmtt-defect/export` | GET | `start_date`, `end_date` | CSV 串流匯出 |
+
+### 快取策略
+- Redis 快取，TTL 300 秒（5 分鐘）
+- Cache key 包含 start_date + end_date
+- 最大查詢範圍: 180 天
+
+### Pareto 圖表維度
+1. WORKFLOW (DW_MES_WIP.WORKFLOWNAME，fallback SPECNAME)
+2. PACKAGE (PRODUCTLINENAME)
+3. TYPE (PJ_TYPE)
+4. TMTT 機台 (EQUIPMENTNAME)
+5. MOLD 機台 (MOLD_EQUIPMENTNAME)
+
+每個維度按總不良數降序排列，含累積百分比。NULL 值歸為「(未知)」。
+
+### 服務函數
+
+```python
+from mes_dashboard.services.tmtt_defect_service import (
+    query_tmtt_defect_analysis,  # 主查詢入口
+    export_csv,                   # CSV 串流匯出
+)
+```
+
+### 注意事項
+- WORKFLOW 欄位來自 DW_MES_WIP.WORKFLOWNAME（排除 PRODUCTLINENAME='點測'），若無則 fallback 到 SPECNAME
+- MOLD 設備取同 LOT 最早上機者（ROW_NUMBER PARTITION BY CONTAINERID ORDER BY TRACKINTIMESTAMP ASC）
+- LOTREJECTHISTORY 只有 EQUIPMENTNAME，TMTT 機台識別以 LOTWIPHISTORY 的 EQUIPMENTID 為主
+
+---
+
 ## 參考檔案索引
 
 | 功能 | 檔案位置 |
@@ -1083,5 +1162,7 @@ from mes_dashboard.services.query_tool_service import (
 | Filter 快取 | `src/mes_dashboard/services/filter_cache.py` |
 | 資源快取 | `src/mes_dashboard/services/resource_cache.py` |
 | 批次追蹤服務 | `src/mes_dashboard/services/query_tool_service.py` |
+| TMTT 不良分析服務 | `src/mes_dashboard/services/tmtt_defect_service.py` |
+| TMTT 不良分析 SQL | `src/mes_dashboard/sql/tmtt_defect/base_data.sql` |
 | API 客戶端 | `src/mes_dashboard/static/js/mes-api.js` |
 | Toast 系統 | `src/mes_dashboard/static/js/toast.js` |

@@ -49,6 +49,11 @@
       "route": "/query-tool",
       "name": "批次追蹤工具",
       "status": "released"
+    },
+    {
+      "route": "/tmtt-defect",
+      "name": "TMTT印字腳型不良分析",
+      "status": "dev"
     }
   ],
   "api_public": true,
