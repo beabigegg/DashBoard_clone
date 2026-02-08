@@ -92,7 +92,7 @@ def create_app(config_name: str | None = None) -> Flask:
     # Initialize database teardown and pool
     init_db(app)
     with app.app_context():
-        get_engine()
+        get_engine(app.config)  # Use config for pool_size/max_overflow
         start_keepalive()  # Keep database connections alive
         start_cache_updater()  # Start Redis cache updater
         init_realtime_equipment_cache(app)  # Start realtime equipment status cache
@@ -230,7 +230,7 @@ def create_app(config_name: str | None = None) -> Flask:
         """API: query table data with optional column filters."""
         data = request.get_json()
         table_name = data.get('table_name')
-        limit = data.get('limit', 1000)
+        limit = min(data.get('limit', 1000), 10000)  # Cap at 10,000
         time_field = data.get('time_field')
         filters = data.get('filters')
 

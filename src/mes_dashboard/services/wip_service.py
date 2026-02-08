@@ -195,11 +195,11 @@ def _filter_base_conditions(
 
     # WORKORDER filter (fuzzy match)
     if workorder:
-        df = df[df['WORKORDER'].str.contains(workorder, case=False, na=False)]
+        df = df[df['WORKORDER'].str.contains(workorder, case=False, na=False, regex=False)]
 
     # LOTID filter (fuzzy match)
     if lotid:
-        df = df[df['LOTID'].str.contains(lotid, case=False, na=False)]
+        df = df[df['LOTID'].str.contains(lotid, case=False, na=False, regex=False)]
 
     return df
 
@@ -1160,7 +1160,7 @@ def search_workorders(
                 df = df[df['PJ_TYPE'] == pj_type]
 
             # Filter by search query (case-insensitive)
-            df = df[df['WORKORDER'].str.contains(q, case=False, na=False)]
+            df = df[df['WORKORDER'].str.contains(q, case=False, na=False, regex=False)]
 
             if df.empty:
                 return []
@@ -1258,7 +1258,7 @@ def search_lot_ids(
                 df = df[df['PJ_TYPE'] == pj_type]
 
             # Filter by search query (case-insensitive)
-            df = df[df['LOTID'].str.contains(q, case=False, na=False)]
+            df = df[df['LOTID'].str.contains(q, case=False, na=False, regex=False)]
 
             if df.empty:
                 return []
@@ -1360,7 +1360,7 @@ def search_packages(
                 df = df[df['PJ_TYPE'] == pj_type]
 
             # Filter by search query (case-insensitive)
-            df = df[df['PACKAGE_LEF'].str.contains(q, case=False, na=False)]
+            df = df[df['PACKAGE_LEF'].str.contains(q, case=False, na=False, regex=False)]
 
             if df.empty:
                 return []
@@ -1461,7 +1461,7 @@ def search_types(
                 df = df[df['PACKAGE_LEF'] == package]
 
             # Filter by search query (case-insensitive)
-            df = df[df['PJ_TYPE'].str.contains(q, case=False, na=False)]
+            df = df[df['PJ_TYPE'].str.contains(q, case=False, na=False, regex=False)]
 
             if df.empty:
                 return []
