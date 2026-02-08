@@ -13,10 +13,12 @@ from mes_dashboard.core.database import (
     DatabaseCircuitOpenError,
 )
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
+from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.utils import get_days_back, parse_bool_query
 
 
 def _clean_nan_values(data):
-    """Convert NaN and NaT values to None for JSON serialization.
+    """Convert NaN/NaT values to None for JSON serialization (depth-safe).
 
     Args:
         data: List of dicts or single dict.
@@ -24,28 +26,77 @@ def _clean_nan_values(data):
     Returns:
         Cleaned data with NaN/NaT replaced by None.
     """
+    def _normalize_scalar(value):
+        if isinstance(value, float) and math.isnan(value):
+            return None
+        if isinstance(value, str) and value == 'NaT':
+            return None
+        try:
+            if value != value:  # NaN check (NaN != NaN)
+                return None
+        except Exception:
+            pass
+        return value
+
     if isinstance(data, list):
-        return [_clean_nan_values(item) for item in data]
+        root: list = []
     elif isinstance(data, dict):
-        cleaned = {}
-        for key, value in data.items():
-            if isinstance(value, float) and math.isnan(value):
-                cleaned[key] = None
-            elif isinstance(value, str) and value == 'NaT':
-                cleaned[key] = None
-            elif value != value:  # NaN check (NaN != NaN)
-                cleaned[key] = None
-            elif isinstance(value, list):
-                # Recursively clean nested lists (e.g., LOT_DETAILS)
-                cleaned[key] = _clean_nan_values(value)
+        root = {}
+    else:
+        return _normalize_scalar(data)
+
+    stack = [(data, root)]
+    seen: set[int] = {id(data)}
+
+    while stack:
+        source, target = stack.pop()
+        if isinstance(source, list):
+            for item in source:
+                if isinstance(item, list):
+                    item_id = id(item)
+                    if item_id in seen:
+                        target.append(None)
+                        continue
+                    child = []
+                    target.append(child)
+                    seen.add(item_id)
+                    stack.append((item, child))
+                elif isinstance(item, dict):
+                    item_id = id(item)
+                    if item_id in seen:
+                        target.append(None)
+                        continue
+                    child = {}
+                    target.append(child)
+                    seen.add(item_id)
+                    stack.append((item, child))
+                else:
+                    target.append(_normalize_scalar(item))
+            continue
+
+        for key, value in source.items():
+            if isinstance(value, list):
+                value_id = id(value)
+                if value_id in seen:
+                    target[key] = None
+                    continue
+                child = []
+                target[key] = child
+                seen.add(value_id)
+                stack.append((value, child))
             elif isinstance(value, dict):
-                # Recursively clean nested dicts
-                cleaned[key] = _clean_nan_values(value)
+                value_id = id(value)
+                if value_id in seen:
+                    target[key] = None
+                    continue
+                child = {}
+                target[key] = child
+                seen.add(value_id)
+                stack.append((value, child))
             else:
-                cleaned[key] = value
-        return cleaned
-    return data
-from mes_dashboard.core.utils import get_days_back
+                target[key] = _normalize_scalar(value)
+    return root
+
 from mes_dashboard.services.resource_service import (
     query_resource_by_status,
     query_resource_by_workcenter,
@@ -61,6 +112,32 @@ from mes_dashboard.config.constants import STATUS_CATEGORIES
 
 # Create Blueprint
 resource_bp = Blueprint('resource', __name__, url_prefix='/api/resource')
+
+_RESOURCE_DETAIL_RATE_LIMIT = configured_rate_limit(
+    bucket="resource-detail",
+    max_attempts_env="RESOURCE_DETAIL_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="RESOURCE_DETAIL_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=60,
+    default_window_seconds=60,
+)
+
+_RESOURCE_STATUS_RATE_LIMIT = configured_rate_limit(
+    bucket="resource-status",
+    max_attempts_env="RESOURCE_STATUS_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="RESOURCE_STATUS_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=90,
+    default_window_seconds=60,
+)
+
+
+def _optional_bool_arg(name: str):
+    raw = request.args.get(name)
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    return parse_bool_query(text)
 
 
 @resource_bp.route('/by_status')
@@ -118,6 +195,7 @@ def api_resource_workcenter_status_matrix():
 
 
 @resource_bp.route('/detail', methods=['POST'])
+@_RESOURCE_DETAIL_RATE_LIMIT
 def api_resource_detail():
     """API: Resource detail with filters."""
     data = request.get_json() or {}
@@ -183,6 +261,7 @@ def api_resource_status_values():
 # ============================================================
 
 @resource_bp.route('/status')
+@_RESOURCE_STATUS_RATE_LIMIT
 def api_resource_status():
     """API: Get merged resource status from realtime cache.
 
@@ -197,20 +276,9 @@ def api_resource_status():
     wc_groups_param = request.args.get('workcenter_groups')
     workcenter_groups = wc_groups_param.split(',') if wc_groups_param else None
 
-    is_production = None
-    is_prod_param = request.args.get('is_production')
-    if is_prod_param:
-        is_production = is_prod_param.lower() in ('1', 'true', 'yes')
-
-    is_key = None
-    is_key_param = request.args.get('is_key')
-    if is_key_param:
-        is_key = is_key_param.lower() in ('1', 'true', 'yes')
-
-    is_monitor = None
-    is_monitor_param = request.args.get('is_monitor')
-    if is_monitor_param:
-        is_monitor = is_monitor_param.lower() in ('1', 'true', 'yes')
+    is_production = _optional_bool_arg('is_production')
+    is_key = _optional_bool_arg('is_key')
+    is_monitor = _optional_bool_arg('is_monitor')
 
     status_cats_param = request.args.get('status_categories')
     status_categories = status_cats_param.split(',') if status_cats_param else None
@@ -260,6 +328,7 @@ def api_resource_status_options():
 
 
 @resource_bp.route('/status/summary')
+@_RESOURCE_STATUS_RATE_LIMIT
 def api_resource_status_summary():
     """API: Get resource status summary statistics.
 
@@ -269,20 +338,9 @@ def api_resource_status_summary():
     wc_groups_param = request.args.get('workcenter_groups')
     workcenter_groups = wc_groups_param.split(',') if wc_groups_param else None
 
-    is_production = None
-    is_prod_param = request.args.get('is_production')
-    if is_prod_param:
-        is_production = is_prod_param.lower() in ('1', 'true', 'yes')
-
-    is_key = None
-    is_key_param = request.args.get('is_key')
-    if is_key_param:
-        is_key = is_key_param.lower() in ('1', 'true', 'yes')
-
-    is_monitor = None
-    is_monitor_param = request.args.get('is_monitor')
-    if is_monitor_param:
-        is_monitor = is_monitor_param.lower() in ('1', 'true', 'yes')
+    is_production = _optional_bool_arg('is_production')
+    is_key = _optional_bool_arg('is_key')
+    is_monitor = _optional_bool_arg('is_monitor')
 
     try:
         data = get_resource_status_summary(
@@ -301,6 +359,7 @@ def api_resource_status_summary():
 
 
 @resource_bp.route('/status/matrix')
+@_RESOURCE_STATUS_RATE_LIMIT
 def api_resource_status_matrix():
     """API: Get workcenter × status matrix.
 
@@ -309,20 +368,9 @@ def api_resource_status_matrix():
         is_key: Filter by key equipment
         is_monitor: Filter by monitor equipment
     """
-    is_production = None
-    is_prod_param = request.args.get('is_production')
-    if is_prod_param:
-        is_production = is_prod_param.lower() in ('1', 'true', 'yes')
-
-    is_key = None
-    is_key_param = request.args.get('is_key')
-    if is_key_param:
-        is_key = is_key_param.lower() in ('1', 'true', 'yes')
-
-    is_monitor = None
-    is_monitor_param = request.args.get('is_monitor')
-    if is_monitor_param:
-        is_monitor = is_monitor_param.lower() in ('1', 'true', 'yes')
+    is_production = _optional_bool_arg('is_production')
+    is_key = _optional_bool_arg('is_key')
+    is_monitor = _optional_bool_arg('is_monitor')
 
     try:
         data = get_workcenter_status_matrix(

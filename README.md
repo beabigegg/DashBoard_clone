@@ -26,8 +26,57 @@
 | Worker 重啟控制 | ✅ 已完成 |
 | Runtime 韌性診斷（threshold/churn/recommendation） | ✅ 已完成 |
 | WIP 共用 autocomplete core 模組 | ✅ 已完成 |
+| WIP 共用 derive core 模組（KPI/filter/chart/table） | ✅ 已完成 |
+| WIP 索引查詢加速與增量同步 | ✅ 已完成 |
+| 快取記憶體放大係數 telemetry | ✅ 已完成 |
+| Cache benchmark gate（P95/記憶體門檻） | ✅ 已完成 |
+| Worker guarded mode + manual override 稽核 | ✅ 已完成 |
+| Runtime contract 啟動校驗（conda/systemd/watchdog） | ✅ 已完成 |
 | 前端核心模組測試（Node test） | ✅ 已完成 |
 | 部署自動化 | ✅ 已完成 |
+
+---
+
+## 開發歷史（Vite 重構後）
+
+- 2026-02-07：完成 Flask + Vite 單一 port 架構切換，舊版 `DashBoard/` 停用。
+- 2026-02-08：補齊 runtime 韌性治理（threshold/churn/recommendation）與 watchdog 可觀測欄位。
+- 2026-02-08：完成 P0 安全/穩定性硬化：
+  - production `SECRET_KEY` 缺失時啟動失敗（fail-fast）
+  - admin form + admin mutation API CSRF 防護
+  - health probe 使用獨立 DB pool，避免與主查詢池互相阻塞
+  - worker/app shutdown 統一清理 cache updater、realtime sync、Redis、DB engine
+  - `hold_detail` inline script 變數改為 `tojson` 序列化
+- 2026-02-08：完成 P1 快取/查詢效率重構：
+  - WIP 查詢路徑改為索引選擇，保留 `resource/wip` 全表快取語意
+  - WIP search index 增量同步（watermark/version）與 drift fallback
+  - health/admin 新增 cache memory amplification telemetry
+  - 建立 `scripts/run_cache_benchmarks.py` + fixture gate
+- 2026-02-08：完成 P2 運維自癒治理：
+  - runtime contract 共用化（app/start_server/watchdog/systemd）
+  - 啟動時 conda/watchdog 路徑 drift fail-fast
+  - worker restart policy（cooldown/retry budget/churn guarded mode）
+  - manual override（需 ack + reason）與結構化 audit log
+- 2026-02-08：完成 round-2 安全/穩定補強：
+  - LDAP endpoint 改為嚴格驗證（`https` + `LDAP_ALLOWED_HOSTS`）
+  - process-level cache 新增 `max_size + LRU`（WIP/Resource）
+  - circuit breaker transition logging 移至鎖外，降低 lock contention
+  - 全域安全標頭（CSP/XFO/nosniff/Referrer-Policy，production 加 HSTS）
+  - WIP detail 分頁參數加上下限（`page>=1`、`1<=page_size<=500`）
+- 2026-02-08：完成 round-3 殘餘風險修補：
+  - WIP cache publish 採 staged publish，失敗不污染舊快照
+  - WIP slow-path parse 移至鎖外；realtime equipment process cache 補齊 bounded LRU
+  - resource NaN 清理改為 depth-safe 迭代；WIP/Hold 布林查詢解析共用化
+  - filter cache view 名稱改為 env 可配置
+  - `/health`、`/health/deep` 新增 5 秒內部 memo（testing 模式禁用）
+  - 高成本 API 增加輕量 rate limit（WIP detail/matrix、Hold lots、Resource status/detail）
+  - DB 連線字串 log redaction 遮罩密碼
+- 2026-02-08：完成 round-4 殘餘治理收斂：
+  - Resource derived index 改為 row-position representation，移除 process 內 full records 複本
+  - Resource / Realtime Equipment 共用 Oracle SQL fragments，降低查詢定義漂移
+  - `resource_cache` / `realtime_equipment_cache` 型別註記與高頻常數命名收斂
+  - `page_registry` 寫檔改為 atomic replace（tmp + rename），避免設定檔半寫入
+  - 新增測試保護：共享 SQL 片段、index normalization、route bool parser 不重複定義
 
 ---
 
@@ -46,19 +95,36 @@
 1. 單一 port 契約維持不變
 - Flask + Gunicorn + Vite dist 由同一服務提供（`GUNICORN_BIND`），前後端同源。
 
-2. Runtime 韌性採「降級 + 可操作建議」
+2. Runtime 韌性採「降級 + 可操作建議 + policy state」
 - `/health`、`/health/deep`、`/admin/api/system-status`、`/admin/api/worker/status` 皆提供：
   - 門檻（thresholds）
+  - policy state（`allowed` / `cooldown` / `blocked`）
   - 重啟 churn 摘要
+  - alerts（pool/circuit/churn）
   - recovery recommendation（值班建議動作）
 
-3. Watchdog 維持手動觸發重啟模型
-- 仍以 admin API 觸發 reload，不預設啟用自動重啟風暴風險。
-- state 檔新增 bounded restart history，方便追蹤 churn。
+3. Watchdog 自癒策略具界限保護
+- restart 流程納入 cooldown + retry budget + churn window。
+- churn 超標時進入 guarded mode，需 admin manual override 才可繼續重啟。
+- state 檔保留 bounded restart history，供 policy 與稽核使用。
 
-4. 前端治理：WIP autocomplete/filter 共用化
+4. 前端治理：WIP compute 共用化
 - `frontend/src/core/autocomplete.js` 作為 WIP overview/detail 共用邏輯來源。
+- `frontend/src/core/wip-derive.js` 共用 KPI/filter/chart/table 導出運算。
 - 維持既有頁面流程與 drill-down 語意，不變更操作習慣。
+
+5. P1 快取效率治理
+- 保留 `resource`、`wip` 全表快取策略（業務約束不變）。
+- 查詢改走索引選擇，並提供 memory amplification / index efficiency telemetry。
+- 以 benchmark gate 驗證 P95 延遲與記憶體放大不超過門檻。
+
+6. P0 Runtime Hardening（安全 + 穩定）
+- Production 必須提供 `SECRET_KEY`；未設定時服務拒絕啟動。
+- `/admin/login` 與 `/admin/api/*` 變更請求必須攜帶 CSRF token。
+- `/health` 資料庫連通探針使用獨立 health pool，降低 pool 飽和時誤判。
+- 關機/重啟時統一釋放 background workers 與 Redis/DB 連線資源。
+- LDAP API URL 啟動驗證：僅允許 `https` + host allowlist。
+- 全域 security headers：CSP/X-Frame-Options/X-Content-Type-Options/Referrer-Policy（production 含 HSTS）。
 
 ---
 
@@ -175,6 +241,12 @@ DB_MAX_OVERFLOW=20
 DB_POOL_TIMEOUT=30
 DB_POOL_RECYCLE=1800
 DB_CALL_TIMEOUT_MS=55000
+DB_POOL_EXHAUSTED_RETRY_AFTER_SECONDS=5
+
+# Health probe 專用 DB pool（與主 request pool 隔離）
+DB_HEALTH_POOL_SIZE=1
+DB_HEALTH_MAX_OVERFLOW=0
+DB_HEALTH_POOL_TIMEOUT=2
 
 # Circuit Breaker
 CIRCUIT_BREAKER_ENABLED=true
@@ -192,6 +264,17 @@ WATCHDOG_RESTART_FLAG=./tmp/mes_dashboard_restart.flag
 WATCHDOG_PID_FILE=./tmp/gunicorn.pid
 WATCHDOG_STATE_FILE=./tmp/mes_dashboard_restart_state.json
 WATCHDOG_RESTART_HISTORY_MAX=50
+CONDA_BIN=/opt/miniconda3/bin/conda
+CONDA_ENV_NAME=mes-dashboard
+RUNTIME_CONTRACT_VERSION=2026.02-p2
+RUNTIME_CONTRACT_ENFORCE=true
+
+# Worker self-healing policy
+WORKER_RESTART_COOLDOWN=60
+WORKER_RESTART_RETRY_BUDGET=3
+WORKER_RESTART_WINDOW_SECONDS=600
+WORKER_RESTART_CHURN_THRESHOLD=3
+WORKER_GUARDED_MODE_ENABLED=true
 
 # Runtime resilience thresholds
 RESILIENCE_DEGRADED_ALERT_SECONDS=300
@@ -202,6 +285,36 @@ RESILIENCE_RESTART_CHURN_THRESHOLD=3
 
 # 管理員設定
 ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
+LDAP_API_URL=https://ldap-api.example.com
+LDAP_ALLOWED_HOSTS=ldap-api.example.com,ldap-api-dr.example.com
+
+# CSRF 防護（admin form/admin mutation API）
+CSRF_ENABLED=true
+
+# Process-level cache bounded LRU（WIP/Resource）
+PROCESS_CACHE_MAX_SIZE=32
+WIP_PROCESS_CACHE_MAX_SIZE=32
+RESOURCE_PROCESS_CACHE_MAX_SIZE=32
+EQUIPMENT_PROCESS_CACHE_MAX_SIZE=32
+
+# Filter cache source views (env-overridable)
+FILTER_CACHE_WIP_VIEW=DWH.DW_MES_LOT_V
+FILTER_CACHE_SPEC_WORKCENTER_VIEW=DWH.DW_MES_SPEC_WORKCENTER_V
+
+# Health internal memoization
+HEALTH_MEMO_TTL_SECONDS=5
+
+# High-cost API rate limit (in-process)
+WIP_MATRIX_RATE_LIMIT_MAX_REQUESTS=120
+WIP_MATRIX_RATE_LIMIT_WINDOW_SECONDS=60
+WIP_DETAIL_RATE_LIMIT_MAX_REQUESTS=90
+WIP_DETAIL_RATE_LIMIT_WINDOW_SECONDS=60
+HOLD_LOTS_RATE_LIMIT_MAX_REQUESTS=90
+HOLD_LOTS_RATE_LIMIT_WINDOW_SECONDS=60
+RESOURCE_DETAIL_RATE_LIMIT_MAX_REQUESTS=60
+RESOURCE_DETAIL_RATE_LIMIT_WINDOW_SECONDS=60
+RESOURCE_STATUS_RATE_LIMIT_MAX_REQUESTS=90
+RESOURCE_STATUS_RATE_LIMIT_WINDOW_SECONDS=60
 ```
 
 ### 生產環境注意事項
@@ -226,6 +339,7 @@ sudo cp deploy/mes-dashboard-watchdog.service /etc/systemd/system/
 
 # 2. 準備環境設定檔
 sudo mkdir -p /etc/mes-dashboard
+sudo cp deploy/mes-dashboard.env.example /etc/mes-dashboard/mes-dashboard.env
 sudo cp .env /etc/mes-dashboard/mes-dashboard.env
 
 # 3. 重新載入 systemd
@@ -237,6 +351,12 @@ sudo systemctl enable --now mes-dashboard mes-dashboard-watchdog
 # 5. 查看狀態
 sudo systemctl status mes-dashboard
 sudo systemctl status mes-dashboard-watchdog
+```
+
+執行 runtime contract 驗證：
+
+```bash
+RUNTIME_CONTRACT_ENFORCE=true ./scripts/start_server.sh check
 ```
 
 ### Rollback 步驟
@@ -494,7 +614,8 @@ DashBoard_vite/
 │   └── worker_watchdog.py      # Worker 監控程式
 ├── deploy/                     # 部署設定
 │   ├── mes-dashboard.service            # Gunicorn systemd 服務 (Conda)
-│   └── mes-dashboard-watchdog.service   # Watchdog systemd 服務 (Conda)
+│   ├── mes-dashboard-watchdog.service   # Watchdog systemd 服務 (Conda)
+│   └── mes-dashboard.env.example        # Runtime contract 環境範本
 ├── tests/                      # 測試
 ├── data/                       # 資料檔案
 ├── logs/                       # 日誌
@@ -524,6 +645,9 @@ pytest tests/e2e/ -v
 
 # 執行壓力測試
 pytest tests/stress/ -v
+
+# Cache benchmark gate（P1）
+conda run -n mes-dashboard python scripts/run_cache_benchmarks.py --enforce
 ```
 
 ---
@@ -569,12 +693,17 @@ pytest tests/stress/ -v
 ### 2026-02-08
 
 - 完成並封存提案 `post-migration-resilience-governance`
+- 完成並封存提案 `p1-cache-query-efficiency`
+- 完成並封存提案 `p2-ops-self-healing-runbook`
 - 新增 runtime 韌性診斷核心（thresholds / restart churn / recovery recommendation）
+- 新增 worker restart policy state（allowed/cooldown/blocked）與 guarded mode override 流程
 - health 與 admin API 新增可操作韌性欄位：
   - `/health`、`/health/deep`
   - `/admin/api/system-status`、`/admin/api/worker/status`
 - watchdog restart state 支援 bounded history（`WATCHDOG_RESTART_HISTORY_MAX`）
 - WIP overview/detail 抽離共用 autocomplete/filter 模組（`frontend/src/core/autocomplete.js`）
+- WIP overview/detail 導入共享 derive 模組（`frontend/src/core/wip-derive.js`）
+- 新增 cache benchmark fixture 與 baseline-vs-indexed 門檻驗證
 - 新增前端 Node 測試流程（`npm --prefix frontend test`）
 - 更新 `README.mdj` 與 migration runbook 文件對齊 gate
 
@@ -654,5 +783,5 @@ pytest tests/stress/ -v
 
 ---
 
-**文檔版本**: 4.1
+**文檔版本**: 4.2
 **最後更新**: 2026-02-08

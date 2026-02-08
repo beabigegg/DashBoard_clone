@@ -3,6 +3,11 @@ import {
   debounce,
   fetchWipAutocompleteItems,
 } from '../core/autocomplete.js';
+import {
+  buildWipOverviewQueryParams,
+  splitHoldByType as splitHoldByTypeShared,
+  prepareParetoData as prepareParetoDataShared,
+} from '../core/wip-derive.js';
 
 ensureMesApiAvailable();
 
@@ -61,20 +66,7 @@ ensureMesApiAvailable();
           }
   
           function buildQueryParams() {
-              const params = {};
-              if (state.filters.workorder) {
-                  params.workorder = state.filters.workorder;
-              }
-              if (state.filters.lotid) {
-                  params.lotid = state.filters.lotid;
-              }
-              if (state.filters.package) {
-                  params.package = state.filters.package;
-              }
-              if (state.filters.type) {
-                  params.type = state.filters.type;
-              }
-              return params;
+              return buildWipOverviewQueryParams(state.filters);
           }
   
           // ============================================================
@@ -96,19 +88,7 @@ ensureMesApiAvailable();
           }
   
           async function fetchMatrix(signal = null) {
-              const params = buildQueryParams();
-              // Add status filter if active
-              if (activeStatusFilter) {
-                  if (activeStatusFilter === 'quality-hold') {
-                      params.status = 'HOLD';
-                      params.hold_type = 'quality';
-                  } else if (activeStatusFilter === 'non-quality-hold') {
-                      params.status = 'HOLD';
-                      params.hold_type = 'non-quality';
-                  } else {
-                      params.status = activeStatusFilter.toUpperCase();
-                  }
-              }
+              const params = buildWipOverviewQueryParams(state.filters, activeStatusFilter);
               const result = await MesApi.get('/api/wip/overview/matrix', {
                   params,
                   timeout: API_TIMEOUT,
@@ -467,37 +447,12 @@ ensureMesApiAvailable();
   
           // Task 2.1: Split hold data by type
           function splitHoldByType(data) {
-              if (!data || !data.items) {
-                  return { quality: [], nonQuality: [] };
-              }
-              const quality = data.items.filter(item => item.holdType === 'quality');
-              const nonQuality = data.items.filter(item => item.holdType !== 'quality');
-              return { quality, nonQuality };
+              return splitHoldByTypeShared(data);
           }
   
           // Task 2.2: Prepare Pareto data (sort by QTY desc, calculate cumulative %)
           function prepareParetoData(items) {
-              if (!items || items.length === 0) {
-                  return { reasons: [], qtys: [], lots: [], cumulative: [], totalQty: 0 };
-              }
-  
-              // Sort by QTY descending
-              const sorted = [...items].sort((a, b) => (b.qty || 0) - (a.qty || 0));
-  
-              const reasons = sorted.map(item => item.reason || '未知');
-              const qtys = sorted.map(item => item.qty || 0);
-              const lots = sorted.map(item => item.lots || 0);
-              const totalQty = qtys.reduce((sum, q) => sum + q, 0);
-  
-              // Calculate cumulative percentage
-              const cumulative = [];
-              let runningSum = 0;
-              qtys.forEach(qty => {
-                  runningSum += qty;
-                  cumulative.push(totalQty > 0 ? Math.round((runningSum / totalQty) * 100) : 0);
-              });
-  
-              return { reasons, qtys, lots, cumulative, totalQty, items: sorted };
+              return prepareParetoDataShared(items);
           }
   
           // Task 3.1: Initialize Pareto charts

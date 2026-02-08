@@ -13,8 +13,9 @@ import logging
 import os
 import threading
 import time
+from collections import OrderedDict
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -31,8 +32,26 @@ from mes_dashboard.config.constants import (
     EQUIPMENT_TYPE_FILTER,
 )
 from mes_dashboard.sql import QueryBuilder
+from mes_dashboard.services.sql_fragments import (
+    RESOURCE_BASE_SELECT_TEMPLATE,
+    RESOURCE_VERSION_SELECT_TEMPLATE,
+)
 
 logger = logging.getLogger('mes_dashboard.resource_cache')
+
+ResourceRecord = dict[str, Any]
+RowPosition = int
+PositionBucket = dict[str, list[RowPosition]]
+FlagBuckets = dict[str, list[RowPosition]]
+ResourceIndex = dict[str, Any]
+
+DEFAULT_PROCESS_CACHE_TTL_SECONDS = 30
+DEFAULT_PROCESS_CACHE_MAX_SIZE = 32
+DEFAULT_RESOURCE_SYNC_INTERVAL_SECONDS = 14_400  # 4 hours
+DEFAULT_INDEX_VERSION_CHECK_INTERVAL_SECONDS = 5
+RESOURCE_DF_CACHE_KEY = "resource_data"
+TRUE_BUCKET = "1"
+FALSE_BUCKET = "0"
 
 # ============================================================
 # Process-Level Cache (Prevents redundant JSON parsing)
@@ -41,26 +60,49 @@ logger = logging.getLogger('mes_dashboard.resource_cache')
 class _ProcessLevelCache:
     """Thread-safe process-level cache for parsed DataFrames."""
 
-    def __init__(self, ttl_seconds: int = 30):
-        self._cache: Dict[str, Tuple[pd.DataFrame, float]] = {}
+    def __init__(self, ttl_seconds: int = DEFAULT_PROCESS_CACHE_TTL_SECONDS, max_size: int = DEFAULT_PROCESS_CACHE_MAX_SIZE):
+        self._cache: OrderedDict[str, tuple[pd.DataFrame, float]] = OrderedDict()
         self._lock = threading.Lock()
-        self._ttl = ttl_seconds
+        self._ttl = max(int(ttl_seconds), 1)
+        self._max_size = max(int(max_size), 1)
 
-    def get(self, key: str) -> Optional[pd.DataFrame]:
+    @property
+    def max_size(self) -> int:
+        return self._max_size
+
+    def _evict_expired_locked(self, now: float) -> None:
+        stale_keys = [
+            key for key, (_, timestamp) in self._cache.items()
+            if now - timestamp > self._ttl
+        ]
+        for key in stale_keys:
+            self._cache.pop(key, None)
+
+    def get(self, key: str) -> pd.DataFrame | None:
         """Get cached DataFrame if not expired."""
         with self._lock:
-            if key not in self._cache:
+            payload = self._cache.get(key)
+            if payload is None:
                 return None
-            df, timestamp = self._cache[key]
-            if time.time() - timestamp > self._ttl:
-                del self._cache[key]
+            df, timestamp = payload
+            now = time.time()
+            if now - timestamp > self._ttl:
+                self._cache.pop(key, None)
                 return None
+            self._cache.move_to_end(key, last=True)
             return df
 
     def set(self, key: str, df: pd.DataFrame) -> None:
         """Cache a DataFrame with current timestamp."""
         with self._lock:
-            self._cache[key] = (df, time.time())
+            now = time.time()
+            self._evict_expired_locked(now)
+            if key in self._cache:
+                self._cache.pop(key, None)
+            elif len(self._cache) >= self._max_size:
+                self._cache.popitem(last=False)
+            self._cache[key] = (df, now)
+            self._cache.move_to_end(key, last=True)
 
     def invalidate(self, key: str) -> None:
         """Remove a key from cache."""
@@ -68,11 +110,29 @@ class _ProcessLevelCache:
             self._cache.pop(key, None)
 
 
+def _resolve_cache_max_size(env_name: str, default: int) -> int:
+    value = os.getenv(env_name)
+    if value is None:
+        return max(int(default), 1)
+    try:
+        return max(int(value), 1)
+    except (TypeError, ValueError):
+        return max(int(default), 1)
+
+
 # Global process-level cache for resource data (30s TTL)
-_resource_df_cache = _ProcessLevelCache(ttl_seconds=30)
+PROCESS_CACHE_MAX_SIZE = _resolve_cache_max_size("PROCESS_CACHE_MAX_SIZE", DEFAULT_PROCESS_CACHE_MAX_SIZE)
+RESOURCE_PROCESS_CACHE_MAX_SIZE = _resolve_cache_max_size(
+    "RESOURCE_PROCESS_CACHE_MAX_SIZE",
+    PROCESS_CACHE_MAX_SIZE,
+)
+_resource_df_cache = _ProcessLevelCache(
+    ttl_seconds=DEFAULT_PROCESS_CACHE_TTL_SECONDS,
+    max_size=RESOURCE_PROCESS_CACHE_MAX_SIZE,
+)
 _resource_parse_lock = threading.Lock()
 _resource_index_lock = threading.Lock()
-_resource_index: Dict[str, Any] = {
+_resource_index: ResourceIndex = {
     "ready": False,
     "source": None,
     "version": None,
@@ -80,19 +140,27 @@ _resource_index: Dict[str, Any] = {
     "built_at": None,
     "version_checked_at": 0.0,
     "count": 0,
-    "records": [],
+    "all_positions": [],
     "by_resource_id": {},
     "by_workcenter": {},
     "by_family": {},
     "by_department": {},
     "by_location": {},
-    "by_is_production": {"1": [], "0": []},
-    "by_is_key": {"1": [], "0": []},
-    "by_is_monitor": {"1": [], "0": []},
+    "by_is_production": {TRUE_BUCKET: [], FALSE_BUCKET: []},
+    "by_is_key": {TRUE_BUCKET: [], FALSE_BUCKET: []},
+    "by_is_monitor": {TRUE_BUCKET: [], FALSE_BUCKET: []},
+    "memory": {
+        "frame_bytes": 0,
+        "index_bytes": 0,
+        "records_json_bytes": 0,
+        "bucket_entries": 0,
+        "amplification_ratio": 0.0,
+        "representation": "dataframe+row-index",
+    },
 }
 
 
-def _new_empty_index() -> Dict[str, Any]:
+def _new_empty_index() -> ResourceIndex:
     return {
         "ready": False,
         "source": None,
@@ -101,15 +169,23 @@ def _new_empty_index() -> Dict[str, Any]:
         "built_at": None,
         "version_checked_at": 0.0,
         "count": 0,
-        "records": [],
+        "all_positions": [],
         "by_resource_id": {},
         "by_workcenter": {},
         "by_family": {},
         "by_department": {},
         "by_location": {},
-        "by_is_production": {"1": [], "0": []},
-        "by_is_key": {"1": [], "0": []},
-        "by_is_monitor": {"1": [], "0": []},
+        "by_is_production": {TRUE_BUCKET: [], FALSE_BUCKET: []},
+        "by_is_key": {TRUE_BUCKET: [], FALSE_BUCKET: []},
+        "by_is_monitor": {TRUE_BUCKET: [], FALSE_BUCKET: []},
+        "memory": {
+            "frame_bytes": 0,
+            "index_bytes": 0,
+            "records_json_bytes": 0,
+            "bucket_entries": 0,
+            "amplification_ratio": 0.0,
+            "representation": "dataframe+row-index",
+        },
     }
 
 
@@ -129,23 +205,59 @@ def _is_truthy_flag(value: Any) -> bool:
     return False
 
 
-def _bucket_append(bucket: Dict[str, List[Dict[str, Any]]], key: Any, record: Dict[str, Any]) -> None:
+def _bucket_append(bucket: PositionBucket, key: Any, row_position: RowPosition) -> None:
     if key is None:
         return
     if isinstance(key, float) and pd.isna(key):
         return
     key_str = str(key)
-    bucket.setdefault(key_str, []).append(record)
+    bucket.setdefault(key_str, []).append(int(row_position))
+
+
+def _estimate_dataframe_bytes(df: pd.DataFrame) -> int:
+    try:
+        return int(df.memory_usage(index=True, deep=True).sum())
+    except Exception:
+        return 0
+
+
+def _estimate_index_bytes(index: ResourceIndex) -> int:
+    """Estimate lightweight index memory footprint for telemetry."""
+    by_resource_id = index.get("by_resource_id", {})
+    by_workcenter = index.get("by_workcenter", {})
+    by_family = index.get("by_family", {})
+    by_department = index.get("by_department", {})
+    by_location = index.get("by_location", {})
+    by_is_production = index.get("by_is_production", {TRUE_BUCKET: [], FALSE_BUCKET: []})
+    by_is_key = index.get("by_is_key", {TRUE_BUCKET: [], FALSE_BUCKET: []})
+    by_is_monitor = index.get("by_is_monitor", {TRUE_BUCKET: [], FALSE_BUCKET: []})
+    all_positions = index.get("all_positions", [])
+
+    position_entries = (
+        len(all_positions)
+        + sum(len(v) for v in by_workcenter.values())
+        + sum(len(v) for v in by_family.values())
+        + sum(len(v) for v in by_department.values())
+        + sum(len(v) for v in by_location.values())
+        + len(by_is_production.get(TRUE_BUCKET, []))
+        + len(by_is_production.get(FALSE_BUCKET, []))
+        + len(by_is_key.get(TRUE_BUCKET, []))
+        + len(by_is_key.get(FALSE_BUCKET, []))
+        + len(by_is_monitor.get(TRUE_BUCKET, []))
+        + len(by_is_monitor.get(FALSE_BUCKET, []))
+    )
+    # Approximate integer/list/dict overhead; telemetry only needs directional signal.
+    return int(position_entries * 8 + len(by_resource_id) * 64)
 
 
 def _build_resource_index(
     df: pd.DataFrame,
     *,
     source: str,
-    version: Optional[str],
-    updated_at: Optional[str],
-) -> Dict[str, Any]:
-    records = df.to_dict(orient='records')
+    version: str | None,
+    updated_at: str | None,
+) -> ResourceIndex:
+    normalized_df = df.reset_index(drop=True)
     index = _new_empty_index()
     index["ready"] = True
     index["source"] = source
@@ -153,31 +265,58 @@ def _build_resource_index(
     index["updated_at"] = updated_at
     index["built_at"] = datetime.now().isoformat()
     index["version_checked_at"] = time.time()
-    index["count"] = len(records)
-    index["records"] = records
+    index["count"] = len(normalized_df)
+    index["all_positions"] = list(range(len(normalized_df)))
 
-    for record in records:
+    for row_position, record in normalized_df.iterrows():
         resource_id = record.get("RESOURCEID")
         if resource_id is not None and not (isinstance(resource_id, float) and pd.isna(resource_id)):
-            index["by_resource_id"][str(resource_id)] = record
+            index["by_resource_id"][str(resource_id)] = int(row_position)
 
-        _bucket_append(index["by_workcenter"], record.get("WORKCENTERNAME"), record)
-        _bucket_append(index["by_family"], record.get("RESOURCEFAMILYNAME"), record)
-        _bucket_append(index["by_department"], record.get("PJ_DEPARTMENT"), record)
-        _bucket_append(index["by_location"], record.get("LOCATIONNAME"), record)
+        _bucket_append(index["by_workcenter"], record.get("WORKCENTERNAME"), row_position)
+        _bucket_append(index["by_family"], record.get("RESOURCEFAMILYNAME"), row_position)
+        _bucket_append(index["by_department"], record.get("PJ_DEPARTMENT"), row_position)
+        _bucket_append(index["by_location"], record.get("LOCATIONNAME"), row_position)
 
-        index["by_is_production"]["1" if _is_truthy_flag(record.get("PJ_ISPRODUCTION")) else "0"].append(record)
-        index["by_is_key"]["1" if _is_truthy_flag(record.get("PJ_ISKEY")) else "0"].append(record)
-        index["by_is_monitor"]["1" if _is_truthy_flag(record.get("PJ_ISMONITOR")) else "0"].append(record)
+        index["by_is_production"][TRUE_BUCKET if _is_truthy_flag(record.get("PJ_ISPRODUCTION")) else FALSE_BUCKET].append(int(row_position))
+        index["by_is_key"][TRUE_BUCKET if _is_truthy_flag(record.get("PJ_ISKEY")) else FALSE_BUCKET].append(int(row_position))
+        index["by_is_monitor"][TRUE_BUCKET if _is_truthy_flag(record.get("PJ_ISMONITOR")) else FALSE_BUCKET].append(int(row_position))
+
+    bucket_entries = (
+        sum(len(v) for v in index["by_workcenter"].values())
+        + sum(len(v) for v in index["by_family"].values())
+        + sum(len(v) for v in index["by_department"].values())
+        + sum(len(v) for v in index["by_location"].values())
+        + len(index["by_is_production"][TRUE_BUCKET])
+        + len(index["by_is_production"][FALSE_BUCKET])
+        + len(index["by_is_key"][TRUE_BUCKET])
+        + len(index["by_is_key"][FALSE_BUCKET])
+        + len(index["by_is_monitor"][TRUE_BUCKET])
+        + len(index["by_is_monitor"][FALSE_BUCKET])
+    )
+    frame_bytes = _estimate_dataframe_bytes(normalized_df)
+    index_bytes = _estimate_index_bytes(index)
+    amplification_ratio = round(
+        (frame_bytes + index_bytes) / max(frame_bytes, 1),
+        4,
+    )
+    index["memory"] = {
+        "frame_bytes": int(frame_bytes),
+        "index_bytes": int(index_bytes),
+        "records_json_bytes": 0,  # kept for backward-compatible telemetry shape
+        "bucket_entries": int(bucket_entries),
+        "amplification_ratio": amplification_ratio,
+        "representation": "dataframe+row-index",
+    }
 
     return index
 
 
 def _index_matches(
-    current: Dict[str, Any],
+    current: ResourceIndex,
     *,
     source: str,
-    version: Optional[str],
+    version: str | None,
     row_count: int,
 ) -> bool:
     if not current.get("ready"):
@@ -193,8 +332,8 @@ def _ensure_resource_index(
     df: pd.DataFrame,
     *,
     source: str,
-    version: Optional[str] = None,
-    updated_at: Optional[str] = None,
+    version: str | None = None,
+    updated_at: str | None = None,
 ) -> None:
     global _resource_index
     with _resource_index_lock:
@@ -212,12 +351,12 @@ def _ensure_resource_index(
         _resource_index = new_index
 
 
-def _get_resource_index() -> Dict[str, Any]:
+def _get_resource_index() -> ResourceIndex:
     with _resource_index_lock:
         return _resource_index
 
 
-def _get_cache_meta(client=None) -> Tuple[Optional[str], Optional[str]]:
+def _get_cache_meta(client=None) -> tuple[str | None, str | None]:
     redis_client = client or get_redis_client()
     if redis_client is None:
         return None, None
@@ -244,31 +383,59 @@ def _redis_data_available(client=None) -> bool:
         return False
 
 
-def _pick_bucket_records(
-    bucket: Dict[str, List[Dict[str, Any]]],
-    keys: List[Any],
-) -> List[Dict[str, Any]]:
-    seen: set[str] = set()
-    result: List[Dict[str, Any]] = []
+def _pick_bucket_positions(
+    bucket: PositionBucket,
+    keys: list[Any],
+) -> list[RowPosition]:
+    seen: set[int] = set()
+    result: list[int] = []
     for key in keys:
-        for record in bucket.get(str(key), []):
-            rid = record.get("RESOURCEID")
-            rid_key = str(rid) if rid is not None else str(id(record))
-            if rid_key in seen:
+        for row_position in bucket.get(str(key), []):
+            normalized = int(row_position)
+            if normalized in seen:
                 continue
-            seen.add(rid_key)
-            result.append(record)
+            seen.add(normalized)
+            result.append(normalized)
     return result
+
+
+def _records_from_positions(df: pd.DataFrame, positions: list[RowPosition]) -> list[ResourceRecord]:
+    if not positions:
+        return []
+    unique_positions = sorted({int(pos) for pos in positions if 0 <= int(pos) < len(df)})
+    if not unique_positions:
+        return []
+    return df.iloc[unique_positions].to_dict(orient='records')
+
+
+def _records_from_index(index: ResourceIndex, positions: list[RowPosition] | None = None) -> list[ResourceRecord]:
+    if not index.get("ready"):
+        return []
+    df = _resource_df_cache.get(RESOURCE_DF_CACHE_KEY)
+    if df is None:
+        legacy_records = index.get("records")
+        if isinstance(legacy_records, list):
+            if positions is None:
+                return list(legacy_records)
+            selected = [legacy_records[int(pos)] for pos in positions if 0 <= int(pos) < len(legacy_records)]
+            return selected
+        return []
+    selected_positions = positions if positions is not None else index.get("all_positions", [])
+    if not selected_positions:
+        selected_positions = list(range(len(df)))
+    return _records_from_positions(df, selected_positions)
 
 # ============================================================
 # Configuration
 # ============================================================
 
 RESOURCE_CACHE_ENABLED = os.getenv('RESOURCE_CACHE_ENABLED', 'true').lower() == 'true'
-RESOURCE_SYNC_INTERVAL = int(os.getenv('RESOURCE_SYNC_INTERVAL', '14400'))  # 4 hours
+RESOURCE_SYNC_INTERVAL = int(
+    os.getenv('RESOURCE_SYNC_INTERVAL', str(DEFAULT_RESOURCE_SYNC_INTERVAL_SECONDS))
+)
 RESOURCE_INDEX_VERSION_CHECK_INTERVAL = int(
-    os.getenv('RESOURCE_INDEX_VERSION_CHECK_INTERVAL', '5')
-)  # seconds
+    os.getenv('RESOURCE_INDEX_VERSION_CHECK_INTERVAL', str(DEFAULT_INDEX_VERSION_CHECK_INTERVAL_SECONDS))
+)
 
 # Redis key helpers
 def _get_key(key: str) -> str:
@@ -313,14 +480,14 @@ def _build_filter_builder() -> QueryBuilder:
     return builder
 
 
-def _load_from_oracle() -> Optional[pd.DataFrame]:
+def _load_from_oracle() -> pd.DataFrame | None:
     """從 Oracle 載入全表資料（套用全域篩選）.
 
     Returns:
         DataFrame with all columns, or None if query failed.
     """
     builder = _build_filter_builder()
-    builder.base_sql = "SELECT * FROM DWH.DW_MES_RESOURCE {{ WHERE_CLAUSE }}"
+    builder.base_sql = RESOURCE_BASE_SELECT_TEMPLATE
     sql, params = builder.build()
 
     try:
@@ -333,14 +500,14 @@ def _load_from_oracle() -> Optional[pd.DataFrame]:
         return None
 
 
-def _get_version_from_oracle() -> Optional[str]:
+def _get_version_from_oracle() -> str | None:
     """取得 Oracle 資料版本（MAX(LASTCHANGEDATE)）.
 
     Returns:
         Version string (ISO format), or None if query failed.
     """
     builder = _build_filter_builder()
-    builder.base_sql = "SELECT MAX(LASTCHANGEDATE) as VERSION FROM DWH.DW_MES_RESOURCE {{ WHERE_CLAUSE }}"
+    builder.base_sql = RESOURCE_VERSION_SELECT_TEMPLATE
     sql, params = builder.build()
 
     try:
@@ -361,7 +528,7 @@ def _get_version_from_oracle() -> Optional[str]:
 # Internal: Redis Functions
 # ============================================================
 
-def _get_version_from_redis() -> Optional[str]:
+def _get_version_from_redis() -> str | None:
     """取得 Redis 快取版本.
 
     Returns:
@@ -411,7 +578,7 @@ def _sync_to_redis(df: pd.DataFrame, version: str) -> bool:
         pipe.execute()
 
         # Invalidate process-level cache so next request picks up new data
-        _resource_df_cache.invalidate("resource_data")
+        _resource_df_cache.invalidate(RESOURCE_DF_CACHE_KEY)
         _invalidate_resource_index()
 
         logger.info(f"Resource cache synced: {len(df)} rows, version={version}")
@@ -421,7 +588,7 @@ def _sync_to_redis(df: pd.DataFrame, version: str) -> bool:
         return False
 
 
-def _get_cached_data() -> Optional[pd.DataFrame]:
+def _get_cached_data() -> pd.DataFrame | None:
     """Get cached resource data from Redis with process-level caching.
 
     Uses a two-tier cache strategy:
@@ -433,21 +600,25 @@ def _get_cached_data() -> Optional[pd.DataFrame]:
     Returns:
         DataFrame with resource data, or None if cache miss.
     """
-    cache_key = "resource_data"
+    cache_key = RESOURCE_DF_CACHE_KEY
 
     # Tier 1: Check process-level cache first (fast path)
     cached_df = _resource_df_cache.get(cache_key)
     if cached_df is not None:
-        if not _get_resource_index().get("ready"):
-            version, updated_at = _get_cache_meta()
-            _ensure_resource_index(
-                cached_df,
-                source="redis",
-                version=version,
-                updated_at=updated_at,
-            )
-        logger.debug(f"Process cache hit: {len(cached_df)} rows")
-        return cached_df
+        if REDIS_ENABLED and RESOURCE_CACHE_ENABLED and not _redis_data_available():
+            _resource_df_cache.invalidate(cache_key)
+            _invalidate_resource_index()
+        else:
+            if not _get_resource_index().get("ready"):
+                version, updated_at = _get_cache_meta()
+                _ensure_resource_index(
+                    cached_df,
+                    source="redis",
+                    version=version,
+                    updated_at=updated_at,
+                )
+            logger.debug(f"Process cache hit: {len(cached_df)} rows")
+            return cached_df
 
     # Tier 2: Parse from Redis (slow path - needs lock)
     if not REDIS_ENABLED or not RESOURCE_CACHE_ENABLED:
@@ -568,7 +739,7 @@ def init_cache() -> None:
         logger.error(f"Failed to init resource cache: {e}")
 
 
-def get_cache_status() -> Dict[str, Any]:
+def get_cache_status() -> dict[str, Any]:
     """取得快取狀態資訊.
 
     Returns:
@@ -611,9 +782,10 @@ def get_cache_status() -> Dict[str, Any]:
 # Query API
 # ============================================================
 
-def get_resource_index_status() -> Dict[str, Any]:
+def get_resource_index_status() -> dict[str, Any]:
     """Get process-level derived index telemetry."""
     index = _get_resource_index()
+    memory = index.get("memory") or {}
     built_at = index.get("built_at")
     age_seconds = None
     if built_at:
@@ -630,19 +802,32 @@ def get_resource_index_status() -> Dict[str, Any]:
         "built_at": built_at,
         "count": int(index.get("count", 0)),
         "age_seconds": round(age_seconds, 3) if age_seconds is not None else None,
+        "memory": {
+            "frame_bytes": int(memory.get("frame_bytes", 0)),
+            "index_bytes": int(memory.get("index_bytes", 0)),
+            "records_json_bytes": int(memory.get("records_json_bytes", 0)),
+            "bucket_entries": int(memory.get("bucket_entries", 0)),
+            "amplification_ratio": float(memory.get("amplification_ratio", 0.0)),
+            "representation": str(memory.get("representation", "unknown")),
+        },
     }
 
 
-def get_resource_index_snapshot() -> Dict[str, Any]:
+def get_resource_index_snapshot() -> ResourceIndex:
     """Get derived resource index snapshot, rebuilding if needed."""
     index = _get_resource_index()
     if index.get("ready"):
         if index.get("source") == "redis":
+            if not _redis_data_available():
+                _resource_df_cache.invalidate(RESOURCE_DF_CACHE_KEY)
+                _invalidate_resource_index()
+                index = _get_resource_index()
+
             # If Redis metadata version is missing, verify payload existence on every call.
             # This avoids serving stale in-process index when Redis payload is evicted.
-            if not index.get("version"):
+            if index.get("ready") and not index.get("version"):
                 if not _redis_data_available():
-                    _resource_df_cache.invalidate("resource_data")
+                    _resource_df_cache.invalidate(RESOURCE_DF_CACHE_KEY)
                     _invalidate_resource_index()
                     index = _get_resource_index()
                 else:
@@ -661,7 +846,7 @@ def get_resource_index_snapshot() -> Dict[str, Any]:
                             current_version,
                             latest_version,
                         )
-                        _resource_df_cache.invalidate("resource_data")
+                        _resource_df_cache.invalidate(RESOURCE_DF_CACHE_KEY)
                         _invalidate_resource_index()
                         index = _get_resource_index()
                     else:
@@ -678,6 +863,7 @@ def get_resource_index_snapshot() -> Dict[str, Any]:
 
     df = _get_cached_data()
     if df is not None:
+        _resource_df_cache.set(RESOURCE_DF_CACHE_KEY, df.reset_index(drop=True))
         version, updated_at = _get_cache_meta()
         _ensure_resource_index(
             df,
@@ -690,6 +876,8 @@ def get_resource_index_snapshot() -> Dict[str, Any]:
     logger.info("Resource cache miss while building index, falling back to Oracle")
     oracle_df = _load_from_oracle()
     if oracle_df is None:
+        _resource_df_cache.invalidate(RESOURCE_DF_CACHE_KEY)
+        _invalidate_resource_index()
         return _new_empty_index()
 
     _ensure_resource_index(
@@ -698,9 +886,11 @@ def get_resource_index_snapshot() -> Dict[str, Any]:
         version=None,
         updated_at=datetime.now().isoformat(),
     )
+    _resource_df_cache.set(RESOURCE_DF_CACHE_KEY, oracle_df.reset_index(drop=True))
     return _get_resource_index()
 
-def get_all_resources() -> List[Dict]:
+
+def get_all_resources() -> list[ResourceRecord]:
     """取得所有快取中的設備資料（全欄位）.
 
     Falls back to Oracle if cache unavailable.
@@ -709,11 +899,10 @@ def get_all_resources() -> List[Dict]:
         List of resource dicts.
     """
     index = get_resource_index_snapshot()
-    records = index.get("records", [])
-    return list(records)
+    return _records_from_index(index)
 
 
-def get_resource_by_id(resource_id: str) -> Optional[Dict]:
+def get_resource_by_id(resource_id: str) -> ResourceRecord | None:
     """依 RESOURCEID 取得單筆設備資料.
 
     Args:
@@ -725,10 +914,12 @@ def get_resource_by_id(resource_id: str) -> Optional[Dict]:
     if not resource_id:
         return None
     index = get_resource_index_snapshot()
-    by_id = index.get("by_resource_id", {})
-    row = by_id.get(str(resource_id))
-    if row is not None:
-        return row
+    by_id: dict[str, RowPosition] = index.get("by_resource_id", {})
+    row_position = by_id.get(str(resource_id))
+    if row_position is not None:
+        rows = _records_from_index(index, [int(row_position)])
+        if rows:
+            return rows[0]
 
     # Backward-compatible fallback for call sites/tests that patch get_all_resources.
     target = str(resource_id)
@@ -738,7 +929,7 @@ def get_resource_by_id(resource_id: str) -> Optional[Dict]:
     return None
 
 
-def get_resources_by_ids(resource_ids: List[str]) -> List[Dict]:
+def get_resources_by_ids(resource_ids: list[str]) -> list[ResourceRecord]:
     """依 RESOURCEID 清單批次取得設備資料.
 
     Args:
@@ -747,20 +938,28 @@ def get_resources_by_ids(resource_ids: List[str]) -> List[Dict]:
     Returns:
         List of matching resource dicts.
     """
+    index = get_resource_index_snapshot()
+    by_id: dict[str, RowPosition] = index.get("by_resource_id", {})
+    positions = [by_id[str(resource_id)] for resource_id in resource_ids if str(resource_id) in by_id]
+    if positions:
+        rows = _records_from_index(index, positions)
+        if rows:
+            return rows
+
+    # Backward-compatible fallback for call sites/tests that patch get_all_resources.
     id_set = set(resource_ids)
-    resources = get_all_resources()
-    return [r for r in resources if r.get('RESOURCEID') in id_set]
+    return [r for r in get_all_resources() if r.get('RESOURCEID') in id_set]
 
 
 def get_resources_by_filter(
-    workcenters: Optional[List[str]] = None,
-    families: Optional[List[str]] = None,
-    departments: Optional[List[str]] = None,
-    locations: Optional[List[str]] = None,
-    is_production: Optional[bool] = None,
-    is_key: Optional[bool] = None,
-    is_monitor: Optional[bool] = None,
-) -> List[Dict]:
+    workcenters: list[str] | None = None,
+    families: list[str] | None = None,
+    departments: list[str] | None = None,
+    locations: list[str] | None = None,
+    is_production: bool | None = None,
+    is_key: bool | None = None,
+    is_monitor: bool | None = None,
+) -> list[ResourceRecord]:
     """依條件篩選設備資料（在 Python 端篩選）.
 
     Args:
@@ -775,42 +974,79 @@ def get_resources_by_filter(
     Returns:
         List of matching resource dicts.
     """
-    resources = get_all_resources()
-
-    result = []
-    for r in resources:
-        # Apply filters
-        if workcenters and r.get('WORKCENTERNAME') not in workcenters:
-            continue
-        if families and r.get('RESOURCEFAMILYNAME') not in families:
-            continue
-        if departments and r.get('PJ_DEPARTMENT') not in departments:
-            continue
-        if locations and r.get('LOCATIONNAME') not in locations:
-            continue
-        if is_production is not None:
-            val = r.get('PJ_ISPRODUCTION')
-            if (val == 1) != is_production:
+    def _filter_from_records(resources: list[ResourceRecord]) -> list[ResourceRecord]:
+        result: list[ResourceRecord] = []
+        for r in resources:
+            if workcenters and r.get('WORKCENTERNAME') not in workcenters:
                 continue
-        if is_key is not None:
-            val = r.get('PJ_ISKEY')
-            if (val == 1) != is_key:
+            if families and r.get('RESOURCEFAMILYNAME') not in families:
                 continue
-        if is_monitor is not None:
-            val = r.get('PJ_ISMONITOR')
-            if (val == 1) != is_monitor:
+            if departments and r.get('PJ_DEPARTMENT') not in departments:
                 continue
+            if locations and r.get('LOCATIONNAME') not in locations:
+                continue
+            if is_production is not None and (r.get('PJ_ISPRODUCTION') == 1) != is_production:
+                continue
+            if is_key is not None and (r.get('PJ_ISKEY') == 1) != is_key:
+                continue
+            if is_monitor is not None and (r.get('PJ_ISMONITOR') == 1) != is_monitor:
+                continue
+            result.append(r)
+        return result
 
-        result.append(r)
+    index = get_resource_index_snapshot()
+    if not index.get("ready"):
+        return _filter_from_records(get_all_resources())
+    if _resource_df_cache.get(RESOURCE_DF_CACHE_KEY) is None:
+        return _filter_from_records(get_all_resources())
 
-    return result
+    candidate_positions: set[int] = set(int(pos) for pos in index.get("all_positions", []))
+    if not candidate_positions:
+        return []
+
+    def _intersect_with_positions(selected: list[int] | None) -> None:
+        nonlocal candidate_positions
+        if selected is None:
+            return
+        candidate_positions &= set(int(item) for item in selected)
+
+    if workcenters:
+        _intersect_with_positions(
+            _pick_bucket_positions(index.get("by_workcenter", {}), workcenters)
+        )
+    if families:
+        _intersect_with_positions(
+            _pick_bucket_positions(index.get("by_family", {}), families)
+        )
+    if departments:
+        _intersect_with_positions(
+            _pick_bucket_positions(index.get("by_department", {}), departments)
+        )
+    if locations:
+        _intersect_with_positions(
+            _pick_bucket_positions(index.get("by_location", {}), locations)
+        )
+    if is_production is not None:
+        _intersect_with_positions(
+            index.get("by_is_production", {}).get(TRUE_BUCKET if is_production else FALSE_BUCKET, [])
+        )
+    if is_key is not None:
+        _intersect_with_positions(
+            index.get("by_is_key", {}).get(TRUE_BUCKET if is_key else FALSE_BUCKET, [])
+        )
+    if is_monitor is not None:
+        _intersect_with_positions(
+            index.get("by_is_monitor", {}).get(TRUE_BUCKET if is_monitor else FALSE_BUCKET, [])
+        )
+
+    return _records_from_index(index, sorted(candidate_positions))
 
 
 # ============================================================
 # Distinct Values API (for filters)
 # ============================================================
 
-def get_distinct_values(column: str) -> List[str]:
+def get_distinct_values(column: str) -> list[str]:
     """取得指定欄位的唯一值清單（排序後）.
 
     Args:
@@ -833,26 +1069,26 @@ def get_distinct_values(column: str) -> List[str]:
     return sorted(values)
 
 
-def get_resource_families() -> List[str]:
+def get_resource_families() -> list[str]:
     """取得型號清單（便捷方法）."""
     return get_distinct_values('RESOURCEFAMILYNAME')
 
 
-def get_workcenters() -> List[str]:
+def get_workcenters() -> list[str]:
     """取得站點清單（便捷方法）."""
     return get_distinct_values('WORKCENTERNAME')
 
 
-def get_departments() -> List[str]:
+def get_departments() -> list[str]:
     """取得部門清單（便捷方法）."""
     return get_distinct_values('PJ_DEPARTMENT')
 
 
-def get_locations() -> List[str]:
+def get_locations() -> list[str]:
     """取得區域清單（便捷方法）."""
     return get_distinct_values('LOCATIONNAME')
 
 
-def get_vendors() -> List[str]:
+def get_vendors() -> list[str]:
     """取得供應商清單（便捷方法）."""
     return get_distinct_values('VENDORNAME')

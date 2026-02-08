@@ -46,6 +46,7 @@ class TestAPIResponseFormat:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data["success"] is True
+        assert "single_port_bind" in data["data"]
         assert "data" in data
 
     def test_unauthenticated_redirect(self, client):
@@ -249,8 +250,17 @@ class TestWorkerControlAPI:
         os.unlink(temp_flag)  # Remove so we can test creation
 
         with patch('mes_dashboard.routes.admin_routes.RESTART_FLAG_PATH', temp_flag):
-            with patch('mes_dashboard.routes.admin_routes._check_restart_cooldown', return_value=(False, 0)):
-                response = admin_client.post('/admin/api/worker/restart')
+            with patch(
+                'mes_dashboard.routes.admin_routes._get_restart_policy_state',
+                return_value={
+                    "state": "allowed",
+                    "allowed": True,
+                    "cooldown": False,
+                    "blocked": False,
+                    "cooldown_remaining_seconds": 0,
+                },
+            ):
+                response = admin_client.post('/admin/api/worker/restart', json={})
 
         assert response.status_code == 200
         data = json.loads(response.data)
@@ -264,13 +274,78 @@ class TestWorkerControlAPI:
 
     def test_worker_restart_cooldown(self, admin_client):
         """Worker restart respects cooldown."""
-        with patch('mes_dashboard.routes.admin_routes._check_restart_cooldown', return_value=(True, 45)):
-            response = admin_client.post('/admin/api/worker/restart')
+        with patch(
+            'mes_dashboard.routes.admin_routes._get_restart_policy_state',
+            return_value={
+                "state": "cooldown",
+                "allowed": False,
+                "cooldown": True,
+                "blocked": False,
+                "cooldown_remaining_seconds": 45,
+            },
+        ):
+            response = admin_client.post('/admin/api/worker/restart', json={})
 
         assert response.status_code == 429
         data = json.loads(response.data)
         assert data["success"] is False
         assert "cooldown" in data["error"]["message"].lower()
+
+    def test_worker_restart_blocked_requires_override(self, admin_client):
+        with patch(
+            'mes_dashboard.routes.admin_routes._get_restart_policy_state',
+            return_value={
+                "state": "blocked",
+                "allowed": False,
+                "cooldown": False,
+                "blocked": True,
+                "cooldown_remaining_seconds": 0,
+            },
+        ):
+            response = admin_client.post('/admin/api/worker/restart', json={})
+
+        assert response.status_code == 409
+        data = json.loads(response.data)
+        assert data["success"] is False
+        assert "guarded mode" in data["error"]["message"].lower()
+
+    def test_worker_restart_manual_override_allowed_when_blocked(self, admin_client):
+        fd, temp_flag = tempfile.mkstemp()
+        os.close(fd)
+        os.unlink(temp_flag)
+
+        with (
+            patch('mes_dashboard.routes.admin_routes.RESTART_FLAG_PATH', temp_flag),
+            patch(
+                'mes_dashboard.routes.admin_routes._get_restart_policy_state',
+                return_value={
+                    "state": "blocked",
+                    "allowed": False,
+                    "cooldown": False,
+                    "blocked": True,
+                    "cooldown_remaining_seconds": 0,
+                },
+            ),
+        ):
+            response = admin_client.post(
+                '/admin/api/worker/restart',
+                json={
+                    "manual_override": True,
+                    "override_acknowledged": True,
+                    "override_reason": "incident mitigation",
+                },
+            )
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["success"] is True
+        assert data["data"]["decision"]["decision"] == "manual_override"
+        assert "single_port_bind" in data["data"]
+
+        try:
+            os.unlink(temp_flag)
+        except OSError:
+            pass
 
 
 class TestCircuitBreakerIntegration:
@@ -285,6 +360,12 @@ class TestCircuitBreakerIntegration:
         cb_status = data["data"]["circuit_breaker"]
         assert "state" in cb_status
         assert "enabled" in cb_status
+
+    def test_system_status_reports_single_port_bind(self, admin_client):
+        response = admin_client.get('/admin/api/system-status')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["data"]["single_port_bind"]
 
 
 class TestPerformancePage:

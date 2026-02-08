@@ -1,14 +1,25 @@
 # -*- coding: utf-8 -*-
 """Unit tests for auth_service module."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from __future__ import annotations
 
-import sys
+from unittest.mock import MagicMock, patch
+
 import os
+import sys
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from mes_dashboard.services import auth_service
+
+
+@pytest.fixture(autouse=True)
+def _ldap_defaults(monkeypatch):
+    """Keep LDAP auth tests deterministic regardless of host env vars."""
+    monkeypatch.setattr(auth_service, "LDAP_API_BASE", "https://ldap.panjit.example")
+    monkeypatch.setattr(auth_service, "LDAP_CONFIG_ERROR", None)
 
 
 class TestAuthenticate:
@@ -83,6 +94,49 @@ class TestAuthenticate:
 
         assert result is None
 
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
+    @patch('mes_dashboard.services.auth_service.requests.post')
+    def test_authenticate_rejects_invalid_ldap_config_without_outbound_call(self, mock_post):
+        """Unsafe LDAP config should block auth and skip outbound request."""
+        with patch.object(auth_service, "LDAP_CONFIG_ERROR", "invalid LDAP API URL"):
+            result = auth_service.authenticate("user", "pass")
+
+        assert result is None
+        mock_post.assert_not_called()
+
+
+class TestLdapConfigValidation:
+    """Validate LDAP base URL hardening rules."""
+
+    def test_accepts_https_allowlisted_host(self):
+        api_base, error = auth_service._validate_ldap_api_url(
+            "https://ldap.panjit.example",
+            ("ldap.panjit.example",),
+        )
+
+        assert error is None
+        assert api_base == "https://ldap.panjit.example"
+
+    def test_rejects_non_https_url(self):
+        api_base, error = auth_service._validate_ldap_api_url(
+            "http://ldap.panjit.example",
+            ("ldap.panjit.example",),
+        )
+
+        assert api_base is None
+        assert error is not None
+        assert "HTTPS" in error
+
+    def test_rejects_non_allowlisted_host(self):
+        api_base, error = auth_service._validate_ldap_api_url(
+            "https://evil.example",
+            ("ldap.panjit.example",),
+        )
+
+        assert api_base is None
+        assert error is not None
+        assert "allowlisted" in error
+
 
 class TestLocalAuthenticate:
     """Tests for local authentication."""
@@ -112,7 +166,6 @@ class TestIsAdmin:
 
     def test_is_admin_with_admin_email(self):
         """Test admin check with admin email."""
-        # Save original ADMIN_EMAILS
         original = auth_service.ADMIN_EMAILS
 
         try:

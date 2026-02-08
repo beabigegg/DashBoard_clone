@@ -3,6 +3,7 @@ import {
   debounce,
   fetchWipAutocompleteItems,
 } from '../core/autocomplete.js';
+import { buildWipDetailQueryParams } from '../core/wip-derive.js';
 
 ensureMesApiAvailable();
 
@@ -73,36 +74,12 @@ ensureMesApiAvailable();
           }
   
           async function fetchDetail(signal = null) {
-              const params = {
+              const params = buildWipDetailQueryParams({
                   page: state.page,
-                  page_size: state.pageSize
-              };
-  
-              if (state.filters.package) {
-                  params.package = state.filters.package;
-              }
-              if (state.filters.type) {
-                  params.type = state.filters.type;
-              }
-              if (activeStatusFilter) {
-                  // Handle hold type filters
-                  if (activeStatusFilter === 'quality-hold') {
-                      params.status = 'HOLD';
-                      params.hold_type = 'quality';
-                  } else if (activeStatusFilter === 'non-quality-hold') {
-                      params.status = 'HOLD';
-                      params.hold_type = 'non-quality';
-                  } else {
-                      // Convert to API status format (RUN/QUEUE)
-                      params.status = activeStatusFilter.toUpperCase();
-                  }
-              }
-              if (state.filters.workorder) {
-                  params.workorder = state.filters.workorder;
-              }
-              if (state.filters.lotid) {
-                  params.lotid = state.filters.lotid;
-              }
+                  pageSize: state.pageSize,
+                  filters: state.filters,
+                  statusFilter: activeStatusFilter,
+              });
   
               const result = await MesApi.get(`/api/wip/detail/${encodeURIComponent(state.workcenter)}`, {
                   params,

@@ -33,6 +33,22 @@ def get_days_back(filters: Optional[Dict] = None, default: int = DEFAULT_DAYS_BA
     return default
 
 
+def parse_bool_query(value: Any, default: bool = False) -> bool:
+    """Parse common boolean query parameter values."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if not text:
+        return default
+    if text in {"true", "1", "yes", "y", "on"}:
+        return True
+    if text in {"false", "0", "no", "n", "off"}:
+        return False
+    return default
+
+
 # ============================================================
 # SQL Filter Building (DEPRECATED)
 # Use mes_dashboard.sql.CommonFilters with QueryBuilder instead.

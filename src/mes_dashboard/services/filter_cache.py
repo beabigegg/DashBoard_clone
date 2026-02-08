@@ -6,6 +6,7 @@ Data is loaded from database and cached in memory with periodic refresh.
 """
 
 import logging
+import os
 import threading
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
@@ -19,8 +20,8 @@ logger = logging.getLogger('mes_dashboard.filter_cache')
 # ============================================================
 
 CACHE_TTL_SECONDS = 3600  # 1 hour cache TTL
-WIP_VIEW = "DWH.DW_MES_LOT_V"
-SPEC_WORKCENTER_VIEW = "DWH.DW_MES_SPEC_WORKCENTER_V"
+WIP_VIEW = os.getenv("FILTER_CACHE_WIP_VIEW", "DWH.DW_MES_LOT_V")
+SPEC_WORKCENTER_VIEW = os.getenv("FILTER_CACHE_SPEC_WORKCENTER_VIEW", "DWH.DW_MES_SPEC_WORKCENTER_V")
 
 # ============================================================
 # Cache Storage

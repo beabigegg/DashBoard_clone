@@ -51,6 +51,59 @@ from mes_dashboard.config.settings import get_config
 # Configure module logger
 logger = logging.getLogger('mes_dashboard.database')
 
+_REDACTION_INSTALLED = False
+_ORACLE_URL_RE = re.compile(r"(oracle\+oracledb://[^:\s/]+:)([^@/\s]+)(@)")
+_ENV_SECRET_RE = re.compile(r"(DB_PASSWORD=)([^\s]+)")
+
+
+def redact_connection_secrets(message: str) -> str:
+    """Redact DB credentials from log message text."""
+    if not message:
+        return message
+    sanitized = _ORACLE_URL_RE.sub(r"\1***\3", message)
+    sanitized = _ENV_SECRET_RE.sub(r"\1***", sanitized)
+    return sanitized
+
+
+class SecretRedactionFilter(logging.Filter):
+    """Filter that masks DB connection secrets in log messages."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            message = record.getMessage()
+        except Exception:
+            return True
+        sanitized = redact_connection_secrets(message)
+        if sanitized != message:
+            record.msg = sanitized
+            record.args = ()
+        return True
+
+
+def install_log_redaction_filter(target_logger: logging.Logger | None = None) -> None:
+    """Attach secret-redaction filter to mes_dashboard logging handlers once."""
+    global _REDACTION_INSTALLED
+    if target_logger is None and _REDACTION_INSTALLED:
+        return
+
+    logger_obj = target_logger or logging.getLogger("mes_dashboard")
+    redaction_filter = SecretRedactionFilter()
+
+    attached = False
+    for handler in logger_obj.handlers:
+        if any(isinstance(f, SecretRedactionFilter) for f in handler.filters):
+            attached = True
+            continue
+        handler.addFilter(redaction_filter)
+        attached = True
+
+    if not attached and not any(isinstance(f, SecretRedactionFilter) for f in logger_obj.filters):
+        logger_obj.addFilter(redaction_filter)
+        attached = True
+
+    if attached and target_logger is None:
+        _REDACTION_INSTALLED = True
+
 # ============================================================
 # SQLAlchemy Engine (QueuePool - connection pooling)
 # ============================================================
@@ -59,6 +112,7 @@ logger = logging.getLogger('mes_dashboard.database')
 # pool_recycle prevents stale connections from firewalls/NAT.
 
 _ENGINE = None
+_HEALTH_ENGINE = None
 _DB_RUNTIME_CONFIG: Optional[Dict[str, Any]] = None
 
 
@@ -132,6 +186,13 @@ def get_db_runtime_config(refresh: bool = False) -> Dict[str, Any]:
         "retry_count": _from_app_or_env_int("DB_CONNECT_RETRY_COUNT", config_class.DB_CONNECT_RETRY_COUNT),
         "retry_delay": _from_app_or_env_float("DB_CONNECT_RETRY_DELAY", config_class.DB_CONNECT_RETRY_DELAY),
         "call_timeout_ms": _from_app_or_env_int("DB_CALL_TIMEOUT_MS", config_class.DB_CALL_TIMEOUT_MS),
+        "health_pool_size": _from_app_or_env_int("DB_HEALTH_POOL_SIZE", 1),
+        "health_max_overflow": _from_app_or_env_int("DB_HEALTH_MAX_OVERFLOW", 0),
+        "health_pool_timeout": _from_app_or_env_int("DB_HEALTH_POOL_TIMEOUT", 2),
+        "pool_exhausted_retry_after_seconds": _from_app_or_env_int(
+            "DB_POOL_EXHAUSTED_RETRY_AFTER_SECONDS",
+            5,
+        ),
     }
     return _DB_RUNTIME_CONFIG.copy()
 
@@ -200,6 +261,42 @@ def get_engine():
             f"call_timeout_ms={runtime['call_timeout_ms']})"
         )
     return _ENGINE
+
+
+def get_health_engine():
+    """Get dedicated SQLAlchemy engine for health probes.
+
+    Health checks use a tiny isolated pool so status probes remain available
+    when the request pool is saturated.
+    """
+    global _HEALTH_ENGINE
+    if _HEALTH_ENGINE is None:
+        runtime = get_db_runtime_config()
+        _HEALTH_ENGINE = create_engine(
+            CONNECTION_STRING,
+            poolclass=QueuePool,
+            pool_size=max(int(runtime["health_pool_size"]), 1),
+            max_overflow=max(int(runtime["health_max_overflow"]), 0),
+            pool_timeout=max(int(runtime["health_pool_timeout"]), 1),
+            pool_recycle=runtime["pool_recycle"],
+            pool_pre_ping=True,
+            connect_args={
+                "tcp_connect_timeout": runtime["tcp_connect_timeout"],
+                "retry_count": runtime["retry_count"],
+                "retry_delay": runtime["retry_delay"],
+            },
+        )
+        _register_pool_events(
+            _HEALTH_ENGINE,
+            min(int(runtime["call_timeout_ms"]), 10_000),
+        )
+        logger.info(
+            "Health engine created (pool_size=%s, max_overflow=%s, pool_timeout=%s)",
+            runtime["health_pool_size"],
+            runtime["health_max_overflow"],
+            runtime["health_pool_timeout"],
+        )
+    return _HEALTH_ENGINE
 
 
 def _register_pool_events(engine, call_timeout_ms: int):
@@ -302,8 +399,12 @@ def dispose_engine():
 
     Call this during application shutdown to cleanly release resources.
     """
-    global _ENGINE, _DB_RUNTIME_CONFIG
+    global _ENGINE, _HEALTH_ENGINE, _DB_RUNTIME_CONFIG
     stop_keepalive()
+    if _HEALTH_ENGINE is not None:
+        _HEALTH_ENGINE.dispose()
+        logger.info("Health engine disposed")
+        _HEALTH_ENGINE = None
     if _ENGINE is not None:
         _ENGINE.dispose()
         logger.info("Database engine disposed, all connections closed")
@@ -432,9 +533,13 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
             elapsed,
             exc,
         )
+        retry_after = max(
+            int(get_db_runtime_config().get("pool_exhausted_retry_after_seconds", 5)),
+            1,
+        )
         raise DatabasePoolExhaustedError(
             "Database connection pool exhausted",
-            retry_after_seconds=5,
+            retry_after_seconds=retry_after,
         ) from exc
     except Exception as exc:
         elapsed = time.time() - start_time

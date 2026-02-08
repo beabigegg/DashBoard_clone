@@ -4,6 +4,7 @@
 Tests workcenter group lookup and mapping functionality.
 """
 
+import importlib
 import pytest
 from unittest.mock import patch, MagicMock
 import pandas as pd
@@ -347,3 +348,17 @@ class TestGetCacheStatus:
         assert result['last_refresh'] is not None
         assert result['workcenter_groups_count'] == 1
         assert result['workcenter_mapping_count'] == 1
+
+
+class TestFilterCacheConfig:
+    """Test environment-based filter-cache source configuration."""
+
+    def test_filter_cache_views_are_env_configurable(self, monkeypatch):
+        monkeypatch.setenv("FILTER_CACHE_WIP_VIEW", "CUSTOM.WIP_VIEW")
+        monkeypatch.setenv("FILTER_CACHE_SPEC_WORKCENTER_VIEW", "CUSTOM.SPEC_VIEW")
+
+        import mes_dashboard.services.filter_cache as fc
+
+        reloaded = importlib.reload(fc)
+        assert reloaded.WIP_VIEW == "CUSTOM.WIP_VIEW"
+        assert reloaded.SPEC_WORKCENTER_VIEW == "CUSTOM.SPEC_VIEW"

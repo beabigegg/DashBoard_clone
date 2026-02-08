@@ -311,3 +311,30 @@ class TestIsCacheAvailable:
                 with patch.object(cache, 'get_key', return_value='mes_wip:data'):
                     result = cache.is_cache_available()
                     assert result is True
+
+
+class TestProcessLevelCache:
+    """Test bounded process-level cache behavior."""
+
+    def test_lru_eviction_prefers_recent_keys(self):
+        from mes_dashboard.core.cache import ProcessLevelCache
+
+        cache = ProcessLevelCache(ttl_seconds=60, max_size=2)
+        df1 = pd.DataFrame([{"LOTID": "A"}])
+        df2 = pd.DataFrame([{"LOTID": "B"}])
+        df3 = pd.DataFrame([{"LOTID": "C"}])
+
+        cache.set("a", df1)
+        cache.set("b", df2)
+        assert cache.get("a") is not None  # refresh recency for "a"
+        cache.set("c", df3)  # should evict "b"
+
+        assert cache.get("b") is None
+        assert cache.get("a") is not None
+        assert cache.get("c") is not None
+
+    def test_wip_process_cache_uses_bounded_config(self):
+        import mes_dashboard.core.cache as cache
+
+        assert cache.WIP_PROCESS_CACHE_MAX_SIZE >= 1
+        assert cache._wip_df_cache.max_size == cache.WIP_PROCESS_CACHE_MAX_SIZE

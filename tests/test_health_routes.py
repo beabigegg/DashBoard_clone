@@ -13,6 +13,8 @@ def _client():
     db._ENGINE = None
     app = create_app('testing')
     app.config['TESTING'] = True
+    from mes_dashboard.routes.health_routes import _reset_health_memo_for_tests
+    _reset_health_memo_for_tests()
     return app.test_client()
 
 
@@ -78,3 +80,37 @@ def test_deep_health_exposes_route_cache_telemetry(
     assert route_cache['degraded'] is False
     assert payload['resilience']['recovery_recommendation']['action'] == 'none'
     assert payload['resilience']['thresholds']['pool_saturation_warning'] >= 0.5
+
+
+def test_health_memo_store_and_expire(monkeypatch):
+    import mes_dashboard.routes.health_routes as hr
+
+    hr._reset_health_memo_for_tests()
+    monkeypatch.setattr(hr, "_health_memo_enabled", lambda: True)
+
+    hr._set_health_memo("health", {"status": "healthy"}, 200)
+    cached = hr._get_health_memo("health")
+    assert cached == ({"status": "healthy"}, 200)
+
+    with hr._HEALTH_MEMO_LOCK:
+        hr._HEALTH_MEMO["health"] = {"ts": 0.0, "payload": {"status": "old"}, "status": 200}
+
+    with patch("mes_dashboard.routes.health_routes.time.time", return_value=100.0):
+        assert hr._get_health_memo("health") is None
+
+
+@patch('mes_dashboard.routes.health_routes._health_memo_enabled', return_value=True)
+@patch('mes_dashboard.routes.health_routes.check_database', return_value=('ok', None))
+@patch('mes_dashboard.routes.health_routes.check_redis', return_value=('ok', None))
+def test_health_route_uses_internal_memoization(
+    _mock_redis,
+    mock_db,
+    _mock_enabled,
+):
+    client = _client()
+    response1 = client.get('/health')
+    response2 = client.get('/health')
+
+    assert response1.status_code == 200
+    assert response2.status_code == 200
+    assert mock_db.call_count == 1

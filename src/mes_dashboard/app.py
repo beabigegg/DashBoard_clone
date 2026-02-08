@@ -3,24 +3,48 @@
 
 from __future__ import annotations
 
+import atexit
 import logging
 import os
 import sys
+import threading
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
 from mes_dashboard.config.tables import TABLES_CONFIG
 from mes_dashboard.config.settings import get_config
 from mes_dashboard.core.cache import create_default_cache_backend
-from mes_dashboard.core.database import get_table_data, get_table_columns, get_engine, init_db, start_keepalive
+from mes_dashboard.core.database import (
+    get_table_data,
+    get_table_columns,
+    get_engine,
+    init_db,
+    start_keepalive,
+    dispose_engine,
+    install_log_redaction_filter,
+)
 from mes_dashboard.core.permissions import is_admin_logged_in, _is_ajax_request
+from mes_dashboard.core.csrf import (
+    get_csrf_token,
+    should_enforce_csrf,
+    validate_csrf,
+)
 from mes_dashboard.routes import register_routes
 from mes_dashboard.routes.auth_routes import auth_bp
 from mes_dashboard.routes.admin_routes import admin_bp
 from mes_dashboard.routes.health_routes import health_bp
 from mes_dashboard.services.page_registry import get_page_status, is_api_public
 from mes_dashboard.core.cache_updater import start_cache_updater, stop_cache_updater
-from mes_dashboard.services.realtime_equipment_cache import init_realtime_equipment_cache
+from mes_dashboard.services.realtime_equipment_cache import (
+    init_realtime_equipment_cache,
+    stop_equipment_status_sync_worker,
+)
+from mes_dashboard.core.redis_client import close_redis
+from mes_dashboard.core.runtime_contract import build_runtime_contract_diagnostics
+
+
+_SHUTDOWN_LOCK = threading.Lock()
+_ATEXIT_REGISTERED = False
 
 
 def _configure_logging(app: Flask) -> None:
@@ -63,6 +87,121 @@ def _configure_logging(app: Flask) -> None:
 
     # Prevent propagation to root logger (avoid duplicate logs)
     logger.propagate = False
+    install_log_redaction_filter(logger)
+
+
+def _is_production_env(app: Flask) -> bool:
+    env_value = str(app.config.get("ENV") or os.getenv("FLASK_ENV") or "production").lower()
+    return env_value in {"prod", "production"}
+
+
+def _build_security_headers(production: bool) -> dict[str, str]:
+    headers = {
+        "Content-Security-Policy": (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; "
+            "font-src 'self' data:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        ),
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+    }
+    if production:
+        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return headers
+
+
+def _resolve_secret_key(app: Flask) -> str:
+    env_name = str(app.config.get("ENV") or os.getenv("FLASK_ENV") or "development").lower()
+    configured = os.environ.get("SECRET_KEY") or app.config.get("SECRET_KEY")
+    insecure_defaults = {"", "dev-secret-key-change-in-prod"}
+
+    if configured and configured not in insecure_defaults:
+        return configured
+
+    if env_name in {"production", "prod"}:
+        raise RuntimeError(
+            "SECRET_KEY is required in production and cannot use insecure defaults."
+        )
+
+    # Development and testing get explicit environment-safe defaults.
+    if env_name in {"testing", "test"}:
+        return "test-secret-key"
+    return "dev-local-only-secret-key"
+
+
+def _shutdown_runtime_resources() -> None:
+    """Stop background workers and shared clients during app/worker shutdown."""
+    logger = logging.getLogger("mes_dashboard")
+
+    try:
+        stop_cache_updater()
+    except Exception as exc:
+        logger.warning("Error stopping cache updater: %s", exc)
+
+    try:
+        stop_equipment_status_sync_worker()
+    except Exception as exc:
+        logger.warning("Error stopping equipment sync worker: %s", exc)
+
+    try:
+        close_redis()
+    except Exception as exc:
+        logger.warning("Error closing Redis client: %s", exc)
+
+    try:
+        dispose_engine()
+    except Exception as exc:
+        logger.warning("Error disposing DB engines: %s", exc)
+
+
+def _register_shutdown_hooks(app: Flask) -> None:
+    global _ATEXIT_REGISTERED
+
+    app.extensions["runtime_shutdown"] = _shutdown_runtime_resources
+    if app.extensions.get("runtime_shutdown_registered"):
+        return
+
+    app.extensions["runtime_shutdown_registered"] = True
+    if app.testing or bool(app.config.get("TESTING")) or os.getenv("PYTEST_CURRENT_TEST"):
+        return
+
+    with _SHUTDOWN_LOCK:
+        if not _ATEXIT_REGISTERED:
+            atexit.register(_shutdown_runtime_resources)
+            _ATEXIT_REGISTERED = True
+
+
+def _is_runtime_contract_enforced(app: Flask) -> bool:
+    raw = os.getenv("RUNTIME_CONTRACT_ENFORCE")
+    if raw is not None:
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
+    return _is_production_env(app)
+
+
+def _validate_runtime_contract(app: Flask) -> None:
+    strict = _is_runtime_contract_enforced(app)
+    diagnostics = build_runtime_contract_diagnostics(strict=strict)
+    app.extensions["runtime_contract"] = diagnostics["contract"]
+    app.extensions["runtime_contract_validation"] = {
+        "valid": diagnostics["valid"],
+        "strict": diagnostics["strict"],
+        "errors": diagnostics["errors"],
+    }
+
+    if diagnostics["valid"]:
+        return
+
+    message = "Runtime contract validation failed: " + "; ".join(diagnostics["errors"])
+    if strict:
+        raise RuntimeError(message)
+    logging.getLogger("mes_dashboard").warning(message)
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -72,19 +211,22 @@ def create_app(config_name: str | None = None) -> Flask:
     config_class = get_config(config_name)
     app.config.from_object(config_class)
 
-    # Session configuration
-    app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-prod")
+    # Session configuration with environment-aware secret validation.
+    app.secret_key = _resolve_secret_key(app)
+    app.config["SECRET_KEY"] = app.secret_key
 
     # Session cookie security settings
-    # SECURE: Only send cookie over HTTPS (disable for local development)
-    app.config['SESSION_COOKIE_SECURE'] = os.environ.get("FLASK_ENV") == "production"
+    # SECURE: Only send cookie over HTTPS in production.
+    app.config['SESSION_COOKIE_SECURE'] = _is_production_env(app)
     # HTTPONLY: Prevent JavaScript access to session cookie (XSS protection)
     app.config['SESSION_COOKIE_HTTPONLY'] = True
-    # SAMESITE: Prevent CSRF by restricting cross-site cookie sending
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    # SAMESITE: strict in production, relaxed for local development usability.
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Strict' if _is_production_env(app) else 'Lax'
 
     # Configure logging first
     _configure_logging(app)
+    _validate_runtime_contract(app)
+    security_headers = _build_security_headers(_is_production_env(app))
 
     # Route-level cache backend (L1 memory + optional L2 Redis)
     app.extensions["cache"] = create_default_cache_backend()
@@ -96,6 +238,7 @@ def create_app(config_name: str | None = None) -> Flask:
         start_keepalive()  # Keep database connections alive
         start_cache_updater()  # Start Redis cache updater
         init_realtime_equipment_cache(app)  # Start realtime equipment status cache
+    _register_shutdown_hooks(app)
 
     # Register API routes
     register_routes(app)
@@ -150,6 +293,34 @@ def create_app(config_name: str | None = None) -> Flask:
 
         return None
 
+    @app.before_request
+    def enforce_csrf():
+        if not should_enforce_csrf(
+            request,
+            enabled=bool(app.config.get("CSRF_ENABLED", True)),
+        ):
+            return None
+
+        if validate_csrf(request):
+            return None
+
+        if request.path == "/admin/login":
+            return render_template("login.html", error="CSRF 驗證失敗，請重新提交"), 403
+
+        from mes_dashboard.core.response import error_response, FORBIDDEN
+
+        return error_response(
+            FORBIDDEN,
+            "CSRF 驗證失敗",
+            status_code=403,
+        )
+
+    @app.after_request
+    def apply_security_headers(response):
+        for header, value in security_headers.items():
+            response.headers.setdefault(header, value)
+        return response
+
     # ========================================================
     # Template Context Processor
     # ========================================================
@@ -185,6 +356,7 @@ def create_app(config_name: str | None = None) -> Flask:
             "admin_user": session.get("admin"),
             "can_view_page": can_view_page,
             "frontend_asset": frontend_asset,
+            "csrf_token": get_csrf_token,
         }
 
     # ========================================================

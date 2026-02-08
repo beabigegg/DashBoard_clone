@@ -707,7 +707,13 @@
         // Auth Helper
         // ============================================================
         async function fetchWithAuth(url, options = {}) {
-            const resp = await fetch(url, { ...options, cache: 'no-store' });
+            const method = (options.method || 'GET').toUpperCase();
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const headers = { ...(options.headers || {}) };
+            if (csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+                headers['X-CSRF-Token'] = csrfToken;
+            }
+            const resp = await fetch(url, { ...options, headers, cache: 'no-store' });
             if (resp.status === 401) {
                 const json = await resp.json().catch(() => ({}));
                 if (!authErrorShown) {
@@ -962,9 +968,15 @@
                 document.getElementById('workerStartTime').textContent =
                     data.worker_start_time ? formatTimestamp(data.worker_start_time) : '--';
 
-                // Update cooldown status
+                // Update recovery policy status
+                const policyState = data?.resilience?.policy_state || {};
                 const cooldown = data.cooldown;
-                if (cooldown && cooldown.active) {
+                if (policyState.blocked) {
+                    document.getElementById('workerCooldown').textContent = 'Guarded mode（需手動 override）';
+                    document.getElementById('restartBtn').disabled = false;
+                    document.getElementById('restartBtn').style.opacity = '1';
+                    document.getElementById('restartBtn').style.cursor = 'pointer';
+                } else if (cooldown && cooldown.active) {
                     document.getElementById('workerCooldown').textContent =
                         `冷卻中 (${cooldown.remaining_seconds}秒)`;
                     document.getElementById('restartBtn').disabled = true;
@@ -1017,11 +1029,41 @@
             btn.style.opacity = '0.5';
 
             try {
-                const resp = await fetchWithAuth('/admin/api/worker/restart', {
+                let resp = await fetchWithAuth('/admin/api/worker/restart', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
                 });
-                const json = await resp.json();
+                let json = await resp.json();
+
+                if (!json.success && resp.status === 409) {
+                    const reason = window.prompt(
+                        '目前 restart policy 為 guarded mode。\n請輸入 override 原因（會記錄於稽核日誌）：'
+                    );
+                    if (!reason || !reason.trim()) {
+                        alert('已取消 override。');
+                        return;
+                    }
+
+                    const acknowledged = window.confirm(
+                        '確認執行 manual override？此操作將繞過 guarded mode 保護。'
+                    );
+                    if (!acknowledged) {
+                        alert('已取消 override。');
+                        return;
+                    }
+
+                    resp = await fetchWithAuth('/admin/api/worker/restart', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            manual_override: true,
+                            override_acknowledged: true,
+                            override_reason: reason.trim()
+                        })
+                    });
+                    json = await resp.json();
+                }
 
                 if (!json.success) {
                     alert('重啟失敗: ' + (json.error?.message || '未知錯誤'));

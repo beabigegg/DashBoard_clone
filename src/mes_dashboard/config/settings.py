@@ -20,6 +20,13 @@ def _float_env(name: str, default: float) -> float:
         return default
 
 
+def _bool_env(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 class Config:
     """Base configuration."""
 
@@ -40,7 +47,8 @@ class Config:
     # Auth configuration - MUST be set in .env file
     LDAP_API_URL = os.getenv("LDAP_API_URL", "")
     ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "")
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-prod")
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    CSRF_ENABLED = _bool_env("CSRF_ENABLED", True)
 
     # Session configuration
     PERMANENT_SESSION_LIFETIME = _int_env("SESSION_LIFETIME", 28800)  # 8 hours
@@ -103,6 +111,7 @@ class TestingConfig(Config):
     DB_CONNECT_RETRY_COUNT = 0
     DB_CONNECT_RETRY_DELAY = 0.0
     DB_CALL_TIMEOUT_MS = 5000
+    CSRF_ENABLED = False
 
 
 def get_config(env: str | None = None) -> Type[Config]:

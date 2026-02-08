@@ -26,10 +26,12 @@ A release is cutover-ready only when all gates pass:
 - pool exhaustion path returns `503` + `DB_POOL_EXHAUSTED` and `Retry-After`
 - circuit-open path returns `503` + `CIRCUIT_BREAKER_OPEN` and fail-fast semantics
 - frontend client does not aggressively retry on degraded pool exhaustion responses
+- health/admin payloads expose worker policy state (`allowed`/`cooldown`/`blocked`) and alert booleans
 
 6. Conda-systemd contract gate
 - `deploy/mes-dashboard.service` and `deploy/mes-dashboard-watchdog.service` both run in the same conda runtime contract
 - `WATCHDOG_RESTART_FLAG`, `WATCHDOG_PID_FILE`, `WATCHDOG_STATE_FILE` paths are consistent across app/admin/watchdog
+- startup contract validation passes: `RUNTIME_CONTRACT_ENFORCE=true ./scripts/start_server.sh check`
 - single-port bind (`GUNICORN_BIND`) remains stable during restart workflow
 
 7. Regression gate
@@ -60,7 +62,8 @@ A release is cutover-ready only when all gates pass:
 5. Conda + systemd rehearsal (recommended before production cutover)
 - `sudo cp deploy/mes-dashboard.service /etc/systemd/system/`
 - `sudo cp deploy/mes-dashboard-watchdog.service /etc/systemd/system/`
-- `sudo mkdir -p /etc/mes-dashboard && sudo cp .env /etc/mes-dashboard/mes-dashboard.env`
+- `sudo mkdir -p /etc/mes-dashboard && sudo cp deploy/mes-dashboard.env.example /etc/mes-dashboard/mes-dashboard.env`
+- merge deployment secrets from `.env` into `/etc/mes-dashboard/mes-dashboard.env`
 - `sudo systemctl daemon-reload`
 - `sudo systemctl enable --now mes-dashboard mes-dashboard-watchdog`
 - call `/admin/api/worker/status` and verify runtime contract paths exist
@@ -69,6 +72,7 @@ A release is cutover-ready only when all gates pass:
 - call `/health` and `/health/deep`
 - confirm route cache mode, degraded flags, and pool/runtime diagnostics align with environment (Redis on/off)
 - trigger one controlled worker restart from admin API and verify single-port continuity
+- verify guarded mode flow: blocked restart requires manual override payload (`manual_override`, `override_acknowledged`, `override_reason`)
 - verify README architecture section matches deployed runtime contract
 
 ## Rollback Procedure
@@ -111,3 +115,6 @@ Use these initial thresholds for alerting/escalation:
 
 4. Frontend/API retry pressure
 - significant increase of client retries for `DB_POOL_EXHAUSTED` or `CIRCUIT_BREAKER_OPEN` responses over baseline
+
+5. Recovery policy blocked
+- `resilience.policy_state.blocked == true` or `resilience.alerts.restart_blocked == true`

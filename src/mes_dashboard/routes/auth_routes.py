@@ -11,6 +11,7 @@ from threading import Lock
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
+from mes_dashboard.core.csrf import rotate_csrf_token
 from mes_dashboard.services.auth_service import authenticate, is_admin
 
 logger = logging.getLogger('mes_dashboard.auth_routes')
@@ -93,6 +94,7 @@ def login():
                 error = "您不是管理員，無法登入後台"
             else:
                 # Login successful
+                session.clear()
                 session["admin"] = {
                     "username": user.get("username"),
                     "displayName": user.get("displayName"),
@@ -100,6 +102,7 @@ def login():
                     "department": user.get("department"),
                     "login_time": datetime.now().isoformat(),
                 }
+                rotate_csrf_token()
                 next_url = request.args.get("next", url_for("portal_index"))
                 return redirect(next_url)
 
@@ -109,5 +112,5 @@ def login():
 @auth_bp.route("/logout")
 def logout():
     """Admin logout."""
-    session.pop("admin", None)
+    session.clear()
     return redirect(url_for("portal_index"))

@@ -1,5 +1,21 @@
 const DEFAULT_TIMEOUT = 30000;
 
+function getCsrfToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
+
+function withCsrfHeaders(headers = {}, method = 'GET') {
+  const normalized = String(method).toUpperCase();
+  const merged = { ...headers };
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalized)) {
+    const csrf = getCsrfToken();
+    if (csrf && !merged['X-CSRF-Token']) {
+      merged['X-CSRF-Token'] = csrf;
+    }
+  }
+  return merged;
+}
+
 function buildApiError(response, payload) {
   const message =
     payload?.error?.message ||
@@ -47,15 +63,19 @@ export async function apiGet(url, options = {}) {
 
 export async function apiPost(url, payload, options = {}) {
   if (window.MesApi?.post) {
-    return window.MesApi.post(url, payload, options);
+    const enrichedOptions = {
+      ...options,
+      headers: withCsrfHeaders(options.headers || {}, 'POST')
+    };
+    return window.MesApi.post(url, payload, enrichedOptions);
   }
   return fetchJson(url, {
     ...options,
     method: 'POST',
-    headers: {
+    headers: withCsrfHeaders({
       'Content-Type': 'application/json',
       ...(options.headers || {})
-    },
+    }, 'POST'),
     body: JSON.stringify(payload)
   });
 }
@@ -64,6 +84,7 @@ export async function apiUpload(url, formData, options = {}) {
   return fetchJson(url, {
     ...options,
     method: 'POST',
+    headers: withCsrfHeaders(options.headers || {}, 'POST'),
     body: formData
   });
 }

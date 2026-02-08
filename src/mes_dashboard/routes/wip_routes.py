@@ -7,6 +7,8 @@ Uses DWH.DW_MES_LOT_V view for real-time WIP data.
 
 from flask import Blueprint, jsonify, request
 
+from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.utils import parse_bool_query
 from mes_dashboard.services.wip_service import (
     get_wip_summary,
     get_wip_matrix,
@@ -24,10 +26,21 @@ from mes_dashboard.services.wip_service import (
 # Create Blueprint
 wip_bp = Blueprint('wip', __name__, url_prefix='/api/wip')
 
+_WIP_MATRIX_RATE_LIMIT = configured_rate_limit(
+    bucket="wip-overview-matrix",
+    max_attempts_env="WIP_MATRIX_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="WIP_MATRIX_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=120,
+    default_window_seconds=60,
+)
 
-def _parse_bool(value: str) -> bool:
-    """Parse boolean from query string."""
-    return value.lower() in ('true', '1', 'yes') if value else False
+_WIP_DETAIL_RATE_LIMIT = configured_rate_limit(
+    bucket="wip-detail",
+    max_attempts_env="WIP_DETAIL_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="WIP_DETAIL_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=90,
+    default_window_seconds=60,
+)
 
 
 # ============================================================
@@ -52,7 +65,7 @@ def api_overview_summary():
     lotid = request.args.get('lotid', '').strip() or None
     package = request.args.get('package', '').strip() or None
     pj_type = request.args.get('type', '').strip() or None
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_wip_summary(
         include_dummy=include_dummy,
@@ -67,6 +80,7 @@ def api_overview_summary():
 
 
 @wip_bp.route('/overview/matrix')
+@_WIP_MATRIX_RATE_LIMIT
 def api_overview_matrix():
     """API: Get workcenter x product line matrix for overview dashboard.
 
@@ -88,7 +102,7 @@ def api_overview_matrix():
     lotid = request.args.get('lotid', '').strip() or None
     package = request.args.get('package', '').strip() or None
     pj_type = request.args.get('type', '').strip() or None
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
     status = request.args.get('status', '').strip().upper() or None
     hold_type = request.args.get('hold_type', '').strip().lower() or None
 
@@ -134,7 +148,7 @@ def api_overview_hold():
     """
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_wip_hold_summary(
         include_dummy=include_dummy,
@@ -151,6 +165,7 @@ def api_overview_hold():
 # ============================================================
 
 @wip_bp.route('/detail/<workcenter>')
+@_WIP_DETAIL_RATE_LIMIT
 def api_detail(workcenter: str):
     """API: Get WIP detail for a specific workcenter group.
 
@@ -176,12 +191,17 @@ def api_detail(workcenter: str):
     hold_type = request.args.get('hold_type', '').strip().lower() or None
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
     page = request.args.get('page', 1, type=int)
-    page_size = min(request.args.get('page_size', 100, type=int), 500)
+    page_size = request.args.get('page_size', 100, type=int)
 
-    if page < 1:
+    if page is None:
         page = 1
+    if page_size is None:
+        page_size = 100
+
+    page = max(page, 1)
+    page_size = max(1, min(page_size, 500))
 
     # Validate status parameter
     if status and status not in ('RUN', 'QUEUE', 'HOLD'):
@@ -245,7 +265,7 @@ def api_meta_workcenters():
     Returns:
         JSON with list of {name, lot_count} sorted by sequence
     """
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_workcenters(include_dummy=include_dummy)
     if result is not None:
@@ -263,7 +283,7 @@ def api_meta_packages():
     Returns:
         JSON with list of {name, lot_count} sorted by count desc
     """
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_packages(include_dummy=include_dummy)
     if result is not None:
@@ -293,7 +313,7 @@ def api_meta_search():
     search_field = request.args.get('field', '').strip().lower()
     q = request.args.get('q', '').strip()
     limit = min(request.args.get('limit', 20, type=int), 50)
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     # Cross-filter parameters
     workorder = request.args.get('workorder', '').strip() or None

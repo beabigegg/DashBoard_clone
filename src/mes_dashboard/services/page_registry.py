@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
 from pathlib import Path
 from threading import Lock
 
@@ -37,15 +39,33 @@ def _load() -> dict:
 def _save(data: dict) -> None:
     """Save page status configuration."""
     global _cache
+    tmp_path: Path | None = None
     try:
         DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-        DATA_FILE.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8"
-        )
+        payload = json.dumps(data, ensure_ascii=False, indent=2)
+
+        # Atomic write: write to sibling temp file, then replace target.
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=str(DATA_FILE.parent),
+            prefix=f".{DATA_FILE.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as tmp:
+            tmp.write(payload)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+            tmp_path = Path(tmp.name)
+        os.replace(tmp_path, DATA_FILE)
         _cache = data
         logger.debug("Saved page status to %s", DATA_FILE)
     except OSError as e:
+        if tmp_path is not None:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
         logger.error("Failed to save page status: %s", e)
         raise
 

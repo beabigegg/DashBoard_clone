@@ -223,6 +223,11 @@
 {% block scripts %}
     <script>
         const tbody = document.getElementById('pages-tbody');
+        const csrfToken = document.querySelector('meta[name=\"csrf-token\"]')?.content || '';
+
+        function withCsrfHeaders(headers = {}) {
+            return csrfToken ? { ...headers, 'X-CSRF-Token': csrfToken } : headers;
+        }
 
         async function loadPages() {
             try {
@@ -266,7 +271,7 @@
             try {
                 const response = await fetch(`/admin/api/pages${route}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify({ status: newStatus })
                 });
 

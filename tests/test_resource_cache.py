@@ -496,6 +496,17 @@ class TestBuildFilterBuilder:
         # Parameterized query should have bind variables
         assert len(params) > 0
 
+    def test_resource_load_uses_shared_sql_fragment_template(self):
+        """Test resource load path uses shared SQL fragment template."""
+        import mes_dashboard.services.resource_cache as rc
+        from mes_dashboard.services.sql_fragments import RESOURCE_TABLE
+
+        with patch.object(rc, "read_sql_df", return_value=pd.DataFrame()) as mock_read:
+            rc._load_from_oracle()
+
+        sql = mock_read.call_args[0][0]
+        assert RESOURCE_TABLE in sql
+
 
 class TestResourceDerivedIndex:
     """Test derived resource index and telemetry behavior."""
@@ -512,9 +523,12 @@ class TestResourceDerivedIndex:
     def test_get_resource_by_id_uses_index_snapshot(self):
         import mes_dashboard.services.resource_cache as rc
 
+        cache_df = pd.DataFrame([{"RESOURCEID": "R001", "RESOURCENAME": "Machine1"}])
+        rc._resource_df_cache.set(rc.RESOURCE_DF_CACHE_KEY, cache_df)
         snapshot = {
-            "records": [{"RESOURCEID": "R001", "RESOURCENAME": "Machine1"}],
-            "by_resource_id": {"R001": {"RESOURCEID": "R001", "RESOURCENAME": "Machine1"}},
+            "ready": True,
+            "all_positions": [0],
+            "by_resource_id": {"R001": 0},
         }
         with patch.object(rc, "get_resource_index_snapshot", return_value=snapshot):
             row = rc.get_resource_by_id("R001")
@@ -561,8 +575,8 @@ class TestResourceDerivedIndex:
             "built_at": "2026-02-07T10:00:05",
             "version_checked_at": 0.0,
             "count": 1,
-            "records": [{"RESOURCEID": "OLD"}],
-            "by_resource_id": {"OLD": {"RESOURCEID": "OLD"}},
+            "all_positions": [0],
+            "by_resource_id": {"OLD": 0},
         }
 
         rebuilt_df = pd.DataFrame([
@@ -576,4 +590,48 @@ class TestResourceDerivedIndex:
                         snapshot = rc.get_resource_index_snapshot()
                         assert snapshot["version"] == "v2"
                         assert snapshot["count"] == 1
-                        assert snapshot["by_resource_id"]["R002"]["RESOURCENAME"] == "Machine2"
+                        assert snapshot["by_resource_id"]["R002"] == 0
+                        records = rc.get_all_resources()
+                        assert records[0]["RESOURCENAME"] == "Machine2"
+
+    def test_normalized_index_does_not_store_full_records_copy(self):
+        import mes_dashboard.services.resource_cache as rc
+
+        df = pd.DataFrame([
+            {"RESOURCEID": "R001", "WORKCENTERNAME": "WC1", "PJ_ISPRODUCTION": 1},
+            {"RESOURCEID": "R002", "WORKCENTERNAME": "WC2", "PJ_ISPRODUCTION": 0},
+        ])
+
+        index = rc._build_resource_index(df, source="redis", version="v1", updated_at="2026-02-08T00:00:00")
+        assert "records" not in index
+        assert index["by_resource_id"]["R001"] == 0
+        assert index["by_resource_id"]["R002"] == 1
+        assert index["memory"]["index_bytes"] > 0
+        assert index["memory"]["records_json_bytes"] == 0
+
+
+class TestResourceProcessLevelCache:
+    """Test bounded process-level cache for resource data."""
+
+    def test_lru_eviction_prefers_recent_keys(self):
+        import mes_dashboard.services.resource_cache as rc
+
+        cache = rc._ProcessLevelCache(ttl_seconds=60, max_size=2)
+        df1 = pd.DataFrame([{"RESOURCEID": "R001"}])
+        df2 = pd.DataFrame([{"RESOURCEID": "R002"}])
+        df3 = pd.DataFrame([{"RESOURCEID": "R003"}])
+
+        cache.set("a", df1)
+        cache.set("b", df2)
+        assert cache.get("a") is not None  # refresh recency for "a"
+        cache.set("c", df3)  # should evict "b"
+
+        assert cache.get("b") is None
+        assert cache.get("a") is not None
+        assert cache.get("c") is not None
+
+    def test_resource_process_cache_uses_bounded_config(self):
+        import mes_dashboard.services.resource_cache as rc
+
+        assert rc.RESOURCE_PROCESS_CACHE_MAX_SIZE >= 1
+        assert rc._resource_df_cache.max_size == rc.RESOURCE_PROCESS_CACHE_MAX_SIZE

@@ -7,12 +7,14 @@ Provides /health and /health/deep endpoints for monitoring service status.
 from __future__ import annotations
 
 import logging
+import os
+import threading
 import time
 from datetime import datetime, timedelta
-from flask import Blueprint, jsonify, make_response
+from flask import Blueprint, current_app, jsonify, make_response
 
 from mes_dashboard.core.database import (
-    get_engine,
+    get_health_engine,
     get_pool_runtime_config,
     get_pool_status,
 )
@@ -28,6 +30,15 @@ from mes_dashboard.core.cache import (
 from mes_dashboard.core.resilience import (
     build_recovery_recommendation,
     get_resilience_thresholds,
+    summarize_restart_history,
+)
+from mes_dashboard.core.runtime_contract import build_runtime_contract_diagnostics
+from mes_dashboard.core.worker_recovery_policy import (
+    evaluate_worker_recovery_state,
+    extract_last_requested_at,
+    extract_restart_history,
+    get_worker_recovery_policy_config,
+    load_restart_state,
 )
 from sqlalchemy import text
 
@@ -41,6 +52,61 @@ health_bp = Blueprint('health', __name__)
 
 DB_LATENCY_WARNING_MS = 100  # Database latency > 100ms is slow
 CACHE_STALE_MINUTES = 2  # Cache update > 2 minutes is stale
+HEALTH_MEMO_TTL_SECONDS = int(os.getenv("HEALTH_MEMO_TTL_SECONDS", "5"))
+
+_HEALTH_MEMO_LOCK = threading.Lock()
+_HEALTH_MEMO: dict[str, dict | None] = {
+    "health": None,
+    "deep": None,
+}
+
+
+def _health_memo_enabled() -> bool:
+    if HEALTH_MEMO_TTL_SECONDS <= 0:
+        return False
+    if current_app.testing or bool(current_app.config.get("TESTING")):
+        return False
+    return True
+
+
+def _get_health_memo(cache_key: str) -> tuple[dict, int] | None:
+    if not _health_memo_enabled():
+        return None
+    now = time.time()
+    with _HEALTH_MEMO_LOCK:
+        entry = _HEALTH_MEMO.get(cache_key)
+        if not entry:
+            return None
+        if now - float(entry.get("ts", 0.0)) > HEALTH_MEMO_TTL_SECONDS:
+            _HEALTH_MEMO[cache_key] = None
+            return None
+        return entry["payload"], int(entry["status"])
+
+
+def _set_health_memo(cache_key: str, payload: dict, status_code: int) -> None:
+    if not _health_memo_enabled():
+        return
+    with _HEALTH_MEMO_LOCK:
+        _HEALTH_MEMO[cache_key] = {
+            "ts": time.time(),
+            "payload": payload,
+            "status": int(status_code),
+        }
+
+
+def _build_health_response(payload: dict, status_code: int):
+    """Build JSON response with explicit no-cache headers."""
+    resp = make_response(jsonify(payload), status_code)
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+
+def _reset_health_memo_for_tests() -> None:
+    with _HEALTH_MEMO_LOCK:
+        _HEALTH_MEMO["health"] = None
+        _HEALTH_MEMO["deep"] = None
 
 
 def _classify_degraded_reason(
@@ -63,6 +129,48 @@ def _classify_degraded_reason(
     return None
 
 
+def _build_resilience_alerts(
+    *,
+    pool_saturation: float | None,
+    circuit_state: str | None,
+    route_cache_degraded: bool,
+    restart_churn_exceeded: bool,
+    restart_blocked: bool,
+    thresholds: dict,
+) -> dict:
+    saturation = float(pool_saturation or 0.0)
+    warning = float(thresholds.get("pool_saturation_warning", 0.9))
+    critical = float(thresholds.get("pool_saturation_critical", 1.0))
+    return {
+        "pool_warning": saturation >= warning,
+        "pool_critical": saturation >= critical,
+        "circuit_open": circuit_state == "OPEN",
+        "route_cache_degraded": bool(route_cache_degraded),
+        "restart_churn_exceeded": bool(restart_churn_exceeded),
+        "restart_blocked": bool(restart_blocked),
+    }
+
+
+def get_worker_recovery_status() -> dict:
+    """Build worker recovery policy status for health/admin telemetry."""
+    state = load_restart_state()
+    history = extract_restart_history(state)
+    policy_state = evaluate_worker_recovery_state(
+        history,
+        last_requested_at=extract_last_requested_at(state),
+    )
+    churn = summarize_restart_history(
+        history,
+        window_seconds=int(policy_state.get("window_seconds") or 600),
+        threshold=int(policy_state.get("churn_threshold") or 3),
+    )
+    return {
+        "policy_state": policy_state,
+        "restart_churn": churn,
+        "policy_config": get_worker_recovery_policy_config(),
+    }
+
+
 def check_database() -> tuple[str, str | None]:
     """Check database connectivity.
 
@@ -71,7 +179,7 @@ def check_database() -> tuple[str, str | None]:
         status is 'ok' or 'error'.
     """
     try:
-        engine = get_engine()
+        engine = get_health_engine()
         with engine.connect() as conn:
             conn.execute(text("SELECT 1 FROM DUAL"))
         return 'ok', None
@@ -111,13 +219,21 @@ def get_cache_status() -> dict:
     status = {
         'enabled': REDIS_ENABLED,
         'sys_date': get_cached_sys_date(),
-        'updated_at': get_cache_updated_at()
+        'updated_at': get_cache_updated_at(),
+        'derived_search_index': {},
+        'derived_frame_snapshot': {},
+        'index_metrics': {},
+        'memory': {},
     }
     try:
         from mes_dashboard.services.wip_service import get_wip_search_index_status
-        status['derived_search_index'] = get_wip_search_index_status()
+        derived = get_wip_search_index_status()
+        status['derived_search_index'] = derived.get('derived_search_index', {})
+        status['derived_frame_snapshot'] = derived.get('derived_frame_snapshot', {})
+        status['index_metrics'] = derived.get('metrics', {})
+        status['memory'] = derived.get('memory', {})
     except Exception:
-        status['derived_search_index'] = {}
+        pass
     return status
 
 
@@ -205,6 +321,11 @@ def health_check():
         - 200 OK: All services healthy or degraded (Redis down but DB ok)
         - 503 Service Unavailable: Database unhealthy
     """
+    cached = _get_health_memo("health")
+    if cached is not None:
+        payload, status_code = cached
+        return _build_health_response(payload, status_code)
+
     from mes_dashboard.core.circuit_breaker import get_circuit_breaker_status
 
     db_status, db_error = check_database()
@@ -266,13 +387,25 @@ def health_check():
             warnings.append(f"Database pool saturation is high ({saturation:.0%})")
 
     thresholds = get_resilience_thresholds()
+    worker_recovery = get_worker_recovery_status()
+    policy_state = worker_recovery.get("policy_state", {})
+    restart_churn = worker_recovery.get("restart_churn", {})
     recommendation = build_recovery_recommendation(
         degraded_reason=degraded_reason,
         pool_saturation=pool_saturation,
         circuit_state=circuit_breaker.get('state'),
-        restart_churn_exceeded=False,
-        cooldown_active=False,
+        restart_churn_exceeded=bool(restart_churn.get("exceeded")),
+        cooldown_active=bool(policy_state.get("cooldown")),
     )
+    alerts = _build_resilience_alerts(
+        pool_saturation=pool_saturation,
+        circuit_state=circuit_breaker.get("state"),
+        route_cache_degraded=bool(route_cache.get("degraded")),
+        restart_churn_exceeded=bool(restart_churn.get("exceeded")),
+        restart_blocked=bool(policy_state.get("blocked")),
+        thresholds=thresholds,
+    )
+    runtime_contract = build_runtime_contract_diagnostics(strict=False)
 
     # Check equipment status cache
     equipment_status_cache = get_equipment_status_cache_status()
@@ -293,8 +426,18 @@ def health_check():
         },
         'resilience': {
             'thresholds': thresholds,
+            'alerts': alerts,
+            'policy_state': {
+                'state': policy_state.get("state"),
+                'allowed': policy_state.get("allowed"),
+                'cooldown': policy_state.get("cooldown"),
+                'blocked': policy_state.get("blocked"),
+                'cooldown_remaining_seconds': policy_state.get("cooldown_remaining_seconds"),
+            },
+            'restart_churn': restart_churn,
             'recovery_recommendation': recommendation,
         },
+        'runtime_contract': runtime_contract,
         'cache': get_cache_status(),
         'route_cache': route_cache,
         'resource_cache': resource_cache,
@@ -307,12 +450,8 @@ def health_check():
     if warnings:
         response['warnings'] = warnings
 
-    # Add no-cache headers to prevent browser caching
-    resp = make_response(jsonify(response), http_code)
-    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
-    return resp
+    _set_health_memo("health", response, http_code)
+    return _build_health_response(response, http_code)
 
 
 @health_bp.route('/health/deep', methods=['GET'])
@@ -333,6 +472,11 @@ def deep_health_check():
     # Require admin authentication - redirect to login for consistency
     if not is_admin_logged_in():
         return redirect(url_for("auth.login", next=request.url))
+
+    cached = _get_health_memo("deep")
+    if cached is not None:
+        payload, status_code = cached
+        return _build_health_response(payload, status_code)
 
     # Check database with latency measurement
     db_start = time.time()
@@ -397,6 +541,9 @@ def deep_health_check():
         warnings.append(f"Database pool saturation is high ({pool_saturation:.0%})")
 
     thresholds = get_resilience_thresholds()
+    worker_recovery = get_worker_recovery_status()
+    policy_state = worker_recovery.get("policy_state", {})
+    restart_churn = worker_recovery.get("restart_churn", {})
     degraded_reason = _classify_degraded_reason(
         db_status=db_status,
         redis_status=redis_status,
@@ -408,9 +555,18 @@ def deep_health_check():
         degraded_reason=degraded_reason,
         pool_saturation=pool_saturation,
         circuit_state=circuit_breaker.get('state'),
-        restart_churn_exceeded=False,
-        cooldown_active=False,
+        restart_churn_exceeded=bool(restart_churn.get("exceeded")),
+        cooldown_active=bool(policy_state.get("cooldown")),
     )
+    alerts = _build_resilience_alerts(
+        pool_saturation=pool_saturation,
+        circuit_state=circuit_breaker.get("state"),
+        route_cache_degraded=bool(route_cache.get("degraded")),
+        restart_churn_exceeded=bool(restart_churn.get("exceeded")),
+        restart_blocked=bool(policy_state.get("blocked")),
+        thresholds=thresholds,
+    )
+    runtime_contract = build_runtime_contract_diagnostics(strict=False)
 
     # Check latency thresholds
     db_latency_status = 'healthy'
@@ -429,8 +585,18 @@ def deep_health_check():
         'degraded_reason': degraded_reason,
         'resilience': {
             'thresholds': thresholds,
+            'alerts': alerts,
+            'policy_state': {
+                'state': policy_state.get("state"),
+                'allowed': policy_state.get("allowed"),
+                'cooldown': policy_state.get("cooldown"),
+                'blocked': policy_state.get("blocked"),
+                'cooldown_remaining_seconds': policy_state.get("cooldown_remaining_seconds"),
+            },
+            'restart_churn': restart_churn,
             'recovery_recommendation': recommendation,
         },
+        'runtime_contract': runtime_contract,
         'checks': {
             'database': {
                 'status': db_latency_status if db_status == 'ok' else 'error',
@@ -446,7 +612,9 @@ def deep_health_check():
             'cache': {
                 'freshness': cache_freshness,
                 'updated_at': cache_updated_at,
-                'sys_date': cache_status.get('sys_date')
+                'sys_date': cache_status.get('sys_date'),
+                'index_metrics': cache_status.get('index_metrics', {}),
+                'memory': cache_status.get('memory', {}),
             },
             'route_cache': route_cache
         },
@@ -464,9 +632,5 @@ def deep_health_check():
     if warnings:
         response['warnings'] = warnings
 
-    # Add no-cache headers
-    resp = make_response(jsonify(response), http_code)
-    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
-    return resp
+    _set_health_memo("deep", response, http_code)
+    return _build_health_response(response, http_code)

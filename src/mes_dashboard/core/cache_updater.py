@@ -221,7 +221,7 @@ class CacheUpdater:
             return None
 
     def _update_redis_cache(self, df: pd.DataFrame, sys_date: str) -> bool:
-        """Update Redis cache with new data using pipeline for atomicity.
+        """Update Redis cache with staged publish for coherent snapshot visibility.
 
         Args:
             df: DataFrame with full table data.
@@ -234,18 +234,24 @@ class CacheUpdater:
         if client is None:
             return False
 
+        staging_key: str | None = None
         try:
             # Convert DataFrame to JSON
             # Handle datetime columns
-            for col in df.select_dtypes(include=['datetime64']).columns:
-                df[col] = df[col].astype(str)
+            df_copy = df.copy()
+            for col in df_copy.select_dtypes(include=['datetime64']).columns:
+                df_copy[col] = df_copy[col].astype(str)
 
-            data_json = df.to_json(orient='records', force_ascii=False)
+            data_json = df_copy.to_json(orient='records', force_ascii=False)
 
-            # Atomic update using pipeline
+            # Stage payload first, then atomically publish live key + metadata.
             now = datetime.now().isoformat()
+            unique_suffix = f"{int(time.time() * 1000)}:{threading.get_ident()}"
+            staging_key = get_key(f"data:staging:{unique_suffix}")
+
             pipe = client.pipeline()
-            pipe.set(get_key("data"), data_json)
+            pipe.set(staging_key, data_json)
+            pipe.rename(staging_key, get_key("data"))
             pipe.set(get_key("meta:sys_date"), sys_date)
             pipe.set(get_key("meta:updated_at"), now)
             pipe.execute()
@@ -253,6 +259,11 @@ class CacheUpdater:
             return True
         except Exception as e:
             logger.error(f"Failed to update Redis cache: {e}")
+            if staging_key:
+                try:
+                    client.delete(staging_key)
+                except Exception:
+                    pass
             return False
 
     def _check_resource_update(self, force: bool = False) -> bool:

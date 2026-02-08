@@ -10,8 +10,10 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import threading
 import time
+from collections import OrderedDict
 from typing import Any, Optional, Protocol, Tuple
 
 import pandas as pd
@@ -39,26 +41,49 @@ class ProcessLevelCache:
     Uses a lock to ensure only one thread parses at a time.
     """
 
-    def __init__(self, ttl_seconds: int = 30):
-        self._cache: dict[str, Tuple[pd.DataFrame, float]] = {}
+    def __init__(self, ttl_seconds: int = 30, max_size: int = 32):
+        self._cache: OrderedDict[str, Tuple[pd.DataFrame, float]] = OrderedDict()
         self._lock = threading.Lock()
-        self._ttl = ttl_seconds
+        self._ttl = max(int(ttl_seconds), 1)
+        self._max_size = max(int(max_size), 1)
+
+    @property
+    def max_size(self) -> int:
+        return self._max_size
+
+    def _evict_expired_locked(self, now: float) -> None:
+        stale_keys = [
+            key for key, (_, timestamp) in self._cache.items()
+            if now - timestamp > self._ttl
+        ]
+        for key in stale_keys:
+            self._cache.pop(key, None)
 
     def get(self, key: str) -> Optional[pd.DataFrame]:
         """Get cached DataFrame if not expired."""
         with self._lock:
-            if key not in self._cache:
+            payload = self._cache.get(key)
+            if payload is None:
                 return None
-            df, timestamp = self._cache[key]
-            if time.time() - timestamp > self._ttl:
-                del self._cache[key]
+            df, timestamp = payload
+            now = time.time()
+            if now - timestamp > self._ttl:
+                self._cache.pop(key, None)
                 return None
+            self._cache.move_to_end(key, last=True)
             return df
 
     def set(self, key: str, df: pd.DataFrame) -> None:
         """Cache a DataFrame with current timestamp."""
         with self._lock:
-            self._cache[key] = (df, time.time())
+            now = time.time()
+            self._evict_expired_locked(now)
+            if key in self._cache:
+                self._cache.pop(key, None)
+            elif len(self._cache) >= self._max_size:
+                self._cache.popitem(last=False)
+            self._cache[key] = (df, now)
+            self._cache.move_to_end(key, last=True)
 
     def invalidate(self, key: str) -> None:
         """Remove a key from cache."""
@@ -71,8 +96,26 @@ class ProcessLevelCache:
             self._cache.clear()
 
 
+def _resolve_cache_max_size(env_name: str, default: int) -> int:
+    value = os.getenv(env_name)
+    if value is None:
+        return max(int(default), 1)
+    try:
+        return max(int(value), 1)
+    except (TypeError, ValueError):
+        return max(int(default), 1)
+
+
 # Global process-level cache for WIP DataFrame (30s TTL)
-_wip_df_cache = ProcessLevelCache(ttl_seconds=30)
+PROCESS_CACHE_MAX_SIZE = _resolve_cache_max_size("PROCESS_CACHE_MAX_SIZE", 32)
+WIP_PROCESS_CACHE_MAX_SIZE = _resolve_cache_max_size(
+    "WIP_PROCESS_CACHE_MAX_SIZE",
+    PROCESS_CACHE_MAX_SIZE,
+)
+_wip_df_cache = ProcessLevelCache(
+    ttl_seconds=30,
+    max_size=WIP_PROCESS_CACHE_MAX_SIZE,
+)
 _wip_parse_lock = threading.Lock()
 
 # ============================================================
@@ -328,33 +371,30 @@ def get_cached_wip_data() -> Optional[pd.DataFrame]:
     if client is None:
         return None
 
-    # Use lock to prevent multiple threads from parsing simultaneously
+    try:
+        start_time = time.time()
+        data_json = client.get(get_key("data"))
+        if data_json is None:
+            logger.debug("Cache miss: no data in Redis")
+            return None
+
+        # Parse outside lock to reduce contention on hot paths.
+        parsed_df = pd.read_json(io.StringIO(data_json), orient='records')
+        parse_time = time.time() - start_time
+    except Exception as e:
+        logger.warning(f"Failed to read cache: {e}")
+        return None
+
+    # Keep lock scope tight: consistency check + cache write only.
     with _wip_parse_lock:
-        # Double-check after acquiring lock (another thread may have parsed)
         cached_df = _wip_df_cache.get(cache_key)
         if cached_df is not None:
-            logger.debug(f"Process cache hit (after lock): {len(cached_df)} rows")
+            logger.debug(f"Process cache hit (after parse): {len(cached_df)} rows")
             return cached_df
+        _wip_df_cache.set(cache_key, parsed_df)
 
-        try:
-            start_time = time.time()
-            data_json = client.get(get_key("data"))
-            if data_json is None:
-                logger.debug("Cache miss: no data in Redis")
-                return None
-
-            # Parse JSON to DataFrame
-            df = pd.read_json(io.StringIO(data_json), orient='records')
-            parse_time = time.time() - start_time
-
-            # Store in process-level cache
-            _wip_df_cache.set(cache_key, df)
-
-            logger.debug(f"Cache hit: loaded {len(df)} rows from Redis (parsed in {parse_time:.2f}s)")
-            return df
-        except Exception as e:
-            logger.warning(f"Failed to read cache: {e}")
-            return None
+    logger.debug(f"Cache hit: loaded {len(parsed_df)} rows from Redis (parsed in {parse_time:.2f}s)")
+    return parsed_df
 
 
 def get_cached_sys_date() -> Optional[str]:

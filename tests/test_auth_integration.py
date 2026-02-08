@@ -16,6 +16,12 @@ from mes_dashboard.app import create_app
 from mes_dashboard.services import page_registry
 
 
+@pytest.fixture(autouse=True)
+def _ldap_defaults(monkeypatch):
+    monkeypatch.setattr("mes_dashboard.services.auth_service.LDAP_API_BASE", "https://ldap.panjit.example")
+    monkeypatch.setattr("mes_dashboard.services.auth_service.LDAP_CONFIG_ERROR", None)
+
+
 @pytest.fixture
 def temp_page_status(tmp_path):
     """Create temporary page status file."""
@@ -70,8 +76,9 @@ class TestLoginRoute:
         assert "管理員登入" in response.data.decode("utf-8") or "login" in response.data.decode("utf-8").lower()
 
     @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
     @patch('mes_dashboard.services.auth_service.requests.post')
-    def test_login_success(self, mock_post, client):
+    def test_login_success(self, mock_post, _mock_is_admin, client):
         """Test successful login via LDAP."""
         # Mock LDAP response
         mock_response = MagicMock()

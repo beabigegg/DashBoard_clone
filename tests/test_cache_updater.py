@@ -171,6 +171,7 @@ class TestUpdateRedisCache:
                 result = updater._update_redis_cache(test_df, '2024-01-15 10:30:00')
 
                 assert result is True
+                mock_pipeline.rename.assert_called_once()
                 mock_pipeline.execute.assert_called_once()
 
     def test_update_redis_cache_no_client(self):
@@ -183,6 +184,27 @@ class TestUpdateRedisCache:
             updater = cu.CacheUpdater()
             result = updater._update_redis_cache(test_df, '2024-01-15')
             assert result is False
+
+    def test_update_redis_cache_cleans_staging_key_on_failure(self):
+        """Failed publish should clean staged key and keep function safe."""
+        import mes_dashboard.core.cache_updater as cu
+
+        mock_client = MagicMock()
+        mock_pipeline = MagicMock()
+        mock_pipeline.execute.side_effect = RuntimeError("pipeline failed")
+        mock_client.pipeline.return_value = mock_pipeline
+
+        test_df = pd.DataFrame({'LOTID': ['LOT001'], 'QTY': [100]})
+
+        with patch.object(cu, 'get_redis_client', return_value=mock_client):
+            with patch.object(cu, 'get_key', side_effect=lambda k: f'mes_wip:{k}'):
+                updater = cu.CacheUpdater()
+                result = updater._update_redis_cache(test_df, '2024-01-15 10:30:00')
+
+        assert result is False
+        mock_client.delete.assert_called_once()
+        staged_key = mock_client.delete.call_args.args[0]
+        assert "staging" in staged_key
 
 
 class TestCacheUpdateFlow:

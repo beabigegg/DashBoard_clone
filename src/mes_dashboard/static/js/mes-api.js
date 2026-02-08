@@ -33,6 +33,23 @@ const MesApi = (function() {
 
     let requestCounter = 0;
 
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name=\"csrf-token\"]');
+        return meta ? meta.content : '';
+    }
+
+    function withCsrfHeaders(headers, method) {
+        const normalized = (method || 'GET').toUpperCase();
+        const nextHeaders = { ...(headers || {}) };
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalized)) {
+            const token = getCsrfToken();
+            if (token && !nextHeaders['X-CSRF-Token']) {
+                nextHeaders['X-CSRF-Token'] = token;
+            }
+        }
+        return nextHeaders;
+    }
+
     /**
      * Generate a unique request ID
      */
@@ -205,9 +222,9 @@ const MesApi = (function() {
 
         const fetchOptions = {
             method: method,
-            headers: {
+            headers: withCsrfHeaders({
                 'Content-Type': 'application/json'
-            }
+            }, method)
         };
 
         if (options.body) {

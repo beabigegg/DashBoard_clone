@@ -236,6 +236,25 @@ class TestDetailRoute(TestWipRoutesBase):
         self.assertEqual(call_args.kwargs['page'], 1)
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_detail')
+    def test_handles_page_size_less_than_one(self, mock_get_detail):
+        """Page size less than 1 should be set to 1."""
+        mock_get_detail.return_value = {
+            'workcenter': '切割',
+            'summary': {'total_lots': 0, 'on_equipment_lots': 0,
+                        'waiting_lots': 0, 'hold_lots': 0},
+            'specs': [],
+            'lots': [],
+            'pagination': {'page': 1, 'page_size': 1,
+                           'total_count': 0, 'total_pages': 1},
+            'sys_date': None
+        }
+
+        self.client.get('/api/wip/detail/切割?page_size=0')
+
+        call_args = mock_get_detail.call_args
+        self.assertEqual(call_args.kwargs['page_size'], 1)
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_detail')
     def test_returns_error_on_failure(self, mock_get_detail):
         """Should return success=False and 500 on failure."""
         mock_get_detail.return_value = None
@@ -245,6 +264,18 @@ class TestDetailRoute(TestWipRoutesBase):
 
         self.assertEqual(response.status_code, 500)
         self.assertFalse(data['success'])
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_detail')
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 7))
+    def test_detail_rate_limited_returns_429(self, _mock_limit, mock_get_detail):
+        """Rate-limited detail requests should return 429."""
+        response = self.client.get('/api/wip/detail/焊接_DB')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 429)
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error']['code'], 'TOO_MANY_REQUESTS')
+        mock_get_detail.assert_not_called()
 
 
 class TestMetaWorkcentersRoute(TestWipRoutesBase):

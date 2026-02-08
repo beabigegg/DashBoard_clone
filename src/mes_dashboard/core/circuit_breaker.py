@@ -130,12 +130,16 @@ class CircuitBreaker:
     @property
     def state(self) -> CircuitState:
         """Get current circuit state, handling state transitions."""
+        transition_log: tuple[int, str] | None = None
         with self._lock:
             if self._state == CircuitState.OPEN:
                 # Check if we should transition to HALF_OPEN
                 if self._open_time and time.time() - self._open_time >= self.recovery_timeout:
-                    self._transition_to(CircuitState.HALF_OPEN)
-            return self._state
+                    transition_log = self._transition_to_locked(CircuitState.HALF_OPEN)
+            current_state = self._state
+        if transition_log:
+            self._emit_transition_log(*transition_log)
+        return current_state
 
     def allow_request(self) -> bool:
         """Check if a request should be allowed.
@@ -161,45 +165,57 @@ class CircuitBreaker:
         if not CIRCUIT_BREAKER_ENABLED:
             return
 
+        transition_log: tuple[int, str] | None = None
         with self._lock:
             self._results.append(True)
 
             if self._state == CircuitState.HALF_OPEN:
                 # Success in half-open means we can close
-                self._transition_to(CircuitState.CLOSED)
+                transition_log = self._transition_to_locked(CircuitState.CLOSED)
+
+        if transition_log:
+            self._emit_transition_log(*transition_log)
 
     def record_failure(self) -> None:
         """Record a failed operation."""
         if not CIRCUIT_BREAKER_ENABLED:
             return
 
+        transition_log: tuple[int, str] | None = None
         with self._lock:
             self._results.append(False)
             self._last_failure_time = time.time()
 
             if self._state == CircuitState.HALF_OPEN:
                 # Failure in half-open means back to open
-                self._transition_to(CircuitState.OPEN)
+                transition_log = self._transition_to_locked(CircuitState.OPEN)
             elif self._state == CircuitState.CLOSED:
                 # Check if we should open
-                self._check_and_open()
+                transition_log = self._check_and_open_locked()
 
-    def _check_and_open(self) -> None:
+        if transition_log:
+            self._emit_transition_log(*transition_log)
+
+    def _check_and_open_locked(self) -> tuple[int, str] | None:
         """Check failure rate and open circuit if needed.
 
         Must be called with lock held.
         """
         if len(self._results) < self.failure_threshold:
-            return
+            return None
 
         failure_count = sum(1 for r in self._results if not r)
         failure_rate = failure_count / len(self._results)
 
         if (failure_count >= self.failure_threshold and
                 failure_rate >= self.failure_rate_threshold):
-            self._transition_to(CircuitState.OPEN)
+            return self._transition_to_locked(CircuitState.OPEN)
+        return None
 
-    def _transition_to(self, new_state: CircuitState) -> None:
+    def _emit_transition_log(self, level: int, message: str) -> None:
+        logger.log(level, message)
+
+    def _transition_to_locked(self, new_state: CircuitState) -> tuple[int, str]:
         """Transition to a new state with logging.
 
         Must be called with lock held.
@@ -209,23 +225,25 @@ class CircuitBreaker:
 
         if new_state == CircuitState.OPEN:
             self._open_time = time.time()
-            logger.warning(
+            return (
+                logging.WARNING,
                 f"Circuit breaker '{self.name}' OPENED: "
                 f"state {old_state.value} -> {new_state.value}, "
                 f"failures: {sum(1 for r in self._results if not r)}/{len(self._results)}"
             )
         elif new_state == CircuitState.HALF_OPEN:
-            logger.info(
+            return (
+                logging.INFO,
                 f"Circuit breaker '{self.name}' entering HALF_OPEN: "
                 f"testing service recovery..."
             )
-        elif new_state == CircuitState.CLOSED:
-            self._open_time = None
-            self._results.clear()
-            logger.info(
-                f"Circuit breaker '{self.name}' CLOSED: "
-                f"service recovered"
-            )
+        self._open_time = None
+        self._results.clear()
+        return (
+            logging.INFO,
+            f"Circuit breaker '{self.name}' CLOSED: "
+            f"service recovered"
+        )
 
     def get_status(self) -> CircuitBreakerStatus:
         """Get current status information."""
@@ -266,7 +284,7 @@ class CircuitBreaker:
             self._results.clear()
             self._last_failure_time = None
             self._open_time = None
-            logger.info(f"Circuit breaker '{self.name}' reset")
+        logger.info(f"Circuit breaker '{self.name}' reset")
 
 
 # ============================================================

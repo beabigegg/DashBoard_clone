@@ -682,7 +682,7 @@
         // State
         // ============================================================
         const state = {
-            reason: '{{ reason | e }}',
+            reason: {{ reason | tojson }},
             summary: null,
             distribution: null,
             lots: null,

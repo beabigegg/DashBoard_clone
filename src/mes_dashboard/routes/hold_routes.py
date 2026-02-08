@@ -6,6 +6,8 @@ Contains Flask Blueprint for Hold Detail page and API endpoints.
 
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for
 
+from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.utils import parse_bool_query
 from mes_dashboard.services.wip_service import (
     get_hold_detail_summary,
     get_hold_detail_distribution,
@@ -16,10 +18,13 @@ from mes_dashboard.services.wip_service import (
 # Create Blueprint
 hold_bp = Blueprint('hold', __name__)
 
-
-def _parse_bool(value: str) -> bool:
-    """Parse boolean from query string."""
-    return value.lower() in ('true', '1', 'yes') if value else False
+_HOLD_LOTS_RATE_LIMIT = configured_rate_limit(
+    bucket="hold-detail-lots",
+    max_attempts_env="HOLD_LOTS_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="HOLD_LOTS_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=90,
+    default_window_seconds=60,
+)
 
 
 # ============================================================
@@ -64,7 +69,7 @@ def api_hold_detail_summary():
     if not reason:
         return jsonify({'success': False, 'error': '缺少必要參數: reason'}), 400
 
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_hold_detail_summary(
         reason=reason,
@@ -90,7 +95,7 @@ def api_hold_detail_distribution():
     if not reason:
         return jsonify({'success': False, 'error': '缺少必要參數: reason'}), 400
 
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_hold_detail_distribution(
         reason=reason,
@@ -102,6 +107,7 @@ def api_hold_detail_distribution():
 
 
 @hold_bp.route('/api/wip/hold-detail/lots')
+@_HOLD_LOTS_RATE_LIMIT
 def api_hold_detail_lots():
     """API: Get paginated lot details for a specific hold reason.
 
@@ -124,7 +130,7 @@ def api_hold_detail_lots():
     workcenter = request.args.get('workcenter', '').strip() or None
     package = request.args.get('package', '').strip() or None
     age_range = request.args.get('age_range', '').strip() or None
-    include_dummy = _parse_bool(request.args.get('include_dummy', ''))
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 50, type=int), 200)
 

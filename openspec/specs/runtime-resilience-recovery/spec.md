@@ -48,3 +48,47 @@ The system MUST expose machine-readable resilience thresholds, restart-churn ind
 #### Scenario: Admin status includes restart churn summary
 - **WHEN** operators call `/admin/api/system-status` or `/admin/api/worker/status`
 - **THEN** responses MUST include bounded restart history summary within a configured time window and indicate whether churn threshold is exceeded
+
+### Requirement: Recovery Recommendations SHALL Reflect Self-Healing Policy State
+Health and admin resilience payloads MUST expose whether automated recovery is allowed, cooling down, or blocked by churn policy.
+
+#### Scenario: Operator inspects degraded state
+- **WHEN** `/health` or `/admin/api/worker/status` is requested during degradation
+- **THEN** response MUST include policy state, cooldown remaining time, and next recommended action
+
+### Requirement: Manual Recovery Override SHALL Be Explicit and Controlled
+Manual restart actions MUST bypass automatic block only through authenticated operator pathways with explicit acknowledgement.
+
+#### Scenario: Churn-blocked state with manual override request
+- **WHEN** authorized admin requests manual restart while auto-recovery is blocked
+- **THEN** system MUST execute controlled restart path and log the override context for auditability
+
+### Requirement: Circuit Breaker State Transitions SHALL Avoid Lock-Held Logging
+Circuit breaker state transitions MUST avoid executing logger I/O while internal state locks are held.
+
+#### Scenario: State transition occurs
+- **WHEN** circuit breaker transitions between CLOSED, OPEN, or HALF_OPEN
+- **THEN** lock-protected section MUST complete state mutation before emitting transition log output
+
+#### Scenario: Slow log handler under load
+- **WHEN** logger handlers are slow or blocked
+- **THEN** circuit breaker lock contention MUST remain bounded and MUST NOT serialize unrelated request paths behind logging latency
+
+### Requirement: Health Endpoints SHALL Use Short Internal Memoization
+Health and deep-health computation SHALL use a short-lived internal cache to prevent probe storms from amplifying backend load.
+
+#### Scenario: Frequent monitor scrapes
+- **WHEN** health endpoints are called repeatedly within a small window
+- **THEN** service SHALL return memoized payload for up to 5 seconds in non-testing environments
+
+#### Scenario: Testing mode
+- **WHEN** app is running in testing mode
+- **THEN** health endpoint memoization MUST be bypassed to preserve deterministic tests
+
+### Requirement: Logs MUST Redact Connection Secrets
+Runtime logs MUST avoid exposing DB connection credentials.
+
+#### Scenario: Connection string appears in log message
+- **WHEN** a log message contains DB URL credentials
+- **THEN** logger output MUST redact password and sensitive userinfo before emission
+

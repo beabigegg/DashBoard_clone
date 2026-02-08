@@ -1,4 +1,5 @@
 import unittest
+import os
 
 from mes_dashboard.app import create_app
 import mes_dashboard.core.database as db
@@ -18,9 +19,17 @@ class AppFactoryTests(unittest.TestCase):
         self.assertEqual(cache.get("app_factory_probe"), {"ok": True})
 
     def test_create_app_production_config(self):
-        app = create_app("production")
-        self.assertFalse(app.config.get("DEBUG"))
-        self.assertEqual(app.config.get("ENV"), "production")
+        old_secret = os.environ.get("SECRET_KEY")
+        try:
+            os.environ["SECRET_KEY"] = "test-production-secret-key"
+            app = create_app("production")
+            self.assertFalse(app.config.get("DEBUG"))
+            self.assertEqual(app.config.get("ENV"), "production")
+        finally:
+            if old_secret is None:
+                os.environ.pop("SECRET_KEY", None)
+            else:
+                os.environ["SECRET_KEY"] = old_secret
 
     def test_create_app_independent_instances(self):
         app1 = create_app()

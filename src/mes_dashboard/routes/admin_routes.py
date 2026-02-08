@@ -7,8 +7,9 @@ import json
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from flask import Blueprint, g, jsonify, render_template, request
 
@@ -19,6 +20,17 @@ from mes_dashboard.core.resilience import (
     get_resilience_thresholds,
     summarize_restart_history,
 )
+from mes_dashboard.core.runtime_contract import (
+    build_runtime_contract_diagnostics,
+    load_runtime_contract,
+)
+from mes_dashboard.core.worker_recovery_policy import (
+    decide_restart_request,
+    evaluate_worker_recovery_state,
+    extract_last_requested_at,
+    extract_restart_history,
+    load_restart_state,
+)
 from mes_dashboard.services.page_registry import get_all_pages, set_page_status
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -28,21 +40,13 @@ logger = logging.getLogger("mes_dashboard.admin")
 # Worker Restart Configuration
 # ============================================================
 
-WATCHDOG_RUNTIME_DIR = os.getenv("WATCHDOG_RUNTIME_DIR", "/tmp")
-RESTART_FLAG_PATH = os.getenv(
-    "WATCHDOG_RESTART_FLAG",
-    f"{WATCHDOG_RUNTIME_DIR}/mes_dashboard_restart.flag"
-)
-RESTART_STATE_PATH = os.getenv(
-    "WATCHDOG_STATE_FILE",
-    f"{WATCHDOG_RUNTIME_DIR}/mes_dashboard_restart_state.json"
-)
-WATCHDOG_PID_PATH = os.getenv(
-    "WATCHDOG_PID_FILE",
-    f"{WATCHDOG_RUNTIME_DIR}/gunicorn.pid"
-)
-GUNICORN_BIND = os.getenv("GUNICORN_BIND", "0.0.0.0:8080")
-RESTART_COOLDOWN_SECONDS = int(os.getenv("WORKER_RESTART_COOLDOWN", "60"))
+_RUNTIME_CONTRACT = load_runtime_contract()
+WATCHDOG_RUNTIME_DIR = _RUNTIME_CONTRACT["watchdog_runtime_dir"]
+RESTART_FLAG_PATH = _RUNTIME_CONTRACT["watchdog_restart_flag"]
+RESTART_STATE_PATH = _RUNTIME_CONTRACT["watchdog_state_file"]
+WATCHDOG_PID_PATH = _RUNTIME_CONTRACT["watchdog_pid_file"]
+GUNICORN_BIND = _RUNTIME_CONTRACT["gunicorn_bind"]
+RUNTIME_CONTRACT_VERSION = _RUNTIME_CONTRACT["version"]
 
 # Track last restart request time (in-memory for this worker)
 _last_restart_request: float = 0.0
@@ -91,7 +95,9 @@ def api_system_status():
     thresholds = get_resilience_thresholds()
     restart_state = _get_restart_state()
     restart_churn = _get_restart_churn_summary(restart_state)
-    in_cooldown, remaining = _check_restart_cooldown()
+    policy_state = _get_restart_policy_state(restart_state)
+    in_cooldown = bool(policy_state.get("cooldown"))
+    remaining = int(policy_state.get("cooldown_remaining_seconds") or 0)
 
     degraded_reason = None
     if db_status == "error":
@@ -111,6 +117,14 @@ def api_system_status():
         restart_churn_exceeded=bool(restart_churn.get("exceeded")),
         cooldown_active=in_cooldown,
     )
+    alerts = _build_restart_alerts(
+        pool_saturation=(pool_state or {}).get("saturation"),
+        circuit_state=circuit_breaker.get("state"),
+        route_cache_degraded=bool(route_cache.get("degraded")),
+        policy_state=policy_state,
+        thresholds=thresholds,
+    )
+    runtime_contract = build_runtime_contract_diagnostics(strict=False)
 
     # Cache status
     from mes_dashboard.routes.health_routes import (
@@ -142,13 +156,22 @@ def api_system_status():
                 "pool_state": pool_state,
                 "route_cache": route_cache,
                 "thresholds": thresholds,
+                "alerts": alerts,
                 "restart_churn": restart_churn,
+                "policy_state": {
+                    "state": policy_state.get("state"),
+                    "allowed": policy_state.get("allowed"),
+                    "cooldown": policy_state.get("cooldown"),
+                    "blocked": policy_state.get("blocked"),
+                    "cooldown_remaining_seconds": remaining,
+                },
                 "recovery_recommendation": recommendation,
                 "restart_cooldown": {
                     "active": in_cooldown,
-                    "remaining_seconds": int(remaining) if in_cooldown else 0,
+                    "remaining_seconds": remaining if in_cooldown else 0,
                 },
             },
+            "runtime_contract": runtime_contract,
             "single_port_bind": GUNICORN_BIND,
             "worker_pid": os.getpid()
         }
@@ -283,13 +306,13 @@ def api_logs_cleanup():
 
 def _get_restart_state() -> dict:
     """Read worker restart state from file."""
-    state_path = Path(RESTART_STATE_PATH)
-    if not state_path.exists():
-        return {}
-    try:
-        return json.loads(state_path.read_text())
-    except (json.JSONDecodeError, IOError):
-        return {}
+    return load_restart_state(RESTART_STATE_PATH)
+
+
+def _iso_from_epoch(ts: float) -> str | None:
+    if ts <= 0:
+        return None
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
 
 def _check_restart_cooldown() -> tuple[bool, float]:
@@ -298,38 +321,16 @@ def _check_restart_cooldown() -> tuple[bool, float]:
     Returns:
         Tuple of (is_in_cooldown, remaining_seconds).
     """
-    global _last_restart_request
-
-    # Check in-memory cooldown first
-    now = time.time()
-    elapsed = now - _last_restart_request
-    if elapsed < RESTART_COOLDOWN_SECONDS:
-        return True, RESTART_COOLDOWN_SECONDS - elapsed
-
-    # Check file-based state (for cross-worker coordination)
-    state = _get_restart_state()
-    last_restart = state.get("last_restart", {})
-    requested_at = last_restart.get("requested_at")
-
-    if requested_at:
-        try:
-            request_time = datetime.fromisoformat(requested_at).timestamp()
-            elapsed = now - request_time
-            if elapsed < RESTART_COOLDOWN_SECONDS:
-                return True, RESTART_COOLDOWN_SECONDS - elapsed
-        except (ValueError, TypeError):
-            pass
-
+    policy = _get_restart_policy_state()
+    if policy.get("cooldown"):
+        return True, float(policy.get("cooldown_remaining_seconds") or 0.0)
     return False, 0.0
 
 
 def _get_restart_history(state: dict | None = None) -> list[dict]:
     """Return bounded restart history for admin telemetry."""
     payload = state if state is not None else _get_restart_state()
-    raw_history = payload.get("history") or []
-    if not isinstance(raw_history, list):
-        return []
-    return raw_history[-20:]
+    return extract_restart_history(payload)[-20:]
 
 
 def _get_restart_churn_summary(state: dict | None = None) -> dict:
@@ -338,22 +339,58 @@ def _get_restart_churn_summary(state: dict | None = None) -> dict:
     return summarize_restart_history(history)
 
 
-def _worker_recovery_hint(churn: dict, cooldown_active: bool) -> dict:
-    """Build worker control recommendation from churn/cooldown state."""
-    if churn.get("exceeded"):
-        return {
-            "action": "throttle_and_investigate_queries",
-            "reason": "restart_churn_exceeded",
-        }
-    if cooldown_active:
-        return {
-            "action": "wait_for_restart_cooldown",
-            "reason": "restart_cooldown_active",
-        }
+def _get_restart_policy_state(state: dict | None = None) -> dict[str, Any]:
+    """Return effective worker restart policy state."""
+    payload = state if state is not None else _get_restart_state()
+    history = _get_restart_history(payload)
+    last_requested = extract_last_requested_at(payload)
+
+    in_memory_requested = _iso_from_epoch(_last_restart_request)
+    if in_memory_requested:
+        try:
+            in_memory_dt = datetime.fromisoformat(in_memory_requested)
+            persisted_dt = datetime.fromisoformat(last_requested) if last_requested else None
+        except (TypeError, ValueError):
+            in_memory_dt = None
+            persisted_dt = None
+        if in_memory_dt and (persisted_dt is None or in_memory_dt > persisted_dt):
+            last_requested = in_memory_requested
+
+    return evaluate_worker_recovery_state(
+        history,
+        last_requested_at=last_requested,
+    )
+
+
+def _build_restart_alerts(
+    *,
+    pool_saturation: float | None,
+    circuit_state: str | None,
+    route_cache_degraded: bool,
+    policy_state: dict[str, Any],
+    thresholds: dict[str, Any],
+) -> dict[str, Any]:
+    saturation = float(pool_saturation or 0.0)
+    warning = float(thresholds.get("pool_saturation_warning", 0.9))
+    critical = float(thresholds.get("pool_saturation_critical", 1.0))
     return {
-        "action": "restart_available",
-        "reason": "no_churn_or_cooldown",
+        "pool_warning": saturation >= warning,
+        "pool_critical": saturation >= critical,
+        "circuit_open": circuit_state == "OPEN",
+        "route_cache_degraded": bool(route_cache_degraded),
+        "restart_churn_exceeded": bool(policy_state.get("churn_exceeded")),
+        "restart_blocked": bool(policy_state.get("blocked")),
     }
+
+
+def _log_restart_audit(event: str, payload: dict[str, Any]) -> None:
+    entry = {
+        "event": event,
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
+        **payload,
+    }
+    logger.info("worker_restart_audit %s", json.dumps(entry, ensure_ascii=False))
 
 
 @admin_bp.route("/api/worker/restart", methods=["POST"])
@@ -366,19 +403,60 @@ def api_worker_restart():
     """
     global _last_restart_request
 
-    # Check cooldown
-    in_cooldown, remaining = _check_restart_cooldown()
-    if in_cooldown:
-        return error_response(
-            TOO_MANY_REQUESTS,
-            f"Restart in cooldown. Please wait {int(remaining)} seconds.",
-            status_code=429
-        )
+    payload = request.get_json(silent=True) or {}
+    manual_override = bool(payload.get("manual_override"))
+    override_acknowledged = bool(payload.get("override_acknowledged"))
+    override_reason = str(payload.get("override_reason") or "").strip()
 
     # Get request metadata
     user = getattr(g, "username", "unknown")
     ip = request.remote_addr or "unknown"
-    timestamp = datetime.now().isoformat()
+    timestamp = datetime.now(tz=timezone.utc).isoformat()
+
+    state = _get_restart_state()
+    policy_state = _get_restart_policy_state(state)
+    decision = decide_restart_request(
+        policy_state,
+        source="manual",
+        manual_override=manual_override,
+        override_acknowledged=override_acknowledged,
+    )
+
+    if manual_override and not override_reason:
+        return error_response(
+            "RESTART_OVERRIDE_REASON_REQUIRED",
+            "Manual override requires non-empty override_reason for audit traceability.",
+            status_code=400,
+        )
+
+    if not decision["allowed"]:
+        status_code = 429 if policy_state.get("cooldown") else 409
+        if status_code == 429:
+            message = (
+                f"Restart in cooldown. Please wait "
+                f"{int(policy_state.get('cooldown_remaining_seconds') or 0)} seconds."
+            )
+            code = TOO_MANY_REQUESTS
+        else:
+            message = (
+                "Restart blocked by guarded mode. "
+                "Set manual_override=true and override_acknowledged=true to proceed."
+            )
+            code = "RESTART_POLICY_BLOCKED"
+        _log_restart_audit(
+            "restart_request_blocked",
+            {
+                "actor": user,
+                "ip": ip,
+                "decision": decision,
+                "policy_state": policy_state,
+            },
+        )
+        return error_response(
+            code,
+            message,
+            status_code=status_code,
+        )
 
     # Write restart flag file
     flag_path = Path(RESTART_FLAG_PATH)
@@ -386,11 +464,21 @@ def api_worker_restart():
         "user": user,
         "ip": ip,
         "timestamp": timestamp,
-        "worker_pid": os.getpid()
+        "worker_pid": os.getpid(),
+        "source": "manual",
+        "manual_override": bool(manual_override and override_acknowledged),
+        "override_acknowledged": override_acknowledged,
+        "override_reason": override_reason or None,
+        "policy_state": policy_state,
+        "policy_decision": decision["decision"],
+        "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
     }
 
     try:
-        flag_path.write_text(json.dumps(flag_data))
+        flag_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = flag_path.with_suffix(flag_path.suffix + ".tmp")
+        tmp_path.write_text(json.dumps(flag_data, ensure_ascii=False))
+        tmp_path.replace(flag_path)
     except IOError as e:
         logger.error(f"Failed to write restart flag: {e}")
         return error_response(
@@ -402,8 +490,15 @@ def api_worker_restart():
     # Update in-memory cooldown
     _last_restart_request = time.time()
 
-    logger.info(
-        f"Worker restart requested by {user} from {ip}"
+    _log_restart_audit(
+        "restart_request_accepted",
+        {
+            "actor": user,
+            "ip": ip,
+            "decision": decision,
+            "policy_state": policy_state,
+            "override_reason": override_reason or None,
+        },
     )
 
     return jsonify({
@@ -412,6 +507,14 @@ def api_worker_restart():
             "message": "Restart requested. Workers will reload shortly.",
             "requested_by": user,
             "requested_at": timestamp,
+            "policy_state": {
+                "state": policy_state.get("state"),
+                "allowed": policy_state.get("allowed"),
+                "cooldown": policy_state.get("cooldown"),
+                "blocked": policy_state.get("blocked"),
+                "cooldown_remaining_seconds": policy_state.get("cooldown_remaining_seconds"),
+            },
+            "decision": decision,
             "single_port_bind": GUNICORN_BIND,
             "watchdog": {
                 "runtime_dir": WATCHDOG_RUNTIME_DIR,
@@ -427,16 +530,21 @@ def api_worker_restart():
 @admin_required
 def api_worker_status():
     """API: Get worker status and restart information."""
-    # Check cooldown
-    in_cooldown, remaining = _check_restart_cooldown()
-
     # Get last restart info
     state = _get_restart_state()
     last_restart = state.get("last_restart", {})
     history = _get_restart_history(state)
     churn = _get_restart_churn_summary(state)
+    policy_state = _get_restart_policy_state(state)
     thresholds = get_resilience_thresholds()
-    recommendation = _worker_recovery_hint(churn, in_cooldown)
+    recommendation = build_recovery_recommendation(
+        degraded_reason="db_pool_saturated" if policy_state.get("blocked") else None,
+        pool_saturation=None,
+        circuit_state=None,
+        restart_churn_exceeded=bool(churn.get("exceeded")),
+        cooldown_active=bool(policy_state.get("cooldown")),
+    )
+    runtime_contract = build_runtime_contract_diagnostics(strict=False)
 
     # Get worker start time (psutil is optional)
     worker_start_time = None
@@ -466,6 +574,11 @@ def api_worker_status():
             "worker_pid": os.getpid(),
             "worker_start_time": worker_start_time,
             "runtime_contract": {
+                "version": runtime_contract["contract"]["version"],
+                "validation": {
+                    "valid": runtime_contract["valid"],
+                    "errors": runtime_contract["errors"],
+                },
                 "single_port_bind": GUNICORN_BIND,
                 "watchdog": {
                     "runtime_dir": WATCHDOG_RUNTIME_DIR,
@@ -478,12 +591,27 @@ def api_worker_status():
                 },
             },
             "cooldown": {
-                "active": in_cooldown,
-                "remaining_seconds": int(remaining) if in_cooldown else 0
+                "active": bool(policy_state.get("cooldown")),
+                "remaining_seconds": int(policy_state.get("cooldown_remaining_seconds") or 0)
             },
             "resilience": {
                 "thresholds": thresholds,
+                "alerts": {
+                    "restart_churn_exceeded": bool(churn.get("exceeded")),
+                    "restart_blocked": bool(policy_state.get("blocked")),
+                },
                 "restart_churn": churn,
+                "policy_state": {
+                    "state": policy_state.get("state"),
+                    "allowed": policy_state.get("allowed"),
+                    "cooldown": policy_state.get("cooldown"),
+                    "blocked": policy_state.get("blocked"),
+                    "cooldown_remaining_seconds": policy_state.get("cooldown_remaining_seconds"),
+                    "attempts_in_window": policy_state.get("attempts_in_window"),
+                    "retry_budget": policy_state.get("retry_budget"),
+                    "churn_threshold": policy_state.get("churn_threshold"),
+                    "window_seconds": policy_state.get("window_seconds"),
+                },
                 "recovery_recommendation": recommendation,
             },
             "restart_history": history,

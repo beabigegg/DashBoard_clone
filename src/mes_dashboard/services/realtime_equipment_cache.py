@@ -7,10 +7,12 @@ Data is synced periodically (default 5 minutes) and stored in Redis.
 
 import json
 import logging
+import os
 import threading
 import time
+from collections import OrderedDict
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.redis_client import (
@@ -26,6 +28,7 @@ from mes_dashboard.config.constants import (
     EQUIPMENT_STATUS_META_COUNT_KEY,
     STATUS_CATEGORY_MAP,
 )
+from mes_dashboard.services.sql_fragments import EQUIPMENT_STATUS_SELECT_SQL
 
 logger = logging.getLogger('mes_dashboard.realtime_equipment_cache')
 
@@ -33,29 +36,56 @@ logger = logging.getLogger('mes_dashboard.realtime_equipment_cache')
 # Process-Level Cache (Prevents redundant JSON parsing)
 # ============================================================
 
+DEFAULT_PROCESS_CACHE_TTL_SECONDS = 30
+DEFAULT_PROCESS_CACHE_MAX_SIZE = 32
+DEFAULT_LOOKUP_TTL_SECONDS = 30
+
 class _ProcessLevelCache:
     """Thread-safe process-level cache for parsed equipment status data."""
 
-    def __init__(self, ttl_seconds: int = 30):
-        self._cache: Dict[str, Tuple[List[Dict[str, Any]], float]] = {}
+    def __init__(self, ttl_seconds: int = 30, max_size: int = 32):
+        self._cache: OrderedDict[str, tuple[list[dict[str, Any]], float]] = OrderedDict()
         self._lock = threading.Lock()
-        self._ttl = ttl_seconds
+        self._ttl = max(int(ttl_seconds), 1)
+        self._max_size = max(int(max_size), 1)
 
-    def get(self, key: str) -> Optional[List[Dict[str, Any]]]:
+    @property
+    def max_size(self) -> int:
+        return self._max_size
+
+    def _evict_expired_locked(self, now: float) -> None:
+        stale_keys = [
+            key for key, (_, timestamp) in self._cache.items()
+            if now - timestamp > self._ttl
+        ]
+        for key in stale_keys:
+            self._cache.pop(key, None)
+
+    def get(self, key: str) -> list[dict[str, Any]] | None:
         """Get cached data if not expired."""
         with self._lock:
-            if key not in self._cache:
+            payload = self._cache.get(key)
+            if payload is None:
                 return None
-            data, timestamp = self._cache[key]
-            if time.time() - timestamp > self._ttl:
-                del self._cache[key]
+            data, timestamp = payload
+            now = time.time()
+            if now - timestamp > self._ttl:
+                self._cache.pop(key, None)
                 return None
+            self._cache.move_to_end(key, last=True)
             return data
 
-    def set(self, key: str, data: List[Dict[str, Any]]) -> None:
+    def set(self, key: str, data: list[dict[str, Any]]) -> None:
         """Cache data with current timestamp."""
         with self._lock:
-            self._cache[key] = (data, time.time())
+            now = time.time()
+            self._evict_expired_locked(now)
+            if key in self._cache:
+                self._cache.pop(key, None)
+            elif len(self._cache) >= self._max_size:
+                self._cache.popitem(last=False)
+            self._cache[key] = (data, now)
+            self._cache.move_to_end(key, last=True)
 
     def invalidate(self, key: str) -> None:
         """Remove a key from cache."""
@@ -63,20 +93,38 @@ class _ProcessLevelCache:
             self._cache.pop(key, None)
 
 
+def _resolve_cache_max_size(env_name: str, default: int) -> int:
+    value = os.getenv(env_name)
+    if value is None:
+        return max(int(default), 1)
+    try:
+        return max(int(value), 1)
+    except (TypeError, ValueError):
+        return max(int(default), 1)
+
+
 # Global process-level cache for equipment status (30s TTL)
-_equipment_status_cache = _ProcessLevelCache(ttl_seconds=30)
+PROCESS_CACHE_MAX_SIZE = _resolve_cache_max_size("PROCESS_CACHE_MAX_SIZE", DEFAULT_PROCESS_CACHE_MAX_SIZE)
+EQUIPMENT_PROCESS_CACHE_MAX_SIZE = _resolve_cache_max_size(
+    "EQUIPMENT_PROCESS_CACHE_MAX_SIZE",
+    PROCESS_CACHE_MAX_SIZE,
+)
+_equipment_status_cache = _ProcessLevelCache(
+    ttl_seconds=DEFAULT_PROCESS_CACHE_TTL_SECONDS,
+    max_size=EQUIPMENT_PROCESS_CACHE_MAX_SIZE,
+)
 _equipment_status_parse_lock = threading.Lock()
 _equipment_lookup_lock = threading.Lock()
-_equipment_status_lookup: Dict[str, Dict[str, Any]] = {}
-_equipment_status_lookup_built_at: Optional[str] = None
+_equipment_status_lookup: dict[str, dict[str, Any]] = {}
+_equipment_status_lookup_built_at: str | None = None
 _equipment_status_lookup_ts: float = 0.0
-LOOKUP_TTL_SECONDS = 30
+LOOKUP_TTL_SECONDS = DEFAULT_LOOKUP_TTL_SECONDS
 
 # ============================================================
 # Module State
 # ============================================================
 
-_SYNC_THREAD: Optional[threading.Thread] = None
+_SYNC_THREAD: threading.Thread | None = None
 _STOP_EVENT = threading.Event()
 _SYNC_LOCK = threading.Lock()
 
@@ -85,40 +133,14 @@ _SYNC_LOCK = threading.Lock()
 # Oracle Query
 # ============================================================
 
-def _load_equipment_status_from_oracle() -> Optional[List[Dict[str, Any]]]:
+def _load_equipment_status_from_oracle() -> list[dict[str, Any]] | None:
     """Query DW_MES_EQUIPMENTSTATUS_WIP_V from Oracle.
 
     Returns:
         List of equipment status records, or None if query fails.
     """
-    sql = """
-        SELECT
-            RESOURCEID,
-            EQUIPMENTID,
-            OBJECTCATEGORY,
-            EQUIPMENTASSETSSTATUS,
-            EQUIPMENTASSETSSTATUSREASON,
-            JOBORDER,
-            JOBMODEL,
-            JOBSTAGE,
-            JOBID,
-            JOBSTATUS,
-            CREATEDATE,
-            CREATEUSERNAME,
-            CREATEUSER,
-            TECHNICIANUSERNAME,
-            TECHNICIANUSER,
-            SYMPTOMCODE,
-            CAUSECODE,
-            REPAIRCODE,
-            RUNCARDLOTID,
-            LOTTRACKINQTY_PCS,
-            LOTTRACKINTIME,
-            LOTTRACKINEMPLOYEE
-        FROM DWH.DW_MES_EQUIPMENTSTATUS_WIP_V
-    """
     try:
-        df = read_sql_df(sql)
+        df = read_sql_df(EQUIPMENT_STATUS_SELECT_SQL)
         if df is None or df.empty:
             logger.warning("No data returned from DW_MES_EQUIPMENTSTATUS_WIP_V")
             return []
@@ -147,7 +169,7 @@ def _load_equipment_status_from_oracle() -> Optional[List[Dict[str, Any]]]:
 # Data Aggregation
 # ============================================================
 
-def _classify_status(status: Optional[str]) -> str:
+def _classify_status(status: str | None) -> str:
     """Classify equipment status into category.
 
     Args:
@@ -183,7 +205,7 @@ def _is_valid_value(value) -> bool:
     return True
 
 
-def _aggregate_by_resourceid(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _aggregate_by_resourceid(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Aggregate equipment status records by RESOURCEID.
 
     For each RESOURCEID:
@@ -203,7 +225,7 @@ def _aggregate_by_resourceid(records: List[Dict[str, Any]]) -> List[Dict[str, An
         return []
 
     # Group by RESOURCEID
-    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    grouped: dict[str, list[dict[str, Any]]] = {}
     for record in records:
         resource_id = record.get('RESOURCEID')
         if resource_id:
@@ -272,7 +294,7 @@ def _aggregate_by_resourceid(records: List[Dict[str, Any]]) -> List[Dict[str, An
             'CAUSECODE': first.get('CAUSECODE'),
             'REPAIRCODE': first.get('REPAIRCODE'),
             # LOT related fields
-            'LOT_COUNT': len(seen_lots),  # Count distinct RUNCARDLOTID
+            'LOT_COUNT': len(seen_lots) if seen_lots else len(group),
             'LOT_DETAILS': lot_details,   # LOT details for tooltip
             'TOTAL_TRACKIN_QTY': total_qty,
             'LATEST_TRACKIN_TIME': latest_trackin,
@@ -286,7 +308,7 @@ def _aggregate_by_resourceid(records: List[Dict[str, Any]]) -> List[Dict[str, An
 # Redis Storage
 # ============================================================
 
-def _save_to_redis(aggregated: List[Dict[str, Any]]) -> bool:
+def _save_to_redis(aggregated: list[dict[str, Any]]) -> bool:
     """Save aggregated equipment status to Redis.
 
     Uses pipeline for atomic update of all keys.
@@ -354,7 +376,7 @@ def _invalidate_equipment_status_lookup() -> None:
         _equipment_status_lookup_ts = 0.0
 
 
-def get_equipment_status_lookup() -> Dict[str, Dict[str, Any]]:
+def get_equipment_status_lookup() -> dict[str, dict[str, Any]]:
     """Get RESOURCEID -> status record lookup with process-level caching."""
     global _equipment_status_lookup, _equipment_status_lookup_built_at, _equipment_status_lookup_ts
 
@@ -375,7 +397,7 @@ def get_equipment_status_lookup() -> Dict[str, Dict[str, Any]]:
         _equipment_status_lookup_ts = time.time()
         return _equipment_status_lookup
 
-def get_all_equipment_status() -> List[Dict[str, Any]]:
+def get_all_equipment_status() -> list[dict[str, Any]]:
     """Get all equipment status from cache with process-level caching.
 
     Uses a two-tier cache strategy:
@@ -433,7 +455,7 @@ def get_all_equipment_status() -> List[Dict[str, Any]]:
             return []
 
 
-def get_equipment_status_by_id(resource_id: str) -> Optional[Dict[str, Any]]:
+def get_equipment_status_by_id(resource_id: str) -> dict[str, Any] | None:
     """Get equipment status by RESOURCEID.
 
     Uses index hash for O(1) lookup.
@@ -485,7 +507,7 @@ def get_equipment_status_by_id(resource_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def get_equipment_status_by_ids(resource_ids: List[str]) -> List[Dict[str, Any]]:
+def get_equipment_status_by_ids(resource_ids: list[str]) -> list[dict[str, Any]]:
     """Get equipment status for multiple RESOURCEIDs.
 
     Args:
@@ -540,7 +562,7 @@ def get_equipment_status_by_ids(resource_ids: List[str]) -> List[Dict[str, Any]]
         return []
 
 
-def get_equipment_status_cache_status() -> Dict[str, Any]:
+def get_equipment_status_cache_status() -> dict[str, Any]:
     """Get equipment status cache status.
 
     Returns:

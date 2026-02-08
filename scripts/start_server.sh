@@ -9,7 +9,7 @@ set -uo pipefail
 # Configuration
 # ============================================================
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONDA_ENV="mes-dashboard"
+CONDA_ENV="${CONDA_ENV_NAME:-mes-dashboard}"
 APP_NAME="mes-dashboard"
 PID_FILE_DEFAULT="${ROOT}/tmp/gunicorn.pid"
 PID_FILE="${WATCHDOG_PID_FILE:-${PID_FILE_DEFAULT}}"
@@ -56,7 +56,7 @@ timestamp() {
 resolve_runtime_paths() {
     WATCHDOG_RUNTIME_DIR="${WATCHDOG_RUNTIME_DIR:-${ROOT}/tmp}"
     WATCHDOG_RESTART_FLAG="${WATCHDOG_RESTART_FLAG:-${WATCHDOG_RUNTIME_DIR}/mes_dashboard_restart.flag}"
-    WATCHDOG_PID_FILE="${WATCHDOG_PID_FILE:-${PID_FILE_DEFAULT}}"
+    WATCHDOG_PID_FILE="${WATCHDOG_PID_FILE:-${WATCHDOG_RUNTIME_DIR}/gunicorn.pid}"
     WATCHDOG_STATE_FILE="${WATCHDOG_STATE_FILE:-${WATCHDOG_RUNTIME_DIR}/mes_dashboard_restart_state.json}"
     PID_FILE="${WATCHDOG_PID_FILE}"
     export WATCHDOG_RUNTIME_DIR WATCHDOG_RESTART_FLAG WATCHDOG_PID_FILE WATCHDOG_STATE_FILE
@@ -81,8 +81,14 @@ check_conda() {
         return 1
     fi
 
+    if [ -n "${CONDA_BIN:-}" ] && [ ! -x "${CONDA_BIN}" ]; then
+        log_error "CONDA_BIN is set but not executable: ${CONDA_BIN}"
+        return 1
+    fi
+
     # Source conda
-    source "$(conda info --base)/etc/profile.d/conda.sh"
+    local conda_cmd="${CONDA_BIN:-$(command -v conda)}"
+    source "$(${conda_cmd} info --base)/etc/profile.d/conda.sh"
 
     # Check if environment exists
     if ! conda env list | grep -q "^${CONDA_ENV} "; then
@@ -93,6 +99,33 @@ check_conda() {
 
     log_success "Conda environment '${CONDA_ENV}' found"
     return 0
+}
+
+validate_runtime_contract() {
+    conda activate "$CONDA_ENV"
+    export PYTHONPATH="${ROOT}/src:${PYTHONPATH:-}"
+
+    if python - <<'PY'
+import os
+import sys
+
+from mes_dashboard.core.runtime_contract import build_runtime_contract_diagnostics
+
+strict = os.getenv("RUNTIME_CONTRACT_ENFORCE", "true").strip().lower() in {"1", "true", "yes", "on"}
+diag = build_runtime_contract_diagnostics(strict=strict)
+if not diag["valid"]:
+    for error in diag["errors"]:
+        print(f"RUNTIME_CONTRACT_ERROR: {error}")
+    raise SystemExit(1)
+PY
+    then
+        log_success "Runtime contract validation passed"
+        return 0
+    fi
+
+    log_error "Runtime contract validation failed"
+    log_info "Fix env vars: WATCHDOG_RUNTIME_DIR / WATCHDOG_RESTART_FLAG / WATCHDOG_PID_FILE / WATCHDOG_STATE_FILE / CONDA_BIN"
+    return 1
 }
 
 check_dependencies() {
@@ -329,6 +362,7 @@ run_all_checks() {
     check_env_file
     load_env
     resolve_runtime_paths
+    validate_runtime_contract || return 1
     check_port || return 1
     check_database
     check_redis

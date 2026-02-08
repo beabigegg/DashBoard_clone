@@ -1,0 +1,9 @@
+{
+  "rows": 30000,
+  "query_count": 400,
+  "seed": 42,
+  "thresholds": {
+    "max_p95_ratio_indexed_vs_baseline": 1.25,
+    "max_memory_amplification_ratio": 1.8
+  }
+}

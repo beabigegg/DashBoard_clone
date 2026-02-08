@@ -221,3 +221,45 @@ class TestCircuitBreakerDisabled:
 
             # Should still allow (disabled)
             assert cb.allow_request() is True
+
+
+class TestCircuitBreakerLogging:
+    """Verify transition logs are emitted without lock-held I/O."""
+
+    def test_transition_emits_open_log_and_preserves_state(self):
+        cb = CircuitBreaker(
+            "test",
+            failure_threshold=2,
+            failure_rate_threshold=0.5,
+            window_size=4,
+        )
+
+        with patch.object(cb, "_emit_transition_log") as mock_emit:
+            for _ in range(4):
+                cb.record_failure()
+
+        assert cb.state == CircuitState.OPEN
+        mock_emit.assert_called_once()
+        level, message = mock_emit.call_args.args
+        assert level is not None
+        assert "OPENED" in message
+
+    def test_transition_logging_executes_outside_lock(self):
+        cb = CircuitBreaker(
+            "test",
+            failure_threshold=2,
+            failure_rate_threshold=0.5,
+            window_size=4,
+        )
+
+        lock_states: list[bool] = []
+
+        def _capture(_level, _message):
+            lock_states.append(cb._lock.locked())
+
+        with patch.object(cb, "_emit_transition_log", side_effect=_capture):
+            for _ in range(4):
+                cb.record_failure()
+
+        assert lock_states
+        assert all(not state for state in lock_states)

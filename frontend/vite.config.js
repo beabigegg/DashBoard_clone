@@ -1,12 +1,12 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   publicDir: false,
   build: {
     outDir: '../src/mes_dashboard/static/dist',
     emptyOutDir: false,
-    sourcemap: false,
+    sourcemap: mode !== 'production',
     rollupOptions: {
       input: {
         portal: resolve(__dirname, 'src/portal/main.js'),
@@ -22,8 +22,17 @@ export default defineConfig({
       output: {
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
-        assetFileNames: '[name][extname]'
+        assetFileNames: '[name][extname]',
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return;
+          }
+          if (id.includes('echarts')) {
+            return 'vendor-echarts';
+          }
+          return 'vendor';
+        }
       }
     }
   }
-});
+}));

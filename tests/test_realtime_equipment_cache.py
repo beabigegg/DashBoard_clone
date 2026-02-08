@@ -7,6 +7,7 @@ Tests aggregation, status classification, and cache query functionality.
 import pytest
 from unittest.mock import patch, MagicMock
 import json
+import pandas as pd
 
 
 class TestClassifyStatus:
@@ -300,9 +301,14 @@ class TestGetEquipmentStatusById:
     def reset_modules(self):
         """Reset module state before each test."""
         import mes_dashboard.core.redis_client as rc
+        import mes_dashboard.services.realtime_equipment_cache as eq
         rc._REDIS_CLIENT = None
+        eq._equipment_status_cache.invalidate("equipment_status_all")
+        eq._invalidate_equipment_status_lookup()
         yield
         rc._REDIS_CLIENT = None
+        eq._equipment_status_cache.invalidate("equipment_status_all")
+        eq._invalidate_equipment_status_lookup()
 
     def test_returns_none_when_redis_unavailable(self):
         """Test returns None when Redis client unavailable."""
@@ -353,9 +359,14 @@ class TestGetEquipmentStatusByIds:
     def reset_modules(self):
         """Reset module state before each test."""
         import mes_dashboard.core.redis_client as rc
+        import mes_dashboard.services.realtime_equipment_cache as eq
         rc._REDIS_CLIENT = None
+        eq._equipment_status_cache.invalidate("equipment_status_all")
+        eq._invalidate_equipment_status_lookup()
         yield
         rc._REDIS_CLIENT = None
+        eq._equipment_status_cache.invalidate("equipment_status_all")
+        eq._invalidate_equipment_status_lookup()
 
     def test_returns_empty_for_empty_input(self):
         """Test returns empty list for empty input."""
@@ -404,9 +415,14 @@ class TestGetAllEquipmentStatus:
     def reset_modules(self):
         """Reset module state before each test."""
         import mes_dashboard.core.redis_client as rc
+        import mes_dashboard.services.realtime_equipment_cache as eq
         rc._REDIS_CLIENT = None
+        eq._equipment_status_cache.invalidate("equipment_status_all")
+        eq._invalidate_equipment_status_lookup()
         yield
         rc._REDIS_CLIENT = None
+        eq._equipment_status_cache.invalidate("equipment_status_all")
+        eq._invalidate_equipment_status_lookup()
 
     def test_returns_empty_when_redis_unavailable(self):
         """Test returns empty list when Redis unavailable."""
@@ -492,3 +508,41 @@ class TestGetEquipmentStatusCacheStatus:
                     assert result['enabled'] is True
                     assert result['loaded'] is True
                     assert result['count'] == 1000
+
+
+class TestEquipmentProcessLevelCache:
+    """Test bounded process-level cache behavior for equipment status."""
+
+    def test_lru_eviction_prefers_recent_keys(self):
+        import mes_dashboard.services.realtime_equipment_cache as eq
+
+        cache = eq._ProcessLevelCache(ttl_seconds=60, max_size=2)
+        cache.set("a", [{"RESOURCEID": "R001"}])
+        cache.set("b", [{"RESOURCEID": "R002"}])
+        assert cache.get("a") is not None  # refresh recency
+        cache.set("c", [{"RESOURCEID": "R003"}])  # should evict "b"
+
+        assert cache.get("b") is None
+        assert cache.get("a") is not None
+        assert cache.get("c") is not None
+
+    def test_global_equipment_cache_uses_bounded_config(self):
+        import mes_dashboard.services.realtime_equipment_cache as eq
+
+        assert eq.EQUIPMENT_PROCESS_CACHE_MAX_SIZE >= 1
+        assert eq._equipment_status_cache.max_size == eq.EQUIPMENT_PROCESS_CACHE_MAX_SIZE
+
+
+class TestSharedQueryFragments:
+    """Test shared SQL fragment governance for equipment cache."""
+
+    def test_equipment_load_uses_shared_sql_fragment(self):
+        import mes_dashboard.services.realtime_equipment_cache as eq
+        from mes_dashboard.services.sql_fragments import EQUIPMENT_STATUS_SELECT_SQL
+
+        mock_df = pd.DataFrame([{"RESOURCEID": "R001", "EQUIPMENTID": "EQ-01"}])
+        with patch.object(eq, "read_sql_df", return_value=mock_df) as mock_read:
+            eq._load_equipment_status_from_oracle()
+
+        sql = mock_read.call_args[0][0]
+        assert sql.strip() == EQUIPMENT_STATUS_SELECT_SQL.strip()

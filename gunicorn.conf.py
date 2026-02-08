@@ -30,6 +30,18 @@ def worker_exit(server, worker):
     except Exception as e:
         server.log.warning(f"Error stopping equipment sync worker: {e}")
 
+    try:
+        from mes_dashboard.core.cache_updater import stop_cache_updater
+        stop_cache_updater()
+    except Exception as e:
+        server.log.warning(f"Error stopping cache updater: {e}")
+
+    try:
+        from mes_dashboard.core.redis_client import close_redis
+        close_redis()
+    except Exception as e:
+        server.log.warning(f"Error closing redis client: {e}")
+
     # Then dispose database connections
     try:
         from mes_dashboard.core.database import dispose_engine

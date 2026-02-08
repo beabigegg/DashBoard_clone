@@ -9,6 +9,7 @@ Now uses Redis cache when available, with fallback to Oracle direct query.
 
 import logging
 import threading
+from collections import Counter
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 
@@ -32,6 +33,20 @@ logger = logging.getLogger('mes_dashboard.wip_service')
 
 _wip_search_index_lock = threading.Lock()
 _wip_search_index_cache: Dict[str, Dict[str, Any]] = {}
+_wip_snapshot_lock = threading.Lock()
+_wip_snapshot_cache: Dict[str, Dict[str, Any]] = {}
+_wip_index_metrics_lock = threading.Lock()
+_wip_index_metrics: Dict[str, Any] = {
+    "snapshot_hits": 0,
+    "snapshot_misses": 0,
+    "search_index_hits": 0,
+    "search_index_misses": 0,
+    "search_index_rebuilds": 0,
+    "search_index_incremental_updates": 0,
+    "search_index_reconciliation_fallbacks": 0,
+}
+
+_EMPTY_INT_INDEX = np.array([], dtype=np.int64)
 
 
 def _safe_value(val):
@@ -153,28 +168,372 @@ def _get_wip_cache_version() -> str:
     return f"{updated_at}|{sys_date}"
 
 
-def _distinct_sorted_values(df: pd.DataFrame, column: str) -> List[str]:
-    if column not in df.columns:
-        return []
-    series = df[column].dropna().astype(str)
-    if series.empty:
-        return []
-    series = series[series.str.len() > 0]
-    if series.empty:
-        return []
-    return series.drop_duplicates().sort_values().tolist()
+def _increment_wip_metric(metric: str, value: int = 1) -> None:
+    with _wip_index_metrics_lock:
+        _wip_index_metrics[metric] = int(_wip_index_metrics.get(metric, 0)) + value
+
+
+def _estimate_dataframe_bytes(df: pd.DataFrame) -> int:
+    if df is None:
+        return 0
+    try:
+        return int(df.memory_usage(index=True, deep=True).sum())
+    except Exception:
+        return 0
+
+
+def _estimate_counter_payload_bytes(counter: Counter) -> int:
+    total = 0
+    for key, count in counter.items():
+        total += len(str(key)) + 16 + int(count)
+    return total
+
+
+def _normalize_text_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and pd.isna(value):
+        return ""
+    text = str(value).strip()
+    return text
+
+
+def _build_filter_mask(
+    df: pd.DataFrame,
+    *,
+    include_dummy: bool,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+) -> pd.Series:
+    if df.empty:
+        return pd.Series(dtype=bool)
+
+    mask = df['WORKORDER'].notna()
+
+    if not include_dummy and 'LOTID' in df.columns:
+        mask &= ~df['LOTID'].astype(str).str.contains('DUMMY', case=False, na=False)
+
+    if workorder and 'WORKORDER' in df.columns:
+        mask &= df['WORKORDER'].astype(str).str.contains(workorder, case=False, na=False)
+
+    if lotid and 'LOTID' in df.columns:
+        mask &= df['LOTID'].astype(str).str.contains(lotid, case=False, na=False)
+
+    return mask
+
+
+def _build_value_index(df: pd.DataFrame, column: str) -> Dict[str, np.ndarray]:
+    if column not in df.columns or df.empty:
+        return {}
+    grouped = df.groupby(column, dropna=True, sort=False).indices
+    return {str(key): np.asarray(indices, dtype=np.int64) for key, indices in grouped.items()}
+
+
+def _intersect_positions(current: Optional[np.ndarray], candidate: Optional[np.ndarray]) -> np.ndarray:
+    if candidate is None:
+        return _EMPTY_INT_INDEX
+    if current is None:
+        return candidate
+    if len(current) == 0 or len(candidate) == 0:
+        return _EMPTY_INT_INDEX
+    return np.intersect1d(current, candidate, assume_unique=False)
+
+
+def _select_with_snapshot_indexes(
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    workcenter: Optional[str] = None,
+    status: Optional[str] = None,
+    hold_type: Optional[str] = None,
+) -> Optional[pd.DataFrame]:
+    snapshot = _get_wip_snapshot(include_dummy=include_dummy)
+    if snapshot is None:
+        return None
+
+    df = snapshot["frame"]
+    indexes = snapshot["indexes"]
+    selected_positions: Optional[np.ndarray] = None
+
+    if workcenter:
+        selected_positions = _intersect_positions(
+            selected_positions,
+            indexes["workcenter"].get(str(workcenter)),
+        )
+    if package:
+        selected_positions = _intersect_positions(
+            selected_positions,
+            indexes["package"].get(str(package)),
+        )
+    if pj_type:
+        selected_positions = _intersect_positions(
+            selected_positions,
+            indexes["pj_type"].get(str(pj_type)),
+        )
+    if status:
+        selected_positions = _intersect_positions(
+            selected_positions,
+            indexes["wip_status"].get(str(status).upper()),
+        )
+    if hold_type:
+        selected_positions = _intersect_positions(
+            selected_positions,
+            indexes["hold_type"].get(str(hold_type).lower()),
+        )
+
+    if selected_positions is None:
+        result = df
+    elif len(selected_positions) == 0:
+        result = df.iloc[0:0]
+    else:
+        result = df.iloc[selected_positions]
+
+    if workorder:
+        result = result[result['WORKORDER'].astype(str).str.contains(workorder, case=False, na=False)]
+    if lotid:
+        result = result[result['LOTID'].astype(str).str.contains(lotid, case=False, na=False)]
+    return result
+
+
+def _build_search_signatures(df: pd.DataFrame) -> tuple[Counter, Dict[str, tuple[str, str, str, str]]]:
+    if df.empty:
+        return Counter(), {}
+
+    workorders = df.get("WORKORDER", pd.Series(index=df.index, dtype=object)).map(_normalize_text_value)
+    lotids = df.get("LOTID", pd.Series(index=df.index, dtype=object)).map(_normalize_text_value)
+    packages = df.get("PACKAGE_LEF", pd.Series(index=df.index, dtype=object)).map(_normalize_text_value)
+    types = df.get("PJ_TYPE", pd.Series(index=df.index, dtype=object)).map(_normalize_text_value)
+
+    signatures = (
+        workorders
+        + "\x1f"
+        + lotids
+        + "\x1f"
+        + packages
+        + "\x1f"
+        + types
+    ).tolist()
+    signature_counter = Counter(signatures)
+
+    signature_fields: Dict[str, tuple[str, str, str, str]] = {}
+    for signature, wo, lot, pkg, pj in zip(signatures, workorders, lotids, packages, types):
+        if signature not in signature_fields:
+            signature_fields[signature] = (wo, lot, pkg, pj)
+    return signature_counter, signature_fields
+
+
+def _build_field_counters(
+    signature_counter: Counter,
+    signature_fields: Dict[str, tuple[str, str, str, str]],
+) -> Dict[str, Counter]:
+    counters = {
+        "workorders": Counter(),
+        "lotids": Counter(),
+        "packages": Counter(),
+        "types": Counter(),
+    }
+    for signature, count in signature_counter.items():
+        wo, lot, pkg, pj = signature_fields.get(signature, ("", "", "", ""))
+        if wo:
+            counters["workorders"][wo] += count
+        if lot:
+            counters["lotids"][lot] += count
+        if pkg:
+            counters["packages"][pkg] += count
+        if pj:
+            counters["types"][pj] += count
+    return counters
+
+
+def _materialize_search_payload(
+    *,
+    version: str,
+    row_count: int,
+    signature_counter: Counter,
+    field_counters: Dict[str, Counter],
+    mode: str,
+    added_rows: int = 0,
+    removed_rows: int = 0,
+    drift_ratio: float = 0.0,
+) -> Dict[str, Any]:
+    workorders = sorted(field_counters["workorders"].keys())
+    lotids = sorted(field_counters["lotids"].keys())
+    packages = sorted(field_counters["packages"].keys())
+    types = sorted(field_counters["types"].keys())
+    memory_bytes = (
+        _estimate_counter_payload_bytes(field_counters["workorders"])
+        + _estimate_counter_payload_bytes(field_counters["lotids"])
+        + _estimate_counter_payload_bytes(field_counters["packages"])
+        + _estimate_counter_payload_bytes(field_counters["types"])
+    )
+    return {
+        "version": version,
+        "built_at": datetime.now().isoformat(),
+        "row_count": int(row_count),
+        "workorders": workorders,
+        "lotids": lotids,
+        "packages": packages,
+        "types": types,
+        "sync_mode": mode,
+        "sync_added_rows": int(added_rows),
+        "sync_removed_rows": int(removed_rows),
+        "drift_ratio": round(float(drift_ratio), 6),
+        "memory_bytes": int(memory_bytes),
+        "_signature_counter": dict(signature_counter),
+        "_field_counters": {
+            "workorders": dict(field_counters["workorders"]),
+            "lotids": dict(field_counters["lotids"]),
+            "packages": dict(field_counters["packages"]),
+            "types": dict(field_counters["types"]),
+        },
+    }
 
 
 def _build_wip_search_index(df: pd.DataFrame, include_dummy: bool) -> Dict[str, Any]:
     filtered = _filter_base_conditions(df, include_dummy=include_dummy)
-    return {
-        "built_at": datetime.now().isoformat(),
-        "row_count": len(filtered),
-        "workorders": _distinct_sorted_values(filtered, "WORKORDER"),
-        "lotids": _distinct_sorted_values(filtered, "LOTID"),
-        "packages": _distinct_sorted_values(filtered, "PACKAGE_LEF"),
-        "types": _distinct_sorted_values(filtered, "PJ_TYPE"),
+    signatures, signature_fields = _build_search_signatures(filtered)
+    field_counters = _build_field_counters(signatures, signature_fields)
+    return _materialize_search_payload(
+        version=_get_wip_cache_version(),
+        row_count=len(filtered),
+        signature_counter=signatures,
+        field_counters=field_counters,
+        mode="full",
+    )
+
+
+def _try_incremental_search_sync(
+    previous: Dict[str, Any],
+    *,
+    version: str,
+    row_count: int,
+    signature_counter: Counter,
+    signature_fields: Dict[str, tuple[str, str, str, str]],
+) -> Optional[Dict[str, Any]]:
+    if not previous:
+        return None
+    old_signature_counter = Counter(previous.get("_signature_counter") or {})
+    old_field_counters_raw = previous.get("_field_counters") or {}
+    if not old_signature_counter or not old_field_counters_raw:
+        return None
+
+    added = signature_counter - old_signature_counter
+    removed = old_signature_counter - signature_counter
+    total_delta = sum(added.values()) + sum(removed.values())
+    drift_ratio = total_delta / max(int(row_count), 1)
+    if drift_ratio > 0.6:
+        _increment_wip_metric("search_index_reconciliation_fallbacks")
+        return None
+
+    field_counters = {
+        "workorders": Counter(old_field_counters_raw.get("workorders") or {}),
+        "lotids": Counter(old_field_counters_raw.get("lotids") or {}),
+        "packages": Counter(old_field_counters_raw.get("packages") or {}),
+        "types": Counter(old_field_counters_raw.get("types") or {}),
     }
+
+    for signature, count in added.items():
+        wo, lot, pkg, pj = signature_fields.get(signature, ("", "", "", ""))
+        if wo:
+            field_counters["workorders"][wo] += count
+        if lot:
+            field_counters["lotids"][lot] += count
+        if pkg:
+            field_counters["packages"][pkg] += count
+        if pj:
+            field_counters["types"][pj] += count
+
+    previous_fields = {
+        sig: tuple(str(v) for v in sig.split("\x1f", 3))
+        for sig in old_signature_counter.keys()
+    }
+    for signature, count in removed.items():
+        wo, lot, pkg, pj = previous_fields.get(signature, ("", "", "", ""))
+        if wo:
+            field_counters["workorders"][wo] -= count
+            if field_counters["workorders"][wo] <= 0:
+                field_counters["workorders"].pop(wo, None)
+        if lot:
+            field_counters["lotids"][lot] -= count
+            if field_counters["lotids"][lot] <= 0:
+                field_counters["lotids"].pop(lot, None)
+        if pkg:
+            field_counters["packages"][pkg] -= count
+            if field_counters["packages"][pkg] <= 0:
+                field_counters["packages"].pop(pkg, None)
+        if pj:
+            field_counters["types"][pj] -= count
+            if field_counters["types"][pj] <= 0:
+                field_counters["types"].pop(pj, None)
+
+    _increment_wip_metric("search_index_incremental_updates")
+    return _materialize_search_payload(
+        version=version,
+        row_count=row_count,
+        signature_counter=signature_counter,
+        field_counters=field_counters,
+        mode="incremental",
+        added_rows=sum(added.values()),
+        removed_rows=sum(removed.values()),
+        drift_ratio=drift_ratio,
+    )
+
+
+def _build_wip_snapshot(df: pd.DataFrame, include_dummy: bool, version: str) -> Dict[str, Any]:
+    filtered = _filter_base_conditions(df, include_dummy=include_dummy)
+    filtered = _add_wip_status_columns(filtered).reset_index(drop=True)
+
+    hold_type_series = pd.Series(index=filtered.index, dtype=object)
+    if not filtered.empty:
+        hold_type_series = pd.Series("", index=filtered.index, dtype=object)
+        hold_type_series.loc[filtered["IS_QUALITY_HOLD"]] = "quality"
+        hold_type_series.loc[filtered["IS_NON_QUALITY_HOLD"]] = "non-quality"
+
+    indexes = {
+        "workcenter": _build_value_index(filtered, "WORKCENTER_GROUP"),
+        "package": _build_value_index(filtered, "PACKAGE_LEF"),
+        "pj_type": _build_value_index(filtered, "PJ_TYPE"),
+        "wip_status": _build_value_index(filtered, "WIP_STATUS"),
+        "hold_type": _build_value_index(pd.DataFrame({"HOLD_TYPE": hold_type_series}), "HOLD_TYPE"),
+    }
+
+    exact_bucket_count = sum(len(bucket) for bucket in indexes.values())
+    return {
+        "version": version,
+        "built_at": datetime.now().isoformat(),
+        "row_count": int(len(filtered)),
+        "frame": filtered,
+        "indexes": indexes,
+        "frame_bytes": _estimate_dataframe_bytes(filtered),
+        "index_bucket_count": int(exact_bucket_count),
+    }
+
+
+def _get_wip_snapshot(include_dummy: bool) -> Optional[Dict[str, Any]]:
+    cache_key = "with_dummy" if include_dummy else "without_dummy"
+    version = _get_wip_cache_version()
+
+    with _wip_snapshot_lock:
+        cached = _wip_snapshot_cache.get(cache_key)
+        if cached and cached.get("version") == version:
+            _increment_wip_metric("snapshot_hits")
+            return cached
+
+    _increment_wip_metric("snapshot_misses")
+    df = _get_wip_dataframe()
+    if df is None:
+        return None
+
+    snapshot = _build_wip_snapshot(df, include_dummy=include_dummy, version=version)
+    with _wip_snapshot_lock:
+        existing = _wip_snapshot_cache.get(cache_key)
+        if existing and existing.get("version") == version:
+            _increment_wip_metric("snapshot_hits")
+            return existing
+        _wip_snapshot_cache[cache_key] = snapshot
+    return snapshot
 
 
 def _get_wip_search_index(include_dummy: bool) -> Optional[Dict[str, Any]]:
@@ -184,14 +543,37 @@ def _get_wip_search_index(include_dummy: bool) -> Optional[Dict[str, Any]]:
     with _wip_search_index_lock:
         cached = _wip_search_index_cache.get(cache_key)
         if cached and cached.get("version") == version:
+            _increment_wip_metric("search_index_hits")
             return cached
 
-    df = _get_wip_dataframe()
-    if df is None:
+    _increment_wip_metric("search_index_misses")
+    snapshot = _get_wip_snapshot(include_dummy=include_dummy)
+    if snapshot is None:
         return None
 
-    index_payload = _build_wip_search_index(df, include_dummy=include_dummy)
-    index_payload["version"] = version
+    filtered = snapshot["frame"]
+    signature_counter, signature_fields = _build_search_signatures(filtered)
+
+    with _wip_search_index_lock:
+        previous = _wip_search_index_cache.get(cache_key)
+
+    index_payload = _try_incremental_search_sync(
+        previous or {},
+        version=version,
+        row_count=int(snapshot.get("row_count", 0)),
+        signature_counter=signature_counter,
+        signature_fields=signature_fields,
+    )
+    if index_payload is None:
+        field_counters = _build_field_counters(signature_counter, signature_fields)
+        index_payload = _materialize_search_payload(
+            version=version,
+            row_count=int(snapshot.get("row_count", 0)),
+            signature_counter=signature_counter,
+            field_counters=field_counters,
+            mode="full",
+        )
+        _increment_wip_metric("search_index_rebuilds")
 
     with _wip_search_index_lock:
         _wip_search_index_cache[cache_key] = index_payload
@@ -207,9 +589,9 @@ def _search_values_from_index(values: List[str], query: str, limit: int) -> List
 def get_wip_search_index_status() -> Dict[str, Any]:
     """Expose WIP derived search-index freshness for diagnostics."""
     with _wip_search_index_lock:
-        snapshot = {}
+        search_snapshot = {}
         for key, payload in _wip_search_index_cache.items():
-            snapshot[key] = {
+            search_snapshot[key] = {
                 "version": payload.get("version"),
                 "built_at": payload.get("built_at"),
                 "row_count": payload.get("row_count", 0),
@@ -217,8 +599,39 @@ def get_wip_search_index_status() -> Dict[str, Any]:
                 "lotids": len(payload.get("lotids", [])),
                 "packages": len(payload.get("packages", [])),
                 "types": len(payload.get("types", [])),
+                "sync_mode": payload.get("sync_mode"),
+                "sync_added_rows": payload.get("sync_added_rows", 0),
+                "sync_removed_rows": payload.get("sync_removed_rows", 0),
+                "drift_ratio": payload.get("drift_ratio", 0.0),
+                "memory_bytes": payload.get("memory_bytes", 0),
             }
-        return snapshot
+    with _wip_snapshot_lock:
+        frame_snapshot = {}
+        for key, payload in _wip_snapshot_cache.items():
+            frame_snapshot[key] = {
+                "version": payload.get("version"),
+                "built_at": payload.get("built_at"),
+                "row_count": payload.get("row_count", 0),
+                "frame_bytes": payload.get("frame_bytes", 0),
+                "index_bucket_count": payload.get("index_bucket_count", 0),
+            }
+    with _wip_index_metrics_lock:
+        metrics = dict(_wip_index_metrics)
+
+    total_frame_bytes = sum(item.get("frame_bytes", 0) for item in frame_snapshot.values())
+    total_search_bytes = sum(item.get("memory_bytes", 0) for item in search_snapshot.values())
+    amplification_ratio = round((total_frame_bytes + total_search_bytes) / max(total_frame_bytes, 1), 4)
+
+    return {
+        "derived_search_index": search_snapshot,
+        "derived_frame_snapshot": frame_snapshot,
+        "metrics": metrics,
+        "memory": {
+            "frame_bytes_total": int(total_frame_bytes),
+            "search_bytes_total": int(total_search_bytes),
+            "amplification_ratio": amplification_ratio,
+        },
+    }
 
 
 def _add_wip_status_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -235,24 +648,31 @@ def _add_wip_status_columns(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame with additional status columns
     """
-    df = df.copy()
+    required = {'WIP_STATUS', 'IS_QUALITY_HOLD', 'IS_NON_QUALITY_HOLD'}
+    if required.issubset(df.columns):
+        return df
+
+    working = df.copy()
 
     # Ensure numeric columns
-    df['EQUIPMENTCOUNT'] = pd.to_numeric(df['EQUIPMENTCOUNT'], errors='coerce').fillna(0)
-    df['CURRENTHOLDCOUNT'] = pd.to_numeric(df['CURRENTHOLDCOUNT'], errors='coerce').fillna(0)
-    df['QTY'] = pd.to_numeric(df['QTY'], errors='coerce').fillna(0)
+    working['EQUIPMENTCOUNT'] = pd.to_numeric(working['EQUIPMENTCOUNT'], errors='coerce').fillna(0)
+    working['CURRENTHOLDCOUNT'] = pd.to_numeric(working['CURRENTHOLDCOUNT'], errors='coerce').fillna(0)
+    working['QTY'] = pd.to_numeric(working['QTY'], errors='coerce').fillna(0)
 
     # Compute WIP status
-    df['WIP_STATUS'] = 'QUEUE'  # Default
-    df.loc[df['EQUIPMENTCOUNT'] > 0, 'WIP_STATUS'] = 'RUN'
-    df.loc[(df['EQUIPMENTCOUNT'] == 0) & (df['CURRENTHOLDCOUNT'] > 0), 'WIP_STATUS'] = 'HOLD'
+    working['WIP_STATUS'] = 'QUEUE'  # Default
+    working.loc[working['EQUIPMENTCOUNT'] > 0, 'WIP_STATUS'] = 'RUN'
+    working.loc[
+        (working['EQUIPMENTCOUNT'] == 0) & (working['CURRENTHOLDCOUNT'] > 0),
+        'WIP_STATUS'
+    ] = 'HOLD'
 
     # Compute hold type
-    df['IS_NON_QUALITY_HOLD'] = df['HOLDREASONNAME'].isin(NON_QUALITY_HOLD_REASONS)
-    df['IS_QUALITY_HOLD'] = (df['WIP_STATUS'] == 'HOLD') & ~df['IS_NON_QUALITY_HOLD']
-    df['IS_NON_QUALITY_HOLD'] = (df['WIP_STATUS'] == 'HOLD') & df['IS_NON_QUALITY_HOLD']
+    non_quality_flags = working['HOLDREASONNAME'].isin(NON_QUALITY_HOLD_REASONS)
+    working['IS_QUALITY_HOLD'] = (working['WIP_STATUS'] == 'HOLD') & ~non_quality_flags
+    working['IS_NON_QUALITY_HOLD'] = (working['WIP_STATUS'] == 'HOLD') & non_quality_flags
 
-    return df
+    return working
 
 
 def _filter_base_conditions(
@@ -272,24 +692,18 @@ def _filter_base_conditions(
     Returns:
         Filtered DataFrame
     """
-    df = df.copy()
+    if df is None or df.empty:
+        return df.iloc[0:0] if isinstance(df, pd.DataFrame) else pd.DataFrame()
 
-    # Exclude NULL WORKORDER (raw materials)
-    df = df[df['WORKORDER'].notna()]
-
-    # DUMMY exclusion
-    if not include_dummy:
-        df = df[~df['LOTID'].str.contains('DUMMY', case=False, na=False)]
-
-    # WORKORDER filter (fuzzy match)
-    if workorder:
-        df = df[df['WORKORDER'].str.contains(workorder, case=False, na=False)]
-
-    # LOTID filter (fuzzy match)
-    if lotid:
-        df = df[df['LOTID'].str.contains(lotid, case=False, na=False)]
-
-    return df
+    mask = _build_filter_mask(
+        df,
+        include_dummy=include_dummy,
+        workorder=workorder,
+        lotid=lotid,
+    )
+    if mask.empty:
+        return df.iloc[0:0]
+    return df.loc[mask]
 
 
 # ============================================================
@@ -325,16 +739,15 @@ def get_wip_summary(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
-            df = _add_wip_status_columns(df)
-
-            # Apply package filter
-            if package and 'PACKAGE_LEF' in df.columns:
-                df = df[df['PACKAGE_LEF'] == package]
-
-            # Apply pj_type filter
-            if pj_type and 'PJ_TYPE' in df.columns:
-                df = df[df['PJ_TYPE'] == pj_type]
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                workorder=workorder,
+                lotid=lotid,
+                package=package,
+                pj_type=pj_type,
+            )
+            if df is None:
+                return _get_wip_summary_from_oracle(include_dummy, workorder, lotid, package, pj_type)
 
             if df.empty:
                 return {
@@ -495,31 +908,30 @@ def get_wip_matrix(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
-            df = _add_wip_status_columns(df)
+            status_upper = status.upper() if status else None
+            hold_type_filter = hold_type if status_upper == 'HOLD' else None
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                workorder=workorder,
+                lotid=lotid,
+                package=package,
+                pj_type=pj_type,
+                status=status_upper,
+                hold_type=hold_type_filter,
+            )
+            if df is None:
+                return _get_wip_matrix_from_oracle(
+                    include_dummy,
+                    workorder,
+                    lotid,
+                    status,
+                    hold_type,
+                    package,
+                    pj_type,
+                )
 
             # Filter by WORKCENTER_GROUP and PACKAGE_LEF
             df = df[df['WORKCENTER_GROUP'].notna() & df['PACKAGE_LEF'].notna()]
-
-            # Apply package filter
-            if package:
-                df = df[df['PACKAGE_LEF'] == package]
-
-            # Apply pj_type filter
-            if pj_type and 'PJ_TYPE' in df.columns:
-                df = df[df['PJ_TYPE'] == pj_type]
-
-            # WIP status filter
-            if status:
-                status_upper = status.upper()
-                df = df[df['WIP_STATUS'] == status_upper]
-
-                # Hold type sub-filter
-                if status_upper == 'HOLD' and hold_type:
-                    if hold_type == 'quality':
-                        df = df[df['IS_QUALITY_HOLD']]
-                    elif hold_type == 'non-quality':
-                        df = df[df['IS_NON_QUALITY_HOLD']]
 
             if df.empty:
                 return {
@@ -677,11 +1089,17 @@ def get_wip_hold_summary(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
-            df = _add_wip_status_columns(df)
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                workorder=workorder,
+                lotid=lotid,
+                status='HOLD',
+            )
+            if df is None:
+                return _get_wip_hold_summary_from_oracle(include_dummy, workorder, lotid)
 
             # Filter for HOLD status with reason
-            df = df[(df['WIP_STATUS'] == 'HOLD') & df['HOLDREASONNAME'].notna()]
+            df = df[df['HOLDREASONNAME'].notna()]
 
             if df.empty:
                 return {'items': []}
@@ -805,17 +1223,40 @@ def get_wip_detail(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy, workorder, lotid)
-            df = _add_wip_status_columns(df)
+            summary_df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                workorder=workorder,
+                lotid=lotid,
+                package=package,
+                workcenter=workcenter,
+            )
+            if summary_df is None:
+                return _get_wip_detail_from_oracle(
+                    workcenter,
+                    package,
+                    status,
+                    hold_type,
+                    workorder,
+                    lotid,
+                    include_dummy,
+                    page,
+                    page_size,
+                )
 
-            # Filter by workcenter
-            df = df[df['WORKCENTER_GROUP'] == workcenter]
-
-            if package:
-                df = df[df['PACKAGE_LEF'] == package]
+            if summary_df.empty:
+                summary = {
+                    'totalLots': 0,
+                    'runLots': 0,
+                    'queueLots': 0,
+                    'holdLots': 0,
+                    'qualityHoldLots': 0,
+                    'nonQualityHoldLots': 0
+                }
+                df = summary_df
+            else:
+                df = summary_df
 
             # Calculate summary before status filter
-            summary_df = df.copy()
             run_lots = len(summary_df[summary_df['WIP_STATUS'] == 'RUN'])
             queue_lots = len(summary_df[summary_df['WIP_STATUS'] == 'QUEUE'])
             hold_lots = len(summary_df[summary_df['WIP_STATUS'] == 'HOLD'])
@@ -835,13 +1276,29 @@ def get_wip_detail(
             # Apply status filter for lots list
             if status:
                 status_upper = status.upper()
-                df = df[df['WIP_STATUS'] == status_upper]
-
-                if status_upper == 'HOLD' and hold_type:
-                    if hold_type == 'quality':
-                        df = df[df['IS_QUALITY_HOLD']]
-                    elif hold_type == 'non-quality':
-                        df = df[df['IS_NON_QUALITY_HOLD']]
+                hold_type_filter = hold_type if status_upper == 'HOLD' else None
+                filtered_df = _select_with_snapshot_indexes(
+                    include_dummy=include_dummy,
+                    workorder=workorder,
+                    lotid=lotid,
+                    package=package,
+                    workcenter=workcenter,
+                    status=status_upper,
+                    hold_type=hold_type_filter,
+                )
+                if filtered_df is None:
+                    return _get_wip_detail_from_oracle(
+                        workcenter,
+                        package,
+                        status,
+                        hold_type,
+                        workorder,
+                        lotid,
+                        include_dummy,
+                        page,
+                        page_size,
+                    )
+                df = filtered_df
 
             # Get specs (sorted by SPECSEQUENCE if available)
             specs_df = df[df['SPECNAME'].notna()][['SPECNAME', 'SPECSEQUENCE']].drop_duplicates()
@@ -1083,7 +1540,9 @@ def get_workcenters(include_dummy: bool = False) -> Optional[List[Dict[str, Any]
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy)
+            df = _select_with_snapshot_indexes(include_dummy=include_dummy)
+            if df is None:
+                return _get_workcenters_from_oracle(include_dummy)
             df = df[df['WORKCENTER_GROUP'].notna()]
 
             if df.empty:
@@ -1162,7 +1621,9 @@ def get_packages(include_dummy: bool = False) -> Optional[List[Dict[str, Any]]]:
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy)
+            df = _select_with_snapshot_indexes(include_dummy=include_dummy)
+            if df is None:
+                return _get_packages_from_oracle(include_dummy)
             df = df[df['PACKAGE_LEF'].notna()]
 
             if df.empty:
@@ -1267,14 +1728,15 @@ def search_workorders(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy, lotid=lotid)
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                lotid=lotid,
+                package=package,
+                pj_type=pj_type,
+            )
+            if df is None:
+                return _search_workorders_from_oracle(q, limit, include_dummy, lotid, package, pj_type)
             df = df[df['WORKORDER'].notna()]
-
-            # Apply cross-filters
-            if package and 'PACKAGE_LEF' in df.columns:
-                df = df[df['PACKAGE_LEF'] == package]
-            if pj_type and 'PJ_TYPE' in df.columns:
-                df = df[df['PJ_TYPE'] == pj_type]
 
             # Filter by search query (case-insensitive)
             df = df[df['WORKORDER'].str.contains(q, case=False, na=False)]
@@ -1375,13 +1837,14 @@ def search_lot_ids(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy, workorder=workorder)
-
-            # Apply cross-filters
-            if package and 'PACKAGE_LEF' in df.columns:
-                df = df[df['PACKAGE_LEF'] == package]
-            if pj_type and 'PJ_TYPE' in df.columns:
-                df = df[df['PJ_TYPE'] == pj_type]
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                workorder=workorder,
+                package=package,
+                pj_type=pj_type,
+            )
+            if df is None:
+                return _search_lot_ids_from_oracle(q, limit, include_dummy, workorder, package, pj_type)
 
             # Filter by search query (case-insensitive)
             df = df[df['LOTID'].str.contains(q, case=False, na=False)]
@@ -1481,7 +1944,14 @@ def search_packages(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy, workorder=workorder, lotid=lotid)
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                workorder=workorder,
+                lotid=lotid,
+                pj_type=pj_type,
+            )
+            if df is None:
+                return _search_packages_from_oracle(q, limit, include_dummy, workorder, lotid, pj_type)
 
             # Check if PACKAGE_LEF column exists
             if 'PACKAGE_LEF' not in df.columns:
@@ -1489,10 +1959,6 @@ def search_packages(
                 return _search_packages_from_oracle(q, limit, include_dummy, workorder, lotid, pj_type)
 
             df = df[df['PACKAGE_LEF'].notna()]
-
-            # Apply cross-filter
-            if pj_type and 'PJ_TYPE' in df.columns:
-                df = df[df['PJ_TYPE'] == pj_type]
 
             # Filter by search query (case-insensitive)
             df = df[df['PACKAGE_LEF'].str.contains(q, case=False, na=False)]
@@ -1591,7 +2057,14 @@ def search_types(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy, workorder=workorder, lotid=lotid)
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                workorder=workorder,
+                lotid=lotid,
+                package=package,
+            )
+            if df is None:
+                return _search_types_from_oracle(q, limit, include_dummy, workorder, lotid, package)
 
             # Check if PJ_TYPE column exists
             if 'PJ_TYPE' not in df.columns:
@@ -1599,10 +2072,6 @@ def search_types(
                 return _search_types_from_oracle(q, limit, include_dummy, workorder, lotid, package)
 
             df = df[df['PJ_TYPE'].notna()]
-
-            # Apply cross-filter
-            if package and 'PACKAGE_LEF' in df.columns:
-                df = df[df['PACKAGE_LEF'] == package]
 
             # Filter by search query (case-insensitive)
             df = df[df['PJ_TYPE'].str.contains(q, case=False, na=False)]
@@ -1686,11 +2155,15 @@ def get_hold_detail_summary(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy)
-            df = _add_wip_status_columns(df)
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                status='HOLD',
+            )
+            if df is None:
+                return _get_hold_detail_summary_from_oracle(reason, include_dummy)
 
             # Filter for HOLD status with matching reason
-            df = df[(df['WIP_STATUS'] == 'HOLD') & (df['HOLDREASONNAME'] == reason)]
+            df = df[df['HOLDREASONNAME'] == reason]
 
             if df.empty:
                 return {
@@ -1783,11 +2256,15 @@ def get_hold_detail_distribution(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy)
-            df = _add_wip_status_columns(df)
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                status='HOLD',
+            )
+            if df is None:
+                return _get_hold_detail_distribution_from_oracle(reason, include_dummy)
 
             # Filter for HOLD status with matching reason
-            df = df[(df['WIP_STATUS'] == 'HOLD') & (df['HOLDREASONNAME'] == reason)]
+            df = df[df['HOLDREASONNAME'] == reason]
 
             total_lots = len(df)
 
@@ -2072,20 +2549,30 @@ def get_hold_detail_lots(
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
         try:
-            df = _filter_base_conditions(cached_df, include_dummy)
-            df = _add_wip_status_columns(df)
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                workcenter=workcenter,
+                package=package,
+                status='HOLD',
+            )
+            if df is None:
+                return _get_hold_detail_lots_from_oracle(
+                    reason=reason,
+                    workcenter=workcenter,
+                    package=package,
+                    age_range=age_range,
+                    include_dummy=include_dummy,
+                    page=page,
+                    page_size=page_size,
+                )
 
             # Filter for HOLD status with matching reason
-            df = df[(df['WIP_STATUS'] == 'HOLD') & (df['HOLDREASONNAME'] == reason)]
+            df = df[df['HOLDREASONNAME'] == reason]
 
             # Ensure numeric columns
             df['AGEBYDAYS'] = pd.to_numeric(df['AGEBYDAYS'], errors='coerce').fillna(0)
 
-            # Optional filters
-            if workcenter:
-                df = df[df['WORKCENTER_GROUP'] == workcenter]
-            if package:
-                df = df[df['PACKAGE_LEF'] == package]
+            # Optional age filter
             if age_range:
                 if age_range == '0-1':
                     df = df[(df['AGEBYDAYS'] >= 0) & (df['AGEBYDAYS'] < 1)]
