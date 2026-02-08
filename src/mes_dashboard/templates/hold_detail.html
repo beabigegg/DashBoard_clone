@@ -1,0 +1,1013 @@
+{% extends "_base.html" %}
+
+{% block title %}Hold Detail - {{ reason }}{% endblock %}
+
+{% block head_extra %}
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text: #222;
+            --muted: #666;
+            --border: #e2e6ef;
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --shadow: 0 2px 10px rgba(0,0,0,0.08);
+            --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            max-width: 1900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 18px 22px;
+            background: linear-gradient(135deg, {% if hold_type == 'quality' %}#ef4444 0%, #dc2626{% else %}#f97316 0%, #ea580c{% endif %} 100%);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-strong);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .last-update {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-indicator {
+            display: none;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .refresh-indicator.active {
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn {
+            padding: 9px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-light {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .btn-light:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .btn-back {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-back:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        .hold-type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 16px 20px;
+            text-align: center;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .summary-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .summary-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .summary-value.small {
+            font-size: 20px;
+        }
+
+        /* Age Distribution Cards */
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .age-distribution {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .age-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 16px;
+            border: 2px solid var(--border);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .age-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .age-card.active {
+            border-color: var(--primary);
+            background: #f0f4ff;
+        }
+
+        .age-card .age-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text);
+        }
+
+        .age-card .age-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .age-card .age-stat {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+
+        .age-card .age-stat .label {
+            color: var(--muted);
+        }
+
+        .age-card .age-stat .value {
+            font-weight: 600;
+        }
+
+        .age-card .age-percentage {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        /* Distribution Grid */
+        .distribution-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #fafbfc;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .card-body {
+            padding: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        /* Distribution Table */
+        .dist-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .dist-table th,
+        .dist-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .dist-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            text-align: left;
+        }
+
+        .dist-table th:nth-child(2),
+        .dist-table th:nth-child(3),
+        .dist-table th:nth-child(4) {
+            text-align: right;
+            width: 80px;
+        }
+
+        .dist-table td:nth-child(2),
+        .dist-table td:nth-child(3),
+        .dist-table td:nth-child(4) {
+            text-align: right;
+        }
+
+        .dist-table tbody tr {
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .dist-table tbody tr:hover {
+            background: #f0f4ff;
+        }
+
+        .dist-table tbody tr.active {
+            background: #e0e7ff;
+        }
+
+        /* Lot Details Table */
+        .table-section {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #fafbfc;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .table-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .table-info {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .filter-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--primary);
+            background: #e8ecff;
+            padding: 4px 12px;
+            border-radius: 4px;
+        }
+
+        .filter-indicator .clear-btn {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 4px;
+        }
+
+        .filter-indicator .clear-btn:hover {
+            color: var(--danger);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            max-height: 500px;
+        }
+
+        .lot-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .lot-table th,
+        .lot-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+        }
+
+        .lot-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .lot-table td:nth-child(3),
+        .lot-table td:nth-child(7),
+        .lot-table th:nth-child(3),
+        .lot-table th:nth-child(7) {
+            text-align: right;
+        }
+
+        .lot-table tbody tr:hover {
+            background: #f8f9fc;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination button {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+
+        .placeholder {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 1400px) {
+            .summary-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .age-distribution {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 1000px) {
+            .summary-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .distribution-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .summary-row {
+                grid-template-columns: 1fr;
+            }
+            .age-distribution {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <a href="/wip-overview" class="btn btn-back">&larr; WIP Overview</a>
+                <h1>Hold Detail: {{ reason }}</h1>
+                <span class="hold-type-badge">{% if hold_type == 'quality' %}品質異常{% else %}非品質異常{% endif %}</span>
+            </div>
+            <div class="header-right">
+                <span class="last-update">
+                    <span class="refresh-indicator" id="refreshIndicator"></span>
+                    <span id="lastUpdate"></span>
+                </span>
+                <button class="btn btn-light" onclick="manualRefresh()">重新整理</button>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-row">
+            <div class="summary-card">
+                <div class="summary-label">Total Lots</div>
+                <div class="summary-value" id="totalLots">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Total QTY</div>
+                <div class="summary-value" id="totalQty">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">平均當站滯留</div>
+                <div class="summary-value small" id="avgAge">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">最久當站滯留</div>
+                <div class="summary-value small" id="maxAge">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">影響站群</div>
+                <div class="summary-value" id="workcenterCount">-</div>
+            </div>
+        </div>
+
+        <!-- Age Distribution -->
+        <div class="section-title">當站滯留天數分佈 (Age at Current Station)</div>
+        <div class="age-distribution" id="ageDistribution">
+            <div class="age-card" data-range="0-1" onclick="toggleAgeFilter('0-1')">
+                <div class="age-label">0-1天</div>
+                <div class="age-stats">
+                    <div class="age-stat"><span class="label">Lots</span><span class="value" id="age01Lots">-</span></div>
+                    <div class="age-stat"><span class="label">QTY</span><span class="value" id="age01Qty">-</span></div>
+                </div>
+                <div class="age-percentage" id="age01Pct">-</div>
+            </div>
+            <div class="age-card" data-range="1-3" onclick="toggleAgeFilter('1-3')">
+                <div class="age-label">1-3天</div>
+                <div class="age-stats">
+                    <div class="age-stat"><span class="label">Lots</span><span class="value" id="age13Lots">-</span></div>
+                    <div class="age-stat"><span class="label">QTY</span><span class="value" id="age13Qty">-</span></div>
+                </div>
+                <div class="age-percentage" id="age13Pct">-</div>
+            </div>
+            <div class="age-card" data-range="3-7" onclick="toggleAgeFilter('3-7')">
+                <div class="age-label">3-7天</div>
+                <div class="age-stats">
+                    <div class="age-stat"><span class="label">Lots</span><span class="value" id="age37Lots">-</span></div>
+                    <div class="age-stat"><span class="label">QTY</span><span class="value" id="age37Qty">-</span></div>
+                </div>
+                <div class="age-percentage" id="age37Pct">-</div>
+            </div>
+            <div class="age-card" data-range="7+" onclick="toggleAgeFilter('7+')">
+                <div class="age-label">7+天</div>
+                <div class="age-stats">
+                    <div class="age-stat"><span class="label">Lots</span><span class="value" id="age7Lots">-</span></div>
+                    <div class="age-stat"><span class="label">QTY</span><span class="value" id="age7Qty">-</span></div>
+                </div>
+                <div class="age-percentage" id="age7Pct">-</div>
+            </div>
+        </div>
+
+        <!-- Distribution Tables -->
+        <div class="distribution-grid">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">By Workcenter</div>
+                </div>
+                <div class="card-body">
+                    <table class="dist-table" id="workcenterTable">
+                        <thead>
+                            <tr>
+                                <th>Workcenter</th>
+                                <th>Lots</th>
+                                <th>QTY</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workcenterBody">
+                            <tr><td colspan="4" class="placeholder">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">By Package</div>
+                </div>
+                <div class="card-body">
+                    <table class="dist-table" id="packageTable">
+                        <thead>
+                            <tr>
+                                <th>Package</th>
+                                <th>Lots</th>
+                                <th>QTY</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="packageBody">
+                            <tr><td colspan="4" class="placeholder">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lot Details Table -->
+        <div class="table-section">
+            <div class="table-header">
+                <div class="table-title">Lot Details</div>
+                <div id="filterIndicator" style="display: none;" class="filter-indicator">
+                    <span id="filterText"></span>
+                    <span class="clear-btn" onclick="clearFilters()">×</span>
+                </div>
+                <div class="table-info" id="tableInfo">Loading...</div>
+            </div>
+            <div class="table-container" id="tableContainer">
+                <table class="lot-table">
+                    <thead>
+                        <tr>
+                            <th>LOTID</th>
+                            <th>WORKORDER</th>
+                            <th>QTY</th>
+                            <th>Package</th>
+                            <th>Workcenter</th>
+                            <th>Spec</th>
+                            <th>Age</th>
+                            <th>Hold By</th>
+                            <th>Dept</th>
+                            <th>Hold Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lotBody">
+                        <tr><td colspan="10" class="placeholder">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination" style="display: none;">
+                <button id="btnPrev" onclick="prevPage()">Prev</button>
+                <span class="page-info" id="pageInfo">Page 1</span>
+                <button id="btnNext" onclick="nextPage()">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <span class="loading-spinner"></span>
+        <span>Loading...</span>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+{% set hold_detail_js = frontend_asset('hold-detail.js') %}
+{% if hold_detail_js %}
+    <script type="module" src="{{ hold_detail_js }}"></script>
+{% else %}
+    <script>
+        // ============================================================
+        // State
+        // ============================================================
+        const state = {
+            reason: '{{ reason | e }}',
+            summary: null,
+            distribution: null,
+            lots: null,
+            page: 1,
+            perPage: 50,
+            filters: {
+                workcenter: null,
+                package: null,
+                ageRange: null
+            }
+        };
+
+        // ============================================================
+        // Utility
+        // ============================================================
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '-') return '-';
+            return num.toLocaleString('zh-TW');
+        }
+
+        function safeText(value, fallback = '-') {
+            return value === null || value === undefined ? fallback : String(value);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function jsSingleQuote(value) {
+            return safeText(value, '')
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'");
+        }
+
+        // ============================================================
+        // API Functions
+        // ============================================================
+        const API_TIMEOUT = 60000;
+
+        async function fetchSummary() {
+            const result = await MesApi.get('/api/wip/hold-detail/summary', {
+                params: { reason: state.reason },
+                timeout: API_TIMEOUT
+            });
+            if (result.success) return result.data;
+            throw new Error(result.error);
+        }
+
+        async function fetchDistribution() {
+            const result = await MesApi.get('/api/wip/hold-detail/distribution', {
+                params: { reason: state.reason },
+                timeout: API_TIMEOUT
+            });
+            if (result.success) return result.data;
+            throw new Error(result.error);
+        }
+
+        async function fetchLots() {
+            const params = {
+                reason: state.reason,
+                page: state.page,
+                per_page: state.perPage
+            };
+            if (state.filters.workcenter) params.workcenter = state.filters.workcenter;
+            if (state.filters.package) params.package = state.filters.package;
+            if (state.filters.ageRange) params.age_range = state.filters.ageRange;
+
+            const result = await MesApi.get('/api/wip/hold-detail/lots', {
+                params,
+                timeout: API_TIMEOUT
+            });
+            if (result.success) return result.data;
+            throw new Error(result.error);
+        }
+
+        // ============================================================
+        // Render Functions
+        // ============================================================
+        function renderSummary(data) {
+            document.getElementById('totalLots').textContent = formatNumber(data.totalLots);
+            document.getElementById('totalQty').textContent = formatNumber(data.totalQty);
+            document.getElementById('avgAge').textContent = data.avgAge ? `${data.avgAge}天` : '-';
+            document.getElementById('maxAge').textContent = data.maxAge ? `${data.maxAge}天` : '-';
+            document.getElementById('workcenterCount').textContent = formatNumber(data.workcenterCount);
+        }
+
+        function renderDistribution(data) {
+            // Age distribution
+            const ageMap = {};
+            data.byAge.forEach(item => { ageMap[item.range] = item; });
+
+            const age01 = ageMap['0-1'] || { lots: 0, qty: 0, percentage: 0 };
+            const age13 = ageMap['1-3'] || { lots: 0, qty: 0, percentage: 0 };
+            const age37 = ageMap['3-7'] || { lots: 0, qty: 0, percentage: 0 };
+            const age7 = ageMap['7+'] || { lots: 0, qty: 0, percentage: 0 };
+
+            document.getElementById('age01Lots').textContent = formatNumber(age01.lots);
+            document.getElementById('age01Qty').textContent = formatNumber(age01.qty);
+            document.getElementById('age01Pct').textContent = `${age01.percentage}%`;
+
+            document.getElementById('age13Lots').textContent = formatNumber(age13.lots);
+            document.getElementById('age13Qty').textContent = formatNumber(age13.qty);
+            document.getElementById('age13Pct').textContent = `${age13.percentage}%`;
+
+            document.getElementById('age37Lots').textContent = formatNumber(age37.lots);
+            document.getElementById('age37Qty').textContent = formatNumber(age37.qty);
+            document.getElementById('age37Pct').textContent = `${age37.percentage}%`;
+
+            document.getElementById('age7Lots').textContent = formatNumber(age7.lots);
+            document.getElementById('age7Qty').textContent = formatNumber(age7.qty);
+            document.getElementById('age7Pct').textContent = `${age7.percentage}%`;
+
+            // Workcenter table
+            const wcBody = document.getElementById('workcenterBody');
+            if (data.byWorkcenter.length === 0) {
+                wcBody.innerHTML = '<tr><td colspan="4" class="placeholder">No data</td></tr>';
+            } else {
+                wcBody.innerHTML = data.byWorkcenter.map(item => `
+                    <tr data-workcenter="${escapeHtml(safeText(item.name))}" onclick="toggleWorkcenterFilter('${jsSingleQuote(item.name)}')" class="${state.filters.workcenter === item.name ? 'active' : ''}">
+                        <td>${escapeHtml(safeText(item.name))}</td>
+                        <td>${escapeHtml(formatNumber(item.lots))}</td>
+                        <td>${escapeHtml(formatNumber(item.qty))}</td>
+                        <td>${escapeHtml(safeText(item.percentage, 0))}%</td>
+                    </tr>
+                `).join('');
+            }
+
+            // Package table
+            const pkgBody = document.getElementById('packageBody');
+            if (data.byPackage.length === 0) {
+                pkgBody.innerHTML = '<tr><td colspan="4" class="placeholder">No data</td></tr>';
+            } else {
+                pkgBody.innerHTML = data.byPackage.map(item => `
+                    <tr data-package="${escapeHtml(safeText(item.name))}" onclick="togglePackageFilter('${jsSingleQuote(item.name)}')" class="${state.filters.package === item.name ? 'active' : ''}">
+                        <td>${escapeHtml(safeText(item.name))}</td>
+                        <td>${escapeHtml(formatNumber(item.lots))}</td>
+                        <td>${escapeHtml(formatNumber(item.qty))}</td>
+                        <td>${escapeHtml(safeText(item.percentage, 0))}%</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        function renderLots(data) {
+            const tbody = document.getElementById('lotBody');
+            const lots = data.lots;
+
+            if (lots.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="placeholder">No data</td></tr>';
+                document.getElementById('tableInfo').textContent = 'No data';
+                document.getElementById('pagination').style.display = 'none';
+                return;
+            }
+
+            tbody.innerHTML = lots.map(lot => `
+                <tr>
+                    <td>${escapeHtml(safeText(lot.lotId))}</td>
+                    <td>${escapeHtml(safeText(lot.workorder))}</td>
+                    <td>${escapeHtml(formatNumber(lot.qty))}</td>
+                    <td>${escapeHtml(safeText(lot.package))}</td>
+                    <td>${escapeHtml(safeText(lot.workcenter))}</td>
+                    <td>${escapeHtml(safeText(lot.spec))}</td>
+                    <td>${escapeHtml(safeText(lot.age))}天</td>
+                    <td>${escapeHtml(safeText(lot.holdBy))}</td>
+                    <td>${escapeHtml(safeText(lot.dept))}</td>
+                    <td>${escapeHtml(safeText(lot.holdComment))}</td>
+                </tr>
+            `).join('');
+
+            // Update pagination
+            const pg = data.pagination;
+            const start = (pg.page - 1) * pg.perPage + 1;
+            const end = Math.min(pg.page * pg.perPage, pg.total);
+            document.getElementById('tableInfo').textContent = `顯示 ${start} - ${end} / ${formatNumber(pg.total)}`;
+
+            if (pg.totalPages > 1) {
+                document.getElementById('pagination').style.display = 'flex';
+                document.getElementById('pageInfo').textContent = `Page ${pg.page} / ${pg.totalPages}`;
+                document.getElementById('btnPrev').disabled = pg.page <= 1;
+                document.getElementById('btnNext').disabled = pg.page >= pg.totalPages;
+            } else {
+                document.getElementById('pagination').style.display = 'none';
+            }
+        }
+
+        function updateFilterIndicator() {
+            const indicator = document.getElementById('filterIndicator');
+            const text = document.getElementById('filterText');
+            const parts = [];
+
+            if (state.filters.workcenter) parts.push(`Workcenter=${state.filters.workcenter}`);
+            if (state.filters.package) parts.push(`Package=${state.filters.package}`);
+            if (state.filters.ageRange) parts.push(`Age=${state.filters.ageRange}天`);
+
+            if (parts.length > 0) {
+                text.textContent = '篩選: ' + parts.join(', ');
+                indicator.style.display = 'flex';
+            } else {
+                indicator.style.display = 'none';
+            }
+
+            // Update active states
+            document.querySelectorAll('.age-card').forEach(card => {
+                card.classList.toggle('active', card.dataset.range === state.filters.ageRange);
+            });
+            document.querySelectorAll('#workcenterBody tr').forEach(row => {
+                row.classList.toggle('active', row.dataset.workcenter === state.filters.workcenter);
+            });
+            document.querySelectorAll('#packageBody tr').forEach(row => {
+                row.classList.toggle('active', row.dataset.package === state.filters.package);
+            });
+        }
+
+        // ============================================================
+        // Filter Functions
+        // ============================================================
+        function toggleAgeFilter(range) {
+            state.filters.ageRange = state.filters.ageRange === range ? null : range;
+            state.page = 1;
+            updateFilterIndicator();
+            loadLots();
+        }
+
+        function toggleWorkcenterFilter(wc) {
+            state.filters.workcenter = state.filters.workcenter === wc ? null : wc;
+            state.page = 1;
+            updateFilterIndicator();
+            loadLots();
+        }
+
+        function togglePackageFilter(pkg) {
+            state.filters.package = state.filters.package === pkg ? null : pkg;
+            state.page = 1;
+            updateFilterIndicator();
+            loadLots();
+        }
+
+        function clearFilters() {
+            state.filters = { workcenter: null, package: null, ageRange: null };
+            state.page = 1;
+            updateFilterIndicator();
+            loadLots();
+        }
+
+        // ============================================================
+        // Pagination
+        // ============================================================
+        function prevPage() {
+            if (state.page > 1) {
+                state.page--;
+                loadLots();
+            }
+        }
+
+        function nextPage() {
+            if (state.lots && state.page < state.lots.pagination.totalPages) {
+                state.page++;
+                loadLots();
+            }
+        }
+
+        // ============================================================
+        // Data Loading
+        // ============================================================
+        async function loadLots() {
+            document.getElementById('lotBody').innerHTML = '<tr><td colspan="10" class="placeholder">Loading...</td></tr>';
+            document.getElementById('refreshIndicator').classList.add('active');
+
+            try {
+                state.lots = await fetchLots();
+                renderLots(state.lots);
+            } catch (error) {
+                console.error('Load lots failed:', error);
+                document.getElementById('lotBody').innerHTML = '<tr><td colspan="10" class="placeholder">Error loading data</td></tr>';
+            } finally {
+                document.getElementById('refreshIndicator').classList.remove('active');
+            }
+        }
+
+        async function loadAllData(showOverlay = true) {
+            if (showOverlay) {
+                document.getElementById('loadingOverlay').style.display = 'flex';
+            }
+            document.getElementById('refreshIndicator').classList.add('active');
+
+            try {
+                const [summary, distribution, lots] = await Promise.all([
+                    fetchSummary(),
+                    fetchDistribution(),
+                    fetchLots()
+                ]);
+
+                state.summary = summary;
+                state.distribution = distribution;
+                state.lots = lots;
+
+                renderSummary(summary);
+                renderDistribution(distribution);
+                renderLots(lots);
+                updateFilterIndicator();
+
+                document.getElementById('lastUpdate').textContent = `Last Update: ${new Date().toLocaleString('zh-TW')}`;
+            } catch (error) {
+                console.error('Load data failed:', error);
+            } finally {
+                document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('refreshIndicator').classList.remove('active');
+            }
+        }
+
+        function manualRefresh() {
+            loadAllData(false);
+        }
+
+        // ============================================================
+        // Initialize
+        // ============================================================
+        window.onload = function() {
+            loadAllData(true);
+        };
+    </script>
+{% endif %}
+{% endblock %}

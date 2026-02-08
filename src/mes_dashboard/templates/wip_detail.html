@@ -1,0 +1,1794 @@
+{% extends "_base.html" %}
+
+{% block title %}WIP Detail Dashboard{% endblock %}
+
+{% block head_extra %}
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text: #222;
+            --muted: #666;
+            --border: #e2e6ef;
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --shadow: 0 2px 10px rgba(0,0,0,0.08);
+            --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            max-width: 1900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 18px 22px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-strong);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .last-update {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-indicator {
+            display: none;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .refresh-indicator.active {
+            display: inline-block;
+        }
+
+        .refresh-success {
+            color: #22c55e;
+            display: none;
+        }
+
+        .refresh-success.active {
+            display: inline-block;
+            animation: fadeOut 1s ease-out forwards;
+        }
+
+        .refresh-error {
+            width: 8px;
+            height: 8px;
+            background: var(--danger);
+            border-radius: 50%;
+            display: none;
+        }
+
+        .refresh-error.active {
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .btn {
+            padding: 9px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-light {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .btn-light:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .btn-back {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-back:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        /* Filters */
+        .filters {
+            background: var(--card-bg);
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        .filter-group select,
+        .filter-group input[type="text"] {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            min-width: 150px;
+        }
+
+        .filter-group select:focus,
+        .filter-group input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        /* Autocomplete container */
+        .autocomplete-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .autocomplete-container input {
+            width: 180px;
+        }
+
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            box-shadow: var(--shadow);
+            z-index: 100;
+            display: none;
+        }
+
+        .autocomplete-dropdown.show {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .autocomplete-item:hover {
+            background: #f0f2ff;
+        }
+
+        .autocomplete-loading {
+            padding: 8px 12px;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .autocomplete-empty {
+            padding: 8px 12px;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .btn-primary {
+            padding: 9px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            padding: 9px 20px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 16px 20px;
+            text-align: center;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .summary-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .summary-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary);
+            transition: all 0.3s ease;
+        }
+
+        .summary-value.highlight {
+            color: var(--danger);
+        }
+
+        .summary-value.success {
+            color: var(--success);
+        }
+
+        .summary-value.warning {
+            color: var(--warning);
+        }
+
+        .summary-value.updated {
+            animation: valueUpdate 0.5s ease;
+        }
+
+        /* Status Card Colors - Clickable */
+        .summary-card.status-run,
+        .summary-card.status-queue,
+        .summary-card.status-quality-hold,
+        .summary-card.status-non-quality-hold {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .summary-card.status-run:hover,
+        .summary-card.status-queue:hover,
+        .summary-card.status-quality-hold:hover,
+        .summary-card.status-non-quality-hold:hover {
+            transform: translateY(-2px);
+        }
+
+        .summary-card.status-run {
+            background: #F0FDF4;
+            border-color: #22C55E;
+        }
+        .summary-card.status-run .summary-value {
+            color: #166534;
+        }
+        .summary-card.status-run:hover {
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.25);
+        }
+        .summary-card.status-run.active {
+            background: #DCFCE7;
+            border-width: 3px;
+            transform: scale(1.03);
+            box-shadow: 0 6px 25px rgba(34, 197, 94, 0.5);
+        }
+
+        .summary-card.status-queue {
+            background: #FFFBEB;
+            border-color: #F59E0B;
+        }
+        .summary-card.status-queue .summary-value {
+            color: #92400E;
+        }
+        .summary-card.status-queue:hover {
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.25);
+        }
+        .summary-card.status-queue.active {
+            background: #FEF3C7;
+            border-width: 3px;
+            transform: scale(1.03);
+            box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5);
+        }
+
+        .summary-card.status-quality-hold {
+            background: #FEF2F2;
+            border-color: #EF4444;
+        }
+        .summary-card.status-quality-hold .summary-value {
+            color: #991B1B;
+        }
+        .summary-card.status-quality-hold:hover {
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.25);
+        }
+        .summary-card.status-quality-hold.active {
+            background: #FEE2E2;
+            border-width: 3px;
+            transform: scale(1.03);
+            box-shadow: 0 6px 25px rgba(239, 68, 68, 0.5);
+        }
+
+        .summary-card.status-non-quality-hold {
+            background: #FFF7ED;
+            border-color: #F97316;
+        }
+        .summary-card.status-non-quality-hold .summary-value {
+            color: #9A3412;
+        }
+        .summary-card.status-non-quality-hold:hover {
+            box-shadow: 0 4px 15px rgba(249, 115, 22, 0.25);
+        }
+        .summary-card.status-non-quality-hold.active {
+            background: #FFEDD5;
+            border-width: 3px;
+            transform: scale(1.03);
+            box-shadow: 0 6px 25px rgba(249, 115, 22, 0.5);
+        }
+
+        /* Dim non-active cards when filtering */
+        .summary-row.filtering .summary-card.status-run:not(.active),
+        .summary-row.filtering .summary-card.status-queue:not(.active),
+        .summary-row.filtering .summary-card.status-quality-hold:not(.active),
+        .summary-row.filtering .summary-card.status-non-quality-hold:not(.active) {
+            opacity: 0.5;
+        }
+
+        @keyframes valueUpdate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); background: rgba(102, 126, 234, 0.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Table Section */
+        .table-section {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #fafbfc;
+        }
+
+        .table-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .table-info {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            background: #f8f9fa;
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* Fixed columns */
+        th.fixed-col,
+        td.fixed-col {
+            position: sticky;
+            background: #fff;
+            z-index: 5;
+        }
+
+        th.fixed-col {
+            background: #f8f9fa;
+            z-index: 11;
+        }
+
+        th.fixed-col:nth-child(1), td.fixed-col:nth-child(1) { left: 0; min-width: 150px; }
+        th.fixed-col:nth-child(2), td.fixed-col:nth-child(2) { left: 150px; min-width: 100px; }
+        th.fixed-col:nth-child(3), td.fixed-col:nth-child(3) { left: 250px; min-width: 120px; }
+        th.fixed-col:nth-child(4), td.fixed-col:nth-child(4) { left: 370px; min-width: 100px; border-right: 2px solid var(--primary); }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+        }
+
+        tbody tr:hover td {
+            background: #f8f9fc;
+        }
+
+        tbody tr:hover td.fixed-col {
+            background: #f0f2ff;
+        }
+
+        /* Spec columns */
+        th.spec-col {
+            background: #e8ebff;
+            text-align: center;
+            font-size: 12px;
+            min-width: 80px;
+        }
+
+        td.spec-cell {
+            text-align: center;
+            font-weight: 600;
+        }
+
+        td.spec-cell.has-data {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        /* WIP Status styles in table */
+        .wip-status-run {
+            color: #166534;
+            background: #F0FDF4;
+            font-weight: 600;
+        }
+
+        .wip-status-queue {
+            color: #92400E;
+            background: #FFFBEB;
+            font-weight: 600;
+        }
+
+        .wip-status-hold {
+            color: #991B1B;
+            background: #FEF2F2;
+            font-weight: 600;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination button {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+
+        .placeholder {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+
+        /* Lot Detail Panel */
+        .lot-detail-panel {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            margin-top: 16px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .lot-detail-panel.show {
+            display: block;
+        }
+
+        .lot-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .lot-detail-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .lot-detail-title .lot-id {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-family: monospace;
+        }
+
+        .lot-detail-close {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .lot-detail-close:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .lot-detail-content {
+            padding: 20px;
+        }
+
+        .lot-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .lot-detail-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .lot-detail-section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .lot-detail-field {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+        }
+
+        .lot-detail-field:last-child {
+            margin-bottom: 0;
+        }
+
+        .lot-detail-label {
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }
+
+        .lot-detail-value {
+            font-size: 13px;
+            color: var(--text);
+            word-break: break-word;
+        }
+
+        .lot-detail-value.empty {
+            color: #ccc;
+        }
+
+        .lot-detail-value.status-run {
+            color: #166534;
+            font-weight: 600;
+        }
+
+        .lot-detail-value.status-queue {
+            color: #92400E;
+            font-weight: 600;
+        }
+
+        .lot-detail-value.status-hold {
+            color: #991B1B;
+            font-weight: 600;
+        }
+
+        .lot-detail-loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--muted);
+        }
+
+        .lot-detail-loading .loading-spinner {
+            margin-right: 8px;
+        }
+
+        /* Clickable LOT ID in table */
+        .lot-id-link {
+            color: var(--primary);
+            cursor: pointer;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .lot-id-link:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
+
+        .lot-id-link.active {
+            background: rgba(102, 126, 234, 0.15);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1400px) {
+            .summary-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .lot-detail-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 1000px) {
+            .summary-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-group select {
+                width: 100%;
+            }
+            .summary-row {
+                grid-template-columns: 1fr;
+            }
+            .lot-detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <a href="/wip-overview" class="btn btn-back">&larr; Overview</a>
+                <h1 id="pageTitle">WIP Detail</h1>
+            </div>
+            <div class="header-right">
+                <span class="last-update">
+                    <span class="refresh-indicator" id="refreshIndicator"></span>
+                    <span class="refresh-success" id="refreshSuccess">&#10003;</span>
+                    <span class="refresh-error" id="refreshError"></span>
+                    <span id="lastUpdate"></span>
+                </span>
+                <button class="btn btn-light" onclick="manualRefresh()">Refresh</button>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>WORKORDER</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="filterWorkorder" placeholder="Search..." autocomplete="off">
+                    <div class="autocomplete-dropdown" id="workorderDropdown"></div>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>LOT ID</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="filterLotid" placeholder="Search..." autocomplete="off">
+                    <div class="autocomplete-dropdown" id="lotidDropdown"></div>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>PACKAGE</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="filterPackage" placeholder="Search..." autocomplete="off">
+                    <div class="autocomplete-dropdown" id="packageDropdown"></div>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>TYPE</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="filterType" placeholder="Search..." autocomplete="off">
+                    <div class="autocomplete-dropdown" id="typeDropdown"></div>
+                </div>
+            </div>
+            <button class="btn-primary" onclick="applyFilters()">Apply</button>
+            <button class="btn-secondary" onclick="clearFilters()">Clear</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-row" id="summaryRow">
+            <div class="summary-card">
+                <div class="summary-label">Total Lots</div>
+                <div class="summary-value" id="totalLots">-</div>
+            </div>
+            <div class="summary-card status-run" onclick="toggleStatusFilter('run')" title="Click to filter RUN only">
+                <div class="summary-label">RUN</div>
+                <div class="summary-value" id="runLots">-</div>
+            </div>
+            <div class="summary-card status-queue" onclick="toggleStatusFilter('queue')" title="Click to filter QUEUE only">
+                <div class="summary-label">QUEUE</div>
+                <div class="summary-value" id="queueLots">-</div>
+            </div>
+            <div class="summary-card status-quality-hold" onclick="toggleStatusFilter('quality-hold')" title="Click to filter Quality Hold only">
+                <div class="summary-label">品質異常</div>
+                <div class="summary-value" id="qualityHoldLots">-</div>
+            </div>
+            <div class="summary-card status-non-quality-hold" onclick="toggleStatusFilter('non-quality-hold')" title="Click to filter Non-Quality Hold only">
+                <div class="summary-label">非品質異常</div>
+                <div class="summary-value" id="nonQualityHoldLots">-</div>
+            </div>
+        </div>
+
+        <!-- Table Section -->
+        <div class="table-section" style="position: relative;">
+            <div class="table-header">
+                <div class="table-title">Lot Details</div>
+                <div class="table-info" id="tableInfo">Loading...</div>
+            </div>
+            <div class="table-container" id="tableContainer">
+                <div class="placeholder">Loading...</div>
+            </div>
+            <div class="pagination" id="pagination" style="display: none;">
+                <button id="btnPrev" onclick="prevPage()">Prev</button>
+                <span class="page-info" id="pageInfo">Page 1</span>
+                <button id="btnNext" onclick="nextPage()">Next</button>
+            </div>
+        </div>
+
+        <!-- Lot Detail Panel -->
+        <div class="lot-detail-panel" id="lotDetailPanel">
+            <div class="lot-detail-header">
+                <div class="lot-detail-title">
+                    Lot Detail - <span class="lot-id" id="lotDetailLotId"></span>
+                </div>
+                <button class="lot-detail-close" onclick="closeLotDetail()">Close</button>
+            </div>
+            <div class="lot-detail-content" id="lotDetailContent">
+                <div class="lot-detail-loading">
+                    <span class="loading-spinner"></span>Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <span class="loading-spinner"></span>
+        <span>Loading...</span>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+{% set wip_detail_js = frontend_asset('wip-detail.js') %}
+{% if wip_detail_js %}
+    <script type="module" src="{{ wip_detail_js }}"></script>
+{% else %}
+    <script>
+        // ============================================================
+        // State Management
+        // ============================================================
+        const state = {
+            workcenter: '',
+            data: null,
+            packages: [],
+            page: 1,
+            pageSize: 100,
+            filters: {
+                package: '',
+                type: '',
+                workorder: '',
+                lotid: ''
+            },
+            isLoading: false,
+            refreshTimer: null,
+            REFRESH_INTERVAL: 10 * 60 * 1000,  // 10 minutes
+            searchDebounceTimers: {}
+        };
+
+        // WIP Status filter (separate from other filters)
+        let activeStatusFilter = null;  // null | 'run' | 'queue' | 'quality-hold' | 'non-quality-hold'
+
+        // AbortController for cancelling in-flight requests
+        let tableAbortController = null;      // For loadTableOnly()
+        let loadAllAbortController = null;    // For loadAllData()
+
+        // ============================================================
+        // Utility Functions
+        // ============================================================
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '-') return '-';
+            return num.toLocaleString('zh-TW');
+        }
+
+        function updateElementWithTransition(elementId, newValue) {
+            const el = document.getElementById(elementId);
+            const oldValue = el.textContent;
+            const formattedNew = formatNumber(newValue);
+
+            if (oldValue !== formattedNew) {
+                el.textContent = formattedNew;
+                el.classList.add('updated');
+                setTimeout(() => el.classList.remove('updated'), 500);
+            }
+        }
+
+        function getUrlParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name) || '';
+        }
+
+        // ============================================================
+        // API Functions (using MesApi)
+        // ============================================================
+        const API_TIMEOUT = 60000;  // 60 seconds timeout
+
+        async function fetchPackages() {
+            const result = await MesApi.get('/api/wip/meta/packages', { silent: true, timeout: API_TIMEOUT });
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch packages');
+        }
+
+        async function fetchDetail(signal = null) {
+            const params = {
+                page: state.page,
+                page_size: state.pageSize
+            };
+
+            if (state.filters.package) {
+                params.package = state.filters.package;
+            }
+            if (state.filters.type) {
+                params.type = state.filters.type;
+            }
+            if (activeStatusFilter) {
+                // Handle hold type filters
+                if (activeStatusFilter === 'quality-hold') {
+                    params.status = 'HOLD';
+                    params.hold_type = 'quality';
+                } else if (activeStatusFilter === 'non-quality-hold') {
+                    params.status = 'HOLD';
+                    params.hold_type = 'non-quality';
+                } else {
+                    // Convert to API status format (RUN/QUEUE)
+                    params.status = activeStatusFilter.toUpperCase();
+                }
+            }
+            if (state.filters.workorder) {
+                params.workorder = state.filters.workorder;
+            }
+            if (state.filters.lotid) {
+                params.lotid = state.filters.lotid;
+            }
+
+            const result = await MesApi.get(`/api/wip/detail/${encodeURIComponent(state.workcenter)}`, {
+                params,
+                timeout: API_TIMEOUT,
+                signal
+            });
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch detail');
+        }
+
+        async function fetchWorkcenters() {
+            const result = await MesApi.get('/api/wip/meta/workcenters', { silent: true, timeout: API_TIMEOUT });
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch workcenters');
+        }
+
+        async function searchApi(type, query) {
+            if (!query || query.length < 2) {
+                return [];
+            }
+
+            // Map internal type to API field name
+            const fieldMap = {
+                'workorder': 'workorder',
+                'lotid': 'lotid',
+                'package': 'package',
+                'type': 'pj_type'
+            };
+            const field = fieldMap[type] || type;
+
+            // Build cross-filter parameters (exclude current field being searched)
+            // Get current input values for cross-filtering
+            const currentWorkorder = document.getElementById('filterWorkorder').value.trim();
+            const currentLotid = document.getElementById('filterLotid').value.trim();
+            const currentPackage = document.getElementById('filterPackage').value.trim();
+            const currentType = document.getElementById('filterType').value.trim();
+
+            const params = { field, q: query, limit: 20 };
+
+            // Add cross-filters (exclude the field being searched)
+            if (type !== 'workorder' && currentWorkorder) {
+                params.workorder = currentWorkorder;
+            }
+            if (type !== 'lotid' && currentLotid) {
+                params.lotid = currentLotid;
+            }
+            if (type !== 'package' && currentPackage) {
+                params.package = currentPackage;
+            }
+            if (type !== 'type' && currentType) {
+                params.type = currentType;
+            }
+
+            try {
+                const result = await MesApi.get('/api/wip/meta/search', {
+                    params,
+                    silent: true,
+                    retries: 0  // No retry for autocomplete
+                });
+                if (result.success) {
+                    return result.data.items || [];
+                }
+            } catch (e) {
+                // Ignore errors for autocomplete
+            }
+            return [];
+        }
+
+        // ============================================================
+        // Render Functions
+        // ============================================================
+        function renderSummary(summary) {
+            if (!summary) return;
+
+            updateElementWithTransition('totalLots', summary.totalLots);
+            updateElementWithTransition('runLots', summary.runLots);
+            updateElementWithTransition('queueLots', summary.queueLots);
+            updateElementWithTransition('qualityHoldLots', summary.qualityHoldLots);
+            updateElementWithTransition('nonQualityHoldLots', summary.nonQualityHoldLots);
+        }
+
+        function renderTable(data) {
+            const container = document.getElementById('tableContainer');
+
+            if (!data || !data.lots || data.lots.length === 0) {
+                container.innerHTML = '<div class="placeholder">No data available</div>';
+                document.getElementById('tableInfo').textContent = 'No data';
+                document.getElementById('pagination').style.display = 'none';
+                return;
+            }
+
+            const specs = data.specs || [];
+
+            let html = '<table><thead><tr>';
+            // Fixed columns
+            html += '<th class="fixed-col">LOT ID</th>';
+            html += '<th class="fixed-col">Equipment</th>';
+            html += '<th class="fixed-col">WIP Status</th>';
+            html += '<th class="fixed-col">Package</th>';
+
+            // Spec columns
+            specs.forEach(spec => {
+                html += `<th class="spec-col">${spec}</th>`;
+            });
+
+            html += '</tr></thead><tbody>';
+
+            data.lots.forEach(lot => {
+                html += '<tr>';
+
+                // Fixed columns - LOT ID is clickable
+                const lotIdDisplay = lot.lotId
+                    ? `<span class="lot-id-link" onclick="showLotDetail('${lot.lotId}')">${lot.lotId}</span>`
+                    : '-';
+                html += `<td class="fixed-col">${lotIdDisplay}</td>`;
+                html += `<td class="fixed-col">${lot.equipment || '<span style="color: var(--muted);">-</span>'}</td>`;
+
+                // WIP Status with color and hold reason
+                const statusClass = `wip-status-${(lot.wipStatus || 'queue').toLowerCase()}`;
+                let statusText = lot.wipStatus || 'QUEUE';
+                if (lot.wipStatus === 'HOLD' && lot.holdReason) {
+                    statusText = `HOLD (${lot.holdReason})`;
+                }
+                html += `<td class="fixed-col ${statusClass}">${statusText}</td>`;
+
+                html += `<td class="fixed-col">${lot.package || '-'}</td>`;
+
+                // Spec columns - show QTY in matching spec column
+                specs.forEach(spec => {
+                    if (lot.spec === spec) {
+                        html += `<td class="spec-cell has-data">${formatNumber(lot.qty)}</td>`;
+                    } else {
+                        html += '<td class="spec-cell"></td>';
+                    }
+                });
+
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            // Update info
+            const pagination = data.pagination;
+            const start = (pagination.page - 1) * pagination.page_size + 1;
+            const end = Math.min(pagination.page * pagination.page_size, pagination.total_count);
+            document.getElementById('tableInfo').textContent =
+                `Showing ${start} - ${end} of ${formatNumber(pagination.total_count)}`;
+
+            // Update pagination
+            if (pagination.total_pages > 1) {
+                document.getElementById('pagination').style.display = 'flex';
+                document.getElementById('pageInfo').textContent =
+                    `Page ${pagination.page} / ${pagination.total_pages}`;
+                document.getElementById('btnPrev').disabled = pagination.page <= 1;
+                document.getElementById('btnNext').disabled = pagination.page >= pagination.total_pages;
+            } else {
+                document.getElementById('pagination').style.display = 'none';
+            }
+
+            // Update last update time
+            if (data.sys_date) {
+                document.getElementById('lastUpdate').textContent = `Last Update: ${data.sys_date}`;
+            }
+        }
+
+        function populatePackageFilter(packages) {
+            const select = document.getElementById('filterPackage');
+            const currentValue = select.value;
+
+            select.innerHTML = '<option value="">All</option>';
+            packages.forEach(pkg => {
+                const option = document.createElement('option');
+                option.value = pkg.name;
+                option.textContent = `${pkg.name} (${pkg.lot_count})`;
+                select.appendChild(option);
+            });
+
+            select.value = currentValue;
+        }
+
+        // ============================================================
+        // Data Loading
+        // ============================================================
+        async function loadAllData(showOverlay = true) {
+            // Cancel any in-flight request to prevent connection pile-up
+            if (loadAllAbortController) {
+                loadAllAbortController.abort();
+                console.log('[WIP Detail] Previous request cancelled');
+            }
+            loadAllAbortController = new AbortController();
+            const signal = loadAllAbortController.signal;
+
+            state.isLoading = true;
+
+            if (showOverlay) {
+                document.getElementById('loadingOverlay').style.display = 'flex';
+            }
+
+            // Show refresh indicator
+            document.getElementById('refreshIndicator').classList.add('active');
+            document.getElementById('refreshError').classList.remove('active');
+            document.getElementById('refreshSuccess').classList.remove('active');
+
+            try {
+                // Load packages for filter (non-blocking - don't fail if this times out)
+                if (state.packages.length === 0) {
+                    try {
+                        state.packages = await fetchPackages();
+                        populatePackageFilter(state.packages);
+                    } catch (pkgError) {
+                        console.warn('Failed to load packages filter:', pkgError);
+                    }
+                }
+
+                // Load detail data (main data - this is critical)
+                state.data = await fetchDetail(signal);
+
+                renderSummary(state.data.summary);
+                renderTable(state.data);
+
+                // Show success indicator
+                document.getElementById('refreshSuccess').classList.add('active');
+                setTimeout(() => {
+                    document.getElementById('refreshSuccess').classList.remove('active');
+                }, 1500);
+
+            } catch (error) {
+                // Ignore abort errors (expected when user triggers new request)
+                if (error.name === 'AbortError') {
+                    console.log('[WIP Detail] Request cancelled (new request started)');
+                    return;
+                }
+                console.error('Data load failed:', error);
+                document.getElementById('refreshError').classList.add('active');
+            } finally {
+                state.isLoading = false;
+                document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('refreshIndicator').classList.remove('active');
+            }
+        }
+
+        // ============================================================
+        // Autocomplete Functions
+        // ============================================================
+        function debounce(func, wait, key) {
+            return function(...args) {
+                if (state.searchDebounceTimers[key]) {
+                    clearTimeout(state.searchDebounceTimers[key]);
+                }
+                state.searchDebounceTimers[key] = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        function showDropdown(dropdownId, items, onSelect) {
+            const dropdown = document.getElementById(dropdownId);
+            if (!items || items.length === 0) {
+                dropdown.innerHTML = '<div class="autocomplete-empty">No results</div>';
+                dropdown.classList.add('show');
+                return;
+            }
+            dropdown.innerHTML = items.map(item =>
+                `<div class="autocomplete-item" data-value="${item}">${item}</div>`
+            ).join('');
+            dropdown.classList.add('show');
+
+            dropdown.querySelectorAll('.autocomplete-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    onSelect(el.dataset.value);
+                    dropdown.classList.remove('show');
+                });
+            });
+        }
+
+        function hideDropdown(dropdownId) {
+            document.getElementById(dropdownId).classList.remove('show');
+        }
+
+        function showLoading(dropdownId) {
+            const dropdown = document.getElementById(dropdownId);
+            dropdown.innerHTML = '<div class="autocomplete-loading">Searching...</div>';
+            dropdown.classList.add('show');
+        }
+
+        function setupAutocomplete(inputId, dropdownId, searchType) {
+            const input = document.getElementById(inputId);
+
+            const doSearch = debounce(async (query) => {
+                if (query.length < 2) {
+                    hideDropdown(dropdownId);
+                    return;
+                }
+                showLoading(dropdownId);
+                try {
+                    const items = await searchApi(searchType, query);
+                    showDropdown(dropdownId, items, (value) => {
+                        input.value = value;
+                    });
+                } catch (e) {
+                    hideDropdown(dropdownId);
+                }
+            }, 300, inputId);
+
+            input.addEventListener('input', (e) => {
+                doSearch(e.target.value);
+            });
+
+            input.addEventListener('focus', (e) => {
+                if (e.target.value.length >= 2) {
+                    doSearch(e.target.value);
+                }
+            });
+
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${dropdownId}`)) {
+                    hideDropdown(dropdownId);
+                }
+            });
+        }
+
+        // ============================================================
+        // Status Filter Toggle (Clickable Cards)
+        // ============================================================
+        function toggleStatusFilter(status) {
+            if (activeStatusFilter === status) {
+                // Clicking the same card again removes the filter
+                activeStatusFilter = null;
+            } else {
+                // Apply new filter
+                activeStatusFilter = status;
+            }
+
+            // Update card styles
+            updateCardStyles();
+
+            // Update table title
+            updateTableTitle();
+
+            // Reset to page 1 and reload table only (no isLoading guard)
+            state.page = 1;
+            loadTableOnly();
+        }
+
+        async function loadTableOnly() {
+            // Cancel any in-flight request to prevent pile-up
+            if (tableAbortController) {
+                tableAbortController.abort();
+            }
+            tableAbortController = new AbortController();
+
+            // Show loading in table container
+            const container = document.getElementById('tableContainer');
+            container.innerHTML = '<div class="placeholder">Loading...</div>';
+
+            // Show refresh indicator
+            document.getElementById('refreshIndicator').classList.add('active');
+
+            try {
+                state.data = await fetchDetail(tableAbortController.signal);
+                renderSummary(state.data.summary);
+                renderTable(state.data);
+
+                // Show success indicator
+                document.getElementById('refreshSuccess').classList.add('active');
+                setTimeout(() => {
+                    document.getElementById('refreshSuccess').classList.remove('active');
+                }, 1500);
+            } catch (error) {
+                // Ignore abort errors (expected when user clicks quickly)
+                if (error.name === 'AbortError') {
+                    console.log('[WIP Detail] Table request cancelled (new filter selected)');
+                    return;
+                }
+                console.error('Table load failed:', error);
+                container.innerHTML = '<div class="placeholder">Error loading data</div>';
+                document.getElementById('refreshError').classList.add('active');
+            } finally {
+                document.getElementById('refreshIndicator').classList.remove('active');
+            }
+        }
+
+        function updateCardStyles() {
+            const row = document.getElementById('summaryRow');
+            const statusCards = document.querySelectorAll('.summary-card.status-run, .summary-card.status-queue, .summary-card.status-quality-hold, .summary-card.status-non-quality-hold');
+
+            // Remove active from all status cards
+            statusCards.forEach(card => {
+                card.classList.remove('active');
+            });
+
+            if (activeStatusFilter) {
+                // Add filtering class to row (dims non-active cards)
+                row.classList.add('filtering');
+
+                // Add active to the selected card
+                const activeCard = document.querySelector(`.summary-card.status-${activeStatusFilter}`);
+                if (activeCard) {
+                    activeCard.classList.add('active');
+                }
+            } else {
+                // Remove filtering class
+                row.classList.remove('filtering');
+            }
+        }
+
+        function updateTableTitle() {
+            const titleEl = document.querySelector('.table-title');
+            const baseTitle = 'Lot Details';
+
+            if (activeStatusFilter) {
+                let statusLabel;
+                if (activeStatusFilter === 'quality-hold') {
+                    statusLabel = '品質異常 Hold';
+                } else if (activeStatusFilter === 'non-quality-hold') {
+                    statusLabel = '非品質異常 Hold';
+                } else {
+                    statusLabel = activeStatusFilter.toUpperCase();
+                }
+                titleEl.textContent = `${baseTitle} - ${statusLabel} Only`;
+            } else {
+                titleEl.textContent = baseTitle;
+            }
+        }
+
+        // ============================================================
+        // Filter & Pagination
+        // ============================================================
+        function applyFilters() {
+            state.filters.workorder = document.getElementById('filterWorkorder').value.trim();
+            state.filters.lotid = document.getElementById('filterLotid').value.trim();
+            state.filters.package = document.getElementById('filterPackage').value.trim();
+            state.filters.type = document.getElementById('filterType').value.trim();
+            state.page = 1;
+            loadAllData(false);
+        }
+
+        function clearFilters() {
+            document.getElementById('filterWorkorder').value = '';
+            document.getElementById('filterLotid').value = '';
+            document.getElementById('filterPackage').value = '';
+            document.getElementById('filterType').value = '';
+            state.filters = { package: '', type: '', workorder: '', lotid: '' };
+
+            // Also clear status filter
+            activeStatusFilter = null;
+            updateCardStyles();
+            updateTableTitle();
+
+            state.page = 1;
+            loadAllData(false);
+        }
+
+        function prevPage() {
+            if (state.page > 1) {
+                state.page--;
+                loadAllData(false);
+            }
+        }
+
+        function nextPage() {
+            if (state.data && state.page < state.data.pagination.total_pages) {
+                state.page++;
+                loadAllData(false);
+            }
+        }
+
+        // ============================================================
+        // Auto-refresh
+        // ============================================================
+        function startAutoRefresh() {
+            if (state.refreshTimer) {
+                clearInterval(state.refreshTimer);
+            }
+            state.refreshTimer = setInterval(() => {
+                if (!document.hidden) {
+                    loadAllData(false);
+                }
+            }, state.REFRESH_INTERVAL);
+        }
+
+        function manualRefresh() {
+            startAutoRefresh();
+            loadAllData(false);
+        }
+
+        // ============================================================
+        // Lot Detail Functions
+        // ============================================================
+        let selectedLotId = null;
+
+        async function fetchLotDetail(lotId) {
+            const result = await MesApi.get(`/api/wip/lot/${encodeURIComponent(lotId)}`, {
+                timeout: API_TIMEOUT
+            });
+            if (result.success) {
+                return result.data;
+            }
+            throw new Error(result.error || 'Failed to fetch lot detail');
+        }
+
+        async function showLotDetail(lotId) {
+            // Update selected state
+            selectedLotId = lotId;
+
+            // Highlight the selected row
+            document.querySelectorAll('.lot-id-link').forEach(el => {
+                el.classList.toggle('active', el.textContent === lotId);
+            });
+
+            // Show panel
+            const panel = document.getElementById('lotDetailPanel');
+            panel.classList.add('show');
+
+            // Update title
+            document.getElementById('lotDetailLotId').textContent = lotId;
+
+            // Show loading
+            document.getElementById('lotDetailContent').innerHTML = `
+                <div class="lot-detail-loading">
+                    <span class="loading-spinner"></span>Loading...
+                </div>
+            `;
+
+            // Scroll to panel
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            try {
+                const data = await fetchLotDetail(lotId);
+                renderLotDetail(data);
+            } catch (error) {
+                console.error('Failed to load lot detail:', error);
+                document.getElementById('lotDetailContent').innerHTML = `
+                    <div class="lot-detail-loading" style="color: var(--danger);">
+                        載入失敗：${error.message || '未知錯誤'}
+                    </div>
+                `;
+            }
+        }
+
+        function renderLotDetail(data) {
+            const labels = data.fieldLabels || {};
+
+            // Helper to format value
+            const formatValue = (value) => {
+                if (value === null || value === undefined || value === '') {
+                    return '<span class="empty">-</span>';
+                }
+                if (typeof value === 'number') {
+                    return formatNumber(value);
+                }
+                return value;
+            };
+
+            // Helper to create field HTML
+            const field = (key, customLabel = null) => {
+                const label = customLabel || labels[key] || key;
+                const value = data[key];
+                let valueClass = '';
+
+                // Special styling for WIP Status
+                if (key === 'wipStatus') {
+                    valueClass = `status-${(value || '').toLowerCase()}`;
+                }
+
+                return `
+                    <div class="lot-detail-field">
+                        <span class="lot-detail-label">${label}</span>
+                        <span class="lot-detail-value ${valueClass}">${formatValue(value)}</span>
+                    </div>
+                `;
+            };
+
+            const html = `
+                <div class="lot-detail-grid">
+                    <!-- Basic Info -->
+                    <div class="lot-detail-section">
+                        <div class="lot-detail-section-title">基本資訊</div>
+                        ${field('lotId')}
+                        ${field('workorder')}
+                        ${field('wipStatus')}
+                        ${field('status')}
+                        ${field('qty')}
+                        ${field('qty2')}
+                        ${field('ageByDays')}
+                        ${field('priority')}
+                    </div>
+
+                    <!-- Product Info -->
+                    <div class="lot-detail-section">
+                        <div class="lot-detail-section-title">產品資訊</div>
+                        ${field('product')}
+                        ${field('productLine')}
+                        ${field('packageLef')}
+                        ${field('pjType')}
+                        ${field('pjFunction')}
+                        ${field('bop')}
+                        ${field('dateCode')}
+                        ${field('produceRegion')}
+                    </div>
+
+                    <!-- Process Info -->
+                    <div class="lot-detail-section">
+                        <div class="lot-detail-section-title">製程資訊</div>
+                        ${field('workcenterGroup')}
+                        ${field('workcenter')}
+                        ${field('spec')}
+                        ${field('specSequence')}
+                        ${field('workflow')}
+                        ${field('equipment')}
+                        ${field('equipmentCount')}
+                        ${field('location')}
+                    </div>
+
+                    <!-- Material Info -->
+                    <div class="lot-detail-section">
+                        <div class="lot-detail-section-title">物料資訊</div>
+                        ${field('waferLotId')}
+                        ${field('waferPn')}
+                        ${field('waferLotPrefix')}
+                        ${field('leadframeName')}
+                        ${field('leadframeOption')}
+                        ${field('compoundName')}
+                        ${field('dieConsumption')}
+                        ${field('uts')}
+                    </div>
+
+                    <!-- Hold Info (if HOLD status) -->
+                    ${data.wipStatus === 'HOLD' || data.holdCount > 0 ? `
+                    <div class="lot-detail-section">
+                        <div class="lot-detail-section-title">Hold 資訊</div>
+                        ${field('holdReason')}
+                        ${field('holdCount')}
+                        ${field('holdEmp')}
+                        ${field('holdDept')}
+                        ${field('holdComment')}
+                        ${field('releaseTime')}
+                        ${field('releaseEmp')}
+                        ${field('releaseComment')}
+                    </div>
+                    ` : ''}
+
+                    <!-- NCR Info (if exists) -->
+                    ${data.ncrId ? `
+                    <div class="lot-detail-section">
+                        <div class="lot-detail-section-title">NCR 資訊</div>
+                        ${field('ncrId')}
+                        ${field('ncrDate')}
+                    </div>
+                    ` : ''}
+
+                    <!-- Comments -->
+                    <div class="lot-detail-section">
+                        <div class="lot-detail-section-title">備註資訊</div>
+                        ${field('comment')}
+                        ${field('commentDate')}
+                        ${field('commentEmp')}
+                        ${field('futureHoldComment')}
+                    </div>
+
+                    <!-- Other Info -->
+                    <div class="lot-detail-section">
+                        <div class="lot-detail-section-title">其他資訊</div>
+                        ${field('owner')}
+                        ${field('startDate')}
+                        ${field('tmttRemaining')}
+                        ${field('dataUpdateDate')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('lotDetailContent').innerHTML = html;
+        }
+
+        function closeLotDetail() {
+            const panel = document.getElementById('lotDetailPanel');
+            panel.classList.remove('show');
+
+            // Remove highlight from selected row
+            document.querySelectorAll('.lot-id-link').forEach(el => {
+                el.classList.remove('active');
+            });
+
+            selectedLotId = null;
+        }
+
+        // ============================================================
+        // Initialize
+        // ============================================================
+        async function init() {
+            // Setup autocomplete for WORKORDER, LOT ID, PACKAGE, and TYPE
+            setupAutocomplete('filterWorkorder', 'workorderDropdown', 'workorder');
+            setupAutocomplete('filterLotid', 'lotidDropdown', 'lotid');
+            setupAutocomplete('filterPackage', 'packageDropdown', 'package');
+            setupAutocomplete('filterType', 'typeDropdown', 'type');
+
+            // Allow Enter key to trigger filter
+            document.getElementById('filterWorkorder').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
+            document.getElementById('filterLotid').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
+            document.getElementById('filterPackage').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
+            document.getElementById('filterType').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
+
+            // Get workcenter from URL or use first available
+            state.workcenter = getUrlParam('workcenter');
+
+            // Get filters from URL params (passed from wip_overview)
+            const urlWorkorder = getUrlParam('workorder');
+            const urlLotid = getUrlParam('lotid');
+            const urlPackage = getUrlParam('package');
+            const urlType = getUrlParam('type');
+            if (urlWorkorder) {
+                state.filters.workorder = urlWorkorder;
+                document.getElementById('filterWorkorder').value = urlWorkorder;
+            }
+            if (urlLotid) {
+                state.filters.lotid = urlLotid;
+                document.getElementById('filterLotid').value = urlLotid;
+            }
+            if (urlPackage) {
+                state.filters.package = urlPackage;
+                document.getElementById('filterPackage').value = urlPackage;
+            }
+            if (urlType) {
+                state.filters.type = urlType;
+                document.getElementById('filterType').value = urlType;
+            }
+
+            if (!state.workcenter) {
+                // Fetch workcenters and use first one
+                try {
+                    const workcenters = await fetchWorkcenters();
+                    if (workcenters && workcenters.length > 0) {
+                        state.workcenter = workcenters[0].name;
+                        // Update URL without reload
+                        window.history.replaceState({}, '', `/wip-detail?workcenter=${encodeURIComponent(state.workcenter)}`);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch workcenters:', error);
+                }
+            }
+
+            if (state.workcenter) {
+                document.getElementById('pageTitle').textContent = `WIP Detail - ${state.workcenter}`;
+                loadAllData(true);
+                startAutoRefresh();
+
+                // Handle page visibility (must be after workcenter is set)
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden && state.workcenter) {
+                        loadAllData(false);
+                        startAutoRefresh();
+                    }
+                });
+            } else {
+                document.getElementById('tableContainer').innerHTML =
+                    '<div class="placeholder">No workcenter available</div>';
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }
+        }
+
+        window.onload = init;
+    </script>
+{% endif %}
+{% endblock %}

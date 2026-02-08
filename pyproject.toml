@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mes-dashboard"
+version = "0.1.0"
+description = "MES Dashboard Portal"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "MES Dashboard Team" }
+]
+keywords = ["flask", "mes", "dashboard"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+]
+
+# Note: Using minimum version pins (>=) to allow automatic security updates.
+# For reproducible builds, use: pip freeze > requirements.lock
+dependencies = [
+    # Core Framework
+    "flask>=3.0.0",
+
+    # Database
+    "oracledb>=2.0.0",
+    "sqlalchemy>=2.0.0",
+
+    # Data Processing
+    "pandas>=2.0.0",
+    "openpyxl>=3.0.0",
+
+    # Cache (Redis)
+    "redis>=5.0.0",
+    "hiredis>=2.0.0",
+
+    # HTTP Client
+    "requests>=2.28.0",
+
+    # Configuration
+    "python-dotenv>=1.0.0",
+
+    # WSGI Server
+    "gunicorn>=21.2.0",
+    "waitress>=2.1.2; platform_system == 'Windows'",
+
+    # System Monitoring
+    "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-playwright>=0.4.0",
+    "playwright>=1.40.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mes_dashboard = ["templates/**/*", "sql/**/*.sql"]

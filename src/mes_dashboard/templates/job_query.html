@@ -1,0 +1,923 @@
+{% extends "_base.html" %}
+
+{% block title %}設備維修查詢工具{% endblock %}
+
+{% block head_extra %}
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        /* Filter Panel */
+        .filter-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 20px;
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .filter-group label {
+            font-weight: 500;
+            color: #333;
+            font-size: 14px;
+        }
+
+        /* Equipment Selector */
+        .equipment-selector {
+            position: relative;
+        }
+
+        .equipment-input {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            background: white;
+        }
+
+        .equipment-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .equipment-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 350px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+        }
+
+        .equipment-dropdown.show {
+            display: block;
+        }
+
+        .equipment-search {
+            width: 100%;
+            padding: 10px 15px;
+            border: none;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .equipment-search:focus {
+            outline: none;
+        }
+
+        .equipment-list {
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .equipment-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .equipment-item:hover {
+            background: #f5f7ff;
+        }
+
+        .equipment-item.selected {
+            background: #e3e8ff;
+        }
+
+        .equipment-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+
+        .equipment-info {
+            flex: 1;
+        }
+
+        .equipment-name {
+            font-weight: 500;
+        }
+
+        .equipment-workcenter {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .selected-count {
+            font-size: 12px;
+            color: #667eea;
+            margin-top: 5px;
+        }
+
+        /* Date Range */
+        .date-range {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="date"] {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input[type="date"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .filter-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* Result Section */
+        .result-section {
+            margin-top: 20px;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .result-info {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .result-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: #f5f7ff;
+        }
+
+        /* Expandable Row */
+        .expand-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 16px;
+            color: #667eea;
+        }
+
+        .expand-btn:hover {
+            background: #e3e8ff;
+        }
+
+        .job-row.expanded {
+            background: #f5f7ff;
+        }
+
+        .txn-history-row {
+            display: none;
+        }
+
+        .txn-history-row.show {
+            display: table-row;
+        }
+
+        .txn-history-cell {
+            padding: 0;
+            background: #fafafa;
+        }
+
+        .txn-history-table {
+            margin: 10px 20px;
+            width: calc(100% - 40px);
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .txn-history-table th {
+            background: #e9ecef;
+            font-size: 12px;
+        }
+
+        .txn-history-table td {
+            font-size: 12px;
+            padding: 8px 12px;
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .status-badge.CREATED { background: #cfe2ff; color: #084298; }
+        .status-badge.ASSIGNED { background: #fff3cd; color: #664d03; }
+        .status-badge.IN_PROGRESS { background: #ffc107; color: #000; }
+        .status-badge.COMPLETED { background: #d1e7dd; color: #0a3622; }
+        .status-badge.CANCELLED { background: #f8d7da; color: #58151c; }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+
+        .info-box {
+            background: #e3e8ff;
+            color: #667eea;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state p {
+            margin-bottom: 10px;
+        }
+
+        /* Arrow animation */
+        .arrow-icon {
+            transition: transform 0.2s;
+        }
+
+        .arrow-icon.rotated {
+            transform: rotate(90deg);
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <div class="header">
+            <h1>設備維修查詢工具</h1>
+            <p>查詢設備維修工單及交易歷史，支援匯出完整資料</p>
+        </div>
+
+        <div class="content">
+            <!-- Filter Panel -->
+            <div class="filter-panel">
+                <!-- Equipment Selector -->
+                <div class="filter-group">
+                    <label>選擇設備：</label>
+                    <div class="equipment-selector">
+                        <div class="equipment-input" onclick="toggleEquipmentDropdown()">
+                            <span id="equipmentDisplay">點擊選擇設備...</span>
+                        </div>
+                        <div class="equipment-dropdown" id="equipmentDropdown">
+                            <input type="text" class="equipment-search" placeholder="搜尋設備名稱或站點..." oninput="filterEquipments(this.value)">
+                            <div class="equipment-list" id="equipmentList">
+                                <div class="loading">
+                                    <div class="loading-spinner"></div>
+                                    <br>載入設備中...
+                                </div>
+                            </div>
+                        </div>
+                        <div class="selected-count" id="selectedCount"></div>
+                    </div>
+                </div>
+
+                <!-- Date Range -->
+                <div class="filter-group">
+                    <label>日期範圍：</label>
+                    <div class="date-range">
+                        <input type="date" id="dateFrom">
+                        <span>~</span>
+                        <input type="date" id="dateTo">
+                        <button class="btn btn-secondary btn-sm" onclick="setLast90Days()">最近 90 天</button>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="filter-actions">
+                    <button class="btn btn-primary" onclick="queryJobs()" id="queryBtn">
+                        查詢工單
+                    </button>
+                    <button class="btn btn-success" onclick="exportCsv()" id="exportBtn" disabled>
+                        匯出 CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Result Section -->
+            <div class="result-section" id="resultSection">
+                <div class="empty-state">
+                    <p>請選擇設備和日期範圍後，點擊「查詢工單」</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    {% set job_query_js = frontend_asset('job-query.js') %}
+    {% if job_query_js %}
+    <script type="module" src="{{ job_query_js }}"></script>
+    {% else %}
+    <script>
+        // State
+        let allEquipments = [];
+        let selectedEquipments = new Set();
+        let jobsData = [];
+        let expandedJobs = new Set();
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadEquipments();
+            setLast90Days();
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                const dropdown = document.getElementById('equipmentDropdown');
+                const selector = document.querySelector('.equipment-selector');
+                if (!selector.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+        });
+
+        // Load equipments from cache
+        async function loadEquipments() {
+            try {
+                const data = await MesApi.get('/api/job-query/resources');
+                if (data.error) {
+                    document.getElementById('equipmentList').innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+
+                allEquipments = data.data;
+                renderEquipmentList(allEquipments);
+            } catch (error) {
+                document.getElementById('equipmentList').innerHTML = `<div class="error">載入失敗: ${error.message}</div>`;
+            }
+        }
+
+        // Render equipment list
+        function renderEquipmentList(equipments) {
+            const container = document.getElementById('equipmentList');
+
+            if (!equipments || equipments.length === 0) {
+                container.innerHTML = '<div class="empty-state">無設備資料</div>';
+                return;
+            }
+
+            let html = '';
+            let currentWorkcenter = null;
+
+            equipments.forEach(eq => {
+                const isSelected = selectedEquipments.has(eq.RESOURCEID);
+
+                // Group header
+                if (eq.WORKCENTERNAME !== currentWorkcenter) {
+                    currentWorkcenter = eq.WORKCENTERNAME;
+                    html += `<div style="padding: 8px 15px; background: #f0f0f0; font-weight: 600; font-size: 12px; color: #666;">${currentWorkcenter || '未分類'}</div>`;
+                }
+
+                html += `
+                    <div class="equipment-item ${isSelected ? 'selected' : ''}" onclick="toggleEquipment('${eq.RESOURCEID}')">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleEquipment('${eq.RESOURCEID}')">
+                        <div class="equipment-info">
+                            <div class="equipment-name">${eq.RESOURCENAME}</div>
+                            <div class="equipment-workcenter">${eq.RESOURCEFAMILYNAME || ''}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Toggle equipment dropdown
+        function toggleEquipmentDropdown() {
+            const dropdown = document.getElementById('equipmentDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        // Filter equipments by search
+        function filterEquipments(query) {
+            const q = query.toLowerCase();
+            const filtered = allEquipments.filter(eq =>
+                (eq.RESOURCENAME && eq.RESOURCENAME.toLowerCase().includes(q)) ||
+                (eq.WORKCENTERNAME && eq.WORKCENTERNAME.toLowerCase().includes(q)) ||
+                (eq.RESOURCEFAMILYNAME && eq.RESOURCEFAMILYNAME.toLowerCase().includes(q))
+            );
+            renderEquipmentList(filtered);
+        }
+
+        // Toggle equipment selection
+        function toggleEquipment(resourceId) {
+            if (selectedEquipments.has(resourceId)) {
+                selectedEquipments.delete(resourceId);
+            } else {
+                selectedEquipments.add(resourceId);
+            }
+            updateSelectedDisplay();
+            renderEquipmentList(allEquipments.filter(eq => {
+                const search = document.querySelector('.equipment-search');
+                if (!search || !search.value) return true;
+                const q = search.value.toLowerCase();
+                return (eq.RESOURCENAME && eq.RESOURCENAME.toLowerCase().includes(q)) ||
+                       (eq.WORKCENTERNAME && eq.WORKCENTERNAME.toLowerCase().includes(q));
+            }));
+        }
+
+        // Update selected display
+        function updateSelectedDisplay() {
+            const display = document.getElementById('equipmentDisplay');
+            const count = document.getElementById('selectedCount');
+
+            if (selectedEquipments.size === 0) {
+                display.textContent = '點擊選擇設備...';
+                count.textContent = '';
+            } else if (selectedEquipments.size <= 3) {
+                const names = allEquipments
+                    .filter(eq => selectedEquipments.has(eq.RESOURCEID))
+                    .map(eq => eq.RESOURCENAME)
+                    .join(', ');
+                display.textContent = names;
+                count.textContent = `已選擇 ${selectedEquipments.size} 台設備`;
+            } else {
+                display.textContent = `已選擇 ${selectedEquipments.size} 台設備`;
+                count.textContent = '';
+            }
+        }
+
+        // Set last 90 days
+        function setLast90Days() {
+            const today = new Date();
+            const past = new Date();
+            past.setDate(today.getDate() - 90);
+
+            document.getElementById('dateFrom').value = past.toISOString().split('T')[0];
+            document.getElementById('dateTo').value = today.toISOString().split('T')[0];
+        }
+
+        // Validate inputs
+        function validateInputs() {
+            if (selectedEquipments.size === 0) {
+                Toast.error('請選擇至少一台設備');
+                return false;
+            }
+
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+
+            if (!dateFrom || !dateTo) {
+                Toast.error('請指定日期範圍');
+                return false;
+            }
+
+            const from = new Date(dateFrom);
+            const to = new Date(dateTo);
+
+            if (to < from) {
+                Toast.error('結束日期不可早於起始日期');
+                return false;
+            }
+
+            const daysDiff = (to - from) / (1000 * 60 * 60 * 24);
+            if (daysDiff > 365) {
+                Toast.error('日期範圍不可超過 365 天');
+                return false;
+            }
+
+            return true;
+        }
+
+        // Query jobs
+        async function queryJobs() {
+            if (!validateInputs()) return;
+
+            const resultSection = document.getElementById('resultSection');
+            resultSection.innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <br>查詢中...
+                </div>
+            `;
+
+            document.getElementById('queryBtn').disabled = true;
+            document.getElementById('exportBtn').disabled = true;
+
+            try {
+                const data = await MesApi.post('/api/job-query/jobs', {
+                    resource_ids: Array.from(selectedEquipments),
+                    start_date: document.getElementById('dateFrom').value,
+                    end_date: document.getElementById('dateTo').value
+                });
+
+                if (data.error) {
+                    resultSection.innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+
+                jobsData = data.data;
+                expandedJobs.clear();
+                renderJobsTable();
+
+                document.getElementById('exportBtn').disabled = jobsData.length === 0;
+
+            } catch (error) {
+                resultSection.innerHTML = `<div class="error">查詢失敗: ${error.message}</div>`;
+            } finally {
+                document.getElementById('queryBtn').disabled = false;
+            }
+        }
+
+        // Render jobs table
+        function renderJobsTable() {
+            const resultSection = document.getElementById('resultSection');
+
+            if (!jobsData || jobsData.length === 0) {
+                resultSection.innerHTML = `
+                    <div class="empty-state">
+                        <p>無符合條件的工單</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <div class="result-header">
+                    <div class="result-info">共 ${jobsData.length} 筆工單</div>
+                    <div class="result-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="expandAll()">全部展開</button>
+                        <button class="btn btn-secondary btn-sm" onclick="collapseAll()">全部收合</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;"></th>
+                                <th>設備名稱</th>
+                                <th>JOBID</th>
+                                <th>狀態</th>
+                                <th>類型</th>
+                                <th>建立時間</th>
+                                <th>完成時間</th>
+                                <th>故障碼</th>
+                                <th>維修碼</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            jobsData.forEach((job, idx) => {
+                const isExpanded = expandedJobs.has(job.JOBID);
+                html += `
+                    <tr class="job-row ${isExpanded ? 'expanded' : ''}" id="job-row-${idx}">
+                        <td>
+                            <button class="expand-btn" onclick="toggleJobHistory('${job.JOBID}', ${idx})">
+                                <span class="arrow-icon ${isExpanded ? 'rotated' : ''}">▶</span>
+                            </button>
+                        </td>
+                        <td>${job.RESOURCENAME || ''}</td>
+                        <td>${job.JOBID || ''}</td>
+                        <td><span class="status-badge ${job.JOBSTATUS || ''}">${job.JOBSTATUS || ''}</span></td>
+                        <td>${job.JOBMODELNAME || ''}</td>
+                        <td>${formatDate(job.CREATEDATE)}</td>
+                        <td>${formatDate(job.COMPLETEDATE)}</td>
+                        <td>${job.CAUSECODENAME || ''}</td>
+                        <td>${job.REPAIRCODENAME || ''}</td>
+                    </tr>
+                    <tr class="txn-history-row ${isExpanded ? 'show' : ''}" id="txn-row-${idx}">
+                        <td colspan="9" class="txn-history-cell">
+                            <div id="txn-content-${idx}">
+                                ${isExpanded ? '<div class="loading"><div class="loading-spinner"></div></div>' : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            resultSection.innerHTML = html;
+
+            // Load expanded histories
+            expandedJobs.forEach(jobId => {
+                const idx = jobsData.findIndex(j => j.JOBID === jobId);
+                if (idx >= 0) loadJobHistory(jobId, idx);
+            });
+        }
+
+        // Toggle job history
+        async function toggleJobHistory(jobId, idx) {
+            const txnRow = document.getElementById(`txn-row-${idx}`);
+            const jobRow = document.getElementById(`job-row-${idx}`);
+            const arrow = jobRow.querySelector('.arrow-icon');
+
+            if (expandedJobs.has(jobId)) {
+                expandedJobs.delete(jobId);
+                txnRow.classList.remove('show');
+                jobRow.classList.remove('expanded');
+                arrow.classList.remove('rotated');
+            } else {
+                expandedJobs.add(jobId);
+                txnRow.classList.add('show');
+                jobRow.classList.add('expanded');
+                arrow.classList.add('rotated');
+                loadJobHistory(jobId, idx);
+            }
+        }
+
+        // Load job history
+        async function loadJobHistory(jobId, idx) {
+            const container = document.getElementById(`txn-content-${idx}`);
+            container.innerHTML = '<div class="loading" style="padding: 20px;"><div class="loading-spinner"></div></div>';
+
+            try {
+                const data = await MesApi.get(`/api/job-query/txn/${jobId}`);
+
+                if (data.error) {
+                    container.innerHTML = `<div class="error" style="margin: 10px 20px;">${data.error}</div>`;
+                    return;
+                }
+
+                if (!data.data || data.data.length === 0) {
+                    container.innerHTML = '<div style="padding: 20px; color: #666;">無交易歷史記錄</div>';
+                    return;
+                }
+
+                let html = `
+                    <table class="txn-history-table">
+                        <thead>
+                            <tr>
+                                <th>交易時間</th>
+                                <th>原狀態</th>
+                                <th>新狀態</th>
+                                <th>階段</th>
+                                <th>故障碼</th>
+                                <th>維修碼</th>
+                                <th>操作者</th>
+                                <th>備註</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.data.forEach(txn => {
+                    html += `
+                        <tr>
+                            <td>${formatDate(txn.TXNDATE)}</td>
+                            <td><span class="status-badge ${txn.FROMJOBSTATUS || ''}">${txn.FROMJOBSTATUS || '-'}</span></td>
+                            <td><span class="status-badge ${txn.JOBSTATUS || ''}">${txn.JOBSTATUS || ''}</span></td>
+                            <td>${txn.STAGENAME || ''}</td>
+                            <td>${txn.CAUSECODENAME || ''}</td>
+                            <td>${txn.REPAIRCODENAME || ''}</td>
+                            <td>${txn.USER_NAME || txn.EMP_NAME || ''}</td>
+                            <td>${txn.COMMENTS || ''}</td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
+
+            } catch (error) {
+                container.innerHTML = `<div class="error" style="margin: 10px 20px;">載入失敗: ${error.message}</div>`;
+            }
+        }
+
+        // Expand all
+        function expandAll() {
+            jobsData.forEach((job, idx) => {
+                if (!expandedJobs.has(job.JOBID)) {
+                    expandedJobs.add(job.JOBID);
+                }
+            });
+            renderJobsTable();
+        }
+
+        // Collapse all
+        function collapseAll() {
+            expandedJobs.clear();
+            renderJobsTable();
+        }
+
+        // Export CSV
+        async function exportCsv() {
+            if (!validateInputs()) return;
+
+            document.getElementById('exportBtn').disabled = true;
+            document.getElementById('exportBtn').textContent = '匯出中...';
+
+            try {
+                const response = await fetch('/api/job-query/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        resource_ids: Array.from(selectedEquipments),
+                        start_date: document.getElementById('dateFrom').value,
+                        end_date: document.getElementById('dateTo').value
+                    })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || '匯出失敗');
+                }
+
+                // Download file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `job_history_${document.getElementById('dateFrom').value}_${document.getElementById('dateTo').value}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                Toast.success('CSV 匯出完成');
+
+            } catch (error) {
+                Toast.error('匯出失敗: ' + error.message);
+            } finally {
+                document.getElementById('exportBtn').disabled = false;
+                document.getElementById('exportBtn').textContent = '匯出 CSV';
+            }
+        }
+
+        // Format date
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            return dateStr.replace('T', ' ').substring(0, 19);
+        }
+    </script>
+    {% endif %}
+{% endblock %}

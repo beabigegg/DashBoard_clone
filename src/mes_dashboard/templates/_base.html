@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MES Dashboard{% endblock %}</title>
+
+    <!-- Toast 樣式 -->
+    <style id="mes-core-styles">
+        /* Toast 容器 */
+        .mes-toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        /* 單個 Toast */
+        .mes-toast {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-size: 14px;
+            pointer-events: auto;
+            animation: mes-toast-enter 0.3s ease-out;
+            max-width: 360px;
+        }
+
+        /* 類型顏色 */
+        .mes-toast-info { border-left: 4px solid #3b82f6; }
+        .mes-toast-success { border-left: 4px solid #22c55e; }
+        .mes-toast-warning { border-left: 4px solid #f59e0b; }
+        .mes-toast-error { border-left: 4px solid #ef4444; }
+        .mes-toast-loading { border-left: 4px solid #6b7280; }
+
+        /* Icon 顏色 */
+        .mes-toast-info .mes-toast-icon { color: #3b82f6; }
+        .mes-toast-success .mes-toast-icon { color: #22c55e; }
+        .mes-toast-warning .mes-toast-icon { color: #f59e0b; }
+        .mes-toast-error .mes-toast-icon { color: #ef4444; }
+        .mes-toast-loading .mes-toast-icon { color: #6b7280; }
+
+        /* Loading 旋轉動畫 */
+        .mes-toast-loading .mes-toast-icon {
+            animation: mes-spin 1s linear infinite;
+        }
+
+        /* Toast 訊息 */
+        .mes-toast-message {
+            flex: 1;
+            word-break: break-word;
+        }
+
+        /* 按鈕 */
+        .mes-toast-close, .mes-toast-retry {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .mes-toast-close {
+            color: #6b7280;
+            font-size: 18px;
+            line-height: 1;
+        }
+        .mes-toast-close:hover { background: rgba(0,0,0,0.1); }
+
+        .mes-toast-retry {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        .mes-toast-retry:hover { background: rgba(59,130,246,0.1); }
+
+        /* 進入動畫 */
+        @keyframes mes-toast-enter {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* 離開動畫 */
+        .mes-toast-exit {
+            animation: mes-toast-exit 0.3s ease-in forwards;
+        }
+
+        @keyframes mes-toast-exit {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        /* 旋轉動畫 */
+        @keyframes mes-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <!-- Toast 容器 -->
+    <div id="mes-toast-container" class="mes-toast-container"></div>
+
+    {% block content %}{% endblock %}
+
+    <!-- 核心 JS -->
+    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mes-api.js') }}"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

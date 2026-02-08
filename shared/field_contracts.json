@@ -1,0 +1,110 @@
+{
+  "job_query": {
+    "jobs_table": [
+      {"api_key": "RESOURCENAME", "ui_label": "設備名稱", "export_header": "設備名稱", "semantic_type": "text"},
+      {"api_key": "JOBID", "ui_label": "JOBID", "export_header": "工單ID", "semantic_type": "identifier"},
+      {"api_key": "JOBSTATUS", "ui_label": "狀態", "export_header": "工單狀態", "semantic_type": "status"},
+      {"api_key": "JOBMODELNAME", "ui_label": "類型", "export_header": "工單類型", "semantic_type": "text"},
+      {"api_key": "CREATEDATE", "ui_label": "建立時間", "export_header": "工單建立時間", "semantic_type": "datetime"},
+      {"api_key": "COMPLETEDATE", "ui_label": "完成時間", "export_header": "工單完成時間", "semantic_type": "datetime"},
+      {"api_key": "CAUSECODENAME", "ui_label": "故障碼", "export_header": "工單故障碼", "semantic_type": "text"},
+      {"api_key": "REPAIRCODENAME", "ui_label": "維修碼", "export_header": "工單維修碼", "semantic_type": "text"}
+    ],
+    "txn_table": [
+      {"api_key": "TXNDATE", "ui_label": "交易時間", "export_header": "交易時間", "semantic_type": "datetime"},
+      {"api_key": "FROMJOBSTATUS", "ui_label": "原狀態", "export_header": "原狀態", "semantic_type": "status"},
+      {"api_key": "JOBSTATUS", "ui_label": "新狀態", "export_header": "新狀態", "semantic_type": "status"},
+      {"api_key": "STAGENAME", "ui_label": "階段", "export_header": "階段", "semantic_type": "text"},
+      {"api_key": "CAUSECODENAME", "ui_label": "故障碼", "export_header": "交易故障碼", "semantic_type": "text"},
+      {"api_key": "REPAIRCODENAME", "ui_label": "維修碼", "export_header": "交易維修碼", "semantic_type": "text"},
+      {"api_key": "USER_NAME", "ui_label": "操作者", "export_header": "使用者帳號", "semantic_type": "text"},
+      {"api_key": "COMMENTS", "ui_label": "備註", "export_header": "備註", "semantic_type": "text"}
+    ],
+    "export": [
+      {"api_key": "RESOURCENAME", "ui_label": "設備名稱", "export_header": "設備名稱", "semantic_type": "text"},
+      {"api_key": "JOBID", "ui_label": "JOBID", "export_header": "工單ID", "semantic_type": "identifier"},
+      {"api_key": "JOB_FINAL_STATUS", "ui_label": "工單最終狀態", "export_header": "工單最終狀態", "semantic_type": "status"},
+      {"api_key": "JOBMODELNAME", "ui_label": "類型", "export_header": "工單類型", "semantic_type": "text"},
+      {"api_key": "JOBORDERNAME", "ui_label": "工單序號", "export_header": "工單序號", "semantic_type": "identifier"},
+      {"api_key": "JOB_CREATEDATE", "ui_label": "建立時間", "export_header": "工單建立時間", "semantic_type": "datetime"},
+      {"api_key": "JOB_COMPLETEDATE", "ui_label": "完成時間", "export_header": "工單完成時間", "semantic_type": "datetime"},
+      {"api_key": "JOB_CAUSECODENAME", "ui_label": "故障碼", "export_header": "工單故障碼", "semantic_type": "text"},
+      {"api_key": "JOB_REPAIRCODENAME", "ui_label": "維修碼", "export_header": "工單維修碼", "semantic_type": "text"},
+      {"api_key": "JOB_SYMPTOMCODENAME", "ui_label": "症狀碼", "export_header": "工單症狀碼", "semantic_type": "text"},
+      {"api_key": "TXNDATE", "ui_label": "交易時間", "export_header": "交易時間", "semantic_type": "datetime"},
+      {"api_key": "FROMJOBSTATUS", "ui_label": "原狀態", "export_header": "原狀態", "semantic_type": "status"},
+      {"api_key": "TXN_JOBSTATUS", "ui_label": "新狀態", "export_header": "新狀態", "semantic_type": "status"},
+      {"api_key": "STAGENAME", "ui_label": "階段", "export_header": "階段", "semantic_type": "text"},
+      {"api_key": "TXN_CAUSECODENAME", "ui_label": "交易故障碼", "export_header": "交易故障碼", "semantic_type": "text"},
+      {"api_key": "TXN_REPAIRCODENAME", "ui_label": "交易維修碼", "export_header": "交易維修碼", "semantic_type": "text"},
+      {"api_key": "TXN_SYMPTOMCODENAME", "ui_label": "交易症狀碼", "export_header": "交易症狀碼", "semantic_type": "text"},
+      {"api_key": "USER_NAME", "ui_label": "使用者帳號", "export_header": "使用者帳號", "semantic_type": "text"},
+      {"api_key": "EMP_NAME", "ui_label": "員工姓名", "export_header": "員工姓名", "semantic_type": "text"},
+      {"api_key": "COMMENTS", "ui_label": "備註", "export_header": "備註", "semantic_type": "text"}
+    ]
+  },
+  "resource_history": {
+    "detail_table": [
+      {"api_key": "workcenter", "ui_label": "站點", "export_header": "站點", "semantic_type": "category"},
+      {"api_key": "family", "ui_label": "型號", "export_header": "型號", "semantic_type": "category"},
+      {"api_key": "resource", "ui_label": "機台", "export_header": "機台", "semantic_type": "text"},
+      {"api_key": "ou_pct", "ui_label": "OU%", "export_header": "OU%", "semantic_type": "percent"},
+      {"api_key": "availability_pct", "ui_label": "Availability%", "export_header": "Availability%", "semantic_type": "percent"},
+      {"api_key": "prd_hours", "ui_label": "PRD(h)", "export_header": "PRD(h)", "semantic_type": "hours"},
+      {"api_key": "prd_pct", "ui_label": "PRD(%)", "export_header": "PRD(%)", "semantic_type": "percent"},
+      {"api_key": "sby_hours", "ui_label": "SBY(h)", "export_header": "SBY(h)", "semantic_type": "hours"},
+      {"api_key": "sby_pct", "ui_label": "SBY(%)", "export_header": "SBY(%)", "semantic_type": "percent"},
+      {"api_key": "udt_hours", "ui_label": "UDT(h)", "export_header": "UDT(h)", "semantic_type": "hours"},
+      {"api_key": "udt_pct", "ui_label": "UDT(%)", "export_header": "UDT(%)", "semantic_type": "percent"},
+      {"api_key": "sdt_hours", "ui_label": "SDT(h)", "export_header": "SDT(h)", "semantic_type": "hours"},
+      {"api_key": "sdt_pct", "ui_label": "SDT(%)", "export_header": "SDT(%)", "semantic_type": "percent"},
+      {"api_key": "egt_hours", "ui_label": "EGT(h)", "export_header": "EGT(h)", "semantic_type": "hours"},
+      {"api_key": "egt_pct", "ui_label": "EGT(%)", "export_header": "EGT(%)", "semantic_type": "percent"},
+      {"api_key": "nst_hours", "ui_label": "NST(h)", "export_header": "NST(h)", "semantic_type": "hours"},
+      {"api_key": "nst_pct", "ui_label": "NST(%)", "export_header": "NST(%)", "semantic_type": "percent"}
+    ],
+    "kpi": [
+      {"api_key": "ou_pct", "ui_label": "OU%", "export_header": "OU%", "semantic_type": "percent"},
+      {"api_key": "availability_pct", "ui_label": "AVAIL%", "export_header": "Availability%", "semantic_type": "percent"},
+      {"api_key": "machine_count", "ui_label": "機台數", "export_header": "機台數", "semantic_type": "count"}
+    ],
+    "export": [
+      {"api_key": "workcenter", "ui_label": "站點", "export_header": "站點", "semantic_type": "category"},
+      {"api_key": "family", "ui_label": "型號", "export_header": "型號", "semantic_type": "category"},
+      {"api_key": "resource", "ui_label": "機台", "export_header": "機台", "semantic_type": "text"},
+      {"api_key": "ou_pct", "ui_label": "OU%", "export_header": "OU%", "semantic_type": "percent"},
+      {"api_key": "availability_pct", "ui_label": "Availability%", "export_header": "Availability%", "semantic_type": "percent"},
+      {"api_key": "prd_hours", "ui_label": "PRD(h)", "export_header": "PRD(h)", "semantic_type": "hours"},
+      {"api_key": "prd_pct", "ui_label": "PRD(%)", "export_header": "PRD(%)", "semantic_type": "percent"},
+      {"api_key": "sby_hours", "ui_label": "SBY(h)", "export_header": "SBY(h)", "semantic_type": "hours"},
+      {"api_key": "sby_pct", "ui_label": "SBY(%)", "export_header": "SBY(%)", "semantic_type": "percent"},
+      {"api_key": "udt_hours", "ui_label": "UDT(h)", "export_header": "UDT(h)", "semantic_type": "hours"},
+      {"api_key": "udt_pct", "ui_label": "UDT(%)", "export_header": "UDT(%)", "semantic_type": "percent"},
+      {"api_key": "sdt_hours", "ui_label": "SDT(h)", "export_header": "SDT(h)", "semantic_type": "hours"},
+      {"api_key": "sdt_pct", "ui_label": "SDT(%)", "export_header": "SDT(%)", "semantic_type": "percent"},
+      {"api_key": "egt_hours", "ui_label": "EGT(h)", "export_header": "EGT(h)", "semantic_type": "hours"},
+      {"api_key": "egt_pct", "ui_label": "EGT(%)", "export_header": "EGT(%)", "semantic_type": "percent"},
+      {"api_key": "nst_hours", "ui_label": "NST(h)", "export_header": "NST(h)", "semantic_type": "hours"},
+      {"api_key": "nst_pct", "ui_label": "NST(%)", "export_header": "NST(%)", "semantic_type": "percent"}
+    ]
+  },
+  "tables": {
+    "result_table": [
+      {"api_key": "column_name", "ui_label": "欄位", "export_header": "欄位", "semantic_type": "text"},
+      {"api_key": "value", "ui_label": "值", "export_header": "值", "semantic_type": "text"}
+    ]
+  },
+  "excel_query": {
+    "result_table": [
+      {"api_key": "search_column", "ui_label": "查詢欄位", "export_header": "查詢欄位", "semantic_type": "text"},
+      {"api_key": "result_column", "ui_label": "回傳欄位", "export_header": "回傳欄位", "semantic_type": "text"}
+    ]
+  },
+  "resource_status": {
+    "matrix_summary": [
+      {"api_key": "workcenter_group", "ui_label": "站點群組", "export_header": "站點群組", "semantic_type": "category"},
+      {"api_key": "resourcefamily", "ui_label": "設備群", "export_header": "設備群", "semantic_type": "category"},
+      {"api_key": "equipment_status", "ui_label": "狀態", "export_header": "狀態", "semantic_type": "status"}
+    ]
+  }
+}

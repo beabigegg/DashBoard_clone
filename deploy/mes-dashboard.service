@@ -1,0 +1,43 @@
+[Unit]
+Description=MES Dashboard Gunicorn Service (Conda Runtime)
+Documentation=https://github.com/your-org/mes-dashboard
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mes-dashboard
+EnvironmentFile=-/etc/mes-dashboard/mes-dashboard.env
+Environment="PYTHONPATH=/opt/mes-dashboard/src"
+Environment="CONDA_BIN=/opt/miniconda3/bin/conda"
+Environment="CONDA_ENV_NAME=mes-dashboard"
+Environment="GUNICORN_BIND=0.0.0.0:8080"
+Environment="WATCHDOG_RUNTIME_DIR=/run/mes-dashboard"
+Environment="WATCHDOG_RESTART_FLAG=/run/mes-dashboard/mes_dashboard_restart.flag"
+Environment="WATCHDOG_PID_FILE=/run/mes-dashboard/gunicorn.pid"
+Environment="WATCHDOG_STATE_FILE=/var/lib/mes-dashboard/restart_state.json"
+
+RuntimeDirectory=mes-dashboard
+StateDirectory=mes-dashboard
+PIDFile=/run/mes-dashboard/gunicorn.pid
+
+ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN}" run --no-capture-output -n "${CONDA_ENV_NAME}" gunicorn --config gunicorn.conf.py --pid "${WATCHDOG_PID_FILE}" --capture-output "mes_dashboard:create_app()"'
+
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mes-dashboard
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/run/mes-dashboard /var/lib/mes-dashboard /opt/mes-dashboard/logs
+
+[Install]
+WantedBy=multi-user.target

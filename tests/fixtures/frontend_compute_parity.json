@@ -1,0 +1,46 @@
+{
+  "metric_tolerance": {
+    "ou_pct": 0.1,
+    "availability_pct": 0.1,
+    "prd_pct": 0.1,
+    "sby_pct": 0.1,
+    "udt_pct": 0.1,
+    "sdt_pct": 0.1,
+    "egt_pct": 0.1,
+    "nst_pct": 0.1
+  },
+  "cases": [
+    {
+      "prd_hours": 10,
+      "sby_hours": 2,
+      "udt_hours": 1,
+      "sdt_hours": 1,
+      "egt_hours": 1,
+      "nst_hours": 1
+    },
+    {
+      "prd_hours": 0,
+      "sby_hours": 0,
+      "udt_hours": 0,
+      "sdt_hours": 0,
+      "egt_hours": 0,
+      "nst_hours": 0
+    },
+    {
+      "prd_hours": 85.5,
+      "sby_hours": 10.2,
+      "udt_hours": 1.1,
+      "sdt_hours": 0.8,
+      "egt_hours": 2.4,
+      "nst_hours": 3.0
+    },
+    {
+      "prd_hours": 5,
+      "sby_hours": 3,
+      "udt_hours": 4,
+      "sdt_hours": 2,
+      "egt_hours": 1,
+      "nst_hours": 5
+    }
+  ]
+}

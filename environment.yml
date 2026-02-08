@@ -1,0 +1,46 @@
+# Conda environment for MES Dashboard
+# Usage: conda env create -f environment.yml
+#        conda activate mes-dashboard
+#
+# Note: Most packages use minimum version pins (>=) to allow automatic security updates.
+# For reproducible builds, generate a lock file: pip freeze > requirements.lock
+
+name: mes-dashboard
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Python version - pinned for consistency across deployments
+  - python=3.11
+  # Frontend build toolchain (Vite)
+  - nodejs>=22
+
+  # Use pip for Python packages (better compatibility with pypi packages)
+  - pip
+  - pip:
+      # Core Framework
+      - flask>=3.0.0
+
+      # Database
+      - oracledb>=2.0.0
+      - sqlalchemy>=2.0.0
+
+      # Data Processing
+      - pandas>=2.0.0
+      - openpyxl>=3.0.0
+
+      # Cache (Redis)
+      - redis>=5.0.0
+      - hiredis>=2.0.0      # C parser for better performance
+
+      # HTTP Client
+      - requests>=2.28.0
+
+      # Configuration
+      - python-dotenv>=1.0.0
+
+      # WSGI Server (Production)
+      - gunicorn>=21.2.0
+
+      # System Monitoring
+      - psutil>=5.9.0

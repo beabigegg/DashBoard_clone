@@ -1,0 +1,858 @@
+# -*- coding: utf-8 -*-
+"""Resource Cache - DWH.DW_MES_RESOURCE 全表快取模組.
+
+全表快取套用全域篩選後的設備主檔資料至 Redis。
+提供統一 API 供各模組取用設備資料和篩選器選項。
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import logging
+import os
+import threading
+import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+import pandas as pd
+
+from mes_dashboard.core.redis_client import (
+    get_redis_client,
+    redis_available,
+    REDIS_ENABLED,
+    REDIS_KEY_PREFIX,
+)
+from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.config.constants import (
+    EXCLUDED_LOCATIONS,
+    EXCLUDED_ASSET_STATUSES,
+    EQUIPMENT_TYPE_FILTER,
+)
+from mes_dashboard.sql import QueryBuilder
+
+logger = logging.getLogger('mes_dashboard.resource_cache')
+
+# ============================================================
+# Process-Level Cache (Prevents redundant JSON parsing)
+# ============================================================
+
+class _ProcessLevelCache:
+    """Thread-safe process-level cache for parsed DataFrames."""
+
+    def __init__(self, ttl_seconds: int = 30):
+        self._cache: Dict[str, Tuple[pd.DataFrame, float]] = {}
+        self._lock = threading.Lock()
+        self._ttl = ttl_seconds
+
+    def get(self, key: str) -> Optional[pd.DataFrame]:
+        """Get cached DataFrame if not expired."""
+        with self._lock:
+            if key not in self._cache:
+                return None
+            df, timestamp = self._cache[key]
+            if time.time() - timestamp > self._ttl:
+                del self._cache[key]
+                return None
+            return df
+
+    def set(self, key: str, df: pd.DataFrame) -> None:
+        """Cache a DataFrame with current timestamp."""
+        with self._lock:
+            self._cache[key] = (df, time.time())
+
+    def invalidate(self, key: str) -> None:
+        """Remove a key from cache."""
+        with self._lock:
+            self._cache.pop(key, None)
+
+
+# Global process-level cache for resource data (30s TTL)
+_resource_df_cache = _ProcessLevelCache(ttl_seconds=30)
+_resource_parse_lock = threading.Lock()
+_resource_index_lock = threading.Lock()
+_resource_index: Dict[str, Any] = {
+    "ready": False,
+    "source": None,
+    "version": None,
+    "updated_at": None,
+    "built_at": None,
+    "version_checked_at": 0.0,
+    "count": 0,
+    "records": [],
+    "by_resource_id": {},
+    "by_workcenter": {},
+    "by_family": {},
+    "by_department": {},
+    "by_location": {},
+    "by_is_production": {"1": [], "0": []},
+    "by_is_key": {"1": [], "0": []},
+    "by_is_monitor": {"1": [], "0": []},
+}
+
+
+def _new_empty_index() -> Dict[str, Any]:
+    return {
+        "ready": False,
+        "source": None,
+        "version": None,
+        "updated_at": None,
+        "built_at": None,
+        "version_checked_at": 0.0,
+        "count": 0,
+        "records": [],
+        "by_resource_id": {},
+        "by_workcenter": {},
+        "by_family": {},
+        "by_department": {},
+        "by_location": {},
+        "by_is_production": {"1": [], "0": []},
+        "by_is_key": {"1": [], "0": []},
+        "by_is_monitor": {"1": [], "0": []},
+    }
+
+
+def _invalidate_resource_index() -> None:
+    with _resource_index_lock:
+        global _resource_index
+        _resource_index = _new_empty_index()
+
+
+def _is_truthy_flag(value: Any) -> bool:
+    if value is True:
+        return True
+    if value in (1, "1"):
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "yes", "y"}
+    return False
+
+
+def _bucket_append(bucket: Dict[str, List[Dict[str, Any]]], key: Any, record: Dict[str, Any]) -> None:
+    if key is None:
+        return
+    if isinstance(key, float) and pd.isna(key):
+        return
+    key_str = str(key)
+    bucket.setdefault(key_str, []).append(record)
+
+
+def _build_resource_index(
+    df: pd.DataFrame,
+    *,
+    source: str,
+    version: Optional[str],
+    updated_at: Optional[str],
+) -> Dict[str, Any]:
+    records = df.to_dict(orient='records')
+    index = _new_empty_index()
+    index["ready"] = True
+    index["source"] = source
+    index["version"] = version
+    index["updated_at"] = updated_at
+    index["built_at"] = datetime.now().isoformat()
+    index["version_checked_at"] = time.time()
+    index["count"] = len(records)
+    index["records"] = records
+
+    for record in records:
+        resource_id = record.get("RESOURCEID")
+        if resource_id is not None and not (isinstance(resource_id, float) and pd.isna(resource_id)):
+            index["by_resource_id"][str(resource_id)] = record
+
+        _bucket_append(index["by_workcenter"], record.get("WORKCENTERNAME"), record)
+        _bucket_append(index["by_family"], record.get("RESOURCEFAMILYNAME"), record)
+        _bucket_append(index["by_department"], record.get("PJ_DEPARTMENT"), record)
+        _bucket_append(index["by_location"], record.get("LOCATIONNAME"), record)
+
+        index["by_is_production"]["1" if _is_truthy_flag(record.get("PJ_ISPRODUCTION")) else "0"].append(record)
+        index["by_is_key"]["1" if _is_truthy_flag(record.get("PJ_ISKEY")) else "0"].append(record)
+        index["by_is_monitor"]["1" if _is_truthy_flag(record.get("PJ_ISMONITOR")) else "0"].append(record)
+
+    return index
+
+
+def _index_matches(
+    current: Dict[str, Any],
+    *,
+    source: str,
+    version: Optional[str],
+    row_count: int,
+) -> bool:
+    if not current.get("ready"):
+        return False
+    if current.get("source") != source:
+        return False
+    if version and current.get("version") != version:
+        return False
+    return int(current.get("count", 0)) == int(row_count)
+
+
+def _ensure_resource_index(
+    df: pd.DataFrame,
+    *,
+    source: str,
+    version: Optional[str] = None,
+    updated_at: Optional[str] = None,
+) -> None:
+    global _resource_index
+    with _resource_index_lock:
+        current = _resource_index
+        if _index_matches(current, source=source, version=version, row_count=len(df)):
+            return
+
+    new_index = _build_resource_index(
+        df,
+        source=source,
+        version=version,
+        updated_at=updated_at,
+    )
+    with _resource_index_lock:
+        _resource_index = new_index
+
+
+def _get_resource_index() -> Dict[str, Any]:
+    with _resource_index_lock:
+        return _resource_index
+
+
+def _get_cache_meta(client=None) -> Tuple[Optional[str], Optional[str]]:
+    redis_client = client or get_redis_client()
+    if redis_client is None:
+        return None, None
+
+    try:
+        version, updated_at = redis_client.mget([
+            _get_key("meta:version"),
+            _get_key("meta:updated"),
+        ])
+        return version, updated_at
+    except Exception:
+        return None, None
+
+
+def _redis_data_available(client=None) -> bool:
+    """Check whether Redis currently has resource payload."""
+    redis_client = client or get_redis_client()
+    if redis_client is None:
+        return False
+
+    try:
+        return redis_client.get(_get_key("data")) is not None
+    except Exception:
+        return False
+
+
+def _pick_bucket_records(
+    bucket: Dict[str, List[Dict[str, Any]]],
+    keys: List[Any],
+) -> List[Dict[str, Any]]:
+    seen: set[str] = set()
+    result: List[Dict[str, Any]] = []
+    for key in keys:
+        for record in bucket.get(str(key), []):
+            rid = record.get("RESOURCEID")
+            rid_key = str(rid) if rid is not None else str(id(record))
+            if rid_key in seen:
+                continue
+            seen.add(rid_key)
+            result.append(record)
+    return result
+
+# ============================================================
+# Configuration
+# ============================================================
+
+RESOURCE_CACHE_ENABLED = os.getenv('RESOURCE_CACHE_ENABLED', 'true').lower() == 'true'
+RESOURCE_SYNC_INTERVAL = int(os.getenv('RESOURCE_SYNC_INTERVAL', '14400'))  # 4 hours
+RESOURCE_INDEX_VERSION_CHECK_INTERVAL = int(
+    os.getenv('RESOURCE_INDEX_VERSION_CHECK_INTERVAL', '5')
+)  # seconds
+
+# Redis key helpers
+def _get_key(key: str) -> str:
+    """Get full Redis key with resource prefix."""
+    return f"{REDIS_KEY_PREFIX}:resource:{key}"
+
+
+# ============================================================
+# Internal: Oracle Load Functions
+# ============================================================
+
+def _build_filter_builder() -> QueryBuilder:
+    """Build QueryBuilder with global filter conditions.
+
+    Returns:
+        QueryBuilder instance with filter conditions applied.
+    """
+    builder = QueryBuilder()
+
+    # Equipment type filter - raw SQL condition from config
+    builder.add_condition(EQUIPMENT_TYPE_FILTER.strip())
+
+    # Workcenter filter - exclude resources without WORKCENTERNAME
+    builder.add_is_not_null("WORKCENTERNAME")
+
+    # Location filter - exclude locations, allow NULL
+    if EXCLUDED_LOCATIONS:
+        builder.add_not_in_condition(
+            "LOCATIONNAME",
+            list(EXCLUDED_LOCATIONS),
+            allow_null=True
+        )
+
+    # Asset status filter - exclude statuses, allow NULL
+    if EXCLUDED_ASSET_STATUSES:
+        builder.add_not_in_condition(
+            "PJ_ASSETSSTATUS",
+            list(EXCLUDED_ASSET_STATUSES),
+            allow_null=True
+        )
+
+    return builder
+
+
+def _load_from_oracle() -> Optional[pd.DataFrame]:
+    """從 Oracle 載入全表資料（套用全域篩選）.
+
+    Returns:
+        DataFrame with all columns, or None if query failed.
+    """
+    builder = _build_filter_builder()
+    builder.base_sql = "SELECT * FROM DWH.DW_MES_RESOURCE {{ WHERE_CLAUSE }}"
+    sql, params = builder.build()
+
+    try:
+        df = read_sql_df(sql, params)
+        if df is not None:
+            logger.info(f"Loaded {len(df)} resources from Oracle")
+        return df
+    except Exception as e:
+        logger.error(f"Failed to load resources from Oracle: {e}")
+        return None
+
+
+def _get_version_from_oracle() -> Optional[str]:
+    """取得 Oracle 資料版本（MAX(LASTCHANGEDATE)）.
+
+    Returns:
+        Version string (ISO format), or None if query failed.
+    """
+    builder = _build_filter_builder()
+    builder.base_sql = "SELECT MAX(LASTCHANGEDATE) as VERSION FROM DWH.DW_MES_RESOURCE {{ WHERE_CLAUSE }}"
+    sql, params = builder.build()
+
+    try:
+        df = read_sql_df(sql, params)
+        if df is not None and not df.empty:
+            version = df.iloc[0]['VERSION']
+            if version is not None:
+                if hasattr(version, 'isoformat'):
+                    return version.isoformat()
+                return str(version)
+        return None
+    except Exception as e:
+        logger.error(f"Failed to get version from Oracle: {e}")
+        return None
+
+
+# ============================================================
+# Internal: Redis Functions
+# ============================================================
+
+def _get_version_from_redis() -> Optional[str]:
+    """取得 Redis 快取版本.
+
+    Returns:
+        Cached version string, or None.
+    """
+    client = get_redis_client()
+    if client is None:
+        return None
+
+    try:
+        return client.get(_get_key("meta:version"))
+    except Exception as e:
+        logger.warning(f"Failed to get version from Redis: {e}")
+        return None
+
+
+def _sync_to_redis(df: pd.DataFrame, version: str) -> bool:
+    """同步至 Redis（使用 pipeline 確保原子性）.
+
+    Args:
+        df: DataFrame with resource data.
+        version: Version string (MAX(LASTCHANGEDATE)).
+
+    Returns:
+        True if sync was successful.
+    """
+    client = get_redis_client()
+    if client is None:
+        return False
+
+    try:
+        # Convert DataFrame to JSON
+        # Handle datetime columns
+        df_copy = df.copy()
+        for col in df_copy.select_dtypes(include=['datetime64']).columns:
+            df_copy[col] = df_copy[col].astype(str)
+
+        data_json = df_copy.to_json(orient='records', force_ascii=False)
+
+        # Atomic update using pipeline
+        now = datetime.now().isoformat()
+        pipe = client.pipeline()
+        pipe.set(_get_key("data"), data_json)
+        pipe.set(_get_key("meta:version"), version)
+        pipe.set(_get_key("meta:updated"), now)
+        pipe.set(_get_key("meta:count"), str(len(df)))
+        pipe.execute()
+
+        # Invalidate process-level cache so next request picks up new data
+        _resource_df_cache.invalidate("resource_data")
+        _invalidate_resource_index()
+
+        logger.info(f"Resource cache synced: {len(df)} rows, version={version}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to sync to Redis: {e}")
+        return False
+
+
+def _get_cached_data() -> Optional[pd.DataFrame]:
+    """Get cached resource data from Redis with process-level caching.
+
+    Uses a two-tier cache strategy:
+    1. Process-level cache: Parsed DataFrame (30s TTL) - fast, no parsing
+    2. Redis cache: Raw JSON data - shared across workers
+
+    This prevents redundant JSON parsing across concurrent requests.
+
+    Returns:
+        DataFrame with resource data, or None if cache miss.
+    """
+    cache_key = "resource_data"
+
+    # Tier 1: Check process-level cache first (fast path)
+    cached_df = _resource_df_cache.get(cache_key)
+    if cached_df is not None:
+        if not _get_resource_index().get("ready"):
+            version, updated_at = _get_cache_meta()
+            _ensure_resource_index(
+                cached_df,
+                source="redis",
+                version=version,
+                updated_at=updated_at,
+            )
+        logger.debug(f"Process cache hit: {len(cached_df)} rows")
+        return cached_df
+
+    # Tier 2: Parse from Redis (slow path - needs lock)
+    if not REDIS_ENABLED or not RESOURCE_CACHE_ENABLED:
+        return None
+
+    client = get_redis_client()
+    if client is None:
+        return None
+
+    # Use lock to prevent multiple threads from parsing simultaneously
+    with _resource_parse_lock:
+        # Double-check after acquiring lock
+        cached_df = _resource_df_cache.get(cache_key)
+        if cached_df is not None:
+            logger.debug(f"Process cache hit (after lock): {len(cached_df)} rows")
+            return cached_df
+
+        try:
+            start_time = time.time()
+            data_json = client.get(_get_key("data"))
+            if data_json is None:
+                logger.debug("Resource cache miss: no data in Redis")
+                return None
+
+            df = pd.read_json(io.StringIO(data_json), orient='records')
+            parse_time = time.time() - start_time
+            version, updated_at = _get_cache_meta(client)
+
+            # Store in process-level cache
+            _resource_df_cache.set(cache_key, df)
+            _ensure_resource_index(
+                df,
+                source="redis",
+                version=version,
+                updated_at=updated_at,
+            )
+
+            logger.debug(f"Resource cache hit: loaded {len(df)} rows from Redis (parsed in {parse_time:.2f}s)")
+            return df
+        except Exception as e:
+            logger.warning(f"Failed to read resource cache: {e}")
+            return None
+
+
+# ============================================================
+# Cache Management API
+# ============================================================
+
+def refresh_cache(force: bool = False) -> bool:
+    """手動刷新快取.
+
+    Args:
+        force: 強制刷新，忽略版本檢查.
+
+    Returns:
+        True if cache was refreshed.
+    """
+    if not REDIS_ENABLED or not RESOURCE_CACHE_ENABLED:
+        logger.info("Resource cache is disabled")
+        return False
+
+    if not redis_available():
+        logger.warning("Redis not available, cannot refresh resource cache")
+        return False
+
+    try:
+        # Get versions
+        oracle_version = _get_version_from_oracle()
+        if oracle_version is None:
+            logger.error("Failed to get version from Oracle")
+            return False
+
+        redis_version = _get_version_from_redis()
+
+        # Check if update needed
+        if not force and redis_version == oracle_version:
+            logger.debug(f"Resource cache version unchanged ({oracle_version}), skipping")
+            return False
+
+        logger.info(f"Resource cache version changed: {redis_version} -> {oracle_version}")
+
+        # Load and sync
+        df = _load_from_oracle()
+        if df is None or df.empty:
+            logger.error("Failed to load resources from Oracle")
+            return False
+
+        return _sync_to_redis(df, oracle_version)
+
+    except Exception as e:
+        logger.error(f"Failed to refresh resource cache: {e}", exc_info=True)
+        return False
+
+
+def init_cache() -> None:
+    """初始化快取（應用啟動時呼叫）."""
+    if not REDIS_ENABLED or not RESOURCE_CACHE_ENABLED:
+        logger.info("Resource cache is disabled, skipping init")
+        return
+
+    if not redis_available():
+        logger.warning("Redis not available during resource cache init")
+        return
+
+    # Check if cache exists
+    client = get_redis_client()
+    if client is None:
+        return
+
+    try:
+        exists = client.exists(_get_key("data"))
+        if not exists:
+            logger.info("Resource cache empty, performing initial load...")
+            refresh_cache(force=True)
+        else:
+            logger.info("Resource cache already populated")
+    except Exception as e:
+        logger.error(f"Failed to init resource cache: {e}")
+
+
+def get_cache_status() -> Dict[str, Any]:
+    """取得快取狀態資訊.
+
+    Returns:
+        Dict with cache status.
+    """
+    status = {
+        'enabled': REDIS_ENABLED and RESOURCE_CACHE_ENABLED,
+        'loaded': False,
+        'count': 0,
+        'version': None,
+        'updated_at': None,
+    }
+
+    if not status['enabled']:
+        return status
+
+    client = get_redis_client()
+    if client is None:
+        return status
+
+    try:
+        status['loaded'] = client.exists(_get_key("data")) > 0
+        if status['loaded']:
+            count_str = client.get(_get_key("meta:count"))
+            status['count'] = int(count_str) if count_str else 0
+            status['version'] = client.get(_get_key("meta:version"))
+            status['updated_at'] = client.get(_get_key("meta:updated"))
+    except Exception as e:
+        logger.warning(f"Failed to get resource cache status: {e}")
+
+    derived = get_resource_index_status()
+    derived_version = derived.get("version")
+    derived["is_fresh"] = bool(status.get("version")) and derived_version == status.get("version")
+    status["derived_index"] = derived
+
+    return status
+
+
+# ============================================================
+# Query API
+# ============================================================
+
+def get_resource_index_status() -> Dict[str, Any]:
+    """Get process-level derived index telemetry."""
+    index = _get_resource_index()
+    built_at = index.get("built_at")
+    age_seconds = None
+    if built_at:
+        try:
+            age_seconds = max((datetime.now() - datetime.fromisoformat(built_at)).total_seconds(), 0.0)
+        except Exception:
+            age_seconds = None
+
+    return {
+        "ready": bool(index.get("ready")),
+        "source": index.get("source"),
+        "version": index.get("version"),
+        "updated_at": index.get("updated_at"),
+        "built_at": built_at,
+        "count": int(index.get("count", 0)),
+        "age_seconds": round(age_seconds, 3) if age_seconds is not None else None,
+    }
+
+
+def get_resource_index_snapshot() -> Dict[str, Any]:
+    """Get derived resource index snapshot, rebuilding if needed."""
+    index = _get_resource_index()
+    if index.get("ready"):
+        if index.get("source") == "redis":
+            # If Redis metadata version is missing, verify payload existence on every call.
+            # This avoids serving stale in-process index when Redis payload is evicted.
+            if not index.get("version"):
+                if not _redis_data_available():
+                    _resource_df_cache.invalidate("resource_data")
+                    _invalidate_resource_index()
+                    index = _get_resource_index()
+                else:
+                    with _resource_index_lock:
+                        _resource_index["version_checked_at"] = time.time()
+                    return _get_resource_index()
+
+            if index.get("ready"):
+                checked_at = float(index.get("version_checked_at") or 0.0)
+                if time.time() - checked_at >= RESOURCE_INDEX_VERSION_CHECK_INTERVAL:
+                    latest_version = _get_version_from_redis()
+                    current_version = index.get("version")
+                    if latest_version and current_version and latest_version != current_version:
+                        logger.info(
+                            "Resource cache version changed (%s -> %s), rebuilding derived index",
+                            current_version,
+                            latest_version,
+                        )
+                        _resource_df_cache.invalidate("resource_data")
+                        _invalidate_resource_index()
+                        index = _get_resource_index()
+                    else:
+                        with _resource_index_lock:
+                            _resource_index["version_checked_at"] = time.time()
+                        return _get_resource_index()
+                else:
+                    return index
+        else:
+            # Oracle fallback snapshot should be treated as ephemeral to avoid serving
+            # stale process data indefinitely if subsequent fallback query fails.
+            _invalidate_resource_index()
+            index = _get_resource_index()
+
+    df = _get_cached_data()
+    if df is not None:
+        version, updated_at = _get_cache_meta()
+        _ensure_resource_index(
+            df,
+            source="redis",
+            version=version,
+            updated_at=updated_at,
+        )
+        return _get_resource_index()
+
+    logger.info("Resource cache miss while building index, falling back to Oracle")
+    oracle_df = _load_from_oracle()
+    if oracle_df is None:
+        return _new_empty_index()
+
+    _ensure_resource_index(
+        oracle_df,
+        source="oracle",
+        version=None,
+        updated_at=datetime.now().isoformat(),
+    )
+    return _get_resource_index()
+
+def get_all_resources() -> List[Dict]:
+    """取得所有快取中的設備資料（全欄位）.
+
+    Falls back to Oracle if cache unavailable.
+
+    Returns:
+        List of resource dicts.
+    """
+    index = get_resource_index_snapshot()
+    records = index.get("records", [])
+    return list(records)
+
+
+def get_resource_by_id(resource_id: str) -> Optional[Dict]:
+    """依 RESOURCEID 取得單筆設備資料.
+
+    Args:
+        resource_id: The RESOURCEID to look up.
+
+    Returns:
+        Resource dict, or None if not found.
+    """
+    if not resource_id:
+        return None
+    index = get_resource_index_snapshot()
+    by_id = index.get("by_resource_id", {})
+    row = by_id.get(str(resource_id))
+    if row is not None:
+        return row
+
+    # Backward-compatible fallback for call sites/tests that patch get_all_resources.
+    target = str(resource_id)
+    for resource in get_all_resources():
+        if str(resource.get("RESOURCEID")) == target:
+            return resource
+    return None
+
+
+def get_resources_by_ids(resource_ids: List[str]) -> List[Dict]:
+    """依 RESOURCEID 清單批次取得設備資料.
+
+    Args:
+        resource_ids: List of RESOURCEIDs to look up.
+
+    Returns:
+        List of matching resource dicts.
+    """
+    id_set = set(resource_ids)
+    resources = get_all_resources()
+    return [r for r in resources if r.get('RESOURCEID') in id_set]
+
+
+def get_resources_by_filter(
+    workcenters: Optional[List[str]] = None,
+    families: Optional[List[str]] = None,
+    departments: Optional[List[str]] = None,
+    locations: Optional[List[str]] = None,
+    is_production: Optional[bool] = None,
+    is_key: Optional[bool] = None,
+    is_monitor: Optional[bool] = None,
+) -> List[Dict]:
+    """依條件篩選設備資料（在 Python 端篩選）.
+
+    Args:
+        workcenters: Filter by WORKCENTERNAME values.
+        families: Filter by RESOURCEFAMILYNAME values.
+        departments: Filter by PJ_DEPARTMENT values.
+        locations: Filter by LOCATIONNAME values.
+        is_production: Filter by PJ_ISPRODUCTION flag.
+        is_key: Filter by PJ_ISKEY flag.
+        is_monitor: Filter by PJ_ISMONITOR flag.
+
+    Returns:
+        List of matching resource dicts.
+    """
+    resources = get_all_resources()
+
+    result = []
+    for r in resources:
+        # Apply filters
+        if workcenters and r.get('WORKCENTERNAME') not in workcenters:
+            continue
+        if families and r.get('RESOURCEFAMILYNAME') not in families:
+            continue
+        if departments and r.get('PJ_DEPARTMENT') not in departments:
+            continue
+        if locations and r.get('LOCATIONNAME') not in locations:
+            continue
+        if is_production is not None:
+            val = r.get('PJ_ISPRODUCTION')
+            if (val == 1) != is_production:
+                continue
+        if is_key is not None:
+            val = r.get('PJ_ISKEY')
+            if (val == 1) != is_key:
+                continue
+        if is_monitor is not None:
+            val = r.get('PJ_ISMONITOR')
+            if (val == 1) != is_monitor:
+                continue
+
+        result.append(r)
+
+    return result
+
+
+# ============================================================
+# Distinct Values API (for filters)
+# ============================================================
+
+def get_distinct_values(column: str) -> List[str]:
+    """取得指定欄位的唯一值清單（排序後）.
+
+    Args:
+        column: Column name (e.g., 'RESOURCEFAMILYNAME').
+
+    Returns:
+        Sorted list of unique values (excluding None, NaN, and empty strings).
+    """
+    resources = get_all_resources()
+    values = set()
+    for r in resources:
+        val = r.get(column)
+        # Skip None, empty strings, and NaN (pandas converts NaN to float)
+        if val is None or val == '':
+            continue
+        # Check for NaN (float type and is NaN)
+        if isinstance(val, float) and pd.isna(val):
+            continue
+        values.add(str(val) if not isinstance(val, str) else val)
+    return sorted(values)
+
+
+def get_resource_families() -> List[str]:
+    """取得型號清單（便捷方法）."""
+    return get_distinct_values('RESOURCEFAMILYNAME')
+
+
+def get_workcenters() -> List[str]:
+    """取得站點清單（便捷方法）."""
+    return get_distinct_values('WORKCENTERNAME')
+
+
+def get_departments() -> List[str]:
+    """取得部門清單（便捷方法）."""
+    return get_distinct_values('PJ_DEPARTMENT')
+
+
+def get_locations() -> List[str]:
+    """取得區域清單（便捷方法）."""
+    return get_distinct_values('LOCATIONNAME')
+
+
+def get_vendors() -> List[str]:
+    """取得供應商清單（便捷方法）."""
+    return get_distinct_values('VENDORNAME')

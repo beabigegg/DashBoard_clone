@@ -1,0 +1,40 @@
+[Unit]
+Description=MES Dashboard Worker Watchdog (Conda Runtime)
+Documentation=https://github.com/your-org/mes-dashboard
+After=network.target mes-dashboard.service
+Requires=mes-dashboard.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mes-dashboard
+EnvironmentFile=-/etc/mes-dashboard/mes-dashboard.env
+Environment="PYTHONPATH=/opt/mes-dashboard/src"
+Environment="CONDA_BIN=/opt/miniconda3/bin/conda"
+Environment="CONDA_ENV_NAME=mes-dashboard"
+Environment="WATCHDOG_RUNTIME_DIR=/run/mes-dashboard"
+Environment="WATCHDOG_RESTART_FLAG=/run/mes-dashboard/mes_dashboard_restart.flag"
+Environment="WATCHDOG_PID_FILE=/run/mes-dashboard/gunicorn.pid"
+Environment="WATCHDOG_STATE_FILE=/var/lib/mes-dashboard/restart_state.json"
+Environment="WATCHDOG_CHECK_INTERVAL=5"
+
+RuntimeDirectory=mes-dashboard
+StateDirectory=mes-dashboard
+
+ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN}" run --no-capture-output -n "${CONDA_ENV_NAME}" python scripts/worker_watchdog.py'
+
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mes-watchdog
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/run/mes-dashboard /var/lib/mes-dashboard
+
+[Install]
+WantedBy=multi-user.target

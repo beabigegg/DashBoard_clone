@@ -1,0 +1,61 @@
+# MES Dashboard Architecture Snapshot (README.mdj)
+
+本檔案為 `README.md` 的架構摘要鏡像，重點反映目前已完成的 Vite + 單一 port 運行契約與韌性治理策略。
+
+## Runtime Contract
+
+- 單一服務單一 port：`GUNICORN_BIND`（預設 `0.0.0.0:8080`）
+- 前端資產由 Vite build 到 `src/mes_dashboard/static/dist/`，由 Flask/Gunicorn 同源提供
+- Watchdog 透過 restart flag + `SIGHUP` 進行 graceful worker reload
+
+## Resilience Contract
+
+- 降級回應：`DB_POOL_EXHAUSTED`、`CIRCUIT_BREAKER_OPEN` + `Retry-After`
+- health/admin 診斷輸出包含：
+  - thresholds
+  - restart churn summary
+  - recovery recommendation
+- 不預設啟用自動重啟；維持受控人工觸發，避免重啟風暴
+
+## Frontend Governance
+
+- WIP overview/detail 的 autocomplete/filter 查詢邏輯共用 `frontend/src/core/autocomplete.js`
+- 目標：維持既有操作語意，同時降低重複邏輯與維護成本
+- 前端核心模組測試：`npm --prefix frontend test`
+
+## 開發歷史（摘要）
+
+### 2026-02-08
+- 封存 `post-migration-resilience-governance`
+- 新增韌性診斷欄位（thresholds/churn/recommendation）
+- 完成 WIP autocomplete 共用模組化與前端測試腳本
+
+### 2026-02-07
+- 封存完整 Vite 遷移相關提案群組
+- 單一 port 架構、抽屜導航、欄位契約治理與 migration gates 就位
+
+## Key Configs
+
+```bash
+WATCHDOG_RUNTIME_DIR=./tmp
+WATCHDOG_RESTART_FLAG=./tmp/mes_dashboard_restart.flag
+WATCHDOG_PID_FILE=./tmp/gunicorn.pid
+WATCHDOG_STATE_FILE=./tmp/mes_dashboard_restart_state.json
+WATCHDOG_RESTART_HISTORY_MAX=50
+
+RESILIENCE_DEGRADED_ALERT_SECONDS=300
+RESILIENCE_POOL_SATURATION_WARNING=0.90
+RESILIENCE_POOL_SATURATION_CRITICAL=1.0
+RESILIENCE_RESTART_CHURN_WINDOW_SECONDS=600
+RESILIENCE_RESTART_CHURN_THRESHOLD=3
+```
+
+## Validation Quick Commands
+
+```bash
+npm --prefix frontend test
+npm --prefix frontend run build
+python -m pytest -q tests/test_resilience.py tests/test_health_routes.py tests/test_performance_integration.py
+```
+
+> 詳細部署、使用說明與完整環境配置請參考 `README.md`。

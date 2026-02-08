@@ -1,0 +1,36 @@
+# MES Dashboard Dependencies
+# ===========================
+#
+# Version Strategy:
+#   Using minimum version pins (>=) to allow automatic security updates.
+#   For reproducible builds, generate a lock file: pip freeze > requirements.lock
+#
+# Python Version: >=3.9 (recommended: 3.11)
+
+# Core Framework
+flask>=3.0.0
+
+# Database
+oracledb>=2.0.0
+sqlalchemy>=2.0.0
+
+# Data Processing
+pandas>=2.0.0              # Note: numpy is installed as a dependency
+openpyxl>=3.0.0            # Excel file support
+
+# Cache (Redis)
+redis>=5.0.0
+hiredis>=2.0.0             # C parser for better Redis performance
+
+# HTTP Client
+requests>=2.28.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# WSGI Server
+gunicorn>=21.2.0           # Linux/macOS production server
+waitress>=2.1.2; platform_system=="Windows"  # Windows alternative
+
+# System Monitoring
+psutil>=5.9.0              # Process and system utilities
