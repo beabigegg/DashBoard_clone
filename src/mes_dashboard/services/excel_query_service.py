@@ -6,6 +6,7 @@ Supports large datasets (7000+ rows) by splitting queries into batches.
 """
 
 import re
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
@@ -13,6 +14,7 @@ import pandas as pd
 
 from mes_dashboard.core.database import get_db_connection
 
+logger = logging.getLogger('mes_dashboard.excel_query_service')
 
 # Oracle IN clause limit
 BATCH_SIZE = 1000
@@ -22,6 +24,9 @@ LIKE_KEYWORD_LIMIT = 100
 
 # Large table threshold for performance warning (10 million rows)
 LARGE_TABLE_THRESHOLD = 10_000_000
+PARSE_ERROR_MESSAGE = "Excel 解析失敗，請確認檔案格式"
+COLUMN_READ_ERROR_MESSAGE = "讀取欄位失敗，請稍後再試"
+QUERY_ERROR_MESSAGE = "查詢服務暫時無法使用"
 
 
 def parse_excel(file_storage) -> Dict[str, Any]:
@@ -46,7 +51,8 @@ def parse_excel(file_storage) -> Dict[str, Any]:
             'total_rows': len(df)
         }
     except Exception as exc:
-        return {'error': f'Excel 解析失敗: {str(exc)}'}
+        logger.exception("Excel parse failed: %s", exc)
+        return {'error': PARSE_ERROR_MESSAGE}
 
 
 def get_column_unique_values(file_storage, column_name: str) -> Dict[str, Any]:
@@ -74,7 +80,8 @@ def get_column_unique_values(file_storage, column_name: str) -> Dict[str, Any]:
             'count': len(values_list)
         }
     except Exception as exc:
-        return {'error': f'讀取欄位失敗: {str(exc)}'}
+        logger.exception("Excel column read failed for %s: %s", column_name, exc)
+        return {'error': COLUMN_READ_ERROR_MESSAGE}
 
 
 def detect_excel_column_type(values: List[str]) -> Dict[str, Any]:
@@ -372,7 +379,8 @@ def execute_batch_query(
     except Exception as exc:
         if connection:
             connection.close()
-        return {'error': f'查詢失敗: {str(exc)}'}
+        logger.exception("Excel batch query failed: %s", exc)
+        return {'error': QUERY_ERROR_MESSAGE}
 
 
 def execute_advanced_batch_query(
@@ -530,7 +538,8 @@ def execute_advanced_batch_query(
     except Exception as exc:
         if connection:
             connection.close()
-        return {'error': f'查詢失敗: {str(exc)}'}
+        logger.exception("Excel advanced batch query failed: %s", exc)
+        return {'error': QUERY_ERROR_MESSAGE}
 
 
 def generate_csv_content(data: List[Dict], columns: List[str]) -> str:

@@ -9,6 +9,8 @@
 - 快取：Redis + process-level cache + indexed selection telemetry
 - 資料：Oracle（QueuePool）
 - 運維：watchdog + admin worker restart API + guarded-mode policy
+- 環境設定：開發與正式環境統一使用專案根目錄同一份 `.env`
+- 啟動腳本：`./scripts/start_server.sh start` 會同時啟動 Gunicorn 與 `worker_watchdog.py`
 
 ## 2. 既有設計原則（保留）
 

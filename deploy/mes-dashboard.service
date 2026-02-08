@@ -9,28 +9,14 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/opt/mes-dashboard
-EnvironmentFile=-/etc/mes-dashboard/mes-dashboard.env
+EnvironmentFile=-/opt/mes-dashboard/.env
 Environment="PYTHONPATH=/opt/mes-dashboard/src"
-Environment="CONDA_BIN=/opt/miniconda3/bin/conda"
-Environment="CONDA_ENV_NAME=mes-dashboard"
-Environment="GUNICORN_BIND=0.0.0.0:8080"
-Environment="WATCHDOG_RUNTIME_DIR=/run/mes-dashboard"
-Environment="WATCHDOG_RESTART_FLAG=/run/mes-dashboard/mes_dashboard_restart.flag"
-Environment="WATCHDOG_PID_FILE=/run/mes-dashboard/gunicorn.pid"
-Environment="WATCHDOG_STATE_FILE=/var/lib/mes-dashboard/restart_state.json"
-Environment="RUNTIME_CONTRACT_VERSION=2026.02-p2"
-Environment="RUNTIME_CONTRACT_ENFORCE=true"
-Environment="WORKER_RESTART_COOLDOWN=60"
-Environment="WORKER_RESTART_RETRY_BUDGET=3"
-Environment="WORKER_RESTART_WINDOW_SECONDS=600"
-Environment="WORKER_RESTART_CHURN_THRESHOLD=3"
-Environment="WORKER_GUARDED_MODE_ENABLED=true"
 
 RuntimeDirectory=mes-dashboard
 StateDirectory=mes-dashboard
 PIDFile=/run/mes-dashboard/gunicorn.pid
 
-ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN}" run --no-capture-output -n "${CONDA_ENV_NAME}" gunicorn --config gunicorn.conf.py --pid "${WATCHDOG_PID_FILE}" --capture-output "mes_dashboard:create_app()"'
+ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN:-/opt/miniconda3/bin/conda}" run --no-capture-output -n "${CONDA_ENV_NAME:-mes-dashboard}" gunicorn --config gunicorn.conf.py --pid "${WATCHDOG_PID_FILE:-/run/mes-dashboard/gunicorn.pid}" --capture-output "mes_dashboard:create_app()"'
 
 KillSignal=SIGTERM
 TimeoutStopSec=30

@@ -161,6 +161,24 @@ class TestLocalAuthenticate:
         assert result is None
 
 
+class TestLocalAuthSafetyGuard:
+    """Tests for production guard on local auth toggle."""
+
+    def test_resolve_local_auth_enabled_blocks_production(self):
+        result = auth_service._resolve_local_auth_enabled(
+            raw_value="true",
+            flask_env="production",
+        )
+        assert result is False
+
+    def test_resolve_local_auth_enabled_allows_development(self):
+        result = auth_service._resolve_local_auth_enabled(
+            raw_value="true",
+            flask_env="development",
+        )
+        assert result is True
+
+
 class TestIsAdmin:
     """Tests for is_admin function."""
 

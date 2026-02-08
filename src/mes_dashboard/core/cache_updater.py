@@ -31,6 +31,7 @@ logger = logging.getLogger('mes_dashboard.cache_updater')
 
 CACHE_CHECK_INTERVAL = int(os.getenv('CACHE_CHECK_INTERVAL', '600'))  # 10 minutes
 WIP_VIEW = "DWH.DW_MES_LOT_V"
+WIP_CACHE_TTL_SECONDS = int(os.getenv('WIP_CACHE_TTL_SECONDS', '0'))
 
 # Resource cache sync interval (default: 4 hours)
 RESOURCE_SYNC_INTERVAL = int(os.getenv('RESOURCE_SYNC_INTERVAL', '14400'))
@@ -236,6 +237,7 @@ class CacheUpdater:
 
         staging_key: str | None = None
         try:
+            ttl_seconds = self._resolve_cache_ttl_seconds()
             # Convert DataFrame to JSON
             # Handle datetime columns
             df_copy = df.copy()
@@ -250,10 +252,10 @@ class CacheUpdater:
             staging_key = get_key(f"data:staging:{unique_suffix}")
 
             pipe = client.pipeline()
-            pipe.set(staging_key, data_json)
+            pipe.set(staging_key, data_json, ex=ttl_seconds)
             pipe.rename(staging_key, get_key("data"))
-            pipe.set(get_key("meta:sys_date"), sys_date)
-            pipe.set(get_key("meta:updated_at"), now)
+            pipe.set(get_key("meta:sys_date"), sys_date, ex=ttl_seconds)
+            pipe.set(get_key("meta:updated_at"), now, ex=ttl_seconds)
             pipe.execute()
 
             return True
@@ -265,6 +267,16 @@ class CacheUpdater:
                 except Exception:
                     pass
             return False
+
+    def _resolve_cache_ttl_seconds(self) -> int:
+        """Resolve Redis TTL for WIP snapshot keys.
+
+        Default strategy: 3x sync interval to tolerate temporary sync gaps while
+        preventing stale data from lingering forever when updater stops.
+        """
+        if WIP_CACHE_TTL_SECONDS > 0:
+            return WIP_CACHE_TTL_SECONDS
+        return max(int(self.interval) * 3, 60)
 
     def _check_resource_update(self, force: bool = False) -> bool:
         """Check and update resource cache if needed.

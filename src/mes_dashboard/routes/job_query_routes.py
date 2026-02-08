@@ -7,6 +7,8 @@ Contains Flask Blueprint for maintenance job query endpoints:
 - CSV export with full history
 """
 
+import logging
+
 from flask import Blueprint, jsonify, request, Response, render_template
 
 from mes_dashboard.services.job_query_service import (
@@ -18,6 +20,7 @@ from mes_dashboard.services.job_query_service import (
 
 # Create Blueprint
 job_query_bp = Blueprint('job_query', __name__)
+logger = logging.getLogger('mes_dashboard.job_query_routes')
 
 
 # ============================================================
@@ -66,7 +69,8 @@ def get_resources():
         })
 
     except Exception as exc:
-        return jsonify({'error': f'載入設備資料失敗: {str(exc)}'}), 500
+        logger.exception("Failed to load job-query resources: %s", exc)
+        return jsonify({'error': '服務暫時無法使用'}), 500
 
 
 @job_query_bp.route('/api/job-query/jobs', methods=['POST'])

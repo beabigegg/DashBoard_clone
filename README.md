@@ -146,7 +146,7 @@ nano .env
 ### 日常操作
 
 ```bash
-# 啟動服務（背景執行）
+# 啟動服務（背景執行，含 Gunicorn + worker_watchdog）
 ./scripts/start_server.sh start
 
 # 停止服務
@@ -158,8 +158,9 @@ nano .env
 # 查看狀態
 ./scripts/start_server.sh status
 
-# 查看日誌
+# 查看日誌（含 watchdog）
 ./scripts/start_server.sh logs follow
+./scripts/start_server.sh logs watchdog
 ```
 
 訪問網址: **http://localhost:8080** （可在 .env 中配置）
@@ -330,17 +331,16 @@ RESOURCE_STATUS_RATE_LIMIT_WINDOW_SECONDS=60
 
 ### Conda + systemd 服務配置
 
-建議在生產環境使用同一份 conda runtime contract 啟動 App 與 Watchdog：
+建議在生產環境使用同一份 `.env`（`/opt/mes-dashboard/.env`）啟動 App 與 Watchdog，與開發環境一致：
 
 ```bash
 # 1. 複製 systemd 服務檔案
 sudo cp deploy/mes-dashboard.service /etc/systemd/system/
 sudo cp deploy/mes-dashboard-watchdog.service /etc/systemd/system/
 
-# 2. 準備環境設定檔
-sudo mkdir -p /etc/mes-dashboard
-sudo cp deploy/mes-dashboard.env.example /etc/mes-dashboard/mes-dashboard.env
-sudo cp .env /etc/mes-dashboard/mes-dashboard.env
+# 2. 確認 /opt/mes-dashboard/.env 權限（供 www-data 讀取）
+sudo chown root:www-data /opt/mes-dashboard/.env
+sudo chmod 640 /opt/mes-dashboard/.env
 
 # 3. 重新載入 systemd
 sudo systemctl daemon-reload
@@ -615,7 +615,6 @@ DashBoard_vite/
 ├── deploy/                     # 部署設定
 │   ├── mes-dashboard.service            # Gunicorn systemd 服務 (Conda)
 │   ├── mes-dashboard-watchdog.service   # Watchdog systemd 服務 (Conda)
-│   └── mes-dashboard.env.example        # Runtime contract 環境範本
 ├── tests/                      # 測試
 ├── data/                       # 資料檔案
 ├── logs/                       # 日誌

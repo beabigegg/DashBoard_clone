@@ -5,6 +5,7 @@ Contains Flask Blueprint for resource/equipment-related API endpoints.
 """
 
 import math
+import logging
 from flask import Blueprint, jsonify, request
 
 from mes_dashboard.core.database import (
@@ -14,6 +15,7 @@ from mes_dashboard.core.database import (
 )
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.response import INTERNAL_ERROR, error_response
 from mes_dashboard.core.utils import get_days_back, parse_bool_query
 
 
@@ -112,6 +114,7 @@ from mes_dashboard.config.constants import STATUS_CATEGORIES
 
 # Create Blueprint
 resource_bp = Blueprint('resource', __name__, url_prefix='/api/resource')
+logger = logging.getLogger('mes_dashboard.resource_routes')
 
 _RESOURCE_DETAIL_RATE_LIMIT = configured_rate_limit(
     bucket="resource-detail",
@@ -253,7 +256,12 @@ def api_resource_status_values():
     except Exception as exc:
         if connection:
             connection.close()
-        return jsonify({'success': False, 'error': str(exc)}), 500
+        logger.exception("Failed to load resource status values: %s", exc)
+        return error_response(
+            INTERNAL_ERROR,
+            "服務暫時無法使用",
+            status_code=500,
+        )
 
 
 # ============================================================
@@ -301,7 +309,12 @@ def api_resource_status():
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:
-        return jsonify({'success': False, 'error': str(exc)}), 500
+        logger.exception("Failed to load realtime resource status: %s", exc)
+        return error_response(
+            INTERNAL_ERROR,
+            "服務暫時無法使用",
+            status_code=500,
+        )
 
 
 @resource_bp.route('/status/options')
@@ -324,7 +337,12 @@ def api_resource_status_options():
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:
-        return jsonify({'success': False, 'error': str(exc)}), 500
+        logger.exception("Failed to load realtime resource options: %s", exc)
+        return error_response(
+            INTERNAL_ERROR,
+            "服務暫時無法使用",
+            status_code=500,
+        )
 
 
 @resource_bp.route('/status/summary')
@@ -355,7 +373,12 @@ def api_resource_status_summary():
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:
-        return jsonify({'success': False, 'error': str(exc)}), 500
+        logger.exception("Failed to load realtime resource summary: %s", exc)
+        return error_response(
+            INTERNAL_ERROR,
+            "服務暫時無法使用",
+            status_code=500,
+        )
 
 
 @resource_bp.route('/status/matrix')
@@ -384,4 +407,9 @@ def api_resource_status_matrix():
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:
-        return jsonify({'success': False, 'error': str(exc)}), 500
+        logger.exception("Failed to load realtime resource matrix: %s", exc)
+        return error_response(
+            INTERNAL_ERROR,
+            "服務暫時無法使用",
+            status_code=500,
+        )

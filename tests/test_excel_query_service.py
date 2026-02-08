@@ -5,7 +5,12 @@ Tests the core service functions without database dependencies.
 """
 
 import pytest
+from unittest.mock import MagicMock, patch
 from mes_dashboard.services.excel_query_service import (
+    parse_excel,
+    get_column_unique_values,
+    execute_batch_query,
+    execute_advanced_batch_query,
     detect_excel_column_type,
     escape_like_pattern,
     build_like_condition,
@@ -14,6 +19,9 @@ from mes_dashboard.services.excel_query_service import (
     sanitize_column_name,
     validate_table_name,
     LIKE_KEYWORD_LIMIT,
+    PARSE_ERROR_MESSAGE,
+    COLUMN_READ_ERROR_MESSAGE,
+    QUERY_ERROR_MESSAGE,
 )
 
 
@@ -259,3 +267,62 @@ class TestValidateTableName:
     def test_sql_injection_prevention(self):
         """Should reject SQL injection attempts."""
         assert validate_table_name('TABLE; DROP--') is False
+
+
+class TestErrorLeakageProtection:
+    """Tests for exception detail masking in excel-query service."""
+
+    @patch("mes_dashboard.services.excel_query_service.pd.read_excel")
+    def test_parse_excel_masks_internal_error_details(self, mock_read_excel):
+        mock_read_excel.side_effect = RuntimeError("openpyxl stack trace detail")
+
+        result = parse_excel(MagicMock())
+
+        assert result["error"] == PARSE_ERROR_MESSAGE
+        assert "openpyxl" not in result["error"]
+
+    @patch("mes_dashboard.services.excel_query_service.pd.read_excel")
+    def test_get_column_unique_values_masks_internal_error_details(self, mock_read_excel):
+        mock_read_excel.side_effect = RuntimeError("internal parser detail")
+
+        result = get_column_unique_values(MagicMock(), "LOT_ID")
+
+        assert result["error"] == COLUMN_READ_ERROR_MESSAGE
+        assert "internal parser detail" not in result["error"]
+
+    @patch("mes_dashboard.services.excel_query_service.get_db_connection")
+    def test_execute_batch_query_masks_internal_error_details(self, mock_get_db):
+        mock_cursor = MagicMock()
+        mock_cursor.execute.side_effect = RuntimeError("ORA-00942: table missing")
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_get_db.return_value = mock_conn
+
+        result = execute_batch_query(
+            table_name="DWH.DW_MES_WIP",
+            search_column="LOT_ID",
+            return_columns=["LOT_ID"],
+            search_values=["LOT001"],
+        )
+
+        assert result["error"] == QUERY_ERROR_MESSAGE
+        assert "ORA-00942" not in result["error"]
+
+    @patch("mes_dashboard.services.excel_query_service.get_db_connection")
+    def test_execute_advanced_batch_query_masks_internal_error_details(self, mock_get_db):
+        mock_cursor = MagicMock()
+        mock_cursor.execute.side_effect = RuntimeError("sensitive sql context")
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_get_db.return_value = mock_conn
+
+        result = execute_advanced_batch_query(
+            table_name="DWH.DW_MES_WIP",
+            search_column="LOT_ID",
+            return_columns=["LOT_ID"],
+            search_values=["LOT001"],
+            query_type="in",
+        )
+
+        assert result["error"] == QUERY_ERROR_MESSAGE
+        assert "sensitive sql context" not in result["error"]

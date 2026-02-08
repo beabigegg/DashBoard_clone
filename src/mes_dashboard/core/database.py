@@ -670,7 +670,7 @@ def get_table_data(
         logger.error(f"get_table_data failed - ORA-{ora_code}: {exc}")
         if connection:
             connection.close()
-        return {'error': f'查詢失敗: {str(exc)}'}
+        return {'error': '查詢服務暫時無法使用'}
 
 
 def get_table_column_metadata(table_name: str) -> Dict[str, Any]:

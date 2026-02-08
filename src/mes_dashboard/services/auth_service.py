@@ -18,7 +18,26 @@ LDAP_TIMEOUT = 10
 ADMIN_EMAILS = os.environ.get("ADMIN_EMAILS", "").lower().split(",")
 
 # Local authentication configuration (for development/testing)
-LOCAL_AUTH_ENABLED = os.environ.get("LOCAL_AUTH_ENABLED", "false").lower() in ("true", "1", "yes")
+def _resolve_local_auth_enabled(
+    raw_value: str | None = None,
+    flask_env: str | None = None,
+) -> bool:
+    """Resolve local auth toggle with production safety guard."""
+    requested = (raw_value if raw_value is not None else os.environ.get("LOCAL_AUTH_ENABLED", "false"))
+    local_auth_requested = str(requested).strip().lower() in ("true", "1", "yes", "on")
+
+    effective_env = (flask_env if flask_env is not None else os.environ.get("FLASK_ENV", "development"))
+    normalized_env = str(effective_env).strip().lower()
+    is_production = normalized_env in {"production", "prod"}
+
+    if local_auth_requested and is_production:
+        logger.error("LOCAL_AUTH_ENABLED is blocked in production environment")
+        return False
+
+    return local_auth_requested
+
+
+LOCAL_AUTH_ENABLED = _resolve_local_auth_enabled()
 LOCAL_AUTH_USERNAME = os.environ.get("LOCAL_AUTH_USERNAME", "")
 LOCAL_AUTH_PASSWORD = os.environ.get("LOCAL_AUTH_PASSWORD", "")
 

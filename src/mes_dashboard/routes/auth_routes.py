@@ -8,6 +8,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from threading import Lock
+from urllib.parse import urlparse
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
@@ -28,6 +29,23 @@ _rate_limit_lock = Lock()
 _login_attempts: dict = defaultdict(list)  # IP -> list of timestamps
 RATE_LIMIT_MAX_ATTEMPTS = 5
 RATE_LIMIT_WINDOW_SECONDS = 300  # 5 minutes
+
+
+def _sanitize_next_url(next_url: str | None) -> str:
+    """Return a safe post-login redirect URL limited to local paths."""
+    fallback = url_for("portal_index")
+    if not next_url:
+        return fallback
+
+    parsed = urlparse(next_url)
+    if parsed.scheme or parsed.netloc:
+        logger.warning("Blocked external next redirect: %s", next_url)
+        return fallback
+
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        return fallback
+
+    return next_url
 
 
 def _is_rate_limited(ip: str) -> bool:
@@ -103,7 +121,7 @@ def login():
                     "login_time": datetime.now().isoformat(),
                 }
                 rotate_csrf_token()
-                next_url = request.args.get("next", url_for("portal_index"))
+                next_url = _sanitize_next_url(request.args.get("next"))
                 return redirect(next_url)
 
     return render_template("login.html", error=error)

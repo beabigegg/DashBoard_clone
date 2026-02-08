@@ -40,6 +40,7 @@ from mes_dashboard.core.runtime_contract import (  # noqa: E402
     build_runtime_contract_diagnostics,
     load_runtime_contract,
 )
+from mes_dashboard.core.watchdog_logging import attach_sqlite_log_handler  # noqa: E402
 from mes_dashboard.core.worker_recovery_policy import (  # noqa: E402
     decide_restart_request,
     evaluate_worker_recovery_state,
@@ -57,6 +58,7 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger('mes_dashboard.watchdog')
+attach_sqlite_log_handler(logger)
 
 # ============================================================
 # Configuration

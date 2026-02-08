@@ -62,8 +62,8 @@ A release is cutover-ready only when all gates pass:
 5. Conda + systemd rehearsal (recommended before production cutover)
 - `sudo cp deploy/mes-dashboard.service /etc/systemd/system/`
 - `sudo cp deploy/mes-dashboard-watchdog.service /etc/systemd/system/`
-- `sudo mkdir -p /etc/mes-dashboard && sudo cp deploy/mes-dashboard.env.example /etc/mes-dashboard/mes-dashboard.env`
-- merge deployment secrets from `.env` into `/etc/mes-dashboard/mes-dashboard.env`
+- ensure deployment uses the same single env file: `/opt/mes-dashboard/.env`
+- `sudo chown root:www-data /opt/mes-dashboard/.env && sudo chmod 640 /opt/mes-dashboard/.env`
 - `sudo systemctl daemon-reload`
 - `sudo systemctl enable --now mes-dashboard mes-dashboard-watchdog`
 - call `/admin/api/worker/status` and verify runtime contract paths exist

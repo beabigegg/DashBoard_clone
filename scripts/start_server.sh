@@ -16,12 +16,15 @@ PID_FILE="${WATCHDOG_PID_FILE:-${PID_FILE_DEFAULT}}"
 LOG_DIR="${ROOT}/logs"
 ACCESS_LOG="${LOG_DIR}/access.log"
 ERROR_LOG="${LOG_DIR}/error.log"
+WATCHDOG_LOG="${LOG_DIR}/watchdog.log"
 STARTUP_LOG="${LOG_DIR}/startup.log"
 DEFAULT_PORT="${GUNICORN_BIND:-0.0.0.0:8080}"
 PORT=$(echo "$DEFAULT_PORT" | cut -d: -f2)
 
 # Redis configuration
 REDIS_ENABLED="${REDIS_ENABLED:-true}"
+# Worker watchdog configuration
+WATCHDOG_ENABLED="${WATCHDOG_ENABLED:-true}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -53,13 +56,25 @@ timestamp() {
     date '+%Y-%m-%d %H:%M:%S'
 }
 
+is_enabled() {
+    case "${1:-}" in
+        1|[Tt][Rr][Uu][Ee]|[Yy][Ee][Ss]|[Oo][Nn])
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 resolve_runtime_paths() {
     WATCHDOG_RUNTIME_DIR="${WATCHDOG_RUNTIME_DIR:-${ROOT}/tmp}"
     WATCHDOG_RESTART_FLAG="${WATCHDOG_RESTART_FLAG:-${WATCHDOG_RUNTIME_DIR}/mes_dashboard_restart.flag}"
     WATCHDOG_PID_FILE="${WATCHDOG_PID_FILE:-${WATCHDOG_RUNTIME_DIR}/gunicorn.pid}"
     WATCHDOG_STATE_FILE="${WATCHDOG_STATE_FILE:-${WATCHDOG_RUNTIME_DIR}/mes_dashboard_restart_state.json}"
+    WATCHDOG_PROCESS_PID_FILE="${WATCHDOG_PROCESS_PID_FILE:-${WATCHDOG_RUNTIME_DIR}/worker_watchdog.pid}"
     PID_FILE="${WATCHDOG_PID_FILE}"
-    export WATCHDOG_RUNTIME_DIR WATCHDOG_RESTART_FLAG WATCHDOG_PID_FILE WATCHDOG_STATE_FILE
+    export WATCHDOG_RUNTIME_DIR WATCHDOG_RESTART_FLAG WATCHDOG_PID_FILE WATCHDOG_STATE_FILE WATCHDOG_PROCESS_PID_FILE
 }
 
 # Load .env file if exists
@@ -396,14 +411,20 @@ rotate_logs() {
         log_info "Archived error.log -> archive/error_${ts}.log"
     fi
 
+    if [ -f "$WATCHDOG_LOG" ] && [ -s "$WATCHDOG_LOG" ]; then
+        mv "$WATCHDOG_LOG" "${LOG_DIR}/archive/watchdog_${ts}.log"
+        log_info "Archived watchdog.log -> archive/watchdog_${ts}.log"
+    fi
+
     # Clean up old archives (keep last 10)
     cd "${LOG_DIR}/archive" 2>/dev/null && \
         ls -t access_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
-        ls -t error_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f
+        ls -t error_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
+        ls -t watchdog_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f
     cd "$ROOT"
 
     # Create fresh log files
-    touch "$ACCESS_LOG" "$ERROR_LOG"
+    touch "$ACCESS_LOG" "$ERROR_LOG" "$WATCHDOG_LOG"
 }
 
 get_pid() {
@@ -429,6 +450,84 @@ is_running() {
     get_pid &>/dev/null
 }
 
+get_watchdog_pid() {
+    if [ -f "$WATCHDOG_PROCESS_PID_FILE" ]; then
+        local pid
+        pid=$(cat "$WATCHDOG_PROCESS_PID_FILE" 2>/dev/null || true)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            echo "$pid"
+            return 0
+        fi
+        rm -f "$WATCHDOG_PROCESS_PID_FILE"
+    fi
+    return 1
+}
+
+is_watchdog_running() {
+    get_watchdog_pid &>/dev/null
+}
+
+start_watchdog() {
+    if ! is_enabled "${WATCHDOG_ENABLED:-true}"; then
+        log_info "Worker watchdog is disabled (WATCHDOG_ENABLED=${WATCHDOG_ENABLED})"
+        return 0
+    fi
+
+    if is_watchdog_running; then
+        local pid
+        pid=$(get_watchdog_pid)
+        log_success "Worker watchdog already running (PID: ${pid})"
+        return 0
+    fi
+
+    log_info "Starting worker watchdog..."
+    nohup python scripts/worker_watchdog.py >> "$WATCHDOG_LOG" 2>&1 &
+    local pid=$!
+    echo "$pid" > "$WATCHDOG_PROCESS_PID_FILE"
+
+    sleep 1
+    if kill -0 "$pid" 2>/dev/null; then
+        log_success "Worker watchdog started (PID: ${pid})"
+        return 0
+    fi
+
+    rm -f "$WATCHDOG_PROCESS_PID_FILE"
+    log_error "Failed to start worker watchdog"
+    return 1
+}
+
+stop_watchdog() {
+    if ! is_watchdog_running; then
+        rm -f "$WATCHDOG_PROCESS_PID_FILE"
+        return 0
+    fi
+
+    local pid
+    pid=$(get_watchdog_pid)
+    log_info "Stopping worker watchdog (PID: ${pid})..."
+    kill -TERM "$pid" 2>/dev/null || true
+
+    local count=0
+    while kill -0 "$pid" 2>/dev/null && [ $count -lt 5 ]; do
+        sleep 1
+        count=$((count + 1))
+    done
+
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null || true
+        sleep 1
+    fi
+
+    rm -f "$WATCHDOG_PROCESS_PID_FILE"
+    if kill -0 "$pid" 2>/dev/null; then
+        log_error "Failed to stop worker watchdog"
+        return 1
+    fi
+
+    log_success "Worker watchdog stopped"
+    return 0
+}
+
 do_start() {
     local foreground=false
 
@@ -442,7 +541,14 @@ do_start() {
     if is_running; then
         local pid=$(get_pid)
         log_warn "Server is already running (PID: ${pid})"
-        return 1
+        if is_enabled "${WATCHDOG_ENABLED:-true}" && ! is_watchdog_running; then
+            check_conda || return 1
+            conda activate "$CONDA_ENV"
+            export PYTHONPATH="${ROOT}/src:${PYTHONPATH:-}"
+            cd "$ROOT"
+            start_watchdog || return 1
+        fi
+        return 0
     fi
 
     # Run checks
@@ -470,6 +576,9 @@ do_start() {
     echo "[$(timestamp)] Starting server" >> "$STARTUP_LOG"
 
     if [ "$foreground" = true ]; then
+        if is_enabled "${WATCHDOG_ENABLED:-true}"; then
+            log_info "Foreground mode does not auto-start watchdog (use background start for watchdog)."
+        fi
         log_info "Running in foreground mode (Ctrl+C to stop)"
         exec gunicorn \
             --config gunicorn.conf.py \
@@ -495,6 +604,7 @@ do_start() {
             log_success "Server started successfully (PID: ${pid})"
             log_info "Access URL: http://localhost:${PORT}"
             log_info "Logs: ${LOG_DIR}/"
+            start_watchdog || return 1
             echo "[$(timestamp)] Server started (PID: ${pid})" >> "$STARTUP_LOG"
         else
             log_error "Failed to start server"
@@ -509,48 +619,54 @@ do_stop() {
     load_env
     resolve_runtime_paths
 
-    if ! is_running; then
-        log_warn "Server is not running"
-        return 0
-    fi
-
-    local pid=$(get_pid)
-    log_info "Stopping server (PID: ${pid})..."
-
-    # Find all gunicorn processes (master + workers)
-    local all_pids=$(pgrep -f "gunicorn.*mes_dashboard" 2>/dev/null | tr '\n' ' ')
-
-    # Graceful shutdown with SIGTERM
-    kill -TERM "$pid" 2>/dev/null
-
-    # Wait for graceful shutdown (max 10 seconds)
-    local count=0
-    while kill -0 "$pid" 2>/dev/null && [ $count -lt 10 ]; do
-        sleep 1
-        count=$((count + 1))
-        echo -n "."
-    done
-    echo ""
-
-    # Force kill if still running (including orphaned workers)
-    if kill -0 "$pid" 2>/dev/null || [ -n "$(pgrep -f 'gunicorn.*mes_dashboard' 2>/dev/null)" ]; then
-        log_warn "Graceful shutdown timeout, forcing..."
-        # Kill all gunicorn processes related to mes_dashboard
-        pkill -9 -f "gunicorn.*mes_dashboard" 2>/dev/null
-        sleep 1
-    fi
-
-    # Cleanup PID file
-    rm -f "$PID_FILE"
-
-    # Verify all processes are stopped
-    if [ -z "$(pgrep -f 'gunicorn.*mes_dashboard' 2>/dev/null)" ]; then
-        log_success "Server stopped"
-        echo "[$(timestamp)] Server stopped (PID: ${pid})" >> "$STARTUP_LOG"
+    local server_running=false
+    local pid=""
+    if is_running; then
+        server_running=true
+        pid=$(get_pid)
+        log_info "Stopping server (PID: ${pid})..."
     else
-        log_error "Failed to stop server"
-        return 1
+        log_warn "Server is not running"
     fi
+
+    if [ "$server_running" = true ]; then
+        # Find all gunicorn processes (master + workers)
+        local all_pids=$(pgrep -f "gunicorn.*mes_dashboard" 2>/dev/null | tr '\n' ' ')
+
+        # Graceful shutdown with SIGTERM
+        kill -TERM "$pid" 2>/dev/null
+
+        # Wait for graceful shutdown (max 10 seconds)
+        local count=0
+        while kill -0 "$pid" 2>/dev/null && [ $count -lt 10 ]; do
+            sleep 1
+            count=$((count + 1))
+            echo -n "."
+        done
+        echo ""
+
+        # Force kill if still running (including orphaned workers)
+        if kill -0 "$pid" 2>/dev/null || [ -n "$(pgrep -f 'gunicorn.*mes_dashboard' 2>/dev/null)" ]; then
+            log_warn "Graceful shutdown timeout, forcing..."
+            # Kill all gunicorn processes related to mes_dashboard
+            pkill -9 -f "gunicorn.*mes_dashboard" 2>/dev/null
+            sleep 1
+        fi
+
+        # Cleanup PID file
+        rm -f "$PID_FILE"
+
+        # Verify all processes are stopped
+        if [ -z "$(pgrep -f 'gunicorn.*mes_dashboard' 2>/dev/null)" ]; then
+            log_success "Server stopped"
+            echo "[$(timestamp)] Server stopped (PID: ${pid})" >> "$STARTUP_LOG"
+        else
+            log_error "Failed to stop server"
+            return 1
+        fi
+    fi
+
+    stop_watchdog
 }
 
 do_restart() {
@@ -585,6 +701,16 @@ do_status() {
 
     # Show Redis status
     redis_status
+    if is_enabled "${WATCHDOG_ENABLED:-true}"; then
+        if is_watchdog_running; then
+            local watchdog_pid=$(get_watchdog_pid)
+            echo -e "  Watchdog:${GREEN} RUNNING${NC} (PID: ${watchdog_pid})"
+        else
+            echo -e "  Watchdog:${YELLOW} STOPPED${NC}"
+        fi
+    else
+        echo -e "  Watchdog:${YELLOW} DISABLED${NC}"
+    fi
 
     if is_running; then
         echo ""
@@ -635,7 +761,15 @@ do_logs() {
             ;;
         follow)
             log_info "Following logs (Ctrl+C to stop)..."
-            tail -f "$ACCESS_LOG" "$ERROR_LOG" 2>/dev/null
+            tail -f "$ACCESS_LOG" "$ERROR_LOG" "$WATCHDOG_LOG" 2>/dev/null
+            ;;
+        watchdog)
+            if [ -f "$WATCHDOG_LOG" ]; then
+                log_info "Watchdog log (last ${lines} lines):"
+                tail -n "$lines" "$WATCHDOG_LOG"
+            else
+                log_warn "Watchdog log not found"
+            fi
             ;;
         *)
             log_info "=== Error Log (last 20 lines) ==="
@@ -643,6 +777,9 @@ do_logs() {
             echo ""
             log_info "=== Access Log (last 20 lines) ==="
             tail -20 "$ACCESS_LOG" 2>/dev/null || echo "(empty)"
+            echo ""
+            log_info "=== Watchdog Log (last 20 lines) ==="
+            tail -20 "$WATCHDOG_LOG" 2>/dev/null || echo "(empty)"
             ;;
     esac
 }
@@ -660,7 +797,7 @@ show_help() {
     echo "  stop           Stop the server gracefully"
     echo "  restart        Restart the server"
     echo "  status         Show server and Redis status"
-    echo "  logs [type]    View logs (access|error|follow|all)"
+    echo "  logs [type]    View logs (access|error|watchdog|follow|all)"
     echo "  check          Run environment checks only"
     echo "  help           Show this help message"
     echo ""
@@ -676,6 +813,7 @@ show_help() {
     echo "  GUNICORN_THREADS   Threads per worker (default: 4)"
     echo "  REDIS_ENABLED      Enable Redis cache (default: true)"
     echo "  REDIS_URL          Redis connection URL"
+    echo "  WATCHDOG_ENABLED   Enable worker watchdog (default: true)"
     echo ""
 }
 

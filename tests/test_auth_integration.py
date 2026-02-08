@@ -107,6 +107,59 @@ class TestLoginRoute:
             assert sess["admin"]["username"] == "92367"
 
     @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.services.auth_service.requests.post')
+    def test_login_blocks_external_next_redirect(self, mock_post, _mock_is_admin, client):
+        """Should ignore external next URL and redirect to portal."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "user": {
+                "username": "92367",
+                "displayName": "Admin User",
+                "mail": "ymirliu@panjit.com.tw",
+                "department": "Test Dept",
+            },
+        }
+        mock_post.return_value = mock_response
+
+        response = client.post(
+            "/admin/login?next=https://evil.example/phish",
+            data={"username": "92367", "password": "password123"},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        assert "evil.example" not in response.location
+        assert response.location.endswith("/")
+
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.services.auth_service.requests.post')
+    def test_login_allows_internal_next_redirect(self, mock_post, _mock_is_admin, client):
+        """Should keep validated local path in next URL."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "user": {
+                "username": "92367",
+                "displayName": "Admin User",
+                "mail": "ymirliu@panjit.com.tw",
+                "department": "Test Dept",
+            },
+        }
+        mock_post.return_value = mock_response
+
+        response = client.post(
+            "/admin/login?next=/admin/pages",
+            data={"username": "92367", "password": "password123"},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        assert response.location.endswith("/admin/pages")
+
+    @patch('mes_dashboard.services.auth_service.LOCAL_AUTH_ENABLED', False)
     @patch('mes_dashboard.services.auth_service.requests.post')
     def test_login_invalid_credentials(self, mock_post, client):
         """Test login with invalid credentials via LDAP."""

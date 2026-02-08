@@ -77,12 +77,14 @@ class TestGetResources:
     @patch('mes_dashboard.services.resource_cache.get_all_resources')
     def test_get_resources_exception(self, mock_get_resources, client):
         """Should handle exception gracefully."""
-        mock_get_resources.side_effect = Exception('Database error')
+        mock_get_resources.side_effect = Exception('ORA-01017 invalid username/password')
 
         response = client.get('/api/job-query/resources')
         assert response.status_code == 500
         data = json.loads(response.data)
         assert 'error' in data
+        assert data['error'] == '服務暫時無法使用'
+        assert 'ORA-01017' not in data['error']
 
 
 class TestQueryJobs:

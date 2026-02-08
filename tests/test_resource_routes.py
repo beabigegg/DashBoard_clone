@@ -3,6 +3,18 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+import mes_dashboard.core.database as db
+from mes_dashboard.app import create_app
+
+
+def _client():
+    db._ENGINE = None
+    app = create_app("testing")
+    app.config["TESTING"] = True
+    return app.test_client()
+
 
 def test_clean_nan_values_handles_deep_nesting_without_recursion_error():
     from mes_dashboard.routes.resource_routes import _clean_nan_values
@@ -30,3 +42,33 @@ def test_clean_nan_values_breaks_cycles_safely():
     cleaned = _clean_nan_values(payload)
     assert cleaned["name"] == "root"
     assert cleaned["self"] is None
+
+
+@patch(
+    "mes_dashboard.routes.resource_routes.get_resource_status_summary",
+    side_effect=RuntimeError("ORA-00942: table or view does not exist"),
+)
+def test_resource_status_summary_masks_internal_error_details(_mock_summary):
+    response = _client().get("/api/resource/status/summary")
+    assert response.status_code == 500
+
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert payload["error"]["code"] == "INTERNAL_ERROR"
+    assert payload["error"]["message"] == "服務暫時無法使用"
+    assert "ORA-00942" not in str(payload)
+
+
+@patch(
+    "mes_dashboard.routes.resource_routes.get_merged_resource_status",
+    side_effect=RuntimeError("sensitive sql context"),
+)
+def test_resource_status_masks_internal_error_details(_mock_status):
+    response = _client().get("/api/resource/status")
+    assert response.status_code == 500
+
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert payload["error"]["code"] == "INTERNAL_ERROR"
+    assert payload["error"]["message"] == "服務暫時無法使用"
+    assert "sensitive sql context" not in str(payload)

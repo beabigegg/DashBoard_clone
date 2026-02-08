@@ -17,12 +17,12 @@ import csv
 import io
 import logging
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Generator
+from typing import Dict, List, Any, Optional, Generator, Tuple
 
 import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df, get_db_connection
-from mes_dashboard.sql import SQLLoader
+from mes_dashboard.sql import SQLLoader, QueryBuilder
 from mes_dashboard.config.field_contracts import get_export_headers, get_export_api_keys
 
 logger = logging.getLogger('mes_dashboard.job_query')
@@ -30,6 +30,8 @@ logger = logging.getLogger('mes_dashboard.job_query')
 # Constants
 BATCH_SIZE = 1000  # Oracle IN clause limit
 MAX_DATE_RANGE_DAYS = 365
+QUERY_ERROR_MESSAGE = "查詢服務暫時無法使用"
+EXPORT_ERROR_MESSAGE = "匯出服務暫時無法使用"
 
 
 # ============================================================
@@ -66,55 +68,72 @@ def validate_date_range(start_date: str, end_date: str) -> Optional[str]:
 # Resource Filter Helpers
 # ============================================================
 
-def _build_resource_filter(resource_ids: List[str], max_chunk_size: int = BATCH_SIZE) -> List[str]:
-    """Build SQL IN clause lists for resource IDs.
-
-    Oracle has a limit of ~1000 items per IN clause, so we chunk if needed.
+def _build_resource_filter(
+    resource_ids: List[str], max_chunk_size: int = BATCH_SIZE
+) -> List[List[str]]:
+    """Build chunked resource ID lists for Oracle IN clause limits.
 
     Args:
         resource_ids: List of resource IDs.
         max_chunk_size: Maximum items per IN clause.
 
     Returns:
-        List of SQL IN clause strings (e.g., "'ID1', 'ID2', 'ID3'").
+        Chunked resource ID values.
     """
-    if not resource_ids:
+    normalized_ids: List[str] = []
+    for rid in resource_ids:
+        if rid is None:
+            continue
+        text = str(rid).strip()
+        if text:
+            normalized_ids.append(text)
+
+    if not normalized_ids:
         return []
 
-    # Escape single quotes
-    escaped_ids = [rid.replace("'", "''") for rid in resource_ids]
-
-    # Chunk into groups
-    chunks = []
-    for i in range(0, len(escaped_ids), max_chunk_size):
-        chunk = escaped_ids[i:i + max_chunk_size]
-        chunks.append("'" + "', '".join(chunk) + "'")
-
+    chunks: List[List[str]] = []
+    for i in range(0, len(normalized_ids), max_chunk_size):
+        chunk = normalized_ids[i:i + max_chunk_size]
+        chunks.append(chunk)
     return chunks
 
 
-def _build_resource_filter_sql(resource_ids: List[str], column: str = 'j.RESOURCEID') -> str:
-    """Build SQL WHERE clause for resource ID filtering.
+def _build_resource_filter_sql(
+    resource_ids: List[str],
+    column: str = 'j.RESOURCEID',
+    max_chunk_size: int = BATCH_SIZE,
+    return_params: bool = False,
+) -> str | Tuple[str, Dict[str, Any]]:
+    """Build parameterized SQL condition for resource ID filtering.
 
-    Handles chunking for large resource lists.
+    Uses bind variables via QueryBuilder and chunks values to satisfy Oracle
+    IN-clause limits.
 
     Args:
         resource_ids: List of resource IDs.
         column: Column name to filter on.
+        max_chunk_size: Maximum items per IN clause.
+        return_params: If True, return (condition_sql, params).
 
     Returns:
-        SQL condition string (e.g., "j.RESOURCEID IN ('ID1', 'ID2')").
+        Condition SQL string, or tuple of condition SQL and parameters.
     """
-    chunks = _build_resource_filter(resource_ids)
+    chunks = _build_resource_filter(resource_ids, max_chunk_size=max_chunk_size)
     if not chunks:
-        return "1=0"  # No resources = no results
+        result: Tuple[str, Dict[str, Any]] = ("1=0", {})
+        return result if return_params else result[0]
 
-    if len(chunks) == 1:
-        return f"{column} IN ({chunks[0]})"
+    builder = QueryBuilder()
+    for chunk in chunks:
+        builder.add_in_condition(column, chunk)
 
-    # Multiple chunks need OR
-    conditions = [f"{column} IN ({chunk})" for chunk in chunks]
-    return "(" + " OR ".join(conditions) + ")"
+    if len(builder.conditions) == 1:
+        condition_sql = builder.conditions[0]
+    else:
+        condition_sql = "(" + " OR ".join(builder.conditions) + ")"
+
+    result = (condition_sql, builder.params.copy())
+    return result if return_params else result[0]
 
 
 # ============================================================
@@ -147,14 +166,20 @@ def get_jobs_by_resources(
 
     try:
         # Build resource filter
-        resource_filter = _build_resource_filter_sql(resource_ids)
+        resource_filter, resource_params = _build_resource_filter_sql(
+            resource_ids, return_params=True
+        )
 
         # Load SQL template
         sql = SQLLoader.load("job_query/job_list")
         sql = sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
 
         # Execute query
-        params = {'start_date': start_date, 'end_date': end_date}
+        params = {
+            'start_date': start_date,
+            'end_date': end_date,
+            **resource_params,
+        }
         df = read_sql_df(sql, params)
 
         # Convert to records
@@ -180,8 +205,8 @@ def get_jobs_by_resources(
         }
 
     except Exception as exc:
-        logger.error(f"Job query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        logger.exception("Job query failed: %s", exc)
+        return {'error': QUERY_ERROR_MESSAGE}
 
 
 def get_job_txn_history(job_id: str) -> Dict[str, Any]:
@@ -228,8 +253,8 @@ def get_job_txn_history(job_id: str) -> Dict[str, Any]:
         }
 
     except Exception as exc:
-        logger.error(f"Transaction history query failed for job {job_id}: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        logger.exception("Transaction history query failed for job %s: %s", job_id, exc)
+        return {'error': QUERY_ERROR_MESSAGE}
 
 
 # ============================================================
@@ -265,14 +290,20 @@ def export_jobs_with_history(
 
     try:
         # Build resource filter
-        resource_filter = _build_resource_filter_sql(resource_ids)
+        resource_filter, resource_params = _build_resource_filter_sql(
+            resource_ids, return_params=True
+        )
 
         # Load SQL template
         sql = SQLLoader.load("job_query/job_txn_export")
         sql = sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
 
         # Execute query
-        params = {'start_date': start_date, 'end_date': end_date}
+        params = {
+            'start_date': start_date,
+            'end_date': end_date,
+            **resource_params,
+        }
         df = read_sql_df(sql, params)
 
         if df is None or len(df) == 0:
@@ -322,8 +353,8 @@ def export_jobs_with_history(
         logger.info(f"CSV export completed: {len(df)} records")
 
     except Exception as exc:
-        logger.error(f"CSV export failed: {exc}")
-        yield f"Error: 匯出失敗 - {str(exc)}\n"
+        logger.exception("CSV export failed: %s", exc)
+        yield f"Error: {EXPORT_ERROR_MESSAGE}\n"
 
 
 def get_export_data(
@@ -351,14 +382,20 @@ def get_export_data(
 
     try:
         # Build resource filter
-        resource_filter = _build_resource_filter_sql(resource_ids)
+        resource_filter, resource_params = _build_resource_filter_sql(
+            resource_ids, return_params=True
+        )
 
         # Load SQL template
         sql = SQLLoader.load("job_query/job_txn_export")
         sql = sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
 
         # Execute query
-        params = {'start_date': start_date, 'end_date': end_date}
+        params = {
+            'start_date': start_date,
+            'end_date': end_date,
+            **resource_params,
+        }
         df = read_sql_df(sql, params)
 
         # Convert to records
@@ -382,5 +419,5 @@ def get_export_data(
         }
 
     except Exception as exc:
-        logger.error(f"Export data query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        logger.exception("Export data query failed: %s", exc)
+        return {'error': QUERY_ERROR_MESSAGE}

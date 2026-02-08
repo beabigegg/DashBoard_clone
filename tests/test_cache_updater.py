@@ -173,6 +173,9 @@ class TestUpdateRedisCache:
                 assert result is True
                 mock_pipeline.rename.assert_called_once()
                 mock_pipeline.execute.assert_called_once()
+                assert mock_pipeline.set.call_count == 3
+                for call in mock_pipeline.set.call_args_list:
+                    assert call.kwargs.get("ex") == updater.interval * 3
 
     def test_update_redis_cache_no_client(self):
         """Test _update_redis_cache handles no client."""
@@ -205,6 +208,26 @@ class TestUpdateRedisCache:
         mock_client.delete.assert_called_once()
         staged_key = mock_client.delete.call_args.args[0]
         assert "staging" in staged_key
+
+    def test_update_redis_cache_ttl_override(self):
+        """Configured TTL override should apply to all Redis keys."""
+        import mes_dashboard.core.cache_updater as cu
+
+        mock_client = MagicMock()
+        mock_pipeline = MagicMock()
+        mock_client.pipeline.return_value = mock_pipeline
+        test_df = pd.DataFrame({'LOTID': ['LOT001'], 'QTY': [100]})
+
+        with patch.object(cu, 'WIP_CACHE_TTL_SECONDS', 42):
+            with patch.object(cu, 'get_redis_client', return_value=mock_client):
+                with patch.object(cu, 'get_key', side_effect=lambda k: f'mes_wip:{k}'):
+                    updater = cu.CacheUpdater(interval=600)
+                    result = updater._update_redis_cache(test_df, '2024-01-15 10:30:00')
+
+        assert result is True
+        assert mock_pipeline.set.call_count == 3
+        for call in mock_pipeline.set.call_args_list:
+            assert call.kwargs.get("ex") == 42
 
 
 class TestCacheUpdateFlow:

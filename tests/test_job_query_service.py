@@ -5,12 +5,17 @@ Tests the core service functions without database dependencies.
 """
 
 import pytest
+from unittest.mock import patch
 from mes_dashboard.services.job_query_service import (
     validate_date_range,
     _build_resource_filter,
     _build_resource_filter_sql,
+    get_jobs_by_resources,
+    export_jobs_with_history,
     BATCH_SIZE,
     MAX_DATE_RANGE_DAYS,
+    QUERY_ERROR_MESSAGE,
+    EXPORT_ERROR_MESSAGE,
 )
 
 
@@ -89,15 +94,13 @@ class TestBuildResourceFilter:
         """Should return single chunk for single ID."""
         result = _build_resource_filter(['RES001'])
         assert len(result) == 1
-        assert result[0] == "'RES001'"
+        assert result[0] == ['RES001']
 
     def test_multiple_ids(self):
         """Should join multiple IDs with comma."""
         result = _build_resource_filter(['RES001', 'RES002', 'RES003'])
         assert len(result) == 1
-        assert "'RES001'" in result[0]
-        assert "'RES002'" in result[0]
-        assert "'RES003'" in result[0]
+        assert result[0] == ['RES001', 'RES002', 'RES003']
 
     def test_chunking(self):
         """Should chunk when exceeding batch size."""
@@ -106,13 +109,13 @@ class TestBuildResourceFilter:
         result = _build_resource_filter(ids)
         assert len(result) == 2
         # First chunk should have BATCH_SIZE items
-        assert result[0].count("'") == BATCH_SIZE * 2  # 2 quotes per ID
+        assert len(result[0]) == BATCH_SIZE
 
-    def test_escape_single_quotes(self):
-        """Should escape single quotes in IDs."""
+    def test_preserve_id_value_without_sql_interpolation(self):
+        """Should keep raw value and defer safety to bind variables."""
         result = _build_resource_filter(["RES'001"])
         assert len(result) == 1
-        assert "RES''001" in result[0]  # Escaped
+        assert result[0] == ["RES'001"]
 
     def test_custom_chunk_size(self):
         """Should respect custom chunk size."""
@@ -130,17 +133,21 @@ class TestBuildResourceFilterSql:
         assert result == "1=0"
 
     def test_single_id(self):
-        """Should build simple IN clause for single ID."""
-        result = _build_resource_filter_sql(['RES001'])
+        """Should build IN clause with bind variable for single ID."""
+        result, params = _build_resource_filter_sql(['RES001'], return_params=True)
         assert "j.RESOURCEID IN" in result
-        assert "'RES001'" in result
+        assert ":p0" in result
+        assert params["p0"] == "RES001"
+        assert "RES001" not in result
 
     def test_multiple_ids(self):
-        """Should build IN clause with multiple IDs."""
-        result = _build_resource_filter_sql(['RES001', 'RES002'])
+        """Should build IN clause with multiple bind variables."""
+        result, params = _build_resource_filter_sql(['RES001', 'RES002'], return_params=True)
         assert "j.RESOURCEID IN" in result
-        assert "'RES001'" in result
-        assert "'RES002'" in result
+        assert ":p0" in result
+        assert ":p1" in result
+        assert params["p0"] == "RES001"
+        assert params["p1"] == "RES002"
 
     def test_custom_column(self):
         """Should use custom column name."""
@@ -157,6 +164,13 @@ class TestBuildResourceFilterSql:
         assert result.startswith("(")
         assert result.endswith(")")
 
+    def test_sql_injection_payload_stays_in_params(self):
+        """Injection payload should never be interpolated into SQL text."""
+        payload = "RES001' OR '1'='1"
+        sql, params = _build_resource_filter_sql([payload], return_params=True)
+        assert payload in params.values()
+        assert payload not in sql
+
 
 class TestServiceConstants:
     """Tests for service constants."""
@@ -168,3 +182,25 @@ class TestServiceConstants:
     def test_max_date_range_is_year(self):
         """Max date range should be 365 days."""
         assert MAX_DATE_RANGE_DAYS == 365
+
+
+class TestErrorLeakageProtection:
+    """Tests for exception detail masking in job-query service."""
+
+    @patch("mes_dashboard.services.job_query_service.read_sql_df")
+    def test_query_error_masks_internal_details(self, mock_read):
+        mock_read.side_effect = RuntimeError("ORA-00942: table or view does not exist")
+
+        result = get_jobs_by_resources(["RES001"], "2024-01-01", "2024-01-31")
+
+        assert result["error"] == QUERY_ERROR_MESSAGE
+        assert "ORA-00942" not in result["error"]
+
+    @patch("mes_dashboard.services.job_query_service.read_sql_df")
+    def test_export_stream_error_masks_internal_details(self, mock_read):
+        mock_read.side_effect = RuntimeError("sensitive sql context")
+
+        output = "".join(export_jobs_with_history(["RES001"], "2024-01-01", "2024-01-31"))
+
+        assert EXPORT_ERROR_MESSAGE in output
+        assert "sensitive sql context" not in output
