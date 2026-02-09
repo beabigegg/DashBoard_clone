@@ -45,53 +45,20 @@ class TestResourceHistoryPageAccess:
         content = response.data.decode('utf-8')
         assert '設備歷史績效' in content
 
-    def test_page_contains_filter_elements(self, client):
-        """Page should contain all filter elements."""
+    def test_page_bootstrap_container_exists(self, client):
+        """Resource history page should expose the Vue mount container."""
         response = client.get('/resource-history')
         content = response.data.decode('utf-8')
 
-        # Check for filter elements
-        assert 'startDate' in content
-        assert 'endDate' in content
-        # Multi-select dropdowns
-        assert 'workcenterGroupsDropdown' in content
-        assert 'familiesDropdown' in content
-        assert 'isProduction' in content
-        assert 'isKey' in content
-        assert 'isMonitor' in content
+        assert "id='app'" in content or 'id="app"' in content
 
-    def test_page_contains_kpi_cards(self, client):
-        """Page should contain KPI card elements."""
+    def test_page_references_vite_module(self, client):
+        """Resource history page should load the Vite module bundle."""
         response = client.get('/resource-history')
         content = response.data.decode('utf-8')
 
-        assert 'kpiOuPct' in content
-        assert 'kpiAvailabilityPct' in content
-        assert 'kpiPrdHours' in content
-        assert 'kpiUdtHours' in content
-        assert 'kpiSdtHours' in content
-        assert 'kpiEgtHours' in content
-        assert 'kpiMachineCount' in content
-
-    def test_page_contains_chart_containers(self, client):
-        """Page should contain chart container elements."""
-        response = client.get('/resource-history')
-        content = response.data.decode('utf-8')
-
-        assert 'trendChart' in content
-        assert 'stackedChart' in content
-        assert 'comparisonChart' in content
-        assert 'heatmapChart' in content
-
-    def test_page_contains_table_elements(self, client):
-        """Page should contain table elements."""
-        response = client.get('/resource-history')
-        content = response.data.decode('utf-8')
-
-        assert 'detailTableBody' in content
-        assert 'expandAllBtn' in content
-        assert 'collapseAllBtn' in content
-        assert 'exportBtn' in content
+        assert '/static/dist/resource-history.js' in content
+        assert 'type="module"' in content
 
 
 class TestResourceHistoryAPIWorkflow:

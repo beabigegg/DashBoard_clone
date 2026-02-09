@@ -63,14 +63,14 @@ class TestTemplateIntegration(unittest.TestCase):
         self.assertIn('type="module"', html)
         self.assertNotIn('mes-toast-container', html)
 
-    def test_resource_page_includes_base_scripts(self):
+    def test_resource_page_serves_pure_vite_module(self):
         response = self.client.get('/resource')
         self.assertEqual(response.status_code, 200)
         html = response.data.decode('utf-8')
 
-        self.assertIn('toast.js', html)
-        self.assertIn('mes-api.js', html)
-        self.assertIn('mes-toast-container', html)
+        self.assertIn('/static/dist/resource-status.js', html)
+        self.assertIn('type="module"', html)
+        self.assertNotIn('mes-toast-container', html)
 
     def test_excel_query_page_includes_base_scripts(self):
         response = self.client.get('/excel-query')

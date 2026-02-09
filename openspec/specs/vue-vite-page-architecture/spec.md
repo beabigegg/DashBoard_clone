@@ -46,6 +46,11 @@ The Vite build configuration SHALL support Vue Single File Components alongside 
 - **THEN** Vite SHALL bundle the shared CSS into each page's output CSS
 - **THEN** shared CSS SHALL NOT create a separate shared chunk that requires additional HTTP requests
 
+#### Scenario: Shared composable import across module boundaries
+- **WHEN** a migrated page imports a composable from another shared module (e.g., `resource-status` imports `useAutoRefresh` from `wip-shared/`)
+- **THEN** the composable SHALL be bundled into the importing page's JS output
+- **THEN** cross-module imports SHALL NOT create unexpected shared chunks
+
 ### Requirement: Pure Vite pages SHALL handle API calls without legacy MesApi
 Pure Vite pages SHALL use the existing `frontend/src/core/api.js` module for API communication without depending on the global `window.MesApi` object from `_base.html`.
 

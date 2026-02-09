@@ -4,7 +4,7 @@
 Contains Flask Blueprint for historical equipment performance analysis endpoints.
 """
 
-from flask import Blueprint, jsonify, request, render_template, Response
+from flask import Blueprint, jsonify, request, redirect, Response
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.config.constants import CACHE_TTL_FILTER_OPTIONS, CACHE_TTL_TREND
@@ -29,12 +29,8 @@ resource_history_bp = Blueprint(
 
 @resource_history_bp.route('/page', methods=['GET'], endpoint='page_alias')
 def api_resource_history_page():
-    """Render the resource history analysis page.
-
-    Note: The actual page route /resource-history is registered separately
-    in the main app initialization.
-    """
-    return render_template('resource_history.html')
+    """Backward-compatible alias for the migrated /resource-history page route."""
+    return redirect('/resource-history')
 
 
 # ============================================================

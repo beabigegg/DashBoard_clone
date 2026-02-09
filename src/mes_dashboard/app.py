@@ -438,8 +438,21 @@ def create_app(config_name: str | None = None) -> Flask:
 
     @app.route('/resource')
     def resource_page():
-        """Resource status report page."""
-        return render_template('resource_status.html')
+        """Resource status report page served as pure Vite HTML output."""
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "resource-status.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'resource-status.html')
+
+        # Test/local fallback when frontend build artifacts are absent.
+        return (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>設備即時概況</title>"
+            "<script type=\"module\" src=\"/static/dist/resource-status.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        )
 
     @app.route('/excel-query')
     def excel_query_page():
@@ -448,8 +461,21 @@ def create_app(config_name: str | None = None) -> Flask:
 
     @app.route('/resource-history')
     def resource_history_page():
-        """Resource history analysis page."""
-        return render_template('resource_history.html')
+        """Resource history analysis page served as pure Vite HTML output."""
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "resource-history.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'resource-history.html')
+
+        # Test/local fallback when frontend build artifacts are absent.
+        return (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>設備歷史績效</title>"
+            "<script type=\"module\" src=\"/static/dist/resource-history.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        )
 
     @app.route('/tmtt-defect')
     def tmtt_defect_page():
