@@ -9,7 +9,7 @@ import os
 import sys
 import threading
 
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
 from mes_dashboard.config.tables import TABLES_CONFIG
 from mes_dashboard.config.settings import get_config
@@ -412,6 +412,12 @@ def create_app(config_name: str | None = None) -> Flask:
     def tmtt_defect_page():
         """TMTT printing & lead form defect analysis page."""
         return render_template('tmtt_defect.html')
+
+    @app.route('/qc-gate')
+    def qc_gate_page():
+        """QC-GATE status report served as pure Vite HTML output."""
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        return send_from_directory(dist_dir, 'qc-gate.html')
 
     # ========================================================
     # Table Query APIs (for table_data_viewer)

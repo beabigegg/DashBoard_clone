@@ -30,6 +30,13 @@
       "order": 3
     },
     {
+      "route": "/qc-gate",
+      "name": "QC-GATE 狀態",
+      "status": "released",
+      "drawer_id": "reports",
+      "order": 4
+    },
+    {
       "route": "/tables",
       "name": "表格總覽",
       "status": "dev",

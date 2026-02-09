@@ -5,10 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build",
+    "build": "vite build && cp ../src/mes_dashboard/static/dist/src/qc-gate/index.html ../src/mes_dashboard/static/dist/qc-gate.html",
     "test": "node --test tests/*.test.js"
   },
   "devDependencies": {
     "vite": "^6.3.0"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^6.0.4",
+    "echarts": "^6.0.0",
+    "vue": "^3.5.27",
+    "vue-echarts": "^8.0.1"
   }
 }

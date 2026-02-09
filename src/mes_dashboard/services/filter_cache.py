@@ -31,6 +31,7 @@ _CACHE = {
     'workcenter_groups': None,      # List of {name, sequence}
     'workcenter_mapping': None,     # Dict {workcentername: {group, sequence}}
     'workcenter_to_short': None,    # Dict {workcentername: short_name}
+    'spec_order_mapping': None,     # Dict {spec_name_upper: spec_order}
     'last_refresh': None,
     'is_loading': False,
 }
@@ -148,6 +149,19 @@ def get_workcenters_by_group(group_name: str) -> List[str]:
     ]
 
 
+def get_spec_order_mapping(force_refresh: bool = False) -> Dict[str, int]:
+    """Get SPEC -> SPEC_ORDER mapping from SPEC_WORKCENTER_V cache.
+
+    Returns:
+        Dict mapping normalized SPEC name (uppercase) to integer SPEC_ORDER.
+    """
+    _ensure_cache_loaded(force_refresh)
+    mapping = _CACHE.get('spec_order_mapping')
+    if isinstance(mapping, dict):
+        return mapping
+    return {}
+
+
 # ============================================================
 # Cache Management
 # ============================================================
@@ -166,6 +180,7 @@ def get_cache_status() -> Dict[str, Any]:
             'is_loading': _CACHE.get('is_loading', False),
             'workcenter_groups_count': len(_CACHE.get('workcenter_groups') or []),
             'workcenter_mapping_count': len(_CACHE.get('workcenter_mapping') or {}),
+            'spec_order_mapping_count': len(_CACHE.get('spec_order_mapping') or {}),
         }
 
 
@@ -215,17 +230,20 @@ def _load_cache() -> bool:
     try:
         # Load workcenter groups - prioritize SPEC_WORKCENTER_V
         wc_groups, wc_mapping, wc_short = _load_workcenter_data()
+        spec_order_mapping = _load_spec_order_mapping_from_spec()
 
         with _CACHE_LOCK:
             _CACHE['workcenter_groups'] = wc_groups
             _CACHE['workcenter_mapping'] = wc_mapping
             _CACHE['workcenter_to_short'] = wc_short
+            _CACHE['spec_order_mapping'] = spec_order_mapping
             _CACHE['last_refresh'] = datetime.now()
             _CACHE['is_loading'] = False
 
         logger.info(
             f"Filter cache refreshed: {len(wc_groups or [])} groups, "
-            f"{len(wc_mapping or {})} workcenters"
+            f"{len(wc_mapping or {})} workcenters, "
+            f"{len(spec_order_mapping or {})} specs"
         )
         return True
 
@@ -344,6 +362,60 @@ def _load_workcenter_mapping_from_spec():
     except Exception as exc:
         logger.error(f"Failed to load from SPEC_WORKCENTER_V: {exc}")
         return [], {}, {}
+
+
+def _safe_sort_value(value: Any, default: int = 999999) -> int:
+    """Parse sequence/order values into stable integers."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        text = str(value).strip()
+        if not text:
+            return default
+        digits = ''.join(ch for ch in text if ch.isdigit())
+        if not digits:
+            return default
+        try:
+            return int(digits)
+        except (TypeError, ValueError):
+            return default
+
+
+def _normalize_spec_name(spec_name: Any) -> str:
+    if spec_name is None:
+        return ''
+    return str(spec_name).strip().upper()
+
+
+def _load_spec_order_mapping_from_spec() -> Dict[str, int]:
+    """Load SPEC -> SPEC_ORDER mapping from DW_MES_SPEC_WORKCENTER_V."""
+    try:
+        sql = f"""
+            SELECT DISTINCT
+                SPEC,
+                SPEC_ORDER
+            FROM {SPEC_WORKCENTER_VIEW}
+            WHERE SPEC IS NOT NULL
+        """
+        df = read_sql_df(sql)
+        if df is None or df.empty:
+            return {}
+
+        mapping: Dict[str, int] = {}
+        for _, row in df.iterrows():
+            normalized_spec = _normalize_spec_name(row.get('SPEC'))
+            if not normalized_spec:
+                continue
+            sort_order = _safe_sort_value(row.get('SPEC_ORDER'))
+            previous = mapping.get(normalized_spec)
+            if previous is None or sort_order < previous:
+                mapping[normalized_spec] = sort_order
+        return mapping
+    except Exception as exc:
+        logger.error(f"Failed to load SPEC_ORDER mapping from SPEC_WORKCENTER_V: {exc}")
+        return {}
 
 
 def _extract_workcenter_data_from_df(df):

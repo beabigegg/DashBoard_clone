@@ -1,7 +1,10 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
+import vue from '@vitejs/plugin-vue';
 
 export default defineConfig(({ mode }) => ({
+  base: '/static/dist/',
+  plugins: [vue()],
   publicDir: false,
   build: {
     outDir: '../src/mes_dashboard/static/dist',
@@ -19,18 +22,30 @@ export default defineConfig(({ mode }) => ({
         'excel-query': resolve(__dirname, 'src/excel-query/main.js'),
         tables: resolve(__dirname, 'src/tables/main.js'),
         'query-tool': resolve(__dirname, 'src/query-tool/main.js'),
-        'tmtt-defect': resolve(__dirname, 'src/tmtt-defect/main.js')
+        'tmtt-defect': resolve(__dirname, 'src/tmtt-defect/main.js'),
+        'qc-gate': resolve(__dirname, 'src/qc-gate/index.html')
       },
       output: {
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: '[name][extname]',
         manualChunks(id) {
-          if (!id.includes('node_modules')) {
+          const normalizedId = id.replace(/\\/g, '/');
+          if (!normalizedId.includes('node_modules')) {
             return;
           }
-          if (id.includes('echarts')) {
+          if (
+            normalizedId.includes('/node_modules/echarts/') ||
+            normalizedId.includes('/node_modules/zrender/') ||
+            normalizedId.includes('/node_modules/vue-echarts/')
+          ) {
             return 'vendor-echarts';
+          }
+          if (
+            normalizedId.includes('/node_modules/vue/') ||
+            normalizedId.includes('/node_modules/@vue/')
+          ) {
+            return 'vendor-vue';
           }
           return 'vendor';
         }
