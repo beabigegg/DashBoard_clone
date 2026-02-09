@@ -8,7 +8,9 @@
     {
       "route": "/wip-overview",
       "name": "WIP 即時概況",
-      "status": "released"
+      "status": "released",
+      "drawer_id": "reports",
+      "order": 1
     },
     {
       "route": "/wip-detail",
@@ -23,37 +25,65 @@
     {
       "route": "/resource-history",
       "name": "設備歷史績效",
-      "status": "released"
+      "status": "released",
+      "drawer_id": "reports",
+      "order": 3
     },
     {
       "route": "/tables",
       "name": "表格總覽",
-      "status": "dev"
+      "status": "dev",
+      "drawer_id": "dev-tools",
+      "order": 1
     },
     {
       "route": "/resource",
       "name": "機台狀態",
-      "status": "released"
+      "status": "released",
+      "drawer_id": "reports",
+      "order": 2
     },
     {
       "route": "/excel-query",
       "name": "Excel 批次查詢",
-      "status": "dev"
+      "status": "dev",
+      "drawer_id": "dev-tools",
+      "order": 2
     },
     {
       "route": "/job-query",
       "name": "設備維修查詢",
-      "status": "released"
+      "status": "released",
+      "drawer_id": "queries",
+      "order": 3
     },
     {
       "route": "/query-tool",
       "name": "批次追蹤工具",
-      "status": "released"
+      "status": "released",
+      "drawer_id": "queries",
+      "order": 4
     },
     {
       "route": "/tmtt-defect",
       "name": "TMTT印字腳型不良分析",
-      "status": "released"
+      "status": "released",
+      "drawer_id": "queries",
+      "order": 5
+    },
+    {
+      "route": "/admin/pages",
+      "name": "頁面管理",
+      "status": "dev",
+      "drawer_id": "dev-tools",
+      "order": 1
+    },
+    {
+      "route": "/admin/performance",
+      "name": "效能監控",
+      "status": "dev",
+      "drawer_id": "dev-tools",
+      "order": 2
     }
   ],
   "api_public": true,
@@ -62,5 +92,25 @@
     "updated_at": "2026-01-29 13:49:59",
     "object_count": 19,
     "source": "tools/query_table_schema.py"
-  }
+  },
+  "drawers": [
+    {
+      "id": "reports",
+      "name": "報表類",
+      "order": 1,
+      "admin_only": false
+    },
+    {
+      "id": "queries",
+      "name": "查詢類",
+      "order": 2,
+      "admin_only": false
+    },
+    {
+      "id": "dev-tools",
+      "name": "開發工具",
+      "order": 3,
+      "admin_only": true
+    }
+  ]
 }

@@ -33,7 +33,11 @@ from mes_dashboard.routes import register_routes
 from mes_dashboard.routes.auth_routes import auth_bp
 from mes_dashboard.routes.admin_routes import admin_bp
 from mes_dashboard.routes.health_routes import health_bp
-from mes_dashboard.services.page_registry import get_page_status, is_api_public
+from mes_dashboard.services.page_registry import (
+    get_navigation_config,
+    get_page_status,
+    is_api_public,
+)
 from mes_dashboard.core.cache_updater import start_cache_updater, stop_cache_updater
 from mes_dashboard.services.realtime_equipment_cache import (
     init_realtime_equipment_cache,
@@ -367,7 +371,7 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/')
     def portal_index():
         """Portal home with tabs."""
-        return render_template('portal.html')
+        return render_template('portal.html', drawers=get_navigation_config())
 
     @app.route('/favicon.ico')
     def favicon():

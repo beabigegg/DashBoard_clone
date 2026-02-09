@@ -168,7 +168,7 @@ import './portal.css';
   });
 
   if (sidebarItems.length > 0) {
-    activateTab(sidebarItems[0].dataset.target);
+    activateTab(sidebarItems[0].dataset.target, sidebarItems[0].dataset.toolSrc || null);
   }
 
   window.toggleHealthPopup = toggleHealthPopup;

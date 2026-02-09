@@ -31,7 +31,17 @@ from mes_dashboard.core.worker_recovery_policy import (
     extract_restart_history,
     load_restart_state,
 )
-from mes_dashboard.services.page_registry import get_all_pages, set_page_status
+from mes_dashboard.services.page_registry import (
+    DrawerConflictError,
+    DrawerNotFoundError,
+    create_drawer,
+    delete_drawer,
+    get_all_drawers,
+    get_all_pages,
+    get_page_status,
+    set_page_status,
+    update_drawer,
+)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 logger = logging.getLogger("mes_dashboard.admin")
@@ -644,23 +654,120 @@ def api_get_pages():
     return jsonify({"success": True, "pages": get_all_pages()})
 
 
+@admin_bp.route("/api/drawers", methods=["GET"])
+@admin_required
+def api_get_drawers():
+    """API: Get all drawer configurations."""
+    return jsonify({"success": True, "drawers": get_all_drawers()})
+
+
+@admin_bp.route("/api/drawers", methods=["POST"])
+@admin_required
+def api_create_drawer():
+    """API: Create a new drawer."""
+    payload = request.get_json(silent=True) or {}
+    name = payload.get("name")
+    order = payload.get("order")
+    admin_only = bool(payload.get("admin_only", False))
+
+    try:
+        drawer = create_drawer(name=name, order=order, admin_only=admin_only)
+    except DrawerConflictError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 409
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.exception("Failed to create drawer")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    return jsonify({"success": True, "drawer": drawer}), 201
+
+
+@admin_bp.route("/api/drawers/<drawer_id>", methods=["PUT"])
+@admin_required
+def api_update_drawer(drawer_id: str):
+    """API: Update drawer name/order/admin_only."""
+    payload = request.get_json(silent=True) or {}
+    updates: dict[str, Any] = {}
+
+    if "name" in payload:
+        updates["name"] = payload.get("name")
+    if "order" in payload:
+        updates["order"] = payload.get("order")
+    if "admin_only" in payload:
+        updates["admin_only"] = bool(payload.get("admin_only"))
+
+    if not updates:
+        return jsonify({"success": False, "error": "No drawer fields to update"}), 400
+
+    try:
+        drawer = update_drawer(drawer_id, **updates)
+    except DrawerNotFoundError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except DrawerConflictError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 409
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.exception("Failed to update drawer %s", drawer_id)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    return jsonify({"success": True, "drawer": drawer})
+
+
+@admin_bp.route("/api/drawers/<drawer_id>", methods=["DELETE"])
+@admin_required
+def api_delete_drawer(drawer_id: str):
+    """API: Delete a drawer if no pages are assigned to it."""
+    try:
+        delete_drawer(drawer_id)
+    except DrawerNotFoundError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except DrawerConflictError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 409
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.exception("Failed to delete drawer %s", drawer_id)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    return jsonify({"success": True})
+
+
 @admin_bp.route("/api/pages/<path:route>", methods=["PUT"])
 @admin_required
 def api_update_page(route: str):
-    """API: Update page status."""
-    data = request.get_json()
-    status = data.get("status")
-    name = data.get("name")
-
-    if status not in ("released", "dev"):
-        return jsonify({"success": False, "error": "Invalid status"}), 400
+    """API: Update page status/name/drawer assignment/order."""
+    data = request.get_json(silent=True) or {}
+    updatable_fields = {"status", "name", "drawer_id", "order"}
+    if not any(field in data for field in updatable_fields):
+        return jsonify({"success": False, "error": "No page fields to update"}), 400
 
     # Ensure route starts with /
     if not route.startswith("/"):
         route = "/" + route
 
+    status = data.get("status")
+    if "status" in data and status not in ("released", "dev"):
+        return jsonify({"success": False, "error": "Invalid status"}), 400
+    if "status" not in data:
+        status = get_page_status(route)
+        if status is None:
+            return jsonify({
+                "success": False,
+                "error": "Status is required for unregistered pages",
+            }), 400
+
+    update_kwargs: dict[str, Any] = {}
+    if "name" in data:
+        update_kwargs["name"] = data.get("name")
+    if "drawer_id" in data:
+        update_kwargs["drawer_id"] = data.get("drawer_id")
+    if "order" in data:
+        update_kwargs["order"] = data.get("order")
+
     try:
-        set_page_status(route, status, name)
+        set_page_status(route, status, **update_kwargs)
         return jsonify({"success": True})
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

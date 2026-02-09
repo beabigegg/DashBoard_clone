@@ -301,6 +301,48 @@ class TestAdminAPI:
         assert data["success"] is True
         assert "pages" in data
 
+    def test_get_drawers_without_login(self, client):
+        """Test drawer API requires login."""
+        response = client.get("/admin/api/drawers", follow_redirects=False)
+        assert response.status_code == 302
+
+    def test_mutate_drawers_without_login(self, client):
+        """Test drawer mutations require login."""
+        response = client.post(
+            "/admin/api/drawers",
+            data=json.dumps({"name": "Unauthorized Drawer"}),
+            content_type="application/json",
+            follow_redirects=False,
+        )
+        assert response.status_code in (302, 401)
+
+        response = client.delete("/admin/api/drawers/reports", follow_redirects=False)
+        assert response.status_code == 302
+
+    def test_get_drawers_with_login(self, client):
+        """Test list drawers API with login."""
+        with client.session_transaction() as sess:
+            sess["admin"] = {"username": "admin"}
+
+        response = client.get("/admin/api/drawers")
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["success"] is True
+        assert "drawers" in data
+        assert any(drawer["id"] == "reports" for drawer in data["drawers"])
+
+    def test_create_drawer_duplicate_name_conflict(self, client):
+        """Test creating duplicate drawer name returns 409."""
+        with client.session_transaction() as sess:
+            sess["admin"] = {"username": "admin"}
+
+        response = client.post(
+            "/admin/api/drawers",
+            data=json.dumps({"name": "報表類", "order": 99}),
+            content_type="application/json",
+        )
+        assert response.status_code == 409
+
     def test_update_page_status(self, client, temp_page_status):
         """Test updating page status via API."""
         with client.session_transaction() as sess:
@@ -332,6 +374,44 @@ class TestAdminAPI:
         )
 
         assert response.status_code == 400
+
+    def test_update_page_drawer_assignment(self, client):
+        """Test assigning page drawer via page update API."""
+        with client.session_transaction() as sess:
+            sess["admin"] = {"username": "admin"}
+
+        response = client.put(
+            "/admin/api/pages/wip-overview",
+            data=json.dumps({"drawer_id": "queries", "order": 3}),
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+
+        page_registry._cache = None
+        pages = page_registry.get_all_pages()
+        page = next(item for item in pages if item["route"] == "/wip-overview")
+        assert page["drawer_id"] == "queries"
+        assert page["order"] == 3
+
+    def test_update_page_invalid_drawer_assignment(self, client):
+        """Test assigning a non-existent drawer returns bad request."""
+        with client.session_transaction() as sess:
+            sess["admin"] = {"username": "admin"}
+
+        response = client.put(
+            "/admin/api/pages/wip-overview",
+            data=json.dumps({"drawer_id": "missing-drawer"}),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+
+    def test_delete_drawer_with_assigned_pages_conflict(self, client):
+        """Test deleting a non-empty drawer returns conflict."""
+        with client.session_transaction() as sess:
+            sess["admin"] = {"username": "admin"}
+
+        response = client.delete("/admin/api/drawers/reports")
+        assert response.status_code == 409
 
 
 class TestContextProcessor:

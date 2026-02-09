@@ -100,6 +100,108 @@ class TestTemplateIntegration(unittest.TestCase):
         self.assertIn('mes-toast-container', html)
 
 
+class TestPortalDynamicDrawerRendering(unittest.TestCase):
+    """Test dynamic portal drawer rendering."""
+
+    def setUp(self):
+        db._ENGINE = None
+        self.app = create_app('testing')
+        self.app.config['TESTING'] = True
+        self.client = self.app.test_client()
+        _login_as_admin(self.client)
+
+    def test_portal_uses_navigation_config_for_sidebar_and_iframes(self):
+        drawers = [
+            {
+                "id": "custom",
+                "name": "自訂分類",
+                "order": 1,
+                "admin_only": False,
+                "pages": [
+                    {
+                        "route": "/wip-overview",
+                        "name": "自訂首頁",
+                        "status": "released",
+                        "order": 1,
+                        "frame_id": "customFrame",
+                        "tool_src": None,
+                    }
+                ],
+            },
+            {
+                "id": "dev-tools",
+                "name": "開發工具",
+                "order": 2,
+                "admin_only": True,
+                "pages": [
+                    {
+                        "route": "/admin/pages",
+                        "name": "頁面管理",
+                        "status": "dev",
+                        "order": 1,
+                        "frame_id": "toolFrame",
+                        "tool_src": "/admin/pages",
+                    }
+                ],
+            },
+        ]
+        with patch("mes_dashboard.app.get_navigation_config", return_value=drawers):
+            response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode("utf-8")
+        self.assertIn("自訂分類", html)
+        self.assertIn('data-target="customFrame"', html)
+        self.assertIn('id="customFrame"', html)
+        self.assertIn('data-tool-src="/admin/pages"', html)
+        self.assertIn('id="toolFrame"', html)
+
+    def test_portal_hides_admin_only_drawer_for_non_admin(self):
+        client = self.app.test_client()
+        drawers = [
+            {
+                "id": "custom",
+                "name": "自訂分類",
+                "order": 1,
+                "admin_only": False,
+                "pages": [
+                    {
+                        "route": "/wip-overview",
+                        "name": "自訂首頁",
+                        "status": "released",
+                        "order": 1,
+                        "frame_id": "customFrame",
+                        "tool_src": None,
+                    }
+                ],
+            },
+            {
+                "id": "dev-tools",
+                "name": "開發工具",
+                "order": 2,
+                "admin_only": True,
+                "pages": [
+                    {
+                        "route": "/admin/pages",
+                        "name": "頁面管理",
+                        "status": "dev",
+                        "order": 1,
+                        "frame_id": "toolFrame",
+                        "tool_src": "/admin/pages",
+                    }
+                ],
+            },
+        ]
+        with patch("mes_dashboard.app.get_navigation_config", return_value=drawers):
+            response = client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode("utf-8")
+        self.assertIn("自訂分類", html)
+        self.assertNotIn("開發工具", html)
+        self.assertNotIn('data-tool-src="/admin/pages"', html)
+
+
 class TestToastCSSIntegration(unittest.TestCase):
     """Test that Toast CSS styles are included in pages."""
 

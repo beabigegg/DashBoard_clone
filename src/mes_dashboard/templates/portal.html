@@ -342,8 +342,6 @@
                 <div class="admin-status">
                     {% if is_admin %}
                         <span class="admin-name">{{ admin_user.displayName }}</span>
-                        <a href="{{ url_for('admin.pages') }}">頁面管理</a>
-                        <a href="{{ url_for('admin.performance') }}">效能監控</a>
                         <a href="{{ url_for('auth.logout') }}">登出</a>
                     {% else %}
                         <a href="{{ url_for('auth.login') }}">管理員登入</a>
@@ -354,69 +352,49 @@
 
         <div class="main-layout">
             <nav class="sidebar">
-                <div class="sidebar-group-title">報表類</div>
-                {% if can_view_page('/wip-overview') %}
-                <button class="sidebar-item" data-target="wipOverviewFrame">WIP 即時概況</button>
-                {% endif %}
-                {% if can_view_page('/resource') %}
-                <button class="sidebar-item" data-target="resourceFrame">設備即時概況</button>
-                {% endif %}
-                {% if can_view_page('/resource-history') %}
-                <button class="sidebar-item" data-target="resourceHistoryFrame">設備歷史績效</button>
-                {% endif %}
-
-                <div class="sidebar-group-title">查詢類</div>
-                {% if can_view_page('/tables') %}
-                <button class="sidebar-item" data-target="tableFrame">數據表查詢工具</button>
-                {% endif %}
-                {% if can_view_page('/excel-query') %}
-                <button class="sidebar-item" data-target="excelQueryFrame">Excel 批次查詢</button>
-                {% endif %}
-                {% if can_view_page('/job-query') %}
-                <button class="sidebar-item" data-target="jobQueryFrame">設備維修查詢</button>
-                {% endif %}
-                {% if can_view_page('/query-tool') %}
-                <button class="sidebar-item" data-target="queryToolFrame">批次追蹤工具</button>
-                {% endif %}
-                {% if can_view_page('/tmtt-defect') %}
-                <button class="sidebar-item" data-target="tmttDefectFrame">TMTT不良分析</button>
-                {% endif %}
-
-                <div class="sidebar-group-title">開發工具</div>
-                {% if is_admin %}
-                <button class="sidebar-item" data-target="toolFrame" data-tool-src="/admin/pages">頁面管理</button>
-                <button class="sidebar-item" data-target="toolFrame" data-tool-src="/admin/performance">效能監控</button>
-                {% else %}
+                {% for drawer in drawers | default([]) %}
+                    {% if not drawer.admin_only or is_admin %}
+                        {% set nav_ns = namespace(has_visible_pages=false) %}
+                        {% for page in drawer.pages %}
+                            {% if can_view_page(page.route) %}
+                                {% set nav_ns.has_visible_pages = true %}
+                            {% endif %}
+                        {% endfor %}
+                        {% if nav_ns.has_visible_pages %}
+                            <div class="sidebar-group-title">{{ drawer.name }}</div>
+                            {% for page in drawer.pages %}
+                                {% if can_view_page(page.route) %}
+                                <button
+                                    class="sidebar-item"
+                                    data-target="{{ page.frame_id }}"
+                                    {% if page.tool_src %}data-tool-src="{{ page.tool_src }}"{% endif %}
+                                >{{ page.name }}</button>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                {% if not is_admin %}
                 <a class="sidebar-item" href="{{ url_for('auth.login') }}">管理員登入</a>
                 {% endif %}
             </nav>
 
             <div class="panel">
-                {% if can_view_page('/wip-overview') %}
-                <iframe id="wipOverviewFrame" data-src="/wip-overview" title="WIP 即時概況"></iframe>
-                {% endif %}
-                {% if can_view_page('/resource') %}
-                <iframe id="resourceFrame" data-src="/resource" title="設備即時概況"></iframe>
-                {% endif %}
-                {% if can_view_page('/tables') %}
-                <iframe id="tableFrame" data-src="/tables" title="數據表查詢工具"></iframe>
-                {% endif %}
-                {% if can_view_page('/excel-query') %}
-                <iframe id="excelQueryFrame" data-src="/excel-query" title="Excel 批次查詢"></iframe>
-                {% endif %}
-                {% if can_view_page('/resource-history') %}
-                <iframe id="resourceHistoryFrame" data-src="/resource-history" title="設備歷史績效"></iframe>
-                {% endif %}
-                {% if can_view_page('/job-query') %}
-                <iframe id="jobQueryFrame" data-src="/job-query" title="設備維修查詢"></iframe>
-                {% endif %}
-                {% if can_view_page('/query-tool') %}
-                <iframe id="queryToolFrame" data-src="/query-tool" title="批次追蹤工具"></iframe>
-                {% endif %}
-                {% if can_view_page('/tmtt-defect') %}
-                <iframe id="tmttDefectFrame" data-src="/tmtt-defect" title="TMTT不良分析"></iframe>
-                {% endif %}
-                {% if is_admin %}
+                {% set frame_ns = namespace(has_tool_pages=false) %}
+                {% for drawer in drawers | default([]) %}
+                    {% if not drawer.admin_only or is_admin %}
+                        {% for page in drawer.pages %}
+                            {% if can_view_page(page.route) %}
+                                {% if page.tool_src %}
+                                    {% set frame_ns.has_tool_pages = true %}
+                                {% else %}
+                <iframe id="{{ page.frame_id }}" data-src="{{ page.route }}" title="{{ page.name }}"></iframe>
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+                {% if is_admin and frame_ns.has_tool_pages %}
                 <iframe id="toolFrame" title="開發工具"></iframe>
                 {% endif %}
             </div>
@@ -432,7 +410,6 @@
     <script>
         const sidebarItems = document.querySelectorAll('.sidebar-item[data-target]');
         const frames = document.querySelectorAll('iframe');
-        const toolFrame = document.getElementById('toolFrame');
 
         function setFrameHeight() {
             const headerHeight = document.querySelector('.header').offsetHeight;
@@ -476,7 +453,7 @@
 
         // Auto-activate first available item
         if (sidebarItems.length > 0) {
-            activateTab(sidebarItems[0].dataset.target);
+            activateTab(sidebarItems[0].dataset.target, sidebarItems[0].dataset.toolSrc || null);
         }
 
         window.addEventListener('resize', setFrameHeight);
