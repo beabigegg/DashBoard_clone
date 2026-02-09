@@ -1,0 +1,263 @@
+@import '../wip-shared/styles.css';
+
+.hold-detail-page .header h1 {
+  font-size: 20px;
+}
+
+.hold-type-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.error-banner {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.hold-summary-row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.age-distribution {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.age-card {
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 16px;
+  border: 2px solid var(--border);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.age-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.age-card.active {
+  border-color: var(--primary);
+  background: #f0f4ff;
+}
+
+.age-label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.age-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.age-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.age-stat .label {
+  color: var(--muted);
+}
+
+.age-stat .value {
+  font-weight: 600;
+}
+
+.age-percentage {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-top: 8px;
+  text-align: right;
+}
+
+.distribution-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.card-body {
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dist-table th,
+.dist-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dist-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  text-align: left;
+}
+
+.dist-table th:nth-child(2),
+.dist-table th:nth-child(3),
+.dist-table th:nth-child(4),
+.dist-table td:nth-child(2),
+.dist-table td:nth-child(3),
+.dist-table td:nth-child(4) {
+  text-align: right;
+}
+
+.dist-table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.dist-table tbody tr:hover {
+  background: #f0f4ff;
+}
+
+.dist-table tbody tr.active {
+  background: #e0e7ff;
+}
+
+.table-section {
+  background: var(--card-bg);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.table-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.table-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.table-container {
+  overflow-x: auto;
+  max-height: 500px;
+}
+
+.lot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lot-table th,
+.lot-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+  white-space: nowrap;
+}
+
+.lot-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.lot-table th:nth-child(3),
+.lot-table th:nth-child(7),
+.lot-table td:nth-child(3),
+.lot-table td:nth-child(7) {
+  text-align: right;
+}
+
+.lot-table tbody tr:hover {
+  background: #f8f9fc;
+}
+
+@media (max-width: 1400px) {
+  .hold-summary-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .age-distribution {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1000px) {
+  .hold-summary-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .distribution-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .hold-summary-row,
+  .age-distribution {
+    grid-template-columns: 1fr;
+  }
+}

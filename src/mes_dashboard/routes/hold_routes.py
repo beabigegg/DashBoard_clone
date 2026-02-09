@@ -4,7 +4,10 @@
 Contains Flask Blueprint for Hold Detail page and API endpoints.
 """
 
-from flask import Blueprint, jsonify, request, render_template, redirect, url_for
+import html
+import os
+
+from flask import Blueprint, current_app, jsonify, redirect, request, send_from_directory
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.utils import parse_bool_query
@@ -12,7 +15,6 @@ from mes_dashboard.services.wip_service import (
     get_hold_detail_summary,
     get_hold_detail_distribution,
     get_hold_detail_lots,
-    is_quality_hold,
 )
 
 # Create Blueprint
@@ -46,8 +48,22 @@ def hold_detail_page():
         # Redirect to WIP Overview when reason is missing
         return redirect('/wip-overview')
 
-    hold_type = 'quality' if is_quality_hold(reason) else 'non-quality'
-    return render_template('hold_detail.html', reason=reason, hold_type=hold_type)
+    # Keep server-side validation, then serve static Vite output directly.
+    dist_dir = os.path.join(current_app.static_folder or "", "dist")
+    dist_html = os.path.join(dist_dir, "hold-detail.html")
+    if os.path.exists(dist_html):
+        return send_from_directory(dist_dir, 'hold-detail.html')
+
+    safe_reason = html.escape(reason, quote=True)
+    return (
+        "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+        f"<title>Hold Detail - {safe_reason}</title>"
+        "<script type=\"module\" src=\"/static/dist/hold-detail.js\"></script>"
+        f"<meta name=\"hold-reason\" content=\"{safe_reason}\">"
+        "</head><body><div id='app'></div></body></html>",
+        200,
+    )
 
 
 # ============================================================

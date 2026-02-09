@@ -1,0 +1,316 @@
+<script setup>
+import { computed, onMounted, reactive, ref } from 'vue';
+
+import { apiGet } from '../core/api.js';
+import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants.js';
+import { useAutoRefresh } from '../wip-shared/composables/useAutoRefresh.js';
+
+import AgeDistribution from './components/AgeDistribution.vue';
+import DistributionTable from './components/DistributionTable.vue';
+import LotTable from './components/LotTable.vue';
+import SummaryCards from './components/SummaryCards.vue';
+
+const REASON = new URLSearchParams(window.location.search).get('reason')?.trim() || '';
+const API_TIMEOUT = 60000;
+
+const summary = ref(null);
+const distribution = ref(null);
+const lots = ref([]);
+const pagination = ref({
+  page: 1,
+  perPage: 50,
+  total: 0,
+  totalPages: 1,
+});
+
+const filters = reactive({
+  workcenter: null,
+  package: null,
+  ageRange: null,
+});
+
+const page = ref(1);
+const initialLoading = ref(true);
+const refreshing = ref(false);
+const lotsLoading = ref(false);
+const lotsError = ref('');
+const loadError = ref('');
+const lastUpdate = ref('');
+
+function unwrapApiResult(result, fallbackMessage) {
+  if (result?.success) {
+    return result.data;
+  }
+  if (result?.success === false) {
+    throw new Error(result.error || fallbackMessage);
+  }
+  if (result?.data !== undefined) {
+    return result.data;
+  }
+  return result;
+}
+
+async function fetchSummary(signal) {
+  const result = await apiGet('/api/wip/hold-detail/summary', {
+    params: { reason: REASON },
+    timeout: API_TIMEOUT,
+    signal,
+  });
+  return unwrapApiResult(result, 'Failed to fetch summary');
+}
+
+async function fetchDistribution(signal) {
+  const result = await apiGet('/api/wip/hold-detail/distribution', {
+    params: { reason: REASON },
+    timeout: API_TIMEOUT,
+    signal,
+  });
+  return unwrapApiResult(result, 'Failed to fetch distribution');
+}
+
+async function fetchLots(signal) {
+  const params = {
+    reason: REASON,
+    page: page.value,
+    per_page: pagination.value.perPage || 50,
+  };
+
+  if (filters.workcenter) {
+    params.workcenter = filters.workcenter;
+  }
+  if (filters.package) {
+    params.package = filters.package;
+  }
+  if (filters.ageRange) {
+    params.age_range = filters.ageRange;
+  }
+
+  const result = await apiGet('/api/wip/hold-detail/lots', {
+    params,
+    timeout: API_TIMEOUT,
+    signal,
+  });
+  return unwrapApiResult(result, 'Failed to fetch lots');
+}
+
+const holdType = computed(() => {
+  if (!REASON) {
+    return 'quality';
+  }
+  return NON_QUALITY_HOLD_REASON_SET.has(REASON) ? 'non-quality' : 'quality';
+});
+
+const holdTypeLabel = computed(() => (holdType.value === 'quality' ? '品質異常' : '非品質異常'));
+
+const headerStyle = computed(() => ({
+  '--header-gradient': holdType.value === 'quality'
+    ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+    : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+}));
+
+const filterText = computed(() => {
+  const parts = [];
+  if (filters.workcenter) {
+    parts.push(`Workcenter=${filters.workcenter}`);
+  }
+  if (filters.package) {
+    parts.push(`Package=${filters.package}`);
+  }
+  if (filters.ageRange) {
+    parts.push(`Age=${filters.ageRange}天`);
+  }
+  return parts.join(', ');
+});
+
+const hasActiveFilters = computed(() => Boolean(filterText.value));
+
+const { createAbortSignal, clearAbortController, resetAutoRefresh, triggerRefresh } = useAutoRefresh({
+  onRefresh: () => loadAllData(false),
+  autoStart: true,
+});
+
+async function loadLots() {
+  lotsLoading.value = true;
+  lotsError.value = '';
+  loadError.value = '';
+  refreshing.value = true;
+
+  const signal = createAbortSignal('hold-detail-lots');
+
+  try {
+    const result = await fetchLots(signal);
+    lots.value = Array.isArray(result?.lots) ? result.lots : [];
+    pagination.value = {
+      page: Number(result?.pagination?.page || 1),
+      perPage: Number(result?.pagination?.perPage || 50),
+      total: Number(result?.pagination?.total || 0),
+      totalPages: Number(result?.pagination?.totalPages || 1),
+    };
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return;
+    }
+    lotsError.value = error?.message || '載入 Lot 資料失敗';
+  } finally {
+    lotsLoading.value = false;
+    refreshing.value = false;
+  }
+}
+
+async function loadAllData(showOverlay = true) {
+  clearAbortController('hold-detail-lots');
+  const signal = createAbortSignal('hold-detail-all');
+
+  if (showOverlay) {
+    initialLoading.value = true;
+  }
+
+  loadError.value = '';
+  lotsError.value = '';
+  refreshing.value = true;
+
+  try {
+    const [summaryData, distributionData, lotsData] = await Promise.all([
+      fetchSummary(signal),
+      fetchDistribution(signal),
+      fetchLots(signal),
+    ]);
+
+    summary.value = summaryData;
+    distribution.value = distributionData;
+    lots.value = Array.isArray(lotsData?.lots) ? lotsData.lots : [];
+    pagination.value = {
+      page: Number(lotsData?.pagination?.page || 1),
+      perPage: Number(lotsData?.pagination?.perPage || 50),
+      total: Number(lotsData?.pagination?.total || 0),
+      totalPages: Number(lotsData?.pagination?.totalPages || 1),
+    };
+
+    lastUpdate.value = `Last Update: ${new Date().toLocaleString('zh-TW')}`;
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return;
+    }
+    loadError.value = error?.message || '載入資料失敗';
+  } finally {
+    refreshing.value = false;
+    initialLoading.value = false;
+  }
+}
+
+function toggleAgeFilter(range) {
+  filters.ageRange = filters.ageRange === range ? null : range;
+  page.value = 1;
+  void loadLots();
+}
+
+function toggleWorkcenterFilter(name) {
+  filters.workcenter = filters.workcenter === name ? null : name;
+  page.value = 1;
+  void loadLots();
+}
+
+function togglePackageFilter(name) {
+  filters.package = filters.package === name ? null : name;
+  page.value = 1;
+  void loadLots();
+}
+
+function clearFilters() {
+  filters.ageRange = null;
+  filters.workcenter = null;
+  filters.package = null;
+  page.value = 1;
+  void loadLots();
+}
+
+function prevPage() {
+  if (page.value <= 1) {
+    return;
+  }
+  page.value -= 1;
+  void loadLots();
+}
+
+function nextPage() {
+  if (page.value >= pagination.value.totalPages) {
+    return;
+  }
+  page.value += 1;
+  void loadLots();
+}
+
+async function manualRefresh() {
+  await triggerRefresh({ resetTimer: true, force: true });
+}
+
+onMounted(() => {
+  if (!REASON) {
+    window.location.replace('/wip-overview');
+    return;
+  }
+  void loadAllData(true);
+});
+</script>
+
+<template>
+  <div class="dashboard hold-detail-page">
+    <header class="header" :style="headerStyle">
+      <div class="header-left">
+        <a href="/wip-overview" class="btn btn-back">&larr; WIP Overview</a>
+        <h1>Hold Detail: {{ REASON }}</h1>
+        <span class="hold-type-badge">{{ holdTypeLabel }}</span>
+      </div>
+      <div class="header-right">
+        <span class="last-update">
+          <span class="refresh-indicator" :class="{ active: refreshing }"></span>
+          <span>{{ lastUpdate }}</span>
+        </span>
+        <button type="button" class="btn btn-light" @click="manualRefresh">重新整理</button>
+      </div>
+    </header>
+
+    <p v-if="loadError" class="error-banner">{{ loadError }}</p>
+
+    <SummaryCards :summary="summary" />
+
+    <section class="section-title">當站滯留天數分佈 (Age at Current Station)</section>
+    <AgeDistribution
+      :items="distribution?.byAge || []"
+      :active-range="filters.ageRange"
+      @toggle="toggleAgeFilter"
+    />
+
+    <section class="distribution-grid">
+      <DistributionTable
+        title="By Workcenter"
+        :rows="distribution?.byWorkcenter || []"
+        :active-name="filters.workcenter"
+        @toggle="toggleWorkcenterFilter"
+      />
+      <DistributionTable
+        title="By Package"
+        :rows="distribution?.byPackage || []"
+        :active-name="filters.package"
+        @toggle="togglePackageFilter"
+      />
+    </section>
+
+    <LotTable
+      :lots="lots"
+      :pagination="pagination"
+      :loading="lotsLoading"
+      :error-message="lotsError"
+      :has-active-filters="hasActiveFilters"
+      :filter-text="filterText"
+      @clear-filters="clearFilters"
+      @prev-page="prevPage"
+      @next-page="nextPage"
+    />
+  </div>
+
+  <div v-if="initialLoading" class="loading-overlay">
+    <span class="loading-spinner"></span>
+    <span>Loading...</span>
+  </div>
+</template>

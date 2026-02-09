@@ -1,21 +1,4 @@
-## Purpose
-Define stable requirements for vue-vite-page-architecture.
-
-## Requirements
-
-
-### Requirement: Pure Vite pages SHALL be served as static HTML
-The system SHALL support serving Vite-built HTML pages directly via Flask without Jinja2 rendering.
-
-#### Scenario: Serve pure Vite page
-- **WHEN** user navigates to a pure Vite page route (e.g., `/qc-gate`)
-- **THEN** Flask SHALL serve the pre-built HTML file from `static/dist/` via `send_from_directory`
-- **THEN** the HTML SHALL NOT pass through Jinja2 template rendering
-
-#### Scenario: Page works in portal iframe
-- **WHEN** the pure Vite page is loaded inside the portal iframe
-- **THEN** the page SHALL render correctly within the iframe context
-- **THEN** CSP `frame-ancestors 'self'` SHALL allow the embedding
+## MODIFIED Requirements
 
 ### Requirement: Vite config SHALL support Vue SFC and HTML entry points
 The Vite build configuration SHALL support Vue Single File Components alongside existing vanilla JS entries.
@@ -46,27 +29,7 @@ The Vite build configuration SHALL support Vue Single File Components alongside 
 - **THEN** Vite SHALL bundle the shared CSS into each page's output CSS
 - **THEN** shared CSS SHALL NOT create a separate shared chunk that requires additional HTTP requests
 
-### Requirement: Pure Vite pages SHALL handle API calls without legacy MesApi
-Pure Vite pages SHALL use the existing `frontend/src/core/api.js` module for API communication without depending on the global `window.MesApi` object from `_base.html`.
-
-#### Scenario: API GET request from pure Vite page
-- **WHEN** a pure Vite page makes a GET API call
-- **THEN** the call SHALL use the `apiGet` function from `core/api.js`
-- **THEN** the call SHALL work without `window.MesApi` being present
-
-### Requirement: Pure Vite pages SHALL handle POST API calls without legacy MesApi
-Pure Vite pages SHALL use the `apiPost` function from `core/api.js` for POST requests without depending on `window.MesApi`.
-
-#### Scenario: API POST request from pure Vite page
-- **WHEN** a pure Vite page makes a POST API call
-- **THEN** the call SHALL use the `apiPost` function from `core/api.js`
-- **THEN** the call SHALL include `Content-Type: application/json` header
-- **THEN** the call SHALL work without `window.MesApi` being present
-
-#### Scenario: CSRF token handling in POST requests
-- **WHEN** a pure Vite page calls `apiPost`
-- **THEN** `apiPost` SHALL attempt to read CSRF token from `<meta name="csrf-token">`
-- **THEN** if no meta tag exists, the request SHALL still proceed (non-admin APIs do not enforce CSRF)
+## ADDED Requirements
 
 ### Requirement: Pure Vite pages with server-side route validation SHALL use send_from_directory with pre-validation
 Pages that require server-side parameter validation before serving SHALL validate parameters in the Flask route and then serve the static HTML.

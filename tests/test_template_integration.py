@@ -36,23 +36,23 @@ class TestTemplateIntegration(unittest.TestCase):
         self.assertIn('mes-api.js', html)
         self.assertIn('mes-toast-container', html)
 
-    def test_wip_overview_includes_base_scripts(self):
+    def test_wip_overview_serves_pure_vite_module(self):
         response = self.client.get('/wip-overview')
         self.assertEqual(response.status_code, 200)
         html = response.data.decode('utf-8')
 
-        self.assertIn('toast.js', html)
-        self.assertIn('mes-api.js', html)
-        self.assertIn('mes-toast-container', html)
+        self.assertIn('/static/dist/wip-overview.js', html)
+        self.assertIn('type="module"', html)
+        self.assertNotIn('mes-toast-container', html)
 
-    def test_wip_detail_includes_base_scripts(self):
+    def test_wip_detail_serves_pure_vite_module(self):
         response = self.client.get('/wip-detail')
         self.assertEqual(response.status_code, 200)
         html = response.data.decode('utf-8')
 
-        self.assertIn('toast.js', html)
-        self.assertIn('mes-api.js', html)
-        self.assertIn('mes-toast-container', html)
+        self.assertIn('/static/dist/wip-detail.js', html)
+        self.assertIn('type="module"', html)
+        self.assertNotIn('mes-toast-container', html)
 
     def test_tables_page_serves_pure_vite_module(self):
         response = self.client.get('/tables')
@@ -219,19 +219,19 @@ class TestToastCSSIntegration(unittest.TestCase):
         self.assertIn('.mes-toast-container', html)
         self.assertIn('.mes-toast', html)
 
-    def test_wip_overview_includes_toast_css(self):
+    def test_wip_overview_excludes_toast_css(self):
         response = self.client.get('/wip-overview')
         html = response.data.decode('utf-8')
 
-        self.assertIn('.mes-toast-container', html)
-        self.assertIn('.mes-toast', html)
+        self.assertNotIn('.mes-toast-container', html)
+        self.assertNotIn('.mes-toast', html)
 
-    def test_wip_detail_includes_toast_css(self):
+    def test_wip_detail_excludes_toast_css(self):
         response = self.client.get('/wip-detail')
         html = response.data.decode('utf-8')
 
-        self.assertIn('.mes-toast-container', html)
-        self.assertIn('.mes-toast', html)
+        self.assertNotIn('.mes-toast-container', html)
+        self.assertNotIn('.mes-toast', html)
 
 
 class TestMesApiUsageInTemplates(unittest.TestCase):

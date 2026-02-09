@@ -402,13 +402,39 @@ def create_app(config_name: str | None = None) -> Flask:
 
     @app.route('/wip-overview')
     def wip_overview_page():
-        """WIP Overview Dashboard - for executives."""
-        return render_template('wip_overview.html')
+        """WIP Overview Dashboard served as pure Vite HTML output."""
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "wip-overview.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'wip-overview.html')
+
+        # Test/local fallback when frontend build artifacts are absent.
+        return (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>WIP Overview Dashboard</title>"
+            "<script type=\"module\" src=\"/static/dist/wip-overview.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        )
 
     @app.route('/wip-detail')
     def wip_detail_page():
-        """WIP Detail Dashboard - for production lines."""
-        return render_template('wip_detail.html')
+        """WIP Detail Dashboard served as pure Vite HTML output."""
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "wip-detail.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'wip-detail.html')
+
+        # Test/local fallback when frontend build artifacts are absent.
+        return (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>WIP Detail Dashboard</title>"
+            "<script type=\"module\" src=\"/static/dist/wip-detail.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        )
 
     @app.route('/resource')
     def resource_page():

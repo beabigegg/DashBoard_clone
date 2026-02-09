@@ -13,9 +13,9 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: {
         portal: resolve(__dirname, 'src/portal/main.js'),
-        'wip-overview': resolve(__dirname, 'src/wip-overview/main.js'),
-        'wip-detail': resolve(__dirname, 'src/wip-detail/main.js'),
-        'hold-detail': resolve(__dirname, 'src/hold-detail/main.js'),
+        'wip-overview': resolve(__dirname, 'src/wip-overview/index.html'),
+        'wip-detail': resolve(__dirname, 'src/wip-detail/index.html'),
+        'hold-detail': resolve(__dirname, 'src/hold-detail/index.html'),
         'resource-status': resolve(__dirname, 'src/resource-status/main.js'),
         'resource-history': resolve(__dirname, 'src/resource-history/main.js'),
         'job-query': resolve(__dirname, 'src/job-query/main.js'),

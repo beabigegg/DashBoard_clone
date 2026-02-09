@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build && cp ../src/mes_dashboard/static/dist/src/tables/index.html ../src/mes_dashboard/static/dist/tables.html && cp ../src/mes_dashboard/static/dist/src/qc-gate/index.html ../src/mes_dashboard/static/dist/qc-gate.html",
+    "build": "vite build && cp ../src/mes_dashboard/static/dist/src/tables/index.html ../src/mes_dashboard/static/dist/tables.html && cp ../src/mes_dashboard/static/dist/src/qc-gate/index.html ../src/mes_dashboard/static/dist/qc-gate.html && cp ../src/mes_dashboard/static/dist/src/wip-overview/index.html ../src/mes_dashboard/static/dist/wip-overview.html && cp ../src/mes_dashboard/static/dist/src/wip-detail/index.html ../src/mes_dashboard/static/dist/wip-detail.html && cp ../src/mes_dashboard/static/dist/src/hold-detail/index.html ../src/mes_dashboard/static/dist/hold-detail.html",
     "test": "node --test tests/*.test.js"
   },
   "devDependencies": {

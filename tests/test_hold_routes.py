@@ -37,10 +37,11 @@ class TestHoldDetailPageRoute(TestHoldRoutesBase):
         response = self.client.get('/hold-detail?reason=YieldLimit')
         self.assertEqual(response.status_code, 200)
 
-    def test_hold_detail_page_contains_reason_in_html(self):
-        """Page should display the hold reason in the HTML."""
+    def test_hold_detail_page_includes_vite_entry(self):
+        """Page should load the Hold Detail Vite module."""
         response = self.client.get('/hold-detail?reason=YieldLimit')
-        self.assertIn(b'YieldLimit', response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'/static/dist/hold-detail.js', response.data)
 
 
 class TestHoldDetailSummaryRoute(TestHoldRoutesBase):
