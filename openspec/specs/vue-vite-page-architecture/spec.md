@@ -36,6 +36,11 @@ The Vite build configuration SHALL support Vue Single File Components alongside 
 - **THEN** ECharts modules SHALL be split into the existing `vendor-echarts` chunk
 - **THEN** chunk splitting SHALL NOT affect existing page bundles
 
+#### Scenario: Migrated page entry replacement
+- **WHEN** a vanilla JS page is migrated to Vue 3
+- **THEN** its Vite entry SHALL change from JS file to HTML file (e.g., `src/tables/main.js` → `src/tables/index.html`)
+- **THEN** the original JS entry SHALL be replaced, not kept alongside
+
 ### Requirement: Pure Vite pages SHALL handle API calls without legacy MesApi
 Pure Vite pages SHALL use the existing `frontend/src/core/api.js` module for API communication without depending on the global `window.MesApi` object from `_base.html`.
 
@@ -43,3 +48,17 @@ Pure Vite pages SHALL use the existing `frontend/src/core/api.js` module for API
 - **WHEN** a pure Vite page makes a GET API call
 - **THEN** the call SHALL use the `apiGet` function from `core/api.js`
 - **THEN** the call SHALL work without `window.MesApi` being present
+
+### Requirement: Pure Vite pages SHALL handle POST API calls without legacy MesApi
+Pure Vite pages SHALL use the `apiPost` function from `core/api.js` for POST requests without depending on `window.MesApi`.
+
+#### Scenario: API POST request from pure Vite page
+- **WHEN** a pure Vite page makes a POST API call
+- **THEN** the call SHALL use the `apiPost` function from `core/api.js`
+- **THEN** the call SHALL include `Content-Type: application/json` header
+- **THEN** the call SHALL work without `window.MesApi` being present
+
+#### Scenario: CSRF token handling in POST requests
+- **WHEN** a pure Vite page calls `apiPost`
+- **THEN** `apiPost` SHALL attempt to read CSRF token from `<meta name="csrf-token">`
+- **THEN** if no meta tag exists, the request SHALL still proceed (non-admin APIs do not enforce CSRF)

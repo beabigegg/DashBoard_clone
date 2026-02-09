@@ -11,7 +11,6 @@ import threading
 
 from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
-from mes_dashboard.config.tables import TABLES_CONFIG
 from mes_dashboard.config.settings import get_config
 from mes_dashboard.core.cache import create_default_cache_backend
 from mes_dashboard.core.database import (
@@ -380,8 +379,26 @@ def create_app(config_name: str | None = None) -> Flask:
 
     @app.route('/tables')
     def tables_page():
-        """Table viewer page."""
-        return render_template('index.html', tables_config=TABLES_CONFIG)
+        """Table viewer page served as pure Vite HTML output."""
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "tables.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'tables.html')
+
+        nested_dist_dir = os.path.join(dist_dir, "src", "tables")
+        nested_dist_html = os.path.join(nested_dist_dir, "index.html")
+        if os.path.exists(nested_dist_html):
+            return send_from_directory(nested_dist_dir, "index.html")
+
+        # Test/local fallback when frontend build artifacts are absent.
+        return (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>MES 數據表查詢工具</title>"
+            "<script type=\"module\" src=\"/static/dist/tables.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        )
 
     @app.route('/wip-overview')
     def wip_overview_page():
@@ -453,6 +470,8 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/api/get_table_info', methods=['GET'])
     def get_table_info():
         """API: get tables config."""
+        from mes_dashboard.config.tables import TABLES_CONFIG
+
         return jsonify(TABLES_CONFIG)
 
     # ========================================================

@@ -507,6 +507,24 @@ class TestBuildFilterBuilder:
         sql = mock_read.call_args[0][0]
         assert RESOURCE_TABLE in sql
 
+    def test_resource_version_sql_replaces_where_clause_placeholder(self):
+        """Version SQL should not leak placeholder token into Oracle."""
+        import mes_dashboard.services.resource_cache as rc
+        from mes_dashboard.services.sql_fragments import RESOURCE_TABLE
+
+        with patch.object(
+            rc,
+            "read_sql_df",
+            return_value=pd.DataFrame([{"VERSION": "2026-02-09T12:00:00"}]),
+        ) as mock_read:
+            rc._get_version_from_oracle()
+
+        sql = mock_read.call_args[0][0]
+        assert RESOURCE_TABLE in sql
+        assert "{{ WHERE_CLAUSE }}" not in sql
+        assert "{ WHERE_CLAUSE }" not in sql
+        assert "WHERE " in sql
+
 
 class TestResourceDerivedIndex:
     """Test derived resource index and telemetry behavior."""

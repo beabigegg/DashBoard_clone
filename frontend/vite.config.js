@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
         'resource-history': resolve(__dirname, 'src/resource-history/main.js'),
         'job-query': resolve(__dirname, 'src/job-query/main.js'),
         'excel-query': resolve(__dirname, 'src/excel-query/main.js'),
-        tables: resolve(__dirname, 'src/tables/main.js'),
+        tables: resolve(__dirname, 'src/tables/index.html'),
         'query-tool': resolve(__dirname, 'src/query-tool/main.js'),
         'tmtt-defect': resolve(__dirname, 'src/tmtt-defect/main.js'),
         'qc-gate': resolve(__dirname, 'src/qc-gate/index.html')

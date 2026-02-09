@@ -8,9 +8,14 @@ resource/equipment cache implementations.
 from __future__ import annotations
 
 RESOURCE_TABLE = "DWH.DW_MES_RESOURCE"
-RESOURCE_BASE_SELECT_TEMPLATE = f"SELECT * FROM {RESOURCE_TABLE} {{ WHERE_CLAUSE }}"
+# NOTE:
+# QueryBuilder.build() only replaces the exact token "{{ WHERE_CLAUSE }}".
+# Keep this token literal (double braces) in shared SQL templates.
+RESOURCE_BASE_SELECT_TEMPLATE = (
+    f"SELECT * FROM {RESOURCE_TABLE} {{{{ WHERE_CLAUSE }}}}"
+)
 RESOURCE_VERSION_SELECT_TEMPLATE = (
-    f"SELECT MAX(LASTCHANGEDATE) as VERSION FROM {RESOURCE_TABLE} {{ WHERE_CLAUSE }}"
+    f"SELECT MAX(LASTCHANGEDATE) as VERSION FROM {RESOURCE_TABLE} {{{{ WHERE_CLAUSE }}}}"
 )
 
 EQUIPMENT_STATUS_VIEW = "DWH.DW_MES_EQUIPMENTSTATUS_WIP_V"
