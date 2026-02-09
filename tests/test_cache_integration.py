@@ -111,6 +111,7 @@ class TestWipApiWithCache:
             'WORKORDER': ['WO001', 'WO002', 'WO003'],
             'WORKCENTER_GROUP': ['WC1', 'WC1', 'WC2'],
             'WORKCENTERSEQUENCE_GROUP': [1, 1, 2],
+            'PACKAGE_LEF': ['PKG1', 'PKG2', 'PKG1'],
             'PRODUCTLINENAME': ['PKG1', 'PKG2', 'PKG1'],
             'EQUIPMENTCOUNT': [1, 0, 0],
             'CURRENTHOLDCOUNT': [0, 1, 0],

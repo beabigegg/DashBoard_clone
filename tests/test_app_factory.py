@@ -10,7 +10,7 @@ class AppFactoryTests(unittest.TestCase):
         db._ENGINE = None
 
     def test_create_app_default_config(self):
-        app = create_app()
+        app = create_app("development")
         self.assertTrue(app.config.get("DEBUG"))
         self.assertEqual(app.config.get("ENV"), "development")
         cache = app.extensions.get("cache")
@@ -20,8 +20,11 @@ class AppFactoryTests(unittest.TestCase):
 
     def test_create_app_production_config(self):
         old_secret = os.environ.get("SECRET_KEY")
+        old_conda_env_name = os.environ.get("CONDA_ENV_NAME")
         try:
             os.environ["SECRET_KEY"] = "test-production-secret-key"
+            # Keep runtime-contract strict validation aligned with active env.
+            os.environ["CONDA_ENV_NAME"] = os.environ.get("CONDA_DEFAULT_ENV", "base")
             app = create_app("production")
             self.assertFalse(app.config.get("DEBUG"))
             self.assertEqual(app.config.get("ENV"), "production")
@@ -30,15 +33,19 @@ class AppFactoryTests(unittest.TestCase):
                 os.environ.pop("SECRET_KEY", None)
             else:
                 os.environ["SECRET_KEY"] = old_secret
+            if old_conda_env_name is None:
+                os.environ.pop("CONDA_ENV_NAME", None)
+            else:
+                os.environ["CONDA_ENV_NAME"] = old_conda_env_name
 
     def test_create_app_independent_instances(self):
-        app1 = create_app()
+        app1 = create_app("development")
         db._ENGINE = None
-        app2 = create_app()
+        app2 = create_app("development")
         self.assertIsNot(app1, app2)
 
     def test_routes_registered(self):
-        app = create_app()
+        app = create_app("development")
         rules = {rule.rule for rule in app.url_map.iter_rules()}
         expected = {
             "/",
@@ -47,6 +54,8 @@ class AppFactoryTests(unittest.TestCase):
             "/wip-overview",
             "/wip-detail",
             "/excel-query",
+            "/query-tool",
+            "/tmtt-defect",
             "/api/wip/overview/summary",
             "/api/wip/overview/matrix",
             "/api/wip/overview/hold",
@@ -56,6 +65,8 @@ class AppFactoryTests(unittest.TestCase):
             "/api/resource/status/summary",
             "/api/dashboard/kpi",
             "/api/excel-query/upload",
+            "/api/query-tool/resolve",
+            "/api/tmtt-defect/analysis",
         }
         missing = expected - rules
         self.assertFalse(missing, f"Missing routes: {sorted(missing)}")

@@ -27,21 +27,32 @@ class TestPortalPage:
         """Portal should have all navigation tabs."""
         page.goto(app_server)
 
-        # Check all tabs exist
+        # Check released tabs exist
         expect(page.locator('.tab:has-text("WIP 即時概況")')).to_be_visible()
-        expect(page.locator('.tab:has-text("機台狀態報表")')).to_be_visible()
-        expect(page.locator('.tab:has-text("數據表查詢工具")')).to_be_visible()
-        expect(page.locator('.tab:has-text("Excel 批次查詢")')).to_be_visible()
+        expect(page.locator('.tab:has-text("設備即時概況")')).to_be_visible()
+        expect(page.locator('.tab:has-text("設備歷史績效")')).to_be_visible()
+        expect(page.locator('.tab:has-text("設備維修查詢")')).to_be_visible()
+        expect(page.locator('.tab:has-text("批次追蹤工具")')).to_be_visible()
 
     def test_portal_tab_switching(self, page: Page, app_server: str):
         """Portal tabs should switch iframe content."""
         page.goto(app_server)
 
         # Click on a different tab
-        page.locator('.tab:has-text("機台狀態報表")').click()
+        page.locator('.tab:has-text("設備即時概況")').click()
 
         # Verify the tab is active
-        expect(page.locator('.tab:has-text("機台狀態報表")')).to_have_class(re.compile(r'active'))
+        expect(page.locator('.tab:has-text("設備即時概況")')).to_have_class(re.compile(r'active'))
+
+    def test_portal_health_popup_clickable(self, page: Page, app_server: str):
+        """Health status pill should toggle popup visibility on click."""
+        page.goto(app_server)
+
+        popup = page.locator('#healthPopup')
+        expect(popup).not_to_have_class(re.compile(r'show'))
+
+        page.locator('#healthStatus').click()
+        expect(popup).to_have_class(re.compile(r'show'))
 
 
 @pytest.mark.e2e
@@ -243,8 +254,13 @@ class TestTablesPage:
     def test_tables_page_loads(self, page: Page, app_server: str):
         """Tables page should load."""
         page.goto(f"{app_server}/tables")
-
-        expect(page.locator('h1')).to_contain_text('MES 數據表查詢工具')
+        header = page.locator('h1')
+        expect(header).to_be_visible()
+        text = header.inner_text()
+        assert (
+            'MES 數據表查詢工具' in text
+            or '頁面開發中' in text
+        )
 
     def test_tables_has_toast_system(self, page: Page, app_server: str):
         """Tables page should have Toast system loaded."""

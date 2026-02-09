@@ -384,5 +384,8 @@ class TestPerformancePage:
         # Should be 200 for authenticated admin
         assert response.status_code == 200
         # Check for performance-related content
-        data_str = response.data.decode('utf-8', errors='ignore').lower()
+        html = response.data.decode('utf-8', errors='ignore')
+        data_str = html.lower()
         assert 'performance' in data_str or '效能' in data_str
+        assert '/static/js/chart.umd.min.js' in html
+        assert 'cdn.jsdelivr.net' not in html

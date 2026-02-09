@@ -26,6 +26,7 @@ Result:
 - PASS
 - `routes 71`
 - Redis/Oracle warnings observed in this local environment; app factory and route registration still completed.
+- Note: current tree includes additional routes (query-tool / tmtt-defect / hardening paths), so fresh smoke now reports `routes 83`.
 
 ## Focused Test Gate (root project)
 

@@ -26,6 +26,12 @@ def disable_cache(func):
     """Decorator to disable Redis cache for Oracle fallback tests."""
     @wraps(func)
     def wrapper(*args, **kwargs):
+        import mes_dashboard.services.wip_service as wip_service
+
+        with wip_service._wip_search_index_lock:
+            wip_service._wip_search_index_cache.clear()
+        with wip_service._wip_snapshot_lock:
+            wip_service._wip_snapshot_cache.clear()
         with patch('mes_dashboard.services.wip_service.get_cached_wip_data', return_value=None):
             with patch('mes_dashboard.services.wip_service.get_cached_sys_date', return_value=None):
                 return func(*args, **kwargs)

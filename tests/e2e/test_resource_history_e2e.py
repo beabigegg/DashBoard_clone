@@ -7,9 +7,9 @@ Run with: pytest tests/e2e/test_resource_history_e2e.py -v --run-integration
 
 import json
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import sys
 import os
@@ -97,16 +97,17 @@ class TestResourceHistoryPageAccess:
 class TestResourceHistoryAPIWorkflow:
     """E2E tests for API workflows."""
 
-    @patch('mes_dashboard.services.filter_cache.get_workcenter_groups')
-    @patch('mes_dashboard.services.filter_cache.get_resource_families')
-    def test_filter_options_workflow(self, mock_families, mock_groups, client):
+    @patch('mes_dashboard.services.resource_history_service.get_filter_options')
+    def test_filter_options_workflow(self, mock_get_filter_options, client):
         """Filter options should be loadable."""
-        mock_groups.return_value = [
-            {'name': '焊接_DB', 'sequence': 1},
-            {'name': '焊接_WB', 'sequence': 2},
-            {'name': '成型', 'sequence': 4},
-        ]
-        mock_families.return_value = ['FAM001', 'FAM002']
+        mock_get_filter_options.return_value = {
+            'workcenter_groups': [
+                {'name': '焊接_DB', 'sequence': 1},
+                {'name': '焊接_WB', 'sequence': 2},
+                {'name': '成型', 'sequence': 4},
+            ],
+            'families': ['FAM001', 'FAM002'],
+        }
 
         response = client.get('/api/resource/history/options')
 
@@ -116,10 +117,26 @@ class TestResourceHistoryAPIWorkflow:
         assert 'workcenter_groups' in data['data']
         assert 'families' in data['data']
 
+    @patch('mes_dashboard.services.resource_history_service._get_filtered_resources')
     @patch('mes_dashboard.services.resource_history_service.read_sql_df')
-    def test_complete_query_workflow(self, mock_read_sql, client):
+    def test_complete_query_workflow(self, mock_read_sql, mock_resources, client):
         """Complete query workflow should return all data sections."""
-        # Mock responses for the 4 queries in query_summary
+        mock_resources.return_value = [
+            {
+                'RESOURCEID': 'RES001',
+                'WORKCENTERNAME': '焊接_DB',
+                'RESOURCEFAMILYNAME': 'FAM001',
+                'RESOURCENAME': 'RES001',
+            },
+            {
+                'RESOURCEID': 'RES002',
+                'WORKCENTERNAME': '成型',
+                'RESOURCEFAMILYNAME': 'FAM002',
+                'RESOURCENAME': 'RES002',
+            },
+        ]
+
+        # Mock responses for the 3 queries in query_summary
         kpi_df = pd.DataFrame([{
             'PRD_HOURS': 8000, 'SBY_HOURS': 1000, 'UDT_HOURS': 500,
             'SDT_HOURS': 300, 'EGT_HOURS': 200, 'NST_HOURS': 1000,
@@ -133,29 +150,20 @@ class TestResourceHistoryAPIWorkflow:
              'UDT_HOURS': 40, 'SDT_HOURS': 25, 'EGT_HOURS': 15, 'NST_HOURS': 100, 'MACHINE_COUNT': 100},
         ])
 
-        heatmap_df = pd.DataFrame([
-            {'WORKCENTERNAME': '焊接_DB', 'DATA_DATE': datetime(2024, 1, 1),
-             'PRD_HOURS': 400, 'SBY_HOURS': 50, 'UDT_HOURS': 25, 'SDT_HOURS': 15, 'EGT_HOURS': 10},
-            {'WORKCENTERNAME': '成型', 'DATA_DATE': datetime(2024, 1, 1),
-             'PRD_HOURS': 600, 'SBY_HOURS': 50, 'UDT_HOURS': 25, 'SDT_HOURS': 15, 'EGT_HOURS': 10},
-        ])
-
-        comparison_df = pd.DataFrame([
-            {'WORKCENTERNAME': '焊接_DB', 'PRD_HOURS': 4000, 'SBY_HOURS': 500,
-             'UDT_HOURS': 250, 'SDT_HOURS': 150, 'EGT_HOURS': 100, 'MACHINE_COUNT': 50},
-            {'WORKCENTERNAME': '成型', 'PRD_HOURS': 4000, 'SBY_HOURS': 500,
-             'UDT_HOURS': 250, 'SDT_HOURS': 150, 'EGT_HOURS': 100, 'MACHINE_COUNT': 50},
+        heatmap_raw_df = pd.DataFrame([
+            {'HISTORYID': 'RES001', 'DATA_DATE': datetime(2024, 1, 1),
+             'PRD_HOURS': 400, 'SBY_HOURS': 50, 'UDT_HOURS': 25, 'SDT_HOURS': 15, 'EGT_HOURS': 10, 'NST_HOURS': 20},
+            {'HISTORYID': 'RES002', 'DATA_DATE': datetime(2024, 1, 1),
+             'PRD_HOURS': 600, 'SBY_HOURS': 50, 'UDT_HOURS': 25, 'SDT_HOURS': 15, 'EGT_HOURS': 10, 'NST_HOURS': 30},
         ])
 
         # Use function-based side_effect for ThreadPoolExecutor parallel queries
-        def mock_sql(sql):
+        def mock_sql(sql, _params=None):
             sql_upper = sql.upper()
-            if 'DATA_DATE' in sql_upper and 'WORKCENTERNAME' in sql_upper:
-                return heatmap_df
+            if 'HISTORYID' in sql_upper and 'DATA_DATE' in sql_upper:
+                return heatmap_raw_df
             elif 'DATA_DATE' in sql_upper:
                 return trend_df
-            elif 'WORKCENTERNAME' in sql_upper:
-                return comparison_df
             else:
                 return kpi_df
 
@@ -189,14 +197,30 @@ class TestResourceHistoryAPIWorkflow:
         # Verify comparison
         assert len(data['data']['workcenter_comparison']) == 2
 
+    @patch('mes_dashboard.services.resource_history_service._get_filtered_resources')
     @patch('mes_dashboard.services.resource_history_service.read_sql_df')
-    def test_detail_query_workflow(self, mock_read_sql, client):
+    def test_detail_query_workflow(self, mock_read_sql, mock_resources, client):
         """Detail query workflow should return hierarchical data."""
+        mock_resources.return_value = [
+            {
+                'RESOURCEID': 'RES001',
+                'WORKCENTERNAME': '焊接_DB',
+                'RESOURCEFAMILYNAME': 'FAM001',
+                'RESOURCENAME': 'RES001',
+            },
+            {
+                'RESOURCEID': 'RES002',
+                'WORKCENTERNAME': '焊接_DB',
+                'RESOURCEFAMILYNAME': 'FAM001',
+                'RESOURCENAME': 'RES002',
+            },
+        ]
+
         detail_df = pd.DataFrame([
-            {'WORKCENTERNAME': '焊接_DB', 'RESOURCEFAMILYNAME': 'FAM001', 'RESOURCENAME': 'RES001',
+            {'HISTORYID': 'RES001',
              'PRD_HOURS': 80, 'SBY_HOURS': 10, 'UDT_HOURS': 5, 'SDT_HOURS': 3, 'EGT_HOURS': 2,
              'NST_HOURS': 10, 'TOTAL_HOURS': 110},
-            {'WORKCENTERNAME': '焊接_DB', 'RESOURCEFAMILYNAME': 'FAM001', 'RESOURCENAME': 'RES002',
+            {'HISTORYID': 'RES002',
              'PRD_HOURS': 75, 'SBY_HOURS': 15, 'UDT_HOURS': 5, 'SDT_HOURS': 3, 'EGT_HOURS': 2,
              'NST_HOURS': 10, 'TOTAL_HOURS': 110},
         ])
@@ -226,11 +250,20 @@ class TestResourceHistoryAPIWorkflow:
         assert 'prd_hours' in first_row
         assert 'prd_pct' in first_row
 
+    @patch('mes_dashboard.services.resource_history_service._get_filtered_resources')
     @patch('mes_dashboard.services.resource_history_service.read_sql_df')
-    def test_export_workflow(self, mock_read_sql, client):
+    def test_export_workflow(self, mock_read_sql, mock_resources, client):
         """Export workflow should return valid CSV."""
+        mock_resources.return_value = [
+            {
+                'RESOURCEID': 'RES001',
+                'WORKCENTERNAME': '焊接_DB',
+                'RESOURCEFAMILYNAME': 'FAM001',
+                'RESOURCENAME': 'RES001',
+            }
+        ]
         mock_read_sql.return_value = pd.DataFrame([
-            {'WORKCENTERNAME': '焊接_DB', 'RESOURCEFAMILYNAME': 'FAM001', 'RESOURCENAME': 'RES001',
+            {'HISTORYID': 'RES001',
              'PRD_HOURS': 80, 'SBY_HOURS': 10, 'UDT_HOURS': 5, 'SDT_HOURS': 3, 'EGT_HOURS': 2,
              'NST_HOURS': 10, 'TOTAL_HOURS': 110},
         ])
@@ -281,17 +314,43 @@ class TestResourceHistoryValidation:
         data = json.loads(response.data)
         assert data['success'] is False
 
+    @patch('mes_dashboard.services.resource_history_service._get_filtered_resources')
     @patch('mes_dashboard.services.resource_history_service.read_sql_df')
-    def test_granularity_options(self, mock_read_sql, client):
+    def test_granularity_options(self, mock_read_sql, mock_resources, client):
         """Different granularity options should work."""
-        mock_df = pd.DataFrame([{
+        mock_resources.return_value = [{
+            'RESOURCEID': 'RES001',
+            'WORKCENTERNAME': '焊接_DB',
+            'RESOURCEFAMILYNAME': 'FAM001',
+            'RESOURCENAME': 'RES001',
+        }]
+        kpi_df = pd.DataFrame([{
             'PRD_HOURS': 100, 'SBY_HOURS': 10, 'UDT_HOURS': 5,
             'SDT_HOURS': 3, 'EGT_HOURS': 2, 'NST_HOURS': 10, 'MACHINE_COUNT': 5
         }])
-        mock_read_sql.return_value = mock_df
+        trend_df = pd.DataFrame([{
+            'DATA_DATE': datetime(2024, 1, 1),
+            'PRD_HOURS': 100, 'SBY_HOURS': 10, 'UDT_HOURS': 5,
+            'SDT_HOURS': 3, 'EGT_HOURS': 2, 'NST_HOURS': 10,
+            'MACHINE_COUNT': 5
+        }])
+        heatmap_raw_df = pd.DataFrame([{
+            'HISTORYID': 'RES001',
+            'DATA_DATE': datetime(2024, 1, 1),
+            'PRD_HOURS': 100, 'SBY_HOURS': 10, 'UDT_HOURS': 5,
+            'SDT_HOURS': 3, 'EGT_HOURS': 2, 'NST_HOURS': 10
+        }])
 
         for granularity in ['day', 'week', 'month', 'year']:
-            mock_read_sql.side_effect = [mock_df, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
+            def mock_sql(sql, _params=None):
+                sql_upper = sql.upper()
+                if 'HISTORYID' in sql_upper and 'DATA_DATE' in sql_upper:
+                    return heatmap_raw_df
+                if 'DATA_DATE' in sql_upper:
+                    return trend_df
+                return kpi_df
+
+            mock_read_sql.side_effect = mock_sql
 
             response = client.get(
                 f'/api/resource/history/summary'

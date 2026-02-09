@@ -81,6 +81,24 @@ class TestTemplateIntegration(unittest.TestCase):
         self.assertIn('mes-api.js', html)
         self.assertIn('mes-toast-container', html)
 
+    def test_query_tool_page_includes_base_scripts(self):
+        response = self.client.get('/query-tool')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+
+        self.assertIn('toast.js', html)
+        self.assertIn('mes-api.js', html)
+        self.assertIn('mes-toast-container', html)
+
+    def test_tmtt_defect_page_includes_base_scripts(self):
+        response = self.client.get('/tmtt-defect')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+
+        self.assertIn('toast.js', html)
+        self.assertIn('mes-api.js', html)
+        self.assertIn('mes-toast-container', html)
+
 
 class TestToastCSSIntegration(unittest.TestCase):
     """Test that Toast CSS styles are included in pages."""
@@ -148,11 +166,29 @@ class TestMesApiUsageInTemplates(unittest.TestCase):
         response = self.client.get('/resource')
         html = response.data.decode('utf-8')
 
-        self.assertTrue('MesApi.post' in html or '/static/dist/resource-status.js' in html)
+        self.assertTrue(
+            'MesApi.post' in html or
+            'MesApi.get' in html or
+            '/static/dist/resource-status.js' in html
+        )
+
+    def test_query_tool_page_uses_vite_module(self):
+        response = self.client.get('/query-tool')
+        html = response.data.decode('utf-8')
+
+        self.assertIn('/static/dist/query-tool.js', html)
+        self.assertIn('type="module"', html)
+
+    def test_tmtt_defect_page_uses_vite_module(self):
+        response = self.client.get('/tmtt-defect')
+        html = response.data.decode('utf-8')
+
+        self.assertIn('/static/dist/tmtt-defect.js', html)
+        self.assertIn('type="module"', html)
 
 
-class TestViteModuleFallbackIntegration(unittest.TestCase):
-    """Ensure page templates support Vite module assets with inline fallback."""
+class TestViteModuleIntegration(unittest.TestCase):
+    """Ensure page templates render Vite module assets."""
 
     def setUp(self):
         db._ENGINE = None
@@ -161,25 +197,7 @@ class TestViteModuleFallbackIntegration(unittest.TestCase):
         self.client = self.app.test_client()
         _login_as_admin(self.client)
 
-    def test_pages_render_inline_fallback_when_asset_missing(self):
-        endpoints_and_markers = [
-            ('/wip-overview', 'function applyFilters'),
-            ('/wip-detail', 'function init'),
-            ('/hold-detail?reason=test-reason', 'function loadAllData'),
-            ('/tables', 'function loadTableData'),
-            ('/resource', 'function loadData'),
-            ('/resource-history', 'function executeQuery'),
-            ('/job-query', 'function queryJobs'),
-            ('/excel-query', 'function uploadExcel'),
-        ]
-        for endpoint, marker in endpoints_and_markers:
-            with patch('mes_dashboard.app.os.path.exists', return_value=False):
-                response = self.client.get(endpoint)
-            self.assertEqual(response.status_code, 200)
-            html = response.data.decode('utf-8')
-            self.assertIn(marker, html)
-
-    def test_pages_render_vite_module_when_asset_exists(self):
+    def test_pages_render_vite_module_reference(self):
         endpoints_and_assets = [
             ('/wip-overview', 'wip-overview.js'),
             ('/wip-detail', 'wip-detail.js'),
@@ -189,9 +207,11 @@ class TestViteModuleFallbackIntegration(unittest.TestCase):
             ('/resource-history', 'resource-history.js'),
             ('/job-query', 'job-query.js'),
             ('/excel-query', 'excel-query.js'),
+            ('/query-tool', 'query-tool.js'),
+            ('/tmtt-defect', 'tmtt-defect.js'),
         ]
         for endpoint, asset in endpoints_and_assets:
-            with patch('mes_dashboard.app.os.path.exists', return_value=True):
+            with patch('mes_dashboard.app.os.path.exists', return_value=False):
                 response = self.client.get(endpoint)
             self.assertEqual(response.status_code, 200)
             html = response.data.decode('utf-8')

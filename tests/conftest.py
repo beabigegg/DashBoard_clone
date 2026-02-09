@@ -7,6 +7,18 @@ import os
 
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+_TMP_DIR = os.path.join(_PROJECT_ROOT, 'tmp')
+
+# Test baseline env: keep pytest isolated from local runtime/.env side effects.
+os.environ.setdefault('FLASK_ENV', 'testing')
+os.environ.setdefault('REDIS_ENABLED', 'false')
+os.environ.setdefault('RUNTIME_CONTRACT_ENFORCE', 'false')
+os.environ.setdefault('SLOW_QUERY_THRESHOLD', '1.0')
+os.environ.setdefault('WATCHDOG_RUNTIME_DIR', _TMP_DIR)
+os.environ.setdefault('WATCHDOG_RESTART_FLAG', os.path.join(_TMP_DIR, 'mes_dashboard_restart.flag'))
+os.environ.setdefault('WATCHDOG_PID_FILE', os.path.join(_TMP_DIR, 'gunicorn.pid'))
+os.environ.setdefault('WATCHDOG_STATE_FILE', os.path.join(_TMP_DIR, 'mes_dashboard_restart_state.json'))
 
 import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app

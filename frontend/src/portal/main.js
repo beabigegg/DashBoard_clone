@@ -177,9 +177,8 @@ import './portal.css';
 
   window.openTool = openTool;
   window.toggleHealthPopup = toggleHealthPopup;
-  if (healthStatus) {
-    healthStatus.addEventListener('click', toggleHealthPopup);
-  }
+  // Click handler is wired via inline onclick in template for fallback compatibility.
+  // Avoid duplicate binding here, otherwise a single click toggles twice.
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#healthStatus') && !e.target.closest('#healthPopup') && healthPopup) {
       healthPopup.classList.remove('show');

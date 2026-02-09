@@ -6,6 +6,7 @@ Loads credentials from environment variables (.env file).
 """
 
 import os
+import sys
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -13,9 +14,14 @@ from urllib.parse import quote_plus
 try:
     from dotenv import load_dotenv
 
-    # Find .env file in project root
-    env_path = Path(__file__).resolve().parents[3] / '.env'
-    load_dotenv(env_path)
+    # Find .env file in project root.
+    # Pytest runs should not auto-load runtime secrets/config from .env.
+    running_pytest = bool(os.getenv("PYTEST_CURRENT_TEST")) or any(
+        "pytest" in arg for arg in sys.argv
+    )
+    if not running_pytest:
+        env_path = Path(__file__).resolve().parents[3] / '.env'
+        load_dotenv(env_path)
 except ImportError:
     pass  # python-dotenv not installed, rely on system environment variables
 

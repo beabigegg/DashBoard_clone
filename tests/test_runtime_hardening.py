@@ -15,7 +15,11 @@ from mes_dashboard.routes.health_routes import check_database
 @pytest.fixture
 def testing_app_factory(monkeypatch):
     def _factory(*, csrf_enabled: bool = False):
+        from mes_dashboard.routes import auth_routes
+
         monkeypatch.setenv("REALTIME_EQUIPMENT_CACHE_ENABLED", "false")
+        with auth_routes._rate_limit_lock:
+            auth_routes._login_attempts.clear()
         db._ENGINE = None
         db._HEALTH_ENGINE = None
         app = create_app("testing")
@@ -154,7 +158,8 @@ def test_security_headers_applied_globally(testing_app_factory):
 
     assert response.status_code == 200
     assert "Content-Security-Policy" in response.headers
-    assert response.headers["X-Frame-Options"] == "DENY"
+    assert "frame-ancestors 'self'" in response.headers["Content-Security-Policy"]
+    assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert "Referrer-Policy" in response.headers
 

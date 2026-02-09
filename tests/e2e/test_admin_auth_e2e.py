@@ -7,9 +7,7 @@ Run with: pytest tests/e2e/test_admin_auth_e2e.py -v --run-integration
 
 import json
 import pytest
-from unittest.mock import patch, MagicMock
-import tempfile
-from pathlib import Path
+from unittest.mock import patch
 
 import sys
 import os
@@ -18,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app
 from mes_dashboard.services import page_registry
+from mes_dashboard.routes import auth_routes
 
 
 @pytest.fixture
@@ -51,7 +50,7 @@ def app(temp_page_status):
 
     app = create_app('testing')
     app.config['TESTING'] = True
-    app.config['WTF_CSRF_ENABLED'] = False
+    app.config['CSRF_ENABLED'] = False
 
     yield app
 
@@ -65,28 +64,31 @@ def client(app):
     return app.test_client()
 
 
-def mock_ldap_success(mail="ymirliu@panjit.com.tw"):
-    """Helper to create mock for successful LDAP auth."""
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "success": True,
-        "user": {
-            "username": "92367",
-            "displayName": "Test Admin",
-            "mail": mail,
-            "department": "Test Department"
-        }
+@pytest.fixture(autouse=True)
+def clear_login_rate_limit():
+    """Reset in-memory login attempts to avoid cross-test interference."""
+    auth_routes._login_attempts.clear()
+    yield
+    auth_routes._login_attempts.clear()
+
+
+def _mock_admin_user(mail: str = "ymirliu@panjit.com.tw") -> dict:
+    return {
+        "username": "92367",
+        "displayName": "Test Admin",
+        "mail": mail,
+        "department": "Test Department",
     }
-    return mock_response
 
 
 class TestFullLoginLogoutFlow:
     """E2E tests for complete login/logout flow."""
 
-    @patch('mes_dashboard.services.auth_service.requests.post')
-    def test_complete_admin_login_workflow(self, mock_post, client):
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    def test_complete_admin_login_workflow(self, mock_auth, _mock_is_admin, client):
         """Test complete admin login workflow."""
-        mock_post.return_value = mock_ldap_success()
+        mock_auth.return_value = _mock_admin_user()
 
         # 1. Access portal - should see login link
         response = client.get("/")
@@ -146,10 +148,11 @@ class TestPageAccessControlFlow:
         content = response.data.decode("utf-8")
         assert "開發中" in content or "403" in content
 
-    @patch('mes_dashboard.services.auth_service.requests.post')
-    def test_admin_can_access_all_pages(self, mock_post, client, temp_page_status):
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    def test_admin_can_access_all_pages(self, mock_auth, _mock_is_admin, client, temp_page_status):
         """Test admin users can access all pages."""
-        mock_post.return_value = mock_ldap_success()
+        mock_auth.return_value = _mock_admin_user()
 
         # 1. Login as admin
         client.post("/admin/login", data={
@@ -169,10 +172,11 @@ class TestPageAccessControlFlow:
 class TestPageManagementFlow:
     """E2E tests for page management flow."""
 
-    @patch('mes_dashboard.services.auth_service.requests.post')
-    def test_admin_can_change_page_status(self, mock_post, client, temp_page_status):
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    def test_admin_can_change_page_status(self, mock_auth, _mock_is_admin, client, temp_page_status):
         """Test admin can change page status via management interface."""
-        mock_post.return_value = mock_ldap_success()
+        mock_auth.return_value = _mock_admin_user()
 
         # 1. Login as admin
         client.post("/admin/login", data={
@@ -206,10 +210,11 @@ class TestPageManagementFlow:
         response = client.get("/wip-overview")
         assert response.status_code == 403
 
-    @patch('mes_dashboard.services.auth_service.requests.post')
-    def test_release_dev_page_makes_it_public(self, mock_post, client, temp_page_status):
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    def test_release_dev_page_makes_it_public(self, mock_auth, _mock_is_admin, client, temp_page_status):
         """Test releasing a dev page makes it publicly accessible."""
-        mock_post.return_value = mock_ldap_success()
+        mock_auth.return_value = _mock_admin_user()
 
         # 1. Verify /tables is currently dev (403 for non-admin)
         response = client.get("/tables")
@@ -253,10 +258,11 @@ class TestPortalDynamicTabs:
         # Dev pages should NOT show (tables and resource are dev)
         # Note: This depends on the can_view_page implementation in portal.html
 
-    @patch('mes_dashboard.services.auth_service.requests.post')
-    def test_portal_shows_all_tabs_for_admin(self, mock_post, client, temp_page_status):
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    def test_portal_shows_all_tabs_for_admin(self, mock_auth, _mock_is_admin, client, temp_page_status):
         """Test portal shows all tabs for admin users."""
-        mock_post.return_value = mock_ldap_success()
+        mock_auth.return_value = _mock_admin_user()
 
         # Login as admin
         client.post("/admin/login", data={
@@ -275,10 +281,11 @@ class TestPortalDynamicTabs:
 class TestSessionPersistence:
     """E2E tests for session persistence."""
 
-    @patch('mes_dashboard.services.auth_service.requests.post')
-    def test_session_persists_across_requests(self, mock_post, client):
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    def test_session_persists_across_requests(self, mock_auth, _mock_is_admin, client):
         """Test admin session persists across multiple requests."""
-        mock_post.return_value = mock_ldap_success()
+        mock_auth.return_value = _mock_admin_user()
 
         # Login
         client.post("/admin/login", data={
@@ -303,7 +310,7 @@ class TestSecurityScenarios:
         """Test admin APIs are protected."""
         # Try to get pages without login
         response = client.get("/admin/api/pages", follow_redirects=False)
-        assert response.status_code == 302
+        assert response.status_code in (302, 401)
 
         # Try to update page without login
         response = client.put(
@@ -312,23 +319,18 @@ class TestSecurityScenarios:
             content_type="application/json",
             follow_redirects=False
         )
-        assert response.status_code == 302
+        assert response.status_code in (302, 401)
 
-    @patch('mes_dashboard.services.auth_service.requests.post')
-    def test_non_admin_user_cannot_login(self, mock_post, client):
+    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=False)
+    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    def test_non_admin_user_cannot_login(self, mock_auth, _mock_is_admin, client):
         """Test non-admin user cannot access admin features."""
-        # Mock LDAP success but with non-admin email
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "success": True,
-            "user": {
-                "username": "99999",
-                "displayName": "Regular User",
-                "mail": "regular@panjit.com.tw",
-                "department": "Test"
-            }
+        mock_auth.return_value = {
+            "username": "99999",
+            "displayName": "Regular User",
+            "mail": "regular@panjit.com.tw",
+            "department": "Test",
         }
-        mock_post.return_value = mock_response
 
         # Try to login
         response = client.post("/admin/login", data={

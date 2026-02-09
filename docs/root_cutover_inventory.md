@@ -41,7 +41,7 @@
 
 ### App import smoke
 - `PYTHONPATH=src python -c "from mes_dashboard.app import create_app; app=create_app('testing'); print(app.url_map)"`
-- Verified route initialization count (`routes 71`) in root-only execution context.
+- Verified route initialization count (`routes 83`) in root-only execution context.
 
 ### HTTP smoke (Flask test client)
 - Verify page renders and module asset tags resolve/fallback:

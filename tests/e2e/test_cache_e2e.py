@@ -198,7 +198,7 @@ class TestSearchEndpointsE2E:
         # Use a common pattern that should exist
         response = requests.get(
             f"{api_base_url}/wip/meta/search",
-            params={'type': 'workorder', 'q': 'WO', 'limit': 10},
+            params={'field': 'workorder', 'q': 'WO', 'limit': 10},
             timeout=30
         )
 
@@ -210,7 +210,7 @@ class TestSearchEndpointsE2E:
         """Test lot ID search returns results."""
         response = requests.get(
             f"{api_base_url}/wip/meta/search",
-            params={'type': 'lotid', 'q': 'LOT', 'limit': 10},
+            params={'field': 'lotid', 'q': 'LOT', 'limit': 10},
             timeout=30
         )
 
@@ -222,7 +222,7 @@ class TestSearchEndpointsE2E:
         """Test search with short query returns empty list."""
         response = requests.get(
             f"{api_base_url}/wip/meta/search",
-            params={'type': 'workorder', 'q': 'W'},  # Too short
+            params={'field': 'workorder', 'q': 'W'},  # Too short
             timeout=30
         )
 

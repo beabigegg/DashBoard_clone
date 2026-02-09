@@ -104,11 +104,12 @@ def _build_security_headers(production: bool) -> dict[str, str]:
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "
             "connect-src 'self'; "
-            "frame-ancestors 'none'; "
+            # Portal embeds same-origin report pages via iframe.
+            "frame-ancestors 'self'; "
             "base-uri 'self'; "
             "form-action 'self'"
         ),
-        "X-Frame-Options": "DENY",
+        "X-Frame-Options": "SAMEORIGIN",
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "strict-origin-when-cross-origin",
     }
@@ -233,11 +234,14 @@ def create_app(config_name: str | None = None) -> Flask:
 
     # Initialize database teardown and pool
     init_db(app)
+    running_pytest = bool(os.getenv("PYTEST_CURRENT_TEST"))
+    is_testing_runtime = bool(app.config.get("TESTING")) or app.testing or running_pytest
     with app.app_context():
-        get_engine()
-        start_keepalive()  # Keep database connections alive
-        start_cache_updater()  # Start Redis cache updater
-        init_realtime_equipment_cache(app)  # Start realtime equipment status cache
+        if not is_testing_runtime:
+            get_engine()
+            start_keepalive()  # Keep database connections alive
+            start_cache_updater()  # Start Redis cache updater
+            init_realtime_equipment_cache(app)  # Start realtime equipment status cache
     _register_shutdown_hooks(app)
 
     # Register API routes
@@ -343,13 +347,10 @@ def create_app(config_name: str | None = None) -> Flask:
             return admin
 
         def frontend_asset(filename: str) -> str | None:
-            """Resolve built frontend asset from static/dist if available."""
+            """Resolve frontend asset path served from static/dist."""
             if not filename:
                 return None
-            dist_path = os.path.join(app.static_folder or "", "dist", filename)
-            if os.path.exists(dist_path):
-                return url_for("static", filename=f"dist/{filename}")
-            return None
+            return url_for("static", filename=f"dist/{filename}")
 
         return {
             "is_admin": admin,
@@ -367,6 +368,11 @@ def create_app(config_name: str | None = None) -> Flask:
     def portal_index():
         """Portal home with tabs."""
         return render_template('portal.html')
+
+    @app.route('/favicon.ico')
+    def favicon():
+        """Serve favicon without 404 noise."""
+        return redirect(url_for('static', filename='favicon.svg'), code=302)
 
     @app.route('/tables')
     def tables_page():
@@ -397,6 +403,11 @@ def create_app(config_name: str | None = None) -> Flask:
     def resource_history_page():
         """Resource history analysis page."""
         return render_template('resource_history.html')
+
+    @app.route('/tmtt-defect')
+    def tmtt_defect_page():
+        """TMTT printing & lead form defect analysis page."""
+        return render_template('tmtt_defect.html')
 
     # ========================================================
     # Table Query APIs (for table_data_viewer)
