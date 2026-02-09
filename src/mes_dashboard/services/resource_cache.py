@@ -419,7 +419,11 @@ def _records_from_index(index: ResourceIndex, positions: list[RowPosition] | Non
                 return list(legacy_records)
             selected = [legacy_records[int(pos)] for pos in positions if 0 <= int(pos) < len(legacy_records)]
             return selected
-        return []
+        # DataFrame evicted from process cache (TTL expired) and no legacy
+        # records stored in index.  Reload from Redis before giving up.
+        df = _get_cached_data()
+        if df is None:
+            return []
     selected_positions = positions if positions is not None else index.get("all_positions", [])
     if not selected_positions:
         selected_positions = list(range(len(df)))

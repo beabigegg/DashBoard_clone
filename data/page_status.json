@@ -45,7 +45,7 @@
     },
     {
       "route": "/resource",
-      "name": "機台狀態",
+      "name": "設備即時概況",
       "status": "released",
       "drawer_id": "reports",
       "order": 2
