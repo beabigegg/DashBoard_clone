@@ -53,7 +53,7 @@
     {
       "route": "/tmtt-defect",
       "name": "TMTT印字腳型不良分析",
-      "status": "dev"
+      "status": "released"
     }
   ],
   "api_public": true,

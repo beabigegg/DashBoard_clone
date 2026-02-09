@@ -1,13 +1,11 @@
 import './portal.css';
 
 (function initPortal() {
-  const tabs = document.querySelectorAll('.tab');
+  const sidebarItems = document.querySelectorAll('.sidebar-item[data-target]');
   const frames = document.querySelectorAll('iframe');
-  const toolFrame = document.getElementById('toolFrame');
   const healthDot = document.getElementById('healthDot');
   const healthLabel = document.getElementById('healthLabel');
   const healthPopup = document.getElementById('healthPopup');
-  const healthStatus = document.getElementById('healthStatus');
   const dbStatus = document.getElementById('dbStatus');
   const redisStatus = document.getElementById('redisStatus');
   const cacheEnabled = document.getElementById('cacheEnabled');
@@ -22,39 +20,35 @@ import './portal.css';
 
   function setFrameHeight() {
     const header = document.querySelector('.header');
-    const tabArea = document.querySelector('.tabs');
-    if (!header || !tabArea) return;
-    const height = Math.max(600, window.innerHeight - header.offsetHeight - tabArea.offsetHeight - 60);
+    if (!header) return;
+    const height = Math.max(600, window.innerHeight - header.offsetHeight - 52);
     frames.forEach((frame) => {
       frame.style.height = `${height}px`;
     });
   }
 
-  function activateTab(targetId) {
-    tabs.forEach((tab) => tab.classList.remove('active'));
+  function activateTab(targetId, toolSrc) {
+    sidebarItems.forEach((item) => item.classList.remove('active'));
     frames.forEach((frame) => frame.classList.remove('active'));
 
-    const tabBtn = document.querySelector(`[data-target="${targetId}"]`);
-    const targetFrame = document.getElementById(targetId);
+    const activeItems = document.querySelectorAll(`.sidebar-item[data-target="${targetId}"]`);
+    activeItems.forEach((item) => {
+      if (!toolSrc || item.dataset.toolSrc === toolSrc) {
+        item.classList.add('active');
+      }
+    });
 
-    if (tabBtn) tabBtn.classList.add('active');
+    const targetFrame = document.getElementById(targetId);
     if (targetFrame) {
       targetFrame.classList.add('active');
-      if (targetFrame.dataset.src && !targetFrame.src) {
+      if (toolSrc) {
+        if (targetFrame.src !== toolSrc && !targetFrame.src.endsWith(toolSrc)) {
+          targetFrame.src = toolSrc;
+        }
+      } else if (targetFrame.dataset.src && !targetFrame.src) {
         targetFrame.src = targetFrame.dataset.src;
       }
     }
-  }
-
-  function openTool(path) {
-    if (!toolFrame) return false;
-    tabs.forEach((tab) => tab.classList.remove('active'));
-    frames.forEach((frame) => frame.classList.remove('active'));
-    toolFrame.classList.add('active');
-    if (toolFrame.src !== path) {
-      toolFrame.src = path;
-    }
-    return false;
   }
 
   function toggleHealthPopup() {
@@ -167,18 +161,17 @@ import './portal.css';
     }
   }
 
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => activateTab(tab.dataset.target));
+  sidebarItems.forEach((item) => {
+    item.addEventListener('click', () => {
+      activateTab(item.dataset.target, item.dataset.toolSrc || null);
+    });
   });
 
-  if (tabs.length > 0) {
-    activateTab(tabs[0].dataset.target);
+  if (sidebarItems.length > 0) {
+    activateTab(sidebarItems[0].dataset.target);
   }
 
-  window.openTool = openTool;
   window.toggleHealthPopup = toggleHealthPopup;
-  // Click handler is wired via inline onclick in template for fallback compatibility.
-  // Avoid duplicate binding here, otherwise a single click toggles twice.
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#healthStatus') && !e.target.closest('#healthPopup') && healthPopup) {
       healthPopup.classList.remove('show');
