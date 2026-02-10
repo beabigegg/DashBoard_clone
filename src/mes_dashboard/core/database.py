@@ -559,6 +559,75 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
         raise
 
 
+def read_sql_df_slow(
+    sql: str,
+    params: Optional[Dict[str, Any]] = None,
+    timeout_seconds: int = 120,
+) -> pd.DataFrame:
+    """Execute a slow SQL query with a custom timeout via direct oracledb connection.
+
+    Unlike read_sql_df which uses the pooled engine (55s timeout),
+    this creates a dedicated connection with a longer call_timeout
+    for known-slow queries (e.g. full table scans on large tables).
+
+    Args:
+        sql: SQL query string with Oracle bind variables.
+        params: Optional dict of parameter values.
+        timeout_seconds: Call timeout in seconds (default: 120).
+
+    Returns:
+        DataFrame with query results, or None on connection failure.
+    """
+    start_time = time.time()
+    timeout_ms = timeout_seconds * 1000
+
+    conn = None
+    try:
+        runtime = get_db_runtime_config()
+        conn = oracledb.connect(
+            **DB_CONFIG,
+            tcp_connect_timeout=runtime["tcp_connect_timeout"],
+            retry_count=runtime["retry_count"],
+            retry_delay=runtime["retry_delay"],
+        )
+        conn.call_timeout = timeout_ms
+        logger.debug(
+            "Slow-query connection established (call_timeout_ms=%s)", timeout_ms
+        )
+
+        cursor = conn.cursor()
+        cursor.execute(sql, params or {})
+        columns = [desc[0].upper() for desc in cursor.description]
+        rows = cursor.fetchall()
+        cursor.close()
+
+        df = pd.DataFrame(rows, columns=columns)
+
+        elapsed = time.time() - start_time
+        if elapsed > 1.0:
+            sql_preview = sql.strip().replace('\n', ' ')[:100]
+            logger.warning(f"Slow query ({elapsed:.2f}s): {sql_preview}...")
+        else:
+            logger.debug(f"Query completed in {elapsed:.3f}s, rows={len(df)}")
+
+        return df
+
+    except Exception as exc:
+        elapsed = time.time() - start_time
+        ora_code = _extract_ora_code(exc)
+        sql_preview = sql.strip().replace('\n', ' ')[:100]
+        logger.error(
+            f"Query failed after {elapsed:.2f}s - ORA-{ora_code}: {exc} | SQL: {sql_preview}..."
+        )
+        raise
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 # ============================================================
 # Table Utilities
 # ============================================================

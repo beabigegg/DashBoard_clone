@@ -488,6 +488,12 @@ def create_app(config_name: str | None = None) -> Flask:
         dist_dir = os.path.join(app.static_folder or "", "dist")
         return send_from_directory(dist_dir, 'qc-gate.html')
 
+    @app.route('/mid-section-defect')
+    def mid_section_defect_page():
+        """Mid-section defect traceability analysis page (pure Vite)."""
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        return send_from_directory(dist_dir, 'mid-section-defect.html')
+
     # ========================================================
     # Table Query APIs (for table_data_viewer)
     # ========================================================

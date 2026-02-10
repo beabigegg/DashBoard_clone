@@ -79,6 +79,13 @@
       "order": 5
     },
     {
+      "route": "/mid-section-defect",
+      "name": "中段製程不良追溯",
+      "status": "dev",
+      "drawer_id": "queries",
+      "order": 6
+    },
+    {
       "route": "/admin/pages",
       "name": "頁面管理",
       "status": "dev",

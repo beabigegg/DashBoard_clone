@@ -23,7 +23,8 @@ export default defineConfig(({ mode }) => ({
         tables: resolve(__dirname, 'src/tables/index.html'),
         'query-tool': resolve(__dirname, 'src/query-tool/main.js'),
         'tmtt-defect': resolve(__dirname, 'src/tmtt-defect/main.js'),
-        'qc-gate': resolve(__dirname, 'src/qc-gate/index.html')
+        'qc-gate': resolve(__dirname, 'src/qc-gate/index.html'),
+        'mid-section-defect': resolve(__dirname, 'src/mid-section-defect/index.html')
       },
       output: {
         entryFileNames: '[name].js',
