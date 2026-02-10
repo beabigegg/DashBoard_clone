@@ -436,7 +436,6 @@ onMounted(() => {
   <div class="dashboard hold-overview-page">
     <header class="header">
       <div class="header-left">
-        <a href="/wip-overview" class="btn btn-back">&larr; WIP Overview</a>
         <h1>Hold Lot Overview</h1>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
       </div>
