@@ -125,6 +125,41 @@
             overflow-y: auto;
         }
 
+        .workcenter-group-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: #f0f0f0;
+            font-weight: 600;
+            font-size: 12px;
+            color: #666;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .workcenter-group-header:hover {
+            background: #e8e8e8;
+        }
+
+        .workcenter-group-header input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .workcenter-group-header input[type="checkbox"].indeterminate {
+            opacity: 0.6;
+        }
+
+        .workcenter-group-name {
+            flex: 1;
+        }
+
+        .workcenter-group-count {
+            font-weight: 400;
+            font-size: 11px;
+            color: #999;
+        }
+
         .equipment-item {
             display: flex;
             align-items: center;
@@ -460,7 +495,7 @@
                 <!-- Actions -->
                 <div class="filter-actions">
                     <button class="btn btn-primary" onclick="queryJobs()" id="queryBtn">
-                        查詢工單
+                        查詢
                     </button>
                     <button class="btn btn-success" onclick="exportCsv()" id="exportBtn" disabled>
                         匯出 CSV
@@ -471,7 +506,7 @@
             <!-- Result Section -->
             <div class="result-section" id="resultSection">
                 <div class="empty-state">
-                    <p>請選擇設備和日期範圍後，點擊「查詢工單」</p>
+                    <p>請選擇設備和日期範圍後，點擊「查詢」</p>
                 </div>
             </div>
         </div>
@@ -531,26 +566,39 @@
             }
 
             let html = '';
-            let currentWorkcenter = null;
 
+            // Group by workcenter
+            const grouped = {};
             equipments.forEach(eq => {
-                const isSelected = selectedEquipments.has(eq.RESOURCEID);
+                const wc = eq.WORKCENTERNAME || '未分類';
+                if (!grouped[wc]) grouped[wc] = [];
+                grouped[wc].push(eq);
+            });
+            const workcenters = Object.keys(grouped).sort();
 
-                // Group header
-                if (eq.WORKCENTERNAME !== currentWorkcenter) {
-                    currentWorkcenter = eq.WORKCENTERNAME;
-                    html += `<div style="padding: 8px 15px; background: #f0f0f0; font-weight: 600; font-size: 12px; color: #666;">${currentWorkcenter || '未分類'}</div>`;
-                }
-
-                html += `
-                    <div class="equipment-item ${isSelected ? 'selected' : ''}" onclick="toggleEquipment('${eq.RESOURCEID}')">
-                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleEquipment('${eq.RESOURCEID}')">
-                        <div class="equipment-info">
-                            <div class="equipment-name">${eq.RESOURCENAME}</div>
-                            <div class="equipment-workcenter">${eq.RESOURCEFAMILYNAME || ''}</div>
+            workcenters.forEach(workcenterName => {
+                const groupEquipments = grouped[workcenterName];
+                const groupIds = groupEquipments.map(eq => eq.RESOURCEID);
+                const selectedInGroup = groupIds.filter(id => selectedEquipments.has(id)).length;
+                const allSelected = selectedInGroup === groupIds.length;
+                const someSelected = selectedInGroup > 0 && !allSelected;
+                html += `<div class="workcenter-group-header" onclick="toggleWorkcenterGroup('${workcenterName}')">
+                    <input type="checkbox" ${allSelected ? 'checked' : ''} ${someSelected ? 'class="indeterminate"' : ''} onclick="event.stopPropagation(); toggleWorkcenterGroup('${workcenterName}')">
+                    <span class="workcenter-group-name">${workcenterName}</span>
+                    <span class="workcenter-group-count">${selectedInGroup}/${groupIds.length}</span>
+                </div>`;
+                groupEquipments.forEach(eq => {
+                    const isSelected = selectedEquipments.has(eq.RESOURCEID);
+                    html += `
+                        <div class="equipment-item ${isSelected ? 'selected' : ''}" onclick="toggleEquipment('${eq.RESOURCEID}')">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleEquipment('${eq.RESOURCEID}')">
+                            <div class="equipment-info">
+                                <div class="equipment-name">${eq.RESOURCENAME}</div>
+                                <div class="equipment-workcenter">${eq.RESOURCEFAMILYNAME || ''}</div>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                });
             });
 
             container.innerHTML = html;
@@ -580,6 +628,30 @@
             } else {
                 selectedEquipments.add(resourceId);
             }
+            updateSelectedDisplay();
+            renderEquipmentList(allEquipments.filter(eq => {
+                const search = document.querySelector('.equipment-search');
+                if (!search || !search.value) return true;
+                const q = search.value.toLowerCase();
+                return (eq.RESOURCENAME && eq.RESOURCENAME.toLowerCase().includes(q)) ||
+                       (eq.WORKCENTERNAME && eq.WORKCENTERNAME.toLowerCase().includes(q));
+            }));
+        }
+
+        // Toggle entire workcenter group selection
+        function toggleWorkcenterGroup(workcenterName) {
+            const groupEquipments = allEquipments.filter(
+                eq => (eq.WORKCENTERNAME || '未分類') === workcenterName
+            );
+            const groupIds = groupEquipments.map(eq => eq.RESOURCEID);
+            const allSelected = groupIds.every(id => selectedEquipments.has(id));
+
+            if (allSelected) {
+                groupIds.forEach(id => selectedEquipments.delete(id));
+            } else {
+                groupIds.forEach(id => selectedEquipments.add(id));
+            }
+
             updateSelectedDisplay();
             renderEquipmentList(allEquipments.filter(eq => {
                 const search = document.querySelector('.equipment-search');

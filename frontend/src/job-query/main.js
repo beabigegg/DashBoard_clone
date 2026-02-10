@@ -88,8 +88,18 @@ function renderTxnCell(txn, apiKey) {
             const workcenters = sortBy(Object.keys(grouped), (name) => name);
 
             workcenters.forEach((workcenterName) => {
-                html += `<div style="padding: 8px 15px; background: #f0f0f0; font-weight: 600; font-size: 12px; color: #666;">${escapeHtml(workcenterName)}</div>`;
-                grouped[workcenterName].forEach((eq) => {
+                const groupEquipments = grouped[workcenterName];
+                const groupIds = groupEquipments.map((eq) => eq.RESOURCEID);
+                const selectedInGroup = groupIds.filter((id) => selectedEquipments.has(id)).length;
+                const allSelected = selectedInGroup === groupIds.length;
+                const someSelected = selectedInGroup > 0 && !allSelected;
+                const escapedName = escapeHtml(workcenterName);
+                html += `<div class="workcenter-group-header" onclick="toggleWorkcenterGroup('${escapedName}')">
+                    <input type="checkbox" ${allSelected ? 'checked' : ''} ${someSelected ? 'class="indeterminate"' : ''} onclick="event.stopPropagation(); toggleWorkcenterGroup('${escapedName}')">
+                    <span class="workcenter-group-name">${escapedName}</span>
+                    <span class="workcenter-group-count">${selectedInGroup}/${groupIds.length}</span>
+                </div>`;
+                groupEquipments.forEach((eq) => {
                     const isSelected = selectedEquipments.has(eq.RESOURCEID);
                     const resourceId = escapeHtml(safeText(eq.RESOURCEID));
                     const resourceName = escapeHtml(safeText(eq.RESOURCENAME));
@@ -136,6 +146,30 @@ function renderTxnCell(txn, apiKey) {
             }
             updateSelectedDisplay();
             renderEquipmentList(allEquipments.filter(eq => {
+                const search = document.querySelector('.equipment-search');
+                if (!search || !search.value) return true;
+                const q = search.value.toLowerCase();
+                return (eq.RESOURCENAME && eq.RESOURCENAME.toLowerCase().includes(q)) ||
+                       (eq.WORKCENTERNAME && eq.WORKCENTERNAME.toLowerCase().includes(q));
+            }));
+        }
+
+        // Toggle entire workcenter group selection
+        function toggleWorkcenterGroup(workcenterName) {
+            const groupEquipments = allEquipments.filter(
+                (eq) => safeText(eq.WORKCENTERNAME, '未分類') === workcenterName
+            );
+            const groupIds = groupEquipments.map((eq) => eq.RESOURCEID);
+            const allSelected = groupIds.every((id) => selectedEquipments.has(id));
+
+            if (allSelected) {
+                groupIds.forEach((id) => selectedEquipments.delete(id));
+            } else {
+                groupIds.forEach((id) => selectedEquipments.add(id));
+            }
+
+            updateSelectedDisplay();
+            renderEquipmentList(allEquipments.filter((eq) => {
                 const search = document.querySelector('.equipment-search');
                 if (!search || !search.value) return true;
                 const q = search.value.toLowerCase();
@@ -460,6 +494,7 @@ renderEquipmentList,
 toggleEquipmentDropdown,
 filterEquipments,
 toggleEquipment,
+toggleWorkcenterGroup,
 updateSelectedDisplay,
 setLast90Days,
 validateInputs,

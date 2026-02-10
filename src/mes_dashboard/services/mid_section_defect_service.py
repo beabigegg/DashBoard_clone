@@ -19,9 +19,11 @@ Attribution Method (Sum):
 """
 
 import csv
+import hashlib
 import io
 import logging
 import math
+import time
 from collections import defaultdict
 from datetime import datetime
 from typing import Optional, Dict, List, Any, Set, Tuple, Generator
@@ -30,8 +32,8 @@ import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
+from mes_dashboard.core.redis_client import try_acquire_lock, release_lock
 from mes_dashboard.sql import SQLLoader, QueryBuilder
-from mes_dashboard.config.workcenter_groups import get_workcenter_group
 
 logger = logging.getLogger('mes_dashboard.mid_section_defect')
 
@@ -41,9 +43,10 @@ CACHE_TTL_TMTT = 300            # 5 min for TMTT detection data
 CACHE_TTL_LOSS_REASONS = 86400  # 24h for loss reason list (daily sync)
 ORACLE_IN_BATCH_SIZE = 1000     # Oracle IN clause limit
 
-# Mid-section workcenter group order range (成型 through 測試)
-MID_SECTION_ORDER_MIN = 4   # 成型
-MID_SECTION_ORDER_MAX = 11  # 測試
+# Distributed lock settings for query_analysis cold-cache path
+ANALYSIS_LOCK_TTL_SECONDS = 120
+ANALYSIS_LOCK_WAIT_TIMEOUT_SECONDS = 90
+ANALYSIS_LOCK_POLL_INTERVAL_SECONDS = 0.5
 
 # Top N for chart display (rest grouped as "其他")
 TOP_N = 10
@@ -111,77 +114,109 @@ def query_analysis(
     if cached is not None:
         return cached
 
-    # Stage 1: TMTT detection data
-    tmtt_df = _fetch_tmtt_data(start_date, end_date)
-    if tmtt_df is None:
-        return None
-    if tmtt_df.empty:
-        return _empty_result()
-
-    # Extract available loss reasons before filtering
-    available_loss_reasons = sorted(
-        tmtt_df.loc[tmtt_df['REJECTQTY'] > 0, 'LOSSREASONNAME']
-        .dropna().unique().tolist()
+    lock_name = (
+        f"mid_section_defect:analysis:{hashlib.md5(cache_key.encode('utf-8')).hexdigest()}"
     )
+    lock_acquired = False
 
-    # Apply loss reason filter if specified
-    if loss_reasons:
-        filtered_df = tmtt_df[
-            (tmtt_df['LOSSREASONNAME'].isin(loss_reasons))
-            | (tmtt_df['REJECTQTY'] == 0)
-            | (tmtt_df['LOSSREASONNAME'].isna())
-        ].copy()
+    # Prevent duplicate cold-cache pipeline execution across workers.
+    lock_acquired = try_acquire_lock(lock_name, ttl_seconds=ANALYSIS_LOCK_TTL_SECONDS)
+    if not lock_acquired:
+        wait_start = time.monotonic()
+        while (
+            time.monotonic() - wait_start
+            < ANALYSIS_LOCK_WAIT_TIMEOUT_SECONDS
+        ):
+            cached = cache_get(cache_key)
+            if cached is not None:
+                return cached
+            time.sleep(ANALYSIS_LOCK_POLL_INTERVAL_SECONDS)
+
+        logger.warning(
+            "Timed out waiting for in-flight mid_section_defect analysis cache; "
+            "continuing with fail-open pipeline execution"
+        )
     else:
-        filtered_df = tmtt_df
+        # Double-check cache after lock acquisition.
+        cached = cache_get(cache_key)
+        if cached is not None:
+            return cached
 
-    # Stage 2: Genealogy resolution (split chain + merge expansion)
-    tmtt_cids = tmtt_df['CONTAINERID'].unique().tolist()
-    tmtt_names = {}
-    for _, r in tmtt_df.drop_duplicates('CONTAINERID').iterrows():
-        tmtt_names[r['CONTAINERID']] = _safe_str(r.get('CONTAINERNAME'))
+    try:
+        # Stage 1: TMTT detection data
+        tmtt_df = _fetch_tmtt_data(start_date, end_date)
+        if tmtt_df is None:
+            return None
+        if tmtt_df.empty:
+            return _empty_result()
 
-    ancestors = {}
-    genealogy_status = 'ready'
+        # Extract available loss reasons before filtering
+        available_loss_reasons = sorted(
+            tmtt_df.loc[tmtt_df['REJECTQTY'] > 0, 'LOSSREASONNAME']
+            .dropna().unique().tolist()
+        )
 
-    if tmtt_cids:
-        try:
-            ancestors = _resolve_full_genealogy(tmtt_cids, tmtt_names)
-        except Exception as exc:
-            logger.error(f"Genealogy resolution failed: {exc}", exc_info=True)
-            genealogy_status = 'error'
+        # Apply loss reason filter if specified
+        if loss_reasons:
+            filtered_df = tmtt_df[
+                (tmtt_df['LOSSREASONNAME'].isin(loss_reasons))
+                | (tmtt_df['REJECTQTY'] == 0)
+                | (tmtt_df['LOSSREASONNAME'].isna())
+            ].copy()
+        else:
+            filtered_df = tmtt_df
 
-    # Stage 3: Upstream history for ALL CIDs (TMTT lots + ancestors)
-    all_query_cids = set(tmtt_cids)
-    for anc_set in ancestors.values():
-        all_query_cids.update(anc_set)
-    # Filter out any non-string values (NaN/None from pandas)
-    all_query_cids = {c for c in all_query_cids if isinstance(c, str) and c}
+        # Stage 2: Genealogy resolution (split chain + merge expansion)
+        tmtt_cids = tmtt_df['CONTAINERID'].unique().tolist()
+        tmtt_names = {}
+        for _, r in tmtt_df.drop_duplicates('CONTAINERID').iterrows():
+            tmtt_names[r['CONTAINERID']] = _safe_str(r.get('CONTAINERNAME'))
 
-    upstream_by_cid = {}
-    if all_query_cids:
-        try:
-            upstream_by_cid = _fetch_upstream_history(list(all_query_cids))
-        except Exception as exc:
-            logger.error(f"Upstream history query failed: {exc}", exc_info=True)
-            genealogy_status = 'error'
-    tmtt_data = _build_tmtt_lookup(filtered_df)
-    attribution = _attribute_defects(
-        tmtt_data, ancestors, upstream_by_cid, loss_reasons,
-    )
+        ancestors = {}
+        genealogy_status = 'ready'
 
-    result = {
-        'kpi': _build_kpi(filtered_df, attribution, loss_reasons),
-        'available_loss_reasons': available_loss_reasons,
-        'charts': _build_all_charts(attribution, tmtt_data),
-        'daily_trend': _build_daily_trend(filtered_df, loss_reasons),
-        'detail': _build_detail_table(filtered_df, ancestors, upstream_by_cid),
-        'genealogy_status': genealogy_status,
-    }
+        if tmtt_cids:
+            try:
+                ancestors = _resolve_full_genealogy(tmtt_cids, tmtt_names)
+            except Exception as exc:
+                logger.error(f"Genealogy resolution failed: {exc}", exc_info=True)
+                genealogy_status = 'error'
 
-    # Only cache successful results (don't cache upstream errors)
-    if genealogy_status == 'ready':
-        cache_set(cache_key, result, ttl=CACHE_TTL_TMTT)
-    return result
+        # Stage 3: Upstream history for ALL CIDs (TMTT lots + ancestors)
+        all_query_cids = set(tmtt_cids)
+        for anc_set in ancestors.values():
+            all_query_cids.update(anc_set)
+        # Filter out any non-string values (NaN/None from pandas)
+        all_query_cids = {c for c in all_query_cids if isinstance(c, str) and c}
+
+        upstream_by_cid = {}
+        if all_query_cids:
+            try:
+                upstream_by_cid = _fetch_upstream_history(list(all_query_cids))
+            except Exception as exc:
+                logger.error(f"Upstream history query failed: {exc}", exc_info=True)
+                genealogy_status = 'error'
+        tmtt_data = _build_tmtt_lookup(filtered_df)
+        attribution = _attribute_defects(
+            tmtt_data, ancestors, upstream_by_cid, loss_reasons,
+        )
+
+        result = {
+            'kpi': _build_kpi(filtered_df, attribution, loss_reasons),
+            'available_loss_reasons': available_loss_reasons,
+            'charts': _build_all_charts(attribution, tmtt_data),
+            'daily_trend': _build_daily_trend(filtered_df, loss_reasons),
+            'detail': _build_detail_table(filtered_df, ancestors, upstream_by_cid),
+            'genealogy_status': genealogy_status,
+        }
+
+        # Only cache successful results (don't cache upstream errors)
+        if genealogy_status == 'ready':
+            cache_set(cache_key, result, ttl=CACHE_TTL_TMTT)
+        return result
+    finally:
+        if lock_acquired:
+            release_lock(lock_name)
 
 
 def query_analysis_detail(
@@ -606,7 +641,7 @@ def _fetch_upstream_history(
     """Fetch upstream production history for ancestor CONTAINERIDs.
 
     Batches queries to respect Oracle IN clause limit.
-    Filters by mid-section workcenter groups (order 4-11) in Python.
+    WORKCENTER_GROUP classification is computed in SQL (CASE WHEN).
 
     Returns:
         {containerid: [{'workcenter_group': ..., 'equipment_name': ..., ...}, ...]}
@@ -646,18 +681,14 @@ def _fetch_upstream_history(
 
     combined = pd.concat(all_rows, ignore_index=True)
 
-    # Filter by mid-section workcenter groups in Python
     result: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for _, row in combined.iterrows():
-        wc_name = row.get('WORKCENTERNAME', '')
-        group_name, order = get_workcenter_group(wc_name)
-        if group_name is None or order < MID_SECTION_ORDER_MIN or order > MID_SECTION_ORDER_MAX:
-            continue
-
         cid = row['CONTAINERID']
+        group_name = _safe_str(row.get('WORKCENTER_GROUP'))
+        if not group_name:
+            group_name = '(未知)'
         result[cid].append({
             'workcenter_group': group_name,
-            'workcenter_group_order': order,
             'equipment_id': _safe_str(row.get('EQUIPMENTID')),
             'equipment_name': _safe_str(row.get('EQUIPMENTNAME')),
             'spec_name': _safe_str(row.get('SPECNAME')),
@@ -665,7 +696,7 @@ def _fetch_upstream_history(
         })
 
     logger.info(
-        f"Upstream history: {len(result)} lots with mid-section records, "
+        f"Upstream history: {len(result)} lots with classified records, "
         f"from {len(unique_cids)} queried CIDs"
     )
     return dict(result)

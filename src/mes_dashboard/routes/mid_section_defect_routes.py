@@ -6,6 +6,7 @@ Reverse traceability from TMTT (test) station back to upstream production statio
 
 from flask import Blueprint, jsonify, request, Response
 
+from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.services.mid_section_defect_service import (
     query_analysis,
     query_analysis_detail,
@@ -19,8 +20,33 @@ mid_section_defect_bp = Blueprint(
     url_prefix='/api/mid-section-defect'
 )
 
+_ANALYSIS_RATE_LIMIT = configured_rate_limit(
+    bucket="mid-section-defect-analysis",
+    max_attempts_env="MID_SECTION_DEFECT_ANALYSIS_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="MID_SECTION_DEFECT_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=6,
+    default_window_seconds=60,
+)
+
+_DETAIL_RATE_LIMIT = configured_rate_limit(
+    bucket="mid-section-defect-analysis-detail",
+    max_attempts_env="MID_SECTION_DEFECT_DETAIL_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="MID_SECTION_DEFECT_DETAIL_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=15,
+    default_window_seconds=60,
+)
+
+_EXPORT_RATE_LIMIT = configured_rate_limit(
+    bucket="mid-section-defect-export",
+    max_attempts_env="MID_SECTION_DEFECT_EXPORT_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="MID_SECTION_DEFECT_EXPORT_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=3,
+    default_window_seconds=60,
+)
+
 
 @mid_section_defect_bp.route('/analysis', methods=['GET'])
+@_ANALYSIS_RATE_LIMIT
 def api_analysis():
     """API: Get mid-section defect traceability analysis (summary).
 
@@ -67,6 +93,7 @@ def api_analysis():
 
 
 @mid_section_defect_bp.route('/analysis/detail', methods=['GET'])
+@_DETAIL_RATE_LIMIT
 def api_analysis_detail():
     """API: Get paginated detail table for mid-section defect analysis.
 
@@ -125,6 +152,7 @@ def api_loss_reasons():
 
 
 @mid_section_defect_bp.route('/export', methods=['GET'])
+@_EXPORT_RATE_LIMIT
 def api_export():
     """API: Export mid-section defect detail data as CSV.
 

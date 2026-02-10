@@ -20,6 +20,11 @@ const filters = reactive({
   endDate: '',
   lossReasons: [],
 });
+const committedFilters = ref({
+  startDate: '',
+  endDate: '',
+  lossReasons: [],
+});
 
 const availableLossReasons = ref([]);
 
@@ -72,14 +77,23 @@ function unwrapApiResult(result, fallbackMessage) {
 }
 
 function buildFilterParams() {
+  const snapshot = committedFilters.value;
   const params = {
-    start_date: filters.startDate,
-    end_date: filters.endDate,
+    start_date: snapshot.startDate,
+    end_date: snapshot.endDate,
   };
-  if (filters.lossReasons.length) {
-    params.loss_reasons = filters.lossReasons.join(',');
+  if (snapshot.lossReasons.length) {
+    params.loss_reasons = snapshot.lossReasons.join(',');
   }
   return params;
+}
+
+function snapshotFilters() {
+  committedFilters.value = {
+    startDate: filters.startDate,
+    endDate: filters.endDate,
+    lossReasons: [...filters.lossReasons],
+  };
 }
 
 async function loadLossReasons() {
@@ -92,7 +106,7 @@ async function loadLossReasons() {
   }
 }
 
-async function loadDetail(page = 1) {
+async function loadDetail(page = 1, signal = null) {
   detailLoading.value = true;
   try {
     const params = {
@@ -103,6 +117,7 @@ async function loadDetail(page = 1) {
     const result = await apiGet('/api/mid-section-defect/analysis/detail', {
       params,
       timeout: API_TIMEOUT,
+      signal,
     });
     const unwrapped = unwrapApiResult(result, '載入明細失敗');
     detailData.value = unwrapped.data?.detail || [];
@@ -110,6 +125,9 @@ async function loadDetail(page = 1) {
       page: 1, page_size: PAGE_SIZE, total_count: 0, total_pages: 1,
     };
   } catch (err) {
+    if (err?.name === 'AbortError') {
+      return;
+    }
     console.error('Detail load failed:', err.message);
     detailData.value = [];
   } finally {
@@ -120,6 +138,7 @@ async function loadDetail(page = 1) {
 async function loadAnalysis() {
   queryError.value = '';
   loading.querying = true;
+  const signal = createAbortSignal('msd-analysis');
 
   try {
     const params = buildFilterParams();
@@ -129,8 +148,9 @@ async function loadAnalysis() {
       apiGet('/api/mid-section-defect/analysis', {
         params,
         timeout: API_TIMEOUT,
+        signal,
       }),
-      loadDetail(1),
+      loadDetail(1, signal),
     ]);
 
     const unwrapped = unwrapApiResult(summaryResult, '查詢失敗');
@@ -143,6 +163,9 @@ async function loadAnalysis() {
       startAutoRefresh();
     }
   } catch (err) {
+    if (err?.name === 'AbortError') {
+      return;
+    }
     queryError.value = err.message || '查詢失敗，請稍後再試';
   } finally {
     loading.querying = false;
@@ -154,38 +177,40 @@ function handleUpdateFilters(updated) {
 }
 
 function handleQuery() {
+  snapshotFilters();
   loadAnalysis();
 }
 
 function prevPage() {
   if (detailPagination.value.page <= 1) return;
-  loadDetail(detailPagination.value.page - 1);
+  loadDetail(detailPagination.value.page - 1, createAbortSignal('msd-detail'));
 }
 
 function nextPage() {
   if (detailPagination.value.page >= detailPagination.value.total_pages) return;
-  loadDetail(detailPagination.value.page + 1);
+  loadDetail(detailPagination.value.page + 1, createAbortSignal('msd-detail'));
 }
 
 function exportCsv() {
+  const snapshot = committedFilters.value;
   const params = new URLSearchParams({
-    start_date: filters.startDate,
-    end_date: filters.endDate,
+    start_date: snapshot.startDate,
+    end_date: snapshot.endDate,
   });
-  if (filters.lossReasons.length) {
-    params.set('loss_reasons', filters.lossReasons.join(','));
+  if (snapshot.lossReasons.length) {
+    params.set('loss_reasons', snapshot.lossReasons.join(','));
   }
 
   const link = document.createElement('a');
   link.href = `/api/mid-section-defect/export?${params}`;
-  link.download = `mid_section_defect_${filters.startDate}_to_${filters.endDate}.csv`;
+  link.download = `mid_section_defect_${snapshot.startDate}_to_${snapshot.endDate}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
 
 let autoRefreshStarted = false;
-const { startAutoRefresh } = useAutoRefresh({
+const { createAbortSignal, startAutoRefresh } = useAutoRefresh({
   onRefresh: () => loadAnalysis(),
   intervalMs: 5 * 60 * 1000,
   autoStart: false,
@@ -194,6 +219,7 @@ const { startAutoRefresh } = useAutoRefresh({
 
 function initPage() {
   setDefaultDates();
+  snapshotFilters();
   loadLossReasons();
 }
 
