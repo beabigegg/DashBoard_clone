@@ -684,6 +684,8 @@ class TestHoldOverviewServiceCachePath(unittest.TestCase):
             'HOLDEMP': ['EMP1', 'EMP2', 'EMP3', 'EMP4', 'EMP5'],
             'DEPTNAME': ['QC', 'PD', 'QC', 'RUN', 'QC'],
             'COMMENT_HOLD': ['C1', 'C2', 'C3', 'C4', 'C5'],
+            'COMMENT_FUTURE': ['FC1', None, 'FC3', None, 'FC5'],
+            'PRODUCT': ['PROD-A', 'PROD-B', 'PROD-A', 'PROD-Z', 'PROD-C'],
             'PJ_TYPE': ['T1', 'T2', 'T1', 'T9', 'T3'],
         })
 
@@ -731,6 +733,19 @@ class TestHoldOverviewServiceCachePath(unittest.TestCase):
         self.assertEqual(len(treemap_result['lots']), 1)
         self.assertEqual(treemap_result['lots'][0]['lotId'], 'L2')
         self.assertEqual(treemap_result['lots'][0]['holdReason'], '特殊需求管控')
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_get_hold_detail_lots_includes_product_and_future_hold_comment(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._sample_hold_df()
+
+        result = get_hold_detail_lots(reason='品質確認', page=1, page_size=10)
+        lot = result['lots'][0]
+        self.assertEqual(lot['product'], 'PROD-A')
+        self.assertEqual(lot['futureHoldComment'], 'FC3')
+
+        lot2 = result['lots'][1]
+        self.assertEqual(lot2['product'], 'PROD-A')
+        self.assertEqual(lot2['futureHoldComment'], 'FC1')
 
     @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
     def test_get_wip_matrix_reason_filter_keeps_backward_compatibility(self, mock_cached_wip):

@@ -2651,6 +2651,7 @@ def get_hold_detail_lots(
                     'lotId': _safe_value(row.get('LOTID')),
                     'workorder': _safe_value(row.get('WORKORDER')),
                     'qty': int(row.get('QTY', 0) or 0),
+                    'product': _safe_value(row.get('PRODUCT')),
                     'package': _safe_value(row.get('PACKAGE_LEF')),
                     'workcenter': _safe_value(row.get('WORKCENTER_GROUP')),
                     'holdReason': _safe_value(row.get('HOLDREASONNAME')),
@@ -2658,7 +2659,8 @@ def get_hold_detail_lots(
                     'age': round(float(row.get('AGEBYDAYS', 0) or 0), 1),
                     'holdBy': _safe_value(row.get('HOLDEMP')),
                     'dept': _safe_value(row.get('DEPTNAME')),
-                    'holdComment': _safe_value(row.get('COMMENT_HOLD'))
+                    'holdComment': _safe_value(row.get('COMMENT_HOLD')),
+                    'futureHoldComment': _safe_value(row.get('COMMENT_FUTURE')),
                 })
 
             total_pages = (total + page_size - 1) // page_size if total > 0 else 1
@@ -2760,6 +2762,7 @@ def _get_hold_detail_lots_from_oracle(
                     LOTID,
                     WORKORDER,
                     QTY,
+                    PRODUCT,
                     PACKAGE_LEF AS PACKAGE,
                     WORKCENTER_GROUP AS WORKCENTER,
                     HOLDREASONNAME AS HOLD_REASON,
@@ -2768,6 +2771,7 @@ def _get_hold_detail_lots_from_oracle(
                     HOLDEMP AS HOLD_BY,
                     DEPTNAME AS DEPT,
                     COMMENT_HOLD AS HOLD_COMMENT,
+                    COMMENT_FUTURE AS FUTURE_HOLD_COMMENT,
                     ROW_NUMBER() OVER (ORDER BY AGEBYDAYS DESC, LOTID) AS RN
                 FROM {WIP_VIEW}
                 {where_clause}
@@ -2784,6 +2788,7 @@ def _get_hold_detail_lots_from_oracle(
                     'lotId': _safe_value(row['LOTID']),
                     'workorder': _safe_value(row['WORKORDER']),
                     'qty': int(row['QTY'] or 0),
+                    'product': _safe_value(row['PRODUCT']),
                     'package': _safe_value(row['PACKAGE']),
                     'workcenter': _safe_value(row['WORKCENTER']),
                     'holdReason': _safe_value(row['HOLD_REASON']),
@@ -2791,7 +2796,8 @@ def _get_hold_detail_lots_from_oracle(
                     'age': float(row['AGE']) if row['AGE'] else 0,
                     'holdBy': _safe_value(row['HOLD_BY']),
                     'dept': _safe_value(row['DEPT']),
-                    'holdComment': _safe_value(row['HOLD_COMMENT'])
+                    'holdComment': _safe_value(row['HOLD_COMMENT']),
+                    'futureHoldComment': _safe_value(row['FUTURE_HOLD_COMMENT']),
                 })
 
         total_pages = (total + page_size - 1) // page_size if total > 0 else 1

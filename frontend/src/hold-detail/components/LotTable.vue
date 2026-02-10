@@ -85,6 +85,7 @@ const pageInfo = computed(() => {
             <th>LOTID</th>
             <th>WORKORDER</th>
             <th>QTY</th>
+            <th>Product</th>
             <th>Package</th>
             <th>Workcenter</th>
             <th>Spec</th>
@@ -92,22 +93,24 @@ const pageInfo = computed(() => {
             <th>Hold By</th>
             <th>Dept</th>
             <th>Hold Comment</th>
+            <th>Future Hold Comment</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="10" class="placeholder">Loading...</td>
+            <td colspan="12" class="placeholder">Loading...</td>
           </tr>
           <tr v-else-if="errorMessage">
-            <td colspan="10" class="placeholder">{{ errorMessage }}</td>
+            <td colspan="12" class="placeholder">{{ errorMessage }}</td>
           </tr>
           <tr v-else-if="lots.length === 0">
-            <td colspan="10" class="placeholder">No data</td>
+            <td colspan="12" class="placeholder">No data</td>
           </tr>
           <tr v-for="lot in lots" v-else :key="lot.lotId">
             <td>{{ lot.lotId || '-' }}</td>
             <td>{{ lot.workorder || '-' }}</td>
             <td>{{ formatNumber(lot.qty) }}</td>
+            <td>{{ lot.product || '-' }}</td>
             <td>{{ lot.package || '-' }}</td>
             <td>{{ lot.workcenter || '-' }}</td>
             <td>{{ lot.spec || '-' }}</td>
@@ -115,6 +118,7 @@ const pageInfo = computed(() => {
             <td>{{ lot.holdBy || '-' }}</td>
             <td>{{ lot.dept || '-' }}</td>
             <td>{{ lot.holdComment || '-' }}</td>
+            <td>{{ lot.futureHoldComment || '-' }}</td>
           </tr>
         </tbody>
       </table>
