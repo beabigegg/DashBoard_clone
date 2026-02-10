@@ -878,6 +878,7 @@ def get_wip_matrix(
     lotid: Optional[str] = None,
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
+    reason: Optional[str] = None,
     package: Optional[str] = None,
     pj_type: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
@@ -892,6 +893,8 @@ def get_wip_matrix(
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
+        reason: Optional HOLDREASONNAME filter
+                Only effective when status='HOLD'
         package: Optional PACKAGE_LEF filter (exact match)
         pj_type: Optional PJ_TYPE filter (exact match)
 
@@ -910,6 +913,7 @@ def get_wip_matrix(
         try:
             status_upper = status.upper() if status else None
             hold_type_filter = hold_type if status_upper == 'HOLD' else None
+            reason_filter = reason if status_upper == 'HOLD' else None
             df = _select_with_snapshot_indexes(
                 include_dummy=include_dummy,
                 workorder=workorder,
@@ -926,9 +930,13 @@ def get_wip_matrix(
                     lotid,
                     status,
                     hold_type,
+                    reason,
                     package,
                     pj_type,
                 )
+
+            if reason_filter:
+                df = df[df['HOLDREASONNAME'] == reason_filter]
 
             # Filter by WORKCENTER_GROUP and PACKAGE_LEF
             df = df[df['WORKCENTER_GROUP'].notna() & df['PACKAGE_LEF'].notna()]
@@ -950,7 +958,16 @@ def get_wip_matrix(
             logger.warning(f"Cache-based matrix calculation failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _get_wip_matrix_from_oracle(include_dummy, workorder, lotid, status, hold_type, package, pj_type)
+    return _get_wip_matrix_from_oracle(
+        include_dummy,
+        workorder,
+        lotid,
+        status,
+        hold_type,
+        reason,
+        package,
+        pj_type,
+    )
 
 
 def _build_matrix_result(df: pd.DataFrame) -> Dict[str, Any]:
@@ -1012,6 +1029,7 @@ def _get_wip_matrix_from_oracle(
     lotid: Optional[str] = None,
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
+    reason: Optional[str] = None,
     package: Optional[str] = None,
     pj_type: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
@@ -1037,6 +1055,8 @@ def _get_wip_matrix_from_oracle(
                 # Hold type sub-filter
                 if hold_type:
                     _add_hold_type_conditions(builder, hold_type)
+                if reason:
+                    builder.add_param_condition("HOLDREASONNAME", reason)
             elif status_upper == 'QUEUE':
                 builder.add_condition("COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) = 0")
 
@@ -2137,19 +2157,21 @@ def _search_types_from_oracle(
 # ============================================================
 
 def get_hold_detail_summary(
-    reason: str,
-    include_dummy: bool = False
+    reason: Optional[str] = None,
+    hold_type: Optional[str] = None,
+    include_dummy: bool = False,
 ) -> Optional[Dict[str, Any]]:
-    """Get summary statistics for a specific hold reason.
+    """Get summary statistics for hold lots.
 
     Uses Redis cache when available, falls back to Oracle direct query.
 
     Args:
-        reason: The HOLDREASONNAME to filter by
+        reason: Optional HOLDREASONNAME filter
+        hold_type: Optional hold type filter ('quality', 'non-quality')
         include_dummy: If True, include DUMMY lots (default: False)
 
     Returns:
-        Dict with totalLots, totalQty, avgAge, maxAge, workcenterCount
+        Dict with totalLots, totalQty, avgAge, maxAge, workcenterCount, dataUpdateDate
     """
     # Try cache first
     cached_df = _get_wip_dataframe()
@@ -2158,12 +2180,17 @@ def get_hold_detail_summary(
             df = _select_with_snapshot_indexes(
                 include_dummy=include_dummy,
                 status='HOLD',
+                hold_type=hold_type,
             )
             if df is None:
-                return _get_hold_detail_summary_from_oracle(reason, include_dummy)
+                return _get_hold_detail_summary_from_oracle(
+                    reason=reason,
+                    hold_type=hold_type,
+                    include_dummy=include_dummy,
+                )
 
-            # Filter for HOLD status with matching reason
-            df = df[df['HOLDREASONNAME'] == reason]
+            if reason:
+                df = df[df['HOLDREASONNAME'] == reason]
 
             if df.empty:
                 return {
@@ -2171,10 +2198,12 @@ def get_hold_detail_summary(
                     'totalQty': 0,
                     'avgAge': 0,
                     'maxAge': 0,
-                    'workcenterCount': 0
+                    'workcenterCount': 0,
+                    'dataUpdateDate': get_cached_sys_date(),
                 }
 
             # Ensure AGEBYDAYS is numeric
+            df = df.copy()
             df['AGEBYDAYS'] = pd.to_numeric(df['AGEBYDAYS'], errors='coerce').fillna(0)
 
             return {
@@ -2182,7 +2211,8 @@ def get_hold_detail_summary(
                 'totalQty': int(df['QTY'].sum()),
                 'avgAge': round(float(df['AGEBYDAYS'].mean()), 1),
                 'maxAge': float(df['AGEBYDAYS'].max()),
-                'workcenterCount': df['WORKCENTER_GROUP'].nunique()
+                'workcenterCount': df['WORKCENTER_GROUP'].nunique(),
+                'dataUpdateDate': get_cached_sys_date(),
             }
         except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
             raise
@@ -2190,19 +2220,27 @@ def get_hold_detail_summary(
             logger.warning(f"Cache-based hold detail summary failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _get_hold_detail_summary_from_oracle(reason, include_dummy)
+    return _get_hold_detail_summary_from_oracle(
+        reason=reason,
+        hold_type=hold_type,
+        include_dummy=include_dummy,
+    )
 
 
 def _get_hold_detail_summary_from_oracle(
-    reason: str,
-    include_dummy: bool = False
+    reason: Optional[str] = None,
+    hold_type: Optional[str] = None,
+    include_dummy: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Get hold detail summary directly from Oracle (fallback)."""
     try:
         builder = _build_base_conditions_builder(include_dummy)
         builder.add_param_condition("STATUS", "HOLD")
         builder.add_condition("CURRENTHOLDCOUNT > 0")
-        builder.add_param_condition("HOLDREASONNAME", reason)
+        if hold_type:
+            _add_hold_type_conditions(builder, hold_type)
+        if reason:
+            builder.add_param_condition("HOLDREASONNAME", reason)
         where_clause, params = builder.build_where_only()
 
         sql = f"""
@@ -2211,7 +2249,8 @@ def _get_hold_detail_summary_from_oracle(
                 SUM(QTY) AS TOTAL_QTY,
                 ROUND(AVG(AGEBYDAYS), 1) AS AVG_AGE,
                 MAX(AGEBYDAYS) AS MAX_AGE,
-                COUNT(DISTINCT WORKCENTER_GROUP) AS WORKCENTER_COUNT
+                COUNT(DISTINCT WORKCENTER_GROUP) AS WORKCENTER_COUNT,
+                MAX(SYS_DATE) AS DATA_UPDATE_DATE
             FROM {WIP_VIEW}
             {where_clause}
         """
@@ -2226,7 +2265,8 @@ def _get_hold_detail_summary_from_oracle(
             'totalQty': int(row['TOTAL_QTY'] or 0),
             'avgAge': float(row['AVG_AGE']) if row['AVG_AGE'] else 0,
             'maxAge': float(row['MAX_AGE']) if row['MAX_AGE'] else 0,
-            'workcenterCount': int(row['WORKCENTER_COUNT'] or 0)
+            'workcenterCount': int(row['WORKCENTER_COUNT'] or 0),
+            'dataUpdateDate': str(row['DATA_UPDATE_DATE']) if row['DATA_UPDATE_DATE'] else None,
         }
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
@@ -2521,7 +2561,9 @@ def _get_hold_detail_distribution_from_oracle(
 
 
 def get_hold_detail_lots(
-    reason: str,
+    reason: Optional[str] = None,
+    hold_type: Optional[str] = None,
+    treemap_reason: Optional[str] = None,
     workcenter: Optional[str] = None,
     package: Optional[str] = None,
     age_range: Optional[str] = None,
@@ -2529,12 +2571,14 @@ def get_hold_detail_lots(
     page: int = 1,
     page_size: int = 50
 ) -> Optional[Dict[str, Any]]:
-    """Get paginated lot details for a specific hold reason.
+    """Get paginated lot details for hold lots.
 
     Uses Redis cache when available, falls back to Oracle direct query.
 
     Args:
-        reason: The HOLDREASONNAME to filter by
+        reason: Optional HOLDREASONNAME filter (from filter bar)
+        hold_type: Optional hold type filter ('quality', 'non-quality')
+        treemap_reason: Optional HOLDREASONNAME filter from treemap selection
         workcenter: Optional WORKCENTER_GROUP filter
         package: Optional PACKAGE_LEF filter
         age_range: Optional age range filter ('0-1', '1-3', '3-7', '7+')
@@ -2545,6 +2589,9 @@ def get_hold_detail_lots(
     Returns:
         Dict with lots list, pagination info, and active filters
     """
+    page = max(int(page or 1), 1)
+    page_size = max(int(page_size or 50), 1)
+
     # Try cache first
     cached_df = _get_wip_dataframe()
     if cached_df is not None:
@@ -2554,10 +2601,13 @@ def get_hold_detail_lots(
                 workcenter=workcenter,
                 package=package,
                 status='HOLD',
+                hold_type=hold_type,
             )
             if df is None:
                 return _get_hold_detail_lots_from_oracle(
                     reason=reason,
+                    hold_type=hold_type,
+                    treemap_reason=treemap_reason,
                     workcenter=workcenter,
                     package=package,
                     age_range=age_range,
@@ -2566,10 +2616,13 @@ def get_hold_detail_lots(
                     page_size=page_size,
                 )
 
-            # Filter for HOLD status with matching reason
-            df = df[df['HOLDREASONNAME'] == reason]
+            if reason:
+                df = df[df['HOLDREASONNAME'] == reason]
+            if treemap_reason:
+                df = df[df['HOLDREASONNAME'] == treemap_reason]
 
             # Ensure numeric columns
+            df = df.copy()
             df['AGEBYDAYS'] = pd.to_numeric(df['AGEBYDAYS'], errors='coerce').fillna(0)
 
             # Optional age filter
@@ -2600,6 +2653,7 @@ def get_hold_detail_lots(
                     'qty': int(row.get('QTY', 0) or 0),
                     'package': _safe_value(row.get('PACKAGE_LEF')),
                     'workcenter': _safe_value(row.get('WORKCENTER_GROUP')),
+                    'holdReason': _safe_value(row.get('HOLDREASONNAME')),
                     'spec': _safe_value(row.get('SPECNAME')),
                     'age': round(float(row.get('AGEBYDAYS', 0) or 0), 1),
                     'holdBy': _safe_value(row.get('HOLDEMP')),
@@ -2618,6 +2672,9 @@ def get_hold_detail_lots(
                     'totalPages': total_pages
                 },
                 'filters': {
+                    'holdType': hold_type,
+                    'reason': reason,
+                    'treemapReason': treemap_reason,
                     'workcenter': workcenter,
                     'package': package,
                     'ageRange': age_range
@@ -2630,12 +2687,22 @@ def get_hold_detail_lots(
 
     # Fallback to Oracle direct query
     return _get_hold_detail_lots_from_oracle(
-        reason, workcenter, package, age_range, include_dummy, page, page_size
+        reason=reason,
+        hold_type=hold_type,
+        treemap_reason=treemap_reason,
+        workcenter=workcenter,
+        package=package,
+        age_range=age_range,
+        include_dummy=include_dummy,
+        page=page,
+        page_size=page_size,
     )
 
 
 def _get_hold_detail_lots_from_oracle(
-    reason: str,
+    reason: Optional[str] = None,
+    hold_type: Optional[str] = None,
+    treemap_reason: Optional[str] = None,
     workcenter: Optional[str] = None,
     package: Optional[str] = None,
     age_range: Optional[str] = None,
@@ -2648,7 +2715,12 @@ def _get_hold_detail_lots_from_oracle(
         builder = _build_base_conditions_builder(include_dummy)
         builder.add_param_condition("STATUS", "HOLD")
         builder.add_condition("CURRENTHOLDCOUNT > 0")
-        builder.add_param_condition("HOLDREASONNAME", reason)
+        if hold_type:
+            _add_hold_type_conditions(builder, hold_type)
+        if reason:
+            builder.add_param_condition("HOLDREASONNAME", reason)
+        if treemap_reason:
+            builder.add_param_condition("HOLDREASONNAME", treemap_reason)
 
         # Optional filters
         if workcenter:
@@ -2690,6 +2762,7 @@ def _get_hold_detail_lots_from_oracle(
                     QTY,
                     PACKAGE_LEF AS PACKAGE,
                     WORKCENTER_GROUP AS WORKCENTER,
+                    HOLDREASONNAME AS HOLD_REASON,
                     SPECNAME AS SPEC,
                     ROUND(AGEBYDAYS, 1) AS AGE,
                     HOLDEMP AS HOLD_BY,
@@ -2713,6 +2786,7 @@ def _get_hold_detail_lots_from_oracle(
                     'qty': int(row['QTY'] or 0),
                     'package': _safe_value(row['PACKAGE']),
                     'workcenter': _safe_value(row['WORKCENTER']),
+                    'holdReason': _safe_value(row['HOLD_REASON']),
                     'spec': _safe_value(row['SPEC']),
                     'age': float(row['AGE']) if row['AGE'] else 0,
                     'holdBy': _safe_value(row['HOLD_BY']),
@@ -2731,6 +2805,9 @@ def _get_hold_detail_lots_from_oracle(
                 'totalPages': total_pages
             },
             'filters': {
+                'holdType': hold_type,
+                'reason': reason,
+                'treemapReason': treemap_reason,
                 'workcenter': workcenter,
                 'package': package,
                 'ageRange': age_range
@@ -2740,6 +2817,146 @@ def _get_hold_detail_lots_from_oracle(
         raise
     except Exception as exc:
         logger.error(f"Hold detail lots query failed: {exc}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+# ============================================================
+# Hold Overview API Functions
+# ============================================================
+
+def get_hold_overview_treemap(
+    hold_type: Optional[str] = None,
+    reason: Optional[str] = None,
+    workcenter: Optional[str] = None,
+    package: Optional[str] = None,
+    include_dummy: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """Get hold overview treemap aggregation grouped by workcenter and reason."""
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            df = _select_with_snapshot_indexes(
+                include_dummy=include_dummy,
+                workcenter=workcenter,
+                package=package,
+                status='HOLD',
+                hold_type=hold_type,
+            )
+            if df is None:
+                return _get_hold_overview_treemap_from_oracle(
+                    hold_type=hold_type,
+                    reason=reason,
+                    workcenter=workcenter,
+                    package=package,
+                    include_dummy=include_dummy,
+                )
+
+            if reason:
+                df = df[df['HOLDREASONNAME'] == reason]
+
+            df = df[df['WORKCENTER_GROUP'].notna() & df['HOLDREASONNAME'].notna()]
+            if df.empty:
+                return {'items': []}
+
+            df = df.copy()
+            df['AGEBYDAYS'] = pd.to_numeric(df['AGEBYDAYS'], errors='coerce').fillna(0)
+            df['QTY'] = pd.to_numeric(df['QTY'], errors='coerce').fillna(0)
+
+            grouped = df.groupby(
+                ['WORKCENTER_GROUP', 'WORKCENTERSEQUENCE_GROUP', 'HOLDREASONNAME'],
+                dropna=False,
+            ).agg(
+                LOTS=('LOTID', 'count'),
+                QTY=('QTY', 'sum'),
+                AVG_AGE=('AGEBYDAYS', 'mean'),
+            ).reset_index()
+            grouped = grouped.sort_values(
+                ['WORKCENTERSEQUENCE_GROUP', 'QTY'],
+                ascending=[True, False],
+            )
+
+            items = []
+            for _, row in grouped.iterrows():
+                items.append({
+                    'workcenter': _safe_value(row.get('WORKCENTER_GROUP')),
+                    'reason': _safe_value(row.get('HOLDREASONNAME')),
+                    'lots': int(row.get('LOTS', 0) or 0),
+                    'qty': int(row.get('QTY', 0) or 0),
+                    'avgAge': round(float(row.get('AVG_AGE', 0) or 0), 1),
+                })
+            return {'items': items}
+        except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
+            raise
+        except Exception as exc:
+            logger.warning(f"Cache-based hold overview treemap failed, falling back to Oracle: {exc}")
+
+    return _get_hold_overview_treemap_from_oracle(
+        hold_type=hold_type,
+        reason=reason,
+        workcenter=workcenter,
+        package=package,
+        include_dummy=include_dummy,
+    )
+
+
+def _get_hold_overview_treemap_from_oracle(
+    hold_type: Optional[str] = None,
+    reason: Optional[str] = None,
+    workcenter: Optional[str] = None,
+    package: Optional[str] = None,
+    include_dummy: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """Get hold overview treemap aggregation directly from Oracle (fallback)."""
+    try:
+        builder = _build_base_conditions_builder(include_dummy)
+        builder.add_param_condition("STATUS", "HOLD")
+        builder.add_condition("CURRENTHOLDCOUNT > 0")
+        if hold_type:
+            _add_hold_type_conditions(builder, hold_type)
+        if reason:
+            builder.add_param_condition("HOLDREASONNAME", reason)
+        if workcenter:
+            builder.add_param_condition("WORKCENTER_GROUP", workcenter)
+        if package:
+            builder.add_param_condition("PACKAGE_LEF", package)
+
+        where_clause, params = builder.build_where_only()
+        sql = f"""
+            SELECT
+                WORKCENTER_GROUP,
+                WORKCENTERSEQUENCE_GROUP,
+                HOLDREASONNAME,
+                COUNT(*) AS LOTS,
+                SUM(QTY) AS QTY,
+                ROUND(AVG(AGEBYDAYS), 1) AS AVG_AGE
+            FROM {WIP_VIEW}
+            {where_clause}
+              AND WORKCENTER_GROUP IS NOT NULL
+              AND HOLDREASONNAME IS NOT NULL
+            GROUP BY WORKCENTER_GROUP, WORKCENTERSEQUENCE_GROUP, HOLDREASONNAME
+            ORDER BY WORKCENTERSEQUENCE_GROUP, SUM(QTY) DESC
+        """
+        df = read_sql_df(sql, params)
+
+        if df is None or df.empty:
+            return {'items': []}
+
+        items = []
+        for _, row in df.iterrows():
+            items.append({
+                'workcenter': _safe_value(row.get('WORKCENTER_GROUP')),
+                'reason': _safe_value(row.get('HOLDREASONNAME')),
+                'lots': int(row.get('LOTS', 0) or 0),
+                'qty': int(row.get('QTY', 0) or 0),
+                'avgAge': round(float(row.get('AVG_AGE', 0) or 0), 1),
+            })
+        return {'items': items}
+    except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
+        raise
+    except Exception as exc:
+        logger.error(f"Hold overview treemap query failed: {exc}")
         import traceback
         traceback.print_exc()
         return None

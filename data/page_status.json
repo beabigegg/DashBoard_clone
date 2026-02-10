@@ -13,6 +13,13 @@
       "order": 1
     },
     {
+      "route": "/hold-overview",
+      "name": "Hold 即時概況",
+      "status": "dev",
+      "drawer_id": "reports",
+      "order": 2
+    },
+    {
       "route": "/wip-detail",
       "name": "WIP 明細",
       "status": "released"
@@ -27,14 +34,14 @@
       "name": "設備歷史績效",
       "status": "released",
       "drawer_id": "reports",
-      "order": 3
+      "order": 4
     },
     {
       "route": "/qc-gate",
       "name": "QC-GATE 狀態",
       "status": "released",
       "drawer_id": "reports",
-      "order": 4
+      "order": 5
     },
     {
       "route": "/tables",
@@ -48,7 +55,7 @@
       "name": "設備即時概況",
       "status": "released",
       "drawer_id": "reports",
-      "order": 2
+      "order": 3
     },
     {
       "route": "/excel-query",

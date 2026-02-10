@@ -33,7 +33,7 @@ The Vite build configuration SHALL support Vue Single File Components alongside 
 #### Scenario: Chunk splitting
 - **WHEN** Vite builds the project
 - **THEN** Vue runtime SHALL be split into a `vendor-vue` chunk
-- **THEN** ECharts modules SHALL be split into the existing `vendor-echarts` chunk
+- **THEN** ECharts modules (including TreemapChart) SHALL be split into the existing `vendor-echarts` chunk
 - **THEN** chunk splitting SHALL NOT affect existing page bundles
 
 #### Scenario: Migrated page entry replacement
@@ -41,13 +41,18 @@ The Vite build configuration SHALL support Vue Single File Components alongside 
 - **THEN** its Vite entry SHALL change from JS file to HTML file (e.g., `src/wip-overview/main.js` → `src/wip-overview/index.html`)
 - **THEN** the original JS entry SHALL be replaced, not kept alongside
 
+#### Scenario: Hold Overview entry point
+- **WHEN** the hold-overview page is added
+- **THEN** `vite.config.js` input SHALL include `'hold-overview': resolve(__dirname, 'src/hold-overview/index.html')`
+- **THEN** the build SHALL produce `hold-overview.html`, `hold-overview.js`, and `hold-overview.css` in `static/dist/`
+
 #### Scenario: Shared CSS import across migrated pages
 - **WHEN** multiple migrated pages import a shared CSS module (e.g., `wip-shared/styles.css`)
 - **THEN** Vite SHALL bundle the shared CSS into each page's output CSS
 - **THEN** shared CSS SHALL NOT create a separate shared chunk that requires additional HTTP requests
 
 #### Scenario: Shared composable import across module boundaries
-- **WHEN** a migrated page imports a composable from another shared module (e.g., `resource-status` imports `useAutoRefresh` from `wip-shared/`)
+- **WHEN** a migrated page imports a composable from another shared module (e.g., `hold-overview` imports `useAutoRefresh` from `wip-shared/`)
 - **THEN** the composable SHALL be bundled into the importing page's JS output
 - **THEN** cross-module imports SHALL NOT create unexpected shared chunks
 

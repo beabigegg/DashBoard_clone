@@ -15,6 +15,9 @@ from mes_dashboard.services.wip_service import (
     get_wip_matrix,
     get_wip_hold_summary,
     get_wip_detail,
+    get_hold_detail_summary,
+    get_hold_detail_lots,
+    get_hold_overview_treemap,
     get_workcenters,
     get_packages,
     search_workorders,
@@ -652,6 +655,139 @@ class TestMultipleFilterConditions(unittest.TestCase):
         self.assertTrue(any('%GA26%' in str(v) for v in params.values()))
         self.assertTrue(any('%A00%' in str(v) for v in params.values()))
 
+
+
+class TestHoldOverviewServiceCachePath(unittest.TestCase):
+    """Test hold overview related behavior on cache path."""
+
+    def setUp(self):
+        import mes_dashboard.services.wip_service as wip_service
+        with wip_service._wip_search_index_lock:
+            wip_service._wip_search_index_cache.clear()
+        with wip_service._wip_snapshot_lock:
+            wip_service._wip_snapshot_cache.clear()
+
+    @staticmethod
+    def _sample_hold_df() -> pd.DataFrame:
+        return pd.DataFrame({
+            'LOTID': ['L1', 'L2', 'L3', 'L4', 'L5'],
+            'WORKORDER': ['WO1', 'WO2', 'WO3', 'WO4', 'WO5'],
+            'QTY': [100, 50, 80, 60, 20],
+            'PACKAGE_LEF': ['PKG-A', 'PKG-B', 'PKG-A', 'PKG-Z', 'PKG-C'],
+            'WORKCENTER_GROUP': ['WC-A', 'WC-B', 'WC-A', 'WC-Z', 'WC-C'],
+            'WORKCENTERSEQUENCE_GROUP': [1, 2, 1, 9, 3],
+            'HOLDREASONNAME': ['品質確認', '特殊需求管控', '品質確認', None, '設備異常'],
+            'AGEBYDAYS': [2.0, 3.0, 5.0, 0.3, 1.2],
+            'EQUIPMENTCOUNT': [0, 0, 0, 1, 0],
+            'CURRENTHOLDCOUNT': [1, 1, 1, 0, 1],
+            'SPECNAME': ['S1', 'S2', 'S1', 'S9', 'S3'],
+            'HOLDEMP': ['EMP1', 'EMP2', 'EMP3', 'EMP4', 'EMP5'],
+            'DEPTNAME': ['QC', 'PD', 'QC', 'RUN', 'QC'],
+            'COMMENT_HOLD': ['C1', 'C2', 'C3', 'C4', 'C5'],
+            'PJ_TYPE': ['T1', 'T2', 'T1', 'T9', 'T3'],
+        })
+
+    @patch('mes_dashboard.services.wip_service.get_cached_sys_date', return_value='2026-02-10 10:00:00')
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_get_hold_detail_summary_supports_optional_reason_and_hold_type(
+        self,
+        mock_cached_wip,
+        _mock_sys_date,
+    ):
+        mock_cached_wip.return_value = self._sample_hold_df()
+
+        reason_summary = get_hold_detail_summary(reason='品質確認')
+        self.assertEqual(reason_summary['totalLots'], 2)
+        self.assertEqual(reason_summary['totalQty'], 180)
+        self.assertEqual(reason_summary['workcenterCount'], 1)
+        self.assertEqual(reason_summary['dataUpdateDate'], '2026-02-10 10:00:00')
+
+        quality_summary = get_hold_detail_summary(hold_type='quality')
+        self.assertEqual(quality_summary['totalLots'], 3)
+        self.assertEqual(quality_summary['totalQty'], 200)
+        self.assertEqual(quality_summary['workcenterCount'], 2)
+
+        all_hold_summary = get_hold_detail_summary()
+        self.assertEqual(all_hold_summary['totalLots'], 4)
+        self.assertEqual(all_hold_summary['totalQty'], 250)
+        self.assertEqual(all_hold_summary['workcenterCount'], 3)
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_get_hold_detail_lots_returns_hold_reason_and_treemap_filter(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._sample_hold_df()
+
+        reason_result = get_hold_detail_lots(reason='品質確認', page=1, page_size=10)
+        self.assertEqual(len(reason_result['lots']), 2)
+        self.assertEqual(reason_result['lots'][0]['lotId'], 'L3')
+        self.assertEqual(reason_result['lots'][0]['holdReason'], '品質確認')
+
+        treemap_result = get_hold_detail_lots(
+            reason=None,
+            hold_type=None,
+            treemap_reason='特殊需求管控',
+            page=1,
+            page_size=10,
+        )
+        self.assertEqual(len(treemap_result['lots']), 1)
+        self.assertEqual(treemap_result['lots'][0]['lotId'], 'L2')
+        self.assertEqual(treemap_result['lots'][0]['holdReason'], '特殊需求管控')
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_get_wip_matrix_reason_filter_keeps_backward_compatibility(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._sample_hold_df()
+
+        hold_quality_all = get_wip_matrix(status='HOLD', hold_type='quality')
+        self.assertEqual(hold_quality_all['grand_total'], 200)
+
+        hold_quality_reason = get_wip_matrix(
+            status='HOLD',
+            hold_type='quality',
+            reason='品質確認',
+        )
+        self.assertEqual(hold_quality_reason['grand_total'], 180)
+        self.assertEqual(hold_quality_reason['workcenters'], ['WC-A'])
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_get_hold_overview_treemap_groups_by_workcenter_and_reason(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._sample_hold_df()
+
+        result = get_hold_overview_treemap(hold_type='quality')
+        self.assertIsNotNone(result)
+        items = result['items']
+        self.assertEqual(len(items), 2)
+        expected = {(item['workcenter'], item['reason']): item for item in items}
+        self.assertEqual(expected[('WC-A', '品質確認')]['lots'], 2)
+        self.assertEqual(expected[('WC-A', '品質確認')]['qty'], 180)
+        self.assertAlmostEqual(expected[('WC-A', '品質確認')]['avgAge'], 3.5)
+        self.assertEqual(expected[('WC-C', '設備異常')]['lots'], 1)
+
+
+class TestHoldOverviewServiceOracleFallback(unittest.TestCase):
+    """Test reason filtering behavior on Oracle fallback path."""
+
+    @disable_cache
+    @patch('mes_dashboard.services.wip_service.read_sql_df')
+    def test_get_wip_matrix_oracle_applies_reason_for_hold_status(self, mock_read_sql):
+        mock_read_sql.return_value = pd.DataFrame()
+
+        get_wip_matrix(status='HOLD', reason='品質確認')
+
+        call_args = mock_read_sql.call_args
+        sql = call_args[0][0]
+        params = call_args[0][1] if len(call_args[0]) > 1 else {}
+        self.assertIn('HOLDREASONNAME', sql)
+        self.assertTrue(any(v == '品質確認' for v in params.values()))
+
+    @disable_cache
+    @patch('mes_dashboard.services.wip_service.read_sql_df')
+    def test_get_wip_matrix_oracle_ignores_reason_for_non_hold_status(self, mock_read_sql):
+        mock_read_sql.return_value = pd.DataFrame()
+
+        get_wip_matrix(status='RUN', reason='品質確認')
+
+        call_args = mock_read_sql.call_args
+        sql = call_args[0][0]
+        self.assertNotIn('HOLDREASONNAME', sql)
 
 
 import pytest

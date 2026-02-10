@@ -9,6 +9,7 @@ from .resource_routes import resource_bp
 from .dashboard_routes import dashboard_bp
 from .excel_query_routes import excel_query_bp
 from .hold_routes import hold_bp
+from .hold_overview_routes import hold_overview_bp
 from .auth_routes import auth_bp
 from .admin_routes import admin_bp
 from .resource_history_routes import resource_history_bp
@@ -26,6 +27,7 @@ def register_routes(app) -> None:
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(excel_query_bp)
     app.register_blueprint(hold_bp)
+    app.register_blueprint(hold_overview_bp)
     app.register_blueprint(resource_history_bp)
     app.register_blueprint(job_query_bp)
     app.register_blueprint(query_tool_bp)
@@ -39,6 +41,7 @@ __all__ = [
     'dashboard_bp',
     'excel_query_bp',
     'hold_bp',
+    'hold_overview_bp',
     'auth_bp',
     'admin_bp',
     'resource_history_bp',

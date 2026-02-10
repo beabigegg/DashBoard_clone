@@ -35,14 +35,17 @@ def mock_registry(temp_data_file):
     """Mock page_registry to use temp file."""
     original_data_file = page_registry.DATA_FILE
     original_cache = page_registry._cache
+    original_cache_mtime = page_registry._cache_mtime
 
     page_registry.DATA_FILE = temp_data_file
     page_registry._cache = None
+    page_registry._cache_mtime = 0.0
 
     yield temp_data_file
 
     page_registry.DATA_FILE = original_data_file
     page_registry._cache = original_cache
+    page_registry._cache_mtime = original_cache_mtime
 
 
 class TestSchemaMigration:
@@ -205,7 +208,8 @@ class TestReloadCache:
         home["status"] = "dev"
         temp_data_file.write_text(json.dumps(data))
 
-        assert page_registry.get_page_status("/") == "released"
+        # Note: _load() has mtime-based invalidation that may auto-detect
+        # the file change, so we only assert post-reload behavior.
         page_registry.reload_cache()
         assert page_registry.get_page_status("/") == "dev"
 

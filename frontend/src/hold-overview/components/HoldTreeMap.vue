@@ -1,0 +1,225 @@
+<script setup>
+import { computed } from 'vue';
+import VChart from 'vue-echarts';
+import { use } from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
+import { TreemapChart } from 'echarts/charts';
+import { TooltipComponent, VisualMapComponent } from 'echarts/components';
+
+use([CanvasRenderer, TreemapChart, TooltipComponent, VisualMapComponent]);
+
+const props = defineProps({
+  items: {
+    type: Array,
+    default: () => [],
+  },
+  activeFilter: {
+    type: Object,
+    default: null,
+  },
+});
+
+const emit = defineEmits(['select']);
+
+const hasData = computed(() => Array.isArray(props.items) && props.items.length > 0);
+const normalizedActiveFilter = computed(() => normalizeFilter(props.activeFilter));
+
+function normalizeFilter(filter) {
+  if (!filter || typeof filter !== 'object') {
+    return null;
+  }
+  const workcenter = String(filter.workcenter || '').trim() || null;
+  const reason = String(filter.reason || '').trim() || null;
+  if (!workcenter || !reason) {
+    return null;
+  }
+  return { workcenter, reason };
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString('zh-TW');
+}
+
+function buildLeafItem(item, activeFilter) {
+  const workcenter = String(item?.workcenter || '').trim();
+  const reason = String(item?.reason || '').trim();
+  const lots = Number(item?.lots || 0);
+  const qty = Number(item?.qty || 0);
+  const avgAge = Number(item?.avgAge || 0);
+  const isActive = Boolean(
+    activeFilter &&
+      activeFilter.workcenter === workcenter &&
+      activeFilter.reason === reason,
+  );
+  const isInactive = Boolean(activeFilter && !isActive);
+
+  return {
+    name: reason,
+    value: [qty, avgAge],
+    workcenter,
+    reason,
+    lots,
+    qty,
+    avgAge,
+    itemStyle: {
+      borderColor: isActive ? '#111827' : '#ffffff',
+      borderWidth: isActive ? 3 : 1,
+      opacity: isInactive ? 0.72 : 1,
+    },
+  };
+}
+
+const treeData = computed(() => {
+  const activeFilter = normalizedActiveFilter.value;
+  const workcenterMap = new Map();
+
+  (props.items || []).forEach((item) => {
+    const workcenter = String(item?.workcenter || '').trim();
+    const reason = String(item?.reason || '').trim();
+    if (!workcenter || !reason) {
+      return;
+    }
+
+    if (!workcenterMap.has(workcenter)) {
+      workcenterMap.set(workcenter, {
+        name: workcenter,
+        children: [],
+      });
+    }
+    const parent = workcenterMap.get(workcenter);
+    parent.children.push(buildLeafItem(item, activeFilter));
+  });
+
+  const data = Array.from(workcenterMap.values());
+  data.forEach((parent) => {
+    parent.value = parent.children.reduce((sum, child) => sum + Number(child.qty || 0), 0);
+    parent.children.sort((a, b) => Number(b.qty || 0) - Number(a.qty || 0));
+  });
+
+  return data.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+});
+
+const chartOption = computed(() => ({
+  tooltip: {
+    confine: true,
+    formatter(params) {
+      const node = params?.data || {};
+      if (!node?.reason) {
+        return `<strong>${params?.name || ''}</strong>`;
+      }
+      return [
+        `<strong>${node.workcenter || '-'}</strong>`,
+        `Reason: ${node.reason || '-'}`,
+        `Lots: ${formatNumber(node.lots)}`,
+        `QTY: ${formatNumber(node.qty)}`,
+        `平均滯留: ${Number(node.avgAge || 0).toFixed(1)}天`,
+      ].join('<br/>');
+    },
+  },
+  visualMap: {
+    type: 'piecewise',
+    show: false,
+    dimension: 1,
+    pieces: [
+      { lt: 1, color: '#22c55e' },
+      { gte: 1, lt: 3, color: '#eab308' },
+      { gte: 3, lt: 7, color: '#f97316' },
+      { gte: 7, color: '#ef4444' },
+    ],
+  },
+  series: [
+    {
+      name: 'Hold TreeMap',
+      type: 'treemap',
+      roam: false,
+      nodeClick: false,
+      breadcrumb: { show: false },
+      leafDepth: 1,
+      visualDimension: 1,
+      upperLabel: {
+        show: true,
+        height: 24,
+        color: '#0f172a',
+        fontWeight: 600,
+      },
+      label: {
+        show: true,
+        formatter(params) {
+          const reason = params?.data?.reason || params?.name || '';
+          return reason.length > 14 ? `${reason.slice(0, 14)}…` : reason;
+        },
+      },
+      itemStyle: {
+        borderColor: '#ffffff',
+        borderWidth: 1,
+        gapWidth: 2,
+      },
+      levels: [
+        {
+          itemStyle: {
+            borderColor: '#d1d5db',
+            borderWidth: 1,
+            gapWidth: 2,
+          },
+          upperLabel: {
+            show: true,
+          },
+        },
+        {
+          itemStyle: {
+            borderColor: '#ffffff',
+            borderWidth: 1,
+            gapWidth: 1,
+          },
+        },
+      ],
+      data: treeData.value,
+    },
+  ],
+}));
+
+function handleChartClick(params) {
+  if (params.componentType !== 'series' || params.seriesType !== 'treemap') {
+    return;
+  }
+  const node = params?.data;
+  if (!node || !node.workcenter || !node.reason) {
+    return;
+  }
+
+  const next = {
+    workcenter: String(node.workcenter || ''),
+    reason: String(node.reason || ''),
+  };
+  const current = normalizedActiveFilter.value;
+  if (
+    current &&
+    current.workcenter === next.workcenter &&
+    current.reason === next.reason
+  ) {
+    emit('select', null);
+    return;
+  }
+  emit('select', next);
+}
+</script>
+
+<template>
+  <section class="treemap-section">
+    <div class="treemap-legend">
+      <span><i class="legend-color" style="--legend-color: #22c55e"></i>綠(&lt;1天)</span>
+      <span><i class="legend-color" style="--legend-color: #eab308"></i>黃(1-3天)</span>
+      <span><i class="legend-color" style="--legend-color: #f97316"></i>橙(3-7天)</span>
+      <span><i class="legend-color" style="--legend-color: #ef4444"></i>紅(&gt;7天)</span>
+    </div>
+
+    <VChart
+      v-if="hasData"
+      class="treemap-chart"
+      :option="chartOption"
+      autoresize
+      @click="handleChartClick"
+    />
+    <div v-else class="placeholder treemap-empty">目前無 Hold 資料</div>
+  </section>
+</template>

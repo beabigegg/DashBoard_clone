@@ -1,0 +1,374 @@
+.hold-overview-page .header h1 {
+  font-size: 22px;
+}
+
+.hold-type-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.error-banner {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.hold-summary-row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.card-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.card-body {
+  padding: 16px;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  padding: 16px 20px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.radio-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  background: #fff;
+}
+
+.radio-option.active {
+  border-color: var(--primary);
+  background: #eef2ff;
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
+.radio-option input {
+  margin: 0;
+}
+
+.reason-select {
+  min-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.reason-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.matrix-container {
+  padding: 0;
+  max-height: 460px;
+  overflow: auto;
+}
+
+.hold-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.hold-matrix-table th,
+.hold-matrix-table td {
+  padding: 8px 10px;
+  text-align: right;
+  border: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.hold-matrix-table th {
+  background: #f3f4f6;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.hold-matrix-table th:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #e5e7eb;
+  border-right: 2px solid #cbd5e1;
+}
+
+.hold-matrix-table td:first-child {
+  text-align: left;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #f9fafb;
+  border-right: 2px solid #cbd5e1;
+}
+
+.hold-matrix-table .clickable {
+  cursor: pointer;
+}
+
+.hold-matrix-table .clickable:hover {
+  background: #eef2ff;
+}
+
+.hold-matrix-table .total-row td,
+.hold-matrix-table .total-col {
+  background: #e5e7eb;
+  font-weight: 700;
+}
+
+.hold-matrix-table tr.active td {
+  background: #e0e7ff;
+}
+
+.hold-matrix-table tr.active td:first-child {
+  background: #c7d2fe;
+}
+
+.hold-matrix-table td.active,
+.hold-matrix-table th.active {
+  background: #c7d2fe;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.cascade-filter-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 2px 0 14px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.filter-chip.matrix {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.filter-chip.treemap {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.chip-clear {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: inherit;
+}
+
+.clear-all-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.treemap-body {
+  padding: 12px 14px 14px;
+}
+
+.treemap-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.treemap-chart {
+  width: 100%;
+  height: clamp(300px, 44vh, 540px);
+}
+
+.treemap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+  background: var(--legend-color);
+}
+
+.treemap-empty {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-section {
+  background: var(--card-bg);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.table-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.table-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.table-container {
+  overflow-x: auto;
+  max-height: 520px;
+}
+
+.lot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lot-table th,
+.lot-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+  white-space: nowrap;
+}
+
+.lot-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.lot-table th:nth-child(3),
+.lot-table th:nth-child(7),
+.lot-table td:nth-child(3),
+.lot-table td:nth-child(7) {
+  text-align: right;
+}
+
+.lot-table tbody tr:hover {
+  background: #f8f9fc;
+}
+
+@media (max-width: 1450px) {
+  .hold-summary-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1000px) {
+  .hold-summary-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reason-select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard.hold-overview-page {
+    padding: 14px;
+  }
+
+  .hold-summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    padding: 14px;
+  }
+}

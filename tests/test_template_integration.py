@@ -54,6 +54,15 @@ class TestTemplateIntegration(unittest.TestCase):
         self.assertIn('type="module"', html)
         self.assertNotIn('mes-toast-container', html)
 
+    def test_hold_overview_serves_pure_vite_module(self):
+        response = self.client.get('/hold-overview')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+
+        self.assertIn('/static/dist/hold-overview.js', html)
+        self.assertIn('type="module"', html)
+        self.assertNotIn('mes-toast-container', html)
+
     def test_tables_page_serves_pure_vite_module(self):
         response = self.client.get('/tables')
         self.assertEqual(response.status_code, 200)
@@ -303,6 +312,7 @@ class TestViteModuleIntegration(unittest.TestCase):
         endpoints_and_assets = [
             ('/wip-overview', 'wip-overview.js'),
             ('/wip-detail', 'wip-detail.js'),
+            ('/hold-overview', 'hold-overview.js'),
             ('/hold-detail?reason=test-reason', 'hold-detail.js'),
             ('/tables', 'tables.js'),
             ('/resource', 'resource-status.js'),

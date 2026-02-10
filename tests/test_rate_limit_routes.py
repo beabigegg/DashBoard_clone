@@ -40,3 +40,29 @@ def test_hold_detail_lots_rate_limit_returns_429(_mock_limit, mock_service):
     assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
     assert response.headers.get('Retry-After') == '4'
     mock_service.assert_not_called()
+
+
+@patch('mes_dashboard.routes.hold_overview_routes.get_wip_matrix')
+@patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 6))
+def test_hold_overview_matrix_rate_limit_returns_429(_mock_limit, mock_service):
+    client = _client()
+    response = client.get('/api/hold-overview/matrix')
+
+    assert response.status_code == 429
+    payload = response.get_json()
+    assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+    assert response.headers.get('Retry-After') == '6'
+    mock_service.assert_not_called()
+
+
+@patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+@patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 3))
+def test_hold_overview_lots_rate_limit_returns_429(_mock_limit, mock_service):
+    client = _client()
+    response = client.get('/api/hold-overview/lots')
+
+    assert response.status_code == 429
+    payload = response.get_json()
+    assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+    assert response.headers.get('Retry-After') == '3'
+    mock_service.assert_not_called()

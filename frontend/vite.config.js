@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => ({
         'wip-overview': resolve(__dirname, 'src/wip-overview/index.html'),
         'wip-detail': resolve(__dirname, 'src/wip-detail/index.html'),
         'hold-detail': resolve(__dirname, 'src/hold-detail/index.html'),
+        'hold-overview': resolve(__dirname, 'src/hold-overview/index.html'),
         'resource-status': resolve(__dirname, 'src/resource-status/index.html'),
         'resource-history': resolve(__dirname, 'src/resource-history/index.html'),
         'job-query': resolve(__dirname, 'src/job-query/main.js'),
