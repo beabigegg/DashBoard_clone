@@ -40,7 +40,7 @@ const filterState = reactive({
   isMonitor: false,
 });
 
-const matrixFilter = ref(null);
+const matrixFilter = ref([]);
 const summaryStatusFilter = ref(null);
 const hierarchyState = reactive({});
 
@@ -146,7 +146,7 @@ async function loadEquipment() {
   const data = unwrapApiResult(result, '載入設備資料失敗');
 
   allEquipment.value = Array.isArray(data) ? data : [];
-  matrixFilter.value = null;
+  matrixFilter.value = [];
   summaryStatusFilter.value = null;
   resetHierarchyState();
 }
@@ -185,11 +185,7 @@ async function checkCacheStatus() {
   }
 }
 
-function buildMatrixFilterLabel(filter) {
-  if (!filter) {
-    return '';
-  }
-
+function buildSingleFilterLabel(filter) {
   const parts = [filter.workcenter_group];
   if (filter.family) {
     parts.push(filter.family);
@@ -198,28 +194,15 @@ function buildMatrixFilterLabel(filter) {
     const resource = allEquipment.value.find((item) => item.RESOURCEID === filter.resource);
     parts.push(resource?.RESOURCENAME || filter.resource);
   }
-
   parts.push(STATUS_DISPLAY_MAP[filter.status] || filter.status);
-  return `矩陣篩選: ${parts.join(' / ')}`;
+  return parts.join(' / ');
 }
 
-function isSameMatrixFilter(left, right) {
-  if (!left || !right) {
-    return false;
-  }
-  return (
-    (left.workcenter_group || null) === (right.workcenter_group || null) &&
-    (left.status || null) === (right.status || null) &&
-    (left.family || null) === (right.family || null) &&
-    (left.resource || null) === (right.resource || null)
-  );
+function filterKey(f) {
+  return `${f.workcenter_group}|${f.status}|${f.family || ''}|${f.resource || ''}`;
 }
 
-function matchMatrixFilter(eq, filter) {
-  if (!filter) {
-    return true;
-  }
-
+function matchSingleFilter(eq, filter) {
   if ((eq.WORKCENTER_GROUP || 'UNKNOWN') !== filter.workcenter_group) {
     return false;
   }
@@ -229,13 +212,13 @@ function matchMatrixFilter(eq, filter) {
   if (filter.resource && (eq.RESOURCEID || null) !== filter.resource) {
     return false;
   }
-
   return normalizeStatus(eq.EQUIPMENTASSETSSTATUS) === filter.status;
 }
 
 const displayedEquipment = computed(() => {
+  const filters = matrixFilter.value;
   return allEquipment.value.filter((eq) => {
-    if (matrixFilter.value && !matchMatrixFilter(eq, matrixFilter.value)) {
+    if (filters.length > 0 && !filters.some((f) => matchSingleFilter(eq, f))) {
       return false;
     }
     if (summaryStatusFilter.value && normalizeStatus(eq.EQUIPMENTASSETSSTATUS) !== summaryStatusFilter.value) {
@@ -248,9 +231,9 @@ const displayedEquipment = computed(() => {
 const activeFilterText = computed(() => {
   const labels = [];
 
-  const matrixLabel = buildMatrixFilterLabel(matrixFilter.value);
-  if (matrixLabel) {
-    labels.push(matrixLabel);
+  if (matrixFilter.value.length > 0) {
+    const parts = matrixFilter.value.map(buildSingleFilterLabel);
+    labels.push(`矩陣篩選: ${parts.join(' + ')}`);
   }
 
   if (summaryStatusFilter.value) {
@@ -261,20 +244,23 @@ const activeFilterText = computed(() => {
 });
 
 function applyMatrixFilter(nextFilter) {
-  if (isSameMatrixFilter(matrixFilter.value, nextFilter)) {
-    matrixFilter.value = null;
-    return;
-  }
-  matrixFilter.value = {
+  const entry = {
     workcenter_group: nextFilter.workcenter_group,
     status: nextFilter.status,
     family: nextFilter.family || null,
     resource: nextFilter.resource || null,
   };
+  const key = filterKey(entry);
+  const idx = matrixFilter.value.findIndex((f) => filterKey(f) === key);
+  if (idx >= 0) {
+    matrixFilter.value = matrixFilter.value.filter((_, i) => i !== idx);
+  } else {
+    matrixFilter.value = [...matrixFilter.value, entry];
+  }
 }
 
 function clearAllEquipmentFilters() {
-  matrixFilter.value = null;
+  matrixFilter.value = [];
   summaryStatusFilter.value = null;
 }
 

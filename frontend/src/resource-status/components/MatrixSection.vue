@@ -19,8 +19,8 @@ const props = defineProps({
     default: () => ({}),
   },
   matrixFilter: {
-    type: Object,
-    default: null,
+    type: Array,
+    default: () => [],
   },
 });
 
@@ -84,17 +84,19 @@ function calcOuPct(counts) {
   return (Number(counts.PRD || 0) / denominator) * 100;
 }
 
-function isMatrixFilterMatch(filter, { group, status, family = null, resource = null }) {
-  if (!filter) {
+function isMatrixFilterMatch(filters, { group, status, family = null, resource = null }) {
+  if (!filters || filters.length === 0) {
     return false;
   }
 
-  const sameGroup = filter.workcenter_group === group;
-  const sameStatus = filter.status === status;
-  const sameFamily = (filter.family || null) === (family || null);
-  const sameResource = (filter.resource || null) === (resource || null);
-
-  return sameGroup && sameStatus && sameFamily && sameResource;
+  return filters.some((f) => {
+    return (
+      f.workcenter_group === group &&
+      f.status === status &&
+      (f.family || null) === (family || null) &&
+      (f.resource || null) === (resource || null)
+    );
+  });
 }
 
 function buildMatrixHierarchy(equipment) {
@@ -155,6 +157,10 @@ function buildMatrixHierarchy(equipment) {
       });
 
       groupNode.children.forEach((familyNode) => {
+        familyNode.children.sort((left, right) =>
+          String(left.name).localeCompare(String(right.name), 'zh-Hant')
+        );
+
         familyNode.selectedColumns = Object.fromEntries(
           MATRIX_STATUS_COLUMNS.map((status) => [
             status,

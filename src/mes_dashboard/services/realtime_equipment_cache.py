@@ -294,7 +294,7 @@ def _aggregate_by_resourceid(records: list[dict[str, Any]]) -> list[dict[str, An
             'CAUSECODE': first.get('CAUSECODE'),
             'REPAIRCODE': first.get('REPAIRCODE'),
             # LOT related fields
-            'LOT_COUNT': len(seen_lots) if seen_lots else len(group),
+            'LOT_COUNT': len(lot_details),
             'LOT_DETAILS': lot_details,   # LOT details for tooltip
             'TOTAL_TRACKIN_QTY': total_qty,
             'LATEST_TRACKIN_TIME': latest_trackin,
