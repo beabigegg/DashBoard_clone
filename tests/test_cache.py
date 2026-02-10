@@ -8,6 +8,9 @@ import pytest
 from unittest.mock import patch, MagicMock
 import pandas as pd
 import json
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 
 class TestGetCachedWipData:
@@ -90,6 +93,49 @@ class TestGetCachedWipData:
                 with patch.object(cache, 'get_key', return_value='mes_wip:data'):
                     result = cache.get_cached_wip_data()
                     assert result is None
+
+    def test_concurrent_requests_parse_redis_once(self, reset_redis):
+        """Concurrent misses should trigger Redis parse exactly once."""
+        import mes_dashboard.core.cache as cache
+
+        test_data = [
+            {'LOTID': 'LOT001', 'QTY': 100, 'WORKORDER': 'WO001'},
+            {'LOTID': 'LOT002', 'QTY': 200, 'WORKORDER': 'WO002'}
+        ]
+        cached_json = json.dumps(test_data)
+
+        mock_client = MagicMock()
+        mock_client.get.return_value = cached_json
+
+        parse_count_lock = threading.Lock()
+        parse_count = 0
+
+        def slow_read_json(*args, **kwargs):
+            nonlocal parse_count
+            with parse_count_lock:
+                parse_count += 1
+            time.sleep(0.05)
+            return pd.DataFrame(test_data)
+
+        start_event = threading.Event()
+
+        def call_cache():
+            start_event.wait(timeout=1)
+            return cache.get_cached_wip_data()
+
+        with patch.object(cache, 'REDIS_ENABLED', True):
+            with patch.object(cache, 'get_redis_client', return_value=mock_client):
+                with patch.object(cache, 'get_key', return_value='mes_wip:data'):
+                    with patch.object(cache.pd, 'read_json', side_effect=slow_read_json):
+                        with ThreadPoolExecutor(max_workers=6) as pool:
+                            futures = [pool.submit(call_cache) for _ in range(6)]
+                            start_event.set()
+                            results = [future.result(timeout=3) for future in futures]
+
+        assert parse_count == 1
+        assert mock_client.get.call_count == 1
+        assert all(result is not None for result in results)
+        assert all(len(result) == 2 for result in results)
 
 
 class TestGetCachedSysDate:

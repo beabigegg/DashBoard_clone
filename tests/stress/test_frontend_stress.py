@@ -13,6 +13,8 @@ Run with: pytest tests/stress/test_frontend_stress.py -v -s
 import pytest
 import time
 import re
+import requests
+from urllib.parse import quote
 from playwright.sync_api import Page, expect
 
 
@@ -310,6 +312,120 @@ class TestPageNavigationStress:
             expect(tab).to_have_class(re.compile(r'active'))
 
         print(f"\n  All {len(tabs)} tabs clickable and responsive")
+
+
+@pytest.mark.stress
+class TestWipHoldPageStress:
+    """Stress tests focused on WIP Overview / WIP Detail / Hold Detail pages."""
+
+    def _pick_workcenter(self, app_server: str) -> str:
+        """Get one available workcenter for WIP detail tests."""
+        try:
+            response = requests.get(f"{app_server}/api/wip/meta/workcenters", timeout=10)
+            if response.status_code != 200:
+                return "TMTT"
+            payload = response.json()
+            items = payload.get("data") or []
+            if not items:
+                return "TMTT"
+            return str(items[0].get("name") or "TMTT")
+        except Exception:
+            return "TMTT"
+
+    def _pick_reason(self, app_server: str) -> str:
+        """Get one hold reason for hold-detail tests."""
+        try:
+            response = requests.get(f"{app_server}/api/wip/overview/hold", timeout=10)
+            if response.status_code != 200:
+                return "YieldLimit"
+            payload = response.json()
+            items = (payload.get("data") or {}).get("items") or []
+            if not items:
+                return "YieldLimit"
+            return str(items[0].get("reason") or "YieldLimit")
+        except Exception:
+            return "YieldLimit"
+
+    def test_rapid_navigation_across_wip_and_hold_pages(self, page: Page, app_server: str):
+        """Rapid page switching should keep pages responsive and error-free."""
+        workcenter = self._pick_workcenter(app_server)
+        reason = self._pick_reason(app_server)
+
+        urls = [
+            f"{app_server}/wip-overview",
+            f"{app_server}/wip-overview?type=PJA3460&status=queue",
+            f"{app_server}/wip-detail?workcenter={quote(workcenter)}&type=PJA3460&status=queue",
+            f"{app_server}/hold-detail?reason={quote(reason)}",
+        ]
+
+        js_errors = []
+        page.on("pageerror", lambda error: js_errors.append(str(error)))
+
+        start_time = time.time()
+        for i in range(16):
+            page.goto(urls[i % len(urls)], wait_until='domcontentloaded', timeout=60000)
+            expect(page.locator("body")).to_be_visible()
+            page.wait_for_timeout(150)
+
+        elapsed = time.time() - start_time
+        print(f"\n  Rapid navigation across 3 pages completed in {elapsed:.2f}s")
+
+        assert len(js_errors) == 0, f"JavaScript errors detected: {js_errors[:3]}"
+
+    def test_wip_and_hold_api_burst_from_browser(self, page: Page, app_server: str):
+        """Browser-side API burst should still return mostly successful responses."""
+        load_page_with_js(page, f"{app_server}/wip-overview")
+
+        result = page.evaluate("""
+            async () => {
+                const safeJson = async (resp) => {
+                    try {
+                        return await resp.json();
+                    } catch (_) {
+                        return null;
+                    }
+                };
+
+                const wcResp = await fetch('/api/wip/meta/workcenters');
+                const wcPayload = await safeJson(wcResp) || {};
+                const workcenter = (wcPayload.data && wcPayload.data[0] && wcPayload.data[0].name) || 'TMTT';
+
+                const holdResp = await fetch('/api/wip/overview/hold');
+                const holdPayload = await safeJson(holdResp) || {};
+                const holdItems = (holdPayload.data && holdPayload.data.items) || [];
+                const reason = (holdItems[0] && holdItems[0].reason) || 'YieldLimit';
+
+                const endpoints = [
+                    '/api/wip/overview/summary',
+                    '/api/wip/overview/matrix',
+                    '/api/wip/overview/hold',
+                    `/api/wip/detail/${encodeURIComponent(workcenter)}?page=1&page_size=100`,
+                    `/api/wip/hold-detail/lots?reason=${encodeURIComponent(reason)}&page=1&per_page=50`,
+                ];
+
+                let total = 0;
+                let success = 0;
+                let failures = 0;
+
+                for (let round = 0; round < 5; round++) {
+                    const responses = await Promise.all(
+                        endpoints.map((endpoint) =>
+                            fetch(endpoint)
+                                .then((r) => ({ ok: r.status < 500 }))
+                                .catch(() => ({ ok: false }))
+                        )
+                    );
+                    total += responses.length;
+                    success += responses.filter((r) => r.ok).length;
+                    failures += responses.filter((r) => !r.ok).length;
+                }
+
+                return { total, success, failures };
+            }
+        """)
+
+        print(f"\n  Browser burst total={result['total']}, success={result['success']}, failures={result['failures']}")
+        assert result['success'] >= 20, f"Too many failed API requests: {result}"
 
 
 @pytest.mark.stress

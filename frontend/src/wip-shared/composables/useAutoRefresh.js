@@ -10,6 +10,7 @@ export function useAutoRefresh({
 } = {}) {
   let refreshTimer = null;
   const controllers = new Map();
+  let pageHideHandler = null;
 
   function stopAutoRefresh() {
     if (refreshTimer) {
@@ -75,16 +76,26 @@ export function useAutoRefresh({
   }
 
   onMounted(() => {
+    pageHideHandler = () => {
+      stopAutoRefresh();
+      abortAllRequests();
+    };
+
     if (autoStart) {
       startAutoRefresh();
     }
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', pageHideHandler);
   });
 
   onBeforeUnmount(() => {
     stopAutoRefresh();
     abortAllRequests();
     document.removeEventListener('visibilitychange', handleVisibilityChange);
+    if (pageHideHandler) {
+      window.removeEventListener('pagehide', pageHideHandler);
+      pageHideHandler = null;
+    }
   });
 
   return {

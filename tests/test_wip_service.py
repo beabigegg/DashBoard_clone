@@ -8,6 +8,9 @@ import unittest
 from unittest.mock import patch, MagicMock
 from functools import wraps
 import pandas as pd
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from mes_dashboard.services.wip_service import (
     WIP_VIEW,
@@ -479,6 +482,70 @@ class TestWipSearchIndexShortcut(unittest.TestCase):
 
         self.assertEqual(result, ["GA26012001"])
         mock_oracle.assert_called_once()
+
+
+class TestWipSnapshotLocking(unittest.TestCase):
+    """Concurrency behavior for snapshot cache build path."""
+
+    def setUp(self):
+        import mes_dashboard.services.wip_service as wip_service
+        with wip_service._wip_snapshot_lock:
+            wip_service._wip_snapshot_cache.clear()
+
+    @staticmethod
+    def _sample_df() -> pd.DataFrame:
+        return pd.DataFrame({
+            "WORKORDER": ["WO1", "WO2"],
+            "LOTID": ["LOT1", "LOT2"],
+            "QTY": [100, 200],
+            "EQUIPMENTCOUNT": [1, 0],
+            "CURRENTHOLDCOUNT": [0, 1],
+            "HOLDREASONNAME": [None, "品質確認"],
+            "WORKCENTER_GROUP": ["WC-A", "WC-B"],
+            "PACKAGE_LEF": ["PKG-A", "PKG-B"],
+            "PJ_TYPE": ["T1", "T2"],
+        })
+
+    def test_concurrent_snapshot_miss_builds_once(self):
+        import mes_dashboard.services.wip_service as wip_service
+
+        df = self._sample_df()
+        build_count_lock = threading.Lock()
+        build_count = 0
+
+        def slow_build(snapshot_df, include_dummy, version):
+            nonlocal build_count
+            with build_count_lock:
+                build_count += 1
+            time.sleep(0.05)
+            return {
+                "version": version,
+                "built_at": "2026-02-10T00:00:00",
+                "row_count": int(len(snapshot_df)),
+                "frame": snapshot_df,
+                "indexes": {},
+                "frame_bytes": 0,
+                "index_bucket_count": 0,
+            }
+
+        start_event = threading.Event()
+
+        def call_snapshot():
+            start_event.wait(timeout=1)
+            return wip_service._get_wip_snapshot(include_dummy=False)
+
+        with patch.object(wip_service, "_get_wip_cache_version", return_value="version-1"):
+            with patch.object(wip_service, "_get_wip_dataframe", return_value=df) as mock_get_df:
+                with patch.object(wip_service, "_build_wip_snapshot", side_effect=slow_build):
+                    with ThreadPoolExecutor(max_workers=6) as pool:
+                        futures = [pool.submit(call_snapshot) for _ in range(6)]
+                        start_event.set()
+                        results = [future.result(timeout=3) for future in futures]
+
+        self.assertEqual(build_count, 1)
+        self.assertEqual(mock_get_df.call_count, 1)
+        self.assertTrue(all(result is not None for result in results))
+        self.assertTrue(all(result.get("version") == "version-1" for result in results))
 
 
 class TestDummyExclusionInAllFunctions(unittest.TestCase):

@@ -522,18 +522,19 @@ def _get_wip_snapshot(include_dummy: bool) -> Optional[Dict[str, Any]]:
             return cached
 
     _increment_wip_metric("snapshot_misses")
-    df = _get_wip_dataframe()
-    if df is None:
-        return None
-
-    snapshot = _build_wip_snapshot(df, include_dummy=include_dummy, version=version)
     with _wip_snapshot_lock:
         existing = _wip_snapshot_cache.get(cache_key)
         if existing and existing.get("version") == version:
             _increment_wip_metric("snapshot_hits")
             return existing
+
+        df = _get_wip_dataframe()
+        if df is None:
+            return None
+
+        snapshot = _build_wip_snapshot(df, include_dummy=include_dummy, version=version)
         _wip_snapshot_cache[cache_key] = snapshot
-    return snapshot
+        return snapshot
 
 
 def _get_wip_search_index(include_dummy: bool) -> Optional[Dict[str, Any]]:
@@ -1206,6 +1207,7 @@ def _get_wip_hold_summary_from_oracle(
 def get_wip_detail(
     workcenter: str,
     package: Optional[str] = None,
+    pj_type: Optional[str] = None,
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
     workorder: Optional[str] = None,
@@ -1221,6 +1223,7 @@ def get_wip_detail(
     Args:
         workcenter: WORKCENTER_GROUP name
         package: Optional PACKAGE_LEF filter
+        pj_type: Optional PJ_TYPE filter (exact match)
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
@@ -1248,12 +1251,14 @@ def get_wip_detail(
                 workorder=workorder,
                 lotid=lotid,
                 package=package,
+                pj_type=pj_type,
                 workcenter=workcenter,
             )
             if summary_df is None:
                 return _get_wip_detail_from_oracle(
                     workcenter,
                     package,
+                    pj_type,
                     status,
                     hold_type,
                     workorder,
@@ -1302,6 +1307,7 @@ def get_wip_detail(
                     workorder=workorder,
                     lotid=lotid,
                     package=package,
+                    pj_type=pj_type,
                     workcenter=workcenter,
                     status=status_upper,
                     hold_type=hold_type_filter,
@@ -1310,6 +1316,7 @@ def get_wip_detail(
                     return _get_wip_detail_from_oracle(
                         workcenter,
                         package,
+                        pj_type,
                         status,
                         hold_type,
                         workorder,
@@ -1367,13 +1374,14 @@ def get_wip_detail(
 
     # Fallback to Oracle direct query
     return _get_wip_detail_from_oracle(
-        workcenter, package, status, hold_type, workorder, lotid, include_dummy, page, page_size
+        workcenter, package, pj_type, status, hold_type, workorder, lotid, include_dummy, page, page_size
     )
 
 
 def _get_wip_detail_from_oracle(
     workcenter: str,
     package: Optional[str] = None,
+    pj_type: Optional[str] = None,
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
     workorder: Optional[str] = None,
@@ -1390,6 +1398,8 @@ def _get_wip_detail_from_oracle(
 
         if package:
             builder.add_param_condition("PACKAGE_LEF", package)
+        if pj_type:
+            builder.add_param_condition("PJ_TYPE", pj_type)
 
         # WIP status filter (RUN/QUEUE/HOLD based on EQUIPMENTCOUNT and CURRENTHOLDCOUNT)
         if status:
@@ -1411,6 +1421,8 @@ def _get_wip_detail_from_oracle(
         summary_builder.add_param_condition("WORKCENTER_GROUP", workcenter)
         if package:
             summary_builder.add_param_condition("PACKAGE_LEF", package)
+        if pj_type:
+            summary_builder.add_param_condition("PJ_TYPE", pj_type)
 
         summary_where, summary_params = summary_builder.build_where_only()
         non_quality_list = CommonFilters.get_non_quality_reasons_sql()

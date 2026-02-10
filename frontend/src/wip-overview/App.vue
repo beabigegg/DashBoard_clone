@@ -46,6 +46,10 @@ function unwrapApiResult(result, fallbackMessage) {
   return result;
 }
 
+function getUrlParam(name) {
+  return new URLSearchParams(window.location.search).get(name)?.trim() || '';
+}
+
 function buildFilters(status = null) {
   return buildWipOverviewQueryParams(filters, status);
 }
@@ -165,6 +169,7 @@ async function loadMatrixOnly() {
 
 function toggleStatusFilter(status) {
   activeStatusFilter.value = activeStatusFilter.value === status ? null : status;
+  updateUrlState();
   void loadMatrixOnly();
 }
 
@@ -175,18 +180,46 @@ function updateFilters(nextFilters) {
   filters.type = nextFilters.type || '';
 }
 
+function updateUrlState() {
+  const params = new URLSearchParams();
+
+  if (filters.workorder) {
+    params.set('workorder', filters.workorder);
+  }
+  if (filters.lotid) {
+    params.set('lotid', filters.lotid);
+  }
+  if (filters.package) {
+    params.set('package', filters.package);
+  }
+  if (filters.type) {
+    params.set('type', filters.type);
+  }
+  if (activeStatusFilter.value) {
+    params.set('status', activeStatusFilter.value);
+  }
+
+  const query = params.toString();
+  const nextUrl = query ? `/wip-overview?${query}` : '/wip-overview';
+  window.history.replaceState({}, '', nextUrl);
+}
+
 function applyFilters(nextFilters) {
   updateFilters(nextFilters);
+  updateUrlState();
   void loadAllData(false);
 }
 
 function clearFilters() {
   updateFilters({ workorder: '', lotid: '', package: '', type: '' });
+  activeStatusFilter.value = null;
+  updateUrlState();
   void loadAllData(false);
 }
 
 function removeFilter(field) {
   filters[field] = '';
+  updateUrlState();
   void loadAllData(false);
 }
 
@@ -206,6 +239,9 @@ function navigateToDetail(workcenter) {
   if (filters.type) {
     params.append('type', filters.type);
   }
+  if (activeStatusFilter.value) {
+    params.append('status', activeStatusFilter.value);
+  }
 
   window.location.href = `/wip-detail?${params.toString()}`;
 }
@@ -221,7 +257,17 @@ async function manualRefresh() {
   await triggerRefresh({ resetTimer: true, force: true });
 }
 
-void loadAllData(true);
+async function initializePage() {
+  filters.workorder = getUrlParam('workorder');
+  filters.lotid = getUrlParam('lotid');
+  filters.package = getUrlParam('package');
+  filters.type = getUrlParam('type');
+  activeStatusFilter.value = getUrlParam('status') || null;
+
+  await loadAllData(true);
+}
+
+void initializePage();
 </script>
 
 <template>

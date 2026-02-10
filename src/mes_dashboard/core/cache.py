@@ -363,38 +363,36 @@ def get_cached_wip_data() -> Optional[pd.DataFrame]:
         logger.debug(f"Process cache hit: {len(cached_df)} rows")
         return cached_df
 
-    # Tier 2: Parse from Redis (slow path - needs lock)
+    # Tier 2: Parse from Redis (slow path, double-check locking)
     if not REDIS_ENABLED:
         return None
 
-    client = get_redis_client()
-    if client is None:
-        return None
-
-    try:
-        start_time = time.time()
-        data_json = client.get(get_key("data"))
-        if data_json is None:
-            logger.debug("Cache miss: no data in Redis")
-            return None
-
-        # Parse outside lock to reduce contention on hot paths.
-        parsed_df = pd.read_json(io.StringIO(data_json), orient='records')
-        parse_time = time.time() - start_time
-    except Exception as e:
-        logger.warning(f"Failed to read cache: {e}")
-        return None
-
-    # Keep lock scope tight: consistency check + cache write only.
     with _wip_parse_lock:
         cached_df = _wip_df_cache.get(cache_key)
         if cached_df is not None:
-            logger.debug(f"Process cache hit (after parse): {len(cached_df)} rows")
+            logger.debug(f"Process cache hit (after lock): {len(cached_df)} rows")
             return cached_df
-        _wip_df_cache.set(cache_key, parsed_df)
 
-    logger.debug(f"Cache hit: loaded {len(parsed_df)} rows from Redis (parsed in {parse_time:.2f}s)")
-    return parsed_df
+        client = get_redis_client()
+        if client is None:
+            return None
+
+        try:
+            start_time = time.time()
+            data_json = client.get(get_key("data"))
+            if data_json is None:
+                logger.debug("Cache miss: no data in Redis")
+                return None
+
+            parsed_df = pd.read_json(io.StringIO(data_json), orient='records')
+            _wip_df_cache.set(cache_key, parsed_df)
+            parse_time = time.time() - start_time
+        except Exception as e:
+            logger.warning(f"Failed to read cache: {e}")
+            return None
+
+        logger.debug(f"Cache hit: loaded {len(parsed_df)} rows from Redis (parsed in {parse_time:.2f}s)")
+        return parsed_df
 
 
 def get_cached_sys_date() -> Optional[str]:

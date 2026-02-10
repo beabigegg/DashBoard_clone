@@ -60,6 +60,28 @@ class TestOverviewSummaryRoute(TestWipRoutesBase):
         self.assertFalse(data['success'])
         self.assertIn('error', data)
 
+    @patch('mes_dashboard.routes.wip_routes.get_wip_summary')
+    def test_passes_filters_and_include_dummy(self, mock_get_summary):
+        """Should pass overview filter params to service layer."""
+        mock_get_summary.return_value = {
+            'totalLots': 0,
+            'totalQtyPcs': 0,
+            'byWipStatus': {},
+            'dataUpdateDate': None,
+        }
+
+        self.client.get(
+            '/api/wip/overview/summary?workorder=WO1&lotid=L1&package=SOT-23&type=PJA&include_dummy=true'
+        )
+
+        mock_get_summary.assert_called_once_with(
+            include_dummy=True,
+            workorder='WO1',
+            lotid='L1',
+            package='SOT-23',
+            pj_type='PJA'
+        )
+
 
 class TestOverviewMatrixRoute(TestWipRoutesBase):
     """Test GET /api/wip/overview/matrix endpoint."""
@@ -96,6 +118,24 @@ class TestOverviewMatrixRoute(TestWipRoutesBase):
         self.assertEqual(response.status_code, 500)
         self.assertFalse(data['success'])
 
+    def test_rejects_invalid_status(self):
+        """Invalid status should return 400."""
+        response = self.client.get('/api/wip/overview/matrix?status=INVALID')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(data['success'])
+        self.assertIn('Invalid status', data['error'])
+
+    def test_rejects_invalid_hold_type(self):
+        """Invalid hold_type should return 400."""
+        response = self.client.get('/api/wip/overview/matrix?status=HOLD&hold_type=oops')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(data['success'])
+        self.assertIn('Invalid hold_type', data['error'])
+
 
 class TestOverviewHoldRoute(TestWipRoutesBase):
     """Test GET /api/wip/overview/hold endpoint."""
@@ -127,6 +167,19 @@ class TestOverviewHoldRoute(TestWipRoutesBase):
 
         self.assertEqual(response.status_code, 500)
         self.assertFalse(data['success'])
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_hold_summary')
+    def test_passes_filters_and_include_dummy(self, mock_get_hold):
+        """Should pass hold filter params to service layer."""
+        mock_get_hold.return_value = {'items': []}
+
+        self.client.get('/api/wip/overview/hold?workorder=WO1&lotid=L1&include_dummy=1')
+
+        mock_get_hold.assert_called_once_with(
+            include_dummy=True,
+            workorder='WO1',
+            lotid='L1'
+        )
 
 
 class TestDetailRoute(TestWipRoutesBase):
@@ -187,6 +240,7 @@ class TestDetailRoute(TestWipRoutesBase):
         mock_get_detail.assert_called_once_with(
             workcenter='焊接_DB',
             package='SOT-23',
+            pj_type=None,
             status='RUN',
             hold_type=None,
             workorder=None,
@@ -264,6 +318,24 @@ class TestDetailRoute(TestWipRoutesBase):
 
         self.assertEqual(response.status_code, 500)
         self.assertFalse(data['success'])
+
+    def test_rejects_invalid_status(self):
+        """Invalid status should return 400."""
+        response = self.client.get('/api/wip/detail/焊接_DB?status=INVALID')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(data['success'])
+        self.assertIn('Invalid status', data['error'])
+
+    def test_rejects_invalid_hold_type(self):
+        """Invalid hold_type should return 400."""
+        response = self.client.get('/api/wip/detail/焊接_DB?status=HOLD&hold_type=oops')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(data['success'])
+        self.assertIn('Invalid hold_type', data['error'])
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_detail')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 7))

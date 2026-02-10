@@ -14,6 +14,7 @@ import time
 import requests
 import concurrent.futures
 from typing import List, Tuple
+from urllib.parse import quote
 
 # Import from local conftest via pytest fixtures
 
@@ -44,6 +45,34 @@ class TestAPILoadConcurrent:
         except Exception as e:
             duration = time.time() - start
             return (False, duration, f"Error: {str(e)[:50]}")
+
+    def _discover_workcenter(self, base_url: str, timeout: float) -> str:
+        """Get one available workcenter for detail load tests."""
+        try:
+            response = requests.get(f"{base_url}/api/wip/meta/workcenters", timeout=timeout)
+            if response.status_code != 200:
+                return "TMTT"
+            payload = response.json()
+            items = payload.get("data") or []
+            if not items:
+                return "TMTT"
+            return str(items[0].get("name") or "TMTT")
+        except Exception:
+            return "TMTT"
+
+    def _discover_hold_reason(self, base_url: str, timeout: float) -> str:
+        """Get one available hold reason for hold-detail load tests."""
+        try:
+            response = requests.get(f"{base_url}/api/wip/overview/hold", timeout=timeout)
+            if response.status_code != 200:
+                return "YieldLimit"
+            payload = response.json()
+            items = (payload.get("data") or {}).get("items") or []
+            if not items:
+                return "YieldLimit"
+            return str(items[0].get("reason") or "YieldLimit")
+        except Exception:
+            return "YieldLimit"
 
     def test_wip_summary_concurrent_load(self, base_url: str, stress_config: dict, stress_result):
         """Test WIP summary API under concurrent load."""
@@ -107,6 +136,68 @@ class TestAPILoadConcurrent:
 
         assert result.success_rate >= 90.0, f"Success rate {result.success_rate:.1f}% is below 90%"
         assert result.avg_response_time < 15.0, f"Avg response time {result.avg_response_time:.2f}s exceeds 15s"
+
+    def test_wip_detail_concurrent_load(self, base_url: str, stress_config: dict, stress_result):
+        """Test WIP detail API under concurrent load."""
+        result = stress_result("WIP Detail Concurrent Load")
+        concurrent_users = stress_config['concurrent_users']
+        requests_per_user = stress_config['requests_per_user']
+        timeout = stress_config['timeout']
+
+        workcenter = self._discover_workcenter(base_url, timeout)
+        url = f"{base_url}/api/wip/detail/{quote(workcenter)}?page=1&page_size=100"
+        total_requests = concurrent_users * requests_per_user
+
+        start_time = time.time()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_users) as executor:
+            futures = [
+                executor.submit(self._make_request, url, timeout)
+                for _ in range(total_requests)
+            ]
+
+            for future in concurrent.futures.as_completed(futures):
+                success, duration, error = future.result()
+                if success:
+                    result.add_success(duration)
+                else:
+                    result.add_failure(error, duration)
+
+        result.total_duration = time.time() - start_time
+        print(result.report())
+
+        assert result.success_rate >= 85.0, f"Success rate {result.success_rate:.1f}% is below 85%"
+        assert result.avg_response_time < 20.0, f"Avg response time {result.avg_response_time:.2f}s exceeds 20s"
+
+    def test_hold_detail_lots_concurrent_load(self, base_url: str, stress_config: dict, stress_result):
+        """Test hold-detail lots API under concurrent load."""
+        result = stress_result("Hold Detail Lots Concurrent Load")
+        concurrent_users = stress_config['concurrent_users']
+        requests_per_user = stress_config['requests_per_user']
+        timeout = stress_config['timeout']
+
+        reason = self._discover_hold_reason(base_url, timeout)
+        url = f"{base_url}/api/wip/hold-detail/lots?reason={quote(reason)}&page=1&per_page=50"
+        total_requests = concurrent_users * requests_per_user
+
+        start_time = time.time()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_users) as executor:
+            futures = [
+                executor.submit(self._make_request, url, timeout)
+                for _ in range(total_requests)
+            ]
+
+            for future in concurrent.futures.as_completed(futures):
+                success, duration, error = future.result()
+                if success:
+                    result.add_success(duration)
+                else:
+                    result.add_failure(error, duration)
+
+        result.total_duration = time.time() - start_time
+        print(result.report())
+
+        assert result.success_rate >= 85.0, f"Success rate {result.success_rate:.1f}% is below 85%"
+        assert result.avg_response_time < 20.0, f"Avg response time {result.avg_response_time:.2f}s exceeds 20s"
 
     def test_resource_summary_concurrent_load(self, base_url: str, stress_config: dict, stress_result):
         """Test resource status summary API under concurrent load."""
@@ -238,6 +329,31 @@ class TestAPILoadRampUp:
 class TestAPITimeoutHandling:
     """Tests for timeout handling under load."""
 
+    @staticmethod
+    def _make_request(url: str, timeout: float) -> Tuple[bool, float, str]:
+        """Make a single request and return (success, duration, error)."""
+        start = time.time()
+        try:
+            response = requests.get(url, timeout=timeout)
+            duration = time.time() - start
+            if response.status_code == 200:
+                if "application/json" in response.headers.get("Content-Type", ""):
+                    payload = response.json()
+                    if payload.get("success", True):
+                        return (True, duration, "")
+                    return (False, duration, f"API returned success=false: {payload.get('error', 'unknown')}")
+                return (True, duration, "")
+            return (False, duration, f"HTTP {response.status_code}")
+        except requests.exceptions.Timeout:
+            duration = time.time() - start
+            return (False, duration, "Request timeout")
+        except requests.exceptions.ConnectionError as exc:
+            duration = time.time() - start
+            return (False, duration, f"Connection error: {str(exc)[:50]}")
+        except Exception as exc:
+            duration = time.time() - start
+            return (False, duration, f"Error: {str(exc)[:50]}")
+
     def test_connection_recovery_after_timeout(self, base_url: str, stress_result):
         """Test that API recovers after timeout scenarios."""
         result = stress_result("Connection Recovery After Timeout")
@@ -279,6 +395,55 @@ class TestAPITimeoutHandling:
         print(result.report())
 
         assert recovered, "System did not recover after timeout scenarios"
+
+    def test_wip_pages_recoverability_after_burst(self, base_url: str, stress_result):
+        """After a burst, health and critical WIP APIs should still respond."""
+        result = stress_result("WIP Pages Recoverability After Burst")
+        timeout = 30.0
+        probe_endpoints = [
+            f"{base_url}/api/wip/overview/summary",
+            f"{base_url}/api/wip/overview/matrix",
+            f"{base_url}/api/wip/overview/hold",
+            f"{base_url}/health",
+        ]
+
+        # Burst phase
+        burst_count = 40
+        start_time = time.time()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            futures = []
+            for _ in range(burst_count):
+                for endpoint in probe_endpoints[:-1]:
+                    futures.append(executor.submit(self._make_request, endpoint, timeout))
+
+            for future in concurrent.futures.as_completed(futures):
+                success, duration, error = future.result()
+                if success:
+                    result.add_success(duration)
+                else:
+                    result.add_failure(error, duration)
+
+        # Recoverability probes
+        healthy_probes = 0
+        for _ in range(5):
+            probe_start = time.time()
+            try:
+                response = requests.get(f"{base_url}/health", timeout=5)
+                duration = time.time() - probe_start
+                if response.status_code in (200, 503):
+                    payload = response.json()
+                    if payload.get("status") in {"healthy", "degraded", "unhealthy"}:
+                        healthy_probes += 1
+                        result.add_success(duration)
+                        continue
+                result.add_failure(f"Unexpected health response: {response.status_code}", duration)
+            except Exception as exc:
+                result.add_failure(str(exc)[:80], time.time() - probe_start)
+            time.sleep(0.2)
+
+        result.total_duration = time.time() - start_time
+        print(result.report())
+        assert healthy_probes >= 3, f"Health endpoint recoverability too low: {healthy_probes}/5"
 
 
 @pytest.mark.stress

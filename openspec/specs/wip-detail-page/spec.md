@@ -17,6 +17,11 @@ The page SHALL read URL query parameters to initialize its state from the Overvi
 - **THEN** filter inputs SHALL be pre-filled with those values
 - **THEN** data SHALL be loaded with those filters applied
 
+#### Scenario: Status passthrough from Overview
+- **WHEN** the URL contains a `status` parameter (e.g., `?workcenter=焊接_DW&status=RUN`)
+- **THEN** the status card corresponding to the `status` value SHALL be activated
+- **THEN** data SHALL be loaded with the status filter applied
+
 #### Scenario: Missing workcenter fallback
 - **WHEN** the page loads without a `workcenter` parameter
 - **THEN** the page SHALL fetch available workcenters from `GET /api/wip/meta/workcenters`
@@ -35,6 +40,7 @@ The page SHALL display five summary cards with status counts for the current wor
 - **THEN** the active card SHALL show a visual active state
 - **THEN** non-active status cards SHALL dim
 - **THEN** clicking the same card again SHALL remove the filter
+- **THEN** the URL SHALL be updated to reflect the active status filter
 
 ### Requirement: Detail page SHALL display lot details table with sticky columns
 The page SHALL display a scrollable table with fixed left columns and dynamic spec columns.
@@ -107,12 +113,18 @@ The page SHALL paginate lot data with server-side support.
 - **WHEN** user clicks Next or Prev
 - **THEN** data SHALL reload with the updated page number
 
-### Requirement: Detail page SHALL have back navigation to Overview
-The page SHALL provide a way to return to the Overview page.
+### Requirement: Detail page SHALL have back navigation to Overview with filter preservation
+The page SHALL provide a way to return to the Overview page while preserving all current filter state.
 
-#### Scenario: Back button
+#### Scenario: Back button with filter state
 - **WHEN** user clicks the "← Overview" button in the header
-- **THEN** the page SHALL navigate to `/wip-overview`
+- **THEN** the page SHALL navigate to `/wip-overview` with current filter values (workorder, lotid, package, type) and status as URL parameters
+- **THEN** only non-empty filter values SHALL appear as URL parameters
+
+#### Scenario: Back button reflects Detail changes
+- **WHEN** the user modifies filters or status in Detail (e.g., changes status from RUN to QUEUE)
+- **THEN** the back button URL SHALL dynamically update to reflect the current Detail filter state
+- **THEN** navigating back SHALL cause Overview to load with the updated filter state
 
 ### Requirement: Detail page SHALL auto-refresh and handle request cancellation
 The page SHALL auto-refresh and cancel stale requests identically to Overview.
@@ -122,3 +134,12 @@ The page SHALL auto-refresh and cancel stale requests identically to Overview.
 - **THEN** data SHALL auto-refresh every 10 minutes, skipping when tab is hidden
 - **THEN** visibility change SHALL trigger immediate refresh
 - **THEN** new requests SHALL cancel in-flight requests via AbortController
+
+### Requirement: Detail page SHALL synchronize status filter to URL
+The page SHALL include the active status filter in URL state management.
+
+#### Scenario: Status included in URL state
+- **WHEN** the status filter is active
+- **THEN** `updateUrlState()` SHALL include `status={value}` in the URL parameters
+- **WHEN** the status filter is cleared
+- **THEN** the `status` parameter SHALL be removed from the URL

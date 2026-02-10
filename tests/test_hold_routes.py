@@ -90,6 +90,24 @@ class TestHoldDetailSummaryRoute(TestHoldRoutesBase):
         self.assertFalse(data['success'])
         self.assertIn('error', data)
 
+    @patch('mes_dashboard.routes.hold_routes.get_hold_detail_summary')
+    def test_passes_include_dummy(self, mock_get_summary):
+        """Should pass include_dummy flag to summary service."""
+        mock_get_summary.return_value = {
+            'totalLots': 0,
+            'totalQty': 0,
+            'avgAge': 0,
+            'maxAge': 0,
+            'workcenterCount': 0,
+        }
+
+        self.client.get('/api/wip/hold-detail/summary?reason=YieldLimit&include_dummy=true')
+
+        mock_get_summary.assert_called_once_with(
+            reason='YieldLimit',
+            include_dummy=True
+        )
+
 
 class TestHoldDetailDistributionRoute(TestHoldRoutesBase):
     """Test GET /api/wip/hold-detail/distribution endpoint."""
@@ -143,6 +161,22 @@ class TestHoldDetailDistributionRoute(TestHoldRoutesBase):
 
         self.assertEqual(response.status_code, 500)
         self.assertFalse(data['success'])
+
+    @patch('mes_dashboard.routes.hold_routes.get_hold_detail_distribution')
+    def test_passes_include_dummy(self, mock_get_dist):
+        """Should pass include_dummy flag to distribution service."""
+        mock_get_dist.return_value = {
+            'byWorkcenter': [],
+            'byPackage': [],
+            'byAge': [],
+        }
+
+        self.client.get('/api/wip/hold-detail/distribution?reason=YieldLimit&include_dummy=1')
+
+        mock_get_dist.assert_called_once_with(
+            reason='YieldLimit',
+            include_dummy=True
+        )
 
 
 class TestHoldDetailLotsRoute(TestHoldRoutesBase):
@@ -268,6 +302,18 @@ class TestHoldDetailLotsRoute(TestHoldRoutesBase):
 
         self.assertEqual(response.status_code, 500)
         self.assertFalse(data['success'])
+
+    @patch('mes_dashboard.routes.hold_routes.get_hold_detail_lots')
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 4))
+    def test_lots_rate_limited_returns_429(self, _mock_limit, mock_get_lots):
+        """Rate-limited lots requests should return 429."""
+        response = self.client.get('/api/wip/hold-detail/lots?reason=YieldLimit')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 429)
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error']['code'], 'TOO_MANY_REQUESTS')
+        mock_get_lots.assert_not_called()
 
 
 class TestHoldDetailAgeRangeFilters(TestHoldRoutesBase):

@@ -460,6 +460,16 @@ get_watchdog_pid() {
         fi
         rm -f "$WATCHDOG_PROCESS_PID_FILE"
     fi
+
+    # Fallback: discover watchdog process even if PID file is missing/stale
+    local discovered_pid
+    discovered_pid=$(pgrep -f "[p]ython .*scripts/worker_watchdog.py" 2>/dev/null | head -1 || true)
+    if [ -n "${discovered_pid}" ] && kill -0 "${discovered_pid}" 2>/dev/null; then
+        echo "${discovered_pid}" > "$WATCHDOG_PROCESS_PID_FILE"
+        echo "${discovered_pid}"
+        return 0
+    fi
+
     return 1
 }
 
@@ -481,7 +491,12 @@ start_watchdog() {
     fi
 
     log_info "Starting worker watchdog..."
-    nohup python scripts/worker_watchdog.py >> "$WATCHDOG_LOG" 2>&1 &
+    if command -v setsid >/dev/null 2>&1; then
+        # Start watchdog in its own session so it survives non-interactive shell teardown.
+        setsid python scripts/worker_watchdog.py >> "$WATCHDOG_LOG" 2>&1 < /dev/null &
+    else
+        nohup python scripts/worker_watchdog.py >> "$WATCHDOG_LOG" 2>&1 < /dev/null &
+    fi
     local pid=$!
     echo "$pid" > "$WATCHDOG_PROCESS_PID_FILE"
 

@@ -69,6 +69,9 @@ function updateUrlState() {
   if (filters.type) {
     params.set('type', filters.type);
   }
+  if (activeStatusFilter.value) {
+    params.set('status', activeStatusFilter.value);
+  }
 
   window.history.replaceState({}, '', `/wip-detail?${params.toString()}`);
 }
@@ -183,6 +186,28 @@ const tableData = computed(() => ({
   specs: detailData.value?.specs || [],
   pagination: detailData.value?.pagination || { page: 1, page_size: PAGE_SIZE, total_count: 0, total_pages: 1 },
 }));
+const backUrl = computed(() => {
+  const params = new URLSearchParams();
+
+  if (filters.workorder) {
+    params.set('workorder', filters.workorder);
+  }
+  if (filters.lotid) {
+    params.set('lotid', filters.lotid);
+  }
+  if (filters.package) {
+    params.set('package', filters.package);
+  }
+  if (filters.type) {
+    params.set('type', filters.type);
+  }
+  if (activeStatusFilter.value) {
+    params.set('status', activeStatusFilter.value);
+  }
+
+  const query = params.toString();
+  return query ? `/wip-overview?${query}` : '/wip-overview';
+});
 
 function updateFilters(nextFilters) {
   filters.workorder = nextFilters.workorder || '';
@@ -210,6 +235,7 @@ function toggleStatusFilter(status) {
   activeStatusFilter.value = activeStatusFilter.value === status ? null : status;
   page.value = 1;
   selectedLotId.value = '';
+  updateUrlState();
   void loadTableOnly();
 }
 
@@ -251,6 +277,7 @@ async function initializePage() {
   filters.lotid = getUrlParam('lotid');
   filters.package = getUrlParam('package');
   filters.type = getUrlParam('type');
+  activeStatusFilter.value = getUrlParam('status') || null;
 
   if (!workcenter.value) {
     const signal = createAbortSignal('wip-detail-init');
@@ -284,7 +311,7 @@ void initializePage();
   <div class="dashboard wip-detail-page">
     <header class="header">
       <div class="header-left">
-        <a href="/wip-overview" class="btn btn-back">&larr; Overview</a>
+        <a :href="backUrl" class="btn btn-back">&larr; Overview</a>
         <h1>{{ pageTitle }}</h1>
       </div>
       <div class="header-right">

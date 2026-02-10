@@ -174,6 +174,7 @@ def api_detail(workcenter: str):
 
     Query Parameters:
         package: Optional PRODUCTLINENAME filter
+        type: Optional PJ_TYPE filter (exact match)
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
@@ -187,6 +188,7 @@ def api_detail(workcenter: str):
         JSON with workcenter, summary, specs, lots, pagination, sys_date
     """
     package = request.args.get('package', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
     status = request.args.get('status', '').strip().upper() or None
     hold_type = request.args.get('hold_type', '').strip().lower() or None
     workorder = request.args.get('workorder', '').strip() or None
@@ -220,6 +222,7 @@ def api_detail(workcenter: str):
     result = get_wip_detail(
         workcenter=workcenter,
         package=package,
+        pj_type=pj_type,
         status=status,
         hold_type=hold_type,
         workorder=workorder,

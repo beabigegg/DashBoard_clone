@@ -98,6 +98,7 @@ class TestAggregateByResourceid:
                 'OBJECTCATEGORY': 'ASSEMBLY',
                 'EQUIPMENTASSETSSTATUS': 'PRD',
                 'EQUIPMENTASSETSSTATUSREASON': None,
+                'RUNCARDLOTID': 'LOT001',
                 'JOBORDER': 'JO001',
                 'JOBSTATUS': 'RUN',
                 'SYMPTOMCODE': None,
@@ -127,6 +128,7 @@ class TestAggregateByResourceid:
                 'OBJECTCATEGORY': 'ASSEMBLY',
                 'EQUIPMENTASSETSSTATUS': 'PRD',
                 'EQUIPMENTASSETSSTATUSREASON': None,
+                'RUNCARDLOTID': 'LOT001',
                 'JOBORDER': 'JO001',
                 'JOBSTATUS': 'RUN',
                 'SYMPTOMCODE': None,
@@ -141,6 +143,7 @@ class TestAggregateByResourceid:
                 'OBJECTCATEGORY': 'ASSEMBLY',
                 'EQUIPMENTASSETSSTATUS': 'PRD',
                 'EQUIPMENTASSETSSTATUSREASON': None,
+                'RUNCARDLOTID': 'LOT002',
                 'JOBORDER': 'JO002',
                 'JOBSTATUS': 'RUN',
                 'SYMPTOMCODE': None,
@@ -155,6 +158,7 @@ class TestAggregateByResourceid:
                 'OBJECTCATEGORY': 'ASSEMBLY',
                 'EQUIPMENTASSETSSTATUS': 'PRD',
                 'EQUIPMENTASSETSSTATUSREASON': None,
+                'RUNCARDLOTID': 'LOT003',
                 'JOBORDER': 'JO003',
                 'JOBSTATUS': 'RUN',
                 'SYMPTOMCODE': None,
@@ -184,6 +188,7 @@ class TestAggregateByResourceid:
                 'OBJECTCATEGORY': 'ASSEMBLY',
                 'EQUIPMENTASSETSSTATUS': 'PRD',
                 'EQUIPMENTASSETSSTATUSREASON': None,
+                'RUNCARDLOTID': 'LOT001',
                 'JOBORDER': 'JO001',
                 'JOBSTATUS': 'RUN',
                 'SYMPTOMCODE': None,
@@ -198,6 +203,7 @@ class TestAggregateByResourceid:
                 'OBJECTCATEGORY': 'WAFERSORT',
                 'EQUIPMENTASSETSSTATUS': 'SBY',
                 'EQUIPMENTASSETSSTATUSREASON': 'Waiting',
+                'RUNCARDLOTID': None,
                 'JOBORDER': None,
                 'JOBSTATUS': None,
                 'SYMPTOMCODE': None,
@@ -216,7 +222,7 @@ class TestAggregateByResourceid:
 
         assert r1['LOT_COUNT'] == 1
         assert r1['STATUS_CATEGORY'] == 'PRODUCTIVE'
-        assert r2['LOT_COUNT'] == 1
+        assert r2['LOT_COUNT'] == 0
         assert r2['STATUS_CATEGORY'] == 'STANDBY'
 
     def test_handles_empty_records(self):
