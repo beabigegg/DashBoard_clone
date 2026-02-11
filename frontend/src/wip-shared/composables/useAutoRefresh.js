@@ -1,6 +1,12 @@
 import { onBeforeUnmount, onMounted } from 'vue';
 
 const DEFAULT_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+const JITTER_FACTOR = 0.15; // ±15% random jitter to prevent synchronized requests
+
+function jitteredInterval(baseMs) {
+  const jitter = baseMs * JITTER_FACTOR * (2 * Math.random() - 1);
+  return Math.max(1000, Math.round(baseMs + jitter));
+}
 
 export function useAutoRefresh({
   onRefresh,
@@ -14,18 +20,23 @@ export function useAutoRefresh({
 
   function stopAutoRefresh() {
     if (refreshTimer) {
-      clearInterval(refreshTimer);
+      clearTimeout(refreshTimer);
       refreshTimer = null;
     }
   }
 
-  function startAutoRefresh() {
+  function scheduleNextRefresh() {
     stopAutoRefresh();
-    refreshTimer = setInterval(() => {
+    refreshTimer = setTimeout(() => {
       if (!document.hidden) {
         void onRefresh?.();
       }
-    }, intervalMs);
+      scheduleNextRefresh();
+    }, jitteredInterval(intervalMs));
+  }
+
+  function startAutoRefresh() {
+    scheduleNextRefresh();
   }
 
   function resetAutoRefresh() {

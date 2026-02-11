@@ -29,7 +29,17 @@ import './portal.css';
 
   function activateTab(targetId, toolSrc) {
     sidebarItems.forEach((item) => item.classList.remove('active'));
-    frames.forEach((frame) => frame.classList.remove('active'));
+
+    // Unload inactive iframes to free memory and stop their timers
+    frames.forEach((frame) => {
+      if (frame.classList.contains('active') && frame.id !== targetId) {
+        if (frame.src) {
+          frame.dataset.src = frame.src;
+        }
+        frame.removeAttribute('src');
+      }
+      frame.classList.remove('active');
+    });
 
     const activeItems = document.querySelectorAll(`.sidebar-item[data-target="${targetId}"]`);
     activeItems.forEach((item) => {

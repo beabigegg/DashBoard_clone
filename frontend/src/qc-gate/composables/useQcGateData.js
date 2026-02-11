@@ -3,6 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { apiGet } from '../../core/api.js';
 
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+const JITTER_FACTOR = 0.15;
+
+function jitteredInterval(baseMs) {
+  const jitter = baseMs * JITTER_FACTOR * (2 * Math.random() - 1);
+  return Math.max(1000, Math.round(baseMs + jitter));
+}
 const API_TIMEOUT_MS = 60000;
 const BUCKET_KEYS = ['lt_6h', '6h_12h', '12h_24h', 'gt_24h'];
 
@@ -106,18 +112,23 @@ export function useQcGateData() {
 
   const stopAutoRefresh = () => {
     if (refreshTimer) {
-      clearInterval(refreshTimer);
+      clearTimeout(refreshTimer);
       refreshTimer = null;
     }
   };
 
-  const startAutoRefresh = () => {
+  const scheduleNextRefresh = () => {
     stopAutoRefresh();
-    refreshTimer = setInterval(() => {
+    refreshTimer = setTimeout(() => {
       if (!document.hidden) {
         void fetchData({ background: true });
       }
-    }, REFRESH_INTERVAL_MS);
+      scheduleNextRefresh();
+    }, jitteredInterval(REFRESH_INTERVAL_MS));
+  };
+
+  const startAutoRefresh = () => {
+    scheduleNextRefresh();
   };
 
   const resetAutoRefresh = () => {

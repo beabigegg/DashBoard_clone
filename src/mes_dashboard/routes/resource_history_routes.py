@@ -4,6 +4,8 @@
 Contains Flask Blueprint for historical equipment performance analysis endpoints.
 """
 
+from datetime import datetime
+
 from flask import Blueprint, jsonify, request, redirect, Response
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
@@ -216,6 +218,21 @@ def api_resource_history_export():
         return jsonify({
             'success': False,
             'error': '必須提供 start_date 和 end_date 參數'
+        }), 400
+
+    # Validate export date range (max 365 days)
+    try:
+        sd = datetime.strptime(start_date, '%Y-%m-%d')
+        ed = datetime.strptime(end_date, '%Y-%m-%d')
+        if (ed - sd).days > 365:
+            return jsonify({
+                'success': False,
+                'error': 'CSV 匯出範圍不可超過一年 (365 天)'
+            }), 400
+    except ValueError:
+        return jsonify({
+            'success': False,
+            'error': '日期格式錯誤，請使用 YYYY-MM-DD'
         }), 400
 
     # Generate filename

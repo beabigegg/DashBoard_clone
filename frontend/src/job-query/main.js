@@ -63,14 +63,14 @@ function renderTxnCell(txn, apiKey) {
             try {
                 const data = await MesApi.get('/api/job-query/resources');
                 if (data.error) {
-                    document.getElementById('equipmentList').innerHTML = `<div class="error">${data.error}</div>`;
+                    document.getElementById('equipmentList').innerHTML = `<div class="error">${escapeHtml(data.error)}</div>`;
                     return;
                 }
 
                 allEquipments = data.data;
                 renderEquipmentList(allEquipments);
             } catch (error) {
-                document.getElementById('equipmentList').innerHTML = `<div class="error">載入失敗: ${error.message}</div>`;
+                document.getElementById('equipmentList').innerHTML = `<div class="error">載入失敗: ${escapeHtml(error.message)}</div>`;
             }
         }
 
@@ -264,7 +264,7 @@ function renderTxnCell(txn, apiKey) {
                 });
 
                 if (data.error) {
-                    resultSection.innerHTML = `<div class="error">${data.error}</div>`;
+                    resultSection.innerHTML = `<div class="error">${escapeHtml(data.error)}</div>`;
                     return;
                 }
 
@@ -275,7 +275,7 @@ function renderTxnCell(txn, apiKey) {
                 document.getElementById('exportBtn').disabled = jobsData.length === 0;
 
             } catch (error) {
-                resultSection.innerHTML = `<div class="error">查詢失敗: ${error.message}</div>`;
+                resultSection.innerHTML = `<div class="error">查詢失敗: ${escapeHtml(error.message)}</div>`;
             } finally {
                 document.getElementById('queryBtn').disabled = false;
             }
@@ -346,11 +346,13 @@ function renderTxnCell(txn, apiKey) {
 
             resultSection.innerHTML = html;
 
-            // Load expanded histories
+            // Load expanded histories in batches to avoid thundering herd
+            const pendingLoads = [];
             expandedJobs.forEach(jobId => {
                 const idx = jobsData.findIndex(j => j.JOBID === jobId);
-                if (idx >= 0) loadJobHistory(jobId, idx);
+                if (idx >= 0) pendingLoads.push({ jobId, idx });
             });
+            void loadHistoriesBatched(pendingLoads);
         }
 
         // Toggle job history
@@ -382,7 +384,7 @@ function renderTxnCell(txn, apiKey) {
                 const data = await MesApi.get(`/api/job-query/txn/${jobId}`);
 
                 if (data.error) {
-                    container.innerHTML = `<div class="error" style="margin: 10px 20px;">${data.error}</div>`;
+                    container.innerHTML = `<div class="error" style="margin: 10px 20px;">${escapeHtml(data.error)}</div>`;
                     return;
                 }
 
@@ -417,7 +419,16 @@ function renderTxnCell(txn, apiKey) {
                 container.innerHTML = html;
 
             } catch (error) {
-                container.innerHTML = `<div class="error" style="margin: 10px 20px;">載入失敗: ${error.message}</div>`;
+                container.innerHTML = `<div class="error" style="margin: 10px 20px;">載入失敗: ${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        // Load multiple job histories with concurrency limit
+        const BATCH_CONCURRENCY = 5;
+        async function loadHistoriesBatched(items) {
+            for (let i = 0; i < items.length; i += BATCH_CONCURRENCY) {
+                const batch = items.slice(i, i + BATCH_CONCURRENCY);
+                await Promise.all(batch.map(({ jobId, idx }) => loadJobHistory(jobId, idx)));
             }
         }
 

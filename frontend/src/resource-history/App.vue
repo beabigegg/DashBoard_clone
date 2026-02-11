@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
 import { buildResourceKpiFromHours } from '../core/compute.js';
@@ -306,7 +306,9 @@ async function initPage() {
   await executeQuery();
 }
 
-void initPage();
+onMounted(() => {
+  void initPage();
+});
 </script>
 
 <template>

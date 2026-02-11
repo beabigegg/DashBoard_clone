@@ -11,6 +11,7 @@ import logging
 
 from flask import Blueprint, jsonify, request, Response, render_template
 
+from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.services.job_query_service import (
     get_jobs_by_resources,
     get_job_txn_history,
@@ -21,6 +22,24 @@ from mes_dashboard.services.job_query_service import (
 # Create Blueprint
 job_query_bp = Blueprint('job_query', __name__)
 logger = logging.getLogger('mes_dashboard.job_query_routes')
+
+MAX_RESOURCE_IDS = 50
+
+_JOB_QUERY_RATE_LIMIT = configured_rate_limit(
+    bucket="job-query",
+    max_attempts_env="JOB_QUERY_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="JOB_QUERY_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=60,
+    default_window_seconds=60,
+)
+
+_JOB_EXPORT_RATE_LIMIT = configured_rate_limit(
+    bucket="job-export",
+    max_attempts_env="JOB_EXPORT_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="JOB_EXPORT_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=10,
+    default_window_seconds=60,
+)
 
 
 # ============================================================
@@ -74,6 +93,7 @@ def get_resources():
 
 
 @job_query_bp.route('/api/job-query/jobs', methods=['POST'])
+@_JOB_QUERY_RATE_LIMIT
 def query_jobs():
     """Query jobs for selected resources.
 
@@ -95,6 +115,8 @@ def query_jobs():
     # Validation
     if not resource_ids:
         return jsonify({'error': '請選擇至少一台設備'}), 400
+    if len(resource_ids) > MAX_RESOURCE_IDS:
+        return jsonify({'error': f'設備數量不可超過 {MAX_RESOURCE_IDS} 台'}), 400
     if not start_date or not end_date:
         return jsonify({'error': '請指定日期範圍'}), 400
 
@@ -111,6 +133,7 @@ def query_jobs():
 
 
 @job_query_bp.route('/api/job-query/txn/<job_id>', methods=['GET'])
+@_JOB_QUERY_RATE_LIMIT
 def query_job_txn_history(job_id: str):
     """Query transaction history for a single job.
 
@@ -131,6 +154,7 @@ def query_job_txn_history(job_id: str):
 
 
 @job_query_bp.route('/api/job-query/export', methods=['POST'])
+@_JOB_EXPORT_RATE_LIMIT
 def export_jobs():
     """Export jobs with full transaction history as CSV.
 
@@ -152,6 +176,8 @@ def export_jobs():
     # Validation
     if not resource_ids:
         return jsonify({'error': '請選擇至少一台設備'}), 400
+    if len(resource_ids) > MAX_RESOURCE_IDS:
+        return jsonify({'error': f'設備數量不可超過 {MAX_RESOURCE_IDS} 台'}), 400
     if not start_date or not end_date:
         return jsonify({'error': '請指定日期範圍'}), 400
 

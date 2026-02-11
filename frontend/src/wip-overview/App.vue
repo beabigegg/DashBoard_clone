@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
 import {
@@ -267,7 +267,9 @@ async function initializePage() {
   await loadAllData(true);
 }
 
-void initializePage();
+onMounted(() => {
+  void initializePage();
+});
 </script>
 
 <template>

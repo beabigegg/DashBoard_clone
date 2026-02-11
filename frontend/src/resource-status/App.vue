@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
 import { useAutoRefresh } from '../wip-shared/composables/useAutoRefresh.js';
@@ -430,7 +430,9 @@ async function initPage() {
   await loadData(true);
 }
 
-void initPage();
+onMounted(() => {
+  void initPage();
+});
 </script>
 
 <template>

@@ -23,7 +23,7 @@
       "route": "/hold-history",
       "name": "Hold 歷史績效",
       "status": "dev",
-      "drawer_id": "reports",
+      "drawer_id": "drawer-2",
       "order": 3
     },
     {
@@ -40,7 +40,7 @@
       "route": "/resource-history",
       "name": "設備歷史績效",
       "status": "released",
-      "drawer_id": "reports",
+      "drawer_id": "drawer-2",
       "order": 5
     },
     {
@@ -75,14 +75,14 @@
       "route": "/job-query",
       "name": "設備維修查詢",
       "status": "released",
-      "drawer_id": "queries",
+      "drawer_id": "drawer",
       "order": 3
     },
     {
       "route": "/query-tool",
       "name": "批次追蹤工具",
-      "status": "released",
-      "drawer_id": "queries",
+      "status": "dev",
+      "drawer_id": "dev-tools",
       "order": 4
     },
     {
@@ -129,12 +129,6 @@
       "admin_only": false
     },
     {
-      "id": "queries",
-      "name": "查詢類",
-      "order": 3,
-      "admin_only": false
-    },
-    {
       "id": "dev-tools",
       "name": "開發工具",
       "order": 4,
@@ -143,6 +137,12 @@
     {
       "id": "drawer",
       "name": "查詢工具",
+      "order": 3,
+      "admin_only": false
+    },
+    {
+      "id": "drawer-2",
+      "name": "歷史報表",
       "order": 2,
       "admin_only": false
     }
