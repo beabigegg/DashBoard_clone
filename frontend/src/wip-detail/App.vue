@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
+import { replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
 import { buildWipDetailQueryParams } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
@@ -73,7 +74,7 @@ function updateUrlState() {
     params.set('status', activeStatusFilter.value);
   }
 
-  window.history.replaceState({}, '', `/wip-detail?${params.toString()}`);
+  replaceRuntimeHistory(`/wip-detail?${params.toString()}`);
 }
 
 async function fetchWorkcenters(signal) {
@@ -206,7 +207,7 @@ const backUrl = computed(() => {
   }
 
   const query = params.toString();
-  return query ? `/wip-overview?${query}` : '/wip-overview';
+  return toRuntimeRoute(query ? `/wip-overview?${query}` : '/wip-overview');
 });
 
 function updateFilters(nextFilters) {

@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import atexit
+import json
 import logging
 import os
 import sys
 import threading
+from pathlib import Path
 
 from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
@@ -48,6 +50,8 @@ from mes_dashboard.core.runtime_contract import build_runtime_contract_diagnosti
 
 _SHUTDOWN_LOCK = threading.Lock()
 _ATEXIT_REGISTERED = False
+_SHELL_ROUTE_CONTRACT_LOCK = threading.Lock()
+_SHELL_ROUTE_CONTRACT_ROUTES: set[str] | None = None
 
 
 def _configure_logging(app: Flask) -> None:
@@ -159,6 +163,49 @@ def _can_view_page_for_user(route: str, *, is_admin: bool) -> bool:
     if status == "released":
         return True
     return is_admin
+
+
+def _safe_order(value: object, default: int = 9999) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
+def _load_shell_route_contract_routes() -> set[str]:
+    """Load shell route contract routes used for navigation diagnostics."""
+    global _SHELL_ROUTE_CONTRACT_ROUTES
+    with _SHELL_ROUTE_CONTRACT_LOCK:
+        if _SHELL_ROUTE_CONTRACT_ROUTES is not None:
+            return _SHELL_ROUTE_CONTRACT_ROUTES
+
+        contract_file = (
+            Path(__file__).resolve().parents[2]
+            / "docs"
+            / "migration"
+            / "portal-shell-route-view-integration"
+            / "route_migration_contract.json"
+        )
+        if not contract_file.exists():
+            _SHELL_ROUTE_CONTRACT_ROUTES = set()
+            return _SHELL_ROUTE_CONTRACT_ROUTES
+
+        try:
+            payload = json.loads(contract_file.read_text(encoding="utf-8"))
+            routes = payload.get("routes", [])
+            _SHELL_ROUTE_CONTRACT_ROUTES = {
+                str(item.get("route", "")).strip()
+                for item in routes
+                if isinstance(item, dict) and str(item.get("route", "")).strip().startswith("/")
+            }
+        except Exception as exc:
+            logging.getLogger("mes_dashboard").warning(
+                "Failed to load shell route contract for diagnostics: %s",
+                exc,
+            )
+            _SHELL_ROUTE_CONTRACT_ROUTES = set()
+
+        return _SHELL_ROUTE_CONTRACT_ROUTES
 
 
 def _shutdown_runtime_resources() -> None:
@@ -398,6 +445,7 @@ def create_app(config_name: str | None = None) -> Flask:
         return render_template('portal.html', drawers=get_navigation_config())
 
     @app.route('/portal-shell')
+    @app.route('/portal-shell/')
     @app.route('/portal-shell/<path:_subpath>')
     def portal_shell_page(_subpath: str | None = None):
         """Portal SPA shell page served as pure Vite HTML output."""
@@ -425,6 +473,7 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/api/portal/navigation', methods=['GET'])
     def portal_navigation_config():
         """Return effective drawer/page navigation config for current user."""
+        nav_logger = logging.getLogger("mes_dashboard.portal_navigation")
         admin = is_admin_logged_in()
         admin_user_payload = None
         if admin:
@@ -436,44 +485,118 @@ def create_app(config_name: str | None = None) -> Flask:
             }
         source = get_navigation_config()
         drawers: list[dict] = []
+        shell_contract_routes = _load_shell_route_contract_routes()
+        diagnostics: dict[str, object] = {
+            "filtered_drawers": 0,
+            "filtered_pages": 0,
+            "invalid_drawers": 0,
+            "invalid_pages": 0,
+            "contract_mismatch_routes": [],
+        }
+        mismatch_routes: set[str] = set()
 
-        for drawer in source:
-            admin_only = bool(drawer.get("admin_only", False))
-            if admin_only and not admin:
+        for drawer_index, drawer in enumerate(source):
+            drawer_id = str(drawer.get("id") or "").strip()
+            if not drawer_id:
+                diagnostics["invalid_drawers"] = int(diagnostics["invalid_drawers"]) + 1
+                nav_logger.warning(
+                    "Skipping navigation drawer with missing id at index=%s",
+                    drawer_index,
+                )
                 continue
 
-            pages = []
-            for page in drawer.get("pages", []):
-                route = str(page.get("route") or "")
-                if not route or not _can_view_page_for_user(route, is_admin=admin):
+            admin_only = bool(drawer.get("admin_only", False))
+            if admin_only and not admin:
+                diagnostics["filtered_drawers"] = int(diagnostics["filtered_drawers"]) + 1
+                continue
+
+            raw_pages = drawer.get("pages", [])
+            if not isinstance(raw_pages, list):
+                diagnostics["invalid_drawers"] = int(diagnostics["invalid_drawers"]) + 1
+                nav_logger.warning(
+                    "Skipping navigation drawer with invalid pages payload: drawer_id=%s type=%s",
+                    drawer_id,
+                    type(raw_pages).__name__,
+                )
+                continue
+
+            pages: list[dict] = []
+            for page_index, page in enumerate(raw_pages):
+                if not isinstance(page, dict):
+                    diagnostics["invalid_pages"] = int(diagnostics["invalid_pages"]) + 1
+                    nav_logger.warning(
+                        "Skipping invalid page payload under drawer_id=%s index=%s type=%s",
+                        drawer_id,
+                        page_index,
+                        type(page).__name__,
+                    )
                     continue
+
+                route = str(page.get("route") or "").strip()
+                if not route or not route.startswith("/"):
+                    diagnostics["invalid_pages"] = int(diagnostics["invalid_pages"]) + 1
+                    nav_logger.warning(
+                        "Skipping page with invalid route: drawer_id=%s route=%s",
+                        drawer_id,
+                        route,
+                    )
+                    continue
+
+                if not _can_view_page_for_user(route, is_admin=admin):
+                    diagnostics["filtered_pages"] = int(diagnostics["filtered_pages"]) + 1
+                    continue
+
+                if shell_contract_routes and route not in shell_contract_routes:
+                    mismatch_routes.add(route)
+                    nav_logger.warning(
+                        "Navigation route missing shell contract: drawer_id=%s route=%s",
+                        drawer_id,
+                        route,
+                    )
+
                 pages.append(
                     {
                         "route": route,
                         "name": page.get("name") or route,
                         "status": page.get("status", "dev"),
-                        "order": page.get("order"),
+                        "order": _safe_order(page.get("order")),
                     }
                 )
 
             if not pages:
                 continue
+            pages = sorted(
+                pages,
+                key=lambda p: (_safe_order(p.get("order")), str(p.get("name") or p.get("route") or "")),
+            )
 
             drawers.append(
                 {
-                    "id": drawer.get("id"),
+                    "id": drawer_id,
                     "name": drawer.get("name"),
-                    "order": drawer.get("order"),
+                    "order": _safe_order(drawer.get("order")),
                     "admin_only": admin_only,
                     "pages": pages,
                 }
             )
+        drawers = sorted(
+            drawers,
+            key=lambda d: (_safe_order(d.get("order")), str(d.get("name") or d.get("id") or "")),
+        )
+        diagnostics["contract_mismatch_routes"] = sorted(mismatch_routes)
 
         return jsonify(
             {
                 "drawers": drawers,
                 "is_admin": admin,
                 "admin_user": admin_user_payload,
+                "admin_links": {
+                    "login": f"/admin/login?next={url_for('portal_shell_page')}",
+                    "logout": "/admin/logout" if admin else None,
+                    "pages": "/admin/pages" if admin else None,
+                    "performance": "/admin/performance" if admin else None,
+                },
+                "diagnostics": diagnostics,
                 "portal_spa_enabled": bool(app.config.get("PORTAL_SPA_ENABLED", False)),
             }
         )

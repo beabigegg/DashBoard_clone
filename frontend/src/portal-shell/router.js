@@ -1,17 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
-import PageBridgeView from './views/PageBridgeView.vue';
+import NativeRouteView from './views/NativeRouteView.vue';
 import ShellHomeView from './views/ShellHomeView.vue';
+import { buildDynamicNavigationState } from './navigationState.js';
+import { normalizeRoutePath } from './routeContracts.js';
 
 let allowedRoutePaths = new Set(['/']);
 let dynamicRouteNames = [];
+let pendingNavigationNotice = '';
+let navigationSynced = false;
 
 function toShellPath(route) {
-  const normalized = String(route || '').trim();
-  if (!normalized || normalized === '/') {
-    return '/';
-  }
-  return `/${normalized.replace(/^\/+/, '')}`;
+  return normalizeRoutePath(route);
 }
 
 export const router = createRouter({
@@ -26,7 +26,8 @@ export const router = createRouter({
     {
       path: '/:pathMatch(.*)*',
       name: 'shell-fallback',
-      redirect: '/'
+      component: ShellHomeView,
+      meta: { title: 'MES 報表入口' },
     }
   ],
   scrollBehavior() {
@@ -34,7 +35,10 @@ export const router = createRouter({
   }
 });
 
-export function syncNavigationRoutes(drawers) {
+export function syncNavigationRoutes(
+  drawers,
+  { isAdmin = false, includeStandaloneDrilldown = false } = {},
+) {
   dynamicRouteNames.forEach((name) => {
     if (router.hasRoute(name)) {
       router.removeRoute(name);
@@ -42,44 +46,49 @@ export function syncNavigationRoutes(drawers) {
   });
   dynamicRouteNames = [];
 
-  const nextAllowed = new Set(['/']);
-  let index = 0;
+  const state = buildDynamicNavigationState(drawers, { isAdmin, includeStandaloneDrilldown });
 
-  (drawers || []).forEach((drawer) => {
-    (drawer.pages || []).forEach((page) => {
-      const shellPath = toShellPath(page.route);
-      if (shellPath === '/') {
-        return;
-      }
-
-      const routeName = `shell-page-${index++}`;
-      router.addRoute({
-        path: shellPath,
-        name: routeName,
-        component: PageBridgeView,
-        props: {
-          targetRoute: page.route,
-          pageName: page.name || page.route,
-          drawerName: drawer.name || drawer.id || ''
-        },
-        meta: {
-          title: page.name || page.route,
-          drawerName: drawer.name || drawer.id || '',
-          targetRoute: page.route,
-        }
-      });
-
-      dynamicRouteNames.push(routeName);
-      nextAllowed.add(shellPath);
+  state.dynamicRoutes.forEach((entry) => {
+    router.addRoute({
+      path: toShellPath(entry.shellPath),
+      name: entry.routeName,
+      component: NativeRouteView,
+      props: {
+        targetRoute: entry.targetRoute,
+        pageName: entry.pageName,
+        drawerName: entry.drawerName,
+        owner: entry.owner,
+      },
+      meta: {
+        title: entry.pageName,
+        drawerName: entry.drawerName,
+        targetRoute: entry.targetRoute,
+        renderMode: entry.renderMode,
+        routeId: entry.routeId,
+      },
     });
+    dynamicRouteNames.push(entry.routeName);
   });
 
-  allowedRoutePaths = nextAllowed;
+  allowedRoutePaths = new Set(state.allowedPaths);
+  navigationSynced = true;
+  return state;
+}
+
+export function consumeNavigationNotice() {
+  const notice = pendingNavigationNotice;
+  pendingNavigationNotice = '';
+  return notice;
 }
 
 router.beforeEach((to) => {
+  if (!navigationSynced) {
+    return true;
+  }
+
   if (to.path === '/' || allowedRoutePaths.has(to.path)) {
     return true;
   }
+  pendingNavigationNotice = `路由 ${to.path} 不在可用清單，已返回首頁。`;
   return { path: '/' };
 });

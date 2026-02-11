@@ -1,0 +1,86 @@
+{
+  "generated_at": "2026-02-11T16:10:00+08:00",
+  "description": "Wave B rewrite entry criteria gates. Native cutover is blocked unless per-page criteria are complete.",
+  "pages": {
+    "/job-query": {
+      "owner": "frontend-mes-reporting",
+      "required_smoke_checks": [
+        "JOB-NATIVE-SMOKE-01",
+        "JOB-NATIVE-SMOKE-02",
+        "JOB-NATIVE-SMOKE-03"
+      ],
+      "required_parity_checks": [
+        "table-columns-and-sort",
+        "query-parameter-semantics",
+        "export-content-contract"
+      ],
+      "evidence": {
+        "smoke": "pass",
+        "parity": "pass",
+        "telemetry": "pass"
+      },
+      "native_cutover_ready": true,
+      "block_reason": ""
+    },
+    "/excel-query": {
+      "owner": "frontend-mes-reporting",
+      "required_smoke_checks": [
+        "EXCEL-NATIVE-SMOKE-01",
+        "EXCEL-NATIVE-SMOKE-02",
+        "EXCEL-NATIVE-SMOKE-03"
+      ],
+      "required_parity_checks": [
+        "upload-parse-contract",
+        "query-result-schema",
+        "export-content-contract"
+      ],
+      "evidence": {
+        "smoke": "pass",
+        "parity": "pass",
+        "telemetry": "pass"
+      },
+      "native_cutover_ready": true,
+      "block_reason": ""
+    },
+    "/query-tool": {
+      "owner": "frontend-mes-reporting",
+      "required_smoke_checks": [
+        "QTOOL-NATIVE-SMOKE-01",
+        "QTOOL-NATIVE-SMOKE-02",
+        "QTOOL-NATIVE-SMOKE-03"
+      ],
+      "required_parity_checks": [
+        "resolve-history-association-contract",
+        "date-range-validation",
+        "state-continuity"
+      ],
+      "evidence": {
+        "smoke": "pass",
+        "parity": "pass",
+        "telemetry": "pass"
+      },
+      "native_cutover_ready": true,
+      "block_reason": ""
+    },
+    "/tmtt-defect": {
+      "owner": "frontend-mes-reporting",
+      "required_smoke_checks": [
+        "TMTT-NATIVE-SMOKE-01",
+        "TMTT-NATIVE-SMOKE-02",
+        "TMTT-NATIVE-SMOKE-03"
+      ],
+      "required_parity_checks": [
+        "range-query-contract",
+        "chart-detail-linkage",
+        "csv-export-contract"
+      ],
+      "evidence": {
+        "smoke": "pass",
+        "parity": "pass",
+        "telemetry": "pass"
+      },
+      "native_cutover_ready": true,
+      "block_reason": ""
+    }
+  }
+}

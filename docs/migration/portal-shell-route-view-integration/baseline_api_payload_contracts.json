@@ -1,0 +1,85 @@
+{
+  "generated_at": "2026-02-11T07:44:03+00:00",
+  "source": "frontend API contracts observed in report modules",
+  "apis": {
+    "/api/wip/overview/summary": {
+      "required_keys": [
+        "dataUpdateDate",
+        "runLots",
+        "queueLots",
+        "holdLots"
+      ],
+      "notes": "WIP summary cards"
+    },
+    "/api/wip/overview/matrix": {
+      "required_keys": [
+        "workcenters",
+        "packages",
+        "matrix",
+        "workcenter_totals"
+      ],
+      "notes": "WIP matrix table"
+    },
+    "/api/wip/hold-detail/summary": {
+      "required_keys": [
+        "workcenterCount",
+        "packageCount",
+        "lotCount"
+      ],
+      "notes": "Hold detail KPI cards"
+    },
+    "/api/hold-overview/matrix": {
+      "required_keys": [
+        "rows",
+        "totals"
+      ],
+      "notes": "Hold overview matrix interaction"
+    },
+    "/api/hold-history/list": {
+      "required_keys": [
+        "rows",
+        "summary"
+      ],
+      "notes": "Hold history table and summary sync"
+    },
+    "/api/resource/status": {
+      "required_keys": [
+        "rows",
+        "summary"
+      ],
+      "notes": "Realtime resource status table"
+    },
+    "/api/resource/history/summary": {
+      "required_keys": [
+        "kpi",
+        "trend",
+        "heatmap",
+        "workcenter_comparison"
+      ],
+      "notes": "Resource history charts"
+    },
+    "/api/resource/history/detail": {
+      "required_keys": [
+        "data"
+      ],
+      "notes": "Resource history detail table"
+    },
+    "/api/qc-gate/summary": {
+      "required_keys": [
+        "summary",
+        "table",
+        "pareto"
+      ],
+      "notes": "QC-GATE chart/table linked view"
+    },
+    "/api/tmtt-defect/analysis": {
+      "required_keys": [
+        "kpi",
+        "pareto",
+        "trend",
+        "detail"
+      ],
+      "notes": "TMTT chart/table analysis payload"
+    }
+  }
+}

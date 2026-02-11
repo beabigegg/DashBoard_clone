@@ -1,23 +1,28 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 import HealthStatus from './components/HealthStatus.vue';
-import { syncNavigationRoutes } from './router.js';
+import { consumeNavigationNotice, syncNavigationRoutes } from './router.js';
+import { normalizeRoutePath } from './routeContracts.js';
 
 const route = useRoute();
+const router = useRouter();
 const loading = ref(true);
 const errorMessage = ref('');
 const drawers = ref([]);
 const isAdmin = ref(false);
 const adminUser = ref(null);
+const navigationNotice = ref('');
+const adminLinks = ref({
+  login: '/admin/login?next=%2Fportal-shell',
+  logout: '/admin/logout',
+  pages: '/admin/pages',
+  performance: '/admin/performance',
+});
 
 function toShellPath(targetRoute) {
-  const normalized = String(targetRoute || '').trim();
-  if (!normalized || normalized === '/') {
-    return '/';
-  }
-  return `/${normalized.replace(/^\/+/, '')}`;
+  return normalizeRoutePath(targetRoute);
 }
 
 const breadcrumb = computed(() => {
@@ -34,7 +39,12 @@ const adminDisplayName = computed(() => {
   return adminUser.value.displayName || adminUser.value.username || '';
 });
 
-const adminLoginHref = computed(() => `/admin/login?next=${encodeURIComponent('/portal-shell')}`);
+const adminLoginHref = computed(() => {
+  if (adminLinks.value?.login) {
+    return adminLinks.value.login;
+  }
+  return `/admin/login?next=${encodeURIComponent('/portal-shell')}`;
+});
 
 async function loadNavigation() {
   loading.value = true;
@@ -46,15 +56,54 @@ async function loadNavigation() {
       throw new Error(`Navigation API error: ${response.status}`);
     }
     const payload = await response.json();
-    drawers.value = Array.isArray(payload.drawers) ? payload.drawers : [];
     isAdmin.value = Boolean(payload.is_admin);
     adminUser.value = payload.admin_user || null;
-    syncNavigationRoutes(drawers.value);
+    adminLinks.value = payload.admin_links || adminLinks.value;
+    const state = syncNavigationRoutes(payload.drawers, {
+      isAdmin: isAdmin.value,
+      includeStandaloneDrilldown: true,
+    });
+    drawers.value = state.drawers;
+
+    if (route.name === 'shell-fallback') {
+      if (state.allowedPaths.includes(route.path)) {
+        await router.replace(route.fullPath);
+      } else {
+        navigationNotice.value = `路由 ${route.path} 不在可用清單，已返回首頁。`;
+        await router.replace('/');
+      }
+    }
+
+    if (route.path === '/') {
+      const firstRoute = state?.drawers?.[0]?.pages?.[0]?.route;
+      const defaultShellPath = firstRoute ? normalizeRoutePath(firstRoute) : '/';
+      if (defaultShellPath !== '/') {
+        await router.replace(defaultShellPath);
+      }
+    }
+
+    const backendMismatches = Array.isArray(payload?.diagnostics?.contract_mismatch_routes)
+      ? payload.diagnostics.contract_mismatch_routes
+      : [];
+
+    if (backendMismatches.length > 0) {
+      navigationNotice.value = `後端導覽含未納管路由：${backendMismatches.join(', ')}`;
+    } else if (state.diagnostics.missingContractRoutes.length > 0) {
+      navigationNotice.value = `部分導覽項目缺少 route contract：${state.diagnostics.missingContractRoutes.join(', ')}`;
+    } else {
+      navigationNotice.value = '';
+    }
   } catch (error) {
     errorMessage.value = error?.message || '無法載入導覽資料';
     drawers.value = [];
     isAdmin.value = false;
     adminUser.value = null;
+    adminLinks.value = {
+      login: `/admin/login?next=${encodeURIComponent('/portal-shell')}`,
+      logout: '/admin/logout',
+      pages: '/admin/pages',
+      performance: '/admin/performance',
+    };
     syncNavigationRoutes([]);
   } finally {
     loading.value = false;
@@ -64,22 +113,29 @@ async function loadNavigation() {
 onMounted(() => {
   void loadNavigation();
 });
+
+watch(
+  () => route.fullPath,
+  () => {
+    navigationNotice.value = consumeNavigationNotice();
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
   <div class="shell">
     <header class="shell-header">
       <div>
-        <h1>MES 報表入口 (SPA Shell)</h1>
-        <p>No-iframe 路由導覽（遷移完成）</p>
+        <h1>MES 報表入口</h1>
       </div>
       <div class="shell-header-right">
         <HealthStatus />
         <div class="admin-entry">
           <template v-if="isAdmin">
-            <a class="admin-link" href="/admin/pages">管理後台</a>
+            <a v-if="adminLinks?.pages" class="admin-link" :href="adminLinks.pages">管理後台</a>
             <span v-if="adminDisplayName" class="admin-name">{{ adminDisplayName }}</span>
-            <a class="admin-link" href="/admin/logout">登出</a>
+            <a v-if="adminLinks?.logout" class="admin-link" :href="adminLinks.logout">登出</a>
           </template>
           <template v-else>
             <a class="admin-link" :href="adminLoginHref">管理員登入</a>
@@ -109,16 +165,13 @@ onMounted(() => {
       </aside>
 
       <section class="content">
+        <div v-if="navigationNotice" class="notice-banner">{{ navigationNotice }}</div>
         <div class="breadcrumb">
           <span v-if="breadcrumb.drawerName">{{ breadcrumb.drawerName }}</span>
           <span v-if="breadcrumb.drawerName">/</span>
           <span>{{ breadcrumb.title }}</span>
         </div>
-        <RouterView v-slot="{ Component, route: currentRoute }">
-          <Transition name="route-fade" mode="out-in">
-            <component :is="Component" :key="currentRoute.fullPath" />
-          </Transition>
-        </RouterView>
+        <RouterView />
       </section>
     </main>
   </div>

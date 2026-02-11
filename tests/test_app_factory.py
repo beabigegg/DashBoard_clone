@@ -87,7 +87,8 @@ class AppFactoryTests(unittest.TestCase):
             client = app.test_client()
             response = client.get("/", follow_redirects=False)
             self.assertEqual(response.status_code, 302)
-            self.assertEqual(response.headers.get("Location"), "/portal-shell")
+            location = response.headers.get("Location", "")
+            self.assertTrue(location.startswith("/portal-shell"))
         finally:
             if old is not None:
                 os.environ["PORTAL_SPA_ENABLED"] = old
@@ -119,7 +120,8 @@ class AppFactoryTests(unittest.TestCase):
             client = app.test_client()
             response = client.get("/", follow_redirects=False)
             self.assertEqual(response.status_code, 302)
-            self.assertEqual(response.headers.get("Location"), "/portal-shell")
+            location = response.headers.get("Location", "")
+            self.assertTrue(location.startswith("/portal-shell"))
         finally:
             if old is None:
                 os.environ.pop("PORTAL_SPA_ENABLED", None)

@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
 import { buildResourceKpiFromHours } from '../core/compute.js';
+import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
 import ComparisonChart from './components/ComparisonChart.vue';
 import DetailSection from './components/DetailSection.vue';
@@ -123,6 +124,43 @@ function buildQueryString() {
   return params.toString();
 }
 
+function readArrayParam(params, key) {
+  const repeated = params.getAll(key).map((value) => String(value || '').trim()).filter(Boolean);
+  if (repeated.length > 0) {
+    return repeated;
+  }
+  return String(params.get(key) || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function readBooleanParam(params, key) {
+  const value = String(params.get(key) || '').trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes';
+}
+
+function readInitialFiltersFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    startDate: String(params.get('start_date') || '').trim(),
+    endDate: String(params.get('end_date') || '').trim(),
+    granularity: String(params.get('granularity') || '').trim(),
+    workcenterGroups: readArrayParam(params, 'workcenter_groups'),
+    families: readArrayParam(params, 'families'),
+    machines: readArrayParam(params, 'resource_ids'),
+    isProduction: readBooleanParam(params, 'is_production'),
+    isKey: readBooleanParam(params, 'is_key'),
+    isMonitor: readBooleanParam(params, 'is_monitor'),
+  };
+}
+
+function updateUrlState() {
+  const queryString = buildQueryString();
+  const nextUrl = queryString ? `/resource-history?${queryString}` : '/resource-history';
+  replaceRuntimeHistory(nextUrl);
+}
+
 function validateDateRange() {
   if (!filters.startDate || !filters.endDate) {
     return '請先設定開始與結束日期';
@@ -186,6 +224,7 @@ function pruneInvalidMachines() {
 }
 
 async function executeQuery() {
+  updateUrlState();
   const validationError = validateDateRange();
   if (validationError) {
     queryError.value = validationError;
@@ -267,6 +306,7 @@ function updateFilters(nextFilters) {
   if (upstreamChanged) {
     pruneInvalidMachines();
   }
+  updateUrlState();
 }
 
 function handleToggleRow(rowId) {
@@ -298,11 +338,36 @@ function exportCsv() {
 
 async function initPage() {
   setDefaultDates();
+  const initial = readInitialFiltersFromUrl();
+  if (initial.startDate) {
+    filters.startDate = initial.startDate;
+  }
+  if (initial.endDate) {
+    filters.endDate = initial.endDate;
+  }
+  if (initial.granularity) {
+    filters.granularity = initial.granularity;
+  }
+  if (initial.workcenterGroups.length > 0) {
+    filters.workcenterGroups = initial.workcenterGroups;
+  }
+  if (initial.families.length > 0) {
+    filters.families = initial.families;
+  }
+  if (initial.machines.length > 0) {
+    filters.machines = initial.machines;
+  }
+  filters.isProduction = initial.isProduction;
+  filters.isKey = initial.isKey;
+  filters.isMonitor = initial.isMonitor;
+
   try {
     await loadOptions();
+    pruneInvalidMachines();
   } catch (error) {
     queryError.value = error?.message || '載入篩選選項失敗';
   }
+  updateUrlState();
   await executeQuery();
 }
 

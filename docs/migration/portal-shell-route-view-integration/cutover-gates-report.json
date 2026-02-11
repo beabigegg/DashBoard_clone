@@ -1,0 +1,84 @@
+{
+  "generated_at": "2026-02-11T17:48:00+08:00",
+  "change": "portal-shell-route-view-integration",
+  "release_blocked": false,
+  "policy": {
+    "block_on_any_failed_gate": true,
+    "block_on_incomplete_smoke_evidence": true,
+    "block_on_critical_parity_failure": true
+  },
+  "gates": [
+    {
+      "id": "G1",
+      "name": "route_availability",
+      "status": "pass",
+      "block_on_fail": true,
+      "sources": [
+        "tests/test_portal_shell_routes.py",
+        "tests/test_cutover_gates.py"
+      ]
+    },
+    {
+      "id": "G2",
+      "name": "drawer_parity_and_admin_visibility",
+      "status": "pass",
+      "block_on_fail": true,
+      "sources": [
+        "tests/test_portal_shell_routes.py",
+        "tests/test_route_view_migration_baseline.py"
+      ]
+    },
+    {
+      "id": "G3",
+      "name": "smoke_evidence_completeness",
+      "status": "pass",
+      "block_on_fail": true,
+      "sources": [
+        "docs/migration/portal-shell-route-view-integration/wave-a-smoke-evidence.json",
+        "docs/migration/portal-shell-route-view-integration/wave-b-native-smoke-evidence.json",
+        "tests/test_cutover_gates.py"
+      ]
+    },
+    {
+      "id": "G4",
+      "name": "no_iframe_shell_content",
+      "status": "pass",
+      "block_on_fail": true,
+      "sources": [
+        "frontend/tests/portal-shell-no-iframe.test.js",
+        "tests/stress/test_frontend_stress.py"
+      ]
+    },
+    {
+      "id": "G5",
+      "name": "route_query_compatibility",
+      "status": "pass",
+      "block_on_fail": true,
+      "sources": [
+        "frontend/tests/portal-shell-route-query-compat.test.js",
+        "tests/test_wip_hold_pages_integration.py"
+      ]
+    },
+    {
+      "id": "G6",
+      "name": "table_chart_filter_interaction_matrix_parity",
+      "status": "pass",
+      "block_on_fail": true,
+      "sources": [
+        "docs/migration/portal-shell-route-view-integration/wave-b-parity-evidence.json",
+        "frontend/tests/portal-shell-parity-table-chart-matrix.test.js"
+      ]
+    },
+    {
+      "id": "G7",
+      "name": "rollback_and_kill_switch_readiness",
+      "status": "pass",
+      "block_on_fail": true,
+      "sources": [
+        "docs/migration/portal-shell-route-view-integration/rollback-rehearsal-shell-route-view.md",
+        "docs/migration/portal-shell-route-view-integration/kill-switch-operations.md",
+        "tests/test_cutover_gates.py"
+      ]
+    }
+  ]
+}

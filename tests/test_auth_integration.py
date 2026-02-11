@@ -415,26 +415,29 @@ class TestAdminAPI:
 
 
 class TestContextProcessor:
-    """Tests for template context processor."""
+    """Tests for SPA shell auth context surface."""
 
     def test_is_admin_in_context_when_logged_in(self, client):
-        """Test is_admin is True in context when logged in."""
+        """Test navigation API exposes admin context when logged in."""
         with client.session_transaction() as sess:
             sess["admin"] = {"username": "admin", "displayName": "Admin"}
 
-        response = client.get("/")
-        content = response.data.decode("utf-8")
-
-        # Should show admin-related content (logout link, etc.)
-        assert "登出" in content or "logout" in content.lower() or "Admin" in content
+        response = client.get("/api/portal/navigation")
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["is_admin"] is True
+        assert payload["admin_user"]["username"] == "admin"
+        assert payload["admin_links"]["logout"] == "/admin/logout"
 
     def test_is_admin_in_context_when_not_logged_in(self, client):
-        """Test is_admin is False in context when not logged in."""
-        response = client.get("/")
-        content = response.data.decode("utf-8")
-
-        # Should show login link, not logout
-        assert "管理員登入" in content or "login" in content.lower()
+        """Test navigation API hides admin context when not logged in."""
+        response = client.get("/api/portal/navigation")
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["is_admin"] is False
+        assert payload["admin_user"] is None
+        assert payload["admin_links"]["logout"] is None
+        assert payload["admin_links"]["login"].startswith("/admin/login?next=")
 
 
 if __name__ == "__main__":

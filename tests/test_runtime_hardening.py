@@ -154,7 +154,7 @@ def test_health_reports_pool_saturation_degraded_reason(
 
 def test_security_headers_applied_globally(testing_app_factory):
     app = testing_app_factory(csrf_enabled=False)
-    response = app.test_client().get("/")
+    response = app.test_client().get("/", follow_redirects=True)
 
     assert response.status_code == 200
     assert "Content-Security-Policy" in response.headers
@@ -175,7 +175,7 @@ def test_hsts_header_enabled_in_production(monkeypatch):
 
     app = create_app("production")
     app.config["TESTING"] = True
-    response = app.test_client().get("/")
+    response = app.test_client().get("/", follow_redirects=True)
 
     assert response.status_code == 200
     assert "Strict-Transport-Security" in response.headers

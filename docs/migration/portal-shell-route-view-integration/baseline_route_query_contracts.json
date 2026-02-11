@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-02-11T07:44:03+00:00",
+  "routes": {
+    "/wip-overview": {
+      "query_keys": [
+        "workorder",
+        "lotid",
+        "package",
+        "type",
+        "status"
+      ],
+      "render_mode": "native",
+      "notes": "filter URL sync + status drill-down to detail"
+    },
+    "/wip-detail": {
+      "query_keys": [
+        "workcenter",
+        "workorder",
+        "lotid",
+        "package",
+        "type",
+        "status"
+      ],
+      "render_mode": "native",
+      "notes": "workcenter deep-link + list/detail continuity"
+    },
+    "/hold-overview": {
+      "query_keys": [],
+      "render_mode": "native",
+      "notes": "summary/matrix/lot interactions must remain stable"
+    },
+    "/hold-detail": {
+      "query_keys": [
+        "reason"
+      ],
+      "render_mode": "native",
+      "notes": "requires reason; missing reason redirects"
+    },
+    "/hold-history": {
+      "query_keys": [],
+      "render_mode": "native",
+      "notes": "trend/pareto/duration/table interactions"
+    },
+    "/resource": {
+      "query_keys": [],
+      "render_mode": "native",
+      "notes": "status summary + table filtering semantics"
+    },
+    "/resource-history": {
+      "query_keys": [
+        "start_date",
+        "end_date",
+        "granularity",
+        "workcenter_groups",
+        "families",
+        "resource_ids",
+        "is_production",
+        "is_key",
+        "is_monitor"
+      ],
+      "render_mode": "native",
+      "notes": "date/granularity/group/family/resource/flags contract"
+    },
+    "/qc-gate": {
+      "query_keys": [],
+      "render_mode": "native",
+      "notes": "chart-table linked filtering parity"
+    },
+    "/job-query": {
+      "query_keys": [],
+      "render_mode": "native",
+      "notes": "resource/date query + txn detail + export"
+    },
+    "/excel-query": {
+      "query_keys": [],
+      "render_mode": "native",
+      "notes": "upload/detect/query/export workflow"
+    },
+    "/query-tool": {
+      "query_keys": [],
+      "render_mode": "native",
+      "notes": "resolve/history/associations/equipment-period workflows"
+    },
+    "/tmtt-defect": {
+      "query_keys": [],
+      "render_mode": "native",
+      "notes": "analysis + chart interactions + CSV export"
+    }
+  }
+}

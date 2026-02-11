@@ -1,0 +1,178 @@
+{
+  "generated_at": "2026-02-11T07:44:03+00:00",
+  "source": "data/page_status.json",
+  "admin": [
+    {
+      "id": "reports",
+      "name": "即時報表",
+      "order": 1,
+      "admin_only": false,
+      "pages": [
+        {
+          "route": "/wip-overview",
+          "name": "WIP 即時概況",
+          "status": "released",
+          "order": 1
+        },
+        {
+          "route": "/hold-overview",
+          "name": "Hold 即時概況",
+          "status": "dev",
+          "order": 2
+        },
+        {
+          "route": "/resource",
+          "name": "設備即時概況",
+          "status": "released",
+          "order": 4
+        },
+        {
+          "route": "/qc-gate",
+          "name": "QC-GATE 狀態",
+          "status": "released",
+          "order": 6
+        }
+      ]
+    },
+    {
+      "id": "drawer-2",
+      "name": "歷史報表",
+      "order": 2,
+      "admin_only": false,
+      "pages": [
+        {
+          "route": "/hold-history",
+          "name": "Hold 歷史績效",
+          "status": "dev",
+          "order": 3
+        },
+        {
+          "route": "/resource-history",
+          "name": "設備歷史績效",
+          "status": "released",
+          "order": 5
+        }
+      ]
+    },
+    {
+      "id": "drawer",
+      "name": "查詢工具",
+      "order": 3,
+      "admin_only": false,
+      "pages": [
+        {
+          "route": "/job-query",
+          "name": "設備維修查詢",
+          "status": "released",
+          "order": 3
+        }
+      ]
+    },
+    {
+      "id": "dev-tools",
+      "name": "開發工具",
+      "order": 4,
+      "admin_only": true,
+      "pages": [
+        {
+          "route": "/tables",
+          "name": "表格總覽",
+          "status": "dev",
+          "order": 1
+        },
+        {
+          "route": "/admin/pages",
+          "name": "頁面管理",
+          "status": "dev",
+          "order": 1
+        },
+        {
+          "route": "/excel-query",
+          "name": "Excel 批次查詢",
+          "status": "dev",
+          "order": 2
+        },
+        {
+          "route": "/admin/performance",
+          "name": "效能監控",
+          "status": "dev",
+          "order": 2
+        },
+        {
+          "route": "/query-tool",
+          "name": "批次追蹤工具",
+          "status": "dev",
+          "order": 4
+        },
+        {
+          "route": "/tmtt-defect",
+          "name": "TMTT印字腳型不良分析",
+          "status": "released",
+          "order": 5
+        },
+        {
+          "route": "/mid-section-defect",
+          "name": "中段製程不良追溯",
+          "status": "dev",
+          "order": 6
+        }
+      ]
+    }
+  ],
+  "non_admin": [
+    {
+      "id": "reports",
+      "name": "即時報表",
+      "order": 1,
+      "admin_only": false,
+      "pages": [
+        {
+          "route": "/wip-overview",
+          "name": "WIP 即時概況",
+          "status": "released",
+          "order": 1
+        },
+        {
+          "route": "/resource",
+          "name": "設備即時概況",
+          "status": "released",
+          "order": 4
+        },
+        {
+          "route": "/qc-gate",
+          "name": "QC-GATE 狀態",
+          "status": "released",
+          "order": 6
+        }
+      ]
+    },
+    {
+      "id": "drawer-2",
+      "name": "歷史報表",
+      "order": 2,
+      "admin_only": false,
+      "pages": [
+        {
+          "route": "/resource-history",
+          "name": "設備歷史績效",
+          "status": "released",
+          "order": 5
+        }
+      ]
+    },
+    {
+      "id": "drawer",
+      "name": "查詢工具",
+      "order": 3,
+      "admin_only": false,
+      "pages": [
+        {
+          "route": "/job-query",
+          "name": "設備維修查詢",
+          "status": "released",
+          "order": 3
+        }
+      ]
+    }
+  ]
+}

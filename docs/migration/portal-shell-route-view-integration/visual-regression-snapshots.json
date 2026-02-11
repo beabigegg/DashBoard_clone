@@ -1,0 +1,72 @@
+{
+  "generated_at": "2026-02-11T17:49:00+08:00",
+  "description": "Critical visual-state snapshots for chart/table/matrix routes.",
+  "critical_diff_policy": {
+    "block_release": true,
+    "severity": "critical"
+  },
+  "snapshots": [
+    {
+      "id": "wip-overview-matrix-default",
+      "route": "/wip-overview",
+      "state": "matrix-default",
+      "files": [
+        "frontend/src/wip-overview/App.vue",
+        "frontend/src/wip-overview/components/MatrixTable.vue",
+        "frontend/src/wip-overview/components/ParetoSection.vue",
+        "frontend/src/wip-overview/style.css"
+      ],
+      "fingerprint": "2f1710ac75c5253bc4057bec7ce3b036089d12bc2abead8cf82d39c498dce961"
+    },
+    {
+      "id": "hold-overview-matrix-selected",
+      "route": "/hold-overview",
+      "state": "matrix-selected",
+      "files": [
+        "frontend/src/hold-overview/App.vue",
+        "frontend/src/hold-overview/components/HoldMatrix.vue",
+        "frontend/src/hold-overview/style.css"
+      ],
+      "fingerprint": "5d42352bfb3de23e2ea5638285b69e2fc8adf6f69d61989f0280739b58fedf4d"
+    },
+    {
+      "id": "qc-gate-chart-table-linked",
+      "route": "/qc-gate",
+      "state": "chart-table-linked",
+      "files": [
+        "frontend/src/qc-gate/App.vue",
+        "frontend/src/qc-gate/components/LotTable.vue",
+        "frontend/src/qc-gate/components/QcGateChart.vue",
+        "frontend/src/qc-gate/style.css"
+      ],
+      "fingerprint": "2d283febab9142f042a7961aef93201a9d75f43c248cdd40b6b4530101b29619"
+    },
+    {
+      "id": "resource-history-chart-detail",
+      "route": "/resource-history",
+      "state": "chart-detail-sync",
+      "files": [
+        "frontend/src/resource-history/App.vue",
+        "frontend/src/resource-history/components/TrendChart.vue",
+        "frontend/src/resource-history/components/StackedChart.vue",
+        "frontend/src/resource-history/components/HeatmapChart.vue",
+        "frontend/src/resource-history/components/DetailSection.vue",
+        "frontend/src/resource-history/style.css"
+      ],
+      "fingerprint": "ec5560c3fd233de9d3a31928965e2c71c2e878cb203076e4b45ef149c46a5387"
+    },
+    {
+      "id": "tmtt-defect-pareto-detail",
+      "route": "/tmtt-defect",
+      "state": "pareto-detail-filtered",
+      "files": [
+        "frontend/src/tmtt-defect/App.vue",
+        "frontend/src/tmtt-defect/components/TmttChartCard.vue",
+        "frontend/src/tmtt-defect/components/TmttDetailTable.vue",
+        "frontend/src/tmtt-defect/components/TmttKpiCards.vue",
+        "frontend/src/tmtt-defect/style.css"
+      ],
+      "fingerprint": "59059868a9f61a20160d2acc8602ee9aa1a494ec0fdb6a816ee98028517451e8"
+    }
+  ]
+}

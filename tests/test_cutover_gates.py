@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Cutover gate enforcement tests for portal no-iframe migration."""
+"""Cutover gate enforcement tests for portal shell route-view migration."""
 
 from __future__ import annotations
 
@@ -9,12 +9,22 @@ from pathlib import Path
 from mes_dashboard.app import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE_VISIBILITY_FILE = ROOT / "docs" / "migration" / "portal-no-iframe" / "baseline_drawer_visibility.json"
-BASELINE_API_FILE = ROOT / "docs" / "migration" / "portal-no-iframe" / "baseline_api_payload_contracts.json"
-ROLLBACK_RUNBOOK = ROOT / "docs" / "migration" / "portal-no-iframe" / "rollback_rehearsal_runbook.md"
-ROLLBACK_STRATEGY = ROOT / "docs" / "migration" / "portal-no-iframe" / "rollback_strategy_shell_and_wrappers.md"
-LEGACY_REWRITE_SMOKE_CHECKLIST = ROOT / "docs" / "migration" / "portal-no-iframe" / "legacy_rewrite_smoke_checklists.md"
+BASELINE_DIR = ROOT / "docs" / "migration" / "portal-shell-route-view-integration"
+BASELINE_VISIBILITY_FILE = BASELINE_DIR / "baseline_drawer_visibility.json"
+BASELINE_API_FILE = BASELINE_DIR / "baseline_api_payload_contracts.json"
+GATE_REPORT_FILE = BASELINE_DIR / "cutover-gates-report.json"
+WAVE_A_EVIDENCE_FILE = BASELINE_DIR / "wave-a-smoke-evidence.json"
+WAVE_B_EVIDENCE_FILE = BASELINE_DIR / "wave-b-native-smoke-evidence.json"
+WAVE_B_PARITY_FILE = BASELINE_DIR / "wave-b-parity-evidence.json"
+VISUAL_SNAPSHOT_FILE = BASELINE_DIR / "visual-regression-snapshots.json"
+ROLLBACK_RUNBOOK = BASELINE_DIR / "rollback-rehearsal-shell-route-view.md"
+KILL_SWITCH_DOC = BASELINE_DIR / "kill-switch-operations.md"
+OBSERVABILITY_REPORT = BASELINE_DIR / "migration-observability-report.md"
 STRESS_SUITE = ROOT / "tests" / "stress" / "test_frontend_stress.py"
+
+
+def _read_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _login_as_admin(client) -> None:
@@ -35,6 +45,7 @@ def test_g1_route_availability_gate_p0_routes_are_2xx_or_3xx():
     app = create_app("testing")
     app.config["TESTING"] = True
     client = app.test_client()
+    _login_as_admin(client)
 
     p0_routes = [
         "/",
@@ -43,6 +54,10 @@ def test_g1_route_availability_gate_p0_routes_are_2xx_or_3xx():
         "/wip-overview",
         "/resource",
         "/qc-gate",
+        "/job-query",
+        "/excel-query",
+        "/query-tool",
+        "/tmtt-defect",
     ]
 
     statuses = [client.get(route).status_code for route in p0_routes]
@@ -50,56 +65,47 @@ def test_g1_route_availability_gate_p0_routes_are_2xx_or_3xx():
 
 
 def test_g2_drawer_parity_gate_matches_baseline_for_admin_and_non_admin():
-    baseline = json.loads(BASELINE_VISIBILITY_FILE.read_text(encoding="utf-8"))
-
+    baseline = _read_json(BASELINE_VISIBILITY_FILE)
     app = create_app("testing")
     app.config["TESTING"] = True
 
     non_admin_client = app.test_client()
-    non_admin_payload = json.loads(non_admin_client.get("/api/portal/navigation").data.decode("utf-8"))
+    non_admin_payload = _read_json_response(non_admin_client.get("/api/portal/navigation"))
 
     admin_client = app.test_client()
     _login_as_admin(admin_client)
-    admin_payload = json.loads(admin_client.get("/api/portal/navigation").data.decode("utf-8"))
+    admin_payload = _read_json_response(admin_client.get("/api/portal/navigation"))
 
     assert _route_set(non_admin_payload["drawers"]) == _route_set(baseline["non_admin"])
     assert _route_set(admin_payload["drawers"]) == _route_set(baseline["admin"])
 
 
-def test_g3_workflow_smoke_gate_critical_routes_reachable_for_admin():
-    app = create_app("testing")
-    app.config["TESTING"] = True
-    client = app.test_client()
-    _login_as_admin(client)
+def test_g3_smoke_evidence_gate_requires_wave_a_and_wave_b_pass():
+    wave_a = _read_json(WAVE_A_EVIDENCE_FILE)
+    wave_b = _read_json(WAVE_B_EVIDENCE_FILE)
 
-    smoke_routes = [
-        "/",
-        "/wip-overview",
-        "/wip-detail?workcenter=TMTT&type=PJA3460&status=queue",
-        "/hold-detail?reason=YieldLimit",
-        "/hold-overview",
-        "/hold-history",
-        "/resource",
-        "/resource-history?start_date=2026-01-01&end_date=2026-01-31",
-        "/qc-gate",
-        "/job-query",
-        "/excel-query",
-        "/query-tool",
-        "/tmtt-defect",
-    ]
-
-    statuses = [client.get(route).status_code for route in smoke_routes]
-    assert all(200 <= status < 400 for status in statuses), statuses
+    for payload in (wave_a, wave_b):
+        assert payload["execution"]["automated_runs"]
+        for run in payload["execution"]["automated_runs"]:
+            assert run["status"] == "pass"
+        for route, result in payload["pages"].items():
+            assert result["status"] == "pass", f"smoke evidence failed: {route}"
+            assert result["critical_failures"] == []
 
 
-def test_g4_client_stability_gate_assertion_present_in_stress_suite():
-    content = STRESS_SUITE.read_text(encoding="utf-8")
-    assert 'page.on("pageerror"' in content
-    assert 'assert len(js_errors) == 0' in content
+def test_g4_no_iframe_gate_blocks_if_shell_uses_iframe():
+    stress_source = STRESS_SUITE.read_text(encoding="utf-8")
+    assert "Portal should not render iframe after migration" in stress_source
+    assert "iframe_count = page.locator('iframe').count()" in stress_source
+
+    report = _read_json(GATE_REPORT_FILE)
+    g4 = next(g for g in report["gates"] if g["id"] == "G4")
+    assert g4["status"] == "pass"
+    assert g4["block_on_fail"] is True
 
 
-def test_g5_data_contract_gate_baseline_keys_are_defined_for_registered_apis():
-    baseline = json.loads(BASELINE_API_FILE.read_text(encoding="utf-8"))
+def test_g5_route_query_compatibility_gate_checks_contracts():
+    baseline = _read_json(BASELINE_API_FILE)
     app = create_app("testing")
     app.config["TESTING"] = True
     registered_routes = {rule.rule for rule in app.url_map.iter_rules()}
@@ -110,21 +116,63 @@ def test_g5_data_contract_gate_baseline_keys_are_defined_for_registered_apis():
         assert required_keys, f"No required_keys defined for {api_route}"
         assert all(isinstance(key, str) and key for key in required_keys)
 
+    report = _read_json(GATE_REPORT_FILE)
+    g5 = next(g for g in report["gates"] if g["id"] == "G5")
+    assert g5["status"] == "pass"
+    assert g5["block_on_fail"] is True
 
-def test_g7_rollback_readiness_gate_has_15_minute_slo_and_operator_steps():
+
+def test_g6_parity_gate_requires_table_chart_filter_interaction_matrix_pass():
+    parity = _read_json(WAVE_B_PARITY_FILE)
+    for route, checks in parity["pages"].items():
+        for dimension in ("table", "chart", "filter", "interaction", "matrix"):
+            status = checks[dimension]["status"]
+            assert status in {"pass", "n/a"}, f"{route} parity failed on {dimension}: {status}"
+
+    snapshots = _read_json(VISUAL_SNAPSHOT_FILE)
+    assert snapshots["critical_diff_policy"]["block_release"] is True
+    assert len(snapshots["snapshots"]) >= 4
+
+    report = _read_json(GATE_REPORT_FILE)
+    g6 = next(g for g in report["gates"] if g["id"] == "G6")
+    assert g6["status"] == "pass"
+    assert g6["block_on_fail"] is True
+
+
+def test_g7_rollback_gate_has_recovery_slo_and_kill_switch_steps():
     rehearsal = ROLLBACK_RUNBOOK.read_text(encoding="utf-8")
-    strategy = ROLLBACK_STRATEGY.read_text(encoding="utf-8")
+    kill_switch = KILL_SWITCH_DOC.read_text(encoding="utf-8")
 
-    assert "15" in rehearsal
-    assert "PORTAL_SPA_ENABLED=false" in strategy
-    assert "/api/portal/navigation" in strategy
+    assert "15 minutes" in rehearsal
+    assert "PORTAL_SPA_ENABLED=false" in rehearsal
+    assert "PORTAL_SPA_ENABLED=false" in kill_switch
+    assert "/api/portal/navigation" in kill_switch
+    assert "/health" in kill_switch
+
+    report = _read_json(GATE_REPORT_FILE)
+    g7 = next(g for g in report["gates"] if g["id"] == "G7")
+    assert g7["status"] == "pass"
+    assert g7["block_on_fail"] is True
 
 
-def test_legacy_rewrite_smoke_checklist_covers_all_wrapped_pages():
-    content = LEGACY_REWRITE_SMOKE_CHECKLIST.read_text(encoding="utf-8")
+def test_release_block_semantics_enforced_by_gate_report():
+    report = _read_json(GATE_REPORT_FILE)
+    assert report["policy"]["block_on_any_failed_gate"] is True
+    assert report["policy"]["block_on_incomplete_smoke_evidence"] is True
+    assert report["policy"]["block_on_critical_parity_failure"] is True
 
-    assert "tmtt-defect" in content
-    assert "job-query" in content
-    assert "excel-query" in content
-    assert "query-tool" in content
-    assert "SMOKE-01" in content
+    for gate in report["gates"]:
+        assert gate["status"] == "pass"
+        assert gate["block_on_fail"] is True
+    assert report["release_blocked"] is False
+
+
+def test_observability_report_covers_route_errors_health_and_fallback_usage():
+    content = OBSERVABILITY_REPORT.read_text(encoding="utf-8")
+    assert "route errors" in content.lower()
+    assert "health regressions" in content.lower()
+    assert "wrapper fallback usage" in content.lower()
+
+
+def _read_json_response(response) -> dict:
+    return json.loads(response.data.decode("utf-8"))

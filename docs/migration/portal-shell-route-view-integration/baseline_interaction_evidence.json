@@ -1,0 +1,706 @@
+{
+  "generated_at": "2026-02-11T07:44:03+00:00",
+  "capture_scope": [
+    "/wip-overview",
+    "/wip-detail",
+    "/hold-overview",
+    "/hold-detail",
+    "/hold-history",
+    "/resource",
+    "/resource-history",
+    "/qc-gate",
+    "/job-query",
+    "/excel-query",
+    "/query-tool",
+    "/tmtt-defect"
+  ],
+  "routes": {
+    "/wip-overview": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/wip-overview",
+      "source_files": [
+        "frontend/src/wip-overview/App.vue",
+        "frontend/src/wip-overview/components/FilterPanel.vue",
+        "frontend/src/wip-overview/components/MatrixTable.vue",
+        "frontend/src/wip-overview/components/ParetoSection.vue",
+        "frontend/src/wip-overview/components/StatusCards.vue",
+        "frontend/src/wip-overview/components/SummaryCards.vue",
+        "frontend/src/wip-overview/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/wip-overview/components/MatrixTable.vue",
+          "frontend/src/wip-overview/components/ParetoSection.vue"
+        ],
+        "has_sort_logic": false,
+        "has_pagination": false,
+        "sort_hint_files": [],
+        "pagination_hint_files": []
+      },
+      "chart": {
+        "component_files": [
+          "frontend/src/wip-overview/components/ParetoSection.vue"
+        ],
+        "has_legend_logic": true,
+        "has_tooltip_logic": true,
+        "legend_hint_files": [
+          "frontend/src/wip-overview/components/ParetoSection.vue"
+        ],
+        "tooltip_hint_files": [
+          "frontend/src/wip-overview/components/ParetoSection.vue"
+        ]
+      },
+      "filter": {
+        "required_query_keys": [
+          "workorder",
+          "lotid",
+          "package",
+          "type",
+          "status"
+        ],
+        "component_files": [
+          "frontend/src/wip-overview/App.vue",
+          "frontend/src/wip-overview/components/FilterPanel.vue",
+          "frontend/src/wip-overview/components/StatusCards.vue"
+        ]
+      },
+      "matrix": {
+        "component_files": [
+          "frontend/src/wip-overview/App.vue",
+          "frontend/src/wip-overview/components/MatrixTable.vue"
+        ],
+        "has_matrix_interaction": true
+      },
+      "api_endpoints": [
+        "/api/wip/overview/hold",
+        "/api/wip/overview/matrix",
+        "/api/wip/overview/summary"
+      ]
+    },
+    "/wip-detail": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/wip-detail",
+      "source_files": [
+        "frontend/src/wip-detail/App.vue",
+        "frontend/src/wip-detail/components/FilterPanel.vue",
+        "frontend/src/wip-detail/components/LotDetailPanel.vue",
+        "frontend/src/wip-detail/components/LotTable.vue",
+        "frontend/src/wip-detail/components/SummaryCards.vue",
+        "frontend/src/wip-detail/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/wip-detail/components/LotTable.vue"
+        ],
+        "has_sort_logic": false,
+        "has_pagination": true,
+        "sort_hint_files": [],
+        "pagination_hint_files": [
+          "frontend/src/wip-detail/App.vue",
+          "frontend/src/wip-detail/components/LotTable.vue"
+        ]
+      },
+      "chart": {
+        "component_files": [],
+        "has_legend_logic": false,
+        "has_tooltip_logic": false,
+        "legend_hint_files": [],
+        "tooltip_hint_files": []
+      },
+      "filter": {
+        "required_query_keys": [
+          "workcenter",
+          "workorder",
+          "lotid",
+          "package",
+          "type",
+          "status"
+        ],
+        "component_files": [
+          "frontend/src/wip-detail/App.vue",
+          "frontend/src/wip-detail/components/FilterPanel.vue",
+          "frontend/src/wip-detail/components/SummaryCards.vue"
+        ]
+      },
+      "matrix": {
+        "component_files": [],
+        "has_matrix_interaction": false
+      },
+      "api_endpoints": [
+        "/api/wip/detail/",
+        "/api/wip/lot/",
+        "/api/wip/meta/workcenters"
+      ]
+    },
+    "/hold-overview": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/hold-overview",
+      "source_files": [
+        "frontend/src/hold-overview/App.vue",
+        "frontend/src/hold-overview/components/FilterBar.vue",
+        "frontend/src/hold-overview/components/FilterIndicator.vue",
+        "frontend/src/hold-overview/components/HoldMatrix.vue",
+        "frontend/src/hold-overview/components/HoldTreeMap.vue",
+        "frontend/src/hold-overview/components/LotTable.vue",
+        "frontend/src/hold-overview/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/hold-overview/components/HoldMatrix.vue",
+          "frontend/src/hold-overview/components/LotTable.vue"
+        ],
+        "has_sort_logic": true,
+        "has_pagination": true,
+        "sort_hint_files": [
+          "frontend/src/hold-overview/App.vue",
+          "frontend/src/hold-overview/components/HoldTreeMap.vue"
+        ],
+        "pagination_hint_files": [
+          "frontend/src/hold-overview/App.vue",
+          "frontend/src/hold-overview/components/LotTable.vue"
+        ]
+      },
+      "chart": {
+        "component_files": [
+          "frontend/src/hold-overview/components/HoldTreeMap.vue"
+        ],
+        "has_legend_logic": true,
+        "has_tooltip_logic": true,
+        "legend_hint_files": [
+          "frontend/src/hold-overview/components/HoldTreeMap.vue"
+        ],
+        "tooltip_hint_files": [
+          "frontend/src/hold-overview/components/HoldTreeMap.vue"
+        ]
+      },
+      "filter": {
+        "required_query_keys": [],
+        "component_files": [
+          "frontend/src/hold-overview/App.vue",
+          "frontend/src/hold-overview/components/FilterBar.vue",
+          "frontend/src/hold-overview/components/FilterIndicator.vue",
+          "frontend/src/hold-overview/components/HoldMatrix.vue",
+          "frontend/src/hold-overview/components/HoldTreeMap.vue",
+          "frontend/src/hold-overview/components/LotTable.vue"
+        ]
+      },
+      "matrix": {
+        "component_files": [
+          "frontend/src/hold-overview/App.vue",
+          "frontend/src/hold-overview/components/FilterIndicator.vue",
+          "frontend/src/hold-overview/components/HoldMatrix.vue"
+        ],
+        "has_matrix_interaction": true
+      },
+      "api_endpoints": [
+        "/api/hold-overview/lots",
+        "/api/hold-overview/matrix",
+        "/api/hold-overview/summary"
+      ]
+    },
+    "/hold-detail": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/hold-detail",
+      "source_files": [
+        "frontend/src/hold-detail/App.vue",
+        "frontend/src/hold-detail/components/AgeDistribution.vue",
+        "frontend/src/hold-detail/components/DistributionTable.vue",
+        "frontend/src/hold-detail/components/LotTable.vue",
+        "frontend/src/hold-detail/components/SummaryCards.vue",
+        "frontend/src/hold-detail/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/hold-detail/components/DistributionTable.vue",
+          "frontend/src/hold-detail/components/LotTable.vue"
+        ],
+        "has_sort_logic": false,
+        "has_pagination": true,
+        "sort_hint_files": [],
+        "pagination_hint_files": [
+          "frontend/src/hold-detail/App.vue",
+          "frontend/src/hold-detail/components/LotTable.vue"
+        ]
+      },
+      "chart": {
+        "component_files": [],
+        "has_legend_logic": false,
+        "has_tooltip_logic": false,
+        "legend_hint_files": [],
+        "tooltip_hint_files": []
+      },
+      "filter": {
+        "required_query_keys": [
+          "reason"
+        ],
+        "component_files": [
+          "frontend/src/hold-detail/App.vue",
+          "frontend/src/hold-detail/components/LotTable.vue"
+        ]
+      },
+      "matrix": {
+        "component_files": [],
+        "has_matrix_interaction": false
+      },
+      "api_endpoints": [
+        "/api/wip/hold-detail/distribution",
+        "/api/wip/hold-detail/lots",
+        "/api/wip/hold-detail/summary"
+      ]
+    },
+    "/hold-history": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/hold-history",
+      "source_files": [
+        "frontend/src/hold-history/App.vue",
+        "frontend/src/hold-history/components/DailyTrend.vue",
+        "frontend/src/hold-history/components/DetailTable.vue",
+        "frontend/src/hold-history/components/DurationChart.vue",
+        "frontend/src/hold-history/components/FilterBar.vue",
+        "frontend/src/hold-history/components/FilterIndicator.vue",
+        "frontend/src/hold-history/components/ReasonPareto.vue",
+        "frontend/src/hold-history/components/RecordTypeFilter.vue",
+        "frontend/src/hold-history/components/SummaryCards.vue",
+        "frontend/src/hold-history/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/hold-history/components/DetailTable.vue"
+        ],
+        "has_sort_logic": false,
+        "has_pagination": true,
+        "sort_hint_files": [],
+        "pagination_hint_files": [
+          "frontend/src/hold-history/App.vue",
+          "frontend/src/hold-history/components/DetailTable.vue"
+        ]
+      },
+      "chart": {
+        "component_files": [
+          "frontend/src/hold-history/components/DailyTrend.vue",
+          "frontend/src/hold-history/components/DurationChart.vue",
+          "frontend/src/hold-history/components/ReasonPareto.vue"
+        ],
+        "has_legend_logic": true,
+        "has_tooltip_logic": true,
+        "legend_hint_files": [
+          "frontend/src/hold-history/components/DailyTrend.vue",
+          "frontend/src/hold-history/components/ReasonPareto.vue"
+        ],
+        "tooltip_hint_files": [
+          "frontend/src/hold-history/components/DailyTrend.vue",
+          "frontend/src/hold-history/components/DurationChart.vue",
+          "frontend/src/hold-history/components/ReasonPareto.vue"
+        ]
+      },
+      "filter": {
+        "required_query_keys": [],
+        "component_files": [
+          "frontend/src/hold-history/App.vue",
+          "frontend/src/hold-history/components/FilterBar.vue",
+          "frontend/src/hold-history/components/FilterIndicator.vue",
+          "frontend/src/hold-history/components/RecordTypeFilter.vue"
+        ]
+      },
+      "matrix": {
+        "component_files": [],
+        "has_matrix_interaction": false
+      },
+      "api_endpoints": [
+        "/api/hold-history/duration",
+        "/api/hold-history/list",
+        "/api/hold-history/reason-pareto",
+        "/api/hold-history/trend"
+      ]
+    },
+    "/resource": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/resource-status",
+      "source_files": [
+        "frontend/src/resource-status/App.vue",
+        "frontend/src/resource-status/components/EquipmentCard.vue",
+        "frontend/src/resource-status/components/EquipmentGrid.vue",
+        "frontend/src/resource-status/components/FilterBar.vue",
+        "frontend/src/resource-status/components/FloatingTooltip.vue",
+        "frontend/src/resource-status/components/MatrixSection.vue",
+        "frontend/src/resource-status/components/StatusHeader.vue",
+        "frontend/src/resource-status/components/SummaryCards.vue",
+        "frontend/src/resource-status/main.js"
+      ],
+      "table": {
+        "component_files": [],
+        "has_sort_logic": true,
+        "has_pagination": false,
+        "sort_hint_files": [
+          "frontend/src/resource-status/App.vue",
+          "frontend/src/resource-status/components/MatrixSection.vue"
+        ],
+        "pagination_hint_files": []
+      },
+      "chart": {
+        "component_files": [],
+        "has_legend_logic": false,
+        "has_tooltip_logic": true,
+        "legend_hint_files": [],
+        "tooltip_hint_files": [
+          "frontend/src/resource-status/App.vue",
+          "frontend/src/resource-status/components/FloatingTooltip.vue"
+        ]
+      },
+      "filter": {
+        "required_query_keys": [],
+        "component_files": [
+          "frontend/src/resource-status/App.vue",
+          "frontend/src/resource-status/components/EquipmentGrid.vue",
+          "frontend/src/resource-status/components/FilterBar.vue",
+          "frontend/src/resource-status/components/MatrixSection.vue"
+        ]
+      },
+      "matrix": {
+        "component_files": [
+          "frontend/src/resource-status/App.vue",
+          "frontend/src/resource-status/components/MatrixSection.vue",
+          "frontend/src/resource-status/components/SummaryCards.vue"
+        ],
+        "has_matrix_interaction": true
+      },
+      "api_endpoints": [
+        "/api/resource/status",
+        "/api/resource/status/options",
+        "/api/resource/status/summary"
+      ]
+    },
+    "/resource-history": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/resource-history",
+      "source_files": [
+        "frontend/src/resource-history/App.vue",
+        "frontend/src/resource-history/components/ComparisonChart.vue",
+        "frontend/src/resource-history/components/DetailSection.vue",
+        "frontend/src/resource-history/components/FilterBar.vue",
+        "frontend/src/resource-history/components/HeatmapChart.vue",
+        "frontend/src/resource-history/components/KpiCards.vue",
+        "frontend/src/resource-history/components/StackedChart.vue",
+        "frontend/src/resource-history/components/TrendChart.vue",
+        "frontend/src/resource-history/main.js"
+      ],
+      "table": {
+        "component_files": [],
+        "has_sort_logic": true,
+        "has_pagination": false,
+        "sort_hint_files": [
+          "frontend/src/resource-history/App.vue",
+          "frontend/src/resource-history/components/ComparisonChart.vue",
+          "frontend/src/resource-history/components/DetailSection.vue",
+          "frontend/src/resource-history/components/HeatmapChart.vue"
+        ],
+        "pagination_hint_files": []
+      },
+      "chart": {
+        "component_files": [
+          "frontend/src/resource-history/components/ComparisonChart.vue",
+          "frontend/src/resource-history/components/HeatmapChart.vue",
+          "frontend/src/resource-history/components/StackedChart.vue",
+          "frontend/src/resource-history/components/TrendChart.vue"
+        ],
+        "has_legend_logic": true,
+        "has_tooltip_logic": true,
+        "legend_hint_files": [
+          "frontend/src/resource-history/components/StackedChart.vue",
+          "frontend/src/resource-history/components/TrendChart.vue"
+        ],
+        "tooltip_hint_files": [
+          "frontend/src/resource-history/components/ComparisonChart.vue",
+          "frontend/src/resource-history/components/HeatmapChart.vue",
+          "frontend/src/resource-history/components/StackedChart.vue",
+          "frontend/src/resource-history/components/TrendChart.vue"
+        ]
+      },
+      "filter": {
+        "required_query_keys": [
+          "start_date",
+          "end_date",
+          "granularity",
+          "workcenter_groups",
+          "families",
+          "resource_ids",
+          "is_production",
+          "is_key",
+          "is_monitor"
+        ],
+        "component_files": [
+          "frontend/src/resource-history/App.vue",
+          "frontend/src/resource-history/components/FilterBar.vue"
+        ]
+      },
+      "matrix": {
+        "component_files": [
+          "frontend/src/resource-history/components/HeatmapChart.vue"
+        ],
+        "has_matrix_interaction": true
+      },
+      "api_endpoints": [
+        "/api/resource/history/detail",
+        "/api/resource/history/export",
+        "/api/resource/history/options",
+        "/api/resource/history/summary"
+      ]
+    },
+    "/qc-gate": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/qc-gate",
+      "source_files": [
+        "frontend/src/qc-gate/App.vue",
+        "frontend/src/qc-gate/components/LotTable.vue",
+        "frontend/src/qc-gate/components/QcGateChart.vue",
+        "frontend/src/qc-gate/composables/useQcGateData.js",
+        "frontend/src/qc-gate/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/qc-gate/components/LotTable.vue"
+        ],
+        "has_sort_logic": true,
+        "has_pagination": false,
+        "sort_hint_files": [
+          "frontend/src/qc-gate/components/LotTable.vue",
+          "frontend/src/qc-gate/composables/useQcGateData.js"
+        ],
+        "pagination_hint_files": []
+      },
+      "chart": {
+        "component_files": [
+          "frontend/src/qc-gate/App.vue",
+          "frontend/src/qc-gate/components/QcGateChart.vue"
+        ],
+        "has_legend_logic": true,
+        "has_tooltip_logic": true,
+        "legend_hint_files": [
+          "frontend/src/qc-gate/components/QcGateChart.vue"
+        ],
+        "tooltip_hint_files": [
+          "frontend/src/qc-gate/components/QcGateChart.vue"
+        ]
+      },
+      "filter": {
+        "required_query_keys": [],
+        "component_files": [
+          "frontend/src/qc-gate/App.vue",
+          "frontend/src/qc-gate/components/LotTable.vue",
+          "frontend/src/qc-gate/components/QcGateChart.vue",
+          "frontend/src/qc-gate/composables/useQcGateData.js"
+        ]
+      },
+      "matrix": {
+        "component_files": [],
+        "has_matrix_interaction": false
+      },
+      "api_endpoints": [
+        "/api/qc-gate/summary"
+      ]
+    },
+    "/job-query": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/job-query",
+      "source_files": [
+        "frontend/src/job-query/App.vue",
+        "frontend/src/job-query/composables/useJobQueryData.js",
+        "frontend/src/job-query/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/job-query/App.vue",
+          "frontend/src/job-query/main.js"
+        ],
+        "has_sort_logic": true,
+        "has_pagination": false,
+        "sort_hint_files": [
+          "frontend/src/job-query/main.js"
+        ],
+        "pagination_hint_files": []
+      },
+      "chart": {
+        "component_files": [],
+        "has_legend_logic": false,
+        "has_tooltip_logic": false,
+        "legend_hint_files": [],
+        "tooltip_hint_files": []
+      },
+      "filter": {
+        "required_query_keys": [],
+        "component_files": [
+          "frontend/src/job-query/App.vue",
+          "frontend/src/job-query/composables/useJobQueryData.js",
+          "frontend/src/job-query/main.js"
+        ]
+      },
+      "matrix": {
+        "component_files": [],
+        "has_matrix_interaction": false
+      },
+      "api_endpoints": [
+        "/api/job-query/export",
+        "/api/job-query/jobs",
+        "/api/job-query/resources",
+        "/api/job-query/txn/"
+      ]
+    },
+    "/excel-query": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/excel-query",
+      "source_files": [
+        "frontend/src/excel-query/App.vue",
+        "frontend/src/excel-query/composables/useExcelQueryData.js",
+        "frontend/src/excel-query/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/excel-query/App.vue",
+          "frontend/src/excel-query/main.js"
+        ],
+        "has_sort_logic": true,
+        "has_pagination": false,
+        "sort_hint_files": [
+          "frontend/src/excel-query/main.js"
+        ],
+        "pagination_hint_files": []
+      },
+      "chart": {
+        "component_files": [],
+        "has_legend_logic": false,
+        "has_tooltip_logic": false,
+        "legend_hint_files": [],
+        "tooltip_hint_files": []
+      },
+      "filter": {
+        "required_query_keys": [],
+        "component_files": [
+          "frontend/src/excel-query/App.vue",
+          "frontend/src/excel-query/composables/useExcelQueryData.js",
+          "frontend/src/excel-query/main.js"
+        ]
+      },
+      "matrix": {
+        "component_files": [],
+        "has_matrix_interaction": false
+      },
+      "api_endpoints": [
+        "/api/excel-query/column-type",
+        "/api/excel-query/column-values",
+        "/api/excel-query/execute",
+        "/api/excel-query/execute-advanced",
+        "/api/excel-query/export-csv",
+        "/api/excel-query/table-metadata",
+        "/api/excel-query/tables",
+        "/api/excel-query/upload"
+      ]
+    },
+    "/query-tool": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/query-tool",
+      "source_files": [
+        "frontend/src/query-tool/App.vue",
+        "frontend/src/query-tool/composables/useQueryToolData.js",
+        "frontend/src/query-tool/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/query-tool/App.vue",
+          "frontend/src/query-tool/main.js"
+        ],
+        "has_sort_logic": true,
+        "has_pagination": false,
+        "sort_hint_files": [
+          "frontend/src/query-tool/main.js"
+        ],
+        "pagination_hint_files": []
+      },
+      "chart": {
+        "component_files": [],
+        "has_legend_logic": true,
+        "has_tooltip_logic": true,
+        "legend_hint_files": [
+          "frontend/src/query-tool/main.js"
+        ],
+        "tooltip_hint_files": [
+          "frontend/src/query-tool/main.js"
+        ]
+      },
+      "filter": {
+        "required_query_keys": [],
+        "component_files": [
+          "frontend/src/query-tool/App.vue",
+          "frontend/src/query-tool/composables/useQueryToolData.js",
+          "frontend/src/query-tool/main.js"
+        ]
+      },
+      "matrix": {
+        "component_files": [],
+        "has_matrix_interaction": false
+      },
+      "api_endpoints": [
+        "/api/query-tool/adjacent-lots",
+        "/api/query-tool/equipment-list",
+        "/api/query-tool/equipment-period",
+        "/api/query-tool/export-csv",
+        "/api/query-tool/lot-associations",
+        "/api/query-tool/lot-history",
+        "/api/query-tool/resolve",
+        "/api/query-tool/workcenter-groups"
+      ]
+    },
+    "/tmtt-defect": {
+      "capture_method": "static_source_analysis",
+      "source_dir": "frontend/src/tmtt-defect",
+      "source_files": [
+        "frontend/src/tmtt-defect/App.vue",
+        "frontend/src/tmtt-defect/components/TmttChartCard.vue",
+        "frontend/src/tmtt-defect/components/TmttDetailTable.vue",
+        "frontend/src/tmtt-defect/components/TmttKpiCards.vue",
+        "frontend/src/tmtt-defect/composables/useTmttDefectData.js",
+        "frontend/src/tmtt-defect/main.js"
+      ],
+      "table": {
+        "component_files": [
+          "frontend/src/tmtt-defect/components/TmttDetailTable.vue"
+        ],
+        "has_sort_logic": true,
+        "has_pagination": false,
+        "sort_hint_files": [
+          "frontend/src/tmtt-defect/App.vue",
+          "frontend/src/tmtt-defect/components/TmttDetailTable.vue",
+          "frontend/src/tmtt-defect/composables/useTmttDefectData.js"
+        ],
+        "pagination_hint_files": []
+      },
+      "chart": {
+        "component_files": [
+          "frontend/src/tmtt-defect/components/TmttChartCard.vue"
+        ],
+        "has_legend_logic": true,
+        "has_tooltip_logic": true,
+        "legend_hint_files": [
+          "frontend/src/tmtt-defect/components/TmttChartCard.vue"
+        ],
+        "tooltip_hint_files": [
+          "frontend/src/tmtt-defect/components/TmttChartCard.vue"
+        ]
+      },
+      "filter": {
+        "required_query_keys": [],
+        "component_files": [
+          "frontend/src/tmtt-defect/App.vue",
+          "frontend/src/tmtt-defect/composables/useTmttDefectData.js"
+        ]
+      },
+      "matrix": {
+        "component_files": [],
+        "has_matrix_interaction": false
+      },
+      "api_endpoints": [
+        "/api/tmtt-defect/analysis",
+        "/api/tmtt-defect/export"
+      ]
+    }
+  }
+}

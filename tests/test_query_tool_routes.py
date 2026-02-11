@@ -33,6 +33,9 @@ class TestQueryToolPage:
 
     def test_page_returns_html(self, client):
         """Should return the query tool page."""
+        with client.session_transaction() as sess:
+            sess["admin"] = {"username": "admin", "displayName": "Admin"}
+
         response = client.get('/query-tool')
         assert response.status_code == 200
         assert b'html' in response.data.lower()

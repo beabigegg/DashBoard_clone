@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import time
 from urllib.parse import parse_qs, quote, urlparse
+import re
 
 import pytest
 import requests
@@ -166,3 +167,67 @@ class TestWipAndHoldPagesE2E:
             page.wait_for_timeout(200)
 
         assert seen == {"summary", "distribution", "lots"}
+
+    def test_portal_shell_deep_links_keep_detail_routes(self, page: Page, app_server: str):
+        workcenter = _pick_workcenter(app_server)
+        page.goto(
+            f"{app_server}/portal-shell/wip-detail?workcenter={quote(workcenter)}&status=queue",
+            wait_until="commit",
+            timeout=60000,
+        )
+        expect(page).to_have_url(re.compile(r".*/portal-shell/wip-detail\\?.*workcenter=.*"))
+        detail_response = _wait_for_response(
+            page,
+            lambda resp: (
+                "/api/wip/detail/" in resp.url
+                and parse_qs(urlparse(resp.url).query).get("status", [None])[0] in {"QUEUE", "queue"}
+            ),
+            timeout_seconds=30.0,
+        )
+        assert detail_response is not None
+        assert detail_response.ok
+
+        reason = _pick_hold_reason(app_server)
+        page.goto(
+            f"{app_server}/portal-shell/hold-detail?reason={quote(reason)}",
+            wait_until="commit",
+            timeout=60000,
+        )
+        expect(page).to_have_url(re.compile(r".*/portal-shell/hold-detail\\?.*reason=.*"))
+        summary_response = _wait_for_response(
+            page,
+            lambda resp: (
+                "/api/wip/hold-detail/summary" in resp.url
+                and parse_qs(urlparse(resp.url).query).get("reason", [None])[0] == reason
+            ),
+            timeout_seconds=30.0,
+        )
+        assert summary_response is not None
+        assert summary_response.ok
+
+    def test_portal_shell_wip_overview_drilldown_routes_to_detail_pages(self, page: Page, app_server: str):
+        page.goto(
+            f"{app_server}/portal-shell/wip-overview",
+            wait_until="commit",
+            timeout=60000,
+        )
+        page.wait_for_timeout(3000)
+
+        matrix_links = page.locator("td.clickable")
+        if matrix_links.count() == 0:
+            pytest.skip("No matrix rows available for WIP drilldown")
+        matrix_links.first.click()
+        expect(page).to_have_url(re.compile(r".*/portal-shell/wip-detail\\?.*workcenter=.*"))
+
+        page.goto(
+            f"{app_server}/portal-shell/wip-overview",
+            wait_until="commit",
+            timeout=60000,
+        )
+        page.wait_for_timeout(3000)
+
+        reason_links = page.locator("a.reason-link")
+        if reason_links.count() == 0:
+            pytest.skip("No pareto reason links available for HOLD drilldown")
+        reason_links.first.click()
+        expect(page).to_have_url(re.compile(r".*/portal-shell/hold-detail\\?.*reason=.*"))

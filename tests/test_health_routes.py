@@ -142,6 +142,9 @@ def test_frontend_shell_health_endpoint_healthy(mock_status):
     payload = response.get_json()
     assert payload["status"] == "healthy"
     assert payload["checks"]["portal_shell_css"]["exists"] is True
+    assert payload["summary"]["status"] == "healthy"
+    assert payload["summary"]["error_count"] == 0
+    assert payload["detail"]["checks"]["portal_shell_css"]["exists"] is True
 
 
 @patch('mes_dashboard.routes.health_routes.get_portal_shell_asset_status')
@@ -170,6 +173,9 @@ def test_frontend_shell_health_endpoint_unhealthy(mock_status):
     payload = response.get_json()
     assert payload["status"] == "unhealthy"
     assert any("portal-shell.css" in error for error in payload.get("errors", []))
+    assert payload["summary"]["status"] == "unhealthy"
+    assert payload["summary"]["error_count"] >= 1
+    assert any("portal-shell.css" in error for error in payload["detail"].get("errors", []))
 
 
 def test_get_portal_shell_asset_status_reports_nested_html_as_healthy(tmp_path):

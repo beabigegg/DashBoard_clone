@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
+import { navigateToRuntimeRoute, replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
 import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
@@ -10,8 +11,8 @@ import DistributionTable from './components/DistributionTable.vue';
 import LotTable from './components/LotTable.vue';
 import SummaryCards from './components/SummaryCards.vue';
 
-const REASON = new URLSearchParams(window.location.search).get('reason')?.trim() || '';
 const API_TIMEOUT = 60000;
+const reason = ref('');
 
 const summary = ref(null);
 const distribution = ref(null);
@@ -52,7 +53,7 @@ function unwrapApiResult(result, fallbackMessage) {
 
 async function fetchSummary(signal) {
   const result = await apiGet('/api/wip/hold-detail/summary', {
-    params: { reason: REASON },
+    params: { reason: reason.value },
     timeout: API_TIMEOUT,
     signal,
   });
@@ -61,7 +62,7 @@ async function fetchSummary(signal) {
 
 async function fetchDistribution(signal) {
   const result = await apiGet('/api/wip/hold-detail/distribution', {
-    params: { reason: REASON },
+    params: { reason: reason.value },
     timeout: API_TIMEOUT,
     signal,
   });
@@ -70,7 +71,7 @@ async function fetchDistribution(signal) {
 
 async function fetchLots(signal) {
   const params = {
-    reason: REASON,
+    reason: reason.value,
     page: page.value,
     per_page: pagination.value.perPage || 50,
   };
@@ -94,13 +95,14 @@ async function fetchLots(signal) {
 }
 
 const holdType = computed(() => {
-  if (!REASON) {
+  if (!reason.value) {
     return 'quality';
   }
-  return NON_QUALITY_HOLD_REASON_SET.has(REASON) ? 'non-quality' : 'quality';
+  return NON_QUALITY_HOLD_REASON_SET.has(reason.value) ? 'non-quality' : 'quality';
 });
 
 const holdTypeLabel = computed(() => (holdType.value === 'quality' ? '品質異常' : '非品質異常'));
+const backToOverviewHref = toRuntimeRoute('/wip-overview');
 
 const headerStyle = computed(() => ({
   '--header-gradient': holdType.value === 'quality'
@@ -123,6 +125,34 @@ const filterText = computed(() => {
 });
 
 const hasActiveFilters = computed(() => Boolean(filterText.value));
+
+function getUrlParam(name) {
+  return new URLSearchParams(window.location.search).get(name)?.trim() || '';
+}
+
+function updateUrlState() {
+  if (!reason.value) {
+    return;
+  }
+
+  const params = new URLSearchParams();
+  params.set('reason', reason.value);
+
+  if (filters.workcenter) {
+    params.set('workcenter', filters.workcenter);
+  }
+  if (filters.package) {
+    params.set('package', filters.package);
+  }
+  if (filters.ageRange) {
+    params.set('age_range', filters.ageRange);
+  }
+  if (page.value > 1) {
+    params.set('page', String(page.value));
+  }
+
+  replaceRuntimeHistory(`/hold-detail?${params.toString()}`);
+}
 
 const { createAbortSignal, clearAbortController, resetAutoRefresh, triggerRefresh } = useAutoRefresh({
   onRefresh: () => loadAllData(false),
@@ -201,18 +231,21 @@ async function loadAllData(showOverlay = true) {
 function toggleAgeFilter(range) {
   filters.ageRange = filters.ageRange === range ? null : range;
   page.value = 1;
+  updateUrlState();
   void loadLots();
 }
 
 function toggleWorkcenterFilter(name) {
   filters.workcenter = filters.workcenter === name ? null : name;
   page.value = 1;
+  updateUrlState();
   void loadLots();
 }
 
 function togglePackageFilter(name) {
   filters.package = filters.package === name ? null : name;
   page.value = 1;
+  updateUrlState();
   void loadLots();
 }
 
@@ -221,6 +254,7 @@ function clearFilters() {
   filters.workcenter = null;
   filters.package = null;
   page.value = 1;
+  updateUrlState();
   void loadLots();
 }
 
@@ -229,6 +263,7 @@ function prevPage() {
     return;
   }
   page.value -= 1;
+  updateUrlState();
   void loadLots();
 }
 
@@ -237,6 +272,7 @@ function nextPage() {
     return;
   }
   page.value += 1;
+  updateUrlState();
   void loadLots();
 }
 
@@ -245,10 +281,20 @@ async function manualRefresh() {
 }
 
 onMounted(() => {
-  if (!REASON) {
-    window.location.replace('/wip-overview');
+  reason.value = getUrlParam('reason');
+  filters.workcenter = getUrlParam('workcenter') || null;
+  filters.package = getUrlParam('package') || null;
+  filters.ageRange = getUrlParam('age_range') || null;
+  const parsedPage = Number.parseInt(getUrlParam('page'), 10);
+  if (Number.isFinite(parsedPage) && parsedPage > 0) {
+    page.value = parsedPage;
+  }
+
+  if (!reason.value) {
+    navigateToRuntimeRoute('/wip-overview', { replace: true });
     return;
   }
+  updateUrlState();
   void loadAllData(true);
 });
 </script>
@@ -257,8 +303,8 @@ onMounted(() => {
   <div class="dashboard hold-detail-page">
     <header class="header" :style="headerStyle">
       <div class="header-left">
-        <a href="/wip-overview" class="btn btn-back">&larr; WIP Overview</a>
-        <h1>Hold Detail: {{ REASON }}</h1>
+        <a :href="backToOverviewHref" class="btn btn-back">&larr; WIP Overview</a>
+        <h1>Hold Detail: {{ reason }}</h1>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
       </div>
       <div class="header-right">

@@ -40,6 +40,11 @@ def load_page_with_js(page: Page, url: str, timeout: int = 60000):
     page.wait_for_timeout(1000)  # Allow JS initialization
 
 
+def locate_portal_nav_links(page: Page):
+    """Locate portal navigation links across legacy/new shell DOM contracts."""
+    return page.locator('.drawer-link[href], .sidebar-item[data-route]')
+
+
 @pytest.mark.stress
 class TestToastStress:
     """Stress tests for Toast notification system."""
@@ -264,7 +269,7 @@ class TestPageNavigationStress:
     def test_rapid_route_switching(self, page: Page, app_server: str):
         """Rapid direct-route switching should remain responsive."""
         page.goto(app_server, wait_until='domcontentloaded', timeout=30000)
-        sidebar_items = page.locator('.sidebar-item[data-route]')
+        sidebar_items = locate_portal_nav_links(page)
         expect(sidebar_items.first).to_be_visible()
         item_count = sidebar_items.count()
         assert item_count >= 1, "No portal sidebar routes available for stress test"
@@ -294,7 +299,7 @@ class TestPageNavigationStress:
     def test_portal_navigation_contract_without_iframe(self, page: Page, app_server: str):
         """Portal sidebar should expose route metadata and no iframe DOM."""
         page.goto(app_server, wait_until='domcontentloaded', timeout=30000)
-        sidebar_items = page.locator('.sidebar-item[data-route]')
+        sidebar_items = locate_portal_nav_links(page)
         expect(sidebar_items.first).to_be_visible()
         assert sidebar_items.count() >= 1, "No route sidebar items found"
 

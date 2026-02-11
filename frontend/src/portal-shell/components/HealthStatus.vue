@@ -1,5 +1,10 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import {
+  buildHealthFallbackDetail,
+  labelFromHealthStatus,
+  normalizeFrontendShellHealth,
+} from '../healthSummary.js';
 
 const status = ref('loading');
 const label = ref('檢查中...');
@@ -75,6 +80,12 @@ function onDocumentClick(event) {
   closePopup();
 }
 
+function onDocumentKeydown(event) {
+  if (event.key === 'Escape') {
+    closePopup();
+  }
+}
+
 async function checkHealth() {
   try {
     const [healthResp, shellResp] = await Promise.all([
@@ -90,14 +101,9 @@ async function checkHealth() {
     const shellData = shellResp.ok ? await shellResp.json() : null;
 
     status.value = healthData.status || 'unhealthy';
-    if (status.value === 'healthy') {
-      label.value = '連線正常';
-    } else if (status.value === 'degraded') {
-      label.value = '部分降級';
-    } else {
-      label.value = '連線異常';
-    }
+    label.value = labelFromHealthStatus(status.value);
 
+    const frontendShell = normalizeFrontendShellHealth(shellData);
     detail.value = {
       database: toStatusText(healthData.services?.database || 'error'),
       redis: toStatusText(healthData.services?.redis || 'disabled'),
@@ -112,26 +118,16 @@ async function checkHealth() {
       routeCacheMode: healthData.route_cache?.mode || '--',
       routeCacheHitRate: `${normalizeHitRate(healthData.route_cache?.l1_hit_rate)} / ${normalizeHitRate(healthData.route_cache?.l2_hit_rate)}`,
       routeCacheDegraded: healthData.route_cache?.degraded ? '是' : '否',
-      frontendShell: shellData?.status === 'healthy' ? '正常' : '異常',
+      frontendShell: frontendShell.status === 'healthy' ? '正常' : '異常',
     };
 
     warnings.value = Array.isArray(healthData.warnings) ? healthData.warnings : [];
-    frontendErrors.value = Array.isArray(shellData?.errors) ? shellData.errors : [];
+    frontendErrors.value = frontendShell.errors;
   } catch {
-    status.value = 'unhealthy';
-    label.value = '無法連線';
-    detail.value = {
-      database: '無法確認',
-      redis: '無法確認',
-      cacheEnabled: '無法確認',
-      cacheUpdatedAt: '--',
-      resourceCacheEnabled: '無法確認',
-      resourceCacheCount: '--',
-      routeCacheMode: '--',
-      routeCacheHitRate: '--',
-      routeCacheDegraded: '--',
-      frontendShell: '無法確認',
-    };
+    const fallback = buildHealthFallbackDetail();
+    status.value = fallback.status;
+    label.value = fallback.label;
+    detail.value = fallback.detail;
     warnings.value = [];
     frontendErrors.value = [];
   }
@@ -143,6 +139,7 @@ onMounted(() => {
     void checkHealth();
   }, 30000);
   document.addEventListener('click', onDocumentClick);
+  document.addEventListener('keydown', onDocumentKeydown);
 });
 
 onUnmounted(() => {
@@ -150,18 +147,25 @@ onUnmounted(() => {
     window.clearInterval(timer);
   }
   document.removeEventListener('click', onDocumentClick);
+  document.removeEventListener('keydown', onDocumentKeydown);
 });
 </script>
 
 <template>
   <div id="shellHealthWrap" class="health-wrap">
-    <button type="button" class="health-trigger" :aria-expanded="popupOpen ? 'true' : 'false'" @click="togglePopup">
+    <button
+      type="button"
+      class="health-trigger"
+      :aria-expanded="popupOpen ? 'true' : 'false'"
+      aria-controls="shellHealthPopup"
+      @click="togglePopup"
+    >
       <span class="dot" :class="statusClass"></span>
       <span class="label">{{ label }}</span>
       <span class="meta-toggle">詳情</span>
     </button>
 
-    <div v-if="popupOpen" class="health-popup">
+    <div v-if="popupOpen" id="shellHealthPopup" class="health-popup">
       <h4>系統連線狀態</h4>
       <div class="health-item">
         <span class="health-item-label">資料庫 (Oracle)</span>

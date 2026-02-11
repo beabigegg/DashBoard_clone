@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
+import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
 import DailyTrend from './components/DailyTrend.vue';
 import DetailTable from './components/DetailTable.vue';
@@ -52,6 +53,26 @@ function toDateString(value) {
   return value.toISOString().slice(0, 10);
 }
 
+function getUrlParam(name) {
+  return new URLSearchParams(window.location.search).get(name)?.trim() || '';
+}
+
+function normalizeHoldType(value) {
+  const holdType = String(value || '').trim();
+  if (holdType === 'quality' || holdType === 'non-quality' || holdType === 'all') {
+    return holdType;
+  }
+  return 'quality';
+}
+
+function parseRecordTypeCsv(value) {
+  const parsed = String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return parsed.length > 0 ? [...new Set(parsed)] : ['new'];
+}
+
 function setDefaultDateRange() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -93,6 +114,34 @@ function normalizeListPayload(payload) {
       totalPages: Number(pagination.totalPages || 1),
     },
   };
+}
+
+function updateUrlState() {
+  const params = new URLSearchParams();
+
+  if (filterBar.startDate) {
+    params.set('start_date', filterBar.startDate);
+  }
+  if (filterBar.endDate) {
+    params.set('end_date', filterBar.endDate);
+  }
+  if (filterBar.holdType) {
+    params.set('hold_type', filterBar.holdType);
+  }
+  if (Array.isArray(recordType.value) && recordType.value.length > 0) {
+    params.set('record_type', recordType.value.join(','));
+  }
+  if (reasonFilter.value) {
+    params.set('reason', reasonFilter.value);
+  }
+  if (durationFilter.value) {
+    params.set('duration_range', durationFilter.value);
+  }
+  if (page.value > 1) {
+    params.set('page', String(page.value));
+  }
+
+  replaceRuntimeHistory(`/hold-history?${params.toString()}`);
 }
 
 function commonParams({
@@ -352,6 +401,7 @@ function handleFilterChange(next) {
   durationFilter.value = '';
   recordType.value = ['new'];
   page.value = 1;
+  updateUrlState();
 
   void loadAllData({ includeTrend: dateChanged, showOverlay: false });
 }
@@ -360,6 +410,7 @@ function handleRecordTypeChange() {
   reasonFilter.value = '';
   durationFilter.value = '';
   page.value = 1;
+  updateUrlState();
   void loadAllData({ includeTrend: false, showOverlay: false });
 }
 
@@ -371,6 +422,7 @@ function handleReasonToggle(reason) {
 
   reasonFilter.value = reasonFilter.value === nextReason ? '' : nextReason;
   page.value = 1;
+  updateUrlState();
   void loadReasonDependents();
 }
 
@@ -380,6 +432,7 @@ function clearReasonFilter() {
   }
   reasonFilter.value = '';
   page.value = 1;
+  updateUrlState();
   void loadReasonDependents();
 }
 
@@ -391,6 +444,7 @@ function handleDurationToggle(range) {
 
   durationFilter.value = durationFilter.value === nextRange ? '' : nextRange;
   page.value = 1;
+  updateUrlState();
   void loadReasonDependents();
 }
 
@@ -400,6 +454,7 @@ function clearDurationFilter() {
   }
   durationFilter.value = '';
   page.value = 1;
+  updateUrlState();
   void loadReasonDependents();
 }
 
@@ -408,6 +463,7 @@ function prevPage() {
     return;
   }
   page.value -= 1;
+  updateUrlState();
   void loadListOnly();
 }
 
@@ -417,16 +473,34 @@ function nextPage() {
     return;
   }
   page.value += 1;
+  updateUrlState();
   void loadListOnly();
 }
 
 async function manualRefresh() {
   page.value = 1;
+  updateUrlState();
   await loadAllData({ includeTrend: true, showOverlay: false });
 }
 
 onMounted(() => {
-  setDefaultDateRange();
+  const startDate = getUrlParam('start_date');
+  const endDate = getUrlParam('end_date');
+  if (startDate && endDate) {
+    filterBar.startDate = startDate;
+    filterBar.endDate = endDate;
+  } else {
+    setDefaultDateRange();
+  }
+  filterBar.holdType = normalizeHoldType(getUrlParam('hold_type'));
+  reasonFilter.value = getUrlParam('reason');
+  durationFilter.value = getUrlParam('duration_range');
+  recordType.value = parseRecordTypeCsv(getUrlParam('record_type'));
+  const parsedPage = Number.parseInt(getUrlParam('page'), 10);
+  if (Number.isFinite(parsedPage) && parsedPage > 0) {
+    page.value = parsedPage;
+  }
+  updateUrlState();
   void loadAllData({ includeTrend: true, showOverlay: true });
 });
 </script>

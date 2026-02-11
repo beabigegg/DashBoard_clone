@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
+import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
 import SummaryCards from '../hold-detail/components/SummaryCards.vue';
@@ -72,6 +73,31 @@ const lastUpdate = computed(() => {
   return value ? `Last Update: ${value}` : '';
 });
 
+const reasonOptions = computed(() => {
+  const source = summary.value || {};
+  const candidates = [];
+
+  if (Array.isArray(source.reason_options)) {
+    candidates.push(...source.reason_options);
+  }
+  if (Array.isArray(source.reasonOptions)) {
+    candidates.push(...source.reasonOptions);
+  }
+  if (Array.isArray(source.topReasons)) {
+    candidates.push(...source.topReasons);
+  }
+  if (source.by_reason && typeof source.by_reason === 'object') {
+    candidates.push(...Object.keys(source.by_reason));
+  }
+  if (source.byReason && typeof source.byReason === 'object') {
+    candidates.push(...Object.keys(source.byReason));
+  }
+
+  return [...new Set(candidates.map((value) => String(value || '').trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+});
+
 function nextRequestId() {
   activeRequestId += 1;
   return activeRequestId;
@@ -92,6 +118,42 @@ function unwrapApiResult(result, fallbackMessage) {
     return result.data;
   }
   return result;
+}
+
+function getUrlParam(name) {
+  return new URLSearchParams(window.location.search).get(name)?.trim() || '';
+}
+
+function normalizeHoldType(value) {
+  const holdType = String(value || '').trim();
+  if (holdType === 'quality' || holdType === 'non-quality' || holdType === 'all') {
+    return holdType;
+  }
+  return 'quality';
+}
+
+function updateUrlState() {
+  const params = new URLSearchParams();
+
+  if (filterBar.holdType) {
+    params.set('hold_type', filterBar.holdType);
+  }
+  if (filterBar.reason) {
+    params.set('reason', filterBar.reason);
+  }
+  if (matrixFilter.value?.workcenter) {
+    params.set('workcenter', matrixFilter.value.workcenter);
+  }
+  if (matrixFilter.value?.package) {
+    params.set('package', matrixFilter.value.package);
+  }
+  if (page.value > 1) {
+    params.set('page', String(page.value));
+  }
+
+  const query = params.toString();
+  const nextUrl = query ? `/hold-overview?${query}` : '/hold-overview';
+  replaceRuntimeHistory(nextUrl);
 }
 
 function buildFilterBarParams() {
@@ -266,12 +328,14 @@ function handleFilterChange(next) {
   filterBar.reason = nextReason;
   matrixFilter.value = null;
   page.value = 1;
+  updateUrlState();
   void loadAllData(false);
 }
 
 function handleMatrixSelect(nextFilter) {
   matrixFilter.value = nextFilter;
   page.value = 1;
+  updateUrlState();
   void loadLots();
 }
 
@@ -281,6 +345,7 @@ function clearMatrixFilter() {
   }
   matrixFilter.value = null;
   page.value = 1;
+  updateUrlState();
   void loadLots();
 }
 
@@ -289,6 +354,7 @@ function prevPage() {
     return;
   }
   page.value -= 1;
+  updateUrlState();
   void loadLots();
 }
 
@@ -297,6 +363,7 @@ function nextPage() {
     return;
   }
   page.value += 1;
+  updateUrlState();
   void loadLots();
 }
 
@@ -305,6 +372,21 @@ async function manualRefresh() {
 }
 
 onMounted(() => {
+  filterBar.holdType = normalizeHoldType(getUrlParam('hold_type'));
+  filterBar.reason = getUrlParam('reason');
+  const workcenter = getUrlParam('workcenter');
+  const pkg = getUrlParam('package');
+  if (workcenter || pkg) {
+    matrixFilter.value = {
+      workcenter: workcenter || null,
+      package: pkg || null,
+    };
+  }
+  const parsedPage = Number.parseInt(getUrlParam('page'), 10);
+  if (Number.isFinite(parsedPage) && parsedPage > 0) {
+    page.value = parsedPage;
+  }
+  updateUrlState();
   void loadAllData(true);
 });
 </script>

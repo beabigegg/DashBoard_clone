@@ -725,4 +725,22 @@ def frontend_shell_health_check():
     """Frontend shell health endpoint for CSS/JS rendering readiness."""
     result = get_portal_shell_asset_status()
     http_code = int(result.pop("http_code", 500))
-    return _build_health_response(result, http_code)
+    errors = list(result.get("errors", []))
+    warnings = list(result.get("warnings", []))
+    summary = {
+        "status": result.get("status", "unhealthy"),
+        "route": result.get("route", "/portal-shell"),
+        "error_count": len(errors),
+        "warning_count": len(warnings),
+    }
+    detail = {
+        "checks": result.get("checks", {}),
+        "errors": errors,
+        "warnings": warnings,
+    }
+    response = {
+        **result,
+        "summary": summary,
+        "detail": detail,
+    }
+    return _build_health_response(response, http_code)

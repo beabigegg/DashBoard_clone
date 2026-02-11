@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
+import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
 import {
   buildWipOverviewQueryParams,
   splitHoldByType,
@@ -201,7 +202,7 @@ function updateUrlState() {
 
   const query = params.toString();
   const nextUrl = query ? `/wip-overview?${query}` : '/wip-overview';
-  window.history.replaceState({}, '', nextUrl);
+  replaceRuntimeHistory(nextUrl);
 }
 
 function applyFilters(nextFilters) {
@@ -243,14 +244,14 @@ function navigateToDetail(workcenter) {
     params.append('status', activeStatusFilter.value);
   }
 
-  window.location.href = `/wip-detail?${params.toString()}`;
+  navigateToRuntimeRoute(`/wip-detail?${params.toString()}`);
 }
 
 function navigateToHoldDetail(reason) {
   if (!reason) {
     return;
   }
-  window.location.href = `/hold-detail?reason=${encodeURIComponent(reason)}`;
+  navigateToRuntimeRoute(`/hold-detail?reason=${encodeURIComponent(reason)}`);
 }
 
 async function manualRefresh() {

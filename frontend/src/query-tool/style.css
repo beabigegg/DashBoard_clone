@@ -1,0 +1,146 @@
+.query-tool-page {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.query-tool-header {
+  border-radius: 12px;
+  padding: 22px 24px;
+  margin-bottom: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--portal-brand-start) 0%, var(--portal-brand-end) 100%);
+  box-shadow: var(--portal-shadow-panel);
+}
+
+.query-tool-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.query-tool-header p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.query-tool-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #334155;
+}
+
+.query-tool-filter select,
+.query-tool-filter input {
+  min-width: 160px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+}
+
+.query-tool-textarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.query-tool-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.query-tool-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.query-tool-btn-primary {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.query-tool-btn-success {
+  background: #16a34a;
+  color: #fff;
+}
+
+.query-tool-btn-ghost {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.query-tool-table-wrap {
+  margin-top: 12px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.query-tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.query-tool-table th,
+.query-tool-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
+}
+
+.query-tool-table th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  text-align: left;
+  z-index: 1;
+}
+
+.query-tool-table tr.selected {
+  background: #eef2ff;
+}
+
+.query-tool-empty {
+  margin: 0;
+  padding: 12px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.query-tool-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.query-tool-success {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 13px;
+}
+
+@media (max-width: 840px) {
+  .query-tool-page {
+    padding: 12px;
+  }
+}
