@@ -18,6 +18,7 @@ const API_TIMEOUT = 60000;
 
 const allEquipment = ref([]);
 const workcenterGroups = ref([]);
+const allResources = ref([]);
 const summary = ref({
   totalCount: 0,
   byStatus: {
@@ -38,6 +39,8 @@ const filterState = reactive({
   isProduction: false,
   isKey: false,
   isMonitor: false,
+  families: [],
+  machines: [],
 });
 
 const matrixFilter = ref([]);
@@ -89,8 +92,51 @@ function buildFilterParams() {
   if (filterState.isMonitor) {
     params.is_monitor = 1;
   }
+  if (filterState.families.length) {
+    params.families = filterState.families.join(',');
+  }
+  if (filterState.machines.length) {
+    params.resource_ids = filterState.machines.join(',');
+  }
 
   return params;
+}
+
+// --- Cascade: derive available family/machine options from upstream filters ---
+const filteredByUpstream = computed(() => {
+  return allResources.value.filter((r) => {
+    if (filterState.group && r.workcenterGroup !== filterState.group) return false;
+    if (filterState.isProduction && !r.isProduction) return false;
+    if (filterState.isKey && !r.isKey) return false;
+    if (filterState.isMonitor && !r.isMonitor) return false;
+    return true;
+  });
+});
+
+const familyOptions = computed(() => {
+  const set = new Set();
+  filteredByUpstream.value.forEach((r) => {
+    if (r.family) set.add(r.family);
+  });
+  return [...set].sort();
+});
+
+const machineOptions = computed(() => {
+  let list = filteredByUpstream.value;
+  if (filterState.families.length > 0) {
+    const fset = new Set(filterState.families);
+    list = list.filter((r) => fset.has(r.family));
+  }
+  return list
+    .map((r) => ({ label: r.name, value: r.id }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+});
+
+function pruneInvalidSelections() {
+  const validFamilies = new Set(familyOptions.value);
+  filterState.families = filterState.families.filter((f) => validFamilies.has(f));
+  const validMachineIds = new Set(machineOptions.value.map((m) => m.value));
+  filterState.machines = filterState.machines.filter((m) => validMachineIds.has(m));
 }
 
 function resetHierarchyState() {
@@ -109,6 +155,7 @@ async function loadOptions() {
     });
     const data = unwrapApiResult(result, '載入篩選選項失敗');
     workcenterGroups.value = Array.isArray(data?.workcenter_groups) ? data.workcenter_groups : [];
+    allResources.value = Array.isArray(data?.resources) ? data.resources : [];
   } finally {
     loading.options = false;
   }
@@ -339,6 +386,7 @@ async function applyFiltersAndReload() {
 
 function updateGroup(group) {
   filterState.group = group || '';
+  pruneInvalidSelections();
   void applyFiltersAndReload();
 }
 
@@ -346,6 +394,18 @@ function updateFlags(nextFlags) {
   filterState.isProduction = Boolean(nextFlags?.isProduction);
   filterState.isKey = Boolean(nextFlags?.isKey);
   filterState.isMonitor = Boolean(nextFlags?.isMonitor);
+  pruneInvalidSelections();
+  void applyFiltersAndReload();
+}
+
+function updateFamilies(families) {
+  filterState.families = families || [];
+  pruneInvalidSelections();
+  void applyFiltersAndReload();
+}
+
+function updateMachines(machines) {
+  filterState.machines = machines || [];
   void applyFiltersAndReload();
 }
 
@@ -388,9 +448,15 @@ void initPage();
         :workcenter-groups="workcenterGroups"
         :selected-group="filterState.group"
         :flags="filterState"
+        :family-options="familyOptions"
+        :machine-options="machineOptions"
+        :selected-families="filterState.families"
+        :selected-machines="filterState.machines"
         :loading="loading.options || loading.refreshing"
         @change-group="updateGroup"
         @change-flags="updateFlags"
+        @change-families="updateFamilies"
+        @change-machines="updateMachines"
       />
 
       <p v-if="summaryError" class="error-banner">{{ summaryError }}</p>

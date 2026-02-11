@@ -42,6 +42,7 @@ E10_STATUSES = ['PRD', 'SBY', 'UDT', 'SDT', 'EGT', 'NST']
 def _get_filtered_resources(
     workcenter_groups: Optional[List[str]] = None,
     families: Optional[List[str]] = None,
+    resource_ids: Optional[List[str]] = None,
     is_production: bool = False,
     is_key: bool = False,
     is_monitor: bool = False,
@@ -53,6 +54,7 @@ def _get_filtered_resources(
     Args:
         workcenter_groups: Optional list of WORKCENTER_GROUP names
         families: Optional list of RESOURCEFAMILYNAME values
+        resource_ids: Optional list of RESOURCEID values
         is_production: Filter by production flag
         is_key: Filter by key equipment flag
         is_monitor: Filter by monitor flag
@@ -79,6 +81,8 @@ def _get_filtered_resources(
             if info.get('group') in workcenter_groups:
                 allowed_workcenters.add(wc_name)
 
+    resource_id_set = set(resource_ids) if resource_ids else None
+
     # Apply filters
     filtered = []
     for r in resources:
@@ -89,6 +93,10 @@ def _get_filtered_resources(
 
         # Family filter
         if families and r.get('RESOURCEFAMILYNAME') not in families:
+            continue
+
+        # Resource ID filter
+        if resource_id_set and r.get('RESOURCEID') not in resource_id_set:
             continue
 
         # Equipment flags filter
@@ -184,7 +192,10 @@ def get_filter_options() -> Optional[Dict[str, Any]]:
         Or None if cache loading fails.
     """
     from mes_dashboard.services.filter_cache import get_workcenter_groups
-    from mes_dashboard.services.resource_cache import get_resource_families
+    from mes_dashboard.services.resource_cache import (
+        get_resource_families,
+        get_resource_cascade_metadata,
+    )
 
     try:
         groups = get_workcenter_groups()
@@ -196,7 +207,8 @@ def get_filter_options() -> Optional[Dict[str, Any]]:
 
         return {
             'workcenter_groups': groups,
-            'families': families
+            'families': families,
+            'resources': get_resource_cascade_metadata(),
         }
     except Exception as exc:
         logger.error(f"Filter options query failed: {exc}")
@@ -213,6 +225,7 @@ def query_summary(
     granularity: str = 'day',
     workcenter_groups: Optional[List[str]] = None,
     families: Optional[List[str]] = None,
+    resource_ids: Optional[List[str]] = None,
     is_production: bool = False,
     is_key: bool = False,
     is_monitor: bool = False,
@@ -246,6 +259,7 @@ def query_summary(
         resources = _get_filtered_resources(
             workcenter_groups=workcenter_groups,
             families=families,
+            resource_ids=resource_ids,
             is_production=is_production,
             is_key=is_key,
             is_monitor=is_monitor,
@@ -330,6 +344,7 @@ def query_detail(
     granularity: str = 'day',
     workcenter_groups: Optional[List[str]] = None,
     families: Optional[List[str]] = None,
+    resource_ids: Optional[List[str]] = None,
     is_production: bool = False,
     is_key: bool = False,
     is_monitor: bool = False,
@@ -364,6 +379,7 @@ def query_detail(
         resources = _get_filtered_resources(
             workcenter_groups=workcenter_groups,
             families=families,
+            resource_ids=resource_ids,
             is_production=is_production,
             is_key=is_key,
             is_monitor=is_monitor,
@@ -418,6 +434,7 @@ def export_csv(
     granularity: str = 'day',
     workcenter_groups: Optional[List[str]] = None,
     families: Optional[List[str]] = None,
+    resource_ids: Optional[List[str]] = None,
     is_production: bool = False,
     is_key: bool = False,
     is_monitor: bool = False,
@@ -451,6 +468,7 @@ def export_csv(
         resources = _get_filtered_resources(
             workcenter_groups=workcenter_groups,
             families=families,
+            resource_ids=resource_ids,
             is_production=is_production,
             is_key=is_key,
             is_monitor=is_monitor,

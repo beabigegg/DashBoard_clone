@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
   modelValue: {
@@ -18,12 +18,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  searchable: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['update:modelValue']);
 
 const rootRef = ref(null);
+const searchRef = ref(null);
 const isOpen = ref(false);
+const searchQuery = ref('');
 
 const normalizedOptions = computed(() => {
   return props.options.map((option) => {
@@ -41,6 +47,14 @@ const normalizedOptions = computed(() => {
       value: String(option),
     };
   });
+});
+
+const displayedOptions = computed(() => {
+  if (!searchQuery.value) {
+    return normalizedOptions.value;
+  }
+  const q = searchQuery.value.toLowerCase();
+  return normalizedOptions.value.filter((opt) => opt.label.toLowerCase().includes(q));
 });
 
 const selectedSet = computed(() => new Set((props.modelValue || []).map((value) => String(value))));
@@ -89,14 +103,21 @@ function toggleOption(value) {
 }
 
 function selectAll() {
-  emit(
-    'update:modelValue',
-    normalizedOptions.value.map((option) => option.value)
-  );
+  const next = new Set(selectedSet.value);
+  for (const opt of displayedOptions.value) {
+    next.add(opt.value);
+  }
+  emit('update:modelValue', [...next]);
 }
 
 function clearAll() {
-  emit('update:modelValue', []);
+  if (!searchQuery.value) {
+    emit('update:modelValue', []);
+    return;
+  }
+  const removing = new Set(displayedOptions.value.map((o) => o.value));
+  const next = props.modelValue.filter((v) => !removing.has(String(v)));
+  emit('update:modelValue', next);
 }
 
 function handleOutsideClick(event) {
@@ -108,6 +129,13 @@ function handleOutsideClick(event) {
     isOpen.value = false;
   }
 }
+
+watch(isOpen, (open) => {
+  if (open && props.searchable) {
+    searchQuery.value = '';
+    requestAnimationFrame(() => searchRef.value?.focus());
+  }
+});
 
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick, true);
@@ -131,9 +159,19 @@ onBeforeUnmount(() => {
     </button>
 
     <div v-if="isOpen" class="multi-select-dropdown">
+      <input
+        v-if="searchable"
+        ref="searchRef"
+        v-model="searchQuery"
+        type="text"
+        class="multi-select-search"
+        placeholder="搜尋..."
+        @click.stop
+      />
+
       <div class="multi-select-options">
         <button
-          v-for="option in normalizedOptions"
+          v-for="option in displayedOptions"
           :key="option.value"
           type="button"
           class="multi-select-option"
@@ -142,6 +180,9 @@ onBeforeUnmount(() => {
           <input type="checkbox" :checked="isSelected(option.value)" tabindex="-1" />
           <span>{{ option.label }}</span>
         </button>
+        <div v-if="searchable && displayedOptions.length === 0" class="multi-select-empty">
+          無符合結果
+        </div>
       </div>
 
       <div class="multi-select-actions">

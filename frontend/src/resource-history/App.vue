@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
 import { buildResourceKpiFromHours } from '../core/compute.js';
@@ -23,6 +23,7 @@ const filters = reactive({
   granularity: 'day',
   workcenterGroups: [],
   families: [],
+  machines: [],
   isProduction: false,
   isKey: false,
   isMonitor: false,
@@ -31,6 +32,7 @@ const filters = reactive({
 const options = reactive({
   workcenterGroups: [],
   families: [],
+  resources: [],
 });
 
 const summaryData = ref({
@@ -104,6 +106,9 @@ function buildQueryString() {
   filters.families.forEach((family) => {
     params.append('families', family);
   });
+  filters.machines.forEach((machine) => {
+    params.append('resource_ids', machine);
+  });
 
   if (filters.isProduction) {
     params.append('is_production', '1');
@@ -151,9 +156,33 @@ async function loadOptions() {
 
     options.workcenterGroups = Array.isArray(data.workcenter_groups) ? data.workcenter_groups : [];
     options.families = Array.isArray(data.families) ? data.families : [];
+    options.resources = Array.isArray(data.resources) ? data.resources : [];
   } finally {
     loading.options = false;
   }
+}
+
+const machineOptions = computed(() => {
+  let list = options.resources;
+  if (filters.workcenterGroups.length > 0) {
+    const gset = new Set(filters.workcenterGroups);
+    list = list.filter((r) => gset.has(r.workcenterGroup));
+  }
+  if (filters.families.length > 0) {
+    const fset = new Set(filters.families);
+    list = list.filter((r) => fset.has(r.family));
+  }
+  if (filters.isProduction) list = list.filter((r) => r.isProduction);
+  if (filters.isKey) list = list.filter((r) => r.isKey);
+  if (filters.isMonitor) list = list.filter((r) => r.isMonitor);
+  return list
+    .map((r) => ({ label: r.name, value: r.id }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+});
+
+function pruneInvalidMachines() {
+  const validIds = new Set(machineOptions.value.map((m) => m.value));
+  filters.machines = filters.machines.filter((m) => validIds.has(m));
 }
 
 async function executeQuery() {
@@ -216,6 +245,13 @@ async function executeQuery() {
 }
 
 function updateFilters(nextFilters) {
+  const upstreamChanged =
+    'workcenterGroups' in nextFilters ||
+    'families' in nextFilters ||
+    'isProduction' in nextFilters ||
+    'isKey' in nextFilters ||
+    'isMonitor' in nextFilters;
+
   filters.startDate = nextFilters.startDate || '';
   filters.endDate = nextFilters.endDate || '';
   filters.granularity = nextFilters.granularity || 'day';
@@ -223,9 +259,14 @@ function updateFilters(nextFilters) {
     ? nextFilters.workcenterGroups
     : [];
   filters.families = Array.isArray(nextFilters.families) ? nextFilters.families : [];
+  filters.machines = Array.isArray(nextFilters.machines) ? nextFilters.machines : [];
   filters.isProduction = Boolean(nextFilters.isProduction);
   filters.isKey = Boolean(nextFilters.isKey);
   filters.isMonitor = Boolean(nextFilters.isMonitor);
+
+  if (upstreamChanged) {
+    pruneInvalidMachines();
+  }
 }
 
 function handleToggleRow(rowId) {
@@ -278,6 +319,7 @@ void initPage();
       <FilterBar
         :filters="filters"
         :options="options"
+        :machine-options="machineOptions"
         :loading="loading.options || loading.querying"
         @update-filters="updateFilters"
         @query="executeQuery"

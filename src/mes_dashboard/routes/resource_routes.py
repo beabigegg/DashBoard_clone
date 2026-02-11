@@ -110,6 +110,10 @@ from mes_dashboard.services.resource_service import (
     get_workcenter_status_matrix,
 )
 from mes_dashboard.services.filter_cache import get_workcenter_groups
+from mes_dashboard.services.resource_cache import (
+    get_resource_families,
+    get_resource_cascade_metadata,
+)
 from mes_dashboard.config.constants import STATUS_CATEGORIES
 
 # Create Blueprint
@@ -291,6 +295,11 @@ def api_resource_status():
     status_cats_param = request.args.get('status_categories')
     status_categories = status_cats_param.split(',') if status_cats_param else None
 
+    families_param = request.args.get('families')
+    families = families_param.split(',') if families_param else None
+    resource_ids_param = request.args.get('resource_ids')
+    resource_ids = resource_ids_param.split(',') if resource_ids_param else None
+
     try:
         data = get_merged_resource_status(
             workcenter_groups=workcenter_groups,
@@ -298,6 +307,8 @@ def api_resource_status():
             is_key=is_key,
             is_monitor=is_monitor,
             status_categories=status_categories,
+            families=families,
+            resource_ids=resource_ids,
         )
         # Clean NaN/NaT values for valid JSON
         cleaned_data = _clean_nan_values(data)
@@ -321,19 +332,26 @@ def api_resource_status():
 def api_resource_status_options():
     """API: Get filter options for realtime status queries.
 
-    Returns workcenter_groups, status_categories, and other filter options.
+    Returns workcenter_groups, status_categories, families, and resources
+    metadata for client-side cascade filtering.
     """
     try:
-        # Get workcenter groups from cache
+        cache_key = make_cache_key("resource_status_options")
+        cached = cache_get(cache_key)
+        if cached is not None:
+            return jsonify({'success': True, 'data': cached})
+
         wc_groups = get_workcenter_groups() or []
 
-        return jsonify({
-            'success': True,
-            'data': {
-                'workcenter_groups': [g['name'] for g in wc_groups],
-                'status_categories': STATUS_CATEGORIES,
-            }
-        })
+        data = {
+            'workcenter_groups': [g['name'] for g in wc_groups],
+            'status_categories': STATUS_CATEGORIES,
+            'families': get_resource_families(),
+            'resources': get_resource_cascade_metadata(),
+        }
+        cache_set(cache_key, data, ttl=300)
+
+        return jsonify({'success': True, 'data': data})
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:
@@ -360,12 +378,19 @@ def api_resource_status_summary():
     is_key = _optional_bool_arg('is_key')
     is_monitor = _optional_bool_arg('is_monitor')
 
+    families_param = request.args.get('families')
+    families = families_param.split(',') if families_param else None
+    resource_ids_param = request.args.get('resource_ids')
+    resource_ids = resource_ids_param.split(',') if resource_ids_param else None
+
     try:
         data = get_resource_status_summary(
             workcenter_groups=workcenter_groups,
             is_production=is_production,
             is_key=is_key,
             is_monitor=is_monitor,
+            families=families,
+            resource_ids=resource_ids,
         )
         # Clean NaN/NaT values for valid JSON
         cleaned_data = _clean_nan_values(data)
@@ -395,11 +420,18 @@ def api_resource_status_matrix():
     is_key = _optional_bool_arg('is_key')
     is_monitor = _optional_bool_arg('is_monitor')
 
+    families_param = request.args.get('families')
+    families = families_param.split(',') if families_param else None
+    resource_ids_param = request.args.get('resource_ids')
+    resource_ids = resource_ids_param.split(',') if resource_ids_param else None
+
     try:
         data = get_workcenter_status_matrix(
             is_production=is_production,
             is_key=is_key,
             is_monitor=is_monitor,
+            families=families,
+            resource_ids=resource_ids,
         )
         # Clean NaN/NaT values for valid JSON
         cleaned_data = _clean_nan_values(data)

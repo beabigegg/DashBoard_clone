@@ -44,7 +44,7 @@ def api_resource_history_options():
     Returns:
         JSON with workcenters and families lists.
     """
-    cache_key = make_cache_key("resource_history_options")
+    cache_key = make_cache_key("resource_history_options_v2")
     options = cache_get(cache_key)
 
     if options is None:
@@ -80,6 +80,7 @@ def api_resource_history_summary():
     granularity = request.args.get('granularity', 'day')
     workcenter_groups = request.args.getlist('workcenter_groups') or None
     families = request.args.getlist('families') or None
+    resource_ids = request.args.getlist('resource_ids') or None
     is_production = request.args.get('is_production') == '1'
     is_key = request.args.get('is_key') == '1'
     is_monitor = request.args.get('is_monitor') == '1'
@@ -98,6 +99,7 @@ def api_resource_history_summary():
         'granularity': granularity,
         'workcenter_groups': sorted(workcenter_groups) if workcenter_groups else None,
         'families': sorted(families) if families else None,
+        'resource_ids': sorted(resource_ids) if resource_ids else None,
         'is_production': is_production,
         'is_key': is_key,
         'is_monitor': is_monitor,
@@ -112,6 +114,7 @@ def api_resource_history_summary():
             granularity=granularity,
             workcenter_groups=workcenter_groups,
             families=families,
+            resource_ids=resource_ids,
             is_production=is_production,
             is_key=is_key,
             is_monitor=is_monitor,
@@ -149,6 +152,7 @@ def api_resource_history_detail():
     granularity = request.args.get('granularity', 'day')
     workcenter_groups = request.args.getlist('workcenter_groups') or None
     families = request.args.getlist('families') or None
+    resource_ids = request.args.getlist('resource_ids') or None
     is_production = request.args.get('is_production') == '1'
     is_key = request.args.get('is_key') == '1'
     is_monitor = request.args.get('is_monitor') == '1'
@@ -166,6 +170,7 @@ def api_resource_history_detail():
         granularity=granularity,
         workcenter_groups=workcenter_groups,
         families=families,
+        resource_ids=resource_ids,
         is_production=is_production,
         is_key=is_key,
         is_monitor=is_monitor,
@@ -201,6 +206,7 @@ def api_resource_history_export():
     granularity = request.args.get('granularity', 'day')
     workcenter_groups = request.args.getlist('workcenter_groups') or None
     families = request.args.getlist('families') or None
+    resource_ids = request.args.getlist('resource_ids') or None
     is_production = request.args.get('is_production') == '1'
     is_key = request.args.get('is_key') == '1'
     is_monitor = request.args.get('is_monitor') == '1'
@@ -223,6 +229,7 @@ def api_resource_history_export():
             granularity=granularity,
             workcenter_groups=workcenter_groups,
             families=families,
+            resource_ids=resource_ids,
             is_production=is_production,
             is_key=is_key,
             is_monitor=is_monitor,

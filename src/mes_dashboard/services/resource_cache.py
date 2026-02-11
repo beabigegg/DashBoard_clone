@@ -1096,3 +1096,31 @@ def get_locations() -> list[str]:
 def get_vendors() -> list[str]:
     """取得供應商清單（便捷方法）."""
     return get_distinct_values('VENDORNAME')
+
+
+def get_resource_cascade_metadata() -> list[dict]:
+    """取得所有設備的輕量 metadata 供前端 cascade 篩選.
+
+    利用已快取的 get_all_resources() + filter_cache.get_workcenter_mapping()
+    產生前端所需的最小資料集。
+
+    Returns:
+        List of dicts with keys: id, name, family, workcenter,
+        workcenterGroup, isProduction, isKey, isMonitor
+    """
+    from mes_dashboard.services.filter_cache import get_workcenter_mapping
+
+    wc_mapping = get_workcenter_mapping() or {}
+    return [
+        {
+            'id': r.get('RESOURCEID', ''),
+            'name': r.get('RESOURCENAME', ''),
+            'family': r.get('RESOURCEFAMILYNAME', ''),
+            'workcenter': r.get('WORKCENTERNAME', ''),
+            'workcenterGroup': (wc_mapping.get(r.get('WORKCENTERNAME')) or {}).get('group', ''),
+            'isProduction': bool(r.get('PJ_ISPRODUCTION')),
+            'isKey': bool(r.get('PJ_ISKEY')),
+            'isMonitor': bool(r.get('PJ_ISMONITOR')),
+        }
+        for r in get_all_resources()
+    ]

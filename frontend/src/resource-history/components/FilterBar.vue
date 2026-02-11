@@ -1,5 +1,5 @@
 <script setup>
-import MultiSelect from './MultiSelect.vue';
+import MultiSelect from '../../resource-shared/components/MultiSelect.vue';
 
 const GRANULARITY_ITEMS = [
   { key: 'day', label: '日' },
@@ -19,6 +19,10 @@ const props = defineProps({
       workcenterGroups: [],
       families: [],
     }),
+  },
+  machineOptions: {
+    type: Array,
+    default: () => [],
   },
   loading: {
     type: Boolean,
@@ -98,6 +102,18 @@ function updateFilters(patch) {
             :disabled="loading"
             placeholder="全部型號"
             @update:model-value="updateFilters({ families: $event })"
+          />
+        </div>
+
+        <div class="filter-field">
+          <label>機台</label>
+          <MultiSelect
+            :model-value="filters.machines"
+            :options="machineOptions"
+            :disabled="loading"
+            placeholder="全部機台"
+            searchable
+            @update:model-value="updateFilters({ machines: $event })"
           />
         </div>
 

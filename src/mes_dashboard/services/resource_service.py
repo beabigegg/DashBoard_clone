@@ -321,6 +321,8 @@ def get_merged_resource_status(
     is_key: Optional[bool] = None,
     is_monitor: Optional[bool] = None,
     status_categories: Optional[List[str]] = None,
+    families: Optional[List[str]] = None,
+    resource_ids: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Get merged resource status from three cache layers.
 
@@ -389,6 +391,10 @@ def get_merged_resource_status(
             continue
         if is_monitor is not None and bool(resource.get('PJ_ISMONITOR')) != is_monitor:
             continue
+        if families and resource.get('RESOURCEFAMILYNAME') not in families:
+            continue
+        if resource_ids and str(resource_id) not in resource_ids:
+            continue
         if status_categories and realtime.get('STATUS_CATEGORY') not in status_categories:
             continue
 
@@ -447,6 +453,8 @@ def get_resource_status_summary(
     is_production: Optional[bool] = None,
     is_key: Optional[bool] = None,
     is_monitor: Optional[bool] = None,
+    families: Optional[List[str]] = None,
+    resource_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Get resource status summary statistics.
 
@@ -455,6 +463,8 @@ def get_resource_status_summary(
         is_production: Filter by PJ_ISPRODUCTION flag
         is_key: Filter by PJ_ISKEY flag
         is_monitor: Filter by PJ_ISMONITOR flag
+        families: Filter by RESOURCEFAMILYNAME
+        resource_ids: Filter by RESOURCEID
 
     Returns:
         Dict with summary statistics including OU%, Availability%, and per-status counts.
@@ -465,6 +475,8 @@ def get_resource_status_summary(
         is_production=is_production,
         is_key=is_key,
         is_monitor=is_monitor,
+        families=families,
+        resource_ids=resource_ids,
     )
 
     if not data:
@@ -537,6 +549,8 @@ def get_workcenter_status_matrix(
     is_production: Optional[bool] = None,
     is_key: Optional[bool] = None,
     is_monitor: Optional[bool] = None,
+    families: Optional[List[str]] = None,
+    resource_ids: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Get workcenter × status matrix.
 
@@ -546,6 +560,8 @@ def get_workcenter_status_matrix(
         is_production: Filter by PJ_ISPRODUCTION flag
         is_key: Filter by PJ_ISKEY flag
         is_monitor: Filter by PJ_ISMONITOR flag
+        families: Filter by RESOURCEFAMILYNAME
+        resource_ids: Filter by RESOURCEID
 
     Returns:
         List of dicts with workcenter_group and status counts.
@@ -555,6 +571,8 @@ def get_workcenter_status_matrix(
         is_production=is_production,
         is_key=is_key,
         is_monitor=is_monitor,
+        families=families,
+        resource_ids=resource_ids,
     )
 
     if not data:
