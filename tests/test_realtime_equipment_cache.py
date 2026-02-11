@@ -7,6 +7,7 @@ Tests aggregation, status classification, and cache query functionality.
 import pytest
 from unittest.mock import patch, MagicMock
 import json
+from datetime import datetime, timedelta
 import pandas as pd
 
 
@@ -537,6 +538,94 @@ class TestEquipmentProcessLevelCache:
 
         assert eq.EQUIPMENT_PROCESS_CACHE_MAX_SIZE >= 1
         assert eq._equipment_status_cache.max_size == eq.EQUIPMENT_PROCESS_CACHE_MAX_SIZE
+
+
+class TestEquipmentRefreshDedup:
+    """Test refresh de-dup behavior and sync worker startup timing."""
+
+    def test_refresh_skips_when_recently_updated(self):
+        """Should skip Oracle query when cache is fresh and force=False."""
+        import mes_dashboard.services.realtime_equipment_cache as eq
+
+        recent_updated = (datetime.now() - timedelta(seconds=10)).isoformat()
+        mock_client = MagicMock()
+        mock_client.get.return_value = recent_updated
+
+        with patch.object(eq, "_SYNC_INTERVAL", 300):
+            with patch.object(eq, "try_acquire_lock", return_value=True):
+                with patch.object(eq, "release_lock") as mock_release_lock:
+                    with patch.object(eq, "get_redis_client", return_value=mock_client):
+                        with patch.object(eq, "get_key_prefix", return_value="mes_wip"):
+                            with patch.object(eq, "_load_equipment_status_from_oracle") as mock_oracle:
+                                with patch.object(eq, "_save_to_redis", return_value=True) as mock_save:
+                                    result = eq.refresh_equipment_status_cache(force=False)
+
+        assert result is False
+        mock_oracle.assert_not_called()
+        mock_save.assert_not_called()
+        mock_client.get.assert_called_once_with("mes_wip:equipment_status:meta:updated")
+        mock_release_lock.assert_called_once_with("equipment_status_cache_update")
+
+    def test_refresh_proceeds_when_stale(self):
+        """Should proceed with Oracle query when cache is stale."""
+        import mes_dashboard.services.realtime_equipment_cache as eq
+
+        stale_updated = (datetime.now() - timedelta(seconds=200)).isoformat()
+        mock_client = MagicMock()
+        mock_client.get.return_value = stale_updated
+
+        with patch.object(eq, "_SYNC_INTERVAL", 300):
+            with patch.object(eq, "try_acquire_lock", return_value=True):
+                with patch.object(eq, "release_lock"):
+                    with patch.object(eq, "get_redis_client", return_value=mock_client):
+                        with patch.object(eq, "get_key_prefix", return_value="mes_wip"):
+                            with patch.object(eq, "_load_equipment_status_from_oracle", return_value=[{"RESOURCEID": "R001"}]) as mock_oracle:
+                                with patch.object(eq, "_aggregate_by_resourceid", return_value=[{"RESOURCEID": "R001"}]):
+                                    with patch.object(eq, "_save_to_redis", return_value=True) as mock_save:
+                                        result = eq.refresh_equipment_status_cache(force=False)
+
+        assert result is True
+        mock_oracle.assert_called_once()
+        mock_save.assert_called_once()
+
+    def test_refresh_proceeds_when_force(self):
+        """Should bypass freshness gate when force=True."""
+        import mes_dashboard.services.realtime_equipment_cache as eq
+
+        with patch.object(eq, "_SYNC_INTERVAL", 300):
+            with patch.object(eq, "try_acquire_lock", return_value=True):
+                with patch.object(eq, "release_lock"):
+                    with patch.object(eq, "get_redis_client") as mock_get_redis_client:
+                        with patch.object(eq, "_load_equipment_status_from_oracle", return_value=[{"RESOURCEID": "R001"}]) as mock_oracle:
+                            with patch.object(eq, "_aggregate_by_resourceid", return_value=[{"RESOURCEID": "R001"}]):
+                                with patch.object(eq, "_save_to_redis", return_value=True) as mock_save:
+                                    result = eq.refresh_equipment_status_cache(force=True)
+
+        assert result is True
+        mock_oracle.assert_called_once()
+        mock_save.assert_called_once()
+        mock_get_redis_client.assert_not_called()
+
+    def test_sync_worker_waits_before_first_refresh(self):
+        """Sync worker should not refresh immediately on startup."""
+        import mes_dashboard.services.realtime_equipment_cache as eq
+
+        class StopImmediatelyEvent:
+            def __init__(self):
+                self.timeouts = []
+
+            def wait(self, timeout=None):
+                self.timeouts.append(timeout)
+                return True
+
+        fake_stop_event = StopImmediatelyEvent()
+
+        with patch.object(eq, "_STOP_EVENT", fake_stop_event):
+            with patch.object(eq, "refresh_equipment_status_cache") as mock_refresh:
+                eq._sync_worker(interval=300)
+
+        mock_refresh.assert_not_called()
+        assert fake_stop_event.timeouts == [300]
 
 
 class TestSharedQueryFragments:

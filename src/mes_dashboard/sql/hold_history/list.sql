@@ -16,6 +16,7 @@ WITH history_base AS (
     h.RELEASEEMP,
     h.RELEASECOMMENTS,
     h.NCRID,
+    h.FUTUREHOLDCOMMENTS,
     CASE
       WHEN h.HOLDREASONNAME IN ({{ NON_QUALITY_REASONS }}) THEN 'non-quality'
       ELSE 'quality'
@@ -56,8 +57,9 @@ filtered AS (
 ),
 ranked AS (
   SELECT
-    NVL(l.LOTID, TRIM(f.CONTAINERID)) AS lot_id,
+    NVL(c.CONTAINERNAME, TRIM(f.CONTAINERID)) AS lot_id,
     f.PJ_WORKORDER AS workorder,
+    c.PRODUCTNAME AS product,
     f.WORKCENTERNAME AS workcenter,
     f.HOLDREASONNAME AS hold_reason,
     f.QTY AS qty,
@@ -69,14 +71,16 @@ ranked AS (
     f.RELEASECOMMENTS AS release_comment,
     f.hold_hours,
     f.NCRID AS ncr_id,
+    f.FUTUREHOLDCOMMENTS AS future_hold_comment,
     ROW_NUMBER() OVER (ORDER BY f.HOLDTXNDATE DESC, f.CONTAINERID) AS rn,
     COUNT(*) OVER () AS total_count
   FROM filtered f
-  LEFT JOIN DWH.DW_MES_LOT_V l ON l.CONTAINERID = f.CONTAINERID
+  LEFT JOIN DWH.DW_MES_CONTAINER c ON c.CONTAINERID = f.CONTAINERID
 )
 SELECT
   lot_id,
   workorder,
+  product,
   workcenter,
   hold_reason,
   qty,
@@ -88,6 +92,7 @@ SELECT
   release_comment,
   hold_hours,
   ncr_id,
+  future_hold_comment,
   total_count
 FROM ranked
 WHERE rn > :offset

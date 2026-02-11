@@ -224,8 +224,8 @@
 .dept-table td:nth-child(3),
 .dept-table td:nth-child(4),
 .dept-table td:nth-child(5),
-.detail-table td:nth-child(11),
-.detail-table td:nth-child(12) {
+.detail-table td:nth-child(6),
+.detail-table td:nth-child(13) {
   text-align: right;
 }
 
@@ -268,6 +268,24 @@
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: default;
+}
+
+.cell-tip {
+  position: fixed;
+  z-index: 9999;
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 400px;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
 }
 
 @media (max-width: 1440px) {

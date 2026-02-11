@@ -265,26 +265,21 @@ class TestPageNavigationStress:
     def test_rapid_tab_switching(self, page: Page, app_server: str):
         """Test rapid tab switching in portal."""
         page.goto(app_server, wait_until='domcontentloaded', timeout=30000)
-        page.wait_for_timeout(500)
-
-        # Only use released pages that are visible without admin login
-        tabs = [
-            '.tab:has-text("WIP 即時概況")',
-            '.tab:has-text("設備即時概況")',
-            '.tab:has-text("設備歷史績效")',
-            '.tab:has-text("設備維修查詢")',
-        ]
+        sidebar_items = page.locator('.sidebar-item[data-target]')
+        expect(sidebar_items.first).to_be_visible()
+        item_count = sidebar_items.count()
+        assert item_count >= 1, "No portal sidebar pages available for navigation stress test"
 
         start_time = time.time()
 
-        # Rapidly switch tabs 20 times
+        # Rapidly switch pages 20 times
         for i in range(20):
-            tab = tabs[i % len(tabs)]
-            page.locator(tab).click()
+            item = sidebar_items.nth(i % item_count)
+            item.click()
             page.wait_for_timeout(50)
 
         switch_time = time.time() - start_time
-        print(f"\n  20 tab switches in {switch_time:.3f}s")
+        print(f"\n  20 sidebar switches in {switch_time:.3f}s")
 
         # Page should still be responsive
         expect(page.locator('h1')).to_contain_text('MES 報表入口')
@@ -293,25 +288,21 @@ class TestPageNavigationStress:
     def test_portal_iframe_stress(self, page: Page, app_server: str):
         """Test portal remains responsive with iframe loading."""
         page.goto(app_server, wait_until='domcontentloaded', timeout=30000)
-        page.wait_for_timeout(500)
+        sidebar_items = page.locator('.sidebar-item[data-target]')
+        expect(sidebar_items.first).to_be_visible()
+        item_count = sidebar_items.count()
+        assert item_count >= 1, "No portal sidebar pages available for iframe stress test"
 
-        # Switch through released tabs (dev tabs hidden without admin login)
-        tabs = [
-            'WIP 即時概況',
-            '設備即時概況',
-            '設備歷史績效',
-            '設備維修查詢',
-        ]
-
-        for tab_name in tabs:
-            page.locator(f'.tab:has-text("{tab_name}")').click()
+        checked = min(item_count, 4)
+        for idx in range(checked):
+            item = sidebar_items.nth(idx)
+            item.click()
             page.wait_for_timeout(200)
 
-            # Verify tab is active
-            tab = page.locator(f'.tab:has-text("{tab_name}")')
-            expect(tab).to_have_class(re.compile(r'active'))
+            # Verify clicked item is active
+            expect(item).to_have_class(re.compile(r'active'))
 
-        print(f"\n  All {len(tabs)} tabs clickable and responsive")
+        print(f"\n  All {checked} sidebar pages clickable and responsive")
 
 
 @pytest.mark.stress

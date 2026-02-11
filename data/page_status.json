@@ -89,14 +89,14 @@
       "route": "/tmtt-defect",
       "name": "TMTT印字腳型不良分析",
       "status": "released",
-      "drawer_id": "queries",
+      "drawer_id": "dev-tools",
       "order": 5
     },
     {
       "route": "/mid-section-defect",
       "name": "中段製程不良追溯",
       "status": "dev",
-      "drawer_id": "queries",
+      "drawer_id": "dev-tools",
       "order": 6
     },
     {
@@ -124,21 +124,27 @@
   "drawers": [
     {
       "id": "reports",
-      "name": "報表類",
+      "name": "即時報表",
       "order": 1,
       "admin_only": false
     },
     {
       "id": "queries",
       "name": "查詢類",
-      "order": 2,
+      "order": 3,
       "admin_only": false
     },
     {
       "id": "dev-tools",
       "name": "開發工具",
-      "order": 3,
+      "order": 4,
       "admin_only": true
+    },
+    {
+      "id": "drawer",
+      "name": "查詢工具",
+      "order": 2,
+      "admin_only": false
     }
   ]
 }

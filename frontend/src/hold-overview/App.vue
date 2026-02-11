@@ -8,7 +8,6 @@ import SummaryCards from '../hold-detail/components/SummaryCards.vue';
 import FilterBar from './components/FilterBar.vue';
 import FilterIndicator from './components/FilterIndicator.vue';
 import HoldMatrix from './components/HoldMatrix.vue';
-import HoldTreeMap from './components/HoldTreeMap.vue';
 import LotTable from './components/LotTable.vue';
 
 const API_TIMEOUT = 60000;
@@ -16,7 +15,6 @@ const DEFAULT_PER_PAGE = 50;
 
 const summary = ref(null);
 const matrix = ref(null);
-const treemapItems = ref([]);
 const lots = ref([]);
 
 const filterBar = reactive({
@@ -25,8 +23,6 @@ const filterBar = reactive({
 });
 
 const matrixFilter = ref(null);
-const treemapFilter = ref(null);
-const reasonOptions = ref([]);
 
 const pagination = ref({
   page: 1,
@@ -56,7 +52,7 @@ const holdTypeLabel = computed(() => {
   return '品質異常';
 });
 
-const hasCascadeFilters = computed(() => Boolean(matrixFilter.value || treemapFilter.value));
+const hasCascadeFilters = computed(() => Boolean(matrixFilter.value));
 
 const lotFilterText = computed(() => {
   const parts = [];
@@ -65,9 +61,6 @@ const lotFilterText = computed(() => {
   }
   if (matrixFilter.value?.package) {
     parts.push(`Package=${matrixFilter.value.package}`);
-  }
-  if (treemapFilter.value?.reason) {
-    parts.push(`TreeMap Reason=${treemapFilter.value.reason}`);
   }
   return parts.join(', ');
 });
@@ -122,27 +115,13 @@ function buildMatrixFilterParams() {
   return params;
 }
 
-function buildTreemapParams() {
-  return {
-    ...buildFilterBarParams(),
-    ...buildMatrixFilterParams(),
-  };
-}
-
 function buildLotsParams() {
-  const params = {
+  return {
     ...buildFilterBarParams(),
     ...buildMatrixFilterParams(),
     page: page.value,
     per_page: Number(pagination.value?.perPage || DEFAULT_PER_PAGE),
   };
-  if (treemapFilter.value?.workcenter) {
-    params.workcenter = treemapFilter.value.workcenter;
-  }
-  if (treemapFilter.value?.reason) {
-    params.treemap_reason = treemapFilter.value.reason;
-  }
-  return params;
 }
 
 async function fetchSummary(signal) {
@@ -161,15 +140,6 @@ async function fetchMatrix(signal) {
     signal,
   });
   return unwrapApiResult(result, 'Failed to fetch hold matrix');
-}
-
-async function fetchTreemap(signal) {
-  const result = await apiGet('/api/hold-overview/treemap', {
-    params: buildTreemapParams(),
-    timeout: API_TIMEOUT,
-    signal,
-  });
-  return unwrapApiResult(result, 'Failed to fetch hold treemap');
 }
 
 async function fetchLots(signal) {
@@ -192,23 +162,6 @@ function updateLotsState(payload) {
   page.value = pagination.value.page;
 }
 
-function updateReasonOptions(items) {
-  const unique = new Set();
-  const nextReasons = [];
-  (items || []).forEach((item) => {
-    const reason = String(item?.reason || '').trim();
-    if (!reason || unique.has(reason)) {
-      return;
-    }
-    unique.add(reason);
-    nextReasons.push(reason);
-  });
-  reasonOptions.value = nextReasons.sort((a, b) => a.localeCompare(b, 'zh-Hant'));
-  if (filterBar.reason && !unique.has(filterBar.reason)) {
-    filterBar.reason = '';
-  }
-}
-
 function showRefreshSuccess() {
   refreshSuccess.value = true;
   window.setTimeout(() => {
@@ -223,7 +176,6 @@ const { createAbortSignal, clearAbortController, triggerRefresh } = useAutoRefre
 
 async function loadAllData(showOverlay = true) {
   const requestId = nextRequestId();
-  clearAbortController('hold-overview-treemap-lots');
   clearAbortController('hold-overview-lots');
   const signal = createAbortSignal('hold-overview-all');
 
@@ -237,10 +189,9 @@ async function loadAllData(showOverlay = true) {
   lotsError.value = '';
 
   try {
-    const [summaryData, matrixData, treemapData, lotsData] = await Promise.all([
+    const [summaryData, matrixData, lotsData] = await Promise.all([
       fetchSummary(signal),
       fetchMatrix(signal),
-      fetchTreemap(signal),
       fetchLots(signal),
     ]);
     if (isStaleRequest(requestId)) {
@@ -249,11 +200,7 @@ async function loadAllData(showOverlay = true) {
 
     summary.value = summaryData;
     matrix.value = matrixData;
-    treemapItems.value = Array.isArray(treemapData?.items) ? treemapData.items : [];
     updateLotsState(lotsData);
-    if (!matrixFilter.value) {
-      updateReasonOptions(treemapItems.value);
-    }
     showRefreshSuccess();
   } catch (error) {
     if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
@@ -273,51 +220,9 @@ async function loadAllData(showOverlay = true) {
   }
 }
 
-async function loadTreemapAndLots() {
-  const requestId = nextRequestId();
-  clearAbortController('hold-overview-all');
-  clearAbortController('hold-overview-lots');
-  const signal = createAbortSignal('hold-overview-treemap-lots');
-
-  refreshing.value = true;
-  lotsLoading.value = true;
-  refreshError.value = false;
-  errorMessage.value = '';
-  lotsError.value = '';
-
-  try {
-    const [treemapData, lotsData] = await Promise.all([
-      fetchTreemap(signal),
-      fetchLots(signal),
-    ]);
-    if (isStaleRequest(requestId)) {
-      return;
-    }
-
-    treemapItems.value = Array.isArray(treemapData?.items) ? treemapData.items : [];
-    updateLotsState(lotsData);
-    showRefreshSuccess();
-  } catch (error) {
-    if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
-      return;
-    }
-    refreshError.value = true;
-    const message = error?.message || '載入 TreeMap/Lot 資料失敗';
-    errorMessage.value = message;
-    lotsError.value = message;
-  } finally {
-    if (isStaleRequest(requestId)) {
-      return;
-    }
-    refreshing.value = false;
-    lotsLoading.value = false;
-  }
-}
-
 async function loadLots() {
   const requestId = nextRequestId();
   clearAbortController('hold-overview-all');
-  clearAbortController('hold-overview-treemap-lots');
   const signal = createAbortSignal('hold-overview-lots');
 
   refreshing.value = true;
@@ -360,20 +265,12 @@ function handleFilterChange(next) {
   filterBar.holdType = nextHoldType;
   filterBar.reason = nextReason;
   matrixFilter.value = null;
-  treemapFilter.value = null;
   page.value = 1;
   void loadAllData(false);
 }
 
 function handleMatrixSelect(nextFilter) {
   matrixFilter.value = nextFilter;
-  treemapFilter.value = null;
-  page.value = 1;
-  void loadTreemapAndLots();
-}
-
-function handleTreemapSelect(nextFilter) {
-  treemapFilter.value = nextFilter;
   page.value = 1;
   void loadLots();
 }
@@ -383,28 +280,8 @@ function clearMatrixFilter() {
     return;
   }
   matrixFilter.value = null;
-  treemapFilter.value = null;
-  page.value = 1;
-  void loadTreemapAndLots();
-}
-
-function clearTreemapFilter() {
-  if (!treemapFilter.value) {
-    return;
-  }
-  treemapFilter.value = null;
   page.value = 1;
   void loadLots();
-}
-
-function clearAllFilters() {
-  if (!hasCascadeFilters.value) {
-    return;
-  }
-  matrixFilter.value = null;
-  treemapFilter.value = null;
-  page.value = 1;
-  void loadTreemapAndLots();
 }
 
 function prevPage() {
@@ -475,29 +352,7 @@ onMounted(() => {
       :matrix-filter="matrixFilter"
       :show-clear-all="true"
       @clear-matrix="clearMatrixFilter"
-      @clear-treemap="clearTreemapFilter"
-      @clear-all="clearAllFilters"
-    />
-
-    <section class="card">
-      <div class="card-header">
-        <div class="card-title">Workcenter → Hold Reason TreeMap</div>
-      </div>
-      <div class="card-body treemap-body">
-        <HoldTreeMap
-          :items="treemapItems"
-          :active-filter="treemapFilter"
-          @select="handleTreemapSelect"
-        />
-      </div>
-    </section>
-
-    <FilterIndicator
-      :treemap-filter="treemapFilter"
-      :show-clear-all="true"
-      @clear-matrix="clearMatrixFilter"
-      @clear-treemap="clearTreemapFilter"
-      @clear-all="clearAllFilters"
+      @clear-all="clearMatrixFilter"
     />
 
     <LotTable
@@ -507,7 +362,7 @@ onMounted(() => {
       :error-message="lotsError"
       :has-active-filters="hasLotFilterText"
       :filter-text="lotFilterText"
-      @clear-filters="clearAllFilters"
+      @clear-filters="clearMatrixFilter"
       @prev-page="prevPage"
       @next-page="nextPage"
     />

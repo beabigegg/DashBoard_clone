@@ -127,6 +127,7 @@ LOOKUP_TTL_SECONDS = DEFAULT_LOOKUP_TTL_SECONDS
 _SYNC_THREAD: threading.Thread | None = None
 _STOP_EVENT = threading.Event()
 _SYNC_LOCK = threading.Lock()
+_SYNC_INTERVAL: int = 300
 
 
 # ============================================================
@@ -662,6 +663,29 @@ def refresh_equipment_status_cache(force: bool = False) -> bool:
 
     try:
         with _SYNC_LOCK:
+            if not force:
+                redis_client = get_redis_client()
+                if redis_client is not None:
+                    try:
+                        prefix = get_key_prefix()
+                        updated_key = f"{prefix}:{EQUIPMENT_STATUS_META_UPDATED_KEY}"
+                        updated_at = redis_client.get(updated_key)
+                        if updated_at:
+                            normalized = updated_at.replace("Z", "+00:00")
+                            parsed = datetime.fromisoformat(normalized)
+                            now = datetime.now(tz=parsed.tzinfo) if parsed.tzinfo else datetime.now()
+                            age_seconds = max((now - parsed).total_seconds(), 0.0)
+                            freshness_threshold = max(int(_SYNC_INTERVAL // 2), 1)
+                            if age_seconds < freshness_threshold:
+                                logger.info(
+                                    "Equipment status cache is fresh (age=%.2fs < threshold=%ds), skipping refresh",
+                                    age_seconds,
+                                    freshness_threshold,
+                                )
+                                return False
+                    except Exception as exc:
+                        logger.warning("Failed to evaluate equipment cache freshness: %s", exc)
+
             logger.info("Refreshing equipment status cache...")
             start_time = time.time()
 
@@ -696,14 +720,11 @@ def _sync_worker(interval: int):
     """
     logger.info(f"Equipment status sync worker started (interval: {interval}s)")
 
-    while not _STOP_EVENT.is_set():
+    while not _STOP_EVENT.wait(timeout=interval):
         try:
             refresh_equipment_status_cache()
         except Exception as exc:
             logger.error(f"Equipment status sync error: {exc}")
-
-        # Wait for next sync or stop signal
-        _STOP_EVENT.wait(timeout=interval)
 
     logger.info("Equipment status sync worker stopped")
 
@@ -764,7 +785,9 @@ def init_realtime_equipment_cache(app=None):
         logger.info("Realtime equipment cache is disabled")
         return
 
+    global _SYNC_INTERVAL
     interval = config.get('EQUIPMENT_STATUS_SYNC_INTERVAL', 300)
+    _SYNC_INTERVAL = int(interval)
 
     logger.info("Initializing realtime equipment cache...")
 
@@ -772,4 +795,4 @@ def init_realtime_equipment_cache(app=None):
     refresh_equipment_status_cache()
 
     # Start background worker
-    _start_equipment_status_sync_worker(interval)
+    _start_equipment_status_sync_worker(_SYNC_INTERVAL)

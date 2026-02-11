@@ -476,6 +476,7 @@ def get_hold_history_list(
                 items.append({
                     'lotId': _clean_text(row.get('LOT_ID')),
                     'workorder': _clean_text(row.get('WORKORDER')),
+                    'product': _clean_text(row.get('PRODUCT')),
                     'workcenter': wc_group or wc_name,
                     'holdReason': _clean_text(row.get('HOLD_REASON')),
                     'qty': _safe_int(row.get('QTY')),
@@ -487,6 +488,7 @@ def get_hold_history_list(
                     'releaseComment': _clean_text(row.get('RELEASE_COMMENT')),
                     'holdHours': round(_safe_float(row.get('HOLD_HOURS')), 2),
                     'ncr': _clean_text(row.get('NCR_ID')),
+                    'futureHoldComment': _clean_text(row.get('FUTURE_HOLD_COMMENT')),
                 })
 
         total_pages = (total + per_page - 1) // per_page if total > 0 else 1

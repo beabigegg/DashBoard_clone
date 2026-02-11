@@ -3,6 +3,7 @@
 {% block title %}MES 報表入口{% endblock %}
 
 {% block head_extra %}
+    <script>if (window.self !== window.top) { window.top.location.href = window.self.location.href; }</script>
     {% set portal_css = frontend_asset('portal.css') %}
     {% if portal_css %}
     <link rel="stylesheet" href="{{ portal_css }}">

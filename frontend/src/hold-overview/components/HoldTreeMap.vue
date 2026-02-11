@@ -132,7 +132,7 @@ const chartOption = computed(() => ({
       name: 'Hold TreeMap',
       type: 'treemap',
       roam: false,
-      nodeClick: false,
+      nodeClick: 'link',
       breadcrumb: { show: false },
       leafDepth: 1,
       visualDimension: 1,

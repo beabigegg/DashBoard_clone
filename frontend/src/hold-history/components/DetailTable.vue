@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 
 const props = defineProps({
   items: {
@@ -52,6 +52,24 @@ function formatHours(value) {
   }
   return Number(value).toFixed(2);
 }
+
+const tip = reactive({ visible: false, text: '', x: 0, y: 0 });
+
+function showTip(event) {
+  const text = event.currentTarget.getAttribute('data-tip');
+  if (!text) {
+    return;
+  }
+  const rect = event.currentTarget.getBoundingClientRect();
+  tip.text = text;
+  tip.x = rect.left;
+  tip.y = rect.bottom + 4;
+  tip.visible = true;
+}
+
+function hideTip() {
+  tip.visible = false;
+}
 </script>
 
 <template>
@@ -67,6 +85,7 @@ function formatHours(value) {
           <tr>
             <th>Lot ID</th>
             <th>WorkOrder</th>
+            <th>Product</th>
             <th>站別</th>
             <th>Hold Reason</th>
             <th>數量</th>
@@ -78,32 +97,35 @@ function formatHours(value) {
             <th>Release Comment</th>
             <th>時長(hr)</th>
             <th>NCR</th>
+            <th>Future Hold Comment</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="13" class="placeholder">Loading...</td>
+            <td colspan="15" class="placeholder">Loading...</td>
           </tr>
           <tr v-else-if="errorMessage">
-            <td colspan="13" class="placeholder">{{ errorMessage }}</td>
+            <td colspan="15" class="placeholder">{{ errorMessage }}</td>
           </tr>
           <tr v-else-if="items.length === 0">
-            <td colspan="13" class="placeholder">No data</td>
+            <td colspan="15" class="placeholder">No data</td>
           </tr>
           <tr v-for="item in items" v-else :key="`${item.lotId}-${item.holdDate}-${item.releaseDate}`">
             <td>{{ item.lotId || '-' }}</td>
             <td>{{ item.workorder || '-' }}</td>
+            <td>{{ item.product || '-' }}</td>
             <td>{{ item.workcenter || '-' }}</td>
             <td>{{ item.holdReason || '-' }}</td>
             <td>{{ formatNumber(item.qty) }}</td>
             <td>{{ item.holdDate || '-' }}</td>
             <td>{{ item.holdEmp || '-' }}</td>
-            <td class="cell-comment">{{ item.holdComment || '-' }}</td>
+            <td class="cell-comment" :data-tip="item.holdComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ item.holdComment || '-' }}</td>
             <td>{{ item.releaseDate || '仍在 Hold' }}</td>
             <td>{{ item.releaseEmp || '-' }}</td>
-            <td class="cell-comment">{{ item.releaseComment || '-' }}</td>
+            <td class="cell-comment" :data-tip="item.releaseComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ item.releaseComment || '-' }}</td>
             <td>{{ formatHours(item.holdHours) }}</td>
             <td>{{ item.ncr || '-' }}</td>
+            <td class="cell-comment" :data-tip="item.futureHoldComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ item.futureHoldComment || '-' }}</td>
           </tr>
         </tbody>
       </table>
@@ -115,4 +137,10 @@ function formatHours(value) {
       <button type="button" :disabled="!canNext" @click="emit('next-page')">Next</button>
     </div>
   </section>
+
+  <Teleport to="body">
+    <div v-if="tip.visible" class="cell-tip" :style="{ left: tip.x + 'px', top: tip.y + 'px' }">
+      {{ tip.text }}
+    </div>
+  </Teleport>
 </template>
