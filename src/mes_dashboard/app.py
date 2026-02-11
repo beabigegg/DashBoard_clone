@@ -498,6 +498,25 @@ def create_app(config_name: str | None = None) -> Flask:
     # Table Query APIs (for table_data_viewer)
     # ========================================================
 
+    from mes_dashboard.config.tables import TABLES_CONFIG
+
+    _ALLOWED_TABLES: dict[str, dict] = {}
+    for _tables in TABLES_CONFIG.values():
+        for _tbl in _tables:
+            _ALLOWED_TABLES[_tbl['name']] = _tbl
+
+    def _validate_table_request(table_name, time_field=None):
+        """Validate table_name against TABLES_CONFIG whitelist."""
+        if not table_name:
+            return '請指定表名', 400
+        if table_name not in _ALLOWED_TABLES:
+            return '不允許查詢此表', 400
+        if time_field is not None:
+            allowed_time = _ALLOWED_TABLES[table_name].get('time_field')
+            if time_field != allowed_time:
+                return '不允許的時間欄位', 400
+        return None, None
+
     @app.route('/api/query_table', methods=['POST'])
     def query_table():
         """API: query table data with optional column filters."""
@@ -507,8 +526,9 @@ def create_app(config_name: str | None = None) -> Flask:
         time_field = data.get('time_field')
         filters = data.get('filters')
 
-        if not table_name:
-            return jsonify({'error': '請指定表名'}), 400
+        error, status = _validate_table_request(table_name, time_field)
+        if error:
+            return jsonify({'error': error}), status
 
         result = get_table_data(table_name, limit, time_field, filters)
         return jsonify(result)
@@ -519,8 +539,9 @@ def create_app(config_name: str | None = None) -> Flask:
         data = request.get_json()
         table_name = data.get('table_name')
 
-        if not table_name:
-            return jsonify({'error': '請指定表名'}), 400
+        error, status = _validate_table_request(table_name)
+        if error:
+            return jsonify({'error': error}), status
 
         columns = get_table_columns(table_name)
         return jsonify({'columns': columns})

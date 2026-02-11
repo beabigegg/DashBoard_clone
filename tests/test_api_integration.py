@@ -30,7 +30,7 @@ class TestTableQueryAPIIntegration(unittest.TestCase):
 
         response = self.client.post(
             '/api/get_table_columns',
-            json={'table_name': 'TEST_TABLE'},
+            json={'table_name': 'DWH.DW_MES_LOT_V'},
             content_type='application/json'
         )
 
@@ -51,6 +51,18 @@ class TestTableQueryAPIIntegration(unittest.TestCase):
         data = json.loads(response.data)
         self.assertIn('error', data)
 
+    def test_query_table_rejects_unlisted_table(self):
+        """Query table with table_name not in TABLES_CONFIG should return 400."""
+        response = self.client.post(
+            '/api/query_table',
+            json={'table_name': 'EVIL_TABLE; DROP TABLE --'},
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertIn('error', data)
+
     @patch('mes_dashboard.app.get_table_data')
     def test_query_table_success(self, mock_get_data):
         """Query table should return JSON with data array."""
@@ -61,7 +73,7 @@ class TestTableQueryAPIIntegration(unittest.TestCase):
 
         response = self.client.post(
             '/api/query_table',
-            json={'table_name': 'TEST_TABLE', 'limit': 100},
+            json={'table_name': 'DWH.DW_MES_LOT_V', 'limit': 100},
             content_type='application/json'
         )
 
@@ -93,7 +105,7 @@ class TestTableQueryAPIIntegration(unittest.TestCase):
         response = self.client.post(
             '/api/query_table',
             json={
-                'table_name': 'TEST_TABLE',
+                'table_name': 'DWH.DW_MES_LOT_V',
                 'limit': 100,
                 'filters': {'STATUS': 'ACTIVE'}
             },
@@ -277,7 +289,7 @@ class TestAPIContentType(unittest.TestCase):
 
         response = self.client.post(
             '/api/get_table_columns',
-            json={'table_name': 'TEST'},
+            json={'table_name': 'DWH.DW_MES_LOT_V'},
             content_type='application/json'
         )
 
