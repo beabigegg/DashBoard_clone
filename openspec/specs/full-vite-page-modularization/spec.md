@@ -2,15 +2,15 @@
 Define stable requirements for full-vite-page-modularization.
 ## Requirements
 ### Requirement: Major Pages SHALL be Managed by Vite Modules
-The system SHALL provide Vite-managed module entries for major portal pages, replacing inline scripts in a phased manner.
+The system SHALL provide Vite-managed module entries for major portal pages under a phased SPA-shell migration while keeping direct route access compatible.
 
-#### Scenario: Portal module loading
-- **WHEN** the portal page is rendered
+#### Scenario: Portal shell module loading
+- **WHEN** the portal experience is rendered
 - **THEN** it MUST load its behavior from a Vite-built module asset when available
 
-#### Scenario: Page module fallback
+#### Scenario: Module fallback continuity
 - **WHEN** a required Vite asset is unavailable
-- **THEN** the system MUST keep page behavior functional through explicit fallback logic
+- **THEN** the system MUST keep affected page behavior functional through explicit fallback logic
 
 ### Requirement: Build Pipeline SHALL Produce Backend-Served Assets
 Vite build output MUST be emitted into backend static paths and served by Flask/Gunicorn on the same origin.
@@ -27,11 +27,15 @@ Page entry modules MUST consume shared chart/query/drawer utilities for common b
 - **THEN** the behavior MUST be provided by shared Vite modules rather than duplicated page-local implementations
 
 ### Requirement: Modularization MUST Preserve Established Navigation and Drill-Down Semantics
-Refactoring into Vite modules SHALL not alter existing page transitions, independent tabs, and drill-down entry points.
+Refactoring into Vite modules and SPA shell routing SHALL not alter existing route paths, query semantics, and drill-down entry points.
 
 #### Scenario: User follows existing drill-down path
 - **WHEN** the user navigates from summary page to detail views
 - **THEN** the resulting flow and parameter semantics MUST match the established baseline behavior
+
+#### Scenario: Direct detail route remains valid
+- **WHEN** users open existing detail routes directly with query parameters (e.g., `/wip-detail?workcenter=...`, `/hold-detail?reason=...`)
+- **THEN** route-level behavior MUST remain compatible with established baseline expectations
 
 ### Requirement: Module Boundaries SHALL Support Frontend Compute Expansion
 Vite module structure MUST keep compute logic decoupled from DOM wiring so additional backend-to-frontend computation shifts can be added safely.

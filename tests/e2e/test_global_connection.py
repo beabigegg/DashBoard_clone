@@ -23,26 +23,25 @@ class TestPortalPage:
         # Wait for page to load
         expect(page.locator('h1')).to_contain_text('MES 報表入口')
 
-    def test_portal_has_all_tabs(self, page: Page, app_server: str):
-        """Portal should have all navigation tabs."""
+    def test_portal_has_all_sidebar_routes(self, page: Page, app_server: str):
+        """Portal should expose route-based sidebar entries."""
         page.goto(app_server)
 
-        # Check released tabs exist
-        expect(page.locator('.tab:has-text("WIP 即時概況")')).to_be_visible()
-        expect(page.locator('.tab:has-text("設備即時概況")')).to_be_visible()
-        expect(page.locator('.tab:has-text("設備歷史績效")')).to_be_visible()
-        expect(page.locator('.tab:has-text("設備維修查詢")')).to_be_visible()
-        expect(page.locator('.tab:has-text("批次追蹤工具")')).to_be_visible()
+        expect(page.locator('.sidebar-item:has-text("WIP 即時概況")')).to_be_visible()
+        expect(page.locator('.sidebar-item:has-text("設備即時概況")')).to_be_visible()
+        expect(page.locator('.sidebar-item:has-text("設備歷史績效")')).to_be_visible()
+        expect(page.locator('.sidebar-item:has-text("設備維修查詢")')).to_be_visible()
 
-    def test_portal_tab_switching(self, page: Page, app_server: str):
-        """Portal tabs should switch iframe content."""
+    def test_portal_sidebar_navigation_uses_direct_routes(self, page: Page, app_server: str):
+        """Sidebar click should navigate to direct route without iframe switching."""
         page.goto(app_server)
 
-        # Click on a different tab
-        page.locator('.tab:has-text("設備即時概況")').click()
-
-        # Verify the tab is active
-        expect(page.locator('.tab:has-text("設備即時概況")')).to_have_class(re.compile(r'active'))
+        first_route = page.locator('.sidebar-item[data-route]').first
+        expect(first_route).to_be_visible()
+        target_href = first_route.get_attribute('href')
+        assert target_href and target_href.startswith('/'), "sidebar route href missing"
+        first_route.click()
+        expect(page).to_have_url(re.compile(f".*{re.escape(target_href)}$"))
 
     def test_portal_health_popup_clickable(self, page: Page, app_server: str):
         """Health status pill should toggle popup visibility on click."""

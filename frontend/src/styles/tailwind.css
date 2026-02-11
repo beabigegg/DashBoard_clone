@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --portal-shell-max-width: 1600px;
+    --portal-shell-gap: 12px;
+    --portal-shell-bg: #f5f7fa;
+    --portal-panel-bg: #ffffff;
+    --portal-text-primary: #1f2937;
+    --portal-text-secondary: #64748b;
+    --portal-brand-start: #667eea;
+    --portal-brand-end: #764ba2;
+    --portal-radius-shell: 10px;
+    --portal-radius-card: 8px;
+    --portal-shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --portal-shadow-panel: 0 2px 10px rgba(0, 0, 0, 0.08);
+    --portal-z-overlay: 1000;
+  }
+
+  body {
+    background: var(--portal-shell-bg);
+    color: var(--portal-text-primary);
+    font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .ui-shell-card {
+    border-radius: var(--portal-radius-shell);
+    background: var(--portal-panel-bg);
+    box-shadow: var(--portal-shadow-panel);
+  }
+
+  .ui-sidebar-link {
+    display: block;
+    width: 100%;
+    text-decoration: none;
+    border-radius: var(--portal-radius-card);
+    transition: all 0.15s ease;
+  }
+
+  .ui-sidebar-link:hover {
+    background: #f1f5f9;
+    color: #667eea;
+  }
+
+  .ui-sidebar-link.is-active {
+    background: #eef2ff;
+    color: #667eea;
+    font-weight: 600;
+  }
+}
+
+@layer utilities {
+  .u-panel-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--portal-shell-gap);
+  }
+
+  .u-content-shell {
+    max-width: var(--portal-shell-max-width);
+    margin-left: auto;
+    margin-right: auto;
+  }
+}

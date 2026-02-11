@@ -170,16 +170,16 @@ class TestNavigationConfig:
 
         reports = next(drawer for drawer in nav if drawer["id"] == "reports")
         assert [page["route"] for page in reports["pages"]] == ["/wip-overview"]
-        assert reports["pages"][0]["frame_id"] == "wipOverviewFrame"
-        assert reports["pages"][0]["tool_src"] is None
+        assert "frame_id" not in reports["pages"][0]
+        assert "tool_src" not in reports["pages"][0]
 
         queries = next(drawer for drawer in nav if drawer["id"] == "queries")
         assert queries["pages"][0]["route"] == "/tables"
         assert queries["pages"][-1]["route"] == "/dev-page"
 
         dev_tools = next(drawer for drawer in nav if drawer["id"] == "dev-tools")
-        assert all(page["frame_id"] == "toolFrame" for page in dev_tools["pages"])
-        assert dev_tools["pages"][0]["tool_src"] == "/admin/pages"
+        assert all("frame_id" not in page for page in dev_tools["pages"])
+        assert all("tool_src" not in page for page in dev_tools["pages"])
 
 
 class TestIsApiPublic:

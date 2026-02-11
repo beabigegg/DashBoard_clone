@@ -125,6 +125,24 @@
   font-weight: 700;
 }
 
+.filter-chip-enter-active,
+.filter-chip-leave-active {
+  transition: all 0.2s ease;
+}
+
+.filter-chip-enter-from,
+.filter-chip-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-chip-enter-active,
+  .filter-chip-leave-active {
+    transition: none !important;
+  }
+}
+
 .overview-summary-row {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

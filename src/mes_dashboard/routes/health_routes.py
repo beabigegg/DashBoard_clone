@@ -11,6 +11,7 @@ import os
 import threading
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from flask import Blueprint, current_app, jsonify, make_response
 
 from mes_dashboard.core.database import (
@@ -310,6 +311,89 @@ def get_workcenter_mapping_status() -> dict:
         'loaded': status.get('loaded', False),
         'workcenter_count': status.get('workcenter_mapping_count', 0),
         'group_count': status.get('workcenter_groups_count', 0),
+    }
+
+
+def get_portal_shell_asset_status() -> dict:
+    """Validate portal-shell HTML/CSS/JS asset availability and references."""
+    dist_dir = Path(current_app.static_folder or "") / "dist"
+    top_level_html = dist_dir / "portal-shell.html"
+    nested_html = dist_dir / "src" / "portal-shell" / "index.html"
+    js_file = dist_dir / "portal-shell.js"
+    shell_css_file = dist_dir / "portal-shell.css"
+    tailwind_css_file = dist_dir / "tailwind.css"
+
+    html_file: Path | None = None
+    if top_level_html.exists():
+        html_file = top_level_html
+    elif nested_html.exists():
+        html_file = nested_html
+
+    checks = {
+        "portal_shell_html": {
+            "exists": html_file is not None,
+            "path": str(html_file) if html_file is not None else None,
+            "source": "top-level" if html_file == top_level_html else "nested" if html_file == nested_html else None,
+        },
+        "portal_shell_js": {
+            "exists": js_file.exists(),
+            "path": str(js_file),
+        },
+        "portal_shell_css": {
+            "exists": shell_css_file.exists(),
+            "path": str(shell_css_file),
+        },
+        "tailwind_css": {
+            "exists": tailwind_css_file.exists(),
+            "path": str(tailwind_css_file),
+        },
+        "html_references": {
+            "portal_shell_js": False,
+            "portal_shell_css": False,
+            "tailwind_css": False,
+        },
+    }
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if html_file is None:
+        errors.append("portal-shell HTML not found (portal-shell.html or src/portal-shell/index.html)")
+    else:
+        try:
+            html_content = html_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            errors.append(f"failed to read shell html: {exc}")
+        else:
+            checks["html_references"]["portal_shell_js"] = "/static/dist/portal-shell.js" in html_content
+            checks["html_references"]["portal_shell_css"] = "/static/dist/portal-shell.css" in html_content
+            checks["html_references"]["tailwind_css"] = "/static/dist/tailwind.css" in html_content
+
+            if not checks["html_references"]["portal_shell_js"]:
+                errors.append("shell html missing reference: /static/dist/portal-shell.js")
+            if not checks["html_references"]["portal_shell_css"]:
+                errors.append("shell html missing reference: /static/dist/portal-shell.css")
+            if not checks["html_references"]["tailwind_css"]:
+                errors.append("shell html missing reference: /static/dist/tailwind.css")
+
+    if not checks["portal_shell_js"]["exists"]:
+        errors.append("asset missing: static/dist/portal-shell.js")
+    if not checks["portal_shell_css"]["exists"]:
+        errors.append("asset missing: static/dist/portal-shell.css")
+    if not checks["tailwind_css"]["exists"]:
+        errors.append("asset missing: static/dist/tailwind.css")
+
+    if checks["portal_shell_html"]["source"] == "nested":
+        warnings.append("using nested shell html source (dist/src/portal-shell/index.html)")
+
+    healthy = len(errors) == 0
+    return {
+        "status": "healthy" if healthy else "unhealthy",
+        "route": "/portal-shell",
+        "checks": checks,
+        "errors": errors,
+        "warnings": warnings,
+        "http_code": 200 if healthy else 503,
     }
 
 
@@ -634,3 +718,11 @@ def deep_health_check():
 
     _set_health_memo("deep", response, http_code)
     return _build_health_response(response, http_code)
+
+
+@health_bp.route('/health/frontend-shell', methods=['GET'])
+def frontend_shell_health_check():
+    """Frontend shell health endpoint for CSS/JS rendering readiness."""
+    result = get_portal_shell_asset_status()
+    http_code = int(result.pop("http_code", 500))
+    return _build_health_response(result, http_code)

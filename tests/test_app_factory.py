@@ -49,6 +49,7 @@ class AppFactoryTests(unittest.TestCase):
         rules = {rule.rule for rule in app.url_map.iter_rules()}
         expected = {
             "/",
+            "/portal-shell",
             "/tables",
             "/resource",
             "/wip-overview",
@@ -69,12 +70,61 @@ class AppFactoryTests(unittest.TestCase):
             "/api/wip/meta/packages",
             "/api/resource/status/summary",
             "/api/dashboard/kpi",
+            "/api/portal/navigation",
             "/api/excel-query/upload",
             "/api/query-tool/resolve",
             "/api/tmtt-defect/analysis",
         }
         missing = expected - rules
         self.assertFalse(missing, f"Missing routes: {sorted(missing)}")
+
+    def test_portal_spa_flag_default_enabled(self):
+        old = os.environ.pop("PORTAL_SPA_ENABLED", None)
+        try:
+            app = create_app("testing")
+            self.assertTrue(app.config.get("PORTAL_SPA_ENABLED"))
+
+            client = app.test_client()
+            response = client.get("/", follow_redirects=False)
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers.get("Location"), "/portal-shell")
+        finally:
+            if old is not None:
+                os.environ["PORTAL_SPA_ENABLED"] = old
+
+    def test_portal_spa_flag_disabled_via_env(self):
+        old = os.environ.get("PORTAL_SPA_ENABLED")
+        os.environ["PORTAL_SPA_ENABLED"] = "false"
+        try:
+            app = create_app("testing")
+            self.assertFalse(app.config.get("PORTAL_SPA_ENABLED"))
+
+            client = app.test_client()
+            response = client.get("/")
+            html = response.data.decode("utf-8")
+            self.assertIn('data-portal-spa-enabled="false"', html)
+        finally:
+            if old is None:
+                os.environ.pop("PORTAL_SPA_ENABLED", None)
+            else:
+                os.environ["PORTAL_SPA_ENABLED"] = old
+
+    def test_portal_spa_flag_enabled_via_env(self):
+        old = os.environ.get("PORTAL_SPA_ENABLED")
+        os.environ["PORTAL_SPA_ENABLED"] = "true"
+        try:
+            app = create_app("testing")
+            self.assertTrue(app.config.get("PORTAL_SPA_ENABLED"))
+
+            client = app.test_client()
+            response = client.get("/", follow_redirects=False)
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers.get("Location"), "/portal-shell")
+        finally:
+            if old is None:
+                os.environ.pop("PORTAL_SPA_ENABLED", None)
+            else:
+                os.environ["PORTAL_SPA_ENABLED"] = old
 
 
 if __name__ == "__main__":

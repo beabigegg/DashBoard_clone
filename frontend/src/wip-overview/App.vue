@@ -6,7 +6,7 @@ import {
   buildWipOverviewQueryParams,
   splitHoldByType,
 } from '../core/wip-derive.js';
-import { useAutoRefresh } from '../wip-shared/composables/useAutoRefresh.js';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
 import FilterPanel from './components/FilterPanel.vue';
 import MatrixTable from './components/MatrixTable.vue';

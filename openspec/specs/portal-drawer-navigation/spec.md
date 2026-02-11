@@ -3,9 +3,8 @@ Define stable requirements for portal-drawer-navigation.
 
 ## Requirements
 
-
 ### Requirement: Portal Navigation SHALL Group Entries by Functional Drawers
-The portal SHALL group navigation entries into functional drawers as defined in the `drawers` configuration of `page_status.json`, rendered dynamically via Jinja2 loop instead of hardcoded HTML.
+The portal SHALL group navigation entries into functional drawers as defined in the `drawers` configuration of `page_status.json`, rendered by the active portal runtime (server template or SPA shell) without changing drawer assignment semantics.
 
 #### Scenario: Drawer grouping visibility
 - **WHEN** users open the portal
@@ -17,29 +16,33 @@ The portal SHALL group navigation entries into functional drawers as defined in 
 - **THEN** the drawer and all its pages SHALL NOT be rendered in the sidebar
 
 #### Scenario: Empty drawer visibility
-- **WHEN** a drawer has no visible pages (all filtered out by `can_view_page()`)
+- **WHEN** a drawer has no visible pages (all filtered out by page visibility checks)
 - **THEN** the drawer group title SHALL NOT be rendered
 
 ### Requirement: Existing Page Behavior SHALL Remain Compatible
-The portal navigation refactor SHALL preserve existing target routes and lazy-load behavior for content frames.
+The portal navigation refactor SHALL preserve existing target routes while replacing iframe-based page embedding with route-driven navigation.
 
 #### Scenario: Route continuity
-- **WHEN** a user selects an existing page entry from a dynamically rendered drawer
+- **WHEN** a user selects an existing page entry from a drawer
 - **THEN** the corresponding original route SHALL be loaded without changing page business logic behavior
 
-#### Scenario: Iframe lazy-load continuity
-- **WHEN** a sidebar item is clicked for the first time
-- **THEN** the iframe SHALL lazy-load its content from the page's route, consistent with current behavior
+#### Scenario: Direct navigation without iframe
+- **WHEN** a sidebar item is clicked
+- **THEN** the browser SHALL navigate to the page's route in the same window
+- **THEN** the portal SHALL NOT render or activate iframe elements for page content
 
-### Requirement: First-run migration SHALL populate drawer configuration automatically
-When `page_status.json` does not contain a `drawers` field, the system SHALL automatically create the default drawer structure matching the current hardcoded layout and assign existing pages to their corresponding drawers.
+### Requirement: Drawer Configuration and Visibility SHALL Remain Deterministic During Migration
+Migration to SPA navigation SHALL preserve the effective drawer visibility outcomes defined by current `drawers + pages + status + admin_only` rules.
 
-#### Scenario: First startup after deployment
-- **WHEN** the application starts and `page_status.json` has no `drawers` field
-- **THEN** the system SHALL create three default drawers (報表類, 查詢類, 開發工具)
-- **THEN** the system SHALL assign each existing page to its historically correct drawer
-- **THEN** the system SHALL persist the updated configuration immediately
+#### Scenario: Non-admin visible drawer pages remain stable
+- **WHEN** a non-admin user opens the portal after migration
+- **THEN** only pages with released visibility in non-admin drawers SHALL be visible
+- **THEN** admin-only drawers SHALL remain hidden
 
-#### Scenario: Subsequent startup
-- **WHEN** the application starts and `page_status.json` already contains a `drawers` field
-- **THEN** the system SHALL NOT modify the existing drawer configuration
+#### Scenario: Admin visible drawer pages remain stable
+- **WHEN** an admin user opens the portal after migration
+- **THEN** all pages allowed by drawer assignment and page status rules SHALL remain visible
+
+#### Scenario: Duplicate order values resolve deterministically
+- **WHEN** multiple pages or drawers share the same `order` value
+- **THEN** rendering order SHALL still be deterministic and repeatable across requests

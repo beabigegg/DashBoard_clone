@@ -114,3 +114,117 @@ def test_health_route_uses_internal_memoization(
     assert response1.status_code == 200
     assert response2.status_code == 200
     assert mock_db.call_count == 1
+
+
+@patch('mes_dashboard.routes.health_routes.get_portal_shell_asset_status')
+def test_frontend_shell_health_endpoint_healthy(mock_status):
+    mock_status.return_value = {
+        "status": "healthy",
+        "route": "/portal-shell",
+        "checks": {
+            "portal_shell_html": {"exists": True},
+            "portal_shell_js": {"exists": True},
+            "portal_shell_css": {"exists": True},
+            "tailwind_css": {"exists": True},
+            "html_references": {
+                "portal_shell_js": True,
+                "portal_shell_css": True,
+                "tailwind_css": True,
+            },
+        },
+        "errors": [],
+        "warnings": [],
+        "http_code": 200,
+    }
+
+    response = _client().get('/health/frontend-shell')
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "healthy"
+    assert payload["checks"]["portal_shell_css"]["exists"] is True
+
+
+@patch('mes_dashboard.routes.health_routes.get_portal_shell_asset_status')
+def test_frontend_shell_health_endpoint_unhealthy(mock_status):
+    mock_status.return_value = {
+        "status": "unhealthy",
+        "route": "/portal-shell",
+        "checks": {
+            "portal_shell_html": {"exists": False},
+            "portal_shell_js": {"exists": False},
+            "portal_shell_css": {"exists": False},
+            "tailwind_css": {"exists": False},
+            "html_references": {
+                "portal_shell_js": False,
+                "portal_shell_css": False,
+                "tailwind_css": False,
+            },
+        },
+        "errors": ["asset missing: static/dist/portal-shell.css"],
+        "warnings": [],
+        "http_code": 503,
+    }
+
+    response = _client().get('/health/frontend-shell')
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["status"] == "unhealthy"
+    assert any("portal-shell.css" in error for error in payload.get("errors", []))
+
+
+def test_get_portal_shell_asset_status_reports_nested_html_as_healthy(tmp_path):
+    from mes_dashboard.routes.health_routes import get_portal_shell_asset_status
+
+    static_dir = tmp_path / "static"
+    dist_dir = static_dir / "dist"
+    nested_dir = dist_dir / "src" / "portal-shell"
+    nested_dir.mkdir(parents=True, exist_ok=True)
+
+    (nested_dir / "index.html").write_text(
+        "<html><head>"
+        "<link rel='stylesheet' href='/static/dist/tailwind.css'>"
+        "<link rel='stylesheet' href='/static/dist/portal-shell.css'>"
+        "<script type='module' src='/static/dist/portal-shell.js'></script>"
+        "</head><body><div id='app'></div></body></html>",
+        encoding="utf-8",
+    )
+    (dist_dir / "portal-shell.js").write_text("console.log('ok');", encoding="utf-8")
+    (dist_dir / "portal-shell.css").write_text(".shell{}", encoding="utf-8")
+    (dist_dir / "tailwind.css").write_text(".tw{}", encoding="utf-8")
+
+    app = create_app("testing")
+    app.config["TESTING"] = True
+    app.static_folder = str(static_dir)
+
+    with app.app_context():
+        result = get_portal_shell_asset_status()
+
+    assert result["status"] == "healthy"
+    assert result["checks"]["portal_shell_html"]["source"] == "nested"
+    assert result["checks"]["html_references"]["portal_shell_css"] is True
+
+
+def test_get_portal_shell_asset_status_reports_missing_css_as_unhealthy(tmp_path):
+    from mes_dashboard.routes.health_routes import get_portal_shell_asset_status
+
+    static_dir = tmp_path / "static"
+    dist_dir = static_dir / "dist"
+    dist_dir.mkdir(parents=True, exist_ok=True)
+
+    (dist_dir / "portal-shell.html").write_text(
+        "<html><head>"
+        "<script type='module' src='/static/dist/portal-shell.js'></script>"
+        "</head><body><div id='app'></div></body></html>",
+        encoding="utf-8",
+    )
+    (dist_dir / "portal-shell.js").write_text("console.log('ok');", encoding="utf-8")
+
+    app = create_app("testing")
+    app.config["TESTING"] = True
+    app.static_folder = str(static_dir)
+
+    with app.app_context():
+        result = get_portal_shell_asset_status()
+
+    assert result["status"] == "unhealthy"
+    assert any("portal-shell.css" in error for error in result["errors"])

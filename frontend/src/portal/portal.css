@@ -30,8 +30,6 @@
 .sidebar-item {
   display: block;
   width: 100%;
-  border: none;
-  background: none;
   text-align: left;
   padding: 8px 14px;
   font-size: 13px;
@@ -52,4 +50,20 @@
   color: #667eea;
   font-weight: 600;
   border-right: 3px solid #667eea;
+}
+
+.route-status {
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 10px 12px;
+  margin-top: 12px;
+  color: #475569;
+}
+
+.route-status.loading {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 600;
 }

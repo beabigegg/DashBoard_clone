@@ -6,6 +6,7 @@ required core JavaScript resources.
 """
 
 import unittest
+import os
 from unittest.mock import patch
 
 from mes_dashboard.app import create_app
@@ -21,11 +22,19 @@ class TestTemplateIntegration(unittest.TestCase):
     """Test that all templates properly extend _base.html."""
 
     def setUp(self):
+        self._old_portal_spa = os.environ.get("PORTAL_SPA_ENABLED")
+        os.environ["PORTAL_SPA_ENABLED"] = "false"
         db._ENGINE = None
         self.app = create_app('testing')
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
         _login_as_admin(self.client)
+
+    def tearDown(self):
+        if self._old_portal_spa is None:
+            os.environ.pop("PORTAL_SPA_ENABLED", None)
+        else:
+            os.environ["PORTAL_SPA_ENABLED"] = self._old_portal_spa
 
     def test_portal_includes_base_scripts(self):
         response = self.client.get('/')
@@ -113,13 +122,21 @@ class TestPortalDynamicDrawerRendering(unittest.TestCase):
     """Test dynamic portal drawer rendering."""
 
     def setUp(self):
+        self._old_portal_spa = os.environ.get("PORTAL_SPA_ENABLED")
+        os.environ["PORTAL_SPA_ENABLED"] = "false"
         db._ENGINE = None
         self.app = create_app('testing')
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
         _login_as_admin(self.client)
 
-    def test_portal_uses_navigation_config_for_sidebar_and_iframes(self):
+    def tearDown(self):
+        if self._old_portal_spa is None:
+            os.environ.pop("PORTAL_SPA_ENABLED", None)
+        else:
+            os.environ["PORTAL_SPA_ENABLED"] = self._old_portal_spa
+
+    def test_portal_uses_navigation_config_for_sidebar_links_without_iframe(self):
         drawers = [
             {
                 "id": "custom",
@@ -132,8 +149,6 @@ class TestPortalDynamicDrawerRendering(unittest.TestCase):
                         "name": "自訂首頁",
                         "status": "released",
                         "order": 1,
-                        "frame_id": "customFrame",
-                        "tool_src": None,
                     }
                 ],
             },
@@ -148,8 +163,6 @@ class TestPortalDynamicDrawerRendering(unittest.TestCase):
                         "name": "頁面管理",
                         "status": "dev",
                         "order": 1,
-                        "frame_id": "toolFrame",
-                        "tool_src": "/admin/pages",
                     }
                 ],
             },
@@ -160,10 +173,11 @@ class TestPortalDynamicDrawerRendering(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.data.decode("utf-8")
         self.assertIn("自訂分類", html)
-        self.assertIn('data-target="customFrame"', html)
-        self.assertIn('id="customFrame"', html)
-        self.assertIn('data-tool-src="/admin/pages"', html)
-        self.assertIn('id="toolFrame"', html)
+        self.assertIn('href="/wip-overview"', html)
+        self.assertIn('data-route="/wip-overview"', html)
+        self.assertIn('href="/admin/pages"', html)
+        self.assertIn('data-route="/admin/pages"', html)
+        self.assertNotIn("<iframe", html)
 
     def test_portal_hides_admin_only_drawer_for_non_admin(self):
         client = self.app.test_client()
@@ -179,8 +193,6 @@ class TestPortalDynamicDrawerRendering(unittest.TestCase):
                         "name": "自訂首頁",
                         "status": "released",
                         "order": 1,
-                        "frame_id": "customFrame",
-                        "tool_src": None,
                     }
                 ],
             },
@@ -195,8 +207,6 @@ class TestPortalDynamicDrawerRendering(unittest.TestCase):
                         "name": "頁面管理",
                         "status": "dev",
                         "order": 1,
-                        "frame_id": "toolFrame",
-                        "tool_src": "/admin/pages",
                     }
                 ],
             },
@@ -208,18 +218,27 @@ class TestPortalDynamicDrawerRendering(unittest.TestCase):
         html = response.data.decode("utf-8")
         self.assertIn("自訂分類", html)
         self.assertNotIn("開發工具", html)
-        self.assertNotIn('data-tool-src="/admin/pages"', html)
+        self.assertNotIn('href="/admin/pages"', html)
+        self.assertNotIn("<iframe", html)
 
 
 class TestToastCSSIntegration(unittest.TestCase):
     """Test that Toast CSS styles are included in pages."""
 
     def setUp(self):
+        self._old_portal_spa = os.environ.get("PORTAL_SPA_ENABLED")
+        os.environ["PORTAL_SPA_ENABLED"] = "false"
         db._ENGINE = None
         self.app = create_app('testing')
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
         _login_as_admin(self.client)
+
+    def tearDown(self):
+        if self._old_portal_spa is None:
+            os.environ.pop("PORTAL_SPA_ENABLED", None)
+        else:
+            os.environ["PORTAL_SPA_ENABLED"] = self._old_portal_spa
 
     def test_portal_includes_toast_css(self):
         response = self.client.get('/')

@@ -2,7 +2,7 @@
 import { reactive, watch } from 'vue';
 
 import { apiGet } from '../../core/api.js';
-import { useAutocomplete } from '../../wip-shared/composables/useAutocomplete.js';
+import { useAutocomplete } from '../../shared-composables/useAutocomplete.js';
 
 const props = defineProps({
   filters: {
@@ -111,23 +111,23 @@ function onSelect(field, value) {
     <button type="button" class="btn-primary" @click="applyFilters">套用篩選</button>
     <button type="button" class="btn-secondary" @click="clearFilters">清除篩選</button>
 
-    <div class="active-filters">
-      <span v-if="filters.workorder" class="filter-tag">
+    <TransitionGroup name="filter-chip" tag="div" class="active-filters">
+      <span v-if="filters.workorder" key="workorder" class="filter-tag">
         WO: {{ filters.workorder }}
         <span class="remove" @click="removeFilter('workorder')">×</span>
       </span>
-      <span v-if="filters.lotid" class="filter-tag">
+      <span v-if="filters.lotid" key="lotid" class="filter-tag">
         Lot: {{ filters.lotid }}
         <span class="remove" @click="removeFilter('lotid')">×</span>
       </span>
-      <span v-if="filters.package" class="filter-tag">
+      <span v-if="filters.package" key="package" class="filter-tag">
         Pkg: {{ filters.package }}
         <span class="remove" @click="removeFilter('package')">×</span>
       </span>
-      <span v-if="filters.type" class="filter-tag">
+      <span v-if="filters.type" key="type" class="filter-tag">
         Type: {{ filters.type }}
         <span class="remove" @click="removeFilter('type')">×</span>
       </span>
-    </div>
+    </TransitionGroup>
   </section>
 </template>

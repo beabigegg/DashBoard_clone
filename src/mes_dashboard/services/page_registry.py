@@ -50,17 +50,6 @@ LEGACY_NAV_ASSIGNMENTS = {
     },
 }
 
-LEGACY_FRAME_ID_MAP = {
-    "/wip-overview": "wipOverviewFrame",
-    "/resource": "resourceFrame",
-    "/tables": "tableFrame",
-    "/excel-query": "excelQueryFrame",
-    "/resource-history": "resourceHistoryFrame",
-    "/job-query": "jobQueryFrame",
-    "/query-tool": "queryToolFrame",
-    "/tmtt-defect": "tmttDefectFrame",
-}
-
 
 class DrawerError(Exception):
     """Base drawer management error."""
@@ -236,17 +225,6 @@ def _generate_drawer_id(name: str, existing_ids: set[str]) -> str:
         candidate = f"{base}-{suffix}"
         suffix += 1
     return candidate
-
-
-def _route_to_frame_id(route: str) -> str:
-    if route in LEGACY_FRAME_ID_MAP:
-        return LEGACY_FRAME_ID_MAP[route]
-
-    parts = [part for part in re.split(r"[\/_-]+", route.strip("/")) if part]
-    if not parts:
-        return "homeFrame"
-    camel = parts[0].lower() + "".join(part.capitalize() for part in parts[1:])
-    return f"{camel}Frame"
 
 
 def _sorted_drawers(drawers: list[dict]) -> list[dict]:
@@ -487,15 +465,12 @@ def get_navigation_config() -> list[dict]:
                 continue
 
             drawer = grouped[drawer_id]
-            use_tool_frame = bool(drawer["admin_only"])
             drawer["pages"].append(
                 {
                     "route": route,
                     "name": page.get("name") or route,
                     "status": page.get("status", "dev"),
                     "order": _safe_int(page.get("order"), 9999),
-                    "frame_id": "toolFrame" if use_tool_frame else _route_to_frame_id(route),
-                    "tool_src": route if use_tool_frame else None,
                 }
             )
 

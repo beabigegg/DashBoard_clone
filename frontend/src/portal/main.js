@@ -1,8 +1,8 @@
 import './portal.css';
 
 (function initPortal() {
-  const sidebarItems = document.querySelectorAll('.sidebar-item[data-target]');
-  const frames = document.querySelectorAll('iframe');
+  const sidebarItems = document.querySelectorAll('.sidebar-item[data-route]');
+  const routeStatus = document.getElementById('routeStatus');
   const healthDot = document.getElementById('healthDot');
   const healthLabel = document.getElementById('healthLabel');
   const healthPopup = document.getElementById('healthPopup');
@@ -17,49 +17,6 @@ import './portal.css';
   const routeCacheMode = document.getElementById('routeCacheMode');
   const routeCacheHitRate = document.getElementById('routeCacheHitRate');
   const routeCacheDegraded = document.getElementById('routeCacheDegraded');
-
-  function setFrameHeight() {
-    const header = document.querySelector('.header');
-    if (!header) return;
-    const height = Math.max(600, window.innerHeight - header.offsetHeight - 52);
-    frames.forEach((frame) => {
-      frame.style.height = `${height}px`;
-    });
-  }
-
-  function activateTab(targetId, toolSrc) {
-    sidebarItems.forEach((item) => item.classList.remove('active'));
-
-    // Unload inactive iframes to free memory and stop their timers
-    frames.forEach((frame) => {
-      if (frame.classList.contains('active') && frame.id !== targetId) {
-        if (frame.src) {
-          frame.dataset.src = frame.src;
-        }
-        frame.removeAttribute('src');
-      }
-      frame.classList.remove('active');
-    });
-
-    const activeItems = document.querySelectorAll(`.sidebar-item[data-target="${targetId}"]`);
-    activeItems.forEach((item) => {
-      if (!toolSrc || item.dataset.toolSrc === toolSrc) {
-        item.classList.add('active');
-      }
-    });
-
-    const targetFrame = document.getElementById(targetId);
-    if (targetFrame) {
-      targetFrame.classList.add('active');
-      if (toolSrc) {
-        if (targetFrame.src !== toolSrc && !targetFrame.src.endsWith(toolSrc)) {
-          targetFrame.src = toolSrc;
-        }
-      } else if (targetFrame.dataset.src && !targetFrame.src) {
-        targetFrame.src = targetFrame.dataset.src;
-      }
-    }
-  }
 
   function toggleHealthPopup() {
     if (!healthPopup) return;
@@ -91,6 +48,18 @@ import './portal.css';
     } catch {
       return dateStr;
     }
+  }
+
+  function markActiveSidebar() {
+    const currentPath = window.location.pathname;
+    sidebarItems.forEach((item) => {
+      const route = item.dataset.route;
+      if (route && route === currentPath) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
   }
 
   async function checkHealth() {
@@ -143,9 +112,7 @@ import './portal.css';
       }
 
       const routeCache = data.route_cache || {};
-      if (routeCacheMode) {
-        routeCacheMode.textContent = routeCache.mode || '--';
-      }
+      if (routeCacheMode) routeCacheMode.textContent = routeCache.mode || '--';
       if (routeCacheHitRate) {
         const l1 = routeCache.l1_hit_rate ?? '--';
         const l2 = routeCache.l2_hit_rate ?? '--';
@@ -173,15 +140,15 @@ import './portal.css';
 
   sidebarItems.forEach((item) => {
     item.addEventListener('click', () => {
-      activateTab(item.dataset.target, item.dataset.toolSrc || null);
+      if (!routeStatus) return;
+      routeStatus.classList.add('loading');
+      routeStatus.textContent = `正在前往 ${item.dataset.pageName || item.dataset.route || '頁面'}...`;
     });
   });
 
-  if (sidebarItems.length > 0) {
-    activateTab(sidebarItems[0].dataset.target, sidebarItems[0].dataset.toolSrc || null);
-  }
-
+  markActiveSidebar();
   window.toggleHealthPopup = toggleHealthPopup;
+
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#healthStatus') && !e.target.closest('#healthPopup') && healthPopup) {
       healthPopup.classList.remove('show');
@@ -190,6 +157,4 @@ import './portal.css';
 
   checkHealth();
   setInterval(checkHealth, 30000);
-  window.addEventListener('resize', setFrameHeight);
-  setFrameHeight();
 })();

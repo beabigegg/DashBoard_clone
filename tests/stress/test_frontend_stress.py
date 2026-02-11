@@ -12,7 +12,6 @@ Run with: pytest tests/stress/test_frontend_stress.py -v -s
 
 import pytest
 import time
-import re
 import requests
 from urllib.parse import quote
 from playwright.sync_api import Page, expect
@@ -260,49 +259,53 @@ class TestMesApiStress:
 
 @pytest.mark.stress
 class TestPageNavigationStress:
-    """Stress tests for rapid page navigation."""
+    """Stress tests for rapid route navigation."""
 
-    def test_rapid_tab_switching(self, page: Page, app_server: str):
-        """Test rapid tab switching in portal."""
+    def test_rapid_route_switching(self, page: Page, app_server: str):
+        """Rapid direct-route switching should remain responsive."""
         page.goto(app_server, wait_until='domcontentloaded', timeout=30000)
-        sidebar_items = page.locator('.sidebar-item[data-target]')
+        sidebar_items = page.locator('.sidebar-item[data-route]')
         expect(sidebar_items.first).to_be_visible()
         item_count = sidebar_items.count()
-        assert item_count >= 1, "No portal sidebar pages available for navigation stress test"
+        assert item_count >= 1, "No portal sidebar routes available for stress test"
+
+        route_hrefs = []
+        checked = min(item_count, 5)
+        for idx in range(checked):
+            href = sidebar_items.nth(idx).get_attribute('href')
+            if href and href.startswith('/'):
+                route_hrefs.append(href)
+
+        assert route_hrefs, "Unable to resolve route hrefs from sidebar"
+
+        js_errors = []
+        page.on("pageerror", lambda error: js_errors.append(str(error)))
 
         start_time = time.time()
-
-        # Rapidly switch pages 20 times
         for i in range(20):
-            item = sidebar_items.nth(i % item_count)
-            item.click()
-            page.wait_for_timeout(50)
+            page.goto(f"{app_server}{route_hrefs[i % len(route_hrefs)]}", wait_until='domcontentloaded', timeout=60000)
+            expect(page.locator('body')).to_be_visible()
+            page.wait_for_timeout(80)
 
         switch_time = time.time() - start_time
-        print(f"\n  20 sidebar switches in {switch_time:.3f}s")
+        print(f"\n  20 route switches in {switch_time:.3f}s")
+        assert len(js_errors) == 0, f"JS errors detected during route switching: {js_errors[:3]}"
 
-        # Page should still be responsive
-        expect(page.locator('h1')).to_contain_text('MES 報表入口')
-        print("  Portal remained stable")
-
-    def test_portal_iframe_stress(self, page: Page, app_server: str):
-        """Test portal remains responsive with iframe loading."""
+    def test_portal_navigation_contract_without_iframe(self, page: Page, app_server: str):
+        """Portal sidebar should expose route metadata and no iframe DOM."""
         page.goto(app_server, wait_until='domcontentloaded', timeout=30000)
-        sidebar_items = page.locator('.sidebar-item[data-target]')
+        sidebar_items = page.locator('.sidebar-item[data-route]')
         expect(sidebar_items.first).to_be_visible()
-        item_count = sidebar_items.count()
-        assert item_count >= 1, "No portal sidebar pages available for iframe stress test"
+        assert sidebar_items.count() >= 1, "No route sidebar items found"
 
-        checked = min(item_count, 4)
-        for idx in range(checked):
-            item = sidebar_items.nth(idx)
-            item.click()
-            page.wait_for_timeout(200)
+        iframe_count = page.locator('iframe').count()
+        assert iframe_count == 0, "Portal should not render iframe after migration"
 
-            # Verify clicked item is active
-            expect(item).to_have_class(re.compile(r'active'))
+        for idx in range(min(sidebar_items.count(), 3)):
+            href = sidebar_items.nth(idx).get_attribute('href')
+            assert href and href.startswith('/'), f"Invalid sidebar href: {href}"
 
-        print(f"\n  All {checked} sidebar pages clickable and responsive")
+        print("\n  Portal route sidebar contract verified without iframe")
 
 
 @pytest.mark.stress

@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
-import { useAutoRefresh } from '../wip-shared/composables/useAutoRefresh.js';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { MATRIX_STATUS_COLUMNS, STATUS_DISPLAY_MAP, normalizeStatus } from '../resource-shared/constants.js';
 
 import EquipmentGrid from './components/EquipmentGrid.vue';

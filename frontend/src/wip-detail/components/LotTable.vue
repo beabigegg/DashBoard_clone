@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 
-import Pagination from '../../wip-shared/components/Pagination.vue';
+import Pagination from '../../shared-ui/components/PaginationControl.vue';
 
 const props = defineProps({
   data: {

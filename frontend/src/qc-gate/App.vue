@@ -128,7 +128,7 @@ function handleManualRefresh() {
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
     <main class="qc-gate-content">
-      <section class="panel chart-panel">
+      <section class="panel chart-panel" :class="{ 'is-refreshing': refreshing }">
         <div class="panel-header">
           <h2>站點等待時間分布</h2>
           <span class="panel-hint">點擊圖表區段可篩選下方 LOT 清單</span>
@@ -146,7 +146,7 @@ function handleManualRefresh() {
         </template>
       </section>
 
-      <section class="panel table-panel">
+      <section class="panel table-panel" :class="{ 'is-refreshing': refreshing }">
         <div class="panel-header">
           <h2>LOT 明細</h2>
           <button

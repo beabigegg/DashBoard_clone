@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive } from 'vue';
+import Pagination from '../../shared-ui/components/PaginationControl.vue';
 
 const props = defineProps({
   items: {
@@ -22,9 +23,6 @@ const props = defineProps({
 
 const emit = defineEmits(['prev-page', 'next-page']);
 
-const canPrev = computed(() => Number(props.pagination?.page || 1) > 1);
-const canNext = computed(() => Number(props.pagination?.page || 1) < Number(props.pagination?.totalPages || 1));
-
 const pageSummary = computed(() => {
   const page = Number(props.pagination?.page || 1);
   const perPage = Number(props.pagination?.perPage || 50);
@@ -37,6 +35,12 @@ const pageSummary = computed(() => {
   const start = (page - 1) * perPage + 1;
   const end = Math.min(page * perPage, total);
   return `顯示 ${start} - ${end} / ${total.toLocaleString('zh-TW')}`;
+});
+
+const pageInfo = computed(() => {
+  const page = Number(props.pagination?.page || 1);
+  const totalPages = Number(props.pagination?.totalPages || 1);
+  return `Page ${page} / ${totalPages}`;
 });
 
 function formatNumber(value) {
@@ -131,11 +135,14 @@ function hideTip() {
       </table>
     </div>
 
-    <div class="pagination">
-      <button type="button" :disabled="!canPrev" @click="emit('prev-page')">Prev</button>
-      <span class="page-info">Page {{ pagination.page || 1 }} / {{ pagination.totalPages || 1 }}</span>
-      <button type="button" :disabled="!canNext" @click="emit('next-page')">Next</button>
-    </div>
+    <Pagination
+      :visible="Number(pagination.totalPages || 1) > 1"
+      :page="Number(pagination.page || 1)"
+      :total-pages="Number(pagination.totalPages || 1)"
+      :info-text="pageInfo"
+      @prev="emit('prev-page')"
+      @next="emit('next-page')"
+    />
   </section>
 
   <Teleport to="body">

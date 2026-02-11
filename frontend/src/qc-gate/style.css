@@ -124,6 +124,12 @@ body {
   border-radius: 12px;
   box-shadow: var(--shadow);
   overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.panel.is-refreshing {
+  border-color: #c7d2fe;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
 }
 
 .panel-header {
@@ -158,6 +164,22 @@ body {
 
 .chart-panel {
   padding-bottom: 8px;
+}
+
+.chart-panel.is-refreshing .chart-canvas,
+.table-panel.is-refreshing .lot-table-wrap {
+  animation: refreshPulse 0.9s ease-in-out;
+}
+
+@keyframes refreshPulse {
+  0% {
+    opacity: 0.78;
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .qc-gate-chart {
@@ -257,6 +279,16 @@ body {
 
 .lot-table tbody tr:hover {
   background: #f8fafc;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .refresh-button,
+  .chart-panel.is-refreshing .chart-canvas,
+  .table-panel.is-refreshing .lot-table-wrap {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 .cell-number {

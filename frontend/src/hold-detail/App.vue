@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
 import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants.js';
-import { useAutoRefresh } from '../wip-shared/composables/useAutoRefresh.js';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
 import AgeDistribution from './components/AgeDistribution.vue';
 import DistributionTable from './components/DistributionTable.vue';

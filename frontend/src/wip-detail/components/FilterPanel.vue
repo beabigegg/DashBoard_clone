@@ -2,7 +2,7 @@
 import { reactive, watch } from 'vue';
 
 import { apiGet } from '../../core/api.js';
-import { useAutocomplete } from '../../wip-shared/composables/useAutocomplete.js';
+import { useAutocomplete } from '../../shared-composables/useAutocomplete.js';
 
 const props = defineProps({
   filters: {

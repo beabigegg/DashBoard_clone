@@ -107,7 +107,6 @@ def _build_security_headers(production: bool) -> dict[str, str]:
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "
             "connect-src 'self'; "
-            # Portal embeds same-origin report pages via iframe.
             "frame-ancestors 'self'; "
             "base-uri 'self'; "
             "form-action 'self'"
@@ -138,6 +137,28 @@ def _resolve_secret_key(app: Flask) -> str:
     if env_name in {"testing", "test"}:
         return "test-secret-key"
     return "dev-local-only-secret-key"
+
+
+def _resolve_portal_spa_enabled(app: Flask) -> bool:
+    """Resolve cutover flag for SPA shell navigation.
+
+    Environment variable takes precedence so operators can toggle behavior
+    without code changes during migration rehearsal/cutover.
+    """
+    raw = os.getenv("PORTAL_SPA_ENABLED")
+    if raw is None:
+        return bool(app.config.get("PORTAL_SPA_ENABLED", False))
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _can_view_page_for_user(route: str, *, is_admin: bool) -> bool:
+    """Mirror portal page visibility policy for shell navigation/API."""
+    status = get_page_status(route)
+    if status is None:
+        return True
+    if status == "released":
+        return True
+    return is_admin
 
 
 def _shutdown_runtime_resources() -> None:
@@ -214,6 +235,7 @@ def create_app(config_name: str | None = None) -> Flask:
 
     config_class = get_config(config_name)
     app.config.from_object(config_class)
+    app.config["PORTAL_SPA_ENABLED"] = _resolve_portal_spa_enabled(app)
 
     # Session configuration with environment-aware secret validation.
     app.secret_key = _resolve_secret_key(app)
@@ -361,6 +383,7 @@ def create_app(config_name: str | None = None) -> Flask:
             "can_view_page": can_view_page,
             "frontend_asset": frontend_asset,
             "csrf_token": get_csrf_token,
+            "portal_spa_enabled": bool(app.config.get("PORTAL_SPA_ENABLED", False)),
         }
 
     # ========================================================
@@ -370,7 +393,90 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/')
     def portal_index():
         """Portal home with tabs."""
+        if bool(app.config.get("PORTAL_SPA_ENABLED", False)):
+            return redirect(url_for("portal_shell_page"))
         return render_template('portal.html', drawers=get_navigation_config())
+
+    @app.route('/portal-shell')
+    @app.route('/portal-shell/<path:_subpath>')
+    def portal_shell_page(_subpath: str | None = None):
+        """Portal SPA shell page served as pure Vite HTML output."""
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "portal-shell.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, "portal-shell.html")
+
+        nested_dist_dir = os.path.join(dist_dir, "src", "portal-shell")
+        nested_dist_html = os.path.join(nested_dist_dir, "index.html")
+        if os.path.exists(nested_dist_html):
+            return send_from_directory(nested_dist_dir, "index.html")
+
+        return (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>MES Portal Shell</title>"
+            "<link rel=\"stylesheet\" href=\"/static/dist/tailwind.css\">"
+            "<link rel=\"stylesheet\" href=\"/static/dist/portal-shell.css\">"
+            "<script type=\"module\" src=\"/static/dist/portal-shell.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        )
+
+    @app.route('/api/portal/navigation', methods=['GET'])
+    def portal_navigation_config():
+        """Return effective drawer/page navigation config for current user."""
+        admin = is_admin_logged_in()
+        admin_user_payload = None
+        if admin:
+            raw_admin = session.get("admin") or {}
+            admin_user_payload = {
+                "displayName": raw_admin.get("displayName"),
+                "username": raw_admin.get("username"),
+                "mail": raw_admin.get("mail"),
+            }
+        source = get_navigation_config()
+        drawers: list[dict] = []
+
+        for drawer in source:
+            admin_only = bool(drawer.get("admin_only", False))
+            if admin_only and not admin:
+                continue
+
+            pages = []
+            for page in drawer.get("pages", []):
+                route = str(page.get("route") or "")
+                if not route or not _can_view_page_for_user(route, is_admin=admin):
+                    continue
+                pages.append(
+                    {
+                        "route": route,
+                        "name": page.get("name") or route,
+                        "status": page.get("status", "dev"),
+                        "order": page.get("order"),
+                    }
+                )
+
+            if not pages:
+                continue
+
+            drawers.append(
+                {
+                    "id": drawer.get("id"),
+                    "name": drawer.get("name"),
+                    "order": drawer.get("order"),
+                    "admin_only": admin_only,
+                    "pages": pages,
+                }
+            )
+
+        return jsonify(
+            {
+                "drawers": drawers,
+                "is_admin": admin,
+                "admin_user": admin_user_payload,
+                "portal_spa_enabled": bool(app.config.get("PORTAL_SPA_ENABLED", False)),
+            }
+        )
 
     @app.route('/favicon.ico')
     def favicon():

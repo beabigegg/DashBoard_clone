@@ -53,6 +53,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            position: relative;
         }
 
         .admin-status {
@@ -79,7 +80,6 @@
             opacity: 0.9;
         }
 
-        /* Health Status Indicator */
         .health-status {
             display: flex;
             align-items: center;
@@ -133,7 +133,6 @@
             opacity: 0.9;
         }
 
-        /* Health Popup */
         .health-popup {
             position: absolute;
             top: 100%;
@@ -208,14 +207,6 @@
             margin-bottom: 4px;
         }
 
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            position: relative;
-        }
-
-        /* Sidebar + Panel Layout */
         .main-layout {
             display: flex;
             gap: 12px;
@@ -235,78 +226,54 @@
             top: 20px;
         }
 
-        .sidebar-group-title {
-            padding: 10px 14px 6px;
-            font-size: 11px;
-            font-weight: 700;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .sidebar-group-title:not(:first-child) {
-            border-top: 1px solid #e2e8f0;
-            margin-top: 4px;
-            padding-top: 12px;
-        }
-
-        .sidebar-item {
-            display: block;
-            width: 100%;
-            border: none;
-            background: none;
-            text-align: left;
-            padding: 8px 14px;
-            font-size: 13px;
-            color: #475569;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            text-decoration: none;
-            font-family: inherit;
-        }
-
-        .sidebar-item:hover {
-            background: #f1f5f9;
-            color: #667eea;
-        }
-
-        .sidebar-item.active {
-            background: #eef2ff;
-            color: #667eea;
-            font-weight: 600;
-            border-right: 3px solid #667eea;
-        }
-
         .panel {
             flex: 1;
             background: white;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-            overflow: hidden;
             min-width: 0;
+            padding: 24px;
         }
 
-        .panel iframe {
-            width: 100%;
-            border: none;
-            display: none;
+        .panel h2 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: #1f2937;
         }
 
-        .panel iframe.active {
-            display: block;
+        .panel p {
+            font-size: 14px;
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .route-status {
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            padding: 10px 12px;
+            margin-top: 12px;
+            color: #475569;
+        }
+
+        .route-status.loading {
+            border-color: #c7d2fe;
+            background: #eef2ff;
+            color: #4338ca;
+            font-weight: 600;
         }
     </style>
 {% endblock %}
 
 {% block content %}
-    <div class="shell">
+    <div class="shell" data-portal-spa-enabled="{{ 'true' if portal_spa_enabled else 'false' }}">
         <div class="header">
             <div class="header-left">
                 <h1>MES 報表入口</h1>
                 <p>統一入口：WIP 即時看板、設備即時概況與數據表查詢工具</p>
             </div>
             <div class="header-right">
-                <!-- Health Status Indicator -->
                 <div class="health-status" id="healthStatus" onclick="toggleHealthPopup()">
                     <span class="health-dot loading" id="healthDot"></span>
                     <span class="health-label" id="healthLabel">檢查中...</span>
@@ -365,11 +332,12 @@
                             <div class="sidebar-group-title">{{ drawer.name }}</div>
                             {% for page in drawer.pages %}
                                 {% if can_view_page(page.route) %}
-                                <button
-                                    class="sidebar-item"
-                                    data-target="{{ page.frame_id }}"
-                                    {% if page.tool_src %}data-tool-src="{{ page.tool_src }}"{% endif %}
-                                >{{ page.name }}</button>
+                                <a
+                                    class="sidebar-item{% if request.path == page.route %} active{% endif %}"
+                                    href="{{ page.route }}"
+                                    data-route="{{ page.route }}"
+                                    data-page-name="{{ page.name }}"
+                                >{{ page.name }}</a>
                                 {% endif %}
                             {% endfor %}
                         {% endif %}
@@ -380,25 +348,12 @@
                 {% endif %}
             </nav>
 
-            <div class="panel">
-                {% set frame_ns = namespace(has_tool_pages=false) %}
-                {% for drawer in drawers | default([]) %}
-                    {% if not drawer.admin_only or is_admin %}
-                        {% for page in drawer.pages %}
-                            {% if can_view_page(page.route) %}
-                                {% if page.tool_src %}
-                                    {% set frame_ns.has_tool_pages = true %}
-                                {% else %}
-                <iframe id="{{ page.frame_id }}" data-src="{{ page.route }}" title="{{ page.name }}"></iframe>
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                    {% endif %}
-                {% endfor %}
-                {% if is_admin and frame_ns.has_tool_pages %}
-                <iframe id="toolFrame" title="開發工具"></iframe>
-                {% endif %}
-            </div>
+            <section class="panel" aria-live="polite">
+                <h2>路由導覽模式</h2>
+                <p>抽屜已與 iframe 載入機制解耦，點選左側項目將直接進入既有路由頁面。</p>
+                <p>目前仍保留抽屜分組、排序與 admin 權限控制規則。</p>
+                <p id="routeStatus" class="route-status">請從左側抽屜選擇頁面。</p>
+            </section>
         </div>
     </div>
 {% endblock %}
@@ -409,191 +364,30 @@
     <script type="module" src="{{ portal_js }}"></script>
     {% else %}
     <script>
-        const sidebarItems = document.querySelectorAll('.sidebar-item[data-target]');
-        const frames = document.querySelectorAll('iframe');
+        (function portalFallback() {
+            const routeStatus = document.getElementById('routeStatus');
+            const sidebarItems = document.querySelectorAll('.sidebar-item[data-route]');
+            const healthPopup = document.getElementById('healthPopup');
 
-        function setFrameHeight() {
-            const headerHeight = document.querySelector('.header').offsetHeight;
-            const padding = 52;
-            const height = Math.max(600, window.innerHeight - headerHeight - padding);
-            frames.forEach(frame => {
-                frame.style.height = `${height}px`;
-            });
-        }
-
-        function activateTab(targetId, toolSrc) {
-            sidebarItems.forEach(item => item.classList.remove('active'));
-
-            // Unload inactive iframes to free memory and stop their timers
-            frames.forEach(frame => {
-                if (frame.classList.contains('active') && frame.id !== targetId) {
-                    if (frame.src) {
-                        frame.dataset.src = frame.src;
-                    }
-                    frame.removeAttribute('src');
-                }
-                frame.classList.remove('active');
-            });
-
-            const activeItems = document.querySelectorAll(`.sidebar-item[data-target="${targetId}"]`);
-            activeItems.forEach(item => {
-                if (!toolSrc || item.dataset.toolSrc === toolSrc) {
-                    item.classList.add('active');
-                }
-            });
-
-            const targetFrame = document.getElementById(targetId);
-            if (targetFrame) {
-                targetFrame.classList.add('active');
-                if (toolSrc) {
-                    // Dev tools: load the specific tool URL
-                    if (targetFrame.src !== toolSrc && !targetFrame.src.endsWith(toolSrc)) {
-                        targetFrame.src = toolSrc;
-                    }
-                } else if (targetFrame.dataset.src && !targetFrame.src) {
-                    targetFrame.src = targetFrame.dataset.src;
-                }
-            }
-        }
-
-        sidebarItems.forEach(item => {
-            item.addEventListener('click', () => {
-                activateTab(item.dataset.target, item.dataset.toolSrc || null);
-            });
-        });
-
-        // Auto-activate first available item
-        if (sidebarItems.length > 0) {
-            activateTab(sidebarItems[0].dataset.target, sidebarItems[0].dataset.toolSrc || null);
-        }
-
-        window.addEventListener('resize', setFrameHeight);
-        setFrameHeight();
-
-        // ============================================================
-        // Health Status Indicator
-        // ============================================================
-        const healthDot = document.getElementById('healthDot');
-        const healthLabel = document.getElementById('healthLabel');
-        const healthPopup = document.getElementById('healthPopup');
-        const dbStatus = document.getElementById('dbStatus');
-        const redisStatus = document.getElementById('redisStatus');
-        const cacheEnabled = document.getElementById('cacheEnabled');
-        const cacheSysDate = document.getElementById('cacheSysDate');
-        const cacheUpdatedAt = document.getElementById('cacheUpdatedAt');
-        const resourceCacheEnabled = document.getElementById('resourceCacheEnabled');
-        const resourceCacheCount = document.getElementById('resourceCacheCount');
-        const resourceCacheUpdatedAt = document.getElementById('resourceCacheUpdatedAt');
-
-        function toggleHealthPopup() {
-            healthPopup.classList.toggle('show');
-        }
-
-        // Close popup when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#healthStatus') && !e.target.closest('#healthPopup')) {
-                healthPopup.classList.remove('show');
-            }
-        });
-
-        function formatStatus(status) {
-            const icons = {
-                'ok': '✓',
-                'error': '✗',
-                'disabled': '○'
-            };
-            return icons[status] || status;
-        }
-
-        function setStatusClass(element, status) {
-            element.classList.remove('ok', 'error', 'disabled');
-            element.classList.add(status === 'ok' ? 'ok' : status === 'error' ? 'error' : 'disabled');
-        }
-
-        function formatDateTime(dateStr) {
-            if (!dateStr) return '--';
-            try {
-                const date = new Date(dateStr);
-                if (isNaN(date.getTime())) return dateStr;
-                return date.toLocaleString('zh-TW', {
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
+            sidebarItems.forEach((item) => {
+                item.addEventListener('click', () => {
+                    if (!routeStatus) return;
+                    routeStatus.classList.add('loading');
+                    routeStatus.textContent = `正在前往 ${item.dataset.pageName || item.dataset.route}...`;
                 });
-            } catch {
-                return dateStr;
-            }
-        }
+            });
 
-        async function checkHealth() {
-            try {
-                const response = await fetch('/health', { cache: 'no-store' });
-                const data = await response.json();
+            window.toggleHealthPopup = function toggleHealthPopup() {
+                if (!healthPopup) return;
+                healthPopup.classList.toggle('show');
+            };
 
-                // Update main indicator
-                healthDot.classList.remove('loading', 'healthy', 'degraded', 'unhealthy');
-
-                if (data.status === 'healthy') {
-                    healthDot.classList.add('healthy');
-                    healthLabel.textContent = '連線正常';
-                } else if (data.status === 'degraded') {
-                    healthDot.classList.add('degraded');
-                    healthLabel.textContent = '部分降級';
-                } else {
-                    healthDot.classList.add('unhealthy');
-                    healthLabel.textContent = '連線異常';
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#healthStatus') && !e.target.closest('#healthPopup') && healthPopup) {
+                    healthPopup.classList.remove('show');
                 }
-
-                // Update database status
-                const dbState = data.services?.database || 'error';
-                dbStatus.innerHTML = `${formatStatus(dbState)} ${dbState === 'ok' ? '正常' : '異常'}`;
-                setStatusClass(dbStatus, dbState);
-
-                // Update Redis status
-                const redisState = data.services?.redis || 'disabled';
-                let redisText = redisState === 'ok' ? '正常' : redisState === 'disabled' ? '未啟用' : '異常';
-                redisStatus.innerHTML = `${formatStatus(redisState)} ${redisText}`;
-                setStatusClass(redisStatus, redisState);
-
-                // Update WIP cache info
-                const cache = data.cache || {};
-                cacheEnabled.textContent = cache.enabled ? '已啟用' : '未啟用';
-                cacheSysDate.textContent = cache.sys_date || '--';
-                cacheUpdatedAt.textContent = formatDateTime(cache.updated_at);
-
-                // Update resource cache info
-                const resCache = data.resource_cache || {};
-                if (resCache.enabled) {
-                    resourceCacheEnabled.textContent = resCache.loaded ? '已載入' : '未載入';
-                    resourceCacheEnabled.style.color = resCache.loaded ? '#22c55e' : '#f59e0b';
-                    resourceCacheCount.textContent = resCache.count ? `${resCache.count} 筆` : '--';
-                    resourceCacheUpdatedAt.textContent = formatDateTime(resCache.updated_at);
-                } else {
-                    resourceCacheEnabled.textContent = '未啟用';
-                    resourceCacheEnabled.style.color = '#9ca3af';
-                    resourceCacheCount.textContent = '--';
-                    resourceCacheUpdatedAt.textContent = '--';
-                }
-
-            } catch (error) {
-                console.error('Health check failed:', error);
-                healthDot.classList.remove('loading', 'healthy', 'degraded');
-                healthDot.classList.add('unhealthy');
-                healthLabel.textContent = '無法連線';
-
-                dbStatus.innerHTML = '✗ 無法確認';
-                setStatusClass(dbStatus, 'error');
-                redisStatus.innerHTML = '✗ 無法確認';
-                setStatusClass(redisStatus, 'error');
-            }
-        }
-
-        // Initial check
-        checkHealth();
-
-        // Periodic check every 30 seconds
-        setInterval(checkHealth, 30000);
+            });
+        })();
     </script>
     {% endif %}
 {% endblock %}

@@ -49,6 +49,7 @@ class Config:
     ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "")
     SECRET_KEY = os.getenv("SECRET_KEY")
     CSRF_ENABLED = _bool_env("CSRF_ENABLED", True)
+    PORTAL_SPA_ENABLED = _bool_env("PORTAL_SPA_ENABLED", True)
 
     # Session configuration
     PERMANENT_SESSION_LIFETIME = _int_env("SESSION_LIFETIME", 28800)  # 8 hours

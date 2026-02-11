@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
-import { useAutoRefresh } from '../wip-shared/composables/useAutoRefresh.js';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
 import SummaryCards from '../hold-detail/components/SummaryCards.vue';
 import FilterBar from './components/FilterBar.vue';

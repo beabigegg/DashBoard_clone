@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: {
         portal: resolve(__dirname, 'src/portal/main.js'),
+        'portal-shell': resolve(__dirname, 'src/portal-shell/index.html'),
         'wip-overview': resolve(__dirname, 'src/wip-overview/index.html'),
         'wip-detail': resolve(__dirname, 'src/wip-detail/index.html'),
         'hold-detail': resolve(__dirname, 'src/hold-detail/index.html'),

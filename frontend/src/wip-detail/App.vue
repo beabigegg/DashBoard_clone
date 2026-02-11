@@ -3,7 +3,7 @@ import { computed, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
 import { buildWipDetailQueryParams } from '../core/wip-derive.js';
-import { useAutoRefresh } from '../wip-shared/composables/useAutoRefresh.js';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
 import FilterPanel from './components/FilterPanel.vue';
 import LotDetailPanel from './components/LotDetailPanel.vue';

@@ -2,7 +2,7 @@
 import { reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
-import { useAutoRefresh } from '../wip-shared/composables/useAutoRefresh.js';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
 import FilterBar from './components/FilterBar.vue';
 import KpiCards from './components/KpiCards.vue';
