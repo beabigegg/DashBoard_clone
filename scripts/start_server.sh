@@ -227,11 +227,20 @@ build_frontend_assets() {
 
     local required_entries=(
         "portal.js"
+        "wip-overview.js"
+        "wip-detail.js"
+        "hold-detail.js"
+        "hold-overview.js"
+        "hold-history.js"
         "resource-status.js"
         "resource-history.js"
         "job-query.js"
         "excel-query.js"
         "tables.js"
+        "query-tool.js"
+        "tmtt-defect.js"
+        "qc-gate.js"
+        "mid-section-defect.js"
     )
     local needs_build=false
     local newest_entry=""
