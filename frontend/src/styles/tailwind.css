@@ -4,9 +4,11 @@
 
 @layer base {
   :root {
-    --portal-shell-max-width: 1600px;
+    --portal-shell-max-width: none;
     --portal-shell-gap: 12px;
     --portal-shell-bg: #f5f7fa;
+    --portal-sidebar-width: 240px;
+    --shell-header-height: 56px;
     --portal-panel-bg: #ffffff;
     --portal-text-primary: #1f2937;
     --portal-text-secondary: #64748b;
@@ -61,7 +63,7 @@
   }
 
   .u-content-shell {
-    max-width: var(--portal-shell-max-width);
+    width: 100%;
     margin-left: auto;
     margin-right: auto;
   }

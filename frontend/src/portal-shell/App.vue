@@ -1,10 +1,17 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import HealthStatus from './components/HealthStatus.vue';
 import { consumeNavigationNotice, syncNavigationRoutes } from './router.js';
 import { normalizeRoutePath } from './routeContracts.js';
+import {
+  SIDEBAR_STORAGE_KEY,
+  buildSidebarUiState,
+  isMobileViewport,
+  parseSidebarCollapsedPreference,
+  serializeSidebarCollapsedPreference,
+} from './sidebarState.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -20,6 +27,9 @@ const adminLinks = ref({
   pages: '/admin/pages',
   performance: '/admin/performance',
 });
+const sidebarCollapsed = ref(false);
+const sidebarMobileOpen = ref(false);
+const isMobile = ref(false);
 
 function toShellPath(targetRoute) {
   return normalizeRoutePath(targetRoute);
@@ -45,6 +55,71 @@ const adminLoginHref = computed(() => {
   }
   return `/admin/login?next=${encodeURIComponent('/portal-shell')}`;
 });
+
+const sidebarUiState = computed(() =>
+  buildSidebarUiState({
+    isMobile: isMobile.value,
+    sidebarCollapsed: sidebarCollapsed.value,
+    sidebarMobileOpen: sidebarMobileOpen.value,
+  }),
+);
+
+const sidebarToggleLabel = computed(() => {
+  if (isMobile.value) {
+    return sidebarMobileOpen.value ? '關閉側邊欄' : '開啟側邊欄';
+  }
+  return sidebarCollapsed.value ? '展開側邊欄' : '收合側邊欄';
+});
+
+function restoreSidebarPreference() {
+  try {
+    const stored = window.sessionStorage.getItem(SIDEBAR_STORAGE_KEY);
+    sidebarCollapsed.value = parseSidebarCollapsedPreference(stored);
+  } catch {
+    sidebarCollapsed.value = false;
+  }
+}
+
+function persistSidebarPreference() {
+  try {
+    window.sessionStorage.setItem(
+      SIDEBAR_STORAGE_KEY,
+      serializeSidebarCollapsedPreference(sidebarCollapsed.value),
+    );
+  } catch {
+    // Keep UI behavior deterministic even if storage is unavailable.
+  }
+}
+
+function checkViewport() {
+  isMobile.value = isMobileViewport(window.innerWidth);
+  if (!isMobile.value) {
+    sidebarMobileOpen.value = false;
+  }
+}
+
+function closeMobileSidebar() {
+  sidebarMobileOpen.value = false;
+}
+
+function toggleSidebar() {
+  if (isMobile.value) {
+    sidebarMobileOpen.value = !sidebarMobileOpen.value;
+    return;
+  }
+  sidebarCollapsed.value = !sidebarCollapsed.value;
+  persistSidebarPreference();
+}
+
+function handleViewportResize() {
+  checkViewport();
+}
+
+function handleGlobalKeydown(event) {
+  if (event.key === 'Escape') {
+    closeMobileSidebar();
+  }
+}
 
 async function loadNavigation() {
   loading.value = true;
@@ -111,12 +186,22 @@ async function loadNavigation() {
 }
 
 onMounted(() => {
+  restoreSidebarPreference();
+  checkViewport();
+  window.addEventListener('resize', handleViewportResize, { passive: true });
+  window.addEventListener('keydown', handleGlobalKeydown);
   void loadNavigation();
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleViewportResize);
+  window.removeEventListener('keydown', handleGlobalKeydown);
 });
 
 watch(
   () => route.fullPath,
   () => {
+    closeMobileSidebar();
     navigationNotice.value = consumeNavigationNotice();
   },
   { immediate: true },
@@ -124,9 +209,27 @@ watch(
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :class="sidebarUiState.shellClass">
     <header class="shell-header">
-      <div>
+      <div class="shell-header-left">
+        <button
+          type="button"
+          class="sidebar-toggle"
+          :aria-expanded="sidebarUiState.ariaExpanded"
+          :aria-label="sidebarToggleLabel"
+          @click="toggleSidebar"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M4 6h16M4 12h16M4 18h16"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+            />
+          </svg>
+        </button>
         <h1>MES 報表入口</h1>
       </div>
       <div class="shell-header-right">
@@ -144,8 +247,12 @@ watch(
       </div>
     </header>
 
+    <Transition name="overlay-fade">
+      <div v-if="isMobile && sidebarMobileOpen" class="sidebar-overlay" @click="closeMobileSidebar" />
+    </Transition>
+
     <main class="shell-main">
-      <aside class="sidebar">
+      <aside class="sidebar" :class="sidebarUiState.sidebarClass">
         <div v-if="loading" class="muted">載入導覽中...</div>
         <div v-else-if="errorMessage" class="error">{{ errorMessage }}</div>
         <template v-else>
@@ -164,7 +271,7 @@ watch(
         </template>
       </aside>
 
-      <section class="content">
+      <section class="shell-content">
         <div v-if="navigationNotice" class="notice-banner">{{ navigationNotice }}</div>
         <div class="breadcrumb">
           <span v-if="breadcrumb.drawerName">{{ breadcrumb.drawerName }}</span>

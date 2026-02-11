@@ -1,6 +1,5 @@
-## Purpose
-Define stable requirements for spa-shell-navigation.
-## Requirements
+## MODIFIED Requirements
+
 ### Requirement: Portal SHALL provide a SPA shell driven by Vue Router
 The portal frontend SHALL use a single SPA shell entry and Vue Router to render page modules without iframe embedding, and SHALL route each page through native route-view integration. The shell layout SHALL use a full-viewport fluid layout with flexbox, removing all max-width constraints and block-centered styling. The main content area (`.shell-content`) SHALL fill available space as a flex child, and the sidebar SHALL be a collapsible flex child that pushes content when expanded on desktop. The content area class SHALL be `.shell-content` (not `.content`) to avoid CSS collision with page-level `.content` classes.
 
@@ -25,38 +24,3 @@ The portal frontend SHALL use a single SPA shell entry and Vue Router to render 
 #### Scenario: Shell content class avoids collision with page-level classes
 - **WHEN** a page module that uses its own `.content` class renders inside the shell
 - **THEN** the shell's content wrapper (`.shell-content`) SHALL NOT interfere with the page's `.content` styling
-
-#### Scenario: Wrapper route remains available during migration
-- **WHEN** a user clicks a sidebar page entry whose migration mode is `wrapper`
-- **THEN** Vue Router SHALL render the wrapper host in shell content area
-- **THEN** the wrapper SHALL preserve page reachability until native rewrite is completed
-
-### Requirement: Existing route contracts SHALL remain stable in SPA mode
-Migration to SPA shell SHALL preserve existing route paths, deep-link behavior, and query semantics during both native and wrapper phases.
-
-#### Scenario: Direct route entry remains functional
-- **WHEN** a user opens an existing route directly (bookmark or refresh)
-- **THEN** the route SHALL resolve to the same page functionality as before migration
-- **THEN** required query parameters SHALL continue to be interpreted with compatible semantics
-
-#### Scenario: Query continuity across shell navigation
-- **WHEN** users navigate from shell list pages to detail pages and back
-- **THEN** query-state parameters required by list/detail workflows SHALL remain consistent with pre-migration behavior
-
-### Requirement: SPA shell navigation SHALL enforce page visibility rules
-SPA navigation SHALL respect backend-defined drawer and page visibility outcomes, including admin entry visibility and route fallback for hidden routes.
-
-#### Scenario: Non-admin visibility in SPA shell
-- **WHEN** a non-admin user opens the shell
-- **THEN** routes and drawer items restricted to admin-only visibility SHALL NOT be presented as navigable entries
-
-#### Scenario: Admin visibility in SPA shell
-- **WHEN** an admin user opens the shell
-- **THEN** pages allowed by drawer and page status rules SHALL be presented as navigable entries
-- **THEN** admin entry links exposed by the shell SHALL remain reachable
-
-#### Scenario: Hidden or unknown route fallback
-- **WHEN** a user navigates to a route that is not visible or not registered in the current shell navigation set
-- **THEN** the shell SHALL redirect to a safe fallback route
-- **THEN** the shell SHALL NOT expose iframe-based fallback rendering
-

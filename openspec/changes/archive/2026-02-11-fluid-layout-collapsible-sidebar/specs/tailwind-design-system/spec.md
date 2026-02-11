@@ -1,7 +1,4 @@
-## Purpose
-Define stable requirements for tailwind-design-system.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Frontend styles SHALL be governed by Tailwind design tokens
 The frontend SHALL define a Tailwind-based design token system for color, spacing, typography, radius, and elevation to ensure consistent styling across modules. The `--portal-shell-max-width` CSS variable SHALL be set to `none` to support the fluid layout. A `--portal-sidebar-width` variable SHALL be added for sidebar width reference. The `.u-content-shell` utility class SHALL use `width: 100%` instead of `max-width` constraint.
@@ -16,19 +13,3 @@ The frontend SHALL define a Tailwind-based design token system for color, spacin
 - **THEN** `--portal-shell-max-width` SHALL resolve to `none`
 - **THEN** `--portal-sidebar-width` SHALL resolve to `240px`
 - **THEN** `.u-content-shell` SHALL apply `width: 100%` without max-width constraint
-
-### Requirement: Tailwind migration SHALL support coexistence with legacy CSS
-The migration SHALL allow Tailwind and existing page CSS to coexist during phased rollout without breaking existing pages.
-
-#### Scenario: Legacy page remains functional during coexistence
-- **WHEN** a not-yet-migrated page is rendered
-- **THEN** existing CSS behavior SHALL remain intact
-- **THEN** Tailwind introduction SHALL NOT cause blocking style regressions
-
-### Requirement: New shared UI components SHALL prefer Tailwind-first styling
-Newly introduced shared components SHALL be implemented with Tailwind-first conventions to avoid expanding duplicated page-local CSS.
-
-#### Scenario: Shared component adoption
-- **WHEN** a new shared component is introduced in migration scope
-- **THEN** its primary style contract SHALL be expressed through Tailwind utilities/components
-- **THEN** page-local CSS additions SHALL be minimized and justified

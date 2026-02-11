@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 
+import MultiSelect from '../resource-shared/components/MultiSelect.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import { useQueryToolData } from './composables/useQueryToolData.js';
@@ -24,6 +25,20 @@ const {
   queryEquipmentPeriod,
   exportCurrentCsv,
 } = useQueryToolData();
+
+const equipmentOptions = computed(() =>
+  equipment.options.map((item) => ({
+    value: item.RESOURCEID,
+    label: item.RESOURCENAME || item.RESOURCEID,
+  })),
+);
+
+const workcenterGroupOptions = computed(() =>
+  batch.workcenterGroups.map((group) => ({
+    value: group.name || group,
+    label: group.name || group,
+  })),
+);
 
 function formatCell(value) {
   if (value === null || value === undefined || value === '') {
@@ -65,11 +80,14 @@ onMounted(async () => {
           </label>
           <label class="query-tool-filter">
             <span>站點群組</span>
-            <select v-model="batch.selectedWorkcenterGroups" multiple size="3">
-              <option v-for="group in batch.workcenterGroups" :key="group.name || group" :value="group.name || group">
-                {{ group.name || group }}
-              </option>
-            </select>
+            <MultiSelect
+              :model-value="batch.selectedWorkcenterGroups"
+              :options="workcenterGroupOptions"
+              :disabled="loading.bootstrapping"
+              placeholder="全部群組"
+              searchable
+              @update:model-value="batch.selectedWorkcenterGroups = $event"
+            />
           </label>
           <template #actions>
             <button type="button" class="query-tool-btn query-tool-btn-primary" :disabled="loading.resolving" @click="resolveLots">
@@ -178,11 +196,14 @@ onMounted(async () => {
         <FilterToolbar>
           <label class="query-tool-filter">
             <span>設備（複選）</span>
-            <select v-model="equipment.selectedEquipmentIds" multiple size="4">
-              <option v-for="item in equipment.options" :key="item.RESOURCEID" :value="item.RESOURCEID">
-                {{ item.RESOURCENAME || item.RESOURCEID }}
-              </option>
-            </select>
+            <MultiSelect
+              :model-value="equipment.selectedEquipmentIds"
+              :options="equipmentOptions"
+              :disabled="loading.bootstrapping || loading.equipment"
+              placeholder="全部設備"
+              searchable
+              @update:model-value="equipment.selectedEquipmentIds = $event"
+            />
           </label>
           <label class="query-tool-filter">
             <span>查詢類型</span>
