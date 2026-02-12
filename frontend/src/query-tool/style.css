@@ -80,6 +80,12 @@
   color: #334155;
 }
 
+.query-tool-row-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .query-tool-table-wrap {
   margin-top: 12px;
   overflow: auto;
@@ -110,6 +116,34 @@
 
 .query-tool-table tr.selected {
   background: #eef2ff;
+}
+
+.query-tool-lineage-row td {
+  background: #f8fafc;
+  border-top: 1px dashed #dbeafe;
+}
+
+.query-tool-lineage-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.query-tool-lineage-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #334155;
+  font-size: 12px;
+}
+
+.query-tool-error-inline {
+  padding: 10px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 12px;
 }
 
 .query-tool-empty {

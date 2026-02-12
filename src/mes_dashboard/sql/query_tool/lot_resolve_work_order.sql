@@ -1,0 +1,14 @@
+-- GA Work Order to CONTAINERID Resolution
+-- Expands work orders to associated CONTAINERIDs.
+--
+-- Parameters:
+--   WORK_ORDER_FILTER - QueryBuilder filter on h.PJ_WORKORDER
+--
+SELECT DISTINCT
+    h.CONTAINERID,
+    h.PJ_WORKORDER,
+    c.CONTAINERNAME,
+    c.SPECNAME
+FROM DWH.DW_MES_LOTWIPHISTORY h
+LEFT JOIN DWH.DW_MES_CONTAINER c ON h.CONTAINERID = c.CONTAINERID
+WHERE {{ WORK_ORDER_FILTER }}

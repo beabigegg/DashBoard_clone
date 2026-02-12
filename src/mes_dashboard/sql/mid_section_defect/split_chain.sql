@@ -1,3 +1,4 @@
+-- DEPRECATED: replaced by sql/lineage/split_ancestors.sql
 -- Mid-Section Defect Traceability - Split Chain (Query 2a)
 -- Resolve split ancestors via DW_MES_CONTAINER.SPLITFROMID
 --

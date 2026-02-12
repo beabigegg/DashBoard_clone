@@ -25,7 +25,8 @@ from typing import Any, Dict, List, Optional, Generator
 import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df
-from mes_dashboard.sql import SQLLoader
+from mes_dashboard.sql import QueryBuilder, SQLLoader
+from mes_dashboard.services.event_fetcher import EventFetcher
 
 try:
     from mes_dashboard.core.database import read_sql_df_slow
@@ -122,58 +123,6 @@ def validate_equipment_input(equipment_ids: List[str]) -> Optional[str]:
     return None
 
 
-# ============================================================
-# Helper Functions
-# ============================================================
-
-def _build_in_clause(values: List[str], max_chunk_size: int = BATCH_SIZE) -> List[str]:
-    """Build SQL IN clause lists for values.
-
-    Oracle has a limit of ~1000 items per IN clause, so we chunk if needed.
-
-    Args:
-        values: List of values.
-        max_chunk_size: Maximum items per IN clause.
-
-    Returns:
-        List of SQL IN clause strings (e.g., "'val1', 'val2', 'val3'").
-    """
-    if not values:
-        return []
-
-    # Escape single quotes
-    escaped = [v.replace("'", "''") for v in values]
-
-    # Chunk into groups
-    chunks = []
-    for i in range(0, len(escaped), max_chunk_size):
-        chunk = escaped[i:i + max_chunk_size]
-        chunks.append("'" + "', '".join(chunk) + "'")
-
-    return chunks
-
-
-def _build_in_filter(values: List[str], column: str) -> str:
-    """Build SQL IN filter clause.
-
-    Args:
-        values: List of values.
-        column: Column name.
-
-    Returns:
-        SQL condition string.
-    """
-    chunks = _build_in_clause(values)
-    if not chunks:
-        return "1=0"
-
-    if len(chunks) == 1:
-        return f"{column} IN ({chunks[0]})"
-
-    conditions = [f"{column} IN ({chunk})" for chunk in chunks]
-    return "(" + " OR ".join(conditions) + ")"
-
-
 def _df_to_records(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """Convert DataFrame to list of records with proper type handling.
 
@@ -259,23 +208,14 @@ def _resolve_by_lot_id(lot_ids: List[str]) -> Dict[str, Any]:
     Returns:
         Resolution result dict.
     """
-    in_filter = _build_in_filter(lot_ids, 'CONTAINERNAME')
-    sql = SQLLoader.load("query_tool/lot_resolve_id")
-    sql = sql.replace("{{ CONTAINER_NAMES }}", in_filter.replace("CONTAINERNAME IN (", "").rstrip(")"))
+    builder = QueryBuilder()
+    builder.add_in_condition("CONTAINERNAME", lot_ids)
+    sql = SQLLoader.load_with_params(
+        "query_tool/lot_resolve_id",
+        CONTAINER_FILTER=builder.get_conditions_sql(),
+    )
 
-    # Direct IN clause construction
-    sql = f"""
-    SELECT
-        CONTAINERID,
-        CONTAINERNAME,
-        MFGORDERNAME,
-        SPECNAME,
-        QTY
-    FROM DWH.DW_MES_CONTAINER
-    WHERE {in_filter}
-    """
-
-    df = read_sql_df(sql, {})
+    df = read_sql_df(sql, builder.params)
     data = _df_to_records(df)
 
     # Map results
@@ -316,21 +256,14 @@ def _resolve_by_serial_number(serial_numbers: List[str]) -> Dict[str, Any]:
     Returns:
         Resolution result dict.
     """
-    in_filter = _build_in_filter(serial_numbers, 'p.FINISHEDNAME')
+    builder = QueryBuilder()
+    builder.add_in_condition("p.FINISHEDNAME", serial_numbers)
+    sql = SQLLoader.load_with_params(
+        "query_tool/lot_resolve_serial",
+        SERIAL_FILTER=builder.get_conditions_sql(),
+    )
 
-    # JOIN with CONTAINER to get LOT ID (CONTAINERNAME)
-    sql = f"""
-    SELECT DISTINCT
-        p.CONTAINERID,
-        p.FINISHEDNAME,
-        c.CONTAINERNAME,
-        c.SPECNAME
-    FROM DWH.DW_MES_PJ_COMBINEDASSYLOTS p
-    LEFT JOIN DWH.DW_MES_CONTAINER c ON p.CONTAINERID = c.CONTAINERID
-    WHERE {in_filter}
-    """
-
-    df = read_sql_df(sql, {})
+    df = read_sql_df(sql, builder.params)
     data = _df_to_records(df)
 
     # Group by serial number
@@ -381,21 +314,14 @@ def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
     Returns:
         Resolution result dict.
     """
-    in_filter = _build_in_filter(work_orders, 'h.PJ_WORKORDER')
+    builder = QueryBuilder()
+    builder.add_in_condition("h.PJ_WORKORDER", work_orders)
+    sql = SQLLoader.load_with_params(
+        "query_tool/lot_resolve_work_order",
+        WORK_ORDER_FILTER=builder.get_conditions_sql(),
+    )
 
-    # JOIN with CONTAINER to get LOT ID (CONTAINERNAME)
-    sql = f"""
-    SELECT DISTINCT
-        h.CONTAINERID,
-        h.PJ_WORKORDER,
-        c.CONTAINERNAME,
-        c.SPECNAME
-    FROM DWH.DW_MES_LOTWIPHISTORY h
-    LEFT JOIN DWH.DW_MES_CONTAINER c ON h.CONTAINERID = c.CONTAINERID
-    WHERE {in_filter}
-    """
-
-    df = read_sql_df(sql, {})
+    df = read_sql_df(sql, builder.params)
     data = _df_to_records(df)
 
     # Group by work order
@@ -472,25 +398,24 @@ def get_lot_history(
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        sql = SQLLoader.load("query_tool/lot_history")
-        params = {'container_id': container_id}
+        events_by_cid = EventFetcher.fetch_events([container_id], "history")
+        rows = list(events_by_cid.get(container_id, []))
 
-        # Add workcenter filter if groups specified
-        workcenter_filter = ""
         if workcenter_groups:
             workcenters = _get_workcenters_for_groups(workcenter_groups)
             if workcenters:
-                workcenter_filter = f"AND {_build_in_filter(workcenters, 'h.WORKCENTERNAME')}"
+                workcenter_set = set(workcenters)
+                rows = [
+                    row
+                    for row in rows
+                    if row.get('WORKCENTERNAME') in workcenter_set
+                ]
                 logger.debug(
                     f"Filtering by {len(workcenter_groups)} groups "
                     f"({len(workcenters)} workcenters)"
                 )
 
-        # Replace placeholder in SQL
-        sql = sql.replace("{{ WORKCENTER_FILTER }}", workcenter_filter)
-
-        df = read_sql_df(sql, params)
-        data = _df_to_records(df)
+        data = _df_to_records(pd.DataFrame(rows))
 
         logger.debug(f"LOT history: {len(data)} records for {container_id}")
 
@@ -576,11 +501,8 @@ def get_lot_materials(container_id: str) -> Dict[str, Any]:
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        sql = SQLLoader.load("query_tool/lot_materials")
-        params = {'container_id': container_id}
-
-        df = read_sql_df(sql, params)
-        data = _df_to_records(df)
+        events_by_cid = EventFetcher.fetch_events([container_id], "materials")
+        data = _df_to_records(pd.DataFrame(events_by_cid.get(container_id, [])))
 
         logger.debug(f"LOT materials: {len(data)} records for {container_id}")
 
@@ -608,11 +530,8 @@ def get_lot_rejects(container_id: str) -> Dict[str, Any]:
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        sql = SQLLoader.load("query_tool/lot_rejects")
-        params = {'container_id': container_id}
-
-        df = read_sql_df(sql, params)
-        data = _df_to_records(df)
+        events_by_cid = EventFetcher.fetch_events([container_id], "rejects")
+        data = _df_to_records(pd.DataFrame(events_by_cid.get(container_id, [])))
 
         logger.debug(f"LOT rejects: {len(data)} records for {container_id}")
 
@@ -640,11 +559,8 @@ def get_lot_holds(container_id: str) -> Dict[str, Any]:
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        sql = SQLLoader.load("query_tool/lot_holds")
-        params = {'container_id': container_id}
-
-        df = read_sql_df(sql, params)
-        data = _df_to_records(df)
+        events_by_cid = EventFetcher.fetch_events([container_id], "holds")
+        data = _df_to_records(pd.DataFrame(events_by_cid.get(container_id, [])))
 
         logger.debug(f"LOT holds: {len(data)} records for {container_id}")
 
@@ -661,7 +577,8 @@ def get_lot_holds(container_id: str) -> Dict[str, Any]:
 
 def get_lot_split_merge_history(
     work_order: str,
-    current_container_id: str = None
+    current_container_id: str = None,
+    full_history: bool = False,
 ) -> Dict[str, Any]:
     """Get complete split/merge history for a work order (完整拆併批歷史).
 
@@ -682,6 +599,8 @@ def get_lot_split_merge_history(
     Args:
         work_order: MFGORDERNAME value (e.g., GA25120713)
         current_container_id: Current LOT's CONTAINERID for highlighting
+        full_history: If True, query complete history using slow connection.
+            If False (default), query only last 6 months with row limit.
 
     Returns:
         Dict with 'data' (split/merge history records) and 'total', or 'error'.
@@ -690,15 +609,28 @@ def get_lot_split_merge_history(
         return {'error': '請指定工單號', 'data': [], 'total': 0}
 
     try:
-        sql = SQLLoader.load("query_tool/lot_split_merge_history")
-        params = {'work_order': work_order}
+        builder = QueryBuilder()
+        builder.add_in_condition("MFGORDERNAME", [work_order])
+        fast_time_window = "AND h.TXNDATE >= ADD_MONTHS(SYSDATE, -6)"
+        fast_row_limit = "FETCH FIRST 500 ROWS ONLY"
+        sql = SQLLoader.load_with_params(
+            "query_tool/lot_split_merge_history",
+            WORK_ORDER_FILTER=builder.get_conditions_sql(),
+            TIME_WINDOW="" if full_history else fast_time_window,
+            ROW_LIMIT="" if full_history else fast_row_limit,
+        )
+        params = builder.params
 
-        logger.info(f"Starting split/merge history query for MFGORDERNAME={work_order}")
+        mode = "full" if full_history else "fast"
+        logger.info(
+            f"Starting split/merge history query for MFGORDERNAME={work_order} mode={mode}"
+        )
 
-        # Use slow query connection with 120s timeout
-        # Note: DW_MES_HM_LOTMOVEOUT has 48M rows, no index on CONTAINERID/FROMCONTAINERID
-        # Query by MFGORDERNAME is faster but still needs extra time
-        df = read_sql_df_slow(sql, params, timeout_seconds=120)
+        if full_history:
+            # Full mode uses dedicated slow query timeout path.
+            df = read_sql_df_slow(sql, params, timeout_seconds=120)
+        else:
+            df = read_sql_df(sql, params)
         data = _df_to_records(df)
 
         # Process records for display
@@ -738,6 +670,7 @@ def get_lot_split_merge_history(
             'data': processed,
             'total': len(processed),
             'work_order': work_order,
+            'mode': mode,
         }
 
     except Exception as exc:
@@ -786,7 +719,8 @@ def _get_mfg_order_for_lot(container_id: str) -> Optional[str]:
 
 def get_lot_splits(
     container_id: str,
-    include_production_history: bool = True  # Uses dedicated slow query connection with 120s timeout
+    include_production_history: bool = True,
+    full_history: bool = False,
 ) -> Dict[str, Any]:
     """Get combined split/merge data for a LOT (拆併批紀錄).
 
@@ -801,6 +735,7 @@ def get_lot_splits(
     Args:
         container_id: CONTAINERID (16-char hex)
         include_production_history: If True (default), include production history query.
+        full_history: If True, query split/merge history without fast-mode limits.
 
     Returns:
         Dict with 'production_history', 'serial_numbers', and totals.
@@ -835,7 +770,8 @@ def get_lot_splits(
             logger.info(f"Querying production history for MFGORDERNAME={mfg_order} (LOT: {container_id})")
             history_result = get_lot_split_merge_history(
                 work_order=mfg_order,
-                current_container_id=container_id
+                current_container_id=container_id,
+                full_history=full_history,
             )
             logger.info(f"[DEBUG] history_result keys: {list(history_result.keys())}")
             logger.info(f"[DEBUG] history_result total: {history_result.get('total', 0)}")
@@ -1006,13 +942,15 @@ def get_equipment_status_hours(
         return {'error': validation_error}
 
     try:
-        # Build filter on HISTORYID (which maps to RESOURCEID)
-        equipment_filter = _build_in_filter(equipment_ids, 'r.RESOURCEID')
-
-        sql = SQLLoader.load("query_tool/equipment_status_hours")
-        sql = sql.replace("{{ EQUIPMENT_FILTER }}", equipment_filter)
+        builder = QueryBuilder()
+        builder.add_in_condition("r.RESOURCEID", equipment_ids)
+        sql = SQLLoader.load_with_params(
+            "query_tool/equipment_status_hours",
+            EQUIPMENT_FILTER=builder.get_conditions_sql(),
+        )
 
         params = {'start_date': start_date, 'end_date': end_date}
+        params.update(builder.params)
         df = read_sql_df(sql, params)
         data = _df_to_records(df)
 
@@ -1076,12 +1014,15 @@ def get_equipment_lots(
         return {'error': validation_error}
 
     try:
-        equipment_filter = _build_in_filter(equipment_ids, 'h.EQUIPMENTID')
-
-        sql = SQLLoader.load("query_tool/equipment_lots")
-        sql = sql.replace("{{ EQUIPMENT_FILTER }}", equipment_filter)
+        builder = QueryBuilder()
+        builder.add_in_condition("h.EQUIPMENTID", equipment_ids)
+        sql = SQLLoader.load_with_params(
+            "query_tool/equipment_lots",
+            EQUIPMENT_FILTER=builder.get_conditions_sql(),
+        )
 
         params = {'start_date': start_date, 'end_date': end_date}
+        params.update(builder.params)
         df = read_sql_df(sql, params)
         data = _df_to_records(df)
 
@@ -1123,12 +1064,15 @@ def get_equipment_materials(
         return {'error': validation_error}
 
     try:
-        equipment_filter = _build_in_filter(equipment_names, 'EQUIPMENTNAME')
-
-        sql = SQLLoader.load("query_tool/equipment_materials")
-        sql = sql.replace("{{ EQUIPMENT_FILTER }}", equipment_filter)
+        builder = QueryBuilder()
+        builder.add_in_condition("EQUIPMENTNAME", equipment_names)
+        sql = SQLLoader.load_with_params(
+            "query_tool/equipment_materials",
+            EQUIPMENT_FILTER=builder.get_conditions_sql(),
+        )
 
         params = {'start_date': start_date, 'end_date': end_date}
+        params.update(builder.params)
         df = read_sql_df(sql, params)
         data = _df_to_records(df)
 
@@ -1170,12 +1114,15 @@ def get_equipment_rejects(
         return {'error': validation_error}
 
     try:
-        equipment_filter = _build_in_filter(equipment_names, 'EQUIPMENTNAME')
-
-        sql = SQLLoader.load("query_tool/equipment_rejects")
-        sql = sql.replace("{{ EQUIPMENT_FILTER }}", equipment_filter)
+        builder = QueryBuilder()
+        builder.add_in_condition("EQUIPMENTNAME", equipment_names)
+        sql = SQLLoader.load_with_params(
+            "query_tool/equipment_rejects",
+            EQUIPMENT_FILTER=builder.get_conditions_sql(),
+        )
 
         params = {'start_date': start_date, 'end_date': end_date}
+        params.update(builder.params)
         df = read_sql_df(sql, params)
         data = _df_to_records(df)
 
@@ -1219,12 +1166,15 @@ def get_equipment_jobs(
         return {'error': validation_error}
 
     try:
-        equipment_filter = _build_in_filter(equipment_ids, 'RESOURCEID')
-
-        sql = SQLLoader.load("query_tool/equipment_jobs")
-        sql = sql.replace("{{ EQUIPMENT_FILTER }}", equipment_filter)
+        builder = QueryBuilder()
+        builder.add_in_condition("RESOURCEID", equipment_ids)
+        sql = SQLLoader.load_with_params(
+            "query_tool/equipment_jobs",
+            EQUIPMENT_FILTER=builder.get_conditions_sql(),
+        )
 
         params = {'start_date': start_date, 'end_date': end_date}
+        params.update(builder.params)
         df = read_sql_df(sql, params)
         data = _df_to_records(df)
 

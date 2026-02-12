@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import MultiSelect from '../resource-shared/components/MultiSelect.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
@@ -20,11 +20,14 @@ const {
   resetEquipmentDateRange,
   bootstrap,
   resolveLots,
+  loadLotLineage,
   loadLotHistory,
   loadAssociations,
   queryEquipmentPeriod,
   exportCurrentCsv,
 } = useQueryToolData();
+
+const expandedLineageIds = ref(new Set());
 
 const equipmentOptions = computed(() =>
   equipment.options.map((item) => ({
@@ -45,6 +48,50 @@ function formatCell(value) {
     return '-';
   }
   return String(value);
+}
+
+function rowContainerId(row) {
+  return String(row?.container_id || row?.CONTAINERID || '').trim();
+}
+
+function isLineageExpanded(containerId) {
+  return expandedLineageIds.value.has(containerId);
+}
+
+function lineageState(containerId) {
+  return batch.lineageCache[containerId] || null;
+}
+
+function lineageAncestors(containerId) {
+  const state = lineageState(containerId);
+  const values = state?.ancestors?.[containerId];
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  return values;
+}
+
+async function handleResolveLots() {
+  expandedLineageIds.value = new Set();
+  await resolveLots();
+}
+
+function toggleLotLineage(row) {
+  const containerId = rowContainerId(row);
+  if (!containerId) {
+    return;
+  }
+
+  const next = new Set(expandedLineageIds.value);
+  if (next.has(containerId)) {
+    next.delete(containerId);
+    expandedLineageIds.value = next;
+    return;
+  }
+
+  next.add(containerId);
+  expandedLineageIds.value = next;
+  void loadLotLineage(containerId);
 }
 
 onMounted(async () => {
@@ -89,7 +136,7 @@ onMounted(async () => {
             />
           </label>
           <template #actions>
-            <button type="button" class="query-tool-btn query-tool-btn-primary" :disabled="loading.resolving" @click="resolveLots">
+            <button type="button" class="query-tool-btn query-tool-btn-primary" :disabled="loading.resolving" @click="handleResolveLots">
               {{ loading.resolving ? '解析中...' : '解析' }}
             </button>
           </template>
@@ -110,22 +157,60 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr
+              <template
                 v-for="(row, index) in batch.resolvedLots"
                 :key="row.container_id || row.CONTAINERID || index"
-                :class="{ selected: batch.selectedContainerId === (row.container_id || row.CONTAINERID) }"
               >
-                <td>
-                  <button
-                    type="button"
-                    class="query-tool-btn query-tool-btn-ghost"
-                    @click="loadLotHistory(row.container_id || row.CONTAINERID)"
-                  >
-                    載入歷程
-                  </button>
-                </td>
-                <td v-for="column in resolvedColumns" :key="column">{{ formatCell(row[column]) }}</td>
-              </tr>
+                <tr :class="{ selected: batch.selectedContainerId === (row.container_id || row.CONTAINERID) }">
+                  <td>
+                    <div class="query-tool-row-actions">
+                      <button
+                        type="button"
+                        class="query-tool-btn query-tool-btn-ghost"
+                        @click="loadLotHistory(rowContainerId(row))"
+                      >
+                        載入歷程
+                      </button>
+                      <button
+                        type="button"
+                        class="query-tool-btn query-tool-btn-ghost"
+                        @click="toggleLotLineage(row)"
+                      >
+                        {{ isLineageExpanded(rowContainerId(row)) ? '收合血緣' : '展開血緣' }}
+                      </button>
+                    </div>
+                  </td>
+                  <td v-for="column in resolvedColumns" :key="column">{{ formatCell(row[column]) }}</td>
+                </tr>
+                <tr
+                  v-if="isLineageExpanded(rowContainerId(row))"
+                  :key="`lineage-${row.container_id || row.CONTAINERID || index}`"
+                  class="query-tool-lineage-row"
+                >
+                  <td :colspan="resolvedColumns.length + 1">
+                    <div v-if="lineageState(rowContainerId(row))?.loading" class="query-tool-empty">
+                      血緣追溯中...
+                    </div>
+                    <div v-else-if="lineageState(rowContainerId(row))?.error" class="query-tool-error-inline">
+                      {{ lineageState(rowContainerId(row)).error }}
+                    </div>
+                    <div v-else-if="lineageAncestors(rowContainerId(row)).length === 0" class="query-tool-empty">
+                      無上游血緣資料
+                    </div>
+                    <div v-else class="query-tool-lineage-content">
+                      <strong>上游節點 ({{ lineageAncestors(rowContainerId(row)).length }})</strong>
+                      <ul class="query-tool-lineage-list">
+                        <li
+                          v-for="ancestorId in lineageAncestors(rowContainerId(row))"
+                          :key="`${rowContainerId(row)}-${ancestorId}`"
+                        >
+                          {{ ancestorId }}
+                        </li>
+                      </ul>
+                    </div>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>

@@ -12,6 +12,8 @@ import json
 from unittest.mock import patch, MagicMock
 
 from mes_dashboard import create_app
+from mes_dashboard.core.cache import NoOpCache
+from mes_dashboard.core.rate_limit import reset_rate_limits_for_tests
 
 
 @pytest.fixture
@@ -19,6 +21,7 @@ def app():
     """Create test Flask application."""
     app = create_app()
     app.config['TESTING'] = True
+    app.extensions["cache"] = NoOpCache()
     return app
 
 
@@ -26,6 +29,13 @@ def app():
 def client(app):
     """Create test client."""
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    reset_rate_limits_for_tests()
+    yield
+    reset_rate_limits_for_tests()
 
 
 class TestQueryToolPage:
@@ -150,6 +160,54 @@ class TestResolveEndpoint:
         data = json.loads(response.data)
         assert data['total'] == 0
         assert 'INVALID-LOT-ID' in data['not_found']
+
+    @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
+    @patch('mes_dashboard.routes.query_tool_routes.cache_get')
+    def test_resolve_cache_hit_skips_service(self, mock_cache_get, mock_resolve, client):
+        mock_cache_get.return_value = {
+            'data': [{'container_id': 'C1', 'input_value': 'LOT-1'}],
+            'total': 1,
+            'input_count': 1,
+            'not_found': [],
+        }
+
+        response = client.post(
+            '/api/query-tool/resolve',
+            json={'input_type': 'lot_id', 'values': ['LOT-1']},
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['total'] == 1
+        mock_resolve.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.cache_set')
+    @patch('mes_dashboard.routes.query_tool_routes.cache_get', return_value=None)
+    @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
+    def test_resolve_success_caches_result(
+        self,
+        mock_resolve,
+        _mock_cache_get,
+        mock_cache_set,
+        client,
+    ):
+        mock_resolve.return_value = {
+            'data': [{'container_id': 'C1', 'input_value': 'LOT-1'}],
+            'total': 1,
+            'input_count': 1,
+            'not_found': [],
+        }
+
+        response = client.post(
+            '/api/query-tool/resolve',
+            json={'input_type': 'lot_id', 'values': ['LOT-1']},
+        )
+
+        assert response.status_code == 200
+        mock_cache_set.assert_called_once()
+        cache_key = mock_cache_set.call_args.args[0]
+        assert cache_key.startswith('qt:resolve:lot_id:')
+        assert mock_cache_set.call_args.kwargs['ttl'] == 60
 
 
 class TestLotHistoryEndpoint:
@@ -315,6 +373,135 @@ class TestLotAssociationsEndpoint:
         data = json.loads(response.data)
         assert 'data' in data
         assert data['total'] == 1
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_splits')
+    def test_lot_splits_default_fast_mode(self, mock_query, client):
+        mock_query.return_value = {'data': [], 'total': 0}
+
+        response = client.get(
+            '/api/query-tool/lot-associations?container_id=488103800029578b&type=splits'
+        )
+
+        assert response.status_code == 200
+        mock_query.assert_called_once_with('488103800029578b', full_history=False)
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_splits')
+    def test_lot_splits_full_history_mode(self, mock_query, client):
+        mock_query.return_value = {'data': [], 'total': 0}
+
+        response = client.get(
+            '/api/query-tool/lot-associations?'
+            'container_id=488103800029578b&type=splits&full_history=true'
+        )
+
+        assert response.status_code == 200
+        mock_query.assert_called_once_with('488103800029578b', full_history=True)
+
+
+class TestQueryToolRateLimit:
+    """Rate-limit behavior for high-cost query-tool endpoints."""
+
+    @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 5))
+    def test_resolve_rate_limited_returns_429(self, _mock_limit, mock_resolve, client):
+        response = client.post(
+            '/api/query-tool/resolve',
+            json={'input_type': 'lot_id', 'values': ['GA23100020-A00-001']},
+        )
+
+        assert response.status_code == 429
+        assert response.headers.get('Retry-After') == '5'
+        payload = response.get_json()
+        assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+        mock_resolve.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 6))
+    def test_lot_history_rate_limited_returns_429(self, _mock_limit, mock_history, client):
+        response = client.get('/api/query-tool/lot-history?container_id=488103800029578b')
+
+        assert response.status_code == 429
+        assert response.headers.get('Retry-After') == '6'
+        payload = response.get_json()
+        assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+        mock_history.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_materials')
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 7))
+    def test_lot_association_rate_limited_returns_429(
+        self,
+        _mock_limit,
+        mock_materials,
+        client,
+    ):
+        response = client.get(
+            '/api/query-tool/lot-associations?container_id=488103800029578b&type=materials'
+        )
+
+        assert response.status_code == 429
+        assert response.headers.get('Retry-After') == '7'
+        payload = response.get_json()
+        assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+        mock_materials.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_adjacent_lots')
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 8))
+    def test_adjacent_lots_rate_limited_returns_429(
+        self,
+        _mock_limit,
+        mock_adjacent,
+        client,
+    ):
+        response = client.get(
+            '/api/query-tool/adjacent-lots?equipment_id=EQ001&target_time=2024-01-15T10:30:00'
+        )
+
+        assert response.status_code == 429
+        assert response.headers.get('Retry-After') == '8'
+        payload = response.get_json()
+        assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+        mock_adjacent.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_equipment_status_hours')
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 9))
+    def test_equipment_period_rate_limited_returns_429(
+        self,
+        _mock_limit,
+        mock_equipment,
+        client,
+    ):
+        response = client.post(
+            '/api/query-tool/equipment-period',
+            json={
+                'equipment_ids': ['EQ001'],
+                'start_date': '2024-01-01',
+                'end_date': '2024-01-31',
+                'query_type': 'status_hours',
+            },
+        )
+
+        assert response.status_code == 429
+        assert response.headers.get('Retry-After') == '9'
+        payload = response.get_json()
+        assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+        mock_equipment.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 10))
+    def test_export_rate_limited_returns_429(self, _mock_limit, mock_history, client):
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_history',
+                'params': {'container_id': '488103800029578b'},
+            },
+        )
+
+        assert response.status_code == 429
+        assert response.headers.get('Retry-After') == '10'
+        payload = response.get_json()
+        assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+        mock_history.assert_not_called()
 
 
 class TestEquipmentPeriodEndpoint:

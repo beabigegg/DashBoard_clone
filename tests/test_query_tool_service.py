@@ -12,8 +12,10 @@ from mes_dashboard.services.query_tool_service import (
     validate_date_range,
     validate_lot_input,
     validate_equipment_input,
-    _build_in_clause,
-    _build_in_filter,
+    _resolve_by_lot_id,
+    _resolve_by_serial_number,
+    _resolve_by_work_order,
+    get_lot_split_merge_history,
     BATCH_SIZE,
     MAX_LOT_IDS,
     MAX_SERIAL_NUMBERS,
@@ -184,86 +186,124 @@ class TestValidateEquipmentInput:
         assert result is None
 
 
-class TestBuildInClause:
-    """Tests for _build_in_clause function."""
+class TestResolveQueriesUseBindParams:
+    """Queries with user input should always use bind params."""
 
-    def test_empty_list(self):
-        """Should return empty list for empty input."""
-        result = _build_in_clause([])
-        assert result == []
+    def test_resolve_by_lot_id_uses_query_builder_params(self):
+        from unittest.mock import patch
+        import pandas as pd
 
-    def test_single_value(self):
-        """Should return single chunk for single value."""
-        result = _build_in_clause(['VAL001'])
-        assert len(result) == 1
-        assert result[0] == "'VAL001'"
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_read.return_value = pd.DataFrame([
+                    {
+                        'CONTAINERID': 'CID-1',
+                        'CONTAINERNAME': 'LOT-1',
+                        'SPECNAME': 'SPEC-1',
+                        'QTY': 100,
+                    }
+                ])
 
-    def test_multiple_values(self):
-        """Should join multiple values with comma."""
-        result = _build_in_clause(['VAL001', 'VAL002', 'VAL003'])
-        assert len(result) == 1
-        assert "'VAL001'" in result[0]
-        assert "'VAL002'" in result[0]
-        assert "'VAL003'" in result[0]
-        assert result[0] == "'VAL001', 'VAL002', 'VAL003'"
+                result = _resolve_by_lot_id(['LOT-1'])
 
-    def test_chunking(self):
-        """Should chunk when exceeding batch size."""
-        # Create more than BATCH_SIZE values
-        values = [f'VAL{i:06d}' for i in range(BATCH_SIZE + 10)]
-        result = _build_in_clause(values)
-        assert len(result) == 2
-        # First chunk should have BATCH_SIZE items
-        assert result[0].count("'") == BATCH_SIZE * 2  # 2 quotes per value
+                assert result['total'] == 1
+                mock_load.assert_called_once()
+                sql_params = mock_load.call_args.kwargs
+                assert 'CONTAINER_FILTER' in sql_params
+                assert ':p0' in sql_params['CONTAINER_FILTER']
+                _, query_params = mock_read.call_args.args
+                assert query_params == {'p0': 'LOT-1'}
 
-    def test_escape_single_quotes(self):
-        """Should escape single quotes in values."""
-        result = _build_in_clause(["VAL'001"])
-        assert len(result) == 1
-        assert "VAL''001" in result[0]  # Escaped
+    def test_resolve_by_serial_number_uses_query_builder_params(self):
+        from unittest.mock import patch
+        import pandas as pd
 
-    def test_custom_chunk_size(self):
-        """Should respect custom chunk size."""
-        values = ['V1', 'V2', 'V3', 'V4', 'V5']
-        result = _build_in_clause(values, max_chunk_size=2)
-        assert len(result) == 3  # 2+2+1
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_read.return_value = pd.DataFrame([
+                    {
+                        'CONTAINERID': 'CID-1',
+                        'FINISHEDNAME': 'SN-1',
+                        'CONTAINERNAME': 'LOT-1',
+                        'SPECNAME': 'SPEC-1',
+                    }
+                ])
+
+                result = _resolve_by_serial_number(['SN-1'])
+
+                assert result['total'] == 1
+                sql_params = mock_load.call_args.kwargs
+                assert ':p0' in sql_params['SERIAL_FILTER']
+                _, query_params = mock_read.call_args.args
+                assert query_params == {'p0': 'SN-1'}
+
+    def test_resolve_by_work_order_uses_query_builder_params(self):
+        from unittest.mock import patch
+        import pandas as pd
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_read.return_value = pd.DataFrame([
+                    {
+                        'CONTAINERID': 'CID-1',
+                        'PJ_WORKORDER': 'WO-1',
+                        'CONTAINERNAME': 'LOT-1',
+                        'SPECNAME': 'SPEC-1',
+                    }
+                ])
+
+                result = _resolve_by_work_order(['WO-1'])
+
+                assert result['total'] == 1
+                sql_params = mock_load.call_args.kwargs
+                assert ':p0' in sql_params['WORK_ORDER_FILTER']
+                _, query_params = mock_read.call_args.args
+                assert query_params == {'p0': 'WO-1'}
 
 
-class TestBuildInFilter:
-    """Tests for _build_in_filter function."""
+class TestSplitMergeHistoryMode:
+    """Fast mode should use read_sql_df, full mode should use read_sql_df_slow."""
 
-    def test_empty_list(self):
-        """Should return 1=0 for empty input (no results)."""
-        result = _build_in_filter([], 'COL')
-        assert result == "1=0"
+    def test_fast_mode_uses_time_window_and_row_limit(self):
+        from unittest.mock import patch
+        import pandas as pd
 
-    def test_single_value(self):
-        """Should build simple IN clause for single value."""
-        result = _build_in_filter(['VAL001'], 'COL')
-        assert "COL IN" in result
-        assert "'VAL001'" in result
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_fast:
+                with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_slow:
+                    mock_load.return_value = "SELECT * FROM DUAL"
+                    mock_fast.return_value = pd.DataFrame([])
 
-    def test_multiple_values(self):
-        """Should build IN clause with multiple values."""
-        result = _build_in_filter(['VAL001', 'VAL002'], 'COL')
-        assert "COL IN" in result
-        assert "'VAL001'" in result
-        assert "'VAL002'" in result
+                    result = get_lot_split_merge_history('WO-1', full_history=False)
 
-    def test_custom_column(self):
-        """Should use custom column name."""
-        result = _build_in_filter(['VAL001'], 't.MYCOL')
-        assert "t.MYCOL IN" in result
+                    assert result['mode'] == 'fast'
+                    kwargs = mock_load.call_args.kwargs
+                    assert "ADD_MONTHS(SYSDATE, -6)" in kwargs['TIME_WINDOW']
+                    assert "FETCH FIRST 500 ROWS ONLY" == kwargs['ROW_LIMIT']
+                    mock_fast.assert_called_once()
+                    mock_slow.assert_not_called()
 
-    def test_large_list_uses_or(self):
-        """Should use OR for chunked results."""
-        # Create more than BATCH_SIZE values
-        values = [f'VAL{i:06d}' for i in range(BATCH_SIZE + 10)]
-        result = _build_in_filter(values, 'COL')
-        assert " OR " in result
-        # Should have parentheses wrapping the OR conditions
-        assert result.startswith("(")
-        assert result.endswith(")")
+    def test_full_mode_uses_slow_query_without_limits(self):
+        from unittest.mock import patch
+        import pandas as pd
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_fast:
+                with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_slow:
+                    mock_load.return_value = "SELECT * FROM DUAL"
+                    mock_slow.return_value = pd.DataFrame([])
+
+                    result = get_lot_split_merge_history('WO-1', full_history=True)
+
+                    assert result['mode'] == 'full'
+                    kwargs = mock_load.call_args.kwargs
+                    assert kwargs['TIME_WINDOW'] == ''
+                    assert kwargs['ROW_LIMIT'] == ''
+                    mock_fast.assert_not_called()
+                    mock_slow.assert_called_once()
 
 
 class TestServiceConstants:
@@ -328,93 +368,73 @@ class TestGetLotHistoryWithWorkcenterFilter:
 
     def test_no_filter_returns_all(self):
         """When no workcenter_groups, should not add filter to SQL."""
-        from unittest.mock import patch, MagicMock
-        import pandas as pd
+        from unittest.mock import patch
+        from mes_dashboard.services.query_tool_service import get_lot_history
 
-        with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
-            with patch('mes_dashboard.services.query_tool_service.SQLLoader') as mock_loader:
-                from mes_dashboard.services.query_tool_service import get_lot_history
+        with patch('mes_dashboard.services.query_tool_service.EventFetcher.fetch_events') as mock_fetch:
+            mock_fetch.return_value = {
+                'abc123': [
+                    {'CONTAINERID': 'abc123', 'WORKCENTERNAME': 'DB_1'},
+                    {'CONTAINERID': 'abc123', 'WORKCENTERNAME': 'WB_1'},
+                ]
+            }
 
-                mock_loader.load.return_value = 'SELECT * FROM t WHERE c = :container_id {{ WORKCENTER_FILTER }}'
-                mock_read.return_value = pd.DataFrame({
-                    'CONTAINERID': ['abc123'],
-                    'WORKCENTERNAME': ['DB_1'],
-                })
+            result = get_lot_history('abc123', workcenter_groups=None)
 
-                result = get_lot_history('abc123', workcenter_groups=None)
-
-                assert 'error' not in result
-                assert result['filtered_by_groups'] == []
-                # Verify SQL does not contain WORKCENTERNAME IN
-                sql_called = mock_read.call_args[0][0]
-                assert 'WORKCENTERNAME IN' not in sql_called
-                assert '{{ WORKCENTER_FILTER }}' not in sql_called
+            assert 'error' not in result
+            assert result['filtered_by_groups'] == []
+            assert result['total'] == 2
 
     def test_with_filter_adds_condition(self):
         """When workcenter_groups provided, should filter by workcenters."""
         from unittest.mock import patch
-        import pandas as pd
+        from mes_dashboard.services.query_tool_service import get_lot_history
 
-        with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
-            with patch('mes_dashboard.services.query_tool_service.SQLLoader') as mock_loader:
-                with patch('mes_dashboard.services.filter_cache.get_workcenters_for_groups') as mock_get_wc:
-                    from mes_dashboard.services.query_tool_service import get_lot_history
+        with patch('mes_dashboard.services.query_tool_service.EventFetcher.fetch_events') as mock_fetch:
+            with patch('mes_dashboard.services.filter_cache.get_workcenters_for_groups') as mock_get_wc:
+                mock_fetch.return_value = {
+                    'abc123': [
+                        {'CONTAINERID': 'abc123', 'WORKCENTERNAME': 'DB_1'},
+                        {'CONTAINERID': 'abc123', 'WORKCENTERNAME': 'WB_1'},
+                    ]
+                }
+                mock_get_wc.return_value = ['DB_1']
 
-                    mock_loader.load.return_value = 'SELECT * FROM t WHERE c = :container_id {{ WORKCENTER_FILTER }}'
-                    mock_get_wc.return_value = ['DB_1', 'DB_2']
-                    mock_read.return_value = pd.DataFrame({
-                        'CONTAINERID': ['abc123'],
-                        'WORKCENTERNAME': ['DB_1'],
-                    })
+                result = get_lot_history('abc123', workcenter_groups=['DB'])
 
-                    result = get_lot_history('abc123', workcenter_groups=['DB'])
-
-                    mock_get_wc.assert_called_once_with(['DB'])
-                    assert result['filtered_by_groups'] == ['DB']
-                    # Verify SQL contains filter
-                    sql_called = mock_read.call_args[0][0]
-                    assert 'WORKCENTERNAME' in sql_called
+                mock_get_wc.assert_called_once_with(['DB'])
+                assert result['filtered_by_groups'] == ['DB']
+                assert result['total'] == 1
+                assert result['data'][0]['WORKCENTERNAME'] == 'DB_1'
 
     def test_empty_groups_list_no_filter(self):
         """Empty groups list should return all (no filter)."""
         from unittest.mock import patch
-        import pandas as pd
+        from mes_dashboard.services.query_tool_service import get_lot_history
 
-        with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
-            with patch('mes_dashboard.services.query_tool_service.SQLLoader') as mock_loader:
-                from mes_dashboard.services.query_tool_service import get_lot_history
+        with patch('mes_dashboard.services.query_tool_service.EventFetcher.fetch_events') as mock_fetch:
+            mock_fetch.return_value = {
+                'abc123': [{'CONTAINERID': 'abc123', 'WORKCENTERNAME': 'DB_1'}]
+            }
 
-                mock_loader.load.return_value = 'SELECT * FROM t WHERE c = :container_id {{ WORKCENTER_FILTER }}'
-                mock_read.return_value = pd.DataFrame({
-                    'CONTAINERID': ['abc123'],
-                    'WORKCENTERNAME': ['DB_1'],
-                })
+            result = get_lot_history('abc123', workcenter_groups=[])
 
-                result = get_lot_history('abc123', workcenter_groups=[])
-
-                assert result['filtered_by_groups'] == []
-                # Verify SQL does not contain WORKCENTERNAME IN
-                sql_called = mock_read.call_args[0][0]
-                assert 'WORKCENTERNAME IN' not in sql_called
+            assert result['filtered_by_groups'] == []
+            assert result['total'] == 1
 
     def test_filter_with_empty_workcenters_result(self):
         """When group has no workcenters, should not add filter."""
         from unittest.mock import patch
-        import pandas as pd
+        from mes_dashboard.services.query_tool_service import get_lot_history
 
-        with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
-            with patch('mes_dashboard.services.query_tool_service.SQLLoader') as mock_loader:
-                with patch('mes_dashboard.services.filter_cache.get_workcenters_for_groups') as mock_get_wc:
-                    from mes_dashboard.services.query_tool_service import get_lot_history
+        with patch('mes_dashboard.services.query_tool_service.EventFetcher.fetch_events') as mock_fetch:
+            with patch('mes_dashboard.services.filter_cache.get_workcenters_for_groups') as mock_get_wc:
+                mock_fetch.return_value = {
+                    'abc123': [{'CONTAINERID': 'abc123', 'WORKCENTERNAME': 'DB_1'}]
+                }
+                mock_get_wc.return_value = []
 
-                    mock_loader.load.return_value = 'SELECT * FROM t WHERE c = :container_id {{ WORKCENTER_FILTER }}'
-                    mock_get_wc.return_value = []  # No workcenters for this group
-                    mock_read.return_value = pd.DataFrame({
-                        'CONTAINERID': ['abc123'],
-                        'WORKCENTERNAME': ['DB_1'],
-                    })
+                result = get_lot_history('abc123', workcenter_groups=['UNKNOWN'])
 
-                    result = get_lot_history('abc123', workcenter_groups=['UNKNOWN'])
-
-                    # Should still succeed, just no filter applied
-                    assert 'error' not in result
+                assert 'error' not in result
+                assert result['total'] == 1

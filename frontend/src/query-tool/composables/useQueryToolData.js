@@ -85,6 +85,7 @@ export function useQueryToolData() {
     lotHistoryRows: [],
     associationType: 'materials',
     associationRows: [],
+    lineageCache: {},
   });
 
   const equipment = reactive({
@@ -185,6 +186,7 @@ export function useQueryToolData() {
     batch.selectedContainerId = '';
     batch.lotHistoryRows = [];
     batch.associationRows = [];
+    batch.lineageCache = {};
     syncBatchUrlState();
     try {
       const payload = await apiPost(
@@ -233,6 +235,52 @@ export function useQueryToolData() {
       return false;
     } finally {
       loading.history = false;
+    }
+  }
+
+  async function loadLotLineage(containerId) {
+    const id = String(containerId || '').trim();
+    if (!id) {
+      return false;
+    }
+
+    const cached = batch.lineageCache[id];
+    if (cached?.loading || cached?.ancestors) {
+      return true;
+    }
+
+    batch.lineageCache[id] = {
+      ancestors: null,
+      merges: null,
+      loading: true,
+      error: '',
+    };
+
+    try {
+      const payload = await apiPost(
+        '/api/trace/lineage',
+        {
+          profile: 'query_tool',
+          container_ids: [id],
+        },
+        { timeout: 60000, silent: true },
+      );
+
+      batch.lineageCache[id] = {
+        ancestors: payload?.ancestors || {},
+        merges: payload?.merges || {},
+        loading: false,
+        error: '',
+      };
+      return true;
+    } catch (error) {
+      batch.lineageCache[id] = {
+        ancestors: null,
+        merges: null,
+        loading: false,
+        error: error?.message || '血緣查詢失敗',
+      };
+      return false;
     }
   }
 
@@ -391,6 +439,7 @@ export function useQueryToolData() {
     resetEquipmentDateRange,
     bootstrap,
     resolveLots,
+    loadLotLineage,
     loadLotHistory,
     loadAssociations,
     queryEquipmentPeriod,

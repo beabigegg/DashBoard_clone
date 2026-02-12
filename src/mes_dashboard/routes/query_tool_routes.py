@@ -9,9 +9,13 @@ Contains Flask Blueprint for batch tracing and equipment period query endpoints:
 - CSV export functionality
 """
 
+import hashlib
+
 from flask import Blueprint, jsonify, request, Response, render_template
 
+from mes_dashboard.core.cache import cache_get, cache_set
 from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell
+from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.services.query_tool_service import (
     resolve_lots,
     get_lot_history,
@@ -36,6 +40,49 @@ from mes_dashboard.services.query_tool_service import (
 # Create Blueprint
 query_tool_bp = Blueprint('query_tool', __name__)
 
+_QUERY_TOOL_RESOLVE_RATE_LIMIT = configured_rate_limit(
+    bucket="query-tool-resolve",
+    max_attempts_env="QT_RESOLVE_RATE_MAX_REQUESTS",
+    window_seconds_env="QT_RESOLVE_RATE_WINDOW_SECONDS",
+    default_max_attempts=10,
+    default_window_seconds=60,
+)
+_QUERY_TOOL_HISTORY_RATE_LIMIT = configured_rate_limit(
+    bucket="query-tool-history",
+    max_attempts_env="QT_HISTORY_RATE_MAX_REQUESTS",
+    window_seconds_env="QT_HISTORY_RATE_WINDOW_SECONDS",
+    default_max_attempts=20,
+    default_window_seconds=60,
+)
+_QUERY_TOOL_ASSOC_RATE_LIMIT = configured_rate_limit(
+    bucket="query-tool-association",
+    max_attempts_env="QT_ASSOC_RATE_MAX_REQUESTS",
+    window_seconds_env="QT_ASSOC_RATE_WINDOW_SECONDS",
+    default_max_attempts=20,
+    default_window_seconds=60,
+)
+_QUERY_TOOL_ADJACENT_RATE_LIMIT = configured_rate_limit(
+    bucket="query-tool-adjacent",
+    max_attempts_env="QT_ADJACENT_RATE_MAX_REQUESTS",
+    window_seconds_env="QT_ADJACENT_RATE_WINDOW_SECONDS",
+    default_max_attempts=20,
+    default_window_seconds=60,
+)
+_QUERY_TOOL_EQUIPMENT_RATE_LIMIT = configured_rate_limit(
+    bucket="query-tool-equipment",
+    max_attempts_env="QT_EQUIP_RATE_MAX_REQUESTS",
+    window_seconds_env="QT_EQUIP_RATE_WINDOW_SECONDS",
+    default_max_attempts=5,
+    default_window_seconds=60,
+)
+_QUERY_TOOL_EXPORT_RATE_LIMIT = configured_rate_limit(
+    bucket="query-tool-export",
+    max_attempts_env="QT_EXPORT_RATE_MAX_REQUESTS",
+    window_seconds_env="QT_EXPORT_RATE_WINDOW_SECONDS",
+    default_max_attempts=3,
+    default_window_seconds=60,
+)
+
 
 # ============================================================
 # Page Route
@@ -55,6 +102,7 @@ def query_tool_page():
 # ============================================================
 
 @query_tool_bp.route('/api/query-tool/resolve', methods=['POST'])
+@_QUERY_TOOL_RESOLVE_RATE_LIMIT
 def resolve_lot_input():
     """Resolve user input to CONTAINERID list.
 
@@ -90,10 +138,28 @@ def resolve_lot_input():
     if validation_error:
         return jsonify({'error': validation_error}), 400
 
+    cache_values = [
+        v.strip()
+        for v in values
+        if isinstance(v, str) and v.strip()
+    ]
+    cache_key = None
+    if cache_values:
+        values_hash = hashlib.md5(
+            "|".join(sorted(cache_values)).encode("utf-8")
+        ).hexdigest()[:16]
+        cache_key = f"qt:resolve:{input_type}:{values_hash}"
+        cached = cache_get(cache_key)
+        if cached is not None:
+            return jsonify(cached)
+
     result = resolve_lots(input_type, values)
 
     if 'error' in result:
         return jsonify(result), 400
+
+    if cache_key is not None:
+        cache_set(cache_key, result, ttl=60)
 
     return jsonify(result)
 
@@ -103,6 +169,7 @@ def resolve_lot_input():
 # ============================================================
 
 @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
+@_QUERY_TOOL_HISTORY_RATE_LIMIT
 def query_lot_history():
     """Query production history for a LOT.
 
@@ -138,6 +205,7 @@ def query_lot_history():
 # ============================================================
 
 @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
+@_QUERY_TOOL_ADJACENT_RATE_LIMIT
 def query_adjacent_lots():
     """Query adjacent lots (前後批) for a specific equipment.
 
@@ -171,6 +239,7 @@ def query_adjacent_lots():
 # ============================================================
 
 @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
+@_QUERY_TOOL_ASSOC_RATE_LIMIT
 def query_lot_associations():
     """Query association data for a LOT.
 
@@ -180,6 +249,7 @@ def query_lot_associations():
         equipment_id: Equipment ID (required for 'jobs' type)
         time_start: Start time (required for 'jobs' type)
         time_end: End time (required for 'jobs' type)
+        full_history: Optional boolean for 'splits' type (default false)
 
     Returns association records based on type.
     """
@@ -200,7 +270,8 @@ def query_lot_associations():
     elif assoc_type == 'holds':
         result = get_lot_holds(container_id)
     elif assoc_type == 'splits':
-        result = get_lot_splits(container_id)
+        full_history = request.args.get('full_history', 'false').lower() == 'true'
+        result = get_lot_splits(container_id, full_history=full_history)
     elif assoc_type == 'jobs':
         equipment_id = request.args.get('equipment_id')
         time_start = request.args.get('time_start')
@@ -222,6 +293,7 @@ def query_lot_associations():
 # ============================================================
 
 @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
+@_QUERY_TOOL_EQUIPMENT_RATE_LIMIT
 def query_equipment_period():
     """Query equipment data for a time period.
 
@@ -363,6 +435,7 @@ def get_workcenter_groups_list():
 # ============================================================
 
 @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
+@_QUERY_TOOL_EXPORT_RATE_LIMIT
 def export_csv():
     """Export query results as CSV.
 

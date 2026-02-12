@@ -33,7 +33,9 @@ import pandas as pd
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.redis_client import try_acquire_lock, release_lock
-from mes_dashboard.sql import SQLLoader, QueryBuilder
+from mes_dashboard.sql import SQLLoader
+from mes_dashboard.services.event_fetcher import EventFetcher
+from mes_dashboard.services.lineage_engine import LineageEngine
 
 logger = logging.getLogger('mes_dashboard.mid_section_defect')
 
@@ -41,7 +43,6 @@ logger = logging.getLogger('mes_dashboard.mid_section_defect')
 MAX_QUERY_DAYS = 180
 CACHE_TTL_TMTT = 300            # 5 min for TMTT detection data
 CACHE_TTL_LOSS_REASONS = 86400  # 24h for loss reason list (daily sync)
-ORACLE_IN_BATCH_SIZE = 1000     # Oracle IN clause limit
 
 # Distributed lock settings for query_analysis cold-cache path
 ANALYSIS_LOCK_TTL_SECONDS = 120
@@ -217,6 +218,155 @@ def query_analysis(
     finally:
         if lock_acquired:
             release_lock(lock_name)
+
+
+def parse_loss_reasons_param(loss_reasons: Any) -> Optional[List[str]]:
+    """Normalize loss reason input from API payloads.
+
+    Accepts comma-separated strings or list-like inputs.
+    Returns None when no valid value is provided.
+    """
+    if loss_reasons is None:
+        return None
+
+    values: List[str]
+    if isinstance(loss_reasons, str):
+        values = [item.strip() for item in loss_reasons.split(',') if item.strip()]
+    elif isinstance(loss_reasons, (list, tuple, set)):
+        values = []
+        for item in loss_reasons:
+            if not isinstance(item, str):
+                continue
+            text = item.strip()
+            if text:
+                values.append(text)
+    else:
+        return None
+
+    if not values:
+        return None
+
+    deduped: List[str] = []
+    seen = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped or None
+
+
+def resolve_trace_seed_lots(
+    start_date: str,
+    end_date: str,
+) -> Optional[Dict[str, Any]]:
+    """Resolve seed lots for staged mid-section trace API."""
+    error = _validate_date_range(start_date, end_date)
+    if error:
+        return {'error': error}
+
+    tmtt_df = _fetch_tmtt_data(start_date, end_date)
+    if tmtt_df is None:
+        return None
+    if tmtt_df.empty:
+        return {'seeds': [], 'seed_count': 0}
+
+    seeds = []
+    unique_rows = tmtt_df.drop_duplicates(subset=['CONTAINERID'])
+    for _, row in unique_rows.iterrows():
+        cid = _safe_str(row.get('CONTAINERID'))
+        if not cid:
+            continue
+        lot_id = _safe_str(row.get('CONTAINERNAME')) or cid
+        seeds.append({
+            'container_id': cid,
+            'container_name': lot_id,
+            'lot_id': lot_id,
+        })
+
+    seeds.sort(key=lambda item: (item.get('lot_id', ''), item.get('container_id', '')))
+    return {
+        'seeds': seeds,
+        'seed_count': len(seeds),
+    }
+
+
+def build_trace_aggregation_from_events(
+    start_date: str,
+    end_date: str,
+    *,
+    loss_reasons: Optional[List[str]] = None,
+    seed_container_ids: Optional[List[str]] = None,
+    lineage_ancestors: Optional[Dict[str, Any]] = None,
+    upstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Build mid-section summary payload from staged events data."""
+    error = _validate_date_range(start_date, end_date)
+    if error:
+        return {'error': error}
+
+    normalized_loss_reasons = parse_loss_reasons_param(loss_reasons)
+
+    tmtt_df = _fetch_tmtt_data(start_date, end_date)
+    if tmtt_df is None:
+        return None
+    if tmtt_df.empty:
+        empty_result = _empty_result()
+        return {
+            'kpi': empty_result['kpi'],
+            'charts': empty_result['charts'],
+            'daily_trend': empty_result['daily_trend'],
+            'available_loss_reasons': empty_result['available_loss_reasons'],
+            'genealogy_status': empty_result['genealogy_status'],
+            'detail_total_count': 0,
+        }
+
+    available_loss_reasons = sorted(
+        tmtt_df.loc[tmtt_df['REJECTQTY'] > 0, 'LOSSREASONNAME']
+        .dropna().unique().tolist()
+    )
+
+    if normalized_loss_reasons:
+        filtered_df = tmtt_df[
+            (tmtt_df['LOSSREASONNAME'].isin(normalized_loss_reasons))
+            | (tmtt_df['REJECTQTY'] == 0)
+            | (tmtt_df['LOSSREASONNAME'].isna())
+        ].copy()
+    else:
+        filtered_df = tmtt_df
+
+    tmtt_data = _build_tmtt_lookup(filtered_df)
+    normalized_ancestors = _normalize_lineage_ancestors(
+        lineage_ancestors,
+        seed_container_ids=seed_container_ids,
+        fallback_seed_ids=list(tmtt_data.keys()),
+    )
+    normalized_upstream = _normalize_upstream_event_records(upstream_events_by_cid or {})
+
+    attribution = _attribute_defects(
+        tmtt_data,
+        normalized_ancestors,
+        normalized_upstream,
+        normalized_loss_reasons,
+    )
+    detail = _build_detail_table(filtered_df, normalized_ancestors, normalized_upstream)
+
+    seed_ids = [
+        cid for cid in (seed_container_ids or list(tmtt_data.keys()))
+        if isinstance(cid, str) and cid.strip()
+    ]
+    genealogy_status = 'ready'
+    if seed_ids and lineage_ancestors is None:
+        genealogy_status = 'error'
+
+    return {
+        'kpi': _build_kpi(filtered_df, attribution, normalized_loss_reasons),
+        'charts': _build_all_charts(attribution, tmtt_data),
+        'daily_trend': _build_daily_trend(filtered_df, normalized_loss_reasons),
+        'available_loss_reasons': available_loss_reasons,
+        'genealogy_status': genealogy_status,
+        'detail_total_count': len(detail),
+    }
 
 
 def query_analysis_detail(
@@ -432,189 +582,10 @@ def _resolve_full_genealogy(
     tmtt_cids: List[str],
     tmtt_names: Dict[str, str],
 ) -> Dict[str, Set[str]]:
-    """Resolve full genealogy for TMTT lots via SPLITFROMID + COMBINEDASSYLOTS.
-
-    Step 1: BFS upward through DW_MES_CONTAINER.SPLITFROMID
-    Step 2: Merge expansion via DW_MES_PJ_COMBINEDASSYLOTS
-    Step 3: BFS on merge source CIDs (one more round)
-
-    Args:
-        tmtt_cids: TMTT lot CONTAINERIDs
-        tmtt_names: {cid: containername} from TMTT detection data
-
-    Returns:
-        {tmtt_cid: set(all ancestor CIDs)}
-    """
-    # ---- Step 1: Split chain BFS upward ----
-    child_to_parent, cid_to_name = _bfs_split_chain(tmtt_cids, tmtt_names)
-
-    # Build initial ancestor sets per TMTT lot (walk up split chain)
-    ancestors: Dict[str, Set[str]] = {}
-    for tmtt_cid in tmtt_cids:
-        visited: Set[str] = set()
-        current = tmtt_cid
-        while current in child_to_parent:
-            parent = child_to_parent[current]
-            if parent in visited:
-                break  # cycle protection
-            visited.add(parent)
-            current = parent
-        ancestors[tmtt_cid] = visited
-
-    # ---- Step 2: Merge expansion via COMBINEDASSYLOTS ----
-    all_names = set(cid_to_name.values())
-    if not all_names:
-        _log_genealogy_summary(ancestors, tmtt_cids, 0)
-        return ancestors
-
-    merge_source_map = _fetch_merge_sources(list(all_names))
-    if not merge_source_map:
-        _log_genealogy_summary(ancestors, tmtt_cids, 0)
-        return ancestors
-
-    # Reverse map: name → set of CIDs with that name
-    name_to_cids: Dict[str, Set[str]] = defaultdict(set)
-    for cid, name in cid_to_name.items():
-        name_to_cids[name].add(cid)
-
-    # Expand ancestors with merge sources
-    merge_source_cids_all: Set[str] = set()
-    for tmtt_cid in tmtt_cids:
-        self_and_ancestors = ancestors[tmtt_cid] | {tmtt_cid}
-        for cid in list(self_and_ancestors):
-            name = cid_to_name.get(cid)
-            if name and name in merge_source_map:
-                for src_cid in merge_source_map[name]:
-                    if src_cid != cid and src_cid not in self_and_ancestors:
-                        ancestors[tmtt_cid].add(src_cid)
-                        merge_source_cids_all.add(src_cid)
-
-    # ---- Step 3: BFS on merge source CIDs ----
-    seen = set(tmtt_cids) | set(child_to_parent.values()) | set(child_to_parent.keys())
-    new_merge_cids = list(merge_source_cids_all - seen)
-    if new_merge_cids:
-        merge_c2p, _ = _bfs_split_chain(new_merge_cids, {})
-        child_to_parent.update(merge_c2p)
-
-        # Walk up merge sources' split chains for each TMTT lot
-        for tmtt_cid in tmtt_cids:
-            for merge_cid in list(ancestors[tmtt_cid] & merge_source_cids_all):
-                current = merge_cid
-                while current in merge_c2p:
-                    parent = merge_c2p[current]
-                    if parent in ancestors[tmtt_cid]:
-                        break
-                    ancestors[tmtt_cid].add(parent)
-                    current = parent
-
-    _log_genealogy_summary(ancestors, tmtt_cids, len(merge_source_cids_all))
+    """Resolve full genealogy for TMTT lots via shared LineageEngine."""
+    ancestors = LineageEngine.resolve_full_genealogy(tmtt_cids, tmtt_names)
+    _log_genealogy_summary(ancestors, tmtt_cids, 0)
     return ancestors
-
-
-def _bfs_split_chain(
-    start_cids: List[str],
-    initial_names: Dict[str, str],
-) -> Tuple[Dict[str, str], Dict[str, str]]:
-    """BFS upward through DW_MES_CONTAINER.SPLITFROMID.
-
-    Args:
-        start_cids: Starting CONTAINERIDs
-        initial_names: Pre-known {cid: containername} mappings
-
-    Returns:
-        child_to_parent: {child_cid: parent_cid} for all split edges
-        cid_to_name: {cid: containername} for all encountered CIDs
-    """
-    child_to_parent: Dict[str, str] = {}
-    cid_to_name: Dict[str, str] = dict(initial_names)
-    seen: Set[str] = set(start_cids)
-    frontier = list(start_cids)
-    bfs_round = 0
-
-    while frontier:
-        bfs_round += 1
-        batch_results: List[Dict[str, Any]] = []
-
-        for i in range(0, len(frontier), ORACLE_IN_BATCH_SIZE):
-            batch = frontier[i:i + ORACLE_IN_BATCH_SIZE]
-            builder = QueryBuilder()
-            builder.add_in_condition("c.CONTAINERID", batch)
-            sql = SQLLoader.load_with_params(
-                "mid_section_defect/split_chain",
-                CID_FILTER=builder.get_conditions_sql(),
-            )
-            try:
-                df = read_sql_df(sql, builder.params)
-                if df is not None and not df.empty:
-                    batch_results.extend(df.to_dict('records'))
-            except Exception as exc:
-                logger.warning(f"Split chain BFS round {bfs_round} batch failed: {exc}")
-
-        new_parents: Set[str] = set()
-        for row in batch_results:
-            cid = row['CONTAINERID']
-            split_from = row.get('SPLITFROMID')
-            name = row.get('CONTAINERNAME')
-
-            if isinstance(name, str) and name:
-                cid_to_name[cid] = name
-            if isinstance(split_from, str) and split_from and cid != split_from:
-                child_to_parent[cid] = split_from
-                if split_from not in seen:
-                    new_parents.add(split_from)
-                    seen.add(split_from)
-
-        frontier = list(new_parents)
-        if bfs_round > 20:
-            logger.warning("Split chain BFS exceeded 20 rounds, stopping")
-            break
-
-    logger.info(
-        f"Split chain BFS: {bfs_round} rounds, "
-        f"{len(child_to_parent)} split edges, "
-        f"{len(cid_to_name)} names collected"
-    )
-    return child_to_parent, cid_to_name
-
-
-def _fetch_merge_sources(
-    finished_names: List[str],
-) -> Dict[str, List[str]]:
-    """Find source lots merged into finished lots via COMBINEDASSYLOTS.
-
-    Args:
-        finished_names: CONTAINERNAMEs to look up as FINISHEDNAME
-
-    Returns:
-        {finished_name: [source_cid, ...]}
-    """
-    result: Dict[str, List[str]] = {}
-
-    for i in range(0, len(finished_names), ORACLE_IN_BATCH_SIZE):
-        batch = finished_names[i:i + ORACLE_IN_BATCH_SIZE]
-        builder = QueryBuilder()
-        builder.add_in_condition("ca.FINISHEDNAME", batch)
-        sql = SQLLoader.load_with_params(
-            "mid_section_defect/merge_lookup",
-            FINISHED_NAME_FILTER=builder.get_conditions_sql(),
-        )
-        try:
-            df = read_sql_df(sql, builder.params)
-            if df is not None and not df.empty:
-                for _, row in df.iterrows():
-                    fn = row['FINISHEDNAME']
-                    src = row['SOURCE_CID']
-                    if isinstance(fn, str) and fn and isinstance(src, str) and src:
-                        result.setdefault(fn, []).append(src)
-        except Exception as exc:
-            logger.warning(f"Merge lookup batch failed: {exc}")
-
-    if result:
-        total_sources = sum(len(v) for v in result.values())
-        logger.info(
-            f"Merge lookup: {len(result)} finished names → {total_sources} source CIDs"
-        )
-    return result
 
 
 def _log_genealogy_summary(
@@ -650,55 +621,76 @@ def _fetch_upstream_history(
         return {}
 
     unique_cids = list(set(all_cids))
-    all_rows = []
-
-    # Batch query in chunks of ORACLE_IN_BATCH_SIZE
-    for i in range(0, len(unique_cids), ORACLE_IN_BATCH_SIZE):
-        batch = unique_cids[i:i + ORACLE_IN_BATCH_SIZE]
-
-        builder = QueryBuilder()
-        builder.add_in_condition("h.CONTAINERID", batch)
-        conditions_sql = builder.get_conditions_sql()
-        params = builder.params
-
-        sql = SQLLoader.load_with_params(
-            "mid_section_defect/upstream_history",
-            ANCESTOR_FILTER=conditions_sql,
-        )
-
-        try:
-            df = read_sql_df(sql, params)
-            if df is not None and not df.empty:
-                all_rows.append(df)
-        except Exception as exc:
-            logger.error(
-                f"Upstream history batch {i//ORACLE_IN_BATCH_SIZE + 1} failed: {exc}",
-                exc_info=True,
-            )
-
-    if not all_rows:
-        return {}
-
-    combined = pd.concat(all_rows, ignore_index=True)
-
-    result: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-    for _, row in combined.iterrows():
-        cid = row['CONTAINERID']
-        group_name = _safe_str(row.get('WORKCENTER_GROUP'))
-        if not group_name:
-            group_name = '(未知)'
-        result[cid].append({
-            'workcenter_group': group_name,
-            'equipment_id': _safe_str(row.get('EQUIPMENTID')),
-            'equipment_name': _safe_str(row.get('EQUIPMENTNAME')),
-            'spec_name': _safe_str(row.get('SPECNAME')),
-            'track_in_time': _safe_str(row.get('TRACKINTIMESTAMP')),
-        })
+    events_by_cid = EventFetcher.fetch_events(unique_cids, "upstream_history")
+    result = _normalize_upstream_event_records(events_by_cid)
 
     logger.info(
         f"Upstream history: {len(result)} lots with classified records, "
         f"from {len(unique_cids)} queried CIDs"
     )
+    return dict(result)
+
+
+def _normalize_lineage_ancestors(
+    lineage_ancestors: Optional[Dict[str, Any]],
+    *,
+    seed_container_ids: Optional[List[str]] = None,
+    fallback_seed_ids: Optional[List[str]] = None,
+) -> Dict[str, Set[str]]:
+    """Normalize lineage payload to {seed_cid: set(ancestor_cid)}."""
+    ancestors: Dict[str, Set[str]] = {}
+
+    if isinstance(lineage_ancestors, dict):
+        for seed, raw_values in lineage_ancestors.items():
+            seed_cid = _safe_str(seed)
+            if not seed_cid:
+                continue
+
+            values = raw_values if isinstance(raw_values, (list, tuple, set)) else []
+            normalized_values: Set[str] = set()
+            for value in values:
+                ancestor_cid = _safe_str(value)
+                if ancestor_cid and ancestor_cid != seed_cid:
+                    normalized_values.add(ancestor_cid)
+            ancestors[seed_cid] = normalized_values
+
+    candidate_seeds = []
+    for seed in (seed_container_ids or []):
+        seed_cid = _safe_str(seed)
+        if seed_cid:
+            candidate_seeds.append(seed_cid)
+    if not candidate_seeds:
+        for seed in (fallback_seed_ids or []):
+            seed_cid = _safe_str(seed)
+            if seed_cid:
+                candidate_seeds.append(seed_cid)
+
+    for seed_cid in candidate_seeds:
+        ancestors.setdefault(seed_cid, set())
+
+    return ancestors
+
+
+def _normalize_upstream_event_records(
+    events_by_cid: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Normalize EventFetcher upstream payload into attribution-ready records."""
+    result: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for cid, events in events_by_cid.items():
+        cid_value = _safe_str(cid)
+        if not cid_value:
+            continue
+        for event in events:
+            group_name = _safe_str(event.get('WORKCENTER_GROUP'))
+            if not group_name:
+                group_name = '(未知)'
+            result[cid_value].append({
+                'workcenter_group': group_name,
+                'equipment_id': _safe_str(event.get('EQUIPMENTID')),
+                'equipment_name': _safe_str(event.get('EQUIPMENTNAME')),
+                'spec_name': _safe_str(event.get('SPECNAME')),
+                'track_in_time': _safe_str(event.get('TRACKINTIMESTAMP')),
+            })
     return dict(result)
 
 

@@ -1,3 +1,4 @@
+-- DEPRECATED: replaced by sql/lineage/split_ancestors.sql
 -- Mid-Section Defect Traceability - LOT Genealogy Records (Query 2)
 -- Batch query for split/merge records related to work orders
 --

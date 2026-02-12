@@ -11,7 +11,7 @@ const props = defineProps({
 const emit = defineEmits(['drilldown']);
 
 const workcenters = computed(() => props.data?.workcenters || []);
-const packages = computed(() => (props.data?.packages || []).slice(0, 15));
+const packages = computed(() => props.data?.packages || []);
 
 function formatNumber(value) {
   if (!value) {
