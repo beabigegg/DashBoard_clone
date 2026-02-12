@@ -1,6 +1,8 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
+import { apiGet } from '../../core/api.js';
+
 const props = defineProps({
   visible: {
     type: Boolean,
@@ -24,6 +26,9 @@ const emit = defineEmits(['close']);
 
 const tooltipRef = ref(null);
 const tooltipStyle = reactive({ left: '0px', top: '0px' });
+const lotDetailMap = ref({});
+const isDragging = ref(false);
+const dragOffset = { x: 0, y: 0 };
 
 const tooltipTitle = computed(() => {
   if (props.type === 'job') {
@@ -38,6 +43,48 @@ const lotItems = computed(() => {
   }
   return props.payload;
 });
+
+async function fetchLotDetails(lots) {
+  const ids = lots.map((lot) => lot.RUNCARDLOTID).filter(Boolean);
+  if (ids.length === 0) {
+    return;
+  }
+
+  const pending = ids.filter((id) => !lotDetailMap.value[id]);
+  if (pending.length === 0) {
+    return;
+  }
+
+  const results = await Promise.allSettled(
+    pending.map((id) =>
+      apiGet(`/api/wip/lot/${encodeURIComponent(id)}`, { timeout: 15000 })
+        .then((result) => {
+          const data = result?.success ? result.data : result?.data !== undefined ? result.data : result;
+          return { id, data };
+        }),
+    ),
+  );
+
+  const updated = { ...lotDetailMap.value };
+  for (const entry of results) {
+    if (entry.status === 'fulfilled' && entry.value?.data) {
+      updated[entry.value.id] = entry.value.data;
+    }
+  }
+  lotDetailMap.value = updated;
+}
+
+function getLotDetail(lotId) {
+  return lotDetailMap.value[lotId] || null;
+}
+
+function lotDetailValue(detail, key) {
+  const value = detail?.[key];
+  if (value === null || value === undefined || value === '') {
+    return '--';
+  }
+  return String(value);
+}
 
 const jobFields = computed(() => {
   if (!props.payload || Array.isArray(props.payload)) {
@@ -106,6 +153,38 @@ function handleOutsideClick(event) {
   }
 }
 
+function onDragStart(event) {
+  if (event.button !== 0) {
+    return;
+  }
+  isDragging.value = true;
+  dragOffset.x = event.clientX - parseFloat(tooltipStyle.left);
+  dragOffset.y = event.clientY - parseFloat(tooltipStyle.top);
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragEnd);
+}
+
+function onDragMove(event) {
+  if (!isDragging.value) {
+    return;
+  }
+  const padding = 10;
+  let nextX = event.clientX - dragOffset.x;
+  let nextY = event.clientY - dragOffset.y;
+
+  nextX = Math.max(padding, Math.min(nextX, window.innerWidth - padding));
+  nextY = Math.max(padding, Math.min(nextY, window.innerHeight - padding));
+
+  tooltipStyle.left = `${nextX}px`;
+  tooltipStyle.top = `${nextY}px`;
+}
+
+function onDragEnd() {
+  isDragging.value = false;
+  document.removeEventListener('mousemove', onDragMove);
+  document.removeEventListener('mouseup', onDragEnd);
+}
+
 function bindOverlayListeners() {
   document.addEventListener('click', handleOutsideClick, true);
   window.addEventListener('resize', positionTooltip);
@@ -114,6 +193,8 @@ function bindOverlayListeners() {
 function unbindOverlayListeners() {
   document.removeEventListener('click', handleOutsideClick, true);
   window.removeEventListener('resize', positionTooltip);
+  document.removeEventListener('mousemove', onDragMove);
+  document.removeEventListener('mouseup', onDragEnd);
 }
 
 watch(
@@ -127,6 +208,10 @@ watch(
     await nextTick();
     positionTooltip();
     bindOverlayListeners();
+
+    if (props.type === 'lot' && Array.isArray(props.payload) && props.payload.length > 0) {
+      void fetchLotDetails(props.payload);
+    }
   }
 );
 
@@ -138,7 +223,7 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <div v-if="visible" ref="tooltipRef" class="floating-tooltip" :style="tooltipStyle" @click.stop>
-      <div class="floating-tooltip-header">
+      <div class="floating-tooltip-header" :class="{ dragging: isDragging }" @mousedown="onDragStart">
         <h3 class="floating-tooltip-title">{{ tooltipTitle }}</h3>
         <button type="button" class="floating-tooltip-close" @click="$emit('close')">&times;</button>
       </div>
@@ -157,11 +242,50 @@ onBeforeUnmount(() => {
                   <span class="tooltip-field-label">Track-in</span>
                   <span class="tooltip-field-value">{{ formatDate(lot.LOTTRACKINTIME) }}</span>
                 </div>
-                <div class="tooltip-field">
-                  <span class="tooltip-field-label">Employee</span>
-                  <span class="tooltip-field-value">{{ lot.LOTTRACKINEMPLOYEE || '--' }}</span>
-                </div>
               </div>
+
+              <template v-if="getLotDetail(lot.RUNCARDLOTID)">
+                <div class="lot-section-label">產品資訊</div>
+                <div class="lot-grid">
+                  <div class="tooltip-field">
+                    <span class="tooltip-field-label">Product</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'product') }}</span>
+                  </div>
+                  <div class="tooltip-field">
+                    <span class="tooltip-field-label">Product Line</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'productLine') }}</span>
+                  </div>
+                  <div class="tooltip-field">
+                    <span class="tooltip-field-label">Package</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'packageLef') }}</span>
+                  </div>
+                  <div class="tooltip-field">
+                    <span class="tooltip-field-label">Workorder</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'workorder') }}</span>
+                  </div>
+                </div>
+
+                <div class="lot-section-label">物料資訊</div>
+                <div class="lot-grid">
+                  <div class="tooltip-field">
+                    <span class="tooltip-field-label">Wafer Lot ID</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'waferLotId') }}</span>
+                  </div>
+                  <div class="tooltip-field">
+                    <span class="tooltip-field-label">Wafer P/N</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'waferPn') }}</span>
+                  </div>
+                  <div class="tooltip-field">
+                    <span class="tooltip-field-label">Leadframe</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'leadframeName') }}</span>
+                  </div>
+                  <div class="tooltip-field">
+                    <span class="tooltip-field-label">Compound</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'compoundName') }}</span>
+                  </div>
+                </div>
+              </template>
+              <div v-else-if="lot.RUNCARDLOTID" class="lot-detail-loading-hint">載入詳細資料中...</div>
             </article>
           </template>
           <div v-else class="tooltip-empty">無 LOT 明細</div>
