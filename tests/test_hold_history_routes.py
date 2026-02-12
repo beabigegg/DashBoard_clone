@@ -41,9 +41,8 @@ class TestHoldHistoryPageRoute(TestHoldHistoryRoutesBase):
 class TestHoldHistoryTrendRoute(TestHoldHistoryRoutesBase):
     """Test GET /api/hold-history/trend endpoint."""
 
-    @patch('mes_dashboard.routes.hold_history_routes.get_still_on_hold_count')
     @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_trend')
-    def test_trend_passes_date_range(self, mock_trend, mock_count):
+    def test_trend_passes_date_range(self, mock_trend):
         mock_trend.return_value = {
             'days': [
                 {
@@ -54,16 +53,14 @@ class TestHoldHistoryTrendRoute(TestHoldHistoryRoutesBase):
                 }
             ]
         }
-        mock_count.return_value = {'quality': 4, 'non_quality': 2, 'all': 6}
 
         response = self.client.get('/api/hold-history/trend?start_date=2026-02-01&end_date=2026-02-07')
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload['success'])
-        self.assertEqual(payload['data']['stillOnHoldCount'], {'quality': 4, 'non_quality': 2, 'all': 6})
+        self.assertIn('days', payload['data'])
         mock_trend.assert_called_once_with('2026-02-01', '2026-02-07')
-        mock_count.assert_called_once_with()
 
     def test_trend_invalid_date_returns_400(self):
         response = self.client.get('/api/hold-history/trend?start_date=2026/02/01&end_date=2026-02-07')
@@ -72,10 +69,9 @@ class TestHoldHistoryTrendRoute(TestHoldHistoryRoutesBase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
 
-    @patch('mes_dashboard.routes.hold_history_routes.get_still_on_hold_count')
     @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_trend')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 8))
-    def test_trend_rate_limited_returns_429(self, _mock_limit, mock_service, _mock_count):
+    def test_trend_rate_limited_returns_429(self, _mock_limit, mock_service):
         response = self.client.get('/api/hold-history/trend?start_date=2026-02-01&end_date=2026-02-07')
         payload = json.loads(response.data)
 

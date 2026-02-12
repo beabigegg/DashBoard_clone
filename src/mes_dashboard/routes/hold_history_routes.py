@@ -15,7 +15,6 @@ from mes_dashboard.services.hold_history_service import (
     get_hold_history_list,
     get_hold_history_reason_pareto,
     get_hold_history_trend,
-    get_still_on_hold_count,
 )
 
 hold_history_bp = Blueprint('hold_history', __name__)
@@ -114,9 +113,6 @@ def api_hold_history_trend():
 
     result = get_hold_history_trend(start_date, end_date)
     if result is not None:
-        count = get_still_on_hold_count()
-        if count is not None:
-            result['stillOnHoldCount'] = count
         return jsonify({'success': True, 'data': result})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500
 

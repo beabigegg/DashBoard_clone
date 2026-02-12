@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 
+import MultiSelect from '../resource-shared/components/MultiSelect.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import StatusBadge from '../shared-ui/components/StatusBadge.vue';
@@ -20,17 +21,22 @@ const {
   selectedJobId,
   txnRows,
   txnColumns,
-  filteredResources,
   selectedResourceCount,
   resetDateRangeToLast90Days,
   hydrateFiltersFromUrl,
   loadResources,
-  toggleResource,
   queryJobs,
   loadTxn,
   exportCsv,
   getStatusTone,
 } = useJobQueryData();
+
+const resourceOptions = computed(() =>
+  resources.value.map((item) => ({
+    value: item.RESOURCEID,
+    label: item.RESOURCENAME || item.RESOURCEID,
+  })),
+);
 
 function formatCellValue(value) {
   if (value === null || value === undefined || value === '') {
@@ -77,8 +83,15 @@ onMounted(async () => {
             <input v-model="filters.endDate" type="date" />
           </label>
           <label class="job-query-filter">
-            <span>設備搜尋</span>
-            <input v-model="filters.searchText" type="text" placeholder="輸入設備/站點/群組..." />
+            <span>設備（複選）</span>
+            <MultiSelect
+              :model-value="filters.resourceIds"
+              :options="resourceOptions"
+              :disabled="loadingResources"
+              placeholder="全部設備"
+              searchable
+              @update:model-value="filters.resourceIds = $event"
+            />
           </label>
 
           <template #actions>
@@ -90,27 +103,6 @@ onMounted(async () => {
             </button>
           </template>
         </FilterToolbar>
-
-        <div class="job-query-resource-grid">
-          <div v-if="loadingResources" class="job-query-empty">載入設備中...</div>
-          <label
-            v-for="resource in filteredResources"
-            :key="resource.RESOURCEID"
-            class="job-query-resource"
-            :class="{ selected: filters.resourceIds.includes(resource.RESOURCEID) }"
-          >
-            <input
-              type="checkbox"
-              :checked="filters.resourceIds.includes(resource.RESOURCEID)"
-              @change="toggleResource(resource.RESOURCEID)"
-            />
-            <div class="job-query-resource-meta">
-              <strong>{{ resource.RESOURCENAME || resource.RESOURCEID }}</strong>
-              <span>{{ resource.WORKCENTERNAME || '-' }} / {{ resource.RESOURCEFAMILYNAME || '-' }}</span>
-            </div>
-          </label>
-          <div v-if="!loadingResources && filteredResources.length === 0" class="job-query-empty">無可用設備</div>
-        </div>
       </SectionCard>
 
       <p v-if="errorMessage" class="job-query-error">{{ errorMessage }}</p>

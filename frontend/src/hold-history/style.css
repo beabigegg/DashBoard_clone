@@ -85,14 +85,27 @@
   box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);
 }
 
-.radio-group,
+.hold-type-select {
+  min-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #ffffff;
+}
+
+.hold-type-select:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);
+}
+
 .checkbox-group {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.radio-option,
 .checkbox-option {
   display: inline-flex;
   align-items: center;
@@ -105,7 +118,6 @@
   font-size: 13px;
 }
 
-.radio-option.active,
 .checkbox-option.active {
   border-color: #0284c7;
   background: #e0f2fe;
@@ -120,7 +132,7 @@
 }
 
 .hold-history-summary-row {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .summary-card {
@@ -290,7 +302,7 @@
 
 @media (max-width: 1440px) {
   .hold-history-summary-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

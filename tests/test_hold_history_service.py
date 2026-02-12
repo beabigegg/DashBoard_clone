@@ -339,28 +339,6 @@ class TestHoldHistoryServiceFunctions(unittest.TestCase):
         self.assertEqual(result['pagination']['total'], 3)
         self.assertEqual(result['pagination']['totalPages'], 2)
 
-    @patch('mes_dashboard.services.hold_history_service.read_sql_df')
-    def test_still_on_hold_count_formats_response(self, mock_read_sql_df):
-        mock_read_sql_df.return_value = pd.DataFrame(
-            [{'QUALITY_COUNT': 4, 'NON_QUALITY_COUNT': 2, 'ALL_COUNT': 6}]
-        )
-
-        result = hold_history_service.get_still_on_hold_count()
-
-        self.assertIsNotNone(result)
-        self.assertEqual(result['quality'], 4)
-        self.assertEqual(result['non_quality'], 2)
-        self.assertEqual(result['all'], 6)
-
-    @patch('mes_dashboard.services.hold_history_service.read_sql_df')
-    def test_still_on_hold_count_empty_returns_zeros(self, mock_read_sql_df):
-        mock_read_sql_df.return_value = pd.DataFrame()
-
-        result = hold_history_service.get_still_on_hold_count()
-
-        self.assertIsNotNone(result)
-        self.assertEqual(result, {'quality': 0, 'non_quality': 0, 'all': 0})
-
     def test_trend_sql_contains_shift_boundary_logic(self):
         sql = hold_history_service._load_hold_history_sql('trend')
 

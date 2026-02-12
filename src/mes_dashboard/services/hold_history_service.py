@@ -341,28 +341,6 @@ def get_hold_history_trend(start_date: str, end_date: str) -> Optional[Dict[str,
         return None
 
 
-def get_still_on_hold_count() -> Optional[Dict[str, int]]:
-    """Count all holds that are still unreleased (factory-wide), by hold type."""
-    try:
-        sql = _load_hold_history_sql('still_on_hold_count')
-        df = read_sql_df(sql, {})
-
-        if df is None or df.empty:
-            return {'quality': 0, 'non_quality': 0, 'all': 0}
-
-        row = df.iloc[0]
-        return {
-            'quality': _safe_int(row.get('QUALITY_COUNT')),
-            'non_quality': _safe_int(row.get('NON_QUALITY_COUNT')),
-            'all': _safe_int(row.get('ALL_COUNT')),
-        }
-    except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
-        raise
-    except Exception as exc:
-        logger.error('Hold history still-on-hold count query failed: %s', exc)
-        return None
-
-
 def get_hold_history_reason_pareto(
     start_date: str,
     end_date: str,

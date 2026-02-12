@@ -15,14 +15,14 @@
     {
       "route": "/hold-overview",
       "name": "Hold 即時概況",
-      "status": "dev",
+      "status": "released",
       "drawer_id": "reports",
       "order": 2
     },
     {
       "route": "/hold-history",
       "name": "Hold 歷史績效",
-      "status": "dev",
+      "status": "released",
       "drawer_id": "drawer-2",
       "order": 3
     },

@@ -64,7 +64,7 @@ const chartOption = computed(() => {
       left: 110,
       right: 20,
       top: 20,
-      bottom: 64,
+      bottom: 100,
     },
     xAxis: {
       type: 'category',
@@ -88,7 +88,7 @@ const chartOption = computed(() => {
       max: 100,
       orient: 'horizontal',
       left: 'center',
-      bottom: 10,
+      bottom: 4,
       inRange: {
         color: ['#ef4444', '#f59e0b', '#22c55e'],
       },

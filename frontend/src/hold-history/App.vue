@@ -50,7 +50,10 @@ const errorMessage = ref('');
 let activeRequestId = 0;
 
 function toDateString(value) {
-  return value.toISOString().slice(0, 10);
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, '0');
+  const d = String(value.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function getUrlParam(name) {
@@ -75,8 +78,19 @@ function parseRecordTypeCsv(value) {
 
 function setDefaultDateRange() {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  let year = now.getFullYear();
+  let month = now.getMonth();
+
+  if (now.getDate() === 1) {
+    month -= 1;
+    if (month < 0) {
+      month = 11;
+      year -= 1;
+    }
+  }
+
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month + 1, 0);
   filterBar.startDate = toDateString(start);
   filterBar.endDate = toDateString(end);
 }
@@ -359,14 +373,18 @@ const summary = computed(() => {
   const netChange = releaseQty - newHoldQty - futureHoldQty;
   const avgHoldHours = estimateAvgHoldHours(durationData.value?.items || []);
 
-  const counts = trendData.value?.stillOnHoldCount || {};
-  const stillOnHoldCount = Number(counts[trendTypeKey.value] || 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const pastDays = days.filter((d) => d.date <= today);
+  const lastDay = pastDays.length > 0 ? pastDays[pastDays.length - 1] : {};
+  const stillOnHoldCount = Number(lastDay.holdQty || 0);
+  const newHoldSnapshotCount = Number(lastDay.newHoldQty || 0);
 
   return {
     releaseQty,
     newHoldQty,
     futureHoldQty,
     stillOnHoldCount,
+    newHoldSnapshotCount,
     netChange,
     avgHoldHours,
   };

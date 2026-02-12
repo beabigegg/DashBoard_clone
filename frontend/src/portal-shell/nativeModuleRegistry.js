@@ -48,7 +48,7 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
   ),
   '/job-query': createNativeLoader(
     () => import('../job-query/App.vue'),
-    [() => import('../job-query/style.css')],
+    [() => import('../resource-shared/styles.css'), () => import('../job-query/style.css')],
   ),
   '/excel-query': createNativeLoader(
     () => import('../excel-query/App.vue'),
