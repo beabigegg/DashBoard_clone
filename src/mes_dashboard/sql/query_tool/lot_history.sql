@@ -2,8 +2,8 @@
 -- Retrieves complete production history for a LOT
 --
 -- Parameters:
---   :container_id - CONTAINERID to query (16-char hex)
---   {{ WORKCENTER_FILTER }} - Optional workcenter name filter (replaced by service)
+--   container_id - CONTAINERID to query (16-char hex)
+--   WORKCENTER_FILTER - Optional workcenter name filter (replaced by service)
 --
 -- Output columns:
 --   PJ_TYPE - Product type (from DW_MES_CONTAINER)

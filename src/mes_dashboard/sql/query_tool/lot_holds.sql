@@ -2,7 +2,7 @@
 -- Retrieves HOLD/RELEASE history for a LOT
 --
 -- Parameters:
---   :container_id - CONTAINERID to query (16-char hex)
+--   container_id - CONTAINERID to query (16-char hex)
 --
 -- Note: Uses HOLDTXNDATE/RELEASETXNDATE (NOT TXNDATETIME)
 --       NULL RELEASETXNDATE means currently HOLD

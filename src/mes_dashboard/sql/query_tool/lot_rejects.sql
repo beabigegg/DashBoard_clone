@@ -2,7 +2,7 @@
 -- Retrieves reject (defect) records for a LOT
 --
 -- Parameters:
---   :container_id - CONTAINERID to query (16-char hex)
+--   container_id - CONTAINERID to query (16-char hex)
 --
 -- Note: Uses LOSSREASONNAME (NOT REJECTREASONNAME)
 --       Uses TXNDATE (NOT TXNDATETIME)

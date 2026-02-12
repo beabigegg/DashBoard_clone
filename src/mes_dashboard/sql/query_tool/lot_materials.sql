@@ -2,7 +2,7 @@
 -- Retrieves material consumption records for a LOT
 --
 -- Parameters:
---   :container_id - CONTAINERID to query (16-char hex)
+--   container_id - CONTAINERID to query (16-char hex)
 --
 -- Note: Uses MATERIALPARTNAME (NOT MATERIALNAME)
 --       Uses QTYCONSUMED (NOT CONSUMEQTY)
