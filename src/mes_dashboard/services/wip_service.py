@@ -3036,6 +3036,8 @@ LOT_DETAIL_FIELD_LABELS = {
     'priority': 'Work Order Priority',
     'tmttRemaining': 'TMTT Remaining',
     'dieConsumption': 'Die Consumption Qty',
+    'leadframeDesc': 'LF Description',
+    'waferDesc': 'Wafer Description',
     'wipStatus': 'WIP Status',
     'dataUpdateDate': 'Data Update Date'
 }
@@ -3062,6 +3064,12 @@ def get_lot_detail(lotid: str) -> Optional[Dict[str, Any]]:
                 return None
 
             row = df.iloc[0]
+            if len(df) > 1:
+                row = row.copy()
+                for col in ('LEADFRAMEDESC', 'WAFERDESC'):
+                    if col in df.columns:
+                        vals = df[col].dropna().unique()
+                        row[col] = ', '.join(str(v) for v in vals) if len(vals) > 0 else None
             return _build_lot_detail_response(row)
         except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
             raise
@@ -3127,7 +3135,9 @@ def _get_lot_detail_from_oracle(lotid: str) -> Optional[Dict[str, Any]]:
                 PRIORITYCODENAME,
                 TMTT_R,
                 WAFER_FACTOR,
-                SYS_DATE
+                SYS_DATE,
+                LEADFRAMEDESC,
+                WAFERDESC
             FROM {WIP_VIEW}
             WHERE LOTID = :lotid
         """
@@ -3137,6 +3147,12 @@ def _get_lot_detail_from_oracle(lotid: str) -> Optional[Dict[str, Any]]:
             return None
 
         row = df.iloc[0]
+        if len(df) > 1:
+            row = row.copy()
+            for col in ('LEADFRAMEDESC', 'WAFERDESC'):
+                if col in df.columns:
+                    vals = df[col].dropna().unique()
+                    row[col] = ', '.join(str(v) for v in vals) if len(vals) > 0 else None
         return _build_lot_detail_response(row)
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
@@ -3233,7 +3249,9 @@ def _build_lot_detail_response(row) -> Dict[str, Any]:
         'dateCode': _safe_value(safe_get('DATECODE')),
         'leadframeName': _safe_value(safe_get('LEADFRAMENAME')),
         'leadframeOption': _safe_value(safe_get('LEADFRAMEOPTION')),
+        'leadframeDesc': _safe_value(safe_get('LEADFRAMEDESC')),
         'compoundName': _safe_value(safe_get('COMNAME')),
+        'waferDesc': _safe_value(safe_get('WAFERDESC')),
         'location': _safe_value(safe_get('LOCATIONNAME')),
         'ncrId': _safe_value(safe_get('EVENTNAME')),
         'ncrDate': format_date('OCCURRENCEDATE'),

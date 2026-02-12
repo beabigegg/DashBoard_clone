@@ -103,7 +103,7 @@ function hasHoldSection() {
 const basicFields = ['lotId', 'workorder', 'wipStatus', 'status', 'qty', 'qty2', 'ageByDays', 'priority'];
 const productFields = ['product', 'productLine', 'packageLef', 'pjType', 'pjFunction', 'bop', 'dateCode', 'produceRegion'];
 const processFields = ['workcenterGroup', 'workcenter', 'spec', 'specSequence', 'workflow', 'equipment', 'equipmentCount', 'location'];
-const materialFields = ['waferLotId', 'waferPn', 'waferLotPrefix', 'leadframeName', 'leadframeOption', 'compoundName', 'dieConsumption', 'uts'];
+const materialFields = ['waferLotId', 'waferPn', 'waferLotPrefix', 'waferDesc', 'leadframeName', 'leadframeOption', 'leadframeDesc', 'compoundName', 'dieConsumption', 'uts'];
 const holdFields = ['holdReason', 'holdCount', 'holdEmp', 'holdDept', 'holdComment', 'releaseTime', 'releaseEmp', 'releaseComment'];
 const ncrFields = ['ncrId', 'ncrDate'];
 const commentFields = ['comment', 'commentDate', 'commentEmp', 'futureHoldComment'];

@@ -36,7 +36,9 @@ const refreshing = ref(false);
 const lotsLoading = ref(false);
 const lotsError = ref('');
 const loadError = ref('');
-const lastUpdate = ref('');
+const lastUpdate = computed(() => {
+  return summary.value?.dataUpdateDate ? `Last Update: ${summary.value.dataUpdateDate}` : '';
+});
 
 function unwrapApiResult(result, fallbackMessage) {
   if (result?.success) {
@@ -216,7 +218,6 @@ async function loadAllData(showOverlay = true) {
       totalPages: Number(lotsData?.pagination?.totalPages || 1),
     };
 
-    lastUpdate.value = `Last Update: ${new Date().toLocaleString('zh-TW')}`;
   } catch (error) {
     if (error?.name === 'AbortError') {
       return;

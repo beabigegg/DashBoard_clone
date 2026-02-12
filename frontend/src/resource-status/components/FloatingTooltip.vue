@@ -276,8 +276,16 @@ onBeforeUnmount(() => {
                     <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'waferPn') }}</span>
                   </div>
                   <div class="tooltip-field">
+                    <span class="tooltip-field-label">Wafer Description</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'waferDesc') }}</span>
+                  </div>
+                  <div class="tooltip-field">
                     <span class="tooltip-field-label">Leadframe</span>
                     <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'leadframeName') }}</span>
+                  </div>
+                  <div class="tooltip-field">
+                    <span class="tooltip-field-label">LF Description</span>
+                    <span class="tooltip-field-value">{{ lotDetailValue(getLotDetail(lot.RUNCARDLOTID), 'leadframeDesc') }}</span>
                   </div>
                   <div class="tooltip-field">
                     <span class="tooltip-field-label">Compound</span>
