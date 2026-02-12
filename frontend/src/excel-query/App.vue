@@ -57,7 +57,6 @@ onMounted(async () => {
   <div class="excel-query-page u-content-shell">
     <header class="excel-query-header">
       <h1>Excel 批次查詢</h1>
-      <p>Native Route-View：Upload / Detect / Query / Export</p>
     </header>
 
     <div class="u-panel-stack">

@@ -1,9 +1,9 @@
 .hold-history-header {
-  background: linear-gradient(135deg, #0f766e 0%, #0ea5e9 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .hold-history-page .header h1 {
-  font-size: 22px;
+  font-size: 24px;
 }
 
 .hold-type-badge {

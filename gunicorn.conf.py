@@ -5,14 +5,16 @@ workers = int(os.getenv("GUNICORN_WORKERS", "2"))  # 2 workers for redundancy
 threads = int(os.getenv("GUNICORN_THREADS", "4"))
 worker_class = "gthread"
 
-# Timeout settings - critical for dashboard stability
-timeout = 65          # Worker timeout: must be > call_timeout (55s)
-graceful_timeout = 30 # Graceful shutdown timeout (enough for thread cleanup)
+# Timeout settings - critical for dashboard stability.
+# Keep this above slow-query timeout paths (e.g. query-tool 120s) and DB pool timeout.
+timeout = int(os.getenv("GUNICORN_TIMEOUT", "130"))
+graceful_timeout = int(os.getenv("GUNICORN_GRACEFUL_TIMEOUT", "60"))
 keepalive = 5         # Keep-alive connections timeout
 
-# Worker lifecycle management - prevent state accumulation
-max_requests = 1000       # Restart worker after N requests
-max_requests_jitter = 100 # Random jitter to prevent simultaneous restarts
+# Worker lifecycle management - prevent state accumulation.
+# Make these configurable so high-load test environments can raise the ceiling.
+max_requests = int(os.getenv("GUNICORN_MAX_REQUESTS", "5000"))
+max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "500"))
 
 
 # ============================================================

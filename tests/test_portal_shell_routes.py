@@ -419,14 +419,23 @@ def test_legacy_shell_contract_fallback_logs_warning(monkeypatch):
     app_module._SHELL_ROUTE_CONTRACT_MAP = None
 
 
-def test_deferred_routes_keep_direct_entry_compatibility_when_spa_enabled(monkeypatch):
+def test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled(monkeypatch):
     monkeypatch.setenv("PORTAL_SPA_ENABLED", "true")
     app = create_app("testing")
     app.config["TESTING"] = True
     client = app.test_client()
     _login_as_admin(client)
 
-    for route in ["/excel-query", "/query-tool", "/tables"]:
-        response = client.get(route, follow_redirects=False)
-        # Deferred routes stay on direct-entry posture in this phase.
-        assert response.status_code == 200, route
+    cases = {
+        "/tables?category=wip": "/portal-shell/tables?category=wip",
+        "/excel-query": "/portal-shell/excel-query",
+        "/query-tool": "/portal-shell/query-tool",
+        "/mid-section-defect": "/portal-shell/mid-section-defect",
+    }
+
+    for direct_url, canonical_url in cases.items():
+        response = client.get(direct_url, follow_redirects=False)
+        assert response.status_code == 302, f"{direct_url} should redirect"
+        assert response.location.endswith(canonical_url), (
+            f"{direct_url}: expected {canonical_url}, got {response.location}"
+        )

@@ -37,27 +37,44 @@ def client(app):
 class TestResourceHistoryPageAccess:
     """E2E tests for page access and navigation."""
 
+    @staticmethod
+    def _load_resource_history_entry(client):
+        spa_enabled = bool(client.application.config.get("PORTAL_SPA_ENABLED", False))
+        response = client.get('/resource-history', follow_redirects=False)
+        if spa_enabled:
+            assert response.status_code == 302
+            assert response.location.endswith('/portal-shell/resource-history')
+            shell_response = client.get('/portal-shell/resource-history')
+            assert shell_response.status_code == 200
+            return shell_response, True
+        return response, False
+
     def test_page_loads_successfully(self, client):
         """Resource history page should load without errors."""
-        response = client.get('/resource-history')
-
+        response, spa_enabled = self._load_resource_history_entry(client)
         assert response.status_code == 200
         content = response.data.decode('utf-8')
-        assert '設備歷史績效' in content
+        if spa_enabled:
+            assert '/static/dist/portal-shell.js' in content
+        else:
+            assert '設備歷史績效' in content
 
     def test_page_bootstrap_container_exists(self, client):
         """Resource history page should expose the Vue mount container."""
-        response = client.get('/resource-history')
+        response, _spa_enabled = self._load_resource_history_entry(client)
         content = response.data.decode('utf-8')
 
         assert "id='app'" in content or 'id="app"' in content
 
     def test_page_references_vite_module(self, client):
         """Resource history page should load the Vite module bundle."""
-        response = client.get('/resource-history')
+        response, spa_enabled = self._load_resource_history_entry(client)
         content = response.data.decode('utf-8')
 
-        assert '/static/dist/resource-history.js' in content
+        if spa_enabled:
+            assert '/static/dist/portal-shell.js' in content
+        else:
+            assert '/static/dist/resource-history.js' in content
         assert 'type="module"' in content
 
 
@@ -334,11 +351,23 @@ class TestResourceHistoryNavigation:
 
     def test_portal_includes_history_tab(self, client):
         """Portal should include resource history tab."""
-        response = client.get('/')
-        content = response.data.decode('utf-8')
-
-        assert '設備歷史績效' in content
-        assert 'resourceHistoryFrame' in content
+        if bool(client.application.config.get("PORTAL_SPA_ENABLED", False)):
+            response = client.get('/api/portal/navigation')
+            assert response.status_code == 200
+            payload = response.get_json()
+            pages = [
+                page
+                for drawer in payload.get("drawers", [])
+                for page in drawer.get("pages", [])
+            ]
+            history_pages = [page for page in pages if page.get("route") == "/resource-history"]
+            assert history_pages, "resource-history route missing from portal navigation contract"
+            assert history_pages[0].get("name") == "設備歷史績效"
+        else:
+            response = client.get('/')
+            content = response.data.decode('utf-8')
+            assert '設備歷史績效' in content
+            assert 'resourceHistoryFrame' in content
 
 
 if __name__ == '__main__':

@@ -125,7 +125,7 @@
     {
       "route": "/tables",
       "route_id": "tables",
-      "scope": "deferred",
+      "scope": "in-scope",
       "render_mode": "native",
       "owner": "frontend-mes-reporting",
       "visibility_policy": "released_or_admin",
@@ -135,7 +135,7 @@
     {
       "route": "/excel-query",
       "route_id": "excel-query",
-      "scope": "deferred",
+      "scope": "in-scope",
       "render_mode": "native",
       "owner": "frontend-mes-reporting",
       "visibility_policy": "released_or_admin",
@@ -145,7 +145,7 @@
     {
       "route": "/query-tool",
       "route_id": "query-tool",
-      "scope": "deferred",
+      "scope": "in-scope",
       "render_mode": "native",
       "owner": "frontend-mes-reporting",
       "visibility_policy": "released_or_admin",
@@ -155,7 +155,7 @@
     {
       "route": "/mid-section-defect",
       "route_id": "mid-section-defect",
-      "scope": "deferred",
+      "scope": "in-scope",
       "render_mode": "native",
       "owner": "frontend-mes-reporting",
       "visibility_policy": "released_or_admin",

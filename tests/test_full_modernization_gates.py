@@ -50,10 +50,13 @@ def test_gate_runner_block_mode_passes_current_baseline():
     assert payload["passed"] is True
 
 
-def test_scope_matrix_keeps_deferred_routes_for_follow_up_only():
+def test_scope_matrix_has_all_routes_promoted_to_in_scope():
     matrix = json.loads(SCOPE_MATRIX.read_text(encoding="utf-8"))
     deferred = {item["route"] for item in matrix["deferred"]}
-    assert deferred == {"/tables", "/excel-query", "/query-tool", "/mid-section-defect"}
+    assert deferred == set(), "all deferred routes should be promoted to in-scope"
+    in_scope_routes = {item["route"] for item in matrix["in_scope"]}
+    for route in ("/tables", "/excel-query", "/query-tool", "/mid-section-defect"):
+        assert route in in_scope_routes, f"{route} should be in-scope"
 
 
 def test_route_contract_parity_check_detects_route_set_drift():

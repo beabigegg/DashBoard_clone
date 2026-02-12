@@ -89,12 +89,17 @@ class TestFullLoginLogoutFlow:
     def test_complete_admin_login_workflow(self, mock_auth, _mock_is_admin, client):
         """Test complete admin login workflow."""
         mock_auth.return_value = _mock_admin_user()
+        spa_enabled = bool(client.application.config.get("PORTAL_SPA_ENABLED", False))
 
-        # 1. Access portal - should see login link
-        response = client.get("/")
-        assert response.status_code == 200
-        content = response.data.decode("utf-8")
-        assert "管理員登入" in content
+        # 1. Access portal entry.
+        response = client.get("/", follow_redirects=False)
+        if spa_enabled:
+            assert response.status_code == 302
+            assert response.location.rstrip("/").endswith("/portal-shell")
+        else:
+            assert response.status_code == 200
+            content = response.data.decode("utf-8")
+            assert "管理員登入" in content
 
         # 2. Go to login page
         response = client.get("/admin/login")
@@ -107,14 +112,20 @@ class TestFullLoginLogoutFlow:
         }, follow_redirects=True)
 
         assert response.status_code == 200
-        content = response.data.decode("utf-8")
-        # Should see admin name and logout option
-        assert "Test Admin" in content or "登出" in content
+        if not spa_enabled:
+            content = response.data.decode("utf-8")
+            # Portal template should show admin identity in non-SPA mode.
+            assert "Test Admin" in content or "登出" in content
 
         # 4. Verify session has admin
         with client.session_transaction() as sess:
             assert "admin" in sess
             assert sess["admin"]["mail"] == "ymirliu@panjit.com.tw"
+
+        if spa_enabled:
+            nav = client.get("/api/portal/navigation")
+            assert nav.status_code == 200
+            assert nav.get_json()["is_admin"] is True
 
         # 5. Access admin pages
         response = client.get("/admin/pages")
@@ -248,15 +259,17 @@ class TestPortalDynamicTabs:
 
     def test_portal_hides_dev_tabs_for_non_admin(self, client, temp_page_status):
         """Test portal hides dev page tabs for non-admin users."""
-        response = client.get("/")
+        response = client.get("/api/portal/navigation")
         assert response.status_code == 200
-        content = response.data.decode("utf-8")
-
-        # Released pages should show
-        assert "WIP 即時概況" in content
-
-        # Dev pages should NOT show (tables and resource are dev)
-        # Note: This depends on the can_view_page implementation in portal.html
+        payload = response.get_json()
+        routes = {
+            page["route"]
+            for drawer in payload.get("drawers", [])
+            for page in drawer.get("pages", [])
+        }
+        assert "/wip-overview" in routes
+        assert "/tables" not in routes
+        assert payload.get("is_admin") is False
 
     @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
     @patch('mes_dashboard.routes.auth_routes.authenticate')
@@ -270,12 +283,17 @@ class TestPortalDynamicTabs:
             "password": "password123"
         })
 
-        response = client.get("/")
+        response = client.get("/api/portal/navigation")
         assert response.status_code == 200
-        content = response.data.decode("utf-8")
-
-        # Admin should see all pages
-        assert "WIP 即時概況" in content
+        payload = response.get_json()
+        routes = {
+            page["route"]
+            for drawer in payload.get("drawers", [])
+            for page in drawer.get("pages", [])
+        }
+        assert "/wip-overview" in routes
+        assert "/tables" in routes
+        assert payload.get("is_admin") is True
 
 
 class TestSessionPersistence:

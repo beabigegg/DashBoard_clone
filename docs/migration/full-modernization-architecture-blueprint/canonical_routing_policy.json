@@ -19,6 +19,10 @@
     "/resource-history",
     "/qc-gate",
     "/job-query",
-    "/tmtt-defect"
+    "/tmtt-defect",
+    "/tables",
+    "/excel-query",
+    "/query-tool",
+    "/mid-section-defect"
   ]
 }

@@ -19,13 +19,21 @@ Runtime fallback behavior for in-scope modernization routes SHALL be retired und
 - **THEN** runtime fallback behavior for that route SHALL be removed or disabled by policy
 - **THEN** reliability for that route SHALL be guaranteed by release-time readiness gates
 
-### Requirement: Deferred routes SHALL keep existing fallback posture in this phase
-Routes deferred from this modernization phase SHALL retain their existing fallback posture until handled by a follow-up change.
+### Requirement: Deferred-route assets SHALL be release-ready before promotion
+Deferred follow-up routes SHALL adopt release-time asset-readiness checks and SHALL fail promotion when required assets are missing.
 
-#### Scenario: Deferred fallback continuity
-- **WHEN** `/tables`, `/excel-query`, `/query-tool`, or `/mid-section-defect` is evaluated in this phase
-- **THEN** fallback retirement SHALL NOT be required for phase completion
-- **THEN** fallback retirement decisions for those routes SHALL be addressed in a follow-up modernization change
+#### Scenario: Deferred-route readiness validation
+- **WHEN** release artifacts are prepared for deferred-route promotion
+- **THEN** required assets for `/tables`, `/excel-query`, `/query-tool`, and `/mid-section-defect` SHALL be validated
+- **THEN** missing required assets SHALL fail release gating
+
+### Requirement: Deferred-route runtime fallback SHALL be retired by governed policy
+Deferred follow-up routes SHALL not remain on runtime fallback posture after readiness, parity, and manual acceptance gates pass.
+
+#### Scenario: Deferred-route fallback retirement
+- **WHEN** a deferred route passes readiness, parity, and manual acceptance gates
+- **THEN** runtime fallback posture for that route SHALL be retired according to milestone policy
+- **THEN** rollback control SHALL remain available via explicit route-level governance switch
 
 ### Requirement: Fallback-retirement failure response SHALL be consistent across route hosts
 When in-scope runtime fallback retirement is enabled and route assets are unavailable, app-level and blueprint-level route handlers SHALL return a consistent retired-fallback response surface.
@@ -37,4 +45,3 @@ When in-scope runtime fallback retirement is enabled and route assets are unavai
 #### Scenario: Blueprint-level in-scope route enters retired fallback state
 - **WHEN** an in-scope blueprint-level route cannot serve required dist assets and fallback retirement is enabled
 - **THEN** the route SHALL return the same standardized retired-fallback response contract used by app-level routes
-

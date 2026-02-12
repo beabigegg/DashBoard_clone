@@ -12,10 +12,5 @@
     {"id": "Q4", "name": "performance-budget", "required": true},
     {"id": "Q5", "name": "manual-acceptance-and-bug-revalidation", "required": true}
   ],
-  "deferred_routes_excluded": [
-    "/tables",
-    "/excel-query",
-    "/query-tool",
-    "/mid-section-defect"
-  ]
+  "deferred_routes_excluded": []
 }

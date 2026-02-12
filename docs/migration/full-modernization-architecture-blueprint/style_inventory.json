@@ -21,7 +21,11 @@
       "global_selectors": ["body"],
       "status": "exception-registered",
       "exception_id": "style-admin-performance-inline-css"
-    }
+    },
+    "/tables": {"global_selectors": [], "status": "pending-audit"},
+    "/excel-query": {"global_selectors": [], "status": "pending-audit"},
+    "/query-tool": {"global_selectors": [], "status": "pending-audit"},
+    "/mid-section-defect": {"global_selectors": [], "status": "pending-audit"}
   },
   "shared_layers": {
     "frontend/src/styles/tailwind.css": [":root", "body"],

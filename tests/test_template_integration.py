@@ -303,10 +303,15 @@ class TestMesApiUsageInTemplates(unittest.TestCase):
             self.assertTrue('MesApi.get' in html or '/static/dist/wip-detail.js' in html)
 
     def test_tables_page_uses_mesapi_or_vite_module(self):
-        response = self.client.get('/tables')
-        html = response.data.decode('utf-8')
+        response, final_response, html = _get_response_and_html(self.client, '/tables')
 
-        self.assertTrue('MesApi.post' in html or '/static/dist/tables.js' in html)
+        if response.status_code == 302:
+            self.assertTrue(response.location.endswith('/portal-shell/tables'))
+            self.assertEqual(final_response.status_code, 200)
+            self.assertIn('/static/dist/portal-shell.js', html)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue('MesApi.post' in html or '/static/dist/tables.js' in html)
 
     def test_resource_page_uses_mesapi_or_vite_module(self):
         response, final_response, html = _get_response_and_html(self.client, '/resource')
@@ -324,11 +329,16 @@ class TestMesApiUsageInTemplates(unittest.TestCase):
             )
 
     def test_query_tool_page_uses_vite_module(self):
-        response = self.client.get('/query-tool')
-        html = response.data.decode('utf-8')
+        response, final_response, html = _get_response_and_html(self.client, '/query-tool')
 
-        self.assertIn('/static/dist/query-tool.js', html)
-        self.assertIn('type="module"', html)
+        if response.status_code == 302:
+            self.assertTrue(response.location.endswith('/portal-shell/query-tool'))
+            self.assertEqual(final_response.status_code, 200)
+            self.assertIn('/static/dist/portal-shell.js', html)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('/static/dist/query-tool.js', html)
+            self.assertIn('type="module"', html)
 
     def test_tmtt_defect_page_uses_vite_module(self):
         response, final_response, html = _get_response_and_html(self.client, '/tmtt-defect')
@@ -377,6 +387,9 @@ class TestViteModuleIntegration(unittest.TestCase):
             '/resource-history': '/portal-shell/resource-history',
             '/job-query': '/portal-shell/job-query',
             '/tmtt-defect': '/portal-shell/tmtt-defect',
+            '/tables': '/portal-shell/tables',
+            '/excel-query': '/portal-shell/excel-query',
+            '/query-tool': '/portal-shell/query-tool',
         }
 
         for endpoint, asset in endpoints_and_assets:

@@ -50,8 +50,9 @@ def test_job_query_native_smoke_query_search_export(client):
     shell = client.get("/portal-shell/job-query?start_date=2026-02-01&end_date=2026-02-11")
     assert shell.status_code == 200
 
-    page = client.get("/job-query")
-    assert page.status_code == 200
+    page = client.get("/job-query", follow_redirects=False)
+    assert page.status_code == 302
+    assert page.location.endswith("/portal-shell/job-query")
 
     with (
         patch(
@@ -111,8 +112,9 @@ def test_excel_query_native_smoke_upload_detect_query_export(client):
     shell = client.get("/portal-shell/excel-query?mode=upload")
     assert shell.status_code == 200
 
-    page = client.get("/excel-query")
-    assert page.status_code == 200
+    page = client.get("/excel-query", follow_redirects=False)
+    assert page.status_code == 302
+    assert page.location.endswith("/portal-shell/excel-query")
 
     from mes_dashboard.routes.excel_query_routes import _uploaded_excel_cache
 
@@ -183,8 +185,9 @@ def test_query_tool_native_smoke_resolve_history_association(client):
     shell = client.get("/portal-shell/query-tool?input_type=lot_id")
     assert shell.status_code == 200
 
-    page = client.get("/query-tool")
-    assert page.status_code == 200
+    page = client.get("/query-tool", follow_redirects=False)
+    assert page.status_code == 302
+    assert page.location.endswith("/portal-shell/query-tool")
 
     with (
         patch(
@@ -224,11 +227,17 @@ def test_query_tool_native_smoke_resolve_history_association(client):
 
 
 def test_tmtt_defect_native_smoke_range_query_and_csv_export(client):
+    _login_as_admin(client)
+
     shell = client.get("/portal-shell/tmtt-defect?start_date=2026-02-01&end_date=2026-02-11")
     assert shell.status_code == 200
 
-    page = client.get("/tmtt-defect")
-    assert page.status_code == 200
+    page = client.get("/tmtt-defect", follow_redirects=False)
+    if client.application.config.get("PORTAL_SPA_ENABLED", False):
+        assert page.status_code == 302
+        assert page.location.endswith("/portal-shell/tmtt-defect")
+    else:
+        assert page.status_code == 200
 
     with (
         patch(

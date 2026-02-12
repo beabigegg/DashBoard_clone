@@ -12,6 +12,10 @@
     "/job-query": ["docs/migration/portal-shell-route-view-integration/wave-b-parity-evidence.json"],
     "/tmtt-defect": ["docs/migration/portal-shell-route-view-integration/wave-b-parity-evidence.json"],
     "/admin/pages": ["tests/test_portal_shell_routes.py"],
-    "/admin/performance": ["tests/test_performance_integration.py"]
+    "/admin/performance": ["tests/test_performance_integration.py"],
+    "/tables": ["tests/test_portal_shell_routes.py"],
+    "/excel-query": ["tests/test_portal_shell_routes.py"],
+    "/query-tool": ["tests/test_portal_shell_routes.py"],
+    "/mid-section-defect": ["tests/test_portal_shell_routes.py"]
   }
 }

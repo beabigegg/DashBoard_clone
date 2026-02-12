@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "change": "deferred-route-modernization-follow-up",
+  "fields": [
+    "id",
+    "type",
+    "scope",
+    "owner",
+    "introduced_by",
+    "reason",
+    "mitigation",
+    "status",
+    "milestone",
+    "tracking_issue"
+  ],
+  "entries": [
+    {
+      "id": "style-excel-query-shell-tokens-no-fallback",
+      "type": "style",
+      "scope": "/excel-query",
+      "owner": "frontend-mes-reporting",
+      "introduced_by": "legacy-template",
+      "reason": "excel-query uses shell tokens (--portal-brand-start, --portal-brand-end, --portal-shadow-panel) without CSS fallback values; inherited from legacy era before shell token governance",
+      "mitigation": "add fallback values during content modernization cutover for /excel-query",
+      "status": "approved-temporary",
+      "milestone": "2026-03-19",
+      "tracking_issue": "deferred-route-modernization-follow-up/excel-query-style-hardening"
+    },
+    {
+      "id": "style-query-tool-shell-tokens-no-fallback",
+      "type": "style",
+      "scope": "/query-tool",
+      "owner": "frontend-mes-reporting",
+      "introduced_by": "legacy-template",
+      "reason": "query-tool uses shell tokens (--portal-brand-start, --portal-brand-end, --portal-shadow-panel) without CSS fallback values; inherited from legacy era before shell token governance",
+      "mitigation": "add fallback values during content modernization cutover for /query-tool",
+      "status": "approved-temporary",
+      "milestone": "2026-03-19",
+      "tracking_issue": "deferred-route-modernization-follow-up/query-tool-style-hardening"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-11T17:49:00+08:00",
+  "generated_at": "2026-02-12T12:40:00+08:00",
   "description": "Critical visual-state snapshots for chart/table/matrix routes.",
   "critical_diff_policy": {
     "block_release": true,
@@ -27,7 +27,7 @@
         "frontend/src/hold-overview/components/HoldMatrix.vue",
         "frontend/src/hold-overview/style.css"
       ],
-      "fingerprint": "5d42352bfb3de23e2ea5638285b69e2fc8adf6f69d61989f0280739b58fedf4d"
+      "fingerprint": "f2ca1666f50afb4f922b522cdf739685ce068911a17d6e6c285244770f451f2c"
     },
     {
       "id": "qc-gate-chart-table-linked",
@@ -39,7 +39,7 @@
         "frontend/src/qc-gate/components/QcGateChart.vue",
         "frontend/src/qc-gate/style.css"
       ],
-      "fingerprint": "2d283febab9142f042a7961aef93201a9d75f43c248cdd40b6b4530101b29619"
+      "fingerprint": "13e000938f5fc398a9abf2c62b3e64dd0c4742ba87b20d144c18befd57e2e1f4"
     },
     {
       "id": "resource-history-chart-detail",
@@ -53,7 +53,7 @@
         "frontend/src/resource-history/components/DetailSection.vue",
         "frontend/src/resource-history/style.css"
       ],
-      "fingerprint": "ec5560c3fd233de9d3a31928965e2c71c2e878cb203076e4b45ef149c46a5387"
+      "fingerprint": "385910e89f10f016f7973e97be30a697a396a71ea470c1bcfe028a2c6daa4cc9"
     },
     {
       "id": "tmtt-defect-pareto-detail",
@@ -66,7 +66,7 @@
         "frontend/src/tmtt-defect/components/TmttKpiCards.vue",
         "frontend/src/tmtt-defect/style.css"
       ],
-      "fingerprint": "59059868a9f61a20160d2acc8602ee9aa1a494ec0fdb6a816ee98028517451e8"
+      "fingerprint": "141d712008d33887a103a5a5133543d527be208c2a5700d16f4c045ce13bb166"
     }
   ]
 }

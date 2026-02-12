@@ -72,6 +72,30 @@
       "query_payload_contract": ["performance_summary", "log_stream"],
       "chart_data_shape": ["timeline", "status_summary"],
       "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/tables": {
+      "filter_input_semantics": ["table_category", "table_name", "dynamic_column_filters"],
+      "query_payload_contract": ["table_name", "limit", "time_field", "filters"],
+      "chart_data_shape": ["dynamic_data_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/excel-query": {
+      "filter_input_semantics": ["file_upload", "excel_column", "table_name", "search_column", "query_type", "return_columns", "date_range"],
+      "query_payload_contract": ["table_name", "search_column", "return_columns", "search_values", "query_type", "date_column", "date_from", "date_to"],
+      "chart_data_shape": ["result_table", "csv_export"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/query-tool": {
+      "filter_input_semantics": ["input_type", "workcenter_groups", "input_values", "association_type", "equipment_ids", "equipment_query_type", "start_date", "end_date"],
+      "query_payload_contract": ["input_type", "values", "container_id", "workcenter_groups", "type", "equipment_ids", "equipment_names", "start_date", "end_date", "query_type"],
+      "chart_data_shape": ["resolved_lots_table", "lot_history_table", "association_table", "equipment_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/mid-section-defect": {
+      "filter_input_semantics": ["start_date", "end_date", "loss_reasons"],
+      "query_payload_contract": ["start_date", "end_date", "loss_reasons", "page", "page_size"],
+      "chart_data_shape": ["kpi_cards", "pareto_by_station", "pareto_by_loss_reason", "pareto_by_machine", "pareto_by_tmtt_machine", "pareto_by_workflow", "pareto_by_package", "daily_trend", "detail_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
     }
   }
 }

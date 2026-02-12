@@ -61,7 +61,6 @@ onMounted(async () => {
   <div class="job-query-page u-content-shell">
     <header class="job-query-header">
       <h1>設備維修查詢</h1>
-      <p>Native Route-View：查詢 / 交易歷程 / CSV 匯出</p>
     </header>
 
     <div class="u-panel-stack">

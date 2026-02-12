@@ -9,6 +9,10 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/qc-gate',
   '/job-query',
   '/tmtt-defect',
+  '/tables',
+  '/excel-query',
+  '/query-tool',
+  '/mid-section-defect',
 ]);
 
 const IN_SCOPE_ADMIN_ROUTES = Object.freeze([
@@ -16,12 +20,7 @@ const IN_SCOPE_ADMIN_ROUTES = Object.freeze([
   '/admin/performance',
 ]);
 
-const DEFERRED_ROUTES = Object.freeze([
-  '/tables',
-  '/excel-query',
-  '/query-tool',
-  '/mid-section-defect',
-]);
+const DEFERRED_ROUTES = Object.freeze([]);
 
 const ALL_KNOWN_ROUTES = Object.freeze([
   ...IN_SCOPE_REPORT_ROUTES,
@@ -195,8 +194,8 @@ const ROUTE_CONTRACTS = Object.freeze({
     title: '表格總覽',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
-    scope: 'deferred',
-    compatibilityPolicy: 'legacy_direct_entry_allowed',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),
   '/excel-query': buildContract({
     route: '/excel-query',
@@ -206,8 +205,8 @@ const ROUTE_CONTRACTS = Object.freeze({
     title: 'Excel 查詢工具',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
-    scope: 'deferred',
-    compatibilityPolicy: 'legacy_direct_entry_allowed',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),
   '/query-tool': buildContract({
     route: '/query-tool',
@@ -217,8 +216,8 @@ const ROUTE_CONTRACTS = Object.freeze({
     title: 'Query Tool',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
-    scope: 'deferred',
-    compatibilityPolicy: 'legacy_direct_entry_allowed',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),
   '/mid-section-defect': buildContract({
     route: '/mid-section-defect',
@@ -228,8 +227,8 @@ const ROUTE_CONTRACTS = Object.freeze({
     title: '中段製程不良追溯',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
-    scope: 'deferred',
-    compatibilityPolicy: 'legacy_direct_entry_allowed',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),
 });
 

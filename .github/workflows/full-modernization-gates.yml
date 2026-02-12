@@ -5,6 +5,10 @@ on:
     paths:
       - "frontend/src/portal-shell/**"
       - "frontend/src/qc-gate/**"
+      - "frontend/src/tables/**"
+      - "frontend/src/excel-query/**"
+      - "frontend/src/query-tool/**"
+      - "frontend/src/mid-section-defect/**"
       - "frontend/tests/portal-shell-*.test.js"
       - "src/mes_dashboard/**"
       - "tests/test_portal_shell_routes.py"
@@ -12,13 +16,20 @@ on:
       - "tests/test_asset_readiness_policy.py"
       - "scripts/check_full_modernization_gates.py"
       - "docs/migration/full-modernization-architecture-blueprint/**"
+      - "docs/migration/deferred-route-modernization-follow-up/**"
       - "openspec/changes/full-modernization-architecture-blueprint/**"
+      - "openspec/changes/deferred-route-modernization-follow-up/**"
+      - "data/modernization_feature_flags.json"
       - ".github/workflows/full-modernization-gates.yml"
   push:
     branches: [ main ]
     paths:
       - "frontend/src/portal-shell/**"
       - "frontend/src/qc-gate/**"
+      - "frontend/src/tables/**"
+      - "frontend/src/excel-query/**"
+      - "frontend/src/query-tool/**"
+      - "frontend/src/mid-section-defect/**"
       - "frontend/tests/portal-shell-*.test.js"
       - "src/mes_dashboard/**"
       - "tests/test_portal_shell_routes.py"
@@ -26,7 +37,10 @@ on:
       - "tests/test_asset_readiness_policy.py"
       - "scripts/check_full_modernization_gates.py"
       - "docs/migration/full-modernization-architecture-blueprint/**"
+      - "docs/migration/deferred-route-modernization-follow-up/**"
       - "openspec/changes/full-modernization-architecture-blueprint/**"
+      - "openspec/changes/deferred-route-modernization-follow-up/**"
+      - "data/modernization_feature_flags.json"
       - ".github/workflows/full-modernization-gates.yml"
 
 jobs:

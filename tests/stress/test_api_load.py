@@ -24,11 +24,11 @@ from urllib.parse import quote
 class TestAPILoadConcurrent:
     """Load tests with concurrent requests."""
 
-    def _make_request(self, url: str, timeout: float) -> Tuple[bool, float, str]:
+    def _make_request(self, url: str, timeout: float, headers: dict | None = None) -> Tuple[bool, float, str]:
         """Make a single request and return (success, duration, error)."""
         start = time.time()
         try:
-            response = requests.get(url, timeout=timeout)
+            response = requests.get(url, timeout=timeout, headers=headers)
             duration = time.time() - start
             if response.status_code == 200:
                 data = response.json()
@@ -212,8 +212,13 @@ class TestAPILoadConcurrent:
         start_time = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_users) as executor:
             futures = [
-                executor.submit(self._make_request, url, timeout)
-                for _ in range(total_requests)
+                executor.submit(
+                    self._make_request,
+                    url,
+                    timeout,
+                    {"X-Forwarded-For": f"10.0.0.{(idx % concurrent_users) + 1}"},
+                )
+                for idx in range(total_requests)
             ]
 
             for future in concurrent.futures.as_completed(futures):
@@ -249,10 +254,11 @@ class TestAPILoadConcurrent:
         start_time = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_users) as executor:
             futures = []
-            for _ in range(concurrent_users):
+            for user_idx in range(concurrent_users):
+                headers = {"X-Forwarded-For": f"10.0.1.{user_idx + 1}"}
                 for endpoint in endpoints:
                     for _ in range(requests_per_endpoint):
-                        futures.append(executor.submit(self._make_request, endpoint, timeout))
+                        futures.append(executor.submit(self._make_request, endpoint, timeout, headers))
 
             for future in concurrent.futures.as_completed(futures):
                 success, duration, error = future.result()

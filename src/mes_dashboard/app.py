@@ -676,6 +676,10 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/tables')
     def tables_page():
         """Table viewer page served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/tables')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
         dist_dir = os.path.join(app.static_folder or "", "dist")
         dist_html = os.path.join(dist_dir, "tables.html")
         if os.path.exists(dist_html):
@@ -687,14 +691,14 @@ def create_app(config_name: str | None = None) -> Flask:
             return send_from_directory(nested_dist_dir, "index.html")
 
         # Test/local fallback when frontend build artifacts are absent.
-        return (
+        return missing_in_scope_asset_response('/tables', (
             "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
             "<title>MES 數據表查詢工具</title>"
             "<script type=\"module\" src=\"/static/dist/tables.js\"></script>"
             "</head><body><div id='app'></div></body></html>",
             200,
-        )
+        ))
 
     @app.route('/wip-overview')
     def wip_overview_page():
@@ -765,6 +769,9 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/excel-query')
     def excel_query_page():
         """Excel batch query tool page."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/excel-query')
+        if canonical_redirect is not None:
+            return canonical_redirect
         return render_template('excel_query.html')
 
     @app.route('/resource-history')
@@ -821,8 +828,23 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/mid-section-defect')
     def mid_section_defect_page():
         """Mid-section defect traceability analysis page (pure Vite)."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/mid-section-defect')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
         dist_dir = os.path.join(app.static_folder or "", "dist")
-        return send_from_directory(dist_dir, 'mid-section-defect.html')
+        dist_html = os.path.join(dist_dir, "mid-section-defect.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'mid-section-defect.html')
+
+        return missing_in_scope_asset_response('/mid-section-defect', (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>中段製程不良追溯</title>"
+            "<script type=\"module\" src=\"/static/dist/mid-section-defect.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        ))
 
     # ========================================================
     # Table Query APIs (for table_data_viewer)

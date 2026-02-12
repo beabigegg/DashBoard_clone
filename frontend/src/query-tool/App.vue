@@ -60,7 +60,6 @@ onMounted(async () => {
   <div class="query-tool-page u-content-shell">
     <header class="query-tool-header">
       <h1>批次追蹤工具</h1>
-      <p>Native Route-View：Resolve / History / Association / Equipment Period</p>
     </header>
 
     <div class="u-panel-stack">

@@ -31,8 +31,10 @@ def client(app):
 class TestQueryToolPage:
     """Tests for /query-tool page route."""
 
-    def test_page_returns_html(self, client):
-        """Should return the query tool page."""
+    def test_page_returns_html(self, client, monkeypatch):
+        """Should return the query tool page when SPA redirect is disabled."""
+        monkeypatch.setenv("PORTAL_SPA_ENABLED", "false")
+        client.application.config["PORTAL_SPA_ENABLED"] = False
         with client.session_transaction() as sess:
             sess["admin"] = {"username": "admin", "displayName": "Admin"}
 

@@ -19,8 +19,8 @@ const backendContractPath = path.resolve(
 );
 
 
-test('in-scope route contracts satisfy governance metadata requirements', () => {
-  const errors = validateRouteContractMap({ inScopeOnly: true });
+test('all route contracts satisfy governance metadata requirements', () => {
+  const errors = validateRouteContractMap();
   assert.deepEqual(errors, []);
 });
 
@@ -38,14 +38,18 @@ test('admin shell targets are governed and rendered as external targets', () => 
 });
 
 
-test('deferred routes stay discoverable but are separable from in-scope gates', () => {
+test('formerly deferred routes are now promoted to in-scope', () => {
   const inScope = new Set(getInScopeRoutes());
   const deferred = getDeferredRoutes();
+  const promotedRoutes = ['/tables', '/excel-query', '/query-tool', '/mid-section-defect'];
 
-  deferred.forEach((route) => {
-    assert.equal(inScope.has(route), false, `deferred route leaked into in-scope: ${route}`);
+  assert.equal(deferred.length, 0, 'all deferred routes should be promoted');
+
+  promotedRoutes.forEach((route) => {
+    assert.equal(inScope.has(route), true, `promoted route missing from in-scope: ${route}`);
     const contract = getRouteContract(route);
-    assert.equal(contract.scope, 'deferred');
+    assert.equal(contract.scope, 'in-scope');
+    assert.equal(contract.compatibilityPolicy, 'redirect_to_shell_when_spa_enabled');
   });
 });
 

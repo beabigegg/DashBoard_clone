@@ -88,6 +88,10 @@ def _route_css_targets() -> dict[str, list[Path]]:
         "/tmtt-defect": [ROOT / "frontend/src/tmtt-defect/style.css"],
         "/admin/pages": [ROOT / "src/mes_dashboard/templates/admin/pages.html"],
         "/admin/performance": [ROOT / "src/mes_dashboard/templates/admin/performance.html"],
+        "/tables": [ROOT / "frontend/src/tables/style.css"],
+        "/excel-query": [ROOT / "frontend/src/excel-query/style.css"],
+        "/query-tool": [ROOT / "frontend/src/query-tool/style.css"],
+        "/mid-section-defect": [ROOT / "frontend/src/mid-section-defect/style.css"],
     }
 
 
@@ -129,9 +133,9 @@ def _check_scope_matrix(scope_matrix: dict[str, Any], report: CheckReport) -> tu
         report.fail("scope matrix has no in-scope routes")
     if "/admin/pages" not in in_scope or "/admin/performance" not in in_scope:
         report.fail("scope matrix must include /admin/pages and /admin/performance")
-    required_deferred = {"/tables", "/excel-query", "/query-tool", "/mid-section-defect"}
+    required_deferred: set[str] = set()
     if deferred != required_deferred:
-        report.fail("scope matrix deferred routes mismatch expected policy")
+        report.fail("scope matrix deferred routes mismatch expected policy (all routes promoted to in-scope)")
     return in_scope, deferred
 
 

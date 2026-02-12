@@ -9,8 +9,8 @@
   --text: #1f2937;
   --muted: #64748b;
   --border: #dbe3ef;
-  --header-from: var(--portal-brand-start, #6366f1);
-  --header-to: var(--portal-brand-end, #7c3aed);
+  --header-from: var(--portal-brand-start, #667eea);
+  --header-to: var(--portal-brand-end, #764ba2);
   --success: #22c55e;
   --warning: #facc15;
   --danger: #ef4444;
@@ -40,7 +40,7 @@
 
 .qc-gate-header h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 24px;
   line-height: 1.2;
 }
 

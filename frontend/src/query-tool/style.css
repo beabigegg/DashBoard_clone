@@ -9,7 +9,7 @@
   padding: 22px 24px;
   margin-bottom: 16px;
   color: #fff;
-  background: linear-gradient(135deg, var(--portal-brand-start) 0%, var(--portal-brand-end) 100%);
+  background: linear-gradient(135deg, var(--portal-brand-start, #667eea) 0%, var(--portal-brand-end, #764ba2) 100%);
   box-shadow: var(--portal-shadow-panel);
 }
 

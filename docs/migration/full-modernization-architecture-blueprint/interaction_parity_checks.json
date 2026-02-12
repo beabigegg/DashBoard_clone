@@ -12,6 +12,10 @@
     "/job-query": ["resource_select", "query_submit", "export_csv"],
     "/tmtt-defect": ["date_range_query", "chart_filter_link", "detail_sort"],
     "/admin/pages": ["drawer_crud", "page_status_update", "admin_visibility"],
-    "/admin/performance": ["admin_auth_access", "performance_view_load"]
+    "/admin/performance": ["admin_auth_access", "performance_view_load"],
+    "/tables": ["table_select", "column_filter_apply", "query_submit"],
+    "/excel-query": ["file_upload", "column_select", "query_execute", "export_csv"],
+    "/query-tool": ["lot_resolve", "history_load", "association_query", "equipment_period_query", "export_csv"],
+    "/mid-section-defect": ["date_range_query", "loss_reason_filter", "pareto_chart_drill", "detail_pagination", "export_csv"]
   }
 }

@@ -90,24 +90,43 @@
       "canonical_shell_path": "/portal-shell/admin/performance",
       "owner": "frontend-platform-admin",
       "visibility_policy": "admin_only"
-    }
-  ],
-  "deferred": [
+    },
     {
       "route": "/tables",
-      "reason": "deferred-to-follow-up-change"
+      "category": "report",
+      "canonical_shell_path": "/portal-shell/tables",
+      "owner": "frontend-mes-reporting",
+      "visibility_policy": "released_or_admin",
+      "promoted_from": "deferred",
+      "promoted_by": "deferred-route-modernization-follow-up"
     },
     {
       "route": "/excel-query",
-      "reason": "deferred-to-follow-up-change"
+      "category": "report",
+      "canonical_shell_path": "/portal-shell/excel-query",
+      "owner": "frontend-mes-reporting",
+      "visibility_policy": "released_or_admin",
+      "promoted_from": "deferred",
+      "promoted_by": "deferred-route-modernization-follow-up"
     },
     {
       "route": "/query-tool",
-      "reason": "deferred-to-follow-up-change"
+      "category": "report",
+      "canonical_shell_path": "/portal-shell/query-tool",
+      "owner": "frontend-mes-reporting",
+      "visibility_policy": "released_or_admin",
+      "promoted_from": "deferred",
+      "promoted_by": "deferred-route-modernization-follow-up"
     },
     {
       "route": "/mid-section-defect",
-      "reason": "deferred-to-follow-up-change"
+      "category": "report",
+      "canonical_shell_path": "/portal-shell/mid-section-defect",
+      "owner": "frontend-mes-reporting",
+      "visibility_policy": "released_or_admin",
+      "promoted_from": "deferred",
+      "promoted_by": "deferred-route-modernization-follow-up"
     }
-  ]
+  ],
+  "deferred": []
 }

@@ -1,6 +1,6 @@
 {
   "change": "full-modernization-architecture-blueprint",
-  "scope": "in-scope-routes-only",
+  "scope": "all-governed-routes",
   "routes": {
     "/wip-overview": {
       "baseline_status": "initialized",
@@ -47,6 +47,22 @@
       "known_bugs": []
     },
     "/admin/performance": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/tables": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/excel-query": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/query-tool": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/mid-section-defect": {
       "baseline_status": "initialized",
       "known_bugs": []
     }

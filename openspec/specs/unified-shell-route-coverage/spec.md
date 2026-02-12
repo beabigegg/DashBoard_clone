@@ -4,7 +4,7 @@
 TBD - created by archiving change full-modernization-architecture-blueprint. Update Purpose after archive.
 ## Requirements
 ### Requirement: In-scope routes SHALL be shell-contract governed
-All in-scope modernization routes SHALL be represented in shell route contracts, loader registration policy, and navigation visibility governance.
+All in-scope modernization routes, including deferred follow-up routes, SHALL be represented in shell route contracts, loader registration policy, and navigation visibility governance with complete metadata.
 
 #### Scenario: In-scope coverage validation
 - **WHEN** shell route contract validation is executed
@@ -15,13 +15,10 @@ All in-scope modernization routes SHALL be represented in shell route contracts,
 - **WHEN** shell navigation is built for admin users
 - **THEN** `/admin/pages` and `/admin/performance` SHALL be represented as governed navigation targets according to visibility/access policy
 
-### Requirement: Out-of-scope routes SHALL not block this phase
-Routes explicitly marked as out-of-scope for this modernization phase SHALL be excluded from required shell-coverage gates in this phase.
-
-#### Scenario: Deferred route exclusion
-- **WHEN** modernization gates execute for this phase
-- **THEN** `/tables`, `/excel-query`, `/query-tool`, and `/mid-section-defect` SHALL be treated as deferred routes
-- **THEN** deferred route absence from new shell-governance gates SHALL NOT fail this phase
+#### Scenario: Deferred route contract promotion
+- **WHEN** follow-up route coverage validation is executed
+- **THEN** `/tables`, `/excel-query`, `/query-tool`, and `/mid-section-defect` SHALL have route metadata, owner metadata, and visibility/access policy metadata
+- **THEN** missing metadata on those deferred routes SHALL fail route-governance validation
 
 ### Requirement: Route coverage governance SHALL be CI-enforced
 Route coverage and contract completeness checks for in-scope routes SHALL run as CI gates.
@@ -48,4 +45,3 @@ When contract loading falls back from the primary modernization contract artifac
 #### Scenario: Legacy contract fallback path selected
 - **WHEN** the primary contract artifact is unavailable and a legacy contract file is loaded
 - **THEN** the system SHALL log a warning that includes the selected legacy source path
-

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -57,7 +59,7 @@ def test_hold_blueprints_share_retired_fallback_template(monkeypatch, route, exi
     assert "系統發生錯誤" in response.data.decode("utf-8")
 
 
-def test_deferred_route_keeps_fallback_posture_when_in_scope_retirement_enabled(monkeypatch):
+def test_promoted_deferred_route_enforces_asset_readiness_when_retirement_enabled(monkeypatch):
     monkeypatch.setenv("PORTAL_SPA_ENABLED", "false")
     monkeypatch.setenv("MODERNIZATION_RETIRE_IN_SCOPE_RUNTIME_FALLBACK", "true")
     app = create_app("testing")
@@ -69,4 +71,20 @@ def test_deferred_route_keeps_fallback_posture_when_in_scope_retirement_enabled(
     with patch("mes_dashboard.app.os.path.exists", return_value=False):
         response = client.get("/tables")
 
-    assert response.status_code == 200
+    # Promoted deferred routes now enforce asset readiness (503 when missing).
+    assert response.status_code == 503
+
+
+def test_template_backed_promoted_routes_do_not_require_html_assets():
+    manifest_path = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "migration"
+        / "full-modernization-architecture-blueprint"
+        / "asset_readiness_manifest.json"
+    )
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    required = payload.get("in_scope_required_assets", {})
+
+    assert required.get("/excel-query") == ["excel-query.js"]
+    assert required.get("/query-tool") == ["query-tool.js"]

@@ -11,6 +11,7 @@ Contains Flask Blueprint for batch tracing and equipment period query endpoints:
 
 from flask import Blueprint, jsonify, request, Response, render_template
 
+from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell
 from mes_dashboard.services.query_tool_service import (
     resolve_lots,
     get_lot_history,
@@ -43,6 +44,9 @@ query_tool_bp = Blueprint('query_tool', __name__)
 @query_tool_bp.route('/query-tool')
 def query_tool_page():
     """Render the query tool page."""
+    canonical_redirect = maybe_redirect_to_canonical_shell('/query-tool')
+    if canonical_redirect is not None:
+        return canonical_redirect
     return render_template('query_tool.html')
 
 
