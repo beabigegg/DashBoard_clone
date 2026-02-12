@@ -21,6 +21,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  renderMode: {
+    type: String,
+    default: 'native',
+  },
 });
 
 const route = useRoute();
@@ -78,6 +82,12 @@ async function loadNativeModule(route) {
   moduleError.value = '';
   resolvedComponent.value = null;
 
+  if (props.renderMode === 'external') {
+    moduleLoading.value = false;
+    openLegacyPage();
+    return;
+  }
+
   const loader = getNativeModuleLoader(route);
   if (!loader) {
     moduleLoading.value = false;
@@ -101,8 +111,8 @@ async function loadNativeModule(route) {
 }
 
 watch(
-  () => props.targetRoute,
-  (route) => {
+  () => [props.targetRoute, props.renderMode],
+  ([route]) => {
     void loadNativeModule(route);
   },
 );

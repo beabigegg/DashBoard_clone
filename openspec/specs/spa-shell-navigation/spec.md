@@ -2,46 +2,31 @@
 Define stable requirements for spa-shell-navigation.
 ## Requirements
 ### Requirement: Portal SHALL provide a SPA shell driven by Vue Router
-The portal frontend SHALL use a single SPA shell entry and Vue Router to render page modules without iframe embedding, and SHALL route each page through native route-view integration. The shell layout SHALL use a full-viewport fluid layout with flexbox, removing all max-width constraints and block-centered styling. The main content area (`.shell-content`) SHALL fill available space as a flex child, and the sidebar SHALL be a collapsible flex child that pushes content when expanded on desktop. The content area class SHALL be `.shell-content` (not `.content`) to avoid CSS collision with page-level `.content` classes.
+The portal frontend SHALL use a single SPA shell entry and Vue Router to render in-scope page modules without iframe embedding. In-scope routes for this phase SHALL include the governed report routes and admin surfaces `/admin/pages` and `/admin/performance`, while deferred routes (`/tables`, `/excel-query`, `/query-tool`, `/mid-section-defect`) are explicitly excluded from this phase contract.
 
-#### Scenario: Drawer navigation renders integrated route view
-- **WHEN** a user clicks a sidebar page entry whose migration mode is `native`
-- **THEN** the active route SHALL be updated through Vue Router
-- **THEN** the main content area SHALL render the corresponding page module inside shell route-view without iframe usage
-- **THEN** the content area SHALL fill the available viewport width minus the sidebar width (if sidebar is expanded)
+#### Scenario: In-scope route renders through shell governance
+- **WHEN** a user navigates to an in-scope shell-governed route
+- **THEN** the route SHALL resolve through Vue Router with shell contract metadata
+- **THEN** the shell SHALL render the corresponding module/target without iframe fallback
 
-#### Scenario: Shell layout fills full viewport
-- **WHEN** the portal shell renders
-- **THEN** the shell SHALL span the full viewport width with no max-width constraint
-- **THEN** the header SHALL span edge-to-edge with no border-radius
-- **THEN** the sidebar and content area SHALL have no outer borders or border-radius
+#### Scenario: Admin route appears as governed target
+- **WHEN** an admin user opens shell navigation
+- **THEN** `/admin/pages` and `/admin/performance` SHALL be exposed as governed navigation targets per access policy
 
-#### Scenario: Page-level max-width constraints are removed when embedded
-- **WHEN** a page module registered in the shell route contracts renders inside `.shell-content`
-- **THEN** page-level max-width constraints SHALL be overridden to allow full-width rendering
-- **THEN** page-level duplicate padding SHALL be removed to avoid double spacing
-- **THEN** standalone page rendering (outside the shell) SHALL remain unaffected
-
-#### Scenario: Shell content class avoids collision with page-level classes
-- **WHEN** a page module that uses its own `.content` class renders inside the shell
-- **THEN** the shell's content wrapper (`.shell-content`) SHALL NOT interfere with the page's `.content` styling
-
-#### Scenario: Wrapper route remains available during migration
-- **WHEN** a user clicks a sidebar page entry whose migration mode is `wrapper`
-- **THEN** Vue Router SHALL render the wrapper host in shell content area
-- **THEN** the wrapper SHALL preserve page reachability until native rewrite is completed
+#### Scenario: Deferred route is excluded from this phase route-governance requirement
+- **WHEN** phase-level shell-governance compliance is evaluated
+- **THEN** `/tables`, `/excel-query`, `/query-tool`, and `/mid-section-defect` SHALL be treated as deferred and excluded from pass/fail criteria for this phase
 
 ### Requirement: Existing route contracts SHALL remain stable in SPA mode
-Migration to SPA shell SHALL preserve existing route paths, deep-link behavior, and query semantics during both native and wrapper phases.
+Migration to the shell-first SPA model SHALL preserve route/query compatibility for in-scope routes while introducing canonical shell routing policy and explicit compatibility handling.
 
-#### Scenario: Direct route entry remains functional
-- **WHEN** a user opens an existing route directly (bookmark or refresh)
-- **THEN** the route SHALL resolve to the same page functionality as before migration
-- **THEN** required query parameters SHALL continue to be interpreted with compatible semantics
+#### Scenario: Canonical shell path behavior for in-scope routes
+- **WHEN** a user opens an in-scope report route via canonical shell path
+- **THEN** route behavior and query semantics SHALL remain compatible with established baseline behavior
 
-#### Scenario: Query continuity across shell navigation
-- **WHEN** users navigate from shell list pages to detail pages and back
-- **THEN** query-state parameters required by list/detail workflows SHALL remain consistent with pre-migration behavior
+#### Scenario: Compatibility policy for direct route entry
+- **WHEN** a user opens an in-scope report route via direct non-canonical entry
+- **THEN** the system SHALL apply explicit compatibility policy (preserve behavior or compatibility redirect) without breaking route semantics
 
 ### Requirement: SPA shell navigation SHALL enforce page visibility rules
 SPA navigation SHALL respect backend-defined drawer and page visibility outcomes, including admin entry visibility and route fallback for hidden routes.
@@ -59,4 +44,23 @@ SPA navigation SHALL respect backend-defined drawer and page visibility outcomes
 - **WHEN** a user navigates to a route that is not visible or not registered in the current shell navigation set
 - **THEN** the shell SHALL redirect to a safe fallback route
 - **THEN** the shell SHALL NOT expose iframe-based fallback rendering
+
+### Requirement: Canonical redirect scope boundaries SHALL be explicit and intentional
+Canonical shell direct-entry redirects SHALL apply only to governed in-scope report routes and SHALL explicitly exclude admin external targets with documented rationale.
+
+#### Scenario: In-scope report route direct entry
+- **WHEN** SPA shell mode is enabled and a user enters an in-scope report route directly
+- **THEN** the system SHALL redirect to the canonical `/portal-shell/...` route while preserving query semantics
+
+#### Scenario: Admin external target direct entry
+- **WHEN** SPA shell mode is enabled and a user enters `/admin/pages` or `/admin/performance` directly
+- **THEN** the system SHALL NOT apply report-route canonical redirect policy
+- **THEN** the exclusion rationale SHALL be documented in code-level comments or governance docs
+
+### Requirement: Missing-required-parameter redirects SHALL avoid avoidable multi-hop chains
+Routes with server-side required query parameters SHALL minimize redirect hops under SPA shell mode.
+
+#### Scenario: Hold detail missing reason in SPA shell mode
+- **WHEN** a user opens `/hold-detail` without `reason` while SPA shell mode is enabled
+- **THEN** the route SHALL resolve via a single-hop redirect to the canonical overview shell path
 

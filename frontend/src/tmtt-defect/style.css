@@ -9,8 +9,12 @@
   padding: 22px 24px;
   margin-bottom: 16px;
   color: #fff;
-  background: linear-gradient(135deg, var(--portal-brand-start) 0%, var(--portal-brand-end) 100%);
-  box-shadow: var(--portal-shadow-panel);
+  background: linear-gradient(
+    135deg,
+    var(--portal-brand-start, #6366f1) 0%,
+    var(--portal-brand-end, #7c3aed) 100%
+  );
+  box-shadow: var(--portal-shadow-panel, 0 8px 24px rgba(79, 70, 229, 0.18));
 }
 
 .tmtt-header h1 {
@@ -113,7 +117,7 @@
   border-radius: 10px;
   border-left: 4px solid #64748b;
   background: #fff;
-  box-shadow: var(--portal-shadow-soft);
+  box-shadow: var(--portal-shadow-soft, 0 2px 8px rgba(15, 23, 42, 0.08));
 }
 
 .tmtt-kpi-card.tone-danger {

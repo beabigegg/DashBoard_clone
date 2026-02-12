@@ -11,6 +11,10 @@ from flask import Blueprint, current_app, jsonify, redirect, request, send_from_
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.utils import parse_bool_query
+from mes_dashboard.core.modernization_policy import (
+    missing_in_scope_asset_response,
+    maybe_redirect_to_canonical_shell,
+)
 from mes_dashboard.services.wip_service import (
     get_hold_detail_summary,
     get_hold_detail_distribution,
@@ -45,8 +49,15 @@ def hold_detail_page():
     """
     reason = request.args.get('reason', '').strip()
     if not reason:
-        # Redirect to WIP Overview when reason is missing
+        # Redirect to overview route; in SPA mode this becomes canonical shell URL.
+        overview_redirect = maybe_redirect_to_canonical_shell('/wip-overview')
+        if overview_redirect is not None:
+            return overview_redirect
         return redirect('/wip-overview')
+
+    canonical_redirect = maybe_redirect_to_canonical_shell('/hold-detail')
+    if canonical_redirect is not None:
+        return canonical_redirect
 
     # Keep server-side validation, then serve static Vite output directly.
     dist_dir = os.path.join(current_app.static_folder or "", "dist")
@@ -55,7 +66,7 @@ def hold_detail_page():
         return send_from_directory(dist_dir, 'hold-detail.html')
 
     safe_reason = html.escape(reason, quote=True)
-    return (
+    return missing_in_scope_asset_response('/hold-detail', (
         "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
         f"<title>Hold Detail - {safe_reason}</title>"
@@ -63,7 +74,7 @@ def hold_detail_page():
         f"<meta name=\"hold-reason\" content=\"{safe_reason}\">"
         "</head><body><div id='app'></div></body></html>",
         200,
-    )
+    ))
 
 
 # ============================================================

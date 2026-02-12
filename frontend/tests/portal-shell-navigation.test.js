@@ -105,3 +105,26 @@ test('buildDynamicNavigationState can include standalone drilldown routes withou
   assert.equal(state.allowedPaths.includes('/wip-detail'), true);
   assert.equal(state.allowedPaths.includes('/hold-detail'), true);
 });
+
+
+test('buildDynamicNavigationState keeps admin routes as governed external targets', () => {
+  const state = buildDynamicNavigationState(
+    [
+      {
+        id: 'dev-tools',
+        name: 'Dev',
+        order: 1,
+        admin_only: true,
+        pages: [{ route: '/admin/pages', name: 'Admin Pages', status: 'dev', order: 1 }],
+      },
+    ],
+    { isAdmin: true },
+  );
+
+  assert.equal(state.diagnostics.missingContractRoutes.length, 0);
+  assert.equal(state.dynamicRoutes.length, 1);
+  assert.equal(state.dynamicRoutes[0].targetRoute, '/admin/pages');
+  assert.equal(state.dynamicRoutes[0].renderMode, 'external');
+  assert.equal(state.dynamicRoutes[0].visibilityPolicy, 'admin_only');
+  assert.equal(state.dynamicRoutes[0].scope, 'in-scope');
+});

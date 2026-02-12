@@ -9,8 +9,12 @@
   padding: 22px 24px;
   margin-bottom: 16px;
   color: #fff;
-  background: linear-gradient(135deg, var(--portal-brand-start) 0%, var(--portal-brand-end) 100%);
-  box-shadow: var(--portal-shadow-panel);
+  background: linear-gradient(
+    135deg,
+    var(--portal-brand-start, #6366f1) 0%,
+    var(--portal-brand-end, #7c3aed) 100%
+  );
+  box-shadow: var(--portal-shadow-panel, 0 8px 24px rgba(79, 70, 229, 0.18));
 }
 
 .job-query-header h1 {

@@ -8,14 +8,10 @@ import shutil
 from pathlib import Path
 from typing import Any, Mapping
 
+from mes_dashboard.core.feature_flags import resolve_bool_flag
+
 CONTRACT_VERSION = "2026.02-p2"
 DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-
-
-def _to_bool(value: str | None, default: bool) -> bool:
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _resolve_path(value: str | None, fallback: Path, project_root: Path) -> Path:
@@ -68,7 +64,12 @@ def load_runtime_contract(
         "watchdog_pid_file": str(pid_file),
         "watchdog_state_file": str(state_file),
         "watchdog_check_interval": int(env.get("WATCHDOG_CHECK_INTERVAL", "5")),
-        "validation_enforced": _to_bool(env.get("RUNTIME_CONTRACT_ENFORCE"), False),
+        "validation_enforced": resolve_bool_flag(
+            "RUNTIME_CONTRACT_ENFORCE",
+            config={},
+            default=False,
+            environ=env,
+        ),
     }
     return contract
 

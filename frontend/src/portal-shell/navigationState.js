@@ -102,7 +102,7 @@ export function buildDynamicNavigationState(
         diagnostics.missingContractRoutes.push(page.route);
       }
 
-      const renderMode = 'native';
+      const renderMode = contract?.renderMode || 'native';
       dynamicRoutes.push({
         routeName: `shell-page-${index++}`,
         shellPath,
@@ -112,6 +112,9 @@ export function buildDynamicNavigationState(
         owner: contract?.owner || '',
         renderMode,
         routeId: contract?.routeId || '',
+        visibilityPolicy: contract?.visibilityPolicy || 'released_or_admin',
+        scope: contract?.scope || 'unknown',
+        compatibilityPolicy: contract?.compatibilityPolicy || 'legacy_direct_entry_allowed',
       });
       registeredRoutes.add(page.route);
       allowedPaths.push(shellPath);
@@ -141,8 +144,11 @@ export function buildDynamicNavigationState(
         pageName: contract?.title || route,
         drawerName: '',
         owner: contract?.owner || '',
-        renderMode: 'native',
+        renderMode: contract?.renderMode || 'native',
         routeId: contract?.routeId || '',
+        visibilityPolicy: contract?.visibilityPolicy || 'released_or_admin',
+        scope: contract?.scope || 'unknown',
+        compatibilityPolicy: contract?.compatibilityPolicy || 'legacy_direct_entry_allowed',
       });
       registeredRoutes.add(route);
       allowedPaths.push(shellPath);

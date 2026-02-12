@@ -12,6 +12,7 @@ import logging
 from flask import Blueprint, jsonify, request, Response, render_template
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell
 from mes_dashboard.services.job_query_service import (
     get_jobs_by_resources,
     get_job_txn_history,
@@ -49,6 +50,9 @@ _JOB_EXPORT_RATE_LIMIT = configured_rate_limit(
 @job_query_bp.route('/job-query')
 def job_query_page():
     """Render the job query page."""
+    canonical_redirect = maybe_redirect_to_canonical_shell('/job-query')
+    if canonical_redirect is not None:
+        return canonical_redirect
     return render_template('job_query.html')
 
 

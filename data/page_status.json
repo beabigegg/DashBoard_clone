@@ -88,7 +88,7 @@
     {
       "route": "/tmtt-defect",
       "name": "TMTT印字腳型不良分析",
-      "status": "released",
+      "status": "dev",
       "drawer_id": "dev-tools",
       "order": 5
     },

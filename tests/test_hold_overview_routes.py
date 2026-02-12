@@ -24,17 +24,15 @@ class TestHoldOverviewPageRoute(TestHoldOverviewRoutesBase):
 
     @patch('mes_dashboard.routes.hold_overview_routes.os.path.exists', return_value=False)
     def test_hold_overview_page_includes_vite_entry(self, _mock_exists):
-        # Page is registered as 'dev' status, requires admin session
-        with self.client.session_transaction() as sess:
-            sess['admin'] = {'displayName': 'Test Admin', 'employeeNo': 'A001'}
-        response = self.client.get('/hold-overview')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'/static/dist/hold-overview.js', response.data)
+        response = self.client.get('/hold-overview', follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith('/portal-shell/hold-overview'))
 
     @patch('mes_dashboard.routes.hold_overview_routes.os.path.exists', return_value=False)
-    def test_hold_overview_page_returns_403_without_admin(self, _mock_exists):
-        response = self.client.get('/hold-overview')
-        self.assertEqual(response.status_code, 403)
+    def test_hold_overview_page_redirects_without_admin(self, _mock_exists):
+        response = self.client.get('/hold-overview', follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith('/portal-shell/hold-overview'))
 
 
 class TestHoldOverviewSummaryRoute(TestHoldOverviewRoutesBase):
@@ -225,4 +223,3 @@ class TestHoldOverviewLotsRoute(TestHoldOverviewRoutesBase):
         self.assertEqual(payload['error']['code'], 'TOO_MANY_REQUESTS')
         self.assertEqual(response.headers.get('Retry-After'), '4')
         mock_service.assert_not_called()
-

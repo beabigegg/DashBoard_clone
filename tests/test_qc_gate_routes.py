@@ -6,7 +6,6 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import mes_dashboard.core.database as db
-from flask import Response
 
 from mes_dashboard.app import create_app
 
@@ -57,15 +56,7 @@ def test_qc_gate_summary_route_returns_500_on_failure(_mock_get_summary):
     assert 'error' in payload
 
 
-@patch('mes_dashboard.app.send_from_directory')
-def test_qc_gate_page_served_from_static_dist(mock_send_from_directory):
-    mock_send_from_directory.return_value = Response('<html>ok</html>', mimetype='text/html')
-
-    response = _client().get('/qc-gate')
-
-    assert response.status_code == 200
-    assert 'text/html' in response.content_type
-
-    call_args = mock_send_from_directory.call_args[0]
-    assert call_args[0].endswith('/static/dist')
-    assert call_args[1] == 'qc-gate.html'
+def test_qc_gate_page_redirects_to_canonical_shell_when_spa_enabled():
+    response = _client().get('/qc-gate', follow_redirects=False)
+    assert response.status_code == 302
+    assert response.location.endswith('/portal-shell/qc-gate')

@@ -22,6 +22,7 @@ os.environ.setdefault('WATCHDOG_STATE_FILE', os.path.join(_TMP_DIR, 'mes_dashboa
 
 import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app
+from mes_dashboard.core.modernization_policy import clear_modernization_policy_cache
 
 
 @pytest.fixture
@@ -31,6 +32,14 @@ def app():
     app = create_app('testing')
     app.config['TESTING'] = True
     return app
+
+
+@pytest.fixture(autouse=True)
+def _reset_modernization_policy_cache():
+    """Keep policy-cache state isolated across tests."""
+    clear_modernization_policy_cache()
+    yield
+    clear_modernization_policy_cache()
 
 
 @pytest.fixture

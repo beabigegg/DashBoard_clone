@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
@@ -10,7 +10,11 @@ import {
 } from '../src/portal-shell/healthSummary.js';
 
 function readSource(relativePath) {
-  return readFileSync(resolve(process.cwd(), relativePath), 'utf8');
+  const directPath = resolve(process.cwd(), relativePath);
+  if (existsSync(directPath)) {
+    return readFileSync(directPath, 'utf8');
+  }
+  return readFileSync(resolve(process.cwd(), 'frontend', relativePath), 'utf8');
 }
 
 

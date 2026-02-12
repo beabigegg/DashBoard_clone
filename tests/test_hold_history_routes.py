@@ -24,18 +24,15 @@ class TestHoldHistoryPageRoute(TestHoldHistoryRoutesBase):
 
     @patch('mes_dashboard.routes.hold_history_routes.os.path.exists', return_value=False)
     def test_hold_history_page_includes_vite_entry(self, _mock_exists):
-        with self.client.session_transaction() as sess:
-            sess['admin'] = {'displayName': 'Test Admin', 'employeeNo': 'A001'}
-
-        response = self.client.get('/hold-history')
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'/static/dist/hold-history.js', response.data)
+        response = self.client.get('/hold-history', follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith('/portal-shell/hold-history'))
 
     @patch('mes_dashboard.routes.hold_history_routes.os.path.exists', return_value=False)
-    def test_hold_history_page_returns_403_without_admin(self, _mock_exists):
-        response = self.client.get('/hold-history')
-        self.assertEqual(response.status_code, 403)
+    def test_hold_history_page_redirects_without_admin(self, _mock_exists):
+        response = self.client.get('/hold-history', follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith('/portal-shell/hold-history'))
 
 
 class TestHoldHistoryTrendRoute(TestHoldHistoryRoutesBase):

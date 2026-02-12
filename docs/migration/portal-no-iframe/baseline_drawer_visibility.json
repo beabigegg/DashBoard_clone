@@ -1,4 +1,5 @@
 {
+  "generated_at": "2026-02-12T02:26:36.887797+00:00",
   "source": "data/page_status.json",
   "admin": [
     {
@@ -16,7 +17,7 @@
         {
           "route": "/hold-overview",
           "name": "Hold 即時概況",
-          "status": "dev",
+          "status": "released",
           "order": 2
         },
         {
@@ -42,7 +43,7 @@
         {
           "route": "/hold-history",
           "name": "Hold 歷史績效",
-          "status": "dev",
+          "status": "released",
           "order": 3
         },
         {
@@ -106,7 +107,7 @@
         {
           "route": "/tmtt-defect",
           "name": "TMTT印字腳型不良分析",
-          "status": "released",
+          "status": "dev",
           "order": 5
         },
         {
@@ -132,6 +133,12 @@
           "order": 1
         },
         {
+          "route": "/hold-overview",
+          "name": "Hold 即時概況",
+          "status": "released",
+          "order": 2
+        },
+        {
           "route": "/resource",
           "name": "設備即時概況",
           "status": "released",
@@ -151,6 +158,12 @@
       "order": 2,
       "admin_only": false,
       "pages": [
+        {
+          "route": "/hold-history",
+          "name": "Hold 歷史績效",
+          "status": "released",
+          "order": 3
+        },
         {
           "route": "/resource-history",
           "name": "設備歷史績效",

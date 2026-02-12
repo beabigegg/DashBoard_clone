@@ -44,6 +44,14 @@ from mes_dashboard.services.realtime_equipment_cache import (
     init_realtime_equipment_cache,
     stop_equipment_status_sync_worker,
 )
+from mes_dashboard.core.modernization_policy import (
+    get_deferred_routes as get_deferred_routes_from_scope_matrix,
+    get_missing_in_scope_assets,
+    is_asset_readiness_enforced,
+    missing_in_scope_asset_response,
+    maybe_redirect_to_canonical_shell,
+)
+from mes_dashboard.core.feature_flags import resolve_bool_flag
 from mes_dashboard.core.redis_client import close_redis
 from mes_dashboard.core.runtime_contract import build_runtime_contract_diagnostics
 
@@ -51,7 +59,7 @@ from mes_dashboard.core.runtime_contract import build_runtime_contract_diagnosti
 _SHUTDOWN_LOCK = threading.Lock()
 _ATEXIT_REGISTERED = False
 _SHELL_ROUTE_CONTRACT_LOCK = threading.Lock()
-_SHELL_ROUTE_CONTRACT_ROUTES: set[str] | None = None
+_SHELL_ROUTE_CONTRACT_MAP: dict[str, dict[str, object]] | None = None
 
 
 def _configure_logging(app: Flask) -> None:
@@ -149,10 +157,11 @@ def _resolve_portal_spa_enabled(app: Flask) -> bool:
     Environment variable takes precedence so operators can toggle behavior
     without code changes during migration rehearsal/cutover.
     """
-    raw = os.getenv("PORTAL_SPA_ENABLED")
-    if raw is None:
-        return bool(app.config.get("PORTAL_SPA_ENABLED", False))
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    return resolve_bool_flag(
+        "PORTAL_SPA_ENABLED",
+        config=app.config,
+        default=bool(app.config.get("PORTAL_SPA_ENABLED", False)),
+    )
 
 
 def _can_view_page_for_user(route: str, *, is_admin: bool) -> bool:
@@ -172,40 +181,95 @@ def _safe_order(value: object, default: int = 9999) -> int:
         return default
 
 
-def _load_shell_route_contract_routes() -> set[str]:
-    """Load shell route contract routes used for navigation diagnostics."""
-    global _SHELL_ROUTE_CONTRACT_ROUTES
+def _load_shell_route_contract_map() -> dict[str, dict[str, object]]:
+    """Load shell route contract map used for navigation diagnostics."""
+    global _SHELL_ROUTE_CONTRACT_MAP
     with _SHELL_ROUTE_CONTRACT_LOCK:
-        if _SHELL_ROUTE_CONTRACT_ROUTES is not None:
-            return _SHELL_ROUTE_CONTRACT_ROUTES
+        if _SHELL_ROUTE_CONTRACT_MAP is not None:
+            return _SHELL_ROUTE_CONTRACT_MAP
 
-        contract_file = (
-            Path(__file__).resolve().parents[2]
+        project_root = Path(__file__).resolve().parents[2]
+        contract_candidates = [
+            project_root
+            / "docs"
+            / "migration"
+            / "full-modernization-architecture-blueprint"
+            / "route_contracts.json",
+            project_root
             / "docs"
             / "migration"
             / "portal-shell-route-view-integration"
-            / "route_migration_contract.json"
-        )
-        if not contract_file.exists():
-            _SHELL_ROUTE_CONTRACT_ROUTES = set()
-            return _SHELL_ROUTE_CONTRACT_ROUTES
+            / "route_migration_contract.json",
+        ]
 
-        try:
-            payload = json.loads(contract_file.read_text(encoding="utf-8"))
-            routes = payload.get("routes", [])
-            _SHELL_ROUTE_CONTRACT_ROUTES = {
-                str(item.get("route", "")).strip()
-                for item in routes
-                if isinstance(item, dict) and str(item.get("route", "")).strip().startswith("/")
-            }
-        except Exception as exc:
-            logging.getLogger("mes_dashboard").warning(
-                "Failed to load shell route contract for diagnostics: %s",
-                exc,
-            )
-            _SHELL_ROUTE_CONTRACT_ROUTES = set()
+        contract_map: dict[str, dict[str, object]] = {}
+        logger = logging.getLogger("mes_dashboard")
+        for index, contract_file in enumerate(contract_candidates):
+            if not contract_file.exists():
+                continue
+            try:
+                payload = json.loads(contract_file.read_text(encoding="utf-8"))
+                routes = payload.get("routes", [])
+                for item in routes:
+                    if not isinstance(item, dict):
+                        continue
+                    route = str(item.get("route", "")).strip()
+                    if route.startswith("/"):
+                        contract_map[route] = dict(item)
+                if contract_map:
+                    if index > 0:
+                        logger.warning(
+                            "Using legacy contract file fallback for shell route contracts: %s",
+                            contract_file,
+                        )
+                    break
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.warning(
+                    "Failed to load shell route contract from %s: %s",
+                    contract_file,
+                    exc,
+                )
 
-        return _SHELL_ROUTE_CONTRACT_ROUTES
+        _SHELL_ROUTE_CONTRACT_MAP = contract_map
+        return _SHELL_ROUTE_CONTRACT_MAP
+
+
+def _load_shell_route_contract_routes() -> set[str]:
+    return set(_load_shell_route_contract_map().keys())
+
+
+def _load_shell_deferred_routes() -> set[str]:
+    contract_map = _load_shell_route_contract_map()
+    deferred_from_contract = {
+        route
+        for route, metadata in contract_map.items()
+        if str(metadata.get("scope", "")).strip() == "deferred"
+    }
+    deferred_from_scope = set(get_deferred_routes_from_scope_matrix())
+    return deferred_from_contract | deferred_from_scope
+
+
+def _validate_in_scope_asset_readiness(app: Flask) -> None:
+    """Validate in-scope dist assets and enforce fail-fast policy when configured."""
+    dist_dir = Path(app.static_folder or "") / "dist"
+    missing_assets = get_missing_in_scope_assets(dist_dir)
+    diagnostics = {
+        "dist_dir": str(dist_dir),
+        "missing_in_scope_assets": missing_assets,
+        "enforced": False,
+    }
+    app.extensions["asset_readiness"] = diagnostics
+    if not missing_assets:
+        return
+
+    with app.app_context():
+        enforced = is_asset_readiness_enforced()
+    diagnostics["enforced"] = enforced
+
+    message = "In-scope asset readiness check failed: " + ", ".join(missing_assets)
+    if enforced:
+        raise RuntimeError(message)
+    logging.getLogger("mes_dashboard").warning(message)
 
 
 def _shutdown_runtime_resources() -> None:
@@ -251,10 +315,11 @@ def _register_shutdown_hooks(app: Flask) -> None:
 
 
 def _is_runtime_contract_enforced(app: Flask) -> bool:
-    raw = os.getenv("RUNTIME_CONTRACT_ENFORCE")
-    if raw is not None:
-        return raw.strip().lower() in {"1", "true", "yes", "on"}
-    return _is_production_env(app)
+    return resolve_bool_flag(
+        "RUNTIME_CONTRACT_ENFORCE",
+        config=app.config,
+        default=_is_production_env(app),
+    )
 
 
 def _validate_runtime_contract(app: Flask) -> None:
@@ -299,6 +364,7 @@ def create_app(config_name: str | None = None) -> Flask:
     # Configure logging first
     _configure_logging(app)
     _validate_runtime_contract(app)
+    _validate_in_scope_asset_readiness(app)
     security_headers = _build_security_headers(_is_production_env(app))
 
     # Route-level cache backend (L1 memory + optional L2 Redis)
@@ -486,6 +552,7 @@ def create_app(config_name: str | None = None) -> Flask:
         source = get_navigation_config()
         drawers: list[dict] = []
         shell_contract_routes = _load_shell_route_contract_routes()
+        deferred_routes = _load_shell_deferred_routes()
         diagnostics: dict[str, object] = {
             "filtered_drawers": 0,
             "filtered_pages": 0,
@@ -546,7 +613,7 @@ def create_app(config_name: str | None = None) -> Flask:
                     diagnostics["filtered_pages"] = int(diagnostics["filtered_pages"]) + 1
                     continue
 
-                if shell_contract_routes and route not in shell_contract_routes:
+                if shell_contract_routes and route not in shell_contract_routes and route not in deferred_routes:
                     mismatch_routes.add(route)
                     nav_logger.warning(
                         "Navigation route missing shell contract: drawer_id=%s route=%s",
@@ -632,56 +699,68 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/wip-overview')
     def wip_overview_page():
         """WIP Overview Dashboard served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/wip-overview')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
         dist_dir = os.path.join(app.static_folder or "", "dist")
         dist_html = os.path.join(dist_dir, "wip-overview.html")
         if os.path.exists(dist_html):
             return send_from_directory(dist_dir, 'wip-overview.html')
 
         # Test/local fallback when frontend build artifacts are absent.
-        return (
+        return missing_in_scope_asset_response('/wip-overview', (
             "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
             "<title>WIP Overview Dashboard</title>"
             "<script type=\"module\" src=\"/static/dist/wip-overview.js\"></script>"
             "</head><body><div id='app'></div></body></html>",
             200,
-        )
+        ))
 
     @app.route('/wip-detail')
     def wip_detail_page():
         """WIP Detail Dashboard served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/wip-detail')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
         dist_dir = os.path.join(app.static_folder or "", "dist")
         dist_html = os.path.join(dist_dir, "wip-detail.html")
         if os.path.exists(dist_html):
             return send_from_directory(dist_dir, 'wip-detail.html')
 
         # Test/local fallback when frontend build artifacts are absent.
-        return (
+        return missing_in_scope_asset_response('/wip-detail', (
             "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
             "<title>WIP Detail Dashboard</title>"
             "<script type=\"module\" src=\"/static/dist/wip-detail.js\"></script>"
             "</head><body><div id='app'></div></body></html>",
             200,
-        )
+        ))
 
     @app.route('/resource')
     def resource_page():
         """Resource status report page served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/resource')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
         dist_dir = os.path.join(app.static_folder or "", "dist")
         dist_html = os.path.join(dist_dir, "resource-status.html")
         if os.path.exists(dist_html):
             return send_from_directory(dist_dir, 'resource-status.html')
 
         # Test/local fallback when frontend build artifacts are absent.
-        return (
+        return missing_in_scope_asset_response('/resource', (
             "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
             "<title>設備即時概況</title>"
             "<script type=\"module\" src=\"/static/dist/resource-status.js\"></script>"
             "</head><body><div id='app'></div></body></html>",
             200,
-        )
+        ))
 
     @app.route('/excel-query')
     def excel_query_page():
@@ -691,31 +770,53 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/resource-history')
     def resource_history_page():
         """Resource history analysis page served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/resource-history')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
         dist_dir = os.path.join(app.static_folder or "", "dist")
         dist_html = os.path.join(dist_dir, "resource-history.html")
         if os.path.exists(dist_html):
             return send_from_directory(dist_dir, 'resource-history.html')
 
         # Test/local fallback when frontend build artifacts are absent.
-        return (
+        return missing_in_scope_asset_response('/resource-history', (
             "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
             "<title>設備歷史績效</title>"
             "<script type=\"module\" src=\"/static/dist/resource-history.js\"></script>"
             "</head><body><div id='app'></div></body></html>",
             200,
-        )
+        ))
 
     @app.route('/tmtt-defect')
     def tmtt_defect_page():
         """TMTT printing & lead form defect analysis page."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/tmtt-defect')
+        if canonical_redirect is not None:
+            return canonical_redirect
         return render_template('tmtt_defect.html')
 
     @app.route('/qc-gate')
     def qc_gate_page():
         """QC-GATE status report served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/qc-gate')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
         dist_dir = os.path.join(app.static_folder or "", "dist")
-        return send_from_directory(dist_dir, 'qc-gate.html')
+        dist_html = os.path.join(dist_dir, "qc-gate.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'qc-gate.html')
+
+        return missing_in_scope_asset_response('/qc-gate', (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>QC-GATE 狀態</title>"
+            "<script type=\"module\" src=\"/static/dist/qc-gate.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        ))
 
     @app.route('/mid-section-defect')
     def mid_section_defect_page():

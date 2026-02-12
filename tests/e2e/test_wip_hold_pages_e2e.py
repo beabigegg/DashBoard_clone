@@ -130,14 +130,21 @@ class TestWipAndHoldPagesE2E:
         back_href = page.locator("a.btn-back").get_attribute("href") or ""
         parsed = urlparse(back_href)
         params = parse_qs(parsed.query)
-        assert parsed.path == "/wip-overview"
+        assert parsed.path in {"/wip-overview", "/portal-shell/wip-overview"}
         assert params.get("type", [None])[0] == "PJA3460"
         assert params.get("status", [None])[0] in {"queue", "QUEUE"}
 
     def test_hold_detail_without_reason_redirects_to_overview(self, page: Page, app_server: str):
+        nav_resp = _get_with_retry(f"{app_server}/api/portal/navigation", attempts=3, timeout=10.0)
+        nav_payload = nav_resp.json() if nav_resp.ok else {}
+        spa_enabled = bool(nav_payload.get("portal_spa_enabled"))
+
         response = _get_with_retry(f"{app_server}/hold-detail", attempts=3, timeout=10.0)
         assert response.status_code == 302
-        assert response.headers.get("Location") == "/wip-overview"
+        if spa_enabled:
+            assert response.headers.get("Location") == "/portal-shell/wip-overview"
+        else:
+            assert response.headers.get("Location") == "/wip-overview"
 
     def test_hold_detail_calls_summary_distribution_and_lots(self, page: Page, app_server: str):
         reason = _pick_hold_reason(app_server)

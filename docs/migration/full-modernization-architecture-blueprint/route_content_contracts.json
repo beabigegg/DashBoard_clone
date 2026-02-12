@@ -1,0 +1,77 @@
+{
+  "change": "full-modernization-architecture-blueprint",
+  "in_scope_routes": {
+    "/wip-overview": {
+      "filter_input_semantics": ["workorder", "lotid", "package", "type", "status"],
+      "query_payload_contract": ["workorder", "lotid", "package", "type", "status"],
+      "chart_data_shape": ["status_cards", "matrix", "pareto"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/wip-detail": {
+      "filter_input_semantics": ["workcenter", "workorder", "lotid", "package", "type", "status", "page"],
+      "query_payload_contract": ["workcenter", "workorder", "lotid", "package", "type", "status", "page"],
+      "chart_data_shape": ["summary_cards", "lot_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/hold-overview": {
+      "filter_input_semantics": ["hold_type", "reason", "workcenter", "package", "age_range", "page"],
+      "query_payload_contract": ["hold_type", "reason", "workcenter", "package", "age_range", "page"],
+      "chart_data_shape": ["summary_cards", "matrix", "treemap", "lot_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/hold-detail": {
+      "filter_input_semantics": ["reason", "workcenter", "package", "age_range", "page"],
+      "query_payload_contract": ["reason", "workcenter", "package", "age_range", "page"],
+      "chart_data_shape": ["summary_cards", "distribution", "lot_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/hold-history": {
+      "filter_input_semantics": ["start_date", "end_date", "hold_type", "record_type", "reason", "duration_range", "page"],
+      "query_payload_contract": ["start_date", "end_date", "hold_type", "record_type", "reason", "duration_range", "page"],
+      "chart_data_shape": ["trend", "reason_pareto", "duration", "detail_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/resource": {
+      "filter_input_semantics": ["workcenter_groups", "families", "resource_ids", "statuses"],
+      "query_payload_contract": ["workcenter_groups", "families", "resource_ids", "statuses"],
+      "chart_data_shape": ["summary_cards", "status_matrix", "equipment_grid"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/resource-history": {
+      "filter_input_semantics": ["start_date", "end_date", "granularity", "workcenter_groups", "families", "resource_ids", "is_production", "is_key", "is_monitor"],
+      "query_payload_contract": ["start_date", "end_date", "granularity", "workcenter_groups", "families", "resource_ids", "is_production", "is_key", "is_monitor"],
+      "chart_data_shape": ["kpi", "trend", "heatmap", "workcenter_comparison", "detail"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/qc-gate": {
+      "filter_input_semantics": ["chart_bucket_selection", "table_sort"],
+      "query_payload_contract": ["summary", "table", "pareto"],
+      "chart_data_shape": ["station_stack_chart", "linked_lot_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/job-query": {
+      "filter_input_semantics": ["resource_ids", "start_date", "end_date"],
+      "query_payload_contract": ["resource_ids", "start_date", "end_date"],
+      "chart_data_shape": ["job_table", "txn_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/tmtt-defect": {
+      "filter_input_semantics": ["start_date", "end_date", "sort", "page"],
+      "query_payload_contract": ["start_date", "end_date"],
+      "chart_data_shape": ["kpi", "pareto", "trend", "detail_table"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/admin/pages": {
+      "filter_input_semantics": ["drawer_crud", "page_status_edit", "order_updates"],
+      "query_payload_contract": ["drawers", "pages", "status"],
+      "chart_data_shape": ["n/a"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    },
+    "/admin/performance": {
+      "filter_input_semantics": ["date_range", "severity", "search"],
+      "query_payload_contract": ["performance_summary", "log_stream"],
+      "chart_data_shape": ["timeline", "status_summary"],
+      "state_contract": ["loading", "empty", "error", "success"]
+    }
+  }
+}

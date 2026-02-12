@@ -1,0 +1,17 @@
+{
+  "change": "full-modernization-architecture-blueprint",
+  "required_flows": {
+    "/wip-overview": ["filter_apply", "filter_reset", "status_card_drill"],
+    "/wip-detail": ["list_detail_continuity", "pagination", "filter_reset"],
+    "/hold-overview": ["reason_toggle", "matrix_selection", "lot_scope_sync"],
+    "/hold-detail": ["reason_required_redirect", "distribution_toggle", "lot_scope_sync"],
+    "/hold-history": ["date_range_query", "pareto_selection", "duration_bucket_selection"],
+    "/resource": ["status_filter", "workcenter_family_filter", "tooltip_open_close"],
+    "/resource-history": ["query_submit", "export_csv", "chart_detail_sync"],
+    "/qc-gate": ["chart_bucket_selection", "table_filter_sync", "filter_clear"],
+    "/job-query": ["resource_select", "query_submit", "export_csv"],
+    "/tmtt-defect": ["date_range_query", "chart_filter_link", "detail_sort"],
+    "/admin/pages": ["drawer_crud", "page_status_update", "admin_visibility"],
+    "/admin/performance": ["admin_auth_access", "performance_view_load"]
+  }
+}

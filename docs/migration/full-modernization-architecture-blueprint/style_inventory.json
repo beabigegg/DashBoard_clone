@@ -1,0 +1,30 @@
+{
+  "change": "full-modernization-architecture-blueprint",
+  "generated_at": "2026-02-12T00:00:00Z",
+  "in_scope_routes": {
+    "/wip-overview": {"global_selectors": [], "status": "clean"},
+    "/wip-detail": {"global_selectors": [], "status": "clean"},
+    "/hold-overview": {"global_selectors": [], "status": "clean"},
+    "/hold-detail": {"global_selectors": [], "status": "clean"},
+    "/hold-history": {"global_selectors": [], "status": "clean"},
+    "/resource": {"global_selectors": [], "status": "clean"},
+    "/resource-history": {"global_selectors": [], "status": "clean"},
+    "/qc-gate": {"global_selectors": [], "status": "clean-after-refactor"},
+    "/job-query": {"global_selectors": [], "status": "clean"},
+    "/tmtt-defect": {"global_selectors": [], "status": "clean"},
+    "/admin/pages": {
+      "global_selectors": ["body"],
+      "status": "exception-registered",
+      "exception_id": "style-admin-pages-inline-css"
+    },
+    "/admin/performance": {
+      "global_selectors": ["body"],
+      "status": "exception-registered",
+      "exception_id": "style-admin-performance-inline-css"
+    }
+  },
+  "shared_layers": {
+    "frontend/src/styles/tailwind.css": [":root", "body"],
+    "frontend/src/portal-shell/style.css": [":root", "body"]
+  }
+}

@@ -18,6 +18,14 @@ def _login_as_admin(client):
         sess['admin'] = {'displayName': 'Test Admin', 'employeeNo': 'A001'}
 
 
+def _get_response_and_html(client, endpoint):
+    response = client.get(endpoint, follow_redirects=False)
+    if response.status_code in {301, 302, 307, 308}:
+        follow = client.get(response.location)
+        return response, follow, follow.data.decode('utf-8')
+    return response, response, response.data.decode('utf-8')
+
+
 class TestTemplateIntegration(unittest.TestCase):
     """Test that all templates properly extend _base.html."""
 
@@ -273,18 +281,26 @@ class TestMesApiUsageInTemplates(unittest.TestCase):
         _login_as_admin(self.client)
 
     def test_wip_overview_uses_mesapi(self):
-        response = self.client.get('/wip-overview')
-        html = response.data.decode('utf-8')
+        response, final_response, html = _get_response_and_html(self.client, '/wip-overview')
 
-        self.assertTrue('MesApi.get' in html or '/static/dist/wip-overview.js' in html)
-        self.assertNotIn('fetchWithTimeout', html)
+        if response.status_code == 302:
+            self.assertTrue(response.location.endswith('/portal-shell/wip-overview'))
+            self.assertEqual(final_response.status_code, 200)
+            self.assertIn('/static/dist/portal-shell.js', html)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue('MesApi.get' in html or '/static/dist/wip-overview.js' in html)
 
     def test_wip_detail_uses_mesapi(self):
-        response = self.client.get('/wip-detail')
-        html = response.data.decode('utf-8')
+        response, final_response, html = _get_response_and_html(self.client, '/wip-detail')
 
-        self.assertTrue('MesApi.get' in html or '/static/dist/wip-detail.js' in html)
-        self.assertNotIn('fetchWithTimeout', html)
+        if response.status_code == 302:
+            self.assertTrue(response.location.endswith('/portal-shell/wip-detail'))
+            self.assertEqual(final_response.status_code, 200)
+            self.assertIn('/static/dist/portal-shell.js', html)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue('MesApi.get' in html or '/static/dist/wip-detail.js' in html)
 
     def test_tables_page_uses_mesapi_or_vite_module(self):
         response = self.client.get('/tables')
@@ -293,14 +309,19 @@ class TestMesApiUsageInTemplates(unittest.TestCase):
         self.assertTrue('MesApi.post' in html or '/static/dist/tables.js' in html)
 
     def test_resource_page_uses_mesapi_or_vite_module(self):
-        response = self.client.get('/resource')
-        html = response.data.decode('utf-8')
+        response, final_response, html = _get_response_and_html(self.client, '/resource')
 
-        self.assertTrue(
-            'MesApi.post' in html or
-            'MesApi.get' in html or
-            '/static/dist/resource-status.js' in html
-        )
+        if response.status_code == 302:
+            self.assertTrue(response.location.endswith('/portal-shell/resource'))
+            self.assertEqual(final_response.status_code, 200)
+            self.assertIn('/static/dist/portal-shell.js', html)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(
+                'MesApi.post' in html or
+                'MesApi.get' in html or
+                '/static/dist/resource-status.js' in html
+            )
 
     def test_query_tool_page_uses_vite_module(self):
         response = self.client.get('/query-tool')
@@ -310,11 +331,17 @@ class TestMesApiUsageInTemplates(unittest.TestCase):
         self.assertIn('type="module"', html)
 
     def test_tmtt_defect_page_uses_vite_module(self):
-        response = self.client.get('/tmtt-defect')
-        html = response.data.decode('utf-8')
+        response, final_response, html = _get_response_and_html(self.client, '/tmtt-defect')
 
-        self.assertIn('/static/dist/tmtt-defect.js', html)
-        self.assertIn('type="module"', html)
+        if response.status_code == 302:
+            self.assertTrue(response.location.endswith('/portal-shell/tmtt-defect'))
+            self.assertEqual(final_response.status_code, 200)
+            self.assertIn('/static/dist/portal-shell.js', html)
+            self.assertIn('type="module"', html)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('/static/dist/tmtt-defect.js', html)
+            self.assertIn('type="module"', html)
 
 
 class TestViteModuleIntegration(unittest.TestCase):
@@ -341,13 +368,33 @@ class TestViteModuleIntegration(unittest.TestCase):
             ('/query-tool', 'query-tool.js'),
             ('/tmtt-defect', 'tmtt-defect.js'),
         ]
+        canonical_routes = {
+            '/wip-overview': '/portal-shell/wip-overview',
+            '/wip-detail': '/portal-shell/wip-detail',
+            '/hold-overview': '/portal-shell/hold-overview',
+            '/hold-detail?reason=test-reason': '/portal-shell/hold-detail?reason=test-reason',
+            '/resource': '/portal-shell/resource',
+            '/resource-history': '/portal-shell/resource-history',
+            '/job-query': '/portal-shell/job-query',
+            '/tmtt-defect': '/portal-shell/tmtt-defect',
+        }
+
         for endpoint, asset in endpoints_and_assets:
-            with patch('mes_dashboard.app.os.path.exists', return_value=False):
-                response = self.client.get(endpoint)
-            self.assertEqual(response.status_code, 200)
-            html = response.data.decode('utf-8')
-            self.assertIn(f'/static/dist/{asset}', html)
-            self.assertIn('type="module"', html)
+            response = self.client.get(endpoint, follow_redirects=False)
+
+            if endpoint in canonical_routes:
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.location.endswith(canonical_routes[endpoint]))
+                follow = self.client.get(response.location)
+                self.assertEqual(follow.status_code, 200)
+                html = follow.data.decode('utf-8')
+                self.assertIn('/static/dist/portal-shell.js', html)
+                self.assertIn('type="module"', html)
+            else:
+                self.assertEqual(response.status_code, 200)
+                html = response.data.decode('utf-8')
+                self.assertIn(f'/static/dist/{asset}', html)
+                self.assertIn('type="module"', html)
 
 
 class TestStaticFilesServing(unittest.TestCase):

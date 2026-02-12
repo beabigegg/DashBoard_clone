@@ -1,0 +1,58 @@
+{
+  "change": "full-modernization-architecture-blueprint",
+  "scope": "in-scope-routes-only",
+  "routes": {
+    "/wip-overview": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/wip-detail": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/hold-overview": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/hold-detail": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/hold-history": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/resource": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/resource-history": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/qc-gate": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/job-query": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/tmtt-defect": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/admin/pages": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    },
+    "/admin/performance": {
+      "baseline_status": "initialized",
+      "known_bugs": []
+    }
+  },
+  "revalidation_rule": {
+    "reproduced_legacy_bug_blocks_signoff": true,
+    "reproduced_legacy_bug_blocks_legacy_retirement": true
+  }
+}

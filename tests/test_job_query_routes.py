@@ -29,10 +29,10 @@ class TestJobQueryPage:
     """Tests for /job-query page route."""
 
     def test_page_returns_html(self, client):
-        """Should return the job query page."""
-        response = client.get('/job-query')
-        assert response.status_code == 200
-        assert b'html' in response.data.lower()
+        """Should redirect direct entry to canonical shell page."""
+        response = client.get('/job-query', follow_redirects=False)
+        assert response.status_code == 302
+        assert response.location.endswith('/portal-shell/job-query')
 
 
 class TestGetResources:

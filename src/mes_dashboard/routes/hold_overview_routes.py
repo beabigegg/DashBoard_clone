@@ -8,6 +8,10 @@ from flask import Blueprint, current_app, jsonify, request, send_from_directory
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.utils import parse_bool_query
+from mes_dashboard.core.modernization_policy import (
+    missing_in_scope_asset_response,
+    maybe_redirect_to_canonical_shell,
+)
 from mes_dashboard.services.wip_service import (
     get_hold_detail_lots,
     get_hold_detail_summary,
@@ -53,19 +57,23 @@ def _parse_hold_type(default: str = 'quality') -> tuple[Optional[str], Optional[
 @hold_overview_bp.route('/hold-overview')
 def hold_overview_page():
     """Render hold overview page from static Vite output."""
+    canonical_redirect = maybe_redirect_to_canonical_shell('/hold-overview')
+    if canonical_redirect is not None:
+        return canonical_redirect
+
     dist_dir = os.path.join(current_app.static_folder or "", "dist")
     dist_html = os.path.join(dist_dir, "hold-overview.html")
     if os.path.exists(dist_html):
         return send_from_directory(dist_dir, 'hold-overview.html')
 
-    return (
+    return missing_in_scope_asset_response('/hold-overview', (
         "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
         "<title>Hold Overview</title>"
         "<script type=\"module\" src=\"/static/dist/hold-overview.js\"></script>"
         "</head><body><div id='app'></div></body></html>",
         200,
-    )
+    ))
 
 
 @hold_overview_bp.route('/api/hold-overview/summary')

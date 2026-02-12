@@ -1,0 +1,22 @@
+{
+  "change": "full-modernization-architecture-blueprint",
+  "in_scope_required_assets": {
+    "/portal-shell": ["portal-shell.html", "portal-shell.js", "portal-shell.css", "tailwind.css"],
+    "/wip-overview": ["wip-overview.html", "wip-overview.js"],
+    "/wip-detail": ["wip-detail.html", "wip-detail.js"],
+    "/hold-overview": ["hold-overview.html", "hold-overview.js"],
+    "/hold-detail": ["hold-detail.html", "hold-detail.js"],
+    "/hold-history": ["hold-history.html", "hold-history.js"],
+    "/resource": ["resource-status.html", "resource-status.js"],
+    "/resource-history": ["resource-history.html", "resource-history.js"],
+    "/qc-gate": ["qc-gate.html", "qc-gate.js"],
+    "/job-query": ["job-query.js"],
+    "/tmtt-defect": ["tmtt-defect.js"]
+  },
+  "deferred_routes": [
+    "/tables",
+    "/excel-query",
+    "/query-tool",
+    "/mid-section-defect"
+  ]
+}

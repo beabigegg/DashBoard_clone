@@ -58,6 +58,7 @@ export function syncNavigationRoutes(
         pageName: entry.pageName,
         drawerName: entry.drawerName,
         owner: entry.owner,
+        renderMode: entry.renderMode,
       },
       meta: {
         title: entry.pageName,
@@ -65,6 +66,9 @@ export function syncNavigationRoutes(
         targetRoute: entry.targetRoute,
         renderMode: entry.renderMode,
         routeId: entry.routeId,
+        visibilityPolicy: entry.visibilityPolicy,
+        scope: entry.scope,
+        compatibilityPolicy: entry.compatibilityPolicy,
       },
     });
     dynamicRouteNames.push(entry.routeName);

@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 function readSource(relativePath) {
-  return readFileSync(resolve(process.cwd(), relativePath), 'utf8');
+  const directPath = resolve(process.cwd(), relativePath);
+  if (existsSync(directPath)) {
+    return readFileSync(directPath, 'utf8');
+  }
+  return readFileSync(resolve(process.cwd(), 'frontend', relativePath), 'utf8');
 }
 
 test('shell route view uses direct RouterView host (no transition blank-state)', () => {

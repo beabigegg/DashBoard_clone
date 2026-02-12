@@ -1,21 +1,24 @@
 ## Purpose
 Define stable requirements for vue-vite-page-architecture.
-
 ## Requirements
-
-
 ### Requirement: Pure Vite pages SHALL be served as static HTML
-The system SHALL support serving Vite-built HTML pages directly via Flask without Jinja2 rendering.
+The system SHALL serve in-scope pure Vite pages through backend static HTML delivery under a shell-first canonical routing policy. Direct-entry compatibility for in-scope routes SHALL be explicit and governed. Admin targets `/admin/pages` and `/admin/performance` SHALL be represented as governed shell navigation targets, while maintaining backend auth/session authority.
 
-#### Scenario: Serve pure Vite page
-- **WHEN** user navigates to a pure Vite page route (e.g., `/qc-gate`)
-- **THEN** Flask SHALL serve the pre-built HTML file from `static/dist/` via `send_from_directory`
-- **THEN** the HTML SHALL NOT pass through Jinja2 template rendering
+#### Scenario: In-scope canonical shell entry
+- **WHEN** a user navigates to an in-scope canonical shell route
+- **THEN** the shell SHALL render the target route via governed route contracts and static asset delivery
 
-#### Scenario: Page works as top-level navigation target
-- **WHEN** a pure Vite page is opened from portal direct navigation
-- **THEN** the page SHALL render correctly as a top-level route without iframe embedding dependency
-- **THEN** page functionality SHALL NOT rely on portal-managed frame lifecycle
+#### Scenario: Direct-entry compatibility policy for in-scope routes
+- **WHEN** a user opens an in-scope route through direct non-canonical entry
+- **THEN** the system SHALL apply explicit compatibility behavior without breaking established query semantics
+
+#### Scenario: Admin targets in shell governance
+- **WHEN** shell navigation is rendered for an authorized admin user
+- **THEN** `/admin/pages` and `/admin/performance` SHALL be reachable through governed admin navigation targets
+
+#### Scenario: Deferred routes excluded from this phase architecture criteria
+- **WHEN** this phase architecture compliance is evaluated
+- **THEN** `/tables`, `/excel-query`, `/query-tool`, and `/mid-section-defect` SHALL be excluded and handled in a follow-up change
 
 ### Requirement: Vite config SHALL support Vue SFC and HTML entry points
 The Vite build configuration SHALL support Vue Single File Components alongside existing vanilla JS entries.
@@ -133,3 +136,4 @@ The mid-section defect page SHALL use `AbortController` to cancel in-flight API 
 - **WHEN** a query is in-flight and user triggers pagination
 - **THEN** the query SHALL NOT be cancelled by the pagination request
 - **THEN** the pagination SHALL use a separate abort key from the query
+

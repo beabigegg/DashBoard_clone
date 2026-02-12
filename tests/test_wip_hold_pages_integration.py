@@ -22,22 +22,18 @@ def client():
 
 
 def test_wip_pages_render_vite_assets(client):
-    """Core WIP/Hold pages should render Vite bundles."""
-    overview = client.get("/wip-overview")
-    detail = client.get("/wip-detail")
-    hold = client.get("/hold-detail?reason=YieldLimit")
+    """Core WIP/Hold direct entries should redirect to canonical shell routes."""
+    overview = client.get("/wip-overview", follow_redirects=False)
+    detail = client.get("/wip-detail", follow_redirects=False)
+    hold = client.get("/hold-detail?reason=YieldLimit", follow_redirects=False)
 
-    assert overview.status_code == 200
-    assert detail.status_code == 200
-    assert hold.status_code == 200
+    assert overview.status_code == 302
+    assert detail.status_code == 302
+    assert hold.status_code == 302
 
-    overview_html = overview.data.decode("utf-8")
-    detail_html = detail.data.decode("utf-8")
-    hold_html = hold.data.decode("utf-8")
-
-    assert "/static/dist/wip-overview.js" in overview_html
-    assert "/static/dist/wip-detail.js" in detail_html
-    assert "/static/dist/hold-detail.js" in hold_html
+    assert overview.location.endswith("/portal-shell/wip-overview")
+    assert detail.location.endswith("/portal-shell/wip-detail")
+    assert hold.location.endswith("/portal-shell/hold-detail?reason=YieldLimit")
 
 
 def test_wip_overview_and_detail_status_parameter_contract(client):

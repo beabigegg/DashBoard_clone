@@ -5,6 +5,7 @@
 > 專案主執行根目錄：`DashBoard_vite/`  
 > 目前已移除舊版 `DashBoard/` 代碼，僅保留新架構。
 > 2026-02-11：`portal-shell-route-view-integration` 已完成並封存，Portal Shell 全面採用 no-iframe 的 SPA route-view 架構。
+> 2026-02-12：`full-modernization-architecture-blueprint` 已完成並封存（Phase 1），目前僅剩 `deferred-route-modernization-follow-up` 進行中（`/tables`、`/excel-query`、`/query-tool`、`/mid-section-defect`）。
 
 ---
 
@@ -46,6 +47,8 @@
 | QC-GATE 即時狀態報表（Vue 3 + Vite） | ✅ 已完成 |
 | 數據表查詢頁面 Vue 3 遷移 | ✅ 已完成 |
 | WIP 三頁 Vue 3 遷移（Overview/Detail/Hold Detail） | ✅ 已完成 |
+| 全站現代化治理 Phase 1（路由治理/品質門檻/資產就緒/手動驗收） | ✅ 已完成（已封存） |
+| Deferred routes 現代化（`/tables`、`/excel-query`、`/query-tool`、`/mid-section-defect`） | ⏳ 進行中（follow-up 提案） |
 | WIP Overview/Detail 篩選條件保留 | ✅ 已完成 |
 | 設備雙頁 Vue 3 遷移（Status/History） | ✅ 已完成 |
 | 設備快取 DataFrame TTL 一致性修復 | ✅ 已完成 |
@@ -55,6 +58,7 @@
 
 ## 開發歷史（Vite 重構後）
 
+- 2026-02-12：完成並封存 `full-modernization-architecture-blueprint`（Phase 1）— in-scope 報表路由全面採 canonical shell entry（`/portal-shell/...`）、補齊 admin 路由治理（`/admin/pages`、`/admin/performance`）、建立資產就緒 fail-fast 政策與前端品質門檻治理；並建立 deferred follow-up 提案承接 `/tables`、`/excel-query`、`/query-tool`、`/mid-section-defect`。
 - 2026-02-11：完成 Portal Shell route-view 全遷移（`portal-shell-route-view-integration`）— 全站移除 iframe 內容嵌入、導入 Vue Router 動態註冊與 fallback guard、補齊 Wave A/Wave B page parity 測試、健康檢查 summary/detail UX 與 `/health/frontend-shell` 契約，並完成 pre/post parity 與 smoke 證據彙整。
 - 2026-02-11：完成 table query API `table_name` 白名單驗證（`/api/query_table`、`/api/get_table_columns`）— 拒絕未註冊資料表，補上整合測試，避免 SQL injection 入口。
 - 2026-02-11：完成設備雙頁級聯篩選（`/resource`、`/resource-history`）— 新增 Group/Family/Machine 多層篩選聯動，前後端支援 `resource_ids` 條件，矩陣與明細篩選一致。
@@ -116,6 +120,7 @@
 - 頁面架構與抽屜分類：`docs/page_architecture_map.md`
 - 前端計算前移與 parity 規則：`docs/frontend_compute_shift_plan.md`
 - Portal Shell route-view 遷移基線與驗收：`docs/migration/portal-shell-route-view-integration/`
+- 全站現代化架構 Phase 1 治理文件：`docs/migration/full-modernization-architecture-blueprint/`
 - Hold 歷史頁資料口徑說明：`docs/hold_history.md`
 - Cutover gates / rollout / rollback：`docs/migration_gates_and_runbook.md`
 - 環境依賴缺口與對策：`docs/environment_gaps_and_mitigation.md`
@@ -162,6 +167,11 @@
 - 關機/重啟時統一釋放 background workers 與 Redis/DB 連線資源。
 - LDAP API URL 啟動驗證：僅允許 `https` + host allowlist。
 - 全域 security headers：CSP/X-Frame-Options/X-Content-Type-Options/Referrer-Policy（production 含 HSTS）。
+
+8. 現階段仍保留部分相容路徑（非 bug，屬於分期策略）
+- in-scope 報表路由已改為 canonical shell redirect（直接進入 `/portal-shell/...`）。
+- `portal-shell` 為目前主路由容器，尚不可移除。
+- deferred scope（`/tables`、`/excel-query`、`/query-tool`、`/mid-section-defect`）與其相容模板/入口會保留到 follow-up 提案完成。
 
 ---
 

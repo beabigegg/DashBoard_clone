@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import patch
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+from unittest.mock import ANY, MagicMock, patch
 
 from mes_dashboard.app import create_app
 
@@ -19,7 +21,7 @@ def test_portal_shell_fallback_html_served_when_dist_missing(monkeypatch):
     app.config["TESTING"] = True
 
     # Force fallback path by simulating missing dist file.
-    monkeypatch.setattr("os.path.exists", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr("mes_dashboard.app.os.path.exists", lambda *_args, **_kwargs: False)
 
     client = app.test_client()
     response = client.get("/portal-shell")
@@ -42,7 +44,7 @@ def test_portal_shell_uses_nested_dist_html_when_top_level_missing(monkeypatch):
             return False
         return path.endswith("/dist/src/portal-shell/index.html")
 
-    monkeypatch.setattr("os.path.exists", fake_exists)
+    monkeypatch.setattr("mes_dashboard.app.os.path.exists", fake_exists)
 
     client = app.test_client()
     response = client.get("/portal-shell")
@@ -133,7 +135,7 @@ def test_navigation_drawer_and_page_order_deterministic_non_admin():
     assert drawer_ids == ["reports", "drawer-2", "drawer"]
 
     reports_routes = [page["route"] for page in payload["drawers"][0]["pages"]]
-    assert reports_routes == ["/wip-overview", "/resource", "/qc-gate"]
+    assert reports_routes == ["/wip-overview", "/hold-overview", "/resource", "/qc-gate"]
 
 
 def test_navigation_contract_page_metadata_fields_present_and_typed():
@@ -199,29 +201,52 @@ def test_navigation_mixed_release_dev_visibility_admin_vs_non_admin():
     app.config["TESTING"] = True
 
     non_admin_client = app.test_client()
-    non_admin_resp = non_admin_client.get("/api/portal/navigation")
-    assert non_admin_resp.status_code == 200
-    non_admin_payload = json.loads(non_admin_resp.data.decode("utf-8"))
-    non_admin_routes = {
-        page["route"]
-        for drawer in non_admin_payload["drawers"]
-        for page in drawer["pages"]
-    }
-    assert "/hold-overview" not in non_admin_routes
-    assert "/hold-history" not in non_admin_routes
+    mixed_config = [
+        {
+            "id": "reports",
+            "name": "Reports",
+            "order": 1,
+            "admin_only": False,
+            "pages": [
+                {"route": "/wip-overview", "name": "WIP", "status": "released", "order": 1},
+                {"route": "/hold-overview", "name": "Hold", "status": "dev", "order": 2},
+            ],
+        }
+    ]
+    def fake_status(route: str):
+        if route == "/hold-overview":
+            return "dev"
+        if route == "/wip-overview":
+            return "released"
+        return None
 
-    admin_client = app.test_client()
-    _login_as_admin(admin_client)
-    admin_resp = admin_client.get("/api/portal/navigation")
-    assert admin_resp.status_code == 200
-    admin_payload = json.loads(admin_resp.data.decode("utf-8"))
-    admin_routes = {
-        page["route"]
-        for drawer in admin_payload["drawers"]
-        for page in drawer["pages"]
-    }
-    assert "/hold-overview" in admin_routes
-    assert "/hold-history" in admin_routes
+    with (
+        patch("mes_dashboard.app.get_navigation_config", return_value=mixed_config),
+        patch("mes_dashboard.app.get_page_status", side_effect=fake_status),
+    ):
+        non_admin_resp = non_admin_client.get("/api/portal/navigation")
+        assert non_admin_resp.status_code == 200
+        non_admin_payload = json.loads(non_admin_resp.data.decode("utf-8"))
+        non_admin_routes = {
+            page["route"]
+            for drawer in non_admin_payload["drawers"]
+            for page in drawer["pages"]
+        }
+        assert "/wip-overview" in non_admin_routes
+        assert "/hold-overview" not in non_admin_routes
+
+        admin_client = app.test_client()
+        _login_as_admin(admin_client)
+        admin_resp = admin_client.get("/api/portal/navigation")
+        assert admin_resp.status_code == 200
+        admin_payload = json.loads(admin_resp.data.decode("utf-8"))
+        admin_routes = {
+            page["route"]
+            for drawer in admin_payload["drawers"]
+            for page in drawer["pages"]
+        }
+        assert "/wip-overview" in admin_routes
+        assert "/hold-overview" in admin_routes
 
 
 def test_portal_navigation_includes_admin_links_by_auth_state():
@@ -302,7 +327,8 @@ def test_portal_navigation_logs_contract_mismatch_route():
     assert payload["diagnostics"]["contract_mismatch_routes"] == ["/resource"]
 
 
-def test_wave_b_native_routes_are_reachable():
+def test_wave_b_native_routes_are_reachable(monkeypatch):
+    monkeypatch.setenv("PORTAL_SPA_ENABLED", "false")
     app = create_app("testing")
     app.config["TESTING"] = True
     client = app.test_client()
@@ -311,3 +337,96 @@ def test_wave_b_native_routes_are_reachable():
     for route in ["/job-query", "/excel-query", "/query-tool", "/tmtt-defect"]:
         response = client.get(route)
         assert response.status_code == 200, f"{route} should be reachable"
+
+
+def test_direct_entry_in_scope_report_routes_redirect_to_canonical_shell_when_spa_enabled(monkeypatch):
+    monkeypatch.setenv("PORTAL_SPA_ENABLED", "true")
+    app = create_app("testing")
+    app.config["TESTING"] = True
+    client = app.test_client()
+    _login_as_admin(client)
+
+    cases = {
+        "/wip-overview?status=queue": "/portal-shell/wip-overview?status=queue",
+        "/resource-history?granularity=day": "/portal-shell/resource-history?granularity=day",
+        "/job-query?start_date=2026-02-01&end_date=2026-02-02": "/portal-shell/job-query?start_date=2026-02-01&end_date=2026-02-02",
+        "/tmtt-defect?start_date=2026-02-01&end_date=2026-02-02": "/portal-shell/tmtt-defect?start_date=2026-02-01&end_date=2026-02-02",
+        "/hold-detail?reason=YieldLimit": "/portal-shell/hold-detail?reason=YieldLimit",
+    }
+
+    for direct_url, canonical_url in cases.items():
+        response = client.get(direct_url, follow_redirects=False)
+        assert response.status_code == 302, direct_url
+        assert response.location.endswith(canonical_url), response.location
+
+
+def test_direct_entry_redirect_preserves_non_ascii_query_params(monkeypatch):
+    monkeypatch.setenv("PORTAL_SPA_ENABLED", "true")
+    app = create_app("testing")
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    response = client.get("/wip-detail?workcenter=焊接_DB&status=queue", follow_redirects=False)
+    assert response.status_code == 302
+
+    parsed = urlparse(response.location)
+    assert parsed.path.endswith("/portal-shell/wip-detail")
+    query = parse_qs(parsed.query)
+    assert query.get("workcenter") == ["焊接_DB"]
+    assert query.get("status") == ["queue"]
+
+
+def test_legacy_shell_contract_fallback_logs_warning(monkeypatch):
+    from mes_dashboard import app as app_module
+
+    app_module._SHELL_ROUTE_CONTRACT_MAP = None
+    app = create_app("testing")
+    app.config["TESTING"] = True
+
+    primary_suffix = "/docs/migration/full-modernization-architecture-blueprint/route_contracts.json"
+    legacy_suffix = "/docs/migration/portal-shell-route-view-integration/route_migration_contract.json"
+    sample_payload = json.dumps({"routes": [{"route": "/wip-overview", "scope": "in-scope"}]})
+    original_exists = Path.exists
+    original_read_text = Path.read_text
+
+    def fake_exists(self):
+        raw = str(self).replace("\\", "/")
+        if raw.endswith(primary_suffix):
+            return False
+        if raw.endswith(legacy_suffix):
+            return True
+        return original_exists(self)
+
+    def fake_read_text(self, encoding="utf-8"):
+        raw = str(self).replace("\\", "/")
+        if raw.endswith(legacy_suffix):
+            return sample_payload
+        return original_read_text(self, encoding=encoding)
+
+    logger = MagicMock()
+    with (
+        patch("mes_dashboard.app.logging.getLogger", return_value=logger),
+        patch.object(Path, "exists", fake_exists),
+        patch.object(Path, "read_text", fake_read_text),
+    ):
+        contract_map = app_module._load_shell_route_contract_map()
+
+    assert "/wip-overview" in contract_map
+    logger.warning.assert_any_call(
+        "Using legacy contract file fallback for shell route contracts: %s",
+        ANY,
+    )
+    app_module._SHELL_ROUTE_CONTRACT_MAP = None
+
+
+def test_deferred_routes_keep_direct_entry_compatibility_when_spa_enabled(monkeypatch):
+    monkeypatch.setenv("PORTAL_SPA_ENABLED", "true")
+    app = create_app("testing")
+    app.config["TESTING"] = True
+    client = app.test_client()
+    _login_as_admin(client)
+
+    for route in ["/excel-query", "/query-tool", "/tables"]:
+        response = client.get(route, follow_redirects=False)
+        # Deferred routes stay on direct-entry posture in this phase.
+        assert response.status_code == 200, route

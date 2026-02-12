@@ -416,19 +416,22 @@ class TestPageRoutes(TestWipRoutesBase):
     """Test page routes for WIP dashboards."""
 
     def test_wip_overview_page_exists(self):
-        """GET /wip-overview should return 200."""
-        response = self.client.get('/wip-overview')
-        self.assertEqual(response.status_code, 200)
+        """GET /wip-overview should redirect to canonical shell route."""
+        response = self.client.get('/wip-overview', follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith('/portal-shell/wip-overview'))
 
     def test_wip_detail_page_exists(self):
-        """GET /wip-detail should return 200."""
-        response = self.client.get('/wip-detail')
-        self.assertEqual(response.status_code, 200)
+        """GET /wip-detail should redirect to canonical shell route."""
+        response = self.client.get('/wip-detail', follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith('/portal-shell/wip-detail'))
 
     def test_wip_detail_page_with_workcenter(self):
-        """GET /wip-detail?workcenter=xxx should return 200."""
-        response = self.client.get('/wip-detail?workcenter=焊接_DB')
-        self.assertEqual(response.status_code, 200)
+        """GET /wip-detail?workcenter=xxx should preserve query during redirect."""
+        response = self.client.get('/wip-detail?workcenter=焊接_DB', follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/portal-shell/wip-detail?workcenter=', response.location)
 
     def test_old_wip_route_removed(self):
         """GET /wip should return 404 (route removed)."""

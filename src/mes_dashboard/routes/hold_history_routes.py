@@ -10,6 +10,10 @@ from typing import Optional, Tuple
 from flask import Blueprint, current_app, jsonify, request, send_from_directory
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.modernization_policy import (
+    missing_in_scope_asset_response,
+    maybe_redirect_to_canonical_shell,
+)
 from mes_dashboard.services.hold_history_service import (
     get_hold_history_duration,
     get_hold_history_list,
@@ -88,19 +92,23 @@ def _parse_record_type(default: str = 'new') -> tuple[Optional[str], Optional[tu
 @hold_history_bp.route('/hold-history')
 def hold_history_page():
     """Render Hold History page from static Vite output."""
+    canonical_redirect = maybe_redirect_to_canonical_shell('/hold-history')
+    if canonical_redirect is not None:
+        return canonical_redirect
+
     dist_dir = os.path.join(current_app.static_folder or '', 'dist')
     dist_html = os.path.join(dist_dir, 'hold-history.html')
     if os.path.exists(dist_html):
         return send_from_directory(dist_dir, 'hold-history.html')
 
-    return (
+    return missing_in_scope_asset_response('/hold-history', (
         '<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
         '<title>Hold History</title>'
         '<script type="module" src="/static/dist/hold-history.js"></script>'
         '</head><body><div id="app"></div></body></html>',
         200,
-    )
+    ))
 
 
 @hold_history_bp.route('/api/hold-history/trend')

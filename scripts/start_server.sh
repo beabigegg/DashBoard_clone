@@ -211,9 +211,36 @@ with engine.connect() as conn:
 }
 
 build_frontend_assets() {
-    if [ "${FRONTEND_BUILD_ON_START:-true}" != "true" ]; then
-        log_info "Skip frontend build (FRONTEND_BUILD_ON_START=${FRONTEND_BUILD_ON_START})"
+    local mode="${FRONTEND_BUILD_MODE:-}"
+    local fail_on_error="${FRONTEND_BUILD_FAIL_ON_ERROR:-}"
+
+    # Backward compatibility:
+    # - FRONTEND_BUILD_MODE takes precedence when set.
+    # - Otherwise, retain FRONTEND_BUILD_ON_START behavior.
+    if [ -z "${mode}" ]; then
+        if [ "${FRONTEND_BUILD_ON_START:-true}" = "true" ]; then
+            mode="auto"
+        else
+            mode="never"
+        fi
+    fi
+    mode="$(echo "${mode}" | tr '[:upper:]' '[:lower:]')"
+
+    if [ -z "${fail_on_error}" ]; then
+        if [ "$(echo "${FLASK_ENV:-development}" | tr '[:upper:]' '[:lower:]')" = "production" ]; then
+            fail_on_error="true"
+        else
+            fail_on_error="false"
+        fi
+    fi
+
+    if [ "${mode}" = "never" ]; then
+        log_info "Skip frontend build (FRONTEND_BUILD_MODE=${mode})"
         return 0
+    fi
+    if [ "${mode}" != "auto" ] && [ "${mode}" != "always" ]; then
+        log_warn "Invalid FRONTEND_BUILD_MODE='${mode}', fallback to auto"
+        mode="auto"
     fi
 
     if [ ! -f "${ROOT}/frontend/package.json" ]; then
@@ -225,54 +252,61 @@ build_frontend_assets() {
         return 0
     fi
 
-    local required_entries=(
-        "portal.js"
-        "wip-overview.js"
-        "wip-detail.js"
-        "hold-detail.js"
-        "hold-overview.js"
-        "hold-history.js"
-        "resource-status.js"
-        "resource-history.js"
-        "job-query.js"
-        "excel-query.js"
-        "tables.js"
-        "query-tool.js"
-        "tmtt-defect.js"
-        "qc-gate.js"
-        "mid-section-defect.js"
-    )
-    local needs_build=false
-    local newest_entry=""
+    local needs_build=true
+    if [ "${mode}" = "auto" ]; then
+        local required_entries=(
+            "portal.js"
+            "wip-overview.js"
+            "wip-detail.js"
+            "hold-detail.js"
+            "hold-overview.js"
+            "hold-history.js"
+            "resource-status.js"
+            "resource-history.js"
+            "job-query.js"
+            "excel-query.js"
+            "tables.js"
+            "query-tool.js"
+            "tmtt-defect.js"
+            "qc-gate.js"
+            "mid-section-defect.js"
+        )
+        needs_build=false
+        local newest_entry=""
 
-    for entry in "${required_entries[@]}"; do
-        local entry_path="${ROOT}/src/mes_dashboard/static/dist/${entry}"
-        if [ ! -f "${entry_path}" ]; then
+        for entry in "${required_entries[@]}"; do
+            local entry_path="${ROOT}/src/mes_dashboard/static/dist/${entry}"
+            if [ ! -f "${entry_path}" ]; then
+                needs_build=true
+                break
+            fi
+            if [ -z "${newest_entry}" ] || [ "${entry_path}" -nt "${newest_entry}" ]; then
+                newest_entry="${entry_path}"
+            fi
+        done
+
+        if [ "$needs_build" = false ] && find "${ROOT}/frontend/src" -type f -newer "${newest_entry}" | grep -q .; then
             needs_build=true
-            break
         fi
-        if [ -z "${newest_entry}" ] || [ "${entry_path}" -nt "${newest_entry}" ]; then
-            newest_entry="${entry_path}"
+        if [ "$needs_build" = false ] && ([ "${ROOT}/frontend/package.json" -nt "${newest_entry}" ] || [ "${ROOT}/frontend/vite.config.js" -nt "${newest_entry}" ]); then
+            needs_build=true
         fi
-    done
 
-    if [ "$needs_build" = false ] && find "${ROOT}/frontend/src" -type f -newer "${newest_entry}" | grep -q .; then
-        needs_build=true
-    fi
-    if [ "$needs_build" = false ] && ([ "${ROOT}/frontend/package.json" -nt "${newest_entry}" ] || [ "${ROOT}/frontend/vite.config.js" -nt "${newest_entry}" ]); then
-        needs_build=true
+        if [ "$needs_build" = false ]; then
+            log_success "Frontend assets are up to date (FRONTEND_BUILD_MODE=auto)"
+            return 0
+        fi
     fi
 
-    if [ "$needs_build" = false ]; then
-        log_success "Frontend assets are up to date"
-        return 0
-    fi
-
-    log_info "Building frontend assets with Vite..."
+    log_info "Building frontend assets with Vite (FRONTEND_BUILD_MODE=${mode})..."
     if npm --prefix "${ROOT}/frontend" run build >/dev/null 2>&1; then
         log_success "Frontend assets built"
     else
-        log_warn "Frontend build failed; continuing with fallback inline scripts"
+        if is_enabled "${fail_on_error}"; then
+            log_error "Frontend build failed; aborting startup (FRONTEND_BUILD_FAIL_ON_ERROR=${fail_on_error})"
+            return 1
+        fi
+        log_warn "Frontend build failed; continuing startup (FRONTEND_BUILD_FAIL_ON_ERROR=${fail_on_error})"
     fi
 }
 
@@ -594,7 +628,7 @@ do_start() {
     PORT=$(echo "${GUNICORN_BIND:-0.0.0.0:8080}" | cut -d: -f2)
     export PYTHONPATH="${ROOT}/src:${PYTHONPATH:-}"
     cd "$ROOT"
-    build_frontend_assets
+    build_frontend_assets || return 1
 
     # Log startup
     echo "[$(timestamp)] Starting server" >> "$STARTUP_LOG"

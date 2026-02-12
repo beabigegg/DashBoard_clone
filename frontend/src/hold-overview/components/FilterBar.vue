@@ -22,17 +22,13 @@ const props = defineProps({
 
 const emit = defineEmits(['change']);
 
-const holdTypeModel = computed({
-  get() {
-    return props.holdType || 'quality';
-  },
-  set(nextValue) {
-    emit('change', {
-      holdType: nextValue || 'quality',
-      reason: props.reason || '',
-    });
-  },
-});
+const HOLD_TYPE_OPTIONS = Object.freeze([
+  { value: 'quality', label: '品質異常' },
+  { value: 'non-quality', label: '非品質異常' },
+  { value: 'all', label: '全部' },
+]);
+
+const holdTypeModel = computed(() => props.holdType || 'quality');
 
 const reasonModel = computed({
   get() {
@@ -59,29 +55,44 @@ const reasonOptions = computed(() => {
   });
   return items;
 });
+
+function selectHoldType(nextValue) {
+  if (props.disabled) {
+    return;
+  }
+  const normalized = nextValue || 'quality';
+  if (normalized === holdTypeModel.value) {
+    return;
+  }
+  emit('change', {
+    holdType: normalized,
+    reason: props.reason || '',
+  });
+}
 </script>
 
 <template>
-  <section class="filter-bar card">
-    <div class="filter-group hold-type-group">
+  <section class="filter-bar card hold-overview-filter-bar">
+    <div class="filter-group hold-type-group hold-overview-hold-type-group">
       <span class="filter-label">Hold Type</span>
-      <div class="radio-group">
-        <label class="radio-option" :class="{ active: holdTypeModel === 'quality' }">
-          <input v-model="holdTypeModel" type="radio" value="quality" :disabled="disabled" />
-          <span>品質異常</span>
-        </label>
-        <label class="radio-option" :class="{ active: holdTypeModel === 'non-quality' }">
-          <input v-model="holdTypeModel" type="radio" value="non-quality" :disabled="disabled" />
-          <span>非品質異常</span>
-        </label>
-        <label class="radio-option" :class="{ active: holdTypeModel === 'all' }">
-          <input v-model="holdTypeModel" type="radio" value="all" :disabled="disabled" />
-          <span>全部</span>
-        </label>
+      <div class="hold-type-segment" role="radiogroup" aria-label="Hold Type">
+        <button
+          v-for="item in HOLD_TYPE_OPTIONS"
+          :key="item.value"
+          type="button"
+          role="radio"
+          class="hold-type-btn"
+          :class="{ active: holdTypeModel === item.value }"
+          :aria-checked="holdTypeModel === item.value"
+          :disabled="disabled"
+          @click="selectHoldType(item.value)"
+        >
+          {{ item.label }}
+        </button>
       </div>
     </div>
 
-    <div class="filter-group reason-group">
+    <div class="filter-group reason-group hold-overview-reason-group">
       <label class="filter-label" for="hold-overview-reason">Reason</label>
       <select
         id="hold-overview-reason"
