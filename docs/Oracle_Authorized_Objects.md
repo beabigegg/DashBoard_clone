@@ -1,15 +1,15 @@
 # Oracle 可使用 TABLE/VIEW 清單（DWH）
 
-**產生時間**: 2026-01-29 13:34:22
-**使用者**: (詳見 .env 中的 DB_USER)
+**產生時間**: 2026-02-13 17:39:41
+**使用者**: MBU1_R
 **Schema**: DWH
 
 ## 摘要
 
-- 可使用物件總數: 19
-- TABLE: 16
+- 可使用物件總數: 22
+- TABLE: 19
 - VIEW: 3
-- 來源 (去重後物件數): DIRECT 19, PUBLIC 0, ROLE 0, SYSTEM 0
+- 來源 (去重後物件數): DIRECT 22, PUBLIC 0, ROLE 0, SYSTEM 0
 
 ## 物件清單
 
@@ -34,3 +34,6 @@
 | `DWH.DW_MES_RESOURCESTATUS_SHIFT` | TABLE | SELECT | DIRECT |
 | `DWH.DW_MES_SPEC_WORKCENTER_V` | VIEW | SELECT | DIRECT |
 | `DWH.DW_MES_WIP` | TABLE | SELECT | DIRECT |
+| `DWH.ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE` | TABLE | SELECT | DIRECT |
+| `DWH.ERP_WIP_MOVETXN` | TABLE | SELECT | DIRECT |
+| `DWH.ERP_WIP_MOVETXN_DETAIL` | TABLE | SELECT | DIRECT |

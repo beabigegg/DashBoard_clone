@@ -25,7 +25,11 @@ const props = defineProps({
 
 const emit = defineEmits(['update:workcenterGroups']);
 
-const columns = computed(() => Object.keys(props.rows[0] || {}));
+const HIDDEN_COLUMNS = new Set(['CONTAINERID', 'EQUIPMENTID', 'RESOURCEID']);
+
+const columns = computed(() =>
+  Object.keys(props.rows[0] || {}).filter((col) => !HIDDEN_COLUMNS.has(col)),
+);
 
 const workcenterOptions = computed(() => {
   return props.workcenterGroups.map((group) => {

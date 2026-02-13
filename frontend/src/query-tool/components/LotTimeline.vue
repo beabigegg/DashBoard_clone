@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 
 import TimelineChart from '../../shared-ui/components/TimelineChart.vue';
-import { hashColor, normalizeText, parseDateTime } from '../utils/values.js';
+import { formatDateTime, hashColor, normalizeText, parseDateTime } from '../utils/values.js';
 
 const props = defineProps({
   historyRows: {
@@ -151,24 +151,28 @@ const timeRange = computed(() => {
 
 <template>
   <section class="rounded-card border border-stroke-soft bg-white p-3">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
       <h4 class="text-sm font-semibold text-slate-800">LOT 生產 Timeline</h4>
-      <p class="text-xs text-slate-500">Hold / Material 事件已覆蓋標記</p>
+      <div class="flex items-center gap-3 text-xs text-slate-500">
+        <span v-if="timeRange">{{ formatDateTime(timeRange.start) }} — {{ formatDateTime(timeRange.end) }}</span>
+        <span>Hold / Material 事件已覆蓋標記</span>
+      </div>
     </div>
 
     <div v-if="tracks.length === 0" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
       歷程資料不足，無法產生 Timeline
     </div>
 
-    <TimelineChart
-      v-else
-      :tracks="tracks"
-      :events="events"
-      :time-range="timeRange"
-      :color-map="colorMap"
-      :label-width="180"
-      :track-row-height="46"
-      :min-chart-width="1040"
-    />
+    <div v-else class="max-h-[420px] overflow-y-auto rounded-card border border-stroke-soft">
+      <TimelineChart
+        :tracks="tracks"
+        :events="events"
+        :time-range="timeRange"
+        :color-map="colorMap"
+        :label-width="180"
+        :track-row-height="46"
+        :min-chart-width="1040"
+      />
+    </div>
   </section>
 </template>

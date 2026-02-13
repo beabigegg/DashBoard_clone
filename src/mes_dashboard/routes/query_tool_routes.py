@@ -19,12 +19,14 @@ from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.services.query_tool_service import (
     resolve_lots,
     get_lot_history,
+    get_lot_history_batch,
     get_adjacent_lots,
     get_lot_materials,
     get_lot_rejects,
     get_lot_holds,
     get_lot_splits,
     get_lot_jobs,
+    get_lot_associations_batch,
     get_equipment_status_hours,
     get_equipment_lots,
     get_equipment_materials,
@@ -171,19 +173,19 @@ def resolve_lot_input():
 @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
 @_QUERY_TOOL_HISTORY_RATE_LIMIT
 def query_lot_history():
-    """Query production history for a LOT.
+    """Query production history for one or more LOTs.
 
     Query params:
-        container_id: CONTAINERID (16-char hex)
+        container_id: Single CONTAINERID (16-char hex)
+        container_ids: Comma-separated CONTAINERIDs (batch mode)
         workcenter_groups: Optional comma-separated list of WORKCENTER_GROUP names
 
-    Returns production history records.
+    When container_ids is provided, uses batch query (single EventFetcher call).
+    Falls back to container_id for single-CID requests.
     """
+    container_ids_param = request.args.get('container_ids')
     container_id = request.args.get('container_id')
     workcenter_groups_param = request.args.get('workcenter_groups')
-
-    if not container_id:
-        return jsonify({'error': '請指定 CONTAINERID'}), 400
 
     # Parse workcenter_groups if provided
     workcenter_groups = None
@@ -192,7 +194,16 @@ def query_lot_history():
             g.strip() for g in workcenter_groups_param.split(',') if g.strip()
         ]
 
-    result = get_lot_history(container_id, workcenter_groups=workcenter_groups)
+    # Batch mode: container_ids takes precedence
+    if container_ids_param:
+        cids = [c.strip() for c in container_ids_param.split(',') if c.strip()]
+        if not cids:
+            return jsonify({'error': '請指定 CONTAINERID'}), 400
+        result = get_lot_history_batch(cids, workcenter_groups=workcenter_groups)
+    elif container_id:
+        result = get_lot_history(container_id, workcenter_groups=workcenter_groups)
+    else:
+        return jsonify({'error': '請指定 CONTAINERID'}), 400
 
     if 'error' in result:
         return jsonify(result), 400
@@ -241,46 +252,52 @@ def query_adjacent_lots():
 @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
 @_QUERY_TOOL_ASSOC_RATE_LIMIT
 def query_lot_associations():
-    """Query association data for a LOT.
+    """Query association data for one or more LOTs.
 
     Query params:
-        container_id: CONTAINERID (16-char hex)
+        container_id: Single CONTAINERID (16-char hex)
+        container_ids: Comma-separated CONTAINERIDs (batch mode)
         type: Association type ('materials', 'rejects', 'holds', 'jobs')
         equipment_id: Equipment ID (required for 'jobs' type)
         time_start: Start time (required for 'jobs' type)
         time_end: End time (required for 'jobs' type)
-        full_history: Optional boolean for 'splits' type (default false)
 
-    Returns association records based on type.
+    When container_ids is provided for materials/rejects/holds, uses batch query.
     """
+    container_ids_param = request.args.get('container_ids')
     container_id = request.args.get('container_id')
     assoc_type = request.args.get('type')
 
-    if not container_id:
-        return jsonify({'error': '請指定 CONTAINERID'}), 400
-
-    valid_types = ['materials', 'rejects', 'holds', 'splits', 'jobs']
+    valid_types = ['materials', 'rejects', 'holds', 'jobs']
     if assoc_type not in valid_types:
         return jsonify({'error': f'不支援的關聯類型: {assoc_type}'}), 400
 
-    if assoc_type == 'materials':
-        result = get_lot_materials(container_id)
-    elif assoc_type == 'rejects':
-        result = get_lot_rejects(container_id)
-    elif assoc_type == 'holds':
-        result = get_lot_holds(container_id)
-    elif assoc_type == 'splits':
-        full_history = request.args.get('full_history', 'false').lower() == 'true'
-        result = get_lot_splits(container_id, full_history=full_history)
-    elif assoc_type == 'jobs':
-        equipment_id = request.args.get('equipment_id')
-        time_start = request.args.get('time_start')
-        time_end = request.args.get('time_end')
+    # Batch mode for materials/rejects/holds
+    batch_types = {'materials', 'rejects', 'holds'}
+    if container_ids_param and assoc_type in batch_types:
+        cids = [c.strip() for c in container_ids_param.split(',') if c.strip()]
+        if not cids:
+            return jsonify({'error': '請指定 CONTAINERID'}), 400
+        result = get_lot_associations_batch(cids, assoc_type)
+    else:
+        if not container_id:
+            return jsonify({'error': '請指定 CONTAINERID'}), 400
 
-        if not all([equipment_id, time_start, time_end]):
-            return jsonify({'error': '查詢 JOB 需指定設備和時間範圍'}), 400
+        if assoc_type == 'materials':
+            result = get_lot_materials(container_id)
+        elif assoc_type == 'rejects':
+            result = get_lot_rejects(container_id)
+        elif assoc_type == 'holds':
+            result = get_lot_holds(container_id)
+        elif assoc_type == 'jobs':
+            equipment_id = request.args.get('equipment_id')
+            time_start = request.args.get('time_start')
+            time_end = request.args.get('time_end')
 
-        result = get_lot_jobs(equipment_id, time_start, time_end)
+            if not all([equipment_id, time_start, time_end]):
+                return jsonify({'error': '查詢 JOB 需指定設備和時間範圍'}), 400
+
+            result = get_lot_jobs(equipment_id, time_start, time_end)
 
     if 'error' in result:
         return jsonify(result), 400

@@ -9,18 +9,16 @@ const LOT_SUB_TABS = Object.freeze([
   'materials',
   'rejects',
   'holds',
-  'splits',
   'jobs',
 ]);
 
-const ASSOCIATION_TABS = new Set(['materials', 'rejects', 'holds', 'splits', 'jobs']);
+const ASSOCIATION_TABS = new Set(['materials', 'rejects', 'holds', 'jobs']);
 
 const EXPORT_TYPE_MAP = Object.freeze({
   history: 'lot_history',
   materials: 'lot_materials',
   rejects: 'lot_rejects',
   holds: 'lot_holds',
-  splits: 'lot_splits',
   jobs: 'lot_jobs',
 });
 
@@ -30,7 +28,6 @@ function emptyTabFlags() {
     materials: false,
     rejects: false,
     holds: false,
-    splits: false,
     jobs: false,
   };
 }
@@ -42,7 +39,6 @@ function emptyTabErrors() {
     materials: '',
     rejects: '',
     holds: '',
-    splits: '',
     jobs: '',
   };
 }
@@ -52,7 +48,6 @@ function emptyAssociations() {
     materials: [],
     rejects: [],
     holds: [],
-    splits: [],
     jobs: [],
   };
 }
@@ -60,41 +55,6 @@ function emptyAssociations() {
 function normalizeSubTab(value) {
   const tab = normalizeText(value).toLowerCase();
   return LOT_SUB_TABS.includes(tab) ? tab : 'history';
-}
-
-function flattenSplitPayload(payload) {
-  if (Array.isArray(payload?.data)) {
-    return payload.data;
-  }
-
-  const productionHistory = Array.isArray(payload?.production_history)
-    ? payload.production_history.map((item) => ({
-      RECORD_TYPE: 'PRODUCTION_HISTORY',
-      ...item,
-    }))
-    : [];
-
-  const serialRows = Array.isArray(payload?.serial_numbers)
-    ? payload.serial_numbers.flatMap((item) => {
-      const serialNumber = item?.serial_number || '';
-      const totalGoodDie = item?.total_good_die || null;
-      const lots = Array.isArray(item?.lots) ? item.lots : [];
-
-      return lots.map((lot) => ({
-        RECORD_TYPE: 'SERIAL_MAPPING',
-        SERIAL_NUMBER: serialNumber,
-        TOTAL_GOOD_DIE: totalGoodDie,
-        LOT_ID: lot?.lot_id || '',
-        WORK_ORDER: lot?.work_order || '',
-        COMBINE_RATIO: lot?.combine_ratio,
-        COMBINE_RATIO_PCT: lot?.combine_ratio_pct || '',
-        GOOD_DIE_QTY: lot?.good_die_qty,
-        ORIGINAL_START_DATE: lot?.original_start_date,
-      }));
-    })
-    : [];
-
-  return [...productionHistory, ...serialRows];
 }
 
 function resolveTimeRangeFromHistory(rows) {
@@ -168,7 +128,6 @@ export function useLotDetail(initial = {}) {
     materials: false,
     rejects: false,
     holds: false,
-    splits: false,
     jobs: false,
   });
 
@@ -234,38 +193,24 @@ export function useLotDetail(initial = {}) {
     errors.history = '';
 
     try {
-      const results = await Promise.allSettled(
-        cids.map((cid) => {
-          const params = new URLSearchParams();
-          params.set('container_id', cid);
-          if (selectedWorkcenterGroups.value.length > 0) {
-            params.set('workcenter_groups', selectedWorkcenterGroups.value.join(','));
-          }
-          return apiGet(`/api/query-tool/lot-history?${params.toString()}`, {
-            timeout: 60000,
-            silent: true,
-          });
-        }),
-      );
-
-      const allRows = [];
-      const failedCids = [];
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          const rows = Array.isArray(result.value?.data) ? result.value.data : [];
-          allRows.push(...rows);
-        } else {
-          failedCids.push(cids[index]);
-        }
-      });
-
-      historyRows.value = allRows;
-      loaded.history = true;
-
-      if (failedCids.length > 0) {
-        errors.history = `部分節點歷程載入失敗：${failedCids.join(', ')}`;
+      const params = new URLSearchParams();
+      // Batch mode: send all CIDs in one request
+      if (cids.length > 1) {
+        params.set('container_ids', cids.join(','));
+      } else {
+        params.set('container_id', cids[0]);
+      }
+      if (selectedWorkcenterGroups.value.length > 0) {
+        params.set('workcenter_groups', selectedWorkcenterGroups.value.join(','));
       }
 
+      const payload = await apiGet(`/api/query-tool/lot-history?${params.toString()}`, {
+        timeout: 120000,
+        silent: true,
+      });
+
+      historyRows.value = Array.isArray(payload?.data) ? payload.data : [];
+      loaded.history = true;
       return true;
     } catch (error) {
       errors.history = error?.message || '載入 LOT 歷程失敗';
@@ -324,29 +269,21 @@ export function useLotDetail(initial = {}) {
 
         associationRows[associationType] = Array.isArray(payload?.data) ? payload.data : [];
       } else {
-        // Non-jobs tabs: load in parallel for all selected CIDs
-        const results = await Promise.allSettled(
-          cids.map((cid) => {
-            const params = new URLSearchParams();
-            params.set('container_id', cid);
-            params.set('type', associationType);
-            return apiGet(`/api/query-tool/lot-associations?${params.toString()}`, {
-              timeout: 120000,
-              silent: true,
-            });
-          }),
-        );
+        // Non-jobs tabs: batch all CIDs into a single request
+        const params = new URLSearchParams();
+        if (cids.length > 1) {
+          params.set('container_ids', cids.join(','));
+        } else {
+          params.set('container_id', cids[0]);
+        }
+        params.set('type', associationType);
 
-        const allRows = [];
-        results.forEach((result) => {
-          if (result.status === 'fulfilled') {
-            const rows = associationType === 'splits'
-              ? flattenSplitPayload(result.value)
-              : (Array.isArray(result.value?.data) ? result.value.data : []);
-            allRows.push(...rows);
-          }
+        const payload = await apiGet(`/api/query-tool/lot-associations?${params.toString()}`, {
+          timeout: 120000,
+          silent: true,
         });
-        associationRows[associationType] = allRows;
+
+        associationRows[associationType] = Array.isArray(payload?.data) ? payload.data : [];
       }
 
       loaded[associationType] = true;

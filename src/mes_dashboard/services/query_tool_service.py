@@ -485,6 +485,106 @@ def get_adjacent_lots(
 
 
 # ============================================================
+# LOT Batch Query Functions
+# ============================================================
+
+def get_lot_history_batch(
+    container_ids: List[str],
+    workcenter_groups: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Get production history for multiple LOTs in a single EventFetcher call.
+
+    Args:
+        container_ids: List of CONTAINERIDs (16-char hex)
+        workcenter_groups: Optional list of WORKCENTER_GROUP names to filter by
+
+    Returns:
+        Dict with 'data' (merged history records) and 'total'.
+    """
+    if not container_ids:
+        return {'error': '請指定 CONTAINERID'}
+
+    try:
+        events_by_cid = EventFetcher.fetch_events(container_ids, "history")
+
+        rows = []
+        for cid in container_ids:
+            rows.extend(events_by_cid.get(cid, []))
+
+        if workcenter_groups:
+            workcenters = _get_workcenters_for_groups(workcenter_groups)
+            if workcenters:
+                workcenter_set = set(workcenters)
+                rows = [
+                    row for row in rows
+                    if row.get('WORKCENTERNAME') in workcenter_set
+                ]
+
+        data = _df_to_records(pd.DataFrame(rows))
+
+        logger.debug(
+            f"LOT history batch: {len(data)} records for "
+            f"{len(container_ids)} containers"
+        )
+
+        return {
+            'data': data,
+            'total': len(data),
+            'container_ids': container_ids,
+            'filtered_by_groups': workcenter_groups or [],
+        }
+
+    except Exception as exc:
+        logger.error(f"LOT history batch query failed: {exc}")
+        return {'error': f'查詢失敗: {str(exc)}'}
+
+
+def get_lot_associations_batch(
+    container_ids: List[str],
+    assoc_type: str,
+) -> Dict[str, Any]:
+    """Get association data for multiple LOTs in a single EventFetcher call.
+
+    Args:
+        container_ids: List of CONTAINERIDs (16-char hex)
+        assoc_type: One of 'materials', 'rejects', 'holds'
+
+    Returns:
+        Dict with 'data' (merged records) and 'total'.
+    """
+    if not container_ids:
+        return {'error': '請指定 CONTAINERID'}
+
+    valid_batch_types = {'materials', 'rejects', 'holds'}
+    if assoc_type not in valid_batch_types:
+        return {'error': f'批次查詢不支援類型: {assoc_type}'}
+
+    try:
+        events_by_cid = EventFetcher.fetch_events(container_ids, assoc_type)
+
+        rows = []
+        for cid in container_ids:
+            rows.extend(events_by_cid.get(cid, []))
+
+        data = _df_to_records(pd.DataFrame(rows))
+
+        logger.debug(
+            f"LOT {assoc_type} batch: {len(data)} records for "
+            f"{len(container_ids)} containers"
+        )
+
+        return {
+            'data': data,
+            'total': len(data),
+            'container_ids': container_ids,
+        }
+
+    except Exception as exc:
+        logger.error(f"LOT {assoc_type} batch query failed: {exc}")
+        return {'error': f'查詢失敗: {str(exc)}'}
+
+
+# ============================================================
 # LOT Association Functions
 # ============================================================
 

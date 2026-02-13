@@ -194,19 +194,15 @@ async function handleResolveLots() {
 
   await lotLineage.primeResolvedLots(lotResolve.resolvedLots.value);
 
-  const rootIds = lotLineage.rootContainerIds.value;
-  if (rootIds.length === 0) {
+  const treeRootIds = lotLineage.treeRoots.value;
+  if (treeRootIds.length === 0) {
     await lotDetail.setSelectedContainerId('');
     lotLineage.clearSelection();
     return;
   }
 
-  const preferredSelection = lotDetail.selectedContainerId.value && rootIds.includes(lotDetail.selectedContainerId.value)
-    ? lotDetail.selectedContainerId.value
-    : rootIds[0];
-
-  lotLineage.selectNode(preferredSelection);
-  await lotDetail.setSelectedContainerId(preferredSelection);
+  // Auto-select all tree roots and load detail for their full subtrees
+  await handleSelectNodes(treeRootIds);
 }
 
 async function handleSelectNodes(containerIds) {

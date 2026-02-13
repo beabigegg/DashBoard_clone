@@ -216,8 +216,7 @@ const chartOption = computed(() => {
         orient: 'LR',
         expandAndCollapse: true,
         initialTreeDepth: -1,
-        roam: true,
-        scaleLimit: { min: 0.5, max: 3 },
+        roam: 'move',
         symbol: 'circle',
         symbolSize: 10,
         label: {

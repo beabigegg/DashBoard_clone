@@ -70,9 +70,8 @@ const emit = defineEmits(['change-sub-tab', 'update-workcenter-groups', 'export-
 const tabMeta = Object.freeze({
   history: { label: '歷程', emptyText: '無歷程資料' },
   materials: { label: '物料', emptyText: '無物料資料' },
-  rejects: { label: '退貨', emptyText: '無退貨資料' },
+  rejects: { label: '報廢', emptyText: '無報廢資料' },
   holds: { label: 'Hold', emptyText: '無 Hold 資料' },
-  splits: { label: 'Split', emptyText: '無 Split 資料' },
   jobs: { label: 'Job', emptyText: '無 Job 資料' },
 });
 
