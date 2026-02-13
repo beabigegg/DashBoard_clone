@@ -1,0 +1,14 @@
+-- Reject History Reason Options
+-- Template slots:
+--   BASE_QUERY (base reject-history daily dataset SQL)
+
+{{ BASE_WITH_CTE }}
+SELECT
+    b.LOSSREASONNAME AS REASON,
+    SUM(b.REJECT_TOTAL_QTY) AS REJECT_TOTAL_QTY,
+    SUM(b.DEFECT_QTY) AS DEFECT_QTY
+FROM base b
+{{ WHERE_CLAUSE }}
+GROUP BY b.LOSSREASONNAME
+HAVING SUM(b.REJECT_TOTAL_QTY) > 0 OR SUM(b.DEFECT_QTY) > 0
+ORDER BY REASON

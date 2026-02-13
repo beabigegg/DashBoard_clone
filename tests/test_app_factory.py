@@ -55,6 +55,7 @@ class AppFactoryTests(unittest.TestCase):
             "/wip-overview",
             "/wip-detail",
             "/hold-overview",
+            "/reject-history",
             "/excel-query",
             "/query-tool",
             "/tmtt-defect",
@@ -74,6 +75,7 @@ class AppFactoryTests(unittest.TestCase):
             "/api/excel-query/upload",
             "/api/query-tool/resolve",
             "/api/tmtt-defect/analysis",
+            "/api/reject-history/summary",
         }
         missing = expected - rules
         self.assertFalse(missing, f"Missing routes: {sorted(missing)}")

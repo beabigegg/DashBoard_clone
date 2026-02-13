@@ -44,6 +44,10 @@ from mes_dashboard.services.realtime_equipment_cache import (
     init_realtime_equipment_cache,
     stop_equipment_status_sync_worker,
 )
+from mes_dashboard.services.scrap_reason_exclusion_cache import (
+    init_scrap_reason_exclusion_cache,
+    stop_scrap_reason_exclusion_cache_worker,
+)
 from mes_dashboard.core.modernization_policy import (
     get_deferred_routes as get_deferred_routes_from_scope_matrix,
     get_missing_in_scope_assets,
@@ -287,6 +291,11 @@ def _shutdown_runtime_resources() -> None:
         logger.warning("Error stopping equipment sync worker: %s", exc)
 
     try:
+        stop_scrap_reason_exclusion_cache_worker()
+    except Exception as exc:
+        logger.warning("Error stopping scrap exclusion cache worker: %s", exc)
+
+    try:
         close_redis()
     except Exception as exc:
         logger.warning("Error closing Redis client: %s", exc)
@@ -380,6 +389,7 @@ def create_app(config_name: str | None = None) -> Flask:
             start_keepalive()  # Keep database connections alive
             start_cache_updater()  # Start Redis cache updater
             init_realtime_equipment_cache(app)  # Start realtime equipment status cache
+            init_scrap_reason_exclusion_cache(app)  # Start exclusion-policy cache sync
     _register_shutdown_hooks(app)
 
     # Register API routes
@@ -792,6 +802,27 @@ def create_app(config_name: str | None = None) -> Flask:
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
             "<title>設備歷史績效</title>"
             "<script type=\"module\" src=\"/static/dist/resource-history.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        ))
+
+    @app.route('/reject-history')
+    def reject_history_page():
+        """Reject history analysis page served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/reject-history')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "reject-history.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'reject-history.html')
+
+        return missing_in_scope_asset_response('/reject-history', (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>報廢歷史查詢</title>"
+            "<script type=\"module\" src=\"/static/dist/reject-history.js\"></script>"
             "</head><body><div id='app'></div></body></html>",
             200,
         ))

@@ -27,6 +27,13 @@
       "order": 3
     },
     {
+      "route": "/reject-history",
+      "name": "報廢歷史查詢",
+      "status": "dev",
+      "drawer_id": "drawer-2",
+      "order": 4
+    },
+    {
       "route": "/wip-detail",
       "name": "WIP 明細",
       "status": "released"

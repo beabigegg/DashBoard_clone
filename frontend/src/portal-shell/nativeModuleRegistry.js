@@ -34,6 +34,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../hold-history/App.vue'),
     [() => import('../wip-shared/styles.css'), () => import('../hold-history/style.css')],
   ),
+  '/reject-history': createNativeLoader(
+    () => import('../reject-history/App.vue'),
+    [() => import('../wip-shared/styles.css'), () => import('../reject-history/style.css')],
+  ),
   '/resource': createNativeLoader(
     () => import('../resource-status/App.vue'),
     [() => import('../resource-shared/styles.css'), () => import('../resource-status/style.css')],

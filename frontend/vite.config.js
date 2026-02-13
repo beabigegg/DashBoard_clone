@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => ({
         'hold-detail': resolve(__dirname, 'src/hold-detail/index.html'),
         'hold-overview': resolve(__dirname, 'src/hold-overview/index.html'),
         'hold-history': resolve(__dirname, 'src/hold-history/index.html'),
+        'reject-history': resolve(__dirname, 'src/reject-history/index.html'),
         'resource-status': resolve(__dirname, 'src/resource-status/index.html'),
         'resource-history': resolve(__dirname, 'src/resource-history/index.html'),
         'job-query': resolve(__dirname, 'src/job-query/main.js'),

@@ -1,5 +1,8 @@
-## ADDED Requirements
+# reject-metric-semantics Specification
 
+## Purpose
+TBD - created by archiving change reject-history-query-page. Update Purpose after archive.
+## Requirements
 ### Requirement: Charge-off reject metric SHALL be computed from five reject component columns
 The system SHALL compute `REJECT_TOTAL_QTY` as the sum of five reject-related quantity columns.
 
@@ -15,6 +18,21 @@ The system SHALL compute `DEFECT_QTY` only from `DEFECTQTY` and SHALL NOT merge 
 - **WHEN** a record has `DEFECTQTY > 0` and reject component sum equals 0
 - **THEN** `DEFECT_QTY` SHALL be non-zero
 - **THEN** `REJECT_TOTAL_QTY` SHALL remain 0
+
+### Requirement: Yield-exclusion policy SHALL follow ERP exclusion table
+The system SHALL use `ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE` as the policy source for "not included in yield" scrap reasons.
+
+#### Scenario: Enabled policy rows
+- **WHEN** exclusion policy is evaluated
+- **THEN** only rows with `ENABLE_FLAG='Y'` SHALL be considered exclusion rules
+
+#### Scenario: Default exclusion behavior
+- **WHEN** `include_excluded_scrap=false` (default)
+- **THEN** source rows matching enabled exclusion reasons SHALL be excluded before computing yield-related metrics
+
+#### Scenario: Optional inclusion override
+- **WHEN** `include_excluded_scrap=true`
+- **THEN** the same matched rows SHALL be included back into metric calculations
 
 ### Requirement: Move-in denominator SHALL be deduplicated at event level
 The system SHALL deduplicate `MOVEIN_QTY` by event key before rate calculations.
@@ -56,3 +74,4 @@ The system SHALL keep explicit names for charge-off reject and non-charge-off de
 - **WHEN** service or export fields are generated
 - **THEN** `REJECT_TOTAL_QTY` SHALL NOT be renamed to `DEFECT_QTY`
 - **THEN** `DEFECT_QTY` SHALL refer only to `DEFECTQTY`
+

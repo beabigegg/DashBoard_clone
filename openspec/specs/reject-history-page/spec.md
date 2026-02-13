@@ -1,5 +1,8 @@
-## ADDED Requirements
+# reject-history-page Specification
 
+## Purpose
+TBD - created by archiving change reject-history-query-page. Update Purpose after archive.
+## Requirements
 ### Requirement: Reject History page SHALL provide filterable historical query controls
 The page SHALL provide a filter area for date range and major production dimensions to drive all report sections.
 
@@ -13,6 +16,29 @@ The page SHALL provide a filter area for date range and major production dimensi
 - **THEN** summary, trend, pareto, and list sections SHALL reload with the same filter set
 - **WHEN** user clicks "清除條件"
 - **THEN** all filters SHALL reset to defaults and all sections SHALL reload
+
+#### Scenario: Required core filters are present
+- **WHEN** the filter panel is rendered
+- **THEN** it SHALL include `start_date/end_date` time filter controls
+- **THEN** it SHALL include reason filter control
+- **THEN** it SHALL include `WORKCENTER_GROUP` filter control
+
+### Requirement: Reject History page SHALL expose yield-exclusion toggle control
+The page SHALL let users decide whether to include policy-marked scrap in yield calculations.
+
+#### Scenario: Default toggle state
+- **WHEN** the page is first loaded
+- **THEN** "納入不計良率報廢" toggle SHALL default to OFF
+- **THEN** requests SHALL be sent with `include_excluded_scrap=false`
+
+#### Scenario: Toggle affects all sections
+- **WHEN** user turns ON/OFF the toggle and clicks "查詢"
+- **THEN** summary, trend, pareto, and list sections SHALL reload under the selected policy mode
+- **THEN** export action SHALL use the same toggle state
+
+#### Scenario: Policy status visibility
+- **WHEN** data is rendered
+- **THEN** the UI SHALL show a clear badge/text indicating whether policy-marked scrap is currently excluded or included
 
 ### Requirement: Reject History page SHALL present KPI cards with split reject/defect semantics
 The page SHALL display KPI cards that simultaneously show charge-off reject and non-charge-off defect metrics.
@@ -48,6 +74,16 @@ The page SHALL provide a Pareto view for loss reasons and support downstream fil
 - **WHEN** reason Pareto data is loaded
 - **THEN** items SHALL be sorted by selected metric descending
 - **THEN** a cumulative percentage line SHALL be shown
+
+#### Scenario: Default 80% cumulative display mode
+- **WHEN** the page first loads Pareto
+- **THEN** it SHALL default to "only cumulative top 80%" mode
+- **THEN** Pareto SHALL only render categories within the cumulative 80% threshold under current filters
+
+#### Scenario: Full Pareto toggle mode
+- **WHEN** user turns OFF the 80% cumulative display mode
+- **THEN** Pareto SHALL render all categories after applying current filters
+- **THEN** switching mode SHALL NOT reset existing time/reason/workcenter-group filters
 
 #### Scenario: Pareto click filtering
 - **WHEN** user clicks a Pareto bar or row
@@ -103,3 +139,4 @@ The page SHALL keep the same semantic grouping across desktop and mobile layouts
 - **WHEN** viewport width is below responsive breakpoint
 - **THEN** cards and chart panels SHALL stack in a single column
 - **THEN** filter controls SHALL remain operable without horizontal overflow
+

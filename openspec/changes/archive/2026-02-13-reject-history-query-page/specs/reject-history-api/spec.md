@@ -19,6 +19,23 @@ The API SHALL provide aggregated summary metrics for the selected filter context
 - **THEN** response SHALL be `{ success: true, data: { ... } }`
 - **THEN** data SHALL include `MOVEIN_QTY`, `REJECT_TOTAL_QTY`, `DEFECT_QTY`, `REJECT_RATE_PCT`, `DEFECT_RATE_PCT`, `REJECT_SHARE_PCT`, `AFFECTED_LOT_COUNT`, and `AFFECTED_WORKORDER_COUNT`
 
+### Requirement: Reject History API SHALL support yield-exclusion policy toggle
+The API SHALL support excluding or including policy-marked scrap reasons through a shared query parameter.
+
+#### Scenario: Default policy mode
+- **WHEN** reject-history endpoints are called without `include_excluded_scrap`
+- **THEN** `include_excluded_scrap` SHALL default to `false`
+- **THEN** rows mapped to `ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE.ENABLE_FLAG='Y'` SHALL be excluded from yield-related calculations
+
+#### Scenario: Explicitly include policy-marked scrap
+- **WHEN** `include_excluded_scrap=true` is provided
+- **THEN** policy-marked rows SHALL be included in summary/trend/pareto/list/export calculations
+- **THEN** API response `meta` SHALL include the effective `include_excluded_scrap` value
+
+#### Scenario: Invalid toggle value
+- **WHEN** `include_excluded_scrap` is not parseable as boolean
+- **THEN** the API SHALL return HTTP 400 with a descriptive validation error
+
 ### Requirement: Reject History API SHALL provide trend endpoint
 The API SHALL return time-series trend data for quantity and rate metrics.
 
@@ -75,6 +92,18 @@ The service SHALL load SQL from dedicated files under `src/mes_dashboard/sql/rej
 - **THEN** SQL SHALL be loaded from files in `sql/reject_history`
 - **THEN** user-supplied filters SHALL be passed through bind parameters
 - **THEN** user input SHALL NOT be interpolated into SQL strings directly
+
+### Requirement: Reject History API SHALL use cached exclusion-policy source
+The API SHALL read exclusion-policy reasons from cached `ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE` data instead of querying Oracle on every request.
+
+#### Scenario: Enabled exclusions only
+- **WHEN** exclusion-policy data is loaded
+- **THEN** only rows with `ENABLE_FLAG='Y'` SHALL be treated as active exclusions
+
+#### Scenario: Daily full-table cache refresh
+- **WHEN** exclusion cache is initialized
+- **THEN** the full table SHALL be loaded and refreshed at least once per 24 hours
+- **THEN** Redis SHOULD be used as shared cache when available, with in-memory fallback when unavailable
 
 ### Requirement: Reject History API SHALL apply rate limiting on expensive endpoints
 The API SHALL rate-limit high-cost endpoints to protect Oracle and application resources.

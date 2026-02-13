@@ -20,6 +20,7 @@ from .tmtt_defect_routes import tmtt_defect_bp
 from .qc_gate_routes import qc_gate_bp
 from .mid_section_defect_routes import mid_section_defect_bp
 from .trace_routes import trace_bp
+from .reject_history_routes import reject_history_bp
 
 
 def register_routes(app) -> None:
@@ -38,6 +39,7 @@ def register_routes(app) -> None:
     app.register_blueprint(qc_gate_bp)
     app.register_blueprint(mid_section_defect_bp)
     app.register_blueprint(trace_bp)
+    app.register_blueprint(reject_history_bp)
 
 __all__ = [
     'wip_bp',
@@ -56,5 +58,6 @@ __all__ = [
     'qc_gate_bp',
     'mid_section_defect_bp',
     'trace_bp',
+    'reject_history_bp',
     'register_routes',
 ]

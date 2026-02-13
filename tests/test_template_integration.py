@@ -373,6 +373,7 @@ class TestViteModuleIntegration(unittest.TestCase):
             ('/tables', 'tables.js'),
             ('/resource', 'resource-status.js'),
             ('/resource-history', 'resource-history.js'),
+            ('/reject-history', 'reject-history.js'),
             ('/job-query', 'job-query.js'),
             ('/excel-query', 'excel-query.js'),
             ('/query-tool', 'query-tool.js'),
@@ -396,13 +397,18 @@ class TestViteModuleIntegration(unittest.TestCase):
             response = self.client.get(endpoint, follow_redirects=False)
 
             if endpoint in canonical_routes:
-                self.assertEqual(response.status_code, 302)
-                self.assertTrue(response.location.endswith(canonical_routes[endpoint]))
-                follow = self.client.get(response.location)
-                self.assertEqual(follow.status_code, 200)
-                html = follow.data.decode('utf-8')
-                self.assertIn('/static/dist/portal-shell.js', html)
-                self.assertIn('type="module"', html)
+                if response.status_code == 302:
+                    self.assertTrue(response.location.endswith(canonical_routes[endpoint]))
+                    follow = self.client.get(response.location)
+                    self.assertEqual(follow.status_code, 200)
+                    html = follow.data.decode('utf-8')
+                    self.assertIn('/static/dist/portal-shell.js', html)
+                    self.assertIn('type="module"', html)
+                else:
+                    self.assertEqual(response.status_code, 200)
+                    html = response.data.decode('utf-8')
+                    self.assertIn(f'/static/dist/{asset}', html)
+                    self.assertIn('type="module"', html)
             else:
                 self.assertEqual(response.status_code, 200)
                 html = response.data.decode('utf-8')
