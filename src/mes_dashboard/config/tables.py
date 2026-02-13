@@ -4,7 +4,7 @@
 Row counts updated from data/table_schema_info.json (2026-01-29)
 """
 
-# 19 core tables config (with categories)
+# 22 core tables config (with categories)
 TABLES_CONFIG = {
     '即時數據表 (View)': [
         {
@@ -145,6 +145,27 @@ TABLES_CONFIG = {
             'row_count': 1965425,
             'time_field': None,
             'description': '併批紀錄表 - 合批/合併批次關聯與數量資訊'
+        },
+        {
+            'name': 'DWH.ERP_WIP_MOVETXN',
+            'display_name': 'ERP_WIP_MOVETXN (DWH.ERP_WIP_MOVETXN)',
+            'row_count': 10499947,
+            'time_field': 'TXN_DATE',
+            'description': 'ERP 工單移轉與報廢明細 - 工單層級移轉/報廢數量事件'
+        },
+        {
+            'name': 'DWH.ERP_WIP_MOVETXN_DETAIL',
+            'display_name': 'ERP_WIP_MOVETXN_DETAIL (DWH.ERP_WIP_MOVETXN_DETAIL)',
+            'row_count': 36715771,
+            'time_field': 'TXN_DATE',
+            'description': 'ERP 工單站點損耗明細 - 站點/產品維度移轉與報廢明細'
+        },
+        {
+            'name': 'DWH.ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE',
+            'display_name': 'ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE (DWH.ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE)',
+            'row_count': 36,
+            'time_field': 'CREATION_DATE',
+            'description': 'ERP 報廢原因排除清單 - 控制需排除的報廢原因代碼'
         }
     ]
 }

@@ -15,6 +15,9 @@ with open(DATA_FILE, 'r', encoding='utf-8') as f:
 
 # 表用途描述（根据表名推断）
 TABLE_DESCRIPTIONS = {
+    'DW_MES_LOT_V': 'MES 即時 WIP 視圖 - 批次現況、工站、設備與 Hold 資訊',
+    'DW_MES_EQUIPMENTSTATUS_WIP_V': '設備狀態與 WIP 關聯視圖 - 即時設備狀態與工單資訊',
+    'DW_MES_SPEC_WORKCENTER_V': '工站/工序對照視圖 - 用於工站分組與排序映射',
     'DW_MES_CONTAINER': '容器/批次主檔 - 目前在製容器狀態、數量與流程資訊',
     'DW_MES_HOLDRELEASEHISTORY': 'Hold/Release 歷史表 - 批次停工與解除紀錄',
     'DW_MES_JOB': '設備維修工單表 - 維修工單的當前狀態與流程',
@@ -30,7 +33,10 @@ TABLE_DESCRIPTIONS = {
     'DW_MES_HM_LOTMOVEOUT': '批次出站事件歷史表 - 出站/移出交易',
     'DW_MES_JOBTXNHISTORY': '維修工單交易歷史表 - 工單狀態變更紀錄',
     'DW_MES_LOTMATERIALSHISTORY': '批次物料消耗歷史表 - 用料與批次關聯',
-    'DW_MES_RESOURCE': '資源表 - 設備/載具等資源基本資料（OBJECTCATEGORY=ASSEMBLY 時，RESOURCENAME 為設備編號）'
+    'DW_MES_RESOURCE': '資源表 - 設備/載具等資源基本資料（OBJECTCATEGORY=ASSEMBLY 時，RESOURCENAME 為設備編號）',
+    'ERP_WIP_MOVETXN': 'ERP 工單移轉與報廢明細 - 工單層級移轉/報廢數量事件',
+    'ERP_WIP_MOVETXN_DETAIL': 'ERP 工單站點損耗明細 - 站點/產品維度移轉與報廢明細',
+    'ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE': 'ERP 報廢原因排除清單 - 控制需排除的報廢原因代碼',
 }
 
 # 常见字段说明

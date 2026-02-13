@@ -1,6 +1,6 @@
 # MES 数据库报表开发参考文档
 
-**生成时间**: 2026-01-29 14:48:13
+**生成时间**: 2026-02-13 17:46:29
 
 ---
 
@@ -71,27 +71,30 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 | # | 表名 | 用途 | 数据量 |
 |---|------|------|--------|
-| 1 | `DW_MES_CONTAINER` | 容器/批次主檔 - 目前在製容器狀態、數量與流程資訊 | 5,218,406 |
-| 2 | `DW_MES_EQUIPMENTSTATUS_WIP_V` | 待补充 | 2,631 |
-| 3 | `DW_MES_HM_LOTMOVEOUT` | 批次出站事件歷史表 - 出站/移出交易 | 48,645,692 |
-| 4 | `DW_MES_HOLDRELEASEHISTORY` | Hold/Release 歷史表 - 批次停工與解除紀錄 | 310,737 |
-| 5 | `DW_MES_JOB` | 設備維修工單表 - 維修工單的當前狀態與流程 | 1,248,622 |
-| 6 | `DW_MES_JOBTXNHISTORY` | 維修工單交易歷史表 - 工單狀態變更紀錄 | 9,554,723 |
-| 7 | `DW_MES_LOTMATERIALSHISTORY` | 批次物料消耗歷史表 - 用料與批次關聯 | 17,829,931 |
-| 8 | `DW_MES_LOTREJECTHISTORY` | 批次不良/報廢歷史表 - 不良原因與數量 | 15,786,025 |
-| 9 | `DW_MES_LOTWIPDATAHISTORY` | 在製數據採集歷史表 - 製程量測/參數紀錄 | 77,960,216 |
-| 10 | `DW_MES_LOTWIPHISTORY` | 在製流轉歷史表 - 批次進出站與流程軌跡 | 53,454,213 |
-| 11 | `DW_MES_LOT_V` | 待补充 | 9,468 |
-| 12 | `DW_MES_MAINTENANCE` | 設備保養/維護紀錄表 - 保養計畫與點檢數據 | 52,060,026 |
+| 1 | `DW_MES_CONTAINER` | 容器/批次主檔 - 目前在製容器狀態、數量與流程資訊 | 5,254,127 |
+| 2 | `DW_MES_EQUIPMENTSTATUS_WIP_V` | 設備狀態與 WIP 關聯視圖 - 即時設備狀態與工單資訊 | 2,618 |
+| 3 | `DW_MES_HM_LOTMOVEOUT` | 批次出站事件歷史表 - 出站/移出交易 | 48,936,608 |
+| 4 | `DW_MES_HOLDRELEASEHISTORY` | Hold/Release 歷史表 - 批次停工與解除紀錄 | 311,409 |
+| 5 | `DW_MES_JOB` | 設備維修工單表 - 維修工單的當前狀態與流程 | 1,257,793 |
+| 6 | `DW_MES_JOBTXNHISTORY` | 維修工單交易歷史表 - 工單狀態變更紀錄 | 9,623,710 |
+| 7 | `DW_MES_LOTMATERIALSHISTORY` | 批次物料消耗歷史表 - 用料與批次關聯 | 17,943,457 |
+| 8 | `DW_MES_LOTREJECTHISTORY` | 批次不良/報廢歷史表 - 不良原因與數量 | 15,905,008 |
+| 9 | `DW_MES_LOTWIPDATAHISTORY` | 在製數據採集歷史表 - 製程量測/參數紀錄 | 78,824,146 |
+| 10 | `DW_MES_LOTWIPHISTORY` | 在製流轉歷史表 - 批次進出站與流程軌跡 | 53,848,924 |
+| 11 | `DW_MES_LOT_V` | MES 即時 WIP 視圖 - 批次現況、工站、設備與 Hold 資訊 | 10,062 |
+| 12 | `DW_MES_MAINTENANCE` | 設備保養/維護紀錄表 - 保養計畫與點檢數據 | 53,170,778 |
 | 13 | `DW_MES_PARTREQUESTORDER` | 維修用料請求表 - 維修/設備零件請領 | 61,396 |
-| 14 | `DW_MES_PJ_COMBINEDASSYLOTS` | 併批紀錄表 - 合批/合併批次關聯與數量資訊 | 1,965,425 |
-| 15 | `DW_MES_RESOURCE` | 資源表 - 設備/載具等資源基本資料（OBJECTCATEGORY=ASSEMBLY 時，RESOURCENAME 為設備編號） | 91,329 |
-| 16 | `DW_MES_RESOURCESTATUS` | 設備狀態變更歷史表 - 狀態切換與原因 | 65,742,614 |
-| 17 | `DW_MES_RESOURCESTATUS_SHIFT` | 設備狀態班次彙總表 - 班次級狀態/工時 | 74,820,134 |
-| 18 | `DW_MES_SPEC_WORKCENTER_V` | 待补充 | 230 |
-| 19 | `DW_MES_WIP` | 在製品現況表（含歷史累積）- 當前 WIP 狀態/數量 | 79,058,085 |
+| 14 | `DW_MES_PJ_COMBINEDASSYLOTS` | 併批紀錄表 - 合批/合併批次關聯與數量資訊 | 1,975,915 |
+| 15 | `DW_MES_RESOURCE` | 資源表 - 設備/載具等資源基本資料（OBJECTCATEGORY=ASSEMBLY 時，RESOURCENAME 為設備編號） | 91,473 |
+| 16 | `DW_MES_RESOURCESTATUS` | 設備狀態變更歷史表 - 狀態切換與原因 | 66,428,898 |
+| 17 | `DW_MES_RESOURCESTATUS_SHIFT` | 設備狀態班次彙總表 - 班次級狀態/工時 | 75,566,666 |
+| 18 | `DW_MES_SPEC_WORKCENTER_V` | 工站/工序對照視圖 - 用於工站分組與排序映射 | 230 |
+| 19 | `DW_MES_WIP` | 在製品現況表（含歷史累積）- 當前 WIP 狀態/數量 | 80,748,581 |
+| 20 | `ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE` | ERP 報廢原因排除清單 - 控制需排除的報廢原因代碼 | 36 |
+| 21 | `ERP_WIP_MOVETXN` | ERP 工單移轉與報廢明細 - 工單層級移轉/報廢數量事件 | 10,499,947 |
+| 22 | `ERP_WIP_MOVETXN_DETAIL` | ERP 工單站點損耗明細 - 站點/產品維度移轉與報廢明細 | 36,715,771 |
 
-**总数据量**: 503,819,903 行
+**总数据量**: 557,177,553 行
 
 ---
 
@@ -101,7 +104,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 容器/批次主檔 - 目前在製容器狀態、數量與流程資訊
 
-**数据量**: 5,218,406 行
+**数据量**: 5,254,127 行
 
 #### 字段列表
 
@@ -205,9 +208,9 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 ### DW_MES_EQUIPMENTSTATUS_WIP_V
 
-**用途**: 待补充
+**用途**: 設備狀態與 WIP 關聯視圖 - 即時設備狀態與工單資訊
 
-**数据量**: 2,631 行
+**数据量**: 2,618 行
 
 #### 字段列表
 
@@ -226,25 +229,27 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 | 11 | `CREATEDATE` | DATE | 7 | 是 | 创建日期 |
 | 12 | `CREATEUSERNAME` | VARCHAR2(40) | 40 | 是 | 名称 |
 | 13 | `CREATEUSER` | VARCHAR2(255) | 255 | 是 | None |
-| 14 | `SYMPTOMCODE` | VARCHAR2(40) | 40 | 是 | None |
-| 15 | `CAUSECODE` | VARCHAR2(40) | 40 | 是 | None |
-| 16 | `REPAIRCODE` | VARCHAR2(40) | 40 | 是 | None |
-| 17 | `RUNCARDLOTID` | VARCHAR2(40) | 40 | 是 | 唯一标识符 |
-| 18 | `Package` | VARCHAR2(40) | 40 | 是 | None |
-| 19 | `PACKAGE_LF` | VARCHAR2(4000) | 4000 | 是 | None |
-| 20 | `Function` | VARCHAR2(40) | 40 | 是 | None |
-| 21 | `TYPE` | VARCHAR2(40) | 40 | 是 | None |
-| 22 | `BOP` | VARCHAR2(40) | 40 | 是 | None |
-| 23 | `WAFERLOTID` | VARCHAR2(40) | 40 | 是 | 唯一标识符 |
-| 24 | `WAFERPN` | VARCHAR2(40) | 40 | 是 | None |
-| 25 | `WAFERLOTID_PREFIX` | VARCHAR2(160) | 160 | 是 | 唯一标识符 |
-| 26 | `SPEC` | VARCHAR2(40) | 40 | 是 | None |
-| 27 | `LFOPTIONID` | VARCHAR2(4000) | 4000 | 是 | 唯一标识符 |
-| 28 | `WIREDESCRIPTION` | VARCHAR2(4000) | 4000 | 是 | None |
-| 29 | `WAFERMIL` | VARCHAR2(3062) | 3062 | 是 | None |
-| 30 | `LOTTRACKINQTY_PCS` | NUMBER | 22 | 是 | 数量 |
-| 31 | `LOTTRACKINTIME` | DATE | 7 | 是 | None |
-| 32 | `LOTTRACKINEMPLOYEE` | VARCHAR2(255) | 255 | 是 | None |
+| 14 | `TECHNICIANUSERNAME` | VARCHAR2(40) | 40 | 是 | 名称 |
+| 15 | `TECHNICIANUSER` | VARCHAR2(255) | 255 | 是 | None |
+| 16 | `SYMPTOMCODE` | VARCHAR2(40) | 40 | 是 | None |
+| 17 | `CAUSECODE` | VARCHAR2(40) | 40 | 是 | None |
+| 18 | `REPAIRCODE` | VARCHAR2(40) | 40 | 是 | None |
+| 19 | `RUNCARDLOTID` | VARCHAR2(40) | 40 | 是 | 唯一标识符 |
+| 20 | `Package` | VARCHAR2(40) | 40 | 是 | None |
+| 21 | `PACKAGE_LF` | VARCHAR2(4000) | 4000 | 是 | None |
+| 22 | `Function` | VARCHAR2(40) | 40 | 是 | None |
+| 23 | `TYPE` | VARCHAR2(40) | 40 | 是 | None |
+| 24 | `BOP` | VARCHAR2(40) | 40 | 是 | None |
+| 25 | `WAFERLOTID` | VARCHAR2(40) | 40 | 是 | 唯一标识符 |
+| 26 | `WAFERPN` | VARCHAR2(40) | 40 | 是 | None |
+| 27 | `WAFERLOTID_PREFIX` | VARCHAR2(160) | 160 | 是 | 唯一标识符 |
+| 28 | `SPEC` | VARCHAR2(40) | 40 | 是 | None |
+| 29 | `LFOPTIONID` | VARCHAR2(4000) | 4000 | 是 | 唯一标识符 |
+| 30 | `WIREDESCRIPTION` | VARCHAR2(4000) | 4000 | 是 | None |
+| 31 | `WAFERMIL` | VARCHAR2(3062) | 3062 | 是 | None |
+| 32 | `LOTTRACKINQTY_PCS` | NUMBER | 22 | 是 | 数量 |
+| 33 | `LOTTRACKINTIME` | DATE | 7 | 是 | None |
+| 34 | `LOTTRACKINEMPLOYEE` | VARCHAR2(255) | 255 | 是 | None |
 
 ---
 
@@ -252,7 +257,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 批次出站事件歷史表 - 出站/移出交易
 
-**数据量**: 48,645,692 行
+**数据量**: 48,936,608 行
 
 #### 字段列表
 
@@ -349,7 +354,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: Hold/Release 歷史表 - 批次停工與解除紀錄
 
-**数据量**: 310,737 行
+**数据量**: 311,409 行
 
 #### 字段列表
 
@@ -400,7 +405,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 設備維修工單表 - 維修工單的當前狀態與流程
 
-**数据量**: 1,248,622 行
+**数据量**: 1,257,793 行
 
 #### 字段列表
 
@@ -462,7 +467,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 維修工單交易歷史表 - 工單狀態變更紀錄
 
-**数据量**: 9,554,723 行
+**数据量**: 9,623,710 行
 
 #### 字段列表
 
@@ -523,7 +528,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 批次物料消耗歷史表 - 用料與批次關聯
 
-**数据量**: 17,829,931 行
+**数据量**: 17,943,457 行
 
 #### 字段列表
 
@@ -571,7 +576,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 批次不良/報廢歷史表 - 不良原因與數量
 
-**数据量**: 15,786,025 行
+**数据量**: 15,905,008 行
 
 #### 字段列表
 
@@ -637,7 +642,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 在製數據採集歷史表 - 製程量測/參數紀錄
 
-**数据量**: 77,960,216 行
+**数据量**: 78,824,146 行
 
 #### 字段列表
 
@@ -679,7 +684,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 在製流轉歷史表 - 批次進出站與流程軌跡
 
-**数据量**: 53,454,213 行
+**数据量**: 53,848,924 行
 
 #### 字段列表
 
@@ -746,9 +751,9 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 ### DW_MES_LOT_V
 
-**用途**: 待补充
+**用途**: MES 即時 WIP 視圖 - 批次現況、工站、設備與 Hold 資訊
 
-**数据量**: 9,468 行
+**数据量**: 10,062 行
 
 #### 字段列表
 
@@ -793,37 +798,39 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 | 37 | `BOP` | VARCHAR2(40) | 40 | 是 | None |
 | 38 | `DATECODE` | VARCHAR2(40) | 40 | 是 | None |
 | 39 | `LEADFRAMENAME` | VARCHAR2(4000) | 4000 | 是 | 名称 |
-| 40 | `LEADFRAMEOPTION` | VARCHAR2(4000) | 4000 | 是 | None |
-| 41 | `COMNAME` | VARCHAR2(4000) | 4000 | 是 | 名称 |
-| 42 | `LOCATIONNAME` | VARCHAR2(40) | 40 | 是 | 名称 |
-| 43 | `PJ_FUNCTION` | VARCHAR2(40) | 40 | 是 | None |
-| 44 | `PJ_TYPE` | VARCHAR2(40) | 40 | 是 | None |
-| 45 | `WAFERNAME` | VARCHAR2(40) | 40 | 是 | 名称 |
-| 46 | `WAFERLOT` | VARCHAR2(160) | 160 | 是 | None |
-| 47 | `EVENTNAME` | VARCHAR2(4000) | 4000 | 是 | 名称 |
-| 48 | `OCCURRENCEDATE` | VARCHAR2(4000) | 4000 | 是 | None |
-| 49 | `RELEASETIME` | VARCHAR2(4000) | 4000 | 是 | None |
-| 50 | `RELEASEEMP` | VARCHAR2(4000) | 4000 | 是 | None |
-| 51 | `RELEASEREASON` | VARCHAR2(4000) | 4000 | 是 | None |
-| 52 | `COMMENT_HOLD` | VARCHAR2(255) | 255 | 是 | None |
-| 53 | `CONTAINERCOMMENTS` | VARCHAR2(2000) | 2000 | 是 | None |
-| 54 | `COMMENT_DATE` | DATE | 7 | 是 | None |
-| 55 | `COMMENT_EMP` | VARCHAR2(255) | 255 | 是 | None |
-| 56 | `COMMENT_FUTURE` | VARCHAR2(255) | 255 | 是 | None |
-| 57 | `HOLDEMP` | VARCHAR2(255) | 255 | 是 | None |
-| 58 | `DEPTNAME` | VARCHAR2(255) | 255 | 是 | 名称 |
-| 59 | `PJ_PRODUCEREGION` | VARCHAR2(40) | 40 | 是 | None |
-| 60 | `WORKORDER` | VARCHAR2(40) | 40 | 是 | None |
-| 61 | `PRIORITYCODENAME` | VARCHAR2(40) | 40 | 是 | 名称 |
-| 62 | `SPECSEQUENCE` | VARCHAR2(10) | 10 | 是 | None |
-| 63 | `WORKCENTERSEQUENCE` | VARCHAR2(255) | 255 | 是 | None |
-| 64 | `TMTT_R` | CHAR(1) | 1 | 是 | None |
-| 65 | `WAFER_FACTOR` | NUMBER | 22 | 是 | None |
-| 66 | `WORKCENTER_GROUP` | VARCHAR2(40) | 40 | 是 | None |
-| 67 | `WORKCENTERSEQUENCE_GROUP` | VARCHAR2(255) | 255 | 是 | None |
-| 68 | `WORKCENTER_SHORT` | VARCHAR2(40) | 40 | 是 | None |
-| 69 | `EQUIPMENTNAME` | VARCHAR2(4000) | 4000 | 是 | 名称 |
-| 70 | `SYS_DATE` | DATE | 7 | 是 | None |
+| 40 | `LEADFRAMEDESC` | VARCHAR2(4000) | 4000 | 是 | None |
+| 41 | `LEADFRAMEOPTION` | VARCHAR2(4000) | 4000 | 是 | None |
+| 42 | `COMNAME` | VARCHAR2(4000) | 4000 | 是 | 名称 |
+| 43 | `LOCATIONNAME` | VARCHAR2(40) | 40 | 是 | 名称 |
+| 44 | `PJ_FUNCTION` | VARCHAR2(40) | 40 | 是 | None |
+| 45 | `PJ_TYPE` | VARCHAR2(40) | 40 | 是 | None |
+| 46 | `WAFERNAME` | VARCHAR2(40) | 40 | 是 | 名称 |
+| 47 | `WAFERDESC` | VARCHAR2(255) | 255 | 是 | None |
+| 48 | `WAFERLOT` | VARCHAR2(160) | 160 | 是 | None |
+| 49 | `EVENTNAME` | VARCHAR2(4000) | 4000 | 是 | 名称 |
+| 50 | `OCCURRENCEDATE` | VARCHAR2(4000) | 4000 | 是 | None |
+| 51 | `RELEASETIME` | VARCHAR2(4000) | 4000 | 是 | None |
+| 52 | `RELEASEEMP` | VARCHAR2(4000) | 4000 | 是 | None |
+| 53 | `RELEASEREASON` | VARCHAR2(4000) | 4000 | 是 | None |
+| 54 | `COMMENT_HOLD` | VARCHAR2(255) | 255 | 是 | None |
+| 55 | `CONTAINERCOMMENTS` | VARCHAR2(2000) | 2000 | 是 | None |
+| 56 | `COMMENT_DATE` | DATE | 7 | 是 | None |
+| 57 | `COMMENT_EMP` | VARCHAR2(255) | 255 | 是 | None |
+| 58 | `COMMENT_FUTURE` | VARCHAR2(255) | 255 | 是 | None |
+| 59 | `HOLDEMP` | VARCHAR2(255) | 255 | 是 | None |
+| 60 | `DEPTNAME` | VARCHAR2(255) | 255 | 是 | 名称 |
+| 61 | `PJ_PRODUCEREGION` | VARCHAR2(40) | 40 | 是 | None |
+| 62 | `WORKORDER` | VARCHAR2(40) | 40 | 是 | None |
+| 63 | `PRIORITYCODENAME` | VARCHAR2(40) | 40 | 是 | 名称 |
+| 64 | `SPECSEQUENCE` | VARCHAR2(10) | 10 | 是 | None |
+| 65 | `WORKCENTERSEQUENCE` | VARCHAR2(255) | 255 | 是 | None |
+| 66 | `TMTT_R` | CHAR(1) | 1 | 是 | None |
+| 67 | `WAFER_FACTOR` | NUMBER | 22 | 是 | None |
+| 68 | `WORKCENTER_GROUP` | VARCHAR2(40) | 40 | 是 | None |
+| 69 | `WORKCENTERSEQUENCE_GROUP` | VARCHAR2(255) | 255 | 是 | None |
+| 70 | `WORKCENTER_SHORT` | VARCHAR2(40) | 40 | 是 | None |
+| 71 | `EQUIPMENTNAME` | VARCHAR2(4000) | 4000 | 是 | 名称 |
+| 72 | `SYS_DATE` | DATE | 7 | 是 | None |
 
 ---
 
@@ -831,7 +838,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 設備保養/維護紀錄表 - 保養計畫與點檢數據
 
-**数据量**: 52,060,026 行
+**数据量**: 53,170,778 行
 
 #### 字段列表
 
@@ -915,7 +922,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 併批紀錄表 - 合批/合併批次關聯與數量資訊
 
-**数据量**: 1,965,425 行
+**数据量**: 1,975,915 行
 
 #### 字段列表
 
@@ -947,7 +954,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 資源表 - 設備/載具等資源基本資料（OBJECTCATEGORY=ASSEMBLY 時，RESOURCENAME 為設備編號）
 
-**数据量**: 91,329 行
+**数据量**: 91,473 行
 
 #### 字段列表
 
@@ -1045,7 +1052,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 設備狀態變更歷史表 - 狀態切換與原因
 
-**数据量**: 65,742,614 行
+**数据量**: 66,428,898 行
 
 #### 字段列表
 
@@ -1092,7 +1099,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 設備狀態班次彙總表 - 班次級狀態/工時
 
-**数据量**: 74,820,134 行
+**数据量**: 75,566,666 行
 
 #### 字段列表
 
@@ -1143,7 +1150,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 ### DW_MES_SPEC_WORKCENTER_V
 
-**用途**: 待补充
+**用途**: 工站/工序對照視圖 - 用於工站分組與排序映射
 
 **数据量**: 230 行
 
@@ -1167,7 +1174,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 在製品現況表（含歷史累積）- 當前 WIP 狀態/數量
 
-**数据量**: 79,058,085 行
+**数据量**: 80,748,581 行
 
 #### 字段列表
 
@@ -1249,21 +1256,117 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 ---
 
+### ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE
+
+**用途**: ERP 報廢原因排除清單 - 控制需排除的報廢原因代碼
+
+**数据量**: 36 行
+
+#### 字段列表
+
+| # | 字段名 | 数据类型 | 长度 | 可空 | 说明 |
+|---|--------|----------|------|------|------|
+| 1 | `REASON_ID` | NUMBER | 22 | 否 | 唯一标识符 |
+| 2 | `REASON_NAME` | VARCHAR2(30) | 30 | 是 | 報廢原因代碼 |
+| 3 | `DESCRIPTION` | VARCHAR2(255) | 255 | 是 | 報廢原因說明 |
+| 4 | `ENABLE_FLAG` | VARCHAR2(1) | 1 | 是 | 啟用識別 |
+| 5 | `CREATION_DATE` | DATE | 7 | 是 | 新增日期 |
+
+---
+
+### ERP_WIP_MOVETXN
+
+**用途**: ERP 工單移轉與報廢明細 - 工單層級移轉/報廢數量事件
+
+**数据量**: 10,499,947 行
+
+**表注释**: 工單移轉與報廢數量明細檔
+
+#### 字段列表
+
+| # | 字段名 | 数据类型 | 长度 | 可空 | 说明 |
+|---|--------|----------|------|------|------|
+| 1 | `SEQ_ID` | NUMBER | 22 | 否 | 批號，系統日期轉為NUMBER |
+| 2 | `WIP_ENTITY_ID` | NUMBER | 22 | 是 | 工單ID |
+| 3 | `WIP_ENTITY_NAME` | VARCHAR2(240) | 240 | 是 | 工單號碼 |
+| 4 | `WIP_CLASS_CODE` | VARCHAR2(10) | 10 | 是 | 工單類別 |
+| 5 | `ITEM_ID` | NUMBER | 22 | 是 | 料號ID |
+| 6 | `OPERATION_SEQ_NUM` | NUMBER | 22 | 是 | 作業序號 |
+| 7 | `DEPARTMENT_ID` | NUMBER | 22 | 是 | 站別ID |
+| 8 | `DEPARTMENT_NAME` | VARCHAR2(10) | 10 | 是 | 站別 |
+| 9 | `TRANSACTION_QUANTITY` | NUMBER | 22 | 是 | 移轉數量 |
+| 10 | `SCRAP_QUANTITY` | NUMBER | 22 | 是 | 報廢數量 |
+| 11 | `UOM` | VARCHAR2(3) | 3 | 是 | 單位 |
+| 12 | `LAST_UPDATED_BY` | NUMBER | 22 | 否 | 標準的who columns |
+| 13 | `LAST_UPDATE_DATE` | DATE | 7 | 否 | 標準的who columns |
+| 14 | `CREATED_BY` | NUMBER | 22 | 否 | 標準的who columns |
+| 15 | `CREATION_DATE` | DATE | 7 | 否 | 標準的who columns |
+| 16 | `LAST_UPDATE_LOGIN` | NUMBER | 22 | 是 | 標準的who columns |
+| 17 | `TXN_DATE` | DATE | 7 | 是 | 異動時間 |
+| 18 | `REASON_CODE` | VARCHAR2(30) | 30 | 是 | 報廢代碼 |
+| 19 | `REASON_NAME` | VARCHAR2(240) | 240 | 是 | 報廢原因 |
+| 20 | `SOURCE_CODE` | VARCHAR2(30) | 30 | 是 | 來源代碼 |
+
+---
+
+### ERP_WIP_MOVETXN_DETAIL
+
+**用途**: ERP 工單站點損耗明細 - 站點/產品維度移轉與報廢明細
+
+**数据量**: 36,715,771 行
+
+**表注释**: 工單各站損耗明細檔
+
+#### 字段列表
+
+| # | 字段名 | 数据类型 | 长度 | 可空 | 说明 |
+|---|--------|----------|------|------|------|
+| 1 | `SEQ_ID` | NUMBER | 22 | 否 | Sequence |
+| 2 | `WIP_ENTITY_NAME` | VARCHAR2(240) | 240 | 是 | 工單號碼 |
+| 3 | `WIP_CLASS_CODE` | VARCHAR2(10) | 10 | 是 | 工單類別 |
+| 4 | `ASSEMBLY_ITEM_NAME` | VARCHAR2(40) | 40 | 是 | 組裝料號 |
+| 5 | `PACKAGE` | VARCHAR2(40) | 40 | 是 | PACKAGE |
+| 6 | `FAMILY` | VARCHAR2(40) | 40 | 是 | FAMILY |
+| 7 | `TYPE` | VARCHAR2(40) | 40 | 是 | TYPE |
+| 8 | `OPERATION_SEQ_NUM` | NUMBER | 22 | 是 | 作業序號 |
+| 9 | `DEPARTMENT_ID` | NUMBER | 22 | 是 | 站別ID |
+| 10 | `DEPARTMENT_NAME` | VARCHAR2(10) | 10 | 是 | 站別 |
+| 11 | `TRANSACTION_QUANTITY` | NUMBER | 22 | 是 | 移轉數量 |
+| 12 | `SCRAP_QUANTITY` | NUMBER | 22 | 是 | 報廢數量 |
+| 13 | `UOM` | VARCHAR2(3) | 3 | 是 | 單位 |
+| 14 | `PROD_RATIO` | NUMBER | 22 | 是 | 製成率 |
+| 15 | `DATE_CLOSED` | DATE | 7 | 是 | 工單關閉時間 |
+| 16 | `LAST_UPDATED_BY` | NUMBER | 22 | 是 | 標準的who columns |
+| 17 | `LAST_UPDATE_DATE` | DATE | 7 | 是 | 標準的who columns |
+| 18 | `CREATED_BY` | NUMBER | 22 | 是 | 標準的who columns |
+| 19 | `CREATION_DATE` | DATE | 7 | 是 | 標準的who columns |
+| 20 | `LAST_UPDATE_LOGIN` | NUMBER | 22 | 是 | 標準的who columns |
+| 21 | `FUNCTION` | VARCHAR2(40) | 40 | 是 | FUNCTION |
+| 22 | `LINE` | VARCHAR2(40) | 40 | 是 | LINE |
+| 23 | `TXN_DATE` | DATE | 7 | 是 | 異動時間 |
+| 24 | `REASON_CODE` | VARCHAR2(30) | 30 | 是 | 報廢代碼 |
+| 25 | `REASON_NAME` | VARCHAR2(240) | 240 | 是 | 報廢原因 |
+| 26 | `SOURCE_CODE` | VARCHAR2(30) | 30 | 是 | 來源代碼 |
+
+---
+
 ## 报表开发注意事项
 
 ### 性能优化建议
 
 1. **大数据量表查询优化**
    - 以下表数据量较大，查询时务必添加时间范围限制：
-     - `DW_MES_WIP`: 79,058,085 行
-     - `DW_MES_LOTWIPDATAHISTORY`: 77,960,216 行
-     - `DW_MES_RESOURCESTATUS_SHIFT`: 74,820,134 行
-     - `DW_MES_RESOURCESTATUS`: 65,742,614 行
-     - `DW_MES_LOTWIPHISTORY`: 53,454,213 行
-     - `DW_MES_MAINTENANCE`: 52,060,026 行
-     - `DW_MES_HM_LOTMOVEOUT`: 48,645,692 行
-     - `DW_MES_LOTMATERIALSHISTORY`: 17,829,931 行
-     - `DW_MES_LOTREJECTHISTORY`: 15,786,025 行
+     - `DW_MES_WIP`: 80,748,581 行
+     - `DW_MES_LOTWIPDATAHISTORY`: 78,824,146 行
+     - `DW_MES_RESOURCESTATUS_SHIFT`: 75,566,666 行
+     - `DW_MES_RESOURCESTATUS`: 66,428,898 行
+     - `DW_MES_LOTWIPHISTORY`: 53,848,924 行
+     - `DW_MES_MAINTENANCE`: 53,170,778 行
+     - `DW_MES_HM_LOTMOVEOUT`: 48,936,608 行
+     - `ERP_WIP_MOVETXN_DETAIL`: 36,715,771 行
+     - `DW_MES_LOTMATERIALSHISTORY`: 17,943,457 行
+     - `DW_MES_LOTREJECTHISTORY`: 15,905,008 行
+     - `ERP_WIP_MOVETXN`: 10,499,947 行
 
 2. **索引使用**
    - 查询时尽量使用已建立索引的字段作为查询条件
@@ -1372,7 +1475,7 @@ ORDER BY w.CREATEDATE DESC;
 
 ### 文档更新记录
 
-- 2026-01-29: 初始版本创建
+- 2026-02-13: 初始版本创建
 
 ### 联系方式
 
