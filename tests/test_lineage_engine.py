@@ -130,7 +130,20 @@ def test_resolve_full_genealogy_combines_split_and_merge(
 
     result = LineageEngine.resolve_full_genealogy(["A"], {"A": "LOT-A"})
 
-    assert result == {"A": {"B", "C", "M1", "M0"}}
+    assert result["ancestors"] == {"A": {"B", "C", "M1", "M0"}}
+    assert result["cid_to_name"]["A"] == "LOT-A"
+    assert result["cid_to_name"]["M0"] == "LOT-M0"
+
+    # parent_map should have direct edges only
+    pm = result["parent_map"]
+    assert pm["A"] == ["B"]
+    assert pm["B"] == ["C", "M1"] or set(pm["B"]) == {"C", "M1"}
+    assert pm["M1"] == ["M0"]
+
+    # merge_edges: B → M1 (LOT-B matched merge source)
+    me = result["merge_edges"]
+    assert "M1" in me.get("B", [])
+
     assert mock_resolve_split_ancestors.call_count == 2
     mock_resolve_merge_sources.assert_called_once()
 

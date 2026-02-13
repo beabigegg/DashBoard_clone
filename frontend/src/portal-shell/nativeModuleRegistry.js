@@ -56,11 +56,15 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
   ),
   '/query-tool': createNativeLoader(
     () => import('../query-tool/App.vue'),
-    [() => import('../resource-shared/styles.css'), () => import('../query-tool/style.css')],
+    [() => import('../resource-shared/styles.css')],
   ),
   '/tmtt-defect': createNativeLoader(
     () => import('../tmtt-defect/App.vue'),
     [() => import('../tmtt-defect/style.css')],
+  ),
+  '/tables': createNativeLoader(
+    () => import('../tables/App.vue'),
+    [() => import('../tables/style.css')],
   ),
 });
 

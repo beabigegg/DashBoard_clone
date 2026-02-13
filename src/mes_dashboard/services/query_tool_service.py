@@ -304,7 +304,7 @@ def _resolve_by_serial_number(serial_numbers: List[str]) -> Dict[str, Any]:
 
 
 def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
-    """Resolve work orders (PJ_WORKORDER) to CONTAINERID.
+    """Resolve work orders (MFGORDERNAME) to CONTAINERID.
 
     Note: One work order may expand to many CONTAINERIDs (can be 100+).
 
@@ -315,7 +315,7 @@ def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
         Resolution result dict.
     """
     builder = QueryBuilder()
-    builder.add_in_condition("h.PJ_WORKORDER", work_orders)
+    builder.add_in_condition("MFGORDERNAME", work_orders)
     sql = SQLLoader.load_with_params(
         "query_tool/lot_resolve_work_order",
         WORK_ORDER_FILTER=builder.get_conditions_sql(),
@@ -327,7 +327,7 @@ def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
     # Group by work order
     wo_to_containers = {}
     for r in data:
-        wo = r['PJ_WORKORDER']
+        wo = r['MFGORDERNAME']
         if wo not in wo_to_containers:
             wo_to_containers[wo] = []
         wo_to_containers[wo].append({

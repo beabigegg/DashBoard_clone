@@ -249,7 +249,7 @@ class TestResolveQueriesUseBindParams:
                 mock_read.return_value = pd.DataFrame([
                     {
                         'CONTAINERID': 'CID-1',
-                        'PJ_WORKORDER': 'WO-1',
+                        'MFGORDERNAME': 'WO-1',
                         'CONTAINERNAME': 'LOT-1',
                         'SPECNAME': 'SPEC-1',
                     }

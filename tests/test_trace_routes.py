@@ -91,10 +91,14 @@ def test_seed_resolve_rate_limited_returns_429(_mock_rate_limit):
     assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
 
 
-@patch('mes_dashboard.routes.trace_routes.LineageEngine.resolve_full_genealogy')
-def test_lineage_success_returns_snake_case(mock_resolve_genealogy):
-    mock_resolve_genealogy.return_value = {
-        'CID-001': {'CID-A', 'CID-B'}
+@patch('mes_dashboard.routes.trace_routes.LineageEngine.resolve_forward_tree')
+def test_lineage_success_returns_forward_tree(mock_resolve_tree):
+    mock_resolve_tree.return_value = {
+        'roots': ['CID-ROOT'],
+        'children_map': {'CID-ROOT': ['CID-A'], 'CID-A': ['CID-001']},
+        'leaf_serials': {'CID-001': ['SN-001']},
+        'cid_to_name': {'CID-ROOT': 'WAFER-001', 'CID-A': 'LOT-A', 'CID-001': 'LOT-001'},
+        'total_nodes': 3,
     }
 
     client = _client()
@@ -109,16 +113,20 @@ def test_lineage_success_returns_snake_case(mock_resolve_genealogy):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload['stage'] == 'lineage'
-    assert sorted(payload['ancestors']['CID-001']) == ['CID-A', 'CID-B']
+    assert payload['roots'] == ['CID-ROOT']
+    assert payload['children_map']['CID-ROOT'] == ['CID-A']
+    assert payload['children_map']['CID-A'] == ['CID-001']
+    assert payload['leaf_serials']['CID-001'] == ['SN-001']
     assert payload['total_nodes'] == 3
-    assert 'totalNodes' not in payload
+    assert payload['names']['CID-ROOT'] == 'WAFER-001'
+    assert payload['names']['CID-A'] == 'LOT-A'
 
 
 @patch(
-    'mes_dashboard.routes.trace_routes.LineageEngine.resolve_full_genealogy',
+    'mes_dashboard.routes.trace_routes.LineageEngine.resolve_forward_tree',
     side_effect=TimeoutError('lineage timed out'),
 )
-def test_lineage_timeout_returns_504(_mock_resolve_genealogy):
+def test_lineage_timeout_returns_504(_mock_resolve_tree):
     client = _client()
     response = client.post(
         '/api/trace/lineage',

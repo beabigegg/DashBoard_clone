@@ -102,7 +102,7 @@
     {
       "route": "/admin/pages",
       "name": "頁面管理",
-      "status": "dev",
+      "status": "released",
       "drawer_id": "dev-tools",
       "order": 1
     },

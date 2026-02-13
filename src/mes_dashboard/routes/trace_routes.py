@@ -34,6 +34,7 @@ logger = logging.getLogger("mes_dashboard.trace_routes")
 trace_bp = Blueprint("trace", __name__, url_prefix="/api/trace")
 
 TRACE_STAGE_TIMEOUT_SECONDS = 10.0
+TRACE_LINEAGE_TIMEOUT_SECONDS = 60.0
 TRACE_CACHE_TTL_SECONDS = 300
 
 PROFILE_QUERY_TOOL = "query_tool"
@@ -220,7 +221,13 @@ def _seed_resolve_mid_section_defect(
     return result, None
 
 
-def _build_lineage_response(container_ids: List[str], ancestors_raw: Dict[str, Any]) -> Dict[str, Any]:
+def _build_lineage_response(
+    container_ids: List[str],
+    ancestors_raw: Dict[str, Any],
+    cid_to_name: Optional[Dict[str, str]] = None,
+    parent_map: Optional[Dict[str, List[str]]] = None,
+    merge_edges: Optional[Dict[str, List[str]]] = None,
+) -> Dict[str, Any]:
     normalized_ancestors: Dict[str, List[str]] = {}
     all_nodes = set(container_ids)
     for seed in container_ids:
@@ -234,12 +241,28 @@ def _build_lineage_response(container_ids: List[str], ancestors_raw: Dict[str, A
         normalized_ancestors[seed] = normalized_list
         all_nodes.update(normalized_list)
 
-    return {
+    response: Dict[str, Any] = {
         "stage": "lineage",
         "ancestors": normalized_ancestors,
         "merges": {},
         "total_nodes": len(all_nodes),
     }
+    if cid_to_name:
+        response["names"] = {
+            cid: name for cid, name in cid_to_name.items()
+            if cid in all_nodes and name
+        }
+    if parent_map:
+        response["parent_map"] = {
+            child: parents for child, parents in parent_map.items()
+            if child in all_nodes
+        }
+    if merge_edges:
+        response["merge_edges"] = {
+            child: sources for child, sources in merge_edges.items()
+            if child in all_nodes
+        }
+    return response
 
 
 def _flatten_domain_records(events_by_cid: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
@@ -382,7 +405,7 @@ def lineage():
 
     started = time.monotonic()
     try:
-        ancestors_raw = LineageEngine.resolve_full_genealogy(container_ids)
+        forward_tree = LineageEngine.resolve_forward_tree(container_ids)
     except Exception as exc:
         if _is_timeout_exception(exc):
             return _error("LINEAGE_TIMEOUT", "lineage query timed out", 504)
@@ -390,10 +413,18 @@ def lineage():
         return _error("LINEAGE_FAILED", "lineage stage failed", 500)
 
     elapsed = time.monotonic() - started
-    if elapsed > TRACE_STAGE_TIMEOUT_SECONDS:
+    if elapsed > TRACE_LINEAGE_TIMEOUT_SECONDS:
         return _error("LINEAGE_TIMEOUT", "lineage query timed out", 504)
 
-    response = _build_lineage_response(container_ids, ancestors_raw)
+    cid_to_name = forward_tree.get("cid_to_name") or {}
+    response: Dict[str, Any] = {
+        "stage": "lineage",
+        "roots": forward_tree.get("roots", []),
+        "children_map": forward_tree.get("children_map", {}),
+        "leaf_serials": forward_tree.get("leaf_serials", {}),
+        "names": {cid: name for cid, name in cid_to_name.items() if name},
+        "total_nodes": forward_tree.get("total_nodes", 0),
+    }
     cache_set(lineage_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
     return jsonify(response)
 

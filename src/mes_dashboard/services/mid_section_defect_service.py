@@ -583,7 +583,8 @@ def _resolve_full_genealogy(
     tmtt_names: Dict[str, str],
 ) -> Dict[str, Set[str]]:
     """Resolve full genealogy for TMTT lots via shared LineageEngine."""
-    ancestors = LineageEngine.resolve_full_genealogy(tmtt_cids, tmtt_names)
+    result = LineageEngine.resolve_full_genealogy(tmtt_cids, tmtt_names)
+    ancestors = result.get("ancestors", {}) if isinstance(result, dict) else result
     _log_genealogy_summary(ancestors, tmtt_cids, 0)
     return ancestors
 

@@ -2,8 +2,7 @@
   "mode": "block",
   "errors": [],
   "warnings": [
-    "/excel-query uses shell tokens without fallback ['--portal-brand-end', '--portal-brand-start', '--portal-shadow-panel'] in frontend/src/excel-query/style.css with approved exception",
-    "/query-tool uses shell tokens without fallback ['--portal-brand-end', '--portal-brand-start', '--portal-shadow-panel'] in frontend/src/query-tool/style.css with approved exception"
+    "/excel-query uses shell tokens without fallback ['--portal-shadow-panel'] in frontend/src/excel-query/style.css with approved exception"
   ],
   "info": [],
   "passed": true
