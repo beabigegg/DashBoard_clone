@@ -40,6 +40,59 @@ class TestRejectHistoryPageRoute(unittest.TestCase):
 
 
 class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
+    @patch('mes_dashboard.routes.reject_history_routes.get_filter_options')
+    @patch('mes_dashboard.routes.reject_history_routes.cache_get')
+    def test_options_uses_cache_hit_without_service_call(self, mock_cache_get, mock_options):
+        mock_cache_get.return_value = {
+            'success': True,
+            'data': {'workcenter_groups': [], 'packages': [], 'reasons': []},
+            'meta': {'include_excluded_scrap': False},
+        }
+
+        response = self.client.get(
+            '/api/reject-history/options?start_date=2026-02-01&end_date=2026-02-07'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        self.assertIn('data', payload)
+        mock_options.assert_not_called()
+
+    @patch('mes_dashboard.routes.reject_history_routes.get_filter_options')
+    def test_options_passes_full_draft_filters(self, mock_options):
+        mock_options.return_value = {
+            'workcenter_groups': [],
+            'packages': [],
+            'reasons': [],
+            'meta': {},
+        }
+
+        response = self.client.get(
+            '/api/reject-history/options'
+            '?start_date=2026-02-01'
+            '&end_date=2026-02-07'
+            '&workcenter_groups=WB'
+            '&workcenter_groups=TEST'
+            '&packages=PKG-A'
+            '&reasons=001_A'
+            '&reason=002_B'
+            '&include_excluded_scrap=true'
+            '&exclude_material_scrap=false'
+            '&exclude_pb_diode=true'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        _, kwargs = mock_options.call_args
+        self.assertEqual(kwargs['workcenter_groups'], ['WB', 'TEST'])
+        self.assertEqual(kwargs['packages'], ['PKG-A'])
+        self.assertEqual(kwargs['reasons'], ['001_A', '002_B'])
+        self.assertIs(kwargs['include_excluded_scrap'], True)
+        self.assertIs(kwargs['exclude_material_scrap'], False)
+        self.assertIs(kwargs['exclude_pb_diode'], True)
+
     def test_summary_missing_dates_returns_400(self):
         response = self.client.get('/api/reject-history/summary')
         payload = json.loads(response.data)

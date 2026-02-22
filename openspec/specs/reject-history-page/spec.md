@@ -4,7 +4,7 @@
 TBD - created by archiving change reject-history-query-page. Update Purpose after archive.
 ## Requirements
 ### Requirement: Reject History page SHALL provide filterable historical query controls
-The page SHALL provide a filter area for date range and major production dimensions to drive all report sections.
+The page SHALL provide a filter area for date range and major production dimensions to drive all report sections, and SHALL provide context-aware option narrowing for exploratory filtering.
 
 #### Scenario: Default filter values
 - **WHEN** the page is first loaded
@@ -22,6 +22,21 @@ The page SHALL provide a filter area for date range and major production dimensi
 - **THEN** it SHALL include `start_date/end_date` time filter controls
 - **THEN** it SHALL include reason filter control
 - **THEN** it SHALL include `WORKCENTER_GROUP` filter control
+
+#### Scenario: Draft filter options are interdependent
+- **WHEN** user changes draft values for `WORKCENTER_GROUP`, `package`, `reason`, or policy toggles
+- **THEN** option candidates for reason/workcenter-group/package SHALL reload under the current draft context
+- **THEN** unavailable combinations SHALL NOT remain in selectable options
+
+#### Scenario: Policy toggles affect option scope
+- **WHEN** user changes policy toggles (including excluded-scrap and material-scrap switches)
+- **THEN** options and query results SHALL use the same policy mode
+- **THEN** option narrowing SHALL remain consistent with backend exclusion semantics
+
+#### Scenario: Invalid selected values are pruned
+- **WHEN** narrowed options no longer contain previously selected values
+- **THEN** invalid selections SHALL be removed automatically before query commit
+- **THEN** apply/query SHALL only send valid selected values
 
 ### Requirement: Reject History page SHALL expose yield-exclusion toggle control
 The page SHALL let users decide whether to include policy-marked scrap in yield calculations.
@@ -139,4 +154,3 @@ The page SHALL keep the same semantic grouping across desktop and mobile layouts
 - **WHEN** viewport width is below responsive breakpoint
 - **THEN** cards and chart panels SHALL stack in a single column
 - **THEN** filter controls SHALL remain operable without horizontal overflow
-

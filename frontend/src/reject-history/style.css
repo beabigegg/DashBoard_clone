@@ -266,10 +266,34 @@
   overflow: auto;
 }
 
-.detail-table .cell-wrap {
-  white-space: normal;
-  max-width: 220px;
-  word-break: break-all;
+.detail-table .cell-nowrap {
+  white-space: nowrap;
+}
+
+.detail-table .col-left {
+  text-align: left;
+}
+
+.detail-table .th-expandable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.detail-table .th-expandable:hover {
+  background: #eef2f7;
+}
+
+.detail-table .expand-icon {
+  font-size: 10px;
+  margin-left: 2px;
+  color: #64748b;
+}
+
+.detail-table .th-sub,
+.detail-table .td-sub {
+  background: #f8fafc;
+  font-size: 11px;
+  color: #475569;
 }
 
 .detail-reason-badge {

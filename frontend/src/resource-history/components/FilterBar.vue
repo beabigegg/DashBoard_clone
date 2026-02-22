@@ -30,7 +30,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['update-filters', 'query']);
+const emit = defineEmits(['update-filters', 'query', 'clear']);
 
 function updateFilters(patch) {
   emit('update-filters', {
@@ -148,6 +148,7 @@ function updateFilters(patch) {
         </div>
 
         <button type="button" class="btn btn-primary" :disabled="loading" @click="$emit('query')">查詢</button>
+        <button type="button" class="btn btn-secondary" :disabled="loading" @click="$emit('clear')">清除條件</button>
       </div>
     </div>
   </section>

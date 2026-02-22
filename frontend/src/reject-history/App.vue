@@ -1,7 +1,13 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 
 import { apiGet } from '../core/api.js';
+import {
+  buildRejectCommonQueryParams,
+  buildRejectOptionsRequestParams,
+  pruneRejectFilterSelections,
+  toRejectFilterSnapshot,
+} from '../core/reject-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
 import DetailTable from './components/DetailTable.vue';
@@ -12,18 +18,19 @@ import TrendChart from './components/TrendChart.vue';
 
 const API_TIMEOUT = 60000;
 const DEFAULT_PER_PAGE = 50;
+const OPTIONS_DEBOUNCE_MS = 300;
 
-const filters = reactive({
-  startDate: '',
-  endDate: '',
-  workcenterGroups: [],
-  packages: [],
-  reason: '',
-  includeExcludedScrap: false,
-  excludeMaterialScrap: true,
-  excludePbDiode: true,
-  paretoTop80: true,
-});
+function createDefaultFilters() {
+  return toRejectFilterSnapshot({
+    includeExcludedScrap: false,
+    excludeMaterialScrap: true,
+    excludePbDiode: true,
+    paretoTop80: true,
+  });
+}
+
+const draftFilters = reactive(createDefaultFilters());
+const committedFilters = reactive(createDefaultFilters());
 
 const page = ref(1);
 const detailReason = ref('');
@@ -67,6 +74,7 @@ const loading = reactive({
 });
 
 const errorMessage = ref('');
+const autoPruneHint = ref('');
 const lastQueryAt = ref('');
 const lastPolicyMeta = ref({
   include_excluded_scrap: false,
@@ -74,15 +82,30 @@ const lastPolicyMeta = ref({
   excluded_reason_count: 0,
 });
 
-let activeRequestId = 0;
+const draftWatchReady = ref(false);
 
-function nextRequestId() {
-  activeRequestId += 1;
-  return activeRequestId;
+let activeDataRequestId = 0;
+let activeOptionsRequestId = 0;
+let optionsDebounceHandle = null;
+let suppressDraftOptionReload = false;
+let lastLoadedOptionsSignature = '';
+
+function nextDataRequestId() {
+  activeDataRequestId += 1;
+  return activeDataRequestId;
 }
 
-function isStaleRequest(requestId) {
-  return requestId !== activeRequestId;
+function isStaleDataRequest(requestId) {
+  return requestId !== activeDataRequestId;
+}
+
+function nextOptionsRequestId() {
+  activeOptionsRequestId += 1;
+  return activeOptionsRequestId;
+}
+
+function isStaleOptionsRequest(requestId) {
+  return requestId !== activeOptionsRequestId;
 }
 
 function toDateString(value) {
@@ -92,14 +115,42 @@ function toDateString(value) {
   return `${y}-${m}-${d}`;
 }
 
-function setDefaultDateRange() {
+function setDefaultDateRange(target) {
   const today = new Date();
   const end = new Date(today);
   end.setDate(end.getDate() - 1);
   const start = new Date(end);
   start.setDate(start.getDate() - 29);
-  filters.startDate = toDateString(start);
-  filters.endDate = toDateString(end);
+  target.startDate = toDateString(start);
+  target.endDate = toDateString(end);
+}
+
+function assignFilterState(target, source) {
+  const snapshot = toRejectFilterSnapshot(source);
+  target.startDate = snapshot.startDate;
+  target.endDate = snapshot.endDate;
+  target.workcenterGroups = [...snapshot.workcenterGroups];
+  target.packages = [...snapshot.packages];
+  target.reason = snapshot.reason;
+  target.includeExcludedScrap = snapshot.includeExcludedScrap;
+  target.excludeMaterialScrap = snapshot.excludeMaterialScrap;
+  target.excludePbDiode = snapshot.excludePbDiode;
+  target.paretoTop80 = snapshot.paretoTop80;
+}
+
+function resetToDefaultFilters(target) {
+  const defaults = createDefaultFilters();
+  setDefaultDateRange(defaults);
+  assignFilterState(target, defaults);
+}
+
+function runWithDraftReloadSuppressed(callback) {
+  suppressDraftOptionReload = true;
+  try {
+    callback();
+  } finally {
+    suppressDraftOptionReload = false;
+  }
 }
 
 function readArrayParam(params, key) {
@@ -121,29 +172,29 @@ function readBooleanParam(params, key, defaultValue = false) {
   return ['1', 'true', 'yes', 'y', 'on'].includes(value);
 }
 
-function restoreFromUrl() {
+function restoreCommittedFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const startDate = String(params.get('start_date') || '').trim();
   const endDate = String(params.get('end_date') || '').trim();
 
   if (startDate && endDate) {
-    filters.startDate = startDate;
-    filters.endDate = endDate;
+    committedFilters.startDate = startDate;
+    committedFilters.endDate = endDate;
   }
 
   const wcGroups = readArrayParam(params, 'workcenter_groups');
   if (wcGroups.length > 0) {
-    filters.workcenterGroups = wcGroups;
+    committedFilters.workcenterGroups = wcGroups;
   }
 
   const packages = readArrayParam(params, 'packages');
   if (packages.length > 0) {
-    filters.packages = packages;
+    committedFilters.packages = packages;
   }
 
   const reason = String(params.get('reason') || '').trim();
   if (reason) {
-    filters.reason = reason;
+    committedFilters.reason = reason;
   }
   const detailReasonFromUrl = String(params.get('detail_reason') || '').trim();
   if (detailReasonFromUrl) {
@@ -154,38 +205,44 @@ function restoreFromUrl() {
     selectedTrendDates.value = trendDates;
   }
 
-  filters.includeExcludedScrap = readBooleanParam(params, 'include_excluded_scrap', false);
-  filters.excludeMaterialScrap = readBooleanParam(params, 'exclude_material_scrap', true);
-  filters.excludePbDiode = readBooleanParam(params, 'exclude_pb_diode', true);
-  filters.paretoTop80 = !readBooleanParam(params, 'pareto_scope_all', false);
+  committedFilters.includeExcludedScrap = readBooleanParam(params, 'include_excluded_scrap', false);
+  committedFilters.excludeMaterialScrap = readBooleanParam(params, 'exclude_material_scrap', true);
+  committedFilters.excludePbDiode = readBooleanParam(params, 'exclude_pb_diode', true);
+  committedFilters.paretoTop80 = !readBooleanParam(params, 'pareto_scope_all', false);
 
   const parsedPage = Number(params.get('page') || '1');
   page.value = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 }
 
+function appendArrayParams(params, key, values) {
+  for (const value of values || []) {
+    params.append(key, value);
+  }
+}
+
 function updateUrlState() {
   const params = new URLSearchParams();
 
-  params.set('start_date', filters.startDate);
-  params.set('end_date', filters.endDate);
-  filters.workcenterGroups.forEach((item) => params.append('workcenter_groups', item));
-  filters.packages.forEach((item) => params.append('packages', item));
+  params.set('start_date', committedFilters.startDate);
+  params.set('end_date', committedFilters.endDate);
+  appendArrayParams(params, 'workcenter_groups', committedFilters.workcenterGroups);
+  appendArrayParams(params, 'packages', committedFilters.packages);
 
-  if (filters.reason) {
-    params.set('reason', filters.reason);
+  if (committedFilters.reason) {
+    params.set('reason', committedFilters.reason);
   }
   if (detailReason.value) {
     params.set('detail_reason', detailReason.value);
   }
-  selectedTrendDates.value.forEach((d) => params.append('trend_dates', d));
+  appendArrayParams(params, 'trend_dates', selectedTrendDates.value);
 
-  if (filters.includeExcludedScrap) {
+  if (committedFilters.includeExcludedScrap) {
     params.set('include_excluded_scrap', 'true');
   }
-  params.set('exclude_material_scrap', String(filters.excludeMaterialScrap));
-  params.set('exclude_pb_diode', String(filters.excludePbDiode));
+  params.set('exclude_material_scrap', String(committedFilters.excludeMaterialScrap));
+  params.set('exclude_pb_diode', String(committedFilters.excludePbDiode));
 
-  if (!filters.paretoTop80) {
+  if (!committedFilters.paretoTop80) {
     params.set('pareto_scope_all', 'true');
   }
 
@@ -206,26 +263,12 @@ function unwrapApiResult(result, fallbackMessage) {
   return result;
 }
 
-function buildCommonParams({ reason = filters.reason } = {}) {
-  const params = {
-    start_date: filters.startDate,
-    end_date: filters.endDate,
-    workcenter_groups: filters.workcenterGroups,
-    packages: filters.packages,
-    include_excluded_scrap: filters.includeExcludedScrap,
-    exclude_material_scrap: filters.excludeMaterialScrap,
-    exclude_pb_diode: filters.excludePbDiode,
-  };
-
-  if (reason) {
-    params.reasons = [reason];
-  }
-
-  return params;
+function buildCommonParams({ reason = committedFilters.reason } = {}) {
+  return buildRejectCommonQueryParams(committedFilters, { reason });
 }
 
 function buildListParams() {
-  const effectiveReason = detailReason.value || filters.reason;
+  const effectiveReason = detailReason.value || committedFilters.reason;
   const params = {
     ...buildCommonParams({ reason: effectiveReason }),
     page: page.value,
@@ -239,15 +282,9 @@ function buildListParams() {
   return params;
 }
 
-async function fetchOptions() {
+async function fetchDraftOptions() {
   const response = await apiGet('/api/reject-history/options', {
-    params: {
-      start_date: filters.startDate,
-      end_date: filters.endDate,
-      include_excluded_scrap: filters.includeExcludedScrap,
-      exclude_material_scrap: filters.excludeMaterialScrap,
-      exclude_pb_diode: filters.excludePbDiode,
-    },
+    params: buildRejectOptionsRequestParams(draftFilters),
     timeout: API_TIMEOUT,
   });
   const payload = unwrapApiResult(response, '載入篩選選項失敗');
@@ -283,37 +320,144 @@ function mergePolicyMeta(meta) {
   };
 }
 
-function normalizeFiltersByOptions() {
-  if (filters.reason && !options.reasons.includes(filters.reason)) {
-    filters.reason = '';
-  }
+function applyOptionsPayload(payload) {
+  options.workcenterGroups = Array.isArray(payload?.workcenter_groups)
+    ? payload.workcenter_groups
+    : [];
+  options.reasons = Array.isArray(payload?.reasons)
+    ? payload.reasons
+    : [];
+  options.packages = Array.isArray(payload?.packages)
+    ? payload.packages
+    : [];
+}
 
-  if (filters.packages.length > 0) {
-    const packageSet = new Set(options.packages);
-    filters.packages = filters.packages.filter((pkg) => packageSet.has(pkg));
+function formatPruneHint(removed) {
+  const parts = [];
+  if (removed.workcenterGroups.length > 0) {
+    parts.push(`WORKCENTER GROUP: ${removed.workcenterGroups.join(', ')}`);
+  }
+  if (removed.packages.length > 0) {
+    parts.push(`Package: ${removed.packages.join(', ')}`);
+  }
+  if (removed.reason) {
+    parts.push(`原因: ${removed.reason}`);
+  }
+  if (parts.length === 0) {
+    return '';
+  }
+  return `已自動清除失效篩選：${parts.join('；')}`;
+}
+
+function pruneDraftByCurrentOptions({ showHint = true } = {}) {
+  const result = pruneRejectFilterSelections(draftFilters, options);
+  if (result.removedCount > 0) {
+    runWithDraftReloadSuppressed(() => {
+      assignFilterState(draftFilters, result.filters);
+    });
+    if (showHint) {
+      autoPruneHint.value = formatPruneHint(result.removed);
+    }
+  }
+  return result;
+}
+
+function commitDraftFilters() {
+  const result = pruneDraftByCurrentOptions({ showHint: true });
+  assignFilterState(committedFilters, draftFilters);
+  return result;
+}
+
+function clearOptionsDebounce() {
+  if (optionsDebounceHandle) {
+    clearTimeout(optionsDebounceHandle);
+    optionsDebounceHandle = null;
   }
 }
 
-async function loadAllData({ loadOptions = true } = {}) {
-  const requestId = nextRequestId();
+async function reloadDraftOptions() {
+  if (!draftFilters.startDate || !draftFilters.endDate) {
+    return;
+  }
+  const signature = draftOptionsSignature.value;
+  const requestId = nextOptionsRequestId();
+  loading.options = true;
+
+  try {
+    const payload = await fetchDraftOptions();
+    if (isStaleOptionsRequest(requestId)) {
+      return;
+    }
+
+    applyOptionsPayload(payload);
+    lastLoadedOptionsSignature = signature;
+    const pruneResult = pruneDraftByCurrentOptions({ showHint: true });
+    if (pruneResult.removedCount > 0) {
+      scheduleOptionsReload();
+    }
+  } catch (error) {
+    if (isStaleOptionsRequest(requestId)) {
+      return;
+    }
+    errorMessage.value = error?.message || '載入篩選選項失敗';
+  } finally {
+    if (isStaleOptionsRequest(requestId)) {
+      return;
+    }
+    loading.options = false;
+  }
+}
+
+function scheduleOptionsReload() {
+  if (!draftWatchReady.value || suppressDraftOptionReload) {
+    return;
+  }
+  clearOptionsDebounce();
+  optionsDebounceHandle = setTimeout(() => {
+    optionsDebounceHandle = null;
+    void reloadDraftOptions();
+  }, OPTIONS_DEBOUNCE_MS);
+}
+
+const draftOptionsSignature = computed(() => {
+  return JSON.stringify({
+    startDate: draftFilters.startDate,
+    endDate: draftFilters.endDate,
+    workcenterGroups: draftFilters.workcenterGroups,
+    packages: draftFilters.packages,
+    reason: draftFilters.reason,
+    includeExcludedScrap: draftFilters.includeExcludedScrap,
+    excludeMaterialScrap: draftFilters.excludeMaterialScrap,
+    excludePbDiode: draftFilters.excludePbDiode,
+  });
+});
+
+watch(draftOptionsSignature, () => {
+  scheduleOptionsReload();
+});
+
+async function ensureDraftOptionsFresh() {
+  clearOptionsDebounce();
+  const signature = draftOptionsSignature.value;
+  if (signature !== lastLoadedOptionsSignature) {
+    await reloadDraftOptions();
+    return;
+  }
+  pruneDraftByCurrentOptions({ showHint: true });
+}
+
+async function loadDataSections() {
+  const requestId = nextDataRequestId();
 
   loading.querying = true;
   loading.list = true;
   errorMessage.value = '';
 
   try {
-    const tasks = [fetchAnalytics(), fetchList()];
-    if (loadOptions) {
-      loading.options = true;
-      tasks.push(fetchOptions());
-    }
-
-    const responses = await Promise.all(tasks);
-    if (isStaleRequest(requestId)) {
+    const [analyticsResp, listResp] = await Promise.all([fetchAnalytics(), fetchList()]);
+    if (isStaleDataRequest(requestId)) {
       return;
     }
-
-    const [analyticsResp, listResp, optionsResp] = responses;
 
     const analyticsData = analyticsResp.data || {};
     summary.value = analyticsData.summary || summary.value;
@@ -327,83 +471,70 @@ async function loadAllData({ loadOptions = true } = {}) {
     };
     mergePolicyMeta(meta);
 
-    if (loadOptions && optionsResp) {
-      options.workcenterGroups = Array.isArray(optionsResp.workcenter_groups)
-        ? optionsResp.workcenter_groups
-        : [];
-      options.reasons = Array.isArray(optionsResp.reasons)
-        ? optionsResp.reasons
-        : [];
-      options.packages = Array.isArray(optionsResp.packages)
-        ? optionsResp.packages
-        : [];
-      normalizeFiltersByOptions();
-    }
-
     lastQueryAt.value = new Date().toLocaleString('zh-TW');
     updateUrlState();
   } catch (error) {
-    if (isStaleRequest(requestId)) {
+    if (isStaleDataRequest(requestId)) {
       return;
     }
     errorMessage.value = error?.message || '載入資料失敗';
   } finally {
-    if (isStaleRequest(requestId)) {
+    if (isStaleDataRequest(requestId)) {
       return;
     }
     loading.initial = false;
     loading.querying = false;
-    loading.options = false;
     loading.list = false;
   }
 }
 
 async function loadListOnly() {
-  const requestId = nextRequestId();
+  const requestId = nextDataRequestId();
   loading.list = true;
   errorMessage.value = '';
 
   try {
     const listResp = await fetchList();
-    if (isStaleRequest(requestId)) {
+    if (isStaleDataRequest(requestId)) {
       return;
     }
     detail.value = listResp.data || detail.value;
     mergePolicyMeta(listResp.meta || {});
     updateUrlState();
   } catch (error) {
-    if (isStaleRequest(requestId)) {
+    if (isStaleDataRequest(requestId)) {
       return;
     }
     errorMessage.value = error?.message || '載入明細資料失敗';
   } finally {
-    if (isStaleRequest(requestId)) {
+    if (isStaleDataRequest(requestId)) {
       return;
     }
     loading.list = false;
   }
 }
 
-function applyFilters() {
+async function applyFilters() {
   page.value = 1;
   detailReason.value = '';
   selectedTrendDates.value = [];
-  void loadAllData({ loadOptions: true });
+  await ensureDraftOptionsFresh();
+  commitDraftFilters();
+  await loadDataSections();
 }
 
-function clearFilters() {
-  setDefaultDateRange();
-  filters.workcenterGroups = [];
-  filters.packages = [];
-  filters.reason = '';
+async function clearFilters() {
+  runWithDraftReloadSuppressed(() => {
+    resetToDefaultFilters(draftFilters);
+  });
+  autoPruneHint.value = '';
   detailReason.value = '';
   selectedTrendDates.value = [];
-  filters.includeExcludedScrap = false;
-  filters.excludeMaterialScrap = true;
-  filters.excludePbDiode = true;
-  filters.paretoTop80 = true;
   page.value = 1;
-  void loadAllData({ loadOptions: true });
+  lastLoadedOptionsSignature = '';
+  await ensureDraftOptionsFresh();
+  commitDraftFilters();
+  await loadDataSections();
 }
 
 function goToPage(nextPage) {
@@ -443,54 +574,70 @@ function onParetoClick(reason) {
 }
 
 function handleParetoScopeToggle(checked) {
-  filters.paretoTop80 = Boolean(checked);
+  const value = Boolean(checked);
+  runWithDraftReloadSuppressed(() => {
+    draftFilters.paretoTop80 = value;
+  });
+  committedFilters.paretoTop80 = value;
   updateUrlState();
 }
 
-function removeFilterChip(chip) {
+async function removeFilterChip(chip) {
   if (!chip?.removable) {
     return;
   }
 
-  if (chip.type === 'reason') {
-    filters.reason = '';
-    detailReason.value = '';
-  } else if (chip.type === 'workcenter') {
-    filters.workcenterGroups = filters.workcenterGroups.filter((item) => item !== chip.value);
-  } else if (chip.type === 'package') {
-    filters.packages = filters.packages.filter((item) => item !== chip.value);
-  } else if (chip.type === 'detail-reason') {
+  if (chip.type === 'detail-reason') {
     detailReason.value = '';
     page.value = 1;
-    void loadListOnly();
+    await loadListOnly();
     return;
-  } else if (chip.type === 'trend-dates') {
+  }
+
+  if (chip.type === 'trend-dates') {
     selectedTrendDates.value = [];
     page.value = 1;
-    void loadListOnly();
+    await loadListOnly();
     return;
+  }
+
+  const nextFilters = toRejectFilterSnapshot(committedFilters);
+  if (chip.type === 'reason') {
+    nextFilters.reason = '';
+    detailReason.value = '';
+  } else if (chip.type === 'workcenter') {
+    nextFilters.workcenterGroups = nextFilters.workcenterGroups.filter((item) => item !== chip.value);
+  } else if (chip.type === 'package') {
+    nextFilters.packages = nextFilters.packages.filter((item) => item !== chip.value);
   } else {
     return;
   }
 
+  runWithDraftReloadSuppressed(() => {
+    assignFilterState(draftFilters, nextFilters);
+  });
+  assignFilterState(committedFilters, nextFilters);
+
   page.value = 1;
-  void loadAllData({ loadOptions: false });
+  lastLoadedOptionsSignature = '';
+  await ensureDraftOptionsFresh();
+  commitDraftFilters();
+  await loadDataSections();
 }
 
 function exportCsv() {
+  const effectiveReason = detailReason.value || committedFilters.reason;
+  const queryParams = buildRejectCommonQueryParams(committedFilters, { reason: effectiveReason });
   const params = new URLSearchParams();
-  params.set('start_date', filters.startDate);
-  params.set('end_date', filters.endDate);
-  params.set('include_excluded_scrap', String(filters.includeExcludedScrap));
-  params.set('exclude_material_scrap', String(filters.excludeMaterialScrap));
-  params.set('exclude_pb_diode', String(filters.excludePbDiode));
 
-  filters.workcenterGroups.forEach((item) => params.append('workcenter_groups', item));
-  filters.packages.forEach((item) => params.append('packages', item));
-  const effectiveReason = detailReason.value || filters.reason;
-  if (effectiveReason) {
-    params.append('reasons', effectiveReason);
-  }
+  params.set('start_date', queryParams.start_date);
+  params.set('end_date', queryParams.end_date);
+  params.set('include_excluded_scrap', String(queryParams.include_excluded_scrap));
+  params.set('exclude_material_scrap', String(queryParams.exclude_material_scrap));
+  params.set('exclude_pb_diode', String(queryParams.exclude_pb_diode));
+  appendArrayParams(params, 'workcenter_groups', queryParams.workcenter_groups || []);
+  appendArrayParams(params, 'packages', queryParams.packages || []);
+  appendArrayParams(params, 'reasons', queryParams.reasons || []);
 
   window.location.href = `/api/reject-history/export?${params.toString()}`;
 }
@@ -571,7 +718,7 @@ const allParetoItems = computed(() => {
 
 const filteredParetoItems = computed(() => {
   const items = allParetoItems.value || [];
-  if (!filters.paretoTop80 || items.length === 0) {
+  if (!committedFilters.paretoTop80 || items.length === 0) {
     return items;
   }
   const top = items.filter((item) => Number(item.cumPct || 0) <= 80);
@@ -582,41 +729,41 @@ const activeFilterChips = computed(() => {
   const chips = [
     {
       key: 'date-range',
-      label: `日期: ${filters.startDate || '-'} ~ ${filters.endDate || '-'}`,
+      label: `日期: ${committedFilters.startDate || '-'} ~ ${committedFilters.endDate || '-'}`,
       removable: false,
       type: 'date',
       value: '',
     },
     {
       key: 'policy-mode',
-      label: filters.includeExcludedScrap ? '政策: 納入不計良率報廢' : '政策: 排除不計良率報廢',
+      label: committedFilters.includeExcludedScrap ? '政策: 納入不計良率報廢' : '政策: 排除不計良率報廢',
       removable: false,
       type: 'policy',
       value: '',
     },
     {
       key: 'material-policy-mode',
-      label: filters.excludeMaterialScrap ? '原物料: 已排除' : '原物料: 已納入',
+      label: committedFilters.excludeMaterialScrap ? '原物料: 已排除' : '原物料: 已納入',
       removable: false,
       type: 'policy',
       value: '',
     },
     {
       key: 'pb-diode-policy',
-      label: filters.excludePbDiode ? 'PB_Diode: 已排除' : 'PB_Diode: 已納入',
+      label: committedFilters.excludePbDiode ? 'PB_Diode: 已排除' : 'PB_Diode: 已納入',
       removable: false,
       type: 'policy',
       value: '',
     },
   ];
 
-  if (filters.reason) {
+  if (committedFilters.reason) {
     chips.push({
-      key: `reason:${filters.reason}`,
-      label: `原因: ${filters.reason}`,
+      key: `reason:${committedFilters.reason}`,
+      label: `原因: ${committedFilters.reason}`,
       removable: true,
       type: 'reason',
-      value: filters.reason,
+      value: committedFilters.reason,
     });
   }
   if (selectedTrendDates.value.length > 0) {
@@ -642,7 +789,7 @@ const activeFilterChips = computed(() => {
     });
   }
 
-  filters.workcenterGroups.forEach((group) => {
+  committedFilters.workcenterGroups.forEach((group) => {
     chips.push({
       key: `workcenter:${group}`,
       label: `WC: ${group}`,
@@ -652,7 +799,7 @@ const activeFilterChips = computed(() => {
     });
   });
 
-  filters.packages.forEach((pkg) => {
+  committedFilters.packages.forEach((pkg) => {
     chips.push({
       key: `package:${pkg}`,
       label: `Package: ${pkg}`,
@@ -683,10 +830,22 @@ const pagination = computed(() => detail.value?.pagination || {
   totalPages: 1,
 });
 
-onMounted(() => {
-  setDefaultDateRange();
-  restoreFromUrl();
-  void loadAllData({ loadOptions: true });
+onMounted(async () => {
+  resetToDefaultFilters(committedFilters);
+  restoreCommittedFiltersFromUrl();
+  runWithDraftReloadSuppressed(() => {
+    assignFilterState(draftFilters, committedFilters);
+  });
+
+  lastLoadedOptionsSignature = '';
+  await reloadDraftOptions();
+  commitDraftFilters();
+  draftWatchReady.value = true;
+  await loadDataSections();
+});
+
+onBeforeUnmount(() => {
+  clearOptionsDebounce();
 });
 </script>
 
@@ -698,14 +857,15 @@ onMounted(() => {
       </div>
       <div class="header-right">
         <div class="last-update" v-if="lastQueryAt">更新時間：{{ lastQueryAt }}</div>
-        <button type="button" class="btn btn-light" :disabled="loading.querying" @click="applyFilters">重新整理</button>
+        <button type="button" class="btn btn-light" :disabled="loading.querying || loading.options" @click="applyFilters">重新整理</button>
       </div>
     </header>
 
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
+    <div v-if="autoPruneHint" class="filter-indicator">{{ autoPruneHint }}</div>
 
     <FilterPanel
-      :filters="filters"
+      :filters="draftFilters"
       :options="options"
       :loading="loading"
       :active-filter-chips="activeFilterChips"

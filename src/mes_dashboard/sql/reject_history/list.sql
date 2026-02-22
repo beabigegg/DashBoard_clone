@@ -23,6 +23,7 @@ paged AS (
     OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
 )
 SELECT
+    p.TXN_TIME,
     p.TXN_DAY,
     p.TXN_MONTH,
     p.WORKCENTER_GROUP,

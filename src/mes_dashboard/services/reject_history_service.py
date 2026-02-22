@@ -12,7 +12,6 @@ from typing import Any, Dict, Generator, Iterable, Optional
 import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df
-from mes_dashboard.services.filter_cache import get_workcenter_groups
 from mes_dashboard.services.scrap_reason_exclusion_cache import get_excluded_reasons
 from mes_dashboard.sql import QueryBuilder, SQLLoader
 
@@ -81,6 +80,22 @@ def _to_date_str(value: Any) -> str:
         return ""
     try:
         return pd.to_datetime(text).strftime("%Y-%m-%d")
+    except Exception:
+        return text
+
+
+def _to_datetime_str(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, pd.Timestamp):
+        return value.to_pydatetime().strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    text = _normalize_text(value)
+    if not text:
+        return ""
+    try:
+        return pd.to_datetime(text).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         return text
 
@@ -295,67 +310,85 @@ def _list_to_csv(
         buffer.truncate(0)
 
 
+def _extract_distinct_text_values(df: pd.DataFrame, column: str) -> list[str]:
+    if df is None or df.empty or column not in df.columns:
+        return []
+    return sorted({
+        _normalize_text(value)
+        for value in df[column].dropna()
+        if _normalize_text(value)
+    })
+
+
+def _extract_workcenter_group_options(df: pd.DataFrame) -> list[dict[str, Any]]:
+    if df is None or df.empty or "WORKCENTER_GROUP" not in df.columns:
+        return []
+
+    sequence_by_name: dict[str, int] = {}
+    for _, row in df.iterrows():
+        name = _normalize_text(row.get("WORKCENTER_GROUP"))
+        if not name:
+            continue
+        sequence = _as_int(row.get("WORKCENTERSEQUENCE_GROUP"))
+        if name not in sequence_by_name:
+            sequence_by_name[name] = sequence
+            continue
+        sequence_by_name[name] = min(sequence_by_name[name], sequence)
+
+    ordered_names = sorted(
+        sequence_by_name.keys(),
+        key=lambda item: (sequence_by_name[item], item),
+    )
+    return [{"name": name, "sequence": sequence_by_name[name]} for name in ordered_names]
+
+
+def _has_material_scrap(df: pd.DataFrame) -> bool:
+    if df is None or df.empty or "SCRAP_OBJECTTYPE" not in df.columns:
+        return False
+    return (
+        df["SCRAP_OBJECTTYPE"]
+        .map(lambda value: _normalize_text(value).upper())
+        .eq("MATERIAL")
+        .any()
+    )
+
+
 def get_filter_options(
     *,
     start_date: str,
     end_date: str,
+    workcenter_groups: Optional[list[str]] = None,
+    packages: Optional[list[str]] = None,
+    reasons: Optional[list[str]] = None,
+    categories: Optional[list[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
 ) -> dict[str, Any]:
-    """Return workcenter-group / package / reason options (single DB query)."""
+    """Return options under current draft filter context with one SQL round-trip."""
     _validate_range(start_date, end_date)
 
     where_clause, params, meta = _build_where_clause(
+        workcenter_groups=workcenter_groups,
+        packages=packages,
+        reasons=reasons,
+        categories=categories,
         include_excluded_scrap=include_excluded_scrap,
         exclude_material_scrap=exclude_material_scrap,
         exclude_pb_diode=exclude_pb_diode,
     )
     sql = _prepare_sql("filter_options", where_clause=where_clause)
     df = read_sql_df(sql, _common_params(start_date, end_date, params))
+    if df is None:
+        df = pd.DataFrame()
 
-    reasons: list[str] = []
-    packages: list[str] = []
-    has_material_option = False
-
-    if df is not None and not df.empty:
-        reasons = sorted({
-            _normalize_text(v)
-            for v in df["REASON"].dropna()
-            if _normalize_text(v)
-        })
-        packages = sorted({
-            _normalize_text(v)
-            for v in df["PACKAGE"].dropna()
-            if _normalize_text(v)
-        })
-        if "SCRAP_OBJECTTYPE" in df.columns:
-            has_material_option = (
-                df["SCRAP_OBJECTTYPE"]
-                .apply(lambda v: str(v or "").strip().upper())
-                .eq("MATERIAL")
-                .any()
-            )
-
-    groups_raw = get_workcenter_groups() or []
-    workcenter_groups = []
-    for item in groups_raw:
-        name = _normalize_text(item.get("name"))
-        if not name:
-            continue
-        workcenter_groups.append(
-            {
-                "name": name,
-                "sequence": _as_int(item.get("sequence")),
-            }
-        )
-
-    reason_options = sorted(set(reasons))
-    if has_material_option and MATERIAL_REASON_OPTION not in reason_options:
+    reason_options = _extract_distinct_text_values(df, "REASON")
+    if _has_material_scrap(df) and MATERIAL_REASON_OPTION not in reason_options:
         reason_options.append(MATERIAL_REASON_OPTION)
+
     return {
-        "workcenter_groups": workcenter_groups,
-        "packages": sorted(set(packages)),
+        "workcenter_groups": _extract_workcenter_group_options(df),
+        "packages": _extract_distinct_text_values(df, "PACKAGE"),
         "reasons": reason_options,
         "meta": meta,
     }
@@ -576,6 +609,7 @@ def query_list(
         for _, row in df.iterrows():
             items.append(
                 {
+                    "TXN_TIME": _to_datetime_str(row.get("TXN_TIME")),
                     "TXN_DAY": _to_date_str(row.get("TXN_DAY")),
                     "TXN_MONTH": _normalize_text(row.get("TXN_MONTH")),
                     "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),

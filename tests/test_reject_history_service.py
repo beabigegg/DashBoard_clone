@@ -115,47 +115,66 @@ def test_build_where_clause_include_override_skips_reason_prefix_policy(monkeypa
 
 def test_get_filter_options_includes_packages(monkeypatch):
     monkeypatch.setattr(svc, "get_excluded_reasons", lambda force_refresh=False: set())
-    monkeypatch.setattr(
-        svc,
-        "get_workcenter_groups",
-        lambda: [
-            {"name": "WB", "sequence": 1},
-            {"name": "FA", "sequence": 2},
-        ],
-    )
+    captured: dict = {}
 
-    def _fake_read_sql_df(sql, _params=None):
-        if "AS REASON" in sql:
-            return pd.DataFrame([{"REASON": "R1"}, {"REASON": "R2"}])
-        if "AS PACKAGE" in sql:
-            return pd.DataFrame([{"PACKAGE": "PKG-A"}, {"PACKAGE": "PKG-B"}])
-        return pd.DataFrame()
+    def _fake_read_sql_df(_sql, params=None):
+        captured["params"] = dict(params or {})
+        return pd.DataFrame(
+            [
+                {
+                    "WORKCENTER_GROUP": "WB",
+                    "WORKCENTERSEQUENCE_GROUP": 1,
+                    "REASON": "R1",
+                    "PACKAGE": "PKG-A",
+                    "SCRAP_OBJECTTYPE": "LOT",
+                },
+                {
+                    "WORKCENTER_GROUP": "FA",
+                    "WORKCENTERSEQUENCE_GROUP": 5,
+                    "REASON": "R2",
+                    "PACKAGE": "PKG-B",
+                    "SCRAP_OBJECTTYPE": "LOT",
+                },
+            ]
+        )
 
     monkeypatch.setattr(svc, "read_sql_df", _fake_read_sql_df)
 
     result = svc.get_filter_options(
         start_date="2026-02-01",
         end_date="2026-02-07",
+        workcenter_groups=["WB"],
+        packages=["PKG-A"],
+        reasons=["R1"],
         include_excluded_scrap=False,
     )
 
     assert result["reasons"] == ["R1", "R2"]
     assert result["packages"] == ["PKG-A", "PKG-B"]
     assert result["workcenter_groups"][0]["name"] == "WB"
+    assert result["workcenter_groups"][1]["name"] == "FA"
+
+    assert captured["params"]["start_date"] == "2026-02-01"
+    assert captured["params"]["end_date"] == "2026-02-07"
+    assert "WB" in captured["params"].values()
+    assert "PKG-A" in captured["params"].values()
+    assert "R1" in captured["params"].values()
 
 
 def test_get_filter_options_appends_material_reason_option(monkeypatch):
     monkeypatch.setattr(svc, "get_excluded_reasons", lambda force_refresh=False: set())
-    monkeypatch.setattr(svc, "get_workcenter_groups", lambda: [])
-
-    def _fake_read_sql_df(sql, _params=None):
-        if "AS REASON" in sql:
-            return pd.DataFrame([{"REASON": "001_TEST"}])
-        if "AS PACKAGE" in sql:
-            return pd.DataFrame([{"PACKAGE": "PKG-A"}])
-        if "AS HAS_MATERIAL" in sql:
-            return pd.DataFrame([{"HAS_MATERIAL": 1}])
-        return pd.DataFrame()
+    def _fake_read_sql_df(_sql, _params=None):
+        return pd.DataFrame(
+            [
+                {
+                    "WORKCENTER_GROUP": "WB",
+                    "WORKCENTERSEQUENCE_GROUP": 1,
+                    "REASON": "001_TEST",
+                    "PACKAGE": "PKG-A",
+                    "SCRAP_OBJECTTYPE": "MATERIAL",
+                }
+            ]
+        )
 
     monkeypatch.setattr(svc, "read_sql_df", _fake_read_sql_df)
 

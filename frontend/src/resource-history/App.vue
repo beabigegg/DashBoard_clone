@@ -1,8 +1,15 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
 import { buildResourceKpiFromHours } from '../core/compute.js';
+import {
+  buildResourceHistoryQueryParams,
+  deriveResourceFamilyOptions,
+  deriveResourceMachineOptions,
+  pruneResourceFilterSelections,
+  toResourceFilterSnapshot,
+} from '../core/resource-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
 import ComparisonChart from './components/ComparisonChart.vue';
@@ -18,17 +25,20 @@ ensureMesApiAvailable();
 const API_TIMEOUT = 60000;
 const MAX_QUERY_DAYS = 730;
 
-const filters = reactive({
-  startDate: '',
-  endDate: '',
-  granularity: 'day',
-  workcenterGroups: [],
-  families: [],
-  machines: [],
-  isProduction: false,
-  isKey: false,
-  isMonitor: false,
-});
+function createDefaultFilters() {
+  return toResourceFilterSnapshot({
+    granularity: 'day',
+    workcenterGroups: [],
+    families: [],
+    machines: [],
+    isProduction: false,
+    isKey: false,
+    isMonitor: false,
+  });
+}
+
+const draftFilters = reactive(createDefaultFilters());
+const committedFilters = reactive(createDefaultFilters());
 
 const options = reactive({
   workcenterGroups: [],
@@ -54,6 +64,19 @@ const loading = reactive({
 const queryError = ref('');
 const detailWarning = ref('');
 const exportMessage = ref('');
+const autoPruneHint = ref('');
+
+const draftWatchReady = ref(false);
+let suppressDraftPrune = false;
+
+function runWithDraftPruneSuppressed(callback) {
+  suppressDraftPrune = true;
+  try {
+    callback();
+  } finally {
+    suppressDraftPrune = false;
+  }
+}
 
 function resetHierarchyState() {
   Object.keys(hierarchyState).forEach((key) => {
@@ -61,7 +84,11 @@ function resetHierarchyState() {
   });
 }
 
-function setDefaultDates() {
+function toDateString(value) {
+  return value.toISOString().slice(0, 10);
+}
+
+function setDefaultDates(target) {
   const today = new Date();
   const endDate = new Date(today);
   endDate.setDate(endDate.getDate() - 1);
@@ -69,12 +96,27 @@ function setDefaultDates() {
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - 6);
 
-  filters.startDate = toDateString(startDate);
-  filters.endDate = toDateString(endDate);
+  target.startDate = toDateString(startDate);
+  target.endDate = toDateString(endDate);
 }
 
-function toDateString(value) {
-  return value.toISOString().slice(0, 10);
+function assignFilterState(target, source) {
+  const snapshot = toResourceFilterSnapshot(source);
+  target.startDate = snapshot.startDate;
+  target.endDate = snapshot.endDate;
+  target.granularity = snapshot.granularity;
+  target.workcenterGroups = [...snapshot.workcenterGroups];
+  target.families = [...snapshot.families];
+  target.machines = [...snapshot.machines];
+  target.isProduction = snapshot.isProduction;
+  target.isKey = snapshot.isKey;
+  target.isMonitor = snapshot.isMonitor;
+}
+
+function resetToDefaultFilters(target) {
+  const defaults = createDefaultFilters();
+  setDefaultDates(defaults);
+  assignFilterState(target, defaults);
 }
 
 function unwrapApiResult(result, fallbackMessage) {
@@ -94,31 +136,31 @@ function mergeComputedKpi(source) {
   };
 }
 
-function buildQueryString() {
+function appendArrayParams(params, key, values) {
+  for (const value of values || []) {
+    params.append(key, value);
+  }
+}
+
+function buildQueryStringFromFilters(filters) {
+  const queryParams = buildResourceHistoryQueryParams(filters);
   const params = new URLSearchParams();
 
-  params.append('start_date', filters.startDate);
-  params.append('end_date', filters.endDate);
-  params.append('granularity', filters.granularity);
+  params.append('start_date', queryParams.start_date);
+  params.append('end_date', queryParams.end_date);
+  params.append('granularity', queryParams.granularity);
+  appendArrayParams(params, 'workcenter_groups', queryParams.workcenter_groups || []);
+  appendArrayParams(params, 'families', queryParams.families || []);
+  appendArrayParams(params, 'resource_ids', queryParams.resource_ids || []);
 
-  filters.workcenterGroups.forEach((group) => {
-    params.append('workcenter_groups', group);
-  });
-  filters.families.forEach((family) => {
-    params.append('families', family);
-  });
-  filters.machines.forEach((machine) => {
-    params.append('resource_ids', machine);
-  });
-
-  if (filters.isProduction) {
-    params.append('is_production', '1');
+  if (queryParams.is_production) {
+    params.append('is_production', queryParams.is_production);
   }
-  if (filters.isKey) {
-    params.append('is_key', '1');
+  if (queryParams.is_key) {
+    params.append('is_key', queryParams.is_key);
   }
-  if (filters.isMonitor) {
-    params.append('is_monitor', '1');
+  if (queryParams.is_monitor) {
+    params.append('is_monitor', queryParams.is_monitor);
   }
 
   return params.toString();
@@ -140,9 +182,9 @@ function readBooleanParam(params, key) {
   return value === '1' || value === 'true' || value === 'yes';
 }
 
-function readInitialFiltersFromUrl() {
+function restoreCommittedFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  return {
+  const next = {
     startDate: String(params.get('start_date') || '').trim(),
     endDate: String(params.get('end_date') || '').trim(),
     granularity: String(params.get('granularity') || '').trim(),
@@ -153,15 +195,37 @@ function readInitialFiltersFromUrl() {
     isKey: readBooleanParam(params, 'is_key'),
     isMonitor: readBooleanParam(params, 'is_monitor'),
   };
+
+  if (next.startDate) {
+    committedFilters.startDate = next.startDate;
+  }
+  if (next.endDate) {
+    committedFilters.endDate = next.endDate;
+  }
+  if (next.granularity) {
+    committedFilters.granularity = next.granularity;
+  }
+  if (next.workcenterGroups.length > 0) {
+    committedFilters.workcenterGroups = next.workcenterGroups;
+  }
+  if (next.families.length > 0) {
+    committedFilters.families = next.families;
+  }
+  if (next.machines.length > 0) {
+    committedFilters.machines = next.machines;
+  }
+  committedFilters.isProduction = next.isProduction;
+  committedFilters.isKey = next.isKey;
+  committedFilters.isMonitor = next.isMonitor;
 }
 
 function updateUrlState() {
-  const queryString = buildQueryString();
+  const queryString = buildQueryStringFromFilters(committedFilters);
   const nextUrl = queryString ? `/resource-history?${queryString}` : '/resource-history';
   replaceRuntimeHistory(nextUrl);
 }
 
-function validateDateRange() {
+function validateDateRange(filters) {
   if (!filters.startDate || !filters.endDate) {
     return '請先設定開始與結束日期';
   }
@@ -200,34 +264,77 @@ async function loadOptions() {
   }
 }
 
-const machineOptions = computed(() => {
-  let list = options.resources;
-  if (filters.workcenterGroups.length > 0) {
-    const gset = new Set(filters.workcenterGroups);
-    list = list.filter((r) => gset.has(r.workcenterGroup));
-  }
-  if (filters.families.length > 0) {
-    const fset = new Set(filters.families);
-    list = list.filter((r) => fset.has(r.family));
-  }
-  if (filters.isProduction) list = list.filter((r) => r.isProduction);
-  if (filters.isKey) list = list.filter((r) => r.isKey);
-  if (filters.isMonitor) list = list.filter((r) => r.isMonitor);
-  return list
-    .map((r) => ({ label: r.name, value: r.id }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+const familyOptions = computed(() => {
+  return deriveResourceFamilyOptions(options.resources, draftFilters);
 });
 
-function pruneInvalidMachines() {
-  const validIds = new Set(machineOptions.value.map((m) => m.value));
-  filters.machines = filters.machines.filter((m) => validIds.has(m));
+const machineOptions = computed(() => {
+  return deriveResourceMachineOptions(options.resources, draftFilters);
+});
+
+const filterBarOptions = computed(() => {
+  return {
+    workcenterGroups: options.workcenterGroups,
+    families: familyOptions.value,
+  };
+});
+
+function formatPruneHint(removed) {
+  const parts = [];
+  if (removed.families.length > 0) {
+    parts.push(`型號: ${removed.families.join(', ')}`);
+  }
+  if (removed.machines.length > 0) {
+    parts.push(`機台: ${removed.machines.join(', ')}`);
+  }
+  if (parts.length === 0) {
+    return '';
+  }
+  return `已自動清除失效篩選：${parts.join('；')}`;
 }
 
-async function executeQuery() {
-  updateUrlState();
-  const validationError = validateDateRange();
+function pruneDraftSelections({ showHint = true } = {}) {
+  const result = pruneResourceFilterSelections(draftFilters, {
+    familyOptions: familyOptions.value,
+    machineOptions: machineOptions.value,
+  });
+  if (result.removedCount > 0) {
+    runWithDraftPruneSuppressed(() => {
+      draftFilters.families = [...result.filters.families];
+      draftFilters.machines = [...result.filters.machines];
+    });
+    if (showHint) {
+      autoPruneHint.value = formatPruneHint(result.removed);
+    }
+  }
+  return result;
+}
+
+const pruneSignature = computed(() => {
+  return JSON.stringify({
+    workcenterGroups: draftFilters.workcenterGroups,
+    families: draftFilters.families,
+    machines: draftFilters.machines,
+    isProduction: draftFilters.isProduction,
+    isKey: draftFilters.isKey,
+    isMonitor: draftFilters.isMonitor,
+    familyOptions: familyOptions.value,
+    machineOptions: machineOptions.value.map((item) => item.value),
+  });
+});
+
+watch(pruneSignature, () => {
+  if (!draftWatchReady.value || suppressDraftPrune) {
+    return;
+  }
+  pruneDraftSelections({ showHint: true });
+});
+
+async function executeCommittedQuery() {
+  const validationError = validateDateRange(committedFilters);
   if (validationError) {
     queryError.value = validationError;
+    loading.initial = false;
     return;
   }
 
@@ -237,7 +344,9 @@ async function executeQuery() {
   exportMessage.value = '';
 
   try {
-    const queryString = buildQueryString();
+    const queryString = buildQueryStringFromFilters(committedFilters);
+    updateUrlState();
+
     const [summaryResponse, detailResponse] = await Promise.all([
       apiGet(`/api/resource/history/summary?${queryString}`, {
         timeout: API_TIMEOUT,
@@ -283,30 +392,31 @@ async function executeQuery() {
   }
 }
 
-function updateFilters(nextFilters) {
-  const upstreamChanged =
-    'workcenterGroups' in nextFilters ||
-    'families' in nextFilters ||
-    'isProduction' in nextFilters ||
-    'isKey' in nextFilters ||
-    'isMonitor' in nextFilters;
-
-  filters.startDate = nextFilters.startDate || '';
-  filters.endDate = nextFilters.endDate || '';
-  filters.granularity = nextFilters.granularity || 'day';
-  filters.workcenterGroups = Array.isArray(nextFilters.workcenterGroups)
-    ? nextFilters.workcenterGroups
-    : [];
-  filters.families = Array.isArray(nextFilters.families) ? nextFilters.families : [];
-  filters.machines = Array.isArray(nextFilters.machines) ? nextFilters.machines : [];
-  filters.isProduction = Boolean(nextFilters.isProduction);
-  filters.isKey = Boolean(nextFilters.isKey);
-  filters.isMonitor = Boolean(nextFilters.isMonitor);
-
-  if (upstreamChanged) {
-    pruneInvalidMachines();
+async function applyFilters() {
+  const validationError = validateDateRange(draftFilters);
+  if (validationError) {
+    queryError.value = validationError;
+    return;
   }
-  updateUrlState();
+  pruneDraftSelections({ showHint: true });
+  assignFilterState(committedFilters, draftFilters);
+  await executeCommittedQuery();
+}
+
+async function clearFilters() {
+  runWithDraftPruneSuppressed(() => {
+    resetToDefaultFilters(draftFilters);
+  });
+  autoPruneHint.value = '';
+  assignFilterState(committedFilters, draftFilters);
+  await executeCommittedQuery();
+}
+
+function updateFilters(nextFilters) {
+  runWithDraftPruneSuppressed(() => {
+    assignFilterState(draftFilters, nextFilters);
+  });
+  pruneDraftSelections({ showHint: true });
 }
 
 function handleToggleRow(rowId) {
@@ -320,15 +430,15 @@ function handleToggleAllRows({ expand, rowIds }) {
 }
 
 function exportCsv() {
-  if (!filters.startDate || !filters.endDate) {
+  if (!committedFilters.startDate || !committedFilters.endDate) {
     queryError.value = '請先設定查詢條件';
     return;
   }
 
-  const queryString = buildQueryString();
+  const queryString = buildQueryStringFromFilters(committedFilters);
   const link = document.createElement('a');
   link.href = `/api/resource/history/export?${queryString}`;
-  link.download = `resource_history_${filters.startDate}_to_${filters.endDate}.csv`;
+  link.download = `resource_history_${committedFilters.startDate}_to_${committedFilters.endDate}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -337,38 +447,22 @@ function exportCsv() {
 }
 
 async function initPage() {
-  setDefaultDates();
-  const initial = readInitialFiltersFromUrl();
-  if (initial.startDate) {
-    filters.startDate = initial.startDate;
-  }
-  if (initial.endDate) {
-    filters.endDate = initial.endDate;
-  }
-  if (initial.granularity) {
-    filters.granularity = initial.granularity;
-  }
-  if (initial.workcenterGroups.length > 0) {
-    filters.workcenterGroups = initial.workcenterGroups;
-  }
-  if (initial.families.length > 0) {
-    filters.families = initial.families;
-  }
-  if (initial.machines.length > 0) {
-    filters.machines = initial.machines;
-  }
-  filters.isProduction = initial.isProduction;
-  filters.isKey = initial.isKey;
-  filters.isMonitor = initial.isMonitor;
+  resetToDefaultFilters(committedFilters);
+  restoreCommittedFiltersFromUrl();
+  runWithDraftPruneSuppressed(() => {
+    assignFilterState(draftFilters, committedFilters);
+  });
 
   try {
     await loadOptions();
-    pruneInvalidMachines();
+    pruneDraftSelections({ showHint: true });
+    assignFilterState(committedFilters, draftFilters);
   } catch (error) {
     queryError.value = error?.message || '載入篩選選項失敗';
   }
-  updateUrlState();
-  await executeQuery();
+
+  draftWatchReady.value = true;
+  await executeCommittedQuery();
 }
 
 onMounted(() => {
@@ -384,15 +478,17 @@ onMounted(() => {
       </header>
 
       <FilterBar
-        :filters="filters"
-        :options="options"
+        :filters="draftFilters"
+        :options="filterBarOptions"
         :machine-options="machineOptions"
         :loading="loading.options || loading.querying"
         @update-filters="updateFilters"
-        @query="executeQuery"
+        @query="applyFilters"
+        @clear="clearFilters"
       />
 
       <p v-if="queryError" class="error-banner query-error">{{ queryError }}</p>
+      <p v-if="autoPruneHint" class="filter-indicator">{{ autoPruneHint }}</p>
       <p v-if="detailWarning" class="filter-indicator active">{{ detailWarning }}</p>
       <p v-if="exportMessage" class="filter-indicator active">{{ exportMessage }}</p>
 
@@ -417,10 +513,6 @@ onMounted(() => {
         @toggle-all="handleToggleAllRows"
         @export-csv="exportCsv"
       />
-    </div>
-
-    <div class="loading-overlay" :class="{ hidden: !loading.initial && !loading.querying }">
-      <div class="loading-spinner"></div>
     </div>
   </div>
 </template>

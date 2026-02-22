@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import os
 from datetime import date, timedelta
 from typing import Optional
 
 from flask import Blueprint, Response, jsonify, request
 
+from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.services.reject_history_service import (
     export_csv,
@@ -20,6 +22,9 @@ from mes_dashboard.services.reject_history_service import (
 )
 
 reject_history_bp = Blueprint("reject_history", __name__)
+_REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS = int(
+    os.getenv("REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS", "14400")
+)
 
 _REJECT_HISTORY_LIST_RATE_LIMIT = configured_rate_limit(
     bucket="reject-history-list",
@@ -83,6 +88,16 @@ def _parse_multi_param(name: str) -> list[str]:
     return deduped
 
 
+def _normalized_list_for_cache(values: Optional[list[str]]) -> Optional[list[str]]:
+    if not values:
+        return None
+    return sorted({
+        str(value).strip()
+        for value in values
+        if str(value).strip()
+    })
+
+
 def _extract_meta(
     payload: dict,
     include_excluded_scrap: bool,
@@ -135,10 +150,41 @@ def api_reject_history_options():
     if bool_error:
         return jsonify(bool_error[0]), bool_error[1]
 
+    workcenter_groups = _parse_multi_param("workcenter_groups") or None
+    packages = _parse_multi_param("packages") or None
+    categories = _parse_multi_param("categories") or None
+
+    reasons = _parse_multi_param("reasons")
+    single_reason = _parse_multi_param("reason")
+    for reason in single_reason:
+        if reason not in reasons:
+            reasons.append(reason)
+    reasons = reasons or None
+
+    cache_filters = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "workcenter_groups": _normalized_list_for_cache(workcenter_groups),
+        "packages": _normalized_list_for_cache(packages),
+        "reasons": _normalized_list_for_cache(reasons),
+        "categories": _normalized_list_for_cache(categories),
+        "include_excluded_scrap": bool(include_excluded_scrap),
+        "exclude_material_scrap": bool(exclude_material_scrap),
+        "exclude_pb_diode": bool(exclude_pb_diode),
+    }
+    cache_key = make_cache_key("reject_history_options_v2", filters=cache_filters)
+    cached_payload = cache_get(cache_key)
+    if cached_payload is not None:
+        return jsonify(cached_payload)
+
     try:
         result = get_filter_options(
             start_date=start_date,
             end_date=end_date,
+            workcenter_groups=workcenter_groups,
+            packages=packages,
+            reasons=reasons,
+            categories=categories,
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
@@ -149,7 +195,13 @@ def api_reject_history_options():
             exclude_material_scrap,
             exclude_pb_diode,
         )
-        return jsonify({"success": True, "data": data, "meta": meta})
+        payload = {"success": True, "data": data, "meta": meta}
+        cache_set(
+            cache_key,
+            payload,
+            ttl=max(_REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS, 1),
+        )
+        return jsonify(payload)
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:
