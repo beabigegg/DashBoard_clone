@@ -104,6 +104,29 @@ def _format_lot_materials_export_rows(rows):
     return normalized_rows
 
 
+def _format_lot_holds_export_rows(rows):
+    """Normalize LOT hold export columns for UI/CSV consistency."""
+    normalized_rows = []
+    for row in rows or []:
+        lot_id = row.get('CONTAINERNAME') or row.get('CONTAINERID') or ''
+        normalized_rows.append({
+            'LOT ID': lot_id,
+            'WORKCENTERNAME': row.get('WORKCENTERNAME', ''),
+            'HOLDTXNDATE': row.get('HOLDTXNDATE', ''),
+            'RELEASETXNDATE': row.get('RELEASETXNDATE', ''),
+            'HOLD_STATUS': row.get('HOLD_STATUS', ''),
+            'HOLD_HOURS': row.get('HOLD_HOURS', ''),
+            'HOLDREASONNAME': row.get('HOLDREASONNAME', ''),
+            'HOLDCOMMENTS': row.get('HOLDCOMMENTS', ''),
+            'HOLDEMP': row.get('HOLDEMP', ''),
+            'HOLDEMPDEPTNAME': row.get('HOLDEMPDEPTNAME', ''),
+            'RELEASEEMP': row.get('RELEASEEMP', ''),
+            'RELEASECOMMENTS': row.get('RELEASECOMMENTS', ''),
+            'NCRID': row.get('NCRID', ''),
+        })
+    return normalized_rows
+
+
 # ============================================================
 # Page Route
 # ============================================================
@@ -613,6 +636,8 @@ def export_csv():
 
         if export_type == 'lot_materials':
             export_data = _format_lot_materials_export_rows(export_data)
+        elif export_type == 'lot_holds':
+            export_data = _format_lot_holds_export_rows(export_data)
 
         # Stream CSV response
         return Response(

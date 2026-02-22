@@ -49,8 +49,9 @@ _DOMAIN_SPECS: Dict[str, Dict[str, Any]] = {
         "default_window": 60,
     },
     "holds": {
-        "filter_column": "CONTAINERID",
+        "filter_column": "h.CONTAINERID",
         "cache_ttl": 180,
+        "schema_version": 2,
         "bucket": "event-holds",
         "max_env": "EVT_HOLDS_RATE_MAX_REQUESTS",
         "window_env": "EVT_HOLDS_RATE_WINDOW_SECONDS",

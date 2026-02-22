@@ -111,12 +111,20 @@ const activeColumnLabels = computed(() => {
       CONTAINERNAME: 'LOT ID',
     };
   }
+  if (props.activeSubTab === 'holds') {
+    return {
+      CONTAINERNAME: 'LOT ID',
+    };
+  }
   return {};
 });
 
 const activeHiddenColumns = computed(() => {
   if (props.activeSubTab === 'materials') {
     return ['CONTAINERID', 'WORKCENTER_GROUP'];
+  }
+  if (props.activeSubTab === 'holds') {
+    return ['CONTAINERID'];
   }
   return [];
 });
@@ -132,6 +140,23 @@ const activeColumnOrder = computed(() => {
       'SPECNAME',
       'EQUIPMENTNAME',
       'TXNDATE',
+    ];
+  }
+  if (props.activeSubTab === 'holds') {
+    return [
+      'CONTAINERNAME',
+      'WORKCENTERNAME',
+      'HOLDTXNDATE',
+      'RELEASETXNDATE',
+      'HOLD_STATUS',
+      'HOLD_HOURS',
+      'HOLDREASONNAME',
+      'HOLDCOMMENTS',
+      'HOLDEMP',
+      'HOLDEMPDEPTNAME',
+      'RELEASEEMP',
+      'RELEASECOMMENTS',
+      'NCRID',
     ];
   }
   return [];
