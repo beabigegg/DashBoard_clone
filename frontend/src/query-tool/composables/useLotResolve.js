@@ -4,15 +4,21 @@ import { apiPost, ensureMesApiAvailable } from '../../core/api.js';
 import { parseInputValues } from '../utils/values.js';
 
 const INPUT_TYPE_OPTIONS = Object.freeze([
+  { value: 'wafer_lot', label: 'Wafer LOT' },
   { value: 'lot_id', label: 'LOT ID' },
   { value: 'serial_number', label: '流水號' },
   { value: 'work_order', label: '工單' },
+  { value: 'gd_work_order', label: 'GD 工單' },
+  { value: 'gd_lot_id', label: 'GD LOT ID' },
 ]);
 
 const INPUT_LIMITS = Object.freeze({
+  wafer_lot: 50,
   lot_id: 50,
   serial_number: 50,
   work_order: 10,
+  gd_work_order: 10,
+  gd_lot_id: 50,
 });
 
 function normalizeInputType(value) {
@@ -29,7 +35,7 @@ function normalizeAllowedTypes(input) {
     : [];
   const filtered = values.filter((value) => Boolean(INPUT_LIMITS[value]));
   if (filtered.length === 0) {
-    return ['lot_id', 'serial_number', 'work_order'];
+    return ['wafer_lot', 'lot_id', 'serial_number', 'work_order', 'gd_work_order', 'gd_lot_id'];
   }
   return filtered;
 }

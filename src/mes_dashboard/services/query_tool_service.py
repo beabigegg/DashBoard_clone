@@ -18,9 +18,10 @@ Architecture:
 import csv
 import io
 import logging
+import re
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Generator
+from typing import Any, Dict, List, Optional, Generator, Iterable, Tuple
 
 import pandas as pd
 
@@ -83,7 +84,7 @@ def validate_lot_input(input_type: str, values: List[str]) -> Optional[str]:
     """Validate LOT input based on type.
 
     Args:
-        input_type: Type of input ('lot_id', 'serial_number', 'work_order')
+        input_type: Type of input
         values: List of input values
 
     Returns:
@@ -94,8 +95,11 @@ def validate_lot_input(input_type: str, values: List[str]) -> Optional[str]:
 
     limits = {
         'lot_id': MAX_LOT_IDS,
+        'wafer_lot': MAX_LOT_IDS,
+        'gd_lot_id': MAX_LOT_IDS,
         'serial_number': MAX_SERIAL_NUMBERS,
         'work_order': MAX_WORK_ORDERS,
+        'gd_work_order': MAX_WORK_ORDERS,
     }
 
     limit = limits.get(input_type, MAX_LOT_IDS)
@@ -155,6 +159,157 @@ def _df_to_records(df: pd.DataFrame) -> List[Dict[str, Any]]:
     return data
 
 
+def _normalize_search_tokens(values: Iterable[str]) -> List[str]:
+    """Normalize user-provided search tokens while preserving order."""
+    normalized: List[str] = []
+    seen = set()
+    for raw in values or []:
+        token = str(raw or '').strip()
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        normalized.append(token)
+    return normalized
+
+
+def _normalize_wildcard_token(value: str) -> str:
+    """Normalize user wildcard syntax.
+
+    Supports both SQL wildcard (`%`) and shell-style wildcard (`*`).
+    """
+    return str(value or '').replace('*', '%')
+
+
+def _is_pattern_token(value: str) -> bool:
+    token = _normalize_wildcard_token(value)
+    return '%' in token or '_' in token
+
+
+def _to_like_regex(pattern: str, *, case_insensitive: bool = False) -> re.Pattern:
+    """Convert SQL LIKE pattern (`%`, `_`, `\\` escape) to Python regex."""
+    token = _normalize_wildcard_token(pattern)
+    parts: List[str] = ['^']
+    i = 0
+    while i < len(token):
+        ch = token[i]
+        if ch == '\\':
+            # Keep Oracle ESCAPE semantics: \% or \_ means literal.
+            if i + 1 < len(token):
+                i += 1
+                parts.append(re.escape(token[i]))
+            else:
+                parts.append(re.escape(ch))
+        elif ch == '%':
+            parts.append('.*')
+        elif ch == '_':
+            parts.append('.')
+        else:
+            parts.append(re.escape(ch))
+        i += 1
+    parts.append('$')
+    flags = re.IGNORECASE if case_insensitive else 0
+    return re.compile(''.join(parts), flags)
+
+
+def _add_exact_or_pattern_condition(
+    builder: QueryBuilder,
+    column: str,
+    values: List[str],
+    *,
+    case_insensitive: bool = False,
+) -> None:
+    """Add a single OR-group condition supporting exact and wildcard tokens."""
+    tokens = _normalize_search_tokens(values)
+    if not tokens:
+        return
+
+    col_expr = f"UPPER(NVL({column}, ''))" if case_insensitive else f"NVL({column}, '')"
+    conditions: List[str] = []
+
+    exact_tokens = [token for token in tokens if not _is_pattern_token(token)]
+    pattern_tokens = [token for token in tokens if _is_pattern_token(token)]
+
+    if exact_tokens:
+        placeholders: List[str] = []
+        for token in exact_tokens:
+            param = builder._next_param()
+            placeholders.append(f":{param}")
+            builder.params[param] = token.upper() if case_insensitive else token
+        conditions.append(f"{col_expr} IN ({', '.join(placeholders)})")
+
+    for token in pattern_tokens:
+        param = builder._next_param()
+        normalized = _normalize_wildcard_token(token)
+        builder.params[param] = normalized.upper() if case_insensitive else normalized
+        conditions.append(f"{col_expr} LIKE :{param} ESCAPE '\\'")
+
+    if conditions:
+        builder.add_condition(f"({' OR '.join(conditions)})")
+
+
+def _match_rows_by_tokens(
+    tokens: List[str],
+    rows: List[Dict[str, Any]],
+    *,
+    row_key: str,
+    case_insensitive: bool = False,
+) -> Tuple[List[Dict[str, Any]], List[str], Dict[str, int]]:
+    """Map query tokens to matching rows and report not-found tokens."""
+    normalized_tokens = _normalize_search_tokens(tokens)
+    if not normalized_tokens:
+        return [], [], {}
+
+    def normalize_text(value: Any) -> str:
+        text = str(value or '').strip()
+        return text.upper() if case_insensitive else text
+
+    row_pairs: List[Tuple[str, Dict[str, Any]]] = [
+        (normalize_text(row.get(row_key)), row)
+        for row in rows
+        if normalize_text(row.get(row_key))
+    ]
+
+    exact_index: Dict[str, List[Dict[str, Any]]] = {}
+    for key, row in row_pairs:
+        exact_index.setdefault(key, []).append(row)
+
+    matches: List[Dict[str, Any]] = []
+    not_found: List[str] = []
+    expansion_info: Dict[str, int] = {}
+    seen_pairs = set()
+
+    for token in normalized_tokens:
+        token_key = normalize_text(token)
+        matched_rows: List[Dict[str, Any]]
+
+        if _is_pattern_token(token):
+            regex = _to_like_regex(token, case_insensitive=case_insensitive)
+            matched_rows = [
+                row
+                for value, row in row_pairs
+                if regex.fullmatch(value)
+            ]
+        else:
+            matched_rows = exact_index.get(token_key, [])
+
+        if not matched_rows:
+            not_found.append(token)
+            continue
+
+        expansion_info[token] = len(matched_rows)
+        for row in matched_rows:
+            cid = str(row.get('CONTAINERID') or row.get('container_id') or '').strip()
+            dedup_key = (token, cid)
+            if dedup_key in seen_pairs:
+                continue
+            seen_pairs.add(dedup_key)
+            item = dict(row)
+            item['input_value'] = token
+            matches.append(item)
+
+    return matches, not_found, expansion_info
+
+
 # ============================================================
 # LOT Resolution Functions
 # ============================================================
@@ -167,7 +322,7 @@ def resolve_lots(input_type: str, values: List[str]) -> Dict[str, Any]:
     This function converts user input to CONTAINERID for subsequent queries.
 
     Args:
-        input_type: Type of input ('lot_id', 'serial_number', 'work_order')
+        input_type: Type of input
         values: List of input values
 
     Returns:
@@ -187,10 +342,16 @@ def resolve_lots(input_type: str, values: List[str]) -> Dict[str, Any]:
     try:
         if input_type == 'lot_id':
             return _resolve_by_lot_id(cleaned)
+        elif input_type == 'wafer_lot':
+            return _resolve_by_wafer_lot(cleaned)
+        elif input_type == 'gd_lot_id':
+            return _resolve_by_gd_lot_id(cleaned)
         elif input_type == 'serial_number':
             return _resolve_by_serial_number(cleaned)
         elif input_type == 'work_order':
             return _resolve_by_work_order(cleaned)
+        elif input_type == 'gd_work_order':
+            return _resolve_by_gd_work_order(cleaned)
         else:
             return {'error': f'不支援的輸入類型: {input_type}'}
 
@@ -209,7 +370,7 @@ def _resolve_by_lot_id(lot_ids: List[str]) -> Dict[str, Any]:
         Resolution result dict.
     """
     builder = QueryBuilder()
-    builder.add_in_condition("CONTAINERNAME", lot_ids)
+    _add_exact_or_pattern_condition(builder, "CONTAINERNAME", lot_ids)
     sql = SQLLoader.load_with_params(
         "query_tool/lot_resolve_id",
         CONTAINER_FILTER=builder.get_conditions_sql(),
@@ -217,23 +378,21 @@ def _resolve_by_lot_id(lot_ids: List[str]) -> Dict[str, Any]:
 
     df = read_sql_df(sql, builder.params)
     data = _df_to_records(df)
+    matched, not_found, expansion_info = _match_rows_by_tokens(
+        lot_ids,
+        data,
+        row_key='CONTAINERNAME',
+    )
 
-    # Map results
-    found = {r['CONTAINERNAME']: r for r in data}
     results = []
-    not_found = []
-
-    for lot_id in lot_ids:
-        if lot_id in found:
-            results.append({
-                'container_id': found[lot_id]['CONTAINERID'],
-                'lot_id': found[lot_id]['CONTAINERNAME'],  # LOT ID for display
-                'input_value': lot_id,
-                'spec_name': found[lot_id].get('SPECNAME'),
-                'qty': found[lot_id].get('QTY'),
-            })
-        else:
-            not_found.append(lot_id)
+    for row in matched:
+        results.append({
+            'container_id': row.get('CONTAINERID'),
+            'lot_id': row.get('CONTAINERNAME'),
+            'input_value': row.get('input_value'),
+            'spec_name': row.get('SPECNAME'),
+            'qty': row.get('QTY'),
+        })
 
     logger.info(f"LOT ID resolution: {len(results)} found, {len(not_found)} not found")
 
@@ -242,6 +401,104 @@ def _resolve_by_lot_id(lot_ids: List[str]) -> Dict[str, Any]:
         'total': len(results),
         'input_count': len(lot_ids),
         'not_found': not_found,
+        'expansion_info': expansion_info,
+    }
+
+
+def _resolve_by_wafer_lot(wafer_lots: List[str]) -> Dict[str, Any]:
+    """Resolve wafer lot values (FIRSTNAME) to CONTAINERID."""
+    builder = QueryBuilder()
+    _add_exact_or_pattern_condition(builder, "FIRSTNAME", wafer_lots)
+    builder.add_condition("OBJECTTYPE = 'LOT'")
+    sql = SQLLoader.load_with_params(
+        "query_tool/lot_resolve_wafer_lot",
+        WAFER_FILTER=builder.get_conditions_sql(),
+    )
+
+    df = read_sql_df(sql, builder.params)
+    data = _df_to_records(df)
+    matched, not_found, expansion_info = _match_rows_by_tokens(
+        wafer_lots,
+        data,
+        row_key='FIRSTNAME',
+    )
+
+    results = []
+    for row in matched:
+        cid = row.get('CONTAINERID')
+        if not cid:
+            continue
+        results.append({
+            'container_id': cid,
+            'lot_id': row.get('CONTAINERNAME'),
+            'input_value': row.get('input_value'),
+            'spec_name': row.get('SPECNAME'),
+            'qty': row.get('QTY'),
+        })
+
+    logger.info(f"Wafer lot resolution: {len(results)} containers from {len(wafer_lots)} wafer lots")
+    return {
+        'data': results,
+        'total': len(results),
+        'input_count': len(wafer_lots),
+        'not_found': not_found,
+        'expansion_info': expansion_info,
+    }
+
+
+def _is_gd_like(value: str) -> bool:
+    text = str(value or '').strip().upper()
+    return text.startswith('GD')
+
+
+def _literal_prefix_before_wildcard(value: str) -> str:
+    token = _normalize_wildcard_token(value)
+    for idx, ch in enumerate(token):
+        if ch in ('%', '_'):
+            return token[:idx]
+    return token
+
+
+def _resolve_by_gd_lot_id(gd_lot_ids: List[str]) -> Dict[str, Any]:
+    """Resolve GD lot IDs to CONTAINERID with strict GD validation."""
+    invalid = [value for value in gd_lot_ids if not _is_gd_like(_literal_prefix_before_wildcard(value))]
+    if invalid:
+        return {'error': f'GD LOT ID 格式錯誤: {", ".join(invalid)}'}
+
+    builder = QueryBuilder()
+    _add_exact_or_pattern_condition(builder, "CONTAINERNAME", gd_lot_ids, case_insensitive=True)
+    builder.add_condition("(UPPER(NVL(CONTAINERNAME, '')) LIKE 'GD%' OR UPPER(NVL(MFGORDERNAME, '')) LIKE 'GD%')")
+    sql = SQLLoader.load_with_params(
+        "query_tool/lot_resolve_id",
+        CONTAINER_FILTER=builder.get_conditions_sql(),
+    )
+
+    df = read_sql_df(sql, builder.params)
+    data = _df_to_records(df)
+    matched, not_found, expansion_info = _match_rows_by_tokens(
+        gd_lot_ids,
+        data,
+        row_key='CONTAINERNAME',
+        case_insensitive=True,
+    )
+
+    results = []
+    for row in matched:
+        results.append({
+            'container_id': row.get('CONTAINERID'),
+            'lot_id': row.get('CONTAINERNAME'),
+            'input_value': row.get('input_value'),
+            'spec_name': row.get('SPECNAME'),
+            'qty': row.get('QTY'),
+        })
+
+    logger.info(f"GD lot resolution: {len(results)} found, {len(not_found)} not found")
+    return {
+        'data': results,
+        'total': len(results),
+        'input_count': len(gd_lot_ids),
+        'not_found': not_found,
+        'expansion_info': expansion_info,
     }
 
 
@@ -257,7 +514,7 @@ def _resolve_by_serial_number(serial_numbers: List[str]) -> Dict[str, Any]:
         Resolution result dict.
     """
     builder = QueryBuilder()
-    builder.add_in_condition("p.FINISHEDNAME", serial_numbers)
+    _add_exact_or_pattern_condition(builder, "p.FINISHEDNAME", serial_numbers)
     sql = SQLLoader.load_with_params(
         "query_tool/lot_resolve_serial",
         SERIAL_FILTER=builder.get_conditions_sql(),
@@ -265,33 +522,20 @@ def _resolve_by_serial_number(serial_numbers: List[str]) -> Dict[str, Any]:
 
     df = read_sql_df(sql, builder.params)
     data = _df_to_records(df)
-
-    # Group by serial number
-    sn_to_containers = {}
-    for r in data:
-        sn = r['FINISHEDNAME']
-        if sn not in sn_to_containers:
-            sn_to_containers[sn] = []
-        sn_to_containers[sn].append({
-            'container_id': r['CONTAINERID'],
-            'lot_id': r.get('CONTAINERNAME'),
-            'spec_name': r.get('SPECNAME'),
-        })
+    matched, not_found, expansion_info = _match_rows_by_tokens(
+        serial_numbers,
+        data,
+        row_key='FINISHEDNAME',
+    )
 
     results = []
-    not_found = []
-
-    for sn in serial_numbers:
-        if sn in sn_to_containers:
-            for item in sn_to_containers[sn]:
-                results.append({
-                    'container_id': item['container_id'],
-                    'lot_id': item['lot_id'],
-                    'input_value': sn,
-                    'spec_name': item.get('spec_name'),
-                })
-        else:
-            not_found.append(sn)
+    for row in matched:
+        results.append({
+            'container_id': row.get('CONTAINERID'),
+            'lot_id': row.get('CONTAINERNAME'),
+            'input_value': row.get('input_value'),
+            'spec_name': row.get('SPECNAME'),
+        })
 
     logger.info(f"Serial number resolution: {len(results)} containers from {len(serial_numbers)} inputs")
 
@@ -300,6 +544,7 @@ def _resolve_by_serial_number(serial_numbers: List[str]) -> Dict[str, Any]:
         'total': len(results),
         'input_count': len(serial_numbers),
         'not_found': not_found,
+        'expansion_info': expansion_info,
     }
 
 
@@ -314,8 +559,13 @@ def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
     Returns:
         Resolution result dict.
     """
+    invalid = [value for value in work_orders if _is_gd_like(_literal_prefix_before_wildcard(value))]
+    if invalid:
+        return {'error': f'正向工單僅支援 GA/GC，請改用反向 GD 工單查詢: {", ".join(invalid)}'}
+
     builder = QueryBuilder()
-    builder.add_in_condition("MFGORDERNAME", work_orders)
+    _add_exact_or_pattern_condition(builder, "MFGORDERNAME", work_orders, case_insensitive=True)
+    builder.add_condition("(UPPER(NVL(MFGORDERNAME, '')) LIKE 'GA%' OR UPPER(NVL(MFGORDERNAME, '')) LIKE 'GC%')")
     sql = SQLLoader.load_with_params(
         "query_tool/lot_resolve_work_order",
         WORK_ORDER_FILTER=builder.get_conditions_sql(),
@@ -323,38 +573,69 @@ def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
 
     df = read_sql_df(sql, builder.params)
     data = _df_to_records(df)
-
-    # Group by work order
-    wo_to_containers = {}
-    for r in data:
-        wo = r['MFGORDERNAME']
-        if wo not in wo_to_containers:
-            wo_to_containers[wo] = []
-        wo_to_containers[wo].append({
-            'container_id': r['CONTAINERID'],
-            'lot_id': r.get('CONTAINERNAME'),
-            'spec_name': r.get('SPECNAME'),
-        })
+    matched, not_found, expansion_info = _match_rows_by_tokens(
+        work_orders,
+        data,
+        row_key='MFGORDERNAME',
+        case_insensitive=True,
+    )
 
     results = []
-    not_found = []
-    expansion_info = {}
-
-    for wo in work_orders:
-        if wo in wo_to_containers:
-            expansion_info[wo] = len(wo_to_containers[wo])
-            for item in wo_to_containers[wo]:
-                results.append({
-                    'container_id': item['container_id'],
-                    'lot_id': item['lot_id'],
-                    'input_value': wo,
-                    'spec_name': item.get('spec_name'),
-                })
-        else:
-            not_found.append(wo)
+    for row in matched:
+        results.append({
+            'container_id': row.get('CONTAINERID'),
+            'lot_id': row.get('CONTAINERNAME'),
+            'input_value': row.get('input_value'),
+            'spec_name': row.get('SPECNAME'),
+        })
 
     logger.info(f"Work order resolution: {len(results)} containers from {len(work_orders)} orders")
 
+    return {
+        'data': results,
+        'total': len(results),
+        'input_count': len(work_orders),
+        'not_found': not_found,
+        'expansion_info': expansion_info,
+    }
+
+
+def _resolve_by_gd_work_order(work_orders: List[str]) -> Dict[str, Any]:
+    """Resolve GD work orders to CONTAINERID."""
+    invalid = [value for value in work_orders if not _is_gd_like(_literal_prefix_before_wildcard(value))]
+    if invalid:
+        return {'error': f'GD 工單格式錯誤: {", ".join(invalid)}'}
+
+    builder = QueryBuilder()
+    _add_exact_or_pattern_condition(builder, "MFGORDERNAME", work_orders, case_insensitive=True)
+    builder.add_condition("UPPER(NVL(MFGORDERNAME, '')) LIKE 'GD%'")
+    sql = SQLLoader.load_with_params(
+        "query_tool/lot_resolve_work_order",
+        WORK_ORDER_FILTER=builder.get_conditions_sql(),
+    )
+
+    df = read_sql_df(sql, builder.params)
+    data = _df_to_records(df)
+    matched, not_found, expansion_info = _match_rows_by_tokens(
+        work_orders,
+        data,
+        row_key='MFGORDERNAME',
+        case_insensitive=True,
+    )
+
+    results = []
+    for row in matched:
+        cid = row.get('CONTAINERID')
+        if not cid:
+            continue
+        results.append({
+            'container_id': cid,
+            'lot_id': row.get('CONTAINERNAME'),
+            'input_value': row.get('input_value'),
+            'spec_name': row.get('SPECNAME'),
+        })
+
+    logger.info(f"GD work order resolution: {len(results)} containers from {len(work_orders)} orders")
     return {
         'data': results,
         'total': len(results),
@@ -584,6 +865,11 @@ def get_lot_associations_batch(
         for cid in container_ids:
             rows.extend(events_by_cid.get(cid, []))
 
+        # Keep timeline grouping consistent with history rows.
+        # Especially for materials, workcenter names like "焊_DB_料" need to map
+        # to the same WORKCENTER_GROUP used by LOT history tracks.
+        _enrich_workcenter_group(rows)
+
         data = _df_to_records(pd.DataFrame(rows))
 
         logger.debug(
@@ -620,7 +906,9 @@ def get_lot_materials(container_id: str) -> Dict[str, Any]:
 
     try:
         events_by_cid = EventFetcher.fetch_events([container_id], "materials")
-        data = _df_to_records(pd.DataFrame(events_by_cid.get(container_id, [])))
+        rows = list(events_by_cid.get(container_id, []))
+        _enrich_workcenter_group(rows)
+        data = _df_to_records(pd.DataFrame(rows))
 
         logger.debug(f"LOT materials: {len(data)} records for {container_id}")
 

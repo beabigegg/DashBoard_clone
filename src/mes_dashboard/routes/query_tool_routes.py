@@ -110,7 +110,7 @@ def resolve_lot_input():
 
     Expects JSON body:
     {
-        "input_type": "lot_id" | "serial_number" | "work_order",
+        "input_type": "lot_id" | "wafer_lot" | "serial_number" | "work_order" | "gd_work_order" | "gd_lot_id",
         "values": ["value1", "value2", ...]
     }
 
@@ -131,7 +131,7 @@ def resolve_lot_input():
     values = data.get('values', [])
 
     # Validate input type
-    valid_types = ['lot_id', 'serial_number', 'work_order']
+    valid_types = ['lot_id', 'wafer_lot', 'serial_number', 'work_order', 'gd_work_order', 'gd_lot_id']
     if input_type not in valid_types:
         return jsonify({'error': f'不支援的查詢類型: {input_type}'}), 400
 
@@ -268,7 +268,7 @@ def query_lot_associations():
     container_id = request.args.get('container_id')
     assoc_type = request.args.get('type')
 
-    valid_types = ['materials', 'rejects', 'holds', 'jobs']
+    valid_types = ['materials', 'rejects', 'holds', 'splits', 'jobs']
     if assoc_type not in valid_types:
         return jsonify({'error': f'不支援的關聯類型: {assoc_type}'}), 400
 
@@ -289,6 +289,9 @@ def query_lot_associations():
             result = get_lot_rejects(container_id)
         elif assoc_type == 'holds':
             result = get_lot_holds(container_id)
+        elif assoc_type == 'splits':
+            full_history = str(request.args.get('full_history', '')).strip().lower() in {'1', 'true', 'yes'}
+            result = get_lot_splits(container_id, full_history=full_history)
         elif assoc_type == 'jobs':
             equipment_id = request.args.get('equipment_id')
             time_start = request.args.get('time_start')

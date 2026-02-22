@@ -40,6 +40,11 @@ const inputCount = computed(() => {
     .length;
 });
 
+const inputTypeLabel = computed(() => {
+  const selected = (props.inputTypeOptions || []).find((option) => option?.value === props.inputType);
+  return selected?.label || '查詢條件';
+});
+
 function handleResolve() {
   emit('resolve');
 }
@@ -82,10 +87,14 @@ function handleResolve() {
       <textarea
         :value="inputText"
         class="min-h-28 w-full rounded-card border border-stroke-soft bg-surface-muted/40 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-brand-500"
-        :placeholder="`可輸入多筆（換行或逗號分隔），最多 ${inputLimit} 筆`"
+        :placeholder="`請輸入 ${inputTypeLabel}（換行或逗號分隔），最多 ${inputLimit} 筆`"
         :disabled="resolving"
         @input="emit('update:inputText', $event.target.value)"
       />
+      <p class="mt-2 text-xs text-slate-500">
+        支援萬用字元：<code>%</code>（任意長度）、<code>_</code>（單一字元），也可用 <code>*</code> 代表 <code>%</code>。
+        例如：<code>GA25%01</code>、<code>GA25%</code>、<code>GMSN-1173%</code>
+      </p>
       <div class="mt-2 flex items-center justify-between text-xs">
         <p class="text-slate-500">已輸入 {{ inputCount }} / {{ inputLimit }}</p>
         <p v-if="errorMessage" class="text-state-danger">{{ errorMessage }}</p>

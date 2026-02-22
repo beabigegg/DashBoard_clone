@@ -20,8 +20,8 @@ const TAB_EQUIPMENT = 'equipment';
 const VALID_TABS = new Set([TAB_LOT, TAB_REVERSE, TAB_EQUIPMENT]);
 
 const tabItems = Object.freeze([
-  { key: TAB_LOT, label: '批次追蹤(正向)', subtitle: '由批次展開下游血緣與明細' },
-  { key: TAB_REVERSE, label: '流水批反查(反向)', subtitle: '由成品流水號回溯上游批次' },
+  { key: TAB_LOT, label: '批次追蹤(正向)', subtitle: '由 Wafer LOT / GA-GC 工單展開下游血緣與明細' },
+  { key: TAB_REVERSE, label: '流水批反查(反向)', subtitle: '由成品流水號 / GD 工單 / GD LOT 回溯上游批次' },
   { key: TAB_EQUIPMENT, label: '設備生產批次追蹤', subtitle: '設備紀錄與時序視圖' },
 ]);
 
@@ -48,6 +48,7 @@ function readStateFromUrl() {
     lotSubTab: normalizeText(params.get('lot_sub_tab')) || 'history',
     lotWorkcenterGroups: parseArrayParam(params, 'workcenter_groups'),
 
+    reverseInputType: normalizeText(params.get('reverse_input_type')) || (tab === TAB_REVERSE ? legacyInputType : '') || 'serial_number',
     reverseInputText: parseArrayParam(params, 'reverse_values').join('\n') || (tab === TAB_REVERSE ? legacyInputText : ''),
     reverseSelectedContainerId: normalizeText(params.get('reverse_container_id')) || (tab === TAB_REVERSE ? legacySelectedContainerId : ''),
     reverseSubTab: normalizeText(params.get('reverse_sub_tab')) || (tab === TAB_REVERSE ? legacyLotSubTab : 'history'),
@@ -68,13 +69,13 @@ const activeTab = ref(initialState.tab);
 const lotResolve = useLotResolve({
   inputType: initialState.lotInputType,
   inputText: initialState.lotInputText,
-  allowedTypes: ['lot_id', 'work_order'],
+  allowedTypes: ['wafer_lot', 'lot_id', 'work_order'],
 });
 
 const reverseResolve = useLotResolve({
-  inputType: 'serial_number',
+  inputType: initialState.reverseInputType,
   inputText: initialState.reverseInputText,
-  allowedTypes: ['serial_number'],
+  allowedTypes: ['serial_number', 'gd_work_order', 'gd_lot_id'],
 });
 
 const lotLineage = useLotLineage({
@@ -151,6 +152,7 @@ function buildUrlState() {
   parseInputValues(reverseResolve.inputText.value).forEach((value) => {
     params.append('reverse_values', value);
   });
+  params.set('reverse_input_type', reverseResolve.inputType.value);
 
   if (lotDetail.selectedContainerId.value) {
     params.set('lot_container_id', lotDetail.selectedContainerId.value);
@@ -202,7 +204,7 @@ function buildUrlState() {
       params.set('container_id', lotDetail.selectedContainerId.value);
     }
   } else if (activeTab.value === TAB_REVERSE) {
-    params.set('input_type', 'serial_number');
+    params.set('input_type', reverseResolve.inputType.value);
     parseInputValues(reverseResolve.inputText.value).forEach((value) => {
       params.append('values', value);
     });
@@ -242,7 +244,7 @@ async function applyStateFromUrl() {
   lotResolve.setInputType(state.lotInputType);
   lotResolve.setInputText(state.lotInputText);
 
-  reverseResolve.setInputType('serial_number');
+  reverseResolve.setInputType(state.reverseInputType);
   reverseResolve.setInputText(state.reverseInputText);
 
   lotDetail.activeSubTab.value = state.lotSubTab;
@@ -395,6 +397,7 @@ watch(
     lotDetail.selectedWorkcenterGroups,
 
     reverseResolve.inputText,
+    reverseResolve.inputType,
     reverseDetail.selectedContainerId,
     reverseDetail.activeSubTab,
     reverseDetail.selectedWorkcenterGroups,
@@ -476,6 +479,8 @@ watch(
           :not-found="lotResolve.notFound.value"
           :lineage-map="lotLineage.lineageMap"
           :name-map="lotLineage.nameMap"
+          :node-meta-map="lotLineage.nodeMetaMap"
+          :edge-type-map="lotLineage.edgeTypeMap"
           :leaf-serials="lotLineage.leafSerials"
           :lineage-loading="lotLineage.lineageLoading.value"
           :selected-container-ids="lotLineage.selectedContainerIds.value"
@@ -513,6 +518,8 @@ watch(
           :not-found="reverseResolve.notFound.value"
           :lineage-map="reverseLineage.lineageMap"
           :name-map="reverseLineage.nameMap"
+          :node-meta-map="reverseLineage.nodeMetaMap"
+          :edge-type-map="reverseLineage.edgeTypeMap"
           :leaf-serials="reverseLineage.leafSerials"
           :lineage-loading="reverseLineage.lineageLoading.value"
           :selected-container-ids="reverseLineage.selectedContainerIds.value"

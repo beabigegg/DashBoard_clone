@@ -12,11 +12,29 @@ import { normalizeText } from '../utils/values.js';
 use([CanvasRenderer, TreeChart, TooltipComponent]);
 
 const NODE_COLORS = {
+  wafer: '#2563EB',
+  gc: '#06B6D4',
+  ga: '#10B981',
+  gd: '#EF4444',
   root: '#3B82F6',
   branch: '#10B981',
   leaf: '#F59E0B',
   serial: '#94A3B8',
 };
+
+const EDGE_STYLES = Object.freeze({
+  split_from: { color: '#CBD5E1', type: 'solid', width: 1.5 },
+  merge_source: { color: '#F59E0B', type: 'dashed', width: 1.8 },
+  wafer_origin: { color: '#2563EB', type: 'dotted', width: 1.8 },
+  gd_rework_source: { color: '#EF4444', type: 'dashed', width: 1.8 },
+  default: { color: '#CBD5E1', type: 'solid', width: 1.5 },
+});
+
+const LABEL_BASE_STYLE = Object.freeze({
+  backgroundColor: 'rgba(255,255,255,0.92)',
+  borderRadius: 3,
+  padding: [1, 4],
+});
 
 const props = defineProps({
   treeRoots: {
@@ -28,6 +46,14 @@ const props = defineProps({
     required: true,
   },
   nameMap: {
+    type: Object,
+    default: () => new Map(),
+  },
+  nodeMetaMap: {
+    type: Object,
+    default: () => new Map(),
+  },
+  edgeTypeMap: {
     type: Object,
     default: () => new Map(),
   },
@@ -84,6 +110,20 @@ const allSerialNames = computed(() => {
 });
 
 function detectNodeType(cid, entry, serials) {
+  const explicitType = normalizeText(props.nodeMetaMap?.get?.(cid)?.node_type).toUpperCase();
+  if (explicitType === 'WAFER') {
+    return 'wafer';
+  }
+  if (explicitType === 'GC') {
+    return 'gc';
+  }
+  if (explicitType === 'GA') {
+    return 'ga';
+  }
+  if (explicitType === 'GD') {
+    return 'gd';
+  }
+
   if (rootsSet.value.has(cid)) {
     return 'root';
   }
@@ -97,7 +137,20 @@ function detectNodeType(cid, entry, serials) {
   return 'branch';
 }
 
-function buildNode(cid, visited) {
+function lookupEdgeType(parentCid, childCid) {
+  const parent = normalizeText(parentCid);
+  const child = normalizeText(childCid);
+  if (!parent || !child) {
+    return '';
+  }
+  const direct = normalizeText(props.edgeTypeMap?.get?.(`${parent}->${child}`));
+  if (direct) {
+    return direct;
+  }
+  return normalizeText(props.edgeTypeMap?.get?.(`${child}->${parent}`));
+}
+
+function buildNode(cid, visited, parentCid = '') {
   const id = normalizeText(cid);
   if (!id || visited.has(id)) {
     return null;
@@ -112,7 +165,7 @@ function buildNode(cid, visited) {
   const isSelected = selectedSet.value.has(id);
 
   const children = childIds
-    .map((childId) => buildNode(childId, visited))
+    .map((childId) => buildNode(childId, visited, id))
     .filter(Boolean);
 
   if (children.length === 0 && serials.length > 0) {
@@ -141,10 +194,12 @@ function buildNode(cid, visited) {
     && allSerialNames.value.has(name);
   const effectiveType = isSerialLike ? 'serial' : nodeType;
   const color = NODE_COLORS[effectiveType] || NODE_COLORS.branch;
+  const incomingEdgeType = lookupEdgeType(parentCid, id);
+  const incomingEdgeStyle = EDGE_STYLES[incomingEdgeType] || EDGE_STYLES.default;
 
   return {
     name,
-    value: { cid: id, type: effectiveType },
+    value: { cid: id, type: effectiveType, edgeType: incomingEdgeType || '' },
     children,
     itemStyle: {
       color,
@@ -152,12 +207,16 @@ function buildNode(cid, visited) {
       borderWidth: isSelected ? 3 : 1,
     },
     label: {
+      ...LABEL_BASE_STYLE,
+      position: children.length > 0 ? 'top' : 'right',
+      distance: children.length > 0 ? 8 : 6,
       fontWeight: isSelected ? 'bold' : 'normal',
       fontSize: isSerialLike ? 10 : 11,
       color: isSelected ? '#1E3A8A' : (isSerialLike ? '#64748B' : '#334155'),
     },
     symbol: isSerialLike ? 'diamond' : (nodeType === 'root' ? 'roundRect' : 'circle'),
     symbolSize: isSerialLike ? 6 : (nodeType === 'root' ? 14 : 10),
+    lineStyle: incomingEdgeStyle,
   };
 }
 
@@ -200,11 +259,13 @@ const TREE_SERIES_DEFAULTS = Object.freeze({
   label: {
     show: true,
     position: 'right',
+    distance: 6,
     fontSize: 11,
     color: '#334155',
     overflow: 'truncate',
     ellipsis: '…',
     width: 160,
+    ...LABEL_BASE_STYLE,
   },
   lineStyle: {
     width: 1.5,
@@ -238,12 +299,23 @@ const chartOption = computed(() => {
       const lines = [`<b>${data.name}</b>`];
       if (val.type === 'serial') {
         lines.push('<span style="color:#64748B">成品序列號</span>');
+      } else if (val.type === 'wafer') {
+        lines.push('<span style="color:#2563EB">Wafer LOT</span>');
+      } else if (val.type === 'gc') {
+        lines.push('<span style="color:#06B6D4">GC LOT</span>');
+      } else if (val.type === 'ga') {
+        lines.push('<span style="color:#10B981">GA LOT</span>');
+      } else if (val.type === 'gd') {
+        lines.push('<span style="color:#EF4444">GD LOT（重工）</span>');
       } else if (val.type === 'root') {
         lines.push('<span style="color:#3B82F6">根節點（晶批）</span>');
       } else if (val.type === 'leaf') {
         lines.push('<span style="color:#F59E0B">末端節點</span>');
       } else if (val.type === 'branch') {
         lines.push('<span style="color:#10B981">中間節點</span>');
+      }
+      if (val.edgeType) {
+        lines.push(`<span style="color:#94A3B8;font-size:11px">關係: ${val.edgeType}</span>`);
       }
       if (val.cid && val.cid !== data.name) {
         lines.push(`<span style="color:#94A3B8;font-size:11px">CID: ${val.cid}</span>`);
@@ -325,20 +397,44 @@ function handleNodeClick(params) {
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2 text-[10px] text-slate-500">
           <span class="inline-flex items-center gap-1">
-            <span class="inline-block size-2.5 rounded-sm" :style="{ background: NODE_COLORS.root }" />
-            晶批
+            <span class="inline-block size-2.5 rounded-sm" :style="{ background: NODE_COLORS.wafer }" />
+            Wafer
           </span>
           <span class="inline-flex items-center gap-1">
-            <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.branch }" />
-            中間
+            <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.gc }" />
+            GC
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.ga }" />
+            GA
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.gd }" />
+            GD
           </span>
           <span class="inline-flex items-center gap-1">
             <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.leaf }" />
-            末端
+            其他 LOT
           </span>
           <span v-if="showSerialLegend" class="inline-flex items-center gap-1">
             <span class="inline-block size-2.5 rotate-45" :style="{ background: NODE_COLORS.serial, width: '8px', height: '8px' }" />
             序列號
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="inline-block h-0.5 w-3 bg-slate-300" />
+            split
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="inline-block h-0.5 w-3 border-t-2 border-dashed border-amber-500" />
+            merge
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="inline-block h-0.5 w-3 border-t-2 border-dotted border-blue-600" />
+            wafer
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="inline-block h-0.5 w-3 border-t-2 border-dashed border-red-500" />
+            gd-rework
           </span>
         </div>
       </div>

@@ -46,7 +46,10 @@ SUPPORTED_PROFILES = {
     PROFILE_MID_SECTION_DEFECT,
 }
 
-QUERY_TOOL_RESOLVE_TYPES = {"lot_id", "serial_number", "work_order"}
+QUERY_TOOL_RESOLVE_TYPES_BY_PROFILE = {
+    PROFILE_QUERY_TOOL: {"wafer_lot", "lot_id", "work_order"},
+    PROFILE_QUERY_TOOL_REVERSE: {"serial_number", "gd_work_order", "gd_lot_id"},
+}
 SUPPORTED_EVENT_DOMAINS = {
     "history",
     "materials",
@@ -172,10 +175,18 @@ def _extract_date_range(params: Dict[str, Any]) -> tuple[Optional[str], Optional
     return None, None
 
 
-def _seed_resolve_query_tool(params: Dict[str, Any]) -> tuple[Optional[Dict[str, Any]], Optional[tuple[str, str, int]]]:
+def _seed_resolve_query_tool(
+    profile: str,
+    params: Dict[str, Any],
+) -> tuple[Optional[Dict[str, Any]], Optional[tuple[str, str, int]]]:
     resolve_type = str(params.get("resolve_type") or params.get("input_type") or "").strip()
-    if resolve_type not in QUERY_TOOL_RESOLVE_TYPES:
-        return None, ("INVALID_PARAMS", "resolve_type must be lot_id/serial_number/work_order", 400)
+    allowed_types = QUERY_TOOL_RESOLVE_TYPES_BY_PROFILE.get(profile, set())
+    if resolve_type not in allowed_types:
+        return None, (
+            "INVALID_PARAMS",
+            f"resolve_type must be one of: {','.join(sorted(allowed_types))}",
+            400,
+        )
 
     values = _normalize_strings(params.get("values", []))
     if not values:
@@ -232,6 +243,8 @@ def _build_lineage_response(
     cid_to_name: Optional[Dict[str, str]] = None,
     parent_map: Optional[Dict[str, List[str]]] = None,
     merge_edges: Optional[Dict[str, List[str]]] = None,
+    typed_nodes: Optional[Dict[str, Dict[str, Any]]] = None,
+    typed_edges: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     normalized_ancestors: Dict[str, List[str]] = {}
     all_nodes = set(container_ids)
@@ -267,6 +280,26 @@ def _build_lineage_response(
             child: sources for child, sources in merge_edges.items()
             if child in all_nodes
         }
+    if typed_nodes:
+        response["nodes"] = {
+            cid: node for cid, node in typed_nodes.items()
+            if cid in all_nodes or cid in container_ids
+        }
+    if typed_edges:
+        normalized_edges = []
+        for edge in typed_edges:
+            if not isinstance(edge, dict):
+                continue
+            from_cid = str(edge.get("from_cid") or "").strip()
+            to_cid = str(edge.get("to_cid") or "").strip()
+            if not from_cid or not to_cid:
+                continue
+            if from_cid in all_nodes or to_cid in all_nodes:
+                normalized_edges.append(edge)
+                all_nodes.add(from_cid)
+                all_nodes.add(to_cid)
+        response["edges"] = normalized_edges
+        response["total_nodes"] = len(all_nodes)
     return response
 
 
@@ -359,7 +392,7 @@ def seed_resolve():
 
     started = time.monotonic()
     if profile in {PROFILE_QUERY_TOOL, PROFILE_QUERY_TOOL_REVERSE}:
-        resolved, route_error = _seed_resolve_query_tool(params)
+        resolved, route_error = _seed_resolve_query_tool(profile, params)
     else:
         resolved, route_error = _seed_resolve_mid_section_defect(params)
 
@@ -418,6 +451,8 @@ def lineage():
                 cid_to_name=reverse_graph.get("cid_to_name"),
                 parent_map=reverse_graph.get("parent_map"),
                 merge_edges=reverse_graph.get("merge_edges"),
+                typed_nodes=reverse_graph.get("nodes"),
+                typed_edges=reverse_graph.get("edges"),
             )
             response["roots"] = list(container_ids)
         else:
@@ -430,6 +465,8 @@ def lineage():
                 "leaf_serials": forward_tree.get("leaf_serials", {}),
                 "names": {cid: name for cid, name in cid_to_name.items() if name},
                 "total_nodes": forward_tree.get("total_nodes", 0),
+                "nodes": forward_tree.get("nodes", {}),
+                "edges": forward_tree.get("edges", []),
             }
     except Exception as exc:
         if _is_timeout_exception(exc):

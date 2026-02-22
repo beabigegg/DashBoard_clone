@@ -13,6 +13,7 @@ from mes_dashboard.services.query_tool_service import (
     validate_lot_input,
     validate_equipment_input,
     _resolve_by_lot_id,
+    _resolve_by_wafer_lot,
     _resolve_by_serial_number,
     _resolve_by_work_order,
     get_lot_split_merge_history,
@@ -215,6 +216,70 @@ class TestResolveQueriesUseBindParams:
                 _, query_params = mock_read.call_args.args
                 assert query_params == {'p0': 'LOT-1'}
 
+    def test_resolve_by_lot_id_supports_wildcard_pattern(self):
+        from unittest.mock import patch
+        import pandas as pd
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_read.return_value = pd.DataFrame([
+                    {
+                        'CONTAINERID': 'CID-1',
+                        'CONTAINERNAME': 'GA25123401',
+                        'SPECNAME': 'SPEC-1',
+                        'QTY': 100,
+                    },
+                    {
+                        'CONTAINERID': 'CID-2',
+                        'CONTAINERNAME': 'GA24123401',
+                        'SPECNAME': 'SPEC-2',
+                        'QTY': 200,
+                    },
+                ])
+
+                result = _resolve_by_lot_id(['GA25%01'])
+
+                assert result['total'] == 1
+                assert result['data'][0]['lot_id'] == 'GA25123401'
+                assert result['data'][0]['input_value'] == 'GA25%01'
+                sql_params = mock_load.call_args.kwargs
+                assert "LIKE" in sql_params['CONTAINER_FILTER']
+                _, query_params = mock_read.call_args.args
+                assert query_params == {'p0': 'GA25%01'}
+
+    def test_resolve_by_wafer_lot_supports_wildcard_pattern(self):
+        from unittest.mock import patch
+        import pandas as pd
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_read.return_value = pd.DataFrame([
+                    {
+                        'CONTAINERID': 'CID-1',
+                        'CONTAINERNAME': 'GA25123401-A00-001',
+                        'SPECNAME': 'SPEC-1',
+                        'QTY': 100,
+                        'FIRSTNAME': 'GMSN-1173#A',
+                    },
+                    {
+                        'CONTAINERID': 'CID-2',
+                        'CONTAINERNAME': 'GA25123402-A00-001',
+                        'SPECNAME': 'SPEC-2',
+                        'QTY': 100,
+                        'FIRSTNAME': 'GMSN-9999#B',
+                    },
+                ])
+
+                result = _resolve_by_wafer_lot(['GMSN-1173%'])
+
+                assert result['total'] == 1
+                assert result['data'][0]['input_value'] == 'GMSN-1173%'
+                sql_params = mock_load.call_args.kwargs
+                assert "LIKE" in sql_params['WAFER_FILTER']
+                assert "OBJECTTYPE = 'LOT'" in sql_params['WAFER_FILTER']
+
     def test_resolve_by_serial_number_uses_query_builder_params(self):
         from unittest.mock import patch
         import pandas as pd
@@ -262,6 +327,39 @@ class TestResolveQueriesUseBindParams:
                 assert ':p0' in sql_params['WORK_ORDER_FILTER']
                 _, query_params = mock_read.call_args.args
                 assert query_params == {'p0': 'WO-1'}
+
+    def test_resolve_by_work_order_supports_wildcard_pattern(self):
+        from unittest.mock import patch
+        import pandas as pd
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_read.return_value = pd.DataFrame([
+                    {
+                        'CONTAINERID': 'CID-1',
+                        'MFGORDERNAME': 'GA25120018',
+                        'CONTAINERNAME': 'GA25120018-A00-001',
+                        'SPECNAME': 'SPEC-1',
+                    },
+                    {
+                        'CONTAINERID': 'CID-2',
+                        'MFGORDERNAME': 'GA24120018',
+                        'CONTAINERNAME': 'GA24120018-A00-001',
+                        'SPECNAME': 'SPEC-2',
+                    },
+                ])
+
+                result = _resolve_by_work_order(['ga25%'])
+
+                assert result['total'] == 1
+                assert result['data'][0]['input_value'] == 'ga25%'
+                assert result['data'][0]['lot_id'] == 'GA25120018-A00-001'
+                sql_params = mock_load.call_args.kwargs
+                assert "LIKE" in sql_params['WORK_ORDER_FILTER']
+                assert "UPPER(NVL(MFGORDERNAME, ''))" in sql_params['WORK_ORDER_FILTER']
+                _, query_params = mock_read.call_args.args
+                assert query_params == {'p0': 'GA25%'}
 
 
 class TestSplitMergeHistoryMode:

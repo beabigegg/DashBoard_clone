@@ -62,11 +62,22 @@ function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function edgeKey(fromCid, toCid) {
+  const from = normalizeText(fromCid);
+  const to = normalizeText(toCid);
+  if (!from || !to) {
+    return '';
+  }
+  return `${from}->${to}`;
+}
+
 export function useReverseLineage(initial = {}) {
   ensureMesApiAvailable();
 
   const lineageMap = reactive(new Map());
   const nameMap = reactive(new Map());
+  const nodeMetaMap = reactive(new Map());
+  const edgeTypeMap = reactive(new Map());
   const leafSerials = reactive(new Map());
   const selectedContainerId = ref(normalizeText(initial.selectedContainerId));
   const selectedContainerIds = ref(
@@ -219,11 +230,41 @@ export function useReverseLineage(initial = {}) {
   function populateReverseTree(payload, requestedRoots = []) {
     const parentMap = normalizeParentMap(payload);
     const names = payload?.names;
+    const typedNodes = payload?.nodes;
+    const typedEdges = payload?.edges;
 
     if (names && typeof names === 'object') {
       Object.entries(names).forEach(([cid, name]) => {
         if (cid && name) {
           nameMap.set(normalizeText(cid), String(name));
+        }
+      });
+    }
+
+    if (typedNodes && typeof typedNodes === 'object') {
+      Object.entries(typedNodes).forEach(([cid, node]) => {
+        const normalizedCid = normalizeText(cid);
+        if (!normalizedCid || !node || typeof node !== 'object') {
+          return;
+        }
+        nodeMetaMap.set(normalizedCid, node);
+        const displayName = normalizeText(node.container_name);
+        if (displayName) {
+          nameMap.set(normalizedCid, displayName);
+        }
+      });
+    }
+
+    edgeTypeMap.clear();
+    if (Array.isArray(typedEdges)) {
+      typedEdges.forEach((edge) => {
+        if (!edge || typeof edge !== 'object') {
+          return;
+        }
+        const key = edgeKey(edge.from_cid, edge.to_cid);
+        const type = normalizeText(edge.edge_type);
+        if (key && type) {
+          edgeTypeMap.set(key, type);
         }
       });
     }
@@ -349,6 +390,8 @@ export function useReverseLineage(initial = {}) {
     semaphore.clear();
     lineageMap.clear();
     nameMap.clear();
+    nodeMetaMap.clear();
+    edgeTypeMap.clear();
     leafSerials.clear();
     rootRows.value = [];
     rootContainerIds.value = [];
@@ -371,6 +414,8 @@ export function useReverseLineage(initial = {}) {
   return {
     lineageMap,
     nameMap,
+    nodeMetaMap,
+    edgeTypeMap,
     leafSerials,
     selectedContainerId,
     selectedContainerIds,

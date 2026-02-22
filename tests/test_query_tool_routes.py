@@ -140,6 +140,34 @@ class TestResolveEndpoint:
         assert data['data'][0]['lot_id'] == 'GA23100020-A00-001'
 
     @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
+    def test_resolve_supports_gd_lot_id(self, mock_resolve, client):
+        mock_resolve.return_value = {
+            'data': [
+                {
+                    'container_id': '4881038000260b21',
+                    'lot_id': 'GD25060502-A11',
+                    'input_value': 'GD25060502-A11',
+                }
+            ],
+            'total': 1,
+            'input_count': 1,
+            'not_found': [],
+        }
+
+        response = client.post(
+            '/api/query-tool/resolve',
+            json={
+                'input_type': 'gd_lot_id',
+                'values': ['GD25060502-A11'],
+            }
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['total'] == 1
+        assert payload['data'][0]['lot_id'] == 'GD25060502-A11'
+
+    @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
     def test_resolve_not_found(self, mock_resolve, client):
         """Should return not_found list for missing LOT IDs."""
         mock_resolve.return_value = {

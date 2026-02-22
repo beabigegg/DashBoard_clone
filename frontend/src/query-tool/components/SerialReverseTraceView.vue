@@ -48,6 +48,14 @@ const props = defineProps({
     type: Object,
     default: () => new Map(),
   },
+  nodeMetaMap: {
+    type: Object,
+    default: () => new Map(),
+  },
+  edgeTypeMap: {
+    type: Object,
+    default: () => new Map(),
+  },
   leafSerials: {
     type: Object,
     default: () => new Map(),
@@ -144,6 +152,8 @@ const emit = defineEmits([
       :not-found="notFound"
       :lineage-map="lineageMap"
       :name-map="nameMap"
+      :node-meta-map="nodeMetaMap"
+      :edge-type-map="edgeTypeMap"
       :leaf-serials="leafSerials"
       :selected-container-ids="selectedContainerIds"
       :loading="lineageLoading"

@@ -9,6 +9,7 @@ import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app
 from mes_dashboard.core.cache import NoOpCache
 from mes_dashboard.core.rate_limit import reset_rate_limits_for_tests
+from mes_dashboard.routes.trace_routes import _lineage_cache_key
 
 
 def _client():
@@ -25,6 +26,14 @@ def setup_function():
 
 def teardown_function():
     reset_rate_limits_for_tests()
+
+
+def test_lineage_cache_key_is_profile_aware():
+    key_forward = _lineage_cache_key("query_tool", ["CID-001", "CID-002"])
+    key_reverse = _lineage_cache_key("query_tool_reverse", ["CID-001", "CID-002"])
+    assert key_forward != key_reverse
+    assert key_forward.startswith("trace:lineage:query_tool:")
+    assert key_reverse.startswith("trace:lineage:query_tool_reverse:")
 
 
 @patch('mes_dashboard.routes.trace_routes.resolve_lots')
@@ -89,6 +98,53 @@ def test_seed_resolve_query_tool_reverse_success(mock_resolve_lots):
     assert payload['seeds'][0]['container_id'] == 'CID-SN'
     assert payload['seeds'][0]['container_name'] == 'LOT-SN'
     assert payload['cache_key'].startswith('trace:seed:query_tool_reverse:')
+
+
+@patch('mes_dashboard.routes.trace_routes.resolve_lots')
+def test_seed_resolve_query_tool_reverse_gd_lot_id_success(mock_resolve_lots):
+    mock_resolve_lots.return_value = {
+        'data': [
+            {
+                'container_id': 'CID-GD',
+                'lot_id': 'GD25060502-A11',
+            }
+        ]
+    }
+
+    client = _client()
+    response = client.post(
+        '/api/trace/seed-resolve',
+        json={
+            'profile': 'query_tool_reverse',
+            'params': {
+                'resolve_type': 'gd_lot_id',
+                'values': ['GD25060502-A11'],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['seed_count'] == 1
+    assert payload['seeds'][0]['container_name'] == 'GD25060502-A11'
+
+
+def test_seed_resolve_query_tool_rejects_reverse_only_type():
+    client = _client()
+    response = client.post(
+        '/api/trace/seed-resolve',
+        json={
+            'profile': 'query_tool',
+            'params': {
+                'resolve_type': 'serial_number',
+                'values': ['SN-001'],
+            },
+        },
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload['error']['code'] == 'INVALID_PARAMS'
 
 
 def test_seed_resolve_invalid_profile_returns_400():
@@ -165,6 +221,13 @@ def test_lineage_reverse_profile_returns_ancestors(mock_resolve_genealogy):
         },
         'parent_map': {'CID-SN': ['CID-A'], 'CID-A': ['CID-B']},
         'merge_edges': {'CID-SN': ['CID-A']},
+        'nodes': {
+            'CID-SN': {'container_id': 'CID-SN', 'node_type': 'GD'},
+            'CID-A': {'container_id': 'CID-A', 'node_type': 'GA'},
+        },
+        'edges': [
+            {'from_cid': 'CID-A', 'to_cid': 'CID-SN', 'edge_type': 'gd_rework_source'},
+        ],
     }
 
     client = _client()
@@ -184,6 +247,8 @@ def test_lineage_reverse_profile_returns_ancestors(mock_resolve_genealogy):
     assert payload['parent_map']['CID-SN'] == ['CID-A']
     assert payload['merge_edges']['CID-SN'] == ['CID-A']
     assert payload['names']['CID-A'] == 'LOT-A'
+    assert payload['nodes']['CID-SN']['node_type'] == 'GD'
+    assert payload['edges'][0]['edge_type'] == 'gd_rework_source'
 
 
 @patch(

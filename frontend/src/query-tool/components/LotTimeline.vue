@@ -24,6 +24,10 @@ function safeDate(value) {
   return parsed ? parsed : null;
 }
 
+function normalizedKey(value) {
+  return normalizeText(value).toUpperCase();
+}
+
 // ── Tracks: group by (WORKCENTER_GROUP × LOT ID × Equipment) ──
 const tracks = computed(() => {
   const grouped = new Map();
@@ -44,7 +48,13 @@ const tracks = computed(() => {
     }
 
     if (!grouped.has(trackKey)) {
-      grouped.set(trackKey, { groupName, lotId, equipment, bars: [] });
+      grouped.set(trackKey, {
+        groupName,
+        lotId,
+        equipment,
+        containerId: normalizeText(row?.CONTAINERID),
+        bars: [],
+      });
     }
 
     grouped.get(trackKey).bars.push({
@@ -56,9 +66,10 @@ const tracks = computed(() => {
     });
   });
 
-  return [...grouped.entries()].map(([trackKey, { groupName, lotId, equipment, bars }]) => ({
+  return [...grouped.entries()].map(([trackKey, { groupName, lotId, equipment, containerId, bars }]) => ({
     id: trackKey,
     group: groupName,
+    containerId,
     label: groupName,
     sublabels: [
       lotId ? `LOT ID: ${lotId}` : '',
@@ -74,20 +85,128 @@ const tracks = computed(() => {
   }));
 });
 
-// ── Events: resolve trackId to compound key via group matching ──
+// ── Events: resolve event-to-track mapping ──
 const groupToFirstTrackId = computed(() => {
   const map = new Map();
   tracks.value.forEach((track) => {
-    if (!map.has(track.group)) {
-      map.set(track.group, track.id);
+    const key = normalizedKey(track.group);
+    if (key && !map.has(key)) {
+      map.set(key, track.id);
     }
   });
   return map;
 });
 
-function resolveEventTrackId(row) {
-  const group = normalizeText(row?.WORKCENTER_GROUP) || normalizeText(row?.WORKCENTERNAME) || '';
-  return groupToFirstTrackId.value.get(group) || group;
+const containerToTrackIds = computed(() => {
+  const map = new Map();
+  tracks.value.forEach((track) => {
+    const cid = normalizedKey(track.containerId);
+    if (!cid) {
+      return;
+    }
+    if (!map.has(cid)) {
+      map.set(cid, []);
+    }
+    map.get(cid).push(track.id);
+  });
+  return map;
+});
+
+const containerSpecWindows = computed(() => {
+  const map = new Map();
+  tracks.value.forEach((track) => {
+    const containerKey = normalizedKey(track.containerId);
+    if (!containerKey) {
+      return;
+    }
+    (track.layers || []).forEach((layer) => {
+      (layer.bars || []).forEach((bar) => {
+        const specKey = normalizedKey(bar?.label || bar?.type);
+        const startMs = bar?.start instanceof Date ? bar.start.getTime() : null;
+        const endMs = bar?.end instanceof Date ? bar.end.getTime() : null;
+        if (!specKey || !Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+          return;
+        }
+
+        const key = `${containerKey}||${specKey}`;
+        if (!map.has(key)) {
+          map.set(key, []);
+        }
+
+        map.get(key).push({
+          trackId: track.id,
+          startMs,
+          endMs: endMs > startMs ? endMs : startMs,
+        });
+      });
+    });
+  });
+  return map;
+});
+
+function pickClosestTrack(windows, timeMs) {
+  if (!Array.isArray(windows) || windows.length === 0) {
+    return '';
+  }
+  if (!Number.isFinite(timeMs)) {
+    return windows[0]?.trackId || '';
+  }
+
+  let best = '';
+  let bestDistance = Number.POSITIVE_INFINITY;
+  windows.forEach((window) => {
+    if (!window?.trackId) {
+      return;
+    }
+    if (timeMs >= window.startMs && timeMs <= window.endMs) {
+      if (0 < bestDistance) {
+        best = window.trackId;
+        bestDistance = 0;
+      }
+      return;
+    }
+    const distance = timeMs < window.startMs
+      ? (window.startMs - timeMs)
+      : (timeMs - window.endMs);
+    if (distance < bestDistance) {
+      best = window.trackId;
+      bestDistance = distance;
+    }
+  });
+
+  return best;
+}
+
+function resolveHoldTrackId(row) {
+  const groupKey = normalizedKey(row?.WORKCENTER_GROUP) || normalizedKey(row?.WORKCENTERNAME);
+  if (groupKey) {
+    const trackId = groupToFirstTrackId.value.get(groupKey);
+    if (trackId) {
+      return trackId;
+    }
+  }
+
+  const containerKey = normalizedKey(row?.CONTAINERID);
+  if (containerKey) {
+    const byContainer = containerToTrackIds.value.get(containerKey) || [];
+    if (byContainer.length > 0) {
+      return byContainer[0];
+    }
+  }
+
+  return '';
+}
+
+function resolveMaterialTrackId(row, time) {
+  const specKey = normalizedKey(row?.SPECNAME);
+  const containerKey = normalizedKey(row?.CONTAINERID);
+  if (!specKey || !containerKey) {
+    return '';
+  }
+
+  const windows = containerSpecWindows.value.get(`${containerKey}||${specKey}`) || [];
+  const timeMs = time instanceof Date ? time.getTime() : null;
+  return pickClosestTrack(windows, timeMs);
 }
 
 const events = computed(() => {
@@ -98,10 +217,14 @@ const events = computed(() => {
     if (!time) {
       return;
     }
+    const trackId = resolveHoldTrackId(row);
+    if (!trackId) {
+      return;
+    }
 
     markers.push({
       id: `hold-${index}`,
-      trackId: resolveEventTrackId(row),
+      trackId,
       time,
       type: 'HOLD',
       shape: 'diamond',
@@ -115,10 +238,14 @@ const events = computed(() => {
     if (!time) {
       return;
     }
+    const trackId = resolveMaterialTrackId(row, time);
+    if (!trackId) {
+      return;
+    }
 
     markers.push({
       id: `material-${index}`,
-      trackId: resolveEventTrackId(row),
+      trackId,
       time,
       type: 'MATERIAL',
       shape: 'triangle',
@@ -128,6 +255,28 @@ const events = computed(() => {
   });
 
   return markers;
+});
+
+const materialMappingStats = computed(() => {
+  let total = 0;
+  let mapped = 0;
+
+  props.materialRows.forEach((row) => {
+    const time = safeDate(row?.TXNDATE);
+    if (!time) {
+      return;
+    }
+    total += 1;
+    if (resolveMaterialTrackId(row, time)) {
+      mapped += 1;
+    }
+  });
+
+  return {
+    total,
+    mapped,
+    unmapped: Math.max(0, total - mapped),
+  };
 });
 
 const colorMap = computed(() => {
@@ -182,6 +331,12 @@ const timeRange = computed(() => {
       <div class="flex items-center gap-3 text-xs text-slate-500">
         <span v-if="timeRange">{{ formatDateTime(timeRange.start) }} — {{ formatDateTime(timeRange.end) }}</span>
         <span>Hold / Material 事件已覆蓋標記</span>
+        <span v-if="materialMappingStats.total > 0">
+          扣料對應 {{ materialMappingStats.mapped }} / {{ materialMappingStats.total }}
+          <template v-if="materialMappingStats.unmapped > 0">
+            （未對應 {{ materialMappingStats.unmapped }}）
+          </template>
+        </span>
       </div>
     </div>
 

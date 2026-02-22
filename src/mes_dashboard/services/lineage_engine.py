@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.sql import QueryBuilder, SQLLoader
@@ -14,6 +14,18 @@ logger = logging.getLogger("mes_dashboard.lineage_engine")
 
 ORACLE_IN_BATCH_SIZE = 1000
 MAX_SPLIT_DEPTH = 20
+
+NODE_TYPE_WAFER = "WAFER"
+NODE_TYPE_GC = "GC"
+NODE_TYPE_GA = "GA"
+NODE_TYPE_GD = "GD"
+NODE_TYPE_LOT = "LOT"
+NODE_TYPE_UNKNOWN = "UNKNOWN"
+
+EDGE_TYPE_SPLIT = "split_from"
+EDGE_TYPE_MERGE = "merge_source"
+EDGE_TYPE_WAFER = "wafer_origin"
+EDGE_TYPE_GD_REWORK = "gd_rework_source"
 
 
 def _normalize_list(values: List[str]) -> List[str]:
@@ -39,6 +51,39 @@ def _safe_str(value: Any) -> Optional[str]:
         return None
     value = value.strip()
     return value if value else None
+
+
+def _upper_prefix_match(value: Optional[str], prefix: str) -> bool:
+    text = _safe_str(value)
+    if not text:
+        return False
+    return text.upper().startswith(prefix.upper())
+
+
+def _append_unique(values: List[str], item: str) -> None:
+    if item and item not in values:
+        values.append(item)
+
+
+def _to_edge_payload(edges: List[Tuple[str, str, str]]) -> List[Dict[str, str]]:
+    dedup: List[Dict[str, str]] = []
+    seen: Set[Tuple[str, str, str]] = set()
+    for from_cid, to_cid, edge_type in edges:
+        from_id = _safe_str(from_cid)
+        to_id = _safe_str(to_cid)
+        et = _safe_str(edge_type)
+        if not from_id or not to_id or not et:
+            continue
+        key = (from_id, to_id, et)
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup.append({
+            "from_cid": from_id,
+            "to_cid": to_id,
+            "edge_type": et,
+        })
+    return dedup
 
 
 def _build_parent_map(
@@ -81,6 +126,174 @@ def _build_parent_map(
 
 class LineageEngine:
     """Unified split/merge genealogy resolver."""
+
+    @staticmethod
+    def _resolve_container_snapshot(
+        container_ids: List[str],
+    ) -> Dict[str, Dict[str, Optional[str]]]:
+        normalized_cids = _normalize_list(container_ids)
+        if not normalized_cids:
+            return {}
+
+        snapshots: Dict[str, Dict[str, Optional[str]]] = {}
+        for i in range(0, len(normalized_cids), ORACLE_IN_BATCH_SIZE):
+            batch = normalized_cids[i:i + ORACLE_IN_BATCH_SIZE]
+            builder = QueryBuilder()
+            builder.add_in_condition("c.CONTAINERID", batch)
+            sql = SQLLoader.load_with_params(
+                "lineage/container_snapshot",
+                CID_FILTER=builder.get_conditions_sql(),
+            )
+            df = read_sql_df(sql, builder.params)
+            if df is None or df.empty:
+                continue
+            for _, row in df.iterrows():
+                cid = _safe_str(row.get("CONTAINERID"))
+                if not cid:
+                    continue
+                snapshots[cid] = {
+                    "CONTAINERID": cid,
+                    "CONTAINERNAME": _safe_str(row.get("CONTAINERNAME")),
+                    "MFGORDERNAME": _safe_str(row.get("MFGORDERNAME")),
+                    "OBJECTTYPE": _safe_str(row.get("OBJECTTYPE")),
+                    "FIRSTNAME": _safe_str(row.get("FIRSTNAME")),
+                    "ORIGINALCONTAINERID": _safe_str(row.get("ORIGINALCONTAINERID")),
+                    "SPLITFROMID": _safe_str(row.get("SPLITFROMID")),
+                }
+        return snapshots
+
+    @staticmethod
+    def _resolve_lot_ids_by_name(names: List[str]) -> Dict[str, str]:
+        normalized_names = _normalize_list(names)
+        if not normalized_names:
+            return {}
+
+        mapping: Dict[str, str] = {}
+        for i in range(0, len(normalized_names), ORACLE_IN_BATCH_SIZE):
+            batch = normalized_names[i:i + ORACLE_IN_BATCH_SIZE]
+            builder = QueryBuilder()
+            builder.add_in_condition("c.CONTAINERNAME", batch)
+            sql = SQLLoader.load_with_params(
+                "lineage/lot_ids_by_name",
+                NAME_FILTER=builder.get_conditions_sql(),
+            )
+            df = read_sql_df(sql, builder.params)
+            if df is None or df.empty:
+                continue
+            for _, row in df.iterrows():
+                cid = _safe_str(row.get("CONTAINERID"))
+                name = _safe_str(row.get("CONTAINERNAME"))
+                if cid and name and name not in mapping:
+                    mapping[name] = cid
+        return mapping
+
+    @staticmethod
+    def _is_gd_snapshot(snapshot: Optional[Dict[str, Optional[str]]]) -> bool:
+        if not snapshot:
+            return False
+        return (
+            _upper_prefix_match(snapshot.get("MFGORDERNAME"), "GD")
+            or _upper_prefix_match(snapshot.get("CONTAINERNAME"), "GD")
+        )
+
+    @staticmethod
+    def _classify_node_type(
+        cid: str,
+        snapshot: Optional[Dict[str, Optional[str]]],
+        wafer_ids: Set[str],
+    ) -> str:
+        if cid in wafer_ids:
+            return NODE_TYPE_WAFER
+        if LineageEngine._is_gd_snapshot(snapshot):
+            return NODE_TYPE_GD
+        if snapshot and (
+            _upper_prefix_match(snapshot.get("MFGORDERNAME"), "GC")
+            or _upper_prefix_match(snapshot.get("CONTAINERNAME"), "GC")
+        ):
+            return NODE_TYPE_GC
+        if snapshot and (
+            _upper_prefix_match(snapshot.get("MFGORDERNAME"), "GA")
+            or _upper_prefix_match(snapshot.get("CONTAINERNAME"), "GA")
+        ):
+            return NODE_TYPE_GA
+        if snapshot and _safe_str(snapshot.get("OBJECTTYPE")) == "LOT":
+            return NODE_TYPE_LOT
+        return NODE_TYPE_UNKNOWN
+
+    @staticmethod
+    def _build_semantic_links(
+        base_node_ids: Set[str],
+        snapshots: Dict[str, Dict[str, Optional[str]]],
+    ) -> Tuple[Dict[str, Dict[str, Optional[str]]], List[Tuple[str, str, str]], Set[str]]:
+        """Build wafer-origin and GD rework edges from container snapshots.
+
+        Returns:
+            (snapshots, semantic_edges, wafer_ids)
+        """
+        if not base_node_ids:
+            return snapshots, [], set()
+
+        all_snapshots = dict(snapshots)
+
+        first_names = sorted({
+            first_name
+            for row in all_snapshots.values()
+            for first_name in [_safe_str(row.get("FIRSTNAME"))]
+            if first_name
+        })
+        wafer_by_name = LineageEngine._resolve_lot_ids_by_name(first_names)
+
+        extra_ids: Set[str] = set()
+        for cid in wafer_by_name.values():
+            if cid not in all_snapshots:
+                extra_ids.add(cid)
+
+        for row in all_snapshots.values():
+            if not LineageEngine._is_gd_snapshot(row):
+                continue
+            source = _safe_str(row.get("ORIGINALCONTAINERID")) or _safe_str(row.get("SPLITFROMID"))
+            if source and source not in all_snapshots:
+                extra_ids.add(source)
+
+        if extra_ids:
+            all_snapshots.update(LineageEngine._resolve_container_snapshot(sorted(extra_ids)))
+
+        semantic_edges: List[Tuple[str, str, str]] = []
+        wafer_ids: Set[str] = set()
+
+        for cid, row in all_snapshots.items():
+            first_name = _safe_str(row.get("FIRSTNAME"))
+            wafer_cid = wafer_by_name.get(first_name or "")
+            if wafer_cid and wafer_cid != cid:
+                semantic_edges.append((wafer_cid, cid, EDGE_TYPE_WAFER))
+                wafer_ids.add(wafer_cid)
+
+            if LineageEngine._is_gd_snapshot(row):
+                source = _safe_str(row.get("ORIGINALCONTAINERID")) or _safe_str(row.get("SPLITFROMID"))
+                if source and source != cid:
+                    semantic_edges.append((source, cid, EDGE_TYPE_GD_REWORK))
+
+        return all_snapshots, semantic_edges, wafer_ids
+
+    @staticmethod
+    def _build_nodes_payload(
+        node_ids: Set[str],
+        snapshots: Dict[str, Dict[str, Optional[str]]],
+        cid_to_name: Dict[str, str],
+        wafer_ids: Set[str],
+    ) -> Dict[str, Dict[str, Optional[str]]]:
+        payload: Dict[str, Dict[str, Optional[str]]] = {}
+        for cid in sorted({cid for cid in node_ids if _safe_str(cid)}):
+            snapshot = snapshots.get(cid, {})
+            name = _safe_str(snapshot.get("CONTAINERNAME")) or _safe_str(cid_to_name.get(cid)) or cid
+            payload[cid] = {
+                "container_id": cid,
+                "container_name": name,
+                "mfgorder_name": _safe_str(snapshot.get("MFGORDERNAME")),
+                "wafer_lot": _safe_str(snapshot.get("FIRSTNAME")),
+                "node_type": LineageEngine._classify_node_type(cid, snapshot, wafer_ids),
+            }
+        return payload
 
     @staticmethod
     def resolve_split_ancestors(
@@ -341,8 +554,17 @@ class LineageEngine:
 
         # Step 2: Trace DOWN from roots to get full tree
         desc_result = LineageEngine.resolve_split_descendants(roots)
-        children_map = desc_result["children_map"]
+        split_children_map = desc_result["children_map"]
+        children_map: Dict[str, List[str]] = {
+            parent: list(children)
+            for parent, children in split_children_map.items()
+        }
         cid_to_name.update(desc_result["cid_to_name"])
+
+        split_edges: List[Tuple[str, str, str]] = []
+        for parent, children in split_children_map.items():
+            for child in children:
+                split_edges.append((parent, child, EDGE_TYPE_SPLIT))
 
         # Collect all nodes in the tree
         all_nodes: Set[str] = set(roots)
@@ -356,13 +578,52 @@ class LineageEngine:
         # Step 4: Query serial numbers for leaf nodes
         leaf_serials = LineageEngine.resolve_leaf_serials(leaf_cids) if leaf_cids else {}
 
+        # Step 5: Build semantic links (wafer origin / GD rework) and augment tree.
+        snapshots: Dict[str, Dict[str, Optional[str]]] = {}
+        semantic_edges: List[Tuple[str, str, str]] = []
+        wafer_ids: Set[str] = set()
+        try:
+            snapshots = LineageEngine._resolve_container_snapshot(list(all_nodes))
+            for cid, row in snapshots.items():
+                name = _safe_str(row.get("CONTAINERNAME"))
+                if name:
+                    cid_to_name[cid] = name
+
+            snapshots, semantic_edges, wafer_ids = LineageEngine._build_semantic_links(all_nodes, snapshots)
+            for cid, row in snapshots.items():
+                name = _safe_str(row.get("CONTAINERNAME"))
+                if name:
+                    cid_to_name[cid] = name
+        except Exception as exc:
+            logger.warning("Forward semantic enrichment skipped due to snapshot error: %s", exc)
+
+        for from_cid, to_cid, _edge_type in semantic_edges:
+            if from_cid not in children_map:
+                children_map[from_cid] = []
+            _append_unique(children_map[from_cid], to_cid)
+            all_nodes.add(from_cid)
+            all_nodes.add(to_cid)
+
+        # Recompute roots after semantic edge augmentation.
+        incoming: Set[str] = set()
+        for parent, children in children_map.items():
+            all_nodes.add(parent)
+            for child in children:
+                incoming.add(child)
+                all_nodes.add(child)
+        roots = sorted([cid for cid in all_nodes if cid not in incoming])
+
+        typed_nodes = LineageEngine._build_nodes_payload(all_nodes, snapshots, cid_to_name, wafer_ids)
+        typed_edges = _to_edge_payload(split_edges + semantic_edges)
+
         logger.info(
-            "Forward tree resolution completed: seeds=%s, roots=%s, nodes=%s, leaves=%s, serials=%s",
+            "Forward tree resolution completed: seeds=%s, roots=%s, nodes=%s, leaves=%s, serials=%s, semantic_edges=%s",
             len(seed_cids),
             len(roots),
             len(all_nodes),
             len(leaf_cids),
             len(leaf_serials),
+            len(semantic_edges),
         )
 
         return {
@@ -371,6 +632,8 @@ class LineageEngine:
             "leaf_serials": leaf_serials,
             "cid_to_name": cid_to_name,
             "total_nodes": len(all_nodes),
+            "nodes": typed_nodes,
+            "edges": typed_edges,
         }
 
     @staticmethod
@@ -390,7 +653,14 @@ class LineageEngine:
         """
         seed_cids = _normalize_list(container_ids)
         if not seed_cids:
-            return {"ancestors": {}, "cid_to_name": {}, "parent_map": {}, "merge_edges": {}}
+            return {
+                "ancestors": {},
+                "cid_to_name": {},
+                "parent_map": {},
+                "merge_edges": {},
+                "nodes": {},
+                "edges": [],
+            }
 
         split_result = LineageEngine.resolve_split_ancestors(seed_cids, initial_names)
         child_to_parent = split_result["child_to_parent"]
@@ -410,46 +680,119 @@ class LineageEngine:
                 current = parent
             ancestors[seed] = visited
 
+        split_edges: List[Tuple[str, str, str]] = [
+            (parent, child, EDGE_TYPE_SPLIT)
+            for child, parent in child_to_parent.items()
+            if _safe_str(parent) and _safe_str(child)
+        ]
+
         all_names = [name for name in cid_to_name.values() if _safe_str(name)]
         merge_source_map = LineageEngine.resolve_merge_sources(all_names)
-        if not merge_source_map:
-            pm, me = _build_parent_map(child_to_parent, {}, {}, cid_to_name)
-            return {"ancestors": ancestors, "cid_to_name": cid_to_name, "parent_map": pm, "merge_edges": me}
-
+        merge_child_to_parent: Dict[str, str] = {}
         merge_source_cids_all: Set[str] = set()
-        for seed in seed_cids:
-            self_and_ancestors = ancestors[seed] | {seed}
-            for cid in list(self_and_ancestors):
-                name = cid_to_name.get(cid)
-                if not name:
-                    continue
-                for source_cid in merge_source_map.get(name, []):
-                    if source_cid == cid or source_cid in self_and_ancestors:
+        if merge_source_map:
+            for seed in seed_cids:
+                self_and_ancestors = ancestors[seed] | {seed}
+                for cid in list(self_and_ancestors):
+                    name = cid_to_name.get(cid)
+                    if not name:
                         continue
-                    ancestors[seed].add(source_cid)
-                    merge_source_cids_all.add(source_cid)
+                    for source_cid in merge_source_map.get(name, []):
+                        if source_cid == cid or source_cid in self_and_ancestors:
+                            continue
+                        ancestors[seed].add(source_cid)
+                        merge_source_cids_all.add(source_cid)
 
-        seen = set(seed_cids) | set(child_to_parent.keys()) | set(child_to_parent.values())
-        new_merge_cids = list(merge_source_cids_all - seen)
-        if not new_merge_cids:
-            pm, me = _build_parent_map(child_to_parent, {}, merge_source_map, cid_to_name)
-            return {"ancestors": ancestors, "cid_to_name": cid_to_name, "parent_map": pm, "merge_edges": me}
+            seen = set(seed_cids) | set(child_to_parent.keys()) | set(child_to_parent.values())
+            new_merge_cids = list(merge_source_cids_all - seen)
+            if new_merge_cids:
+                merge_split_result = LineageEngine.resolve_split_ancestors(new_merge_cids)
+                merge_child_to_parent = merge_split_result["child_to_parent"]
+                cid_to_name.update(merge_split_result["cid_to_name"])
 
-        merge_split_result = LineageEngine.resolve_split_ancestors(new_merge_cids)
-        merge_child_to_parent = merge_split_result["child_to_parent"]
-        cid_to_name.update(merge_split_result["cid_to_name"])
-
-        for seed in seed_cids:
-            for merge_cid in list(ancestors[seed] & merge_source_cids_all):
-                current = merge_cid
-                depth = 0
-                while current in merge_child_to_parent and depth < MAX_SPLIT_DEPTH:
-                    depth += 1
-                    parent = merge_child_to_parent[current]
-                    if parent in ancestors[seed]:
-                        break
-                    ancestors[seed].add(parent)
-                    current = parent
+                for seed in seed_cids:
+                    for merge_cid in list(ancestors[seed] & merge_source_cids_all):
+                        current = merge_cid
+                        depth = 0
+                        while current in merge_child_to_parent and depth < MAX_SPLIT_DEPTH:
+                            depth += 1
+                            parent = merge_child_to_parent[current]
+                            if parent in ancestors[seed]:
+                                break
+                            ancestors[seed].add(parent)
+                            current = parent
 
         pm, me = _build_parent_map(child_to_parent, merge_child_to_parent, merge_source_map, cid_to_name)
-        return {"ancestors": ancestors, "cid_to_name": cid_to_name, "parent_map": pm, "merge_edges": me}
+
+        for child, parent in merge_child_to_parent.items():
+            if _safe_str(parent) and _safe_str(child):
+                split_edges.append((parent, child, EDGE_TYPE_SPLIT))
+
+        merge_payload_edges: List[Tuple[str, str, str]] = []
+        for child, sources in me.items():
+            for source in sources:
+                merge_payload_edges.append((source, child, EDGE_TYPE_MERGE))
+
+        all_nodes: Set[str] = set(seed_cids)
+        for values in ancestors.values():
+            all_nodes.update(values)
+        for child, parents in pm.items():
+            all_nodes.add(child)
+            all_nodes.update(parents)
+
+        snapshots: Dict[str, Dict[str, Optional[str]]] = {}
+        semantic_edges: List[Tuple[str, str, str]] = []
+        wafer_ids: Set[str] = set()
+        try:
+            snapshots = LineageEngine._resolve_container_snapshot(list(all_nodes))
+            for cid, row in snapshots.items():
+                name = _safe_str(row.get("CONTAINERNAME"))
+                if name:
+                    cid_to_name[cid] = name
+
+            snapshots, semantic_edges, wafer_ids = LineageEngine._build_semantic_links(all_nodes, snapshots)
+            for cid, row in snapshots.items():
+                name = _safe_str(row.get("CONTAINERNAME"))
+                if name:
+                    cid_to_name[cid] = name
+        except Exception as exc:
+            logger.warning("Reverse semantic enrichment skipped due to snapshot error: %s", exc)
+
+        for parent, child, _edge_type in semantic_edges:
+            parent = _safe_str(parent)
+            child = _safe_str(child)
+            if not parent or not child:
+                continue
+            parents = pm.setdefault(child, [])
+            _append_unique(parents, parent)
+            all_nodes.add(parent)
+            all_nodes.add(child)
+
+        recomputed_ancestors: Dict[str, Set[str]] = {}
+        for seed in seed_cids:
+            visited: Set[str] = set()
+            stack = list(pm.get(seed, []))
+            depth = 0
+            while stack and depth < MAX_SPLIT_DEPTH * 10:
+                depth += 1
+                parent = _safe_str(stack.pop())
+                if not parent or parent in visited:
+                    continue
+                visited.add(parent)
+                for grand_parent in pm.get(parent, []):
+                    gp = _safe_str(grand_parent)
+                    if gp and gp not in visited:
+                        stack.append(gp)
+            recomputed_ancestors[seed] = visited
+
+        typed_nodes = LineageEngine._build_nodes_payload(all_nodes, snapshots, cid_to_name, wafer_ids)
+        typed_edges = _to_edge_payload(split_edges + merge_payload_edges + semantic_edges)
+
+        return {
+            "ancestors": recomputed_ancestors,
+            "cid_to_name": cid_to_name,
+            "parent_map": pm,
+            "merge_edges": me,
+            "nodes": typed_nodes,
+            "edges": typed_edges,
+        }
