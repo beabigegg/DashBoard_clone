@@ -32,6 +32,7 @@ _CACHE = {
     'workcenter_mapping': None,     # Dict {workcentername: {group, sequence}}
     'workcenter_to_short': None,    # Dict {workcentername: short_name}
     'spec_order_mapping': None,     # Dict {spec_name_upper: spec_order}
+    'spec_workcenter_mapping': None,  # Dict {spec_name_upper: {workcenter, group, sequence}}
     'last_refresh': None,
     'is_loading': False,
 }
@@ -162,6 +163,33 @@ def get_spec_order_mapping(force_refresh: bool = False) -> Dict[str, int]:
     return {}
 
 
+def get_spec_workcenter_mapping(force_refresh: bool = False) -> Dict[str, Dict[str, Any]]:
+    """Get SPEC -> {workcenter, group, sequence} mapping.
+
+    Returns:
+        Dict mapping normalized SPEC name (uppercase) to workcenter info.
+    """
+    _ensure_cache_loaded(force_refresh)
+    return _CACHE.get('spec_workcenter_mapping') or {}
+
+
+def get_specs_for_groups(groups: List[str]) -> List[str]:
+    """Get list of SPEC names that belong to specified workcenter groups.
+
+    Args:
+        groups: List of WORKCENTER_GROUP names
+
+    Returns:
+        List of normalized SPEC names (uppercase) belonging to those groups.
+    """
+    mapping = get_spec_workcenter_mapping()
+    if not mapping:
+        return []
+    target = {g.strip().upper() for g in groups if g}
+    return [spec for spec, info in mapping.items()
+            if info['group'].strip().upper() in target]
+
+
 # ============================================================
 # Cache Management
 # ============================================================
@@ -181,6 +209,7 @@ def get_cache_status() -> Dict[str, Any]:
             'workcenter_groups_count': len(_CACHE.get('workcenter_groups') or []),
             'workcenter_mapping_count': len(_CACHE.get('workcenter_mapping') or {}),
             'spec_order_mapping_count': len(_CACHE.get('spec_order_mapping') or {}),
+            'spec_workcenter_mapping_count': len(_CACHE.get('spec_workcenter_mapping') or {}),
         }
 
 
@@ -231,19 +260,22 @@ def _load_cache() -> bool:
         # Load workcenter groups - prioritize SPEC_WORKCENTER_V
         wc_groups, wc_mapping, wc_short = _load_workcenter_data()
         spec_order_mapping = _load_spec_order_mapping_from_spec()
+        spec_wc_mapping = _load_spec_workcenter_mapping()
 
         with _CACHE_LOCK:
             _CACHE['workcenter_groups'] = wc_groups
             _CACHE['workcenter_mapping'] = wc_mapping
             _CACHE['workcenter_to_short'] = wc_short
             _CACHE['spec_order_mapping'] = spec_order_mapping
+            _CACHE['spec_workcenter_mapping'] = spec_wc_mapping
             _CACHE['last_refresh'] = datetime.now()
             _CACHE['is_loading'] = False
 
         logger.info(
             f"Filter cache refreshed: {len(wc_groups or [])} groups, "
             f"{len(wc_mapping or {})} workcenters, "
-            f"{len(spec_order_mapping or {})} specs"
+            f"{len(spec_order_mapping or {})} specs, "
+            f"{len(spec_wc_mapping or {})} spec-wc mappings"
         )
         return True
 
@@ -415,6 +447,37 @@ def _load_spec_order_mapping_from_spec() -> Dict[str, int]:
         return mapping
     except Exception as exc:
         logger.error(f"Failed to load SPEC_ORDER mapping from SPEC_WORKCENTER_V: {exc}")
+        return {}
+
+
+def _load_spec_workcenter_mapping() -> Dict[str, Dict[str, Any]]:
+    """Load SPEC -> {workcenter, group, sequence} mapping from SPEC_WORKCENTER_V."""
+    try:
+        sql = f"""
+            SELECT SPEC, WORK_CENTER, WORK_CENTER_GROUP, WORKCENTERSEQUENCE_GROUP
+            FROM {SPEC_WORKCENTER_VIEW}
+            WHERE SPEC IS NOT NULL AND WORK_CENTER IS NOT NULL
+        """
+        df = read_sql_df(sql)
+        if df is None or df.empty:
+            return {}
+
+        mapping: Dict[str, Dict[str, Any]] = {}
+        for _, row in df.iterrows():
+            spec = _normalize_spec_name(row.get('SPEC'))
+            if not spec:
+                continue
+            seq = _safe_sort_value(row.get('WORKCENTERSEQUENCE_GROUP'))
+            prev = mapping.get(spec)
+            if prev is None or seq < prev['sequence']:
+                mapping[spec] = {
+                    'workcenter': str(row['WORK_CENTER']).strip(),
+                    'group': str(row['WORK_CENTER_GROUP']).strip(),
+                    'sequence': seq,
+                }
+        return mapping
+    except Exception as exc:
+        logger.error(f"Failed to load SPEC_WORKCENTER mapping from SPEC_WORKCENTER_V: {exc}")
         return {}
 
 

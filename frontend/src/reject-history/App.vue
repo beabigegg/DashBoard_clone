@@ -568,7 +568,9 @@ function onTrendDateClick(dateStr) {
 }
 
 function onTrendLegendChange(selected) {
-  trendLegendSelected.value = selected;
+  // Spread to create a new object — ECharts reuses the same internal reference,
+  // and Vue's ref setter skips trigger when Object.is(old, new) is true.
+  trendLegendSelected.value = { ...selected };
   page.value = 1;
   updateUrlState();
   void loadListOnly();

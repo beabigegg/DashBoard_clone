@@ -206,7 +206,14 @@ def _build_where_clause(
     normalized_categories = sorted({_normalize_text(v) for v in (categories or []) if _normalize_text(v)})
 
     if normalized_wc_groups:
-        builder.add_in_condition("b.WORKCENTER_GROUP", normalized_wc_groups)
+        from mes_dashboard.services.filter_cache import get_specs_for_groups
+        specs_in_groups = get_specs_for_groups(normalized_wc_groups)
+        if specs_in_groups:
+            # Specs in cache are uppercase; use UPPER() for case-insensitive match
+            builder.add_in_condition("UPPER(b.SPECNAME)", specs_in_groups)
+        else:
+            # Fallback: cache not ready or no specs found for these groups
+            builder.add_in_condition("b.WORKCENTER_GROUP", normalized_wc_groups)
     if normalized_packages:
         builder.add_in_condition("b.PRODUCTLINENAME", normalized_packages)
     if reason_name_filters:
