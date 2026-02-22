@@ -59,6 +59,38 @@ def test_seed_resolve_query_tool_success(mock_resolve_lots):
     assert payload['cache_key'].startswith('trace:seed:query_tool:')
 
 
+@patch('mes_dashboard.routes.trace_routes.resolve_lots')
+def test_seed_resolve_query_tool_reverse_success(mock_resolve_lots):
+    mock_resolve_lots.return_value = {
+        'data': [
+            {
+                'container_id': 'CID-SN',
+                'lot_id': 'LOT-SN',
+            }
+        ]
+    }
+
+    client = _client()
+    response = client.post(
+        '/api/trace/seed-resolve',
+        json={
+            'profile': 'query_tool_reverse',
+            'params': {
+                'resolve_type': 'serial_number',
+                'values': ['SN-001'],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['stage'] == 'seed-resolve'
+    assert payload['seed_count'] == 1
+    assert payload['seeds'][0]['container_id'] == 'CID-SN'
+    assert payload['seeds'][0]['container_name'] == 'LOT-SN'
+    assert payload['cache_key'].startswith('trace:seed:query_tool_reverse:')
+
+
 def test_seed_resolve_invalid_profile_returns_400():
     client = _client()
     response = client.post(
@@ -119,6 +151,38 @@ def test_lineage_success_returns_forward_tree(mock_resolve_tree):
     assert payload['leaf_serials']['CID-001'] == ['SN-001']
     assert payload['total_nodes'] == 3
     assert payload['names']['CID-ROOT'] == 'WAFER-001'
+    assert payload['names']['CID-A'] == 'LOT-A'
+
+
+@patch('mes_dashboard.routes.trace_routes.LineageEngine.resolve_full_genealogy')
+def test_lineage_reverse_profile_returns_ancestors(mock_resolve_genealogy):
+    mock_resolve_genealogy.return_value = {
+        'ancestors': {'CID-SN': {'CID-A', 'CID-B'}},
+        'cid_to_name': {
+            'CID-SN': 'LOT-SN',
+            'CID-A': 'LOT-A',
+            'CID-B': 'LOT-B',
+        },
+        'parent_map': {'CID-SN': ['CID-A'], 'CID-A': ['CID-B']},
+        'merge_edges': {'CID-SN': ['CID-A']},
+    }
+
+    client = _client()
+    response = client.post(
+        '/api/trace/lineage',
+        json={
+            'profile': 'query_tool_reverse',
+            'container_ids': ['CID-SN'],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['stage'] == 'lineage'
+    assert payload['roots'] == ['CID-SN']
+    assert sorted(payload['ancestors']['CID-SN']) == ['CID-A', 'CID-B']
+    assert payload['parent_map']['CID-SN'] == ['CID-A']
+    assert payload['merge_edges']['CID-SN'] == ['CID-A']
     assert payload['names']['CID-A'] == 'LOT-A'
 
 

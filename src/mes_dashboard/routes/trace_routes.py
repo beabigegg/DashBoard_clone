@@ -38,8 +38,13 @@ TRACE_LINEAGE_TIMEOUT_SECONDS = 60.0
 TRACE_CACHE_TTL_SECONDS = 300
 
 PROFILE_QUERY_TOOL = "query_tool"
+PROFILE_QUERY_TOOL_REVERSE = "query_tool_reverse"
 PROFILE_MID_SECTION_DEFECT = "mid_section_defect"
-SUPPORTED_PROFILES = {PROFILE_QUERY_TOOL, PROFILE_MID_SECTION_DEFECT}
+SUPPORTED_PROFILES = {
+    PROFILE_QUERY_TOOL,
+    PROFILE_QUERY_TOOL_REVERSE,
+    PROFILE_MID_SECTION_DEFECT,
+}
 
 QUERY_TOOL_RESOLVE_TYPES = {"lot_id", "serial_number", "work_order"}
 SUPPORTED_EVENT_DOMAINS = {
@@ -113,8 +118,8 @@ def _seed_cache_key(profile: str, params: Dict[str, Any]) -> str:
     return f"trace:seed:{profile}:{_hash_payload(params)}"
 
 
-def _lineage_cache_key(container_ids: List[str]) -> str:
-    return f"trace:lineage:{_short_hash(sorted(container_ids))}"
+def _lineage_cache_key(profile: str, container_ids: List[str]) -> str:
+    return f"trace:lineage:{profile}:{_short_hash(sorted(container_ids))}"
 
 
 def _events_cache_key(profile: str, domains: List[str], container_ids: List[str]) -> str:
@@ -353,7 +358,7 @@ def seed_resolve():
     )
 
     started = time.monotonic()
-    if profile == PROFILE_QUERY_TOOL:
+    if profile in {PROFILE_QUERY_TOOL, PROFILE_QUERY_TOOL_REVERSE}:
         resolved, route_error = _seed_resolve_query_tool(params)
     else:
         resolved, route_error = _seed_resolve_mid_section_defect(params)
@@ -391,7 +396,7 @@ def lineage():
     if not container_ids:
         return _error("INVALID_PARAMS", "container_ids must contain at least one id", 400)
 
-    lineage_cache_key = _lineage_cache_key(container_ids)
+    lineage_cache_key = _lineage_cache_key(profile, container_ids)
     cached = cache_get(lineage_cache_key)
     if cached is not None:
         return jsonify(cached)
@@ -405,7 +410,27 @@ def lineage():
 
     started = time.monotonic()
     try:
-        forward_tree = LineageEngine.resolve_forward_tree(container_ids)
+        if profile == PROFILE_QUERY_TOOL_REVERSE:
+            reverse_graph = LineageEngine.resolve_full_genealogy(container_ids)
+            response = _build_lineage_response(
+                container_ids,
+                reverse_graph.get("ancestors", {}),
+                cid_to_name=reverse_graph.get("cid_to_name"),
+                parent_map=reverse_graph.get("parent_map"),
+                merge_edges=reverse_graph.get("merge_edges"),
+            )
+            response["roots"] = list(container_ids)
+        else:
+            forward_tree = LineageEngine.resolve_forward_tree(container_ids)
+            cid_to_name = forward_tree.get("cid_to_name") or {}
+            response = {
+                "stage": "lineage",
+                "roots": forward_tree.get("roots", []),
+                "children_map": forward_tree.get("children_map", {}),
+                "leaf_serials": forward_tree.get("leaf_serials", {}),
+                "names": {cid: name for cid, name in cid_to_name.items() if name},
+                "total_nodes": forward_tree.get("total_nodes", 0),
+            }
     except Exception as exc:
         if _is_timeout_exception(exc):
             return _error("LINEAGE_TIMEOUT", "lineage query timed out", 504)
@@ -416,15 +441,6 @@ def lineage():
     if elapsed > TRACE_LINEAGE_TIMEOUT_SECONDS:
         return _error("LINEAGE_TIMEOUT", "lineage query timed out", 504)
 
-    cid_to_name = forward_tree.get("cid_to_name") or {}
-    response: Dict[str, Any] = {
-        "stage": "lineage",
-        "roots": forward_tree.get("roots", []),
-        "children_map": forward_tree.get("children_map", {}),
-        "leaf_serials": forward_tree.get("leaf_serials", {}),
-        "names": {cid: name for cid, name in cid_to_name.items() if name},
-        "total_nodes": forward_tree.get("total_nodes", 0),
-    }
     cache_set(lineage_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
     return jsonify(response)
 

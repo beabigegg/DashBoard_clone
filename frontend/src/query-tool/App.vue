@@ -5,20 +5,24 @@ import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
 import EquipmentView from './components/EquipmentView.vue';
 import LotTraceView from './components/LotTraceView.vue';
+import SerialReverseTraceView from './components/SerialReverseTraceView.vue';
 import { useEquipmentQuery } from './composables/useEquipmentQuery.js';
 import { useLotDetail } from './composables/useLotDetail.js';
 import { useLotLineage } from './composables/useLotLineage.js';
 import { useLotResolve } from './composables/useLotResolve.js';
+import { useReverseLineage } from './composables/useReverseLineage.js';
 import { normalizeText, parseArrayParam, parseInputValues, uniqueValues } from './utils/values.js';
 
 const TAB_LOT = 'lot';
+const TAB_REVERSE = 'reverse';
 const TAB_EQUIPMENT = 'equipment';
 
-const VALID_TABS = new Set([TAB_LOT, TAB_EQUIPMENT]);
+const VALID_TABS = new Set([TAB_LOT, TAB_REVERSE, TAB_EQUIPMENT]);
 
 const tabItems = Object.freeze([
-  { key: TAB_LOT, label: 'LOT 追蹤', subtitle: '血緣樹與批次詳情' },
-  { key: TAB_EQUIPMENT, label: '設備查詢', subtitle: '設備紀錄與時序視圖' },
+  { key: TAB_LOT, label: '批次追蹤(正向)', subtitle: '由批次展開下游血緣與明細' },
+  { key: TAB_REVERSE, label: '流水批反查(反向)', subtitle: '由成品流水號回溯上游批次' },
+  { key: TAB_EQUIPMENT, label: '設備生產批次追蹤', subtitle: '設備紀錄與時序視圖' },
 ]);
 
 function normalizeTopTab(value) {
@@ -29,13 +33,28 @@ function normalizeTopTab(value) {
 function readStateFromUrl() {
   const params = new URLSearchParams(window.location.search);
 
+  const tab = normalizeTopTab(params.get('tab'));
+  const legacyInputType = normalizeText(params.get('input_type'));
+  const legacyInputText = parseArrayParam(params, 'values').join('\n');
+  const legacySelectedContainerId = normalizeText(params.get('container_id'));
+  const legacyLotSubTab = normalizeText(params.get('lot_sub_tab')) || 'history';
+  const legacyWorkcenterGroups = parseArrayParam(params, 'workcenter_groups');
+
   return {
-    tab: normalizeTopTab(params.get('tab')),
-    inputType: normalizeText(params.get('input_type')) || 'lot_id',
-    inputText: parseArrayParam(params, 'values').join('\n'),
-    selectedContainerId: normalizeText(params.get('container_id')),
+    tab,
+    lotInputType: normalizeText(params.get('lot_input_type')) || (tab === TAB_LOT ? legacyInputType : '') || 'lot_id',
+    lotInputText: parseArrayParam(params, 'lot_values').join('\n') || (tab === TAB_LOT ? legacyInputText : ''),
+    lotSelectedContainerId: normalizeText(params.get('lot_container_id')) || (tab === TAB_LOT ? legacySelectedContainerId : ''),
     lotSubTab: normalizeText(params.get('lot_sub_tab')) || 'history',
-    workcenterGroups: parseArrayParam(params, 'workcenter_groups'),
+    lotWorkcenterGroups: parseArrayParam(params, 'workcenter_groups'),
+
+    reverseInputText: parseArrayParam(params, 'reverse_values').join('\n') || (tab === TAB_REVERSE ? legacyInputText : ''),
+    reverseSelectedContainerId: normalizeText(params.get('reverse_container_id')) || (tab === TAB_REVERSE ? legacySelectedContainerId : ''),
+    reverseSubTab: normalizeText(params.get('reverse_sub_tab')) || (tab === TAB_REVERSE ? legacyLotSubTab : 'history'),
+    reverseWorkcenterGroups: parseArrayParam(params, 'reverse_workcenter_groups').length
+      ? parseArrayParam(params, 'reverse_workcenter_groups')
+      : (tab === TAB_REVERSE ? legacyWorkcenterGroups : []),
+
     equipmentIds: parseArrayParam(params, 'equipment_ids'),
     startDate: normalizeText(params.get('start_date')),
     endDate: normalizeText(params.get('end_date')),
@@ -47,18 +66,35 @@ const initialState = readStateFromUrl();
 const activeTab = ref(initialState.tab);
 
 const lotResolve = useLotResolve({
-  inputType: initialState.inputType,
-  inputText: initialState.inputText,
+  inputType: initialState.lotInputType,
+  inputText: initialState.lotInputText,
+  allowedTypes: ['lot_id', 'work_order'],
+});
+
+const reverseResolve = useLotResolve({
+  inputType: 'serial_number',
+  inputText: initialState.reverseInputText,
+  allowedTypes: ['serial_number'],
 });
 
 const lotLineage = useLotLineage({
-  selectedContainerId: initialState.selectedContainerId,
+  selectedContainerId: initialState.lotSelectedContainerId,
+});
+
+const reverseLineage = useReverseLineage({
+  selectedContainerId: initialState.reverseSelectedContainerId,
 });
 
 const lotDetail = useLotDetail({
-  selectedContainerId: initialState.selectedContainerId,
+  selectedContainerId: initialState.lotSelectedContainerId,
   activeSubTab: initialState.lotSubTab,
-  workcenterGroups: initialState.workcenterGroups,
+  workcenterGroups: initialState.lotWorkcenterGroups,
+});
+
+const reverseDetail = useLotDetail({
+  selectedContainerId: initialState.reverseSelectedContainerId,
+  activeSubTab: initialState.reverseSubTab,
+  workcenterGroups: initialState.reverseWorkcenterGroups,
 });
 
 const equipmentQuery = useEquipmentQuery({
@@ -73,6 +109,11 @@ const activeTabMeta = computed(() => tabItems.find((item) => item.key === active
 const selectedContainerName = computed(() => {
   const cid = lotDetail.selectedContainerId.value;
   return cid ? (lotLineage.nameMap.get(cid) || '') : '';
+});
+
+const reverseSelectedContainerName = computed(() => {
+  const cid = reverseDetail.selectedContainerId.value;
+  return cid ? (reverseLineage.nameMap.get(cid) || '') : '';
 });
 
 // Compatibility placeholders for existing table parity tests.
@@ -101,22 +142,38 @@ function buildUrlState() {
   const params = new URLSearchParams();
 
   params.set('tab', activeTab.value);
-  params.set('input_type', lotResolve.inputType.value);
 
+  params.set('lot_input_type', lotResolve.inputType.value);
   parseInputValues(lotResolve.inputText.value).forEach((value) => {
-    params.append('values', value);
+    params.append('lot_values', value);
+  });
+
+  parseInputValues(reverseResolve.inputText.value).forEach((value) => {
+    params.append('reverse_values', value);
   });
 
   if (lotDetail.selectedContainerId.value) {
-    params.set('container_id', lotDetail.selectedContainerId.value);
+    params.set('lot_container_id', lotDetail.selectedContainerId.value);
+  }
+
+  if (reverseDetail.selectedContainerId.value) {
+    params.set('reverse_container_id', reverseDetail.selectedContainerId.value);
   }
 
   if (lotDetail.activeSubTab.value) {
     params.set('lot_sub_tab', lotDetail.activeSubTab.value);
   }
 
+  if (reverseDetail.activeSubTab.value) {
+    params.set('reverse_sub_tab', reverseDetail.activeSubTab.value);
+  }
+
   uniqueValues(lotDetail.selectedWorkcenterGroups.value).forEach((group) => {
     params.append('workcenter_groups', group);
+  });
+
+  uniqueValues(reverseDetail.selectedWorkcenterGroups.value).forEach((group) => {
+    params.append('reverse_workcenter_groups', group);
   });
 
   uniqueValues(equipmentQuery.selectedEquipmentIds.value).forEach((id) => {
@@ -133,6 +190,29 @@ function buildUrlState() {
 
   if (equipmentQuery.activeSubTab.value) {
     params.set('equipment_sub_tab', equipmentQuery.activeSubTab.value);
+  }
+
+  // Backward-compatible URL keys for deep links and existing tests.
+  if (activeTab.value === TAB_LOT) {
+    params.set('input_type', lotResolve.inputType.value);
+    parseInputValues(lotResolve.inputText.value).forEach((value) => {
+      params.append('values', value);
+    });
+    if (lotDetail.selectedContainerId.value) {
+      params.set('container_id', lotDetail.selectedContainerId.value);
+    }
+  } else if (activeTab.value === TAB_REVERSE) {
+    params.set('input_type', 'serial_number');
+    parseInputValues(reverseResolve.inputText.value).forEach((value) => {
+      params.append('values', value);
+    });
+    if (reverseDetail.selectedContainerId.value) {
+      params.set('container_id', reverseDetail.selectedContainerId.value);
+    }
+    params.set('lot_sub_tab', reverseDetail.activeSubTab.value);
+    uniqueValues(reverseDetail.selectedWorkcenterGroups.value).forEach((group) => {
+      params.append('workcenter_groups', group);
+    });
   }
 
   return params.toString();
@@ -159,11 +239,17 @@ async function applyStateFromUrl() {
 
   activeTab.value = state.tab;
 
-  lotResolve.setInputType(state.inputType);
-  lotResolve.setInputText(state.inputText);
+  lotResolve.setInputType(state.lotInputType);
+  lotResolve.setInputText(state.lotInputText);
+
+  reverseResolve.setInputType('serial_number');
+  reverseResolve.setInputText(state.reverseInputText);
 
   lotDetail.activeSubTab.value = state.lotSubTab;
-  lotDetail.selectedWorkcenterGroups.value = state.workcenterGroups;
+  lotDetail.selectedWorkcenterGroups.value = state.lotWorkcenterGroups;
+
+  reverseDetail.activeSubTab.value = state.reverseSubTab;
+  reverseDetail.selectedWorkcenterGroups.value = state.reverseWorkcenterGroups;
 
   equipmentQuery.selectedEquipmentIds.value = state.equipmentIds;
   equipmentQuery.startDate.value = state.startDate || equipmentQuery.startDate.value;
@@ -172,9 +258,14 @@ async function applyStateFromUrl() {
 
   suppressUrlSync.value = false;
 
-  if (state.selectedContainerId) {
-    lotLineage.selectNode(state.selectedContainerId);
-    await lotDetail.setSelectedContainerId(state.selectedContainerId);
+  if (state.lotSelectedContainerId) {
+    lotLineage.selectNode(state.lotSelectedContainerId);
+    await lotDetail.setSelectedContainerId(state.lotSelectedContainerId);
+  }
+
+  if (state.reverseSelectedContainerId) {
+    reverseLineage.selectNode(state.reverseSelectedContainerId);
+    await reverseDetail.setSelectedContainerId(state.reverseSelectedContainerId);
   }
 }
 
@@ -193,10 +284,20 @@ async function handleResolveLots() {
   }
 
   // Build tree only — don't auto-select or load detail data.
-  // User clicks a node to trigger detail/timeline loading on demand.
   await lotLineage.primeResolvedLots(lotResolve.resolvedLots.value);
   lotLineage.clearSelection();
   lotDetail.clearTabData();
+}
+
+async function handleResolveReverse() {
+  const result = await reverseResolve.resolveLots();
+  if (!result?.ok) {
+    return;
+  }
+
+  await reverseLineage.primeResolvedLots(reverseResolve.resolvedLots.value);
+  reverseLineage.clearSelection();
+  reverseDetail.clearTabData();
 }
 
 async function handleSelectNodes(containerIds) {
@@ -211,16 +312,39 @@ async function handleSelectNodes(containerIds) {
   await lotDetail.setSelectedContainerIds([...seen]);
 }
 
+async function handleSelectReverseNodes(containerIds) {
+  reverseLineage.setSelectedNodes(containerIds);
+
+  const seen = new Set();
+  containerIds.forEach((cid) => {
+    reverseLineage.getSubtreeCids(cid).forEach((id) => seen.add(id));
+  });
+
+  await reverseDetail.setSelectedContainerIds([...seen]);
+}
+
 async function handleChangeLotSubTab(tab) {
   await lotDetail.setActiveSubTab(tab);
+}
+
+async function handleChangeReverseSubTab(tab) {
+  await reverseDetail.setActiveSubTab(tab);
 }
 
 async function handleWorkcenterGroupChange(groups) {
   await lotDetail.setSelectedWorkcenterGroups(groups);
 }
 
+async function handleReverseWorkcenterGroupChange(groups) {
+  await reverseDetail.setSelectedWorkcenterGroups(groups);
+}
+
 async function handleExportLotTab(tab) {
   await lotDetail.exportSubTab(tab);
+}
+
+async function handleExportReverseTab(tab) {
+  await reverseDetail.exportSubTab(tab);
 }
 
 async function handleChangeEquipmentSubTab(tab) {
@@ -239,12 +363,18 @@ onMounted(async () => {
   window.addEventListener('popstate', handlePopState);
   await Promise.all([
     lotDetail.loadWorkcenterGroups(),
+    reverseDetail.loadWorkcenterGroups(),
     equipmentQuery.bootstrap(),
   ]);
 
-  if (initialState.selectedContainerId) {
-    lotLineage.selectNode(initialState.selectedContainerId);
-    await lotDetail.setSelectedContainerId(initialState.selectedContainerId);
+  if (initialState.lotSelectedContainerId) {
+    lotLineage.selectNode(initialState.lotSelectedContainerId);
+    await lotDetail.setSelectedContainerId(initialState.lotSelectedContainerId);
+  }
+
+  if (initialState.reverseSelectedContainerId) {
+    reverseLineage.selectNode(initialState.reverseSelectedContainerId);
+    await reverseDetail.setSelectedContainerId(initialState.reverseSelectedContainerId);
   }
 
   syncUrlState();
@@ -257,11 +387,18 @@ onBeforeUnmount(() => {
 watch(
   [
     activeTab,
+
     lotResolve.inputType,
     lotResolve.inputText,
     lotDetail.selectedContainerId,
     lotDetail.activeSubTab,
     lotDetail.selectedWorkcenterGroups,
+
+    reverseResolve.inputText,
+    reverseDetail.selectedContainerId,
+    reverseDetail.activeSubTab,
+    reverseDetail.selectedWorkcenterGroups,
+
     equipmentQuery.selectedEquipmentIds,
     equipmentQuery.startDate,
     equipmentQuery.endDate,
@@ -281,13 +418,22 @@ watch(
     }
   },
 );
+
+watch(
+  () => reverseLineage.selectedContainerId.value,
+  (nextSelection) => {
+    if (nextSelection && nextSelection !== reverseDetail.selectedContainerId.value) {
+      void reverseDetail.setSelectedContainerId(nextSelection);
+    }
+  },
+);
 </script>
 
 <template>
   <div class="u-content-shell space-y-3 p-3 lg:p-5">
     <header class="rounded-shell bg-gradient-to-r from-brand-500 to-accent-500 px-5 py-4 text-white shadow-shell">
       <h1 class="text-xl font-semibold tracking-wide">批次追蹤工具</h1>
-      <p class="mt-1 text-xs text-indigo-100">LOT 追蹤與設備查詢整合入口</p>
+      <p class="mt-1 text-xs text-indigo-100">正向/反向批次追溯與設備生產批次查詢整合入口</p>
     </header>
 
     <section class="rounded-shell border border-stroke-panel bg-surface-card shadow-panel">
@@ -352,6 +498,43 @@ watch(
           @change-sub-tab="handleChangeLotSubTab"
           @update-workcenter-groups="handleWorkcenterGroupChange"
           @export-lot-tab="handleExportLotTab"
+        />
+
+        <SerialReverseTraceView
+          v-show="activeTab === TAB_REVERSE"
+          :input-type="reverseResolve.inputType.value"
+          :input-text="reverseResolve.inputText.value"
+          :input-type-options="reverseResolve.inputTypeOptions"
+          :input-limit="reverseResolve.inputLimit.value"
+          :resolving="reverseResolve.loading.resolving"
+          :resolve-error-message="reverseResolve.errorMessage.value"
+          :resolve-success-message="reverseResolve.successMessage.value"
+          :tree-roots="reverseLineage.treeRoots.value"
+          :not-found="reverseResolve.notFound.value"
+          :lineage-map="reverseLineage.lineageMap"
+          :name-map="reverseLineage.nameMap"
+          :leaf-serials="reverseLineage.leafSerials"
+          :lineage-loading="reverseLineage.lineageLoading.value"
+          :selected-container-ids="reverseLineage.selectedContainerIds.value"
+          :selected-container-id="reverseDetail.selectedContainerId.value"
+          :selected-container-name="reverseSelectedContainerName"
+          :detail-container-ids="reverseDetail.selectedContainerIds.value"
+          :detail-loading="reverseDetail.loading"
+          :detail-loaded="reverseDetail.loaded"
+          :detail-exporting="reverseDetail.exporting"
+          :detail-errors="reverseDetail.errors"
+          :active-sub-tab="reverseDetail.activeSubTab.value"
+          :history-rows="reverseDetail.historyRows.value"
+          :association-rows="reverseDetail.associationRows"
+          :workcenter-groups="reverseDetail.workcenterGroups.value"
+          :selected-workcenter-groups="reverseDetail.selectedWorkcenterGroups.value"
+          @update:input-type="reverseResolve.setInputType($event)"
+          @update:input-text="reverseResolve.setInputText($event)"
+          @resolve="handleResolveReverse"
+          @select-nodes="handleSelectReverseNodes"
+          @change-sub-tab="handleChangeReverseSubTab"
+          @update-workcenter-groups="handleReverseWorkcenterGroupChange"
+          @export-lot-tab="handleExportReverseTab"
         />
 
         <EquipmentView

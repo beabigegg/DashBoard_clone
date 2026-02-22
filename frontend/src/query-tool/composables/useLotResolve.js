@@ -23,10 +23,28 @@ function normalizeInputType(value) {
   return 'lot_id';
 }
 
+function normalizeAllowedTypes(input) {
+  const values = Array.isArray(input)
+    ? input.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+  const filtered = values.filter((value) => Boolean(INPUT_LIMITS[value]));
+  if (filtered.length === 0) {
+    return ['lot_id', 'serial_number', 'work_order'];
+  }
+  return filtered;
+}
+
 export function useLotResolve(initial = {}) {
   ensureMesApiAvailable();
 
+  const allowedTypes = normalizeAllowedTypes(initial.allowedTypes);
+  const optionPool = INPUT_TYPE_OPTIONS.filter((option) => allowedTypes.includes(option.value));
+  const defaultType = optionPool[0]?.value || 'lot_id';
+
   const inputType = ref(normalizeInputType(initial.inputType));
+  if (!allowedTypes.includes(inputType.value)) {
+    inputType.value = defaultType;
+  }
   const inputText = ref(String(initial.inputText || ''));
 
   const resolvedLots = ref([]);
@@ -40,7 +58,7 @@ export function useLotResolve(initial = {}) {
     resolving: false,
   });
 
-  const inputTypeOptions = INPUT_TYPE_OPTIONS;
+  const inputTypeOptions = optionPool;
   const inputValues = computed(() => parseInputValues(inputText.value));
   const inputLimit = computed(() => INPUT_LIMITS[inputType.value] || 50);
 
@@ -62,7 +80,8 @@ export function useLotResolve(initial = {}) {
   }
 
   function setInputType(nextType) {
-    inputType.value = normalizeInputType(nextType);
+    const normalized = normalizeInputType(nextType);
+    inputType.value = allowedTypes.includes(normalized) ? normalized : defaultType;
   }
 
   function setInputText(text) {
@@ -71,7 +90,11 @@ export function useLotResolve(initial = {}) {
 
   function validateInput(values) {
     if (values.length === 0) {
-      return '請輸入 LOT/流水號/工單條件';
+      const labels = inputTypeOptions
+        .map((option) => option.label)
+        .filter(Boolean)
+        .join('/');
+      return labels ? `請輸入 ${labels} 條件` : '請輸入查詢條件';
     }
 
     const limit = INPUT_LIMITS[inputType.value] || 50;

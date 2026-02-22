@@ -47,6 +47,22 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  title: {
+    type: String,
+    default: '批次血緣樹',
+  },
+  description: {
+    type: String,
+    default: '生產流程追溯：晶批 → 切割 → 封裝 → 成品（點擊節點可多選）',
+  },
+  emptyMessage: {
+    type: String,
+    default: '目前尚無 LOT 根節點，請先在上方解析。',
+  },
+  showSerialLegend: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits(['select-nodes']);
@@ -302,8 +318,8 @@ function handleNodeClick(params) {
   <section class="rounded-card border border-stroke-soft bg-white p-3 shadow-soft">
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
       <div>
-        <h3 class="text-sm font-semibold text-slate-800">批次血緣樹</h3>
-        <p class="text-xs text-slate-500">生產流程追溯：晶批 → 切割 → 封裝 → 成品（點擊節點可多選）</p>
+        <h3 class="text-sm font-semibold text-slate-800">{{ title }}</h3>
+        <p class="text-xs text-slate-500">{{ description }}</p>
       </div>
 
       <div class="flex items-center gap-3">
@@ -320,7 +336,7 @@ function handleNodeClick(params) {
             <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.leaf }" />
             末端
           </span>
-          <span class="inline-flex items-center gap-1">
+          <span v-if="showSerialLegend" class="inline-flex items-center gap-1">
             <span class="inline-block size-2.5 rotate-45" :style="{ background: NODE_COLORS.serial, width: '8px', height: '8px' }" />
             序列號
           </span>
@@ -338,7 +354,7 @@ function handleNodeClick(params) {
 
     <!-- Empty state -->
     <div v-else-if="!hasData" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-10 text-center text-xs text-slate-500">
-      目前尚無 LOT 根節點，請先在上方解析。
+      {{ emptyMessage }}
     </div>
 
     <!-- ECharts Tree -->

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""E2E coverage for the Query Tool page (LOT 追蹤 + 設備查詢 tabs)."""
+"""E2E coverage for the Query Tool page tabs and core query flows."""
 
 from __future__ import annotations
 
@@ -262,10 +262,12 @@ class TestQueryToolPageE2E:
         heading = page.get_by_role("heading", name="批次追蹤工具")
         expect(heading).to_be_visible()
 
-        # Both tab buttons should exist
-        lot_tab = page.locator("button", has_text="LOT 追蹤")
-        equipment_tab = page.locator("button", has_text="設備查詢")
+        # All tab buttons should exist
+        lot_tab = page.locator("button", has_text="批次追蹤(正向)")
+        reverse_tab = page.locator("button", has_text="流水批反查(反向)")
+        equipment_tab = page.locator("button", has_text="設備生產批次追蹤")
         expect(lot_tab).to_be_visible()
+        expect(reverse_tab).to_be_visible()
         expect(equipment_tab).to_be_visible()
 
     def test_lot_tab_resolve_work_order(self, page: Page, app_server: str):
@@ -388,12 +390,12 @@ class TestQueryToolPageE2E:
         textarea.fill("GA26010001")
 
         # Switch to equipment tab
-        equipment_tab = page.locator("button", has_text="設備查詢")
+        equipment_tab = page.locator("button", has_text="設備生產批次追蹤")
         equipment_tab.click()
         page.wait_for_timeout(500)
 
         # Switch back to LOT tab
-        lot_tab = page.locator("button", has_text="LOT 追蹤")
+        lot_tab = page.locator("button", has_text="批次追蹤(正向)")
         lot_tab.click()
         page.wait_for_timeout(500)
 
