@@ -16,6 +16,7 @@ sqlalchemy>=2.0.0,<3.0.0
 
 # Data Processing
 pandas==2.3.3       # pandas 3.x removed DBAPI2 flow used by current pd.read_sql + SQLAlchemy usage
+pyarrow>=17.0.0,<20.0.0   # Parquet serialization for Redis DataFrame cache
 openpyxl>=3.0.0            # Excel file support
 
 # Cache (Redis)

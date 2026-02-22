@@ -149,3 +149,53 @@ export function buildRejectCommonQueryParams(filters = {}, { reason = '' } = {})
   }
   return params;
 }
+
+export function parseMultiLineInput(text) {
+  if (!text) return [];
+  const tokens = String(text)
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.replace(/\*/g, '%'));
+  const seen = new Set();
+  const result = [];
+  for (const token of tokens) {
+    if (!seen.has(token)) {
+      seen.add(token);
+      result.push(token);
+    }
+  }
+  return result;
+}
+
+export function buildViewParams(queryId, {
+  supplementaryFilters = {},
+  metricFilter = 'all',
+  trendDates = [],
+  detailReason = '',
+  page = 1,
+  perPage = 50,
+} = {}) {
+  const params = { query_id: queryId };
+  if (supplementaryFilters.packages?.length > 0) {
+    params.packages = supplementaryFilters.packages;
+  }
+  if (supplementaryFilters.workcenterGroups?.length > 0) {
+    params.workcenter_groups = supplementaryFilters.workcenterGroups;
+  }
+  if (supplementaryFilters.reason) {
+    params.reason = supplementaryFilters.reason;
+  }
+  if (metricFilter && metricFilter !== 'all') {
+    params.metric_filter = metricFilter;
+  }
+  if (trendDates?.length > 0) {
+    params.trend_dates = trendDates;
+  }
+  if (detailReason) {
+    params.detail_reason = detailReason;
+  }
+  params.page = page || 1;
+  params.per_page = perPage || 50;
+  return params;
+}

@@ -225,8 +225,8 @@ def _build_where_clause(
         builder.add_condition("UPPER(NVL(TRIM(b.SCRAP_OBJECTTYPE), '-')) <> 'MATERIAL'")
         material_exclusion_applied = True
     pb_diode_exclusion_applied = False
-    if exclude_pb_diode and "PB_Diode" not in normalized_packages:
-        builder.add_condition("b.PRODUCTLINENAME <> 'PB_Diode'")
+    if exclude_pb_diode and not any(p.startswith("PB_") for p in normalized_packages):
+        builder.add_condition("b.PRODUCTLINENAME NOT LIKE 'PB\\_%' ESCAPE '\\'")
         pb_diode_exclusion_applied = True
     if normalized_categories:
         builder.add_in_condition("b.REJECTCATEGORYNAME", normalized_categories)
@@ -275,6 +275,12 @@ def _build_where_clause(
     return where_clause, params, meta
 
 
+_DEFAULT_BASE_WHERE = (
+    "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
+    " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+)
+
+
 def _prepare_sql(
     name: str,
     *,
@@ -282,10 +288,12 @@ def _prepare_sql(
     bucket_expr: str = "",
     metric_column: str = "",
     base_variant: str = "",
+    base_where: str = "",
 ) -> str:
     sql = _load_sql(name)
     sql = sql.replace("{{ BASE_QUERY }}", _base_query_sql(base_variant))
     sql = sql.replace("{{ BASE_WITH_CTE }}", _base_with_cte_sql("base", base_variant))
+    sql = sql.replace("{{ BASE_WHERE }}", base_where or _DEFAULT_BASE_WHERE)
     sql = sql.replace("{{ WHERE_CLAUSE }}", where_clause or "")
     sql = sql.replace("{{ BUCKET_EXPR }}", bucket_expr or "TRUNC(b.TXN_DAY)")
     sql = sql.replace("{{ METRIC_COLUMN }}", metric_column or "b.REJECT_TOTAL_QTY")

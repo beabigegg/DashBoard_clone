@@ -11,7 +11,13 @@ from flask import Blueprint, Response, jsonify, request
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.services.reject_dataset_cache import (
+    apply_view,
+    execute_primary_query,
+    export_csv_from_cache,
+)
 from mes_dashboard.services.reject_history_service import (
+    _list_to_csv,
     export_csv,
     get_filter_options,
     query_analytics,
@@ -438,3 +444,138 @@ def api_reject_history_analytics():
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:
         return jsonify({"success": False, "error": "查詢分析資料失敗"}), 500
+
+
+# ============================================================
+# Two-phase query endpoints (POST /query, GET /view)
+# ============================================================
+
+
+@reject_history_bp.route("/api/reject-history/query", methods=["POST"])
+def api_reject_history_query():
+    """Primary query: execute Oracle → cache DataFrame → return results."""
+    body = request.get_json(silent=True) or {}
+
+    mode = str(body.get("mode", "")).strip()
+    if mode not in ("date_range", "container"):
+        return jsonify({"success": False, "error": "mode 必須為 date_range 或 container"}), 400
+
+    include_excluded_scrap = bool(body.get("include_excluded_scrap", False))
+    exclude_material_scrap = bool(body.get("exclude_material_scrap", True))
+    exclude_pb_diode = bool(body.get("exclude_pb_diode", True))
+
+    try:
+        kwargs = {
+            "mode": mode,
+            "include_excluded_scrap": include_excluded_scrap,
+            "exclude_material_scrap": exclude_material_scrap,
+            "exclude_pb_diode": exclude_pb_diode,
+        }
+
+        if mode == "date_range":
+            kwargs["start_date"] = str(body.get("start_date", "")).strip()
+            kwargs["end_date"] = str(body.get("end_date", "")).strip()
+            if not kwargs["start_date"] or not kwargs["end_date"]:
+                return jsonify({"success": False, "error": "date_range mode 需要 start_date 和 end_date"}), 400
+        else:
+            kwargs["container_input_type"] = str(body.get("container_input_type", "lot")).strip()
+            container_values = body.get("container_values", [])
+            if not isinstance(container_values, list) or not container_values:
+                return jsonify({"success": False, "error": "container mode 需要 container_values 陣列"}), 400
+            kwargs["container_values"] = [str(v).strip() for v in container_values if str(v).strip()]
+
+        result = execute_primary_query(**kwargs)
+        return jsonify({"success": True, **result})
+
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": "主查詢執行失敗"}), 500
+
+
+@reject_history_bp.route("/api/reject-history/view", methods=["GET"])
+def api_reject_history_view():
+    """Supplementary view: read cache → filter → return derived data."""
+    query_id = request.args.get("query_id", "").strip()
+    if not query_id:
+        return jsonify({"success": False, "error": "缺少必要參數: query_id"}), 400
+
+    page = request.args.get("page", 1, type=int) or 1
+    per_page = request.args.get("per_page", 50, type=int) or 50
+    metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
+    reason = request.args.get("reason", "").strip() or None
+    detail_reason = request.args.get("detail_reason", "").strip() or None
+
+    try:
+        result = apply_view(
+            query_id=query_id,
+            packages=_parse_multi_param("packages") or None,
+            workcenter_groups=_parse_multi_param("workcenter_groups") or None,
+            reason=reason,
+            metric_filter=metric_filter,
+            trend_dates=_parse_multi_param("trend_dates") or None,
+            detail_reason=detail_reason,
+            page=page,
+            per_page=per_page,
+        )
+
+        if result is None:
+            return jsonify({"success": False, "error": "cache_expired"}), 410
+
+        return jsonify({"success": True, "data": result})
+
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": "視圖查詢失敗"}), 500
+
+
+@reject_history_bp.route("/api/reject-history/export-cached", methods=["GET"])
+def api_reject_history_export_cached():
+    """Export CSV from cached dataset."""
+    query_id = request.args.get("query_id", "").strip()
+    if not query_id:
+        return jsonify({"success": False, "error": "缺少必要參數: query_id"}), 400
+
+    metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
+    reason = request.args.get("reason", "").strip() or None
+    detail_reason = request.args.get("detail_reason", "").strip() or None
+
+    try:
+        rows = export_csv_from_cache(
+            query_id=query_id,
+            packages=_parse_multi_param("packages") or None,
+            workcenter_groups=_parse_multi_param("workcenter_groups") or None,
+            reason=reason,
+            metric_filter=metric_filter,
+            trend_dates=_parse_multi_param("trend_dates") or None,
+            detail_reason=detail_reason,
+        )
+
+        if rows is None:
+            return jsonify({"success": False, "error": "cache_expired"}), 410
+
+        headers = [
+            "LOT", "WORKCENTER", "WORKCENTER_GROUP", "Package", "FUNCTION",
+            "TYPE", "PRODUCT", "原因", "EQUIPMENT", "COMMENT", "SPEC",
+            "REJECT_QTY", "STANDBY_QTY", "QTYTOPROCESS_QTY", "INPROCESS_QTY",
+            "PROCESSED_QTY", "扣帳報廢量", "不扣帳報廢量", "MOVEIN_QTY",
+            "報廢時間", "日期",
+        ]
+        return Response(
+            _list_to_csv(rows, headers=headers),
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=reject_history_export.csv",
+                "Content-Type": "text/csv; charset=utf-8-sig",
+            },
+        )
+
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception:
+        return jsonify({"success": False, "error": "匯出 CSV 失敗"}), 500

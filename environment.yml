@@ -27,6 +27,7 @@ dependencies:
 
       # Data Processing
       - pandas==2.3.3   # Pin DBAPI2-compatible release for current pd.read_sql flow
+      - pyarrow>=17.0.0,<20.0.0   # Parquet serialization for Redis DataFrame cache
       - openpyxl>=3.0.0
 
       # Cache (Redis)

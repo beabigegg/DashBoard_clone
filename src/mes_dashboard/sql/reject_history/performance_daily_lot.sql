@@ -72,8 +72,7 @@ reject_raw AS (
       ON c.CONTAINERID = r.CONTAINERID
     LEFT JOIN spec_map sm
       ON sm.SPEC = TRIM(r.SPECNAME)
-    WHERE r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
-      AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
+    WHERE {{ BASE_WHERE }}
 ),
 daily_agg AS (
     SELECT
