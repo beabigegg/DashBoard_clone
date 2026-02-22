@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import ExportButton from './ExportButton.vue';
 import LotAssociationTable from './LotAssociationTable.vue';
 import LotHistoryTable from './LotHistoryTable.vue';
+import LotRejectTable from './LotRejectTable.vue';
 import LotTimeline from './LotTimeline.vue';
 
 const props = defineProps({
@@ -105,36 +106,35 @@ const activeEmptyText = computed(() => {
 });
 
 const activeColumnLabels = computed(() => {
-  if (props.activeSubTab !== 'materials') {
-    return {};
+  if (props.activeSubTab === 'materials') {
+    return {
+      CONTAINERNAME: 'LOT ID',
+    };
   }
-  return {
-    CONTAINERNAME: 'LOT ID',
-  };
+  return {};
 });
 
 const activeHiddenColumns = computed(() => {
-  if (props.activeSubTab !== 'materials') {
-    return [];
+  if (props.activeSubTab === 'materials') {
+    return ['CONTAINERID', 'WORKCENTER_GROUP'];
   }
-  return ['CONTAINERID'];
+  return [];
 });
 
 const activeColumnOrder = computed(() => {
-  if (props.activeSubTab !== 'materials') {
-    return [];
+  if (props.activeSubTab === 'materials') {
+    return [
+      'CONTAINERNAME',
+      'MATERIALPARTNAME',
+      'MATERIALLOTNAME',
+      'QTYCONSUMED',
+      'WORKCENTERNAME',
+      'SPECNAME',
+      'EQUIPMENTNAME',
+      'TXNDATE',
+    ];
   }
-  return [
-    'CONTAINERNAME',
-    'MATERIALPARTNAME',
-    'MATERIALLOTNAME',
-    'QTYCONSUMED',
-    'WORKCENTERNAME',
-    'SPECNAME',
-    'EQUIPMENTNAME',
-    'TXNDATE',
-    'WORKCENTER_GROUP',
-  ];
+  return [];
 });
 
 const canExport = computed(() => {
@@ -223,13 +223,20 @@ const detailCountLabel = computed(() => {
       </div>
 
       <LotAssociationTable
-        v-else
+        v-else-if="activeSubTab !== 'rejects'"
         :rows="activeRows"
         :loading="activeLoading"
         :empty-text="activeLoaded ? activeEmptyText : '尚未查詢此分頁資料'"
         :column-labels="activeColumnLabels"
         :hidden-columns="activeHiddenColumns"
         :column-order="activeColumnOrder"
+      />
+
+      <LotRejectTable
+        v-else
+        :rows="activeRows"
+        :loading="activeLoading"
+        :empty-text="activeLoaded ? activeEmptyText : '尚未查詢此分頁資料'"
       />
     </template>
   </section>

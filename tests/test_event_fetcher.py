@@ -112,3 +112,27 @@ def test_fetch_events_materials_branch_replaces_aliased_container_filter(
     assert "m.CONTAINERID = :container_id" not in sql
     assert "IN" in sql.upper()
     assert params == {"p0": "CID-1", "p1": "CID-2"}
+
+
+@patch("mes_dashboard.services.event_fetcher.cache_set")
+@patch("mes_dashboard.services.event_fetcher.cache_get", return_value=None)
+@patch("mes_dashboard.services.event_fetcher.read_sql_df")
+@patch("mes_dashboard.services.event_fetcher.SQLLoader.load")
+def test_fetch_events_rejects_branch_replaces_aliased_container_filter(
+    mock_sql_load,
+    mock_read_sql_df,
+    _mock_cache_get,
+    _mock_cache_set,
+):
+    mock_sql_load.return_value = (
+        "SELECT * FROM t r LEFT JOIN c ON c.CONTAINERID = r.CONTAINERID "
+        "WHERE r.CONTAINERID = :container_id ORDER BY r.TXNDATE"
+    )
+    mock_read_sql_df.return_value = pd.DataFrame([])
+
+    EventFetcher.fetch_events(["CID-1", "CID-2"], "rejects")
+
+    sql, params = mock_read_sql_df.call_args.args
+    assert "r.CONTAINERID = :container_id" not in sql
+    assert "IN" in sql.upper()
+    assert params == {"p0": "CID-1", "p1": "CID-2"}

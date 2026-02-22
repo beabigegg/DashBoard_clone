@@ -31,6 +31,7 @@ _DOMAIN_SPECS: Dict[str, Dict[str, Any]] = {
     "materials": {
         "filter_column": "m.CONTAINERID",
         "cache_ttl": 300,
+        "schema_version": 2,
         "bucket": "event-materials",
         "max_env": "EVT_MATERIALS_RATE_MAX_REQUESTS",
         "window_env": "EVT_MATERIALS_RATE_WINDOW_SECONDS",
@@ -38,8 +39,9 @@ _DOMAIN_SPECS: Dict[str, Dict[str, Any]] = {
         "default_window": 60,
     },
     "rejects": {
-        "filter_column": "CONTAINERID",
+        "filter_column": "r.CONTAINERID",
         "cache_ttl": 300,
+        "schema_version": 2,
         "bucket": "event-rejects",
         "max_env": "EVT_REJECTS_RATE_MAX_REQUESTS",
         "window_env": "EVT_REJECTS_RATE_WINDOW_SECONDS",
@@ -116,7 +118,8 @@ class EventFetcher:
     def _cache_key(domain: str, container_ids: List[str]) -> str:
         normalized = sorted(_normalize_ids(container_ids))
         digest = hashlib.md5("|".join(normalized).encode("utf-8")).hexdigest()[:12]
-        return f"evt:{domain}:{digest}"
+        schema_version = int(_DOMAIN_SPECS.get(domain, {}).get("schema_version", 1))
+        return f"evt:{domain}:v{schema_version}:{digest}"
 
     @staticmethod
     def _replace_container_filter(sql: str, condition_sql: str) -> str:
