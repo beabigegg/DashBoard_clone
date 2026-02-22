@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { formatDateTime, normalizeText, parseDateTime } from '../../query-tool/utils/values.js';
 
@@ -30,11 +30,13 @@ const props = defineProps({
   },
   minChartWidth: {
     type: Number,
-    default: 960,
+    default: 600,
   },
 });
 
-const AXIS_HEIGHT = 42;
+const AXIS_HEIGHT = 32;
+const RANGE_PAD_RATIO = 0.03;
+
 const tooltipRef = ref({
   visible: false,
   x: 0,
@@ -43,6 +45,7 @@ const tooltipRef = ref({
   lines: [],
 });
 const containerRef = ref(null);
+const scrollRef = ref(null);
 
 function toTimestamp(value) {
   if (typeof value === 'number') {
@@ -80,34 +83,35 @@ const normalizedTimeRange = computed(() => {
   const explicitStart = toTimestamp(props.timeRange?.start);
   const explicitEnd = toTimestamp(props.timeRange?.end);
 
+  let startMs;
+  let endMs;
+
   if (explicitStart !== null && explicitEnd !== null && explicitEnd > explicitStart) {
-    return {
-      startMs: explicitStart,
-      endMs: explicitEnd,
-    };
+    startMs = explicitStart;
+    endMs = explicitEnd;
+  } else {
+    const timestamps = collectDomainTimestamps();
+    if (timestamps.length === 0) {
+      const now = Date.now();
+      return {
+        startMs: now - (1000 * 60 * 60),
+        endMs: now + (1000 * 60 * 60),
+      };
+    }
+
+    startMs = Math.min(...timestamps);
+    endMs = Math.max(...timestamps);
+    if (endMs === startMs) {
+      endMs = startMs + (1000 * 60 * 60);
+    }
   }
 
-  const timestamps = collectDomainTimestamps();
-  if (timestamps.length === 0) {
-    const now = Date.now();
-    return {
-      startMs: now - (1000 * 60 * 60),
-      endMs: now + (1000 * 60 * 60),
-    };
-  }
-
-  const startMs = Math.min(...timestamps);
-  const endMs = Math.max(...timestamps);
-  if (endMs === startMs) {
-    return {
-      startMs,
-      endMs: startMs + (1000 * 60 * 60),
-    };
-  }
-
+  // Add a small padding so bars don't sit at the very edge
+  const span = endMs - startMs;
+  const pad = span * RANGE_PAD_RATIO;
   return {
-    startMs,
-    endMs,
+    startMs: startMs - pad,
+    endMs: endMs + pad,
   };
 });
 
@@ -119,8 +123,16 @@ const trackCount = computed(() => props.tracks.length);
 
 const chartWidth = computed(() => {
   const hours = totalDurationMs.value / (1000 * 60 * 60);
-  const estimated = Math.round(hours * 36);
-  return Math.max(props.minChartWidth, estimated);
+  // Adaptive scaling: longer durations get fewer px/hour to stay compact
+  let pxPerHour;
+  if (hours <= 6) pxPerHour = 120;
+  else if (hours <= 24) pxPerHour = 60;
+  else if (hours <= 72) pxPerHour = 30;
+  else if (hours <= 168) pxPerHour = 16;
+  else if (hours <= 720) pxPerHour = 6;
+  else pxPerHour = 3;
+
+  return Math.max(props.minChartWidth, Math.round(hours * pxPerHour));
 });
 
 const svgHeight = computed(() => AXIS_HEIGHT + trackCount.value * props.trackRowHeight + 2);
@@ -159,37 +171,45 @@ function normalizeEvent(event) {
   };
 }
 
+const HOUR_MS = 1000 * 60 * 60;
+const DAY_MS = HOUR_MS * 24;
+
 const timelineTicks = computed(() => {
   const ticks = [];
   const rangeMs = totalDurationMs.value;
-  const rangeHours = rangeMs / (1000 * 60 * 60);
+  const rangeHours = rangeMs / HOUR_MS;
 
-  const stepMs = rangeHours <= 48
-    ? (1000 * 60 * 60)
-    : (1000 * 60 * 60 * 24);
+  let stepMs;
+  if (rangeHours <= 12) stepMs = HOUR_MS;
+  else if (rangeHours <= 48) stepMs = HOUR_MS * 2;
+  else if (rangeHours <= 168) stepMs = HOUR_MS * 6;
+  else if (rangeHours <= 720) stepMs = DAY_MS;
+  else stepMs = DAY_MS * 3;
 
   const start = normalizedTimeRange.value.startMs;
   const end = normalizedTimeRange.value.endMs;
 
-  let cursor = start;
+  // Snap cursor to the nearest clean boundary
+  const snapMs = stepMs >= DAY_MS ? DAY_MS : HOUR_MS;
+  let cursor = Math.ceil(start / snapMs) * snapMs;
+
   while (cursor <= end) {
     const date = new Date(cursor);
-    const label = stepMs < (1000 * 60 * 60 * 24)
-      ? `${String(date.getHours()).padStart(2, '0')}:00`
-      : `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    let label;
+    if (stepMs < DAY_MS) {
+      label = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:00`;
+    } else {
+      label = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
 
-    ticks.push({
-      timeMs: cursor,
-      label,
-    });
-
+    ticks.push({ timeMs: cursor, label });
     cursor += stepMs;
   }
 
   if (ticks.length < 2) {
     ticks.push({
       timeMs: end,
-      label: stepMs < (1000 * 60 * 60 * 24) ? 'End' : '結束',
+      label: '結束',
     });
   }
 
@@ -254,17 +274,26 @@ const legendItems = computed(() => {
   }));
 });
 
+// ── Tooltip (fixed-position, teleported to body) ──────────────
+const TOOLTIP_MAX_W = 288; // max-w-72
+const TOOLTIP_EST_H = 120;
+
 function showTooltip(event, title, lines = []) {
-  const host = containerRef.value;
-  if (!host) {
-    return;
+  let x = event.clientX + 14;
+  let y = event.clientY + 14;
+
+  // Flip when near viewport edges
+  if (x + TOOLTIP_MAX_W > window.innerWidth - 8) {
+    x = event.clientX - TOOLTIP_MAX_W - 8;
+  }
+  if (y + TOOLTIP_EST_H > window.innerHeight - 8) {
+    y = event.clientY - TOOLTIP_EST_H - 8;
   }
 
-  const bounds = host.getBoundingClientRect();
   tooltipRef.value = {
     visible: true,
-    x: event.clientX - bounds.left + 12,
-    y: event.clientY - bounds.top + 12,
+    x: Math.max(4, x),
+    y: Math.max(4, y),
     title,
     lines,
   };
@@ -274,6 +303,21 @@ function hideTooltip() {
   tooltipRef.value.visible = false;
 }
 
+// Hide tooltip when the chart area scrolls (fixed tooltip would become stale)
+function handleScroll() {
+  if (tooltipRef.value.visible) {
+    hideTooltip();
+  }
+}
+
+onMounted(() => {
+  scrollRef.value?.addEventListener('scroll', handleScroll, { passive: true });
+});
+onBeforeUnmount(() => {
+  scrollRef.value?.removeEventListener('scroll', handleScroll);
+  hideTooltip();
+});
+
 function handleBarHover(mouseEvent, bar, trackLabel) {
   const normalized = normalizeBar(bar);
   if (!normalized) {
@@ -282,7 +326,7 @@ function handleBarHover(mouseEvent, bar, trackLabel) {
 
   const start = formatDateTime(normalized.start);
   const end = formatDateTime(normalized.end);
-  const durationHours = ((normalized.endMs - normalized.startMs) / (1000 * 60 * 60)).toFixed(2);
+  const durationHours = ((normalized.endMs - normalized.startMs) / HOUR_MS).toFixed(2);
 
   const title = normalizeText(normalized.label) || normalizeText(normalized.type) || '區段';
   const lines = [
@@ -325,7 +369,7 @@ function eventPath(type, x, y) {
 
 <template>
   <div class="rounded-card border border-stroke-soft bg-white p-3">
-    <div class="mb-3 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+    <div class="mb-2 flex flex-wrap items-center gap-3 text-xs text-slate-600">
       <span class="font-medium text-slate-700">Timeline</span>
       <div v-for="item in legendItems" :key="item.key" class="flex items-center gap-1">
         <span class="inline-block size-2 rounded-full" :style="{ backgroundColor: item.color }" />
@@ -335,26 +379,40 @@ function eventPath(type, x, y) {
 
     <div
       ref="containerRef"
-      class="relative overflow-hidden rounded-card border border-stroke-soft bg-surface-muted/30"
+      class="relative rounded-card border border-stroke-soft bg-surface-muted/30"
       @mouseleave="hideTooltip"
     >
       <div class="grid" :style="{ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }">
+        <!-- Track labels (sticky left) -->
         <div class="sticky left-0 z-20 border-r border-stroke-soft bg-white">
-          <div class="flex h-[42px] items-center border-b border-stroke-soft px-3 text-xs font-semibold tracking-wide text-slate-500">
+          <div
+            class="flex items-center border-b border-stroke-soft px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400"
+            :style="{ height: `${AXIS_HEIGHT}px` }"
+          >
             Track
           </div>
 
           <div
             v-for="track in tracks"
             :key="track.id || track.label"
-            class="flex items-center border-b border-stroke-soft/70 px-3 text-xs text-slate-700"
+            class="flex flex-col justify-center border-b border-stroke-soft/70 px-3"
             :style="{ height: `${trackRowHeight}px` }"
           >
-            <span class="line-clamp-1">{{ track.label }}</span>
+            <span class="truncate text-xs font-medium text-slate-700">{{ track.label }}</span>
+            <!-- sublabels (array) takes priority over sublabel (string) -->
+            <template v-if="track.sublabels?.length">
+              <span
+                v-for="sub in track.sublabels"
+                :key="sub"
+                class="truncate text-[10px] leading-tight text-slate-400"
+              >{{ sub }}</span>
+            </template>
+            <span v-else-if="track.sublabel" class="truncate text-[10px] leading-tight text-slate-400">{{ track.sublabel }}</span>
           </div>
         </div>
 
-        <div class="overflow-x-auto">
+        <!-- Chart area (scrollable) -->
+        <div ref="scrollRef" class="overflow-x-auto">
           <svg
             :width="chartWidth"
             :height="svgHeight"
@@ -363,8 +421,9 @@ function eventPath(type, x, y) {
           >
             <rect x="0" y="0" :width="chartWidth" :height="svgHeight" fill="#ffffff" />
 
+            <!-- Time axis -->
             <g>
-              <line x1="0" :x2="chartWidth" y1="41" y2="41" stroke="#cbd5e1" stroke-width="1" />
+              <line x1="0" :x2="chartWidth" :y1="AXIS_HEIGHT - 1" :y2="AXIS_HEIGHT - 1" stroke="#cbd5e1" stroke-width="1" />
               <g v-for="tick in timelineTicks" :key="tick.timeMs">
                 <line
                   :x1="xByTimestamp(tick.timeMs)"
@@ -376,16 +435,18 @@ function eventPath(type, x, y) {
                   stroke-dasharray="2 3"
                 />
                 <text
-                  :x="xByTimestamp(tick.timeMs) + 2"
-                  y="14"
+                  :x="xByTimestamp(tick.timeMs) + 3"
+                  y="13"
                   fill="#475569"
-                  font-size="11"
+                  font-size="10"
+                  font-family="ui-monospace, monospace"
                 >
                   {{ tick.label }}
                 </text>
               </g>
             </g>
 
+            <!-- Track rows -->
             <g v-for="(track, trackIndex) in tracks" :key="track.id || track.label">
               <rect
                 x="0"
@@ -396,6 +457,7 @@ function eventPath(type, x, y) {
                 opacity="0.45"
               />
 
+              <!-- Bars -->
               <g v-for="(layer, layerIndex) in (track.layers || [])" :key="layer.id || layerIndex">
                 <template
                   v-for="(bar, barIndex) in (layer.bars || [])"
@@ -405,16 +467,18 @@ function eventPath(type, x, y) {
                     v-if="normalizeBar(bar)"
                     :x="xByTimestamp(normalizeBar(bar).startMs)"
                     :y="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).y"
-                    :width="Math.max(2, xByTimestamp(normalizeBar(bar).endMs) - xByTimestamp(normalizeBar(bar).startMs))"
+                    :width="Math.max(4, xByTimestamp(normalizeBar(bar).endMs) - xByTimestamp(normalizeBar(bar).startMs))"
                     :height="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).height"
                     :fill="bar.color || resolveColor(bar.type)"
                     :opacity="layer.opacity ?? (layerIndex === 0 ? 0.45 : 0.9)"
                     rx="3"
+                    class="cursor-pointer"
                     @mousemove="handleBarHover($event, bar, track.label)"
                   />
                 </template>
               </g>
 
+              <!-- Event markers -->
               <template v-for="(eventItem, eventIndex) in events" :key="eventItem.id || `${trackIndex}-event-${eventIndex}`">
                 <path
                   v-if="normalizeEvent(eventItem) && normalizeText(eventItem.trackId) === normalizeText(track.id)"
@@ -422,6 +486,7 @@ function eventPath(type, x, y) {
                   :fill="eventItem.color || resolveColor(eventItem.type)"
                   stroke="#0f172a"
                   stroke-width="0.5"
+                  class="cursor-pointer"
                   @mousemove="handleEventHover($event, eventItem, track.label)"
                 />
               </template>
@@ -429,15 +494,27 @@ function eventPath(type, x, y) {
           </svg>
         </div>
       </div>
-
-      <div
-        v-if="tooltipRef.visible"
-        class="pointer-events-none absolute z-30 max-w-72 rounded-card border border-stroke-soft bg-slate-900/95 px-2 py-1.5 text-[11px] text-slate-100 shadow-lg"
-        :style="{ left: `${tooltipRef.x}px`, top: `${tooltipRef.y}px` }"
-      >
-        <p class="font-semibold text-white">{{ tooltipRef.title }}</p>
-        <p v-for="line in tooltipRef.lines" :key="line" class="mt-0.5 text-slate-200">{{ line }}</p>
-      </div>
     </div>
+
+    <!-- Tooltip: teleported to body so it's never clipped by overflow -->
+    <Teleport to="body">
+      <Transition name="tooltip-fade">
+        <div
+          v-if="tooltipRef.visible"
+          class="pointer-events-none fixed z-[9999] max-w-72 rounded-lg border border-slate-600/30 bg-slate-900/95 px-2.5 py-2 text-[11px] leading-relaxed text-slate-100 shadow-xl backdrop-blur-sm"
+          :style="{ left: `${tooltipRef.x}px`, top: `${tooltipRef.y}px` }"
+        >
+          <p class="font-semibold text-white">{{ tooltipRef.title }}</p>
+          <p v-for="line in tooltipRef.lines" :key="line" class="mt-0.5 text-slate-300">{{ line }}</p>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
+
+<style scoped>
+.tooltip-fade-enter-active { transition: opacity 0.12s ease-out; }
+.tooltip-fade-leave-active { transition: opacity 0.08s ease-in; }
+.tooltip-fade-enter-from,
+.tooltip-fade-leave-to { opacity: 0; }
+</style>

@@ -145,113 +145,137 @@ function buildNode(cid, visited) {
   };
 }
 
-const echartsData = computed(() => {
+// Build each root into its own independent tree data
+const treesData = computed(() => {
   if (props.treeRoots.length === 0) {
     return [];
   }
 
-  const visited = new Set();
+  const globalVisited = new Set();
   return props.treeRoots
-    .map((rootId) => buildNode(rootId, visited))
+    .map((rootId) => buildNode(rootId, globalVisited))
     .filter(Boolean);
 });
 
-const hasData = computed(() => echartsData.value.length > 0);
+const hasData = computed(() => treesData.value.length > 0);
 
-function countNodes(nodes) {
-  let count = 0;
-  function walk(list) {
-    list.forEach((node) => {
-      count += 1;
-      if (node.children?.length > 0) {
-        walk(node.children);
-      }
-    });
+function countLeaves(node) {
+  if (!node.children || node.children.length === 0) {
+    return 1;
   }
-  walk(nodes);
-  return count;
+  return node.children.reduce((sum, child) => sum + countLeaves(child), 0);
 }
 
 const chartHeight = computed(() => {
-  const total = countNodes(echartsData.value);
-  const base = Math.max(300, Math.min(800, total * 28));
+  const totalLeaves = treesData.value.reduce((sum, tree) => sum + countLeaves(tree), 0);
+  const base = Math.max(300, Math.min(1200, totalLeaves * 36));
   return `${base}px`;
 });
 
+const TREE_SERIES_DEFAULTS = Object.freeze({
+  type: 'tree',
+  layout: 'orthogonal',
+  orient: 'LR',
+  expandAndCollapse: true,
+  initialTreeDepth: -1,
+  roam: 'move',
+  symbol: 'circle',
+  symbolSize: 10,
+  label: {
+    show: true,
+    position: 'right',
+    fontSize: 11,
+    color: '#334155',
+    overflow: 'truncate',
+    ellipsis: '…',
+    width: 160,
+  },
+  lineStyle: {
+    width: 1.5,
+    color: '#CBD5E1',
+    curveness: 0.5,
+  },
+  emphasis: {
+    focus: 'ancestor',
+    itemStyle: { borderWidth: 2 },
+    label: { fontWeight: 'bold' },
+  },
+  animationDuration: 350,
+  animationDurationUpdate: 300,
+});
+
 const chartOption = computed(() => {
-  if (!hasData.value) {
+  const trees = treesData.value;
+  if (trees.length === 0) {
     return null;
   }
 
-  return {
-    tooltip: {
-      trigger: 'item',
-      triggerOn: 'mousemove',
-      formatter(params) {
-        const data = params?.data;
-        if (!data) {
-          return '';
-        }
-        const val = data.value || {};
-        const lines = [`<b>${data.name}</b>`];
-        if (val.type === 'serial') {
-          lines.push('<span style="color:#64748B">成品序列號</span>');
-        } else if (val.type === 'root') {
-          lines.push('<span style="color:#3B82F6">根節點（晶批）</span>');
-        } else if (val.type === 'leaf') {
-          lines.push('<span style="color:#F59E0B">末端節點</span>');
-        } else if (val.type === 'branch') {
-          lines.push('<span style="color:#10B981">中間節點</span>');
-        }
-        if (val.cid && val.cid !== data.name) {
-          lines.push(`<span style="color:#94A3B8;font-size:11px">CID: ${val.cid}</span>`);
-        }
-        return lines.join('<br/>');
-      },
+  const tooltip = {
+    trigger: 'item',
+    triggerOn: 'mousemove',
+    formatter(params) {
+      const data = params?.data;
+      if (!data) {
+        return '';
+      }
+      const val = data.value || {};
+      const lines = [`<b>${data.name}</b>`];
+      if (val.type === 'serial') {
+        lines.push('<span style="color:#64748B">成品序列號</span>');
+      } else if (val.type === 'root') {
+        lines.push('<span style="color:#3B82F6">根節點（晶批）</span>');
+      } else if (val.type === 'leaf') {
+        lines.push('<span style="color:#F59E0B">末端節點</span>');
+      } else if (val.type === 'branch') {
+        lines.push('<span style="color:#10B981">中間節點</span>');
+      }
+      if (val.cid && val.cid !== data.name) {
+        lines.push(`<span style="color:#94A3B8;font-size:11px">CID: ${val.cid}</span>`);
+      }
+      return lines.join('<br/>');
     },
-    series: [
-      {
-        type: 'tree',
-        layout: 'orthogonal',
-        orient: 'LR',
-        expandAndCollapse: true,
-        initialTreeDepth: -1,
-        roam: 'move',
-        symbol: 'circle',
-        symbolSize: 10,
-        label: {
-          show: true,
-          position: 'right',
-          fontSize: 11,
-          color: '#334155',
-          overflow: 'truncate',
-          ellipsis: '…',
-          width: 160,
-        },
-        lineStyle: {
-          width: 1.5,
-          color: '#CBD5E1',
-          curveness: 0.5,
-        },
-        emphasis: {
-          focus: 'ancestor',
-          itemStyle: {
-            borderWidth: 2,
-          },
-          label: {
-            fontWeight: 'bold',
-          },
-        },
-        animationDuration: 350,
-        animationDurationUpdate: 300,
+  };
+
+  // Single root → one series, full area
+  if (trees.length === 1) {
+    return {
+      tooltip,
+      series: [{
+        ...TREE_SERIES_DEFAULTS,
         left: 40,
         right: 180,
         top: 20,
         bottom: 20,
-        data: echartsData.value,
-      },
-    ],
-  };
+        data: [trees[0]],
+      }],
+    };
+  }
+
+  // Multiple roots → one series per tree, each in its own vertical band
+  const leafCounts = trees.map(countLeaves);
+  const totalLeaves = leafCounts.reduce((a, b) => a + b, 0);
+  const GAP_PX = 12;
+  const totalGapPercent = ((trees.length - 1) * GAP_PX / 800) * 100;
+  const usablePercent = 100 - totalGapPercent;
+
+  let cursor = 0;
+  const series = trees.map((tree, index) => {
+    const fraction = leafCounts[index] / totalLeaves;
+    const heightPercent = Math.max(10, usablePercent * fraction);
+    const topPercent = cursor;
+    cursor += heightPercent + (GAP_PX / 800) * 100;
+
+    return {
+      ...TREE_SERIES_DEFAULTS,
+      left: 40,
+      right: 180,
+      top: `${topPercent}%`,
+      height: `${heightPercent}%`,
+      data: [tree],
+    };
+  });
+
+  return { tooltip, series };
 });
 
 function handleNodeClick(params) {

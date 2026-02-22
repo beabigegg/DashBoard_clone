@@ -24,16 +24,18 @@ function safeDate(value) {
   return parsed ? parsed : null;
 }
 
-function fallbackTrackId() {
-  const first = props.historyRows[0];
-  return normalizeText(first?.WORKCENTERNAME) || 'UNKNOWN_TRACK';
-}
-
+// ── Tracks: group by (WORKCENTER_GROUP × LOT ID × Equipment) ──
 const tracks = computed(() => {
   const grouped = new Map();
 
   props.historyRows.forEach((row, index) => {
-    const workcenterName = normalizeText(row?.WORKCENTERNAME) || `WORKCENTER-${index + 1}`;
+    const groupName = normalizeText(row?.WORKCENTER_GROUP)
+      || normalizeText(row?.WORKCENTERNAME)
+      || `WORKCENTER-${index + 1}`;
+    const lotId = normalizeText(row?.CONTAINERNAME || row?.CONTAINERID) || '';
+    const equipment = normalizeText(row?.EQUIPMENTNAME) || '';
+    const trackKey = `${groupName}||${lotId}||${equipment}`;
+
     const start = safeDate(row?.TRACKINTIMESTAMP);
     const end = safeDate(row?.TRACKOUTTIMESTAMP) || (start ? new Date(start.getTime() + (1000 * 60 * 30)) : null);
 
@@ -41,32 +43,52 @@ const tracks = computed(() => {
       return;
     }
 
-    if (!grouped.has(workcenterName)) {
-      grouped.set(workcenterName, []);
+    if (!grouped.has(trackKey)) {
+      grouped.set(trackKey, { groupName, lotId, equipment, bars: [] });
     }
 
-    grouped.get(workcenterName).push({
-      id: `${workcenterName}-${index}`,
+    grouped.get(trackKey).bars.push({
+      id: `${trackKey}-${index}`,
       start,
       end,
-      type: workcenterName,
-      label: row?.SPECNAME || workcenterName,
-      detail: `${normalizeText(row?.CONTAINERNAME || row?.CONTAINERID)} | ${normalizeText(row?.EQUIPMENTNAME)}`,
+      type: groupName,
+      label: row?.SPECNAME || groupName,
     });
   });
 
-  return [...grouped.entries()].map(([trackId, bars]) => ({
-    id: trackId,
-    label: trackId,
+  return [...grouped.entries()].map(([trackKey, { groupName, lotId, equipment, bars }]) => ({
+    id: trackKey,
+    group: groupName,
+    label: groupName,
+    sublabels: [
+      lotId ? `LOT ID: ${lotId}` : '',
+      equipment ? `機台編號: ${equipment}` : '',
+    ].filter(Boolean),
     layers: [
       {
-        id: `${trackId}-lots`,
+        id: `${trackKey}-lots`,
         bars,
         opacity: 0.85,
       },
     ],
   }));
 });
+
+// ── Events: resolve trackId to compound key via group matching ──
+const groupToFirstTrackId = computed(() => {
+  const map = new Map();
+  tracks.value.forEach((track) => {
+    if (!map.has(track.group)) {
+      map.set(track.group, track.id);
+    }
+  });
+  return map;
+});
+
+function resolveEventTrackId(row) {
+  const group = normalizeText(row?.WORKCENTER_GROUP) || normalizeText(row?.WORKCENTERNAME) || '';
+  return groupToFirstTrackId.value.get(group) || group;
+}
 
 const events = computed(() => {
   const markers = [];
@@ -79,7 +101,7 @@ const events = computed(() => {
 
     markers.push({
       id: `hold-${index}`,
-      trackId: normalizeText(row?.WORKCENTERNAME) || fallbackTrackId(),
+      trackId: resolveEventTrackId(row),
       time,
       type: 'HOLD',
       shape: 'diamond',
@@ -96,7 +118,7 @@ const events = computed(() => {
 
     markers.push({
       id: `material-${index}`,
-      trackId: normalizeText(row?.WORKCENTERNAME) || fallbackTrackId(),
+      trackId: resolveEventTrackId(row),
       time,
       type: 'MATERIAL',
       shape: 'triangle',
@@ -114,14 +136,22 @@ const colorMap = computed(() => {
     MATERIAL: '#0ea5e9',
   };
 
+  // Color by workcenter group (not compound key) so same group = same color
+  const seen = new Set();
   tracks.value.forEach((track) => {
-    colors[track.id] = hashColor(track.id);
+    if (!seen.has(track.group)) {
+      seen.add(track.group);
+      colors[track.group] = hashColor(track.group);
+    }
   });
 
   return colors;
 });
 
 const timeRange = computed(() => {
+  // Derive range ONLY from history bars so it updates when LOT selection
+  // or workcenter group filter changes. Hold/material events are supplementary
+  // markers and should not stretch the visible range.
   const timestamps = [];
 
   tracks.value.forEach((track) => {
@@ -131,10 +161,6 @@ const timeRange = computed(() => {
         timestamps.push(bar.end?.getTime?.() || 0);
       });
     });
-  });
-
-  events.value.forEach((eventItem) => {
-    timestamps.push(eventItem.time?.getTime?.() || 0);
   });
 
   const normalized = timestamps.filter((item) => Number.isFinite(item) && item > 0);
@@ -163,15 +189,15 @@ const timeRange = computed(() => {
       歷程資料不足，無法產生 Timeline
     </div>
 
-    <div v-else class="max-h-[420px] overflow-y-auto rounded-card border border-stroke-soft">
+    <div v-else class="max-h-[520px] overflow-y-auto">
       <TimelineChart
         :tracks="tracks"
         :events="events"
         :time-range="timeRange"
         :color-map="colorMap"
-        :label-width="180"
-        :track-row-height="46"
-        :min-chart-width="1040"
+        :label-width="200"
+        :track-row-height="58"
+        :min-chart-width="600"
       />
     </div>
   </section>

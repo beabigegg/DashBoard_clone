@@ -381,6 +381,22 @@ def _get_workcenters_for_groups(groups: List[str]) -> List[str]:
     return get_workcenters_for_groups(groups)
 
 
+def _enrich_workcenter_group(rows: list) -> list:
+    """Add WORKCENTER_GROUP field to each history row based on WORKCENTERNAME.
+
+    Uses filter_cache workcenter mapping to resolve the group name.
+    """
+    from mes_dashboard.services.filter_cache import get_workcenter_mapping
+    mapping = get_workcenter_mapping() or {}
+    for row in rows:
+        wc_name = row.get('WORKCENTERNAME')
+        if wc_name and wc_name in mapping:
+            row['WORKCENTER_GROUP'] = mapping[wc_name].get('group', wc_name)
+        else:
+            row['WORKCENTER_GROUP'] = wc_name or ''
+    return rows
+
+
 def get_lot_history(
     container_id: str,
     workcenter_groups: Optional[List[str]] = None
@@ -415,6 +431,7 @@ def get_lot_history(
                     f"({len(workcenters)} workcenters)"
                 )
 
+        _enrich_workcenter_group(rows)
         data = _df_to_records(pd.DataFrame(rows))
 
         logger.debug(f"LOT history: {len(data)} records for {container_id}")
@@ -520,6 +537,7 @@ def get_lot_history_batch(
                     if row.get('WORKCENTERNAME') in workcenter_set
                 ]
 
+        _enrich_workcenter_group(rows)
         data = _df_to_records(pd.DataFrame(rows))
 
         logger.debug(

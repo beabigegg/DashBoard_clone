@@ -192,17 +192,11 @@ async function handleResolveLots() {
     return;
   }
 
+  // Build tree only — don't auto-select or load detail data.
+  // User clicks a node to trigger detail/timeline loading on demand.
   await lotLineage.primeResolvedLots(lotResolve.resolvedLots.value);
-
-  const treeRootIds = lotLineage.treeRoots.value;
-  if (treeRootIds.length === 0) {
-    await lotDetail.setSelectedContainerId('');
-    lotLineage.clearSelection();
-    return;
-  }
-
-  // Auto-select all tree roots and load detail for their full subtrees
-  await handleSelectNodes(treeRootIds);
+  lotLineage.clearSelection();
+  lotDetail.clearTabData();
 }
 
 async function handleSelectNodes(containerIds) {
