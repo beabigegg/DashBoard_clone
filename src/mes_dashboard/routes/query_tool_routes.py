@@ -86,6 +86,24 @@ _QUERY_TOOL_EXPORT_RATE_LIMIT = configured_rate_limit(
 )
 
 
+def _format_lot_materials_export_rows(rows):
+    """Normalize LOT material export columns for UI/CSV consistency."""
+    normalized_rows = []
+    for row in rows or []:
+        lot_id = row.get('CONTAINERNAME') or row.get('CONTAINERID') or ''
+        normalized_rows.append({
+            'LOT ID': lot_id,
+            'MATERIALPARTNAME': row.get('MATERIALPARTNAME', ''),
+            'MATERIALLOTNAME': row.get('MATERIALLOTNAME', ''),
+            'QTYCONSUMED': row.get('QTYCONSUMED', ''),
+            'WORKCENTERNAME': row.get('WORKCENTERNAME', ''),
+            'SPECNAME': row.get('SPECNAME', ''),
+            'EQUIPMENTNAME': row.get('EQUIPMENTNAME', ''),
+            'TXNDATE': row.get('TXNDATE', ''),
+        })
+    return normalized_rows
+
+
 # ============================================================
 # Page Route
 # ============================================================
@@ -501,7 +519,7 @@ def export_csv():
         elif export_type == 'lot_materials':
             container_id = params.get('container_id')
             result = get_lot_materials(container_id)
-            filename = f'lot_materials_{container_id}.csv'
+            filename = f'lot_raw_materials_{container_id}.csv'
 
         elif export_type == 'lot_rejects':
             container_id = params.get('container_id')
@@ -593,10 +611,13 @@ def export_csv():
         if not export_data:
             return jsonify({'error': '查無資料'}), 404
 
+        if export_type == 'lot_materials':
+            export_data = _format_lot_materials_export_rows(export_data)
+
         # Stream CSV response
         return Response(
             generate_csv_stream(export_data),
-            mimetype='text/csv; charset=utf-8',
+            mimetype='text/csv; charset=utf-8-sig',
             headers={
                 'Content-Disposition': f'attachment; filename={filename}'
             }

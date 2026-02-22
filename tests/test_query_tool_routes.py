@@ -713,6 +713,43 @@ class TestExportCsvEndpoint:
         assert response.status_code == 200
         assert 'text/csv' in response.content_type
 
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_materials')
+    def test_export_lot_materials_uses_container_name_as_lot_id(
+        self,
+        mock_get_materials,
+        client,
+    ):
+        mock_get_materials.return_value = {
+            'data': [
+                {
+                    'CONTAINERID': '488103800029578b',
+                    'CONTAINERNAME': 'GA25010001-A01',
+                    'MATERIALPARTNAME': 'M-001',
+                    'MATERIALLOTNAME': 'LOT-MAT-01',
+                    'QTYCONSUMED': 10,
+                    'WORKCENTERNAME': 'DB',
+                    'SPECNAME': 'SPEC-DB',
+                    'EQUIPMENTNAME': 'EQ-01',
+                    'TXNDATE': '2026-02-22 10:00:00',
+                }
+            ],
+            'total': 1,
+        }
+
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_materials',
+                'params': {'container_id': '488103800029578b'}
+            }
+        )
+
+        assert response.status_code == 200
+        assert 'lot_raw_materials_488103800029578b.csv' in response.headers.get('Content-Disposition', '')
+        decoded = response.data.decode('utf-8-sig')
+        assert 'LOT ID' in decoded
+        assert 'GA25010001-A01' in decoded
+
 
 class TestEquipmentListEndpoint:
     """Tests for /api/query-tool/equipment-list endpoint."""

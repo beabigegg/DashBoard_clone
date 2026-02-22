@@ -526,6 +526,7 @@ def export_csv(
 
         # Write CSV header
         output = io.StringIO()
+        output.write('\ufeff')  # UTF-8 BOM for Excel compatibility
         writer = csv.writer(output)
         writer.writerow(headers)
         yield output.getvalue()

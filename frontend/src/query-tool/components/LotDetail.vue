@@ -69,7 +69,7 @@ const emit = defineEmits(['change-sub-tab', 'update-workcenter-groups', 'export-
 
 const tabMeta = Object.freeze({
   history: { label: '歷程', emptyText: '無歷程資料' },
-  materials: { label: '物料', emptyText: '無物料資料' },
+  materials: { label: '原物料', emptyText: '無原物料資料' },
   rejects: { label: '報廢', emptyText: '無報廢資料' },
   holds: { label: 'Hold', emptyText: '無 Hold 資料' },
   jobs: { label: 'Job', emptyText: '無 Job 資料' },
@@ -102,6 +102,39 @@ const activeExporting = computed(() => {
 
 const activeEmptyText = computed(() => {
   return tabMeta[props.activeSubTab]?.emptyText || '無資料';
+});
+
+const activeColumnLabels = computed(() => {
+  if (props.activeSubTab !== 'materials') {
+    return {};
+  }
+  return {
+    CONTAINERNAME: 'LOT ID',
+  };
+});
+
+const activeHiddenColumns = computed(() => {
+  if (props.activeSubTab !== 'materials') {
+    return [];
+  }
+  return ['CONTAINERID'];
+});
+
+const activeColumnOrder = computed(() => {
+  if (props.activeSubTab !== 'materials') {
+    return [];
+  }
+  return [
+    'CONTAINERNAME',
+    'MATERIALPARTNAME',
+    'MATERIALLOTNAME',
+    'QTYCONSUMED',
+    'WORKCENTERNAME',
+    'SPECNAME',
+    'EQUIPMENTNAME',
+    'TXNDATE',
+    'WORKCENTER_GROUP',
+  ];
 });
 
 const canExport = computed(() => {
@@ -194,6 +227,9 @@ const detailCountLabel = computed(() => {
         :rows="activeRows"
         :loading="activeLoading"
         :empty-text="activeLoaded ? activeEmptyText : '尚未查詢此分頁資料'"
+        :column-labels="activeColumnLabels"
+        :hidden-columns="activeHiddenColumns"
+        :column-order="activeColumnOrder"
       />
     </template>
   </section>

@@ -348,7 +348,7 @@ def export_csv():
 
     return Response(
         csv_content,
-        mimetype='text/csv; charset=utf-8',
+        mimetype='text/csv; charset=utf-8-sig',
         headers={
             'Content-Disposition': 'attachment; filename=query_result.csv'
         }

@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 from collections import defaultdict
 from typing import Any, Dict, List
 
@@ -28,7 +29,7 @@ _DOMAIN_SPECS: Dict[str, Dict[str, Any]] = {
         "default_window": 60,
     },
     "materials": {
-        "filter_column": "CONTAINERID",
+        "filter_column": "m.CONTAINERID",
         "cache_ttl": 300,
         "bucket": "event-materials",
         "max_env": "EVT_MATERIALS_RATE_MAX_REQUESTS",
@@ -106,11 +107,30 @@ def _normalize_ids(container_ids: List[str]) -> List[str]:
 class EventFetcher:
     """Fetches container-scoped event records with cache and batching."""
 
+    _CONTAINER_EQ_PARAM_PATTERN = re.compile(
+        r"(?:[A-Za-z_][A-Za-z0-9_]*\.)?CONTAINERID\s*=\s*:container_id",
+        re.IGNORECASE,
+    )
+
     @staticmethod
     def _cache_key(domain: str, container_ids: List[str]) -> str:
         normalized = sorted(_normalize_ids(container_ids))
         digest = hashlib.md5("|".join(normalized).encode("utf-8")).hexdigest()[:12]
         return f"evt:{domain}:{digest}"
+
+    @staticmethod
+    def _replace_container_filter(sql: str, condition_sql: str) -> str:
+        """Replace single-CID predicate with batched predicate in domain SQL."""
+        replaced_sql, replacements = EventFetcher._CONTAINER_EQ_PARAM_PATTERN.subn(
+            condition_sql,
+            sql,
+            count=1,
+        )
+        if replacements == 0:
+            logger.warning(
+                "EventFetcher container filter replacement missed target predicate"
+            )
+        return replaced_sql
 
     @staticmethod
     def _get_rate_limit_config(domain: str) -> Dict[str, int | str]:
@@ -133,20 +153,20 @@ class EventFetcher:
 
         if domain == "history":
             sql = SQLLoader.load("query_tool/lot_history")
-            sql = sql.replace("h.CONTAINERID = :container_id", condition_sql)
+            sql = EventFetcher._replace_container_filter(sql, condition_sql)
             return sql.replace("{{ WORKCENTER_FILTER }}", "")
 
         if domain == "materials":
             sql = SQLLoader.load("query_tool/lot_materials")
-            return sql.replace("CONTAINERID = :container_id", condition_sql)
+            return EventFetcher._replace_container_filter(sql, condition_sql)
 
         if domain == "rejects":
             sql = SQLLoader.load("query_tool/lot_rejects")
-            return sql.replace("CONTAINERID = :container_id", condition_sql)
+            return EventFetcher._replace_container_filter(sql, condition_sql)
 
         if domain == "holds":
             sql = SQLLoader.load("query_tool/lot_holds")
-            return sql.replace("CONTAINERID = :container_id", condition_sql)
+            return EventFetcher._replace_container_filter(sql, condition_sql)
 
         if domain == "jobs":
             return f"""

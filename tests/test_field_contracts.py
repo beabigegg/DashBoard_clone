@@ -123,5 +123,5 @@ def test_resource_history_export_uses_contract_headers(
         chunks = list(export_resource_history_csv('2024-01-01', '2024-01-10'))
 
     assert chunks
-    header_row = next(csv.reader(io.StringIO(chunks[0])))
+    header_row = next(csv.reader(io.StringIO(chunks[0].lstrip('\ufeff'))))
     assert header_row == export_headers

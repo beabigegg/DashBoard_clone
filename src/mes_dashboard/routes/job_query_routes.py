@@ -192,7 +192,7 @@ def export_jobs():
     # Stream CSV response
     return Response(
         export_jobs_with_history(resource_ids, start_date, end_date),
-        mimetype='text/csv; charset=utf-8',
+        mimetype='text/csv; charset=utf-8-sig',
         headers={
             'Content-Disposition': 'attachment; filename=job_history_export.csv'
         }
