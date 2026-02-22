@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import ExportButton from './ExportButton.vue';
 import LotAssociationTable from './LotAssociationTable.vue';
 import LotHistoryTable from './LotHistoryTable.vue';
+import LotJobsTable from './LotJobsTable.vue';
 import LotRejectTable from './LotRejectTable.vue';
 import LotTimeline from './LotTimeline.vue';
 
@@ -73,7 +74,7 @@ const tabMeta = Object.freeze({
   materials: { label: '原物料', emptyText: '無原物料資料' },
   rejects: { label: '報廢', emptyText: '無報廢資料' },
   holds: { label: 'Hold', emptyText: '無 Hold 資料' },
-  jobs: { label: 'Job', emptyText: '無 Job 資料' },
+  jobs: { label: '維修', emptyText: '無維修資料' },
 });
 
 const subTabs = Object.keys(tabMeta);
@@ -248,13 +249,20 @@ const detailCountLabel = computed(() => {
       </div>
 
       <LotAssociationTable
-        v-else-if="activeSubTab !== 'rejects'"
+        v-else-if="activeSubTab !== 'rejects' && activeSubTab !== 'jobs'"
         :rows="activeRows"
         :loading="activeLoading"
         :empty-text="activeLoaded ? activeEmptyText : '尚未查詢此分頁資料'"
         :column-labels="activeColumnLabels"
         :hidden-columns="activeHiddenColumns"
         :column-order="activeColumnOrder"
+      />
+
+      <LotJobsTable
+        v-else-if="activeSubTab === 'jobs'"
+        :rows="activeRows"
+        :loading="activeLoading"
+        :empty-text="activeLoaded ? activeEmptyText : '尚未查詢此分頁資料'"
       />
 
       <LotRejectTable
