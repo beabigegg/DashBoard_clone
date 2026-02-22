@@ -71,6 +71,7 @@ const loading = reactive({
   querying: false,
   options: false,
   list: false,
+  exporting: false,
 });
 
 const errorMessage = ref('');
@@ -267,12 +268,19 @@ function buildCommonParams({ reason = committedFilters.reason } = {}) {
   return buildRejectCommonQueryParams(committedFilters, { reason });
 }
 
+function metricFilterParam() {
+  const mode = paretoMetricMode.value;
+  if (mode === 'reject' || mode === 'defect') return mode;
+  return 'all';
+}
+
 function buildListParams() {
   const effectiveReason = detailReason.value || committedFilters.reason;
   const params = {
     ...buildCommonParams({ reason: effectiveReason }),
     page: page.value,
     per_page: DEFAULT_PER_PAGE,
+    metric_filter: metricFilterParam(),
   };
   if (selectedTrendDates.value.length > 0) {
     const sorted = [...selectedTrendDates.value].sort();
@@ -561,7 +569,9 @@ function onTrendDateClick(dateStr) {
 
 function onTrendLegendChange(selected) {
   trendLegendSelected.value = selected;
+  page.value = 1;
   updateUrlState();
+  void loadListOnly();
 }
 
 function onParetoClick(reason) {
@@ -625,7 +635,9 @@ async function removeFilterChip(chip) {
   await loadDataSections();
 }
 
-function exportCsv() {
+async function exportCsv() {
+  if (loading.exporting) return;
+
   const effectiveReason = detailReason.value || committedFilters.reason;
   const queryParams = buildRejectCommonQueryParams(committedFilters, { reason: effectiveReason });
   const params = new URLSearchParams();
@@ -638,8 +650,33 @@ function exportCsv() {
   appendArrayParams(params, 'workcenter_groups', queryParams.workcenter_groups || []);
   appendArrayParams(params, 'packages', queryParams.packages || []);
   appendArrayParams(params, 'reasons', queryParams.reasons || []);
+  params.set('metric_filter', metricFilterParam());
 
-  window.location.href = `/api/reject-history/export?${params.toString()}`;
+  loading.exporting = true;
+  errorMessage.value = '';
+  try {
+    const response = await fetch(`/api/reject-history/export?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('匯出 CSV 失敗');
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename=(.+?)(?:;|$)/);
+    const filename = filenameMatch ? filenameMatch[1] : `reject_history_${queryParams.start_date}_to_${queryParams.end_date}.csv`;
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    errorMessage.value = error?.message || '匯出 CSV 失敗';
+  } finally {
+    loading.exporting = false;
+  }
 }
 
 const totalScrapQty = computed(() => {

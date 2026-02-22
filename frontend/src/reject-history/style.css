@@ -166,6 +166,27 @@
   background: #0b5e59;
 }
 
+.btn-export:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .reject-summary-row {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
@@ -191,8 +212,10 @@
 
 .chart-wrap,
 .pareto-chart-wrap {
+  width: 100%;
   height: 340px;
   position: relative;
+  overflow: hidden;
 }
 
 .pareto-header {

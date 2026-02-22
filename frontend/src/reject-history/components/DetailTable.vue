@@ -42,6 +42,8 @@ function formatNumber(value) {
             <th class="col-left">TYPE</th>
             <th>PRODUCT</th>
             <th>原因</th>
+            <th>EQUIPMENT</th>
+            <th>COMMENT</th>
             <th class="th-expandable" @click="showRejectBreakdown = !showRejectBreakdown">
               扣帳報廢量 <span class="expand-icon">{{ showRejectBreakdown ? '▾' : '▸' }}</span>
             </th>
@@ -65,6 +67,8 @@ function formatNumber(value) {
             <td class="col-left">{{ row.PJ_TYPE }}</td>
             <td>{{ row.PRODUCTNAME || '' }}</td>
             <td>{{ row.LOSSREASONNAME }}</td>
+            <td>{{ row.EQUIPMENTNAME || '' }}</td>
+            <td>{{ row.REJECTCOMMENT || '' }}</td>
             <td>{{ formatNumber(row.REJECT_TOTAL_QTY) }}</td>
             <template v-if="showRejectBreakdown">
               <td class="td-sub">{{ formatNumber(row.REJECT_QTY) }}</td>
@@ -77,7 +81,7 @@ function formatNumber(value) {
             <td class="cell-nowrap">{{ row.TXN_TIME || row.TXN_DAY }}</td>
           </tr>
           <tr v-if="!items || items.length === 0">
-            <td :colspan="showRejectBreakdown ? 15 : 10" class="placeholder">No data</td>
+            <td :colspan="showRejectBreakdown ? 17 : 12" class="placeholder">No data</td>
           </tr>
         </tbody>
       </table>

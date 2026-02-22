@@ -333,6 +333,7 @@ def api_reject_history_list():
 
     page = request.args.get("page", 1, type=int) or 1
     per_page = request.args.get("per_page", 50, type=int) or 50
+    metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
 
     try:
         result = query_list(
@@ -347,6 +348,7 @@ def api_reject_history_list():
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
+            metric_filter=metric_filter,
         )
         data, meta = _extract_meta(
             result,
@@ -372,6 +374,7 @@ def api_reject_history_export():
     if bool_error:
         return jsonify(bool_error[0]), bool_error[1]
 
+    metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
     filename = f"reject_history_{start_date}_to_{end_date}.csv"
     try:
         return Response(
@@ -385,6 +388,7 @@ def api_reject_history_export():
                 include_excluded_scrap=include_excluded_scrap,
                 exclude_material_scrap=exclude_material_scrap,
                 exclude_pb_diode=exclude_pb_diode,
+                metric_filter=metric_filter,
             ),
             mimetype="text/csv",
             headers={

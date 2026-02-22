@@ -296,6 +296,9 @@ def _list_to_csv(
     rows: Iterable[dict[str, Any]],
     headers: list[str],
 ) -> Generator[str, None, None]:
+    # BOM for UTF-8 so Excel opens the CSV with correct encoding
+    yield "\ufeff"
+
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=headers)
     writer.writeheader()
@@ -561,6 +564,19 @@ def query_reason_pareto(
     }
 
 
+def _apply_metric_filter(where_clause: str, metric_filter: str) -> str:
+    """Append metric-type filter (reject / defect) to an existing WHERE clause."""
+    if metric_filter == "reject":
+        cond = "b.REJECT_TOTAL_QTY > 0"
+    elif metric_filter == "defect":
+        cond = "b.DEFECT_QTY > 0"
+    else:
+        return where_clause
+    if where_clause.strip():
+        return f"{where_clause} AND {cond}"
+    return f"WHERE {cond}"
+
+
 def query_list(
     *,
     start_date: str,
@@ -574,6 +590,7 @@ def query_list(
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
+    metric_filter: str = "all",
 ) -> dict[str, Any]:
     _validate_range(start_date, end_date)
 
@@ -590,6 +607,7 @@ def query_list(
         exclude_material_scrap=exclude_material_scrap,
         exclude_pb_diode=exclude_pb_diode,
     )
+    where_clause = _apply_metric_filter(where_clause, metric_filter)
     sql = _prepare_sql("list", where_clause=where_clause, base_variant="lot")
     query_params = _common_params(
         start_date,
@@ -615,6 +633,7 @@ def query_list(
                     "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
                     "WORKCENTERNAME": _normalize_text(row.get("WORKCENTERNAME")),
                     "SPECNAME": _normalize_text(row.get("SPECNAME")),
+                    "EQUIPMENTNAME": _normalize_text(row.get("EQUIPMENTNAME")),
                     "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
                     "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
                     "CONTAINERNAME": _normalize_text(row.get("CONTAINERNAME")),
@@ -622,6 +641,7 @@ def query_list(
                     "PRODUCTNAME": _normalize_text(row.get("PRODUCTNAME")),
                     "LOSSREASONNAME": _normalize_text(row.get("LOSSREASONNAME")),
                     "LOSSREASON_CODE": _normalize_text(row.get("LOSSREASON_CODE")),
+                    "REJECTCOMMENT": _normalize_text(row.get("REJECTCOMMENT")),
                     "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
                     "REJECT_QTY": _as_int(row.get("REJECT_QTY")),
                     "STANDBY_QTY": _as_int(row.get("STANDBY_QTY")),
@@ -661,6 +681,7 @@ def export_csv(
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
+    metric_filter: str = "all",
 ) -> Generator[str, None, None]:
     _validate_range(start_date, end_date)
 
@@ -673,7 +694,8 @@ def export_csv(
         exclude_material_scrap=exclude_material_scrap,
         exclude_pb_diode=exclude_pb_diode,
     )
-    sql = _prepare_sql("export", where_clause=where_clause)
+    where_clause = _apply_metric_filter(where_clause, metric_filter)
+    sql = _prepare_sql("export", where_clause=where_clause, base_variant="lot")
     df = read_sql_df(sql, _common_params(start_date, end_date, params))
 
     rows = []
@@ -681,54 +703,52 @@ def export_csv(
         for _, row in df.iterrows():
             rows.append(
                 {
-                    "TXN_DAY": _to_date_str(row.get("TXN_DAY")),
-                    "TXN_MONTH": _normalize_text(row.get("TXN_MONTH")),
+                    "LOT": _normalize_text(row.get("CONTAINERNAME")),
+                    "WORKCENTER": _normalize_text(row.get("WORKCENTERNAME")),
                     "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
-                    "WORKCENTERNAME": _normalize_text(row.get("WORKCENTERNAME")),
-                    "SPECNAME": _normalize_text(row.get("SPECNAME")),
-                    "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
-                    "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
-                    "LOSSREASONNAME": _normalize_text(row.get("LOSSREASONNAME")),
-                    "LOSSREASON_CODE": _normalize_text(row.get("LOSSREASON_CODE")),
-                    "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
+                    "Package": _normalize_text(row.get("PRODUCTLINENAME")),
+                    "FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
+                    "TYPE": _normalize_text(row.get("PJ_TYPE")),
+                    "PRODUCT": _normalize_text(row.get("PRODUCTNAME")),
+                    "原因": _normalize_text(row.get("LOSSREASONNAME")),
+                    "EQUIPMENT": _normalize_text(row.get("EQUIPMENTNAME")),
+                    "COMMENT": _normalize_text(row.get("REJECTCOMMENT")),
+                    "SPEC": _normalize_text(row.get("SPECNAME")),
                     "REJECT_QTY": _as_int(row.get("REJECT_QTY")),
                     "STANDBY_QTY": _as_int(row.get("STANDBY_QTY")),
                     "QTYTOPROCESS_QTY": _as_int(row.get("QTYTOPROCESS_QTY")),
                     "INPROCESS_QTY": _as_int(row.get("INPROCESS_QTY")),
                     "PROCESSED_QTY": _as_int(row.get("PROCESSED_QTY")),
-                    "REJECT_TOTAL_QTY": _as_int(row.get("REJECT_TOTAL_QTY")),
-                    "DEFECT_QTY": _as_int(row.get("DEFECT_QTY")),
-                    "REJECT_RATE_PCT": round(_as_float(row.get("REJECT_RATE_PCT")), 4),
-                    "DEFECT_RATE_PCT": round(_as_float(row.get("DEFECT_RATE_PCT")), 4),
-                    "REJECT_SHARE_PCT": round(_as_float(row.get("REJECT_SHARE_PCT")), 4),
-                    "AFFECTED_LOT_COUNT": _as_int(row.get("AFFECTED_LOT_COUNT")),
-                    "AFFECTED_WORKORDER_COUNT": _as_int(row.get("AFFECTED_WORKORDER_COUNT")),
+                    "扣帳報廢量": _as_int(row.get("REJECT_TOTAL_QTY")),
+                    "不扣帳報廢量": _as_int(row.get("DEFECT_QTY")),
+                    "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
+                    "報廢時間": _to_datetime_str(row.get("TXN_TIME")),
+                    "日期": _to_date_str(row.get("TXN_DAY")),
                 }
             )
 
     headers = [
-        "TXN_DAY",
-        "TXN_MONTH",
+        "LOT",
+        "WORKCENTER",
         "WORKCENTER_GROUP",
-        "WORKCENTERNAME",
-        "SPECNAME",
-        "PRODUCTLINENAME",
-        "PJ_TYPE",
-        "LOSSREASONNAME",
-        "LOSSREASON_CODE",
-        "MOVEIN_QTY",
+        "Package",
+        "FUNCTION",
+        "TYPE",
+        "PRODUCT",
+        "原因",
+        "EQUIPMENT",
+        "COMMENT",
+        "SPEC",
         "REJECT_QTY",
         "STANDBY_QTY",
         "QTYTOPROCESS_QTY",
         "INPROCESS_QTY",
         "PROCESSED_QTY",
-        "REJECT_TOTAL_QTY",
-        "DEFECT_QTY",
-        "REJECT_RATE_PCT",
-        "DEFECT_RATE_PCT",
-        "REJECT_SHARE_PCT",
-        "AFFECTED_LOT_COUNT",
-        "AFFECTED_WORKORDER_COUNT",
+        "扣帳報廢量",
+        "不扣帳報廢量",
+        "MOVEIN_QTY",
+        "報廢時間",
+        "日期",
     ]
     return _list_to_csv(rows, headers=headers)
 

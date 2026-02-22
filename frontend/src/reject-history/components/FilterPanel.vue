@@ -84,7 +84,10 @@ defineEmits(['apply', 'clear', 'export-csv', 'remove-chip', 'pareto-scope-toggle
         <div class="filter-actions">
           <button class="btn btn-primary" :disabled="loading.querying" @click="$emit('apply')">查詢</button>
           <button class="btn btn-secondary" :disabled="loading.querying" @click="$emit('clear')">清除條件</button>
-          <button class="btn btn-light btn-export" :disabled="loading.querying" @click="$emit('export-csv')">匯出 CSV</button>
+          <button class="btn btn-light btn-export" :disabled="loading.querying || loading.exporting" @click="$emit('export-csv')">
+            <template v-if="loading.exporting"><span class="btn-spinner"></span>匯出中...</template>
+            <template v-else>匯出 CSV</template>
+          </button>
         </div>
       </div>
     </div>

@@ -31,7 +31,7 @@ const chartOption = computed(() => {
       data: ['扣帳報廢量', '不扣帳報廢量'],
       bottom: 0,
     },
-    grid: { left: 48, right: 24, top: 22, bottom: 70 },
+    grid: { left: 48, right: 24, top: 22, bottom: 70, containLabel: false },
     xAxis: {
       type: 'category',
       data: items.map((item) => item.bucket_date || ''),
@@ -97,7 +97,7 @@ function handleLegendChange(params) {
     <article class="card">
       <div class="card-header"><div class="card-title">報廢量趨勢</div></div>
       <div class="card-body chart-wrap">
-        <VChart :option="chartOption" autoresize @click="handleChartClick" @legendselectchanged="handleLegendChange" />
+        <VChart :option="chartOption" :autoresize="{ throttle: 100 }" style="width: 100%; height: 100%" @click="handleChartClick" @legendselectchanged="handleLegendChange" />
         <div v-if="!hasData && !loading" class="placeholder chart-empty">No data</div>
       </div>
     </article>
