@@ -760,8 +760,12 @@ const filteredParetoItems = computed(() => {
   if (!committedFilters.paretoTop80 || items.length === 0) {
     return items;
   }
-  const top = items.filter((item) => Number(item.cumPct || 0) <= 80);
-  return top.length > 0 ? top : [items[0]];
+  // Include items up to AND including the one that crosses 80%,
+  // but always show at least 5 items so the chart stays informative
+  // when one reason dominates (e.g. defect-only mode).
+  const cutIdx = items.findIndex((item) => Number(item.cumPct || 0) >= 80);
+  const top80Count = cutIdx >= 0 ? cutIdx + 1 : items.length;
+  return items.slice(0, Math.max(top80Count, Math.min(5, items.length)));
 });
 
 const activeFilterChips = computed(() => {

@@ -31,7 +31,8 @@ function formatNumber(value) {
         </span>
       </div>
     </div>
-    <div class="card-body detail-table-wrap">
+    <div class="card-body detail-table-wrap" :class="{ 'is-loading': loading }">
+      <div v-if="loading" class="table-loading-overlay"><span class="table-spinner"></span></div>
       <table class="detail-table">
         <thead>
           <tr>
