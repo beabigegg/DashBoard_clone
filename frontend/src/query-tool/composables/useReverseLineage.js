@@ -71,6 +71,31 @@ function edgeKey(fromCid, toCid) {
   return `${from}->${to}`;
 }
 
+function collectAncestors(parentMap, startCid) {
+  const start = normalizeText(startCid);
+  if (!start) {
+    return new Set();
+  }
+
+  const visited = new Set();
+  const stack = [start];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    const parents = Array.isArray(parentMap?.[current]) ? parentMap[current] : [];
+    parents.forEach((parentId) => {
+      const parent = normalizeText(parentId);
+      if (!parent || visited.has(parent)) {
+        return;
+      }
+      visited.add(parent);
+      stack.push(parent);
+    });
+  }
+
+  return visited;
+}
+
 export function useReverseLineage(initial = {}) {
   ensureMesApiAvailable();
 
@@ -78,6 +103,7 @@ export function useReverseLineage(initial = {}) {
   const nameMap = reactive(new Map());
   const nodeMetaMap = reactive(new Map());
   const edgeTypeMap = reactive(new Map());
+  const graphEdges = ref([]);
   const leafSerials = reactive(new Map());
   const selectedContainerId = ref(normalizeText(initial.selectedContainerId));
   const selectedContainerIds = ref(
@@ -227,6 +253,81 @@ export function useReverseLineage(initial = {}) {
     return normalized;
   }
 
+  function deriveDisplayRoots(candidateRoots, parentMap) {
+    const roots = uniqueValues((candidateRoots || []).map((cid) => normalizeText(cid)).filter(Boolean));
+    if (roots.length <= 1) {
+      return roots;
+    }
+
+    const candidateSet = new Set(roots);
+    const groupedRoots = [];
+    const groupsByInput = new Map();
+    const assigned = new Set();
+
+    // Keep reduction within each query input token to avoid cross-token interference.
+    rootRows.value.forEach((row) => {
+      const cid = extractContainerId(row);
+      if (!candidateSet.has(cid)) {
+        return;
+      }
+
+      const inputToken = normalizeText(row?.input_value || row?.inputValue || row?.INPUT_VALUE);
+      const key = inputToken || `__${cid}`;
+
+      if (!groupsByInput.has(key)) {
+        groupsByInput.set(key, []);
+        groupedRoots.push(groupsByInput.get(key));
+      }
+
+      const group = groupsByInput.get(key);
+      if (!group.includes(cid)) {
+        group.push(cid);
+        assigned.add(cid);
+      }
+    });
+
+    // Roots not found in rootRows still need a standalone group.
+    roots.forEach((cid) => {
+      if (assigned.has(cid)) {
+        return;
+      }
+      groupedRoots.push([cid]);
+    });
+
+    const reduced = [];
+
+    groupedRoots.forEach((group) => {
+      if (group.length <= 1) {
+        const only = group[0];
+        if (only && !reduced.includes(only)) {
+          reduced.push(only);
+        }
+        return;
+      }
+
+      const ancestorCache = new Map();
+      const getAncestors = (cid) => {
+        if (!ancestorCache.has(cid)) {
+          ancestorCache.set(cid, collectAncestors(parentMap, cid));
+        }
+        return ancestorCache.get(cid);
+      };
+
+      const kept = group.filter((cid) => !group.some((otherCid) => (
+        otherCid !== cid && getAncestors(otherCid).has(cid)
+      )));
+
+      const finalGroup = kept.length > 0 ? kept : group;
+      finalGroup.forEach((cid) => {
+        if (cid && !reduced.includes(cid)) {
+          reduced.push(cid);
+        }
+      });
+    });
+
+    return reduced;
+  }
+
   function populateReverseTree(payload, requestedRoots = []) {
     const parentMap = normalizeParentMap(payload);
     const names = payload?.names;
@@ -256,18 +357,23 @@ export function useReverseLineage(initial = {}) {
     }
 
     edgeTypeMap.clear();
+    const normalizedEdges = [];
     if (Array.isArray(typedEdges)) {
       typedEdges.forEach((edge) => {
         if (!edge || typeof edge !== 'object') {
           return;
         }
-        const key = edgeKey(edge.from_cid, edge.to_cid);
+        const from = normalizeText(edge.from_cid);
+        const to = normalizeText(edge.to_cid);
+        const key = edgeKey(from, to);
         const type = normalizeText(edge.edge_type);
         if (key && type) {
           edgeTypeMap.set(key, type);
+          normalizedEdges.push({ from_cid: from, to_cid: to, edge_type: type });
         }
       });
     }
+    graphEdges.value = normalizedEdges;
 
     Object.entries(parentMap).forEach(([childId, parentIds]) => {
       patchEntry(childId, {
@@ -317,7 +423,7 @@ export function useReverseLineage(initial = {}) {
       }
     });
 
-    treeRoots.value = roots;
+    treeRoots.value = deriveDisplayRoots(roots, parentMap);
   }
 
   async function fetchLineage(containerIds, { force = false } = {}) {
@@ -392,6 +498,7 @@ export function useReverseLineage(initial = {}) {
     nameMap.clear();
     nodeMetaMap.clear();
     edgeTypeMap.clear();
+    graphEdges.value = [];
     leafSerials.clear();
     rootRows.value = [];
     rootContainerIds.value = [];
@@ -416,6 +523,7 @@ export function useReverseLineage(initial = {}) {
     nameMap,
     nodeMetaMap,
     edgeTypeMap,
+    graphEdges,
     leafSerials,
     selectedContainerId,
     selectedContainerIds,

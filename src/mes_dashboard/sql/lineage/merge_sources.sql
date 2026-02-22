@@ -1,8 +1,8 @@
 -- Unified LineageEngine - Merge Sources
--- Find source lots merged into finished lots from DW_MES_PJ_COMBINEDASSYLOTS.
+-- Find source lots merged into target LOT CIDs from DW_MES_PJ_COMBINEDASSYLOTS.
 --
 -- Parameters:
---   FINISHED_NAME_FILTER - QueryBuilder-generated condition on ca.FINISHEDNAME
+--   TARGET_CID_FILTER - QueryBuilder-generated condition on ca.LOTID
 --
 SELECT
     ca.CONTAINERID   AS SOURCE_CID,
@@ -10,4 +10,4 @@ SELECT
     ca.FINISHEDNAME,
     ca.LOTID         AS FINISHED_CID
 FROM DWH.DW_MES_PJ_COMBINEDASSYLOTS ca
-WHERE {{ FINISHED_NAME_FILTER }}
+WHERE {{ TARGET_CID_FILTER }}

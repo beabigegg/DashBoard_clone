@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 
 import VChart from 'vue-echarts';
 import { use } from 'echarts/core';
@@ -7,6 +7,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import { TreeChart } from 'echarts/charts';
 import { TooltipComponent } from 'echarts/components';
 
+import ExportButton from './ExportButton.vue';
 import { normalizeText } from '../utils/values.js';
 
 use([CanvasRenderer, TreeChart, TooltipComponent]);
@@ -28,6 +29,20 @@ const EDGE_STYLES = Object.freeze({
   wafer_origin: { color: '#2563EB', type: 'dotted', width: 1.8 },
   gd_rework_source: { color: '#EF4444', type: 'dashed', width: 1.8 },
   default: { color: '#CBD5E1', type: 'solid', width: 1.5 },
+});
+
+const EDGE_TAGS = Object.freeze({
+  split_from: { forward: '←拆', reverse: '→拆' },
+  merge_source: { forward: '←併', reverse: '→併' },
+  wafer_origin: { forward: '←晶', reverse: '→晶' },
+  gd_rework_source: { forward: '←重', reverse: '→重' },
+});
+
+const RELATION_TYPE_LABELS = Object.freeze({
+  split_from: '拆批',
+  merge_source: '併批',
+  wafer_origin: '晶圓來源',
+  gd_rework_source: '重工來源',
 });
 
 const LABEL_BASE_STYLE = Object.freeze({
@@ -56,6 +71,10 @@ const props = defineProps({
   edgeTypeMap: {
     type: Object,
     default: () => new Map(),
+  },
+  graphEdges: {
+    type: Array,
+    default: () => [],
   },
   leafSerials: {
     type: Object,
@@ -92,6 +111,10 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['select-nodes']);
+const chartRef = ref(null);
+const exportingTreeImage = ref(false);
+const exportingRelationCsv = ref(false);
+const exportErrorMessage = ref('');
 
 const selectedSet = computed(() => new Set(props.selectedContainerIds.map(normalizeText).filter(Boolean)));
 
@@ -107,6 +130,47 @@ const allSerialNames = computed(() => {
     }
   }
   return names;
+});
+
+const relationRows = computed(() => {
+  const rows = [];
+  const seen = new Set();
+  const source = Array.isArray(props.graphEdges) ? props.graphEdges : [];
+
+  source.forEach((edge) => {
+    if (!edge || typeof edge !== 'object') {
+      return;
+    }
+    const fromCid = normalizeText(edge.from_cid);
+    const toCid = normalizeText(edge.to_cid);
+    const edgeType = normalizeText(edge.edge_type);
+    if (!fromCid || !toCid || !edgeType) {
+      return;
+    }
+
+    const key = `${fromCid}->${toCid}:${edgeType}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+
+    rows.push({
+      key,
+      fromCid,
+      toCid,
+      fromName: normalizeText(props.nameMap?.get?.(fromCid) || fromCid),
+      toName: normalizeText(props.nameMap?.get?.(toCid) || toCid),
+      edgeType,
+      edgeLabel: RELATION_TYPE_LABELS[edgeType] || edgeType,
+    });
+  });
+
+  rows.sort((a, b) => (
+    a.edgeLabel.localeCompare(b.edgeLabel, 'zh-Hant')
+    || a.fromName.localeCompare(b.fromName, 'zh-Hant')
+    || a.toName.localeCompare(b.toName, 'zh-Hant')
+  ));
+  return rows;
 });
 
 function detectNodeType(cid, entry, serials) {
@@ -137,17 +201,62 @@ function detectNodeType(cid, entry, serials) {
   return 'branch';
 }
 
-function lookupEdgeType(parentCid, childCid) {
+function lookupEdgeMeta(parentCid, childCid) {
   const parent = normalizeText(parentCid);
   const child = normalizeText(childCid);
   if (!parent || !child) {
-    return '';
+    return { edgeType: '', reversed: false };
   }
   const direct = normalizeText(props.edgeTypeMap?.get?.(`${parent}->${child}`));
   if (direct) {
-    return direct;
+    return { edgeType: direct, reversed: false };
   }
-  return normalizeText(props.edgeTypeMap?.get?.(`${child}->${parent}`));
+  const reverse = normalizeText(props.edgeTypeMap?.get?.(`${child}->${parent}`));
+  if (reverse) {
+    return { edgeType: reverse, reversed: true };
+  }
+  return { edgeType: '', reversed: false };
+}
+
+function relationTag(edgeType, reversed) {
+  const spec = EDGE_TAGS[normalizeText(edgeType)];
+  if (!spec) {
+    return '';
+  }
+  return reversed ? spec.reverse : spec.forward;
+}
+
+function relationSentence({ edgeType, reversed, leftName, currentName }) {
+  const left = normalizeText(leftName);
+  const current = normalizeText(currentName);
+  if (!edgeType || !left || !current) {
+    return '';
+  }
+
+  if (edgeType === 'split_from') {
+    return reversed
+      ? `${left} 拆自 ${current}`
+      : `${current} 拆自 ${left}`;
+  }
+  if (edgeType === 'merge_source') {
+    return reversed
+      ? `${left} 由 ${current} 併批而來`
+      : `${current} 由 ${left} 併批而來`;
+  }
+  if (edgeType === 'wafer_origin') {
+    return reversed
+      ? `${left} 對應 Wafer ${current}`
+      : `${current} 源自 Wafer ${left}`;
+  }
+  if (edgeType === 'gd_rework_source') {
+    return reversed
+      ? `${left} 由 ${current} 重工而來`
+      : `${current} 由 ${left} 重工而來`;
+  }
+
+  return reversed
+    ? `${left} 與 ${current}（${edgeType}）`
+    : `${current} 與 ${left}（${edgeType}）`;
 }
 
 function buildNode(cid, visited, parentCid = '') {
@@ -194,12 +303,24 @@ function buildNode(cid, visited, parentCid = '') {
     && allSerialNames.value.has(name);
   const effectiveType = isSerialLike ? 'serial' : nodeType;
   const color = NODE_COLORS[effectiveType] || NODE_COLORS.branch;
-  const incomingEdgeType = lookupEdgeType(parentCid, id);
+  const incomingMeta = lookupEdgeMeta(parentCid, id);
+  const incomingEdgeType = incomingMeta.edgeType;
+  const incomingEdgeReversed = incomingMeta.reversed;
   const incomingEdgeStyle = EDGE_STYLES[incomingEdgeType] || EDGE_STYLES.default;
+  const parentName = normalizeText(props.nameMap?.get?.(normalizeText(parentCid)) || parentCid);
+  const shortTag = relationTag(incomingEdgeType, incomingEdgeReversed);
+  const displayLabel = shortTag ? `${shortTag} ${name}` : name;
 
   return {
     name,
-    value: { cid: id, type: effectiveType, edgeType: incomingEdgeType || '' },
+    value: {
+      cid: id,
+      type: effectiveType,
+      edgeType: incomingEdgeType || '',
+      edgeReversed: incomingEdgeReversed,
+      parentName,
+      relationTag: shortTag,
+    },
     children,
     itemStyle: {
       color,
@@ -213,6 +334,7 @@ function buildNode(cid, visited, parentCid = '') {
       fontWeight: isSelected ? 'bold' : 'normal',
       fontSize: isSerialLike ? 10 : 11,
       color: isSelected ? '#1E3A8A' : (isSerialLike ? '#64748B' : '#334155'),
+      formatter: () => displayLabel,
     },
     symbol: isSerialLike ? 'diamond' : (nodeType === 'root' ? 'roundRect' : 'circle'),
     symbolSize: isSerialLike ? 6 : (nodeType === 'root' ? 14 : 10),
@@ -226,9 +348,8 @@ const treesData = computed(() => {
     return [];
   }
 
-  const globalVisited = new Set();
   return props.treeRoots
-    .map((rootId) => buildNode(rootId, globalVisited))
+    .map((rootId) => buildNode(rootId, new Set()))
     .filter(Boolean);
 });
 
@@ -247,6 +368,73 @@ const chartHeight = computed(() => {
   return `${base}px`;
 });
 
+function countGraphemes(text) {
+  return Array.from(normalizeText(text)).length;
+}
+
+function walkTreeMetrics(node, depth, metrics) {
+  if (!node || typeof node !== 'object') {
+    return;
+  }
+
+  metrics.maxDepth = Math.max(metrics.maxDepth, depth);
+  const relationTag = normalizeText(node?.value?.relationTag);
+  const labelText = relationTag
+    ? `${relationTag} ${normalizeText(node.name)}`
+    : normalizeText(node.name);
+  metrics.maxLabelChars = Math.max(metrics.maxLabelChars, countGraphemes(labelText));
+
+  const children = Array.isArray(node.children) ? node.children : [];
+  children.forEach((child) => walkTreeMetrics(child, depth + 1, metrics));
+}
+
+const treeMetrics = computed(() => {
+  const metrics = {
+    maxDepth: 1,
+    maxLabelChars: 12,
+  };
+
+  treesData.value.forEach((tree) => walkTreeMetrics(tree, 1, metrics));
+  return metrics;
+});
+
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+const labelWidthPx = computed(() => clampNumber(
+  treeMetrics.value.maxLabelChars * 7 + 14,
+  120,
+  360,
+));
+
+const depthSpacingPx = computed(() => clampNumber(
+  88 + Math.round(treeMetrics.value.maxLabelChars * 1.4),
+  96,
+  132,
+));
+
+const rootLabelWidthPx = computed(() => {
+  const maxChars = props.treeRoots.reduce((max, rootCid) => {
+    const rootId = normalizeText(rootCid);
+    const rootName = normalizeText(props.nameMap?.get?.(rootId) || rootId);
+    return Math.max(max, countGraphemes(rootName));
+  }, 8);
+  return clampNumber(maxChars * 7 + 24, 72, 260);
+});
+
+const chartLayout = computed(() => {
+  const left = rootLabelWidthPx.value;
+  const right = labelWidthPx.value + 18;
+  const depthSpacing = depthSpacingPx.value;
+  const depthCount = Math.max(1, treeMetrics.value.maxDepth - 1);
+  const requiredWidth = left + right + (depthCount * depthSpacing) + 120;
+  const minWidth = clampNumber(requiredWidth, 760, 3000);
+  return { left, right, minWidth };
+});
+
+const chartMinWidth = computed(() => `${chartLayout.value.minWidth}px`);
+
 const TREE_SERIES_DEFAULTS = Object.freeze({
   type: 'tree',
   layout: 'orthogonal',
@@ -262,9 +450,7 @@ const TREE_SERIES_DEFAULTS = Object.freeze({
     distance: 6,
     fontSize: 11,
     color: '#334155',
-    overflow: 'truncate',
-    ellipsis: '…',
-    width: 160,
+    overflow: 'break',
     ...LABEL_BASE_STYLE,
   },
   lineStyle: {
@@ -315,7 +501,17 @@ const chartOption = computed(() => {
         lines.push('<span style="color:#10B981">中間節點</span>');
       }
       if (val.edgeType) {
-        lines.push(`<span style="color:#94A3B8;font-size:11px">關係: ${val.edgeType}</span>`);
+        const sentence = relationSentence({
+          edgeType: val.edgeType,
+          reversed: Boolean(val.edgeReversed),
+          leftName: val.parentName,
+          currentName: data.name,
+        });
+        if (sentence) {
+          lines.push(`<span style="color:#0F172A;font-size:11px">讀法: ${sentence}</span>`);
+        }
+        const directionTag = val.relationTag ? `（${val.relationTag}）` : '';
+        lines.push(`<span style="color:#94A3B8;font-size:11px">關係型別: ${val.edgeType}${directionTag}</span>`);
       }
       if (val.cid && val.cid !== data.name) {
         lines.push(`<span style="color:#94A3B8;font-size:11px">CID: ${val.cid}</span>`);
@@ -330,10 +526,14 @@ const chartOption = computed(() => {
       tooltip,
       series: [{
         ...TREE_SERIES_DEFAULTS,
-        left: 40,
-        right: 180,
+        left: chartLayout.value.left,
+        right: chartLayout.value.right,
         top: 20,
         bottom: 20,
+        label: {
+          ...TREE_SERIES_DEFAULTS.label,
+          width: labelWidthPx.value,
+        },
         data: [trees[0]],
       }],
     };
@@ -355,10 +555,14 @@ const chartOption = computed(() => {
 
     return {
       ...TREE_SERIES_DEFAULTS,
-      left: 40,
-      right: 180,
+      left: chartLayout.value.left,
+      right: chartLayout.value.right,
       top: `${topPercent}%`,
       height: `${heightPercent}%`,
+      label: {
+        ...TREE_SERIES_DEFAULTS.label,
+        width: labelWidthPx.value,
+      },
       data: [tree],
     };
   });
@@ -384,6 +588,122 @@ function handleNodeClick(params) {
   }
   emit('select-nodes', [...current]);
 }
+
+function buildExportFileName(ext = 'png') {
+  const now = new Date();
+  const ts = [
+    String(now.getFullYear()).padStart(4, '0'),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0'),
+  ].join('');
+  const rawBase = normalizeText(props.title) || 'lineage_tree';
+  const safeBase = rawBase
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, '_');
+  return `${safeBase}_${ts}.${ext}`;
+}
+
+function triggerDownloadByUrl(url, filename) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function getChartInstance() {
+  const chartComponent = chartRef.value;
+  if (!chartComponent) {
+    return null;
+  }
+  if (typeof chartComponent.getEchartsInstance === 'function') {
+    return chartComponent.getEchartsInstance();
+  }
+  return chartComponent.chart || null;
+}
+
+function escapeCsvField(value) {
+  const text = normalizeText(value);
+  if (text === '') {
+    return '';
+  }
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function buildCsvContent() {
+  const headers = ['來源批次', '來源CID', '目標批次', '目標CID', '關係', '關係代碼'];
+  const lines = [headers.join(',')];
+
+  relationRows.value.forEach((row) => {
+    lines.push([
+      escapeCsvField(row.fromName),
+      escapeCsvField(row.fromCid),
+      escapeCsvField(row.toName),
+      escapeCsvField(row.toCid),
+      escapeCsvField(row.edgeLabel),
+      escapeCsvField(row.edgeType),
+    ].join(','));
+  });
+
+  return `\uFEFF${lines.join('\r\n')}`;
+}
+
+async function exportTreeAsPng() {
+  if (!hasData.value || exportingTreeImage.value) {
+    return;
+  }
+
+  exportingTreeImage.value = true;
+  exportErrorMessage.value = '';
+
+  try {
+    await nextTick();
+    const instance = getChartInstance();
+    if (!instance || typeof instance.getDataURL !== 'function') {
+      throw new Error('無法取得樹圖實例');
+    }
+
+    const dataUrl = instance.getDataURL({
+      type: 'png',
+      pixelRatio: Math.max(2, Math.min(4, window.devicePixelRatio || 2)),
+      backgroundColor: '#FFFFFF',
+    });
+    triggerDownloadByUrl(dataUrl, buildExportFileName('png'));
+  } catch (error) {
+    exportErrorMessage.value = error?.message || '樹圖匯出失敗';
+  } finally {
+    exportingTreeImage.value = false;
+  }
+}
+
+function exportRelationCsv() {
+  if (!hasData.value || exportingRelationCsv.value || relationRows.value.length === 0) {
+    return;
+  }
+
+  exportingRelationCsv.value = true;
+  exportErrorMessage.value = '';
+
+  try {
+    const csv = buildCsvContent();
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const href = URL.createObjectURL(blob);
+    triggerDownloadByUrl(href, buildExportFileName('csv'));
+    URL.revokeObjectURL(href);
+  } catch (error) {
+    exportErrorMessage.value = error?.message || '關係 CSV 匯出失敗';
+  } finally {
+    exportingRelationCsv.value = false;
+  }
+}
 </script>
 
 <template>
@@ -392,9 +712,25 @@ function handleNodeClick(params) {
       <div>
         <h3 class="text-sm font-semibold text-slate-800">{{ title }}</h3>
         <p class="text-xs text-slate-500">{{ description }}</p>
+        <p class="text-[11px] text-slate-500">
+          讀圖方向由左至右；節點前綴 <code>←拆/←併/←晶/←重</code> 代表本節點由左側來源而來，
+          <code>→拆/→併/→晶/→重</code> 代表左側節點由本節點而來。
+        </p>
       </div>
 
       <div class="flex items-center gap-3">
+        <ExportButton
+          :disabled="!hasData || loading"
+          :loading="exportingTreeImage"
+          label="匯出樹圖 PNG"
+          @click="exportTreeAsPng"
+        />
+        <ExportButton
+          :disabled="!hasData || loading || relationRows.length === 0"
+          :loading="exportingRelationCsv"
+          label="匯出關係 CSV"
+          @click="exportRelationCsv"
+        />
         <div class="flex items-center gap-2 text-[10px] text-slate-500">
           <span class="inline-flex items-center gap-1">
             <span class="inline-block size-2.5 rounded-sm" :style="{ background: NODE_COLORS.wafer }" />
@@ -422,23 +758,26 @@ function handleNodeClick(params) {
           </span>
           <span class="inline-flex items-center gap-1">
             <span class="inline-block h-0.5 w-3 bg-slate-300" />
-            split
+            split(拆批)
           </span>
           <span class="inline-flex items-center gap-1">
             <span class="inline-block h-0.5 w-3 border-t-2 border-dashed border-amber-500" />
-            merge
+            merge(併批)
           </span>
           <span class="inline-flex items-center gap-1">
             <span class="inline-block h-0.5 w-3 border-t-2 border-dotted border-blue-600" />
-            wafer
+            wafer(晶圓來源)
           </span>
           <span class="inline-flex items-center gap-1">
             <span class="inline-block h-0.5 w-3 border-t-2 border-dashed border-red-500" />
-            gd-rework
+            gd-rework(重工來源)
           </span>
         </div>
       </div>
     </div>
+    <p v-if="exportErrorMessage" class="mb-2 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">
+      {{ exportErrorMessage }}
+    </p>
 
     <!-- Loading overlay -->
     <div v-if="loading" class="flex items-center justify-center rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 py-16">
@@ -454,15 +793,53 @@ function handleNodeClick(params) {
     </div>
 
     <!-- ECharts Tree -->
-    <div v-else class="relative">
+    <div v-else class="relative overflow-x-auto">
       <VChart
+        ref="chartRef"
         class="lineage-tree-chart"
-        :style="{ height: chartHeight }"
+        :style="{ height: chartHeight, width: '100%', minWidth: chartMinWidth }"
         :option="chartOption"
         autoresize
         @click="handleNodeClick"
       />
     </div>
+
+    <details v-if="relationRows.length > 0" class="mt-3 rounded-card border border-stroke-soft bg-surface-muted/50 px-3 py-2">
+      <summary class="cursor-pointer text-xs font-medium text-slate-700">
+        關係清單（{{ relationRows.length }}）
+      </summary>
+      <div class="mt-2 max-h-56 overflow-auto rounded border border-stroke-soft bg-white">
+        <table class="min-w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50 text-[11px] text-slate-500">
+            <tr>
+              <th class="px-2 py-1.5 font-medium">來源批次</th>
+              <th class="px-2 py-1.5 font-medium">目標批次</th>
+              <th class="px-2 py-1.5 font-medium">關係</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in relationRows.slice(0, 200)"
+              :key="row.key"
+              class="border-t border-slate-100"
+            >
+              <td class="px-2 py-1.5 font-mono text-[11px]">
+                {{ row.fromName }}
+              </td>
+              <td class="px-2 py-1.5 font-mono text-[11px]">
+                {{ row.toName }}
+              </td>
+              <td class="px-2 py-1.5 text-[11px]">
+                {{ row.edgeLabel }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-if="relationRows.length > 200" class="mt-1 text-[11px] text-slate-500">
+        僅顯示前 200 筆，請搭配上方樹圖與節點點選進一步縮小範圍。
+      </p>
+    </details>
 
     <!-- Not found warning -->
     <div v-if="notFound.length > 0" class="mt-3 rounded-card border border-state-warning/40 bg-amber-50 px-3 py-2 text-xs text-amber-700">

@@ -90,7 +90,6 @@ def _build_parent_map(
     child_to_parent: Dict[str, str],
     merge_child_to_parent: Dict[str, str],
     merge_source_map: Dict[str, List[str]],
-    cid_to_name: Dict[str, str],
 ) -> tuple:
     """Build per-node direct parent lists and merge edge lists.
 
@@ -98,6 +97,9 @@ def _build_parent_map(
         (parent_map, merge_edges) where:
         - parent_map: {child_cid: [direct_parent_cids]}
         - merge_edges: {child_cid: [merge_source_cids]}
+
+    Notes:
+        merge_source_map is keyed by target/child CID.
     """
     parent_map: Dict[str, List[str]] = defaultdict(list)
     merge_edges: Dict[str, List[str]] = defaultdict(list)
@@ -109,17 +111,18 @@ def _build_parent_map(
         if parent not in parent_map[child]:
             parent_map[child].append(parent)
 
-    if merge_source_map and cid_to_name:
-        name_to_cids: Dict[str, List[str]] = defaultdict(list)
-        for cid, name in cid_to_name.items():
-            name_to_cids[name].append(cid)
-
-        for name, source_cids in merge_source_map.items():
-            for owner_cid in name_to_cids.get(name, []):
-                for source_cid in source_cids:
-                    if source_cid != owner_cid and source_cid not in parent_map[owner_cid]:
-                        parent_map[owner_cid].append(source_cid)
-                        merge_edges[owner_cid].append(source_cid)
+    if merge_source_map:
+        for owner_cid, source_cids in merge_source_map.items():
+            child = _safe_str(owner_cid)
+            if not child:
+                continue
+            for source_cid in source_cids:
+                source = _safe_str(source_cid)
+                if not source or source == child:
+                    continue
+                if source not in parent_map[child]:
+                    parent_map[child].append(source)
+                    merge_edges[child].append(source)
 
     return dict(parent_map), dict(merge_edges)
 
@@ -361,23 +364,23 @@ class LineageEngine:
 
     @staticmethod
     def resolve_merge_sources(
-        container_names: List[str],
+        target_cids: List[str],
     ) -> Dict[str, List[str]]:
-        """Resolve merge source lots from FINISHEDNAME."""
-        normalized_names = _normalize_list(container_names)
-        if not normalized_names:
+        """Resolve merge source lots by target LOT CID (COMBINE.LOTID)."""
+        normalized_target_cids = _normalize_list(target_cids)
+        if not normalized_target_cids:
             return {}
 
         result: Dict[str, Set[str]] = defaultdict(set)
 
-        for i in range(0, len(normalized_names), ORACLE_IN_BATCH_SIZE):
-            batch = normalized_names[i:i + ORACLE_IN_BATCH_SIZE]
+        for i in range(0, len(normalized_target_cids), ORACLE_IN_BATCH_SIZE):
+            batch = normalized_target_cids[i:i + ORACLE_IN_BATCH_SIZE]
             builder = QueryBuilder()
-            builder.add_in_condition("ca.FINISHEDNAME", batch)
+            builder.add_in_condition("ca.LOTID", batch)
 
             sql = SQLLoader.load_with_params(
                 "lineage/merge_sources",
-                FINISHED_NAME_FILTER=builder.get_conditions_sql(),
+                TARGET_CID_FILTER=builder.get_conditions_sql(),
             )
 
             df = read_sql_df(sql, builder.params)
@@ -385,16 +388,16 @@ class LineageEngine:
                 continue
 
             for _, row in df.iterrows():
-                finished_name = _safe_str(row.get("FINISHEDNAME"))
+                target_cid = _safe_str(row.get("FINISHED_CID"))
                 source_cid = _safe_str(row.get("SOURCE_CID"))
-                if not finished_name or not source_cid:
+                if not target_cid or not source_cid or source_cid == target_cid:
                     continue
-                result[finished_name].add(source_cid)
+                result[target_cid].add(source_cid)
 
         mapped = {k: sorted(v) for k, v in result.items()}
         logger.info(
-            "Merge source resolution completed: finished_names=%s, mapped=%s",
-            len(normalized_names),
+            "Merge source resolution completed: target_cids=%s, mapped=%s",
+            len(normalized_target_cids),
             len(mapped),
         )
         return mapped
@@ -565,6 +568,7 @@ class LineageEngine:
         for parent, children in split_children_map.items():
             for child in children:
                 split_edges.append((parent, child, EDGE_TYPE_SPLIT))
+        split_pairs = {(parent, child) for parent, child, _ in split_edges}
 
         # Collect all nodes in the tree
         all_nodes: Set[str] = set(roots)
@@ -577,6 +581,26 @@ class LineageEngine:
 
         # Step 4: Query serial numbers for leaf nodes
         leaf_serials = LineageEngine.resolve_leaf_serials(leaf_cids) if leaf_cids else {}
+
+        # Step 4b: Resolve merge relations for known nodes by target CID.
+        merge_edges: List[Tuple[str, str, str]] = []
+        try:
+            merge_source_map = LineageEngine.resolve_merge_sources(list(all_nodes))
+            for target_cid, source_cids in merge_source_map.items():
+                target = _safe_str(target_cid)
+                if not target:
+                    continue
+                for source_cid in source_cids:
+                    source = _safe_str(source_cid)
+                    if not source or source == target:
+                        continue
+                    if (source, target) in split_pairs:
+                        continue
+                    merge_edges.append((source, target, EDGE_TYPE_MERGE))
+                    all_nodes.add(source)
+                    all_nodes.add(target)
+        except Exception as exc:
+            logger.warning("Forward merge enrichment skipped due to merge lookup error: %s", exc)
 
         # Step 5: Build semantic links (wafer origin / GD rework) and augment tree.
         snapshots: Dict[str, Dict[str, Optional[str]]] = {}
@@ -614,15 +638,16 @@ class LineageEngine:
         roots = sorted([cid for cid in all_nodes if cid not in incoming])
 
         typed_nodes = LineageEngine._build_nodes_payload(all_nodes, snapshots, cid_to_name, wafer_ids)
-        typed_edges = _to_edge_payload(split_edges + semantic_edges)
+        typed_edges = _to_edge_payload(split_edges + merge_edges + semantic_edges)
 
         logger.info(
-            "Forward tree resolution completed: seeds=%s, roots=%s, nodes=%s, leaves=%s, serials=%s, semantic_edges=%s",
+            "Forward tree resolution completed: seeds=%s, roots=%s, nodes=%s, leaves=%s, serials=%s, merge_edges=%s, semantic_edges=%s",
             len(seed_cids),
             len(roots),
             len(all_nodes),
             len(leaf_cids),
             len(leaf_serials),
+            len(merge_edges),
             len(semantic_edges),
         )
 
@@ -686,18 +711,25 @@ class LineageEngine:
             if _safe_str(parent) and _safe_str(child)
         ]
 
-        all_names = [name for name in cid_to_name.values() if _safe_str(name)]
-        merge_source_map = LineageEngine.resolve_merge_sources(all_names)
+        merge_lookup_targets = sorted(
+            {
+                cid
+                for cid in (
+                    list(seed_cids)
+                    + list(child_to_parent.keys())
+                    + list(child_to_parent.values())
+                )
+                if _safe_str(cid)
+            }
+        )
+        merge_source_map = LineageEngine.resolve_merge_sources(merge_lookup_targets)
         merge_child_to_parent: Dict[str, str] = {}
         merge_source_cids_all: Set[str] = set()
         if merge_source_map:
             for seed in seed_cids:
                 self_and_ancestors = ancestors[seed] | {seed}
                 for cid in list(self_and_ancestors):
-                    name = cid_to_name.get(cid)
-                    if not name:
-                        continue
-                    for source_cid in merge_source_map.get(name, []):
+                    for source_cid in merge_source_map.get(cid, []):
                         if source_cid == cid or source_cid in self_and_ancestors:
                             continue
                         ancestors[seed].add(source_cid)
@@ -722,7 +754,7 @@ class LineageEngine:
                             ancestors[seed].add(parent)
                             current = parent
 
-        pm, me = _build_parent_map(child_to_parent, merge_child_to_parent, merge_source_map, cid_to_name)
+        pm, me = _build_parent_map(child_to_parent, merge_child_to_parent, merge_source_map)
 
         for child, parent in merge_child_to_parent.items():
             if _safe_str(parent) and _safe_str(child):

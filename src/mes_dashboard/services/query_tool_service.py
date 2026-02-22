@@ -503,46 +503,126 @@ def _resolve_by_gd_lot_id(gd_lot_ids: List[str]) -> Dict[str, Any]:
 
 
 def _resolve_by_serial_number(serial_numbers: List[str]) -> Dict[str, Any]:
-    """Resolve serial numbers (FINISHEDNAME) to CONTAINERID.
+    """Resolve serial-related inputs to CONTAINERID.
 
-    Note: One serial number may map to multiple CONTAINERIDs.
-
-    Args:
-        serial_numbers: List of serial numbers
-
-    Returns:
-        Resolution result dict.
+    Matching sources (in priority order):
+      1. DW_MES_PJ_COMBINEDASSYLOTS.FINISHEDNAME (new serial path)
+      2. DW_MES_CONTAINER.CONTAINERNAME (old serial / lot-id style inputs)
+      3. DW_MES_CONTAINER.FIRSTNAME (bridge from serial to related lots)
     """
-    builder = QueryBuilder()
-    _add_exact_or_pattern_condition(builder, "p.FINISHEDNAME", serial_numbers)
-    sql = SQLLoader.load_with_params(
-        "query_tool/lot_resolve_serial",
-        SERIAL_FILTER=builder.get_conditions_sql(),
+    tokens = _normalize_search_tokens(serial_numbers)
+    if not tokens:
+        return {
+            'data': [],
+            'total': 0,
+            'input_count': 0,
+            'not_found': [],
+            'expansion_info': {},
+        }
+
+    source_configs = [
+        {
+            'name': 'finished_name',
+            'priority': 0,
+            'sql_name': 'query_tool/lot_resolve_serial',
+            'filter_key': 'SERIAL_FILTER',
+            'filter_column': 'p.FINISHEDNAME',
+            'match_key': 'FINISHEDNAME',
+            'extra_conditions': [],
+        },
+        {
+            'name': 'container_name',
+            'priority': 1,
+            'sql_name': 'query_tool/lot_resolve_id',
+            'filter_key': 'CONTAINER_FILTER',
+            'filter_column': 'CONTAINERNAME',
+            'match_key': 'CONTAINERNAME',
+            'extra_conditions': ["OBJECTTYPE = 'LOT'"],
+        },
+        {
+            'name': 'first_name',
+            'priority': 2,
+            'sql_name': 'query_tool/lot_resolve_wafer_lot',
+            'filter_key': 'WAFER_FILTER',
+            'filter_column': 'FIRSTNAME',
+            'match_key': 'FIRSTNAME',
+            'extra_conditions': ["OBJECTTYPE = 'LOT'"],
+        },
+    ]
+
+    best_match_by_key: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+    for config in source_configs:
+        builder = QueryBuilder()
+        _add_exact_or_pattern_condition(builder, config['filter_column'], tokens)
+        for cond in config['extra_conditions']:
+            builder.add_condition(cond)
+
+        if not builder.conditions:
+            continue
+
+        sql = SQLLoader.load_with_params(
+            config['sql_name'],
+            **{config['filter_key']: builder.get_conditions_sql()},
+        )
+        df = read_sql_df(sql, builder.params)
+        data = _df_to_records(df)
+        matched, _, _ = _match_rows_by_tokens(
+            tokens,
+            data,
+            row_key=config['match_key'],
+        )
+
+        for row in matched:
+            input_value = str(row.get('input_value') or '').strip()
+            cid = str(row.get('CONTAINERID') or '').strip()
+            if not input_value or not cid:
+                continue
+
+            candidate = {
+                'container_id': cid,
+                'lot_id': row.get('CONTAINERNAME') or cid,
+                'input_value': input_value,
+                'spec_name': row.get('SPECNAME'),
+                'match_source': config['name'],
+                '_priority': config['priority'],
+            }
+            key = (input_value, cid)
+            existing = best_match_by_key.get(key)
+            if existing is None or candidate['_priority'] < existing['_priority']:
+                best_match_by_key[key] = candidate
+
+    grouped_by_input: Dict[str, List[Dict[str, Any]]] = {}
+    for item in best_match_by_key.values():
+        grouped_by_input.setdefault(item['input_value'], []).append(item)
+
+    results: List[Dict[str, Any]] = []
+    not_found: List[str] = []
+    expansion_info: Dict[str, int] = {}
+
+    for token in tokens:
+        rows = grouped_by_input.get(token, [])
+        rows.sort(key=lambda row: (row.get('_priority', 999), str(row.get('lot_id') or '')))
+        if not rows:
+            not_found.append(token)
+            continue
+
+        expansion_info[token] = len(rows)
+        for row in rows:
+            row.pop('_priority', None)
+            results.append(row)
+
+    logger.info(
+        "Serial number resolution: %s containers from %s inputs (not_found=%s)",
+        len(results),
+        len(tokens),
+        len(not_found),
     )
-
-    df = read_sql_df(sql, builder.params)
-    data = _df_to_records(df)
-    matched, not_found, expansion_info = _match_rows_by_tokens(
-        serial_numbers,
-        data,
-        row_key='FINISHEDNAME',
-    )
-
-    results = []
-    for row in matched:
-        results.append({
-            'container_id': row.get('CONTAINERID'),
-            'lot_id': row.get('CONTAINERNAME'),
-            'input_value': row.get('input_value'),
-            'spec_name': row.get('SPECNAME'),
-        })
-
-    logger.info(f"Serial number resolution: {len(results)} containers from {len(serial_numbers)} inputs")
 
     return {
         'data': results,
         'total': len(results),
-        'input_count': len(serial_numbers),
+        'input_count': len(tokens),
         'not_found': not_found,
         'expansion_info': expansion_info,
     }

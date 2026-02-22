@@ -67,35 +67,35 @@ def test_resolve_split_ancestors_batches_and_enforces_max_depth(mock_read_sql_df
 
 @patch("mes_dashboard.services.lineage_engine.read_sql_df")
 def test_resolve_merge_sources_batches_and_returns_mapping(mock_read_sql_df):
-    names = [f"FN{i:04d}" for i in range(1001)]
+    target_cids = [f"T{i:04d}" for i in range(1001)]
     mock_read_sql_df.side_effect = [
         pd.DataFrame(
             [
-                {"FINISHEDNAME": "FN0000", "SOURCE_CID": "SRC-A"},
-                {"FINISHEDNAME": "FN0000", "SOURCE_CID": "SRC-B"},
+                {"FINISHED_CID": "T0000", "SOURCE_CID": "SRC-A"},
+                {"FINISHED_CID": "T0000", "SOURCE_CID": "SRC-B"},
             ]
         ),
         pd.DataFrame(
             [
-                {"FINISHEDNAME": "FN1000", "SOURCE_CID": "SRC-C"},
-                {"FINISHEDNAME": "FN1000", "SOURCE_CID": "SRC-C"},
-                {"FINISHEDNAME": None, "SOURCE_CID": "SRC-INVALID"},
+                {"FINISHED_CID": "T1000", "SOURCE_CID": "SRC-C"},
+                {"FINISHED_CID": "T1000", "SOURCE_CID": "SRC-C"},
+                {"FINISHED_CID": None, "SOURCE_CID": "SRC-INVALID"},
             ]
         ),
     ]
 
-    result = LineageEngine.resolve_merge_sources(names)
+    result = LineageEngine.resolve_merge_sources(target_cids)
 
     assert mock_read_sql_df.call_count == 2
     first_sql, first_params = mock_read_sql_df.call_args_list[0].args
     second_sql, second_params = mock_read_sql_df.call_args_list[1].args
-    assert "{{ FINISHED_NAME_FILTER }}" not in first_sql
-    assert "{{ FINISHED_NAME_FILTER }}" not in second_sql
+    assert "{{ TARGET_CID_FILTER }}" not in first_sql
+    assert "{{ TARGET_CID_FILTER }}" not in second_sql
     assert len(first_params) == 1000
     assert len(second_params) == 1
 
-    assert result["FN0000"] == ["SRC-A", "SRC-B"]
-    assert result["FN1000"] == ["SRC-C"]
+    assert result["T0000"] == ["SRC-A", "SRC-B"]
+    assert result["T1000"] == ["SRC-C"]
 
 
 @patch("mes_dashboard.services.lineage_engine.LineageEngine.resolve_merge_sources")
@@ -126,7 +126,7 @@ def test_resolve_full_genealogy_combines_split_and_merge(
             },
         },
     ]
-    mock_resolve_merge_sources.return_value = {"LOT-B": ["M1"]}
+    mock_resolve_merge_sources.return_value = {"B": ["M1"]}
 
     result = LineageEngine.resolve_full_genealogy(["A"], {"A": "LOT-A"})
 

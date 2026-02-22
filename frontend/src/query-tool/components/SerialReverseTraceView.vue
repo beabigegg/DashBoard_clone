@@ -56,6 +56,10 @@ const props = defineProps({
     type: Object,
     default: () => new Map(),
   },
+  graphEdges: {
+    type: Array,
+    default: () => [],
+  },
   leafSerials: {
     type: Object,
     default: () => new Map(),
@@ -154,6 +158,7 @@ const emit = defineEmits([
       :name-map="nameMap"
       :node-meta-map="nodeMetaMap"
       :edge-type-map="edgeTypeMap"
+      :graph-edges="graphEdges"
       :leaf-serials="leafSerials"
       :selected-container-ids="selectedContainerIds"
       :loading="lineageLoading"

@@ -286,23 +286,63 @@ class TestResolveQueriesUseBindParams:
 
         with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
             with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
-                mock_load.return_value = "SELECT * FROM DUAL"
-                mock_read.return_value = pd.DataFrame([
-                    {
-                        'CONTAINERID': 'CID-1',
-                        'FINISHEDNAME': 'SN-1',
-                        'CONTAINERNAME': 'LOT-1',
-                        'SPECNAME': 'SPEC-1',
-                    }
-                ])
+                mock_load.side_effect = [
+                    "SELECT * FROM COMBINE",
+                    "SELECT * FROM CONTAINER_NAME",
+                    "SELECT * FROM FIRSTNAME",
+                ]
+                mock_read.side_effect = [
+                    pd.DataFrame([
+                        {
+                            'CONTAINERID': 'CID-FIN',
+                            'FINISHEDNAME': 'SN-1',
+                            'CONTAINERNAME': 'LOT-FIN',
+                            'SPECNAME': 'SPEC-1',
+                        }
+                    ]),
+                    pd.DataFrame([
+                        {
+                            'CONTAINERID': 'CID-NAME',
+                            'CONTAINERNAME': 'SN-1',
+                            'SPECNAME': 'SPEC-2',
+                            'MFGORDERNAME': None,
+                            'QTY': 1,
+                        }
+                    ]),
+                    pd.DataFrame([
+                        {
+                            'CONTAINERID': 'CID-FIRST',
+                            'CONTAINERNAME': 'GD25000001-A01',
+                            'FIRSTNAME': 'SN-1',
+                            'SPECNAME': 'SPEC-3',
+                            'QTY': 1,
+                        }
+                    ]),
+                ]
 
                 result = _resolve_by_serial_number(['SN-1'])
 
-                assert result['total'] == 1
-                sql_params = mock_load.call_args.kwargs
-                assert ':p0' in sql_params['SERIAL_FILTER']
-                _, query_params = mock_read.call_args.args
-                assert query_params == {'p0': 'SN-1'}
+                assert result['total'] == 3
+                assert {row['match_source'] for row in result['data']} == {
+                    'finished_name',
+                    'container_name',
+                    'first_name',
+                }
+
+                assert [call.args[0] for call in mock_load.call_args_list] == [
+                    'query_tool/lot_resolve_serial',
+                    'query_tool/lot_resolve_id',
+                    'query_tool/lot_resolve_wafer_lot',
+                ]
+                assert ':p0' in mock_load.call_args_list[0].kwargs['SERIAL_FILTER']
+                assert ':p0' in mock_load.call_args_list[1].kwargs['CONTAINER_FILTER']
+                assert ':p0' in mock_load.call_args_list[2].kwargs['WAFER_FILTER']
+                assert "OBJECTTYPE = 'LOT'" in mock_load.call_args_list[1].kwargs['CONTAINER_FILTER']
+                assert "OBJECTTYPE = 'LOT'" in mock_load.call_args_list[2].kwargs['WAFER_FILTER']
+
+                assert mock_read.call_args_list[0].args[1] == {'p0': 'SN-1'}
+                assert mock_read.call_args_list[1].args[1] == {'p0': 'SN-1'}
+                assert mock_read.call_args_list[2].args[1] == {'p0': 'SN-1'}
 
     def test_resolve_by_work_order_uses_query_builder_params(self):
         from unittest.mock import patch
