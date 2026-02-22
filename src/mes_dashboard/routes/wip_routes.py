@@ -16,6 +16,7 @@ from mes_dashboard.services.wip_service import (
     get_wip_detail,
     get_workcenters,
     get_packages,
+    get_wip_filter_options,
     search_workorders,
     search_lot_ids,
     search_packages,
@@ -56,6 +57,8 @@ def api_overview_summary():
         lotid: Optional LOTID filter (fuzzy match)
         package: Optional PACKAGE_LEF filter (exact match)
         pj_type: Optional PJ_TYPE filter (exact match)
+        firstname: Optional FIRSTNAME filter (exact match)
+        waferdesc: Optional WAFERDESC filter (exact match)
         include_dummy: Include DUMMY lots (default: false)
 
     Returns:
@@ -65,6 +68,8 @@ def api_overview_summary():
     lotid = request.args.get('lotid', '').strip() or None
     package = request.args.get('package', '').strip() or None
     pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_wip_summary(
@@ -72,7 +77,9 @@ def api_overview_summary():
         workorder=workorder,
         lotid=lotid,
         package=package,
-        pj_type=pj_type
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
     )
     if result is not None:
         return jsonify({'success': True, 'data': result})
@@ -89,6 +96,8 @@ def api_overview_matrix():
         lotid: Optional LOTID filter (fuzzy match)
         package: Optional PACKAGE_LEF filter (exact match)
         pj_type: Optional PJ_TYPE filter (exact match)
+        firstname: Optional FIRSTNAME filter (exact match)
+        waferdesc: Optional WAFERDESC filter (exact match)
         include_dummy: Include DUMMY lots (default: false)
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
@@ -102,6 +111,8 @@ def api_overview_matrix():
     lotid = request.args.get('lotid', '').strip() or None
     package = request.args.get('package', '').strip() or None
     pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
     status = request.args.get('status', '').strip().upper() or None
     hold_type = request.args.get('hold_type', '').strip().lower() or None
@@ -127,7 +138,9 @@ def api_overview_matrix():
         status=status,
         hold_type=hold_type,
         package=package,
-        pj_type=pj_type
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
     )
     if result is not None:
         return jsonify({'success': True, 'data': result})
@@ -141,6 +154,10 @@ def api_overview_hold():
     Query Parameters:
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
+        package: Optional PACKAGE_LEF filter (exact match)
+        type: Optional PJ_TYPE filter (exact match)
+        firstname: Optional FIRSTNAME filter (exact match)
+        waferdesc: Optional WAFERDESC filter (exact match)
         include_dummy: Include DUMMY lots (default: false)
 
     Returns:
@@ -148,12 +165,20 @@ def api_overview_hold():
     """
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
+    package = request.args.get('package', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_wip_hold_summary(
         include_dummy=include_dummy,
         workorder=workorder,
-        lotid=lotid
+        lotid=lotid,
+        package=package,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
     )
     if result is not None:
         return jsonify({'success': True, 'data': result})
@@ -175,6 +200,8 @@ def api_detail(workcenter: str):
     Query Parameters:
         package: Optional PRODUCTLINENAME filter
         type: Optional PJ_TYPE filter (exact match)
+        firstname: Optional FIRSTNAME filter (exact match)
+        waferdesc: Optional WAFERDESC filter (exact match)
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
@@ -189,6 +216,8 @@ def api_detail(workcenter: str):
     """
     package = request.args.get('package', '').strip() or None
     pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
     status = request.args.get('status', '').strip().upper() or None
     hold_type = request.args.get('hold_type', '').strip().lower() or None
     workorder = request.args.get('workorder', '').strip() or None
@@ -223,6 +252,8 @@ def api_detail(workcenter: str):
         workcenter=workcenter,
         package=package,
         pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
         status=status,
         hold_type=hold_type,
         workorder=workorder,
@@ -289,6 +320,31 @@ def api_meta_packages():
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_packages(include_dummy=include_dummy)
+    if result is not None:
+        return jsonify({'success': True, 'data': result})
+    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+
+
+@wip_bp.route('/meta/filter-options')
+def api_meta_filter_options():
+    """API: Get interdependent WIP overview filter options from cache-backed source."""
+    include_dummy = parse_bool_query(request.args.get('include_dummy'))
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    package = request.args.get('package', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
+
+    result = get_wip_filter_options(
+        include_dummy=include_dummy,
+        workorder=workorder,
+        lotid=lotid,
+        package=package,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
+    )
     if result is not None:
         return jsonify({'success': True, 'data': result})
     return jsonify({'success': False, 'error': '查詢失敗'}), 500

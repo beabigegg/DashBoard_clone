@@ -87,12 +87,14 @@ def _build_base_conditions_builder(
         builder.add_condition("LOTID NOT LIKE '%DUMMY%'")
 
     # WORKORDER filter (fuzzy match)
-    if workorder:
-        builder.add_like_condition("WORKORDER", workorder, position="both")
+    workorders = _split_csv_values(workorder)
+    if workorders:
+        builder.add_or_like_conditions("WORKORDER", workorders, position="both", case_insensitive=True)
 
     # LOTID filter (fuzzy match)
-    if lotid:
-        builder.add_like_condition("LOTID", lotid, position="both")
+    lotids = _split_csv_values(lotid)
+    if lotids:
+        builder.add_or_like_conditions("LOTID", lotids, position="both", case_insensitive=True)
 
     return builder
 
@@ -198,6 +200,57 @@ def _normalize_text_value(value: Any) -> str:
     return text
 
 
+def _split_csv_values(raw: Optional[str]) -> List[str]:
+    if not raw:
+        return []
+    values: List[str] = []
+    seen = set()
+    for token in str(raw).split(","):
+        text = token.strip()
+        if not text or text in seen:
+            continue
+        values.append(text)
+        seen.add(text)
+    return values
+
+
+def _contains_any_mask(series: pd.Series, raw_values: Optional[str]) -> pd.Series:
+    values = _split_csv_values(raw_values)
+    if not values:
+        return pd.Series(True, index=series.index)
+
+    text_series = series.astype(str)
+    mask = pd.Series(False, index=series.index)
+    for value in values:
+        mask |= text_series.str.contains(value, case=False, na=False)
+    return mask
+
+
+def _add_exact_filter_conditions(builder: QueryBuilder, column: str, raw_values: Optional[str]) -> QueryBuilder:
+    values = _split_csv_values(raw_values)
+    if not values:
+        return builder
+    if len(values) == 1:
+        builder.add_param_condition(column, values[0])
+        return builder
+    builder.add_in_condition(column, values)
+    return builder
+
+
+def _lookup_positions(index_map: Dict[str, np.ndarray], raw_values: Optional[str]) -> Optional[np.ndarray]:
+    values = _split_csv_values(raw_values)
+    if not values:
+        return None
+
+    buckets = [index_map.get(str(value)) for value in values]
+    buckets = [bucket for bucket in buckets if bucket is not None and len(bucket) > 0]
+    if not buckets:
+        return _EMPTY_INT_INDEX
+    if len(buckets) == 1:
+        return buckets[0]
+    return np.unique(np.concatenate(buckets))
+
+
 def _build_filter_mask(
     df: pd.DataFrame,
     *,
@@ -214,10 +267,10 @@ def _build_filter_mask(
         mask &= ~df['LOTID'].astype(str).str.contains('DUMMY', case=False, na=False)
 
     if workorder and 'WORKORDER' in df.columns:
-        mask &= df['WORKORDER'].astype(str).str.contains(workorder, case=False, na=False)
+        mask &= _contains_any_mask(df['WORKORDER'], workorder)
 
     if lotid and 'LOTID' in df.columns:
-        mask &= df['LOTID'].astype(str).str.contains(lotid, case=False, na=False)
+        mask &= _contains_any_mask(df['LOTID'], lotid)
 
     return mask
 
@@ -245,6 +298,8 @@ def _select_with_snapshot_indexes(
     lotid: Optional[str] = None,
     package: Optional[str] = None,
     pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
     workcenter: Optional[str] = None,
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
@@ -260,17 +315,27 @@ def _select_with_snapshot_indexes(
     if workcenter:
         selected_positions = _intersect_positions(
             selected_positions,
-            indexes["workcenter"].get(str(workcenter)),
+            _lookup_positions(indexes["workcenter"], workcenter),
         )
     if package:
         selected_positions = _intersect_positions(
             selected_positions,
-            indexes["package"].get(str(package)),
+            _lookup_positions(indexes["package"], package),
         )
     if pj_type:
         selected_positions = _intersect_positions(
             selected_positions,
-            indexes["pj_type"].get(str(pj_type)),
+            _lookup_positions(indexes["pj_type"], pj_type),
+        )
+    if firstname:
+        selected_positions = _intersect_positions(
+            selected_positions,
+            _lookup_positions(indexes["firstname"], firstname),
+        )
+    if waferdesc:
+        selected_positions = _intersect_positions(
+            selected_positions,
+            _lookup_positions(indexes["waferdesc"], waferdesc),
         )
     if status:
         selected_positions = _intersect_positions(
@@ -291,13 +356,15 @@ def _select_with_snapshot_indexes(
         result = df.iloc[selected_positions]
 
     if workorder:
-        result = result[result['WORKORDER'].astype(str).str.contains(workorder, case=False, na=False)]
+        result = result[_contains_any_mask(result['WORKORDER'], workorder)]
     if lotid:
-        result = result[result['LOTID'].astype(str).str.contains(lotid, case=False, na=False)]
+        result = result[_contains_any_mask(result['LOTID'], lotid)]
     return result
 
 
-def _build_search_signatures(df: pd.DataFrame) -> tuple[Counter, Dict[str, tuple[str, str, str, str]]]:
+def _build_search_signatures(
+    df: pd.DataFrame,
+) -> tuple[Counter, Dict[str, tuple[str, str, str, str, str, str]]]:
     if df.empty:
         return Counter(), {}
 
@@ -305,6 +372,8 @@ def _build_search_signatures(df: pd.DataFrame) -> tuple[Counter, Dict[str, tuple
     lotids = df.get("LOTID", pd.Series(index=df.index, dtype=object)).map(_normalize_text_value)
     packages = df.get("PACKAGE_LEF", pd.Series(index=df.index, dtype=object)).map(_normalize_text_value)
     types = df.get("PJ_TYPE", pd.Series(index=df.index, dtype=object)).map(_normalize_text_value)
+    firstnames = df.get("FIRSTNAME", pd.Series(index=df.index, dtype=object)).map(_normalize_text_value)
+    waferdescs = df.get("WAFERDESC", pd.Series(index=df.index, dtype=object)).map(_normalize_text_value)
 
     signatures = (
         workorders
@@ -314,28 +383,49 @@ def _build_search_signatures(df: pd.DataFrame) -> tuple[Counter, Dict[str, tuple
         + packages
         + "\x1f"
         + types
+        + "\x1f"
+        + firstnames
+        + "\x1f"
+        + waferdescs
     ).tolist()
     signature_counter = Counter(signatures)
 
-    signature_fields: Dict[str, tuple[str, str, str, str]] = {}
-    for signature, wo, lot, pkg, pj in zip(signatures, workorders, lotids, packages, types):
+    signature_fields: Dict[str, tuple[str, str, str, str, str, str]] = {}
+    for signature, wo, lot, pkg, pj, first, wafer in zip(
+        signatures,
+        workorders,
+        lotids,
+        packages,
+        types,
+        firstnames,
+        waferdescs,
+    ):
         if signature not in signature_fields:
-            signature_fields[signature] = (wo, lot, pkg, pj)
+            signature_fields[signature] = (wo, lot, pkg, pj, first, wafer)
     return signature_counter, signature_fields
+
+
+def _decode_signature_fields(signature: str) -> tuple[str, str, str, str, str, str]:
+    parts = [str(value) for value in str(signature).split("\x1f")]
+    if len(parts) < 6:
+        parts.extend([""] * (6 - len(parts)))
+    return tuple(parts[:6])
 
 
 def _build_field_counters(
     signature_counter: Counter,
-    signature_fields: Dict[str, tuple[str, str, str, str]],
+    signature_fields: Dict[str, tuple[str, str, str, str, str, str]],
 ) -> Dict[str, Counter]:
     counters = {
         "workorders": Counter(),
         "lotids": Counter(),
         "packages": Counter(),
         "types": Counter(),
+        "firstnames": Counter(),
+        "waferdescs": Counter(),
     }
     for signature, count in signature_counter.items():
-        wo, lot, pkg, pj = signature_fields.get(signature, ("", "", "", ""))
+        wo, lot, pkg, pj, first, wafer = signature_fields.get(signature, ("", "", "", "", "", ""))
         if wo:
             counters["workorders"][wo] += count
         if lot:
@@ -344,6 +434,10 @@ def _build_field_counters(
             counters["packages"][pkg] += count
         if pj:
             counters["types"][pj] += count
+        if first:
+            counters["firstnames"][first] += count
+        if wafer:
+            counters["waferdescs"][wafer] += count
     return counters
 
 
@@ -362,11 +456,15 @@ def _materialize_search_payload(
     lotids = sorted(field_counters["lotids"].keys())
     packages = sorted(field_counters["packages"].keys())
     types = sorted(field_counters["types"].keys())
+    firstnames = sorted(field_counters["firstnames"].keys())
+    waferdescs = sorted(field_counters["waferdescs"].keys())
     memory_bytes = (
         _estimate_counter_payload_bytes(field_counters["workorders"])
         + _estimate_counter_payload_bytes(field_counters["lotids"])
         + _estimate_counter_payload_bytes(field_counters["packages"])
         + _estimate_counter_payload_bytes(field_counters["types"])
+        + _estimate_counter_payload_bytes(field_counters["firstnames"])
+        + _estimate_counter_payload_bytes(field_counters["waferdescs"])
     )
     return {
         "version": version,
@@ -376,6 +474,8 @@ def _materialize_search_payload(
         "lotids": lotids,
         "packages": packages,
         "types": types,
+        "firstnames": firstnames,
+        "waferdescs": waferdescs,
         "sync_mode": mode,
         "sync_added_rows": int(added_rows),
         "sync_removed_rows": int(removed_rows),
@@ -387,6 +487,8 @@ def _materialize_search_payload(
             "lotids": dict(field_counters["lotids"]),
             "packages": dict(field_counters["packages"]),
             "types": dict(field_counters["types"]),
+            "firstnames": dict(field_counters["firstnames"]),
+            "waferdescs": dict(field_counters["waferdescs"]),
         },
     }
 
@@ -410,7 +512,7 @@ def _try_incremental_search_sync(
     version: str,
     row_count: int,
     signature_counter: Counter,
-    signature_fields: Dict[str, tuple[str, str, str, str]],
+    signature_fields: Dict[str, tuple[str, str, str, str, str, str]],
 ) -> Optional[Dict[str, Any]]:
     if not previous:
         return None
@@ -432,10 +534,12 @@ def _try_incremental_search_sync(
         "lotids": Counter(old_field_counters_raw.get("lotids") or {}),
         "packages": Counter(old_field_counters_raw.get("packages") or {}),
         "types": Counter(old_field_counters_raw.get("types") or {}),
+        "firstnames": Counter(old_field_counters_raw.get("firstnames") or {}),
+        "waferdescs": Counter(old_field_counters_raw.get("waferdescs") or {}),
     }
 
     for signature, count in added.items():
-        wo, lot, pkg, pj = signature_fields.get(signature, ("", "", "", ""))
+        wo, lot, pkg, pj, first, wafer = signature_fields.get(signature, ("", "", "", "", "", ""))
         if wo:
             field_counters["workorders"][wo] += count
         if lot:
@@ -444,13 +548,14 @@ def _try_incremental_search_sync(
             field_counters["packages"][pkg] += count
         if pj:
             field_counters["types"][pj] += count
+        if first:
+            field_counters["firstnames"][first] += count
+        if wafer:
+            field_counters["waferdescs"][wafer] += count
 
-    previous_fields = {
-        sig: tuple(str(v) for v in sig.split("\x1f", 3))
-        for sig in old_signature_counter.keys()
-    }
+    previous_fields = {sig: _decode_signature_fields(sig) for sig in old_signature_counter.keys()}
     for signature, count in removed.items():
-        wo, lot, pkg, pj = previous_fields.get(signature, ("", "", "", ""))
+        wo, lot, pkg, pj, first, wafer = previous_fields.get(signature, ("", "", "", "", "", ""))
         if wo:
             field_counters["workorders"][wo] -= count
             if field_counters["workorders"][wo] <= 0:
@@ -467,6 +572,14 @@ def _try_incremental_search_sync(
             field_counters["types"][pj] -= count
             if field_counters["types"][pj] <= 0:
                 field_counters["types"].pop(pj, None)
+        if first:
+            field_counters["firstnames"][first] -= count
+            if field_counters["firstnames"][first] <= 0:
+                field_counters["firstnames"].pop(first, None)
+        if wafer:
+            field_counters["waferdescs"][wafer] -= count
+            if field_counters["waferdescs"][wafer] <= 0:
+                field_counters["waferdescs"].pop(wafer, None)
 
     _increment_wip_metric("search_index_incremental_updates")
     return _materialize_search_payload(
@@ -495,6 +608,8 @@ def _build_wip_snapshot(df: pd.DataFrame, include_dummy: bool, version: str) -> 
         "workcenter": _build_value_index(filtered, "WORKCENTER_GROUP"),
         "package": _build_value_index(filtered, "PACKAGE_LEF"),
         "pj_type": _build_value_index(filtered, "PJ_TYPE"),
+        "firstname": _build_value_index(filtered, "FIRSTNAME"),
+        "waferdesc": _build_value_index(filtered, "WAFERDESC"),
         "wip_status": _build_value_index(filtered, "WIP_STATUS"),
         "hold_type": _build_value_index(pd.DataFrame({"HOLD_TYPE": hold_type_series}), "HOLD_TYPE"),
     }
@@ -600,6 +715,8 @@ def get_wip_search_index_status() -> Dict[str, Any]:
                 "lotids": len(payload.get("lotids", [])),
                 "packages": len(payload.get("packages", [])),
                 "types": len(payload.get("types", [])),
+                "firstnames": len(payload.get("firstnames", [])),
+                "waferdescs": len(payload.get("waferdescs", [])),
                 "sync_mode": payload.get("sync_mode"),
                 "sync_added_rows": payload.get("sync_added_rows", 0),
                 "sync_removed_rows": payload.get("sync_removed_rows", 0),
@@ -716,7 +833,9 @@ def get_wip_summary(
     workorder: Optional[str] = None,
     lotid: Optional[str] = None,
     package: Optional[str] = None,
-    pj_type: Optional[str] = None
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Get WIP KPI summary for overview dashboard.
 
@@ -728,6 +847,8 @@ def get_wip_summary(
         lotid: Optional LOTID filter (fuzzy match)
         package: Optional PACKAGE_LEF filter (exact match)
         pj_type: Optional PJ_TYPE filter (exact match)
+        firstname: Optional FIRSTNAME filter (exact match)
+        waferdesc: Optional WAFERDESC filter (exact match)
 
     Returns:
         Dict with summary stats (camelCase):
@@ -746,9 +867,19 @@ def get_wip_summary(
                 lotid=lotid,
                 package=package,
                 pj_type=pj_type,
+                firstname=firstname,
+                waferdesc=waferdesc,
             )
             if df is None:
-                return _get_wip_summary_from_oracle(include_dummy, workorder, lotid, package, pj_type)
+                return _get_wip_summary_from_oracle(
+                    include_dummy,
+                    workorder,
+                    lotid,
+                    package,
+                    pj_type,
+                    firstname,
+                    waferdesc,
+                )
 
             if df.empty:
                 return {
@@ -804,7 +935,15 @@ def get_wip_summary(
             logger.warning(f"Cache-based summary calculation failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _get_wip_summary_from_oracle(include_dummy, workorder, lotid, package, pj_type)
+    return _get_wip_summary_from_oracle(
+        include_dummy,
+        workorder,
+        lotid,
+        package,
+        pj_type,
+        firstname,
+        waferdesc,
+    )
 
 
 def _get_wip_summary_from_oracle(
@@ -812,17 +951,19 @@ def _get_wip_summary_from_oracle(
     workorder: Optional[str] = None,
     lotid: Optional[str] = None,
     package: Optional[str] = None,
-    pj_type: Optional[str] = None
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Get WIP summary directly from Oracle (fallback)."""
     try:
         # Build conditions using QueryBuilder
         builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
 
-        if package:
-            builder.add_param_condition("PACKAGE_LEF", package)
-        if pj_type:
-            builder.add_param_condition("PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(builder, "PACKAGE_LEF", package)
+        _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
+        _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
 
         # Load SQL template and build query
         base_sql = SQLLoader.load("wip/summary")
@@ -881,7 +1022,9 @@ def get_wip_matrix(
     hold_type: Optional[str] = None,
     reason: Optional[str] = None,
     package: Optional[str] = None,
-    pj_type: Optional[str] = None
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Get workcenter x product line matrix for overview dashboard.
 
@@ -898,6 +1041,8 @@ def get_wip_matrix(
                 Only effective when status='HOLD'
         package: Optional PACKAGE_LEF filter (exact match)
         pj_type: Optional PJ_TYPE filter (exact match)
+        firstname: Optional FIRSTNAME filter (exact match)
+        waferdesc: Optional WAFERDESC filter (exact match)
 
     Returns:
         Dict with matrix data:
@@ -921,6 +1066,8 @@ def get_wip_matrix(
                 lotid=lotid,
                 package=package,
                 pj_type=pj_type,
+                firstname=firstname,
+                waferdesc=waferdesc,
                 status=status_upper,
                 hold_type=hold_type_filter,
             )
@@ -934,6 +1081,8 @@ def get_wip_matrix(
                     reason,
                     package,
                     pj_type,
+                    firstname,
+                    waferdesc,
                 )
 
             if reason_filter:
@@ -968,6 +1117,8 @@ def get_wip_matrix(
         reason,
         package,
         pj_type,
+        firstname,
+        waferdesc,
     )
 
 
@@ -1032,7 +1183,9 @@ def _get_wip_matrix_from_oracle(
     hold_type: Optional[str] = None,
     reason: Optional[str] = None,
     package: Optional[str] = None,
-    pj_type: Optional[str] = None
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Get WIP matrix directly from Oracle (fallback)."""
     try:
@@ -1041,10 +1194,10 @@ def _get_wip_matrix_from_oracle(
         builder.add_is_not_null("WORKCENTER_GROUP")
         builder.add_is_not_null("PACKAGE_LEF")
 
-        if package:
-            builder.add_param_condition("PACKAGE_LEF", package)
-        if pj_type:
-            builder.add_param_condition("PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(builder, "PACKAGE_LEF", package)
+        _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
+        _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
 
         # WIP status filter
         if status:
@@ -1091,7 +1244,11 @@ def _get_wip_matrix_from_oracle(
 def get_wip_hold_summary(
     include_dummy: bool = False,
     workorder: Optional[str] = None,
-    lotid: Optional[str] = None
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Get hold summary grouped by hold reason.
 
@@ -1101,6 +1258,10 @@ def get_wip_hold_summary(
         include_dummy: If True, include DUMMY lots (default: False)
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
+        package: Optional PACKAGE_LEF filter (exact match)
+        pj_type: Optional PJ_TYPE filter (exact match)
+        firstname: Optional FIRSTNAME filter (exact match)
+        waferdesc: Optional WAFERDESC filter (exact match)
 
     Returns:
         Dict with hold items sorted by lots desc:
@@ -1114,10 +1275,22 @@ def get_wip_hold_summary(
                 include_dummy=include_dummy,
                 workorder=workorder,
                 lotid=lotid,
+                package=package,
+                pj_type=pj_type,
+                firstname=firstname,
+                waferdesc=waferdesc,
                 status='HOLD',
             )
             if df is None:
-                return _get_wip_hold_summary_from_oracle(include_dummy, workorder, lotid)
+                return _get_wip_hold_summary_from_oracle(
+                    include_dummy,
+                    workorder,
+                    lotid,
+                    package,
+                    pj_type,
+                    firstname,
+                    waferdesc,
+                )
 
             # Filter for HOLD status with reason
             df = df[df['HOLDREASONNAME'].notna()]
@@ -1150,13 +1323,25 @@ def get_wip_hold_summary(
             logger.warning(f"Cache-based hold summary calculation failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _get_wip_hold_summary_from_oracle(include_dummy, workorder, lotid)
+    return _get_wip_hold_summary_from_oracle(
+        include_dummy,
+        workorder,
+        lotid,
+        package,
+        pj_type,
+        firstname,
+        waferdesc,
+    )
 
 
 def _get_wip_hold_summary_from_oracle(
     include_dummy: bool = False,
     workorder: Optional[str] = None,
-    lotid: Optional[str] = None
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Get WIP hold summary directly from Oracle (fallback)."""
     try:
@@ -1164,6 +1349,10 @@ def _get_wip_hold_summary_from_oracle(
         builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
         builder.add_param_condition("STATUS", "HOLD")
         builder.add_is_not_null("HOLDREASONNAME")
+        _add_exact_filter_conditions(builder, "PACKAGE_LEF", package)
+        _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
+        _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
 
         where_clause, params = builder.build_where_only()
 
@@ -1208,6 +1397,8 @@ def get_wip_detail(
     workcenter: str,
     package: Optional[str] = None,
     pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
     workorder: Optional[str] = None,
@@ -1224,6 +1415,8 @@ def get_wip_detail(
         workcenter: WORKCENTER_GROUP name
         package: Optional PACKAGE_LEF filter
         pj_type: Optional PJ_TYPE filter (exact match)
+        firstname: Optional FIRSTNAME filter (exact match)
+        waferdesc: Optional WAFERDESC filter (exact match)
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
@@ -1252,6 +1445,8 @@ def get_wip_detail(
                 lotid=lotid,
                 package=package,
                 pj_type=pj_type,
+                firstname=firstname,
+                waferdesc=waferdesc,
                 workcenter=workcenter,
             )
             if summary_df is None:
@@ -1259,6 +1454,8 @@ def get_wip_detail(
                     workcenter,
                     package,
                     pj_type,
+                    firstname,
+                    waferdesc,
                     status,
                     hold_type,
                     workorder,
@@ -1308,6 +1505,8 @@ def get_wip_detail(
                     lotid=lotid,
                     package=package,
                     pj_type=pj_type,
+                    firstname=firstname,
+                    waferdesc=waferdesc,
                     workcenter=workcenter,
                     status=status_upper,
                     hold_type=hold_type_filter,
@@ -1317,6 +1516,8 @@ def get_wip_detail(
                         workcenter,
                         package,
                         pj_type,
+                        firstname,
+                        waferdesc,
                         status,
                         hold_type,
                         workorder,
@@ -1374,7 +1575,18 @@ def get_wip_detail(
 
     # Fallback to Oracle direct query
     return _get_wip_detail_from_oracle(
-        workcenter, package, pj_type, status, hold_type, workorder, lotid, include_dummy, page, page_size
+        workcenter,
+        package,
+        pj_type,
+        firstname,
+        waferdesc,
+        status,
+        hold_type,
+        workorder,
+        lotid,
+        include_dummy,
+        page,
+        page_size,
     )
 
 
@@ -1382,6 +1594,8 @@ def _get_wip_detail_from_oracle(
     workcenter: str,
     package: Optional[str] = None,
     pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
     workorder: Optional[str] = None,
@@ -1396,10 +1610,10 @@ def _get_wip_detail_from_oracle(
         builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
         builder.add_param_condition("WORKCENTER_GROUP", workcenter)
 
-        if package:
-            builder.add_param_condition("PACKAGE_LEF", package)
-        if pj_type:
-            builder.add_param_condition("PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(builder, "PACKAGE_LEF", package)
+        _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
+        _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
 
         # WIP status filter (RUN/QUEUE/HOLD based on EQUIPMENTCOUNT and CURRENTHOLDCOUNT)
         if status:
@@ -1419,10 +1633,10 @@ def _get_wip_detail_from_oracle(
         # Build summary conditions (without status/hold_type filter for full breakdown)
         summary_builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
         summary_builder.add_param_condition("WORKCENTER_GROUP", workcenter)
-        if package:
-            summary_builder.add_param_condition("PACKAGE_LEF", package)
-        if pj_type:
-            summary_builder.add_param_condition("PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(summary_builder, "PACKAGE_LEF", package)
+        _add_exact_filter_conditions(summary_builder, "PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(summary_builder, "FIRSTNAME", firstname)
+        _add_exact_filter_conditions(summary_builder, "WAFERDESC", waferdesc)
 
         summary_where, summary_params = summary_builder.build_where_only()
         non_quality_list = CommonFilters.get_non_quality_reasons_sql()
@@ -1716,6 +1930,202 @@ def _get_packages_from_oracle(include_dummy: bool = False) -> Optional[List[Dict
     except Exception as exc:
         logger.error(f"Packages query failed: {exc}")
         return None
+
+
+def _distinct_non_empty_values(df: pd.DataFrame, column: str) -> List[str]:
+    if df is None or df.empty or column not in df.columns:
+        return []
+    values = (
+        df[column]
+        .map(_normalize_text_value)
+        .tolist()
+    )
+    return sorted({value for value in values if value})
+
+
+def _build_filter_options_payload(df: pd.DataFrame) -> Dict[str, List[str]]:
+    return {
+        "workorders": _distinct_non_empty_values(df, "WORKORDER"),
+        "lotids": _distinct_non_empty_values(df, "LOTID"),
+        "packages": _distinct_non_empty_values(df, "PACKAGE_LEF"),
+        "types": _distinct_non_empty_values(df, "PJ_TYPE"),
+        "firstnames": _distinct_non_empty_values(df, "FIRSTNAME"),
+        "waferdescs": _distinct_non_empty_values(df, "WAFERDESC"),
+    }
+
+
+def _query_distinct_values_from_oracle(
+    column: str,
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
+    exclude_field: Optional[str] = None,
+) -> Optional[List[str]]:
+    try:
+        builder = _build_base_conditions_builder(
+            include_dummy=include_dummy,
+            workorder=None if exclude_field == "workorder" else workorder,
+            lotid=None if exclude_field == "lotid" else lotid,
+        )
+        builder.add_is_not_null(column)
+        if exclude_field != "package":
+            _add_exact_filter_conditions(builder, "PACKAGE_LEF", package)
+        if exclude_field != "pj_type":
+            _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
+        if exclude_field != "firstname":
+            _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
+        if exclude_field != "waferdesc":
+            _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
+        where_clause, params = builder.build_where_only()
+        sql = f"""
+            SELECT DISTINCT {column}
+            FROM {WIP_VIEW}
+            {where_clause}
+            ORDER BY {column}
+        """
+        df = read_sql_df(sql, params)
+        if df is None or df.empty:
+            return []
+        values = df[column].map(_normalize_text_value).tolist()
+        return sorted({value for value in values if value})
+    except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
+        raise
+    except Exception as exc:
+        logger.error(f"Distinct value query failed for {column}: {exc}")
+        return None
+
+
+def _get_wip_filter_options_from_oracle(
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
+) -> Optional[Dict[str, List[str]]]:
+    columns = {
+        "workorder": ("workorders", "WORKORDER"),
+        "lotid": ("lotids", "LOTID"),
+        "package": ("packages", "PACKAGE_LEF"),
+        "pj_type": ("types", "PJ_TYPE"),
+        "firstname": ("firstnames", "FIRSTNAME"),
+        "waferdesc": ("waferdescs", "WAFERDESC"),
+    }
+    payload: Dict[str, List[str]] = {}
+    for field, (key, column) in columns.items():
+        values = _query_distinct_values_from_oracle(
+            column,
+            include_dummy=include_dummy,
+            workorder=workorder,
+            lotid=lotid,
+            package=package,
+            pj_type=pj_type,
+            firstname=firstname,
+            waferdesc=waferdesc,
+            exclude_field=field,
+        )
+        if values is None:
+            return None
+        payload[key] = values
+    return payload
+
+
+def _get_filter_options_cache_payload(
+    *,
+    include_dummy: bool,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
+) -> Optional[Dict[str, List[str]]]:
+    by_field = {
+        "workorder": ("workorders", "WORKORDER"),
+        "lotid": ("lotids", "LOTID"),
+        "package": ("packages", "PACKAGE_LEF"),
+        "pj_type": ("types", "PJ_TYPE"),
+        "firstname": ("firstnames", "FIRSTNAME"),
+        "waferdesc": ("waferdescs", "WAFERDESC"),
+    }
+
+    payload: Dict[str, List[str]] = {}
+    for field, (key, column) in by_field.items():
+        df = _select_with_snapshot_indexes(
+            include_dummy=include_dummy,
+            workorder=None if field == "workorder" else workorder,
+            lotid=None if field == "lotid" else lotid,
+            package=None if field == "package" else package,
+            pj_type=None if field == "pj_type" else pj_type,
+            firstname=None if field == "firstname" else firstname,
+            waferdesc=None if field == "waferdesc" else waferdesc,
+        )
+        if df is None:
+            return None
+        payload[key] = _distinct_non_empty_values(df, column)
+
+    return payload
+
+
+def get_wip_filter_options(
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
+) -> Optional[Dict[str, List[str]]]:
+    """Get interdependent filter option lists for WIP overview dropdowns."""
+    has_filter = any(
+        _split_csv_values(value)
+        for value in (workorder, lotid, package, pj_type, firstname, waferdesc)
+    )
+
+    indexed = _get_wip_search_index(include_dummy=include_dummy)
+    if indexed is not None and not has_filter:
+        return {
+            "workorders": list(indexed.get("workorders", [])),
+            "lotids": list(indexed.get("lotids", [])),
+            "packages": list(indexed.get("packages", [])),
+            "types": list(indexed.get("types", [])),
+            "firstnames": list(indexed.get("firstnames", [])),
+            "waferdescs": list(indexed.get("waferdescs", [])),
+        }
+
+    cached_df = _get_wip_dataframe()
+    if cached_df is not None:
+        try:
+            payload = _get_filter_options_cache_payload(
+                include_dummy=include_dummy,
+                workorder=workorder,
+                lotid=lotid,
+                package=package,
+                pj_type=pj_type,
+                firstname=firstname,
+                waferdesc=waferdesc,
+            )
+            if payload is not None:
+                return payload
+        except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
+            raise
+        except Exception as exc:
+            logger.warning(f"Cache-based filter options calculation failed, falling back to Oracle: {exc}")
+
+    return _get_wip_filter_options_from_oracle(
+        include_dummy=include_dummy,
+        workorder=workorder,
+        lotid=lotid,
+        package=package,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
+    )
 
 
 # ============================================================

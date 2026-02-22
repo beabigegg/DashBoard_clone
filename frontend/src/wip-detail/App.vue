@@ -1,9 +1,9 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
 import { replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
-import { buildWipDetailQueryParams } from '../core/wip-derive.js';
+import { buildWipDetailQueryParams, buildWipOverviewQueryParams } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
 import FilterPanel from './components/FilterPanel.vue';
@@ -13,15 +13,27 @@ import SummaryCards from './components/SummaryCards.vue';
 
 const API_TIMEOUT = 60000;
 const PAGE_SIZE = 100;
+const FILTER_OPTION_DEBOUNCE_MS = 120;
 
 const workcenter = ref('');
 const page = ref(1);
 const filters = reactive({
-  workorder: '',
-  lotid: '',
-  package: '',
-  type: '',
+  workorder: [],
+  lotid: [],
+  package: [],
+  type: [],
+  firstname: [],
+  waferdesc: [],
 });
+const filterOptions = ref({
+  workorders: [],
+  lotids: [],
+  packages: [],
+  types: [],
+  firstnames: [],
+  waferdescs: [],
+});
+
 const activeStatusFilter = ref(null);
 
 const detailData = ref(null);
@@ -32,6 +44,9 @@ const refreshSuccess = ref(false);
 const refreshError = ref(false);
 const errorMessage = ref('');
 const selectedLotId = ref('');
+
+let filterOptionsDebounceTimer = null;
+let filterOptionsRequestToken = 0;
 
 function unwrapApiResult(result, fallbackMessage) {
   if (result?.success) {
@@ -50,6 +65,35 @@ function getUrlParam(name) {
   return new URLSearchParams(window.location.search).get(name)?.trim() || '';
 }
 
+function parseCsvParam(name) {
+  const raw = getUrlParam(name);
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function normalizeArrayValues(values) {
+  if (!values) {
+    return [];
+  }
+  if (Array.isArray(values)) {
+    return values.map((value) => String(value).trim()).filter(Boolean);
+  }
+  return String(values)
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function serializeFilterValue(values) {
+  const normalized = normalizeArrayValues(values);
+  return normalized.join(',');
+}
+
 function updateUrlState() {
   if (!workcenter.value) {
     return;
@@ -58,17 +102,30 @@ function updateUrlState() {
   const params = new URLSearchParams();
   params.set('workcenter', workcenter.value);
 
-  if (filters.workorder) {
-    params.set('workorder', filters.workorder);
+  const workorder = serializeFilterValue(filters.workorder);
+  const lotid = serializeFilterValue(filters.lotid);
+  const pkg = serializeFilterValue(filters.package);
+  const type = serializeFilterValue(filters.type);
+  const firstname = serializeFilterValue(filters.firstname);
+  const waferdesc = serializeFilterValue(filters.waferdesc);
+
+  if (workorder) {
+    params.set('workorder', workorder);
   }
-  if (filters.lotid) {
-    params.set('lotid', filters.lotid);
+  if (lotid) {
+    params.set('lotid', lotid);
   }
-  if (filters.package) {
-    params.set('package', filters.package);
+  if (pkg) {
+    params.set('package', pkg);
   }
-  if (filters.type) {
-    params.set('type', filters.type);
+  if (type) {
+    params.set('type', type);
+  }
+  if (firstname) {
+    params.set('firstname', firstname);
+  }
+  if (waferdesc) {
+    params.set('waferdesc', waferdesc);
   }
   if (activeStatusFilter.value) {
     params.set('status', activeStatusFilter.value);
@@ -105,6 +162,51 @@ async function fetchDetail(signal) {
   return unwrapApiResult(result, 'Failed to fetch detail');
 }
 
+async function loadFilterOptions(sourceFilters = filters) {
+  const requestToken = ++filterOptionsRequestToken;
+
+  try {
+    const params = buildWipOverviewQueryParams(sourceFilters);
+    const result = await apiGet('/api/wip/meta/filter-options', {
+      params,
+      timeout: API_TIMEOUT,
+      silent: true,
+    });
+    const data = unwrapApiResult(result, '載入篩選選項失敗');
+
+    if (requestToken !== filterOptionsRequestToken) {
+      return;
+    }
+
+    filterOptions.value = {
+      workorders: Array.isArray(data?.workorders) ? data.workorders : [],
+      lotids: Array.isArray(data?.lotids) ? data.lotids : [],
+      packages: Array.isArray(data?.packages) ? data.packages : [],
+      types: Array.isArray(data?.types) ? data.types : [],
+      firstnames: Array.isArray(data?.firstnames) ? data.firstnames : [],
+      waferdescs: Array.isArray(data?.waferdescs) ? data.waferdescs : [],
+    };
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      console.warn('載入 WIP Detail 篩選選項失敗:', error);
+    }
+  }
+}
+
+function scheduleFilterOptionsReload(nextDraftFilters) {
+  if (filterOptionsDebounceTimer) {
+    clearTimeout(filterOptionsDebounceTimer);
+  }
+
+  filterOptionsDebounceTimer = setTimeout(() => {
+    void loadFilterOptions(nextDraftFilters);
+  }, FILTER_OPTION_DEBOUNCE_MS);
+}
+
+function onFilterDraftChange(nextDraftFilters) {
+  scheduleFilterOptionsReload(nextDraftFilters);
+}
+
 function showRefreshSuccess() {
   refreshSuccess.value = true;
   setTimeout(() => {
@@ -112,7 +214,7 @@ function showRefreshSuccess() {
   }, 1500);
 }
 
-const { createAbortSignal, triggerRefresh, startAutoRefresh, resetAutoRefresh } = useAutoRefresh({
+const { createAbortSignal, triggerRefresh, startAutoRefresh } = useAutoRefresh({
   onRefresh: () => loadAllData(false),
   autoStart: false,
 });
@@ -190,17 +292,30 @@ const tableData = computed(() => ({
 const backUrl = computed(() => {
   const params = new URLSearchParams();
 
-  if (filters.workorder) {
-    params.set('workorder', filters.workorder);
+  const workorder = serializeFilterValue(filters.workorder);
+  const lotid = serializeFilterValue(filters.lotid);
+  const pkg = serializeFilterValue(filters.package);
+  const type = serializeFilterValue(filters.type);
+  const firstname = serializeFilterValue(filters.firstname);
+  const waferdesc = serializeFilterValue(filters.waferdesc);
+
+  if (workorder) {
+    params.set('workorder', workorder);
   }
-  if (filters.lotid) {
-    params.set('lotid', filters.lotid);
+  if (lotid) {
+    params.set('lotid', lotid);
   }
-  if (filters.package) {
-    params.set('package', filters.package);
+  if (pkg) {
+    params.set('package', pkg);
   }
-  if (filters.type) {
-    params.set('type', filters.type);
+  if (type) {
+    params.set('type', type);
+  }
+  if (firstname) {
+    params.set('firstname', firstname);
+  }
+  if (waferdesc) {
+    params.set('waferdesc', waferdesc);
   }
   if (activeStatusFilter.value) {
     params.set('status', activeStatusFilter.value);
@@ -211,24 +326,37 @@ const backUrl = computed(() => {
 });
 
 function updateFilters(nextFilters) {
-  filters.workorder = nextFilters.workorder || '';
-  filters.lotid = nextFilters.lotid || '';
-  filters.package = nextFilters.package || '';
-  filters.type = nextFilters.type || '';
+  filters.workorder = normalizeArrayValues(nextFilters.workorder);
+  filters.lotid = normalizeArrayValues(nextFilters.lotid);
+  filters.package = normalizeArrayValues(nextFilters.package);
+  filters.type = normalizeArrayValues(nextFilters.type);
+  filters.firstname = normalizeArrayValues(nextFilters.firstname);
+  filters.waferdesc = normalizeArrayValues(nextFilters.waferdesc);
 }
 
 function applyFilters(nextFilters) {
   updateFilters(nextFilters);
   page.value = 1;
+  selectedLotId.value = '';
   updateUrlState();
+  void loadFilterOptions(filters);
   void loadAllData(false);
 }
 
 function clearFilters() {
-  updateFilters({ workorder: '', lotid: '', package: '', type: '' });
+  updateFilters({
+    workorder: [],
+    lotid: [],
+    package: [],
+    type: [],
+    firstname: [],
+    waferdesc: [],
+  });
   activeStatusFilter.value = null;
   page.value = 1;
+  selectedLotId.value = '';
   updateUrlState();
+  void loadFilterOptions(filters);
   void loadAllData(false);
 }
 
@@ -274,10 +402,14 @@ async function manualRefresh() {
 async function initializePage() {
   workcenter.value = getUrlParam('workcenter');
 
-  filters.workorder = getUrlParam('workorder');
-  filters.lotid = getUrlParam('lotid');
-  filters.package = getUrlParam('package');
-  filters.type = getUrlParam('type');
+  updateFilters({
+    workorder: parseCsvParam('workorder'),
+    lotid: parseCsvParam('lotid'),
+    package: parseCsvParam('package'),
+    type: parseCsvParam('type'),
+    firstname: parseCsvParam('firstname'),
+    waferdesc: parseCsvParam('waferdesc'),
+  });
   activeStatusFilter.value = getUrlParam('status') || null;
 
   if (!workcenter.value) {
@@ -301,11 +433,21 @@ async function initializePage() {
     return;
   }
 
-  await loadAllData(true);
+  await Promise.all([
+    loadFilterOptions(filters),
+    loadAllData(true),
+  ]);
   startAutoRefresh();
 }
 
 void initializePage();
+
+onBeforeUnmount(() => {
+  if (filterOptionsDebounceTimer) {
+    clearTimeout(filterOptionsDebounceTimer);
+    filterOptionsDebounceTimer = null;
+  }
+});
 </script>
 
 <template>
@@ -328,7 +470,14 @@ void initializePage();
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
 
-    <FilterPanel :filters="filters" @apply="applyFilters" @clear="clearFilters" />
+    <FilterPanel
+      :filters="filters"
+      :options="filterOptions"
+      :loading="refreshing"
+      @apply="applyFilters"
+      @clear="clearFilters"
+      @draft-change="onFilterDraftChange"
+    />
 
     <SummaryCards
       :summary="summary"

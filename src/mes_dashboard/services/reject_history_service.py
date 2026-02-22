@@ -103,8 +103,9 @@ def _load_sql(name: str) -> str:
     return SQLLoader.load(f"reject_history/{name}")
 
 
-def _base_query_sql() -> str:
-    sql = _load_sql("performance_daily").strip().rstrip(";")
+def _base_query_sql(variant: str = "") -> str:
+    sql_name = "performance_daily_lot" if variant == "lot" else "performance_daily"
+    sql = _load_sql(sql_name).strip().rstrip(";")
     # Strip leading comment/blank lines so WITH parsing can detect the first SQL token.
     lines = sql.splitlines()
     first_sql_line = 0
@@ -161,8 +162,8 @@ def _split_with_query(sql: str) -> tuple[str, str] | None:
     return None
 
 
-def _base_with_cte_sql(alias: str = "base") -> str:
-    base_sql = _base_query_sql()
+def _base_with_cte_sql(alias: str = "base", variant: str = "") -> str:
+    base_sql = _base_query_sql(variant)
     split = _split_with_query(base_sql)
     if split is None:
         return f"WITH {alias} AS (\n{base_sql}\n)"
@@ -178,6 +179,7 @@ def _build_where_clause(
     categories: Optional[list[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
     builder = QueryBuilder()
 
@@ -200,6 +202,10 @@ def _build_where_clause(
     if exclude_material_scrap and not material_reason_selected:
         builder.add_condition("UPPER(NVL(TRIM(b.SCRAP_OBJECTTYPE), '-')) <> 'MATERIAL'")
         material_exclusion_applied = True
+    pb_diode_exclusion_applied = False
+    if exclude_pb_diode and "PB_Diode" not in normalized_packages:
+        builder.add_condition("b.PRODUCTLINENAME <> 'PB_Diode'")
+        pb_diode_exclusion_applied = True
     if normalized_categories:
         builder.add_in_condition("b.REJECTCATEGORYNAME", normalized_categories)
 
@@ -241,6 +247,8 @@ def _build_where_clause(
         "package_filter_count": len(normalized_packages),
         "reason_filter_count": len(reason_name_filters),
         "material_reason_selected": material_reason_selected,
+        "exclude_pb_diode": bool(exclude_pb_diode),
+        "pb_diode_exclusion_applied": pb_diode_exclusion_applied,
     }
     return where_clause, params, meta
 
@@ -251,10 +259,11 @@ def _prepare_sql(
     where_clause: str = "",
     bucket_expr: str = "",
     metric_column: str = "",
+    base_variant: str = "",
 ) -> str:
     sql = _load_sql(name)
-    sql = sql.replace("{{ BASE_QUERY }}", _base_query_sql())
-    sql = sql.replace("{{ BASE_WITH_CTE }}", _base_with_cte_sql("base"))
+    sql = sql.replace("{{ BASE_QUERY }}", _base_query_sql(base_variant))
+    sql = sql.replace("{{ BASE_WITH_CTE }}", _base_with_cte_sql("base", base_variant))
     sql = sql.replace("{{ WHERE_CLAUSE }}", where_clause or "")
     sql = sql.replace("{{ BUCKET_EXPR }}", bucket_expr or "TRUNC(b.TXN_DAY)")
     sql = sql.replace("{{ METRIC_COLUMN }}", metric_column or "b.REJECT_TOTAL_QTY")
@@ -292,39 +301,41 @@ def get_filter_options(
     end_date: str,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> dict[str, Any]:
-    """Return workcenter-group / package / reason options."""
+    """Return workcenter-group / package / reason options (single DB query)."""
     _validate_range(start_date, end_date)
 
     where_clause, params, meta = _build_where_clause(
         include_excluded_scrap=include_excluded_scrap,
         exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
     )
-    reason_sql = _prepare_sql("reason_options", where_clause=where_clause)
-    reason_df = read_sql_df(reason_sql, _common_params(start_date, end_date, params))
-    reasons = []
-    if reason_df is not None and not reason_df.empty:
-        reasons = [
-            _normalize_text(v)
-            for v in reason_df.get("REASON", [])
-            if _normalize_text(v)
-        ]
+    sql = _prepare_sql("filter_options", where_clause=where_clause)
+    df = read_sql_df(sql, _common_params(start_date, end_date, params))
 
-    material_sql = _prepare_sql("material_reason_option", where_clause=where_clause)
-    material_df = read_sql_df(material_sql, _common_params(start_date, end_date, params))
+    reasons: list[str] = []
+    packages: list[str] = []
     has_material_option = False
-    if material_df is not None and not material_df.empty:
-        has_material_option = _as_int(material_df.iloc[0].get("HAS_MATERIAL")) > 0
 
-    package_sql = _prepare_sql("package_options", where_clause=where_clause)
-    package_df = read_sql_df(package_sql, _common_params(start_date, end_date, params))
-    packages = []
-    if package_df is not None and not package_df.empty:
-        packages = [
+    if df is not None and not df.empty:
+        reasons = sorted({
             _normalize_text(v)
-            for v in package_df.get("PACKAGE", [])
+            for v in df["REASON"].dropna()
             if _normalize_text(v)
-        ]
+        })
+        packages = sorted({
+            _normalize_text(v)
+            for v in df["PACKAGE"].dropna()
+            if _normalize_text(v)
+        })
+        if "SCRAP_OBJECTTYPE" in df.columns:
+            has_material_option = (
+                df["SCRAP_OBJECTTYPE"]
+                .apply(lambda v: str(v or "").strip().upper())
+                .eq("MATERIAL")
+                .any()
+            )
 
     groups_raw = get_workcenter_groups() or []
     workcenter_groups = []
@@ -360,6 +371,7 @@ def query_summary(
     categories: Optional[list[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> dict[str, Any]:
     _validate_range(start_date, end_date)
     where_clause, params, meta = _build_where_clause(
@@ -369,6 +381,7 @@ def query_summary(
         categories=categories,
         include_excluded_scrap=include_excluded_scrap,
         exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
     )
     sql = _prepare_sql("summary", where_clause=where_clause)
     df = read_sql_df(sql, _common_params(start_date, end_date, params))
@@ -398,6 +411,7 @@ def query_trend(
     categories: Optional[list[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> dict[str, Any]:
     _validate_range(start_date, end_date)
     normalized_granularity = _normalize_text(granularity).lower() or "day"
@@ -411,6 +425,7 @@ def query_trend(
         categories=categories,
         include_excluded_scrap=include_excluded_scrap,
         exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
     )
     sql = _prepare_sql(
         "trend",
@@ -451,6 +466,7 @@ def query_reason_pareto(
     categories: Optional[list[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> dict[str, Any]:
     _validate_range(start_date, end_date)
     normalized_metric = _normalize_text(metric_mode).lower() or "reject_total"
@@ -468,6 +484,7 @@ def query_reason_pareto(
         categories=categories,
         include_excluded_scrap=include_excluded_scrap,
         exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
     )
     sql = _prepare_sql(
         "reason_pareto",
@@ -523,6 +540,7 @@ def query_list(
     categories: Optional[list[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> dict[str, Any]:
     _validate_range(start_date, end_date)
 
@@ -537,8 +555,9 @@ def query_list(
         categories=categories,
         include_excluded_scrap=include_excluded_scrap,
         exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
     )
-    sql = _prepare_sql("list", where_clause=where_clause)
+    sql = _prepare_sql("list", where_clause=where_clause, base_variant="lot")
     query_params = _common_params(
         start_date,
         end_date,
@@ -564,6 +583,9 @@ def query_list(
                     "SPECNAME": _normalize_text(row.get("SPECNAME")),
                     "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
                     "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
+                    "CONTAINERNAME": _normalize_text(row.get("CONTAINERNAME")),
+                    "PJ_FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
+                    "PRODUCTNAME": _normalize_text(row.get("PRODUCTNAME")),
                     "LOSSREASONNAME": _normalize_text(row.get("LOSSREASONNAME")),
                     "LOSSREASON_CODE": _normalize_text(row.get("LOSSREASON_CODE")),
                     "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
@@ -577,7 +599,6 @@ def query_list(
                     "REJECT_RATE_PCT": round(_as_float(row.get("REJECT_RATE_PCT")), 4),
                     "DEFECT_RATE_PCT": round(_as_float(row.get("DEFECT_RATE_PCT")), 4),
                     "REJECT_SHARE_PCT": round(_as_float(row.get("REJECT_SHARE_PCT")), 4),
-                    "AFFECTED_LOT_COUNT": _as_int(row.get("AFFECTED_LOT_COUNT")),
                     "AFFECTED_WORKORDER_COUNT": _as_int(row.get("AFFECTED_WORKORDER_COUNT")),
                 }
             )
@@ -605,6 +626,7 @@ def export_csv(
     categories: Optional[list[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> Generator[str, None, None]:
     _validate_range(start_date, end_date)
 
@@ -615,6 +637,7 @@ def export_csv(
         categories=categories,
         include_excluded_scrap=include_excluded_scrap,
         exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
     )
     sql = _prepare_sql("export", where_clause=where_clause)
     df = read_sql_df(sql, _common_params(start_date, end_date, params))
@@ -674,3 +697,168 @@ def export_csv(
         "AFFECTED_WORKORDER_COUNT",
     ]
     return _list_to_csv(rows, headers=headers)
+
+
+def _derive_summary(df: pd.DataFrame) -> dict[str, Any]:
+    """Aggregate analytics rows into a single summary dict."""
+    if df is None or df.empty:
+        return {
+            "MOVEIN_QTY": 0,
+            "REJECT_TOTAL_QTY": 0,
+            "DEFECT_QTY": 0,
+            "REJECT_RATE_PCT": 0,
+            "DEFECT_RATE_PCT": 0,
+            "REJECT_SHARE_PCT": 0,
+            "AFFECTED_LOT_COUNT": 0,
+            "AFFECTED_WORKORDER_COUNT": 0,
+        }
+
+    movein = _as_int(df["MOVEIN_QTY"].sum())
+    reject_total = _as_int(df["REJECT_TOTAL_QTY"].sum())
+    defect = _as_int(df["DEFECT_QTY"].sum())
+    affected_lot = _as_int(df["AFFECTED_LOT_COUNT"].sum())
+    affected_wo = _as_int(df["AFFECTED_WORKORDER_COUNT"].sum())
+
+    total_scrap = reject_total + defect
+    reject_rate = round((reject_total / movein * 100) if movein else 0, 4)
+    defect_rate = round((defect / movein * 100) if movein else 0, 4)
+    reject_share = round((reject_total / total_scrap * 100) if total_scrap else 0, 4)
+
+    return {
+        "MOVEIN_QTY": movein,
+        "REJECT_TOTAL_QTY": reject_total,
+        "DEFECT_QTY": defect,
+        "REJECT_RATE_PCT": reject_rate,
+        "DEFECT_RATE_PCT": defect_rate,
+        "REJECT_SHARE_PCT": reject_share,
+        "AFFECTED_LOT_COUNT": affected_lot,
+        "AFFECTED_WORKORDER_COUNT": affected_wo,
+    }
+
+
+def _derive_trend(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Group analytics rows by BUCKET_DATE into daily trend items."""
+    if df is None or df.empty:
+        return []
+
+    grouped = df.groupby("BUCKET_DATE", sort=True).agg(
+        MOVEIN_QTY=("MOVEIN_QTY", "sum"),
+        REJECT_TOTAL_QTY=("REJECT_TOTAL_QTY", "sum"),
+        DEFECT_QTY=("DEFECT_QTY", "sum"),
+    ).reset_index()
+
+    items = []
+    for _, row in grouped.iterrows():
+        movein = _as_int(row["MOVEIN_QTY"])
+        reject_total = _as_int(row["REJECT_TOTAL_QTY"])
+        defect = _as_int(row["DEFECT_QTY"])
+        items.append({
+            "bucket_date": _to_date_str(row["BUCKET_DATE"]),
+            "MOVEIN_QTY": movein,
+            "REJECT_TOTAL_QTY": reject_total,
+            "DEFECT_QTY": defect,
+            "REJECT_RATE_PCT": round((reject_total / movein * 100) if movein else 0, 4),
+            "DEFECT_RATE_PCT": round((defect / movein * 100) if movein else 0, 4),
+        })
+    return items
+
+
+def _derive_pareto(df: pd.DataFrame, metric_mode: str = "reject_total") -> list[dict[str, Any]]:
+    """Group analytics rows by REASON into pareto items with PCT/CUM_PCT."""
+    if df is None or df.empty:
+        return []
+
+    metric_col = "REJECT_TOTAL_QTY" if metric_mode == "reject_total" else "DEFECT_QTY"
+
+    grouped = df.groupby("REASON", sort=False).agg(
+        MOVEIN_QTY=("MOVEIN_QTY", "sum"),
+        REJECT_TOTAL_QTY=("REJECT_TOTAL_QTY", "sum"),
+        DEFECT_QTY=("DEFECT_QTY", "sum"),
+        AFFECTED_LOT_COUNT=("AFFECTED_LOT_COUNT", "sum"),
+    ).reset_index()
+
+    grouped = grouped.sort_values(metric_col, ascending=False).reset_index(drop=True)
+    total_metric = _as_float(grouped[metric_col].sum())
+
+    items = []
+    cum = 0.0
+    for _, row in grouped.iterrows():
+        metric_value = _as_float(row[metric_col])
+        pct = round((metric_value / total_metric * 100) if total_metric else 0, 4)
+        cum += pct
+        reason_text = _normalize_text(row["REASON"]) or "(未填寫)"
+        items.append({
+            "reason": reason_text,
+            "metric_value": metric_value,
+            "MOVEIN_QTY": _as_int(row["MOVEIN_QTY"]),
+            "REJECT_TOTAL_QTY": _as_int(row["REJECT_TOTAL_QTY"]),
+            "DEFECT_QTY": _as_int(row["DEFECT_QTY"]),
+            "count": _as_int(row["AFFECTED_LOT_COUNT"]),
+            "pct": pct,
+            "cumPct": round(cum, 4),
+        })
+    return items
+
+
+def _derive_raw_items(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Return per-(date, reason) rows for client-side re-derivation."""
+    if df is None or df.empty:
+        return []
+    items = []
+    for _, row in df.iterrows():
+        items.append({
+            "bucket_date": _to_date_str(row["BUCKET_DATE"]),
+            "reason": _normalize_text(row["REASON"]) or "(未填寫)",
+            "MOVEIN_QTY": _as_int(row["MOVEIN_QTY"]),
+            "REJECT_TOTAL_QTY": _as_int(row["REJECT_TOTAL_QTY"]),
+            "DEFECT_QTY": _as_int(row["DEFECT_QTY"]),
+            "AFFECTED_LOT_COUNT": _as_int(row["AFFECTED_LOT_COUNT"]),
+            "AFFECTED_WORKORDER_COUNT": _as_int(row["AFFECTED_WORKORDER_COUNT"]),
+        })
+    return items
+
+
+def query_analytics(
+    *,
+    start_date: str,
+    end_date: str,
+    metric_mode: str = "reject_total",
+    workcenter_groups: Optional[list[str]] = None,
+    packages: Optional[list[str]] = None,
+    reasons: Optional[list[str]] = None,
+    categories: Optional[list[str]] = None,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
+) -> dict[str, Any]:
+    """Single DB query → summary + trend + pareto (replaces 3 separate queries)."""
+    _validate_range(start_date, end_date)
+    normalized_metric = _normalize_text(metric_mode).lower() or "reject_total"
+    if normalized_metric not in VALID_METRIC_MODE:
+        raise ValueError("Invalid metric_mode. Use reject_total or defect")
+
+    where_clause, params, meta = _build_where_clause(
+        workcenter_groups=workcenter_groups,
+        packages=packages,
+        reasons=reasons,
+        categories=categories,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    sql = _prepare_sql("analytics", where_clause=where_clause)
+    df = read_sql_df(sql, _common_params(start_date, end_date, params))
+
+    return {
+        "summary": _derive_summary(df),
+        "trend": {
+            "items": _derive_trend(df),
+            "granularity": "day",
+        },
+        "pareto": {
+            "items": _derive_pareto(df, normalized_metric),
+            "metric_mode": normalized_metric,
+        },
+        "raw_items": _derive_raw_items(df),
+        "meta": meta,
+    }

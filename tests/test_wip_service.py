@@ -23,6 +23,7 @@ from mes_dashboard.services.wip_service import (
     get_hold_overview_treemap,
     get_workcenters,
     get_packages,
+    get_wip_filter_options,
     search_workorders,
     search_lot_ids,
 )
@@ -285,6 +286,84 @@ class TestGetPackages(unittest.TestCase):
         result = get_packages()
 
         self.assertEqual(result, [])
+
+
+class TestGetWipFilterOptions(unittest.TestCase):
+    """Test get_wip_filter_options function."""
+
+    def setUp(self):
+        import mes_dashboard.services.wip_service as wip_service
+        with wip_service._wip_search_index_lock:
+            wip_service._wip_search_index_cache.clear()
+        with wip_service._wip_snapshot_lock:
+            wip_service._wip_snapshot_cache.clear()
+
+    @patch('mes_dashboard.services.wip_service._get_wip_search_index')
+    def test_prefers_search_index_payload(self, mock_get_index):
+        mock_get_index.return_value = {
+            'workorders': ['WO1', 'WO2'],
+            'lotids': ['LOT1'],
+            'packages': ['PKG1'],
+            'types': ['TYPE1'],
+            'firstnames': ['WF001'],
+            'waferdescs': ['SiC'],
+        }
+
+        result = get_wip_filter_options()
+
+        self.assertEqual(result['workorders'], ['WO1', 'WO2'])
+        self.assertEqual(result['firstnames'], ['WF001'])
+        self.assertEqual(result['waferdescs'], ['SiC'])
+
+    @patch('mes_dashboard.services.wip_service._get_wip_search_index', return_value=None)
+    @patch('mes_dashboard.services.wip_service._get_wip_dataframe')
+    def test_interdependent_options_follow_cross_filters(self, mock_cached_wip, _mock_get_index):
+        mock_cached_wip.return_value = pd.DataFrame({
+            'WORKORDER': ['WO1', 'WO1', 'WO2'],
+            'LOTID': ['L1', 'L2', 'L3'],
+            'PACKAGE_LEF': ['PKG-A', 'PKG-B', 'PKG-B'],
+            'PJ_TYPE': ['TYPE-1', 'TYPE-1', 'TYPE-2'],
+            'FIRSTNAME': ['WF-A', 'WF-B', 'WF-A'],
+            'WAFERDESC': ['SiC', 'SiC', 'Si'],
+            'EQUIPMENTCOUNT': [0, 1, 0],
+            'CURRENTHOLDCOUNT': [1, 0, 0],
+            'QTY': [10, 20, 30],
+            'HOLDREASONNAME': ['Q-Check', None, None],
+            'WORKCENTER_GROUP': ['WC-A', 'WC-A', 'WC-B'],
+        })
+
+        result = get_wip_filter_options(workorder='WO1')
+
+        # Exclude-self semantics: workorder options still show values allowed by other filters.
+        self.assertEqual(result['workorders'], ['WO1', 'WO2'])
+        self.assertEqual(result['lotids'], ['L1', 'L2'])
+        self.assertEqual(result['types'], ['TYPE-1'])
+        self.assertEqual(result['waferdescs'], ['SiC'])
+
+    @patch('mes_dashboard.services.wip_service._get_wip_search_index', return_value=None)
+    @patch('mes_dashboard.services.wip_service._select_with_snapshot_indexes')
+    @patch('mes_dashboard.services.wip_service._get_wip_dataframe')
+    def test_falls_back_to_cache_dataframe(
+        self,
+        mock_cached_wip,
+        mock_select_with_snapshot,
+        _mock_get_index,
+    ):
+        mock_cached_wip.return_value = pd.DataFrame({'WORKORDER': ['WO1']})
+        mock_select_with_snapshot.return_value = pd.DataFrame({
+            'WORKORDER': ['WO2', 'WO1'],
+            'LOTID': ['LOT2', 'LOT1'],
+            'PACKAGE_LEF': ['PKG2', 'PKG1'],
+            'PJ_TYPE': ['TYPE2', 'TYPE1'],
+            'FIRSTNAME': ['WF002', 'WF001'],
+            'WAFERDESC': ['Si', 'SiC'],
+        })
+
+        result = get_wip_filter_options()
+
+        self.assertEqual(result['workorders'], ['WO1', 'WO2'])
+        self.assertEqual(result['firstnames'], ['WF001', 'WF002'])
+        self.assertEqual(result['waferdescs'], ['Si', 'SiC'])
 
 
 class TestSearchWorkorders(unittest.TestCase):
@@ -688,8 +767,9 @@ class TestMultipleFilterConditions(unittest.TestCase):
         sql = call_args[0][0]
         params = call_args[0][1] if len(call_args[0]) > 1 else {}
 
-        self.assertIn("WORKORDER LIKE", sql)
-        self.assertIn("LOTID LIKE", sql)
+        self.assertIn("WORKORDER", sql)
+        self.assertIn("LOTID", sql)
+        self.assertIn("LIKE", sql)
         self.assertIn("LOTID NOT LIKE '%DUMMY%'", sql)
         # Verify params contain the search patterns
         self.assertTrue(any('%GA26%' in str(v) for v in params.values()))
@@ -714,8 +794,9 @@ class TestMultipleFilterConditions(unittest.TestCase):
         sql = call_args[0][0]
         params = call_args[0][1] if len(call_args[0]) > 1 else {}
 
-        self.assertIn("WORKORDER LIKE", sql)
-        self.assertIn("LOTID LIKE", sql)
+        self.assertIn("WORKORDER", sql)
+        self.assertIn("LOTID", sql)
+        self.assertIn("LIKE", sql)
         # Should NOT contain DUMMY exclusion since include_dummy=True
         self.assertNotIn("LOTID NOT LIKE '%DUMMY%'", sql)
         # Verify params contain the search patterns

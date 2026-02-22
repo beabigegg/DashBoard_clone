@@ -10,16 +10,20 @@ import {
 
 test('buildWipOverviewQueryParams keeps only non-empty filters', () => {
   const params = buildWipOverviewQueryParams({
-    workorder: ' WO-1 ',
-    lotid: '',
-    package: 'PKG-A',
+    workorder: [' WO-1 ', 'WO-2'],
+    lotid: [],
+    package: ['PKG-A'],
     type: 'QFN',
+    firstname: ['WF-01'],
+    waferdesc: 'SiC',
   });
 
   assert.deepEqual(params, {
-    workorder: 'WO-1',
+    workorder: 'WO-1,WO-2',
     package: 'PKG-A',
     type: 'QFN',
+    firstname: 'WF-01',
+    waferdesc: 'SiC',
   });
 });
 

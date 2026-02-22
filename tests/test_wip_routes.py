@@ -71,7 +71,8 @@ class TestOverviewSummaryRoute(TestWipRoutesBase):
         }
 
         self.client.get(
-            '/api/wip/overview/summary?workorder=WO1&lotid=L1&package=SOT-23&type=PJA&include_dummy=true'
+            '/api/wip/overview/summary?workorder=WO1&lotid=L1&package=SOT-23'
+            '&type=PJA&firstname=WF001&waferdesc=SiC&include_dummy=true'
         )
 
         mock_get_summary.assert_called_once_with(
@@ -79,7 +80,9 @@ class TestOverviewSummaryRoute(TestWipRoutesBase):
             workorder='WO1',
             lotid='L1',
             package='SOT-23',
-            pj_type='PJA'
+            pj_type='PJA',
+            firstname='WF001',
+            waferdesc='SiC',
         )
 
 
@@ -136,6 +139,35 @@ class TestOverviewMatrixRoute(TestWipRoutesBase):
         self.assertFalse(data['success'])
         self.assertIn('Invalid hold_type', data['error'])
 
+    @patch('mes_dashboard.routes.wip_routes.get_wip_matrix')
+    def test_passes_filters_to_service(self, mock_get_matrix):
+        """Should pass overview matrix filters to service layer."""
+        mock_get_matrix.return_value = {
+            'workcenters': [],
+            'packages': [],
+            'matrix': {},
+            'workcenter_totals': {},
+            'package_totals': {},
+            'grand_total': 0,
+        }
+
+        self.client.get(
+            '/api/wip/overview/matrix?workorder=WO1&lotid=L1&package=SOT-23&type=PJA'
+            '&firstname=WF001&waferdesc=SiC&status=RUN&include_dummy=1'
+        )
+
+        mock_get_matrix.assert_called_once_with(
+            include_dummy=True,
+            workorder='WO1',
+            lotid='L1',
+            status='RUN',
+            hold_type=None,
+            package='SOT-23',
+            pj_type='PJA',
+            firstname='WF001',
+            waferdesc='SiC',
+        )
+
 
 class TestOverviewHoldRoute(TestWipRoutesBase):
     """Test GET /api/wip/overview/hold endpoint."""
@@ -173,12 +205,19 @@ class TestOverviewHoldRoute(TestWipRoutesBase):
         """Should pass hold filter params to service layer."""
         mock_get_hold.return_value = {'items': []}
 
-        self.client.get('/api/wip/overview/hold?workorder=WO1&lotid=L1&include_dummy=1')
+        self.client.get(
+            '/api/wip/overview/hold?workorder=WO1&lotid=L1&package=SOT-23&type=PJA'
+            '&firstname=WF001&waferdesc=SiC&include_dummy=1'
+        )
 
         mock_get_hold.assert_called_once_with(
             include_dummy=True,
             workorder='WO1',
-            lotid='L1'
+            lotid='L1',
+            package='SOT-23',
+            pj_type='PJA',
+            firstname='WF001',
+            waferdesc='SiC',
         )
 
 
@@ -234,13 +273,16 @@ class TestDetailRoute(TestWipRoutesBase):
         }
 
         response = self.client.get(
-            '/api/wip/detail/焊接_DB?package=SOT-23&status=RUN&page=2&page_size=50'
+            '/api/wip/detail/焊接_DB?package=SOT-23&type=PJA&firstname=WF001&waferdesc=SiC'
+            '&status=RUN&page=2&page_size=50'
         )
 
         mock_get_detail.assert_called_once_with(
             workcenter='焊接_DB',
             package='SOT-23',
-            pj_type=None,
+            pj_type='PJA',
+            firstname='WF001',
+            waferdesc='SiC',
             status='RUN',
             hold_type=None,
             workorder=None,
@@ -406,6 +448,87 @@ class TestMetaPackagesRoute(TestWipRoutesBase):
         mock_get_pkgs.return_value = None
 
         response = self.client.get('/api/wip/meta/packages')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertFalse(data['success'])
+
+
+class TestMetaFilterOptionsRoute(TestWipRoutesBase):
+    """Test GET /api/wip/meta/filter-options endpoint."""
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_filter_options')
+    def test_returns_success_with_options(self, mock_get_options):
+        mock_get_options.return_value = {
+            'workorders': ['WO1'],
+            'lotids': ['LOT1'],
+            'packages': ['PKG1'],
+            'types': ['TYPE1'],
+            'firstnames': ['WF001'],
+            'waferdescs': ['SiC'],
+        }
+
+        response = self.client.get('/api/wip/meta/filter-options')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['data']['workorders'], ['WO1'])
+        self.assertEqual(data['data']['waferdescs'], ['SiC'])
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_filter_options')
+    def test_passes_include_dummy_flag(self, mock_get_options):
+        mock_get_options.return_value = {
+            'workorders': [],
+            'lotids': [],
+            'packages': [],
+            'types': [],
+            'firstnames': [],
+            'waferdescs': [],
+        }
+
+        self.client.get('/api/wip/meta/filter-options?include_dummy=true')
+        mock_get_options.assert_called_once_with(
+            include_dummy=True,
+            workorder=None,
+            lotid=None,
+            package=None,
+            pj_type=None,
+            firstname=None,
+            waferdesc=None,
+        )
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_filter_options')
+    def test_passes_cross_filter_parameters(self, mock_get_options):
+        mock_get_options.return_value = {
+            'workorders': ['WO1'],
+            'lotids': ['LOT1'],
+            'packages': ['PKG1'],
+            'types': ['TYPE1'],
+            'firstnames': ['WF001'],
+            'waferdescs': ['SiC'],
+        }
+
+        self.client.get(
+            '/api/wip/meta/filter-options?workorder=WO1,WO2&lotid=L1&package=PKG1'
+            '&type=PJA&firstname=WF001&waferdesc=SiC'
+        )
+
+        mock_get_options.assert_called_once_with(
+            include_dummy=False,
+            workorder='WO1,WO2',
+            lotid='L1',
+            package='PKG1',
+            pj_type='PJA',
+            firstname='WF001',
+            waferdesc='SiC',
+        )
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_filter_options')
+    def test_returns_error_on_failure(self, mock_get_options):
+        mock_get_options.return_value = None
+
+        response = self.client.get('/api/wip/meta/filter-options')
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 500)

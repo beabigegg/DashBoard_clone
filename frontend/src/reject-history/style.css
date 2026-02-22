@@ -52,6 +52,10 @@
   grid-column: span 2;
 }
 
+.filter-group-full {
+  grid-column: 1 / -1;
+}
+
 .filter-label {
   font-size: 12px;
   font-weight: 700;
@@ -78,12 +82,17 @@
   min-width: 0;
 }
 
-.inline-toggle-group {
-  align-self: center;
+.filter-toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .checkbox-row {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
@@ -111,8 +120,7 @@
 .filter-actions {
   display: flex;
   gap: 10px;
-  justify-content: flex-end;
-  grid-column: span 2;
+  flex-shrink: 0;
 }
 
 .active-filter-chip-row {
@@ -194,6 +202,17 @@
   gap: 12px;
 }
 
+.pareto-date-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .pareto-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
@@ -226,6 +245,10 @@
   z-index: 1;
 }
 
+.detail-table tbody tr:hover {
+  background: #f8fbff;
+}
+
 .reason-link {
   border: none;
   background: transparent;
@@ -243,7 +266,39 @@
   overflow: auto;
 }
 
-/* ---- MultiSelect component styles (shared-ui compatible) ---- */
+.detail-table .cell-wrap {
+  white-space: normal;
+  max-width: 220px;
+  word-break: break-all;
+}
+
+.detail-reason-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-clear {
+  border: 0;
+  background: transparent;
+  color: #991b1b;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ---- MultiSelect component styles ----
+   Duplicated from resource-shared/styles.css because this page imports
+   wip-shared/styles.css instead. Cannot import resource-shared directly
+   due to conflicting global class names (.dashboard, .btn, etc.).
+   TODO: Add <style> block to MultiSelect.vue to eliminate this duplication. ---- */
 
 .multi-select {
   position: relative;
@@ -387,11 +442,6 @@
     grid-column: span 2;
   }
 
-  .filter-actions {
-    grid-column: span 2;
-    justify-content: flex-start;
-  }
-
   .pareto-layout {
     grid-template-columns: 1fr;
   }
@@ -406,9 +456,13 @@
     grid-template-columns: 1fr;
   }
 
-  .filter-group-wide,
-  .filter-actions {
+  .filter-group-wide {
     grid-column: span 1;
+  }
+
+  .filter-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .checkbox-row {

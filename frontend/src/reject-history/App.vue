@@ -1,17 +1,14 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 
-import { BarChart, LineChart } from 'echarts/charts';
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
-import { use } from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
-import VChart from 'vue-echarts';
-
 import { apiGet } from '../core/api.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
-import MultiSelect from '../resource-shared/components/MultiSelect.vue';
 
-use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
+import DetailTable from './components/DetailTable.vue';
+import FilterPanel from './components/FilterPanel.vue';
+import ParetoSection from './components/ParetoSection.vue';
+import SummaryCards from './components/SummaryCards.vue';
+import TrendChart from './components/TrendChart.vue';
 
 const API_TIMEOUT = 60000;
 const DEFAULT_PER_PAGE = 50;
@@ -24,11 +21,14 @@ const filters = reactive({
   reason: '',
   includeExcludedScrap: false,
   excludeMaterialScrap: true,
+  excludePbDiode: true,
   paretoTop80: true,
 });
 
 const page = ref(1);
 const detailReason = ref('');
+const selectedTrendDates = ref([]);
+const trendLegendSelected = ref({ '扣帳報廢量': true, '不扣帳報廢量': true });
 
 const options = reactive({
   workcenterGroups: [],
@@ -48,7 +48,7 @@ const summary = ref({
 });
 
 const trend = ref({ items: [], granularity: 'day' });
-const pareto = ref({ items: [], metric_mode: 'reject_total', pareto_scope: 'top80' });
+const analyticsRawItems = ref([]);
 const detail = ref({
   items: [],
   pagination: {
@@ -64,7 +64,6 @@ const loading = reactive({
   querying: false,
   options: false,
   list: false,
-  pareto: false,
 });
 
 const errorMessage = ref('');
@@ -150,9 +149,14 @@ function restoreFromUrl() {
   if (detailReasonFromUrl) {
     detailReason.value = detailReasonFromUrl;
   }
+  const trendDates = readArrayParam(params, 'trend_dates');
+  if (trendDates.length > 0) {
+    selectedTrendDates.value = trendDates;
+  }
 
   filters.includeExcludedScrap = readBooleanParam(params, 'include_excluded_scrap', false);
   filters.excludeMaterialScrap = readBooleanParam(params, 'exclude_material_scrap', true);
+  filters.excludePbDiode = readBooleanParam(params, 'exclude_pb_diode', true);
   filters.paretoTop80 = !readBooleanParam(params, 'pareto_scope_all', false);
 
   const parsedPage = Number(params.get('page') || '1');
@@ -173,11 +177,13 @@ function updateUrlState() {
   if (detailReason.value) {
     params.set('detail_reason', detailReason.value);
   }
+  selectedTrendDates.value.forEach((d) => params.append('trend_dates', d));
 
   if (filters.includeExcludedScrap) {
     params.set('include_excluded_scrap', 'true');
   }
   params.set('exclude_material_scrap', String(filters.excludeMaterialScrap));
+  params.set('exclude_pb_diode', String(filters.excludePbDiode));
 
   if (!filters.paretoTop80) {
     params.set('pareto_scope_all', 'true');
@@ -188,14 +194,6 @@ function updateUrlState() {
   }
 
   replaceRuntimeHistory(`/reject-history?${params.toString()}`);
-}
-
-function formatNumber(value) {
-  return Number(value || 0).toLocaleString('zh-TW');
-}
-
-function formatPct(value) {
-  return `${Number(value || 0).toFixed(2)}%`;
 }
 
 function unwrapApiResult(result, fallbackMessage) {
@@ -216,6 +214,7 @@ function buildCommonParams({ reason = filters.reason } = {}) {
     packages: filters.packages,
     include_excluded_scrap: filters.includeExcludedScrap,
     exclude_material_scrap: filters.excludeMaterialScrap,
+    exclude_pb_diode: filters.excludePbDiode,
   };
 
   if (reason) {
@@ -225,21 +224,19 @@ function buildCommonParams({ reason = filters.reason } = {}) {
   return params;
 }
 
-function buildParetoParams() {
-  return {
-    ...buildCommonParams({ reason: filters.reason }),
-    metric_mode: 'reject_total',
-    pareto_scope: filters.paretoTop80 ? 'top80' : 'all',
-  };
-}
-
 function buildListParams() {
   const effectiveReason = detailReason.value || filters.reason;
-  return {
+  const params = {
     ...buildCommonParams({ reason: effectiveReason }),
     page: page.value,
     per_page: DEFAULT_PER_PAGE,
   };
+  if (selectedTrendDates.value.length > 0) {
+    const sorted = [...selectedTrendDates.value].sort();
+    params.start_date = sorted[0];
+    params.end_date = sorted[sorted.length - 1];
+  }
+  return params;
 }
 
 async function fetchOptions() {
@@ -249,6 +246,7 @@ async function fetchOptions() {
       end_date: filters.endDate,
       include_excluded_scrap: filters.includeExcludedScrap,
       exclude_material_scrap: filters.excludeMaterialScrap,
+      exclude_pb_diode: filters.excludePbDiode,
     },
     timeout: API_TIMEOUT,
   });
@@ -256,33 +254,15 @@ async function fetchOptions() {
   return payload.data || {};
 }
 
-async function fetchSummary() {
-  const response = await apiGet('/api/reject-history/summary', {
-    params: buildCommonParams(),
-    timeout: API_TIMEOUT,
-  });
-  const payload = unwrapApiResult(response, '載入摘要資料失敗');
-  return payload;
-}
-
-async function fetchTrend() {
-  const response = await apiGet('/api/reject-history/trend', {
+async function fetchAnalytics() {
+  const response = await apiGet('/api/reject-history/analytics', {
     params: {
       ...buildCommonParams(),
-      granularity: 'day',
+      metric_mode: 'reject_total',
     },
     timeout: API_TIMEOUT,
   });
-  const payload = unwrapApiResult(response, '載入趨勢資料失敗');
-  return payload;
-}
-
-async function fetchPareto() {
-  const response = await apiGet('/api/reject-history/reason-pareto', {
-    params: buildParetoParams(),
-    timeout: API_TIMEOUT,
-  });
-  const payload = unwrapApiResult(response, '載入柏拉圖資料失敗');
+  const payload = unwrapApiResult(response, '載入分析資料失敗');
   return payload;
 }
 
@@ -319,11 +299,10 @@ async function loadAllData({ loadOptions = true } = {}) {
 
   loading.querying = true;
   loading.list = true;
-  loading.pareto = true;
   errorMessage.value = '';
 
   try {
-    const tasks = [fetchSummary(), fetchTrend(), fetchPareto(), fetchList()];
+    const tasks = [fetchAnalytics(), fetchList()];
     if (loadOptions) {
       loading.options = true;
       tasks.push(fetchOptions());
@@ -334,17 +313,16 @@ async function loadAllData({ loadOptions = true } = {}) {
       return;
     }
 
-    const [summaryResp, trendResp, paretoResp, listResp, optionsResp] = responses;
+    const [analyticsResp, listResp, optionsResp] = responses;
 
-    summary.value = summaryResp.data || summary.value;
-    trend.value = trendResp.data || trend.value;
-    pareto.value = paretoResp.data || pareto.value;
+    const analyticsData = analyticsResp.data || {};
+    summary.value = analyticsData.summary || summary.value;
+    trend.value = analyticsData.trend || trend.value;
+    analyticsRawItems.value = Array.isArray(analyticsData.raw_items) ? analyticsData.raw_items : [];
     detail.value = listResp.data || detail.value;
 
     const meta = {
-      ...(summaryResp.meta || {}),
-      ...(trendResp.meta || {}),
-      ...(paretoResp.meta || {}),
+      ...(analyticsResp.meta || {}),
       ...(listResp.meta || {}),
     };
     mergePolicyMeta(meta);
@@ -377,7 +355,6 @@ async function loadAllData({ loadOptions = true } = {}) {
     loading.querying = false;
     loading.options = false;
     loading.list = false;
-    loading.pareto = false;
   }
 }
 
@@ -407,35 +384,10 @@ async function loadListOnly() {
   }
 }
 
-async function loadParetoOnly() {
-  const requestId = nextRequestId();
-  loading.pareto = true;
-  errorMessage.value = '';
-
-  try {
-    const paretoResp = await fetchPareto();
-    if (isStaleRequest(requestId)) {
-      return;
-    }
-    pareto.value = paretoResp.data || pareto.value;
-    mergePolicyMeta(paretoResp.meta || {});
-    updateUrlState();
-  } catch (error) {
-    if (isStaleRequest(requestId)) {
-      return;
-    }
-    errorMessage.value = error?.message || '載入柏拉圖資料失敗';
-  } finally {
-    if (isStaleRequest(requestId)) {
-      return;
-    }
-    loading.pareto = false;
-  }
-}
-
 function applyFilters() {
   page.value = 1;
   detailReason.value = '';
+  selectedTrendDates.value = [];
   void loadAllData({ loadOptions: true });
 }
 
@@ -445,8 +397,10 @@ function clearFilters() {
   filters.packages = [];
   filters.reason = '';
   detailReason.value = '';
+  selectedTrendDates.value = [];
   filters.includeExcludedScrap = false;
   filters.excludeMaterialScrap = true;
+  filters.excludePbDiode = true;
   filters.paretoTop80 = true;
   page.value = 1;
   void loadAllData({ loadOptions: true });
@@ -460,6 +414,25 @@ function goToPage(nextPage) {
   void loadListOnly();
 }
 
+function onTrendDateClick(dateStr) {
+  if (!dateStr) {
+    return;
+  }
+  const idx = selectedTrendDates.value.indexOf(dateStr);
+  if (idx >= 0) {
+    selectedTrendDates.value = selectedTrendDates.value.filter((d) => d !== dateStr);
+  } else {
+    selectedTrendDates.value = [...selectedTrendDates.value, dateStr];
+  }
+  page.value = 1;
+  void loadListOnly();
+}
+
+function onTrendLegendChange(selected) {
+  trendLegendSelected.value = selected;
+  updateUrlState();
+}
+
 function onParetoClick(reason) {
   if (!reason) {
     return;
@@ -471,7 +444,7 @@ function onParetoClick(reason) {
 
 function handleParetoScopeToggle(checked) {
   filters.paretoTop80 = Boolean(checked);
-  void loadParetoOnly();
+  updateUrlState();
 }
 
 function removeFilterChip(chip) {
@@ -491,6 +464,11 @@ function removeFilterChip(chip) {
     page.value = 1;
     void loadListOnly();
     return;
+  } else if (chip.type === 'trend-dates') {
+    selectedTrendDates.value = [];
+    page.value = 1;
+    void loadListOnly();
+    return;
   } else {
     return;
   }
@@ -505,6 +483,7 @@ function exportCsv() {
   params.set('end_date', filters.endDate);
   params.set('include_excluded_scrap', String(filters.includeExcludedScrap));
   params.set('exclude_material_scrap', String(filters.excludeMaterialScrap));
+  params.set('exclude_pb_diode', String(filters.excludePbDiode));
 
   filters.workcenterGroups.forEach((item) => params.append('workcenter_groups', item));
   filters.packages.forEach((item) => params.append('packages', item));
@@ -518,6 +497,85 @@ function exportCsv() {
 
 const totalScrapQty = computed(() => {
   return Number(summary.value.REJECT_TOTAL_QTY || 0) + Number(summary.value.DEFECT_QTY || 0);
+});
+
+const paretoMetricMode = computed(() => {
+  const s = trendLegendSelected.value;
+  const rejectOn = s['扣帳報廢量'] !== false;
+  const defectOn = s['不扣帳報廢量'] !== false;
+  if (rejectOn && defectOn) return 'all';
+  if (rejectOn) return 'reject';
+  if (defectOn) return 'defect';
+  return 'none';
+});
+
+const paretoMetricLabel = computed(() => {
+  switch (paretoMetricMode.value) {
+    case 'reject': return '扣帳報廢量';
+    case 'defect': return '不扣帳報廢量';
+    case 'none': return '報廢量';
+    default: return '全部報廢量';
+  }
+});
+
+const allParetoItems = computed(() => {
+  const raw = analyticsRawItems.value;
+  if (!raw || raw.length === 0) return [];
+
+  const mode = paretoMetricMode.value;
+  if (mode === 'none') return [];
+
+  const dateSet = selectedTrendDates.value.length > 0 ? new Set(selectedTrendDates.value) : null;
+  const filtered = dateSet ? raw.filter((r) => dateSet.has(r.bucket_date)) : raw;
+  if (filtered.length === 0) return [];
+
+  const map = new Map();
+  for (const item of filtered) {
+    const key = item.reason;
+    if (!map.has(key)) {
+      map.set(key, { reason: key, MOVEIN_QTY: 0, REJECT_TOTAL_QTY: 0, DEFECT_QTY: 0, AFFECTED_LOT_COUNT: 0 });
+    }
+    const acc = map.get(key);
+    acc.MOVEIN_QTY += Number(item.MOVEIN_QTY || 0);
+    acc.REJECT_TOTAL_QTY += Number(item.REJECT_TOTAL_QTY || 0);
+    acc.DEFECT_QTY += Number(item.DEFECT_QTY || 0);
+    acc.AFFECTED_LOT_COUNT += Number(item.AFFECTED_LOT_COUNT || 0);
+  }
+
+  const withMetric = Array.from(map.values()).map((row) => {
+    let mv;
+    if (mode === 'all') mv = row.REJECT_TOTAL_QTY + row.DEFECT_QTY;
+    else if (mode === 'reject') mv = row.REJECT_TOTAL_QTY;
+    else mv = row.DEFECT_QTY;
+    return { ...row, metric_value: mv };
+  });
+
+  const sorted = withMetric.filter((r) => r.metric_value > 0).sort((a, b) => b.metric_value - a.metric_value);
+  const total = sorted.reduce((sum, r) => sum + r.metric_value, 0);
+  let cum = 0;
+  return sorted.map((row) => {
+    const pct = total ? Number(((row.metric_value / total) * 100).toFixed(4)) : 0;
+    cum += pct;
+    return {
+      reason: row.reason,
+      metric_value: row.metric_value,
+      MOVEIN_QTY: row.MOVEIN_QTY,
+      REJECT_TOTAL_QTY: row.REJECT_TOTAL_QTY,
+      DEFECT_QTY: row.DEFECT_QTY,
+      count: row.AFFECTED_LOT_COUNT,
+      pct,
+      cumPct: Number(cum.toFixed(4)),
+    };
+  });
+});
+
+const filteredParetoItems = computed(() => {
+  const items = allParetoItems.value || [];
+  if (!filters.paretoTop80 || items.length === 0) {
+    return items;
+  }
+  const top = items.filter((item) => Number(item.cumPct || 0) <= 80);
+  return top.length > 0 ? top : [items[0]];
 });
 
 const activeFilterChips = computed(() => {
@@ -543,6 +601,13 @@ const activeFilterChips = computed(() => {
       type: 'policy',
       value: '',
     },
+    {
+      key: 'pb-diode-policy',
+      label: filters.excludePbDiode ? 'PB_Diode: 已排除' : 'PB_Diode: 已納入',
+      removable: false,
+      type: 'policy',
+      value: '',
+    },
   ];
 
   if (filters.reason) {
@@ -552,6 +617,19 @@ const activeFilterChips = computed(() => {
       removable: true,
       type: 'reason',
       value: filters.reason,
+    });
+  }
+  if (selectedTrendDates.value.length > 0) {
+    const dates = selectedTrendDates.value;
+    const label = dates.length === 1
+      ? `趨勢日期: ${dates[0]}`
+      : `趨勢日期: ${dates.length} 日`;
+    chips.push({
+      key: 'trend-dates',
+      label,
+      removable: true,
+      type: 'trend-dates',
+      value: '',
     });
   }
   if (detailReason.value) {
@@ -598,144 +676,12 @@ const kpiCards = computed(() => {
   ];
 });
 
-const quantityChartOption = computed(() => {
-  const items = Array.isArray(trend.value?.items) ? trend.value.items : [];
-  return {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'cross' },
-    },
-    legend: {
-      data: ['扣帳報廢量', '不扣帳報廢量'],
-      bottom: 0,
-    },
-    grid: { left: 48, right: 24, top: 22, bottom: 70 },
-    xAxis: {
-      type: 'category',
-      data: items.map((item) => item.bucket_date || ''),
-    },
-    yAxis: {
-      type: 'value',
-      axisLabel: {
-        formatter(value) {
-          return Number(value || 0).toLocaleString('zh-TW');
-        },
-      },
-    },
-    series: [
-      {
-        name: '扣帳報廢量',
-        type: 'bar',
-        data: items.map((item) => Number(item.REJECT_TOTAL_QTY || 0)),
-        itemStyle: { color: '#dc2626' },
-        barMaxWidth: 28,
-      },
-      {
-        name: '不扣帳報廢量',
-        type: 'bar',
-        data: items.map((item) => Number(item.DEFECT_QTY || 0)),
-        itemStyle: { color: '#0284c7' },
-        barMaxWidth: 28,
-      },
-    ],
-  };
-});
-
-const paretoChartOption = computed(() => {
-  const items = Array.isArray(pareto.value?.items) ? pareto.value.items : [];
-  return {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'cross' },
-      formatter(params) {
-        const idx = Number(params?.[0]?.dataIndex || 0);
-        const item = items[idx] || {};
-        return [
-          `<b>${item.reason || '(未填寫)'}</b>`,
-          `報廢量: ${formatNumber(item.metric_value || 0)}`,
-          `占比: ${Number(item.pct || 0).toFixed(2)}%`,
-          `累計: ${Number(item.cumPct || 0).toFixed(2)}%`,
-        ].join('<br/>');
-      },
-    },
-    legend: {
-      data: ['報廢量', '累積%'],
-      bottom: 0,
-    },
-    grid: {
-      left: 52,
-      right: 52,
-      top: 20,
-      bottom: 96,
-    },
-    xAxis: {
-      type: 'category',
-      data: items.map((item) => item.reason || '(未填寫)'),
-      axisLabel: {
-        interval: 0,
-        rotate: items.length > 6 ? 35 : 0,
-        fontSize: 11,
-        overflow: 'truncate',
-        width: 100,
-      },
-    },
-    yAxis: [
-      {
-        type: 'value',
-        name: '量',
-      },
-      {
-        type: 'value',
-        name: '%',
-        min: 0,
-        max: 100,
-        axisLabel: { formatter: '{value}%' },
-      },
-    ],
-    series: [
-      {
-        name: '報廢量',
-        type: 'bar',
-        data: items.map((item) => Number(item.metric_value || 0)),
-        barMaxWidth: 34,
-        itemStyle: {
-          color(params) {
-            const reason = items[params.dataIndex]?.reason || '';
-            return reason === detailReason.value ? '#b91c1c' : '#2563eb';
-          },
-          borderRadius: [4, 4, 0, 0],
-        },
-      },
-      {
-        name: '累積%',
-        type: 'line',
-        yAxisIndex: 1,
-        data: items.map((item) => Number(item.cumPct || 0)),
-        lineStyle: { color: '#f59e0b', width: 2 },
-        itemStyle: { color: '#f59e0b' },
-        symbolSize: 6,
-      },
-    ],
-  };
-});
-
-function onParetoChartClick(params) {
-  if (params?.seriesType !== 'bar') {
-    return;
-  }
-  const selected = pareto.value?.items?.[params.dataIndex]?.reason;
-  onParetoClick(selected);
-}
-
 const pagination = computed(() => detail.value?.pagination || {
   page: 1,
   perPage: DEFAULT_PER_PAGE,
   total: 0,
   totalPages: 1,
 });
-
-const hasTrendData = computed(() => Array.isArray(trend.value?.items) && trend.value.items.length > 0);
-const hasParetoData = computed(() => Array.isArray(pareto.value?.items) && pareto.value.items.length > 0);
 
 onMounted(() => {
   setDefaultDateRange();
@@ -752,217 +698,54 @@ onMounted(() => {
       </div>
       <div class="header-right">
         <div class="last-update" v-if="lastQueryAt">更新時間：{{ lastQueryAt }}</div>
+        <button type="button" class="btn btn-light" :disabled="loading.querying" @click="applyFilters">重新整理</button>
       </div>
     </header>
 
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
-    <section class="card">
-      <div class="card-header">
-        <div class="card-title">查詢條件</div>
-      </div>
-      <div class="card-body filter-panel">
-        <div class="filter-group">
-          <label class="filter-label" for="start-date">開始日期</label>
-          <input id="start-date" v-model="filters.startDate" type="date" class="filter-input" />
-        </div>
-        <div class="filter-group">
-          <label class="filter-label" for="end-date">結束日期</label>
-          <input id="end-date" v-model="filters.endDate" type="date" class="filter-input" />
-        </div>
+    <FilterPanel
+      :filters="filters"
+      :options="options"
+      :loading="loading"
+      :active-filter-chips="activeFilterChips"
+      @apply="applyFilters"
+      @clear="clearFilters"
+      @export-csv="exportCsv"
+      @remove-chip="removeFilterChip"
+      @pareto-scope-toggle="handleParetoScopeToggle"
+    />
 
-        <div class="filter-group">
-          <label class="filter-label">Package</label>
-          <MultiSelect
-            :model-value="filters.packages"
-            :options="options.packages"
-            placeholder="全部 Package"
-            searchable
-            @update:model-value="filters.packages = $event"
-          />
-        </div>
+    <SummaryCards :cards="kpiCards" />
 
-        <div class="filter-group filter-group-wide">
-          <label class="filter-label">WORKCENTER GROUP</label>
-          <MultiSelect
-            :model-value="filters.workcenterGroups"
-            :options="options.workcenterGroups"
-            placeholder="全部工作中心群組"
-            searchable
-            @update:model-value="filters.workcenterGroups = $event"
-          />
-        </div>
+    <TrendChart
+      :items="trend.items"
+      :selected-dates="selectedTrendDates"
+      :loading="loading.querying"
+      @date-click="onTrendDateClick"
+      @legend-change="onTrendLegendChange"
+    />
 
-        <div class="filter-group filter-group-wide">
-          <label class="filter-label" for="reason">報廢原因</label>
-          <select id="reason" v-model="filters.reason" class="filter-input">
-            <option value="">全部原因</option>
-            <option v-for="reason in options.reasons" :key="reason" :value="reason">
-              {{ reason }}
-            </option>
-          </select>
-        </div>
+    <ParetoSection
+      :items="filteredParetoItems"
+      :detail-reason="detailReason"
+      :selected-dates="selectedTrendDates"
+      :metric-label="paretoMetricLabel"
+      :loading="loading.querying"
+      @reason-click="onParetoClick"
+    />
 
-        <div class="filter-group filter-group-wide inline-toggle-group">
-          <div class="checkbox-row">
-            <label class="checkbox-pill">
-              <input v-model="filters.includeExcludedScrap" type="checkbox" />
-              納入不計良率報廢
-            </label>
-            <label class="checkbox-pill">
-              <input v-model="filters.excludeMaterialScrap" type="checkbox" />
-              排除原物料報廢
-            </label>
-            <label class="checkbox-pill">
-              <input
-                :checked="filters.paretoTop80"
-                type="checkbox"
-                @change="handleParetoScopeToggle($event.target.checked)"
-              />
-              Pareto 僅顯示累計前 80%
-            </label>
-          </div>
-        </div>
+    <DetailTable
+      :items="detail.items"
+      :pagination="pagination"
+      :loading="loading.list"
+      :detail-reason="detailReason"
+      @go-to-page="goToPage"
+      @clear-reason="onParetoClick(detailReason)"
+    />
+  </div>
 
-        <div class="filter-actions">
-          <button class="btn btn-primary" :disabled="loading.querying" @click="applyFilters">查詢</button>
-          <button class="btn btn-secondary" :disabled="loading.querying" @click="clearFilters">清除條件</button>
-          <button class="btn btn-light btn-export" :disabled="loading.querying" @click="exportCsv">匯出 CSV</button>
-        </div>
-      </div>
-      <div class="card-body active-filter-chip-row" v-if="activeFilterChips.length > 0">
-        <div class="filter-label">套用中篩選</div>
-        <div class="chip-list">
-          <div v-for="chip in activeFilterChips" :key="chip.key" class="filter-chip">
-            <span>{{ chip.label }}</span>
-            <button
-              v-if="chip.removable"
-              type="button"
-              class="chip-remove"
-              @click="removeFilterChip(chip)"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="summary-row reject-summary-row">
-      <article
-        v-for="card in kpiCards"
-        :key="card.key"
-        class="summary-card"
-        :class="`lane-${card.lane}`"
-      >
-        <div class="summary-label">{{ card.label }}</div>
-        <div class="summary-value small">{{ card.isPct ? formatPct(card.value) : formatNumber(card.value) }}</div>
-      </article>
-    </section>
-
-    <section class="chart-grid">
-      <article class="card">
-        <div class="card-header"><div class="card-title">報廢量趨勢</div></div>
-        <div class="card-body chart-wrap">
-          <VChart :option="quantityChartOption" autoresize />
-          <div v-if="!hasTrendData && !loading.querying" class="placeholder chart-empty">No data</div>
-        </div>
-      </article>
-    </section>
-
-    <section class="card">
-      <div class="card-header pareto-header">
-        <div class="card-title">報廢量 vs 報廢原因（Pareto）</div>
-      </div>
-      <div class="card-body pareto-layout">
-        <div class="pareto-chart-wrap">
-          <VChart :option="paretoChartOption" autoresize @click="onParetoChartClick" />
-          <div v-if="!hasParetoData && !loading.pareto" class="placeholder chart-empty">No data</div>
-        </div>
-        <div class="pareto-table-wrap">
-          <table class="detail-table pareto-table">
-            <thead>
-              <tr>
-                <th>原因</th>
-                <th>報廢量</th>
-                <th>占比</th>
-                <th>累積</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="item in pareto.items"
-                :key="item.reason"
-                :class="{ active: detailReason === item.reason }"
-              >
-                <td>
-                  <button class="reason-link" type="button" @click="onParetoClick(item.reason)">
-                    {{ item.reason }}
-                  </button>
-                </td>
-                <td>{{ formatNumber(item.metric_value) }}</td>
-                <td>{{ formatPct(item.pct) }}</td>
-                <td>{{ formatPct(item.cumPct) }}</td>
-              </tr>
-              <tr v-if="!pareto.items || pareto.items.length === 0">
-                <td colspan="4" class="placeholder">No data</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card-header">
-        <div class="card-title">明細列表</div>
-      </div>
-      <div class="card-body detail-table-wrap">
-        <table class="detail-table">
-          <thead>
-            <tr>
-              <th>日期</th>
-              <th>WORKCENTER_GROUP</th>
-              <th>WORKCENTER</th>
-              <th>Package</th>
-              <th>原因</th>
-              <th>REJECT_TOTAL_QTY</th>
-              <th>DEFECT_QTY</th>
-              <th>REJECT_QTY</th>
-              <th>STANDBY_QTY</th>
-              <th>QTYTOPROCESS_QTY</th>
-              <th>INPROCESS_QTY</th>
-              <th>PROCESSED_QTY</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in detail.items" :key="`${row.TXN_DAY}-${row.WORKCENTERNAME}-${row.LOSSREASONNAME}`">
-              <td>{{ row.TXN_DAY }}</td>
-              <td>{{ row.WORKCENTER_GROUP }}</td>
-              <td>{{ row.WORKCENTERNAME }}</td>
-              <td>{{ row.PRODUCTLINENAME }}</td>
-              <td>{{ row.LOSSREASONNAME }}</td>
-              <td>{{ formatNumber(row.REJECT_TOTAL_QTY) }}</td>
-              <td>{{ formatNumber(row.DEFECT_QTY) }}</td>
-              <td>{{ formatNumber(row.REJECT_QTY) }}</td>
-              <td>{{ formatNumber(row.STANDBY_QTY) }}</td>
-              <td>{{ formatNumber(row.QTYTOPROCESS_QTY) }}</td>
-              <td>{{ formatNumber(row.INPROCESS_QTY) }}</td>
-              <td>{{ formatNumber(row.PROCESSED_QTY) }}</td>
-            </tr>
-            <tr v-if="!detail.items || detail.items.length === 0">
-              <td colspan="12" class="placeholder">No data</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pagination">
-        <button :disabled="pagination.page <= 1 || loading.list" @click="goToPage(pagination.page - 1)">Prev</button>
-        <span class="page-info">
-          Page {{ pagination.page }} / {{ pagination.totalPages }} · Total {{ formatNumber(pagination.total) }}
-        </span>
-        <button :disabled="pagination.page >= pagination.totalPages || loading.list" @click="goToPage(pagination.page + 1)">Next</button>
-      </div>
-    </section>
+  <div v-if="loading.initial" class="loading-overlay">
+    <span class="loading-spinner"></span>
   </div>
 </template>

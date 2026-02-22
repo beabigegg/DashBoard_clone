@@ -5,6 +5,16 @@ function toTrimmedString(value) {
   return String(value).trim();
 }
 
+function normalizeFilterValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => toTrimmedString(item))
+      .filter((item) => item.length > 0)
+      .join(',');
+  }
+  return toTrimmedString(value);
+}
+
 export function normalizeStatusFilter(statusFilter) {
   if (!statusFilter) {
     return {};
@@ -20,15 +30,19 @@ export function normalizeStatusFilter(statusFilter) {
 
 export function buildWipOverviewQueryParams(filters = {}, statusFilter = null) {
   const params = {};
-  const workorder = toTrimmedString(filters.workorder);
-  const lotid = toTrimmedString(filters.lotid);
-  const pkg = toTrimmedString(filters.package);
-  const type = toTrimmedString(filters.type);
+  const workorder = normalizeFilterValue(filters.workorder);
+  const lotid = normalizeFilterValue(filters.lotid);
+  const pkg = normalizeFilterValue(filters.package);
+  const type = normalizeFilterValue(filters.type);
+  const firstname = normalizeFilterValue(filters.firstname);
+  const waferdesc = normalizeFilterValue(filters.waferdesc);
 
   if (workorder) params.workorder = workorder;
   if (lotid) params.lotid = lotid;
   if (pkg) params.package = pkg;
   if (type) params.type = type;
+  if (firstname) params.firstname = firstname;
+  if (waferdesc) params.waferdesc = waferdesc;
 
   return { ...params, ...normalizeStatusFilter(statusFilter) };
 }
