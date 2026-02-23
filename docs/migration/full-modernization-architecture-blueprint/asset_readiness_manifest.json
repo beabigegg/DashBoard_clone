@@ -11,7 +11,6 @@
     "/qc-gate": ["qc-gate.js"],
     "/job-query": ["job-query.js"],
     "/tmtt-defect": ["tmtt-defect.js"],
-    "/admin/pages": ["admin-pages.js"],
     "/admin/performance": ["admin-performance.js"],
     "/tables": ["tables.js"],
     "/excel-query": ["excel-query.js"],
