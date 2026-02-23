@@ -27,6 +27,13 @@ const emit = defineEmits(['update:workcenterGroups']);
 
 const HIDDEN_COLUMNS = new Set(['CONTAINERID', 'EQUIPMENTID', 'RESOURCEID']);
 
+const COLUMN_LABELS = Object.freeze({
+  CONTAINERNAME: 'LOT ID',
+  PJ_TYPE: 'TYPE',
+  PJ_BOP: 'BOP',
+  PJ_WORKORDER: 'WORKORDER',
+});
+
 const columns = computed(() =>
   Object.keys(props.rows[0] || {}).filter((col) => !HIDDEN_COLUMNS.has(col)),
 );
@@ -73,7 +80,7 @@ const workcenterOptions = computed(() => {
         <thead>
           <tr>
             <th v-for="column in columns" :key="column">
-              {{ column }}
+              {{ COLUMN_LABELS[column] || column }}
             </th>
           </tr>
         </thead>

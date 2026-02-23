@@ -27,10 +27,21 @@ const props = defineProps({
 
 const emit = defineEmits(['export']);
 
+const COLUMN_LABELS = Object.freeze({
+  CONTAINERNAME: 'LOT ID',
+  WAFER_LOT_ID: 'WAFER LOT',
+  PJ_TYPE: 'TYPE',
+  PJ_BOP: 'BOP',
+  PJ_WORKORDER: 'WORKORDER',
+});
+
 const columns = Object.freeze([
-  'CONTAINERID',
   'CONTAINERNAME',
+  'WAFER_LOT_ID',
+  'PJ_TYPE',
+  'PJ_BOP',
   'SPECNAME',
+  'PJ_WORKORDER',
   'TRACKINTIMESTAMP',
   'TRACKOUTTIMESTAMP',
   'TRACKINQTY',
@@ -69,7 +80,7 @@ const columns = Object.freeze([
         <thead>
           <tr>
             <th v-for="column in columns" :key="column">
-              {{ column }}
+              {{ COLUMN_LABELS[column] || column }}
             </th>
           </tr>
         </thead>

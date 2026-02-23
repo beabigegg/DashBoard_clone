@@ -109,7 +109,7 @@ const sortedRows = computed(() => {
       <table class="query-tool-table">
         <thead>
           <tr>
-            <th>LOT</th>
+            <th>LOT ID</th>
             <th>WORKCENTER</th>
             <th>Package</th>
             <th>FUNCTION</th>

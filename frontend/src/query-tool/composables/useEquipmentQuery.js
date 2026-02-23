@@ -81,7 +81,7 @@ export function useEquipmentQuery(initial = {}) {
   const equipmentOptionItems = computed(() => {
     return equipmentOptions.value.map((item) => ({
       value: String(item.RESOURCEID),
-      label: item.RESOURCENAME ? `${item.RESOURCENAME} (${item.RESOURCEID})` : String(item.RESOURCEID),
+      label: item.RESOURCENAME || String(item.RESOURCEID),
     }));
   });
 

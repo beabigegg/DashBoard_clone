@@ -143,6 +143,67 @@ def _format_lot_holds_export_rows(rows):
     return normalized_rows
 
 
+def _format_equipment_lots_export_rows(rows):
+    """Normalize equipment lots export columns for UI/CSV consistency."""
+    normalized_rows = []
+    for row in rows or []:
+        normalized_rows.append({
+            'LOT ID': row.get('CONTAINERNAME') or row.get('CONTAINERID') or '',
+            'WAFER LOT': row.get('WAFER_LOT_ID', ''),
+            'TYPE': row.get('PJ_TYPE', ''),
+            'BOP': row.get('PJ_BOP', ''),
+            'SPECNAME': row.get('SPECNAME', ''),
+            'WORKORDER': row.get('PJ_WORKORDER', ''),
+            'TRACKINTIMESTAMP': row.get('TRACKINTIMESTAMP', ''),
+            'TRACKOUTTIMESTAMP': row.get('TRACKOUTTIMESTAMP', ''),
+            'TRACKINQTY': row.get('TRACKINQTY', ''),
+            'TRACKOUTQTY': row.get('TRACKOUTQTY', ''),
+            'EQUIPMENTNAME': row.get('EQUIPMENTNAME', ''),
+            'WORKCENTERNAME': row.get('WORKCENTERNAME', ''),
+        })
+    return normalized_rows
+
+
+_LOT_HISTORY_COLUMN_RENAMES = {
+    'CONTAINERNAME': 'LOT ID',
+    'PJ_TYPE': 'TYPE',
+    'PJ_BOP': 'BOP',
+    'PJ_WORKORDER': 'WORKORDER',
+}
+
+_LOT_HISTORY_HIDDEN = {'CONTAINERID', 'EQUIPMENTID', 'RESOURCEID'}
+
+
+def _format_lot_history_export_rows(rows):
+    """Rename columns in lot history export to match frontend labels."""
+    normalized_rows = []
+    for row in rows or []:
+        out = {}
+        for key, value in row.items():
+            if key in _LOT_HISTORY_HIDDEN:
+                continue
+            label = _LOT_HISTORY_COLUMN_RENAMES.get(key, key)
+            out[label] = value if value is not None else ''
+        normalized_rows.append(out)
+    return normalized_rows
+
+
+def _format_lot_rejects_export_rows(rows):
+    """Rename CONTAINERNAME to LOT ID in lot rejects export."""
+    normalized_rows = []
+    for row in rows or []:
+        out = {}
+        for key, value in row.items():
+            if key == 'CONTAINERID':
+                continue
+            if key == 'CONTAINERNAME':
+                out['LOT ID'] = value or ''
+            else:
+                out[key] = value if value is not None else ''
+        normalized_rows.append(out)
+    return normalized_rows
+
+
 # ============================================================
 # Page Route
 # ============================================================
@@ -657,6 +718,12 @@ def export_csv():
             export_data = _format_lot_materials_export_rows(export_data)
         elif export_type == 'lot_holds':
             export_data = _format_lot_holds_export_rows(export_data)
+        elif export_type == 'equipment_lots':
+            export_data = _format_equipment_lots_export_rows(export_data)
+        elif export_type == 'lot_history':
+            export_data = _format_lot_history_export_rows(export_data)
+        elif export_type == 'lot_rejects':
+            export_data = _format_lot_rejects_export_rows(export_data)
 
         # Stream CSV response
         return Response(
