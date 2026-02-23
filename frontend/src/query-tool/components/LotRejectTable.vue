@@ -96,43 +96,43 @@ const sortedRows = computed(() => {
 </script>
 
 <template>
-  <section class="rounded-card border border-stroke-soft bg-white p-3">
-    <div v-if="loading" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+  <div>
+    <div v-if="loading" class="placeholder">
       讀取中...
     </div>
 
-    <div v-else-if="sortedRows.length === 0" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+    <div v-else-if="sortedRows.length === 0" class="placeholder">
       {{ emptyText }}
     </div>
 
-    <div v-else class="max-h-[420px] overflow-auto rounded-card border border-stroke-soft">
-      <table class="min-w-full border-collapse text-xs">
-        <thead class="sticky top-0 z-10 bg-slate-100 text-slate-700">
+    <div v-else class="query-tool-table-wrap">
+      <table class="query-tool-table">
+        <thead>
           <tr>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">LOT</th>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">WORKCENTER</th>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">Package</th>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">FUNCTION</th>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">TYPE</th>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">PRODUCT</th>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">原因</th>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">EQUIPMENT</th>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">COMMENT</th>
+            <th>LOT</th>
+            <th>WORKCENTER</th>
+            <th>Package</th>
+            <th>FUNCTION</th>
+            <th>TYPE</th>
+            <th>PRODUCT</th>
+            <th>原因</th>
+            <th>EQUIPMENT</th>
+            <th>COMMENT</th>
             <th
-              class="cursor-pointer whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold hover:text-brand-700"
+              style="cursor: pointer"
               @click="showRejectBreakdown = !showRejectBreakdown"
             >
               扣帳報廢量 <span>{{ showRejectBreakdown ? '▾' : '▸' }}</span>
             </th>
             <template v-if="showRejectBreakdown">
-              <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">REJECT</th>
-              <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">STANDBY</th>
-              <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">QTYTOPROCESS</th>
-              <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">INPROCESS</th>
-              <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">PROCESSED</th>
+              <th>REJECT</th>
+              <th>STANDBY</th>
+              <th>QTYTOPROCESS</th>
+              <th>INPROCESS</th>
+              <th>PROCESSED</th>
             </template>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">不扣帳報廢量</th>
-            <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">報廢時間</th>
+            <th>不扣帳報廢量</th>
+            <th>報廢時間</th>
           </tr>
         </thead>
 
@@ -140,30 +140,29 @@ const sortedRows = computed(() => {
           <tr
             v-for="(row, idx) in sortedRows"
             :key="`${row.TXN_TIME_RAW}-${row.CONTAINERNAME}-${row.LOSSREASONNAME}-${idx}`"
-            class="odd:bg-white even:bg-slate-50"
           >
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.CONTAINERNAME }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.WORKCENTERNAME || '-' }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.PRODUCTLINENAME || '-' }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.PJ_FUNCTION || '-' }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.PJ_TYPE || '-' }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.PRODUCTNAME || '-' }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.LOSSREASONNAME || '-' }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.EQUIPMENTNAME || '-' }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.REJECTCOMMENT || '-' }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ formatNumber(row.REJECT_TOTAL_QTY) }}</td>
+            <td>{{ row.CONTAINERNAME }}</td>
+            <td>{{ row.WORKCENTERNAME || '-' }}</td>
+            <td>{{ row.PRODUCTLINENAME || '-' }}</td>
+            <td>{{ row.PJ_FUNCTION || '-' }}</td>
+            <td>{{ row.PJ_TYPE || '-' }}</td>
+            <td>{{ row.PRODUCTNAME || '-' }}</td>
+            <td>{{ row.LOSSREASONNAME || '-' }}</td>
+            <td>{{ row.EQUIPMENTNAME || '-' }}</td>
+            <td>{{ row.REJECTCOMMENT || '-' }}</td>
+            <td>{{ formatNumber(row.REJECT_TOTAL_QTY) }}</td>
             <template v-if="showRejectBreakdown">
-              <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ formatNumber(row.REJECT_QTY) }}</td>
-              <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ formatNumber(row.STANDBY_QTY) }}</td>
-              <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ formatNumber(row.QTYTOPROCESS_QTY) }}</td>
-              <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ formatNumber(row.INPROCESS_QTY) }}</td>
-              <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ formatNumber(row.PROCESSED_QTY) }}</td>
+              <td>{{ formatNumber(row.REJECT_QTY) }}</td>
+              <td>{{ formatNumber(row.STANDBY_QTY) }}</td>
+              <td>{{ formatNumber(row.QTYTOPROCESS_QTY) }}</td>
+              <td>{{ formatNumber(row.INPROCESS_QTY) }}</td>
+              <td>{{ formatNumber(row.PROCESSED_QTY) }}</td>
             </template>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ formatNumber(row.DEFECT_QTY) }}</td>
-            <td class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700">{{ row.TXN_TIME || '-' }}</td>
+            <td>{{ formatNumber(row.DEFECT_QTY) }}</td>
+            <td>{{ row.TXN_TIME || '-' }}</td>
           </tr>
         </tbody>
       </table>
     </div>
-  </section>
+  </div>
 </template>

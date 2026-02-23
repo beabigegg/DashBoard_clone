@@ -707,12 +707,12 @@ function exportRelationCsv() {
 </script>
 
 <template>
-  <section class="rounded-card border border-stroke-soft bg-white p-3 shadow-soft">
-    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+  <section class="card"><div class="card-body">
+    <div class="query-tool-section-header">
       <div>
-        <h3 class="text-sm font-semibold text-slate-800">{{ title }}</h3>
-        <p class="text-xs text-slate-500">{{ description }}</p>
-        <p class="text-[11px] text-slate-500">
+        <h3 class="card-title">{{ title }}</h3>
+        <p class="query-tool-muted">{{ description }}</p>
+        <p class="query-tool-muted" style="font-size: 11px">
           讀圖方向由左至右；節點前綴 <code>←拆/←併/←晶/←重</code> 代表本節點由左側來源而來，
           <code>→拆/→併/→晶/→重</code> 代表左側節點由本節點而來。
         </p>
@@ -775,20 +775,17 @@ function exportRelationCsv() {
         </div>
       </div>
     </div>
-    <p v-if="exportErrorMessage" class="mb-2 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">
+    <p v-if="exportErrorMessage" class="error-banner">
       {{ exportErrorMessage }}
     </p>
 
     <!-- Loading overlay -->
-    <div v-if="loading" class="flex items-center justify-center rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 py-16">
-      <div class="flex flex-col items-center gap-2">
-        <span class="inline-block size-5 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-        <span class="text-xs text-slate-500">正在載入血緣資料…</span>
-      </div>
+    <div v-if="loading" class="placeholder" style="padding: 48px 12px">
+      正在載入血緣資料…
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="!hasData" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-10 text-center text-xs text-slate-500">
+    <div v-else-if="!hasData" class="placeholder">
       {{ emptyMessage }}
     </div>
 
@@ -804,52 +801,51 @@ function exportRelationCsv() {
       />
     </div>
 
-    <details v-if="relationRows.length > 0" class="mt-3 rounded-card border border-stroke-soft bg-surface-muted/50 px-3 py-2">
-      <summary class="cursor-pointer text-xs font-medium text-slate-700">
+    <details v-if="relationRows.length > 0" style="margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc; padding: 8px 12px">
+      <summary style="cursor: pointer; font-size: 12px; font-weight: 600; color: #334155">
         關係清單（{{ relationRows.length }}）
       </summary>
-      <div class="mt-2 max-h-56 overflow-auto rounded border border-stroke-soft bg-white">
-        <table class="min-w-full text-left text-xs text-slate-700">
-          <thead class="bg-slate-50 text-[11px] text-slate-500">
+      <div class="query-tool-table-wrap short" style="margin-top: 8px; max-height: 224px">
+        <table class="query-tool-table">
+          <thead>
             <tr>
-              <th class="px-2 py-1.5 font-medium">來源批次</th>
-              <th class="px-2 py-1.5 font-medium">目標批次</th>
-              <th class="px-2 py-1.5 font-medium">關係</th>
+              <th>來源批次</th>
+              <th>目標批次</th>
+              <th>關係</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="row in relationRows.slice(0, 200)"
               :key="row.key"
-              class="border-t border-slate-100"
             >
-              <td class="px-2 py-1.5 font-mono text-[11px]">
+              <td style="font-family: monospace; font-size: 11px">
                 {{ row.fromName }}
               </td>
-              <td class="px-2 py-1.5 font-mono text-[11px]">
+              <td style="font-family: monospace; font-size: 11px">
                 {{ row.toName }}
               </td>
-              <td class="px-2 py-1.5 text-[11px]">
+              <td style="font-size: 11px">
                 {{ row.edgeLabel }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p v-if="relationRows.length > 200" class="mt-1 text-[11px] text-slate-500">
+      <p v-if="relationRows.length > 200" class="query-tool-muted" style="margin-top: 4px; font-size: 11px">
         僅顯示前 200 筆，請搭配上方樹圖與節點點選進一步縮小範圍。
       </p>
     </details>
 
     <!-- Not found warning -->
-    <div v-if="notFound.length > 0" class="mt-3 rounded-card border border-state-warning/40 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+    <div v-if="notFound.length > 0" class="query-tool-success" style="border-color: #fde68a; background: #fefce8; color: #92400e">
       未命中：{{ notFound.join(', ') }}
     </div>
 
     <!-- Selection summary -->
-    <div v-if="selectedContainerIds.length > 0" class="mt-3 rounded-card border border-brand-200 bg-brand-50/60 px-3 py-2">
+    <div v-if="selectedContainerIds.length > 0" class="query-tool-success" style="border-color: #c7d2fe; background: rgba(238,242,255,0.6); color: inherit">
       <div class="flex flex-wrap items-center gap-1.5">
-        <span class="mr-1 text-xs font-medium text-brand-700">已選 {{ selectedContainerIds.length }} 個節點</span>
+        <span class="mr-1 text-xs font-medium" style="color: #4338ca">已選 {{ selectedContainerIds.length }} 個節點</span>
         <span
           v-for="cid in selectedContainerIds.slice(0, 8)"
           :key="cid"
@@ -860,7 +856,7 @@ function exportRelationCsv() {
         <span v-if="selectedContainerIds.length > 8" class="text-xs text-brand-600">+{{ selectedContainerIds.length - 8 }} 更多</span>
       </div>
     </div>
-  </section>
+  </div></section>
 </template>
 
 <style scoped>

@@ -88,82 +88,83 @@ const subTabs = Object.keys(tabMeta);
 
 <template>
   <div class="space-y-3">
-    <section class="rounded-card border border-stroke-soft bg-white p-3 shadow-soft">
-      <FilterToolbar>
-        <label class="flex min-w-[320px] flex-col gap-1 text-xs text-slate-500">
-          <span class="font-medium">設備（可複選）</span>
-          <MultiSelect
-            :model-value="selectedEquipmentIds"
-            :options="equipmentOptions"
-            :disabled="loading.bootstrapping"
-            searchable
-            placeholder="請選擇設備"
-            @update:model-value="emit('update:selected-equipment-ids', $event)"
-          />
-        </label>
+    <section class="card">
+      <div class="card-body">
+        <FilterToolbar>
+          <label class="filter-group" style="min-width: 320px">
+            <span class="filter-label">設備（可複選）</span>
+            <MultiSelect
+              :model-value="selectedEquipmentIds"
+              :options="equipmentOptions"
+              :disabled="loading.bootstrapping"
+              searchable
+              placeholder="請選擇設備"
+              @update:model-value="emit('update:selected-equipment-ids', $event)"
+            />
+          </label>
 
-        <label class="flex min-w-[180px] flex-col gap-1 text-xs text-slate-500">
-          <span class="font-medium">開始日期</span>
-          <input
-            type="date"
-            class="h-9 rounded-card border border-stroke-soft bg-white px-3 text-sm text-slate-700 outline-none focus:border-brand-500"
-            :value="startDate"
-            @input="emit('update:start-date', $event.target.value)"
-          />
-        </label>
+          <label class="filter-group">
+            <span class="filter-label">開始日期</span>
+            <input
+              type="date"
+              class="query-tool-date-input"
+              :value="startDate"
+              @input="emit('update:start-date', $event.target.value)"
+            />
+          </label>
 
-        <label class="flex min-w-[180px] flex-col gap-1 text-xs text-slate-500">
-          <span class="font-medium">結束日期</span>
-          <input
-            type="date"
-            class="h-9 rounded-card border border-stroke-soft bg-white px-3 text-sm text-slate-700 outline-none focus:border-brand-500"
-            :value="endDate"
-            @input="emit('update:end-date', $event.target.value)"
-          />
-        </label>
+          <label class="filter-group">
+            <span class="filter-label">結束日期</span>
+            <input
+              type="date"
+              class="query-tool-date-input"
+              :value="endDate"
+              @input="emit('update:end-date', $event.target.value)"
+            />
+          </label>
 
-        <template #actions>
-          <button
-            type="button"
-            class="h-9 rounded-card border border-stroke-soft bg-white px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-            @click="emit('reset-date-range')"
-          >
-            近 30 天
-          </button>
+          <template #actions>
+            <button
+              type="button"
+              class="btn btn-ghost"
+              @click="emit('reset-date-range')"
+            >
+              近 30 天
+            </button>
 
-          <button
-            type="button"
-            class="h-9 rounded-card bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600"
-            :disabled="loading[activeSubTab] || loading.timeline"
-            @click="emit('query-active-sub-tab')"
-          >
-            {{ loading[activeSubTab] || loading.timeline ? '查詢中...' : '查詢' }}
-          </button>
-        </template>
-      </FilterToolbar>
+            <button
+              type="button"
+              class="btn btn-primary"
+              :disabled="loading[activeSubTab] || loading.timeline"
+              @click="emit('query-active-sub-tab')"
+            >
+              {{ loading[activeSubTab] || loading.timeline ? '查詢中...' : '查詢' }}
+            </button>
+          </template>
+        </FilterToolbar>
 
-      <p v-if="errors.filters" class="mt-2 rounded-card border border-state-danger/40 bg-rose-50 px-3 py-2 text-xs text-state-danger">
-        {{ errors.filters }}
-      </p>
+        <p v-if="errors.filters" class="error-banner" style="margin-top: 8px">
+          {{ errors.filters }}
+        </p>
+      </div>
     </section>
 
-    <section class="rounded-card border border-stroke-soft bg-white p-3 shadow-soft">
-      <div class="mb-3 flex flex-wrap gap-2 border-b border-stroke-soft pb-2">
-        <button
-          v-for="tab in subTabs"
-          :key="tab"
-          type="button"
-          class="rounded-card border px-3 py-1.5 text-xs font-medium transition"
-          :class="tab === activeSubTab
-            ? 'border-brand-500 bg-brand-50 text-brand-700'
-            : 'border-transparent bg-surface-muted/70 text-slate-600 hover:border-stroke-soft hover:text-slate-800'"
-          @click="emit('change-sub-tab', tab)"
-        >
-          {{ tabMeta[tab] }}
-        </button>
-      </div>
+    <section class="card">
+      <div class="card-body">
+        <div class="query-tool-sub-tab-bar">
+          <button
+            v-for="tab in subTabs"
+            :key="tab"
+            type="button"
+            class="query-tool-sub-tab"
+            :class="{ active: tab === activeSubTab }"
+            @click="emit('change-sub-tab', tab)"
+          >
+            {{ tabMeta[tab] }}
+          </button>
+        </div>
 
-      <EquipmentLotsTable
+        <EquipmentLotsTable
         v-if="activeSubTab === 'lots'"
         :rows="lotsRows"
         :loading="loading.lots"
@@ -208,6 +209,7 @@ const subTabs = Object.keys(tabMeta);
         :exporting="exporting.timeline"
         @export="emit('export-sub-tab', 'timeline')"
       />
+      </div>
     </section>
   </div>
 </template>

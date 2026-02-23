@@ -2,6 +2,15 @@
 
 {% block title %}批次追蹤工具{% endblock %}
 
+{% block head_extra %}
+    {% set shared_css = frontend_asset('styles.css') %}
+    {% set tw_css = frontend_asset('tailwind.css') %}
+    {% set page_css = frontend_asset('query-tool.css') %}
+    {% if shared_css %}<link rel="stylesheet" href="{{ shared_css }}">{% endif %}
+    {% if tw_css %}<link rel="stylesheet" href="{{ tw_css }}">{% endif %}
+    {% if page_css %}<link rel="stylesheet" href="{{ page_css }}">{% endif %}
+{% endblock %}
+
 {% block content %}
     <div id="app"></div>
 {% endblock %}

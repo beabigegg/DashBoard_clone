@@ -60,7 +60,7 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
   ),
   '/query-tool': createNativeLoader(
     () => import('../query-tool/App.vue'),
-    [() => import('../resource-shared/styles.css')],
+    [() => import('../query-tool/style.css')],
   ),
   '/tmtt-defect': createNativeLoader(
     () => import('../tmtt-defect/App.vue'),

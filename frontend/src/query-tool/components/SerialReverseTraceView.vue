@@ -147,7 +147,7 @@ const emit = defineEmits([
       @resolve="emit('resolve')"
     />
 
-    <p v-if="resolveSuccessMessage" class="rounded-card border border-state-success/40 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+    <p v-if="resolveSuccessMessage" class="query-tool-success">
       {{ resolveSuccessMessage }}
     </p>
 

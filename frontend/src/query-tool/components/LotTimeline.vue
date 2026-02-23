@@ -325,10 +325,10 @@ const timeRange = computed(() => {
 </script>
 
 <template>
-  <section class="rounded-card border border-stroke-soft bg-white p-3">
-    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-      <h4 class="text-sm font-semibold text-slate-800">LOT 生產 Timeline</h4>
-      <div class="flex items-center gap-3 text-xs text-slate-500">
+  <div>
+    <div class="query-tool-section-header">
+      <h4 class="card-title">LOT 生產 Timeline</h4>
+      <div class="flex items-center gap-3 query-tool-muted">
         <span v-if="timeRange">{{ formatDateTime(timeRange.start) }} — {{ formatDateTime(timeRange.end) }}</span>
         <span>Hold / Material 事件已覆蓋標記</span>
         <span v-if="materialMappingStats.total > 0">
@@ -340,11 +340,11 @@ const timeRange = computed(() => {
       </div>
     </div>
 
-    <div v-if="tracks.length === 0" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+    <div v-if="tracks.length === 0" class="placeholder">
       歷程資料不足，無法產生 Timeline
     </div>
 
-    <div v-else class="max-h-[520px] overflow-y-auto">
+    <div v-else style="max-height: 520px; overflow-y: auto">
       <TimelineChart
         :tracks="tracks"
         :events="events"
@@ -355,5 +355,5 @@ const timeRange = computed(() => {
         :min-chart-width="600"
       />
     </div>
-  </section>
+  </div>
 </template>

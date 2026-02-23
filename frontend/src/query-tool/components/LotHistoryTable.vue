@@ -43,12 +43,12 @@ const workcenterOptions = computed(() => {
 </script>
 
 <template>
-  <section class="rounded-card border border-stroke-soft bg-white p-3">
-    <div class="mb-2 flex flex-wrap items-end justify-between gap-2">
-      <h4 class="text-sm font-semibold text-slate-800">歷程資料</h4>
+  <div>
+    <div class="query-tool-section-header">
+      <h4 class="card-title">歷程資料</h4>
 
-      <label class="min-w-[260px] text-xs text-slate-500">
-        <span class="mb-1 block font-medium">站點群組篩選</span>
+      <label class="filter-group" style="min-width: 260px">
+        <span class="filter-label">站點群組篩選</span>
         <MultiSelect
           :model-value="selectedWorkcenterGroups"
           :options="workcenterOptions"
@@ -60,23 +60,19 @@ const workcenterOptions = computed(() => {
       </label>
     </div>
 
-    <div v-if="loading" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+    <div v-if="loading" class="placeholder">
       歷程資料讀取中...
     </div>
 
-    <div v-else-if="rows.length === 0" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+    <div v-else-if="rows.length === 0" class="placeholder">
       無歷程資料
     </div>
 
-    <div v-else class="max-h-[360px] overflow-auto rounded-card border border-stroke-soft">
-      <table class="min-w-full border-collapse text-xs">
-        <thead class="sticky top-0 z-10 bg-slate-100 text-slate-700">
+    <div v-else class="query-tool-table-wrap short">
+      <table class="query-tool-table">
+        <thead>
           <tr>
-            <th
-              v-for="column in columns"
-              :key="column"
-              class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold"
-            >
+            <th v-for="column in columns" :key="column">
               {{ column }}
             </th>
           </tr>
@@ -86,18 +82,13 @@ const workcenterOptions = computed(() => {
           <tr
             v-for="(row, rowIndex) in rows"
             :key="row.HISTORYMAINLINEID || row.TRACKINTIMESTAMP || rowIndex"
-            class="odd:bg-white even:bg-slate-50"
           >
-            <td
-              v-for="column in columns"
-              :key="`${rowIndex}-${column}`"
-              class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700"
-            >
+            <td v-for="column in columns" :key="`${rowIndex}-${column}`">
               {{ formatCellValue(row[column]) }}
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-  </section>
+  </div>
 </template>

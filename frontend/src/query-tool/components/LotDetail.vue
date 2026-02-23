@@ -193,46 +193,45 @@ const detailCountLabel = computed(() => {
 </script>
 
 <template>
-  <section class="rounded-card border border-stroke-soft bg-white p-3 shadow-soft">
-    <div v-if="!selectedContainerId" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-8 text-center text-xs text-slate-500">
-      請從上方血緣樹選擇節點後查看明細。
-    </div>
+  <section class="card">
+    <div class="card-body">
+      <div v-if="!selectedContainerId" class="placeholder">
+        請從上方血緣樹選擇節點後查看明細。
+      </div>
 
-    <template v-else>
-      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 class="text-sm font-semibold text-slate-800">LOT 明細{{ detailCountLabel }}</h3>
-          <p class="text-xs text-slate-500">{{ detailDisplayNames }}</p>
+      <template v-else>
+        <div class="query-tool-section-header">
+          <div>
+            <div class="card-title">LOT 明細{{ detailCountLabel }}</div>
+            <span class="query-tool-muted">{{ detailDisplayNames }}</span>
+          </div>
+
+          <ExportButton
+            :disabled="!canExport"
+            :loading="activeExporting"
+            :label="`${tabMeta[activeSubTab]?.label || ''} 匯出 CSV`"
+            @click="emit('export-tab', activeSubTab)"
+          />
         </div>
 
-        <ExportButton
-          :disabled="!canExport"
-          :loading="activeExporting"
-          :label="`${tabMeta[activeSubTab]?.label || ''} 匯出 CSV`"
-          @click="emit('export-tab', activeSubTab)"
-        />
-      </div>
+        <div class="query-tool-sub-tab-bar">
+          <button
+            v-for="tab in subTabs"
+            :key="tab"
+            type="button"
+            class="query-tool-sub-tab"
+            :class="{ active: tab === activeSubTab }"
+            @click="emit('change-sub-tab', tab)"
+          >
+            {{ tabMeta[tab].label }}
+          </button>
+        </div>
 
-      <div class="mb-3 flex flex-wrap gap-2 border-b border-stroke-soft pb-2">
-        <button
-          v-for="tab in subTabs"
-          :key="tab"
-          type="button"
-          class="rounded-card border px-3 py-1.5 text-xs font-medium transition"
-          :class="tab === activeSubTab
-            ? 'border-brand-500 bg-brand-50 text-brand-700'
-            : 'border-transparent bg-surface-muted/70 text-slate-600 hover:border-stroke-soft hover:text-slate-800'"
-          @click="emit('change-sub-tab', tab)"
-        >
-          {{ tabMeta[tab].label }}
-        </button>
-      </div>
+        <p v-if="activeError" class="error-banner">
+          {{ activeError }}
+        </p>
 
-      <p v-if="activeError" class="mb-2 rounded-card border border-state-danger/40 bg-rose-50 px-3 py-2 text-xs text-state-danger">
-        {{ activeError }}
-      </p>
-
-      <div v-if="activeSubTab === 'history'" class="space-y-3">
+        <div v-if="activeSubTab === 'history'" class="space-y-3">
         <LotTimeline
           :history-rows="historyRows"
           :hold-rows="associationRows.holds || []"
@@ -271,6 +270,7 @@ const detailCountLabel = computed(() => {
         :loading="activeLoading"
         :empty-text="activeLoaded ? activeEmptyText : '尚未查詢此分頁資料'"
       />
-    </template>
+      </template>
+    </div>
   </section>
 </template>

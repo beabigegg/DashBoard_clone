@@ -209,9 +209,9 @@ const showEmpty = computed(() => tracks.value.length === 0 || (tracks.value.ever
 </script>
 
 <template>
-  <section class="rounded-card border border-stroke-soft bg-white p-3">
-    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-      <h4 class="text-sm font-semibold text-slate-800">設備 Timeline</h4>
+  <div>
+    <div class="query-tool-section-header">
+      <h4 class="card-title">設備 Timeline</h4>
       <ExportButton
         :disabled="exportDisabled"
         :loading="exporting"
@@ -220,15 +220,15 @@ const showEmpty = computed(() => tracks.value.length === 0 || (tracks.value.ever
       />
     </div>
 
-    <p v-if="error" class="mb-2 rounded-card border border-state-danger/40 bg-rose-50 px-3 py-2 text-xs text-state-danger">
+    <p v-if="error" class="error-banner">
       {{ error }}
     </p>
 
-    <div v-if="loading" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+    <div v-if="loading" class="placeholder">
       Timeline 資料載入中...
     </div>
 
-    <div v-else-if="showEmpty" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+    <div v-else-if="showEmpty" class="placeholder">
       無 Timeline 資料
     </div>
 
@@ -242,5 +242,5 @@ const showEmpty = computed(() => tracks.value.length === 0 || (tracks.value.ever
       :label-width="220"
       :min-chart-width="1200"
     />
-  </section>
+  </div>
 </template>

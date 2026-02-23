@@ -25,7 +25,7 @@ test('all route contracts satisfy governance metadata requirements', () => {
 });
 
 
-test('admin shell targets are governed and rendered as external targets', () => {
+test('admin shell targets are governed with correct render modes', () => {
   const pagesContract = getRouteContract('/admin/pages');
   const perfContract = getRouteContract('/admin/performance');
 
@@ -34,7 +34,7 @@ test('admin shell targets are governed and rendered as external targets', () => 
   assert.equal(pagesContract.visibilityPolicy, 'admin_only');
   assert.equal(perfContract.visibilityPolicy, 'admin_only');
   assert.equal(pagesContract.renderMode, 'external');
-  assert.equal(perfContract.renderMode, 'external');
+  assert.equal(perfContract.renderMode, 'native');
 });
 
 

@@ -433,23 +433,23 @@ watch(
 </script>
 
 <template>
-  <div class="u-content-shell space-y-3 p-3 lg:p-5">
-    <header class="rounded-shell bg-gradient-to-r from-brand-500 to-accent-500 px-5 py-4 text-white shadow-shell">
-      <h1 class="text-xl font-semibold tracking-wide">批次追蹤工具</h1>
-      <p class="mt-1 text-xs text-indigo-100">正向/反向批次追溯與設備生產批次查詢整合入口</p>
+  <div class="dashboard query-tool-page">
+    <header class="header query-tool-header">
+      <div class="header-left">
+        <h1>批次追蹤工具</h1>
+        <p class="query-tool-subtitle">正向/反向批次追溯與設備生產批次查詢整合入口</p>
+      </div>
     </header>
 
-    <section class="rounded-shell border border-stroke-panel bg-surface-card shadow-panel">
-      <div class="border-b border-stroke-soft px-3 pt-3 lg:px-5">
-        <nav class="flex flex-wrap gap-2" aria-label="query-tool tabs">
+    <section class="card">
+      <div class="card-header">
+        <nav class="query-tool-tab-bar" aria-label="query-tool tabs">
           <button
             v-for="tab in tabItems"
             :key="tab.key"
             type="button"
-            class="rounded-card border px-4 py-2 text-sm font-medium transition"
-            :class="tab.key === activeTab
-              ? 'border-brand-500 bg-brand-50 text-brand-700 shadow-soft'
-              : 'border-transparent bg-surface-muted text-slate-600 hover:border-stroke-soft hover:text-slate-800'"
+            class="query-tool-tab"
+            :class="{ active: tab.key === activeTab }"
             :aria-selected="tab.key === activeTab"
             :aria-current="tab.key === activeTab ? 'page' : undefined"
             @click="activateTab(tab.key)"
@@ -459,11 +459,11 @@ watch(
         </nav>
       </div>
 
-      <div class="space-y-3 px-3 py-4 lg:px-5">
-        <div class="rounded-card border border-stroke-soft bg-surface-muted/60 px-4 py-3">
-          <p class="text-xs font-medium tracking-wide text-slate-500">目前頁籤</p>
-          <h2 class="mt-1 text-base font-semibold text-slate-800">{{ activeTabMeta.label }}</h2>
-          <p class="mt-1 text-sm text-slate-600">{{ activeTabMeta.subtitle }}</p>
+      <div class="card-body">
+        <div class="query-tool-tab-desc">
+          <p class="query-tool-tab-desc-label">目前頁籤</p>
+          <h2 class="query-tool-tab-desc-title">{{ activeTabMeta.label }}</h2>
+          <p class="query-tool-tab-desc-subtitle">{{ activeTabMeta.subtitle }}</p>
         </div>
 
         <LotTraceView

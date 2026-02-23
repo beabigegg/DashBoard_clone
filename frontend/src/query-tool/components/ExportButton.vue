@@ -18,7 +18,7 @@ const props = defineProps({
 <template>
   <button
     type="button"
-    class="rounded-card bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+    class="btn btn-export"
     :disabled="disabled || loading"
   >
     {{ loading ? '匯出中...' : label }}

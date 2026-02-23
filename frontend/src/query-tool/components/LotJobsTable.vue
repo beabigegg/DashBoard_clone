@@ -174,46 +174,39 @@ async function loadTxn(jobId) {
 
 <template>
   <section class="space-y-3">
-    <div class="rounded-card border border-stroke-soft bg-white p-3">
-      <div v-if="loading" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+    <div>
+      <div v-if="loading" class="placeholder">
         讀取中...
       </div>
 
-      <div v-else-if="sortedRows.length === 0" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+      <div v-else-if="sortedRows.length === 0" class="placeholder">
         {{ emptyText }}
       </div>
 
-      <div v-else class="max-h-[420px] overflow-auto rounded-card border border-stroke-soft">
-        <table class="min-w-full border-collapse text-xs">
-          <thead class="sticky top-0 z-10 bg-slate-100 text-slate-700">
+      <div v-else class="query-tool-table-wrap">
+        <table class="query-tool-table">
+          <thead>
             <tr>
-              <th class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold">操作</th>
-              <th
-                v-for="column in jobColumns"
-                :key="column"
-                class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold"
-              >
+              <th>操作</th>
+              <th v-for="column in jobColumns" :key="column">
                 {{ column }}
               </th>
             </tr>
           </thead>
 
           <tbody>
-            <tr v-for="(row, rowIndex) in sortedRows" :key="rowKey(row, rowIndex)" class="odd:bg-white even:bg-slate-50">
-              <td class="border-b border-stroke-soft/70 px-2 py-1.5">
+            <tr v-for="(row, rowIndex) in sortedRows" :key="rowKey(row, rowIndex)">
+              <td>
                 <button
                   type="button"
-                  class="rounded-card border border-stroke-soft bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-surface-muted/70 hover:text-slate-800"
+                  class="btn btn-ghost"
+                  style="padding: 2px 8px; font-size: 11px"
                   @click="loadTxn(row?.JOBID)"
                 >
                   查看交易歷程
                 </button>
               </td>
-              <td
-                v-for="column in jobColumns"
-                :key="`${rowKey(row, rowIndex)}-${column}`"
-                class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700"
-              >
+              <td v-for="column in jobColumns" :key="`${rowKey(row, rowIndex)}-${column}`">
                 <StatusBadge
                   v-if="column === 'JOBSTATUS'"
                   :tone="buildStatusTone(row?.[column])"
@@ -227,33 +220,29 @@ async function loadTxn(jobId) {
       </div>
     </div>
 
-    <div v-if="selectedJobId" class="rounded-card border border-stroke-soft bg-white p-3">
-      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h4 class="text-sm font-semibold text-slate-800">交易歷程：{{ selectedJobId }}</h4>
-        <span class="text-xs text-slate-500">{{ txnRows.length }} 筆</span>
+    <div v-if="selectedJobId">
+      <div class="query-tool-section-header">
+        <h4 class="card-title">交易歷程：{{ selectedJobId }}</h4>
+        <span class="query-tool-muted">{{ txnRows.length }} 筆</span>
       </div>
 
-      <p v-if="txnError" class="mb-2 rounded-card border border-state-danger/40 bg-rose-50 px-3 py-2 text-xs text-state-danger">
+      <p v-if="txnError" class="error-banner">
         {{ txnError }}
       </p>
 
-      <div v-if="loadingTxn" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+      <div v-if="loadingTxn" class="placeholder">
         載入交易歷程中...
       </div>
 
-      <div v-else-if="txnRows.length === 0" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+      <div v-else-if="txnRows.length === 0" class="placeholder">
         無交易歷程資料
       </div>
 
-      <div v-else class="max-h-[420px] overflow-auto rounded-card border border-stroke-soft">
-        <table class="min-w-full border-collapse text-xs">
-          <thead class="sticky top-0 z-10 bg-slate-100 text-slate-700">
+      <div v-else class="query-tool-table-wrap">
+        <table class="query-tool-table">
+          <thead>
             <tr>
-              <th
-                v-for="column in txnColumns"
-                :key="column"
-                class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold"
-              >
+              <th v-for="column in txnColumns" :key="column">
                 {{ column }}
               </th>
             </tr>
@@ -263,13 +252,8 @@ async function loadTxn(jobId) {
             <tr
               v-for="(row, rowIndex) in txnRows"
               :key="row?.JOBTXNHISTORYID || `${selectedJobId}-${rowIndex}`"
-              class="odd:bg-white even:bg-slate-50"
             >
-              <td
-                v-for="column in txnColumns"
-                :key="`${row?.JOBTXNHISTORYID || rowIndex}-${column}`"
-                class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700"
-              >
+              <td v-for="column in txnColumns" :key="`${row?.JOBTXNHISTORYID || rowIndex}-${column}`">
                 <StatusBadge
                   v-if="column === 'JOBSTATUS' || column === 'FROMJOBSTATUS'"
                   :tone="buildStatusTone(row?.[column])"

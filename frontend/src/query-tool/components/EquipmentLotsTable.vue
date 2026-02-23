@@ -41,9 +41,9 @@ const columns = Object.freeze([
 </script>
 
 <template>
-  <section class="rounded-card border border-stroke-soft bg-white p-3">
-    <div class="mb-2 flex items-center justify-between gap-2">
-      <h4 class="text-sm font-semibold text-slate-800">生產紀錄</h4>
+  <div>
+    <div class="query-tool-section-header">
+      <h4 class="card-title">生產紀錄</h4>
       <ExportButton
         :disabled="exportDisabled"
         :loading="exporting"
@@ -52,44 +52,36 @@ const columns = Object.freeze([
       />
     </div>
 
-    <p v-if="error" class="mb-2 rounded-card border border-state-danger/40 bg-rose-50 px-3 py-2 text-xs text-state-danger">
+    <p v-if="error" class="error-banner">
       {{ error }}
     </p>
 
-    <div v-if="loading" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+    <div v-if="loading" class="placeholder">
       載入中...
     </div>
 
-    <div v-else-if="rows.length === 0" class="rounded-card border border-dashed border-stroke-soft bg-surface-muted/40 px-3 py-5 text-center text-xs text-slate-500">
+    <div v-else-if="rows.length === 0" class="placeholder">
       無生產紀錄
     </div>
 
-    <div v-else class="max-h-[460px] overflow-auto rounded-card border border-stroke-soft">
-      <table class="min-w-full border-collapse text-xs">
-        <thead class="sticky top-0 z-10 bg-slate-100 text-slate-700">
+    <div v-else class="query-tool-table-wrap tall">
+      <table class="query-tool-table">
+        <thead>
           <tr>
-            <th
-              v-for="column in columns"
-              :key="column"
-              class="whitespace-nowrap border-b border-stroke-soft px-2 py-1.5 text-left font-semibold"
-            >
+            <th v-for="column in columns" :key="column">
               {{ column }}
             </th>
           </tr>
         </thead>
 
         <tbody>
-          <tr v-for="(row, rowIndex) in rows" :key="row.HISTORYMAINLINEID || rowIndex" class="odd:bg-white even:bg-slate-50">
-            <td
-              v-for="column in columns"
-              :key="`${rowIndex}-${column}`"
-              class="whitespace-nowrap border-b border-stroke-soft/70 px-2 py-1.5 text-slate-700"
-            >
+          <tr v-for="(row, rowIndex) in rows" :key="row.HISTORYMAINLINEID || rowIndex">
+            <td v-for="column in columns" :key="`${rowIndex}-${column}`">
               {{ formatCellValue(row[column]) }}
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-  </section>
+  </div>
 </template>

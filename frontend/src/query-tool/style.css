@@ -1,0 +1,481 @@
+/* ================================================================
+   query-tool/style.css — 自包含頁面樣式
+   包含 wip-shared 基礎變數與元件 + 頁面專屬樣式
+   ================================================================ */
+
+/* ---- 設計 Token (與 wip-shared/styles.css 同步) ---- */
+:root {
+  --bg: #f5f7fa;
+  --card-bg: #ffffff;
+  --text: #222;
+  --muted: #666;
+  --border: #e2e6ef;
+  --primary: #667eea;
+  --primary-dark: #5568d3;
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+}
+
+/* ---- 全域重置 ---- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Microsoft JhengHei', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ---- 頁面容器 ---- */
+.dashboard {
+  max-width: 1900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.query-tool-page {
+  max-width: 1900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ---- Header (wip-shared) ---- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px 22px;
+  background: var(--header-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
+  border-radius: 10px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-strong);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header h1 {
+  color: #fff;
+  font-size: 24px;
+}
+
+.query-tool-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.query-tool-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* ---- 按鈕 (wip-shared) ---- */
+.btn {
+  padding: 9px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  padding: 9px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--primary);
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-export {
+  background: #0f766e;
+  color: #fff;
+}
+
+.btn-export:hover {
+  background: #0b5e59;
+}
+
+.btn-export:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid var(--border);
+}
+
+.btn-ghost:hover {
+  background: #e2e8f0;
+}
+
+/* ---- 佔位 / 空狀態 (wip-shared) ---- */
+.placeholder {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+}
+
+/* ---- Card 基礎 ---- */
+.card {
+  background: var(--card-bg);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: visible;
+  margin-bottom: 14px;
+}
+
+.card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: #f8fafc;
+  border-radius: 10px 10px 0 0;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.card-body {
+  padding: 14px 16px;
+}
+
+/* ---- Error 訊息 ---- */
+.error-banner {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+/* ---- Tab 導航 (頂層) ---- */
+.query-tool-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.query-tool-tab {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.query-tool-tab:hover:not(.active) {
+  border-color: var(--border);
+  color: #1e293b;
+}
+
+.query-tool-tab.active {
+  border-color: var(--primary);
+  background: #eef2ff;
+  color: #4c51bf;
+  box-shadow: var(--shadow);
+}
+
+/* ---- Tab 說明區塊 ---- */
+.query-tool-tab-desc {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+}
+
+.query-tool-tab-desc-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.025em;
+}
+
+.query-tool-tab-desc-title {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.query-tool-tab-desc-subtitle {
+  margin-top: 4px;
+  font-size: 14px;
+  color: #475569;
+}
+
+/* ---- Sub-tab 導航 (Detail / Equipment) ---- */
+.query-tool-sub-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.query-tool-sub-tab {
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #f1f5f9;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.query-tool-sub-tab:hover:not(.active) {
+  border-color: var(--border);
+  color: #1e293b;
+}
+
+.query-tool-sub-tab.active {
+  border-color: var(--primary);
+  background: #eef2ff;
+  color: #4c51bf;
+}
+
+/* ---- 表單控制元素 ---- */
+.query-tool-select {
+  width: 100%;
+  height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  color: #334155;
+  outline: none;
+}
+
+.query-tool-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+.query-tool-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.query-tool-textarea {
+  width: 100%;
+  min-height: 112px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 13px;
+  color: #334155;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+}
+
+.query-tool-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+.query-tool-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.query-tool-date-input {
+  width: 100%;
+  height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  color: #334155;
+  outline: none;
+}
+
+.query-tool-date-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+.query-tool-input-help {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.query-tool-input-help code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #e2e8f0;
+  font-size: 11px;
+}
+
+.query-tool-input-counter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.query-tool-input-error {
+  color: var(--danger);
+}
+
+/* ---- Filter label ---- */
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+}
+
+/* ---- 區段標頭 (標題 + 動作列) ---- */
+.query-tool-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.query-tool-muted {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- 表格 ---- */
+.query-tool-table-wrap {
+  overflow: auto;
+  max-height: 420px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.query-tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.query-tool-table th,
+.query-tool-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.query-tool-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  font-weight: 700;
+  color: #334155;
+}
+
+.query-tool-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.query-tool-table tbody tr:nth-child(even) {
+  background: #fafbfd;
+}
+
+/* ---- 訊息 ---- */
+.query-tool-success {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 13px;
+}
+
+/* ---- 表格高度變體 ---- */
+.query-tool-table-wrap.short {
+  max-height: 360px;
+}
+
+.query-tool-table-wrap.tall {
+  max-height: 460px;
+}
+
+/* ---- 響應式 ---- */
+@media (max-width: 768px) {
+  .dashboard,
+  .query-tool-page {
+    padding: 16px;
+  }
+
+  .header {
+    padding: 14px 16px;
+  }
+
+  .header h1 {
+    font-size: 20px;
+  }
+
+  .query-tool-tab-bar {
+    gap: 6px;
+  }
+
+  .query-tool-tab {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}
