@@ -91,6 +91,34 @@ class TestRedisClient:
             key = rc.get_key('mykey')
             assert key == ':mykey'
 
+    def test_redact_connection_url_masks_password(self):
+        import mes_dashboard.core.redis_client as rc
+
+        redacted = rc.redact_connection_url("redis://user:secret@localhost:6379/0")
+        assert redacted == "redis://user:***@localhost:6379/0"
+
+    def test_redact_connection_url_without_credentials(self):
+        import mes_dashboard.core.redis_client as rc
+
+        redacted = rc.redact_connection_url("redis://localhost:6379/0")
+        assert redacted == "redis://localhost:6379/0"
+
+    def test_get_redis_client_logs_redacted_url(self, reset_module):
+        import mes_dashboard.core.redis_client as rc
+
+        with patch.object(rc, 'REDIS_ENABLED', True):
+            with patch.object(rc, 'REDIS_URL', 'redis://user:secret@localhost:6379/0'):
+                with patch.object(rc.redis.Redis, 'from_url') as mock_from_url:
+                    with patch.object(rc.logger, 'info') as mock_info:
+                        mock_client = MagicMock()
+                        mock_client.ping.return_value = True
+                        mock_from_url.return_value = mock_client
+
+                        rc.get_redis_client()
+
+                        logged_url = mock_info.call_args.args[1]
+                        assert logged_url == 'redis://user:***@localhost:6379/0'
+
 
 class TestRedisClientSingleton:
     """Test Redis client singleton behavior."""

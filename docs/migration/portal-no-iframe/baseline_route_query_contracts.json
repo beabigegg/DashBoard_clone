@@ -1,0 +1,46 @@
+{
+  "source": "frontend route parsing and current parity matrix",
+  "routes": {
+    "/wip-overview": {
+      "query_keys": [
+        "workorder",
+        "lotid",
+        "package",
+        "type",
+        "status"
+      ],
+      "notes": "filters + status URL state must remain compatible"
+    },
+    "/wip-detail": {
+      "query_keys": [
+        "workcenter",
+        "workorder",
+        "lotid",
+        "package",
+        "type",
+        "status"
+      ],
+      "notes": "workcenter deep-link and back-link query continuity"
+    },
+    "/hold-detail": {
+      "query_keys": [
+        "reason"
+      ],
+      "notes": "reason required for normal access flow"
+    },
+    "/resource-history": {
+      "query_keys": [
+        "start_date",
+        "end_date",
+        "granularity",
+        "workcenter_groups",
+        "families",
+        "resource_ids",
+        "is_production",
+        "is_key",
+        "is_monitor"
+      ],
+      "notes": "query/export params must remain compatible"
+    }
+  }
+}

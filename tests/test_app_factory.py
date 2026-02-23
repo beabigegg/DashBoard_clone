@@ -130,6 +130,34 @@ class AppFactoryTests(unittest.TestCase):
             else:
                 os.environ["PORTAL_SPA_ENABLED"] = old
 
+    def test_default_env_is_production_when_flask_env_missing(self):
+        old_flask_env = os.environ.pop("FLASK_ENV", None)
+        old_secret = os.environ.get("SECRET_KEY")
+        old_runtime_contract = os.environ.get("RUNTIME_CONTRACT_ENFORCE")
+        old_realtime_cache = os.environ.get("REALTIME_EQUIPMENT_CACHE_ENABLED")
+        try:
+            os.environ["SECRET_KEY"] = "test-production-secret-key"
+            os.environ["RUNTIME_CONTRACT_ENFORCE"] = "false"
+            os.environ["REALTIME_EQUIPMENT_CACHE_ENABLED"] = "false"
+
+            app = create_app()
+            self.assertEqual(app.config.get("ENV"), "production")
+        finally:
+            if old_flask_env is not None:
+                os.environ["FLASK_ENV"] = old_flask_env
+            if old_secret is None:
+                os.environ.pop("SECRET_KEY", None)
+            else:
+                os.environ["SECRET_KEY"] = old_secret
+            if old_runtime_contract is None:
+                os.environ.pop("RUNTIME_CONTRACT_ENFORCE", None)
+            else:
+                os.environ["RUNTIME_CONTRACT_ENFORCE"] = old_runtime_contract
+            if old_realtime_cache is None:
+                os.environ.pop("REALTIME_EQUIPMENT_CACHE_ENABLED", None)
+            else:
+                os.environ["REALTIME_EQUIPMENT_CACHE_ENABLED"] = old_realtime_cache
+
 
 if __name__ == "__main__":
     unittest.main()

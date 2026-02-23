@@ -114,11 +114,15 @@ def _is_production_env(app: Flask) -> bool:
     return env_value in {"prod", "production"}
 
 
-def _build_security_headers(production: bool) -> dict[str, str]:
+def _build_security_headers(production: bool, *, allow_unsafe_eval: bool = False) -> dict[str, str]:
+    script_directives = ["'self'", "'unsafe-inline'"]
+    if allow_unsafe_eval:
+        script_directives.append("'unsafe-eval'")
+
     headers = {
         "Content-Security-Policy": (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            f"script-src {' '.join(script_directives)}; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "
@@ -153,6 +157,42 @@ def _resolve_secret_key(app: Flask) -> str:
     if env_name in {"testing", "test"}:
         return "test-secret-key"
     return "dev-local-only-secret-key"
+
+
+def _validate_production_security_settings(app: Flask) -> None:
+    """Validate production security-sensitive runtime settings."""
+    if not _is_production_env(app):
+        return
+
+    trust_proxy_headers = resolve_bool_flag(
+        "TRUST_PROXY_HEADERS",
+        config=app.config,
+        default=bool(app.config.get("TRUST_PROXY_HEADERS", False)),
+    )
+    if trust_proxy_headers:
+        configured_sources = os.getenv("TRUSTED_PROXY_IPS")
+        if configured_sources is None:
+            configured_sources = app.config.get("TRUSTED_PROXY_IPS")
+        if isinstance(configured_sources, str):
+            trusted_sources = tuple(
+                part.strip()
+                for part in configured_sources.split(",")
+                if part.strip()
+            )
+        else:
+            trusted_sources = tuple(configured_sources or ())
+        if not trusted_sources:
+            raise RuntimeError(
+                "TRUST_PROXY_HEADERS=true requires TRUSTED_PROXY_IPS in production."
+            )
+
+
+def _resolve_csp_allow_unsafe_eval(app: Flask) -> bool:
+    return resolve_bool_flag(
+        "CSP_ALLOW_UNSAFE_EVAL",
+        config=app.config,
+        default=bool(app.config.get("CSP_ALLOW_UNSAFE_EVAL", False)),
+    )
 
 
 def _resolve_portal_spa_enabled(app: Flask) -> bool:
@@ -367,6 +407,7 @@ def create_app(config_name: str | None = None) -> Flask:
     # Session configuration with environment-aware secret validation.
     app.secret_key = _resolve_secret_key(app)
     app.config["SECRET_KEY"] = app.secret_key
+    _validate_production_security_settings(app)
 
     # Session cookie security settings
     # SECURE: Only send cookie over HTTPS in production.
@@ -380,7 +421,10 @@ def create_app(config_name: str | None = None) -> Flask:
     _configure_logging(app)
     _validate_runtime_contract(app)
     _validate_in_scope_asset_readiness(app)
-    security_headers = _build_security_headers(_is_production_env(app))
+    security_headers = _build_security_headers(
+        _is_production_env(app),
+        allow_unsafe_eval=_resolve_csp_allow_unsafe_eval(app),
+    )
 
     # Route-level cache backend (L1 memory + optional L2 Redis)
     app.extensions["cache"] = create_default_cache_backend()

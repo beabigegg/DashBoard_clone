@@ -277,6 +277,19 @@ DB_PASSWORD=your_password
 # Flask 設定
 FLASK_ENV=production          # production | development
 SECRET_KEY=your-secret-key    # 生產環境請更換
+MAX_JSON_BODY_BYTES=262144    # JSON 請求大小上限（bytes）
+
+# 輸入預算保護（Released 高成本 API）
+QUERY_TOOL_MAX_CONTAINER_IDS=200
+RESOURCE_DETAIL_DEFAULT_LIMIT=500
+RESOURCE_DETAIL_MAX_LIMIT=500
+
+# 反向代理信任邊界（無反向代理時務必維持 false）
+TRUST_PROXY_HEADERS=false
+TRUSTED_PROXY_IPS=127.0.0.1
+
+# CSP 相容開關（預設 false；僅在必要時啟用）
+CSP_ALLOW_UNSAFE_EVAL=false
 
 # Gunicorn 設定
 GUNICORN_BIND=0.0.0.0:8080    # 服務監聽位址

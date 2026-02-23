@@ -88,11 +88,11 @@ def _load() -> dict:
                 logger.debug("Loaded page status from %s", DATA_FILE)
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning("Failed to load page status: %s", e)
-                _cache = {"pages": [], "api_public": True}
+                _cache = {"pages": [], "api_public": False}
                 _cache_mtime = 0.0
         else:
             logger.info("Page status file not found, using defaults")
-            _cache = {"pages": [], "api_public": True}
+            _cache = {"pages": [], "api_public": False}
             _cache_mtime = 0.0
 
         if _migrate_navigation_schema(_cache):
@@ -487,7 +487,14 @@ def is_api_public() -> bool:
         True if API endpoints bypass permission checks
     """
     with _lock:
-        return _load().get("api_public", True)
+        value = _load().get("api_public", False)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        if isinstance(value, (int, float)):
+            return bool(value)
+        return False
 
 
 def reload_cache() -> None:

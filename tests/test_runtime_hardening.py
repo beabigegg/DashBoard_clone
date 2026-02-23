@@ -159,6 +159,7 @@ def test_security_headers_applied_globally(testing_app_factory):
     assert response.status_code == 200
     assert "Content-Security-Policy" in response.headers
     assert "frame-ancestors 'self'" in response.headers["Content-Security-Policy"]
+    assert "'unsafe-eval'" not in response.headers["Content-Security-Policy"]
     assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert "Referrer-Policy" in response.headers
@@ -181,3 +182,32 @@ def test_hsts_header_enabled_in_production(monkeypatch):
     assert "Strict-Transport-Security" in response.headers
 
     _shutdown(app)
+
+
+def test_csp_unsafe_eval_can_be_enabled_via_env(monkeypatch):
+    monkeypatch.setenv("CSP_ALLOW_UNSAFE_EVAL", "true")
+    # Build app directly to control env behavior.
+    monkeypatch.setenv("REALTIME_EQUIPMENT_CACHE_ENABLED", "false")
+    db._ENGINE = None
+    db._HEALTH_ENGINE = None
+    app = create_app("testing")
+    app.config["TESTING"] = True
+
+    response = app.test_client().get("/", follow_redirects=True)
+    assert response.status_code == 200
+    assert "'unsafe-eval'" in response.headers["Content-Security-Policy"]
+
+    _shutdown(app)
+
+
+def test_production_trusted_proxy_requires_allowlist(monkeypatch):
+    monkeypatch.setenv("SECRET_KEY", "test-production-secret-key")
+    monkeypatch.setenv("REALTIME_EQUIPMENT_CACHE_ENABLED", "false")
+    monkeypatch.setenv("RUNTIME_CONTRACT_ENFORCE", "false")
+    monkeypatch.setenv("TRUST_PROXY_HEADERS", "true")
+    monkeypatch.delenv("TRUSTED_PROXY_IPS", raising=False)
+    db._ENGINE = None
+    db._HEALTH_ENGINE = None
+
+    with pytest.raises(RuntimeError, match="TRUSTED_PROXY_IPS"):
+        create_app("production")

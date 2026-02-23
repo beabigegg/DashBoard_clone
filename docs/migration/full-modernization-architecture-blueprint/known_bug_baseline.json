@@ -1,0 +1,21 @@
+{
+  "routes": {
+    "/wip-overview": { "known_issues": [] },
+    "/wip-detail": { "known_issues": [] },
+    "/hold-overview": { "known_issues": [] },
+    "/hold-detail": { "known_issues": [] },
+    "/hold-history": { "known_issues": [] },
+    "/reject-history": { "known_issues": [] },
+    "/resource": { "known_issues": [] },
+    "/resource-history": { "known_issues": [] },
+    "/qc-gate": { "known_issues": [] },
+    "/job-query": { "known_issues": [] },
+    "/tmtt-defect": { "known_issues": [] },
+    "/tables": { "known_issues": [] },
+    "/excel-query": { "known_issues": [] },
+    "/query-tool": { "known_issues": [] },
+    "/mid-section-defect": { "known_issues": [] },
+    "/admin/pages": { "known_issues": [] },
+    "/admin/performance": { "known_issues": [] }
+  }
+}

@@ -90,6 +90,43 @@ class TestGetResources:
 class TestQueryJobs:
     """Tests for /api/job-query/jobs endpoint."""
 
+    @patch('mes_dashboard.routes.job_query_routes.get_jobs_by_resources')
+    def test_non_json_payload_returns_415(self, mock_query, client):
+        response = client.post(
+            '/api/job-query/jobs',
+            data='plain-text',
+            content_type='text/plain',
+        )
+        assert response.status_code == 415
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_query.assert_not_called()
+
+    @patch('mes_dashboard.routes.job_query_routes.get_jobs_by_resources')
+    def test_malformed_json_returns_400(self, mock_query, client):
+        response = client.post(
+            '/api/job-query/jobs',
+            data='{"resource_ids":',
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_query.assert_not_called()
+
+    @patch('mes_dashboard.routes.job_query_routes.get_jobs_by_resources')
+    def test_payload_too_large_returns_413(self, mock_query, client):
+        client.application.config['MAX_JSON_BODY_BYTES'] = 8
+        response = client.post(
+            '/api/job-query/jobs',
+            data='{"resource_ids":["RES001"]}',
+            content_type='application/json',
+        )
+        assert response.status_code == 413
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_query.assert_not_called()
+
     def test_missing_resource_ids(self, client):
         """Should return error without resource_ids."""
         response = client.post(
@@ -258,6 +295,30 @@ class TestQueryJobTxnHistory:
 
 class TestExportJobs:
     """Tests for /api/job-query/export endpoint."""
+
+    @patch('mes_dashboard.routes.job_query_routes.export_jobs_with_history')
+    def test_non_json_payload_returns_415(self, mock_export, client):
+        response = client.post(
+            '/api/job-query/export',
+            data='plain-text',
+            content_type='text/plain',
+        )
+        assert response.status_code == 415
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_export.assert_not_called()
+
+    @patch('mes_dashboard.routes.job_query_routes.export_jobs_with_history')
+    def test_malformed_json_returns_400(self, mock_export, client):
+        response = client.post(
+            '/api/job-query/export',
+            data='{"resource_ids":',
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_export.assert_not_called()
 
     def test_missing_resource_ids(self, client):
         """Should return error without resource_ids."""

@@ -11,10 +11,27 @@ window.__FIELD_CONTRACTS__['job_query:txn_table'] = getPageContract('job_query',
 const jobTableFields = getPageContract('job_query', 'jobs_table');
 const txnTableFields = getPageContract('job_query', 'txn_table');
 
+function toDataToken(value) {
+  return encodeURIComponent(safeText(value));
+}
+
+function fromDataToken(value) {
+  if (!value) {
+    return '';
+  }
+  try {
+    return decodeURIComponent(value);
+  } catch (_error) {
+    return value;
+  }
+}
+
 function renderJobCell(job, apiKey) {
   if (apiKey === 'JOBSTATUS') {
     const value = safeText(job[apiKey]);
-    return `<span class="status-badge ${value}">${value}</span>`;
+    const classToken = safeText(value).replace(/[^A-Za-z0-9_-]/g, '_');
+    const escaped = escapeHtml(value);
+    return `<span class="status-badge ${classToken}">${escaped}</span>`;
   }
   if (apiKey === 'CREATEDATE' || apiKey === 'COMPLETEDATE') {
     return formatDate(job[apiKey]);
@@ -25,7 +42,9 @@ function renderJobCell(job, apiKey) {
 function renderTxnCell(txn, apiKey) {
   if (apiKey === 'FROMJOBSTATUS' || apiKey === 'JOBSTATUS') {
     const value = safeText(txn[apiKey], '-');
-    return `<span class="status-badge ${escapeHtml(value)}">${escapeHtml(value)}</span>`;
+    const classToken = safeText(value).replace(/[^A-Za-z0-9_-]/g, '_');
+    const escaped = escapeHtml(value);
+    return `<span class="status-badge ${classToken}">${escaped}</span>`;
   }
   if (apiKey === 'TXNDATE') {
     return formatDate(txn[apiKey]);
@@ -47,6 +66,16 @@ function renderTxnCell(txn, apiKey) {
         document.addEventListener('DOMContentLoaded', () => {
             loadEquipments();
             setLast90Days();
+
+            const equipmentList = document.getElementById('equipmentList');
+            if (equipmentList) {
+                equipmentList.addEventListener('click', handleEquipmentListClick);
+            }
+
+            const resultSection = document.getElementById('resultSection');
+            if (resultSection) {
+                resultSection.addEventListener('click', handleResultSectionClick);
+            }
 
             // Close dropdown when clicking outside
             document.addEventListener('click', (e) => {
@@ -94,20 +123,22 @@ function renderTxnCell(txn, apiKey) {
                 const allSelected = selectedInGroup === groupIds.length;
                 const someSelected = selectedInGroup > 0 && !allSelected;
                 const escapedName = escapeHtml(workcenterName);
-                html += `<div class="workcenter-group-header" onclick="toggleWorkcenterGroup('${escapedName}')">
-                    <input type="checkbox" ${allSelected ? 'checked' : ''} ${someSelected ? 'class="indeterminate"' : ''} onclick="event.stopPropagation(); toggleWorkcenterGroup('${escapedName}')">
+                const workcenterToken = toDataToken(workcenterName);
+                html += `<div class="workcenter-group-header" data-action="toggle-workcenter-group" data-workcenter="${workcenterToken}">
+                    <input type="checkbox" ${allSelected ? 'checked' : ''} ${someSelected ? 'class="indeterminate"' : ''} data-action="toggle-workcenter-group" data-workcenter="${workcenterToken}">
                     <span class="workcenter-group-name">${escapedName}</span>
                     <span class="workcenter-group-count">${selectedInGroup}/${groupIds.length}</span>
                 </div>`;
                 groupEquipments.forEach((eq) => {
                     const isSelected = selectedEquipments.has(eq.RESOURCEID);
-                    const resourceId = escapeHtml(safeText(eq.RESOURCEID));
+                    const resourceId = safeText(eq.RESOURCEID);
+                    const resourceIdToken = toDataToken(resourceId);
                     const resourceName = escapeHtml(safeText(eq.RESOURCENAME));
                     const familyName = escapeHtml(safeText(eq.RESOURCEFAMILYNAME));
 
                     html += `
-                        <div class="equipment-item ${isSelected ? 'selected' : ''}" onclick="toggleEquipment('${resourceId}')">
-                            <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleEquipment('${resourceId}')">
+                        <div class="equipment-item ${isSelected ? 'selected' : ''}" data-action="toggle-equipment" data-resource-id="${resourceIdToken}">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="toggle-equipment" data-resource-id="${resourceIdToken}">
                             <div class="equipment-info">
                                 <div class="equipment-name">${resourceName}</div>
                                 <div class="equipment-workcenter">${familyName}</div>
@@ -118,6 +149,30 @@ function renderTxnCell(txn, apiKey) {
             });
 
             container.innerHTML = html;
+        }
+
+        function handleEquipmentListClick(event) {
+            const trigger = event.target.closest('[data-action]');
+            if (!trigger) {
+                return;
+            }
+
+            if (trigger.dataset.action === 'toggle-workcenter-group') {
+                const workcenterName = fromDataToken(trigger.dataset.workcenter);
+                if (!workcenterName) {
+                    return;
+                }
+                toggleWorkcenterGroup(workcenterName);
+                return;
+            }
+
+            if (trigger.dataset.action === 'toggle-equipment') {
+                const resourceId = fromDataToken(trigger.dataset.resourceId);
+                if (!resourceId) {
+                    return;
+                }
+                toggleEquipment(resourceId);
+            }
         }
 
         // Toggle equipment dropdown
@@ -299,8 +354,8 @@ function renderTxnCell(txn, apiKey) {
                 <div class="result-header">
                     <div class="result-info">共 ${jobsData.length} 筆工單</div>
                     <div class="result-actions">
-                        <button class="btn btn-secondary btn-sm" onclick="expandAll()">全部展開</button>
-                        <button class="btn btn-secondary btn-sm" onclick="collapseAll()">全部收合</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-action="expand-all">全部展開</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-action="collapse-all">全部收合</button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -316,13 +371,14 @@ function renderTxnCell(txn, apiKey) {
 
             jobsData.forEach((job, idx) => {
                 const isExpanded = expandedJobs.has(job.JOBID);
+                const jobIdToken = toDataToken(job.JOBID);
                 const jobCells = jobTableFields
                     .map((field) => `<td>${renderJobCell(job, field.api_key)}</td>`)
                     .join('');
                 html += `
                     <tr class="job-row ${isExpanded ? 'expanded' : ''}" id="job-row-${idx}">
                         <td>
-                            <button class="expand-btn" onclick="toggleJobHistory('${escapeHtml(safeText(job.JOBID))}', ${idx})">
+                            <button type="button" class="expand-btn" data-action="toggle-job-history" data-job-id="${jobIdToken}" data-row-index="${idx}">
                                 <span class="arrow-icon ${isExpanded ? 'rotated' : ''}">▶</span>
                             </button>
                         </td>
@@ -353,6 +409,31 @@ function renderTxnCell(txn, apiKey) {
                 if (idx >= 0) pendingLoads.push({ jobId, idx });
             });
             void loadHistoriesBatched(pendingLoads);
+        }
+
+        function handleResultSectionClick(event) {
+            const trigger = event.target.closest('[data-action]');
+            if (!trigger) {
+                return;
+            }
+
+            const action = trigger.dataset.action;
+            if (action === 'expand-all') {
+                expandAll();
+                return;
+            }
+            if (action === 'collapse-all') {
+                collapseAll();
+                return;
+            }
+            if (action === 'toggle-job-history') {
+                const idx = Number.parseInt(trigger.dataset.rowIndex || '', 10);
+                const jobId = fromDataToken(trigger.dataset.jobId);
+                if (!Number.isInteger(idx) || !jobId) {
+                    return;
+                }
+                void toggleJobHistory(jobId, idx);
+            }
         }
 
         // Toggle job history

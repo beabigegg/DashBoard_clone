@@ -5,6 +5,7 @@ Provides functions to query equipment status from DWH.DW_MES_RESOURCE and DWH.DW
 """
 
 import logging
+import os
 import pandas as pd
 from typing import Optional, Dict, List, Any
 
@@ -173,6 +174,22 @@ def query_resource_detail(
         DataFrame with resource details or None if query fails.
     """
     try:
+        try:
+            max_limit = max(int(os.getenv("RESOURCE_DETAIL_MAX_LIMIT", "500")), 1)
+        except (TypeError, ValueError):
+            max_limit = 500
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = 500
+        try:
+            offset = int(offset)
+        except (TypeError, ValueError):
+            offset = 0
+
+        limit = max(1, min(limit, max_limit))
+        offset = max(offset, 0)
+
         base_sql = get_resource_latest_status_subquery(days_back)
 
         # Use QueryBuilder for safe parameterized conditions

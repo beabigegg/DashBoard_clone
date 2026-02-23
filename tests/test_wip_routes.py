@@ -535,6 +535,32 @@ class TestMetaFilterOptionsRoute(TestWipRoutesBase):
         self.assertFalse(data['success'])
 
 
+class TestMetaSearchRoute(TestWipRoutesBase):
+    """Test GET /api/wip/meta/search endpoint."""
+
+    @patch('mes_dashboard.routes.wip_routes.search_workorders')
+    def test_invalid_limit_type_falls_back_to_default(self, mock_search):
+        mock_search.return_value = []
+
+        response = self.client.get('/api/wip/meta/search?field=workorder&q=WO&limit=abc')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['success'])
+        self.assertEqual(mock_search.call_args.kwargs['limit'], 20)
+
+    @patch('mes_dashboard.routes.wip_routes.search_workorders')
+    def test_limit_is_bounded_with_upper_cap(self, mock_search):
+        mock_search.return_value = []
+
+        response = self.client.get('/api/wip/meta/search?field=workorder&q=WO&limit=999')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['success'])
+        self.assertEqual(mock_search.call_args.kwargs['limit'], 50)
+
+
 class TestPageRoutes(TestWipRoutesBase):
     """Test page routes for WIP dashboards."""
 

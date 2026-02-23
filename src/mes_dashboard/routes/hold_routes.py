@@ -159,9 +159,12 @@ def api_hold_detail_lots():
     age_range = request.args.get('age_range', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
     page = request.args.get('page', 1, type=int)
-    per_page = min(request.args.get('per_page', 50, type=int), 200)
+    per_page_value = request.args.get('per_page', 50, type=int)
+    if per_page_value is None:
+        per_page_value = 50
+    per_page = min(max(per_page_value, 1), 200)
 
-    if page < 1:
+    if page is None or page < 1:
         page = 1
 
     # Validate age_range parameter

@@ -371,7 +371,10 @@ def api_meta_search():
     """
     search_field = request.args.get('field', '').strip().lower()
     q = request.args.get('q', '').strip()
-    limit = min(request.args.get('limit', 20, type=int), 50)
+    limit_value = request.args.get('limit', 20, type=int)
+    if limit_value is None:
+        limit_value = 20
+    limit = min(max(limit_value, 1), 50)
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     # Cross-filter parameters

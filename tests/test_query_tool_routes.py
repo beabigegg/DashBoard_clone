@@ -56,6 +56,30 @@ class TestQueryToolPage:
 class TestResolveEndpoint:
     """Tests for /api/query-tool/resolve endpoint."""
 
+    @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
+    def test_non_json_payload_returns_415(self, mock_resolve, client):
+        response = client.post(
+            '/api/query-tool/resolve',
+            data='plain-text',
+            content_type='text/plain',
+        )
+        assert response.status_code == 415
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_resolve.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
+    def test_malformed_json_returns_400(self, mock_resolve, client):
+        response = client.post(
+            '/api/query-tool/resolve',
+            data='{"input_type":',
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_resolve.assert_not_called()
+
     def test_missing_input_type(self, client):
         """Should return error without input_type."""
         response = client.post(
@@ -280,6 +304,15 @@ class TestLotHistoryEndpoint:
         data = json.loads(response.data)
         assert 'error' in data
 
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history_batch')
+    def test_lot_history_batch_over_limit_returns_413(self, mock_batch, client):
+        client.application.config['QUERY_TOOL_MAX_CONTAINER_IDS'] = 2
+        response = client.get('/api/query-tool/lot-history?container_ids=A,B,C')
+        assert response.status_code == 413
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_batch.assert_not_called()
+
 
 class TestAdjacentLotsEndpoint:
     """Tests for /api/query-tool/adjacent-lots endpoint."""
@@ -425,6 +458,17 @@ class TestLotAssociationsEndpoint:
         assert response.status_code == 200
         mock_query.assert_called_once_with('488103800029578b', full_history=True)
 
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_associations_batch')
+    def test_lot_associations_batch_over_limit_returns_413(self, mock_batch, client):
+        client.application.config['QUERY_TOOL_MAX_CONTAINER_IDS'] = 1
+        response = client.get(
+            '/api/query-tool/lot-associations?type=materials&container_ids=A,B'
+        )
+        assert response.status_code == 413
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_batch.assert_not_called()
+
 
 class TestQueryToolRateLimit:
     """Rate-limit behavior for high-cost query-tool endpoints."""
@@ -534,6 +578,30 @@ class TestQueryToolRateLimit:
 
 class TestEquipmentPeriodEndpoint:
     """Tests for /api/query-tool/equipment-period endpoint."""
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_equipment_status_hours')
+    def test_non_json_payload_returns_415(self, mock_query, client):
+        response = client.post(
+            '/api/query-tool/equipment-period',
+            data='plain-text',
+            content_type='text/plain',
+        )
+        assert response.status_code == 415
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_query.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_equipment_status_hours')
+    def test_malformed_json_returns_400(self, mock_query, client):
+        response = client.post(
+            '/api/query-tool/equipment-period',
+            data='{"equipment_ids":',
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_query.assert_not_called()
 
     def test_missing_query_type(self, client):
         """Should return error without query_type."""
@@ -662,6 +730,30 @@ class TestEquipmentPeriodEndpoint:
 
 class TestExportCsvEndpoint:
     """Tests for /api/query-tool/export-csv endpoint."""
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    def test_non_json_payload_returns_415(self, mock_get_history, client):
+        response = client.post(
+            '/api/query-tool/export-csv',
+            data='plain-text',
+            content_type='text/plain',
+        )
+        assert response.status_code == 415
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_get_history.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    def test_malformed_json_returns_400(self, mock_get_history, client):
+        response = client.post(
+            '/api/query-tool/export-csv',
+            data='{"export_type":',
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert 'error' in payload
+        mock_get_history.assert_not_called()
 
     def test_missing_export_type(self, client):
         """Should return error without export_type."""

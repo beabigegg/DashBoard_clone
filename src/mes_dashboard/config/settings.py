@@ -27,6 +27,13 @@ def _bool_env(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _csv_env(name: str, default: str = "") -> tuple[str, ...]:
+    value = os.getenv(name, default)
+    if not value:
+        return tuple()
+    return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
 class Config:
     """Base configuration."""
 
@@ -50,6 +57,15 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY")
     CSRF_ENABLED = _bool_env("CSRF_ENABLED", True)
     PORTAL_SPA_ENABLED = _bool_env("PORTAL_SPA_ENABLED", True)
+
+    # Hardening configuration (safe-by-default)
+    MAX_JSON_BODY_BYTES = _int_env("MAX_JSON_BODY_BYTES", 262144)  # 256 KB
+    QUERY_TOOL_MAX_CONTAINER_IDS = _int_env("QUERY_TOOL_MAX_CONTAINER_IDS", 200)
+    RESOURCE_DETAIL_DEFAULT_LIMIT = _int_env("RESOURCE_DETAIL_DEFAULT_LIMIT", 500)
+    RESOURCE_DETAIL_MAX_LIMIT = _int_env("RESOURCE_DETAIL_MAX_LIMIT", 500)
+    TRUST_PROXY_HEADERS = _bool_env("TRUST_PROXY_HEADERS", False)
+    TRUSTED_PROXY_IPS = _csv_env("TRUSTED_PROXY_IPS")
+    CSP_ALLOW_UNSAFE_EVAL = _bool_env("CSP_ALLOW_UNSAFE_EVAL", False)
 
     # Session configuration
     PERMANENT_SESSION_LIFETIME = _int_env("SESSION_LIFETIME", 28800)  # 8 hours
@@ -117,7 +133,7 @@ class TestingConfig(Config):
 
 def get_config(env: str | None = None) -> Type[Config]:
     """Select config class based on environment name."""
-    value = (env or os.getenv("FLASK_ENV", "development")).lower()
+    value = (env or os.getenv("FLASK_ENV", "production")).lower()
     if value in {"prod", "production"}:
         return ProductionConfig
     if value in {"test", "testing"}:

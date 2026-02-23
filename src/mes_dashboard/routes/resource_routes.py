@@ -6,7 +6,7 @@ Contains Flask Blueprint for resource/equipment-related API endpoints.
 
 import math
 import logging
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 
 from mes_dashboard.core.database import (
     get_db_connection,
@@ -15,6 +15,7 @@ from mes_dashboard.core.database import (
 )
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.core.response import INTERNAL_ERROR, error_response
 from mes_dashboard.core.utils import get_days_back, parse_bool_query
 
@@ -147,6 +148,14 @@ def _optional_bool_arg(name: str):
     return parse_bool_query(text)
 
 
+def _config_int(name: str, default: int, minimum: int = 1) -> int:
+    try:
+        parsed = int(current_app.config.get(name, default))
+    except Exception:
+        parsed = int(default)
+    return max(parsed, minimum)
+
+
 @resource_bp.route('/by_status')
 def api_resource_by_status():
     """API: Resource count by status."""
@@ -205,10 +214,33 @@ def api_resource_workcenter_status_matrix():
 @_RESOURCE_DETAIL_RATE_LIMIT
 def api_resource_detail():
     """API: Resource detail with filters."""
-    data = request.get_json() or {}
+    data, payload_error = parse_json_payload(require_object=True)
+    if payload_error is not None:
+        return jsonify({'success': False, 'error': payload_error.message}), payload_error.status_code
+
     filters = data.get('filters')
-    limit = data.get('limit', 500)
-    offset = data.get('offset', 0)
+    if filters is not None and not isinstance(filters, dict):
+        return jsonify({'success': False, 'error': 'filters 必須為物件'}), 400
+
+    default_limit = _config_int("RESOURCE_DETAIL_DEFAULT_LIMIT", 500)
+    max_limit = _config_int("RESOURCE_DETAIL_MAX_LIMIT", default_limit)
+
+    try:
+        limit = int(data.get('limit', default_limit))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'limit 必須為整數'}), 400
+    if limit < 1:
+        return jsonify({'success': False, 'error': 'limit 必須大於 0'}), 400
+    if limit > max_limit:
+        return jsonify({'success': False, 'error': f'limit 不可超過 {max_limit}'}), 413
+
+    try:
+        offset = int(data.get('offset', 0))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'offset 必須為整數'}), 400
+    if offset < 0:
+        return jsonify({'success': False, 'error': 'offset 不可小於 0'}), 400
+
     days_back = get_days_back(filters)
 
     df = query_resource_detail(filters, limit, offset, days_back)

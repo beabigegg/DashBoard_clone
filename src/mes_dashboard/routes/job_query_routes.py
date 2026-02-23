@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, request, Response, render_template
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell
+from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.services.job_query_service import (
     get_jobs_by_resources,
     get_job_txn_history,
@@ -110,7 +111,9 @@ def query_jobs():
 
     Returns job list.
     """
-    data = request.get_json()
+    data, payload_error = parse_json_payload(require_non_empty_object=True)
+    if payload_error is not None:
+        return jsonify({'error': payload_error.message}), payload_error.status_code
 
     resource_ids = data.get('resource_ids', [])
     start_date = data.get('start_date')
@@ -171,7 +174,9 @@ def export_jobs():
 
     Returns streaming CSV response.
     """
-    data = request.get_json()
+    data, payload_error = parse_json_payload(require_non_empty_object=True)
+    if payload_error is not None:
+        return jsonify({'error': payload_error.message}), payload_error.status_code
 
     resource_ids = data.get('resource_ids', [])
     start_date = data.get('start_date')

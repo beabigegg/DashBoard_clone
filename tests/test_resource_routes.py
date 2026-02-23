@@ -72,3 +72,77 @@ def test_resource_status_masks_internal_error_details(_mock_status):
     assert payload["error"]["code"] == "INTERNAL_ERROR"
     assert payload["error"]["message"] == "服務暫時無法使用"
     assert "sensitive sql context" not in str(payload)
+
+
+@patch("mes_dashboard.routes.resource_routes.query_resource_detail")
+def test_resource_detail_non_json_payload_returns_415(mock_query):
+    response = _client().post(
+        "/api/resource/detail",
+        data="plain-text",
+        content_type="text/plain",
+    )
+
+    assert response.status_code == 415
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert "error" in payload
+    mock_query.assert_not_called()
+
+
+@patch("mes_dashboard.routes.resource_routes.query_resource_detail")
+def test_resource_detail_malformed_json_returns_400(mock_query):
+    response = _client().post(
+        "/api/resource/detail",
+        data='{"filters":',
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert "error" in payload
+    mock_query.assert_not_called()
+
+
+@patch("mes_dashboard.routes.resource_routes.query_resource_detail")
+def test_resource_detail_rejects_limit_over_configured_max(mock_query):
+    client = _client()
+    client.application.config["RESOURCE_DETAIL_MAX_LIMIT"] = 100
+    response = client.post(
+        "/api/resource/detail",
+        json={"limit": 101, "offset": 0, "filters": {}},
+    )
+
+    assert response.status_code == 413
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert "limit" in payload["error"]
+    mock_query.assert_not_called()
+
+
+@patch("mes_dashboard.routes.resource_routes.query_resource_detail")
+def test_resource_detail_rejects_invalid_limit_type(mock_query):
+    response = _client().post(
+        "/api/resource/detail",
+        json={"limit": "abc", "offset": 0, "filters": {}},
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert "limit" in payload["error"]
+    mock_query.assert_not_called()
+
+
+@patch("mes_dashboard.routes.resource_routes.query_resource_detail")
+def test_resource_detail_rejects_negative_offset(mock_query):
+    response = _client().post(
+        "/api/resource/detail",
+        json={"limit": 10, "offset": -1, "filters": {}},
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert "offset" in payload["error"]
+    mock_query.assert_not_called()

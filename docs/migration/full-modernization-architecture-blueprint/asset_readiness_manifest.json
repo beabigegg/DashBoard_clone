@@ -1,0 +1,22 @@
+{
+  "in_scope_required_assets": {
+    "/wip-overview": ["wip-overview.js"],
+    "/wip-detail": ["wip-detail.js"],
+    "/hold-overview": ["hold-overview.js"],
+    "/hold-detail": ["hold-detail.js"],
+    "/hold-history": ["hold-history.js"],
+    "/reject-history": ["reject-history.js"],
+    "/resource": ["resource-status.js"],
+    "/resource-history": ["resource-history.js"],
+    "/qc-gate": ["qc-gate.js"],
+    "/job-query": ["job-query.js"],
+    "/tmtt-defect": ["tmtt-defect.js"],
+    "/admin/pages": ["admin-pages.js"],
+    "/admin/performance": ["admin-performance.js"],
+    "/tables": ["tables.js"],
+    "/excel-query": ["excel-query.js"],
+    "/query-tool": ["query-tool.js"],
+    "/mid-section-defect": ["mid-section-defect.js"]
+  },
+  "deferred_routes": []
+}

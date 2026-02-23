@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from typing import Optional
+from urllib.parse import urlsplit, urlunsplit
 
 import redis
 
@@ -24,6 +25,31 @@ REDIS_KEY_PREFIX = os.getenv('REDIS_KEY_PREFIX', 'mes_wip')
 # ============================================================
 
 _REDIS_CLIENT: Optional[redis.Redis] = None
+
+
+def redact_connection_url(url: str) -> str:
+    """Redact credentials in URL-like connection strings."""
+    if not url:
+        return url
+    try:
+        parsed = urlsplit(url)
+    except Exception:
+        return url
+
+    netloc = parsed.netloc
+    if "@" not in netloc:
+        return url
+
+    credentials, host = netloc.rsplit("@", 1)
+    if ":" in credentials:
+        user, _password = credentials.split(":", 1)
+        masked = f"{user}:***" if user else "***"
+    else:
+        masked = "***"
+
+    return urlunsplit(
+        (parsed.scheme, f"{masked}@{host}", parsed.path, parsed.query, parsed.fragment)
+    )
 
 
 def get_redis_client() -> Optional[redis.Redis]:
@@ -50,7 +76,7 @@ def get_redis_client() -> Optional[redis.Redis]:
             )
             # Test connection
             _REDIS_CLIENT.ping()
-            logger.info(f"Redis client connected to {REDIS_URL}")
+            logger.info("Redis client connected to %s", redact_connection_url(REDIS_URL))
         except redis.RedisError as e:
             logger.warning(f"Failed to connect to Redis: {e}")
             _REDIS_CLIENT = None

@@ -196,6 +196,22 @@ class TestIsApiPublic:
 
         assert page_registry.is_api_public() is False
 
+    def test_api_public_defaults_false_when_key_missing(self, mock_registry, temp_data_file):
+        data = json.loads(temp_data_file.read_text())
+        data.pop("api_public", None)
+        temp_data_file.write_text(json.dumps(data))
+        page_registry._cache = None
+
+        assert page_registry.is_api_public() is False
+
+    def test_api_public_invalid_value_defaults_false(self, mock_registry, temp_data_file):
+        data = json.loads(temp_data_file.read_text())
+        data["api_public"] = "not-a-bool"
+        temp_data_file.write_text(json.dumps(data))
+        page_registry._cache = None
+
+        assert page_registry.is_api_public() is False
+
 
 class TestReloadCache:
     """Tests for reload_cache function."""

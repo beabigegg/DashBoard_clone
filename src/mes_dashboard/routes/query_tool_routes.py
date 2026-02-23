@@ -11,11 +11,12 @@ Contains Flask Blueprint for batch tracing and equipment period query endpoints:
 
 import hashlib
 
-from flask import Blueprint, jsonify, request, Response, render_template
+from flask import Blueprint, jsonify, request, Response, render_template, current_app
 
 from mes_dashboard.core.cache import cache_get, cache_set
 from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.services.query_tool_service import (
     resolve_lots,
     get_lot_history,
@@ -84,6 +85,21 @@ _QUERY_TOOL_EXPORT_RATE_LIMIT = configured_rate_limit(
     default_max_attempts=3,
     default_window_seconds=60,
 )
+
+
+def _query_tool_max_container_ids() -> int:
+    try:
+        value = int(current_app.config.get("QUERY_TOOL_MAX_CONTAINER_IDS", 200))
+    except Exception:
+        value = 200
+    return max(value, 1)
+
+
+def _reject_if_batch_too_large(container_ids: list[str]):
+    max_ids = _query_tool_max_container_ids()
+    if len(container_ids) <= max_ids:
+        return None
+    return jsonify({'error': f'container_ids 數量不可超過 {max_ids} 筆'}), 413
 
 
 def _format_lot_materials_export_rows(rows):
@@ -163,10 +179,9 @@ def resolve_lot_input():
         "not_found": ["value3"]
     }
     """
-    data = request.get_json()
-
-    if not data:
-        return jsonify({'error': '請求內容不可為空'}), 400
+    data, payload_error = parse_json_payload(require_non_empty_object=True)
+    if payload_error is not None:
+        return jsonify({'error': payload_error.message}), payload_error.status_code
 
     input_type = data.get('input_type')
     values = data.get('values', [])
@@ -240,6 +255,9 @@ def query_lot_history():
         cids = [c.strip() for c in container_ids_param.split(',') if c.strip()]
         if not cids:
             return jsonify({'error': '請指定 CONTAINERID'}), 400
+        too_large = _reject_if_batch_too_large(cids)
+        if too_large is not None:
+            return too_large
         result = get_lot_history_batch(cids, workcenter_groups=workcenter_groups)
     elif container_id:
         result = get_lot_history(container_id, workcenter_groups=workcenter_groups)
@@ -319,6 +337,9 @@ def query_lot_associations():
         cids = [c.strip() for c in container_ids_param.split(',') if c.strip()]
         if not cids:
             return jsonify({'error': '請指定 CONTAINERID'}), 400
+        too_large = _reject_if_batch_too_large(cids)
+        if too_large is not None:
+            return too_large
         result = get_lot_associations_batch(cids, assoc_type)
     else:
         if not container_id:
@@ -369,10 +390,9 @@ def query_equipment_period():
 
     Returns data based on query_type.
     """
-    data = request.get_json()
-
-    if not data:
-        return jsonify({'error': '請求內容不可為空'}), 400
+    data, payload_error = parse_json_payload(require_non_empty_object=True)
+    if payload_error is not None:
+        return jsonify({'error': payload_error.message}), payload_error.status_code
 
     equipment_ids = data.get('equipment_ids', [])
     equipment_names = data.get('equipment_names', [])
@@ -511,10 +531,9 @@ def export_csv():
 
     Returns streaming CSV response.
     """
-    data = request.get_json()
-
-    if not data:
-        return jsonify({'error': '請求內容不可為空'}), 400
+    data, payload_error = parse_json_payload(require_non_empty_object=True)
+    if payload_error is not None:
+        return jsonify({'error': payload_error.message}), payload_error.status_code
 
     export_type = data.get('export_type')
     params = data.get('params', {})

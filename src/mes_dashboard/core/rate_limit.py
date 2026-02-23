@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import threading
 import time
+from ipaddress import ip_address, ip_network
 from collections import defaultdict, deque
 from functools import wraps
 from typing import Callable, Deque
@@ -29,11 +30,66 @@ def _env_int(name: str, default: int) -> int:
     return max(value, 1)
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _trusted_proxy_networks() -> list:
+    raw = os.getenv("TRUSTED_PROXY_IPS", "")
+    if not raw:
+        return []
+
+    networks = []
+    for token in raw.split(","):
+        candidate = token.strip()
+        if not candidate:
+            continue
+        try:
+            if "/" in candidate:
+                networks.append(ip_network(candidate, strict=False))
+            else:
+                if ":" in candidate:
+                    networks.append(ip_network(f"{candidate}/128", strict=False))
+                else:
+                    networks.append(ip_network(f"{candidate}/32", strict=False))
+        except ValueError:
+            continue
+    return networks
+
+
+def _is_trusted_proxy_source(remote_addr: str | None) -> bool:
+    if not _env_bool("TRUST_PROXY_HEADERS", False):
+        return False
+    if not remote_addr:
+        return False
+
+    networks = _trusted_proxy_networks()
+    if not networks:
+        # Explicit proxy trust mode requires explicit trusted source list.
+        return False
+
+    try:
+        remote_ip = ip_address(remote_addr.strip())
+    except ValueError:
+        return False
+
+    return any(remote_ip in network for network in networks)
+
+
 def _client_identifier() -> str:
-    forwarded = request.headers.get("X-Forwarded-For", "").strip()
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.remote_addr or "unknown"
+    remote = request.remote_addr
+    if _is_trusted_proxy_source(remote):
+        forwarded = request.headers.get("X-Forwarded-For", "").strip()
+        if forwarded:
+            candidate = forwarded.split(",")[0].strip()
+            try:
+                return str(ip_address(candidate))
+            except ValueError:
+                pass
+    return remote or "unknown"
 
 
 def check_and_record(

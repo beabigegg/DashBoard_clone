@@ -312,6 +312,34 @@ class TestHoldDetailLotsRoute(TestHoldRoutesBase):
         self.assertEqual(call_args.kwargs['page'], 1)
 
     @patch('mes_dashboard.routes.hold_routes.get_hold_detail_lots')
+    def test_handles_invalid_page_type(self, mock_get_lots):
+        mock_get_lots.return_value = {
+            'lots': [],
+            'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 1},
+            'filters': {'workcenter': None, 'package': None, 'ageRange': None}
+        }
+
+        response = self.client.get('/api/wip/hold-detail/lots?reason=YieldLimit&page=abc')
+        self.assertEqual(response.status_code, 200)
+
+        call_args = mock_get_lots.call_args
+        self.assertEqual(call_args.kwargs['page'], 1)
+
+    @patch('mes_dashboard.routes.hold_routes.get_hold_detail_lots')
+    def test_handles_invalid_per_page_type(self, mock_get_lots):
+        mock_get_lots.return_value = {
+            'lots': [],
+            'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 1},
+            'filters': {'workcenter': None, 'package': None, 'ageRange': None}
+        }
+
+        response = self.client.get('/api/wip/hold-detail/lots?reason=YieldLimit&per_page=abc')
+        self.assertEqual(response.status_code, 200)
+
+        call_args = mock_get_lots.call_args
+        self.assertEqual(call_args.kwargs['page_size'], 50)
+
+    @patch('mes_dashboard.routes.hold_routes.get_hold_detail_lots')
     def test_returns_error_on_failure(self, mock_get_lots):
         """Should return success=False and 500 on failure."""
         mock_get_lots.return_value = None

@@ -18,6 +18,7 @@ Architecture:
 import csv
 import io
 import logging
+import os
 import re
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -47,6 +48,13 @@ MAX_EQUIPMENTS = 20
 MAX_DATE_RANGE_DAYS = 90
 DEFAULT_TIME_WINDOW_HOURS = 168  # 1 week for better PJ_TYPE detection
 ADJACENT_LOTS_COUNT = 3
+
+
+def _max_batch_container_ids() -> int:
+    try:
+        return max(int(os.getenv("QUERY_TOOL_MAX_CONTAINER_IDS", "200")), 1)
+    except (TypeError, ValueError):
+        return 200
 
 
 # ============================================================
@@ -881,6 +889,9 @@ def get_lot_history_batch(
     """
     if not container_ids:
         return {'error': '請指定 CONTAINERID'}
+    max_ids = _max_batch_container_ids()
+    if len(container_ids) > max_ids:
+        return {'error': f'container_ids 數量不可超過 {max_ids} 筆'}
 
     try:
         events_by_cid = EventFetcher.fetch_events(container_ids, "history")
@@ -933,6 +944,9 @@ def get_lot_associations_batch(
     """
     if not container_ids:
         return {'error': '請指定 CONTAINERID'}
+    max_ids = _max_batch_container_ids()
+    if len(container_ids) > max_ids:
+        return {'error': f'container_ids 數量不可超過 {max_ids} 筆'}
 
     valid_batch_types = {'materials', 'rejects', 'holds'}
     if assoc_type not in valid_batch_types:
