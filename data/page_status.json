@@ -83,14 +83,14 @@
       "name": "設備維修查詢",
       "status": "released",
       "drawer_id": "drawer",
-      "order": 3
+      "order": 1
     },
     {
       "route": "/query-tool",
       "name": "批次追蹤工具",
-      "status": "dev",
-      "drawer_id": "dev-tools",
-      "order": 4
+      "status": "released",
+      "drawer_id": "drawer",
+      "order": 2
     },
     {
       "route": "/tmtt-defect",
