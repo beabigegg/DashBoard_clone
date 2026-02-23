@@ -70,6 +70,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../tables/App.vue'),
     [() => import('../tables/style.css')],
   ),
+  '/admin/performance': createNativeLoader(
+    () => import('../admin-performance/App.vue'),
+    [() => import('../admin-performance/style.css')],
+  ),
 });
 
 export function getNativeModuleLoader(route) {

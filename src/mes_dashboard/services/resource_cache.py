@@ -19,6 +19,7 @@ from typing import Any
 
 import pandas as pd
 
+from mes_dashboard.core.cache import register_process_cache
 from mes_dashboard.core.redis_client import (
     get_redis_client,
     redis_available,
@@ -109,6 +110,13 @@ class _ProcessLevelCache:
         with self._lock:
             self._cache.pop(key, None)
 
+    def stats(self) -> dict:
+        """Return live cache statistics for telemetry."""
+        with self._lock:
+            now = time.time()
+            live = sum(1 for _, (_, ts) in self._cache.items() if now - ts <= self._ttl)
+            return {"entries": live, "max_size": self._max_size, "ttl_seconds": self._ttl}
+
 
 def _resolve_cache_max_size(env_name: str, default: int) -> int:
     value = os.getenv(env_name)
@@ -130,6 +138,7 @@ _resource_df_cache = _ProcessLevelCache(
     ttl_seconds=DEFAULT_PROCESS_CACHE_TTL_SECONDS,
     max_size=RESOURCE_PROCESS_CACHE_MAX_SIZE,
 )
+register_process_cache("resource", _resource_df_cache, "Resource DataFrame (L1, 30s)")
 _resource_parse_lock = threading.Lock()
 _resource_index_lock = threading.Lock()
 _resource_index: ResourceIndex = {

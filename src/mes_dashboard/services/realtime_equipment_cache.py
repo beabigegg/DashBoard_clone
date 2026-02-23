@@ -14,6 +14,7 @@ from collections import OrderedDict
 from datetime import datetime
 from typing import Any
 
+from mes_dashboard.core.cache import register_process_cache
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.redis_client import (
     get_redis_client,
@@ -92,6 +93,13 @@ class _ProcessLevelCache:
         with self._lock:
             self._cache.pop(key, None)
 
+    def stats(self) -> dict:
+        """Return live cache statistics for telemetry."""
+        with self._lock:
+            now = time.time()
+            live = sum(1 for _, (_, ts) in self._cache.items() if now - ts <= self._ttl)
+            return {"entries": live, "max_size": self._max_size, "ttl_seconds": self._ttl}
+
 
 def _resolve_cache_max_size(env_name: str, default: int) -> int:
     value = os.getenv(env_name)
@@ -113,6 +121,7 @@ _equipment_status_cache = _ProcessLevelCache(
     ttl_seconds=DEFAULT_PROCESS_CACHE_TTL_SECONDS,
     max_size=EQUIPMENT_PROCESS_CACHE_MAX_SIZE,
 )
+register_process_cache("equipment_status", _equipment_status_cache, "Equipment Status (L1, 30s)")
 _equipment_status_parse_lock = threading.Lock()
 _equipment_lookup_lock = threading.Lock()
 _equipment_status_lookup: dict[str, dict[str, Any]] = {}

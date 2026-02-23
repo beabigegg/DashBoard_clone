@@ -95,6 +95,34 @@ class ProcessLevelCache:
         with self._lock:
             self._cache.clear()
 
+    def stats(self) -> dict:
+        """Return live cache statistics for telemetry."""
+        with self._lock:
+            now = time.time()
+            live = sum(1 for _, (_, ts) in self._cache.items() if now - ts <= self._ttl)
+            return {"entries": live, "max_size": self._max_size, "ttl_seconds": self._ttl}
+
+
+# ============================================================
+# Process-Level Cache Registry (for admin telemetry)
+# ============================================================
+
+_PROCESS_CACHE_REGISTRY: dict[str, tuple[str, Any]] = {}
+
+
+def register_process_cache(name: str, cache_instance: Any, description: str = "") -> None:
+    """Register a ProcessLevelCache instance for admin telemetry."""
+    _PROCESS_CACHE_REGISTRY[name] = (description, cache_instance)
+
+
+def get_all_process_cache_stats() -> dict[str, dict]:
+    """Collect stats from all registered ProcessLevelCache instances."""
+    return {
+        name: {**inst.stats(), "description": desc}
+        for name, (desc, inst) in _PROCESS_CACHE_REGISTRY.items()
+        if callable(getattr(inst, "stats", None))
+    }
+
 
 def _resolve_cache_max_size(env_name: str, default: int) -> int:
     value = os.getenv(env_name)
@@ -116,6 +144,7 @@ _wip_df_cache = ProcessLevelCache(
     ttl_seconds=30,
     max_size=WIP_PROCESS_CACHE_MAX_SIZE,
 )
+register_process_cache("wip_dataframe", _wip_df_cache, "WIP DataFrame (L1, 30s)")
 _wip_parse_lock = threading.Lock()
 
 # ============================================================

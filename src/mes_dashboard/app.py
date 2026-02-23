@@ -296,6 +296,12 @@ def _shutdown_runtime_resources() -> None:
         logger.warning("Error stopping scrap exclusion cache worker: %s", exc)
 
     try:
+        from mes_dashboard.core.metrics_history import stop_metrics_history
+        stop_metrics_history()
+    except Exception as exc:
+        logger.warning("Error stopping metrics history: %s", exc)
+
+    try:
         close_redis()
     except Exception as exc:
         logger.warning("Error closing Redis client: %s", exc)
@@ -390,6 +396,8 @@ def create_app(config_name: str | None = None) -> Flask:
             start_cache_updater()  # Start Redis cache updater
             init_realtime_equipment_cache(app)  # Start realtime equipment status cache
             init_scrap_reason_exclusion_cache(app)  # Start exclusion-policy cache sync
+            from mes_dashboard.core.metrics_history import start_metrics_history
+            start_metrics_history(app)  # Start metrics history collector
     _register_shutdown_hooks(app)
 
     # Register API routes

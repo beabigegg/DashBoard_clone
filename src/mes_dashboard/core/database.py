@@ -416,6 +416,14 @@ def dispose_engine():
 # Direct Connection Helpers
 # ============================================================
 
+_DIRECT_CONN_COUNTER = 0
+_DIRECT_CONN_LOCK = threading.Lock()
+
+
+def get_direct_connection_count() -> int:
+    """Return total direct (non-pooled) connections since worker start."""
+    return _DIRECT_CONN_COUNTER
+
 
 def get_db_connection():
     """Create a direct oracledb connection.
@@ -432,6 +440,9 @@ def get_db_connection():
             retry_delay=runtime["retry_delay"],
         )
         conn.call_timeout = runtime["call_timeout_ms"]
+        with _DIRECT_CONN_LOCK:
+            global _DIRECT_CONN_COUNTER
+            _DIRECT_CONN_COUNTER += 1
         logger.debug(
             "Direct oracledb connection established (call_timeout_ms=%s)",
             runtime["call_timeout_ms"],
@@ -591,6 +602,9 @@ def read_sql_df_slow(
             retry_delay=runtime["retry_delay"],
         )
         conn.call_timeout = timeout_ms
+        with _DIRECT_CONN_LOCK:
+            global _DIRECT_CONN_COUNTER
+            _DIRECT_CONN_COUNTER += 1
         logger.debug(
             "Slow-query connection established (call_timeout_ms=%s)", timeout_ms
         )

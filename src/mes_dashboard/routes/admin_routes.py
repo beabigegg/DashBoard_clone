@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, g, jsonify, render_template, request
+from flask import Blueprint, current_app, g, jsonify, render_template, request, send_from_directory
 
 from mes_dashboard.core.permissions import admin_required
 from mes_dashboard.core.response import error_response, TOO_MANY_REQUESTS
@@ -69,7 +69,11 @@ _last_restart_request: float = 0.0
 @admin_bp.route("/performance")
 @admin_required
 def performance():
-    """Performance monitoring dashboard."""
+    """Performance monitoring dashboard (Vue SPA)."""
+    dist_dir = os.path.join(current_app.static_folder or "", "dist")
+    dist_html = os.path.join(dist_dir, "admin-performance.html")
+    if os.path.exists(dist_html):
+        return send_from_directory(dist_dir, "admin-performance.html")
     return render_template("admin/performance.html")
 
 
@@ -260,6 +264,137 @@ def api_logs():
             "enabled": True,
             "stats": log_store.get_stats()
         }
+    })
+
+
+@admin_bp.route("/api/performance-detail", methods=["GET"])
+@admin_required
+def api_performance_detail():
+    """API: Get detailed performance telemetry for admin dashboard.
+
+    Returns redis, process_caches, route_cache, db_pool, and
+    direct_connections sections in a single response.
+    """
+    from mes_dashboard.core.cache import get_all_process_cache_stats
+    from mes_dashboard.core.database import (
+        get_direct_connection_count,
+        get_pool_runtime_config,
+        get_pool_status,
+    )
+    from mes_dashboard.core.redis_client import (
+        get_redis_client,
+        REDIS_ENABLED,
+        REDIS_KEY_PREFIX,
+    )
+    from mes_dashboard.routes.health_routes import get_route_cache_status
+
+    # ---- Redis detail ----
+    redis_detail = None
+    if REDIS_ENABLED:
+        client = get_redis_client()
+        if client is not None:
+            try:
+                info = client.info(section="memory")
+                stats_info = client.info(section="stats")
+                clients_info = client.info(section="clients")
+
+                hits = int(stats_info.get("keyspace_hits", 0))
+                misses = int(stats_info.get("keyspace_misses", 0))
+                total = hits + misses
+                hit_rate = round(hits / total, 4) if total > 0 else 0
+
+                # Scan key counts per namespace
+                namespace_prefixes = [
+                    "data", "route_cache", "equipment_status",
+                    "reject_dataset", "meta", "lock", "scrap_exclusion",
+                ]
+                namespaces = []
+                for ns in namespace_prefixes:
+                    pattern = f"{REDIS_KEY_PREFIX}:{ns}*"
+                    count = 0
+                    cursor = 0
+                    while True:
+                        cursor, keys = client.scan(cursor=cursor, match=pattern, count=100)
+                        count += len(keys)
+                        if cursor == 0:
+                            break
+                    namespaces.append({"name": ns, "key_count": count})
+
+                redis_detail = {
+                    "used_memory_human": info.get("used_memory_human", "N/A"),
+                    "used_memory": info.get("used_memory", 0),
+                    "peak_memory_human": info.get("used_memory_peak_human", "N/A"),
+                    "peak_memory": info.get("used_memory_peak", 0),
+                    "maxmemory_human": info.get("maxmemory_human", "N/A"),
+                    "maxmemory": info.get("maxmemory", 0),
+                    "connected_clients": clients_info.get("connected_clients", 0),
+                    "hit_rate": hit_rate,
+                    "keyspace_hits": hits,
+                    "keyspace_misses": misses,
+                    "namespaces": namespaces,
+                }
+            except Exception as exc:
+                logger.warning("Failed to collect Redis detail: %s", exc)
+                redis_detail = {"error": str(exc)}
+
+    # ---- Process caches ----
+    process_caches = get_all_process_cache_stats()
+
+    # ---- Route cache ----
+    route_cache = get_route_cache_status()
+
+    # ---- DB pool ----
+    db_pool = None
+    try:
+        pool_status = get_pool_status()
+        pool_config = get_pool_runtime_config()
+        db_pool = {
+            "status": pool_status,
+            "config": {
+                "pool_size": pool_config.get("pool_size"),
+                "max_overflow": pool_config.get("max_overflow"),
+                "pool_timeout": pool_config.get("pool_timeout"),
+                "pool_recycle": pool_config.get("pool_recycle"),
+            },
+        }
+    except Exception as exc:
+        logger.warning("Failed to collect DB pool status: %s", exc)
+        db_pool = {"error": str(exc)}
+
+    # ---- Direct connections ----
+    direct_connections = {
+        "total_since_start": get_direct_connection_count(),
+        "worker_pid": os.getpid(),
+    }
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "redis": redis_detail,
+            "process_caches": process_caches,
+            "route_cache": route_cache,
+            "db_pool": db_pool,
+            "direct_connections": direct_connections,
+        },
+    })
+
+
+@admin_bp.route("/api/performance-history", methods=["GET"])
+@admin_required
+def api_performance_history():
+    """API: Get historical metrics snapshots for trend charts."""
+    from mes_dashboard.core.metrics_history import get_metrics_history_store
+
+    minutes = request.args.get("minutes", 30, type=int)
+    minutes = max(1, min(minutes, 180))
+    store = get_metrics_history_store()
+    snapshots = store.query_snapshots(minutes=minutes)
+    return jsonify({
+        "success": True,
+        "data": {
+            "snapshots": snapshots,
+            "count": len(snapshots),
+        },
     })
 
 
