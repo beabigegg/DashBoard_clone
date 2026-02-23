@@ -136,7 +136,7 @@ body {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(10, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
 }
 
@@ -529,12 +529,6 @@ body {
   margin-bottom: 12px;
 }
 
-@media (max-width: 1500px) {
-  .summary-grid {
-    grid-template-columns: repeat(5, minmax(120px, 1fr));
-  }
-}
-
 @media (max-width: 980px) {
   .resource-page {
     padding: 12px;
@@ -542,10 +536,6 @@ body {
 
   .header-gradient h1 {
     font-size: 20px;
-  }
-
-  .summary-grid {
-    grid-template-columns: repeat(3, minmax(110px, 1fr));
   }
 }
 
@@ -662,10 +652,6 @@ body {
 }
 
 @media (max-width: 640px) {
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(100px, 1fr));
-  }
-
   .matrix-table th:first-child,
   .matrix-table td:first-child {
     min-width: 220px;
