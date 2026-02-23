@@ -52,6 +52,16 @@ function buildStatusTone(status) {
   return 'neutral';
 }
 
+const JOBS_DISPLAY_COLUMNS = Object.freeze([
+  'RESOURCENAME', 'JOBID', 'JOBSTATUS', 'JOBMODELNAME',
+  'CREATEDATE', 'COMPLETEDATE', 'CAUSECODENAME', 'REPAIRCODENAME',
+]);
+
+const TXN_DISPLAY_COLUMNS = Object.freeze([
+  'TXNDATE', 'FROMJOBSTATUS', 'JOBSTATUS', 'STAGENAME',
+  'CAUSECODENAME', 'REPAIRCODENAME', 'USER_NAME', 'COMMENTS',
+]);
+
 export function useJobQueryData() {
   const resources = ref([]);
   const loadingResources = ref(false);
@@ -89,13 +99,13 @@ export function useJobQueryData() {
   const selectedResourceCount = computed(() => filters.resourceIds.length);
 
   const jobsColumns = computed(() => {
-    const row = jobs.value[0] || {};
-    return Object.keys(row);
+    const available = new Set(Object.keys(jobs.value[0] || {}));
+    return JOBS_DISPLAY_COLUMNS.filter((col) => available.has(col));
   });
 
   const txnColumns = computed(() => {
-    const row = txnRows.value[0] || {};
-    return Object.keys(row);
+    const available = new Set(Object.keys(txnRows.value[0] || {}));
+    return TXN_DISPLAY_COLUMNS.filter((col) => available.has(col));
   });
 
   function resetDateRangeToLast90Days() {

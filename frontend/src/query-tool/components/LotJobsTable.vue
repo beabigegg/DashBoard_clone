@@ -47,24 +47,14 @@ const JOB_COLUMN_PRIORITY = Object.freeze([
 ]);
 
 const TXN_COLUMN_PRIORITY = Object.freeze([
-  'JOBTXNHISTORYID',
-  'JOBID',
   'TXNDATE',
   'FROMJOBSTATUS',
   'JOBSTATUS',
   'STAGENAME',
-  'TOSTAGENAME',
   'CAUSECODENAME',
   'REPAIRCODENAME',
-  'SYMPTOMCODENAME',
-  'USER_EMPNO',
   'USER_NAME',
-  'EMP_EMPNO',
-  'EMP_NAME',
   'COMMENTS',
-  'CDONAME',
-  'JOBMODELNAME',
-  'JOBORDERNAME',
 ]);
 
 const selectedJobId = ref('');
@@ -73,20 +63,8 @@ const loadingTxn = ref(false);
 const txnError = ref('');
 
 function buildOrderedColumns(rows, preferred) {
-  const keys = Object.keys(rows?.[0] || {});
-  if (keys.length === 0) {
-    return [...preferred];
-  }
-
-  const keySet = new Set(keys);
-  const ordered = preferred.filter((column) => keySet.has(column));
-  const orderedSet = new Set(ordered);
-  keys.forEach((column) => {
-    if (!orderedSet.has(column)) {
-      ordered.push(column);
-    }
-  });
-  return ordered;
+  const keys = new Set(Object.keys(rows?.[0] || {}));
+  return preferred.filter((column) => keys.has(column));
 }
 
 const sortedRows = computed(() => {
