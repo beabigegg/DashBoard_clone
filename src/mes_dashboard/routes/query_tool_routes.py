@@ -214,6 +214,20 @@ def _format_lot_rejects_export_rows(rows):
     return normalized_rows
 
 
+def _format_lot_jobs_export_rows(rows):
+    """Rename CONTAINERNAMES to LOT ID in lot jobs export."""
+    normalized_rows = []
+    for row in rows or []:
+        out = {}
+        for key, value in row.items():
+            if key == 'CONTAINERNAMES':
+                out['LOT ID'] = value or ''
+            else:
+                out[key] = value if value is not None else ''
+        normalized_rows.append(out)
+    return normalized_rows
+
+
 # ============================================================
 # Page Route
 # ============================================================
@@ -752,6 +766,8 @@ def export_csv():
             export_data = _format_lot_history_export_rows(export_data)
         elif export_type == 'lot_rejects':
             export_data = _format_lot_rejects_export_rows(export_data)
+        elif export_type == 'lot_jobs':
+            export_data = _format_lot_jobs_export_rows(export_data)
 
         # Stream CSV response
         return Response(
