@@ -7,6 +7,7 @@
 --   :time_end     - End time of LOT processing
 
 SELECT
+    j.CONTAINERNAMES,
     j.RESOURCENAME,
     j.JOBID,
     j.JOBSTATUS   AS JOB_FINAL_STATUS,

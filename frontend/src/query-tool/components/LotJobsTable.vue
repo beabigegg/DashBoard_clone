@@ -165,7 +165,7 @@ async function loadTxn(jobId) {
             <tr>
               <th>操作</th>
               <th v-for="column in jobColumns" :key="column">
-                {{ column }}
+                {{ column === 'CONTAINERNAMES' ? 'LOT ID' : column }}
               </th>
             </tr>
           </thead>
