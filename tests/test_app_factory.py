@@ -58,7 +58,6 @@ class AppFactoryTests(unittest.TestCase):
             "/reject-history",
             "/excel-query",
             "/query-tool",
-            "/tmtt-defect",
             "/api/wip/overview/summary",
             "/api/wip/overview/matrix",
             "/api/wip/overview/hold",
@@ -74,7 +73,6 @@ class AppFactoryTests(unittest.TestCase):
             "/api/portal/navigation",
             "/api/excel-query/upload",
             "/api/query-tool/resolve",
-            "/api/tmtt-defect/analysis",
             "/api/reject-history/summary",
         }
         missing = expected - rules

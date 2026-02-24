@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import os
 import re
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List
 
 from mes_dashboard.core.cache import cache_get, cache_set
@@ -17,6 +19,7 @@ from mes_dashboard.sql import QueryBuilder, SQLLoader
 logger = logging.getLogger("mes_dashboard.event_fetcher")
 
 ORACLE_IN_BATCH_SIZE = 1000
+EVENT_FETCHER_MAX_WORKERS = int(os.getenv('EVENT_FETCHER_MAX_WORKERS', '4'))
 
 _DOMAIN_SPECS: Dict[str, Dict[str, Any]] = {
     "history": {
@@ -74,6 +77,15 @@ _DOMAIN_SPECS: Dict[str, Dict[str, Any]] = {
         "bucket": "event-upstream",
         "max_env": "EVT_UPSTREAM_RATE_MAX_REQUESTS",
         "window_env": "EVT_UPSTREAM_RATE_WINDOW_SECONDS",
+        "default_max": 20,
+        "default_window": 60,
+    },
+    "downstream_rejects": {
+        "filter_column": "r.CONTAINERID",
+        "cache_ttl": 300,
+        "bucket": "event-downstream-rejects",
+        "max_env": "EVT_DOWNSTREAM_REJECTS_RATE_MAX_REQUESTS",
+        "window_env": "EVT_DOWNSTREAM_REJECTS_RATE_WINDOW_SECONDS",
         "default_max": 20,
         "default_window": 60,
     },
@@ -155,6 +167,12 @@ class EventFetcher:
                 ANCESTOR_FILTER=condition_sql,
             )
 
+        if domain == "downstream_rejects":
+            return SQLLoader.load_with_params(
+                "mid_section_defect/downstream_rejects",
+                DESCENDANT_FILTER=condition_sql,
+            )
+
         if domain == "history":
             sql = SQLLoader.load("query_tool/lot_history")
             sql = EventFetcher._replace_container_filter(sql, condition_sql)
@@ -219,36 +237,63 @@ class EventFetcher:
         filter_column = spec["filter_column"]
         match_mode = spec.get("match_mode", "in")
 
-        for i in range(0, len(normalized_ids), ORACLE_IN_BATCH_SIZE):
-            batch = normalized_ids[i:i + ORACLE_IN_BATCH_SIZE]
+        def _fetch_batch(batch_ids):
             builder = QueryBuilder()
             if match_mode == "contains":
-                builder.add_or_like_conditions(filter_column, batch, position="both")
+                builder.add_or_like_conditions(filter_column, batch_ids, position="both")
             else:
-                builder.add_in_condition(filter_column, batch)
-
+                builder.add_in_condition(filter_column, batch_ids)
             sql = EventFetcher._build_domain_sql(domain, builder.get_conditions_sql())
-            df = read_sql_df(sql, builder.params)
-            if df is None or df.empty:
-                continue
+            return batch_ids, read_sql_df(sql, builder.params)
 
+        def _sanitize_record(d):
+            """Replace NaN/NaT values with None for JSON-safe serialization."""
+            for k, v in d.items():
+                if isinstance(v, float) and math.isnan(v):
+                    d[k] = None
+            return d
+
+        def _process_batch_result(batch_ids, df):
+            if df is None or df.empty:
+                return
             for _, row in df.iterrows():
                 if domain == "jobs":
-                    record = row.to_dict()
+                    record = _sanitize_record(row.to_dict())
                     containers = record.get("CONTAINERIDS")
                     if not isinstance(containers, str) or not containers:
                         continue
-                    for cid in batch:
+                    for cid in batch_ids:
                         if cid in containers:
                             enriched = dict(record)
                             enriched["CONTAINERID"] = cid
                             grouped[cid].append(enriched)
                     continue
-
                 cid = row.get("CONTAINERID")
                 if not isinstance(cid, str) or not cid:
                     continue
-                grouped[cid].append(row.to_dict())
+                grouped[cid].append(_sanitize_record(row.to_dict()))
+
+        batches = [
+            normalized_ids[i:i + ORACLE_IN_BATCH_SIZE]
+            for i in range(0, len(normalized_ids), ORACLE_IN_BATCH_SIZE)
+        ]
+
+        if len(batches) <= 1:
+            for batch in batches:
+                batch_ids, df = _fetch_batch(batch)
+                _process_batch_result(batch_ids, df)
+        else:
+            with ThreadPoolExecutor(max_workers=min(len(batches), EVENT_FETCHER_MAX_WORKERS)) as executor:
+                futures = {executor.submit(_fetch_batch, b): b for b in batches}
+                for future in as_completed(futures):
+                    try:
+                        batch_ids, df = future.result()
+                        _process_batch_result(batch_ids, df)
+                    except Exception:
+                        logger.error(
+                            "EventFetcher batch query failed domain=%s batch_size=%s",
+                            domain, len(futures[future]), exc_info=True,
+                        )
 
         result = dict(grouped)
         cache_set(cache_key, result, ttl=_DOMAIN_SPECS[domain]["cache_ttl"])

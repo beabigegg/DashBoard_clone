@@ -8,6 +8,7 @@ const DEFAULT_STAGE_TIMEOUT_MS = 60000;
 const PROFILE_DOMAINS = Object.freeze({
   query_tool: ['history', 'materials', 'rejects', 'holds', 'jobs'],
   mid_section_defect: ['upstream_history'],
+  mid_section_defect_forward: ['upstream_history', 'downstream_rejects'],
 });
 
 function stageKey(stageName) {
@@ -31,23 +32,42 @@ function normalizeSeedContainerIds(seedPayload) {
   return containerIds;
 }
 
-function collectAllContainerIds(seedContainerIds, lineagePayload) {
+function collectAllContainerIds(seedContainerIds, lineagePayload, direction) {
   const seen = new Set(seedContainerIds);
   const merged = [...seedContainerIds];
-  const ancestors = lineagePayload?.ancestors || {};
-  Object.values(ancestors).forEach((values) => {
-    if (!Array.isArray(values)) {
-      return;
+
+  if (direction === 'forward') {
+    const childrenMap = lineagePayload?.children_map || {};
+    const queue = [...seedContainerIds];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const children = childrenMap[current];
+      if (!Array.isArray(children)) continue;
+      for (const child of children) {
+        const id = String(child || '').trim();
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        merged.push(id);
+        queue.push(id);
+      }
     }
-    values.forEach((value) => {
-      const id = String(value || '').trim();
-      if (!id || seen.has(id)) {
+  } else {
+    const ancestors = lineagePayload?.ancestors || {};
+    Object.values(ancestors).forEach((values) => {
+      if (!Array.isArray(values)) {
         return;
       }
-      seen.add(id);
-      merged.push(id);
+      values.forEach((value) => {
+        const id = String(value || '').trim();
+        if (!id || seen.has(id)) {
+          return;
+        }
+        seen.add(id);
+        merged.push(id);
+      });
     });
-  });
+  }
+
   return merged;
 }
 
@@ -89,7 +109,11 @@ export function useTraceProgress({ profile } = {}) {
   }
 
   async function execute(params = {}) {
-    const domains = PROFILE_DOMAINS[profile];
+    const direction = params.direction || 'backward';
+    const domainKey = profile === 'mid_section_defect' && direction === 'forward'
+      ? 'mid_section_defect_forward'
+      : profile;
+    const domains = PROFILE_DOMAINS[domainKey];
     if (!domains) {
       throw new Error(`Unsupported trace profile: ${profile}`);
     }
@@ -123,13 +147,14 @@ export function useTraceProgress({ profile } = {}) {
           profile,
           container_ids: seedContainerIds,
           cache_key: seedPayload?.cache_key || null,
+          params,
         },
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },
       );
       stage_results.lineage = lineagePayload;
       completed_stages.value = [...completed_stages.value, 'lineage'];
 
-      const allContainerIds = collectAllContainerIds(seedContainerIds, lineagePayload);
+      const allContainerIds = collectAllContainerIds(seedContainerIds, lineagePayload, direction);
       current_stage.value = 'events';
       const eventsPayload = await apiPost(
         '/api/trace/events',
@@ -142,6 +167,7 @@ export function useTraceProgress({ profile } = {}) {
           seed_container_ids: seedContainerIds,
           lineage: {
             ancestors: lineagePayload?.ancestors || {},
+            children_map: lineagePayload?.children_map || {},
           },
         },
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },

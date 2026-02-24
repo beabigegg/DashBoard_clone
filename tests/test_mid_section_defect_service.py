@@ -12,6 +12,7 @@ from mes_dashboard.services.mid_section_defect_service import (
     query_analysis,
     query_analysis_detail,
     query_all_loss_reasons,
+    query_station_options,
 )
 
 
@@ -135,9 +136,9 @@ def test_query_all_loss_reasons_cache_miss_queries_and_caches_sorted_values(
 @patch('mes_dashboard.services.mid_section_defect_service.try_acquire_lock', return_value=True)
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_upstream_history')
 @patch('mes_dashboard.services.mid_section_defect_service._resolve_full_genealogy')
-@patch('mes_dashboard.services.mid_section_defect_service._fetch_tmtt_data')
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
 def test_trace_aggregation_matches_query_analysis_summary(
-    mock_fetch_tmtt_data,
+    mock_fetch_detection_data,
     mock_resolve_genealogy,
     mock_fetch_upstream_history,
     _mock_lock,
@@ -145,7 +146,7 @@ def test_trace_aggregation_matches_query_analysis_summary(
     _mock_cache_get,
     _mock_cache_set,
 ):
-    tmtt_df = pd.DataFrame([
+    detection_df = pd.DataFrame([
         {
             'CONTAINERID': 'CID-001',
             'CONTAINERNAME': 'LOT-001',
@@ -155,7 +156,7 @@ def test_trace_aggregation_matches_query_analysis_summary(
             'WORKFLOW': 'WF-A',
             'PRODUCTLINENAME': 'PKG-A',
             'PJ_TYPE': 'TYPE-A',
-            'TMTT_EQUIPMENTNAME': 'TMTT-01',
+            'DETECTION_EQUIPMENTNAME': 'EQ-01',
             'TRACKINTIMESTAMP': '2025-01-10 10:00:00',
             'FINISHEDRUNCARD': 'FR-001',
         },
@@ -168,7 +169,7 @@ def test_trace_aggregation_matches_query_analysis_summary(
             'WORKFLOW': 'WF-B',
             'PRODUCTLINENAME': 'PKG-B',
             'PJ_TYPE': 'TYPE-B',
-            'TMTT_EQUIPMENTNAME': 'TMTT-02',
+            'DETECTION_EQUIPMENTNAME': 'EQ-02',
             'TRACKINTIMESTAMP': '2025-01-11 10:00:00',
             'FINISHEDRUNCARD': 'FR-002',
         },
@@ -211,7 +212,7 @@ def test_trace_aggregation_matches_query_analysis_summary(
         }],
     }
 
-    mock_fetch_tmtt_data.return_value = tmtt_df
+    mock_fetch_detection_data.return_value = detection_df
     mock_resolve_genealogy.return_value = ancestors
     mock_fetch_upstream_history.return_value = upstream_normalized
 
@@ -240,3 +241,13 @@ def test_trace_aggregation_matches_query_analysis_summary(
 
     assert staged_summary['daily_trend'] == summary['daily_trend']
     assert staged_summary['charts'].keys() == summary['charts'].keys()
+
+
+def test_query_station_options_returns_ordered_list():
+    result = query_station_options()
+    assert isinstance(result, list)
+    assert len(result) == 12
+    assert result[0]['name'] == '切割'
+    assert result[0]['order'] == 0
+    assert result[-1]['name'] == '測試'
+    assert result[-1]['order'] == 11

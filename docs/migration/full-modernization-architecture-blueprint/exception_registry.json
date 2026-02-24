@@ -71,13 +71,6 @@
       "reason": "Legacy styles pending full token and scope migration"
     },
     {
-      "id": "style-legacy-tmtt-defect",
-      "scope": "/tmtt-defect",
-      "owner": "frontend-mes-reporting",
-      "milestone": "full-modernization-phase2",
-      "reason": "Legacy styles pending full token and scope migration"
-    },
-    {
       "id": "style-legacy-admin-pages",
       "scope": "/admin/pages",
       "owner": "frontend-platform-admin",

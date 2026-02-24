@@ -11,12 +11,11 @@
     "/resource-history": {"content_cutover_enabled": true},
     "/qc-gate": {"content_cutover_enabled": true},
     "/job-query": {"content_cutover_enabled": true},
-    "/tmtt-defect": {"content_cutover_enabled": true},
     "/admin/pages": {"content_cutover_enabled": true},
     "/admin/performance": {"content_cutover_enabled": true},
     "/tables": {"content_cutover_enabled": false},
     "/excel-query": {"content_cutover_enabled": false},
     "/query-tool": {"content_cutover_enabled": false},
-    "/mid-section-defect": {"content_cutover_enabled": false}
+    "/mid-section-defect": {"content_cutover_enabled": true}
   }
 }

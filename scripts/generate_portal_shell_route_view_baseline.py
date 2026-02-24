@@ -131,15 +131,6 @@ TARGET_ROUTE_CONTRACTS: list[dict[str, Any]] = [
         "owner": "frontend-mes-reporting",
         "rollback_strategy": "fallback_to_legacy_route",
     },
-    {
-        "route": "/tmtt-defect",
-        "page_name": "TMTT Defect",
-        "render_mode": "native",
-        "required_query_keys": [],
-        "source_dir": "frontend/src/tmtt-defect",
-        "owner": "frontend-mes-reporting",
-        "rollback_strategy": "fallback_to_legacy_route",
-    },
 ]
 
 
@@ -180,10 +171,6 @@ CRITICAL_API_PAYLOAD_CONTRACTS = {
         "required_keys": ["summary", "table", "pareto"],
         "notes": "QC-GATE chart/table linked view",
     },
-    "/api/tmtt-defect/analysis": {
-        "required_keys": ["kpi", "pareto", "trend", "detail"],
-        "notes": "TMTT chart/table analysis payload",
-    },
 }
 
 
@@ -199,7 +186,6 @@ ROUTE_NOTES = {
     "/job-query": "resource/date query + txn detail + export",
     "/excel-query": "upload/detect/query/export workflow",
     "/query-tool": "resolve/history/associations/equipment-period workflows",
-    "/tmtt-defect": "analysis + chart interactions + CSV export",
 }
 
 

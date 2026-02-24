@@ -10,7 +10,6 @@
     "/resource-history": ["resource-history.js"],
     "/qc-gate": ["qc-gate.js"],
     "/job-query": ["job-query.js"],
-    "/tmtt-defect": ["tmtt-defect.js"],
     "/admin/performance": ["admin-performance.js"],
     "/tables": ["tables.js"],
     "/excel-query": ["excel-query.js"],

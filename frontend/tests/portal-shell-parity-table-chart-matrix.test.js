@@ -37,8 +37,6 @@ test('table parity: list/detail pages preserve pagination and sort continuity ho
   assert.match(holdDetailSource, /page|currentPage|perPage/);
   assert.match(holdDetailSource, /distribution|lots/i);
 
-  const tmttTableSource = readSource('src/tmtt-defect/components/TmttDetailTable.vue');
-  assert.match(tmttTableSource, /sort/i);
 });
 
 test('chart parity: chart pages keep tooltip, legend, autoresize and click linkage', () => {
@@ -53,10 +51,6 @@ test('chart parity: chart pages keep tooltip, legend, autoresize and click linka
   assert.match(holdParetoSource, /legend\s*:/);
   assert.match(holdParetoSource, /@click="handleChartClick"/);
 
-  const tmttChartSource = readSource('src/tmtt-defect/components/TmttChartCard.vue');
-  assert.match(tmttChartSource, /tooltip\s*:/);
-  assert.match(tmttChartSource, /legend\s*:/);
-  assert.match(tmttChartSource, /autoresize/);
 });
 
 test('matrix interaction parity: selection/highlight/drill handlers remain present', () => {

@@ -879,14 +879,6 @@ def create_app(config_name: str | None = None) -> Flask:
             200,
         ))
 
-    @app.route('/tmtt-defect')
-    def tmtt_defect_page():
-        """TMTT printing & lead form defect analysis page."""
-        canonical_redirect = maybe_redirect_to_canonical_shell('/tmtt-defect')
-        if canonical_redirect is not None:
-            return canonical_redirect
-        return render_template('tmtt_defect.html')
-
     @app.route('/qc-gate')
     def qc_gate_page():
         """QC-GATE status report served as pure Vite HTML output."""

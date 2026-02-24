@@ -16,6 +16,10 @@ const props = defineProps({
     type: Object,
     default: () => ({ page: 1, page_size: 200, total_count: 0, total_pages: 1 }),
   },
+  direction: {
+    type: String,
+    default: 'backward',
+  },
 });
 
 const emit = defineEmits(['export-csv', 'prev-page', 'next-page']);
@@ -23,12 +27,12 @@ const emit = defineEmits(['export-csv', 'prev-page', 'next-page']);
 const sortField = ref('DEFECT_RATE');
 const sortAsc = ref(false);
 
-const COLUMNS = [
+const COLUMNS_BACKWARD = [
   { key: 'CONTAINERNAME', label: 'LOT ID', width: '140px' },
   { key: 'PJ_TYPE', label: 'TYPE', width: '80px' },
   { key: 'PRODUCTLINENAME', label: 'PACKAGE', width: '90px' },
   { key: 'WORKFLOW', label: 'WORKFLOW', width: '100px' },
-  { key: 'TMTT_EQUIPMENTNAME', label: 'TMTT 設備', width: '110px' },
+  { key: 'DETECTION_EQUIPMENTNAME', label: '偵測設備', width: '110px' },
   { key: 'INPUT_QTY', label: '投入數', width: '70px', numeric: true },
   { key: 'LOSS_REASON', label: '不良原因', width: '130px' },
   { key: 'DEFECT_QTY', label: '不良數', width: '70px', numeric: true },
@@ -36,6 +40,21 @@ const COLUMNS = [
   { key: 'ANCESTOR_COUNT', label: '上游LOT數', width: '80px', numeric: true },
   { key: 'UPSTREAM_MACHINES', label: '上游機台', width: '200px' },
 ];
+
+const COLUMNS_FORWARD = [
+  { key: 'CONTAINERNAME', label: 'LOT ID', width: '140px' },
+  { key: 'DETECTION_EQUIPMENTNAME', label: '偵測設備', width: '120px' },
+  { key: 'TRACKINQTY', label: '偵測投入', width: '80px', numeric: true },
+  { key: 'DEFECT_QTY', label: '偵測不良', width: '80px', numeric: true },
+  { key: 'DOWNSTREAM_STATIONS_REACHED', label: '下游到達站數', width: '100px', numeric: true },
+  { key: 'DOWNSTREAM_TOTAL_REJECT', label: '下游不良總數', width: '100px', numeric: true },
+  { key: 'DOWNSTREAM_REJECT_RATE', label: '下游不良率(%)', width: '110px', numeric: true },
+  { key: 'WORST_DOWNSTREAM_STATION', label: '最差下游站', width: '120px' },
+];
+
+const activeColumns = computed(() => (
+  props.direction === 'forward' ? COLUMNS_FORWARD : COLUMNS_BACKWARD
+));
 
 const sortedData = computed(() => {
   if (!props.data || !props.data.length) return [];
@@ -80,7 +99,7 @@ function sortIcon(field) {
 
 function formatCell(value, col) {
   if (value == null || value === '') return '-';
-  if (col.key === 'DEFECT_RATE') return Number(value).toFixed(2);
+  if (col.key === 'DEFECT_RATE' || col.key === 'DOWNSTREAM_REJECT_RATE') return Number(value).toFixed(2);
   if (col.numeric) return Number(value).toLocaleString();
   return value;
 }
@@ -104,7 +123,7 @@ function formatCell(value, col) {
           <thead>
             <tr>
               <th
-                v-for="col in COLUMNS"
+                v-for="col in activeColumns"
                 :key="col.key"
                 :style="{ width: col.width }"
                 class="sortable"
@@ -116,12 +135,12 @@ function formatCell(value, col) {
           </thead>
           <tbody>
             <tr v-for="(row, idx) in sortedData" :key="idx">
-              <td v-for="col in COLUMNS" :key="col.key" :class="{ numeric: col.numeric }">
+              <td v-for="col in activeColumns" :key="col.key" :class="{ numeric: col.numeric }">
                 {{ formatCell(row[col.key], col) }}
               </td>
             </tr>
             <tr v-if="!sortedData.length">
-              <td :colspan="COLUMNS.length" class="empty-row">暫無資料</td>
+              <td :colspan="activeColumns.length" class="empty-row">暫無資料</td>
             </tr>
           </tbody>
         </table>

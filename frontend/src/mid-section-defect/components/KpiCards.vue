@@ -10,11 +10,19 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  direction: {
+    type: String,
+    default: 'backward',
+  },
+  stationLabel: {
+    type: String,
+    default: '測試',
+  },
 });
 
-const cards = computed(() => [
+const backwardCards = computed(() => [
   {
-    label: 'TMTT 投入數',
+    label: `${props.stationLabel} 投入數`,
     value: formatNumber(props.kpi.total_input),
     unit: 'pcs',
     color: '#3b82f6',
@@ -51,6 +59,49 @@ const cards = computed(() => [
     color: '#10b981',
   },
 ]);
+
+const forwardCards = computed(() => [
+  {
+    label: '偵測批次數',
+    value: formatNumber(props.kpi.detection_lot_count),
+    unit: 'lots',
+    color: '#3b82f6',
+  },
+  {
+    label: '偵測不良數',
+    value: formatNumber(props.kpi.detection_defect_qty),
+    unit: 'pcs',
+    color: '#ef4444',
+  },
+  {
+    label: '追蹤批次數',
+    value: formatNumber(props.kpi.tracked_lot_count),
+    unit: 'lots',
+    color: '#6366f1',
+  },
+  {
+    label: '下游到達站數',
+    value: formatNumber(props.kpi.downstream_stations_reached),
+    unit: '站',
+    color: '#8b5cf6',
+  },
+  {
+    label: '下游不良總數',
+    value: formatNumber(props.kpi.downstream_total_reject),
+    unit: 'pcs',
+    color: '#f59e0b',
+  },
+  {
+    label: '下游不良率',
+    value: formatRate(props.kpi.downstream_reject_rate),
+    unit: '%',
+    color: '#10b981',
+  },
+]);
+
+const cards = computed(() => (
+  props.direction === 'forward' ? forwardCards.value : backwardCards.value
+));
 
 function formatNumber(v) {
   if (v == null || v === 0) return '0';

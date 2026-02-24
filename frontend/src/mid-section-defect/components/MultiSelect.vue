@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
   modelValue: {
@@ -18,12 +18,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  searchable: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits(['update:modelValue']);
 
 const rootRef = ref(null);
+const searchRef = ref(null);
 const isOpen = ref(false);
+const searchQuery = ref('');
 
 const normalizedOptions = computed(() => {
   return props.options.map((option) => {
@@ -41,6 +47,14 @@ const normalizedOptions = computed(() => {
       value: String(option),
     };
   });
+});
+
+const filteredOptions = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase();
+  if (!q) return normalizedOptions.value;
+  return normalizedOptions.value.filter(
+    (opt) => opt.label.toLowerCase().includes(q) || opt.value.toLowerCase().includes(q)
+  );
 });
 
 const selectedSet = computed(() => new Set((props.modelValue || []).map((value) => String(value))));
@@ -70,6 +84,17 @@ function toggleDropdown() {
   }
   isOpen.value = !isOpen.value;
 }
+
+watch(isOpen, (open) => {
+  if (open) {
+    searchQuery.value = '';
+    nextTick(() => {
+      if (props.searchable && searchRef.value) {
+        searchRef.value.focus();
+      }
+    });
+  }
+});
 
 function isSelected(value) {
   return selectedSet.value.has(String(value));
@@ -131,9 +156,19 @@ onBeforeUnmount(() => {
     </button>
 
     <div v-if="isOpen" class="multi-select-dropdown">
+      <div v-if="searchable" class="multi-select-search">
+        <input
+          ref="searchRef"
+          v-model="searchQuery"
+          type="text"
+          class="multi-select-search-input"
+          placeholder="搜尋..."
+        />
+      </div>
+
       <div class="multi-select-options">
         <button
-          v-for="option in normalizedOptions"
+          v-for="option in filteredOptions"
           :key="option.value"
           type="button"
           class="multi-select-option"
@@ -142,6 +177,9 @@ onBeforeUnmount(() => {
           <input type="checkbox" :checked="isSelected(option.value)" tabindex="-1" />
           <span>{{ option.label }}</span>
         </button>
+        <div v-if="filteredOptions.length === 0" class="multi-select-no-match">
+          無符合項目
+        </div>
       </div>
 
       <div class="multi-select-actions">

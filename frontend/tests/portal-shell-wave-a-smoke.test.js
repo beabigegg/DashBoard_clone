@@ -15,7 +15,6 @@ const WAVE_A_ROUTES = Object.freeze([
   '/resource',
   '/resource-history',
   '/qc-gate',
-  '/tmtt-defect',
 ]);
 
 const WAVE_B_NATIVE_ROUTES = Object.freeze([

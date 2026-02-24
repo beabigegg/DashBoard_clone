@@ -76,6 +76,12 @@
           "name": "批次追蹤工具",
           "status": "released",
           "order": 2
+        },
+        {
+          "route": "/mid-section-defect",
+          "name": "製程不良追溯分析",
+          "status": "released",
+          "order": 3
         }
       ]
     },
@@ -108,18 +114,6 @@
           "name": "效能監控",
           "status": "dev",
           "order": 2
-        },
-        {
-          "route": "/tmtt-defect",
-          "name": "TMTT印字腳型不良分析",
-          "status": "dev",
-          "order": 5
-        },
-        {
-          "route": "/mid-section-defect",
-          "name": "中段製程不良追溯",
-          "status": "dev",
-          "order": 6
         }
       ]
     }
@@ -194,6 +188,12 @@
           "name": "批次追蹤工具",
           "status": "released",
           "order": 2
+        },
+        {
+          "route": "/mid-section-defect",
+          "name": "製程不良追溯分析",
+          "status": "released",
+          "order": 3
         }
       ]
     }

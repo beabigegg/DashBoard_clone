@@ -14,9 +14,35 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  stationOptions: {
+    type: Array,
+    default: () => [],
+  },
+  queryMode: {
+    type: String,
+    default: 'date_range',
+  },
+  containerInputType: {
+    type: String,
+    default: 'lot',
+  },
+  containerInput: {
+    type: String,
+    default: '',
+  },
+  resolutionInfo: {
+    type: Object,
+    default: null,
+  },
 });
 
-const emit = defineEmits(['update-filters', 'query']);
+const emit = defineEmits([
+  'update-filters',
+  'query',
+  'update:queryMode',
+  'update:containerInputType',
+  'update:containerInput',
+]);
 
 function updateFilters(patch) {
   emit('update-filters', {
@@ -29,29 +55,112 @@ function updateFilters(patch) {
 <template>
   <section class="section-card">
     <div class="section-inner">
+      <!-- Mode toggle tabs -->
+      <div class="mode-tab-row">
+        <button
+          type="button"
+          :class="['mode-tab', { active: queryMode === 'date_range' }]"
+          @click="$emit('update:queryMode', 'date_range')"
+        >
+          日期區間
+        </button>
+        <button
+          type="button"
+          :class="['mode-tab', { active: queryMode === 'container' }]"
+          @click="$emit('update:queryMode', 'container')"
+        >
+          LOT / 工單 / WAFER
+        </button>
+      </div>
+
       <div class="filter-row">
+        <!-- Shared: detection station -->
         <div class="filter-field">
-          <label for="msd-start-date">開始</label>
-          <input
-            id="msd-start-date"
-            type="date"
-            :value="filters.startDate"
+          <label for="msd-station">偵測站</label>
+          <select
+            id="msd-station"
+            :value="filters.station"
             :disabled="loading"
-            @input="updateFilters({ startDate: $event.target.value })"
-          />
+            class="filter-select"
+            @change="updateFilters({ station: $event.target.value })"
+          >
+            <option
+              v-for="opt in stationOptions"
+              :key="opt.name"
+              :value="opt.name"
+            >
+              {{ opt.label || opt.name }}
+            </option>
+          </select>
         </div>
 
-        <div class="filter-field">
-          <label for="msd-end-date">結束</label>
-          <input
-            id="msd-end-date"
-            type="date"
-            :value="filters.endDate"
+        <!-- Container mode: input type -->
+        <div v-if="queryMode === 'container'" class="filter-field">
+          <label for="msd-container-type">輸入類型</label>
+          <select
+            id="msd-container-type"
+            class="filter-select"
+            :value="containerInputType"
             :disabled="loading"
-            @input="updateFilters({ endDate: $event.target.value })"
-          />
+            @change="$emit('update:containerInputType', $event.target.value)"
+          >
+            <option value="lot">LOT</option>
+            <option value="work_order">工單</option>
+            <option value="wafer_lot">WAFER LOT</option>
+          </select>
         </div>
 
+        <!-- Shared: direction -->
+        <div class="filter-field">
+          <label>方向</label>
+          <div class="direction-toggle">
+            <button
+              type="button"
+              class="direction-btn"
+              :class="{ active: filters.direction === 'backward' }"
+              :disabled="loading"
+              @click="updateFilters({ direction: 'backward' })"
+            >
+              反向追溯
+            </button>
+            <button
+              type="button"
+              class="direction-btn"
+              :class="{ active: filters.direction === 'forward' }"
+              :disabled="loading"
+              @click="updateFilters({ direction: 'forward' })"
+            >
+              正向追溯
+            </button>
+          </div>
+        </div>
+
+        <!-- Date range mode: dates -->
+        <template v-if="queryMode === 'date_range'">
+          <div class="filter-field">
+            <label for="msd-start-date">開始</label>
+            <input
+              id="msd-start-date"
+              type="date"
+              :value="filters.startDate"
+              :disabled="loading"
+              @input="updateFilters({ startDate: $event.target.value })"
+            />
+          </div>
+
+          <div class="filter-field">
+            <label for="msd-end-date">結束</label>
+            <input
+              id="msd-end-date"
+              type="date"
+              :value="filters.endDate"
+              :disabled="loading"
+              @input="updateFilters({ endDate: $event.target.value })"
+            />
+          </div>
+        </template>
+
+        <!-- Shared: loss reasons -->
         <div class="filter-field">
           <label>不良原因</label>
           <MultiSelect
@@ -71,6 +180,33 @@ function updateFilters(patch) {
         >
           查詢
         </button>
+      </div>
+
+      <!-- Container mode: textarea input -->
+      <div v-if="queryMode === 'container'" class="container-input-row">
+        <textarea
+          class="filter-textarea"
+          rows="3"
+          :value="containerInput"
+          :disabled="loading"
+          placeholder="每行一個，支援 * 或 % wildcard&#10;GA26020001-A00-001&#10;GA260200%&#10;..."
+          @input="$emit('update:containerInput', $event.target.value)"
+        ></textarea>
+      </div>
+
+      <!-- Resolution info (container mode) -->
+      <div
+        v-if="resolutionInfo && queryMode === 'container'"
+        class="resolution-info"
+      >
+        已解析 {{ resolutionInfo.resolved_count }} 筆容器
+        <template v-if="resolutionInfo.not_found?.length > 0">
+          <span class="resolution-warn">
+            ({{ resolutionInfo.not_found.length }} 筆未找到:
+            {{ resolutionInfo.not_found.slice(0, 10).join(', ')
+            }}{{ resolutionInfo.not_found.length > 10 ? '...' : '' }})
+          </span>
+        </template>
       </div>
     </div>
   </section>

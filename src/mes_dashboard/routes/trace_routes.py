@@ -12,7 +12,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
 from flask import Blueprint, jsonify, request
@@ -33,8 +35,8 @@ logger = logging.getLogger("mes_dashboard.trace_routes")
 
 trace_bp = Blueprint("trace", __name__, url_prefix="/api/trace")
 
-TRACE_STAGE_TIMEOUT_SECONDS = 10.0
-TRACE_LINEAGE_TIMEOUT_SECONDS = 60.0
+TRACE_SLOW_THRESHOLD_SECONDS = float(os.getenv('TRACE_SLOW_THRESHOLD_SECONDS', '15'))
+TRACE_EVENTS_MAX_WORKERS = int(os.getenv('TRACE_EVENTS_MAX_WORKERS', '4'))
 TRACE_CACHE_TTL_SECONDS = 300
 
 PROFILE_QUERY_TOOL = "query_tool"
@@ -57,6 +59,7 @@ SUPPORTED_EVENT_DOMAINS = {
     "holds",
     "jobs",
     "upstream_history",
+    "downstream_rejects",
 }
 
 _TRACE_SEED_RATE_LIMIT = configured_rate_limit(
@@ -133,10 +136,6 @@ def _events_cache_key(profile: str, domains: List[str], container_ids: List[str]
 
 def _error(code: str, message: str, status_code: int = 400):
     return error_response(code, message, status_code=status_code)
-
-
-def _timeout(stage: str):
-    return _error(f"{stage.upper().replace('-', '_')}_TIMEOUT", f"{stage} stage exceeded timeout budget", 504)
 
 
 def _is_timeout_exception(exc: Exception) -> bool:
@@ -225,11 +224,72 @@ def _seed_resolve_query_tool(
 def _seed_resolve_mid_section_defect(
     params: Dict[str, Any],
 ) -> tuple[Optional[Dict[str, Any]], Optional[tuple[str, str, int]]]:
+    mode = str(params.get("mode") or "date_range").strip()
+
+    if mode == "container":
+        resolve_type = str(params.get("resolve_type") or "").strip()
+        if resolve_type not in {"lot_id", "work_order", "wafer_lot"}:
+            return None, (
+                "INVALID_PARAMS",
+                "resolve_type must be one of: lot_id, work_order, wafer_lot",
+                400,
+            )
+        values = _normalize_strings(params.get("values", []))
+        if not values:
+            return None, ("INVALID_PARAMS", "values must contain at least one query value", 400)
+
+        resolved = resolve_lots(resolve_type, values)
+        if not isinstance(resolved, dict):
+            return None, ("SEED_RESOLVE_FAILED", "seed resolve returned unexpected payload", 500)
+        if "error" in resolved:
+            return None, ("SEED_RESOLVE_FAILED", str(resolved.get("error") or "seed resolve failed"), 400)
+
+        seeds = []
+        seen: set = set()
+        not_found: List[str] = []
+        resolved_values: set = set()
+        for row in resolved.get("data", []):
+            if not isinstance(row, dict):
+                continue
+            container_id = str(row.get("container_id") or row.get("CONTAINERID") or "").strip()
+            if not container_id or container_id in seen:
+                continue
+            seen.add(container_id)
+            lot_id = str(
+                row.get("lot_id")
+                or row.get("CONTAINERNAME")
+                or row.get("input_value")
+                or container_id
+            ).strip()
+            seeds.append({
+                "container_id": container_id,
+                "container_name": lot_id,
+                "lot_id": lot_id,
+            })
+            input_val = str(row.get("input_value") or "").strip()
+            if input_val:
+                resolved_values.add(input_val)
+
+        for val in values:
+            if val not in resolved_values and not any(
+                s.get("lot_id", "") == val or s.get("container_name", "") == val
+                for s in seeds
+            ):
+                not_found.append(val)
+
+        return {
+            "seeds": seeds,
+            "seed_count": len(seeds),
+            "not_found": not_found,
+        }, None
+
+    # date_range mode (default)
     start_date, end_date = _extract_date_range(params)
     if not start_date or not end_date:
         return None, ("INVALID_PARAMS", "start_date/end_date (or date_range) is required", 400)
 
-    result = resolve_trace_seed_lots(start_date, end_date)
+    station = str(params.get("station") or "測試").strip()
+    result = resolve_trace_seed_lots(start_date, end_date, station=station)
     if result is None:
         return None, ("SEED_RESOLVE_FAILED", "seed resolve service unavailable", 503)
     if "error" in result:
@@ -334,9 +394,14 @@ def _build_msd_aggregation(
     if not isinstance(params, dict):
         return None, ("INVALID_PARAMS", "params is required for mid_section_defect profile", 400)
 
-    start_date, end_date = _extract_date_range(params)
-    if not start_date or not end_date:
-        return None, ("INVALID_PARAMS", "start_date/end_date is required in params", 400)
+    mode = str(params.get("mode") or "date_range").strip()
+
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    if mode != "container":
+        start_date, end_date = _extract_date_range(params)
+        if not start_date or not end_date:
+            return None, ("INVALID_PARAMS", "start_date/end_date is required in params", 400)
 
     raw_loss_reasons = params.get("loss_reasons")
     loss_reasons = parse_loss_reasons_param(raw_loss_reasons)
@@ -347,6 +412,8 @@ def _build_msd_aggregation(
         seed_container_ids = _normalize_strings(list(lineage_ancestors.keys()))
 
     upstream_events = domain_results.get("upstream_history", {})
+    station = str(params.get("station") or "測試").strip()
+    direction = str(params.get("direction") or "backward").strip()
 
     aggregation = build_trace_aggregation_from_events(
         start_date,
@@ -355,6 +422,9 @@ def _build_msd_aggregation(
         seed_container_ids=seed_container_ids,
         lineage_ancestors=lineage_ancestors,
         upstream_events_by_cid=upstream_events,
+        station=station,
+        direction=direction,
+        mode=mode,
     )
     if aggregation is None:
         return None, ("EVENTS_AGGREGATION_FAILED", "aggregation service unavailable", 503)
@@ -397,8 +467,8 @@ def seed_resolve():
         resolved, route_error = _seed_resolve_mid_section_defect(params)
 
     elapsed = time.monotonic() - started
-    if elapsed > TRACE_STAGE_TIMEOUT_SECONDS:
-        return _timeout("seed_resolve")
+    if elapsed > TRACE_SLOW_THRESHOLD_SECONDS:
+        logger.warning("trace seed-resolve slow elapsed=%.2fs", elapsed)
 
     if route_error is not None:
         code, message, status = route_error
@@ -441,9 +511,18 @@ def lineage():
         payload.get("cache_key"),
     )
 
+    # Determine lineage direction: backward profiles use reverse genealogy,
+    # forward profiles (and mid_section_defect with direction=backward) use genealogy
+    direction = "forward"
+    if profile == PROFILE_QUERY_TOOL_REVERSE:
+        direction = "backward"
+    elif profile == PROFILE_MID_SECTION_DEFECT:
+        params = payload.get("params") or {}
+        direction = str(params.get("direction") or "backward").strip()
+
     started = time.monotonic()
     try:
-        if profile == PROFILE_QUERY_TOOL_REVERSE:
+        if direction == "backward":
             reverse_graph = LineageEngine.resolve_full_genealogy(container_ids)
             response = _build_lineage_response(
                 container_ids,
@@ -475,8 +554,8 @@ def lineage():
         return _error("LINEAGE_FAILED", "lineage stage failed", 500)
 
     elapsed = time.monotonic() - started
-    if elapsed > TRACE_LINEAGE_TIMEOUT_SECONDS:
-        return _error("LINEAGE_TIMEOUT", "lineage query timed out", 504)
+    if elapsed > TRACE_SLOW_THRESHOLD_SECONDS:
+        logger.warning("trace lineage slow elapsed=%.2fs", elapsed)
 
     cache_set(lineage_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
     return jsonify(response)
@@ -526,19 +605,25 @@ def events():
     raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
     failed_domains: List[str] = []
 
-    for domain in domains:
-        try:
-            events_by_cid = EventFetcher.fetch_events(container_ids, domain)
-            raw_domain_results[domain] = events_by_cid
-            rows = _flatten_domain_records(events_by_cid)
-            results[domain] = {"data": rows, "count": len(rows)}
-        except Exception as exc:
-            logger.error("events stage domain failed domain=%s: %s", domain, exc, exc_info=True)
-            failed_domains.append(domain)
+    with ThreadPoolExecutor(max_workers=min(len(domains), TRACE_EVENTS_MAX_WORKERS)) as executor:
+        futures = {
+            executor.submit(EventFetcher.fetch_events, container_ids, domain): domain
+            for domain in domains
+        }
+        for future in as_completed(futures):
+            domain = futures[future]
+            try:
+                events_by_cid = future.result()
+                raw_domain_results[domain] = events_by_cid
+                rows = _flatten_domain_records(events_by_cid)
+                results[domain] = {"data": rows, "count": len(rows)}
+            except Exception as exc:
+                logger.error("events stage domain failed domain=%s: %s", domain, exc, exc_info=True)
+                failed_domains.append(domain)
 
     elapsed = time.monotonic() - started
-    if elapsed > TRACE_STAGE_TIMEOUT_SECONDS:
-        return _error("EVENTS_TIMEOUT", "events stage timed out", 504)
+    if elapsed > TRACE_SLOW_THRESHOLD_SECONDS:
+        logger.warning("trace events slow elapsed=%.2fs domains=%s", elapsed, ",".join(domains))
 
     aggregation = None
     if profile == PROFILE_MID_SECTION_DEFECT:

@@ -35,7 +35,6 @@ LEGACY_NAV_ASSIGNMENTS = {
     "/excel-query": {"drawer_id": "queries", "order": 2},
     "/job-query": {"drawer_id": "queries", "order": 3},
     "/query-tool": {"drawer_id": "queries", "order": 4},
-    "/tmtt-defect": {"drawer_id": "queries", "order": 5},
     "/admin/pages": {
         "drawer_id": "dev-tools",
         "order": 1,

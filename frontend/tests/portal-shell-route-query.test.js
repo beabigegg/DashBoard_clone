@@ -30,7 +30,7 @@ test('buildLaunchHref replaces existing query keys with latest runtime values', 
 
 test('buildLaunchHref ignores empty and null-like query values', () => {
   assert.equal(
-    buildLaunchHref('/tmtt-defect', { start_date: '', end_date: null, shift: undefined }),
-    '/tmtt-defect',
+    buildLaunchHref('/mid-section-defect', { start_date: '', end_date: null, shift: undefined }),
+    '/mid-section-defect',
   );
 });

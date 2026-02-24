@@ -121,18 +121,6 @@
       "compatibility_policy": "redirect_to_shell_when_spa_enabled"
     },
     {
-      "route": "/tmtt-defect",
-      "route_id": "tmtt-defect",
-      "title": "TMTT Defect",
-      "scope": "in-scope",
-      "render_mode": "native",
-      "owner": "frontend-mes-reporting",
-      "visibility_policy": "released_or_admin",
-      "canonical_shell_path": "/portal-shell/tmtt-defect",
-      "rollback_strategy": "fallback_to_legacy_route",
-      "compatibility_policy": "redirect_to_shell_when_spa_enabled"
-    },
-    {
       "route": "/admin/pages",
       "route_id": "admin-pages",
       "title": "Admin Pages",

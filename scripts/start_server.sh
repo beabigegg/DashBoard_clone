@@ -267,7 +267,6 @@ build_frontend_assets() {
             "excel-query.js"
             "tables.js"
             "query-tool.js"
-            "tmtt-defect.js"
             "qc-gate.js"
             "mid-section-defect.js"
         )

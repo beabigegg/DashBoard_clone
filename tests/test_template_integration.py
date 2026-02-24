@@ -116,15 +116,6 @@ class TestTemplateIntegration(unittest.TestCase):
         self.assertIn('mes-api.js', html)
         self.assertIn('mes-toast-container', html)
 
-    def test_tmtt_defect_page_includes_base_scripts(self):
-        response = self.client.get('/tmtt-defect')
-        self.assertEqual(response.status_code, 200)
-        html = response.data.decode('utf-8')
-
-        self.assertIn('toast.js', html)
-        self.assertIn('mes-api.js', html)
-        self.assertIn('mes-toast-container', html)
-
 
 class TestPortalDynamicDrawerRendering(unittest.TestCase):
     """Test dynamic portal drawer rendering."""
@@ -340,18 +331,6 @@ class TestMesApiUsageInTemplates(unittest.TestCase):
             self.assertIn('/static/dist/query-tool.js', html)
             self.assertIn('type="module"', html)
 
-    def test_tmtt_defect_page_uses_vite_module(self):
-        response, final_response, html = _get_response_and_html(self.client, '/tmtt-defect')
-
-        if response.status_code == 302:
-            self.assertTrue(response.location.endswith('/portal-shell/tmtt-defect'))
-            self.assertEqual(final_response.status_code, 200)
-            self.assertIn('/static/dist/portal-shell.js', html)
-            self.assertIn('type="module"', html)
-        else:
-            self.assertEqual(response.status_code, 200)
-            self.assertIn('/static/dist/tmtt-defect.js', html)
-            self.assertIn('type="module"', html)
 
 
 class TestViteModuleIntegration(unittest.TestCase):
@@ -377,7 +356,6 @@ class TestViteModuleIntegration(unittest.TestCase):
             ('/job-query', 'job-query.js'),
             ('/excel-query', 'excel-query.js'),
             ('/query-tool', 'query-tool.js'),
-            ('/tmtt-defect', 'tmtt-defect.js'),
         ]
         canonical_routes = {
             '/wip-overview': '/portal-shell/wip-overview',
@@ -387,7 +365,6 @@ class TestViteModuleIntegration(unittest.TestCase):
             '/resource': '/portal-shell/resource',
             '/resource-history': '/portal-shell/resource-history',
             '/job-query': '/portal-shell/job-query',
-            '/tmtt-defect': '/portal-shell/tmtt-defect',
             '/tables': '/portal-shell/tables',
             '/excel-query': '/portal-shell/excel-query',
             '/query-tool': '/portal-shell/query-tool',

@@ -10,7 +10,6 @@
     { "route": "/resource-history", "category": "report" },
     { "route": "/qc-gate", "category": "report" },
     { "route": "/job-query", "category": "report" },
-    { "route": "/tmtt-defect", "category": "report" },
     { "route": "/tables", "category": "report" },
     { "route": "/excel-query", "category": "report" },
     { "route": "/query-tool", "category": "report" },

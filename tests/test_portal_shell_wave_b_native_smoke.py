@@ -226,42 +226,6 @@ def test_query_tool_native_smoke_resolve_history_association(client):
         assert associations.get_json()["total"] == 1
 
 
-def test_tmtt_defect_native_smoke_range_query_and_csv_export(client):
-    _login_as_admin(client)
-
-    shell = client.get("/portal-shell/tmtt-defect?start_date=2026-02-01&end_date=2026-02-11")
-    assert shell.status_code == 200
-
-    page = client.get("/tmtt-defect", follow_redirects=False)
-    if client.application.config.get("PORTAL_SPA_ENABLED", False):
-        assert page.status_code == 302
-        assert page.location.endswith("/portal-shell/tmtt-defect")
-    else:
-        assert page.status_code == 200
-
-    with (
-        patch(
-            "mes_dashboard.routes.tmtt_defect_routes.query_tmtt_defect_analysis",
-            return_value={
-                "kpi": {"total_input": 10},
-                "charts": {"by_workflow": []},
-                "detail": [],
-            },
-        ),
-        patch(
-            "mes_dashboard.routes.tmtt_defect_routes.export_csv",
-            return_value=iter(["LOT_ID,TYPE\n", "LOT001,PRINT\n"]),
-        ),
-    ):
-        query = client.get("/api/tmtt-defect/analysis?start_date=2026-02-01&end_date=2026-02-11")
-        assert query.status_code == 200
-        assert query.get_json()["success"] is True
-
-        export = client.get("/api/tmtt-defect/export?start_date=2026-02-01&end_date=2026-02-11")
-        assert export.status_code == 200
-        assert "text/csv" in export.content_type
-
-
 def test_reject_history_native_smoke_query_sections_and_export(client):
     _login_as_admin(client)
 

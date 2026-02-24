@@ -138,7 +138,6 @@ def main() -> int:
         "/job-query",
         "/excel-query",
         "/query-tool",
-        "/tmtt-defect",
     ]
 
     legacy = _measure_routes(legacy_routes, portal_spa_enabled=False)

@@ -46,7 +46,31 @@ def test_analysis_success(mock_query_analysis):
     assert payload['success'] is True
     assert payload['data']['detail_total_count'] == 2
     assert payload['data']['kpi']['total_input'] == 100
-    mock_query_analysis.assert_called_once_with('2025-01-01', '2025-01-31', ['A', 'B'])
+    mock_query_analysis.assert_called_once_with(
+        '2025-01-01', '2025-01-31', ['A', 'B'], '測試', 'backward',
+    )
+
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis')
+def test_analysis_with_station_and_direction(mock_query_analysis):
+    mock_query_analysis.return_value = {
+        'kpi': {'detection_lot_count': 50},
+        'charts': {'by_downstream_station': []},
+        'daily_trend': [],
+        'available_loss_reasons': [],
+        'genealogy_status': 'ready',
+        'detail': [],
+    }
+
+    client = _client()
+    response = client.get(
+        '/api/mid-section-defect/analysis?start_date=2025-01-01&end_date=2025-01-31&station=成型&direction=forward'
+    )
+
+    assert response.status_code == 200
+    mock_query_analysis.assert_called_once_with(
+        '2025-01-01', '2025-01-31', None, '成型', 'forward',
+    )
 
 
 def test_analysis_missing_dates_returns_400():
@@ -103,6 +127,8 @@ def test_detail_success(mock_query_detail):
         '2025-01-01',
         '2025-01-31',
         None,
+        '測試',
+        'backward',
         page=2,
         page_size=200,
     )
@@ -146,7 +172,9 @@ def test_export_success(mock_export_csv):
     assert response.status_code == 200
     assert 'text/csv' in response.content_type
     assert 'attachment;' in response.headers.get('Content-Disposition', '')
-    mock_export_csv.assert_called_once_with('2025-01-01', '2025-01-31', ['A', 'B'])
+    mock_export_csv.assert_called_once_with(
+        '2025-01-01', '2025-01-31', ['A', 'B'], '測試', 'backward',
+    )
 
 
 @patch('mes_dashboard.routes.mid_section_defect_routes.export_csv')
@@ -160,3 +188,20 @@ def test_export_rate_limited_returns_429(_mock_rate_limit, mock_export_csv):
     payload = response.get_json()
     assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
     mock_export_csv.assert_not_called()
+
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.query_station_options')
+def test_station_options_success(mock_query_station_options):
+    mock_query_station_options.return_value = [
+        {'name': '切割', 'order': 0},
+        {'name': '測試', 'order': 11},
+    ]
+
+    client = _client()
+    response = client.get('/api/mid-section-defect/station-options')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['success'] is True
+    assert len(payload['data']) == 2
+    assert payload['data'][0]['name'] == '切割'

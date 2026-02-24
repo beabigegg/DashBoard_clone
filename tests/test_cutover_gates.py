@@ -57,7 +57,6 @@ def test_g1_route_availability_gate_p0_routes_are_2xx_or_3xx():
         "/job-query",
         "/excel-query",
         "/query-tool",
-        "/tmtt-defect",
     ]
 
     statuses = [client.get(route).status_code for route in p0_routes]

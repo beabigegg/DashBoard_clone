@@ -71,6 +71,83 @@ body {
   font-weight: 700;
 }
 
+/* ====== Mode Tabs ====== */
+.mode-tab-row {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--msd-border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+  margin-bottom: 12px;
+}
+
+.mode-tab {
+  padding: 7px 16px;
+  border: none;
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-tab.active {
+  background: var(--msd-primary);
+  color: #fff;
+}
+
+.mode-tab:not(:last-child) {
+  border-right: 1px solid var(--msd-border);
+}
+
+.mode-tab:hover:not(.active) {
+  background: #e2e8f0;
+}
+
+/* ====== Container Input ====== */
+.container-input-row {
+  padding: 8px 0 0;
+}
+
+.filter-textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: monospace;
+  line-height: 1.5;
+  border: 1px solid var(--msd-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #1f2937;
+  background: #ffffff;
+}
+
+.filter-textarea:focus {
+  outline: none;
+  border-color: var(--msd-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.filter-textarea:disabled {
+  background: #f1f5f9;
+  cursor: not-allowed;
+}
+
+/* ====== Resolution Info ====== */
+.resolution-info {
+  padding: 8px 0 0;
+  font-size: 13px;
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.resolution-warn {
+  color: #b45309;
+  font-weight: 400;
+}
+
 /* ====== Filter Bar ====== */
 .filter-row {
   display: flex;
@@ -137,6 +214,54 @@ body {
 
 .btn-sm:hover:not(:disabled) {
   background: #f1f5f9;
+}
+
+/* ====== Filter Select ====== */
+.filter-select {
+  border: 1px solid var(--msd-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: #ffffff;
+  color: #1f2937;
+  min-width: 100px;
+}
+
+/* ====== Direction Toggle ====== */
+.direction-toggle {
+  display: inline-flex;
+  border: 1px solid var(--msd-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.direction-btn {
+  border: none;
+  background: #ffffff;
+  color: #475569;
+  font-size: 13px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.direction-btn + .direction-btn {
+  border-left: 1px solid var(--msd-border);
+}
+
+.direction-btn.active {
+  background: var(--msd-primary);
+  color: #ffffff;
+}
+
+.direction-btn:hover:not(:disabled):not(.active) {
+  background: #f1f5f9;
+}
+
+.direction-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* ====== MultiSelect ====== */
@@ -218,6 +343,33 @@ body {
 
 .multi-select-option input[type='checkbox'] {
   pointer-events: none;
+}
+
+.multi-select-search {
+  padding: 8px 8px 4px;
+}
+
+.multi-select-search-input {
+  width: 100%;
+  border: 1px solid var(--msd-border);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 13px;
+  color: #1f2937;
+  background: #ffffff;
+  outline: none;
+}
+
+.multi-select-search-input:focus {
+  border-color: var(--msd-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.multi-select-no-match {
+  padding: 12px;
+  text-align: center;
+  color: var(--msd-muted);
+  font-size: 13px;
 }
 
 .multi-select-actions {
@@ -322,11 +474,65 @@ body {
   grid-column: 1 / -1;
 }
 
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chart-header .chart-title {
+  margin: 0;
+}
+
 .chart-title {
   margin: 0 0 8px;
   font-size: 14px;
   font-weight: 600;
   color: var(--msd-text);
+}
+
+.chart-inline-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.chart-inline-filters .multi-select {
+  min-width: 160px;
+}
+
+.chart-inline-filters .multi-select-trigger {
+  padding: 3px 7px;
+  font-size: 12px;
+  border-color: var(--msd-border);
+  background: #f8fafc;
+  color: #475569;
+}
+
+.chart-inline-filters .multi-select-dropdown {
+  min-width: 220px;
+  right: 0;
+  left: auto;
+}
+
+.chart-inline-filter {
+  border: 1px solid var(--msd-border);
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-size: 12px;
+  color: #475569;
+  background: #f8fafc;
+  cursor: pointer;
+  max-width: 140px;
+  flex-shrink: 0;
+}
+
+.chart-inline-filter:focus {
+  outline: 2px solid var(--msd-primary);
+  outline-offset: 1px;
 }
 
 .chart-canvas {

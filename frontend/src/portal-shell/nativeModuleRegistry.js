@@ -62,13 +62,13 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../query-tool/App.vue'),
     [() => import('../query-tool/style.css')],
   ),
-  '/tmtt-defect': createNativeLoader(
-    () => import('../tmtt-defect/App.vue'),
-    [() => import('../tmtt-defect/style.css')],
-  ),
   '/tables': createNativeLoader(
     () => import('../tables/App.vue'),
     [() => import('../tables/style.css')],
+  ),
+  '/mid-section-defect': createNativeLoader(
+    () => import('../mid-section-defect/App.vue'),
+    [() => import('../mid-section-defect/style.css')],
   ),
   '/admin/performance': createNativeLoader(
     () => import('../admin-performance/App.vue'),

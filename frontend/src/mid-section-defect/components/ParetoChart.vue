@@ -120,7 +120,10 @@ const chartOption = computed(() => {
 
 <template>
   <div class="chart-card">
-    <h3 class="chart-title">{{ title }}</h3>
+    <div class="chart-header">
+      <h3 class="chart-title">{{ title }}</h3>
+      <slot name="header-extra" />
+    </div>
     <VChart
       v-if="chartOption"
       class="chart-canvas"
