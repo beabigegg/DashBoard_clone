@@ -27,6 +27,7 @@ from mes_dashboard.services.query_tool_service import (
     get_lot_holds,
     get_lot_splits,
     get_lot_jobs,
+    get_lot_jobs_with_history,
     get_lot_associations_batch,
     get_equipment_status_hours,
     get_equipment_lots,
@@ -683,7 +684,7 @@ def export_csv():
             filename = f'lot_splits_{container_id}.csv'
 
         elif export_type == 'lot_jobs':
-            result = get_lot_jobs(
+            result = get_lot_jobs_with_history(
                 params.get('equipment_id'),
                 params.get('time_start'),
                 params.get('time_end')

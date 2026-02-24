@@ -1411,6 +1411,66 @@ def get_lot_jobs(
         return {'error': f'查詢失敗: {str(exc)}'}
 
 
+def get_lot_jobs_with_history(
+    equipment_id: str,
+    time_start: str,
+    time_end: str
+) -> Dict[str, Any]:
+    """Get JOB records with full transaction history for export.
+
+    Joins DW_MES_JOB with DW_MES_JOBTXNHISTORY so each row contains
+    both job-level and transaction-level columns, matching the pattern
+    used by the job-query export.
+
+    Args:
+        equipment_id: Equipment ID (RESOURCEID)
+        time_start: Start time (ISO format)
+        time_end: End time (ISO format)
+
+    Returns:
+        Dict with 'data' (flattened job+txn records) and 'total', or 'error'.
+    """
+    if not all([equipment_id, time_start, time_end]):
+        return {'error': '請指定設備和時間範圍'}
+
+    try:
+        if isinstance(time_start, str):
+            start = datetime.strptime(time_start, '%Y-%m-%d %H:%M:%S')
+        else:
+            start = time_start
+
+        if isinstance(time_end, str):
+            end = datetime.strptime(time_end, '%Y-%m-%d %H:%M:%S')
+        else:
+            end = time_end
+
+        sql = SQLLoader.load("query_tool/lot_jobs_with_txn")
+        params = {
+            'equipment_id': equipment_id,
+            'time_start': start,
+            'time_end': end,
+        }
+
+        df = read_sql_df(sql, params)
+        data = _df_to_records(df)
+
+        logger.debug(
+            f"LOT jobs with txn history: {len(data)} records for {equipment_id}"
+        )
+
+        return {
+            'data': data,
+            'total': len(data),
+            'equipment_id': equipment_id,
+        }
+
+    except Exception as exc:
+        logger.error(
+            f"LOT jobs with txn history query failed for {equipment_id}: {exc}"
+        )
+        return {'error': f'查詢失敗: {str(exc)}'}
+
+
 # ============================================================
 # Equipment Period Query Functions
 # ============================================================

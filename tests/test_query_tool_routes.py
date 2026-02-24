@@ -1027,6 +1027,39 @@ class TestExportCsvBatchEndpoint:
         data = response.get_json()
         assert 'CONTAINERID' in data.get('error', '')
 
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_jobs_with_history')
+    def test_export_lot_jobs_calls_with_history(self, mock_jobs_hist, client):
+        """lot_jobs export should call get_lot_jobs_with_history (includes txn)."""
+        mock_jobs_hist.return_value = {
+            'data': [
+                {
+                    'RESOURCENAME': 'ASSY-01',
+                    'JOBID': 'JOB-001',
+                    'JOB_FINAL_STATUS': 'Complete',
+                    'TXNDATE': '2026-01-15 10:00:00',
+                    'TXN_JOBSTATUS': 'Complete',
+                    'STAGENAME': 'Repair',
+                },
+            ],
+            'total': 1,
+        }
+
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_jobs',
+                'params': {
+                    'equipment_id': 'EQ001',
+                    'time_start': '2026-01-01 00:00:00',
+                    'time_end': '2026-01-31 23:59:59',
+                },
+            },
+        )
+
+        assert response.status_code == 200
+        assert 'text/csv' in response.content_type
+        mock_jobs_hist.assert_called_once_with('EQ001', '2026-01-01 00:00:00', '2026-01-31 23:59:59')
+
 
 class TestEquipmentListEndpoint:
     """Tests for /api/query-tool/equipment-list endpoint."""

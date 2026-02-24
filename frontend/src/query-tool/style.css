@@ -116,16 +116,17 @@ body {
   cursor: not-allowed;
 }
 
-.btn-export {
+.btn.btn-export {
   background: #0f766e;
   color: #fff;
 }
 
-.btn-export:hover {
+.btn.btn-export:hover {
   background: #0b5e59;
+  color: #fff;
 }
 
-.btn-export:disabled {
+.btn.btn-export:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

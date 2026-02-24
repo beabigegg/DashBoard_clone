@@ -24,7 +24,6 @@ ensureMesApiAvailable();
 
 const JOB_COLUMN_PRIORITY = Object.freeze([
   'JOBID',
-  'RESOURCEID',
   'RESOURCENAME',
   'JOBSTATUS',
   'JOBMODELNAME',
@@ -42,7 +41,6 @@ const JOB_COLUMN_PRIORITY = Object.freeze([
   'PJ_SYMPTOMCODE2NAME',
   'CREATE_EMPNAME',
   'COMPLETE_EMPNAME',
-  'CONTAINERIDS',
   'CONTAINERNAMES',
 ]);
 

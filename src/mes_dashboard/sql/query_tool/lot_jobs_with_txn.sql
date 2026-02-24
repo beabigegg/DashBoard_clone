@@ -1,0 +1,38 @@
+-- LOT Related JOB Records with Transaction History Export
+-- Joins JOB with JOBTXNHISTORY for complete CSV export
+--
+-- Parameters:
+--   :equipment_id - Equipment ID (EQUIPMENTID = RESOURCEID)
+--   :time_start   - Start time of LOT processing
+--   :time_end     - End time of LOT processing
+
+SELECT
+    j.RESOURCENAME,
+    j.JOBID,
+    j.JOBSTATUS   AS JOB_FINAL_STATUS,
+    j.JOBMODELNAME,
+    j.JOBORDERNAME,
+    j.CREATEDATE  AS JOB_CREATEDATE,
+    j.COMPLETEDATE AS JOB_COMPLETEDATE,
+    j.CAUSECODENAME  AS JOB_CAUSECODENAME,
+    j.REPAIRCODENAME AS JOB_REPAIRCODENAME,
+    j.SYMPTOMCODENAME AS JOB_SYMPTOMCODENAME,
+    h.TXNDATE,
+    h.FROMJOBSTATUS,
+    h.JOBSTATUS   AS TXN_JOBSTATUS,
+    h.STAGENAME,
+    h.CAUSECODENAME  AS TXN_CAUSECODENAME,
+    h.REPAIRCODENAME AS TXN_REPAIRCODENAME,
+    h.SYMPTOMCODENAME AS TXN_SYMPTOMCODENAME,
+    h.USER_NAME,
+    h.EMP_NAME,
+    h.COMMENTS
+FROM DWH.DW_MES_JOB j
+JOIN DWH.DW_MES_JOBTXNHISTORY h ON j.JOBID = h.JOBID
+WHERE j.RESOURCEID = :equipment_id
+  AND (
+    (j.CREATEDATE BETWEEN :time_start AND :time_end)
+    OR (j.COMPLETEDATE BETWEEN :time_start AND :time_end)
+    OR (j.CREATEDATE <= :time_start AND (j.COMPLETEDATE IS NULL OR j.COMPLETEDATE >= :time_end))
+  )
+ORDER BY j.JOBID, h.TXNDATE
