@@ -17,7 +17,8 @@ function formatAge(value) {
   if (value === null || value === undefined || value === '-') {
     return '-';
   }
-  return `${value}天`;
+  const num = Number(value);
+  return `${Number.isFinite(num) ? num.toFixed(1) : value}天`;
 }
 </script>
 

@@ -40,6 +40,15 @@ from mes_dashboard.services.query_tool_service import (
     validate_equipment_input,
 )
 
+
+def _resolve_export_cids(params: dict) -> list[str]:
+    """Extract container_ids from export params, supporting both batch and single."""
+    cids = params.get('container_ids') or []
+    if isinstance(cids, list) and cids:
+        return [c for c in cids if c]
+    single = params.get('container_id')
+    return [single] if single else []
+
 # Create Blueprint
 query_tool_bp = Blueprint('query_tool', __name__)
 
@@ -605,11 +614,14 @@ def export_csv():
 
     try:
         if export_type == 'lot_history':
-            container_id = params.get('container_id')
-            if not container_id:
+            cids = _resolve_export_cids(params)
+            if not cids:
                 return jsonify({'error': '請指定 CONTAINERID'}), 400
-            result = get_lot_history(container_id)
-            filename = f'lot_history_{container_id}.csv'
+            if len(cids) > 1:
+                result = get_lot_history_batch(cids)
+            else:
+                result = get_lot_history(cids[0])
+            filename = f'lot_history_{cids[0]}.csv'
 
         elif export_type == 'adjacent_lots':
             result = get_adjacent_lots(
@@ -620,19 +632,34 @@ def export_csv():
             filename = 'adjacent_lots.csv'
 
         elif export_type == 'lot_materials':
-            container_id = params.get('container_id')
-            result = get_lot_materials(container_id)
-            filename = f'lot_raw_materials_{container_id}.csv'
+            cids = _resolve_export_cids(params)
+            if not cids:
+                return jsonify({'error': '請指定 CONTAINERID'}), 400
+            if len(cids) > 1:
+                result = get_lot_associations_batch(cids, 'materials')
+            else:
+                result = get_lot_materials(cids[0])
+            filename = f'lot_raw_materials_{cids[0]}.csv'
 
         elif export_type == 'lot_rejects':
-            container_id = params.get('container_id')
-            result = get_lot_rejects(container_id)
-            filename = f'lot_rejects_{container_id}.csv'
+            cids = _resolve_export_cids(params)
+            if not cids:
+                return jsonify({'error': '請指定 CONTAINERID'}), 400
+            if len(cids) > 1:
+                result = get_lot_associations_batch(cids, 'rejects')
+            else:
+                result = get_lot_rejects(cids[0])
+            filename = f'lot_rejects_{cids[0]}.csv'
 
         elif export_type == 'lot_holds':
-            container_id = params.get('container_id')
-            result = get_lot_holds(container_id)
-            filename = f'lot_holds_{container_id}.csv'
+            cids = _resolve_export_cids(params)
+            if not cids:
+                return jsonify({'error': '請指定 CONTAINERID'}), 400
+            if len(cids) > 1:
+                result = get_lot_associations_batch(cids, 'holds')
+            else:
+                result = get_lot_holds(cids[0])
+            filename = f'lot_holds_{cids[0]}.csv'
 
         elif export_type == 'lot_splits':
             container_id = params.get('container_id')

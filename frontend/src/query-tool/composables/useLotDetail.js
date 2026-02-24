@@ -378,9 +378,9 @@ export function useLotDetail(initial = {}) {
   async function exportSubTab(tab) {
     const normalized = normalizeSubTab(tab);
     const exportType = EXPORT_TYPE_MAP[normalized];
-    const containerId = selectedContainerId.value;
+    const cids = getActiveCids();
 
-    if (!exportType || !containerId) {
+    if (!exportType || cids.length === 0) {
       return false;
     }
 
@@ -389,7 +389,7 @@ export function useLotDetail(initial = {}) {
 
     try {
       const params = {
-        container_id: containerId,
+        container_ids: cids,
       };
 
       if (normalized === 'jobs') {

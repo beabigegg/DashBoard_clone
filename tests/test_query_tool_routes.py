@@ -885,6 +885,149 @@ class TestExportCsvEndpoint:
         assert 'GA25010001-A01' in decoded
 
 
+class TestExportCsvBatchEndpoint:
+    """Tests for /api/query-tool/export-csv with batch container_ids."""
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history_batch')
+    def test_export_lot_history_batch(self, mock_batch, client):
+        """Batch container_ids should call get_lot_history_batch."""
+        mock_batch.return_value = {
+            'data': [
+                {'CONTAINERNAME': 'LOT-A', 'SPECNAME': 'S1', 'TRACKINTIMESTAMP': '2026-01-01'},
+                {'CONTAINERNAME': 'LOT-B', 'SPECNAME': 'S1', 'TRACKINTIMESTAMP': '2026-01-02'},
+            ],
+            'total': 2,
+        }
+
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_history',
+                'params': {'container_ids': ['aaa1', 'bbb2']},
+            },
+        )
+
+        assert response.status_code == 200
+        assert 'text/csv' in response.content_type
+        mock_batch.assert_called_once_with(['aaa1', 'bbb2'])
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    def test_export_lot_history_single_cid_in_array(self, mock_single, client):
+        """Single-element container_ids should call get_lot_history (not batch)."""
+        mock_single.return_value = {
+            'data': [{'CONTAINERNAME': 'LOT-A', 'SPECNAME': 'S1'}],
+            'total': 1,
+        }
+
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_history',
+                'params': {'container_ids': ['aaa1']},
+            },
+        )
+
+        assert response.status_code == 200
+        mock_single.assert_called_once_with('aaa1')
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_associations_batch')
+    def test_export_lot_materials_batch(self, mock_batch, client):
+        """Batch container_ids for materials should call get_lot_associations_batch."""
+        mock_batch.return_value = {
+            'data': [
+                {'CONTAINERNAME': 'LOT-A', 'MATERIALPARTNAME': 'M1', 'QTYCONSUMED': 5},
+            ],
+            'total': 1,
+        }
+
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_materials',
+                'params': {'container_ids': ['aaa1', 'bbb2']},
+            },
+        )
+
+        assert response.status_code == 200
+        assert 'text/csv' in response.content_type
+        mock_batch.assert_called_once_with(['aaa1', 'bbb2'], 'materials')
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_associations_batch')
+    def test_export_lot_rejects_batch(self, mock_batch, client):
+        """Batch container_ids for rejects should call get_lot_associations_batch."""
+        mock_batch.return_value = {
+            'data': [
+                {'CONTAINERNAME': 'LOT-A', 'LOSSREASONNAME': 'IR', 'REJECT_TOTAL_QTY': 10},
+            ],
+            'total': 1,
+        }
+
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_rejects',
+                'params': {'container_ids': ['aaa1', 'bbb2']},
+            },
+        )
+
+        assert response.status_code == 200
+        mock_batch.assert_called_once_with(['aaa1', 'bbb2'], 'rejects')
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_associations_batch')
+    def test_export_lot_holds_batch(self, mock_batch, client):
+        """Batch container_ids for holds should call get_lot_associations_batch."""
+        mock_batch.return_value = {
+            'data': [
+                {'CONTAINERNAME': 'LOT-A', 'HOLDREASONNAME': 'Q-Time', 'HOLD_STATUS': 'HOLD'},
+            ],
+            'total': 1,
+        }
+
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_holds',
+                'params': {'container_ids': ['aaa1', 'bbb2']},
+            },
+        )
+
+        assert response.status_code == 200
+        mock_batch.assert_called_once_with(['aaa1', 'bbb2'], 'holds')
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    def test_export_backward_compat_container_id(self, mock_single, client):
+        """Legacy container_id param should still work."""
+        mock_single.return_value = {
+            'data': [{'CONTAINERNAME': 'LOT-A', 'SPECNAME': 'S1'}],
+            'total': 1,
+        }
+
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_history',
+                'params': {'container_id': '488103800029578b'},
+            },
+        )
+
+        assert response.status_code == 200
+        mock_single.assert_called_once_with('488103800029578b')
+
+    def test_export_lot_history_no_cids_returns_400(self, client):
+        """Missing container_ids and container_id should return 400."""
+        response = client.post(
+            '/api/query-tool/export-csv',
+            json={
+                'export_type': 'lot_history',
+                'params': {},
+            },
+        )
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert 'CONTAINERID' in data.get('error', '')
+
+
 class TestEquipmentListEndpoint:
     """Tests for /api/query-tool/equipment-list endpoint."""
 
