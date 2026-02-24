@@ -2,7 +2,6 @@
 import { computed, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
-import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useTraceProgress } from '../shared-composables/useTraceProgress.js';
 import TraceProgressBar from '../shared-composables/TraceProgressBar.vue';
 
@@ -381,10 +380,6 @@ async function loadAnalysis() {
       saveSession();
     }
 
-    if (!autoRefreshStarted) {
-      autoRefreshStarted = true;
-      startAutoRefresh();
-    }
   } catch (err) {
     if (err?.name === 'AbortError') {
       return;
@@ -434,16 +429,14 @@ function exportCsv() {
   document.body.removeChild(link);
 }
 
-let autoRefreshStarted = false;
-const { createAbortSignal, startAutoRefresh } = useAutoRefresh({
-  onRefresh: async () => {
-    trace.abort();
-    await loadAnalysis();
-  },
-  intervalMs: 5 * 60 * 1000,
-  autoStart: false,
-  refreshOnVisible: true,
-});
+const _abortControllers = new Map();
+function createAbortSignal(key = 'default') {
+  const prev = _abortControllers.get(key);
+  if (prev) prev.abort();
+  const ctrl = new AbortController();
+  _abortControllers.set(key, ctrl);
+  return ctrl.signal;
+}
 
 function saveSession() {
   try {

@@ -5,7 +5,7 @@
 --   Dynamically built IN clause for descendant CONTAINERIDs ({{ DESCENDANT_FILTER }})
 --
 -- Tables used:
---   DWH.DW_MES_LOTREJECTHISTORY (reject records)
+--   DWH.DW_MES_LOTREJECTHISTORY (reject records - charge-off + non-charge-off)
 --
 -- Performance:
 --   CONTAINERID has index. Batch IN clause (up to 1000 per query).
@@ -49,7 +49,8 @@ SELECT
       + NVL(r.STANDBYQTY, 0)
       + NVL(r.QTYTOPROCESS, 0)
       + NVL(r.INPROCESSQTY, 0)
-      + NVL(r.PROCESSEDQTY, 0) AS REJECT_TOTAL_QTY,
+      + NVL(r.PROCESSEDQTY, 0)
+      + NVL(r.DEFECTQTY, 0) AS REJECT_TOTAL_QTY,
     r.TXNDATE
 FROM DWH.DW_MES_LOTREJECTHISTORY r
 WHERE {{ DESCENDANT_FILTER }}

@@ -297,6 +297,7 @@ def build_trace_aggregation_from_events(
     seed_container_ids: Optional[List[str]] = None,
     lineage_ancestors: Optional[Dict[str, Any]] = None,
     upstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    downstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     station: str = '測試',
     direction: str = 'backward',
     mode: str = 'date_range',
@@ -308,6 +309,7 @@ def build_trace_aggregation_from_events(
             seed_container_ids=seed_container_ids,
             lineage_ancestors=lineage_ancestors,
             upstream_events_by_cid=upstream_events_by_cid,
+            downstream_events_by_cid=downstream_events_by_cid,
             station=station,
             direction=direction,
         )
@@ -348,6 +350,43 @@ def build_trace_aggregation_from_events(
         filtered_df = detection_df
 
     detection_data = _build_detection_lookup(filtered_df)
+
+    seed_ids = [
+        cid for cid in (seed_container_ids or list(detection_data.keys()))
+        if isinstance(cid, str) and cid.strip()
+    ]
+    genealogy_status = 'ready'
+    if seed_ids and lineage_ancestors is None:
+        genealogy_status = 'error'
+
+    # Forward direction: use forward pipeline
+    if direction == 'forward':
+        station_order = get_group_order(station)
+        defect_cids = filtered_df.loc[
+            filtered_df['REJECTQTY'] > 0, 'CONTAINERID'
+        ].unique().tolist()
+
+        wip_by_cid = _normalize_upstream_event_records(upstream_events_by_cid or {})
+        downstream_rejects = _normalize_downstream_event_records(downstream_events_by_cid or {})
+
+        forward_attr = _attribute_forward_defects(
+            detection_data, defect_cids, wip_by_cid, downstream_rejects, station_order,
+        )
+        detail = _build_forward_detail_table(
+            filtered_df, defect_cids, wip_by_cid, downstream_rejects, station_order,
+        )
+
+        return {
+            'kpi': _build_forward_kpi(detection_data, forward_attr),
+            'charts': _build_forward_charts(forward_attr, detection_data),
+            'daily_trend': _build_daily_trend(filtered_df, normalized_loss_reasons),
+            'available_loss_reasons': available_loss_reasons,
+            'genealogy_status': genealogy_status,
+            'detail_total_count': len(detail),
+            'attribution': [],
+        }
+
+    # Backward direction
     normalized_ancestors = _normalize_lineage_ancestors(
         lineage_ancestors,
         seed_container_ids=seed_container_ids,
@@ -362,14 +401,6 @@ def build_trace_aggregation_from_events(
         normalized_loss_reasons,
     )
     detail = _build_detail_table(filtered_df, normalized_ancestors, normalized_upstream)
-
-    seed_ids = [
-        cid for cid in (seed_container_ids or list(detection_data.keys()))
-        if isinstance(cid, str) and cid.strip()
-    ]
-    genealogy_status = 'ready'
-    if seed_ids and lineage_ancestors is None:
-        genealogy_status = 'error'
 
     return {
         'kpi': _build_kpi(filtered_df, attribution, normalized_loss_reasons),
@@ -388,6 +419,7 @@ def _build_trace_aggregation_container_mode(
     seed_container_ids: Optional[List[str]] = None,
     lineage_ancestors: Optional[Dict[str, Any]] = None,
     upstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    downstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     station: str = '測試',
     direction: str = 'backward',
 ) -> Optional[Dict[str, Any]]:
@@ -437,6 +469,43 @@ def _build_trace_aggregation_container_mode(
         filtered_df = detection_df
 
     detection_data = _build_detection_lookup(filtered_df)
+
+    seed_ids = [
+        cid for cid in seed_container_ids
+        if isinstance(cid, str) and cid.strip()
+    ]
+    genealogy_status = 'ready'
+    if seed_ids and lineage_ancestors is None:
+        genealogy_status = 'error'
+
+    # Forward direction
+    if direction == 'forward':
+        station_order = get_group_order(station)
+        defect_cids = filtered_df.loc[
+            filtered_df['REJECTQTY'] > 0, 'CONTAINERID'
+        ].unique().tolist()
+
+        wip_by_cid = _normalize_upstream_event_records(upstream_events_by_cid or {})
+        downstream_rejects = _normalize_downstream_event_records(downstream_events_by_cid or {})
+
+        forward_attr = _attribute_forward_defects(
+            detection_data, defect_cids, wip_by_cid, downstream_rejects, station_order,
+        )
+        detail = _build_forward_detail_table(
+            filtered_df, defect_cids, wip_by_cid, downstream_rejects, station_order,
+        )
+
+        return {
+            'kpi': _build_forward_kpi(detection_data, forward_attr),
+            'charts': _build_forward_charts(forward_attr, detection_data),
+            'daily_trend': [],
+            'available_loss_reasons': available_loss_reasons,
+            'genealogy_status': genealogy_status,
+            'detail_total_count': len(detail),
+            'attribution': [],
+        }
+
+    # Backward direction
     normalized_ancestors = _normalize_lineage_ancestors(
         lineage_ancestors,
         seed_container_ids=seed_container_ids,
@@ -451,14 +520,6 @@ def _build_trace_aggregation_container_mode(
         normalized_loss_reasons,
     )
     detail = _build_detail_table(filtered_df, normalized_ancestors, normalized_upstream)
-
-    seed_ids = [
-        cid for cid in seed_container_ids
-        if isinstance(cid, str) and cid.strip()
-    ]
-    genealogy_status = 'ready'
-    if seed_ids and lineage_ancestors is None:
-        genealogy_status = 'error'
 
     return {
         'kpi': _build_kpi(filtered_df, attribution, normalized_loss_reasons),
@@ -1198,6 +1259,29 @@ def _normalize_upstream_event_records(
                 'spec_name': _safe_str(event.get('SPECNAME')),
                 'track_in_time': _safe_str(event.get('TRACKINTIMESTAMP')),
                 'trackinqty': _safe_int(event.get('TRACKINQTY')),
+            })
+    return dict(result)
+
+
+def _normalize_downstream_event_records(
+    events_by_cid: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Normalize EventFetcher downstream_rejects payload into forward-pipeline-ready records."""
+    result: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for cid, events in events_by_cid.items():
+        cid_value = _safe_str(cid)
+        if not cid_value:
+            continue
+        for event in events:
+            group_name = _safe_str(event.get('WORKCENTER_GROUP'))
+            if not group_name:
+                continue
+            result[cid_value].append({
+                'workcenter_group': group_name,
+                'lossreasonname': _safe_str(event.get('LOSSREASONNAME')),
+                'equipment_name': _safe_str(event.get('EQUIPMENTNAME')),
+                'reject_total_qty': _safe_int(event.get('REJECT_TOTAL_QTY')),
+                'txndate': _safe_str(event.get('TXNDATE')),
             })
     return dict(result)
 

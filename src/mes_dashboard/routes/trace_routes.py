@@ -412,6 +412,7 @@ def _build_msd_aggregation(
         seed_container_ids = _normalize_strings(list(lineage_ancestors.keys()))
 
     upstream_events = domain_results.get("upstream_history", {})
+    downstream_events = domain_results.get("downstream_rejects", {})
     station = str(params.get("station") or "測試").strip()
     direction = str(params.get("direction") or "backward").strip()
 
@@ -422,6 +423,7 @@ def _build_msd_aggregation(
         seed_container_ids=seed_container_ids,
         lineage_ancestors=lineage_ancestors,
         upstream_events_by_cid=upstream_events,
+        downstream_events_by_cid=downstream_events,
         station=station,
         direction=direction,
         mode=mode,

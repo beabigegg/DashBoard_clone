@@ -9,7 +9,7 @@
 --
 -- Tables used:
 --   DWH.DW_MES_LOTWIPHISTORY (detection station records)
---   DWH.DW_MES_LOTREJECTHISTORY (defect records - ALL loss reasons)
+--   DWH.DW_MES_LOTREJECTHISTORY (defect records - charge-off + non-charge-off)
 --   DWH.DW_MES_CONTAINER (product info + MFGORDERNAME for genealogy)
 --   DWH.DW_MES_WIP (WORKFLOWNAME)
 
@@ -43,7 +43,8 @@ detection_rejects AS (
         r.CONTAINERID,
         r.LOSSREASONNAME,
         SUM(NVL(r.REJECTQTY, 0) + NVL(r.STANDBYQTY, 0) + NVL(r.QTYTOPROCESS, 0)
-            + NVL(r.INPROCESSQTY, 0) + NVL(r.PROCESSEDQTY, 0)) AS REJECTQTY
+            + NVL(r.INPROCESSQTY, 0) + NVL(r.PROCESSEDQTY, 0)
+            + NVL(r.DEFECTQTY, 0)) AS REJECTQTY
     FROM DWH.DW_MES_LOTREJECTHISTORY r
     WHERE r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
       AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
