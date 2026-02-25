@@ -201,6 +201,10 @@ def get_db_runtime_config(refresh: bool = False) -> Dict[str, Any]:
             "DB_SLOW_MAX_CONCURRENT",
             config_class.DB_SLOW_MAX_CONCURRENT,
         ),
+        "slow_fetchmany_size": _from_app_or_env_int(
+            "DB_SLOW_FETCHMANY_SIZE",
+            5000,
+        ),
     }
     return _DB_RUNTIME_CONFIG.copy()
 
@@ -683,6 +687,104 @@ def read_sql_df_slow(
         sql_preview = sql.strip().replace('\n', ' ')[:100]
         logger.error(
             f"Query failed after {elapsed:.2f}s - ORA-{ora_code}: {exc} | SQL: {sql_preview}..."
+        )
+        raise
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        with _SLOW_QUERY_LOCK:
+            _SLOW_QUERY_ACTIVE -= 1
+        sem.release()
+
+
+def read_sql_df_slow_iter(
+    sql: str,
+    params: Optional[Dict[str, Any]] = None,
+    timeout_seconds: Optional[int] = None,
+    batch_size: Optional[int] = None,
+):
+    """Execute a slow SQL query and yield batches of (columns, rows) without DataFrame.
+
+    Uses cursor.fetchmany() to avoid full materialization in memory.
+    Each yielded batch is a tuple of (columns: List[str], rows: List[tuple]).
+
+    Args:
+        sql: SQL query string with Oracle bind variables.
+        params: Optional dict of parameter values.
+        timeout_seconds: Call timeout in seconds. None = use config default.
+        batch_size: Number of rows per fetchmany call. None = use
+            DB_SLOW_FETCHMANY_SIZE from config (default 5000).
+    """
+    global _SLOW_QUERY_ACTIVE
+
+    runtime = get_db_runtime_config()
+    if timeout_seconds is None:
+        timeout_ms = runtime["slow_call_timeout_ms"]
+    else:
+        timeout_ms = timeout_seconds * 1000
+
+    if batch_size is None:
+        batch_size = runtime["slow_fetchmany_size"]
+
+    sem = _get_slow_query_semaphore()
+    acquired = sem.acquire(timeout=60)
+    if not acquired:
+        raise RuntimeError(
+            "Slow-query concurrency limit reached; try again later"
+        )
+
+    with _SLOW_QUERY_LOCK:
+        _SLOW_QUERY_ACTIVE += 1
+        active = _SLOW_QUERY_ACTIVE
+
+    logger.info("Slow query iter starting (active=%s, timeout_ms=%s, batch_size=%s)", active, timeout_ms, batch_size)
+    start_time = time.time()
+    conn = None
+    total_rows = 0
+    try:
+        conn = oracledb.connect(
+            **DB_CONFIG,
+            tcp_connect_timeout=runtime["tcp_connect_timeout"],
+            retry_count=runtime["retry_count"],
+            retry_delay=runtime["retry_delay"],
+        )
+        conn.call_timeout = timeout_ms
+        with _DIRECT_CONN_LOCK:
+            global _DIRECT_CONN_COUNTER
+            _DIRECT_CONN_COUNTER += 1
+        logger.debug(
+            "Slow-query iter connection established (call_timeout_ms=%s)", timeout_ms
+        )
+
+        cursor = conn.cursor()
+        cursor.execute(sql, params or {})
+        columns = [desc[0].upper() for desc in cursor.description]
+
+        while True:
+            rows = cursor.fetchmany(batch_size)
+            if not rows:
+                break
+            total_rows += len(rows)
+            yield columns, rows
+
+        cursor.close()
+
+        elapsed = time.time() - start_time
+        if elapsed > 1.0:
+            sql_preview = sql.strip().replace('\n', ' ')[:100]
+            logger.warning(f"Slow query iter ({elapsed:.2f}s, rows={total_rows}): {sql_preview}...")
+        else:
+            logger.debug(f"Query iter completed in {elapsed:.3f}s, rows={total_rows}")
+
+    except Exception as exc:
+        elapsed = time.time() - start_time
+        ora_code = _extract_ora_code(exc)
+        sql_preview = sql.strip().replace('\n', ' ')[:100]
+        logger.error(
+            f"Query iter failed after {elapsed:.2f}s - ORA-{ora_code}: {exc} | SQL: {sql_preview}..."
         )
         raise
     finally:

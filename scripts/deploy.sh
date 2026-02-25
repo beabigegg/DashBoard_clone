@@ -242,8 +242,13 @@ show_next_steps() {
     echo "  sudo chmod 640 .env"
     echo "  sudo cp deploy/mes-dashboard.service /etc/systemd/system/"
     echo "  sudo cp deploy/mes-dashboard-watchdog.service /etc/systemd/system/"
+    echo "  sudo cp deploy/mes-dashboard-trace-worker.service /etc/systemd/system/"
     echo "  sudo systemctl daemon-reload"
     echo "  sudo systemctl enable --now mes-dashboard mes-dashboard-watchdog"
+    echo ""
+    echo "Optional: enable async trace worker (for large queries)"
+    echo "  # Set TRACE_WORKER_ENABLED=true in .env"
+    echo "  sudo systemctl enable --now mes-dashboard-trace-worker"
     echo ""
     echo "=========================================="
 }

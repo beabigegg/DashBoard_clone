@@ -27,6 +27,14 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=mes-dashboard
 
+# Memory protection (cgroup v2): prevents OOM from killing entire VM.
+# MemoryHigh: soft limit — kernel starts reclaiming when exceeded (service stays alive).
+# MemoryMax: hard limit — OOM kills only this service (host OS survives).
+# Adjust based on VM RAM: MemoryHigh ≈ 70% of VM RAM, MemoryMax ≈ 85% of VM RAM.
+# For 7GB VM: MemoryHigh=5G, MemoryMax=6G (leaves ~1GB for OS + Redis).
+MemoryHigh=5G
+MemoryMax=6G
+
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict

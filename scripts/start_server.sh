@@ -25,6 +25,9 @@ PORT=$(echo "$DEFAULT_PORT" | cut -d: -f2)
 REDIS_ENABLED="${REDIS_ENABLED:-true}"
 # Worker watchdog configuration
 WATCHDOG_ENABLED="${WATCHDOG_ENABLED:-true}"
+# RQ trace worker configuration
+TRACE_WORKER_ENABLED="${TRACE_WORKER_ENABLED:-false}"
+TRACE_WORKER_QUEUE="${TRACE_WORKER_QUEUE:-trace-events}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -73,6 +76,8 @@ resolve_runtime_paths() {
     WATCHDOG_PID_FILE="${WATCHDOG_PID_FILE:-${WATCHDOG_RUNTIME_DIR}/gunicorn.pid}"
     WATCHDOG_STATE_FILE="${WATCHDOG_STATE_FILE:-${WATCHDOG_RUNTIME_DIR}/mes_dashboard_restart_state.json}"
     WATCHDOG_PROCESS_PID_FILE="${WATCHDOG_PROCESS_PID_FILE:-${WATCHDOG_RUNTIME_DIR}/worker_watchdog.pid}"
+    RQ_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_trace_worker.pid"
+    RQ_WORKER_LOG="${LOG_DIR}/rq_worker.log"
     PID_FILE="${WATCHDOG_PID_FILE}"
     export WATCHDOG_RUNTIME_DIR WATCHDOG_RESTART_FLAG WATCHDOG_PID_FILE WATCHDOG_STATE_FILE WATCHDOG_PROCESS_PID_FILE
 }
@@ -585,6 +590,126 @@ stop_watchdog() {
     return 0
 }
 
+# ============================================================
+# RQ Trace Worker Management Functions
+# ============================================================
+get_rq_worker_pid() {
+    if [ -f "$RQ_WORKER_PID_FILE" ]; then
+        local pid
+        pid=$(cat "$RQ_WORKER_PID_FILE" 2>/dev/null || true)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            echo "$pid"
+            return 0
+        fi
+        rm -f "$RQ_WORKER_PID_FILE"
+    fi
+
+    local discovered_pid
+    discovered_pid=$(pgrep -f "[r]q worker.*${TRACE_WORKER_QUEUE}" 2>/dev/null | head -1 || true)
+    if [ -n "${discovered_pid}" ] && kill -0 "${discovered_pid}" 2>/dev/null; then
+        echo "${discovered_pid}" > "$RQ_WORKER_PID_FILE"
+        echo "${discovered_pid}"
+        return 0
+    fi
+
+    return 1
+}
+
+is_rq_worker_running() {
+    get_rq_worker_pid &>/dev/null
+}
+
+start_rq_worker() {
+    if ! is_enabled "${TRACE_WORKER_ENABLED:-false}"; then
+        log_info "RQ trace worker is disabled (TRACE_WORKER_ENABLED=${TRACE_WORKER_ENABLED:-false})"
+        return 0
+    fi
+
+    if [ "$REDIS_ENABLED" != "true" ]; then
+        log_warn "Redis is disabled; cannot start RQ trace worker"
+        return 0
+    fi
+
+    if is_rq_worker_running; then
+        local pid
+        pid=$(get_rq_worker_pid)
+        log_success "RQ trace worker already running (PID: ${pid})"
+        return 0
+    fi
+
+    # Check if rq is installed
+    if ! python -c "import rq" 2>/dev/null; then
+        log_warn "rq package not installed; skip trace worker (pip install rq)"
+        return 0
+    fi
+
+    log_info "Starting RQ trace worker (queue: ${TRACE_WORKER_QUEUE})..."
+    local redis_url="${REDIS_URL:-redis://localhost:6379/0}"
+    if command -v setsid >/dev/null 2>&1; then
+        setsid rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
+    else
+        nohup rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
+    fi
+    local pid=$!
+    echo "$pid" > "$RQ_WORKER_PID_FILE"
+
+    sleep 1
+    if kill -0 "$pid" 2>/dev/null; then
+        log_success "RQ trace worker started (PID: ${pid})"
+        return 0
+    fi
+
+    rm -f "$RQ_WORKER_PID_FILE"
+    log_error "Failed to start RQ trace worker"
+    return 1
+}
+
+stop_rq_worker() {
+    if ! is_rq_worker_running; then
+        rm -f "$RQ_WORKER_PID_FILE"
+        return 0
+    fi
+
+    local pid
+    pid=$(get_rq_worker_pid)
+    log_info "Stopping RQ trace worker (PID: ${pid})..."
+    kill -TERM "$pid" 2>/dev/null || true
+
+    local count=0
+    while kill -0 "$pid" 2>/dev/null && [ $count -lt 10 ]; do
+        sleep 1
+        count=$((count + 1))
+    done
+
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null || true
+        sleep 1
+    fi
+
+    rm -f "$RQ_WORKER_PID_FILE"
+    if kill -0 "$pid" 2>/dev/null; then
+        log_error "Failed to stop RQ trace worker"
+        return 1
+    fi
+
+    log_success "RQ trace worker stopped"
+    return 0
+}
+
+rq_worker_status() {
+    if ! is_enabled "${TRACE_WORKER_ENABLED:-false}"; then
+        echo -e "  RQ Worker:${YELLOW} DISABLED${NC}"
+        return 0
+    fi
+
+    if is_rq_worker_running; then
+        local pid=$(get_rq_worker_pid)
+        echo -e "  RQ Worker:${GREEN} RUNNING${NC} (PID: ${pid}, queue: ${TRACE_WORKER_QUEUE})"
+    else
+        echo -e "  RQ Worker:${RED} STOPPED${NC}"
+    fi
+}
+
 do_start() {
     local foreground=false
 
@@ -662,6 +787,7 @@ do_start() {
             log_info "Access URL: http://localhost:${PORT}"
             log_info "Logs: ${LOG_DIR}/"
             start_watchdog || return 1
+            start_rq_worker
             echo "[$(timestamp)] Server started (PID: ${pid})" >> "$STARTUP_LOG"
         else
             log_error "Failed to start server"
@@ -723,6 +849,7 @@ do_stop() {
         fi
     fi
 
+    stop_rq_worker
     stop_watchdog
 }
 
@@ -768,6 +895,7 @@ do_status() {
     else
         echo -e "  Watchdog:${YELLOW} DISABLED${NC}"
     fi
+    rq_worker_status
 
     if is_running; then
         echo ""

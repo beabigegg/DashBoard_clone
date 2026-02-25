@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List
 
 from mes_dashboard.core.cache import cache_get, cache_set
-from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
+from mes_dashboard.core.database import read_sql_df_slow_iter
 from mes_dashboard.sql import QueryBuilder, SQLLoader
 
 logger = logging.getLogger("mes_dashboard.event_fetcher")
@@ -238,41 +238,38 @@ class EventFetcher:
         filter_column = spec["filter_column"]
         match_mode = spec.get("match_mode", "in")
 
-        def _fetch_batch(batch_ids):
+        def _sanitize_value(v):
+            """Replace NaN float values with None for JSON-safe serialization."""
+            if isinstance(v, float) and math.isnan(v):
+                return None
+            return v
+
+        def _fetch_and_group_batch(batch_ids):
+            """Fetch a batch using fetchmany iterator and group into ``grouped``."""
             builder = QueryBuilder()
             if match_mode == "contains":
                 builder.add_or_like_conditions(filter_column, batch_ids, position="both")
             else:
                 builder.add_in_condition(filter_column, batch_ids)
             sql = EventFetcher._build_domain_sql(domain, builder.get_conditions_sql())
-            return batch_ids, read_sql_df(sql, builder.params, timeout_seconds=60)
 
-        def _sanitize_record(d):
-            """Replace NaN/NaT values with None for JSON-safe serialization."""
-            for k, v in d.items():
-                if isinstance(v, float) and math.isnan(v):
-                    d[k] = None
-            return d
-
-        def _process_batch_result(batch_ids, df):
-            if df is None or df.empty:
-                return
-            for _, row in df.iterrows():
-                if domain == "jobs":
-                    record = _sanitize_record(row.to_dict())
-                    containers = record.get("CONTAINERIDS")
-                    if not isinstance(containers, str) or not containers:
+            for columns, rows in read_sql_df_slow_iter(sql, builder.params, timeout_seconds=60):
+                for row in rows:
+                    record = {k: _sanitize_value(v) for k, v in zip(columns, row)}
+                    if domain == "jobs":
+                        containers = record.get("CONTAINERIDS")
+                        if not isinstance(containers, str) or not containers:
+                            continue
+                        for cid in batch_ids:
+                            if cid in containers:
+                                enriched = dict(record)
+                                enriched["CONTAINERID"] = cid
+                                grouped[cid].append(enriched)
                         continue
-                    for cid in batch_ids:
-                        if cid in containers:
-                            enriched = dict(record)
-                            enriched["CONTAINERID"] = cid
-                            grouped[cid].append(enriched)
-                    continue
-                cid = row.get("CONTAINERID")
-                if not isinstance(cid, str) or not cid:
-                    continue
-                grouped[cid].append(_sanitize_record(row.to_dict()))
+                    cid = record.get("CONTAINERID")
+                    if not isinstance(cid, str) or not cid:
+                        continue
+                    grouped[cid].append(record)
 
         batches = [
             normalized_ids[i:i + ORACLE_IN_BATCH_SIZE]
@@ -281,15 +278,13 @@ class EventFetcher:
 
         if len(batches) <= 1:
             for batch in batches:
-                batch_ids, df = _fetch_batch(batch)
-                _process_batch_result(batch_ids, df)
+                _fetch_and_group_batch(batch)
         else:
             with ThreadPoolExecutor(max_workers=min(len(batches), EVENT_FETCHER_MAX_WORKERS)) as executor:
-                futures = {executor.submit(_fetch_batch, b): b for b in batches}
+                futures = {executor.submit(_fetch_and_group_batch, b): b for b in batches}
                 for future in as_completed(futures):
                     try:
-                        batch_ids, df = future.result()
-                        _process_batch_result(batch_ids, df)
+                        future.result()
                     except Exception:
                         logger.error(
                             "EventFetcher batch query failed domain=%s batch_size=%s",

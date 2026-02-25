@@ -1,10 +1,12 @@
 import { reactive, ref } from 'vue';
 
-import { apiPost, ensureMesApiAvailable } from '../core/api.js';
+import { apiGet, apiPost, ensureMesApiAvailable } from '../core/api.js';
 
 ensureMesApiAvailable();
 
 const DEFAULT_STAGE_TIMEOUT_MS = 360000;
+const JOB_POLL_INTERVAL_MS = 3000;
+const JOB_POLL_MAX_MS = 1800000; // 30 minutes
 const PROFILE_DOMAINS = Object.freeze({
   query_tool: ['history', 'materials', 'rejects', 'holds', 'jobs'],
   mid_section_defect: ['upstream_history', 'materials'],
@@ -71,6 +73,107 @@ function collectAllContainerIds(seedContainerIds, lineagePayload, direction) {
   return merged;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll an async trace job until it completes or fails.
+ *
+ * @param {string} statusUrl - The job status endpoint URL
+ * @param {object} options - { signal, onProgress }
+ * @returns {Promise<string>} The final status ('finished' or throws)
+ */
+async function pollJobUntilComplete(statusUrl, { signal, onProgress } = {}) {
+  const started = Date.now();
+
+  while (true) {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+
+    const status = await apiGet(statusUrl, { timeout: 15000, signal });
+
+    if (typeof onProgress === 'function') {
+      onProgress(status);
+    }
+
+    if (status.status === 'finished') {
+      return 'finished';
+    }
+
+    if (status.status === 'failed') {
+      const error = new Error(status.error || '非同步查詢失敗');
+      error.errorCode = 'JOB_FAILED';
+      throw error;
+    }
+
+    if (Date.now() - started > JOB_POLL_MAX_MS) {
+      const error = new Error('非同步查詢超時');
+      error.errorCode = 'JOB_POLL_TIMEOUT';
+      throw error;
+    }
+
+    await sleep(JOB_POLL_INTERVAL_MS);
+  }
+}
+
+/**
+ * Consume an NDJSON stream from the server, calling onChunk for each line.
+ *
+ * @param {string} url - The stream endpoint URL
+ * @param {object} options - { signal, onChunk }
+ * @returns {Promise<void>}
+ */
+async function consumeNDJSONStream(url, { signal, onChunk } = {}) {
+  const response = await fetch(url, { signal });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    const error = new Error(`Stream request failed: HTTP ${response.status} ${text}`);
+    error.errorCode = 'STREAM_FAILED';
+    throw error;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete last line
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const chunk = JSON.parse(trimmed);
+          if (typeof onChunk === 'function') onChunk(chunk);
+        } catch {
+          // skip malformed NDJSON lines
+        }
+      }
+    }
+
+    // process remaining buffer
+    if (buffer.trim()) {
+      try {
+        const chunk = JSON.parse(buffer.trim());
+        if (typeof onChunk === 'function') onChunk(chunk);
+      } catch {
+        // skip malformed final line
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export function useTraceProgress({ profile } = {}) {
   const current_stage = ref(null);
   const completed_stages = ref([]);
@@ -88,6 +191,15 @@ export function useTraceProgress({ profile } = {}) {
     events: null,
   });
 
+  // Async job progress (populated when events stage uses async path)
+  const job_progress = reactive({
+    active: false,
+    job_id: null,
+    status: null,
+    elapsed_seconds: 0,
+    progress: '',
+  });
+
   let activeController = null;
 
   function reset() {
@@ -99,6 +211,11 @@ export function useTraceProgress({ profile } = {}) {
     stage_errors.seed = null;
     stage_errors.lineage = null;
     stage_errors.events = null;
+    job_progress.active = false;
+    job_progress.job_id = null;
+    job_progress.status = null;
+    job_progress.elapsed_seconds = 0;
+    job_progress.progress = '';
   }
 
   function abort() {
@@ -173,7 +290,70 @@ export function useTraceProgress({ profile } = {}) {
         },
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },
       );
-      stage_results.events = eventsPayload;
+
+      // Async path: server returned 202 with job_id
+      if (eventsPayload?.async === true && eventsPayload?.status_url) {
+        job_progress.active = true;
+        job_progress.job_id = eventsPayload.job_id;
+        job_progress.status = 'queued';
+
+        // Phase 1: poll until job finishes
+        await pollJobUntilComplete(eventsPayload.status_url, {
+          signal: controller.signal,
+          onProgress: (status) => {
+            job_progress.status = status.status;
+            job_progress.elapsed_seconds = status.elapsed_seconds || 0;
+            job_progress.progress = status.progress || '';
+          },
+        });
+
+        // Phase 2: stream result via NDJSON (or fall back to full result)
+        const streamUrl = eventsPayload.stream_url;
+        if (streamUrl) {
+          job_progress.progress = 'streaming';
+
+          const streamedResult = { stage: 'events', results: {}, aggregation: null };
+          let totalRecords = 0;
+
+          await consumeNDJSONStream(streamUrl, {
+            signal: controller.signal,
+            onChunk: (chunk) => {
+              if (chunk.type === 'domain_start') {
+                streamedResult.results[chunk.domain] = { data: [], count: 0, total: chunk.total };
+              } else if (chunk.type === 'records' && streamedResult.results[chunk.domain]) {
+                const domainResult = streamedResult.results[chunk.domain];
+                domainResult.data.push(...chunk.data);
+                domainResult.count = domainResult.data.length;
+                totalRecords += chunk.data.length;
+                job_progress.progress = `streaming: ${totalRecords} records`;
+              } else if (chunk.type === 'aggregation') {
+                streamedResult.aggregation = chunk.data;
+              } else if (chunk.type === 'warning') {
+                streamedResult.error = chunk.code;
+                streamedResult.failed_domains = chunk.failed_domains;
+              } else if (chunk.type === 'full_result') {
+                // Legacy fallback: server sent full result as single chunk
+                Object.assign(streamedResult, chunk.data);
+              }
+            },
+          });
+
+          stage_results.events = streamedResult;
+        } else {
+          // No stream_url: fall back to fetching full result
+          const resultUrl = `${eventsPayload.status_url}/result`;
+          stage_results.events = await apiGet(resultUrl, {
+            timeout: DEFAULT_STAGE_TIMEOUT_MS,
+            signal: controller.signal,
+          });
+        }
+
+        job_progress.active = false;
+      } else {
+        // Sync path
+        stage_results.events = eventsPayload;
+      }
+
       completed_stages.value = [...completed_stages.value, 'events'];
       return stage_results;
     } catch (error) {
@@ -192,6 +372,7 @@ export function useTraceProgress({ profile } = {}) {
       }
       current_stage.value = null;
       is_running.value = false;
+      job_progress.active = false;
     }
   }
 
@@ -200,6 +381,7 @@ export function useTraceProgress({ profile } = {}) {
     completed_stages,
     stage_results,
     stage_errors,
+    job_progress,
     is_running,
     execute,
     reset,

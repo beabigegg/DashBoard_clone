@@ -482,3 +482,343 @@ def test_non_msd_events_cache_unchanged(mock_cache_set, mock_cache_get, mock_fet
     assert payload['stage'] == 'events'
     # EventFetcher should NOT have been called — served from cache
     mock_fetch_events.assert_not_called()
+
+
+# ---- Admission control tests ----
+
+
+def test_events_non_msd_cid_limit_returns_413(monkeypatch):
+    """Non-MSD profile exceeding CID limit should return 413."""
+    monkeypatch.setattr(
+        'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
+    )
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': [f'CID-{i}' for i in range(10)],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 413
+    payload = response.get_json()
+    assert payload['error']['code'] == 'CID_LIMIT_EXCEEDED'
+
+
+@patch('mes_dashboard.routes.trace_routes.build_trace_aggregation_from_events')
+@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+def test_events_msd_bypasses_cid_limit(
+    mock_fetch_events,
+    mock_build_aggregation,
+    monkeypatch,
+):
+    """MSD profile should bypass CID limit and proceed normally."""
+    monkeypatch.setattr(
+        'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
+    )
+    mock_fetch_events.return_value = {
+        f'CID-{i}': [{'CONTAINERID': f'CID-{i}', 'WORKCENTER_GROUP': '測試'}]
+        for i in range(10)
+    }
+    mock_build_aggregation.return_value = {
+        'kpi': {'total_input': 10},
+        'charts': {},
+        'daily_trend': [],
+        'available_loss_reasons': [],
+        'genealogy_status': 'ready',
+        'detail_total_count': 0,
+    }
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'mid_section_defect',
+            'container_ids': [f'CID-{i}' for i in range(10)],
+            'domains': ['upstream_history'],
+            'params': {
+                'start_date': '2025-01-01',
+                'end_date': '2025-01-31',
+            },
+            'lineage': {'ancestors': {}},
+            'seed_container_ids': [f'CID-{i}' for i in range(10)],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['stage'] == 'events'
+    mock_fetch_events.assert_called()
+
+
+@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+def test_events_non_msd_within_limit_proceeds(mock_fetch_events):
+    """Non-MSD profile within CID limit should proceed normally."""
+    mock_fetch_events.return_value = {
+        'CID-001': [{'CONTAINERID': 'CID-001', 'EVENTTYPE': 'TRACK_IN'}]
+    }
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': ['CID-001'],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['stage'] == 'events'
+
+
+# ---- Async job queue tests ----
+
+
+@patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
+def test_events_routes_to_async_above_threshold(
+    mock_async_avail,
+    mock_enqueue,
+    monkeypatch,
+):
+    """CID count > async threshold should return 202 with job_id."""
+    monkeypatch.setattr(
+        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 5,
+    )
+    mock_enqueue.return_value = ('trace-evt-abc123', None)
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': [f'CID-{i}' for i in range(10)],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload['async'] is True
+    assert payload['job_id'] == 'trace-evt-abc123'
+    assert '/api/trace/job/trace-evt-abc123' in payload['status_url']
+
+
+@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
+def test_events_falls_back_to_sync_when_async_unavailable(
+    mock_async_avail,
+    mock_fetch_events,
+    monkeypatch,
+):
+    """When async is unavailable, should fall through to sync processing."""
+    monkeypatch.setattr(
+        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 2,
+    )
+    mock_fetch_events.return_value = {
+        f'CID-{i}': [{'CONTAINERID': f'CID-{i}'}]
+        for i in range(3)
+    }
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': [f'CID-{i}' for i in range(3)],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['stage'] == 'events'
+    mock_fetch_events.assert_called()
+
+
+@patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
+def test_events_falls_back_to_413_when_enqueue_fails(
+    mock_async_avail,
+    mock_enqueue,
+    monkeypatch,
+):
+    """When enqueue fails for non-MSD, should fall back to 413."""
+    monkeypatch.setattr(
+        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 3,
+    )
+    monkeypatch.setattr(
+        'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
+    )
+    mock_enqueue.return_value = (None, 'Redis down')
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': [f'CID-{i}' for i in range(10)],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 413
+    payload = response.get_json()
+    assert payload['error']['code'] == 'CID_LIMIT_EXCEEDED'
+
+
+# ---- Job status/result endpoint tests ----
+
+
+@patch('mes_dashboard.routes.trace_routes.get_job_status')
+def test_job_status_found(mock_status):
+    """GET /api/trace/job/<id> should return status."""
+    mock_status.return_value = {
+        'job_id': 'trace-evt-abc',
+        'status': 'started',
+        'profile': 'query_tool',
+        'cid_count': 100,
+        'domains': ['history'],
+        'progress': 'fetching events',
+        'created_at': 1740000000.0,
+        'elapsed_seconds': 15.0,
+        'error': None,
+    }
+
+    client = _client()
+    response = client.get('/api/trace/job/trace-evt-abc')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['status'] == 'started'
+    assert payload['job_id'] == 'trace-evt-abc'
+
+
+@patch('mes_dashboard.routes.trace_routes.get_job_status', return_value=None)
+def test_job_status_not_found(mock_status):
+    """GET /api/trace/job/<id> should return 404 for unknown job."""
+    client = _client()
+    response = client.get('/api/trace/job/trace-evt-nonexist')
+
+    assert response.status_code == 404
+
+
+@patch('mes_dashboard.routes.trace_routes.get_job_result')
+@patch('mes_dashboard.routes.trace_routes.get_job_status')
+def test_job_result_success(mock_status, mock_result):
+    """GET /api/trace/job/<id>/result should return result for finished job."""
+    mock_status.return_value = {'status': 'finished', 'job_id': 'j1'}
+    mock_result.return_value = {
+        'stage': 'events',
+        'results': {'history': {'data': [], 'count': 0}},
+        'aggregation': None,
+    }
+
+    client = _client()
+    response = client.get('/api/trace/job/j1/result')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['stage'] == 'events'
+
+
+@patch('mes_dashboard.routes.trace_routes.get_job_status')
+def test_job_result_not_complete(mock_status):
+    """GET /api/trace/job/<id>/result should return 409 for non-finished job."""
+    mock_status.return_value = {'status': 'started', 'job_id': 'j2'}
+
+    client = _client()
+    response = client.get('/api/trace/job/j2/result')
+
+    assert response.status_code == 409
+    payload = response.get_json()
+    assert payload['error']['code'] == 'JOB_NOT_COMPLETE'
+
+
+@patch('mes_dashboard.routes.trace_routes.get_job_result', return_value=None)
+@patch('mes_dashboard.routes.trace_routes.get_job_status')
+def test_job_result_expired(mock_status, mock_result):
+    """GET /api/trace/job/<id>/result should return 404 if result expired."""
+    mock_status.return_value = {'status': 'finished', 'job_id': 'j3'}
+
+    client = _client()
+    response = client.get('/api/trace/job/j3/result')
+
+    assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# NDJSON stream endpoint
+# ---------------------------------------------------------------------------
+@patch("mes_dashboard.routes.trace_routes.stream_job_result_ndjson")
+@patch("mes_dashboard.routes.trace_routes.get_job_status")
+def test_job_stream_success(mock_status, mock_stream):
+    """GET /api/trace/job/<id>/stream should return NDJSON for finished job."""
+    mock_status.return_value = {'status': 'finished', 'job_id': 'j1'}
+    mock_stream.return_value = iter([
+        '{"type":"meta","job_id":"j1","domains":["history"]}\n',
+        '{"type":"complete","total_records":0}\n',
+    ])
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.get('/api/trace/job/j1/stream')
+
+    assert response.status_code == 200
+    assert response.content_type.startswith('application/x-ndjson')
+
+    lines = [l for l in response.data.decode().strip().split('\n') if l.strip()]
+    assert len(lines) == 2
+
+
+@patch("mes_dashboard.routes.trace_routes.get_job_status")
+def test_job_stream_not_found(mock_status):
+    """GET /api/trace/job/<id>/stream should return 404 for missing job."""
+    mock_status.return_value = None
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.get('/api/trace/job/j-missing/stream')
+
+    assert response.status_code == 404
+
+
+@patch("mes_dashboard.routes.trace_routes.get_job_status")
+def test_job_stream_not_complete(mock_status):
+    """GET /api/trace/job/<id>/stream should return 409 for incomplete job."""
+    mock_status.return_value = {'status': 'started', 'job_id': 'j2'}
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.get('/api/trace/job/j2/stream')
+
+    assert response.status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# 202 response includes stream_url
+# ---------------------------------------------------------------------------
+@patch("mes_dashboard.routes.trace_routes.is_async_available", return_value=True)
+@patch("mes_dashboard.routes.trace_routes.enqueue_trace_events_job")
+def test_events_async_response_includes_stream_url(mock_enqueue, mock_async):
+    """Events 202 response should include stream_url field."""
+    mock_enqueue.return_value = ("trace-evt-xyz", None)
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    cids = [f"CID-{i}" for i in range(25000)]
+    response = client.post('/api/trace/events', json={
+        'profile': 'query_tool',
+        'container_ids': cids,
+        'domains': ['history'],
+    })
+
+    assert response.status_code == 202
+    data = response.get_json()
+    assert data["stream_url"] == "/api/trace/job/trace-evt-xyz/stream"
+    assert data["status_url"] == "/api/trace/job/trace-evt-xyz"

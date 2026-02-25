@@ -18,7 +18,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
 from mes_dashboard.core.cache import cache_get, cache_set
 from mes_dashboard.core.rate_limit import configured_rate_limit
@@ -31,6 +31,14 @@ from mes_dashboard.services.mid_section_defect_service import (
     resolve_trace_seed_lots,
 )
 from mes_dashboard.services.query_tool_service import resolve_lots
+from mes_dashboard.services.trace_job_service import (
+    TRACE_ASYNC_CID_THRESHOLD,
+    enqueue_trace_events_job,
+    get_job_result,
+    get_job_status,
+    is_async_available,
+    stream_job_result_ndjson,
+)
 
 logger = logging.getLogger("mes_dashboard.trace_routes")
 
@@ -38,6 +46,7 @@ trace_bp = Blueprint("trace", __name__, url_prefix="/api/trace")
 
 TRACE_SLOW_THRESHOLD_SECONDS = float(os.getenv('TRACE_SLOW_THRESHOLD_SECONDS', '15'))
 TRACE_EVENTS_MAX_WORKERS = int(os.getenv('TRACE_EVENTS_MAX_WORKERS', '2'))
+TRACE_EVENTS_CID_LIMIT = int(os.getenv('TRACE_EVENTS_CID_LIMIT', '50000'))
 TRACE_CACHE_TTL_SECONDS = 300
 
 PROFILE_QUERY_TOOL = "query_tool"
@@ -84,6 +93,14 @@ _TRACE_EVENTS_RATE_LIMIT = configured_rate_limit(
     max_attempts_env="TRACE_EVENTS_RATE_LIMIT_MAX_REQUESTS",
     window_seconds_env="TRACE_EVENTS_RATE_LIMIT_WINDOW_SECONDS",
     default_max_attempts=15,
+    default_window_seconds=60,
+)
+
+_TRACE_JOB_RATE_LIMIT = configured_rate_limit(
+    bucket="trace-job-status",
+    max_attempts_env="TRACE_JOB_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="TRACE_JOB_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=60,
     default_window_seconds=60,
 )
 
@@ -622,10 +639,49 @@ def events():
             400,
         )
 
+    # Admission control: non-MSD profiles have a hard CID limit to prevent OOM.
+    # MSD (reject tracing) needs all CIDs for accurate aggregation statistics.
+    is_msd = (profile == PROFILE_MID_SECTION_DEFECT)
+    cid_count = len(container_ids)
+
+    # Route large queries to async job queue when available.
+    # Falls through to sync path if RQ is not installed or Redis is down.
+    if cid_count > TRACE_ASYNC_CID_THRESHOLD and is_async_available():
+        job_id, err = enqueue_trace_events_job(profile, container_ids, domains, payload)
+        if job_id is not None:
+            logger.info(
+                "trace events routed to async job_id=%s profile=%s cid_count=%s",
+                job_id, profile, cid_count,
+            )
+            return jsonify({
+                "stage": "events",
+                "async": True,
+                "job_id": job_id,
+                "status_url": f"/api/trace/job/{job_id}",
+                "stream_url": f"/api/trace/job/{job_id}/stream",
+            }), 202
+        logger.warning("trace async enqueue failed cid_count=%s: %s", cid_count, err)
+
+    if not is_msd and cid_count > TRACE_EVENTS_CID_LIMIT:
+        logger.warning(
+            "trace events CID limit exceeded profile=%s cid_count=%s limit=%s",
+            profile, cid_count, TRACE_EVENTS_CID_LIMIT,
+        )
+        return _error(
+            "CID_LIMIT_EXCEEDED",
+            f"container_ids count ({cid_count}) exceeds limit ({TRACE_EVENTS_CID_LIMIT})",
+            413,
+        )
+
+    if is_msd and cid_count > TRACE_EVENTS_CID_LIMIT:
+        logger.warning(
+            "trace events MSD large query proceeding cid_count=%s limit=%s",
+            cid_count, TRACE_EVENTS_CID_LIMIT,
+        )
+
     # For MSD profile, skip the events-level cache so that aggregation is
     # always recomputed with the current loss_reasons.  EventFetcher still
     # provides per-domain Redis caching, so raw Oracle queries are avoided.
-    is_msd = (profile == PROFILE_MID_SECTION_DEFECT)
 
     events_cache_key = _events_cache_key(profile, domains, container_ids)
     if not is_msd:
@@ -655,9 +711,11 @@ def events():
             domain = futures[future]
             try:
                 events_by_cid = future.result()
-                raw_domain_results[domain] = events_by_cid
                 rows = _flatten_domain_records(events_by_cid)
                 results[domain] = {"data": rows, "count": len(rows)}
+                if is_msd:
+                    raw_domain_results[domain] = events_by_cid
+                # Non-MSD: events_by_cid goes out of scope here, no double retention
             except Exception as exc:
                 logger.error("events stage domain failed domain=%s: %s", domain, exc, exc_info=True)
                 failed_domains.append(domain)
@@ -694,3 +752,62 @@ def events():
         gc.collect()
 
     return jsonify(response)
+
+
+@trace_bp.route("/job/<job_id>", methods=["GET"])
+@_TRACE_JOB_RATE_LIMIT
+def job_status(job_id: str):
+    """Return the current status of an async trace job."""
+    status = get_job_status(job_id)
+    if status is None:
+        return _error("JOB_NOT_FOUND", "job not found or expired", 404)
+    return jsonify(status)
+
+
+@trace_bp.route("/job/<job_id>/result", methods=["GET"])
+@_TRACE_JOB_RATE_LIMIT
+def job_result(job_id: str):
+    """Return the result of a completed async trace job."""
+    status = get_job_status(job_id)
+    if status is None:
+        return _error("JOB_NOT_FOUND", "job not found or expired", 404)
+
+    if status["status"] not in ("finished",):
+        return jsonify({
+            "error": {"code": "JOB_NOT_COMPLETE", "message": "job has not completed yet"},
+            "status": status["status"],
+        }), 409
+
+    domain = request.args.get("domain")
+    offset = request.args.get("offset", 0, type=int)
+    limit = request.args.get("limit", 0, type=int)
+
+    result = get_job_result(job_id, domain=domain, offset=offset, limit=limit)
+    if result is None:
+        return _error("JOB_RESULT_EXPIRED", "job result has expired", 404)
+
+    return jsonify(result)
+
+
+@trace_bp.route("/job/<job_id>/stream", methods=["GET"])
+@_TRACE_JOB_RATE_LIMIT
+def job_stream(job_id: str):
+    """Stream completed job result as NDJSON for progressive frontend consumption."""
+    status = get_job_status(job_id)
+    if status is None:
+        return _error("JOB_NOT_FOUND", "job not found or expired", 404)
+
+    if status["status"] != "finished":
+        return jsonify({
+            "error": {"code": "JOB_NOT_COMPLETE", "message": "job has not completed yet"},
+            "status": status["status"],
+        }), 409
+
+    return Response(
+        stream_job_result_ndjson(job_id),
+        mimetype="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
