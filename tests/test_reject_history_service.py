@@ -374,6 +374,7 @@ def test_export_csv_contains_semantic_headers(monkeypatch):
     )
     payload = "".join(chunks)
 
-    assert "REJECT_TOTAL_QTY" in payload
-    assert "DEFECT_QTY" in payload
+    assert "扣帳報廢量" in payload
+    assert "不扣帳報廢量" in payload
+    assert "WORKFLOW" in payload
     assert "2026-02-03" in payload

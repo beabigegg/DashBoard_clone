@@ -11,6 +11,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.utils import parse_bool_query
 from mes_dashboard.services.reject_dataset_cache import (
     apply_view,
     compute_dimension_pareto,
@@ -69,15 +70,6 @@ def _parse_date_range(required: bool = True) -> tuple[Optional[str], Optional[st
     return start_date, end_date, None
 
 
-def _parse_bool(value: str, *, name: str) -> tuple[Optional[bool], Optional[tuple[dict, int]]]:
-    normalized = str(value or "").strip().lower()
-    if normalized in {"", "0", "false", "no", "n", "off"}:
-        return False, None
-    if normalized in {"1", "true", "yes", "y", "on"}:
-        return True, None
-    return None, ({"success": False, "error": f"Invalid {name}, use true/false"}, 400)
-
-
 def _parse_multi_param(name: str) -> list[str]:
     values = []
     for raw in request.args.getlist(name):
@@ -120,32 +112,29 @@ def _extract_meta(
     return data, meta
 
 
+_VALID_BOOL_STRINGS = {"", "0", "false", "no", "n", "off", "1", "true", "yes", "y", "on"}
+
+
 def _parse_common_bools() -> tuple[Optional[tuple[dict, int]], bool, bool, bool]:
     """Parse include_excluded_scrap, exclude_material_scrap, exclude_pb_diode."""
-    include_excluded_scrap, err1 = _parse_bool(
+    for name in ("include_excluded_scrap", "exclude_material_scrap", "exclude_pb_diode"):
+        raw = str(request.args.get(name, "") or "").strip().lower()
+        if raw not in _VALID_BOOL_STRINGS:
+            return ({"success": False, "error": f"Invalid {name}, use true/false"}, 400), False, True, True
+
+    include_excluded_scrap = parse_bool_query(
         request.args.get("include_excluded_scrap", ""),
-        name="include_excluded_scrap",
+        default=False,
     )
-    if err1:
-        return err1, False, True, True
-    exclude_material_scrap, err2 = _parse_bool(
+    exclude_material_scrap = parse_bool_query(
         request.args.get("exclude_material_scrap", "true"),
-        name="exclude_material_scrap",
+        default=True,
     )
-    if err2:
-        return err2, False, True, True
-    exclude_pb_diode, err3 = _parse_bool(
+    exclude_pb_diode = parse_bool_query(
         request.args.get("exclude_pb_diode", "true"),
-        name="exclude_pb_diode",
+        default=True,
     )
-    if err3:
-        return err3, False, True, True
-    return (
-        None,
-        bool(include_excluded_scrap),
-        bool(exclude_material_scrap),
-        bool(exclude_pb_diode),
-    )
+    return None, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode
 
 
 @reject_history_bp.route("/api/reject-history/options", methods=["GET"])
@@ -582,7 +571,7 @@ def api_reject_history_export_cached():
 
         headers = [
             "LOT", "WORKCENTER", "WORKCENTER_GROUP", "Package", "FUNCTION",
-            "TYPE", "PRODUCT", "原因", "EQUIPMENT", "COMMENT", "SPEC",
+            "TYPE", "WORKFLOW", "PRODUCT", "原因", "EQUIPMENT", "COMMENT", "SPEC",
             "REJECT_QTY", "STANDBY_QTY", "QTYTOPROCESS_QTY", "INPROCESS_QTY",
             "PROCESSED_QTY", "扣帳報廢量", "不扣帳報廢量", "MOVEIN_QTY",
             "報廢時間", "日期",

@@ -9,6 +9,7 @@ Provides three stage endpoints for progressive trace execution:
 
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import logging
@@ -36,7 +37,7 @@ logger = logging.getLogger("mes_dashboard.trace_routes")
 trace_bp = Blueprint("trace", __name__, url_prefix="/api/trace")
 
 TRACE_SLOW_THRESHOLD_SECONDS = float(os.getenv('TRACE_SLOW_THRESHOLD_SECONDS', '15'))
-TRACE_EVENTS_MAX_WORKERS = int(os.getenv('TRACE_EVENTS_MAX_WORKERS', '4'))
+TRACE_EVENTS_MAX_WORKERS = int(os.getenv('TRACE_EVENTS_MAX_WORKERS', '2'))
 TRACE_CACHE_TTL_SECONDS = 300
 
 PROFILE_QUERY_TOOL = "query_tool"
@@ -668,9 +669,12 @@ def events():
     aggregation = None
     if profile == PROFILE_MID_SECTION_DEFECT:
         aggregation, agg_error = _build_msd_aggregation(payload, raw_domain_results)
+        del raw_domain_results
         if agg_error is not None:
             code, message, status = agg_error
             return _error(code, message, status)
+    else:
+        del raw_domain_results
 
     response: Dict[str, Any] = {
         "stage": "events",
@@ -683,6 +687,10 @@ def events():
         response["code"] = "EVENTS_PARTIAL_FAILURE"
         response["failed_domains"] = sorted(failed_domains)
 
-    if not is_msd:
+    if not is_msd and len(container_ids) <= 10000:
         cache_set(events_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
+
+    if len(container_ids) > 10000:
+        gc.collect()
+
     return jsonify(response)

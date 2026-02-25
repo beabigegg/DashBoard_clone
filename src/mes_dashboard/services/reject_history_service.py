@@ -858,6 +858,7 @@ def export_csv(
         "Package",
         "FUNCTION",
         "TYPE",
+        "WORKFLOW",
         "PRODUCT",
         "原因",
         "EQUIPMENT",

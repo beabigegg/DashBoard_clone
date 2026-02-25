@@ -80,6 +80,8 @@ def test_wip_overview_and_detail_status_parameter_contract(client):
             hold_type=None,
             package=None,
             pj_type="PJA3460",
+            firstname=None,
+            waferdesc=None,
         )
         mock_detail.assert_called_once_with(
             workcenter="TMTT",
@@ -89,6 +91,8 @@ def test_wip_overview_and_detail_status_parameter_contract(client):
             hold_type=None,
             workorder=None,
             lotid=None,
+            firstname=None,
+            waferdesc=None,
             include_dummy=False,
             page=1,
             page_size=100,

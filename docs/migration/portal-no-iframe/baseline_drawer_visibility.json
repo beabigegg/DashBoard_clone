@@ -48,7 +48,7 @@
         {
           "route": "/reject-history",
           "name": "報廢歷史查詢",
-          "status": "dev",
+          "status": "released",
           "order": 4
         },
         {
@@ -162,6 +162,12 @@
           "name": "Hold 歷史績效",
           "status": "released",
           "order": 3
+        },
+        {
+          "route": "/reject-history",
+          "name": "報廢歷史查詢",
+          "status": "released",
+          "order": 4
         },
         {
           "route": "/resource-history",

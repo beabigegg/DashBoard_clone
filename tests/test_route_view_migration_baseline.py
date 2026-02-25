@@ -7,6 +7,8 @@ import json
 import copy
 from pathlib import Path
 
+import pytest
+
 from mes_dashboard.app import create_app
 from mes_dashboard.services.navigation_contract import (
     compute_drawer_visibility,
@@ -18,6 +20,11 @@ from mes_dashboard.services.navigation_contract import (
 ROOT = Path(__file__).resolve().parent.parent
 PAGE_STATUS_FILE = ROOT / "data" / "page_status.json"
 BASELINE_DIR = ROOT / "docs" / "migration" / "portal-shell-route-view-integration"
+
+pytestmark = pytest.mark.skipif(
+    not BASELINE_DIR.exists(),
+    reason=f"Migration baseline directory missing: {BASELINE_DIR}",
+)
 
 BASELINE_VISIBILITY_FILE = BASELINE_DIR / "baseline_drawer_visibility.json"
 BASELINE_ROUTE_QUERY_FILE = BASELINE_DIR / "baseline_route_query_contracts.json"

@@ -309,3 +309,11 @@ def test_resolve_full_genealogy_includes_semantic_edges(
     edge_types = {edge["edge_type"] for edge in result["edges"]}
     assert "wafer_origin" in edge_types
     assert "gd_rework_source" in edge_types
+
+
+def test_lineage_engine_uses_slow_connection():
+    """Regression: lineage_engine must use read_sql_df_slow (non-pooled)."""
+    import mes_dashboard.services.lineage_engine as le
+    from mes_dashboard.core.database import read_sql_df_slow
+
+    assert le.read_sql_df is read_sql_df_slow

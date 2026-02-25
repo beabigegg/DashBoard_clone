@@ -65,6 +65,12 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "redis: mark test as requiring Redis connection"
     )
+    config.addinivalue_line(
+        "markers", "stress: mark test as stress/load test (requires --run-stress)"
+    )
+    config.addinivalue_line(
+        "markers", "load: mark test as load test (requires --run-stress)"
+    )
 
 
 def pytest_addoption(parser):
@@ -81,6 +87,12 @@ def pytest_addoption(parser):
         default=False,
         help="Run end-to-end tests that require running server"
     )
+    parser.addoption(
+        "--run-stress",
+        action="store_true",
+        default=False,
+        help="Run stress/load tests that require running server"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -88,11 +100,16 @@ def pytest_collection_modifyitems(config, items):
     run_integration = config.getoption("--run-integration")
     run_e2e = config.getoption("--run-e2e")
 
+    run_stress = config.getoption("--run-stress")
+
     skip_integration = pytest.mark.skip(reason="need --run-integration option to run")
     skip_e2e = pytest.mark.skip(reason="need --run-e2e option to run")
+    skip_stress = pytest.mark.skip(reason="need --run-stress option to run")
 
     for item in items:
         if "integration" in item.keywords and not run_integration:
             item.add_marker(skip_integration)
         if "e2e" in item.keywords and not run_e2e:
             item.add_marker(skip_e2e)
+        if ("stress" in item.keywords or "load" in item.keywords) and not run_stress:
+            item.add_marker(skip_stress)

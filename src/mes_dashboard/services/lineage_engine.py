@@ -7,7 +7,7 @@ import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.sql import QueryBuilder, SQLLoader
 
 logger = logging.getLogger("mes_dashboard.lineage_engine")

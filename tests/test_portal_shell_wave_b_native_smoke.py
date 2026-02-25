@@ -282,7 +282,7 @@ def test_reject_history_native_smoke_query_sections_and_export(client):
             },
         ),
         patch(
-            "mes_dashboard.routes.reject_history_routes.query_reason_pareto",
+            "mes_dashboard.routes.reject_history_routes.query_dimension_pareto",
             return_value={
                 "items": [
                     {

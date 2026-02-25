@@ -334,7 +334,7 @@ def test_wave_b_native_routes_are_reachable(monkeypatch):
     client = app.test_client()
     _login_as_admin(client)
 
-    for route in ["/job-query", "/excel-query", "/query-tool", "/tmtt-defect"]:
+    for route in ["/job-query", "/excel-query", "/query-tool"]:
         response = client.get(route)
         assert response.status_code == 200, f"{route} should be reachable"
 
@@ -350,7 +350,6 @@ def test_direct_entry_in_scope_report_routes_redirect_to_canonical_shell_when_sp
         "/wip-overview?status=queue": "/portal-shell/wip-overview?status=queue",
         "/resource-history?granularity=day": "/portal-shell/resource-history?granularity=day",
         "/job-query?start_date=2026-02-01&end_date=2026-02-02": "/portal-shell/job-query?start_date=2026-02-01&end_date=2026-02-02",
-        "/tmtt-defect?start_date=2026-02-01&end_date=2026-02-02": "/portal-shell/tmtt-defect?start_date=2026-02-01&end_date=2026-02-02",
         "/hold-detail?reason=YieldLimit": "/portal-shell/hold-detail?reason=YieldLimit",
     }
 

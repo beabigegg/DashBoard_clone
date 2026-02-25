@@ -13,13 +13,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List
 
 from mes_dashboard.core.cache import cache_get, cache_set
-from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.sql import QueryBuilder, SQLLoader
 
 logger = logging.getLogger("mes_dashboard.event_fetcher")
 
 ORACLE_IN_BATCH_SIZE = 1000
-EVENT_FETCHER_MAX_WORKERS = int(os.getenv('EVENT_FETCHER_MAX_WORKERS', '4'))
+EVENT_FETCHER_MAX_WORKERS = int(os.getenv('EVENT_FETCHER_MAX_WORKERS', '2'))
+CACHE_SKIP_CID_THRESHOLD = int(os.getenv('EVENT_FETCHER_CACHE_SKIP_CID_THRESHOLD', '10000'))
 
 _DOMAIN_SPECS: Dict[str, Dict[str, Any]] = {
     "history": {
@@ -244,7 +245,7 @@ class EventFetcher:
             else:
                 builder.add_in_condition(filter_column, batch_ids)
             sql = EventFetcher._build_domain_sql(domain, builder.get_conditions_sql())
-            return batch_ids, read_sql_df(sql, builder.params)
+            return batch_ids, read_sql_df(sql, builder.params, timeout_seconds=60)
 
         def _sanitize_record(d):
             """Replace NaN/NaT values with None for JSON-safe serialization."""
@@ -296,7 +297,15 @@ class EventFetcher:
                         )
 
         result = dict(grouped)
-        cache_set(cache_key, result, ttl=_DOMAIN_SPECS[domain]["cache_ttl"])
+        del grouped
+
+        if len(normalized_ids) <= CACHE_SKIP_CID_THRESHOLD:
+            cache_set(cache_key, result, ttl=_DOMAIN_SPECS[domain]["cache_ttl"])
+        else:
+            logger.warning(
+                "EventFetcher skipping cache domain=%s cid_count=%s (threshold=%s)",
+                domain, len(normalized_ids), CACHE_SKIP_CID_THRESHOLD,
+            )
         logger.info(
             "EventFetcher fetched domain=%s queried_cids=%s hit_cids=%s",
             domain,

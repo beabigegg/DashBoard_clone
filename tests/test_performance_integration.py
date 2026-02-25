@@ -387,5 +387,5 @@ class TestPerformancePage:
         html = response.data.decode('utf-8', errors='ignore')
         data_str = html.lower()
         assert 'performance' in data_str or '效能' in data_str
-        assert '/static/js/chart.umd.min.js' in html
+        assert '/static/dist/admin-performance.js' in html
         assert 'cdn.jsdelivr.net' not in html

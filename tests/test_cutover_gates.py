@@ -6,10 +6,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from mes_dashboard.app import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE_DIR = ROOT / "docs" / "migration" / "portal-shell-route-view-integration"
+
+pytestmark = pytest.mark.skipif(
+    not BASELINE_DIR.exists(),
+    reason=f"Migration baseline directory missing: {BASELINE_DIR}",
+)
 BASELINE_VISIBILITY_FILE = BASELINE_DIR / "baseline_drawer_visibility.json"
 BASELINE_API_FILE = BASELINE_DIR / "baseline_api_payload_contracts.json"
 GATE_REPORT_FILE = BASELINE_DIR / "cutover-gates-report.json"

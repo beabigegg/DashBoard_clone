@@ -368,6 +368,7 @@ class TestViteModuleIntegration(unittest.TestCase):
             '/tables': '/portal-shell/tables',
             '/excel-query': '/portal-shell/excel-query',
             '/query-tool': '/portal-shell/query-tool',
+            '/reject-history': '/portal-shell/reject-history',
         }
 
         for endpoint, asset in endpoints_and_assets:

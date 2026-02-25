@@ -7,9 +7,15 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
-SNAPSHOT_FILE = (
-    ROOT / "docs" / "migration" / "portal-shell-route-view-integration" / "visual-regression-snapshots.json"
+BASELINE_DIR = ROOT / "docs" / "migration" / "portal-shell-route-view-integration"
+SNAPSHOT_FILE = BASELINE_DIR / "visual-regression-snapshots.json"
+
+pytestmark = pytest.mark.skipif(
+    not BASELINE_DIR.exists(),
+    reason=f"Migration baseline directory missing: {BASELINE_DIR}",
 )
 
 

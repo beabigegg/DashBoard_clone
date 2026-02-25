@@ -160,3 +160,11 @@ def test_fetch_events_holds_branch_replaces_aliased_container_filter(
     assert "h.CONTAINERID = :container_id" not in sql
     assert "IN" in sql.upper()
     assert params == {"p0": "CID-1", "p1": "CID-2"}
+
+
+def test_event_fetcher_uses_slow_connection():
+    """Regression: event_fetcher must use read_sql_df_slow (non-pooled)."""
+    import mes_dashboard.services.event_fetcher as ef
+    from mes_dashboard.core.database import read_sql_df_slow
+
+    assert ef.read_sql_df is read_sql_df_slow

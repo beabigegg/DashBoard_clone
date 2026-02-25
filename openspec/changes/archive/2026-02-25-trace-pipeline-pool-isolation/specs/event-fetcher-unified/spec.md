@@ -1,8 +1,5 @@
-# event-fetcher-unified Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change unified-lineage-engine. Update Purpose after archive.
-## Requirements
 ### Requirement: EventFetcher SHALL provide unified cached event querying across domains
 `EventFetcher` SHALL encapsulate batch event queries with L1/L2 layered cache and rate limit bucket configuration, supporting domains: `history`, `materials`, `rejects`, `holds`, `jobs`, `upstream_history`, `downstream_rejects`.
 
@@ -32,4 +29,3 @@ TBD - created by archiving change unified-lineage-engine. Update Purpose after a
 #### Scenario: Batch concurrency default
 - **WHEN** EventFetcher processes batches for a domain with >1000 CIDs
 - **THEN** the default `EVENT_FETCHER_MAX_WORKERS` SHALL be 2 (env: `EVENT_FETCHER_MAX_WORKERS`)
-
