@@ -6,9 +6,9 @@ threads = int(os.getenv("GUNICORN_THREADS", "4"))
 worker_class = "gthread"
 
 # Timeout settings - critical for dashboard stability.
-# Keep this above slow-query timeout paths (e.g. query-tool 120s) and DB pool timeout.
-timeout = int(os.getenv("GUNICORN_TIMEOUT", "130"))
-graceful_timeout = int(os.getenv("GUNICORN_GRACEFUL_TIMEOUT", "60"))
+# Keep this above slow-query timeout paths (e.g. read_sql_df_slow 300s) and DB pool timeout.
+timeout = int(os.getenv("GUNICORN_TIMEOUT", "360"))
+graceful_timeout = int(os.getenv("GUNICORN_GRACEFUL_TIMEOUT", "120"))
 keepalive = 5         # Keep-alive connections timeout
 
 # Worker lifecycle management - prevent state accumulation.

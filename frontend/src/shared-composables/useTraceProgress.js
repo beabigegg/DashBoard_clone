@@ -4,7 +4,7 @@ import { apiPost, ensureMesApiAvailable } from '../core/api.js';
 
 ensureMesApiAvailable();
 
-const DEFAULT_STAGE_TIMEOUT_MS = 60000;
+const DEFAULT_STAGE_TIMEOUT_MS = 360000;
 const PROFILE_DOMAINS = Object.freeze({
   query_tool: ['history', 'materials', 'rejects', 'holds', 'jobs'],
   mid_section_defect: ['upstream_history', 'materials'],

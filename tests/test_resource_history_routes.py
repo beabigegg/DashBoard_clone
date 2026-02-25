@@ -61,8 +61,8 @@ class TestResourceHistoryOptionsAPI(unittest.TestCase):
         self.assertIn('error', data)
 
 
-class TestResourceHistorySummaryAPI(unittest.TestCase):
-    """Integration tests for /api/resource/history/summary endpoint."""
+class TestResourceHistoryQueryAPI(unittest.TestCase):
+    """Integration tests for POST /api/resource/history/query endpoint."""
 
     def setUp(self):
         """Set up test client."""
@@ -73,7 +73,10 @@ class TestResourceHistorySummaryAPI(unittest.TestCase):
 
     def test_missing_start_date(self):
         """Missing start_date should return 400."""
-        response = self.client.get('/api/resource/history/summary?end_date=2024-01-31')
+        response = self.client.post(
+            '/api/resource/history/query',
+            json={'end_date': '2024-01-31'},
+        )
 
         self.assertEqual(response.status_code, 400)
         data = json.loads(response.data)
@@ -82,74 +85,69 @@ class TestResourceHistorySummaryAPI(unittest.TestCase):
 
     def test_missing_end_date(self):
         """Missing end_date should return 400."""
-        response = self.client.get('/api/resource/history/summary?start_date=2024-01-01')
+        response = self.client.post(
+            '/api/resource/history/query',
+            json={'start_date': '2024-01-01'},
+        )
 
         self.assertEqual(response.status_code, 400)
         data = json.loads(response.data)
         self.assertFalse(data['success'])
         self.assertIn('end_date', data['error'])
 
-    @patch('mes_dashboard.routes.resource_history_routes.query_summary')
-    def test_date_range_exceeds_limit(self, mock_query):
-        """Date range exceeding 730 days should return error."""
-        mock_query.return_value = {'error': '查詢範圍不可超過 730 天（兩年）'}
-
-        response = self.client.get(
-            '/api/resource/history/summary?start_date=2024-01-01&end_date=2026-01-02'
-        )
-
-        self.assertEqual(response.status_code, 400)
-        data = json.loads(response.data)
-        self.assertFalse(data['success'])
-        self.assertIn('730', data['error'])
-
-    @patch('mes_dashboard.routes.resource_history_routes.query_summary')
-    def test_successful_summary(self, mock_query):
-        """Successful summary request should return all data sections."""
+    @patch('mes_dashboard.routes.resource_history_routes.execute_primary_query')
+    def test_successful_query(self, mock_query):
+        """Successful query should return query_id, summary, and detail."""
         mock_query.return_value = {
-            'kpi': {
-                'ou_pct': 80.0,
-                'prd_hours': 800,
-                'sby_hours': 100,
-                'udt_hours': 50,
-                'sdt_hours': 30,
-                'egt_hours': 20,
-                'nst_hours': 100,
-                'machine_count': 10
+            'query_id': 'abc123',
+            'summary': {
+                'kpi': {'ou_pct': 80.0, 'machine_count': 10},
+                'trend': [{'date': '2024-01-01', 'ou_pct': 80.0}],
+                'heatmap': [{'workcenter': 'WC01', 'date': '2024-01-01', 'ou_pct': 80.0}],
+                'workcenter_comparison': [{'workcenter': 'WC01', 'ou_pct': 80.0}],
             },
-            'trend': [{'date': '2024-01-01', 'ou_pct': 80.0}],
-            'heatmap': [{'workcenter': 'WC01', 'date': '2024-01-01', 'ou_pct': 80.0}],
-            'workcenter_comparison': [{'workcenter': 'WC01', 'ou_pct': 80.0}]
+            'detail': {
+                'data': [{'workcenter': 'WC01', 'ou_pct': 80.0}],
+                'total': 1,
+                'truncated': False,
+                'max_records': None,
+            },
         }
 
-        response = self.client.get(
-            '/api/resource/history/summary?start_date=2024-01-01&end_date=2024-01-07'
+        response = self.client.post(
+            '/api/resource/history/query',
+            json={'start_date': '2024-01-01', 'end_date': '2024-01-07'},
         )
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(data['success'])
-        self.assertIn('kpi', data['data'])
-        self.assertIn('trend', data['data'])
-        self.assertIn('heatmap', data['data'])
-        self.assertIn('workcenter_comparison', data['data'])
+        self.assertIn('query_id', data)
+        self.assertIn('summary', data)
+        self.assertIn('detail', data)
+        self.assertIn('kpi', data['summary'])
+        self.assertIn('trend', data['summary'])
 
-    @patch('mes_dashboard.routes.resource_history_routes.query_summary')
-    def test_summary_with_filters(self, mock_query):
-        """Summary with filters should pass them to service."""
-        mock_query.return_value = {'kpi': {}, 'trend': [], 'heatmap': [], 'workcenter_comparison': []}
+    @patch('mes_dashboard.routes.resource_history_routes.execute_primary_query')
+    def test_query_with_filters(self, mock_query):
+        """Query with filters should pass them to service."""
+        mock_query.return_value = {
+            'query_id': 'abc123',
+            'summary': {'kpi': {}, 'trend': [], 'heatmap': [], 'workcenter_comparison': []},
+            'detail': {'data': [], 'total': 0, 'truncated': False, 'max_records': None},
+        }
 
-        response = self.client.get(
-            '/api/resource/history/summary'
-            '?start_date=2024-01-01'
-            '&end_date=2024-01-07'
-            '&granularity=week'
-            '&workcenter_groups=焊接_DB'
-            '&workcenter_groups=成型'
-            '&families=FAM01'
-            '&families=FAM02'
-            '&is_production=1'
-            '&is_key=1'
+        response = self.client.post(
+            '/api/resource/history/query',
+            json={
+                'start_date': '2024-01-01',
+                'end_date': '2024-01-07',
+                'granularity': 'week',
+                'workcenter_groups': ['焊接_DB', '成型'],
+                'families': ['FAM01', 'FAM02'],
+                'is_production': True,
+                'is_key': True,
+            },
         )
 
         self.assertEqual(response.status_code, 200)
@@ -162,8 +160,8 @@ class TestResourceHistorySummaryAPI(unittest.TestCase):
         self.assertTrue(call_kwargs['is_key'])
 
 
-class TestResourceHistoryDetailAPI(unittest.TestCase):
-    """Integration tests for /api/resource/history/detail endpoint."""
+class TestResourceHistoryViewAPI(unittest.TestCase):
+    """Integration tests for GET /api/resource/history/view endpoint."""
 
     def setUp(self):
         """Set up test client."""
@@ -172,60 +170,54 @@ class TestResourceHistoryDetailAPI(unittest.TestCase):
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
 
-    def test_missing_dates(self):
-        """Missing dates should return 400."""
-        response = self.client.get('/api/resource/history/detail')
+    def test_missing_query_id(self):
+        """Missing query_id should return 400."""
+        response = self.client.get('/api/resource/history/view')
 
         self.assertEqual(response.status_code, 400)
         data = json.loads(response.data)
         self.assertFalse(data['success'])
+        self.assertIn('query_id', data['error'])
 
-    @patch('mes_dashboard.routes.resource_history_routes.query_detail')
-    def test_successful_detail(self, mock_query):
-        """Successful detail request should return data with total and truncated flag."""
-        mock_query.return_value = {
-            'data': [
-                {'workcenter': 'WC01', 'family': 'FAM01', 'resource': 'RES01', 'ou_pct': 80.0}
-            ],
-            'total': 100,
-            'truncated': False,
-            'max_records': None
+    @patch('mes_dashboard.routes.resource_history_routes.apply_view')
+    def test_cache_expired(self, mock_view):
+        """Expired cache should return 410."""
+        mock_view.return_value = None
+
+        response = self.client.get('/api/resource/history/view?query_id=abc123')
+
+        self.assertEqual(response.status_code, 410)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error'], 'cache_expired')
+
+    @patch('mes_dashboard.routes.resource_history_routes.apply_view')
+    def test_successful_view(self, mock_view):
+        """Successful view should return summary and detail."""
+        mock_view.return_value = {
+            'summary': {
+                'kpi': {'ou_pct': 80.0},
+                'trend': [],
+                'heatmap': [],
+                'workcenter_comparison': [],
+            },
+            'detail': {
+                'data': [{'workcenter': 'WC01', 'ou_pct': 80.0}],
+                'total': 1,
+                'truncated': False,
+                'max_records': None,
+            },
         }
 
         response = self.client.get(
-            '/api/resource/history/detail?start_date=2024-01-01&end_date=2024-01-07'
+            '/api/resource/history/view?query_id=abc123&granularity=week'
         )
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(data['success'])
-        self.assertIn('data', data)
-        self.assertIn('total', data)
-        self.assertIn('truncated', data)
-        self.assertFalse(data['truncated'])
-
-    @patch('mes_dashboard.routes.resource_history_routes.query_detail')
-    def test_detail_truncated_warning(self, mock_query):
-        """Detail with truncated data should return truncated flag and max_records."""
-        mock_query.return_value = {
-            'data': [{'workcenter': 'WC01', 'family': 'FAM01', 'resource': 'RES01', 'ou_pct': 80.0}],
-            'total': 6000,
-            'truncated': True,
-            'max_records': 5000
-        }
-
-        response = self.client.get(
-            '/api/resource/history/detail'
-            '?start_date=2024-01-01'
-            '&end_date=2024-01-07'
-        )
-
-        self.assertEqual(response.status_code, 200)
-        data = json.loads(response.data)
-        self.assertTrue(data['success'])
-        self.assertTrue(data['truncated'])
-        self.assertEqual(data['max_records'], 5000)
-        self.assertEqual(data['total'], 6000)
+        self.assertIn('summary', data)
+        self.assertIn('detail', data)
 
 
 class TestResourceHistoryExportAPI(unittest.TestCase):

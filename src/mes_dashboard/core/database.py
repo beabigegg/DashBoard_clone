@@ -193,6 +193,14 @@ def get_db_runtime_config(refresh: bool = False) -> Dict[str, Any]:
             "DB_POOL_EXHAUSTED_RETRY_AFTER_SECONDS",
             5,
         ),
+        "slow_call_timeout_ms": _from_app_or_env_int(
+            "DB_SLOW_CALL_TIMEOUT_MS",
+            config_class.DB_SLOW_CALL_TIMEOUT_MS,
+        ),
+        "slow_max_concurrent": _from_app_or_env_int(
+            "DB_SLOW_MAX_CONCURRENT",
+            config_class.DB_SLOW_MAX_CONCURRENT,
+        ),
     }
     return _DB_RUNTIME_CONFIG.copy()
 
@@ -220,6 +228,7 @@ def get_pool_status() -> Dict[str, Any]:
         "checked_in": int(pool.checkedin()),
         "max_capacity": max_capacity,
         "saturation": saturation,
+        "slow_query_active": get_slow_query_active_count(),
     }
 
 
@@ -399,7 +408,7 @@ def dispose_engine():
 
     Call this during application shutdown to cleanly release resources.
     """
-    global _ENGINE, _HEALTH_ENGINE, _DB_RUNTIME_CONFIG
+    global _ENGINE, _HEALTH_ENGINE, _DB_RUNTIME_CONFIG, _SLOW_QUERY_SEMAPHORE
     stop_keepalive()
     if _HEALTH_ENGINE is not None:
         _HEALTH_ENGINE.dispose()
@@ -410,6 +419,7 @@ def dispose_engine():
         logger.info("Database engine disposed, all connections closed")
         _ENGINE = None
     _DB_RUNTIME_CONFIG = None
+    _SLOW_QUERY_SEMAPHORE = None
 
 
 # ============================================================
@@ -418,6 +428,26 @@ def dispose_engine():
 
 _DIRECT_CONN_COUNTER = 0
 _DIRECT_CONN_LOCK = threading.Lock()
+
+# Slow-query concurrency control
+_SLOW_QUERY_SEMAPHORE: Optional[threading.Semaphore] = None
+_SLOW_QUERY_ACTIVE = 0
+_SLOW_QUERY_LOCK = threading.Lock()
+
+
+def _get_slow_query_semaphore() -> threading.Semaphore:
+    """Lazily initialise the slow-query semaphore from runtime config."""
+    global _SLOW_QUERY_SEMAPHORE
+    if _SLOW_QUERY_SEMAPHORE is None:
+        runtime = get_db_runtime_config()
+        _SLOW_QUERY_SEMAPHORE = threading.Semaphore(runtime["slow_max_concurrent"])
+        logger.info("Slow-query semaphore initialised (max_concurrent=%s)", runtime["slow_max_concurrent"])
+    return _SLOW_QUERY_SEMAPHORE
+
+
+def get_slow_query_active_count() -> int:
+    """Return the number of slow queries currently executing."""
+    return _SLOW_QUERY_ACTIVE
 
 
 def get_direct_connection_count() -> int:
@@ -573,7 +603,7 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
 def read_sql_df_slow(
     sql: str,
     params: Optional[Dict[str, Any]] = None,
-    timeout_seconds: int = 120,
+    timeout_seconds: Optional[int] = None,
 ) -> pd.DataFrame:
     """Execute a slow SQL query with a custom timeout via direct oracledb connection.
 
@@ -581,20 +611,41 @@ def read_sql_df_slow(
     this creates a dedicated connection with a longer call_timeout
     for known-slow queries (e.g. full table scans on large tables).
 
+    Concurrency is limited by a semaphore (DB_SLOW_MAX_CONCURRENT) to
+    prevent Oracle connection exhaustion.
+
     Args:
         sql: SQL query string with Oracle bind variables.
         params: Optional dict of parameter values.
-        timeout_seconds: Call timeout in seconds (default: 120).
+        timeout_seconds: Call timeout in seconds.  None = use
+            DB_SLOW_CALL_TIMEOUT_MS from config (default 300s).
 
     Returns:
-        DataFrame with query results, or None on connection failure.
+        DataFrame with query results.
     """
-    start_time = time.time()
-    timeout_ms = timeout_seconds * 1000
+    global _SLOW_QUERY_ACTIVE
 
+    runtime = get_db_runtime_config()
+    if timeout_seconds is None:
+        timeout_ms = runtime["slow_call_timeout_ms"]
+    else:
+        timeout_ms = timeout_seconds * 1000
+
+    sem = _get_slow_query_semaphore()
+    acquired = sem.acquire(timeout=60)
+    if not acquired:
+        raise RuntimeError(
+            "Slow-query concurrency limit reached; try again later"
+        )
+
+    with _SLOW_QUERY_LOCK:
+        _SLOW_QUERY_ACTIVE += 1
+        active = _SLOW_QUERY_ACTIVE
+
+    logger.info("Slow query starting (active=%s, timeout_ms=%s)", active, timeout_ms)
+    start_time = time.time()
     conn = None
     try:
-        runtime = get_db_runtime_config()
         conn = oracledb.connect(
             **DB_CONFIG,
             tcp_connect_timeout=runtime["tcp_connect_timeout"],
@@ -640,6 +691,9 @@ def read_sql_df_slow(
                 conn.close()
             except Exception:
                 pass
+        with _SLOW_QUERY_LOCK:
+            _SLOW_QUERY_ACTIVE -= 1
+        sem.release()
 
 
 # ============================================================

@@ -132,7 +132,7 @@ export function useExcelQueryData() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const payload = await apiUpload('/api/excel-query/upload', formData, { timeout: 120000, silent: true });
+      const payload = await apiUpload('/api/excel-query/upload', formData, { timeout: 360000, silent: true });
       excelColumns.value = Array.isArray(payload?.columns) ? payload.columns : [];
       excelPreview.value = Array.isArray(payload?.preview) ? payload.preview : [];
       uploadState.fileName = String(file.name || '');
@@ -252,7 +252,7 @@ export function useExcelQueryData() {
           date_from: filters.dateFrom || undefined,
           date_to: filters.dateTo || undefined,
         },
-        { timeout: 120000, silent: true },
+        { timeout: 360000, silent: true },
       );
       queryResult.rows = Array.isArray(payload?.data) ? payload.data : [];
       queryResult.columns = Array.isArray(payload?.columns) ? payload.columns : filters.returnColumns;

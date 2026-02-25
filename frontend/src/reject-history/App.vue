@@ -15,7 +15,7 @@ import ParetoSection from './components/ParetoSection.vue';
 import SummaryCards from './components/SummaryCards.vue';
 import TrendChart from './components/TrendChart.vue';
 
-const API_TIMEOUT = 60000;
+const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 50;
 
 // ---- Primary query form state ----
@@ -214,7 +214,11 @@ async function executePrimaryQuery() {
     updateUrlState();
   } catch (error) {
     if (isStaleRequest(requestId)) return;
-    errorMessage.value = error?.message || '主查詢執行失敗';
+    if (error?.name === 'AbortError') {
+      errorMessage.value = '查詢逾時，請縮短日期範圍後重試';
+    } else {
+      errorMessage.value = error?.message || '主查詢執行失敗';
+    }
   } finally {
     if (isStaleRequest(requestId)) return;
     loading.querying = false;
@@ -264,7 +268,11 @@ async function refreshView() {
     updateUrlState();
   } catch (error) {
     if (isStaleRequest(requestId)) return;
-    errorMessage.value = error?.message || '視圖查詢失敗';
+    if (error?.name === 'AbortError') {
+      errorMessage.value = '查詢逾時，請縮短日期範圍後重試';
+    } else {
+      errorMessage.value = error?.message || '視圖查詢失敗';
+    }
   } finally {
     if (isStaleRequest(requestId)) return;
     loading.list = false;
@@ -360,7 +368,9 @@ async function fetchDimensionPareto(dim) {
   } catch (err) {
     if (myId !== activeDimRequestId) return;
     dimensionParetoItems.value = [];
-    errorMessage.value = err.message || '查詢維度 Pareto 失敗';
+    if (err?.name !== 'AbortError') {
+      errorMessage.value = err.message || '查詢維度 Pareto 失敗';
+    }
   } finally {
     if (myId === activeDimRequestId) {
       dimensionParetoLoading.value = false;

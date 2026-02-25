@@ -135,7 +135,7 @@ async function loadTxn(jobId) {
 
   try {
     const payload = await apiGet(`/api/job-query/txn/${encodeURIComponent(id)}`, {
-      timeout: 60000,
+      timeout: 360000,
       silent: true,
     });
     txnRows.value = Array.isArray(payload?.data) ? payload.data : [];

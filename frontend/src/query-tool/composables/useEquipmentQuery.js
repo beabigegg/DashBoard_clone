@@ -120,7 +120,7 @@ export function useEquipmentQuery(initial = {}) {
     const payload = await apiPost(
       '/api/query-tool/equipment-period',
       buildQueryPayload(queryType),
-      { timeout: 120000, silent: true },
+      { timeout: 360000, silent: true },
     );
 
     return Array.isArray(payload?.data) ? payload.data : [];
@@ -132,7 +132,7 @@ export function useEquipmentQuery(initial = {}) {
 
     try {
       const payload = await apiGet('/api/query-tool/equipment-list', {
-        timeout: 60000,
+        timeout: 360000,
         silent: true,
       });
       equipmentOptions.value = Array.isArray(payload?.data) ? payload.data : [];

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 
-import { apiGet } from '../core/api.js';
+import { apiGet, apiPost } from '../core/api.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
 import DailyTrend from './components/DailyTrend.vue';
@@ -13,7 +13,7 @@ import RecordTypeFilter from './components/RecordTypeFilter.vue';
 import ReasonPareto from './components/ReasonPareto.vue';
 import SummaryCards from './components/SummaryCards.vue';
 
-const API_TIMEOUT = 60000;
+const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 50;
 
 const filterBar = reactive({
@@ -22,6 +22,7 @@ const filterBar = reactive({
   holdType: 'quality',
 });
 
+const queryId = ref('');
 const reasonFilter = ref('');
 const durationFilter = ref('');
 const recordType = ref(['new']);
@@ -158,74 +159,23 @@ function updateUrlState() {
   replaceRuntimeHistory(`/hold-history?${params.toString()}`);
 }
 
-function commonParams({
-  includeHoldType = true,
-  includeReason = false,
-  includeRecordType = false,
-  includeDuration = false,
-} = {}) {
-  const params = {
-    start_date: filterBar.startDate,
-    end_date: filterBar.endDate,
-  };
+function recordTypeCsv() {
+  const rt = Array.isArray(recordType.value) ? recordType.value : [recordType.value];
+  return rt.join(',');
+}
 
-  if (includeHoldType) {
-    params.hold_type = filterBar.holdType;
+function applyViewResult(result, { listOnly = false } = {}) {
+  if (!listOnly) {
+    trendData.value = result.trend || trendData.value;
+    reasonParetoData.value = result.reason_pareto || reasonParetoData.value;
+    durationData.value = result.duration || durationData.value;
   }
-
-  if (includeRecordType) {
-    const rt = Array.isArray(recordType.value) ? recordType.value : [recordType.value];
-    params.record_type = rt.join(',');
-  }
-
-  if (includeReason && reasonFilter.value) {
-    params.reason = reasonFilter.value;
-  }
-
-  if (includeDuration && durationFilter.value) {
-    params.duration_range = durationFilter.value;
-  }
-
-  return params;
+  detailData.value = normalizeListPayload(result.list);
 }
 
-async function fetchTrend() {
-  const response = await apiGet('/api/hold-history/trend', {
-    params: commonParams({ includeHoldType: false }),
-    timeout: API_TIMEOUT,
-  });
-  return unwrapApiResult(response, '載入 trend 資料失敗');
-}
+// ---- Primary query (POST /query -> Oracle -> cache) ----
 
-async function fetchReasonPareto() {
-  const response = await apiGet('/api/hold-history/reason-pareto', {
-    params: commonParams({ includeHoldType: true, includeRecordType: true }),
-    timeout: API_TIMEOUT,
-  });
-  return unwrapApiResult(response, '載入 pareto 資料失敗');
-}
-
-async function fetchDuration() {
-  const response = await apiGet('/api/hold-history/duration', {
-    params: commonParams({ includeHoldType: true, includeRecordType: true }),
-    timeout: API_TIMEOUT,
-  });
-  return unwrapApiResult(response, '載入 duration 資料失敗');
-}
-
-async function fetchList() {
-  const response = await apiGet('/api/hold-history/list', {
-    params: {
-      ...commonParams({ includeHoldType: true, includeReason: true, includeRecordType: true, includeDuration: true }),
-      page: page.value,
-      per_page: DEFAULT_PER_PAGE,
-    },
-    timeout: API_TIMEOUT,
-  });
-  return unwrapApiResult(response, '載入明細資料失敗');
-}
-
-async function loadAllData({ includeTrend = true, showOverlay = false } = {}) {
+async function executePrimaryQuery({ showOverlay = false } = {}) {
   const requestId = nextRequestId();
 
   if (showOverlay) {
@@ -237,90 +187,90 @@ async function loadAllData({ includeTrend = true, showOverlay = false } = {}) {
   errorMessage.value = '';
 
   try {
-    const requests = [];
-    if (includeTrend) {
-      requests.push(fetchTrend());
-    }
-    requests.push(fetchReasonPareto(), fetchDuration(), fetchList());
+    const body = {
+      start_date: filterBar.startDate,
+      end_date: filterBar.endDate,
+      hold_type: filterBar.holdType,
+      record_type: recordTypeCsv(),
+    };
 
-    const responses = await Promise.all(requests);
-    if (isStaleRequest(requestId)) {
-      return;
-    }
+    const resp = await apiPost('/api/hold-history/query', body, { timeout: API_TIMEOUT });
+    if (isStaleRequest(requestId)) return;
 
-    let cursor = 0;
-    if (includeTrend) {
-      trendData.value = responses[cursor] || { days: [] };
-      cursor += 1;
-    }
+    const result = unwrapApiResult(resp, '主查詢執行失敗');
 
-    reasonParetoData.value = responses[cursor] || { items: [] };
-    cursor += 1;
-    durationData.value = responses[cursor] || { items: [] };
-    cursor += 1;
-    detailData.value = normalizeListPayload(responses[cursor]);
+    queryId.value = result.query_id;
+    applyViewResult(result);
+
+    updateUrlState();
   } catch (error) {
-    if (isStaleRequest(requestId)) {
-      return;
+    if (isStaleRequest(requestId)) return;
+    if (error?.name === 'AbortError') {
+      errorMessage.value = '查詢逾時，請縮短日期範圍後重試';
+    } else {
+      errorMessage.value = error?.message || '主查詢執行失敗';
     }
-    errorMessage.value = error?.message || '載入資料失敗';
   } finally {
-    if (isStaleRequest(requestId)) {
-      return;
-    }
+    if (isStaleRequest(requestId)) return;
     loading.global = false;
     loading.list = false;
     initialLoading.value = false;
   }
 }
 
-async function loadReasonDependents() {
+// ---- View refresh (GET /view -> read cache -> filter) ----
+
+async function refreshView({ listOnly = false } = {}) {
+  if (!queryId.value) return;
+
   const requestId = nextRequestId();
+  if (!listOnly) {
+    loading.global = true;
+  }
   loading.list = true;
   errorMessage.value = '';
 
   try {
-    const list = await fetchList();
-    if (isStaleRequest(requestId)) {
+    const params = {
+      query_id: queryId.value,
+      hold_type: filterBar.holdType,
+      record_type: recordTypeCsv(),
+      page: page.value,
+      per_page: DEFAULT_PER_PAGE,
+    };
+
+    if (reasonFilter.value) {
+      params.reason = reasonFilter.value;
+    }
+    if (durationFilter.value) {
+      params.duration_range = durationFilter.value;
+    }
+
+    const resp = await apiGet('/api/hold-history/view', {
+      params,
+      timeout: API_TIMEOUT,
+    });
+    if (isStaleRequest(requestId)) return;
+
+    // Cache expired -> auto re-execute primary query
+    if (resp?.success === false && resp?.error === 'cache_expired') {
+      await executePrimaryQuery();
       return;
     }
-    detailData.value = normalizeListPayload(list);
+
+    const result = unwrapApiResult(resp, '視圖查詢失敗');
+    applyViewResult(result, { listOnly });
   } catch (error) {
-    if (isStaleRequest(requestId)) {
-      return;
-    }
-    errorMessage.value = error?.message || '載入明細資料失敗';
+    if (isStaleRequest(requestId)) return;
+    errorMessage.value = error?.message || '載入資料失敗';
   } finally {
-    if (isStaleRequest(requestId)) {
-      return;
-    }
+    if (isStaleRequest(requestId)) return;
+    loading.global = false;
     loading.list = false;
   }
 }
 
-async function loadListOnly() {
-  const requestId = nextRequestId();
-  loading.list = true;
-  errorMessage.value = '';
-
-  try {
-    const list = await fetchList();
-    if (isStaleRequest(requestId)) {
-      return;
-    }
-    detailData.value = normalizeListPayload(list);
-  } catch (error) {
-    if (isStaleRequest(requestId)) {
-      return;
-    }
-    errorMessage.value = error?.message || '載入明細資料失敗';
-  } finally {
-    if (isStaleRequest(requestId)) {
-      return;
-    }
-    loading.list = false;
-  }
-}
+// ---- Computed ----
 
 function estimateAvgHoldHours(items) {
   const bucketHours = {
@@ -400,6 +350,8 @@ const holdTypeLabel = computed(() => {
   return '品質異常';
 });
 
+// ---- Event handlers ----
+
 function handleFilterChange(next) {
   const nextStartDate = next?.startDate || '';
   const nextEndDate = next?.endDate || '';
@@ -421,7 +373,13 @@ function handleFilterChange(next) {
   page.value = 1;
   updateUrlState();
 
-  void loadAllData({ includeTrend: dateChanged, showOverlay: false });
+  if (dateChanged) {
+    // Date changed -> new primary query (Oracle)
+    void executePrimaryQuery();
+  } else {
+    // Only hold_type changed -> view refresh (cache only)
+    void refreshView();
+  }
 }
 
 function handleRecordTypeChange() {
@@ -429,7 +387,7 @@ function handleRecordTypeChange() {
   durationFilter.value = '';
   page.value = 1;
   updateUrlState();
-  void loadAllData({ includeTrend: false, showOverlay: false });
+  void refreshView();
 }
 
 function handleReasonToggle(reason) {
@@ -441,7 +399,7 @@ function handleReasonToggle(reason) {
   reasonFilter.value = reasonFilter.value === nextReason ? '' : nextReason;
   page.value = 1;
   updateUrlState();
-  void loadReasonDependents();
+  void refreshView();
 }
 
 function clearReasonFilter() {
@@ -451,7 +409,7 @@ function clearReasonFilter() {
   reasonFilter.value = '';
   page.value = 1;
   updateUrlState();
-  void loadReasonDependents();
+  void refreshView();
 }
 
 function handleDurationToggle(range) {
@@ -463,7 +421,7 @@ function handleDurationToggle(range) {
   durationFilter.value = durationFilter.value === nextRange ? '' : nextRange;
   page.value = 1;
   updateUrlState();
-  void loadReasonDependents();
+  void refreshView();
 }
 
 function clearDurationFilter() {
@@ -473,7 +431,7 @@ function clearDurationFilter() {
   durationFilter.value = '';
   page.value = 1;
   updateUrlState();
-  void loadReasonDependents();
+  void refreshView();
 }
 
 function prevPage() {
@@ -482,7 +440,7 @@ function prevPage() {
   }
   page.value -= 1;
   updateUrlState();
-  void loadListOnly();
+  void refreshView({ listOnly: true });
 }
 
 function nextPage() {
@@ -492,13 +450,15 @@ function nextPage() {
   }
   page.value += 1;
   updateUrlState();
-  void loadListOnly();
+  void refreshView({ listOnly: true });
 }
 
 async function manualRefresh() {
   page.value = 1;
+  reasonFilter.value = '';
+  durationFilter.value = '';
   updateUrlState();
-  await loadAllData({ includeTrend: true, showOverlay: false });
+  await executePrimaryQuery();
 }
 
 onMounted(() => {
@@ -519,7 +479,7 @@ onMounted(() => {
     page.value = parsedPage;
   }
   updateUrlState();
-  void loadAllData({ includeTrend: true, showOverlay: true });
+  void executePrimaryQuery({ showOverlay: true });
 });
 </script>
 

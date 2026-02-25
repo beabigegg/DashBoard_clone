@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
-import { apiGet, ensureMesApiAvailable } from '../core/api.js';
+import { apiGet, apiPost, ensureMesApiAvailable } from '../core/api.js';
 import { buildResourceKpiFromHours } from '../core/compute.js';
 import {
   buildResourceHistoryQueryParams,
@@ -22,7 +22,7 @@ import TrendChart from './components/TrendChart.vue';
 
 ensureMesApiAvailable();
 
-const API_TIMEOUT = 60000;
+const API_TIMEOUT = 360000;
 const MAX_QUERY_DAYS = 730;
 
 function createDefaultFilters() {
@@ -65,6 +65,9 @@ const queryError = ref('');
 const detailWarning = ref('');
 const exportMessage = ref('');
 const autoPruneHint = ref('');
+
+const queryId = ref('');
+const lastPrimarySnapshot = ref('');
 
 const draftWatchReady = ref(false);
 let suppressDraftPrune = false;
@@ -330,7 +333,47 @@ watch(pruneSignature, () => {
   pruneDraftSelections({ showHint: true });
 });
 
-async function executeCommittedQuery() {
+// ─── Two-phase helpers ──────────────────────────────────────
+
+/**
+ * Build a snapshot string of "primary" params (those that require a new Oracle query).
+ * Granularity is NOT primary — it can be re-derived from cache.
+ */
+function buildPrimarySnapshot(filters) {
+  const p = buildResourceHistoryQueryParams(filters);
+  return JSON.stringify({
+    start_date: p.start_date,
+    end_date: p.end_date,
+    workcenter_groups: p.workcenter_groups || [],
+    families: p.families || [],
+    resource_ids: p.resource_ids || [],
+    is_production: p.is_production || '',
+    is_key: p.is_key || '',
+    is_monitor: p.is_monitor || '',
+  });
+}
+
+function applyViewResult(result) {
+  const summary = result.summary || {};
+  summaryData.value = {
+    kpi: mergeComputedKpi(summary.kpi || {}),
+    trend: (summary.trend || []).map((item) => mergeComputedKpi(item || {})),
+    heatmap: summary.heatmap || [],
+    workcenter_comparison: summary.workcenter_comparison || [],
+  };
+
+  const detail = result.detail || {};
+  detailData.value = Array.isArray(detail.data) ? detail.data : [];
+  resetHierarchyState();
+
+  if (detail.truncated) {
+    detailWarning.value = `明細資料超過 ${detail.max_records} 筆，僅顯示前 ${detail.max_records} 筆。`;
+  } else {
+    detailWarning.value = '';
+  }
+}
+
+async function executePrimaryQuery() {
   const validationError = validateDateRange(committedFilters);
   if (validationError) {
     queryError.value = validationError;
@@ -344,46 +387,37 @@ async function executeCommittedQuery() {
   exportMessage.value = '';
 
   try {
-    const queryString = buildQueryStringFromFilters(committedFilters);
     updateUrlState();
 
-    const [summaryResponse, detailResponse] = await Promise.all([
-      apiGet(`/api/resource/history/summary?${queryString}`, {
-        timeout: API_TIMEOUT,
-        silent: true,
-      }),
-      apiGet(`/api/resource/history/detail?${queryString}`, {
-        timeout: API_TIMEOUT,
-        silent: true,
-      }),
-    ]);
-
-    const summaryPayload = unwrapApiResult(summaryResponse, '查詢摘要失敗');
-    const detailPayload = unwrapApiResult(detailResponse, '查詢明細失敗');
-
-    const rawSummary = summaryPayload.data || {};
-    summaryData.value = {
-      ...rawSummary,
-      kpi: mergeComputedKpi(rawSummary.kpi || {}),
-      trend: (rawSummary.trend || []).map((item) => mergeComputedKpi(item || {})),
-      heatmap: rawSummary.heatmap || [],
-      workcenter_comparison: rawSummary.workcenter_comparison || [],
+    const queryParams = buildResourceHistoryQueryParams(committedFilters);
+    const body = {
+      start_date: queryParams.start_date,
+      end_date: queryParams.end_date,
+      granularity: queryParams.granularity,
+      workcenter_groups: queryParams.workcenter_groups || [],
+      families: queryParams.families || [],
+      resource_ids: queryParams.resource_ids || [],
+      is_production: !!queryParams.is_production,
+      is_key: !!queryParams.is_key,
+      is_monitor: !!queryParams.is_monitor,
     };
 
-    detailData.value = Array.isArray(detailPayload.data) ? detailPayload.data : [];
-    resetHierarchyState();
+    const response = await apiPost('/api/resource/history/query', body, {
+      timeout: API_TIMEOUT,
+      silent: true,
+    });
 
-    if (detailPayload.truncated) {
-      detailWarning.value = `明細資料超過 ${detailPayload.max_records} 筆，僅顯示前 ${detailPayload.max_records} 筆。`;
-    }
+    const payload = unwrapApiResult(response, '查詢失敗');
+    queryId.value = payload.query_id || '';
+    lastPrimarySnapshot.value = buildPrimarySnapshot(committedFilters);
+    applyViewResult(payload);
   } catch (error) {
-    queryError.value = error?.message || '查詢失敗';
-    summaryData.value = {
-      kpi: {},
-      trend: [],
-      heatmap: [],
-      workcenter_comparison: [],
-    };
+    if (error?.name === 'AbortError') {
+      queryError.value = '查詢逾時，請縮小日期範圍或資源篩選後重試';
+    } else {
+      queryError.value = error?.message || '查詢失敗';
+    }
+    summaryData.value = { kpi: {}, trend: [], heatmap: [], workcenter_comparison: [] };
     detailData.value = [];
     resetHierarchyState();
   } finally {
@@ -391,6 +425,47 @@ async function executeCommittedQuery() {
     loading.initial = false;
   }
 }
+
+async function refreshView() {
+  if (!queryId.value) {
+    await executePrimaryQuery();
+    return;
+  }
+
+  loading.querying = true;
+  queryError.value = '';
+
+  try {
+    updateUrlState();
+
+    const response = await apiGet('/api/resource/history/view', {
+      timeout: API_TIMEOUT,
+      silent: true,
+      params: {
+        query_id: queryId.value,
+        granularity: committedFilters.granularity || 'day',
+      },
+    });
+
+    if (response?.success === false && response?.error === 'cache_expired') {
+      await executePrimaryQuery();
+      return;
+    }
+
+    const payload = unwrapApiResult(response, '查詢失敗');
+    applyViewResult(payload);
+  } catch (error) {
+    if (error?.message === 'cache_expired' || error?.status === 410) {
+      await executePrimaryQuery();
+      return;
+    }
+    queryError.value = error?.message || '查詢失敗';
+  } finally {
+    loading.querying = false;
+  }
+}
+
+// ─── Filter actions ─────────────────────────────────────────
 
 async function applyFilters() {
   const validationError = validateDateRange(draftFilters);
@@ -400,7 +475,13 @@ async function applyFilters() {
   }
   pruneDraftSelections({ showHint: true });
   assignFilterState(committedFilters, draftFilters);
-  await executeCommittedQuery();
+
+  const currentPrimary = buildPrimarySnapshot(committedFilters);
+  if (queryId.value && currentPrimary === lastPrimarySnapshot.value) {
+    await refreshView();
+  } else {
+    await executePrimaryQuery();
+  }
 }
 
 async function clearFilters() {
@@ -409,7 +490,7 @@ async function clearFilters() {
   });
   autoPruneHint.value = '';
   assignFilterState(committedFilters, draftFilters);
-  await executeCommittedQuery();
+  await executePrimaryQuery();
 }
 
 function updateFilters(nextFilters) {
@@ -462,7 +543,7 @@ async function initPage() {
   }
 
   draftWatchReady.value = true;
-  await executeCommittedQuery();
+  await executePrimaryQuery();
 }
 
 onMounted(() => {

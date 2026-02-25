@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Unit tests for Hold History API routes."""
+"""Unit tests for Hold History API routes (two-phase query/view pattern)."""
 
 import json
 import unittest
@@ -35,215 +35,220 @@ class TestHoldHistoryPageRoute(TestHoldHistoryRoutesBase):
         self.assertTrue(response.location.endswith('/portal-shell/hold-history'))
 
 
-class TestHoldHistoryTrendRoute(TestHoldHistoryRoutesBase):
-    """Test GET /api/hold-history/trend endpoint."""
+class TestHoldHistoryQueryRoute(TestHoldHistoryRoutesBase):
+    """Test POST /api/hold-history/query endpoint."""
 
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_trend')
-    def test_trend_passes_date_range(self, mock_trend):
-        mock_trend.return_value = {
-            'days': [
-                {
-                    'date': '2026-02-01',
-                    'quality': {'holdQty': 10, 'newHoldQty': 2, 'releaseQty': 3, 'futureHoldQty': 1},
-                    'non_quality': {'holdQty': 5, 'newHoldQty': 1, 'releaseQty': 2, 'futureHoldQty': 0},
-                    'all': {'holdQty': 15, 'newHoldQty': 3, 'releaseQty': 5, 'futureHoldQty': 1},
-                }
-            ]
-        }
-
-        response = self.client.get('/api/hold-history/trend?start_date=2026-02-01&end_date=2026-02-07')
-        payload = json.loads(response.data)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(payload['success'])
-        self.assertIn('days', payload['data'])
-        mock_trend.assert_called_once_with('2026-02-01', '2026-02-07')
-
-    def test_trend_invalid_date_returns_400(self):
-        response = self.client.get('/api/hold-history/trend?start_date=2026/02/01&end_date=2026-02-07')
+    def test_query_missing_dates_returns_400(self):
+        response = self.client.post(
+            '/api/hold-history/query',
+            json={'start_date': '2026-02-01'},
+        )
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
 
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_trend')
+    def test_query_invalid_date_format_returns_400(self):
+        response = self.client.post(
+            '/api/hold-history/query',
+            json={'start_date': '2026/02/01', 'end_date': '2026-02-07'},
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload['success'])
+
+    def test_query_end_before_start_returns_400(self):
+        response = self.client.post(
+            '/api/hold-history/query',
+            json={'start_date': '2026-02-07', 'end_date': '2026-02-01'},
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload['success'])
+
+    def test_query_invalid_record_type_returns_400(self):
+        response = self.client.post(
+            '/api/hold-history/query',
+            json={
+                'start_date': '2026-02-01',
+                'end_date': '2026-02-07',
+                'record_type': 'invalid',
+            },
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload['success'])
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_primary_query')
+    def test_query_success(self, mock_exec):
+        mock_exec.return_value = {
+            'query_id': 'abc123',
+            'trend': {'days': []},
+            'reason_pareto': {'items': []},
+            'duration': {'items': []},
+            'list': {'items': [], 'pagination': {}},
+        }
+
+        response = self.client.post(
+            '/api/hold-history/query',
+            json={
+                'start_date': '2026-02-01',
+                'end_date': '2026-02-07',
+                'hold_type': 'quality',
+            },
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        self.assertIn('query_id', payload['data'])
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_primary_query')
+    def test_query_passes_params(self, mock_exec):
+        mock_exec.return_value = {'query_id': 'x', 'trend': {}, 'reason_pareto': {}, 'duration': {}, 'list': {}}
+
+        self.client.post(
+            '/api/hold-history/query',
+            json={
+                'start_date': '2026-02-01',
+                'end_date': '2026-02-07',
+                'hold_type': 'non-quality',
+                'record_type': 'on_hold',
+            },
+        )
+
+        mock_exec.assert_called_once_with(
+            start_date='2026-02-01',
+            end_date='2026-02-07',
+            hold_type='non-quality',
+            record_type='on_hold',
+        )
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_primary_query')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 8))
-    def test_trend_rate_limited_returns_429(self, _mock_limit, mock_service):
-        response = self.client.get('/api/hold-history/trend?start_date=2026-02-01&end_date=2026-02-07')
+    def test_query_rate_limited_returns_429(self, _mock_limit, mock_exec):
+        response = self.client.post(
+            '/api/hold-history/query',
+            json={'start_date': '2026-02-01', 'end_date': '2026-02-07'},
+        )
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 429)
         self.assertEqual(payload['error']['code'], 'TOO_MANY_REQUESTS')
         self.assertEqual(response.headers.get('Retry-After'), '8')
-        mock_service.assert_not_called()
+        mock_exec.assert_not_called()
 
 
-class TestHoldHistoryReasonParetoRoute(TestHoldHistoryRoutesBase):
-    """Test GET /api/hold-history/reason-pareto endpoint."""
+class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
+    """Test GET /api/hold-history/view endpoint."""
 
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_reason_pareto')
-    def test_reason_pareto_passes_hold_type_and_record_type(self, mock_service):
-        mock_service.return_value = {'items': []}
+    def test_view_missing_query_id_returns_400(self):
+        response = self.client.get('/api/hold-history/view')
+        payload = json.loads(response.data)
 
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload['success'])
+        self.assertIn('query_id', payload['error'])
+
+    def test_view_invalid_record_type_returns_400(self):
         response = self.client.get(
-            '/api/hold-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07'
-            '&hold_type=non-quality&record_type=on_hold'
-        )
-
-        self.assertEqual(response.status_code, 200)
-        mock_service.assert_called_once_with('2026-02-01', '2026-02-07', 'non-quality', 'on_hold')
-
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_reason_pareto')
-    def test_reason_pareto_defaults_record_type_to_new(self, mock_service):
-        mock_service.return_value = {'items': []}
-
-        response = self.client.get(
-            '/api/hold-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07&hold_type=quality'
-        )
-
-        self.assertEqual(response.status_code, 200)
-        mock_service.assert_called_once_with('2026-02-01', '2026-02-07', 'quality', 'new')
-
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_reason_pareto')
-    def test_reason_pareto_multi_record_type(self, mock_service):
-        mock_service.return_value = {'items': []}
-
-        response = self.client.get(
-            '/api/hold-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07'
-            '&hold_type=quality&record_type=on_hold,released'
-        )
-
-        self.assertEqual(response.status_code, 200)
-        mock_service.assert_called_once_with('2026-02-01', '2026-02-07', 'quality', 'on_hold,released')
-
-    def test_reason_pareto_invalid_record_type_returns_400(self):
-        response = self.client.get(
-            '/api/hold-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07&record_type=invalid'
+            '/api/hold-history/view?query_id=abc123&record_type=bogus'
         )
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
 
-    def test_reason_pareto_partial_invalid_record_type_returns_400(self):
+    def test_view_invalid_duration_range_returns_400(self):
         response = self.client.get(
-            '/api/hold-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07&record_type=on_hold,bogus'
+            '/api/hold-history/view?query_id=abc123&duration_range=invalid'
         )
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
 
+    @patch('mes_dashboard.routes.hold_history_routes.apply_view')
+    def test_view_cache_expired_returns_410(self, mock_view):
+        mock_view.return_value = None
 
-class TestHoldHistoryDurationRoute(TestHoldHistoryRoutesBase):
-    """Test GET /api/hold-history/duration endpoint."""
-
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_duration')
-    def test_duration_failure_returns_500(self, mock_service):
-        mock_service.return_value = None
-
-        response = self.client.get('/api/hold-history/duration?start_date=2026-02-01&end_date=2026-02-07')
+        response = self.client.get('/api/hold-history/view?query_id=abc123')
         payload = json.loads(response.data)
 
-        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 410)
         self.assertFalse(payload['success'])
+        self.assertEqual(payload['error'], 'cache_expired')
 
-    def test_duration_invalid_hold_type(self):
-        response = self.client.get(
-            '/api/hold-history/duration?start_date=2026-02-01&end_date=2026-02-07&hold_type=invalid'
-        )
-        payload = json.loads(response.data)
-
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(payload['success'])
-
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_duration')
-    def test_duration_passes_record_type(self, mock_service):
-        mock_service.return_value = {'items': []}
-
-        response = self.client.get(
-            '/api/hold-history/duration?start_date=2026-02-01&end_date=2026-02-07&record_type=released'
-        )
-
-        self.assertEqual(response.status_code, 200)
-        mock_service.assert_called_once_with('2026-02-01', '2026-02-07', 'quality', 'released')
-
-    def test_duration_invalid_record_type_returns_400(self):
-        response = self.client.get(
-            '/api/hold-history/duration?start_date=2026-02-01&end_date=2026-02-07&record_type=bogus'
-        )
-        payload = json.loads(response.data)
-
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(payload['success'])
-
-
-class TestHoldHistoryListRoute(TestHoldHistoryRoutesBase):
-    """Test GET /api/hold-history/list endpoint."""
-
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_list')
-    def test_list_caps_per_page_and_sets_page_floor(self, mock_service):
-        mock_service.return_value = {
-            'items': [],
-            'pagination': {'page': 1, 'perPage': 200, 'total': 0, 'totalPages': 1},
+    @patch('mes_dashboard.routes.hold_history_routes.apply_view')
+    def test_view_success(self, mock_view):
+        mock_view.return_value = {
+            'trend': {'days': []},
+            'reason_pareto': {'items': []},
+            'duration': {'items': []},
+            'list': {'items': [], 'pagination': {}},
         }
 
         response = self.client.get(
-            '/api/hold-history/list?start_date=2026-02-01&end_date=2026-02-07'
-            '&hold_type=all&page=0&per_page=500&reason=品質確認'
+            '/api/hold-history/view?query_id=abc123&hold_type=non-quality&reason=品質確認&page=2&per_page=20'
         )
+        payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
-        mock_service.assert_called_once_with(
-            start_date='2026-02-01',
-            end_date='2026-02-07',
-            hold_type='all',
+        self.assertTrue(payload['success'])
+
+        mock_view.assert_called_once_with(
+            query_id='abc123',
+            hold_type='non-quality',
             reason='品質確認',
             record_type='new',
             duration_range=None,
-            page=1,
-            per_page=200,
+            page=2,
+            per_page=20,
         )
 
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_list')
-    def test_list_passes_duration_range(self, mock_service):
-        mock_service.return_value = {
-            'items': [],
-            'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 1},
+    @patch('mes_dashboard.routes.hold_history_routes.apply_view')
+    def test_view_caps_per_page(self, mock_view):
+        mock_view.return_value = {
+            'trend': {'days': []},
+            'reason_pareto': {'items': []},
+            'duration': {'items': []},
+            'list': {'items': [], 'pagination': {}},
         }
 
-        response = self.client.get(
-            '/api/hold-history/list?start_date=2026-02-01&end_date=2026-02-07&duration_range=<4h'
+        self.client.get(
+            '/api/hold-history/view?query_id=abc123&page=0&per_page=500'
         )
 
-        self.assertEqual(response.status_code, 200)
-        mock_service.assert_called_once_with(
-            start_date='2026-02-01',
-            end_date='2026-02-07',
-            hold_type='quality',
-            reason=None,
-            record_type='new',
-            duration_range='<4h',
-            page=1,
-            per_page=50,
+        call_kwargs = mock_view.call_args[1]
+        self.assertEqual(call_kwargs['page'], 1)
+        self.assertEqual(call_kwargs['per_page'], 200)
+
+    @patch('mes_dashboard.routes.hold_history_routes.apply_view')
+    def test_view_passes_duration_range(self, mock_view):
+        mock_view.return_value = {
+            'trend': {'days': []},
+            'reason_pareto': {'items': []},
+            'duration': {'items': []},
+            'list': {'items': [], 'pagination': {}},
+        }
+
+        self.client.get(
+            '/api/hold-history/view?query_id=abc123&duration_range=<4h'
         )
 
-    def test_list_invalid_duration_range_returns_400(self):
-        response = self.client.get(
-            '/api/hold-history/list?start_date=2026-02-01&end_date=2026-02-07&duration_range=invalid'
-        )
-        payload = json.loads(response.data)
+        call_kwargs = mock_view.call_args[1]
+        self.assertEqual(call_kwargs['duration_range'], '<4h')
 
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(payload['success'])
-
-    @patch('mes_dashboard.routes.hold_history_routes.get_hold_history_list')
+    @patch('mes_dashboard.routes.hold_history_routes.apply_view')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 5))
-    def test_list_rate_limited_returns_429(self, _mock_limit, mock_service):
-        response = self.client.get('/api/hold-history/list?start_date=2026-02-01&end_date=2026-02-07')
+    def test_view_rate_limited_returns_429(self, _mock_limit, mock_view):
+        response = self.client.get('/api/hold-history/view?query_id=abc123')
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 429)
         self.assertEqual(payload['error']['code'], 'TOO_MANY_REQUESTS')
         self.assertEqual(response.headers.get('Retry-After'), '5')
-        mock_service.assert_not_called()
+        mock_view.assert_not_called()

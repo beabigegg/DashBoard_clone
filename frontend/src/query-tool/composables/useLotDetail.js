@@ -164,7 +164,7 @@ export function useLotDetail(initial = {}) {
 
     try {
       const payload = await apiGet('/api/query-tool/workcenter-groups', {
-        timeout: 60000,
+        timeout: 360000,
         silent: true,
       });
 
@@ -205,7 +205,7 @@ export function useLotDetail(initial = {}) {
       }
 
       const payload = await apiGet(`/api/query-tool/lot-history?${params.toString()}`, {
-        timeout: 120000,
+        timeout: 360000,
         silent: true,
       });
 
@@ -263,7 +263,7 @@ export function useLotDetail(initial = {}) {
         params.set('time_end', timeRange.time_end);
 
         const payload = await apiGet(`/api/query-tool/lot-associations?${params.toString()}`, {
-          timeout: 120000,
+          timeout: 360000,
           silent: true,
         });
 
@@ -279,7 +279,7 @@ export function useLotDetail(initial = {}) {
         params.set('type', associationType);
 
         const payload = await apiGet(`/api/query-tool/lot-associations?${params.toString()}`, {
-          timeout: 120000,
+          timeout: 360000,
           silent: true,
         });
 

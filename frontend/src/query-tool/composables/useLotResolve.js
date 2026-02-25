@@ -134,7 +134,7 @@ export function useLotResolve(initial = {}) {
           input_type: inputType.value,
           values,
         },
-        { timeout: 60000, silent: true },
+        { timeout: 360000, silent: true },
       );
 
       resolvedLots.value = Array.isArray(payload?.data) ? payload.data : [];

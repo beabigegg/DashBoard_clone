@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
-from mes_dashboard.core.database import get_db_connection
+from mes_dashboard.core.database import get_db_connection, get_db_runtime_config
 
 logger = logging.getLogger('mes_dashboard.excel_query_service')
 
@@ -322,6 +322,7 @@ def execute_batch_query(
     connection = get_db_connection()
     if not connection:
         return {'error': '資料庫連接失敗'}
+    connection.call_timeout = get_db_runtime_config()["slow_call_timeout_ms"]
 
     try:
         cursor = connection.cursor()
@@ -429,6 +430,7 @@ def execute_advanced_batch_query(
     connection = get_db_connection()
     if not connection:
         return {'error': '資料庫連接失敗'}
+    connection.call_timeout = get_db_runtime_config()["slow_call_timeout_ms"]
 
     try:
         cursor = connection.cursor()

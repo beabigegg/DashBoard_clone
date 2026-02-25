@@ -205,7 +205,7 @@ export function useLotLineage(initial = {}) {
             profile: 'query_tool',
             container_ids: containerIds,
           },
-          { timeout: 60000, silent: true },
+          { timeout: 360000, silent: true },
         );
       } catch (error) {
         const status = Number(error?.status || 0);

@@ -2,6 +2,7 @@
 """Resource History Analysis API routes.
 
 Contains Flask Blueprint for historical equipment performance analysis endpoints.
+Two-phase flow: POST /query (Oracle → cache) + GET /view (cache → derived views).
 """
 
 from datetime import datetime
@@ -9,12 +10,14 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request, redirect, Response
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
-from mes_dashboard.config.constants import CACHE_TTL_FILTER_OPTIONS, CACHE_TTL_TREND
+from mes_dashboard.config.constants import CACHE_TTL_FILTER_OPTIONS
 from mes_dashboard.services.resource_history_service import (
     get_filter_options,
-    query_summary,
-    query_detail,
     export_csv,
+)
+from mes_dashboard.services.resource_dataset_cache import (
+    execute_primary_query,
+    apply_view,
 )
 
 # Create Blueprint
@@ -59,131 +62,111 @@ def api_resource_history_options():
     return jsonify({'success': False, 'error': '查詢篩選選項失敗'}), 500
 
 
-@resource_history_bp.route('/summary', methods=['GET'])
-def api_resource_history_summary():
-    """API: Get summary data (KPI, trend, heatmap, workcenter comparison).
+# ============================================================
+# Two-phase dataset cache endpoints
+# ============================================================
 
-    Query Parameters:
-        start_date: Start date (YYYY-MM-DD)
-        end_date: End date (YYYY-MM-DD)
-        granularity: day|week|month|year (default: day)
-        workcenter_groups: Optional workcenter group filter (multi-select)
-        families: Optional resource family filter (multi-select)
-        is_production: 1 to filter production equipment
-        is_key: 1 to filter key equipment
-        is_monitor: 1 to filter monitored equipment
+def _validate_dates(start_date: str, end_date: str):
+    """Validate and return parsed dates, or raise ValueError."""
+    if not start_date or not end_date:
+        raise ValueError("必須提供 start_date 和 end_date 參數")
+    sd = datetime.strptime(start_date, "%Y-%m-%d")
+    ed = datetime.strptime(end_date, "%Y-%m-%d")
+    if ed < sd:
+        raise ValueError("end_date 不可早於 start_date")
+    return sd, ed
+
+
+def _parse_resource_filters(data: dict) -> dict:
+    """Extract resource filter params from dict (request body or query params)."""
+    return {
+        "workcenter_groups": data.get("workcenter_groups") or None,
+        "families": data.get("families") or None,
+        "resource_ids": data.get("resource_ids") or None,
+        "is_production": _bool_param(data.get("is_production")),
+        "is_key": _bool_param(data.get("is_key")),
+        "is_monitor": _bool_param(data.get("is_monitor")),
+    }
+
+
+def _bool_param(val) -> bool:
+    """Normalize bool-ish values from JSON body or query string."""
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        return val in ("1", "true", "True")
+    return bool(val) if val is not None else False
+
+
+@resource_history_bp.route('/query', methods=['POST'])
+def api_resource_history_query():
+    """API: Primary query — Oracle → cache → return query_id + initial view.
+
+    JSON Body:
+        start_date: str (YYYY-MM-DD)
+        end_date: str (YYYY-MM-DD)
+        granularity: str (day|week|month|year, default: day)
+        workcenter_groups: list[str] (optional)
+        families: list[str] (optional)
+        resource_ids: list[str] (optional)
+        is_production: bool (optional)
+        is_key: bool (optional)
+        is_monitor: bool (optional)
 
     Returns:
-        JSON with kpi, trend, heatmap, workcenter_comparison sections.
+        JSON { success, query_id, summary, detail }
     """
-    # Parse query parameters
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    granularity = request.args.get('granularity', 'day')
-    workcenter_groups = request.args.getlist('workcenter_groups') or None
-    families = request.args.getlist('families') or None
-    resource_ids = request.args.getlist('resource_ids') or None
-    is_production = request.args.get('is_production') == '1'
-    is_key = request.args.get('is_key') == '1'
-    is_monitor = request.args.get('is_monitor') == '1'
+    body = request.get_json(silent=True) or {}
+    start_date = body.get("start_date", "")
+    end_date = body.get("end_date", "")
+    granularity = body.get("granularity", "day")
 
-    # Validate required parameters
-    if not start_date or not end_date:
-        return jsonify({
-            'success': False,
-            'error': '必須提供 start_date 和 end_date 參數'
-        }), 400
+    try:
+        _validate_dates(start_date, end_date)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
 
-    # Build cache key with filters dict
-    cache_filters = {
-        'start_date': start_date,
-        'end_date': end_date,
-        'granularity': granularity,
-        'workcenter_groups': sorted(workcenter_groups) if workcenter_groups else None,
-        'families': sorted(families) if families else None,
-        'resource_ids': sorted(resource_ids) if resource_ids else None,
-        'is_production': is_production,
-        'is_key': is_key,
-        'is_monitor': is_monitor,
-    }
-    cache_key = make_cache_key("resource_history_summary", filters=cache_filters)
-    result = cache_get(cache_key)
+    filters = _parse_resource_filters(body)
 
-    if result is None:
-        result = query_summary(
+    try:
+        result = execute_primary_query(
             start_date=start_date,
             end_date=end_date,
             granularity=granularity,
-            workcenter_groups=workcenter_groups,
-            families=families,
-            resource_ids=resource_ids,
-            is_production=is_production,
-            is_key=is_key,
-            is_monitor=is_monitor,
+            **filters,
         )
-        if result is not None and 'error' not in result:
-            cache_set(cache_key, result, ttl=CACHE_TTL_TREND)
-
-    if result is not None:
-        if 'error' in result:
-            return jsonify({'success': False, 'error': result['error']}), 400
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢摘要資料失敗'}), 500
+        return jsonify({"success": True, **result})
+    except Exception as exc:
+        return jsonify({"success": False, "error": f"查詢失敗: {exc}"}), 500
 
 
-@resource_history_bp.route('/detail', methods=['GET'])
-def api_resource_history_detail():
-    """API: Get hierarchical detail data.
+@resource_history_bp.route('/view', methods=['GET'])
+def api_resource_history_view():
+    """API: Supplementary view — read cache, derive views. No Oracle query.
 
     Query Parameters:
-        start_date: Start date (YYYY-MM-DD)
-        end_date: End date (YYYY-MM-DD)
-        granularity: day|week|month|year (default: day)
-        workcenter_groups: Optional workcenter group filter (multi-select)
-        families: Optional resource family filter (multi-select)
-        is_production: 1 to filter production equipment
-        is_key: 1 to filter key equipment
-        is_monitor: 1 to filter monitored equipment
+        query_id: str (required)
+        granularity: str (day|week|month|year, default: day)
 
     Returns:
-        JSON with data array, total count, truncated flag.
+        JSON { success, summary, detail } or 410 on cache miss.
     """
-    # Parse query parameters
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    granularity = request.args.get('granularity', 'day')
-    workcenter_groups = request.args.getlist('workcenter_groups') or None
-    families = request.args.getlist('families') or None
-    resource_ids = request.args.getlist('resource_ids') or None
-    is_production = request.args.get('is_production') == '1'
-    is_key = request.args.get('is_key') == '1'
-    is_monitor = request.args.get('is_monitor') == '1'
+    query_id = request.args.get("query_id", "")
+    granularity = request.args.get("granularity", "day")
 
-    # Validate required parameters
-    if not start_date or not end_date:
-        return jsonify({
-            'success': False,
-            'error': '必須提供 start_date 和 end_date 參數'
-        }), 400
+    if not query_id:
+        return jsonify({"success": False, "error": "必須提供 query_id"}), 400
 
-    result = query_detail(
-        start_date=start_date,
-        end_date=end_date,
-        granularity=granularity,
-        workcenter_groups=workcenter_groups,
-        families=families,
-        resource_ids=resource_ids,
-        is_production=is_production,
-        is_key=is_key,
-        is_monitor=is_monitor,
-    )
+    result = apply_view(query_id=query_id, granularity=granularity)
+    if result is None:
+        return jsonify({"success": False, "error": "cache_expired"}), 410
 
-    if result is not None:
-        if 'error' in result:
-            return jsonify({'success': False, 'error': result['error']}), 400
-        return jsonify({'success': True, **result})
-    return jsonify({'success': False, 'error': '查詢明細資料失敗'}), 500
+    return jsonify({"success": True, **result})
 
+
+# ============================================================
+# Export (kept — uses existing service directly)
+# ============================================================
 
 @resource_history_bp.route('/export', methods=['GET'])
 def api_resource_history_export():

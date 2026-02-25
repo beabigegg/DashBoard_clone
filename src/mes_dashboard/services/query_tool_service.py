@@ -1128,7 +1128,7 @@ def get_lot_split_merge_history(
 
         if full_history:
             # Full mode uses dedicated slow query timeout path.
-            df = read_sql_df_slow(sql, params, timeout_seconds=120)
+            df = read_sql_df_slow(sql, params)
         else:
             df = read_sql_df(sql, params)
         data = _df_to_records(df)

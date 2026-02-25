@@ -216,7 +216,7 @@ export function useReverseLineage(initial = {}) {
             profile: 'query_tool_reverse',
             container_ids: containerIds,
           },
-          { timeout: 60000, silent: true },
+          { timeout: 360000, silent: true },
         );
       } catch (error) {
         const status = Number(error?.status || 0);

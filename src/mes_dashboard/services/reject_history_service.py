@@ -11,7 +11,7 @@ from typing import Any, Dict, Generator, Iterable, Optional
 
 import pandas as pd
 
-from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.services.scrap_reason_exclusion_cache import get_excluded_reasons
 from mes_dashboard.sql import QueryBuilder, SQLLoader
 

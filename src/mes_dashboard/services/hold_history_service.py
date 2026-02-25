@@ -15,7 +15,7 @@ import pandas as pd
 from mes_dashboard.core.database import (
     DatabaseCircuitOpenError,
     DatabasePoolExhaustedError,
-    read_sql_df,
+    read_sql_df_slow as read_sql_df,
 )
 from mes_dashboard.core.redis_client import get_key, get_redis_client
 from mes_dashboard.services.filter_cache import get_workcenter_group as _get_wc_group

@@ -174,7 +174,7 @@ export function useJobQueryData() {
     loadingResources.value = true;
     errorMessage.value = '';
     try {
-      const payload = await apiGet('/api/job-query/resources', { timeout: 60000, silent: true });
+      const payload = await apiGet('/api/job-query/resources', { timeout: 360000, silent: true });
       resources.value = Array.isArray(payload?.data) ? payload.data : [];
     } catch (error) {
       errorMessage.value = error?.message || '載入設備清單失敗';
@@ -206,7 +206,7 @@ export function useJobQueryData() {
           start_date: filters.startDate,
           end_date: filters.endDate,
         },
-        { timeout: 60000, silent: true },
+        { timeout: 360000, silent: true },
       );
       jobs.value = Array.isArray(payload?.data) ? payload.data : [];
       return true;
@@ -229,7 +229,7 @@ export function useJobQueryData() {
     errorMessage.value = '';
     try {
       const payload = await apiGet(`/api/job-query/txn/${encodeURIComponent(id)}`, {
-        timeout: 60000,
+        timeout: 360000,
         silent: true,
       });
       txnRows.value = Array.isArray(payload?.data) ? payload.data : [];

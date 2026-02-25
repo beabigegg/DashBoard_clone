@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
-from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.core.redis_client import (
     REDIS_ENABLED,
     get_key,
