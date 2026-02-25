@@ -46,7 +46,7 @@ from typing import Optional, Dict, List, Any, Set, Tuple, Generator
 
 import pandas as pd
 
-from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.redis_client import try_acquire_lock, release_lock
 from mes_dashboard.sql import SQLLoader
