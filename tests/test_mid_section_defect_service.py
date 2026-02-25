@@ -10,7 +10,9 @@ import pandas as pd
 from mes_dashboard.services.mid_section_defect_service import (
     _attribute_materials,
     _attribute_wafer_roots,
+    _build_detail_table,
     build_trace_aggregation_from_events,
+    export_csv,
     query_analysis,
     query_analysis_detail,
     query_all_loss_reasons,
@@ -362,3 +364,184 @@ def test_attribute_wafer_roots_multiple_roots():
     # Sorted by DEFECT_RATE desc
     assert result[0]['ROOT_CONTAINER_NAME'] == 'ROOT-B'
     assert result[1]['ROOT_CONTAINER_NAME'] == 'ROOT-A'
+
+
+# --- _build_detail_table tests ---
+
+def _make_detection_df(rows):
+    """Helper: build a DataFrame like _fetch_station_detection_data output."""
+    return pd.DataFrame(rows)
+
+
+def test_build_detail_table_structured_upstream_machines():
+    """UPSTREAM_MACHINES should be a list of {station, machine} objects."""
+    df = _make_detection_df([
+        {
+            'CONTAINERID': 'C1', 'CONTAINERNAME': 'LOT-1', 'PJ_TYPE': 'T',
+            'PRODUCTLINENAME': 'P', 'WORKFLOW': 'W', 'FINISHEDRUNCARD': 'FR',
+            'DETECTION_EQUIPMENTNAME': 'DET-01', 'TRACKINQTY': 100,
+            'REJECTQTY': 5, 'LOSSREASONNAME': 'R1',
+        },
+    ])
+    ancestors = {'C1': {'A1'}}
+    upstream_by_cid = {
+        'A1': [
+            {'workcenter_group': '中段', 'equipment_name': 'WIRE-01'},
+            {'workcenter_group': '後段', 'equipment_name': 'DIE-01'},
+        ],
+        'C1': [
+            {'workcenter_group': '測試', 'equipment_name': 'TEST-01'},
+        ],
+    }
+
+    result = _build_detail_table(df, ancestors, upstream_by_cid)
+
+    assert len(result) == 1
+    row = result[0]
+    machines = row['UPSTREAM_MACHINES']
+    assert isinstance(machines, list)
+    assert len(machines) == 3
+    assert {'station': '中段', 'machine': 'WIRE-01'} in machines
+    assert {'station': '後段', 'machine': 'DIE-01'} in machines
+    assert {'station': '測試', 'machine': 'TEST-01'} in machines
+    assert row['UPSTREAM_MACHINE_COUNT'] == 3
+
+
+def test_build_detail_table_structured_upstream_materials():
+    """UPSTREAM_MATERIALS should be a list of {part, lot} objects."""
+    df = _make_detection_df([
+        {
+            'CONTAINERID': 'C1', 'CONTAINERNAME': 'LOT-1', 'PJ_TYPE': 'T',
+            'PRODUCTLINENAME': 'P', 'WORKFLOW': 'W', 'FINISHEDRUNCARD': 'FR',
+            'DETECTION_EQUIPMENTNAME': 'DET-01', 'TRACKINQTY': 100,
+            'REJECTQTY': 0, 'LOSSREASONNAME': '',
+        },
+    ])
+    ancestors = {'C1': {'A1'}}
+    upstream_by_cid = {}
+    materials_by_cid = {
+        'A1': [
+            {'MATERIALPARTNAME': 'PART-X', 'MATERIALLOTNAME': 'ML-1'},
+            {'MATERIALPARTNAME': 'PART-Y', 'MATERIALLOTNAME': ''},
+        ],
+    }
+
+    result = _build_detail_table(
+        df, ancestors, upstream_by_cid, materials_by_cid=materials_by_cid,
+    )
+
+    assert len(result) == 1
+    materials = result[0]['UPSTREAM_MATERIALS']
+    assert isinstance(materials, list)
+    assert len(materials) == 2
+    assert {'part': 'PART-X', 'lot': 'ML-1'} in materials
+    assert {'part': 'PART-Y', 'lot': ''} in materials
+
+
+def test_build_detail_table_wafer_root():
+    """WAFER_ROOT should be the root ancestor container name."""
+    df = _make_detection_df([
+        {
+            'CONTAINERID': 'C1', 'CONTAINERNAME': 'LOT-1', 'PJ_TYPE': 'T',
+            'PRODUCTLINENAME': 'P', 'WORKFLOW': 'W', 'FINISHEDRUNCARD': 'FR',
+            'DETECTION_EQUIPMENTNAME': 'D', 'TRACKINQTY': 100,
+            'REJECTQTY': 3, 'LOSSREASONNAME': 'R1',
+        },
+    ])
+    ancestors = {'C1': set()}
+    upstream_by_cid = {}
+    roots = {'C1': 'WAFER-ROOT-001'}
+
+    result = _build_detail_table(
+        df, ancestors, upstream_by_cid, roots=roots,
+    )
+
+    assert result[0]['WAFER_ROOT'] == 'WAFER-ROOT-001'
+
+
+def test_build_detail_table_multiple_defect_reasons_expand_rows():
+    """LOT with multiple defect reasons should produce one row per reason."""
+    df = _make_detection_df([
+        {
+            'CONTAINERID': 'C1', 'CONTAINERNAME': 'LOT-1', 'PJ_TYPE': 'T',
+            'PRODUCTLINENAME': 'P', 'WORKFLOW': 'W', 'FINISHEDRUNCARD': 'FR',
+            'DETECTION_EQUIPMENTNAME': 'D', 'TRACKINQTY': 200,
+            'REJECTQTY': 5, 'LOSSREASONNAME': 'R1',
+        },
+        {
+            'CONTAINERID': 'C1', 'CONTAINERNAME': 'LOT-1', 'PJ_TYPE': 'T',
+            'PRODUCTLINENAME': 'P', 'WORKFLOW': 'W', 'FINISHEDRUNCARD': 'FR',
+            'DETECTION_EQUIPMENTNAME': 'D', 'TRACKINQTY': 200,
+            'REJECTQTY': 3, 'LOSSREASONNAME': 'R2',
+        },
+    ])
+
+    result = _build_detail_table(df, {'C1': set()}, {})
+
+    assert len(result) == 2
+    reasons = [r['LOSS_REASON'] for r in result]
+    assert 'R1' in reasons
+    assert 'R2' in reasons
+    assert result[0]['DEFECT_QTY'] + result[1]['DEFECT_QTY'] == 8
+
+
+def test_build_detail_table_deduplicates_machines():
+    """Same machine appearing in multiple ancestors should appear only once."""
+    df = _make_detection_df([
+        {
+            'CONTAINERID': 'C1', 'CONTAINERNAME': 'LOT-1', 'PJ_TYPE': 'T',
+            'PRODUCTLINENAME': 'P', 'WORKFLOW': 'W', 'FINISHEDRUNCARD': 'FR',
+            'DETECTION_EQUIPMENTNAME': 'D', 'TRACKINQTY': 100,
+            'REJECTQTY': 1, 'LOSSREASONNAME': 'R1',
+        },
+    ])
+    ancestors = {'C1': {'A1', 'A2'}}
+    # Same machine in both ancestors
+    upstream_by_cid = {
+        'A1': [{'workcenter_group': '中段', 'equipment_name': 'EQ-01'}],
+        'A2': [{'workcenter_group': '中段', 'equipment_name': 'EQ-01'}],
+    }
+
+    result = _build_detail_table(df, ancestors, upstream_by_cid)
+
+    assert result[0]['UPSTREAM_MACHINE_COUNT'] == 1
+    assert len(result[0]['UPSTREAM_MACHINES']) == 1
+
+
+@patch('mes_dashboard.services.mid_section_defect_service.query_analysis')
+def test_export_csv_flattens_structured_fields(mock_query_analysis):
+    """CSV export should flatten UPSTREAM_MACHINES and UPSTREAM_MATERIALS to strings."""
+    mock_query_analysis.return_value = {
+        'detail': [
+            {
+                'CONTAINERNAME': 'LOT-1',
+                'PJ_TYPE': 'T',
+                'PRODUCTLINENAME': 'P',
+                'WORKFLOW': 'W',
+                'FINISHEDRUNCARD': 'FR',
+                'DETECTION_EQUIPMENTNAME': 'D',
+                'INPUT_QTY': 100,
+                'LOSS_REASON': 'R1',
+                'DEFECT_QTY': 5,
+                'DEFECT_RATE': 5.0,
+                'ANCESTOR_COUNT': 1,
+                'UPSTREAM_MACHINE_COUNT': 2,
+                'UPSTREAM_MACHINES': [
+                    {'station': '中段', 'machine': 'WIRE-01'},
+                    {'station': '後段', 'machine': 'DIE-02'},
+                ],
+                'UPSTREAM_MATERIALS': [
+                    {'part': 'PART-A', 'lot': 'ML-1'},
+                ],
+                'WAFER_ROOT': 'ROOT-001',
+            },
+        ],
+    }
+
+    lines = list(export_csv('2025-01-01', '2025-01-31', direction='backward'))
+
+    # First line is BOM, second is header, third is data
+    assert len(lines) == 3
+    data_line = lines[2]
+    assert '中段/WIRE-01, 後段/DIE-02' in data_line
+    assert 'PART-A/ML-1' in data_line
