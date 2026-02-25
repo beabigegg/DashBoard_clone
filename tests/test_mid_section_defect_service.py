@@ -8,6 +8,8 @@ from unittest.mock import patch
 import pandas as pd
 
 from mes_dashboard.services.mid_section_defect_service import (
+    _attribute_materials,
+    _attribute_wafer_roots,
     build_trace_aggregation_from_events,
     query_analysis,
     query_analysis_detail,
@@ -251,3 +253,112 @@ def test_query_station_options_returns_ordered_list():
     assert result[0]['order'] == 0
     assert result[-1]['name'] == '測試'
     assert result[-1]['order'] == 11
+
+
+# --- _attribute_materials tests ---
+
+def _make_detection_data(entries):
+    """Helper: build detection_data dict from simplified entries."""
+    data = {}
+    for e in entries:
+        data[e['cid']] = {
+            'containername': e.get('name', e['cid']),
+            'trackinqty': e['trackinqty'],
+            'rejectqty_by_reason': e.get('reasons', {}),
+        }
+    return data
+
+
+def test_attribute_materials_basic_rate_calculation():
+    detection_data = _make_detection_data([
+        {'cid': 'C1', 'trackinqty': 100, 'reasons': {'R1': 5}},
+        {'cid': 'C2', 'trackinqty': 200, 'reasons': {'R1': 10}},
+    ])
+    ancestors = {'C1': {'A1'}, 'C2': {'A1'}}
+    materials_by_cid = {
+        'A1': [{'MATERIALPARTNAME': 'PART-A', 'MATERIALLOTNAME': 'LOT-X'}],
+    }
+
+    result = _attribute_materials(detection_data, ancestors, materials_by_cid)
+
+    assert len(result) == 1
+    assert result[0]['MATERIAL_KEY'] == 'PART-A (LOT-X)'
+    assert result[0]['INPUT_QTY'] == 300
+    assert result[0]['DEFECT_QTY'] == 15
+    assert abs(result[0]['DEFECT_RATE'] - 5.0) < 0.01
+    assert result[0]['DETECTION_LOT_COUNT'] == 2
+
+
+def test_attribute_materials_null_lot_name():
+    detection_data = _make_detection_data([
+        {'cid': 'C1', 'trackinqty': 100, 'reasons': {'R1': 3}},
+    ])
+    ancestors = {'C1': {'A1'}}
+    materials_by_cid = {
+        'A1': [{'MATERIALPARTNAME': 'PART-B', 'MATERIALLOTNAME': None}],
+    }
+
+    result = _attribute_materials(detection_data, ancestors, materials_by_cid)
+
+    assert len(result) == 1
+    assert result[0]['MATERIAL_KEY'] == 'PART-B'
+    assert result[0]['MATERIAL_LOT_NAME'] == ''
+
+
+def test_attribute_materials_with_loss_reason_filter():
+    detection_data = _make_detection_data([
+        {'cid': 'C1', 'trackinqty': 100, 'reasons': {'R1': 5, 'R2': 3}},
+    ])
+    ancestors = {'C1': {'A1'}}
+    materials_by_cid = {
+        'A1': [{'MATERIALPARTNAME': 'P', 'MATERIALLOTNAME': 'L'}],
+    }
+
+    result = _attribute_materials(detection_data, ancestors, materials_by_cid, loss_reasons=['R1'])
+
+    assert result[0]['DEFECT_QTY'] == 5
+
+
+# --- _attribute_wafer_roots tests ---
+
+def test_attribute_wafer_roots_basic():
+    detection_data = _make_detection_data([
+        {'cid': 'C1', 'name': 'LOT-1', 'trackinqty': 100, 'reasons': {'R1': 5}},
+        {'cid': 'C2', 'name': 'LOT-2', 'trackinqty': 200, 'reasons': {'R1': 10}},
+    ])
+    roots = {'C1': 'ROOT-A', 'C2': 'ROOT-A'}
+
+    result = _attribute_wafer_roots(detection_data, roots)
+
+    assert len(result) == 1
+    assert result[0]['ROOT_CONTAINER_NAME'] == 'ROOT-A'
+    assert result[0]['INPUT_QTY'] == 300
+    assert result[0]['DEFECT_QTY'] == 15
+
+
+def test_attribute_wafer_roots_self_root():
+    """LOTs with no root mapping should use their own container name."""
+    detection_data = _make_detection_data([
+        {'cid': 'C1', 'name': 'LOT-SELF', 'trackinqty': 100, 'reasons': {'R1': 2}},
+    ])
+    roots = {}  # No root for C1
+
+    result = _attribute_wafer_roots(detection_data, roots)
+
+    assert len(result) == 1
+    assert result[0]['ROOT_CONTAINER_NAME'] == 'LOT-SELF'
+
+
+def test_attribute_wafer_roots_multiple_roots():
+    detection_data = _make_detection_data([
+        {'cid': 'C1', 'name': 'L1', 'trackinqty': 100, 'reasons': {'R1': 5}},
+        {'cid': 'C2', 'name': 'L2', 'trackinqty': 200, 'reasons': {'R1': 20}},
+    ])
+    roots = {'C1': 'ROOT-A', 'C2': 'ROOT-B'}
+
+    result = _attribute_wafer_roots(detection_data, roots)
+
+    assert len(result) == 2
+    # Sorted by DEFECT_RATE desc
+    assert result[0]['ROOT_CONTAINER_NAME'] == 'ROOT-B'
+    assert result[1]['ROOT_CONTAINER_NAME'] == 'ROOT-A'

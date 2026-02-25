@@ -10,7 +10,9 @@ import KpiCards from './components/KpiCards.vue';
 import MultiSelect from './components/MultiSelect.vue';
 import ParetoChart from './components/ParetoChart.vue';
 import TrendChart from './components/TrendChart.vue';
+import AnalysisSummary from './components/AnalysisSummary.vue';
 import DetailTable from './components/DetailTable.vue';
+import SuspectContextPanel from './components/SuspectContextPanel.vue';
 
 ensureMesApiAvailable();
 
@@ -170,6 +172,12 @@ const filteredByMachineData = computed(() => {
   return filtered.length > 0 ? buildMachineChartFromAttribution(filtered) : [];
 });
 
+const suspectMachineNames = computed(() => {
+  const data = filteredByMachineData.value;
+  if (!Array.isArray(data)) return [];
+  return data.filter((d) => d.name && d.name !== '其他').map((d) => d.name);
+});
+
 const isForward = computed(() => committedFilters.value.direction === 'forward');
 const committedStation = computed(() => {
   const key = committedFilters.value.station || '測試';
@@ -198,7 +206,25 @@ const eventsAggregation = computed(() => trace.stage_results.events?.aggregation
 const showAnalysisSkeleton = computed(() => hasQueried.value && loading.querying && !eventsAggregation.value);
 const showAnalysisCharts = computed(() => hasQueried.value && (Boolean(eventsAggregation.value) || restoredFromCache.value));
 
-const skeletonChartCount = computed(() => (isForward.value ? 4 : 6));
+const skeletonChartCount = computed(() => (isForward.value ? 4 : 5));
+
+const totalAncestorCount = computed(() => trace.stage_results.lineage?.total_ancestor_count || analysisData.value?.total_ancestor_count || 0);
+
+const summaryQueryParams = computed(() => {
+  const snap = committedFilters.value;
+  const params = {
+    queryMode: snap.queryMode || 'date_range',
+    startDate: snap.startDate,
+    endDate: snap.endDate,
+    lossReasons: snap.lossReasons || [],
+  };
+  if (snap.queryMode === 'container') {
+    params.containerInputType = snap.containerInputType || 'lot';
+    params.resolvedCount = resolutionInfo.value?.resolved_count || 0;
+    params.notFoundCount = resolutionInfo.value?.not_found?.length || 0;
+  }
+  return params;
+});
 
 function emptyAnalysisData() {
   return {
@@ -364,6 +390,7 @@ async function loadAnalysis() {
       analysisData.value = {
         ...analysisData.value,
         ...eventsAggregation.value,
+        total_ancestor_count: trace.stage_results.lineage?.total_ancestor_count || 0,
       };
     }
 
@@ -427,6 +454,21 @@ function exportCsv() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// Suspect context panel state
+const suspectPanelMachine = ref(null);
+
+function handleMachineBarClick({ name, dataIndex }) {
+  if (!name || name === '其他') return;
+  const attribution = analysisData.value?.attribution;
+  if (!Array.isArray(attribution)) return;
+  const match = attribution.find(
+    (rec) => rec.EQUIPMENT_NAME === name,
+  );
+  if (match) {
+    suspectPanelMachine.value = suspectPanelMachine.value?.EQUIPMENT_NAME === name ? null : match;
+  }
 }
 
 const _abortControllers = new Map();
@@ -542,6 +584,14 @@ void initPage();
 
       <transition name="trace-fade">
         <div v-if="showAnalysisCharts">
+          <AnalysisSummary
+            v-if="!isForward"
+            :query-params="summaryQueryParams"
+            :kpi="analysisData.kpi"
+            :total-ancestor-count="totalAncestorCount"
+            :station-label="committedStation"
+          />
+
           <KpiCards
             :kpi="analysisData.kpi"
             :loading="false"
@@ -552,35 +602,40 @@ void initPage();
           <div class="charts-section">
             <template v-if="!isForward">
               <div class="charts-row">
-                <ParetoChart title="依上游機台歸因" :data="filteredByMachineData">
-                  <template #header-extra>
-                    <div class="chart-inline-filters">
-                      <MultiSelect
-                        v-if="upstreamStationOptions.length > 1"
-                        :model-value="upstreamStationFilter"
-                        :options="upstreamStationOptions"
-                        placeholder="全部站點"
-                        @update:model-value="upstreamStationFilter = $event; upstreamSpecFilter = []"
-                      />
-                      <MultiSelect
-                        v-if="upstreamSpecOptions.length > 1"
-                        :model-value="upstreamSpecFilter"
-                        :options="upstreamSpecOptions"
-                        placeholder="全部型號"
-                        @update:model-value="upstreamSpecFilter = $event"
-                      />
-                    </div>
-                  </template>
-                </ParetoChart>
+                <div class="chart-with-panel">
+                  <ParetoChart title="依上游機台歸因" :data="filteredByMachineData" enable-click @bar-click="handleMachineBarClick">
+                    <template #header-extra>
+                      <div class="chart-inline-filters">
+                        <MultiSelect
+                          v-if="upstreamStationOptions.length > 1"
+                          :model-value="upstreamStationFilter"
+                          :options="upstreamStationOptions"
+                          placeholder="全部站點"
+                          @update:model-value="upstreamStationFilter = $event; upstreamSpecFilter = []"
+                        />
+                        <MultiSelect
+                          v-if="upstreamSpecOptions.length > 1"
+                          :model-value="upstreamSpecFilter"
+                          :options="upstreamSpecOptions"
+                          placeholder="全部型號"
+                          @update:model-value="upstreamSpecFilter = $event"
+                        />
+                      </div>
+                    </template>
+                  </ParetoChart>
+                  <SuspectContextPanel
+                    :machine="suspectPanelMachine"
+                    @close="suspectPanelMachine = null"
+                  />
+                </div>
+                <ParetoChart title="依原物料歸因" :data="analysisData.charts?.by_material" />
+              </div>
+              <div class="charts-row">
+                <ParetoChart title="依源頭批次歸因" :data="analysisData.charts?.by_wafer_root" />
                 <ParetoChart title="依不良原因" :data="analysisData.charts?.by_loss_reason" />
               </div>
               <div class="charts-row">
                 <ParetoChart title="依偵測機台" :data="analysisData.charts?.by_detection_machine" />
-                <ParetoChart title="依製程 (WORKFLOW)" :data="analysisData.charts?.by_workflow" />
-              </div>
-              <div class="charts-row">
-                <ParetoChart title="依封裝 (PACKAGE)" :data="analysisData.charts?.by_package" />
-                <ParetoChart title="依 TYPE" :data="analysisData.charts?.by_pj_type" />
               </div>
             </template>
             <template v-else>
@@ -606,6 +661,7 @@ void initPage();
         :loading="detailLoading"
         :pagination="detailPagination"
         :direction="committedFilters.direction"
+        :suspect-machines="suspectMachineNames"
         @export-csv="exportCsv"
         @prev-page="prevPage"
         @next-page="nextPage"

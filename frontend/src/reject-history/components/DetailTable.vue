@@ -41,6 +41,7 @@ function formatNumber(value) {
             <th>Package</th>
             <th>FUNCTION</th>
             <th class="col-left">TYPE</th>
+            <th>WORKFLOW</th>
             <th>PRODUCT</th>
             <th>原因</th>
             <th>EQUIPMENT</th>
@@ -66,6 +67,7 @@ function formatNumber(value) {
             <td>{{ row.PRODUCTLINENAME }}</td>
             <td>{{ row.PJ_FUNCTION || '' }}</td>
             <td class="col-left">{{ row.PJ_TYPE }}</td>
+            <td>{{ row.WORKFLOWNAME || '' }}</td>
             <td>{{ row.PRODUCTNAME || '' }}</td>
             <td>{{ row.LOSSREASONNAME }}</td>
             <td>{{ row.EQUIPMENTNAME || '' }}</td>
@@ -82,7 +84,7 @@ function formatNumber(value) {
             <td class="cell-nowrap">{{ row.TXN_TIME || row.TXN_DAY }}</td>
           </tr>
           <tr v-if="!items || items.length === 0">
-            <td :colspan="showRejectBreakdown ? 17 : 12" class="placeholder">No data</td>
+            <td :colspan="showRejectBreakdown ? 18 : 13" class="placeholder">No data</td>
           </tr>
         </tbody>
       </table>

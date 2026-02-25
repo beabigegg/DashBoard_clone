@@ -7,7 +7,7 @@ ensureMesApiAvailable();
 const DEFAULT_STAGE_TIMEOUT_MS = 60000;
 const PROFILE_DOMAINS = Object.freeze({
   query_tool: ['history', 'materials', 'rejects', 'holds', 'jobs'],
-  mid_section_defect: ['upstream_history'],
+  mid_section_defect: ['upstream_history', 'materials'],
   mid_section_defect_forward: ['upstream_history', 'downstream_rejects'],
 });
 
@@ -168,6 +168,7 @@ export function useTraceProgress({ profile } = {}) {
           lineage: {
             ancestors: lineagePayload?.ancestors || {},
             children_map: lineagePayload?.children_map || {},
+            seed_roots: lineagePayload?.seed_roots || {},
           },
         },
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },

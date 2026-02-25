@@ -570,6 +570,7 @@ def _paginate_detail(
                 "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
                 "WORKCENTERNAME": _normalize_text(row.get("WORKCENTERNAME")),
                 "SPECNAME": _normalize_text(row.get("SPECNAME")),
+                "WORKFLOWNAME": _normalize_text(row.get("WORKFLOWNAME")),
                 "EQUIPMENTNAME": _normalize_text(row.get("EQUIPMENTNAME")),
                 "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
                 "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
@@ -623,6 +624,128 @@ def _extract_available_filters(df: pd.DataFrame) -> dict:
 
 
 # ============================================================
+# Dimension Pareto from cache
+# ============================================================
+
+# Dimension → DF column mapping (matches _DIMENSION_COLUMN_MAP in reject_history_service)
+_DIM_TO_DF_COLUMN = {
+    "reason": "LOSSREASONNAME",
+    "package": "PRODUCTLINENAME",
+    "type": "PJ_TYPE",
+    "workflow": "WORKFLOWNAME",
+    "workcenter": "WORKCENTER_GROUP",
+    "equipment": "PRIMARY_EQUIPMENTNAME",
+}
+
+
+def compute_dimension_pareto(
+    *,
+    query_id: str,
+    dimension: str = "reason",
+    metric_mode: str = "reject_total",
+    pareto_scope: str = "top80",
+    packages: Optional[List[str]] = None,
+    workcenter_groups: Optional[List[str]] = None,
+    reason: Optional[str] = None,
+    trend_dates: Optional[List[str]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Compute dimension pareto from cached DataFrame (no Oracle query)."""
+    df = _get_cached_df(query_id)
+    if df is None:
+        return None
+
+    dim_col = _DIM_TO_DF_COLUMN.get(dimension, "LOSSREASONNAME")
+    if dim_col not in df.columns:
+        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
+
+    # Apply supplementary filters
+    filtered = _apply_supplementary_filters(
+        df,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reason=reason,
+    )
+    if filtered is None or filtered.empty:
+        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
+
+    # Apply trend date filter
+    if trend_dates and "TXN_DAY" in filtered.columns:
+        date_set = set(trend_dates)
+        filtered = filtered[
+            filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
+        ]
+        if filtered.empty:
+            return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
+
+    # Determine metric column
+    if metric_mode == "defect":
+        metric_col = "DEFECT_QTY"
+    else:
+        metric_col = "REJECT_TOTAL_QTY"
+
+    if metric_col not in filtered.columns:
+        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
+
+    # Group by dimension
+    agg_dict = {}
+    for col in ["MOVEIN_QTY", "REJECT_TOTAL_QTY", "DEFECT_QTY"]:
+        if col in filtered.columns:
+            agg_dict[col] = (col, "sum")
+
+    grouped = filtered.groupby(dim_col, sort=False).agg(**agg_dict).reset_index()
+
+    # Count distinct lots
+    if "CONTAINERID" in filtered.columns:
+        lot_counts = (
+            filtered.groupby(dim_col)["CONTAINERID"]
+            .nunique()
+            .reset_index()
+            .rename(columns={"CONTAINERID": "AFFECTED_LOT_COUNT"})
+        )
+        grouped = grouped.merge(lot_counts, on=dim_col, how="left")
+    else:
+        grouped["AFFECTED_LOT_COUNT"] = 0
+
+    # Compute metric and sort
+    grouped["METRIC_VALUE"] = grouped[metric_col].fillna(0)
+    grouped = grouped[grouped["METRIC_VALUE"] > 0].sort_values(
+        "METRIC_VALUE", ascending=False
+    )
+    if grouped.empty:
+        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
+
+    total_metric = grouped["METRIC_VALUE"].sum()
+    grouped["PCT"] = (grouped["METRIC_VALUE"] / total_metric * 100).round(4)
+    grouped["CUM_PCT"] = grouped["PCT"].cumsum().round(4)
+
+    all_items = []
+    for _, row in grouped.iterrows():
+        all_items.append({
+            "reason": _normalize_text(row.get(dim_col)) or "(未知)",
+            "metric_value": _as_float(row.get("METRIC_VALUE")),
+            "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
+            "REJECT_TOTAL_QTY": _as_int(row.get("REJECT_TOTAL_QTY")),
+            "DEFECT_QTY": _as_int(row.get("DEFECT_QTY")),
+            "count": _as_int(row.get("AFFECTED_LOT_COUNT")),
+            "pct": round(_as_float(row.get("PCT")), 4),
+            "cumPct": round(_as_float(row.get("CUM_PCT")), 4),
+        })
+
+    items = list(all_items)
+    if pareto_scope == "top80" and items:
+        top_items = [item for item in items if _as_float(item.get("cumPct")) <= 80.0]
+        if not top_items:
+            top_items = [items[0]]
+        items = top_items
+
+    return {
+        "items": items,
+        "dimension": dimension,
+        "metric_mode": metric_mode,
+    }
+
+
+# ============================================================
 # CSV export from cache
 # ============================================================
 
@@ -670,6 +793,7 @@ def export_csv_from_cache(
                 "Package": _normalize_text(row.get("PRODUCTLINENAME")),
                 "FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
                 "TYPE": _normalize_text(row.get("PJ_TYPE")),
+                "WORKFLOW": _normalize_text(row.get("WORKFLOWNAME")),
                 "PRODUCT": _normalize_text(row.get("PRODUCTNAME")),
                 "原因": _normalize_text(row.get("LOSSREASONNAME")),
                 "EQUIPMENT": _normalize_text(row.get("EQUIPMENTNAME")),

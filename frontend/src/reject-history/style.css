@@ -228,16 +228,27 @@
   line-height: 1;
 }
 
-.btn-export {
+.btn.btn-primary:hover {
+  background: var(--primary-dark);
+  color: #fff;
+}
+
+.btn.btn-secondary:hover {
+  background: #5a6268;
+  color: #fff;
+}
+
+.btn.btn-export {
   background: #0f766e;
   color: #fff;
 }
 
-.btn-export:hover {
+.btn.btn-export:hover {
   background: #0b5e59;
+  color: #fff;
 }
 
-.btn-export:disabled {
+.btn.btn-export:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
@@ -294,6 +305,17 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.dimension-select {
+  font-size: 12px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 4px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #374151);
+  cursor: pointer;
+  margin-left: auto;
 }
 
 .pareto-date-badge {

@@ -463,6 +463,10 @@ body {
   grid-template-columns: 1fr;
 }
 
+.chart-with-panel {
+  position: relative;
+}
+
 .chart-card {
   background: var(--msd-card-bg);
   border-radius: 10px;

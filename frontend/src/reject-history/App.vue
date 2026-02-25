@@ -62,6 +62,9 @@ const page = ref(1);
 const detailReason = ref('');
 const selectedTrendDates = ref([]);
 const trendLegendSelected = ref({ '扣帳報廢量': true, '不扣帳報廢量': true });
+const paretoDimension = ref('reason');
+const dimensionParetoItems = ref([]);
+const dimensionParetoLoading = ref(false);
 
 // ---- Data state ----
 const summary = ref({
@@ -197,6 +200,8 @@ async function executePrimaryQuery() {
     page.value = 1;
     detailReason.value = '';
     selectedTrendDates.value = [];
+    paretoDimension.value = 'reason';
+    dimensionParetoItems.value = [];
 
     // Apply initial data
     analyticsRawItems.value = Array.isArray(result.analytics_raw)
@@ -301,6 +306,7 @@ function onTrendDateClick(dateStr) {
   }
   page.value = 1;
   void refreshView();
+  refreshDimensionParetoIfActive();
 }
 
 function onTrendLegendChange(selected) {
@@ -308,6 +314,7 @@ function onTrendLegendChange(selected) {
   page.value = 1;
   updateUrlState();
   void refreshView();
+  refreshDimensionParetoIfActive();
 }
 
 function onParetoClick(reason) {
@@ -323,6 +330,59 @@ function handleParetoScopeToggle(checked) {
   updateUrlState();
 }
 
+let activeDimRequestId = 0;
+
+async function fetchDimensionPareto(dim) {
+  if (dim === 'reason' || !queryId.value) return;
+  activeDimRequestId += 1;
+  const myId = activeDimRequestId;
+  dimensionParetoLoading.value = true;
+  try {
+    const params = {
+      query_id: queryId.value,
+      start_date: committedPrimary.startDate,
+      end_date: committedPrimary.endDate,
+      dimension: dim,
+      metric_mode: paretoMetricMode.value === 'defect' ? 'defect' : 'reject_total',
+      pareto_scope: committedPrimary.paretoTop80 ? 'top80' : 'all',
+      include_excluded_scrap: committedPrimary.includeExcludedScrap,
+      exclude_material_scrap: committedPrimary.excludeMaterialScrap,
+      exclude_pb_diode: committedPrimary.excludePbDiode,
+      packages: supplementaryFilters.packages.length > 0 ? supplementaryFilters.packages : undefined,
+      workcenter_groups: supplementaryFilters.workcenterGroups.length > 0 ? supplementaryFilters.workcenterGroups : undefined,
+      reason: supplementaryFilters.reason || undefined,
+      trend_dates: selectedTrendDates.value.length > 0 ? selectedTrendDates.value : undefined,
+    };
+    const resp = await apiGet('/api/reject-history/reason-pareto', { params, timeout: API_TIMEOUT });
+    if (myId !== activeDimRequestId) return;
+    const result = unwrapApiResult(resp, '查詢維度 Pareto 失敗');
+    dimensionParetoItems.value = result.data?.items || [];
+  } catch (err) {
+    if (myId !== activeDimRequestId) return;
+    dimensionParetoItems.value = [];
+    errorMessage.value = err.message || '查詢維度 Pareto 失敗';
+  } finally {
+    if (myId === activeDimRequestId) {
+      dimensionParetoLoading.value = false;
+    }
+  }
+}
+
+function refreshDimensionParetoIfActive() {
+  if (paretoDimension.value !== 'reason') {
+    void fetchDimensionPareto(paretoDimension.value);
+  }
+}
+
+function onDimensionChange(dim) {
+  paretoDimension.value = dim;
+  if (dim === 'reason') {
+    dimensionParetoItems.value = [];
+  } else {
+    void fetchDimensionPareto(dim);
+  }
+}
+
 function onSupplementaryChange(filters) {
   supplementaryFilters.packages = filters.packages || [];
   supplementaryFilters.workcenterGroups = filters.workcenterGroups || [];
@@ -331,6 +391,7 @@ function onSupplementaryChange(filters) {
   detailReason.value = '';
   selectedTrendDates.value = [];
   void refreshView();
+  refreshDimensionParetoIfActive();
 }
 
 function removeFilterChip(chip) {
@@ -347,6 +408,7 @@ function removeFilterChip(chip) {
     selectedTrendDates.value = [];
     page.value = 1;
     void refreshView();
+    refreshDimensionParetoIfActive();
     return;
   }
 
@@ -354,6 +416,7 @@ function removeFilterChip(chip) {
     supplementaryFilters.reason = '';
     page.value = 1;
     void refreshView();
+    refreshDimensionParetoIfActive();
     return;
   }
 
@@ -363,6 +426,7 @@ function removeFilterChip(chip) {
     );
     page.value = 1;
     void refreshView();
+    refreshDimensionParetoIfActive();
     return;
   }
 
@@ -372,6 +436,7 @@ function removeFilterChip(chip) {
     );
     page.value = 1;
     void refreshView();
+    refreshDimensionParetoIfActive();
     return;
   }
 }
@@ -554,6 +619,11 @@ const filteredParetoItems = computed(() => {
   const cutIdx = items.findIndex((item) => Number(item.cumPct || 0) >= 80);
   const top80Count = cutIdx >= 0 ? cutIdx + 1 : items.length;
   return items.slice(0, Math.max(top80Count, Math.min(5, items.length)));
+});
+
+const activeParetoItems = computed(() => {
+  if (paretoDimension.value !== 'reason') return dimensionParetoItems.value;
+  return filteredParetoItems.value;
 });
 
 const activeFilterChips = computed(() => {
@@ -871,12 +941,15 @@ onMounted(() => {
       />
 
       <ParetoSection
-        :items="filteredParetoItems"
+        :items="activeParetoItems"
         :detail-reason="detailReason"
         :selected-dates="selectedTrendDates"
         :metric-label="paretoMetricLabel"
-        :loading="loading.querying"
+        :loading="loading.querying || dimensionParetoLoading"
+        :dimension="paretoDimension"
+        :show-dimension-selector="committedPrimary.mode === 'date_range'"
         @reason-click="onParetoClick"
+        @dimension-change="onDimensionChange"
       />
 
       <DetailTable

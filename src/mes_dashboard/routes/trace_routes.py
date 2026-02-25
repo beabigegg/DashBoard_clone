@@ -121,6 +121,11 @@ def _hash_payload(payload: Any) -> str:
 
 
 def _seed_cache_key(profile: str, params: Dict[str, Any]) -> str:
+    if profile == PROFILE_MID_SECTION_DEFECT:
+        # loss_reasons does not affect seed resolution; exclude it so that
+        # changing the reason filter hits the cache instead of re-querying Oracle.
+        filtered = {k: v for k, v in params.items() if k != "loss_reasons"}
+        return f"trace:seed:{profile}:{_hash_payload(filtered)}"
     return f"trace:seed:{profile}:{_hash_payload(params)}"
 
 
@@ -305,6 +310,7 @@ def _build_lineage_response(
     merge_edges: Optional[Dict[str, List[str]]] = None,
     typed_nodes: Optional[Dict[str, Dict[str, Any]]] = None,
     typed_edges: Optional[List[Dict[str, Any]]] = None,
+    seed_roots: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     normalized_ancestors: Dict[str, List[str]] = {}
     all_nodes = set(container_ids)
@@ -319,12 +325,20 @@ def _build_lineage_response(
         normalized_ancestors[seed] = normalized_list
         all_nodes.update(normalized_list)
 
+    # Count unique ancestor CIDs excluding seeds themselves
+    seed_set = set(container_ids)
+    ancestor_only = all_nodes - seed_set
+    total_ancestor_count = len(ancestor_only)
+
     response: Dict[str, Any] = {
         "stage": "lineage",
         "ancestors": normalized_ancestors,
         "merges": {},
         "total_nodes": len(all_nodes),
+        "total_ancestor_count": total_ancestor_count,
     }
+    if seed_roots:
+        response["seed_roots"] = seed_roots
     if cid_to_name:
         response["names"] = {
             cid: name for cid, name in cid_to_name.items()
@@ -386,6 +400,19 @@ def _parse_lineage_payload(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _parse_lineage_roots(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """Extract seed_roots mapping from lineage payload."""
+    lineage = payload.get("lineage")
+    if isinstance(lineage, dict):
+        roots = lineage.get("seed_roots")
+        if isinstance(roots, dict):
+            return roots
+    direct_roots = payload.get("seed_roots")
+    if isinstance(direct_roots, dict):
+        return direct_roots
+    return None
+
+
 def _build_msd_aggregation(
     payload: Dict[str, Any],
     domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]],
@@ -407,11 +434,13 @@ def _build_msd_aggregation(
     loss_reasons = parse_loss_reasons_param(raw_loss_reasons)
 
     lineage_ancestors = _parse_lineage_payload(payload)
+    lineage_roots = _parse_lineage_roots(payload)
     seed_container_ids = _normalize_strings(payload.get("seed_container_ids", []))
     if not seed_container_ids and isinstance(lineage_ancestors, dict):
         seed_container_ids = _normalize_strings(list(lineage_ancestors.keys()))
 
     upstream_events = domain_results.get("upstream_history", {})
+    materials_events = domain_results.get("materials", {})
     downstream_events = domain_results.get("downstream_rejects", {})
     station = str(params.get("station") or "測試").strip()
     direction = str(params.get("direction") or "backward").strip()
@@ -422,7 +451,9 @@ def _build_msd_aggregation(
         loss_reasons=loss_reasons,
         seed_container_ids=seed_container_ids,
         lineage_ancestors=lineage_ancestors,
+        lineage_roots=lineage_roots,
         upstream_events_by_cid=upstream_events,
+        materials_events_by_cid=materials_events,
         downstream_events_by_cid=downstream_events,
         station=station,
         direction=direction,
@@ -534,6 +565,7 @@ def lineage():
                 merge_edges=reverse_graph.get("merge_edges"),
                 typed_nodes=reverse_graph.get("nodes"),
                 typed_edges=reverse_graph.get("edges"),
+                seed_roots=reverse_graph.get("seed_roots"),
             )
             response["roots"] = list(container_ids)
         else:
@@ -589,10 +621,16 @@ def events():
             400,
         )
 
+    # For MSD profile, skip the events-level cache so that aggregation is
+    # always recomputed with the current loss_reasons.  EventFetcher still
+    # provides per-domain Redis caching, so raw Oracle queries are avoided.
+    is_msd = (profile == PROFILE_MID_SECTION_DEFECT)
+
     events_cache_key = _events_cache_key(profile, domains, container_ids)
-    cached = cache_get(events_cache_key)
-    if cached is not None:
-        return jsonify(cached)
+    if not is_msd:
+        cached = cache_get(events_cache_key)
+        if cached is not None:
+            return jsonify(cached)
 
     logger.info(
         "trace events profile=%s domains=%s cid_count=%s correlation_cache_key=%s",
@@ -645,5 +683,6 @@ def events():
         response["code"] = "EVENTS_PARTIAL_FAILURE"
         response["failed_domains"] = sorted(failed_domains)
 
-    cache_set(events_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
+    if not is_msd:
+        cache_set(events_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
     return jsonify(response)

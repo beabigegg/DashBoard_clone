@@ -289,6 +289,7 @@ def _prepare_sql(
     metric_column: str = "",
     base_variant: str = "",
     base_where: str = "",
+    dimension_column: str = "",
 ) -> str:
     sql = _load_sql(name)
     sql = sql.replace("{{ BASE_QUERY }}", _base_query_sql(base_variant))
@@ -297,6 +298,7 @@ def _prepare_sql(
     sql = sql.replace("{{ WHERE_CLAUSE }}", where_clause or "")
     sql = sql.replace("{{ BUCKET_EXPR }}", bucket_expr or "TRUNC(b.TXN_DAY)")
     sql = sql.replace("{{ METRIC_COLUMN }}", metric_column or "b.REJECT_TOTAL_QTY")
+    sql = sql.replace("{{ DIMENSION_COLUMN }}", dimension_column or "b.LOSSREASONNAME")
     return sql
 
 
@@ -579,6 +581,111 @@ def query_reason_pareto(
     }
 
 
+# Allowed dimension → SQL column mapping for dimension_pareto
+_DIMENSION_COLUMN_MAP = {
+    "reason": "b.LOSSREASONNAME",
+    "package": "b.PRODUCTLINENAME",
+    "type": "b.PJ_TYPE",
+    "workflow": "b.WORKFLOWNAME",
+    "workcenter": "b.WORKCENTER_GROUP",
+    "equipment": "b.PRIMARY_EQUIPMENTNAME",
+}
+
+
+def query_dimension_pareto(
+    *,
+    start_date: str,
+    end_date: str,
+    dimension: str = "reason",
+    metric_mode: str = "reject_total",
+    pareto_scope: str = "top80",
+    workcenter_groups: Optional[list[str]] = None,
+    packages: Optional[list[str]] = None,
+    reasons: Optional[list[str]] = None,
+    categories: Optional[list[str]] = None,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
+) -> dict[str, Any]:
+    """Pareto chart grouped by an arbitrary dimension (reason, package, type, workcenter, equipment)."""
+    _validate_range(start_date, end_date)
+
+    normalized_dim = _normalize_text(dimension).lower() or "reason"
+    if normalized_dim not in _DIMENSION_COLUMN_MAP:
+        raise ValueError(f"Invalid dimension '{dimension}'. Use: {', '.join(_DIMENSION_COLUMN_MAP)}")
+
+    # For reason dimension, delegate to existing optimized function
+    if normalized_dim == "reason":
+        return query_reason_pareto(
+            start_date=start_date, end_date=end_date,
+            metric_mode=metric_mode, pareto_scope=pareto_scope,
+            workcenter_groups=workcenter_groups, packages=packages,
+            reasons=reasons, categories=categories,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
+        )
+
+    normalized_metric = _normalize_text(metric_mode).lower() or "reject_total"
+    if normalized_metric not in VALID_METRIC_MODE:
+        raise ValueError("Invalid metric_mode. Use reject_total or defect")
+
+    normalized_scope = _normalize_text(pareto_scope).lower() or "top80"
+    if normalized_scope not in {"top80", "all"}:
+        raise ValueError("Invalid pareto_scope. Use top80 or all")
+
+    dim_col = _DIMENSION_COLUMN_MAP[normalized_dim]
+
+    where_clause, params, meta = _build_where_clause(
+        workcenter_groups=workcenter_groups,
+        packages=packages,
+        reasons=reasons,
+        categories=categories,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    sql = _prepare_sql(
+        "dimension_pareto",
+        where_clause=where_clause,
+        metric_column=_metric_column(normalized_metric),
+        dimension_column=dim_col,
+    )
+    df = read_sql_df(sql, _common_params(start_date, end_date, params))
+    all_items = []
+    if df is not None and not df.empty:
+        for _, row in df.iterrows():
+            all_items.append({
+                "reason": _normalize_text(row.get("DIMENSION_VALUE")) or "(未知)",
+                "metric_value": _as_float(row.get("METRIC_VALUE")),
+                "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
+                "REJECT_TOTAL_QTY": _as_int(row.get("REJECT_TOTAL_QTY")),
+                "DEFECT_QTY": _as_int(row.get("DEFECT_QTY")),
+                "count": _as_int(row.get("AFFECTED_LOT_COUNT")),
+                "pct": round(_as_float(row.get("PCT")), 4),
+                "cumPct": round(_as_float(row.get("CUM_PCT")), 4),
+            })
+
+    items = list(all_items)
+    if normalized_scope == "top80" and items:
+        top_items = [item for item in items if _as_float(item.get("cumPct")) <= 80.0]
+        if not top_items:
+            top_items = [items[0]]
+        items = top_items
+
+    return {
+        "items": items,
+        "dimension": normalized_dim,
+        "metric_mode": normalized_metric,
+        "pareto_scope": normalized_scope,
+        "meta": {
+            **meta,
+            "total_items_after_filter": len(all_items),
+            "displayed_items": len(items),
+        },
+    }
+
+
 def _apply_metric_filter(where_clause: str, metric_filter: str) -> str:
     """Append metric-type filter (reject / defect) to an existing WHERE clause."""
     if metric_filter == "reject":
@@ -648,6 +755,7 @@ def query_list(
                     "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
                     "WORKCENTERNAME": _normalize_text(row.get("WORKCENTERNAME")),
                     "SPECNAME": _normalize_text(row.get("SPECNAME")),
+                    "WORKFLOWNAME": _normalize_text(row.get("WORKFLOWNAME")),
                     "EQUIPMENTNAME": _normalize_text(row.get("EQUIPMENTNAME")),
                     "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
                     "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
@@ -724,6 +832,7 @@ def export_csv(
                     "Package": _normalize_text(row.get("PRODUCTLINENAME")),
                     "FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
                     "TYPE": _normalize_text(row.get("PJ_TYPE")),
+                    "WORKFLOW": _normalize_text(row.get("WORKFLOWNAME")),
                     "PRODUCT": _normalize_text(row.get("PRODUCTNAME")),
                     "原因": _normalize_text(row.get("LOSSREASONNAME")),
                     "EQUIPMENT": _normalize_text(row.get("EQUIPMENTNAME")),

@@ -20,6 +20,10 @@ const props = defineProps({
     type: String,
     default: 'backward',
   },
+  suspectMachines: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const emit = defineEmits(['export-csv', 'prev-page', 'next-page']);
@@ -38,7 +42,8 @@ const COLUMNS_BACKWARD = [
   { key: 'DEFECT_QTY', label: '不良數', width: '70px', numeric: true },
   { key: 'DEFECT_RATE', label: '不良率(%)', width: '90px', numeric: true },
   { key: 'ANCESTOR_COUNT', label: '上游LOT數', width: '80px', numeric: true },
-  { key: 'UPSTREAM_MACHINES', label: '上游機台', width: '200px' },
+  { key: 'UPSTREAM_MACHINE_COUNT', label: '上游台數', width: '80px', numeric: true },
+  { key: 'SUSPECT_HITS', label: '嫌疑命中', width: '200px', custom: true },
 ];
 
 const COLUMNS_FORWARD = [
@@ -103,6 +108,27 @@ function formatCell(value, col) {
   if (col.numeric) return Number(value).toLocaleString();
   return value;
 }
+
+function getSuspectHits(row) {
+  const upstreamMachines = row.UPSTREAM_MACHINES;
+  if (!Array.isArray(upstreamMachines) || upstreamMachines.length === 0) return null;
+  const suspects = props.suspectMachines;
+  if (!suspects || suspects.length === 0) return null;
+
+  const suspectSet = new Set(suspects);
+  const machineNames = upstreamMachines.map((m) => m.machine || m);
+  const uniqueNames = [...new Set(machineNames)];
+  const hits = uniqueNames.filter((name) => suspectSet.has(name));
+
+  if (hits.length === 0) return null;
+
+  return {
+    hitNames: hits,
+    hitCount: hits.length,
+    totalCount: uniqueNames.length,
+    fullMatch: hits.length === uniqueNames.length,
+  };
+}
 </script>
 
 <template>
@@ -136,7 +162,14 @@ function formatCell(value, col) {
           <tbody>
             <tr v-for="(row, idx) in sortedData" :key="idx">
               <td v-for="col in activeColumns" :key="col.key" :class="{ numeric: col.numeric }">
-                {{ formatCell(row[col.key], col) }}
+                <template v-if="col.key === 'SUSPECT_HITS'">
+                  <span v-if="getSuspectHits(row)" :class="{ 'hit-full': getSuspectHits(row).fullMatch }" class="suspect-cell">
+                    {{ getSuspectHits(row).hitNames.join(', ') }}
+                    <span class="hit-ratio">({{ getSuspectHits(row).hitCount }}/{{ getSuspectHits(row).totalCount }})</span>
+                  </span>
+                  <span v-else class="no-hit">-</span>
+                </template>
+                <template v-else>{{ formatCell(row[col.key], col) }}</template>
               </td>
             </tr>
             <tr v-if="!sortedData.length">
@@ -156,3 +189,21 @@ function formatCell(value, col) {
     </div>
   </section>
 </template>
+
+<style scoped>
+.suspect-cell {
+  font-size: 12px;
+  color: var(--text-primary, #374151);
+}
+.hit-ratio {
+  color: var(--text-tertiary, #9ca3af);
+  margin-left: 4px;
+}
+.hit-full {
+  color: #059669;
+  font-weight: 600;
+}
+.no-hit {
+  color: var(--text-tertiary, #9ca3af);
+}
+</style>

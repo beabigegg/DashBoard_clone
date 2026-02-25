@@ -13,6 +13,7 @@ from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.services.reject_dataset_cache import (
     apply_view,
+    compute_dimension_pareto,
     execute_primary_query,
     export_csv_from_cache,
 )
@@ -22,6 +23,7 @@ from mes_dashboard.services.reject_history_service import (
     get_filter_options,
     query_analytics,
     query_list,
+    query_dimension_pareto,
     query_reason_pareto,
     query_summary,
     query_trend,
@@ -298,11 +300,30 @@ def api_reject_history_reason_pareto():
 
     metric_mode = request.args.get("metric_mode", "reject_total").strip().lower() or "reject_total"
     pareto_scope = request.args.get("pareto_scope", "top80").strip().lower() or "top80"
+    dimension = request.args.get("dimension", "reason").strip().lower() or "reason"
+    query_id = request.args.get("query_id", "").strip()
 
     try:
-        result = query_reason_pareto(
+        # Prefer cache-based computation when query_id is available
+        if query_id:
+            result = compute_dimension_pareto(
+                query_id=query_id,
+                dimension=dimension,
+                metric_mode=metric_mode,
+                pareto_scope=pareto_scope,
+                packages=_parse_multi_param("packages") or None,
+                workcenter_groups=_parse_multi_param("workcenter_groups") or None,
+                reason=request.args.get("reason", "").strip() or None,
+                trend_dates=_parse_multi_param("trend_dates") or None,
+            )
+            if result is not None:
+                return jsonify({"success": True, "data": result, "meta": {}})
+            # Cache expired, fall through to Oracle query
+
+        result = query_dimension_pareto(
             start_date=start_date,
             end_date=end_date,
+            dimension=dimension,
             metric_mode=metric_mode,
             pareto_scope=pareto_scope,
             workcenter_groups=_parse_multi_param("workcenter_groups") or None,

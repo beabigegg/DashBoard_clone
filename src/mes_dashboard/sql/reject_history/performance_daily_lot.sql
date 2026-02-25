@@ -19,6 +19,17 @@ WITH spec_map AS (
     WHERE SPEC IS NOT NULL
     GROUP BY SPEC
 ),
+workflow_lookup AS (
+    SELECT /*+ MATERIALIZE */ DISTINCT w.CONTAINERID, w.WORKFLOWNAME
+    FROM DWH.DW_MES_WIP w
+    WHERE w.PRODUCTLINENAME <> '點測'
+      AND w.CONTAINERID IN (
+          SELECT DISTINCT r0.CONTAINERID
+          FROM DWH.DW_MES_LOTREJECTHISTORY r0
+          WHERE r0.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
+            AND r0.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
+      )
+),
 reject_raw AS (
     SELECT
         r.TXNDATE,
@@ -41,6 +52,7 @@ reject_raw AS (
             TRIM(REGEXP_SUBSTR(r.EQUIPMENTNAME, '[^,]+', 1, 1)),
             NVL(TRIM(r.EQUIPMENTNAME), '(NA)')
         ) AS PRIMARY_EQUIPMENTNAME,
+        NVL(TRIM(wf.WORKFLOWNAME), NVL(TRIM(r.SPECNAME), '(NA)')) AS WORKFLOWNAME,
         NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') AS LOSSREASONNAME,
         NVL(
             TRIM(REGEXP_SUBSTR(NVL(TRIM(r.LOSSREASONNAME), '(未填寫)'), '^[^_[:space:]-]+')),
@@ -72,6 +84,8 @@ reject_raw AS (
       ON c.CONTAINERID = r.CONTAINERID
     LEFT JOIN spec_map sm
       ON sm.SPEC = TRIM(r.SPECNAME)
+    LEFT JOIN workflow_lookup wf
+      ON wf.CONTAINERID = r.CONTAINERID
     WHERE {{ BASE_WHERE }}
 ),
 daily_agg AS (
@@ -86,6 +100,7 @@ daily_agg AS (
         WORKCENTERSEQUENCE_GROUP,
         WORKCENTERNAME,
         SPECNAME,
+        WORKFLOWNAME,
         EQUIPMENTNAME,
         PRIMARY_EQUIPMENTNAME,
         PRODUCTLINENAME,
@@ -118,6 +133,7 @@ daily_agg AS (
         WORKCENTERSEQUENCE_GROUP,
         WORKCENTERNAME,
         SPECNAME,
+        WORKFLOWNAME,
         EQUIPMENTNAME,
         PRIMARY_EQUIPMENTNAME,
         PRODUCTLINENAME,
@@ -139,6 +155,7 @@ SELECT
     WORKCENTERSEQUENCE_GROUP,
     WORKCENTERNAME,
     SPECNAME,
+    WORKFLOWNAME,
     EQUIPMENTNAME,
     PRIMARY_EQUIPMENTNAME,
     PRODUCTLINENAME,

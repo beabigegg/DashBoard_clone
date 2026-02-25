@@ -597,6 +597,49 @@ def get_workcenter_groups_list():
 
 
 # ============================================================
+# Equipment Recent Jobs API (for suspect context panel)
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', methods=['GET'])
+def get_equipment_recent_jobs(equipment_id):
+    """Get recent JOB records for a specific equipment (last 30 days, top 5).
+
+    Used by the suspect machine context panel in mid-section-defect analysis.
+    """
+    from mes_dashboard.sql import SQLLoader
+    from mes_dashboard.core.database import read_sql_df
+
+    equipment_id = str(equipment_id or '').strip()
+    if not equipment_id:
+        return jsonify({'error': '請指定設備ID'}), 400
+
+    try:
+        sql = SQLLoader.load("query_tool/equipment_recent_jobs")
+        df = read_sql_df(sql, {'equipment_id': equipment_id})
+
+        if df is None or df.empty:
+            return jsonify({'data': [], 'total': 0})
+
+        data = []
+        for _, row in df.iterrows():
+            data.append({
+                'JOBID': str(row.get('JOBID') or ''),
+                'JOBSTATUS': str(row.get('JOBSTATUS') or ''),
+                'JOBMODELNAME': str(row.get('JOBMODELNAME') or ''),
+                'CREATEDATE': str(row.get('CREATEDATE') or ''),
+                'COMPLETEDATE': str(row.get('COMPLETEDATE') or ''),
+                'CAUSECODENAME': str(row.get('CAUSECODENAME') or ''),
+                'REPAIRCODENAME': str(row.get('REPAIRCODENAME') or ''),
+                'RESOURCENAME': str(row.get('RESOURCENAME') or ''),
+            })
+
+        return jsonify({'data': data, 'total': len(data)})
+
+    except Exception as exc:
+        return jsonify({'error': f'載入維修紀錄失敗: {str(exc)}'}), 500
+
+
+# ============================================================
 # CSV Export API
 # ============================================================
 

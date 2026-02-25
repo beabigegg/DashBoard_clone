@@ -9,17 +9,33 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
 
+const DIMENSION_OPTIONS = [
+  { value: 'reason', label: '不良原因' },
+  { value: 'package', label: 'PACKAGE' },
+  { value: 'type', label: 'TYPE' },
+  { value: 'workflow', label: 'WORKFLOW' },
+  { value: 'workcenter', label: '站點' },
+  { value: 'equipment', label: '機台' },
+];
+
 const props = defineProps({
   items: { type: Array, default: () => [] },
   detailReason: { type: String, default: '' },
   selectedDates: { type: Array, default: () => [] },
   metricLabel: { type: String, default: '報廢量' },
   loading: { type: Boolean, default: false },
+  dimension: { type: String, default: 'reason' },
+  showDimensionSelector: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['reason-click']);
+const emit = defineEmits(['reason-click', 'dimension-change']);
 
 const hasData = computed(() => Array.isArray(props.items) && props.items.length > 0);
+
+const dimensionLabel = computed(() => {
+  const opt = DIMENSION_OPTIONS.find((o) => o.value === props.dimension);
+  return opt ? opt.label : '報廢原因';
+});
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('zh-TW');
@@ -108,7 +124,7 @@ const chartOption = computed(() => {
 });
 
 function handleChartClick(params) {
-  if (params?.seriesType !== 'bar') {
+  if (params?.seriesType !== 'bar' || props.dimension !== 'reason') {
     return;
   }
   const reason = props.items?.[params.dataIndex]?.reason;
@@ -122,9 +138,17 @@ function handleChartClick(params) {
   <section class="card">
     <div class="card-header pareto-header">
       <div class="card-title">
-        {{ metricLabel }} vs 報廢原因（Pareto）
+        {{ metricLabel }} vs {{ dimensionLabel }}（Pareto）
         <span v-for="d in selectedDates" :key="d" class="pareto-date-badge">{{ d }}</span>
       </div>
+      <select
+        v-if="showDimensionSelector"
+        class="dimension-select"
+        :value="dimension"
+        @change="emit('dimension-change', $event.target.value)"
+      >
+        <option v-for="opt in DIMENSION_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+      </select>
     </div>
     <div class="card-body pareto-layout">
       <div class="pareto-chart-wrap">
@@ -135,7 +159,7 @@ function handleChartClick(params) {
         <table class="detail-table pareto-table">
           <thead>
             <tr>
-              <th>原因</th>
+              <th>{{ dimensionLabel }}</th>
               <th>{{ metricLabel }}</th>
               <th>占比</th>
               <th>累積</th>
@@ -148,9 +172,10 @@ function handleChartClick(params) {
               :class="{ active: detailReason === item.reason }"
             >
               <td>
-                <button class="reason-link" type="button" @click="$emit('reason-click', item.reason)">
+                <button v-if="dimension === 'reason'" class="reason-link" type="button" @click="$emit('reason-click', item.reason)">
                   {{ item.reason }}
                 </button>
+                <span v-else>{{ item.reason }}</span>
               </td>
               <td>{{ formatNumber(item.metric_value) }}</td>
               <td>{{ formatPct(item.pct) }}</td>

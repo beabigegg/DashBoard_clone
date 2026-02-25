@@ -9,7 +9,7 @@ import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app
 from mes_dashboard.core.cache import NoOpCache
 from mes_dashboard.core.rate_limit import reset_rate_limits_for_tests
-from mes_dashboard.routes.trace_routes import _lineage_cache_key
+from mes_dashboard.routes.trace_routes import _lineage_cache_key, _seed_cache_key
 
 
 def _client():
@@ -380,3 +380,105 @@ def test_events_rate_limited_returns_429(_mock_rate_limit):
     assert response.headers.get('Retry-After') == '5'
     payload = response.get_json()
     assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+
+
+# ---- MSD cache isolation tests ----
+
+
+def test_msd_seed_cache_key_ignores_loss_reasons():
+    """Changing loss_reasons should not change the seed cache key for MSD."""
+    base_params = {
+        'start_date': '2025-01-01',
+        'end_date': '2025-01-31',
+        'station': '測試',
+        'direction': 'backward',
+    }
+    key_all = _seed_cache_key('mid_section_defect', {**base_params, 'loss_reasons': ['A', 'B', 'C']})
+    key_two = _seed_cache_key('mid_section_defect', {**base_params, 'loss_reasons': ['A']})
+    key_none = _seed_cache_key('mid_section_defect', base_params)
+
+    assert key_all == key_two == key_none
+
+
+def test_non_msd_seed_cache_key_includes_all_params():
+    """For non-MSD profiles the seed cache key should still hash all params."""
+    params_a = {'resolve_type': 'lot_id', 'values': ['LOT-001'], 'extra': 'x'}
+    params_b = {'resolve_type': 'lot_id', 'values': ['LOT-001'], 'extra': 'y'}
+
+    key_a = _seed_cache_key('query_tool', params_a)
+    key_b = _seed_cache_key('query_tool', params_b)
+    assert key_a != key_b
+
+
+@patch('mes_dashboard.routes.trace_routes.build_trace_aggregation_from_events')
+@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+def test_msd_events_recomputes_aggregation_on_each_call(
+    mock_fetch_events,
+    mock_build_aggregation,
+):
+    """MSD events should NOT use events-level cache, so aggregation is always fresh."""
+    mock_fetch_events.return_value = {
+        'CID-001': [{'CONTAINERID': 'CID-001', 'WORKCENTER_GROUP': '測試'}]
+    }
+    mock_build_aggregation.return_value = {
+        'kpi': {'total_input': 100},
+        'charts': {},
+        'daily_trend': [],
+        'available_loss_reasons': [],
+        'genealogy_status': 'ready',
+        'detail_total_count': 0,
+    }
+
+    client = _client()
+    body = {
+        'profile': 'mid_section_defect',
+        'container_ids': ['CID-001'],
+        'domains': ['upstream_history'],
+        'params': {
+            'start_date': '2025-01-01',
+            'end_date': '2025-01-31',
+            'loss_reasons': ['Reason-A'],
+        },
+        'lineage': {'ancestors': {'CID-001': ['CID-A']}},
+        'seed_container_ids': ['CID-001'],
+    }
+
+    # First call
+    resp1 = client.post('/api/trace/events', json=body)
+    assert resp1.status_code == 200
+
+    # Second call with different loss_reasons — aggregation must be re-invoked
+    body['params']['loss_reasons'] = ['Reason-B']
+    resp2 = client.post('/api/trace/events', json=body)
+    assert resp2.status_code == 200
+
+    assert mock_build_aggregation.call_count == 2
+
+
+@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+@patch('mes_dashboard.routes.trace_routes.cache_get')
+@patch('mes_dashboard.routes.trace_routes.cache_set')
+def test_non_msd_events_cache_unchanged(mock_cache_set, mock_cache_get, mock_fetch_events):
+    """Non-MSD profiles should still use events-level cache as before."""
+    cached_response = {
+        'stage': 'events',
+        'results': {'history': {'data': [], 'count': 0}},
+        'aggregation': None,
+    }
+    mock_cache_get.return_value = cached_response
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': ['CID-001'],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['stage'] == 'events'
+    # EventFetcher should NOT have been called — served from cache
+    mock_fetch_events.assert_not_called()

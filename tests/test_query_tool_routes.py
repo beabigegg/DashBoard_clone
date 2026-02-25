@@ -1152,6 +1152,62 @@ class TestWorkcenterGroupsEndpoint:
         assert 'error' in data
 
 
+class TestEquipmentRecentJobsEndpoint:
+    """Tests for /api/query-tool/equipment-recent-jobs/<equipment_id> endpoint."""
+
+    @patch('mes_dashboard.core.database.read_sql_df')
+    @patch('mes_dashboard.sql.SQLLoader.load', return_value='SELECT 1')
+    def test_returns_recent_jobs(self, _mock_sql, mock_read_sql, client):
+        """Should return recent JOB records for given equipment."""
+        import pandas as pd
+        mock_read_sql.return_value = pd.DataFrame([
+            {
+                'JOBID': 'JOB-001',
+                'JOBSTATUS': 'Complete',
+                'JOBMODELNAME': 'MODEL-A',
+                'CREATEDATE': '2026-02-01 10:00:00',
+                'COMPLETEDATE': '2026-02-01 12:00:00',
+                'CAUSECODENAME': 'CAUSE-1',
+                'REPAIRCODENAME': 'REPAIR-1',
+                'RESOURCENAME': 'EQ-001',
+            },
+        ])
+
+        response = client.get('/api/query-tool/equipment-recent-jobs/EQ001')
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert len(data['data']) == 1
+        assert data['data'][0]['JOBID'] == 'JOB-001'
+        assert data['total'] == 1
+
+    @patch('mes_dashboard.core.database.read_sql_df')
+    @patch('mes_dashboard.sql.SQLLoader.load', return_value='SELECT 1')
+    def test_returns_empty_when_no_jobs(self, _mock_sql, mock_read_sql, client):
+        """Should return empty list when no jobs found."""
+        import pandas as pd
+        mock_read_sql.return_value = pd.DataFrame()
+
+        response = client.get('/api/query-tool/equipment-recent-jobs/EQ002')
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['data'] == []
+        assert data['total'] == 0
+
+    @patch('mes_dashboard.core.database.read_sql_df')
+    @patch('mes_dashboard.sql.SQLLoader.load', return_value='SELECT 1')
+    def test_handles_db_error(self, _mock_sql, mock_read_sql, client):
+        """Should return 500 on database error."""
+        mock_read_sql.side_effect = Exception('DB connection failed')
+
+        response = client.get('/api/query-tool/equipment-recent-jobs/EQ003')
+
+        assert response.status_code == 500
+        data = json.loads(response.data)
+        assert 'error' in data
+
+
 class TestLotHistoryWithWorkcenterFilter:
     """Tests for /api/query-tool/lot-history with workcenter filter."""
 

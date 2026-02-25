@@ -166,7 +166,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_reason_pareto')
+    @patch('mes_dashboard.routes.reject_history_routes.query_dimension_pareto')
     def test_reason_pareto_defaults_top80(self, mock_pareto):
         mock_pareto.return_value = {'items': [], 'metric_mode': 'reject_total', 'pareto_scope': 'top80', 'meta': {}}
 
@@ -176,6 +176,47 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         _, kwargs = mock_pareto.call_args
         self.assertEqual(kwargs['pareto_scope'], 'top80')
         self.assertEqual(kwargs['metric_mode'], 'reject_total')
+        self.assertEqual(kwargs['dimension'], 'reason')
+
+    @patch('mes_dashboard.routes.reject_history_routes.query_dimension_pareto')
+    def test_dimension_pareto_accepts_package(self, mock_pareto):
+        mock_pareto.return_value = {
+            'items': [{'reason': 'PKG-A', 'metric_value': 100, 'pct': 50, 'cumPct': 50}],
+            'dimension': 'package',
+            'metric_mode': 'reject_total',
+            'pareto_scope': 'all',
+            'meta': {},
+        }
+
+        response = self.client.get(
+            '/api/reject-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07&dimension=package&pareto_scope=all'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        _, kwargs = mock_pareto.call_args
+        self.assertEqual(kwargs['dimension'], 'package')
+
+    @patch('mes_dashboard.routes.reject_history_routes.query_dimension_pareto')
+    def test_dimension_pareto_accepts_equipment(self, mock_pareto):
+        mock_pareto.return_value = {
+            'items': [{'reason': 'EQ-01', 'metric_value': 50, 'pct': 100, 'cumPct': 100}],
+            'dimension': 'equipment',
+            'metric_mode': 'reject_total',
+            'pareto_scope': 'top80',
+            'meta': {},
+        }
+
+        response = self.client.get(
+            '/api/reject-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07&dimension=equipment'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        _, kwargs = mock_pareto.call_args
+        self.assertEqual(kwargs['dimension'], 'equipment')
 
     @patch('mes_dashboard.routes.reject_history_routes.query_list')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 6))

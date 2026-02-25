@@ -72,12 +72,9 @@ ANALYSIS_LOCK_POLL_INTERVAL_SECONDS = 0.5
 TOP_N = 10
 
 # Dimension column mapping for backward attribution charts
+# by_material and by_wafer_root are handled separately (different attribution source)
 DIMENSION_MAP = {
-    'by_station': 'WORKCENTER_GROUP',
     'by_machine': 'EQUIPMENT_NAME',
-    'by_workflow': 'WORKFLOW',
-    'by_package': 'PRODUCTLINENAME',
-    'by_pj_type': 'PJ_TYPE',
     'by_detection_machine': 'DETECTION_EQUIPMENTNAME',
 }
 
@@ -102,7 +99,10 @@ CSV_COLUMNS_BACKWARD = [
     ('DEFECT_QTY', '不良數'),
     ('DEFECT_RATE', '不良率(%)'),
     ('ANCESTOR_COUNT', '上游LOT數'),
+    ('UPSTREAM_MACHINE_COUNT', '上游台數'),
     ('UPSTREAM_MACHINES', '上游機台'),
+    ('UPSTREAM_MATERIALS', '上游原物料'),
+    ('WAFER_ROOT', '源頭批次'),
 ]
 
 # CSV export column config (forward)
@@ -296,7 +296,9 @@ def build_trace_aggregation_from_events(
     loss_reasons: Optional[List[str]] = None,
     seed_container_ids: Optional[List[str]] = None,
     lineage_ancestors: Optional[Dict[str, Any]] = None,
+    lineage_roots: Optional[Dict[str, str]] = None,
     upstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    materials_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     downstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     station: str = '測試',
     direction: str = 'backward',
@@ -308,7 +310,9 @@ def build_trace_aggregation_from_events(
             loss_reasons=loss_reasons,
             seed_container_ids=seed_container_ids,
             lineage_ancestors=lineage_ancestors,
+            lineage_roots=lineage_roots,
             upstream_events_by_cid=upstream_events_by_cid,
+            materials_events_by_cid=materials_events_by_cid,
             downstream_events_by_cid=downstream_events_by_cid,
             station=station,
             direction=direction,
@@ -393,6 +397,7 @@ def build_trace_aggregation_from_events(
         fallback_seed_ids=list(detection_data.keys()),
     )
     normalized_upstream = _normalize_upstream_event_records(upstream_events_by_cid or {})
+    normalized_materials = _normalize_materials_event_records(materials_events_by_cid or {})
 
     attribution = _attribute_defects(
         detection_data,
@@ -400,11 +405,25 @@ def build_trace_aggregation_from_events(
         normalized_upstream,
         normalized_loss_reasons,
     )
-    detail = _build_detail_table(filtered_df, normalized_ancestors, normalized_upstream)
+    mat_attribution = _attribute_materials(
+        detection_data, normalized_ancestors, normalized_materials, normalized_loss_reasons,
+    )
+    root_attribution = _attribute_wafer_roots(
+        detection_data, lineage_roots or {}, normalized_loss_reasons,
+    )
+    detail = _build_detail_table(
+        filtered_df, normalized_ancestors, normalized_upstream,
+        materials_by_cid=normalized_materials,
+        roots=lineage_roots,
+    )
 
     return {
         'kpi': _build_kpi(filtered_df, attribution, normalized_loss_reasons),
-        'charts': _build_all_charts(attribution, detection_data),
+        'charts': _build_all_charts(
+            attribution, detection_data,
+            materials_attribution=mat_attribution,
+            wafer_root_attribution=root_attribution,
+        ),
         'daily_trend': _build_daily_trend(filtered_df, normalized_loss_reasons),
         'available_loss_reasons': available_loss_reasons,
         'genealogy_status': genealogy_status,
@@ -418,7 +437,9 @@ def _build_trace_aggregation_container_mode(
     loss_reasons: Optional[List[str]] = None,
     seed_container_ids: Optional[List[str]] = None,
     lineage_ancestors: Optional[Dict[str, Any]] = None,
+    lineage_roots: Optional[Dict[str, str]] = None,
     upstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    materials_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     downstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     station: str = '測試',
     direction: str = 'backward',
@@ -512,6 +533,7 @@ def _build_trace_aggregation_container_mode(
         fallback_seed_ids=list(detection_data.keys()),
     )
     normalized_upstream = _normalize_upstream_event_records(upstream_events_by_cid or {})
+    normalized_materials = _normalize_materials_event_records(materials_events_by_cid or {})
 
     attribution = _attribute_defects(
         detection_data,
@@ -519,11 +541,25 @@ def _build_trace_aggregation_container_mode(
         normalized_upstream,
         normalized_loss_reasons,
     )
-    detail = _build_detail_table(filtered_df, normalized_ancestors, normalized_upstream)
+    mat_attribution = _attribute_materials(
+        detection_data, normalized_ancestors, normalized_materials, normalized_loss_reasons,
+    )
+    root_attribution = _attribute_wafer_roots(
+        detection_data, lineage_roots or {}, normalized_loss_reasons,
+    )
+    detail = _build_detail_table(
+        filtered_df, normalized_ancestors, normalized_upstream,
+        materials_by_cid=normalized_materials,
+        roots=lineage_roots,
+    )
 
     return {
         'kpi': _build_kpi(filtered_df, attribution, normalized_loss_reasons),
-        'charts': _build_all_charts(attribution, detection_data),
+        'charts': _build_all_charts(
+            attribution, detection_data,
+            materials_attribution=mat_attribution,
+            wafer_root_attribution=root_attribution,
+        ),
         'daily_trend': [],
         'available_loss_reasons': available_loss_reasons,
         'genealogy_status': genealogy_status,
@@ -635,7 +671,20 @@ def export_csv(
         return
 
     for row in result.get('detail', []):
-        writer.writerow([row.get(col, '') for col, _ in columns])
+        csv_row = []
+        for col, _ in columns:
+            value = row.get(col, '')
+            # Flatten structured list fields for CSV
+            if col == 'UPSTREAM_MACHINES' and isinstance(value, list):
+                value = ', '.join(
+                    f"{m.get('station', '')}/{m.get('machine', '')}" for m in value
+                )
+            elif col == 'UPSTREAM_MATERIALS' and isinstance(value, list):
+                value = ', '.join(
+                    f"{m.get('part', '')}/{m.get('lot', '')}" for m in value
+                )
+            csv_row.append(value)
+        writer.writerow(csv_row)
         yield output.getvalue()
         output.seek(0)
         output.truncate(0)
@@ -988,7 +1037,9 @@ def _run_backward_pipeline(
         'available_loss_reasons': available_loss_reasons,
         'charts': _build_all_charts(attribution, detection_data),
         'daily_trend': _build_daily_trend(filtered_df, loss_reasons),
-        'detail': _build_detail_table(filtered_df, ancestors, upstream_by_cid),
+        'detail': _build_detail_table(
+            filtered_df, ancestors, upstream_by_cid,
+        ),
         'genealogy_status': genealogy_status,
         'attribution': attribution,
     }
@@ -1263,6 +1314,29 @@ def _normalize_upstream_event_records(
     return dict(result)
 
 
+def _normalize_materials_event_records(
+    events_by_cid: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Normalize EventFetcher materials payload into attribution-ready records."""
+    result: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for cid, events in events_by_cid.items():
+        cid_value = _safe_str(cid)
+        if not cid_value:
+            continue
+        for event in events:
+            part = _safe_str(event.get('MATERIALPARTNAME'))
+            if not part:
+                continue
+            result[cid_value].append({
+                'MATERIALPARTNAME': part,
+                'MATERIALLOTNAME': _safe_str(event.get('MATERIALLOTNAME')),
+                'QTYCONSUMED': _safe_int(event.get('QTYCONSUMED')),
+                'WORKCENTERNAME': _safe_str(event.get('WORKCENTERNAME')),
+                'EQUIPMENTNAME': _safe_str(event.get('EQUIPMENTNAME')),
+            })
+    return dict(result)
+
+
 def _normalize_downstream_event_records(
     events_by_cid: Dict[str, List[Dict[str, Any]]],
 ) -> Dict[str, List[Dict[str, Any]]]:
@@ -1441,6 +1515,119 @@ def _attribute_defects(
     return attribution
 
 
+def _attribute_materials(
+    detection_data: Dict[str, Dict[str, Any]],
+    ancestors: Dict[str, Set[str]],
+    materials_by_cid: Dict[str, List[Dict[str, Any]]],
+    loss_reasons: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Attribute detection station defects to upstream materials.
+
+    Symmetric to ``_attribute_defects`` but keyed by
+    ``(MATERIALPARTNAME, MATERIALLOTNAME)``.
+    """
+    material_to_detection: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+
+    for det_cid, data in detection_data.items():
+        ancestor_set = ancestors.get(det_cid, set())
+        all_cids = ancestor_set | {det_cid}
+
+        for anc_cid in all_cids:
+            for record in materials_by_cid.get(anc_cid, []):
+                part = _safe_str(record.get('MATERIALPARTNAME') or record.get('material_part_name'))
+                lot = _safe_str(record.get('MATERIALLOTNAME') or record.get('material_lot_name'))
+                if not part:
+                    continue
+                material_key = (part, lot) if lot else (part, '')
+                material_to_detection[material_key].add(det_cid)
+
+    attribution = []
+    for material_key, det_lot_set in material_to_detection.items():
+        part_name, lot_name = material_key
+
+        total_trackinqty = sum(
+            detection_data[cid]['trackinqty'] for cid in det_lot_set
+            if cid in detection_data
+        )
+
+        total_rejectqty = 0
+        for cid in det_lot_set:
+            if cid not in detection_data:
+                continue
+            by_reason = detection_data[cid]['rejectqty_by_reason']
+            if loss_reasons:
+                for reason in loss_reasons:
+                    total_rejectqty += by_reason.get(reason, 0)
+            else:
+                total_rejectqty += sum(by_reason.values())
+
+        rate = round(total_rejectqty / total_trackinqty * 100, 4) if total_trackinqty else 0.0
+
+        display_name = f"{part_name} ({lot_name})" if lot_name else part_name
+        attribution.append({
+            'MATERIAL_KEY': display_name,
+            'MATERIAL_PART_NAME': part_name,
+            'MATERIAL_LOT_NAME': lot_name,
+            'DETECTION_LOT_COUNT': len(det_lot_set),
+            'INPUT_QTY': total_trackinqty,
+            'DEFECT_QTY': total_rejectqty,
+            'DEFECT_RATE': rate,
+        })
+
+    attribution.sort(key=lambda x: x['DEFECT_RATE'], reverse=True)
+    return attribution
+
+
+def _attribute_wafer_roots(
+    detection_data: Dict[str, Dict[str, Any]],
+    roots: Dict[str, str],
+    loss_reasons: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Attribute detection station defects to wafer root ancestors.
+
+    ``roots`` maps seed container_id → root container_name.
+    """
+    root_to_detection: Dict[str, Set[str]] = defaultdict(set)
+
+    for det_cid in detection_data:
+        root_name = roots.get(det_cid)
+        if not root_name:
+            # Self-root: use the lot's own container name
+            root_name = detection_data[det_cid].get('containername', det_cid)
+        root_to_detection[root_name].add(det_cid)
+
+    attribution = []
+    for root_name, det_lot_set in root_to_detection.items():
+        total_trackinqty = sum(
+            detection_data[cid]['trackinqty'] for cid in det_lot_set
+            if cid in detection_data
+        )
+
+        total_rejectqty = 0
+        for cid in det_lot_set:
+            if cid not in detection_data:
+                continue
+            by_reason = detection_data[cid]['rejectqty_by_reason']
+            if loss_reasons:
+                for reason in loss_reasons:
+                    total_rejectqty += by_reason.get(reason, 0)
+            else:
+                total_rejectqty += sum(by_reason.values())
+
+        rate = round(total_rejectqty / total_trackinqty * 100, 4) if total_trackinqty else 0.0
+
+        attribution.append({
+            'ROOT_CONTAINER_NAME': root_name,
+            'DETECTION_LOT_COUNT': len(det_lot_set),
+            'INPUT_QTY': total_trackinqty,
+            'DEFECT_QTY': total_rejectqty,
+            'DEFECT_RATE': rate,
+        })
+
+    attribution.sort(key=lambda x: x['DEFECT_RATE'], reverse=True)
+    return attribution
+
+
 # ============================================================
 # Forward Defect Attribution Engine
 # ============================================================
@@ -1563,9 +1750,13 @@ def _build_kpi(
 
     affected_machines = sum(1 for a in attribution if a['DEFECT_QTY'] > 0)
 
+    # Count LOTs that have at least one defect matching selected reasons
+    defective_lot_count = int(defect_rows['CONTAINERID'].nunique()) if not defect_rows.empty else 0
+
     return {
         'total_input': total_input,
         'lot_count': lot_count,
+        'defective_lot_count': defective_lot_count,
         'total_defect_qty': total_defect_qty,
         'total_defect_rate': total_defect_rate,
         'top_loss_reason': top_reason,
@@ -1707,11 +1898,26 @@ def _build_loss_reason_chart(
 def _build_all_charts(
     attribution: List[Dict[str, Any]],
     detection_data: Dict[str, Dict[str, Any]],
+    *,
+    materials_attribution: Optional[List[Dict[str, Any]]] = None,
+    wafer_root_attribution: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, List[Dict]]:
     """Build chart data for all backward dimensions."""
     charts = {}
     for key, dim_col in DIMENSION_MAP.items():
         charts[key] = _build_chart_data(attribution, dim_col)
+
+    # Materials attribution chart (keyed by MATERIAL_KEY)
+    if materials_attribution:
+        charts['by_material'] = _build_chart_data(materials_attribution, 'MATERIAL_KEY')
+    else:
+        charts['by_material'] = []
+
+    # Wafer root attribution chart (keyed by ROOT_CONTAINER_NAME)
+    if wafer_root_attribution:
+        charts['by_wafer_root'] = _build_chart_data(wafer_root_attribution, 'ROOT_CONTAINER_NAME')
+    else:
+        charts['by_wafer_root'] = []
 
     loss_rows = []
     for cid, data in detection_data.items():
@@ -1913,8 +2119,11 @@ def _build_detail_table(
     df: pd.DataFrame,
     ancestors: Dict[str, Set[str]],
     upstream_by_cid: Dict[str, List[Dict[str, Any]]],
+    *,
+    materials_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    roots: Optional[Dict[str, str]] = None,
 ) -> List[Dict[str, Any]]:
-    """Build LOT-level detail table with upstream machine info (backward)."""
+    """Build LOT-level detail table with structured upstream info (backward)."""
     if df.empty:
         return []
 
@@ -1935,6 +2144,9 @@ def _build_detail_table(
         if reason and qty > 0:
             lot_defects[cid][reason] += qty
 
+    materials_by_cid = materials_by_cid or {}
+    roots = roots or {}
+
     result = []
     for _, row in lots.iterrows():
         cid = row['CONTAINERID']
@@ -1942,43 +2154,65 @@ def _build_detail_table(
         ancestor_set = ancestors.get(cid, set())
         all_cids = ancestor_set | {cid}
 
-        upstream_machines = set()
+        # Structured upstream machines
+        seen_machines: Set[Tuple[str, str]] = set()
+        upstream_machines_list: List[Dict[str, str]] = []
         for anc_cid in all_cids:
             for rec in upstream_by_cid.get(anc_cid, []):
-                upstream_machines.add(f"{rec['workcenter_group']}/{rec['equipment_name']}")
+                pair = (rec['workcenter_group'], rec['equipment_name'])
+                if pair not in seen_machines:
+                    seen_machines.add(pair)
+                    upstream_machines_list.append({
+                        'station': rec['workcenter_group'],
+                        'machine': rec['equipment_name'],
+                    })
+
+        # Structured upstream materials
+        seen_materials: Set[Tuple[str, str]] = set()
+        upstream_materials_list: List[Dict[str, str]] = []
+        for anc_cid in all_cids:
+            for rec in materials_by_cid.get(anc_cid, []):
+                part = rec.get('MATERIALPARTNAME', '')
+                lot_name = rec.get('MATERIALLOTNAME', '')
+                pair = (part, lot_name)
+                if pair not in seen_materials and part:
+                    seen_materials.add(pair)
+                    upstream_materials_list.append({'part': part, 'lot': lot_name})
+
+        # Wafer root
+        wafer_root = roots.get(cid, '')
+
+        base = {
+            'CONTAINERNAME': _safe_str(row.get('CONTAINERNAME')),
+            'PJ_TYPE': _safe_str(row.get('PJ_TYPE')),
+            'PRODUCTLINENAME': _safe_str(row.get('PRODUCTLINENAME')),
+            'WORKFLOW': _safe_str(row.get('WORKFLOW')),
+            'FINISHEDRUNCARD': _safe_str(row.get('FINISHEDRUNCARD')),
+            'DETECTION_EQUIPMENTNAME': _safe_str(row.get('DETECTION_EQUIPMENTNAME')),
+            'INPUT_QTY': input_qty,
+            'ANCESTOR_COUNT': len(ancestor_set),
+            'UPSTREAM_MACHINES': upstream_machines_list,
+            'UPSTREAM_MACHINE_COUNT': len(seen_machines),
+            'UPSTREAM_MATERIALS': upstream_materials_list,
+            'WAFER_ROOT': wafer_root,
+        }
 
         reasons = lot_defects.get(cid, {})
         if reasons:
             for reason, qty in sorted(reasons.items()):
                 rate = round(qty / input_qty * 100, 4) if input_qty else 0.0
                 result.append({
-                    'CONTAINERNAME': _safe_str(row.get('CONTAINERNAME')),
-                    'PJ_TYPE': _safe_str(row.get('PJ_TYPE')),
-                    'PRODUCTLINENAME': _safe_str(row.get('PRODUCTLINENAME')),
-                    'WORKFLOW': _safe_str(row.get('WORKFLOW')),
-                    'FINISHEDRUNCARD': _safe_str(row.get('FINISHEDRUNCARD')),
-                    'DETECTION_EQUIPMENTNAME': _safe_str(row.get('DETECTION_EQUIPMENTNAME')),
-                    'INPUT_QTY': input_qty,
+                    **base,
                     'LOSS_REASON': reason,
                     'DEFECT_QTY': qty,
                     'DEFECT_RATE': rate,
-                    'ANCESTOR_COUNT': len(ancestor_set),
-                    'UPSTREAM_MACHINES': ', '.join(sorted(upstream_machines)),
                 })
         else:
             result.append({
-                'CONTAINERNAME': _safe_str(row.get('CONTAINERNAME')),
-                'PJ_TYPE': _safe_str(row.get('PJ_TYPE')),
-                'PRODUCTLINENAME': _safe_str(row.get('PRODUCTLINENAME')),
-                'WORKFLOW': _safe_str(row.get('WORKFLOW')),
-                'FINISHEDRUNCARD': _safe_str(row.get('FINISHEDRUNCARD')),
-                'DETECTION_EQUIPMENTNAME': _safe_str(row.get('DETECTION_EQUIPMENTNAME')),
-                'INPUT_QTY': input_qty,
+                **base,
                 'LOSS_REASON': '',
                 'DEFECT_QTY': 0,
                 'DEFECT_RATE': 0.0,
-                'ANCESTOR_COUNT': len(ancestor_set),
-                'UPSTREAM_MACHINES': ', '.join(sorted(upstream_machines)),
             })
 
     return result

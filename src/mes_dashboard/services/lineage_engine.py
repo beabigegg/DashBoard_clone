@@ -801,6 +801,7 @@ class LineageEngine:
             all_nodes.add(child)
 
         recomputed_ancestors: Dict[str, Set[str]] = {}
+        recomputed_roots: Dict[str, str] = {}
         for seed in seed_cids:
             visited: Set[str] = set()
             stack = list(pm.get(seed, []))
@@ -816,6 +817,15 @@ class LineageEngine:
                     if gp and gp not in visited:
                         stack.append(gp)
             recomputed_ancestors[seed] = visited
+            # Root = ancestor with no further parents; if no ancestors, seed is its own root
+            if visited:
+                root_cid = next(
+                    (cid for cid in visited if not pm.get(cid)),
+                    next(iter(visited)),
+                )
+            else:
+                root_cid = seed
+            recomputed_roots[seed] = cid_to_name.get(root_cid, root_cid)
 
         typed_nodes = LineageEngine._build_nodes_payload(all_nodes, snapshots, cid_to_name, wafer_ids)
         typed_edges = _to_edge_payload(split_edges + merge_payload_edges + semantic_edges)
@@ -825,6 +835,7 @@ class LineageEngine:
             "cid_to_name": cid_to_name,
             "parent_map": pm,
             "merge_edges": me,
+            "seed_roots": recomputed_roots,
             "nodes": typed_nodes,
             "edges": typed_edges,
         }
