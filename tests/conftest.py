@@ -20,6 +20,32 @@ os.environ.setdefault('WATCHDOG_RESTART_FLAG', os.path.join(_TMP_DIR, 'mes_dashb
 os.environ.setdefault('WATCHDOG_PID_FILE', os.path.join(_TMP_DIR, 'gunicorn.pid'))
 os.environ.setdefault('WATCHDOG_STATE_FILE', os.path.join(_TMP_DIR, 'mes_dashboard_restart_state.json'))
 
+
+def _load_dotenv_if_present():
+    """Load .env file into os.environ for integration/e2e tests.
+
+    Uses setdefault so explicit env vars (e.g. FLASK_ENV=testing set above)
+    take precedence over .env values.
+    """
+    env_path = os.path.join(_PROJECT_ROOT, '.env')
+    if not os.path.isfile(env_path):
+        return
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            os.environ.setdefault(key.strip(), value.strip())
+
+
+# When --run-integration or --run-e2e is passed, load .env BEFORE database module
+# import so DB_HOST/DB_USER etc. are available for CONNECTION_STRING construction.
+# The database config module explicitly skips .env under pytest (to isolate unit tests),
+# so we pre-populate the env vars here for integration/e2e runs.
+if '--run-integration' in sys.argv or '--run-e2e' in sys.argv:
+    _load_dotenv_if_present()
+
 import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app
 from mes_dashboard.core.modernization_policy import clear_modernization_policy_cache

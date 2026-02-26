@@ -28,7 +28,9 @@ class TestHealthEndpoint:
     @patch('mes_dashboard.routes.health_routes.check_database')
     @patch('mes_dashboard.routes.health_routes.check_redis')
     @patch('mes_dashboard.routes.health_routes.get_cache_status')
-    def test_health_all_ok(self, mock_cache_status, mock_check_redis, mock_check_db, app_with_mock_cache):
+    @patch('mes_dashboard.routes.health_routes.get_route_cache_status', return_value={'mode': 'none', 'degraded': False, 'available': False})
+    @patch('mes_dashboard.core.circuit_breaker.get_circuit_breaker_status', return_value={'state': 'CLOSED', 'enabled': True, 'failure_count': 0, 'success_count': 0, 'total_count': 0, 'failure_rate': 0.0})
+    def test_health_all_ok(self, mock_cb, mock_route_cache, mock_cache_status, mock_check_redis, mock_check_db, app_with_mock_cache):
         """Test health endpoint returns 200 when all services are healthy."""
         mock_check_db.return_value = ('ok', None)
         mock_check_redis.return_value = ('ok', None)
@@ -84,7 +86,9 @@ class TestHealthEndpoint:
     @patch('mes_dashboard.routes.health_routes.check_database')
     @patch('mes_dashboard.routes.health_routes.check_redis')
     @patch('mes_dashboard.routes.health_routes.get_cache_status')
-    def test_health_redis_disabled(self, mock_cache_status, mock_check_redis, mock_check_db, app_with_mock_cache):
+    @patch('mes_dashboard.routes.health_routes.get_route_cache_status', return_value={'mode': 'none', 'degraded': False, 'available': False})
+    @patch('mes_dashboard.core.circuit_breaker.get_circuit_breaker_status', return_value={'state': 'CLOSED', 'enabled': True, 'failure_count': 0, 'success_count': 0, 'total_count': 0, 'failure_rate': 0.0})
+    def test_health_redis_disabled(self, mock_cb, mock_route_cache, mock_cache_status, mock_check_redis, mock_check_db, app_with_mock_cache):
         """Test health endpoint shows Redis disabled status."""
         mock_check_db.return_value = ('ok', None)
         mock_check_redis.return_value = ('disabled', None)

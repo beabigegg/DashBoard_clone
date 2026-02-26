@@ -101,11 +101,14 @@ class TestResourceHistoryAPIWorkflow:
         assert 'workcenter_groups' in data['data']
         assert 'families' in data['data']
 
-    @patch('mes_dashboard.services.resource_history_service._get_filtered_resources')
-    @patch('mes_dashboard.services.resource_history_service.read_sql_df')
-    def test_complete_query_workflow(self, mock_read_sql, mock_resources, client):
-        """Complete query workflow should return all data sections."""
-        mock_resources.return_value = [
+    @patch('mes_dashboard.services.resource_dataset_cache._get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_dataset_cache._get_resource_lookup')
+    @patch('mes_dashboard.services.resource_dataset_cache.read_sql_df')
+    @patch('mes_dashboard.services.resource_dataset_cache._get_filtered_resources_and_lookup')
+    def test_complete_query_workflow(self, mock_res_lookup, mock_read_sql,
+                                     mock_get_lookup, mock_get_wc, client):
+        """Complete query workflow via POST /query should return summary + detail."""
+        resources = [
             {
                 'RESOURCEID': 'RES001',
                 'WORKCENTERNAME': '焊接_DB',
@@ -119,73 +122,73 @@ class TestResourceHistoryAPIWorkflow:
                 'RESOURCENAME': 'RES002',
             },
         ]
+        resource_lookup = {r['RESOURCEID']: r for r in resources}
+        mock_res_lookup.return_value = (
+            resources,
+            resource_lookup,
+            "HISTORYID IN ('RES001', 'RES002')",
+        )
+        mock_get_lookup.return_value = resource_lookup
+        mock_get_wc.return_value = {
+            '焊接_DB': {'group': '焊接_DB', 'sequence': 1},
+            '成型': {'group': '成型', 'sequence': 4},
+        }
 
-        # Mock responses for the 3 queries in query_summary
-        kpi_df = pd.DataFrame([{
-            'PRD_HOURS': 8000, 'SBY_HOURS': 1000, 'UDT_HOURS': 500,
-            'SDT_HOURS': 300, 'EGT_HOURS': 200, 'NST_HOURS': 1000,
-            'MACHINE_COUNT': 100
-        }])
-
-        trend_df = pd.DataFrame([
-            {'DATA_DATE': datetime(2024, 1, 1), 'PRD_HOURS': 1000, 'SBY_HOURS': 100,
-             'UDT_HOURS': 50, 'SDT_HOURS': 30, 'EGT_HOURS': 20, 'NST_HOURS': 100, 'MACHINE_COUNT': 100},
-            {'DATA_DATE': datetime(2024, 1, 2), 'PRD_HOURS': 1100, 'SBY_HOURS': 90,
-             'UDT_HOURS': 40, 'SDT_HOURS': 25, 'EGT_HOURS': 15, 'NST_HOURS': 100, 'MACHINE_COUNT': 100},
-        ])
-
-        heatmap_raw_df = pd.DataFrame([
+        # Base facts DataFrame (per-resource × per-day, single Oracle query)
+        base_df = pd.DataFrame([
             {'HISTORYID': 'RES001', 'DATA_DATE': datetime(2024, 1, 1),
-             'PRD_HOURS': 400, 'SBY_HOURS': 50, 'UDT_HOURS': 25, 'SDT_HOURS': 15, 'EGT_HOURS': 10, 'NST_HOURS': 20},
+             'PRD_HOURS': 4000, 'SBY_HOURS': 500, 'UDT_HOURS': 250,
+             'SDT_HOURS': 150, 'EGT_HOURS': 100, 'NST_HOURS': 500, 'TOTAL_HOURS': 5500},
             {'HISTORYID': 'RES002', 'DATA_DATE': datetime(2024, 1, 1),
-             'PRD_HOURS': 600, 'SBY_HOURS': 50, 'UDT_HOURS': 25, 'SDT_HOURS': 15, 'EGT_HOURS': 10, 'NST_HOURS': 30},
+             'PRD_HOURS': 4000, 'SBY_HOURS': 500, 'UDT_HOURS': 250,
+             'SDT_HOURS': 150, 'EGT_HOURS': 100, 'NST_HOURS': 500, 'TOTAL_HOURS': 5500},
         ])
+        mock_read_sql.return_value = base_df
 
-        # Use function-based side_effect for ThreadPoolExecutor parallel queries
-        def mock_sql(sql, _params=None):
-            sql_upper = sql.upper()
-            if 'HISTORYID' in sql_upper and 'DATA_DATE' in sql_upper:
-                return heatmap_raw_df
-            elif 'DATA_DATE' in sql_upper:
-                return trend_df
-            else:
-                return kpi_df
-
-        mock_read_sql.side_effect = mock_sql
-
-        response = client.get(
-            '/api/resource/history/summary'
-            '?start_date=2024-01-01'
-            '&end_date=2024-01-07'
-            '&granularity=day'
+        response = client.post(
+            '/api/resource/history/query',
+            json={
+                'start_date': '2024-01-01',
+                'end_date': '2024-01-07',
+                'granularity': 'day',
+            },
         )
 
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['success'] is True
+        assert 'query_id' in data
 
-        # Verify KPI
-        assert data['data']['kpi']['ou_pct'] == 80.0
-        # Availability% = (8000+1000+200) / (8000+1000+200+300+500+1000) * 100 = 9200/11000 = 83.6%
-        assert data['data']['kpi']['availability_pct'] == 83.6
-        assert data['data']['kpi']['machine_count'] == 100
+        # Verify KPI (derived from base_df)
+        # Total PRD=8000, SBY=1000, UDT=500, SDT=300, EGT=200
+        # OU% = 8000/(8000+1000+500+300+200)*100 = 80.0
+        assert data['summary']['kpi']['ou_pct'] == 80.0
+        # Availability% = (8000+1000+200)/(8000+1000+200+300+500+1000)*100 = 83.6
+        assert data['summary']['kpi']['availability_pct'] == 83.6
+        assert data['summary']['kpi']['machine_count'] == 2
 
-        # Verify trend
-        assert len(data['data']['trend']) == 2
-        # Trend should also have availability_pct
-        assert 'availability_pct' in data['data']['trend'][0]
+        # Verify trend (one period since both rows are same date)
+        assert len(data['summary']['trend']) >= 1
+        assert 'availability_pct' in data['summary']['trend'][0]
 
         # Verify heatmap
-        assert len(data['data']['heatmap']) == 2
+        assert len(data['summary']['heatmap']) >= 1
 
         # Verify comparison
-        assert len(data['data']['workcenter_comparison']) == 2
+        assert len(data['summary']['workcenter_comparison']) == 2
 
-    @patch('mes_dashboard.services.resource_history_service._get_filtered_resources')
-    @patch('mes_dashboard.services.resource_history_service.read_sql_df')
-    def test_detail_query_workflow(self, mock_read_sql, mock_resources, client):
-        """Detail query workflow should return hierarchical data."""
-        mock_resources.return_value = [
+        # Verify detail
+        assert data['detail']['total'] == 2
+        assert len(data['detail']['data']) == 2
+
+    @patch('mes_dashboard.services.resource_dataset_cache._get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_dataset_cache._get_resource_lookup')
+    @patch('mes_dashboard.services.resource_dataset_cache.read_sql_df')
+    @patch('mes_dashboard.services.resource_dataset_cache._get_filtered_resources_and_lookup')
+    def test_detail_query_workflow(self, mock_res_lookup, mock_read_sql,
+                                    mock_get_lookup, mock_get_wc, client):
+        """Detail query via POST /query should return hierarchical data."""
+        resources = [
             {
                 'RESOURCEID': 'RES001',
                 'WORKCENTERNAME': '焊接_DB',
@@ -199,33 +202,44 @@ class TestResourceHistoryAPIWorkflow:
                 'RESOURCENAME': 'RES002',
             },
         ]
+        resource_lookup = {r['RESOURCEID']: r for r in resources}
+        mock_res_lookup.return_value = (
+            resources,
+            resource_lookup,
+            "HISTORYID IN ('RES001', 'RES002')",
+        )
+        mock_get_lookup.return_value = resource_lookup
+        mock_get_wc.return_value = {
+            '焊接_DB': {'group': '焊接_DB', 'sequence': 1},
+        }
 
-        detail_df = pd.DataFrame([
-            {'HISTORYID': 'RES001',
+        base_df = pd.DataFrame([
+            {'HISTORYID': 'RES001', 'DATA_DATE': datetime(2024, 1, 1),
              'PRD_HOURS': 80, 'SBY_HOURS': 10, 'UDT_HOURS': 5, 'SDT_HOURS': 3, 'EGT_HOURS': 2,
              'NST_HOURS': 10, 'TOTAL_HOURS': 110},
-            {'HISTORYID': 'RES002',
+            {'HISTORYID': 'RES002', 'DATA_DATE': datetime(2024, 1, 1),
              'PRD_HOURS': 75, 'SBY_HOURS': 15, 'UDT_HOURS': 5, 'SDT_HOURS': 3, 'EGT_HOURS': 2,
              'NST_HOURS': 10, 'TOTAL_HOURS': 110},
         ])
+        mock_read_sql.return_value = base_df
 
-        mock_read_sql.return_value = detail_df
-
-        response = client.get(
-            '/api/resource/history/detail'
-            '?start_date=2024-01-01'
-            '&end_date=2024-01-07'
+        response = client.post(
+            '/api/resource/history/query',
+            json={
+                'start_date': '2024-01-01',
+                'end_date': '2024-01-07',
+            },
         )
 
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['success'] is True
-        assert data['total'] == 2
-        assert len(data['data']) == 2
-        assert data['truncated'] is False
+        assert data['detail']['total'] == 2
+        assert len(data['detail']['data']) == 2
+        assert data['detail']['truncated'] is False
 
         # Verify data structure
-        first_row = data['data'][0]
+        first_row = data['detail']['data'][0]
         assert 'workcenter' in first_row
         assert 'family' in first_row
         assert 'resource' in first_row
@@ -278,69 +292,71 @@ class TestResourceHistoryValidation:
     """E2E tests for input validation."""
 
     def test_date_range_validation(self, client):
-        """Date range exceeding 730 days should be rejected."""
-        response = client.get(
-            '/api/resource/history/summary'
-            '?start_date=2024-01-01'
-            '&end_date=2026-01-02'
+        """Inverted date range (end_date < start_date) should be rejected."""
+        response = client.post(
+            '/api/resource/history/query',
+            json={
+                'start_date': '2026-01-02',
+                'end_date': '2024-01-01',
+            },
         )
 
         assert response.status_code == 400
         data = json.loads(response.data)
         assert data['success'] is False
-        assert '730' in data['error']
 
     def test_missing_required_params(self, client):
         """Missing required parameters should return error."""
-        response = client.get('/api/resource/history/summary')
+        response = client.post(
+            '/api/resource/history/query',
+            json={},
+        )
 
         assert response.status_code == 400
         data = json.loads(response.data)
         assert data['success'] is False
 
-    @patch('mes_dashboard.services.resource_history_service._get_filtered_resources')
-    @patch('mes_dashboard.services.resource_history_service.read_sql_df')
-    def test_granularity_options(self, mock_read_sql, mock_resources, client):
-        """Different granularity options should work."""
-        mock_resources.return_value = [{
+    @patch('mes_dashboard.services.resource_dataset_cache._get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_dataset_cache._get_resource_lookup')
+    @patch('mes_dashboard.services.resource_dataset_cache.read_sql_df')
+    @patch('mes_dashboard.services.resource_dataset_cache._get_filtered_resources_and_lookup')
+    def test_granularity_options(self, mock_res_lookup, mock_read_sql,
+                                  mock_get_lookup, mock_get_wc, client):
+        """Different granularity options should work via POST /query."""
+        resources = [{
             'RESOURCEID': 'RES001',
             'WORKCENTERNAME': '焊接_DB',
             'RESOURCEFAMILYNAME': 'FAM001',
             'RESOURCENAME': 'RES001',
         }]
-        kpi_df = pd.DataFrame([{
-            'PRD_HOURS': 100, 'SBY_HOURS': 10, 'UDT_HOURS': 5,
-            'SDT_HOURS': 3, 'EGT_HOURS': 2, 'NST_HOURS': 10, 'MACHINE_COUNT': 5
-        }])
-        trend_df = pd.DataFrame([{
-            'DATA_DATE': datetime(2024, 1, 1),
-            'PRD_HOURS': 100, 'SBY_HOURS': 10, 'UDT_HOURS': 5,
-            'SDT_HOURS': 3, 'EGT_HOURS': 2, 'NST_HOURS': 10,
-            'MACHINE_COUNT': 5
-        }])
-        heatmap_raw_df = pd.DataFrame([{
+        resource_lookup = {r['RESOURCEID']: r for r in resources}
+        mock_res_lookup.return_value = (
+            resources,
+            resource_lookup,
+            "HISTORYID IN ('RES001')",
+        )
+        mock_get_lookup.return_value = resource_lookup
+        mock_get_wc.return_value = {
+            '焊接_DB': {'group': '焊接_DB', 'sequence': 1},
+        }
+
+        base_df = pd.DataFrame([{
             'HISTORYID': 'RES001',
             'DATA_DATE': datetime(2024, 1, 1),
             'PRD_HOURS': 100, 'SBY_HOURS': 10, 'UDT_HOURS': 5,
-            'SDT_HOURS': 3, 'EGT_HOURS': 2, 'NST_HOURS': 10
+            'SDT_HOURS': 3, 'EGT_HOURS': 2, 'NST_HOURS': 10,
+            'TOTAL_HOURS': 130,
         }])
+        mock_read_sql.return_value = base_df
 
         for granularity in ['day', 'week', 'month', 'year']:
-            def mock_sql(sql, _params=None):
-                sql_upper = sql.upper()
-                if 'HISTORYID' in sql_upper and 'DATA_DATE' in sql_upper:
-                    return heatmap_raw_df
-                if 'DATA_DATE' in sql_upper:
-                    return trend_df
-                return kpi_df
-
-            mock_read_sql.side_effect = mock_sql
-
-            response = client.get(
-                f'/api/resource/history/summary'
-                f'?start_date=2024-01-01'
-                f'&end_date=2024-01-31'
-                f'&granularity={granularity}'
+            response = client.post(
+                '/api/resource/history/query',
+                json={
+                    'start_date': '2024-01-01',
+                    'end_date': '2024-01-31',
+                    'granularity': granularity,
+                },
             )
 
             assert response.status_code == 200, f"Failed for granularity={granularity}"

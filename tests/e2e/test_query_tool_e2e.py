@@ -241,7 +241,7 @@ class TestQueryToolBackendIntegration:
         })
         assert lineage_resp.status_code == 200
         payload = lineage_resp.json()
-        assert "ancestors" in payload or "data" in payload
+        assert "children_map" in payload or "ancestors" in payload or "data" in payload
 
 
 # ---------------------------------------------------------------------------
@@ -276,12 +276,13 @@ class TestQueryToolPageE2E:
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="commit", timeout=60000)
         page.wait_for_timeout(2000)
 
-        # Select work_order input type
-        select = page.locator("select")
+        # Select work_order input type (use .first – the Lot tab's QueryBar
+        # is rendered before the Reverse tab's QueryBar via v-show)
+        select = page.locator("select.query-tool-select").first
         select.select_option("work_order")
 
         # Enter work order in textarea
-        textarea = page.locator("textarea")
+        textarea = page.locator("textarea.query-tool-textarea").first
         textarea.fill("GA26010001")
 
         # Collect API responses during resolve
@@ -295,8 +296,8 @@ class TestQueryToolPageE2E:
 
         page.on("response", handle_response)
 
-        # Click resolve button
-        resolve_btn = page.locator("button", has_text="解析")
+        # Click resolve button (use .first – Lot tab's button appears first via v-show)
+        resolve_btn = page.locator("button", has_text="解析").first
         resolve_btn.click()
 
         # Wait for resolve + lineage responses
@@ -340,10 +341,10 @@ class TestQueryToolPageE2E:
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="commit", timeout=60000)
         page.wait_for_timeout(3000)
 
-        # Select work_order and resolve
-        page.locator("select").select_option("work_order")
-        page.locator("textarea").fill("GA26010001")
-        page.locator("button", has_text="解析").click()
+        # Select work_order and resolve (use .first to target Lot tab's QueryBar)
+        page.locator("select.query-tool-select").first.select_option("work_order")
+        page.locator("textarea.query-tool-textarea").first.fill("GA26010001")
+        page.locator("button", has_text="解析").first.click()
 
         # Wait for resolve + lineage + detail loading
         resolve_done = _wait_for_api_response(page, "/api/query-tool/resolve", timeout_seconds=60)
@@ -385,8 +386,8 @@ class TestQueryToolPageE2E:
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="commit", timeout=60000)
         page.wait_for_timeout(1500)
 
-        # Enter text in LOT tab
-        textarea = page.locator("textarea")
+        # Enter text in LOT tab (use .first to target Lot tab's QueryBar)
+        textarea = page.locator("textarea.query-tool-textarea").first
         textarea.fill("GA26010001")
 
         # Switch to equipment tab
@@ -408,9 +409,9 @@ class TestQueryToolPageE2E:
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="commit", timeout=60000)
         page.wait_for_timeout(1500)
 
-        page.locator("select").select_option("work_order")
-        page.locator("textarea").fill("GA26010001")
-        page.locator("button", has_text="解析").click()
+        page.locator("select.query-tool-select").first.select_option("work_order")
+        page.locator("textarea.query-tool-textarea").first.fill("GA26010001")
+        page.locator("button", has_text="解析").first.click()
 
         # Wait for resolve + lineage
         page.wait_for_timeout(8000)
@@ -433,9 +434,9 @@ class TestQueryToolPageE2E:
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="commit", timeout=60000)
         page.wait_for_timeout(1500)
 
-        page.locator("select").select_option("work_order")
-        page.locator("textarea").fill("GA26010001")
-        page.locator("button", has_text="解析").click()
+        page.locator("select.query-tool-select").first.select_option("work_order")
+        page.locator("textarea.query-tool-textarea").first.fill("GA26010001")
+        page.locator("button", has_text="解析").first.click()
 
         # Wait for resolve + detail load
         page.wait_for_timeout(8000)
@@ -467,9 +468,9 @@ class TestQueryToolFullFlowE2E:
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="commit", timeout=60000)
         page.wait_for_timeout(2000)
 
-        # Step 1: Configure input
-        page.locator("select").select_option("work_order")
-        page.locator("textarea").fill("GA26010001")
+        # Step 1: Configure input (use .first to target Lot tab's QueryBar)
+        page.locator("select.query-tool-select").first.select_option("work_order")
+        page.locator("textarea.query-tool-textarea").first.fill("GA26010001")
 
         # Step 2: Track all API calls
         api_calls = {}
@@ -489,8 +490,8 @@ class TestQueryToolFullFlowE2E:
 
         page.on("response", track_response)
 
-        # Step 3: Click resolve
-        page.locator("button", has_text="解析").click()
+        # Step 3: Click resolve (use .first – Lot tab's button appears first via v-show)
+        page.locator("button", has_text="解析").first.click()
 
         # Step 4: Wait for cascade of API calls
         deadline = time.time() + 90

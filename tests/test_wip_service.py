@@ -963,6 +963,14 @@ class TestWipServiceIntegration:
         python -m pytest tests/test_wip_service.py -k Integration --run-integration
     """
 
+    @pytest.fixture(autouse=True)
+    def _reset_db_state(self):
+        """Reset DB engine and circuit breaker so integration tests start clean."""
+        import mes_dashboard.core.database as _db
+        from mes_dashboard.core.circuit_breaker import get_database_circuit_breaker
+        _db._ENGINE = None
+        get_database_circuit_breaker().reset()
+
     @pytest.mark.integration
     def test_get_wip_summary_integration(self):
         """Integration test for get_wip_summary."""

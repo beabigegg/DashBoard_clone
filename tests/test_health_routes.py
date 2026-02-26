@@ -21,7 +21,9 @@ def _client():
 @patch('mes_dashboard.routes.health_routes.check_database', return_value=('ok', None))
 @patch('mes_dashboard.routes.health_routes.check_redis', return_value=('error', 'redis-down'))
 @patch('mes_dashboard.routes.health_routes.get_route_cache_status')
+@patch('mes_dashboard.core.circuit_breaker.get_circuit_breaker_status', return_value={'state': 'CLOSED', 'enabled': True, 'failure_count': 0, 'success_count': 0, 'total_count': 0, 'failure_rate': 0.0})
 def test_health_includes_route_cache_and_degraded_warning(
+    _mock_cb,
     mock_route_cache,
     _mock_redis,
     _mock_db,
