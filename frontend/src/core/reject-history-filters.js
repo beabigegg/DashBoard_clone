@@ -175,6 +175,7 @@ export function buildViewParams(queryId, {
   detailReason = '',
   page = 1,
   perPage = 50,
+  policyFilters = {},
 } = {}) {
   const params = { query_id: queryId };
   if (supplementaryFilters.packages?.length > 0) {
@@ -197,5 +198,16 @@ export function buildViewParams(queryId, {
   }
   params.page = page || 1;
   params.per_page = perPage || 50;
+
+  // Policy filters (applied in-memory on cached data)
+  if (policyFilters.includeExcludedScrap) {
+    params.include_excluded_scrap = 'true';
+  }
+  if (policyFilters.excludeMaterialScrap === false) {
+    params.exclude_material_scrap = 'false';
+  }
+  if (policyFilters.excludePbDiode === false) {
+    params.exclude_pb_diode = 'false';
+  }
   return params;
 }

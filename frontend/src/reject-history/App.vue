@@ -242,6 +242,11 @@ async function refreshView() {
       detailReason: detailReason.value,
       page: page.value,
       perPage: DEFAULT_PER_PAGE,
+      policyFilters: {
+        includeExcludedScrap: committedPrimary.includeExcludedScrap,
+        excludeMaterialScrap: committedPrimary.excludeMaterialScrap,
+        excludePbDiode: committedPrimary.excludePbDiode,
+      },
     });
 
     const resp = await apiGet('/api/reject-history/view', {
@@ -467,6 +472,11 @@ async function exportCsv() {
     params.set('metric_filter', metricFilterParam());
     for (const date of selectedTrendDates.value) params.append('trend_dates', date);
     if (detailReason.value) params.set('detail_reason', detailReason.value);
+
+    // Policy filters (applied in-memory on cached data)
+    if (committedPrimary.includeExcludedScrap) params.set('include_excluded_scrap', 'true');
+    if (!committedPrimary.excludeMaterialScrap) params.set('exclude_material_scrap', 'false');
+    if (!committedPrimary.excludePbDiode) params.set('exclude_pb_diode', 'false');
 
     const response = await fetch(`/api/reject-history/export-cached?${params.toString()}`);
 

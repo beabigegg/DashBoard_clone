@@ -173,6 +173,11 @@ function emitSupplementary(patch) {
       class="card-body resolution-info"
     >
       已解析 {{ resolutionInfo.resolved_count }} 筆容器
+      <template v-if="resolutionInfo.expansion_info && Object.keys(resolutionInfo.expansion_info).length > 1">
+        <span class="resolution-detail">
+          ({{ Object.entries(resolutionInfo.expansion_info).map(([k, v]) => `${k}: ${v}`).join(', ') }})
+        </span>
+      </template>
       <template v-if="resolutionInfo.not_found?.length > 0">
         <span class="resolution-warn">
           ({{ resolutionInfo.not_found.length }} 筆未找到:

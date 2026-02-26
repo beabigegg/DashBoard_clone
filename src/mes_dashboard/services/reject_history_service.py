@@ -280,6 +280,11 @@ _DEFAULT_BASE_WHERE = (
     " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
 )
 
+_DEFAULT_WORKFLOW_FILTER = (
+    "r0.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
+    " AND r0.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+)
+
 
 def _prepare_sql(
     name: str,
@@ -290,11 +295,13 @@ def _prepare_sql(
     base_variant: str = "",
     base_where: str = "",
     dimension_column: str = "",
+    workflow_filter: str = "",
 ) -> str:
     sql = _load_sql(name)
     sql = sql.replace("{{ BASE_QUERY }}", _base_query_sql(base_variant))
     sql = sql.replace("{{ BASE_WITH_CTE }}", _base_with_cte_sql("base", base_variant))
     sql = sql.replace("{{ BASE_WHERE }}", base_where or _DEFAULT_BASE_WHERE)
+    sql = sql.replace("{{ WORKFLOW_FILTER }}", workflow_filter or _DEFAULT_WORKFLOW_FILTER)
     sql = sql.replace("{{ WHERE_CLAUSE }}", where_clause or "")
     sql = sql.replace("{{ BUCKET_EXPR }}", bucket_expr or "TRUNC(b.TXN_DAY)")
     sql = sql.replace("{{ METRIC_COLUMN }}", metric_column or "b.REJECT_TOTAL_QTY")

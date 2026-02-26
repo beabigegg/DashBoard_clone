@@ -518,6 +518,10 @@ def api_reject_history_view():
     reason = request.args.get("reason", "").strip() or None
     detail_reason = request.args.get("detail_reason", "").strip() or None
 
+    include_excluded_scrap = request.args.get("include_excluded_scrap", "false").lower() == "true"
+    exclude_material_scrap = request.args.get("exclude_material_scrap", "true").lower() != "false"
+    exclude_pb_diode = request.args.get("exclude_pb_diode", "true").lower() != "false"
+
     try:
         result = apply_view(
             query_id=query_id,
@@ -529,6 +533,9 @@ def api_reject_history_view():
             detail_reason=detail_reason,
             page=page,
             per_page=per_page,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
         )
 
         if result is None:
@@ -555,6 +562,10 @@ def api_reject_history_export_cached():
     reason = request.args.get("reason", "").strip() or None
     detail_reason = request.args.get("detail_reason", "").strip() or None
 
+    include_excluded_scrap = request.args.get("include_excluded_scrap", "false").lower() == "true"
+    exclude_material_scrap = request.args.get("exclude_material_scrap", "true").lower() != "false"
+    exclude_pb_diode = request.args.get("exclude_pb_diode", "true").lower() != "false"
+
     try:
         rows = export_csv_from_cache(
             query_id=query_id,
@@ -564,6 +575,9 @@ def api_reject_history_export_cached():
             metric_filter=metric_filter,
             trend_dates=_parse_multi_param("trend_dates") or None,
             detail_reason=detail_reason,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
         )
 
         if rows is None:

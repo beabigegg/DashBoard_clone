@@ -67,6 +67,11 @@
   font-weight: 600;
 }
 
+.resolution-detail {
+  color: #475569;
+  font-weight: 400;
+}
+
 .resolution-warn {
   color: #b45309;
   font-weight: 400;

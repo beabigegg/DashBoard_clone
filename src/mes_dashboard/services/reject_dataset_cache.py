@@ -168,6 +168,7 @@ def resolve_containers(
             "input_count": result.get("input_count", len(values)),
             "resolved_count": len(container_ids),
             "not_found": result.get("not_found", []),
+            "expansion_info": result.get("expansion_info", {}),
         },
     }
 
@@ -194,6 +195,7 @@ def execute_primary_query(
     base_where_parts: List[str] = []
     base_params: Dict[str, Any] = {}
     resolution_info: Optional[Dict[str, Any]] = None
+    workflow_filter: str = ""  # empty = use default date-based filter
 
     if mode == "date_range":
         if not start_date or not end_date:
@@ -227,28 +229,35 @@ def execute_primary_query(
         base_where_parts.append(cid_condition)
         base_params.update(cid_params)
 
+        # Build workflow_filter for the workflow_lookup CTE (uses r0 alias).
+        # Reuses the same bind param names (p0, p1, ...) already in base_params.
+        wf_builder = QueryBuilder()
+        wf_builder.add_in_condition("r0.CONTAINERID", container_ids)
+        wf_where, _ = wf_builder.build_where_only()
+        wf_condition = wf_where.strip()
+        if wf_condition.upper().startswith("WHERE "):
+            wf_condition = wf_condition[6:].strip()
+        workflow_filter = wf_condition
+
     else:
         raise ValueError(f"不支援的查詢模式: {mode}")
 
     base_where = " AND ".join(base_where_parts)
 
-    # ---- Build policy WHERE (only toggles, no supplementary filters) ----
-    policy_where, policy_params, meta = _build_where_clause(
+    # ---- Build policy meta (for response only, NOT for SQL) ----
+    _, _, meta = _build_where_clause(
         include_excluded_scrap=include_excluded_scrap,
         exclude_material_scrap=exclude_material_scrap,
         exclude_pb_diode=exclude_pb_diode,
     )
 
-    # ---- Compute query_id from all primary params ----
+    # ---- Compute query_id from base params only (policy filters applied in-memory) ----
     query_id_input = {
         "mode": mode,
         "start_date": start_date,
         "end_date": end_date,
         "container_input_type": container_input_type,
         "container_values": sorted(container_values or []),
-        "include_excluded_scrap": include_excluded_scrap,
-        "exclude_material_scrap": exclude_material_scrap,
-        "exclude_pb_diode": exclude_pb_diode,
     }
     query_id = _make_query_id(query_id_input)
 
@@ -256,28 +265,92 @@ def execute_primary_query(
     cached_df = _get_cached_df(query_id)
     if cached_df is not None:
         logger.info("Dataset cache hit for query_id=%s", query_id)
+        filtered = _apply_policy_filters(
+            cached_df,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
+        )
         return _build_primary_response(
-            query_id, cached_df, meta, resolution_info
+            query_id, filtered, meta, resolution_info
         )
 
-    # ---- Execute Oracle query ----
+    # ---- Execute Oracle query (NO policy filters — cache unfiltered) ----
     logger.info("Dataset cache miss for query_id=%s, querying Oracle", query_id)
     sql = _prepare_sql(
         "list",
-        where_clause=policy_where,
+        where_clause="",
         base_variant="lot",
         base_where=base_where,
+        workflow_filter=workflow_filter,
     )
-    all_params = {**base_params, **policy_params, "offset": 0, "limit": 999999999}
+    all_params = {**base_params, "offset": 0, "limit": 999999999}
     df = read_sql_df(sql, all_params)
     if df is None:
         df = pd.DataFrame()
 
-    # ---- Cache and return ----
+    # ---- Cache unfiltered, return filtered ----
     if not df.empty:
         _store_df(query_id, df)
 
-    return _build_primary_response(query_id, df, meta, resolution_info)
+    filtered = _apply_policy_filters(
+        df,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    return _build_primary_response(query_id, filtered, meta, resolution_info)
+
+
+def _apply_policy_filters(
+    df: pd.DataFrame,
+    *,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
+) -> pd.DataFrame:
+    """Apply policy toggle filters in-memory (pandas).
+
+    Mirrors the SQL-level policy from _build_where_clause but operates
+    on the cached DataFrame so that toggling filters doesn't require
+    a new Oracle round-trip.
+    """
+    if df is None or df.empty:
+        return df
+
+    mask = pd.Series(True, index=df.index)
+
+    # ---- Material scrap exclusion ----
+    if exclude_material_scrap and "SCRAP_OBJECTTYPE" in df.columns:
+        obj_type = df["SCRAP_OBJECTTYPE"].fillna("").str.strip().str.upper()
+        mask &= obj_type != "MATERIAL"
+
+    # ---- PB diode exclusion ----
+    if exclude_pb_diode and "PRODUCTLINENAME" in df.columns:
+        mask &= ~df["PRODUCTLINENAME"].fillna("").str.match(r"(?i)^PB_")
+
+    # ---- Scrap reason exclusion policy ----
+    if not include_excluded_scrap:
+        from mes_dashboard.services.scrap_reason_exclusion_cache import (
+            get_excluded_reasons,
+        )
+
+        excluded = get_excluded_reasons()
+        if excluded and "LOSSREASON_CODE" in df.columns:
+            code_upper = df["LOSSREASON_CODE"].fillna("").str.strip().str.upper()
+            mask &= ~code_upper.isin(excluded)
+        if excluded and "LOSSREASONNAME" in df.columns:
+            name_upper = df["LOSSREASONNAME"].fillna("").str.strip().str.upper()
+            mask &= ~name_upper.isin(excluded)
+
+        # Only keep reasons matching ^[0-9]{3}_ pattern
+        if "LOSSREASONNAME" in df.columns:
+            name_trimmed = df["LOSSREASONNAME"].fillna("").str.strip().str.upper()
+            mask &= name_trimmed.str.match(r"^[0-9]{3}_")
+            # Exclude XXX_ and ZZZ_ prefixes
+            mask &= ~name_trimmed.str.match(r"^(XXX|ZZZ)_")
+
+    return df[mask]
 
 
 def _build_primary_response(
@@ -323,11 +396,22 @@ def apply_view(
     detail_reason: Optional[str] = None,
     page: int = 1,
     per_page: int = 50,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """Read cache → apply filters → return derived data. Returns None if expired."""
     df = _get_cached_df(query_id)
     if df is None:
         return None
+
+    # Apply policy filters first (cache stores unfiltered data)
+    df = _apply_policy_filters(
+        df,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
 
     filtered = _apply_supplementary_filters(
         df,
@@ -759,11 +843,21 @@ def export_csv_from_cache(
     metric_filter: str = "all",
     trend_dates: Optional[List[str]] = None,
     detail_reason: Optional[str] = None,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> Optional[list]:
     """Read cache → apply filters → return list of dicts for CSV export."""
     df = _get_cached_df(query_id)
     if df is None:
         return None
+
+    df = _apply_policy_filters(
+        df,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
 
     filtered = _apply_supplementary_filters(
         df,

@@ -37,8 +37,7 @@ workflow_lookup AS (
       AND w.CONTAINERID IN (
           SELECT DISTINCT r0.CONTAINERID
           FROM DWH.DW_MES_LOTREJECTHISTORY r0
-          WHERE r0.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
-            AND r0.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
+          WHERE {{ WORKFLOW_FILTER }}
       )
 ),
 reject_raw AS (
