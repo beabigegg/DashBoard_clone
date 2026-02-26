@@ -71,10 +71,7 @@ _last_restart_request: float = 0.0
 def performance():
     """Performance monitoring dashboard (Vue SPA)."""
     dist_dir = os.path.join(current_app.static_folder or "", "dist")
-    dist_html = os.path.join(dist_dir, "admin-performance.html")
-    if os.path.exists(dist_html):
-        return send_from_directory(dist_dir, "admin-performance.html")
-    return render_template("admin/performance.html")
+    return send_from_directory(dist_dir, "admin-performance.html")
 
 
 @admin_bp.route("/api/system-status", methods=["GET"])

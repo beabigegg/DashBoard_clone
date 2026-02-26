@@ -233,6 +233,7 @@ def get_pool_status() -> Dict[str, Any]:
         "max_capacity": max_capacity,
         "saturation": saturation,
         "slow_query_active": get_slow_query_active_count(),
+        "slow_query_waiting": get_slow_query_waiting_count(),
     }
 
 
@@ -436,6 +437,7 @@ _DIRECT_CONN_LOCK = threading.Lock()
 # Slow-query concurrency control
 _SLOW_QUERY_SEMAPHORE: Optional[threading.Semaphore] = None
 _SLOW_QUERY_ACTIVE = 0
+_SLOW_QUERY_WAITING = 0
 _SLOW_QUERY_LOCK = threading.Lock()
 
 
@@ -452,6 +454,11 @@ def _get_slow_query_semaphore() -> threading.Semaphore:
 def get_slow_query_active_count() -> int:
     """Return the number of slow queries currently executing."""
     return _SLOW_QUERY_ACTIVE
+
+
+def get_slow_query_waiting_count() -> int:
+    """Return the number of threads waiting for the slow-query semaphore."""
+    return _SLOW_QUERY_WAITING
 
 
 def get_direct_connection_count() -> int:
@@ -627,7 +634,8 @@ def read_sql_df_slow(
     Returns:
         DataFrame with query results.
     """
-    global _SLOW_QUERY_ACTIVE
+    global _SLOW_QUERY_ACTIVE, _SLOW_QUERY_WAITING
+    from mes_dashboard.core.metrics import record_query_latency
 
     runtime = get_db_runtime_config()
     if timeout_seconds is None:
@@ -636,7 +644,13 @@ def read_sql_df_slow(
         timeout_ms = timeout_seconds * 1000
 
     sem = _get_slow_query_semaphore()
-    acquired = sem.acquire(timeout=60)
+    with _SLOW_QUERY_LOCK:
+        _SLOW_QUERY_WAITING += 1
+    try:
+        acquired = sem.acquire(timeout=60)
+    finally:
+        with _SLOW_QUERY_LOCK:
+            _SLOW_QUERY_WAITING -= 1
     if not acquired:
         raise RuntimeError(
             "Slow-query concurrency limit reached; try again later"
@@ -690,6 +704,8 @@ def read_sql_df_slow(
         )
         raise
     finally:
+        elapsed = time.time() - start_time
+        record_query_latency(elapsed)
         if conn:
             try:
                 conn.close()
@@ -718,7 +734,8 @@ def read_sql_df_slow_iter(
         batch_size: Number of rows per fetchmany call. None = use
             DB_SLOW_FETCHMANY_SIZE from config (default 5000).
     """
-    global _SLOW_QUERY_ACTIVE
+    global _SLOW_QUERY_ACTIVE, _SLOW_QUERY_WAITING
+    from mes_dashboard.core.metrics import record_query_latency
 
     runtime = get_db_runtime_config()
     if timeout_seconds is None:
@@ -730,7 +747,13 @@ def read_sql_df_slow_iter(
         batch_size = runtime["slow_fetchmany_size"]
 
     sem = _get_slow_query_semaphore()
-    acquired = sem.acquire(timeout=60)
+    with _SLOW_QUERY_LOCK:
+        _SLOW_QUERY_WAITING += 1
+    try:
+        acquired = sem.acquire(timeout=60)
+    finally:
+        with _SLOW_QUERY_LOCK:
+            _SLOW_QUERY_WAITING -= 1
     if not acquired:
         raise RuntimeError(
             "Slow-query concurrency limit reached; try again later"
@@ -788,6 +811,8 @@ def read_sql_df_slow_iter(
         )
         raise
     finally:
+        elapsed = time.time() - start_time
+        record_query_latency(elapsed)
         if conn:
             try:
                 conn.close()

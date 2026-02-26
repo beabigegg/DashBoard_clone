@@ -160,6 +160,8 @@
         <StatCard :value="poolTotalConnections" label="總連線數" />
         <StatCard :value="perfDetail.db_pool.status.max_capacity" label="最大容量" />
         <StatCard :value="poolOverflowDisplay" label="溢出連線" />
+        <StatCard :value="perfDetail.db_pool.status.slow_query_active" label="慢查詢執行中" />
+        <StatCard :value="perfDetail.db_pool.status.slow_query_waiting" label="慢查詢排隊中" />
         <StatCard :value="perfDetail.db_pool.config?.pool_size" label="池大小" />
         <StatCard :value="perfDetail.db_pool.config?.pool_recycle" label="回收週期 (s)" />
         <StatCard :value="perfDetail.db_pool.config?.pool_timeout" label="逾時 (s)" />
@@ -173,6 +175,15 @@
       title="連線池趨勢"
       :snapshots="historyData"
       :series="poolTrendSeries"
+    />
+
+    <!-- Worker Memory Trend -->
+    <TrendChart
+      v-if="historyData.length > 1"
+      title="Worker 記憶體趨勢"
+      :snapshots="historyData"
+      :series="memoryTrendSeries"
+      yAxisLabel="MB"
     />
 
     <!-- Worker Control -->
@@ -450,7 +461,12 @@ async function loadWorkerStatus() {
 async function loadPerformanceHistory() {
   try {
     const res = await apiGet('/admin/api/performance-history', { params: { minutes: 30 } });
-    historyData.value = res?.data?.snapshots || [];
+    const snapshots = res?.data?.snapshots || [];
+    // Pre-process: convert worker_rss_bytes to worker_rss_mb for trend chart
+    historyData.value = snapshots.map((s) => ({
+      ...s,
+      worker_rss_mb: s.worker_rss_bytes ? Math.round(s.worker_rss_bytes / 1048576 * 10) / 10 : 0,
+    }));
   } catch (e) {
     console.error('Failed to load performance history:', e);
   }
@@ -460,6 +476,7 @@ async function loadPerformanceHistory() {
 const poolTrendSeries = [
   { name: '飽和度', key: 'pool_saturation', color: '#6366f1' },
   { name: '使用中', key: 'pool_checked_out', color: '#f59e0b' },
+  { name: '慢查詢執行中', key: 'slow_query_active', color: '#ef4444' },
 ];
 
 const latencyTrendSeries = [
@@ -476,6 +493,10 @@ const hitRateTrendSeries = [
   { name: 'Redis 命中率', key: 'redis_hit_rate', color: '#22c55e' },
   { name: 'L1 命中率', key: 'rc_l1_hit_rate', color: '#2563eb' },
   { name: 'L2 命中率', key: 'rc_l2_hit_rate', color: '#f59e0b' },
+];
+
+const memoryTrendSeries = [
+  { name: 'RSS (MB)', key: 'worker_rss_mb', color: '#8b5cf6' },
 ];
 
 async function refreshAll() {

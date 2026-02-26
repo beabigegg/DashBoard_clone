@@ -32,6 +32,9 @@ METRICS_HISTORY_INTERVAL = int(os.getenv('METRICS_HISTORY_INTERVAL', '30'))
 METRICS_HISTORY_RETENTION_DAYS = int(os.getenv('METRICS_HISTORY_RETENTION_DAYS', '3'))
 METRICS_HISTORY_MAX_ROWS = int(os.getenv('METRICS_HISTORY_MAX_ROWS', '50000'))
 
+ARCHIVE_LOG_DIR = os.getenv('ARCHIVE_LOG_DIR', 'logs/archive')
+ARCHIVE_LOG_KEEP_COUNT = int(os.getenv('ARCHIVE_LOG_KEEP_COUNT', '20'))
+
 # ============================================================
 # Database Schema
 # ============================================================
@@ -54,9 +57,19 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     latency_p50_ms REAL,
     latency_p95_ms REAL,
     latency_p99_ms REAL,
-    latency_count INTEGER
+    latency_count INTEGER,
+    slow_query_active INTEGER,
+    slow_query_waiting INTEGER,
+    worker_rss_bytes INTEGER
 );
 """
+
+# New columns added after initial schema — used for ALTER TABLE migration.
+_MIGRATION_COLUMNS = [
+    ("slow_query_active", "INTEGER"),
+    ("slow_query_waiting", "INTEGER"),
+    ("worker_rss_bytes", "INTEGER"),
+]
 
 CREATE_INDEX_SQL = (
     "CREATE INDEX IF NOT EXISTS idx_metrics_ts ON metrics_snapshots(ts);"
@@ -69,7 +82,47 @@ COLUMNS = [
     "redis_used_memory", "redis_hit_rate",
     "rc_l1_hit_rate", "rc_l2_hit_rate", "rc_miss_rate",
     "latency_p50_ms", "latency_p95_ms", "latency_p99_ms", "latency_count",
+    "slow_query_active", "slow_query_waiting", "worker_rss_bytes",
 ]
+
+
+# ============================================================
+# Archive Log Cleanup
+# ============================================================
+
+_ARCHIVE_LOG_PREFIXES = ("access_", "error_", "watchdog_", "rq_worker_", "startup_")
+
+
+def cleanup_archive_logs(
+    archive_dir: str = ARCHIVE_LOG_DIR,
+    keep_per_type: int = ARCHIVE_LOG_KEEP_COUNT,
+) -> int:
+    """Delete old rotated log files from the archive directory.
+
+    Keeps the most recent *keep_per_type* files per log type (by mtime).
+    Returns the total number of files deleted.
+    """
+    archive_path = Path(archive_dir)
+    if not archive_path.is_dir():
+        return 0
+
+    deleted = 0
+    for prefix in _ARCHIVE_LOG_PREFIXES:
+        files = sorted(
+            (f for f in archive_path.iterdir() if f.name.startswith(prefix) and f.is_file()),
+            key=lambda f: f.stat().st_mtime,
+            reverse=True,
+        )
+        for old_file in files[keep_per_type:]:
+            try:
+                old_file.unlink()
+                deleted += 1
+            except OSError as exc:
+                logger.warning("Failed to delete archive log %s: %s", old_file, exc)
+
+    if deleted > 0:
+        logger.info("Cleaned up %d archive log files from %s", deleted, archive_dir)
+    return deleted
 
 
 # ============================================================
@@ -94,6 +147,14 @@ class MetricsHistoryStore:
             cursor = conn.cursor()
             cursor.execute(CREATE_TABLE_SQL)
             cursor.execute(CREATE_INDEX_SQL)
+            # Migrate existing databases: add new columns if missing.
+            for col_name, col_type in _MIGRATION_COLUMNS:
+                try:
+                    cursor.execute(
+                        f"ALTER TABLE metrics_snapshots ADD COLUMN {col_name} {col_type}"
+                    )
+                except sqlite3.OperationalError:
+                    pass  # Column already exists — tolerate duplicate column error.
             conn.commit()
         self._initialized = True
         logger.info("Metrics history store initialized at %s", self.db_path)
@@ -136,8 +197,9 @@ class MetricsHistoryStore:
                              pool_overflow, pool_max_capacity,
                              redis_used_memory, redis_hit_rate,
                              rc_l1_hit_rate, rc_l2_hit_rate, rc_miss_rate,
-                             latency_p50_ms, latency_p95_ms, latency_p99_ms, latency_count)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                             latency_p50_ms, latency_p95_ms, latency_p99_ms, latency_count,
+                             slow_query_active, slow_query_waiting, worker_rss_bytes)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                         """,
                         (
                             ts, pid,
@@ -155,6 +217,9 @@ class MetricsHistoryStore:
                             lat.get("p95_ms"),
                             lat.get("p99_ms"),
                             lat.get("count"),
+                            data.get("slow_query_active"),
+                            data.get("slow_query_waiting"),
+                            data.get("worker_rss_bytes"),
                         ),
                     )
                     conn.commit()
@@ -263,17 +328,36 @@ class MetricsHistoryCollector:
             if self._cleanup_counter >= 100:
                 self._cleanup_counter = 0
                 self._store.cleanup()
+                try:
+                    cleanup_archive_logs()
+                except Exception as exc:
+                    logger.debug("Archive log cleanup failed: %s", exc)
 
     def _collect_snapshot(self) -> None:
         try:
             data: Dict[str, Any] = {}
 
-            # Pool status
+            # Pool status (includes slow_query_active and slow_query_waiting)
             try:
                 from mes_dashboard.core.database import get_pool_status
-                data["pool"] = get_pool_status()
+                pool_status = get_pool_status()
+                data["pool"] = pool_status
+                data["slow_query_active"] = pool_status.get("slow_query_active", 0)
+                data["slow_query_waiting"] = pool_status.get("slow_query_waiting", 0)
             except Exception:
                 data["pool"] = {}
+                data["slow_query_active"] = 0
+                data["slow_query_waiting"] = 0
+
+            # Worker RSS memory
+            try:
+                import resource
+                # ru_maxrss is in KB on Linux
+                data["worker_rss_bytes"] = resource.getrusage(
+                    resource.RUSAGE_SELF
+                ).ru_maxrss * 1024
+            except Exception:
+                data["worker_rss_bytes"] = 0
 
             # Redis
             try:
