@@ -376,26 +376,27 @@ def _derive_trend(df: pd.DataFrame) -> Dict[str, Any]:
                 day_data[key] = _empty_trend_metrics()
                 continue
 
-            # holdQty: distinct containers on hold as of this day
+            # holdQty: total QTY on hold as of this day
             on_hold = (tdf["HOLD_DAY"] <= d) & (
                 tdf["RELEASE_DAY"].isna() | (tdf["RELEASE_DAY"] > d)
             )
-            hold_qty = int(tdf.loc[on_hold, "CONTAINERID"].nunique())
+            hold_qty = _safe_int(tdf.loc[on_hold, "QTY"].sum())
 
-            # newHoldQty: new holds arriving this day (dedup)
+            # newHoldQty: QTY of new holds arriving this day (dedup)
             new_mask = (tdf["HOLD_DAY"] == d) & (tdf["RN_HOLD_DAY"] == 1)
-            new_hold_qty = int(new_mask.sum())
+            new_hold_qty = _safe_int(tdf.loc[new_mask, "QTY"].sum())
 
-            # releaseQty: releases on this day
-            release_qty = int((tdf["RELEASE_DAY"] == d).sum())
+            # releaseQty: QTY released on this day
+            release_mask = tdf["RELEASE_DAY"] == d
+            release_qty = _safe_int(tdf.loc[release_mask, "QTY"].sum())
 
-            # futureHoldQty: future holds on this day
+            # futureHoldQty: QTY of future holds on this day
             future_mask = (
                 (tdf["HOLD_DAY"] == d)
                 & (tdf["IS_FUTURE_HOLD"] == 1)
                 & (tdf["FUTURE_HOLD_FLAG"] == 1)
             )
-            future_hold_qty = int(future_mask.sum())
+            future_hold_qty = _safe_int(tdf.loc[future_mask, "QTY"].sum())
 
             day_data[key] = {
                 "holdQty": hold_qty,
@@ -428,15 +429,15 @@ def _derive_reason_pareto(df: pd.DataFrame) -> Dict[str, Any]:
         .agg(count=("CONTAINERID", "count"), qty=("QTY", "sum"))
         .reset_index()
     )
-    grouped = grouped.sort_values("count", ascending=False)
-    total = grouped["count"].sum()
+    grouped = grouped.sort_values("qty", ascending=False)
+    total_qty = grouped["qty"].sum()
 
     items: List[Dict[str, Any]] = []
     cumulative = 0.0
     for _, row in grouped.iterrows():
         count = _safe_int(row["count"])
         qty = _safe_int(row["qty"])
-        pct = round((count / total * 100) if total > 0 else 0, 2)
+        pct = round((qty / total_qty * 100) if total_qty > 0 else 0, 2)
         cumulative += pct
         items.append(
             {
@@ -466,7 +467,7 @@ def _derive_duration(df: pd.DataFrame) -> Dict[str, Any]:
         return {"items": []}
 
     hours = released["HOLD_HOURS"]
-    total = len(released)
+    total_qty = _safe_int(released["QTY"].sum())
 
     buckets = [
         ("<4h", hours < 4),
@@ -479,7 +480,7 @@ def _derive_duration(df: pd.DataFrame) -> Dict[str, Any]:
     for label, mask in buckets:
         count = int(mask.sum())
         qty = _safe_int(released.loc[mask, "QTY"].sum())
-        pct = round((count / total * 100) if total > 0 else 0, 2)
+        pct = round((qty / total_qty * 100) if total_qty > 0 else 0, 2)
         items.append({"range": label, "count": count, "qty": qty, "pct": pct})
 
     return {"items": items}

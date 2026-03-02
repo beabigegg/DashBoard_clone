@@ -487,7 +487,7 @@ onMounted(() => {
   <div class="dashboard hold-history-page">
     <header class="header hold-history-header">
       <div class="header-left">
-        <h1>Hold 歷史績效 Dashboard</h1>
+        <h1>Hold 歷史績效</h1>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
       </div>
       <div class="header-right">
