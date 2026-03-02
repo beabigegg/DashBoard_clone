@@ -53,6 +53,10 @@
   margin-bottom: 12px;
 }
 
+.supplementary-toolbar {
+  margin-bottom: 12px;
+}
+
 .supplementary-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -312,6 +316,13 @@
   gap: 12px;
 }
 
+.pareto-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .dimension-select {
   font-size: 12px;
   padding: 3px 8px;
@@ -320,7 +331,10 @@
   background: var(--bg-primary, #fff);
   color: var(--text-primary, #374151);
   cursor: pointer;
-  margin-left: auto;
+}
+
+.pareto-scope-select {
+  min-width: 110px;
 }
 
 .pareto-date-badge {

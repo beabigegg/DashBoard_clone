@@ -19,16 +19,6 @@ WITH spec_map AS (
     WHERE SPEC IS NOT NULL
     GROUP BY SPEC
 ),
-workflow_lookup AS (
-    SELECT /*+ MATERIALIZE */ DISTINCT w.CONTAINERID, w.WORKFLOWNAME
-    FROM DWH.DW_MES_WIP w
-    WHERE w.PRODUCTLINENAME <> '點測'
-      AND w.CONTAINERID IN (
-          SELECT DISTINCT r0.CONTAINERID
-          FROM DWH.DW_MES_LOTREJECTHISTORY r0
-          WHERE {{ WORKFLOW_FILTER }}
-      )
-),
 reject_raw AS (
     SELECT
         r.TXNDATE,
@@ -49,9 +39,37 @@ reject_raw AS (
         NVL(TRIM(r.EQUIPMENTNAME), '(NA)') AS EQUIPMENTNAME,
         NVL(
             TRIM(REGEXP_SUBSTR(r.EQUIPMENTNAME, '[^,]+', 1, 1)),
-            NVL(TRIM(r.EQUIPMENTNAME), '(NA)')
+            '(NA)'
         ) AS PRIMARY_EQUIPMENTNAME,
-        NVL(TRIM(wf.WORKFLOWNAME), NVL(TRIM(r.SPECNAME), '(NA)')) AS WORKFLOWNAME,
+        NVL(
+            TRIM(lwh.WORKFLOWNAME),
+            NVL(
+                TRIM((
+                    SELECT w.WORKFLOWNAME
+                    FROM DWH.DW_MES_WIP w
+                    WHERE c.CONTAINERNAME IS NOT NULL
+                      AND w.CONTAINERNAME = c.CONTAINERNAME
+                      AND NVL(TRIM(w.SPECNAME), '-') = NVL(TRIM(r.SPECNAME), '-')
+                      AND w.TXNDATE <= r.TXNDATE
+                      AND TRIM(w.WORKFLOWNAME) IS NOT NULL
+                    ORDER BY w.TXNDATE DESC
+                    FETCH FIRST 1 ROW ONLY
+                )),
+                NVL(
+                    TRIM((
+                        SELECT w.WORKFLOWNAME
+                        FROM DWH.DW_MES_WIP w
+                        WHERE c.CONTAINERNAME IS NOT NULL
+                          AND w.CONTAINERNAME = c.CONTAINERNAME
+                          AND NVL(TRIM(w.SPECNAME), '-') = NVL(TRIM(r.SPECNAME), '-')
+                          AND TRIM(w.WORKFLOWNAME) IS NOT NULL
+                        ORDER BY w.TXNDATE DESC
+                        FETCH FIRST 1 ROW ONLY
+                    )),
+                    '(NA)'
+                )
+            )
+        ) AS WORKFLOWNAME,
         NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') AS LOSSREASONNAME,
         NVL(
             TRIM(REGEXP_SUBSTR(NVL(TRIM(r.LOSSREASONNAME), '(未填寫)'), '^[^_[:space:]-]+')),
@@ -81,10 +99,10 @@ reject_raw AS (
     FROM DWH.DW_MES_LOTREJECTHISTORY r
     LEFT JOIN DWH.DW_MES_CONTAINER c
       ON c.CONTAINERID = r.CONTAINERID
+    LEFT JOIN DWH.DW_MES_LOTWIPHISTORY lwh
+      ON lwh.WIPTRACKINGGROUPKEYID = r.WIPTRACKINGGROUPKEYID
     LEFT JOIN spec_map sm
       ON sm.SPEC = TRIM(r.SPECNAME)
-    LEFT JOIN workflow_lookup wf
-      ON wf.CONTAINERID = r.CONTAINERID
     WHERE {{ BASE_WHERE }}
 ),
 daily_agg AS (

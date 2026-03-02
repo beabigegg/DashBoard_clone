@@ -17,25 +17,35 @@ const DIMENSION_OPTIONS = [
   { value: 'workcenter', label: '站點' },
   { value: 'equipment', label: '機台' },
 ];
+const DISPLAY_SCOPE_TOP20_DIMENSIONS = new Set(['type', 'workflow', 'equipment']);
 
 const props = defineProps({
   items: { type: Array, default: () => [] },
-  detailReason: { type: String, default: '' },
+  selectedValues: { type: Array, default: () => [] },
   selectedDates: { type: Array, default: () => [] },
   metricLabel: { type: String, default: '報廢量' },
   loading: { type: Boolean, default: false },
   dimension: { type: String, default: 'reason' },
   showDimensionSelector: { type: Boolean, default: false },
+  displayScope: { type: String, default: 'all' },
 });
 
-const emit = defineEmits(['reason-click', 'dimension-change']);
+const emit = defineEmits(['item-toggle', 'dimension-change', 'display-scope-change']);
 
 const hasData = computed(() => Array.isArray(props.items) && props.items.length > 0);
+const selectedValueSet = computed(() => new Set((props.selectedValues || []).map((item) => String(item || '').trim())));
+const showDisplayScopeSelector = computed(
+  () => DISPLAY_SCOPE_TOP20_DIMENSIONS.has(props.dimension),
+);
 
 const dimensionLabel = computed(() => {
   const opt = DIMENSION_OPTIONS.find((o) => o.value === props.dimension);
   return opt ? opt.label : '報廢原因';
 });
+
+function isSelected(value) {
+  return selectedValueSet.value.has(String(value || '').trim());
+}
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('zh-TW');
@@ -105,7 +115,7 @@ const chartOption = computed(() => {
         itemStyle: {
           color(params) {
             const reason = items[params.dataIndex]?.reason || '';
-            return reason === props.detailReason ? '#b91c1c' : '#2563eb';
+            return isSelected(reason) ? '#b91c1c' : '#2563eb';
           },
           borderRadius: [4, 4, 0, 0],
         },
@@ -124,12 +134,12 @@ const chartOption = computed(() => {
 });
 
 function handleChartClick(params) {
-  if (params?.seriesType !== 'bar' || props.dimension !== 'reason') {
+  if (params?.seriesType !== 'bar') {
     return;
   }
-  const reason = props.items?.[params.dataIndex]?.reason;
-  if (reason) {
-    emit('reason-click', reason);
+  const itemValue = props.items?.[params.dataIndex]?.reason;
+  if (itemValue) {
+    emit('item-toggle', itemValue);
   }
 }
 </script>
@@ -141,14 +151,25 @@ function handleChartClick(params) {
         {{ metricLabel }} vs {{ dimensionLabel }}（Pareto）
         <span v-for="d in selectedDates" :key="d" class="pareto-date-badge">{{ d }}</span>
       </div>
-      <select
-        v-if="showDimensionSelector"
-        class="dimension-select"
-        :value="dimension"
-        @change="emit('dimension-change', $event.target.value)"
-      >
-        <option v-for="opt in DIMENSION_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
+      <div class="pareto-controls">
+        <select
+          v-if="showDimensionSelector"
+          class="dimension-select"
+          :value="dimension"
+          @change="emit('dimension-change', $event.target.value)"
+        >
+          <option v-for="opt in DIMENSION_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+        <select
+          v-if="showDisplayScopeSelector"
+          class="dimension-select pareto-scope-select"
+          :value="displayScope"
+          @change="emit('display-scope-change', $event.target.value)"
+        >
+          <option value="all">全部顯示</option>
+          <option value="top20">只顯示 TOP 20</option>
+        </select>
+      </div>
     </div>
     <div class="card-body pareto-layout">
       <div class="pareto-chart-wrap">
@@ -169,13 +190,12 @@ function handleChartClick(params) {
             <tr
               v-for="item in items"
               :key="item.reason"
-              :class="{ active: detailReason === item.reason }"
+              :class="{ active: isSelected(item.reason) }"
             >
               <td>
-                <button v-if="dimension === 'reason'" class="reason-link" type="button" @click="$emit('reason-click', item.reason)">
+                <button class="reason-link" type="button" @click="$emit('item-toggle', item.reason)">
                   {{ item.reason }}
                 </button>
-                <span v-else>{{ item.reason }}</span>
               </td>
               <td>{{ formatNumber(item.metric_value) }}</td>
               <td>{{ formatPct(item.pct) }}</td>

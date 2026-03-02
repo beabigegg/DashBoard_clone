@@ -26,7 +26,7 @@ REDIS_ENABLED="${REDIS_ENABLED:-true}"
 # Worker watchdog configuration
 WATCHDOG_ENABLED="${WATCHDOG_ENABLED:-true}"
 # RQ trace worker configuration
-TRACE_WORKER_ENABLED="${TRACE_WORKER_ENABLED:-false}"
+TRACE_WORKER_ENABLED="${TRACE_WORKER_ENABLED:-true}"
 TRACE_WORKER_QUEUE="${TRACE_WORKER_QUEUE:-trace-events}"
 
 # Colors for output

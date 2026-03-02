@@ -5,7 +5,6 @@ import { apiGet, apiPost } from '../core/api.js';
 import {
   buildViewParams,
   parseMultiLineInput,
-  toRejectFilterSnapshot,
 } from '../core/reject-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
@@ -17,6 +16,15 @@ import TrendChart from './components/TrendChart.vue';
 
 const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 50;
+const PARETO_TOP20_DIMENSIONS = new Set(['type', 'workflow', 'equipment']);
+const PARETO_DIMENSION_LABELS = {
+  reason: '不良原因',
+  package: 'PACKAGE',
+  type: 'TYPE',
+  workflow: 'WORKFLOW',
+  workcenter: '站點',
+  equipment: '機台',
+};
 
 // ---- Primary query form state ----
 const queryMode = ref('date_range');
@@ -59,10 +67,11 @@ const supplementaryFilters = reactive({
 
 // ---- Interactive state ----
 const page = ref(1);
-const detailReason = ref('');
 const selectedTrendDates = ref([]);
 const trendLegendSelected = ref({ '扣帳報廢量': true, '不扣帳報廢量': true });
 const paretoDimension = ref('reason');
+const selectedParetoValues = ref([]);
+const paretoDisplayScope = ref('all');
 const dimensionParetoItems = ref([]);
 const dimensionParetoLoading = ref(false);
 
@@ -198,8 +207,9 @@ async function executePrimaryQuery() {
     supplementaryFilters.workcenterGroups = [];
     supplementaryFilters.reason = '';
     page.value = 1;
-    detailReason.value = '';
     selectedTrendDates.value = [];
+    selectedParetoValues.value = [];
+    paretoDisplayScope.value = 'all';
     paretoDimension.value = 'reason';
     dimensionParetoItems.value = [];
 
@@ -239,7 +249,8 @@ async function refreshView() {
       supplementaryFilters,
       metricFilter: metricFilterParam(),
       trendDates: selectedTrendDates.value,
-      detailReason: detailReason.value,
+      paretoDimension: paretoDimension.value,
+      paretoValues: selectedParetoValues.value,
       page: page.value,
       perPage: DEFAULT_PER_PAGE,
       policyFilters: {
@@ -330,10 +341,18 @@ function onTrendLegendChange(selected) {
   refreshDimensionParetoIfActive();
 }
 
-function onParetoClick(reason) {
-  if (!reason) return;
-  detailReason.value = detailReason.value === reason ? '' : reason;
+function onParetoItemToggle(itemValue) {
+  const normalized = String(itemValue || '').trim();
+  if (!normalized) return;
+  if (selectedParetoValues.value.includes(normalized)) {
+    selectedParetoValues.value = selectedParetoValues.value.filter(
+      (item) => item !== normalized,
+    );
+  } else {
+    selectedParetoValues.value = [...selectedParetoValues.value, normalized];
+  }
   page.value = 1;
+  updateUrlState();
   void refreshView();
 }
 
@@ -341,6 +360,7 @@ function handleParetoScopeToggle(checked) {
   draftFilters.paretoTop80 = Boolean(checked);
   committedPrimary.paretoTop80 = Boolean(checked);
   updateUrlState();
+  refreshDimensionParetoIfActive();
 }
 
 let activeDimRequestId = 0;
@@ -391,11 +411,28 @@ function refreshDimensionParetoIfActive() {
 
 function onDimensionChange(dim) {
   paretoDimension.value = dim;
+  selectedParetoValues.value = [];
+  paretoDisplayScope.value = 'all';
+  page.value = 1;
   if (dim === 'reason') {
     dimensionParetoItems.value = [];
+    void refreshView();
   } else {
     void fetchDimensionPareto(dim);
+    void refreshView();
   }
+}
+
+function onParetoDisplayScopeChange(scope) {
+  paretoDisplayScope.value = scope === 'top20' ? 'top20' : 'all';
+  updateUrlState();
+}
+
+function clearParetoSelection() {
+  selectedParetoValues.value = [];
+  page.value = 1;
+  updateUrlState();
+  void refreshView();
 }
 
 function onSupplementaryChange(filters) {
@@ -403,8 +440,8 @@ function onSupplementaryChange(filters) {
   supplementaryFilters.workcenterGroups = filters.workcenterGroups || [];
   supplementaryFilters.reason = filters.reason || '';
   page.value = 1;
-  detailReason.value = '';
   selectedTrendDates.value = [];
+  selectedParetoValues.value = [];
   void refreshView();
   refreshDimensionParetoIfActive();
 }
@@ -412,9 +449,12 @@ function onSupplementaryChange(filters) {
 function removeFilterChip(chip) {
   if (!chip?.removable) return;
 
-  if (chip.type === 'detail-reason') {
-    detailReason.value = '';
+  if (chip.type === 'pareto-value') {
+    selectedParetoValues.value = selectedParetoValues.value.filter(
+      (value) => value !== chip.value,
+    );
     page.value = 1;
+    updateUrlState();
     void refreshView();
     return;
   }
@@ -471,7 +511,8 @@ async function exportCsv() {
     if (supplementaryFilters.reason) params.set('reason', supplementaryFilters.reason);
     params.set('metric_filter', metricFilterParam());
     for (const date of selectedTrendDates.value) params.append('trend_dates', date);
-    if (detailReason.value) params.set('detail_reason', detailReason.value);
+    params.set('pareto_dimension', paretoDimension.value);
+    for (const value of selectedParetoValues.value) params.append('pareto_values', value);
 
     // Policy filters (applied in-memory on cached data)
     if (committedPrimary.includeExcludedScrap) params.set('include_excluded_scrap', 'true');
@@ -642,9 +683,23 @@ const filteredParetoItems = computed(() => {
 });
 
 const activeParetoItems = computed(() => {
-  if (paretoDimension.value !== 'reason') return dimensionParetoItems.value;
-  return filteredParetoItems.value;
+  const baseItems =
+    paretoDimension.value === 'reason'
+      ? filteredParetoItems.value
+      : (dimensionParetoItems.value || []);
+
+  if (
+    PARETO_TOP20_DIMENSIONS.has(paretoDimension.value)
+    && paretoDisplayScope.value === 'top20'
+  ) {
+    return baseItems.slice(0, 20);
+  }
+  return baseItems;
 });
+
+const selectedParetoDimensionLabel = computed(
+  () => PARETO_DIMENSION_LABELS[paretoDimension.value] || 'Pareto',
+);
 
 const activeFilterChips = computed(() => {
   const chips = [];
@@ -742,15 +797,15 @@ const activeFilterChips = computed(() => {
     });
   }
 
-  if (detailReason.value) {
+  selectedParetoValues.value.forEach((value) => {
     chips.push({
-      key: `detail-reason:${detailReason.value}`,
-      label: `明細原因: ${detailReason.value}`,
+      key: `pareto-value:${paretoDimension.value}:${value}`,
+      label: `${selectedParetoDimensionLabel.value}: ${value}`,
       removable: true,
-      type: 'detail-reason',
-      value: detailReason.value,
+      type: 'pareto-value',
+      value,
     });
-  }
+  });
 
   return chips;
 });
@@ -809,9 +864,9 @@ function updateUrlState() {
 
   // Interactive
   appendArrayParams(params, 'trend_dates', selectedTrendDates.value);
-  if (detailReason.value) {
-    params.set('detail_reason', detailReason.value);
-  }
+  params.set('pareto_dimension', paretoDimension.value);
+  appendArrayParams(params, 'pareto_values', selectedParetoValues.value);
+  if (paretoDisplayScope.value !== 'all') params.set('pareto_display_scope', paretoDisplayScope.value);
   if (!committedPrimary.paretoTop80) {
     params.set('pareto_scope_all', 'true');
   }
@@ -886,15 +941,26 @@ function restoreFromUrl() {
 
   // Interactive
   const urlTrendDates = readArrayParam(params, 'trend_dates');
-  const urlDetailReason = String(params.get('detail_reason') || '').trim();
+  const rawParetoDimension = String(params.get('pareto_dimension') || '').trim().toLowerCase();
+  const urlParetoDimension = Object.hasOwn(PARETO_DIMENSION_LABELS, rawParetoDimension)
+    ? rawParetoDimension
+    : 'reason';
+  const urlParetoValues = readArrayParam(params, 'pareto_values');
+  const urlParetoDisplayScope = String(params.get('pareto_display_scope') || '').trim().toLowerCase();
   const parsedPage = Number(params.get('page') || '1');
+
+  paretoDimension.value = urlParetoDimension;
+  selectedParetoValues.value = urlParetoValues;
+  paretoDisplayScope.value = urlParetoDisplayScope === 'top20' ? 'top20' : 'all';
 
   return {
     packages: urlPackages,
     workcenterGroups: urlWcGroups,
     reason: urlReason,
     trendDates: urlTrendDates,
-    detailReason: urlDetailReason,
+    paretoDimension: urlParetoDimension,
+    paretoValues: urlParetoValues,
+    paretoDisplayScope: paretoDisplayScope.value,
     page: Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1,
   };
 }
@@ -962,23 +1028,26 @@ onMounted(() => {
 
       <ParetoSection
         :items="activeParetoItems"
-        :detail-reason="detailReason"
+        :selected-values="selectedParetoValues"
+        :display-scope="paretoDisplayScope"
         :selected-dates="selectedTrendDates"
         :metric-label="paretoMetricLabel"
         :loading="loading.querying || dimensionParetoLoading"
         :dimension="paretoDimension"
         :show-dimension-selector="committedPrimary.mode === 'date_range'"
-        @reason-click="onParetoClick"
+        @item-toggle="onParetoItemToggle"
         @dimension-change="onDimensionChange"
+        @display-scope-change="onParetoDisplayScopeChange"
       />
 
       <DetailTable
         :items="detail.items"
         :pagination="pagination"
         :loading="loading.list"
-        :detail-reason="detailReason"
+        :selected-pareto-values="selectedParetoValues"
+        :selected-pareto-dimension-label="selectedParetoDimensionLabel"
         @go-to-page="goToPage"
-        @clear-reason="onParetoClick(detailReason)"
+        @clear-pareto-selection="clearParetoSelection"
       />
     </template>
   </div>

@@ -8,10 +8,11 @@ defineProps({
     default: () => ({ page: 1, perPage: 50, total: 0, totalPages: 1 }),
   },
   loading: { type: Boolean, default: false },
-  detailReason: { type: String, default: '' },
+  selectedParetoValues: { type: Array, default: () => [] },
+  selectedParetoDimensionLabel: { type: String, default: '' },
 });
 
-defineEmits(['go-to-page', 'clear-reason']);
+defineEmits(['go-to-page', 'clear-pareto-selection']);
 
 const showRejectBreakdown = ref(false);
 
@@ -25,9 +26,14 @@ function formatNumber(value) {
     <div class="card-header">
       <div class="card-title">
         明細列表
-        <span v-if="detailReason" class="detail-reason-badge">
-          原因: {{ detailReason }}
-          <button type="button" class="badge-clear" @click="$emit('clear-reason')">×</button>
+        <span v-if="selectedParetoValues.length > 0" class="detail-reason-badge">
+          {{ selectedParetoDimensionLabel || 'Pareto 篩選' }}:
+          {{
+            selectedParetoValues.length === 1
+              ? selectedParetoValues[0]
+              : `${selectedParetoValues.length} 項`
+          }}
+          <button type="button" class="badge-clear" @click="$emit('clear-pareto-selection')">×</button>
         </span>
       </div>
     </div>

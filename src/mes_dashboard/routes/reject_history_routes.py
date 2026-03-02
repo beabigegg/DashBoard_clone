@@ -113,6 +113,14 @@ def _extract_meta(
 
 
 _VALID_BOOL_STRINGS = {"", "0", "false", "no", "n", "off", "1", "true", "yes", "y", "on"}
+_VALID_PARETO_DIMENSIONS = {
+    "reason",
+    "package",
+    "type",
+    "workflow",
+    "workcenter",
+    "equipment",
+}
 
 
 def _parse_common_bools() -> tuple[Optional[tuple[dict, int]], bool, bool, bool]:
@@ -135,6 +143,22 @@ def _parse_common_bools() -> tuple[Optional[tuple[dict, int]], bool, bool, bool]
         default=True,
     )
     return None, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode
+
+
+def _parse_pareto_selection() -> tuple[Optional[tuple[dict, int]], Optional[str], Optional[list[str]]]:
+    pareto_dimension = request.args.get("pareto_dimension", "").strip().lower()
+    pareto_values = _parse_multi_param("pareto_values")
+    if pareto_values and not pareto_dimension:
+        pareto_dimension = "reason"
+    if pareto_dimension and pareto_dimension not in _VALID_PARETO_DIMENSIONS:
+        return (
+            {
+                "success": False,
+                "error": f"Invalid pareto_dimension, supported: {', '.join(sorted(_VALID_PARETO_DIMENSIONS))}",
+            },
+            400,
+        ), None, None
+    return None, (pareto_dimension or None), (pareto_values or None)
 
 
 @reject_history_bp.route("/api/reject-history/options", methods=["GET"])
@@ -304,6 +328,9 @@ def api_reject_history_reason_pareto():
                 workcenter_groups=_parse_multi_param("workcenter_groups") or None,
                 reason=request.args.get("reason", "").strip() or None,
                 trend_dates=_parse_multi_param("trend_dates") or None,
+                include_excluded_scrap=include_excluded_scrap,
+                exclude_material_scrap=exclude_material_scrap,
+                exclude_pb_diode=exclude_pb_diode,
             )
             if result is not None:
                 return jsonify({"success": True, "data": result, "meta": {}})
@@ -517,6 +544,9 @@ def api_reject_history_view():
     metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
     reason = request.args.get("reason", "").strip() or None
     detail_reason = request.args.get("detail_reason", "").strip() or None
+    pareto_error, pareto_dimension, pareto_values = _parse_pareto_selection()
+    if pareto_error:
+        return jsonify(pareto_error[0]), pareto_error[1]
 
     include_excluded_scrap = request.args.get("include_excluded_scrap", "false").lower() == "true"
     exclude_material_scrap = request.args.get("exclude_material_scrap", "true").lower() != "false"
@@ -531,6 +561,8 @@ def api_reject_history_view():
             metric_filter=metric_filter,
             trend_dates=_parse_multi_param("trend_dates") or None,
             detail_reason=detail_reason,
+            pareto_dimension=pareto_dimension,
+            pareto_values=pareto_values,
             page=page,
             per_page=per_page,
             include_excluded_scrap=include_excluded_scrap,
@@ -561,6 +593,9 @@ def api_reject_history_export_cached():
     metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
     reason = request.args.get("reason", "").strip() or None
     detail_reason = request.args.get("detail_reason", "").strip() or None
+    pareto_error, pareto_dimension, pareto_values = _parse_pareto_selection()
+    if pareto_error:
+        return jsonify(pareto_error[0]), pareto_error[1]
 
     include_excluded_scrap = request.args.get("include_excluded_scrap", "false").lower() == "true"
     exclude_material_scrap = request.args.get("exclude_material_scrap", "true").lower() != "false"
@@ -575,6 +610,8 @@ def api_reject_history_export_cached():
             metric_filter=metric_filter,
             trend_dates=_parse_multi_param("trend_dates") or None,
             detail_reason=detail_reason,
+            pareto_dimension=pareto_dimension,
+            pareto_values=pareto_values,
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,

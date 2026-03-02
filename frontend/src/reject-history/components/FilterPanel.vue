@@ -126,14 +126,6 @@ function emitSupplementary(patch) {
             <input v-model="filters.excludePbDiode" type="checkbox" />
             排除 PB_* 系列
           </label>
-          <label class="checkbox-pill">
-            <input
-              :checked="filters.paretoTop80"
-              type="checkbox"
-              @change="$emit('pareto-scope-toggle', $event.target.checked)"
-            />
-            Pareto 僅顯示累計前 80%
-          </label>
         </div>
         <div class="filter-actions">
           <button
@@ -190,6 +182,16 @@ function emitSupplementary(patch) {
     <!-- Supplementary filters (only after primary query) -->
     <div v-if="queryId" class="supplementary-panel">
       <div class="supplementary-header">補充篩選 (快取內篩選)</div>
+      <div class="supplementary-toolbar">
+        <label class="checkbox-pill">
+          <input
+            :checked="filters.paretoTop80"
+            type="checkbox"
+            @change="$emit('pareto-scope-toggle', $event.target.checked)"
+          />
+          Pareto 僅顯示累計前 80%
+        </label>
+      </div>
       <div class="supplementary-row">
         <div class="filter-group">
           <label class="filter-label">WORKCENTER GROUP</label>

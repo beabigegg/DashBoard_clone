@@ -173,6 +173,8 @@ export function buildViewParams(queryId, {
   metricFilter = 'all',
   trendDates = [],
   detailReason = '',
+  paretoDimension = '',
+  paretoValues = [],
   page = 1,
   perPage = 50,
   policyFilters = {},
@@ -195,6 +197,14 @@ export function buildViewParams(queryId, {
   }
   if (detailReason) {
     params.detail_reason = detailReason;
+  }
+  const normalizedParetoDimension = normalizeText(paretoDimension).toLowerCase();
+  const normalizedParetoValues = normalizeArray(paretoValues);
+  if (normalizedParetoDimension) {
+    params.pareto_dimension = normalizedParetoDimension;
+  }
+  if (normalizedParetoValues.length > 0) {
+    params.pareto_values = normalizedParetoValues;
   }
   params.page = page || 1;
   params.per_page = perPage || 50;

@@ -53,6 +53,7 @@ logger = logging.getLogger("mes_dashboard.reject_dataset_cache")
 _CACHE_TTL = 900  # 15 minutes
 _CACHE_MAX_SIZE = 8
 _REDIS_NAMESPACE = "reject_dataset"
+_CACHE_SCHEMA_VERSION = 4
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("reject_dataset", _dataset_cache, "Reject Dataset (L1, 15min)")
@@ -253,6 +254,7 @@ def execute_primary_query(
 
     # ---- Compute query_id from base params only (policy filters applied in-memory) ----
     query_id_input = {
+        "cache_schema_version": _CACHE_SCHEMA_VERSION,
         "mode": mode,
         "start_date": start_date,
         "end_date": end_date,
@@ -394,6 +396,8 @@ def apply_view(
     metric_filter: str = "all",
     trend_dates: Optional[List[str]] = None,
     detail_reason: Optional[str] = None,
+    pareto_dimension: Optional[str] = None,
+    pareto_values: Optional[List[str]] = None,
     page: int = 1,
     per_page: int = 50,
     include_excluded_scrap: bool = False,
@@ -438,6 +442,11 @@ def apply_view(
         detail_df = detail_df[
             detail_df["LOSSREASONNAME"].str.strip() == detail_reason.strip()
         ]
+    detail_df = _apply_pareto_selection_filter(
+        detail_df,
+        pareto_dimension=pareto_dimension,
+        pareto_values=pareto_values,
+    )
 
     detail_page = _paginate_detail(detail_df, page=page, per_page=per_page)
 
@@ -486,6 +495,46 @@ def _apply_supplementary_filters(
         mask &= df["DEFECT_QTY"] > 0
 
     return df[mask]
+
+
+def _normalize_pareto_values(values: Optional[List[str]]) -> List[str]:
+    normalized: List[str] = []
+    seen = set()
+    for value in values or []:
+        item = _normalize_text(value)
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        normalized.append(item)
+    return normalized
+
+
+def _apply_pareto_selection_filter(
+    df: pd.DataFrame,
+    *,
+    pareto_dimension: Optional[str] = None,
+    pareto_values: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """Apply Pareto multi-select filters on detail/export datasets."""
+    if df is None or df.empty:
+        return df
+
+    normalized_values = _normalize_pareto_values(pareto_values)
+    if not normalized_values:
+        return df
+
+    dimension = _normalize_text(pareto_dimension).lower() or "reason"
+    dim_col = _DIM_TO_DF_COLUMN.get(dimension)
+    if not dim_col:
+        raise ValueError(f"不支援的 pareto_dimension: {pareto_dimension}")
+    if dim_col not in df.columns:
+        return df.iloc[0:0]
+
+    value_set = set(normalized_values)
+    normalized_dimension_values = df[dim_col].map(
+        lambda value: _normalize_text(value) or "(未知)"
+    )
+    return df[normalized_dimension_values.isin(value_set)]
 
 
 # ============================================================
@@ -732,11 +781,24 @@ def compute_dimension_pareto(
     workcenter_groups: Optional[List[str]] = None,
     reason: Optional[str] = None,
     trend_dates: Optional[List[str]] = None,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """Compute dimension pareto from cached DataFrame (no Oracle query)."""
     df = _get_cached_df(query_id)
     if df is None:
         return None
+
+    # Keep cache-based pareto behavior aligned with primary/view policy filters.
+    df = _apply_policy_filters(
+        df,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    if df is None or df.empty:
+        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
 
     dim_col = _DIM_TO_DF_COLUMN.get(dimension, "LOSSREASONNAME")
     if dim_col not in df.columns:
@@ -843,6 +905,8 @@ def export_csv_from_cache(
     metric_filter: str = "all",
     trend_dates: Optional[List[str]] = None,
     detail_reason: Optional[str] = None,
+    pareto_dimension: Optional[str] = None,
+    pareto_values: Optional[List[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
@@ -876,6 +940,11 @@ def export_csv_from_cache(
         filtered = filtered[
             filtered["LOSSREASONNAME"].str.strip() == detail_reason.strip()
         ]
+    filtered = _apply_pareto_selection_filter(
+        filtered,
+        pareto_dimension=pareto_dimension,
+        pareto_values=pareto_values,
+    )
 
     rows = []
     for _, row in filtered.iterrows():

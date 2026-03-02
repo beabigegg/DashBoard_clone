@@ -87,6 +87,16 @@ The API SHALL provide CSV export using the same filter and metric semantics as l
 - **THEN** CSV headers SHALL include both `REJECT_TOTAL_QTY` and `DEFECT_QTY`
 - **THEN** export rows SHALL follow the same semantic definitions as summary/list endpoints
 
+#### Scenario: Cached export supports full detail-filter parity
+- **WHEN** `GET /api/reject-history/export-cached` is called with an existing `query_id`
+- **THEN** the endpoint SHALL apply primary policy toggles, supplementary filters, trend-date filters, metric filter, and Pareto-selected item filters
+- **THEN** returned rows SHALL match the same filtered detail dataset semantics used by `GET /api/reject-history/view`
+
+#### Scenario: CSV encoding and escaping are stable
+- **WHEN** either export endpoint returns CSV
+- **THEN** response charset SHALL be `utf-8-sig`
+- **THEN** values containing commas, quotes, or newlines SHALL be CSV-escaped correctly
+
 ### Requirement: Reject History API SHALL centralize SQL in reject_history SQL directory
 The service SHALL load SQL from dedicated files under `src/mes_dashboard/sql/reject_history/`.
 
