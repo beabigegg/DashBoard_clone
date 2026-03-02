@@ -23,6 +23,15 @@ const props = defineProps({
 });
 
 const collapsed = ref(false);
+const INPUT_TYPE_LABELS = Object.freeze({
+  lot: 'LOT ID',
+  lot_id: 'LOT ID',
+  work_order: '工單',
+  wafer_lot: 'WAFER LOT',
+  serial_number: '成品流水號',
+  gd_work_order: 'GD 工單',
+  gd_lot_id: 'GD LOT ID',
+});
 
 // Restore from sessionStorage
 try {
@@ -44,6 +53,10 @@ function formatNumber(v) {
   if (v == null || v === 0) return '0';
   return Number(v).toLocaleString();
 }
+
+function formatInputType(value) {
+  return INPUT_TYPE_LABELS[value] || value || 'LOT ID';
+}
 </script>
 
 <template>
@@ -61,7 +74,7 @@ function formatNumber(v) {
           <ul class="block-list">
             <li>偵測站：{{ stationLabel }}</li>
             <template v-if="queryParams.queryMode === 'container'">
-              <li>輸入方式：{{ queryParams.containerInputType === 'lot' ? 'LOT ID' : queryParams.containerInputType }}</li>
+              <li>輸入方式：{{ formatInputType(queryParams.containerInputType) }}</li>
               <li v-if="queryParams.resolvedCount != null">解析數量：{{ queryParams.resolvedCount }} 筆</li>
               <li v-if="queryParams.notFoundCount > 0">未找到：{{ queryParams.notFoundCount }} 筆</li>
             </template>

@@ -251,10 +251,10 @@ def _seed_resolve_mid_section_defect(
 
     if mode == "container":
         resolve_type = str(params.get("resolve_type") or "").strip()
-        if resolve_type not in {"lot_id", "work_order", "wafer_lot"}:
+        if resolve_type not in {"lot_id", "work_order", "wafer_lot", "serial_number", "gd_work_order", "gd_lot_id"}:
             return None, (
                 "INVALID_PARAMS",
-                "resolve_type must be one of: lot_id, work_order, wafer_lot",
+                "resolve_type must be one of: lot_id, work_order, wafer_lot, serial_number, gd_work_order, gd_lot_id",
                 400,
             )
         values = _normalize_strings(params.get("values", []))

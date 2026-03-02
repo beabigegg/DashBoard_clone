@@ -107,6 +107,9 @@ function updateFilters(patch) {
             <option value="lot">LOT</option>
             <option value="work_order">工單</option>
             <option value="wafer_lot">WAFER LOT</option>
+            <option value="serial_number">成品流水號</option>
+            <option value="gd_work_order">GD 工單</option>
+            <option value="gd_lot_id">GD LOT ID</option>
           </select>
         </div>
 

@@ -41,11 +41,12 @@ logger = logging.getLogger('mes_dashboard.query_tool')
 
 # Constants
 BATCH_SIZE = 1000  # Oracle IN clause limit
-MAX_LOT_IDS = 50
-MAX_SERIAL_NUMBERS = 50
-MAX_WORK_ORDERS = 10
+MAX_LOT_IDS = 100
+MAX_SERIAL_NUMBERS = 100
+MAX_WORK_ORDERS = 50
+MAX_GD_WORK_ORDERS = 100
 MAX_EQUIPMENTS = 20
-MAX_DATE_RANGE_DAYS = 90
+MAX_DATE_RANGE_DAYS = 365
 DEFAULT_TIME_WINDOW_HOURS = 168  # 1 week for better PJ_TYPE detection
 ADJACENT_LOTS_COUNT = 3
 
@@ -107,7 +108,7 @@ def validate_lot_input(input_type: str, values: List[str]) -> Optional[str]:
         'gd_lot_id': MAX_LOT_IDS,
         'serial_number': MAX_SERIAL_NUMBERS,
         'work_order': MAX_WORK_ORDERS,
-        'gd_work_order': MAX_WORK_ORDERS,
+        'gd_work_order': MAX_GD_WORK_ORDERS,
     }
 
     limit = limits.get(input_type, MAX_LOT_IDS)

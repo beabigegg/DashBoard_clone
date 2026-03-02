@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
 import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app
 from mes_dashboard.core.cache import NoOpCache
@@ -145,6 +146,49 @@ def test_seed_resolve_query_tool_rejects_reverse_only_type():
     assert response.status_code == 400
     payload = response.get_json()
     assert payload['error']['code'] == 'INVALID_PARAMS'
+
+
+@pytest.mark.parametrize(
+    ("resolve_type", "input_value"),
+    [
+        ("serial_number", "SN-001"),
+        ("gd_work_order", "GD25060001"),
+        ("gd_lot_id", "GD25060502-A11"),
+    ],
+)
+@patch('mes_dashboard.routes.trace_routes.resolve_lots')
+def test_seed_resolve_mid_section_defect_container_supports_reverse_input_types(
+    mock_resolve_lots,
+    resolve_type,
+    input_value,
+):
+    mock_resolve_lots.return_value = {
+        'data': [
+            {
+                'container_id': 'CID-MSD',
+                'lot_id': 'LOT-MSD',
+            }
+        ]
+    }
+
+    client = _client()
+    response = client.post(
+        '/api/trace/seed-resolve',
+        json={
+            'profile': 'mid_section_defect',
+            'params': {
+                'mode': 'container',
+                'resolve_type': resolve_type,
+                'values': [input_value],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['stage'] == 'seed-resolve'
+    assert payload['seed_count'] == 1
+    assert payload['seeds'][0]['container_id'] == 'CID-MSD'
 
 
 def test_seed_resolve_invalid_profile_returns_400():

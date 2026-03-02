@@ -14,6 +14,7 @@ from unittest.mock import patch, MagicMock
 from mes_dashboard import create_app
 from mes_dashboard.core.cache import NoOpCache
 from mes_dashboard.core.rate_limit import reset_rate_limits_for_tests
+from mes_dashboard.services.query_tool_service import MAX_DATE_RANGE_DAYS, MAX_LOT_IDS
 
 
 @pytest.fixture
@@ -119,8 +120,7 @@ class TestResolveEndpoint:
 
     def test_values_over_limit(self, client):
         """Should reject values exceeding limit."""
-        # More than MAX_LOT_IDS (50)
-        values = [f'GA{i:09d}' for i in range(51)]
+        values = [f'GA{i:09d}' for i in range(MAX_LOT_IDS + 1)]
         response = client.post(
             '/api/query-tool/resolve',
             json={
@@ -131,7 +131,7 @@ class TestResolveEndpoint:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '超過上限' in data['error'] or '50' in data['error']
+        assert '超過上限' in data['error'] or str(MAX_LOT_IDS) in data['error']
 
     @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
     def test_resolve_success(self, mock_resolve, client):
@@ -678,20 +678,20 @@ class TestEquipmentPeriodEndpoint:
         assert '結束日期' in data['error'] or '早於' in data['error']
 
     def test_date_range_exceeds_limit(self, client):
-        """Should reject date range > 90 days."""
+        """Should reject date range greater than service max days."""
         response = client.post(
             '/api/query-tool/equipment-period',
             json={
                 'equipment_ids': ['EQ001'],
                 'start_date': '2024-01-01',
-                'end_date': '2024-06-01',
+                'end_date': '2025-01-02',
                 'query_type': 'status_hours'
             }
         )
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '90' in data['error']
+        assert str(MAX_DATE_RANGE_DAYS) in data['error']
 
     def test_invalid_query_type(self, client):
         """Should reject invalid query_type."""

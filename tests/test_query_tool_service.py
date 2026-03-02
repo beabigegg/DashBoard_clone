@@ -21,6 +21,7 @@ from mes_dashboard.services.query_tool_service import (
     MAX_LOT_IDS,
     MAX_SERIAL_NUMBERS,
     MAX_WORK_ORDERS,
+    MAX_GD_WORK_ORDERS,
     MAX_EQUIPMENTS,
     MAX_DATE_RANGE_DAYS,
 )
@@ -53,14 +54,14 @@ class TestValidateDateRange:
 
     def test_exactly_max_range(self):
         """Should allow exactly max range days."""
-        # 90 days from 2024-01-01 is 2024-03-31
-        result = validate_date_range('2024-01-01', '2024-03-31')
+        # 365 days from 2025-01-01 is 2026-01-01
+        result = validate_date_range('2025-01-01', '2026-01-01')
         assert result is None
 
     def test_one_day_over_max_range(self):
         """Should reject one day over max range."""
-        # 91 days
-        result = validate_date_range('2024-01-01', '2024-04-02')
+        # 366 days
+        result = validate_date_range('2025-01-01', '2026-01-02')
         assert result is not None
         assert str(MAX_DATE_RANGE_DAYS) in result
 
@@ -139,6 +140,14 @@ class TestValidateLotInput:
         assert result is not None
         assert '超過上限' in result
         assert str(MAX_WORK_ORDERS) in result
+
+    def test_exceeds_gd_work_order_limit(self):
+        """Should reject GD work orders exceeding limit."""
+        values = [f'GD{i:06d}' for i in range(MAX_GD_WORK_ORDERS + 1)]
+        result = validate_lot_input('gd_work_order', values)
+        assert result is not None
+        assert '超過上限' in result
+        assert str(MAX_GD_WORK_ORDERS) in result
 
     def test_exactly_at_limit(self):
         """Should accept values exactly at limit."""
@@ -452,8 +461,8 @@ class TestServiceConstants:
         assert BATCH_SIZE <= 1000
 
     def test_max_date_range_is_reasonable(self):
-        """Max date range should be 90 days."""
-        assert MAX_DATE_RANGE_DAYS == 90
+        """Max date range should be 365 days."""
+        assert MAX_DATE_RANGE_DAYS == 365
 
     def test_max_lot_ids_is_reasonable(self):
         """Max LOT IDs should be sensible."""
@@ -464,8 +473,12 @@ class TestServiceConstants:
         assert 10 <= MAX_SERIAL_NUMBERS <= 100
 
     def test_max_work_orders_is_reasonable(self):
-        """Max work orders should be low due to expansion."""
-        assert MAX_WORK_ORDERS <= 20  # Work orders can expand to many LOTs
+        """Max work orders should match API contract."""
+        assert MAX_WORK_ORDERS == 50
+
+    def test_max_gd_work_orders_is_reasonable(self):
+        """Max GD work orders should match API contract."""
+        assert MAX_GD_WORK_ORDERS == 100
 
     def test_max_equipments_is_reasonable(self):
         """Max equipments should be sensible."""

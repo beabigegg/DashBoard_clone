@@ -57,7 +57,7 @@ from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS, get_group_
 logger = logging.getLogger('mes_dashboard.mid_section_defect')
 
 # Constants
-MAX_QUERY_DAYS = 180
+MAX_QUERY_DAYS = 365
 CACHE_TTL_DETECTION = 300       # 5 min for detection data
 CACHE_TTL_LOSS_REASONS = 86400  # 24h for loss reason list (daily sync)
 
@@ -613,7 +613,7 @@ def query_analysis_detail(
 def query_all_loss_reasons() -> Optional[Dict[str, Any]]:
     """Get all loss reasons (cached daily in Redis).
 
-    Lightweight query: DISTINCT LOSSREASONNAME from last 180 days.
+    Lightweight query: DISTINCT LOSSREASONNAME from last 365 days.
     Cached with 24h TTL — suitable for dropdown population on page load.
 
     Returns:

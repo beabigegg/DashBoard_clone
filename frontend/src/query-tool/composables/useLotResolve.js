@@ -13,12 +13,12 @@ const INPUT_TYPE_OPTIONS = Object.freeze([
 ]);
 
 const INPUT_LIMITS = Object.freeze({
-  wafer_lot: 50,
-  lot_id: 50,
-  serial_number: 50,
-  work_order: 10,
-  gd_work_order: 10,
-  gd_lot_id: 50,
+  wafer_lot: 100,
+  lot_id: 100,
+  serial_number: 100,
+  work_order: 50,
+  gd_work_order: 100,
+  gd_lot_id: 100,
 });
 
 function normalizeInputType(value) {
@@ -66,7 +66,7 @@ export function useLotResolve(initial = {}) {
 
   const inputTypeOptions = optionPool;
   const inputValues = computed(() => parseInputValues(inputText.value));
-  const inputLimit = computed(() => INPUT_LIMITS[inputType.value] || 50);
+  const inputLimit = computed(() => INPUT_LIMITS[inputType.value] || INPUT_LIMITS.lot_id);
 
   function clearMessages() {
     errorMessage.value = '';
@@ -103,7 +103,7 @@ export function useLotResolve(initial = {}) {
       return labels ? `請輸入 ${labels} 條件` : '請輸入查詢條件';
     }
 
-    const limit = INPUT_LIMITS[inputType.value] || 50;
+    const limit = INPUT_LIMITS[inputType.value] || INPUT_LIMITS.lot_id;
     if (values.length > limit) {
       return `輸入數量超過上限 (${limit} 筆)`;
     }
