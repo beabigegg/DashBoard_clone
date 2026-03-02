@@ -51,9 +51,14 @@ class Config:
     DB_CONNECT_RETRY_DELAY = _float_env("DB_CONNECT_RETRY_DELAY", 1.0)
     DB_CALL_TIMEOUT_MS = _int_env("DB_CALL_TIMEOUT_MS", 55000)
 
-    # Slow-query dedicated connection settings (non-pooled)
+    # Slow-query settings (isolated from main request pool)
     DB_SLOW_CALL_TIMEOUT_MS = _int_env("DB_SLOW_CALL_TIMEOUT_MS", 300000)  # 300s
     DB_SLOW_MAX_CONCURRENT = _int_env("DB_SLOW_MAX_CONCURRENT", 5)
+    DB_SLOW_POOL_ENABLED = _bool_env("DB_SLOW_POOL_ENABLED", True)
+    DB_SLOW_POOL_SIZE = _int_env("DB_SLOW_POOL_SIZE", 2)
+    DB_SLOW_POOL_MAX_OVERFLOW = _int_env("DB_SLOW_POOL_MAX_OVERFLOW", 1)
+    DB_SLOW_POOL_TIMEOUT = _int_env("DB_SLOW_POOL_TIMEOUT", 30)
+    DB_SLOW_POOL_RECYCLE = _int_env("DB_SLOW_POOL_RECYCLE", 1800)
 
     # Auth configuration - MUST be set in .env file
     LDAP_API_URL = os.getenv("LDAP_API_URL", "")
@@ -100,6 +105,7 @@ class DevelopmentConfig(Config):
     DB_CONNECT_RETRY_DELAY = _float_env("DB_CONNECT_RETRY_DELAY", 1.0)
     DB_CALL_TIMEOUT_MS = _int_env("DB_CALL_TIMEOUT_MS", 55000)
     DB_SLOW_MAX_CONCURRENT = _int_env("DB_SLOW_MAX_CONCURRENT", 3)
+    DB_SLOW_POOL_ENABLED = _bool_env("DB_SLOW_POOL_ENABLED", True)
 
 
 class ProductionConfig(Config):
@@ -117,6 +123,7 @@ class ProductionConfig(Config):
     DB_CONNECT_RETRY_DELAY = _float_env("DB_CONNECT_RETRY_DELAY", 1.0)
     DB_CALL_TIMEOUT_MS = _int_env("DB_CALL_TIMEOUT_MS", 55000)
     DB_SLOW_MAX_CONCURRENT = _int_env("DB_SLOW_MAX_CONCURRENT", 5)
+    DB_SLOW_POOL_ENABLED = _bool_env("DB_SLOW_POOL_ENABLED", True)
 
 
 class TestingConfig(Config):
@@ -136,6 +143,7 @@ class TestingConfig(Config):
     DB_CALL_TIMEOUT_MS = 5000
     DB_SLOW_CALL_TIMEOUT_MS = 10000
     DB_SLOW_MAX_CONCURRENT = 1
+    DB_SLOW_POOL_ENABLED = False
     CSRF_ENABLED = False
 
 

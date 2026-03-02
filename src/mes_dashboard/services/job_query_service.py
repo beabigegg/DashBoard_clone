@@ -140,12 +140,19 @@ def _build_resource_filter_sql(
 # Query Functions
 # ============================================================
 
+_JOB_CACHE_TTL = 600  # 10 min for job query results
+
+
 def get_jobs_by_resources(
     resource_ids: List[str],
     start_date: str,
     end_date: str
 ) -> Dict[str, Any]:
     """Query jobs for selected resources within date range.
+
+    For date ranges exceeding BATCH_QUERY_TIME_THRESHOLD_DAYS (default 60),
+    the query is decomposed into monthly chunks via BatchQueryEngine.
+    Results are cached in Redis to avoid redundant Oracle queries.
 
     Args:
         resource_ids: List of RESOURCEID values to query
@@ -165,22 +172,78 @@ def get_jobs_by_resources(
         return {'error': validation_error}
 
     try:
-        # Build resource filter
-        resource_filter, resource_params = _build_resource_filter_sql(
-            resource_ids, return_params=True
+        from mes_dashboard.services.batch_query_engine import (
+            decompose_by_time_range,
+            execute_plan,
+            merge_chunks,
+            compute_query_hash,
+            should_decompose_by_time,
         )
+        from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 
-        # Load SQL template
-        sql = SQLLoader.load("job_query/job_list")
-        sql = sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
+        # Check Redis cache first
+        cache_hash = compute_query_hash({
+            "resource_ids": sorted(resource_ids),
+            "start_date": start_date,
+            "end_date": end_date,
+        })
+        cache_key = f"job_query:{cache_hash}"
+        cached_df = redis_load_df(cache_key)
+        if cached_df is not None:
+            logger.info("Job query cache hit (hash=%s)", cache_hash)
+            df = cached_df
+        elif should_decompose_by_time(start_date, end_date):
+            # --- Engine path for long date ranges ---
+            engine_chunks = decompose_by_time_range(start_date, end_date)
 
-        # Execute query
-        params = {
-            'start_date': start_date,
-            'end_date': end_date,
-            **resource_params,
-        }
-        df = read_sql_df(sql, params)
+            # Build resource filter once (reused across all chunks)
+            resource_filter, resource_params = _build_resource_filter_sql(
+                resource_ids, return_params=True
+            )
+            sql = SQLLoader.load("job_query/job_list")
+            sql = sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
+
+            def _run_job_chunk(chunk, max_rows_per_chunk=None):
+                chunk_params = {
+                    'start_date': chunk['chunk_start'],
+                    'end_date': chunk['chunk_end'],
+                    **resource_params,
+                }
+                result = read_sql_df(sql, chunk_params)
+                return result if result is not None else pd.DataFrame()
+
+            logger.info(
+                "Engine activated for job query: %d chunks, %d resources",
+                len(engine_chunks), len(resource_ids),
+            )
+            execute_plan(
+                engine_chunks, _run_job_chunk,
+                query_hash=cache_hash,
+                cache_prefix="job",
+                chunk_ttl=_JOB_CACHE_TTL,
+            )
+            df = merge_chunks("job", cache_hash)
+            # Store merged result for fast re-access
+            if not df.empty:
+                redis_store_df(cache_key, df, ttl=_JOB_CACHE_TTL)
+        else:
+            # --- Direct path (short query) ---
+            resource_filter, resource_params = _build_resource_filter_sql(
+                resource_ids, return_params=True
+            )
+            sql = SQLLoader.load("job_query/job_list")
+            sql = sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
+            params = {
+                'start_date': start_date,
+                'end_date': end_date,
+                **resource_params,
+            }
+            df = read_sql_df(sql, params)
+            if df is None:
+                df = pd.DataFrame()
+            # Cache the result
+            if not df.empty:
+                redis_store_df(cache_key, df, ttl=_JOB_CACHE_TTL)
 
         # Convert to records
         data = []

@@ -861,7 +861,12 @@ def _fetch_station_detection_data(
     end_date: str,
     station: str = '測試',
 ) -> Optional[pd.DataFrame]:
-    """Execute station_detection.sql and return raw DataFrame."""
+    """Execute station_detection.sql and return raw DataFrame.
+
+    For date ranges exceeding BATCH_QUERY_TIME_THRESHOLD_DAYS (default 60),
+    the query is decomposed into monthly chunks via BatchQueryEngine to
+    prevent Oracle timeout on high-volume stations.
+    """
     cache_key = make_cache_key(
         "mid_section_detection",
         filters={
@@ -885,16 +890,58 @@ def _fetch_station_detection_data(
             STATION_FILTER=wip_filter,
             STATION_FILTER_REJECTS=rej_filter,
         )
-        bind_params = {
-            'start_date': start_date,
-            'end_date': end_date,
-            **wip_params,
-            **rej_params,
-        }
-        df = read_sql_df(sql, bind_params)
-        if df is None:
-            logger.error("Station detection query returned None (station=%s)", station)
-            return None
+
+        from mes_dashboard.services.batch_query_engine import (
+            decompose_by_time_range,
+            execute_plan,
+            merge_chunks,
+            compute_query_hash,
+            should_decompose_by_time,
+        )
+
+        if should_decompose_by_time(start_date, end_date):
+            # --- Engine path for long date ranges ---
+            engine_chunks = decompose_by_time_range(start_date, end_date)
+            engine_hash = compute_query_hash({
+                "station": station,
+                "start_date": start_date,
+                "end_date": end_date,
+            })
+
+            def _run_detection_chunk(chunk, max_rows_per_chunk=None):
+                chunk_params = {
+                    'start_date': chunk['chunk_start'],
+                    'end_date': chunk['chunk_end'],
+                    **wip_params,
+                    **rej_params,
+                }
+                result = read_sql_df(sql, chunk_params)
+                return result if result is not None else pd.DataFrame()
+
+            logger.info(
+                "Engine activated for detection (%s): %d chunks",
+                station, len(engine_chunks),
+            )
+            execute_plan(
+                engine_chunks, _run_detection_chunk,
+                query_hash=engine_hash,
+                cache_prefix="msd_detect",
+                chunk_ttl=CACHE_TTL_DETECTION,
+            )
+            df = merge_chunks("msd_detect", engine_hash)
+        else:
+            # --- Direct path (short query) ---
+            bind_params = {
+                'start_date': start_date,
+                'end_date': end_date,
+                **wip_params,
+                **rej_params,
+            }
+            df = read_sql_df(sql, bind_params)
+            if df is None:
+                logger.error("Station detection query returned None (station=%s)", station)
+                return None
+
         logger.info(
             "Station detection (%s): %d rows, %d unique lots",
             station,

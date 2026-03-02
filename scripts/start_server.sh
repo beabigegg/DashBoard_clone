@@ -23,6 +23,15 @@ PORT=$(echo "$DEFAULT_PORT" | cut -d: -f2)
 
 # Redis configuration
 REDIS_ENABLED="${REDIS_ENABLED:-true}"
+REDIS_KEY_PREFIX="${REDIS_KEY_PREFIX:-mes_wip}"
+REDIS_MAXMEMORY="${REDIS_MAXMEMORY:-512mb}"
+REDIS_MAXMEMORY_POLICY="${REDIS_MAXMEMORY_POLICY:-allkeys-lru}"
+REDIS_PERSISTENCE_ENABLED="${REDIS_PERSISTENCE_ENABLED:-true}"
+REDIS_APPENDONLY="${REDIS_APPENDONLY:-yes}"
+REDIS_APPENDFSYNC="${REDIS_APPENDFSYNC:-everysec}"
+REDIS_SAVE="${REDIS_SAVE:-900 1 300 10 60 10000}"
+REDIS_TTL_CLEANUP_ON_START="${REDIS_TTL_CLEANUP_ON_START:-true}"
+REDIS_TTL_CLEANUP_PATTERNS="${REDIS_TTL_CLEANUP_PATTERNS:-batch:*,reject_dataset:*,hold_dataset:*,resource_dataset:*,job_query:*}"
 # Worker watchdog configuration
 WATCHDOG_ENABLED="${WATCHDOG_ENABLED:-true}"
 # RQ trace worker configuration
@@ -337,6 +346,101 @@ check_redis() {
     fi
 }
 
+apply_redis_runtime_config() {
+    if [ "$REDIS_ENABLED" != "true" ]; then
+        return 0
+    fi
+    if ! command -v redis-cli &> /dev/null; then
+        return 0
+    fi
+    if ! redis-cli ping &>/dev/null; then
+        return 0
+    fi
+
+    local configured=0
+
+    if [ -n "${REDIS_MAXMEMORY:-}" ] && [ "${REDIS_MAXMEMORY}" != "0" ]; then
+        if redis-cli CONFIG SET maxmemory "${REDIS_MAXMEMORY}" >/dev/null 2>&1; then
+            configured=$((configured + 1))
+        else
+            log_warn "Failed to set Redis maxmemory=${REDIS_MAXMEMORY}"
+        fi
+    fi
+
+    if [ -n "${REDIS_MAXMEMORY_POLICY:-}" ]; then
+        if redis-cli CONFIG SET maxmemory-policy "${REDIS_MAXMEMORY_POLICY}" >/dev/null 2>&1; then
+            configured=$((configured + 1))
+        else
+            log_warn "Failed to set Redis maxmemory-policy=${REDIS_MAXMEMORY_POLICY}"
+        fi
+    fi
+
+    if is_enabled "${REDIS_PERSISTENCE_ENABLED:-true}"; then
+        if redis-cli CONFIG SET appendonly "${REDIS_APPENDONLY}" >/dev/null 2>&1; then
+            configured=$((configured + 1))
+        else
+            log_warn "Failed to set Redis appendonly=${REDIS_APPENDONLY}"
+        fi
+        if redis-cli CONFIG SET appendfsync "${REDIS_APPENDFSYNC}" >/dev/null 2>&1; then
+            configured=$((configured + 1))
+        else
+            log_warn "Failed to set Redis appendfsync=${REDIS_APPENDFSYNC}"
+        fi
+        if [ -n "${REDIS_SAVE:-}" ]; then
+            if redis-cli CONFIG SET save "${REDIS_SAVE}" >/dev/null 2>&1; then
+                configured=$((configured + 1))
+            else
+                log_warn "Failed to set Redis save='${REDIS_SAVE}'"
+            fi
+        fi
+    fi
+
+    if redis-cli CONFIG REWRITE >/dev/null 2>&1; then
+        configured=$((configured + 1))
+    else
+        log_warn "Redis CONFIG REWRITE failed (runtime config is active but may not persist restart)"
+    fi
+
+    if [ "$configured" -gt 0 ]; then
+        log_info "Redis runtime config applied (maxmemory=${REDIS_MAXMEMORY}, policy=${REDIS_MAXMEMORY_POLICY}, appendonly=${REDIS_APPENDONLY})"
+    fi
+}
+
+cleanup_redis_keys_without_ttl() {
+    if [ "$REDIS_ENABLED" != "true" ]; then
+        return 0
+    fi
+    if ! command -v redis-cli &> /dev/null; then
+        return 0
+    fi
+    if ! redis-cli ping &>/dev/null; then
+        return 0
+    fi
+    if ! is_enabled "${REDIS_TTL_CLEANUP_ON_START:-true}"; then
+        return 0
+    fi
+
+    local deleted=0
+    local raw_pattern
+    for raw_pattern in ${REDIS_TTL_CLEANUP_PATTERNS//,/ }; do
+        local full_pattern="${REDIS_KEY_PREFIX}:${raw_pattern}"
+        while IFS= read -r key; do
+            [ -z "${key}" ] && continue
+            local pttl
+            pttl=$(redis-cli PTTL "${key}" 2>/dev/null || echo "-2")
+            if [[ "${pttl}" =~ ^-?[0-9]+$ ]] && [ "${pttl}" -lt 0 ]; then
+                if redis-cli DEL "${key}" >/dev/null 2>&1; then
+                    deleted=$((deleted + 1))
+                fi
+            fi
+        done < <(redis-cli --scan --pattern "${full_pattern}" 2>/dev/null)
+    done
+
+    if [ "$deleted" -gt 0 ]; then
+        log_info "Redis TTL cleanup removed ${deleted} stale keys without expiry"
+    fi
+}
+
 start_redis() {
     if [ "$REDIS_ENABLED" != "true" ]; then
         return 0
@@ -349,6 +453,8 @@ start_redis() {
     # Check if Redis is already running
     if redis-cli ping &>/dev/null; then
         log_success "Redis is already running"
+        apply_redis_runtime_config
+        cleanup_redis_keys_without_ttl
         return 0
     fi
 
@@ -359,6 +465,8 @@ start_redis() {
             sleep 1
             if redis-cli ping &>/dev/null; then
                 log_success "Redis service started"
+                apply_redis_runtime_config
+                cleanup_redis_keys_without_ttl
                 return 0
             fi
         fi

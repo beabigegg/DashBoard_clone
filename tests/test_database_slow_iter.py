@@ -117,3 +117,4 @@ def test_runtime_config_includes_fetchmany_size():
     assert "slow_fetchmany_size" in runtime
     assert isinstance(runtime["slow_fetchmany_size"], int)
     assert runtime["slow_fetchmany_size"] > 0
+    assert "slow_pool_enabled" in runtime

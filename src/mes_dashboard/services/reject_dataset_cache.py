@@ -11,21 +11,26 @@ Cache layers:
 
 from __future__ import annotations
 
-import base64
 import hashlib
-import io
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
-from mes_dashboard.core.redis_client import (
-    REDIS_ENABLED,
-    get_key,
-    get_redis_client,
+from mes_dashboard.core.query_spool_store import (
+    clear_spooled_df,
+    load_spooled_df,
+    store_spooled_df,
+)
+from mes_dashboard.core.redis_client import get_key, get_redis_client
+from mes_dashboard.core.redis_df_store import (
+    redis_clear_batch,
+    redis_load_df,
+    redis_store_df,
 )
 from mes_dashboard.services.filter_cache import get_specs_for_groups
 from mes_dashboard.services.reject_history_service import (
@@ -54,6 +59,26 @@ _CACHE_TTL = 900  # 15 minutes
 _CACHE_MAX_SIZE = 8
 _REDIS_NAMESPACE = "reject_dataset"
 _CACHE_SCHEMA_VERSION = 4
+_REJECT_ENGINE_GRAIN_DAYS = max(1, int(os.getenv("REJECT_ENGINE_GRAIN_DAYS", "10")))
+_REJECT_ENGINE_PARALLEL = max(1, int(os.getenv("REJECT_ENGINE_PARALLEL", "2")))
+_REJECT_ENGINE_MAX_ROWS_PER_CHUNK = max(
+    1, int(os.getenv("REJECT_ENGINE_MAX_ROWS_PER_CHUNK", "50000"))
+)
+_REJECT_ENGINE_MAX_TOTAL_ROWS = max(
+    1, int(os.getenv("REJECT_ENGINE_MAX_TOTAL_ROWS", "300000"))
+)
+_REJECT_ENGINE_SPILL_ENABLED = os.getenv("REJECT_ENGINE_SPILL_ENABLED", "true").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+_REJECT_ENGINE_MAX_RESULT_MB = max(
+    1, int(os.getenv("REJECT_ENGINE_MAX_RESULT_MB", "64"))
+)
+_REJECT_ENGINE_SPOOL_TTL_SECONDS = max(
+    300, int(os.getenv("REJECT_ENGINE_SPOOL_TTL_SECONDS", "21600"))
+)
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("reject_dataset", _dataset_cache, "Reject Dataset (L1, 15min)")
@@ -71,44 +96,26 @@ def _make_query_id(params: dict) -> str:
 
 
 # ============================================================
-# Redis L2 helpers (parquet ↔ base64 string)
+# Redis L2 helpers (delegated to shared redis_df_store)
 # ============================================================
 
 
-def _redis_key(query_id: str) -> str:
-    return get_key(f"{_REDIS_NAMESPACE}:{query_id}")
-
-
 def _redis_store_df(query_id: str, df: pd.DataFrame) -> None:
-    if not REDIS_ENABLED:
-        return
-    client = get_redis_client()
-    if client is None:
-        return
-    try:
-        buf = io.BytesIO()
-        df.to_parquet(buf, engine="pyarrow", index=False)
-        encoded = base64.b64encode(buf.getvalue()).decode("ascii")
-        client.setex(_redis_key(query_id), _CACHE_TTL, encoded)
-    except Exception as exc:
-        logger.warning("Failed to store DataFrame in Redis: %s", exc)
+    redis_store_df(f"{_REDIS_NAMESPACE}:{query_id}", df, ttl=_CACHE_TTL)
 
 
 def _redis_load_df(query_id: str) -> Optional[pd.DataFrame]:
-    if not REDIS_ENABLED:
-        return None
+    return redis_load_df(f"{_REDIS_NAMESPACE}:{query_id}")
+
+
+def _redis_delete_df(query_id: str) -> None:
     client = get_redis_client()
     if client is None:
-        return None
+        return
     try:
-        encoded = client.get(_redis_key(query_id))
-        if encoded is None:
-            return None
-        raw = base64.b64decode(encoded)
-        return pd.read_parquet(io.BytesIO(raw), engine="pyarrow")
-    except Exception as exc:
-        logger.warning("Failed to load DataFrame from Redis: %s", exc)
-        return None
+        client.delete(get_key(f"{_REDIS_NAMESPACE}:{query_id}"))
+    except Exception:
+        return
 
 
 # ============================================================
@@ -117,20 +124,68 @@ def _redis_load_df(query_id: str) -> Optional[pd.DataFrame]:
 
 
 def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
-    """Read cache: L1 hit → return, L1 miss → L2 → write L1 → return."""
+    """Read cache: L1 hit → L2 hit → spool fallback."""
     df = _dataset_cache.get(query_id)
     if df is not None:
         return df
+
     df = _redis_load_df(query_id)
     if df is not None:
         _dataset_cache.set(query_id, df)
-    return df
+        return df
+
+    df = load_spooled_df(_REDIS_NAMESPACE, query_id)
+    if df is not None:
+        # Keep large payload out of L1 cache to avoid worker RSS spikes.
+        df_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
+        if df_mb <= min(float(_REJECT_ENGINE_MAX_RESULT_MB), 32.0):
+            _dataset_cache.set(query_id, df)
+        return df
+    return None
 
 
 def _store_df(query_id: str, df: pd.DataFrame) -> None:
     """Write to L1 and L2."""
     _dataset_cache.set(query_id, df)
     _redis_store_df(query_id, df)
+    clear_spooled_df(_REDIS_NAMESPACE, query_id)
+
+
+def _store_query_result(query_id: str, df: pd.DataFrame) -> None:
+    """Store result using Redis for small sets and parquet spill for large sets."""
+    if df is None or df.empty:
+        return
+
+    df_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
+    should_spill = _REJECT_ENGINE_SPILL_ENABLED and (
+        len(df) >= _REJECT_ENGINE_MAX_TOTAL_ROWS or df_mb >= _REJECT_ENGINE_MAX_RESULT_MB
+    )
+
+    if should_spill:
+        spilled = store_spooled_df(
+            _REDIS_NAMESPACE,
+            query_id,
+            df,
+            ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
+        )
+        if spilled:
+            _dataset_cache.invalidate(query_id)
+            _redis_delete_df(query_id)
+            logger.info(
+                "Stored query result via parquet spill (query_id=%s, rows=%d, size_mb=%.1f)",
+                query_id,
+                len(df),
+                df_mb,
+            )
+            return
+        logger.warning(
+            "Parquet spill failed, fallback to dataset cache (query_id=%s, rows=%d, size_mb=%.1f)",
+            query_id,
+            len(df),
+            df_mb,
+        )
+
+    _store_df(query_id, df)
 
 
 # ============================================================
@@ -197,6 +252,7 @@ def execute_primary_query(
     base_params: Dict[str, Any] = {}
     resolution_info: Optional[Dict[str, Any]] = None
     workflow_filter: str = ""  # empty = use default date-based filter
+    container_ids: List[str] = []  # populated in container mode
 
     if mode == "date_range":
         if not start_date or not end_date:
@@ -279,21 +335,131 @@ def execute_primary_query(
 
     # ---- Execute Oracle query (NO policy filters — cache unfiltered) ----
     logger.info("Dataset cache miss for query_id=%s, querying Oracle", query_id)
-    sql = _prepare_sql(
-        "list",
-        where_clause="",
-        base_variant="lot",
-        base_where=base_where,
-        workflow_filter=workflow_filter,
+
+    # Decide whether to route through BatchQueryEngine
+    from mes_dashboard.services.batch_query_engine import (
+        decompose_by_time_range,
+        decompose_by_ids,
+        execute_plan,
+        merge_chunks,
+        compute_query_hash,
+        should_decompose_by_time,
+        should_decompose_by_ids,
+        BATCH_QUERY_TIME_THRESHOLD_DAYS,
     )
-    all_params = {**base_params, "offset": 0, "limit": 999999999}
-    df = read_sql_df(sql, all_params)
-    if df is None:
-        df = pd.DataFrame()
+
+    use_engine = False
+    engine_chunks: Optional[list] = None
+    engine_parallel = 1
+    engine_hash: Optional[str] = None
+
+    if mode == "date_range" and should_decompose_by_time(start_date, end_date):
+        engine_chunks = decompose_by_time_range(
+            start_date,
+            end_date,
+            grain_days=_REJECT_ENGINE_GRAIN_DAYS,
+        )
+        engine_parallel = _REJECT_ENGINE_PARALLEL
+        use_engine = True
+        logger.info(
+            "Engine activated for date_range: %d chunks (query_id=%s, grain_days=%d, parallel=%d)",
+            len(engine_chunks), query_id, _REJECT_ENGINE_GRAIN_DAYS, engine_parallel,
+        )
+    elif mode == "container" and should_decompose_by_ids(container_ids):
+        id_batches = decompose_by_ids(container_ids)
+        engine_chunks = [{"ids": batch} for batch in id_batches]
+        use_engine = True
+        logger.info(
+            "Engine activated for container IDs: %d batches (query_id=%s)",
+            len(engine_chunks), query_id,
+        )
+
+    if use_engine and engine_chunks:
+        # --- Engine path ---
+        engine_hash = compute_query_hash(query_id_input)
+        redis_clear_batch("reject", engine_hash)
+
+        def _run_reject_chunk(chunk, max_rows_per_chunk=None):
+            """Execute one chunk of the reject query via read_sql_df_slow."""
+            chunk_where_parts: List[str] = []
+            chunk_params: Dict[str, Any] = {}
+            chunk_wf_filter = ""
+
+            if "chunk_start" in chunk:
+                # Time-range chunk
+                chunk_where_parts.append(
+                    "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
+                    " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+                )
+                chunk_params["start_date"] = chunk["chunk_start"]
+                chunk_params["end_date"] = chunk["chunk_end"]
+            elif "ids" in chunk:
+                # ID-batch chunk
+                b = QueryBuilder()
+                b.add_in_condition("r.CONTAINERID", chunk["ids"])
+                cid_w, cid_p = b.build_where_only()
+                cid_c = cid_w.strip()
+                if cid_c.upper().startswith("WHERE "):
+                    cid_c = cid_c[6:].strip()
+                chunk_where_parts.append(cid_c)
+                chunk_params.update(cid_p)
+                # Workflow filter for container mode
+                wfb = QueryBuilder()
+                wfb.add_in_condition("r0.CONTAINERID", chunk["ids"])
+                wf_w, _ = wfb.build_where_only()
+                wf_c = wf_w.strip()
+                if wf_c.upper().startswith("WHERE "):
+                    wf_c = wf_c[6:].strip()
+                chunk_wf_filter = wf_c
+
+            chunk_where = " AND ".join(chunk_where_parts)
+            chunk_sql = _prepare_sql(
+                "list",
+                where_clause="",
+                base_variant="lot",
+                base_where=chunk_where,
+                workflow_filter=chunk_wf_filter,
+            )
+            limit = max_rows_per_chunk if max_rows_per_chunk else 500000
+            chunk_params["offset"] = 0
+            chunk_params["limit"] = limit
+            result = read_sql_df(chunk_sql, chunk_params)
+            return result if result is not None else pd.DataFrame()
+
+        execute_plan(
+            engine_chunks,
+            _run_reject_chunk,
+            parallel=engine_parallel,
+            skip_cached=False,
+            query_hash=engine_hash,
+            cache_prefix="reject",
+            chunk_ttl=_CACHE_TTL,
+            max_rows_per_chunk=_REJECT_ENGINE_MAX_ROWS_PER_CHUNK,
+        )
+        df = merge_chunks(
+            "reject",
+            engine_hash,
+            max_total_rows=_REJECT_ENGINE_MAX_TOTAL_ROWS,
+        )
+    else:
+        # --- Direct path (short query, no engine overhead) ---
+        sql = _prepare_sql(
+            "list",
+            where_clause="",
+            base_variant="lot",
+            base_where=base_where,
+            workflow_filter=workflow_filter,
+        )
+        all_params = {**base_params, "offset": 0, "limit": 500000}
+        df = read_sql_df(sql, all_params)
+        if df is None:
+            df = pd.DataFrame()
 
     # ---- Cache unfiltered, return filtered ----
     if not df.empty:
-        _store_df(query_id, df)
+        _store_query_result(query_id, df)
+    if engine_hash:
+        redis_clear_batch("reject", engine_hash)
 
     filtered = _apply_policy_filters(
         df,

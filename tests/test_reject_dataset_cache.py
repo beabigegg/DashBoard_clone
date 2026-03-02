@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+from unittest.mock import MagicMock
+
 import pandas as pd
 import pytest
 
@@ -292,3 +295,359 @@ def test_apply_pareto_selection_filter_supports_multi_dimension_and_logic():
 
     assert len(filtered) == 1
     assert set(filtered["CONTAINERNAME"].tolist()) == {"LOT-002"}
+
+
+# ============================================================
+# 5.9 — 365-day date range → engine decomposition, no Oracle timeout
+# ============================================================
+
+
+class TestEngineDecompositionDateRange:
+    """Verify engine routing for long date ranges."""
+
+    def test_365_day_range_triggers_engine(self, monkeypatch):
+        """5.9: 365-day date range → chunks decomposed, engine path used."""
+        import mes_dashboard.services.batch_query_engine as engine_mod
+
+        # Track calls via engine module (local imports inside function pull from here)
+        engine_calls = {
+            "decompose": 0,
+            "execute": 0,
+            "merge": 0,
+            "chunk_count": 0,
+            "parallel": 0,
+            "max_rows_per_chunk": 0,
+        }
+
+        original_decompose = engine_mod.decompose_by_time_range
+
+        def tracked_decompose(*args, **kwargs):
+            engine_calls["decompose"] += 1
+            return original_decompose(*args, **kwargs)
+
+        def fake_execute_plan(chunks, query_fn, **kwargs):
+            engine_calls["execute"] += 1
+            engine_calls["chunk_count"] = len(chunks)
+            engine_calls["parallel"] = int(kwargs.get("parallel", 1))
+            engine_calls["max_rows_per_chunk"] = int(kwargs.get("max_rows_per_chunk", 0))
+            return kwargs.get("query_hash", "fake_hash")
+
+        result_df = pd.DataFrame({
+            "CONTAINERID": ["C1"],
+            "LOSSREASONNAME": ["R1"],
+            "REJECT_TOTAL_QTY": [10],
+        })
+
+        def fake_merge_chunks(prefix, qhash, **kwargs):
+            engine_calls["merge"] += 1
+            return result_df
+
+        # Mock on engine module (local imports will pick these up)
+        monkeypatch.setattr(engine_mod, "decompose_by_time_range", tracked_decompose)
+        monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
+        monkeypatch.setattr(engine_mod, "merge_chunks", fake_merge_chunks)
+        # Mock service-level helpers
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._prepare_sql",
+            lambda *a, **kw: "SELECT 1 FROM dual",
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._store_df",
+            lambda *a, **kw: None,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._get_cached_df",
+            lambda _: None,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._apply_policy_filters",
+            lambda df, **kw: df,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._build_primary_response",
+            lambda qid, df, meta, ri: {"query_id": qid, "rows": len(df)},
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._build_where_clause",
+            lambda **kw: ("", {}, {}),
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._validate_range",
+            lambda *a: None,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache.redis_clear_batch",
+            lambda *a, **kw: 0,
+        )
+
+        result = cache_svc.execute_primary_query(
+            mode="date_range",
+            start_date="2025-01-01",
+            end_date="2025-12-31",
+        )
+
+        assert engine_calls["decompose"] == 1
+        assert engine_calls["execute"] == 1
+        assert engine_calls["merge"] == 1
+        assert result["rows"] == 1
+
+        expected_chunks = original_decompose(
+            "2025-01-01",
+            "2025-12-31",
+            grain_days=cache_svc._REJECT_ENGINE_GRAIN_DAYS,
+        )
+        assert engine_calls["chunk_count"] == len(expected_chunks)
+        assert engine_calls["parallel"] == cache_svc._REJECT_ENGINE_PARALLEL
+        assert engine_calls["max_rows_per_chunk"] == cache_svc._REJECT_ENGINE_MAX_ROWS_PER_CHUNK
+
+    def test_short_range_skips_engine(self, monkeypatch):
+        """Short date range (<= threshold) uses direct path, no engine."""
+        import mes_dashboard.services.batch_query_engine as engine_mod
+
+        engine_calls = {"decompose": 0}
+
+        original_decompose = engine_mod.decompose_by_time_range
+
+        def tracked_decompose(*args, **kwargs):
+            engine_calls["decompose"] += 1
+            return original_decompose(*args, **kwargs)
+
+        monkeypatch.setattr(engine_mod, "decompose_by_time_range", tracked_decompose)
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._get_cached_df",
+            lambda _: None,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._prepare_sql",
+            lambda *a, **kw: "SELECT 1 FROM dual",
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache.read_sql_df",
+            lambda sql, params: pd.DataFrame({"CONTAINERID": ["C1"]}),
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._store_df",
+            lambda *a, **kw: None,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._apply_policy_filters",
+            lambda df, **kw: df,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._build_primary_response",
+            lambda qid, df, meta, ri: {"query_id": qid, "rows": len(df)},
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._build_where_clause",
+            lambda **kw: ("", {}, {}),
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache.redis_clear_batch",
+            lambda *a, **kw: 0,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._validate_range",
+            lambda *a: None,
+        )
+
+        result = cache_svc.execute_primary_query(
+            mode="date_range",
+            start_date="2025-06-01",
+            end_date="2025-06-30",
+        )
+
+        assert engine_calls["decompose"] == 0  # Engine NOT used
+        assert result["rows"] == 1
+
+
+# ============================================================
+# 5.10 — Large workorder (500+ containers) → ID batching
+# ============================================================
+
+
+class TestEngineDecompositionContainerIDs:
+    """Verify engine routing for large container ID sets."""
+
+    def test_large_container_set_triggers_engine(self, monkeypatch):
+        """5.10: 1500 container IDs → engine ID batching activated."""
+        import mes_dashboard.services.batch_query_engine as engine_mod
+
+        engine_calls = {"execute": 0, "merge": 0}
+        fake_ids = [f"CID-{i:04d}" for i in range(1500)]
+
+        def fake_execute_plan(chunks, query_fn, **kwargs):
+            engine_calls["execute"] += 1
+            # Verify correct number of chunks
+            assert len(chunks) == 2  # 1500 / 1000 = 2 batches
+            return kwargs.get("query_hash", "fake_hash")
+
+        result_df = pd.DataFrame({"CONTAINERID": fake_ids[:5]})
+
+        def fake_merge_chunks(prefix, qhash, **kwargs):
+            engine_calls["merge"] += 1
+            return result_df
+
+        monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
+        monkeypatch.setattr(engine_mod, "merge_chunks", fake_merge_chunks)
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache.resolve_containers",
+            lambda input_type, values: {
+                "container_ids": fake_ids,
+                "resolution_info": {"type": input_type, "count": len(fake_ids)},
+            },
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._get_cached_df",
+            lambda _: None,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._prepare_sql",
+            lambda *a, **kw: "SELECT 1 FROM dual",
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._store_df",
+            lambda *a, **kw: None,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._apply_policy_filters",
+            lambda df, **kw: df,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._build_primary_response",
+            lambda qid, df, meta, ri: {"query_id": qid, "rows": len(df)},
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache._build_where_clause",
+            lambda **kw: ("", {}, {}),
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.reject_dataset_cache.redis_clear_batch",
+            lambda *a, **kw: 0,
+        )
+
+        result = cache_svc.execute_primary_query(
+            mode="container",
+            container_input_type="workorder",
+            container_values=["WO-BIG"],
+        )
+
+        assert engine_calls["execute"] == 1
+        assert engine_calls["merge"] == 1
+
+
+def test_engine_path_stores_mixed_precision_decimal_chunks_without_redis_serialization_error(
+    monkeypatch, caplog
+):
+    """Long-range engine path should handle Decimal object columns in chunk cache."""
+    import mes_dashboard.core.redis_df_store as rds
+    import mes_dashboard.services.batch_query_engine as bqe
+
+    mock_client = MagicMock()
+    stored = {}
+    hashes = {}
+
+    mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
+    mock_client.get.side_effect = lambda k: stored.get(k)
+    mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
+    mock_client.hset.side_effect = lambda k, mapping=None: hashes.setdefault(k, {}).update(mapping or {})
+    mock_client.hgetall.side_effect = lambda k: hashes.get(k, {})
+    mock_client.expire.return_value = None
+
+    engine_row = pd.DataFrame(
+        {
+            "CONTAINERID": ["C-1", "C-2"],
+            "LOSSREASONNAME": ["001_A", "002_B"],
+            "REJECT_TOTAL_QTY": [10, 20],
+            "REJECT_SHARE_PCT": [Decimal("12.345"), Decimal("1.2")],
+            "REJECT_RATE_PCT": [Decimal("0.123456"), Decimal("9.000001")],
+        }
+    )
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _: None)
+    monkeypatch.setattr(cache_svc, "_prepare_sql", lambda *a, **kw: "SELECT 1 FROM dual")
+    monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+    monkeypatch.setattr(cache_svc, "_validate_range", lambda *a: None)
+    monkeypatch.setattr(cache_svc, "_apply_policy_filters", lambda df, **kw: df)
+    monkeypatch.setattr(cache_svc, "_build_primary_response", lambda qid, df, meta, ri: {"rows": len(df)})
+    monkeypatch.setattr(cache_svc, "read_sql_df", lambda sql, params: engine_row.copy())
+    monkeypatch.setattr(cache_svc, "redis_clear_batch", lambda *a, **kw: 0)
+
+    monkeypatch.setattr(rds, "REDIS_ENABLED", True)
+    monkeypatch.setattr(rds, "get_redis_client", lambda: mock_client)
+    monkeypatch.setattr(bqe, "get_redis_client", lambda: mock_client)
+    result = cache_svc.execute_primary_query(
+        mode="date_range",
+        start_date="2025-01-01",
+        end_date="2025-12-31",
+    )
+
+    expected_chunks = bqe.decompose_by_time_range(
+        "2025-01-01",
+        "2025-12-31",
+        grain_days=cache_svc._REJECT_ENGINE_GRAIN_DAYS,
+    )
+    assert result["rows"] == len(expected_chunks) * 2
+    assert "Failed to store DataFrame in Redis" not in caplog.text
+    assert any("batch:reject" in key for key in stored)
+
+
+def test_large_result_spills_to_parquet_and_view_export_use_spool_fallback(monkeypatch):
+    """13.8: long-range oversized result should use spool and still serve view/export."""
+    spool_data = {}
+    df = _build_detail_filter_df().copy()
+
+    cache_svc._dataset_cache.clear()
+    monkeypatch.setattr(cache_svc, "_redis_load_df", lambda _qid: None)
+    monkeypatch.setattr(cache_svc, "_validate_range", lambda *_: None)
+    monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+    monkeypatch.setattr(cache_svc, "_prepare_sql", lambda *a, **kw: "SELECT 1 FROM dual")
+    monkeypatch.setattr(cache_svc, "read_sql_df", lambda sql, params: df.copy())
+    monkeypatch.setattr(cache_svc, "_apply_policy_filters", lambda data, **kw: data)
+    monkeypatch.setattr(
+        cache_svc,
+        "_build_primary_response",
+        lambda qid, result_df, meta, resolution_info: {"query_id": qid, "rows": len(result_df)},
+    )
+
+    monkeypatch.setattr(cache_svc, "_REJECT_ENGINE_SPILL_ENABLED", True)
+    monkeypatch.setattr(cache_svc, "_REJECT_ENGINE_MAX_TOTAL_ROWS", 1)
+    monkeypatch.setattr(cache_svc, "_REJECT_ENGINE_MAX_RESULT_MB", 1)
+    monkeypatch.setattr(cache_svc, "_store_df", lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("_store_df should not be called for spill path")))
+    monkeypatch.setattr(cache_svc, "_redis_delete_df", lambda *_a, **_kw: None)
+
+    def fake_store_spooled_df(namespace, query_id, data, ttl_seconds=None):
+        spool_data[(namespace, query_id)] = data.copy()
+        return True
+
+    def fake_load_spooled_df(namespace, query_id):
+        stored = spool_data.get((namespace, query_id))
+        return stored.copy() if stored is not None else None
+
+    monkeypatch.setattr(cache_svc, "store_spooled_df", fake_store_spooled_df)
+    monkeypatch.setattr(cache_svc, "load_spooled_df", fake_load_spooled_df)
+
+    result = cache_svc.execute_primary_query(
+        mode="date_range",
+        start_date="2025-01-01",
+        end_date="2025-01-31",
+    )
+
+    query_id = result["query_id"]
+    assert result["rows"] == len(df)
+    assert (cache_svc._REDIS_NAMESPACE, query_id) in spool_data
+
+    # Force cache miss for L1/L2 and verify spool fallback serves view/export.
+    cache_svc._dataset_cache.clear()
+    monkeypatch.setattr(cache_svc, "_redis_load_df", lambda _qid: None)
+    monkeypatch.setattr(
+        "mes_dashboard.services.scrap_reason_exclusion_cache.get_excluded_reasons",
+        lambda: [],
+    )
+
+    view_result = cache_svc.apply_view(query_id=query_id, page=1, per_page=200)
+    assert view_result is not None
+    assert view_result["detail"]["pagination"]["total"] == len(df)
+
+    export_rows = cache_svc.export_csv_from_cache(query_id=query_id)
+    assert export_rows is not None
+    assert len(export_rows) == len(df)

@@ -113,6 +113,7 @@ def install_log_redaction_filter(target_logger: logging.Logger | None = None) ->
 
 _ENGINE = None
 _HEALTH_ENGINE = None
+_SLOW_ENGINE = None
 _DB_RUNTIME_CONFIG: Optional[Dict[str, Any]] = None
 
 
@@ -166,6 +167,23 @@ def _from_app_or_env_float(name: str, fallback: float) -> float:
     return float(fallback)
 
 
+def _from_app_or_env_bool(name: str, fallback: bool) -> bool:
+    try:
+        app_value = current_app.config.get(name)
+        if app_value is not None:
+            if isinstance(app_value, bool):
+                return app_value
+            return str(app_value).strip().lower() in {"1", "true", "yes", "on"}
+    except RuntimeError:
+        pass
+
+    env_value = os.getenv(name)
+    if env_value is not None:
+        return env_value.strip().lower() in {"1", "true", "yes", "on"}
+
+    return bool(fallback)
+
+
 def get_db_runtime_config(refresh: bool = False) -> Dict[str, Any]:
     """Get effective DB runtime configuration used by pool and direct connections."""
     global _DB_RUNTIME_CONFIG
@@ -201,6 +219,26 @@ def get_db_runtime_config(refresh: bool = False) -> Dict[str, Any]:
             "DB_SLOW_MAX_CONCURRENT",
             config_class.DB_SLOW_MAX_CONCURRENT,
         ),
+        "slow_pool_enabled": _from_app_or_env_bool(
+            "DB_SLOW_POOL_ENABLED",
+            getattr(config_class, "DB_SLOW_POOL_ENABLED", True),
+        ),
+        "slow_pool_size": _from_app_or_env_int(
+            "DB_SLOW_POOL_SIZE",
+            getattr(config_class, "DB_SLOW_POOL_SIZE", 2),
+        ),
+        "slow_pool_max_overflow": _from_app_or_env_int(
+            "DB_SLOW_POOL_MAX_OVERFLOW",
+            getattr(config_class, "DB_SLOW_POOL_MAX_OVERFLOW", 1),
+        ),
+        "slow_pool_timeout": _from_app_or_env_int(
+            "DB_SLOW_POOL_TIMEOUT",
+            getattr(config_class, "DB_SLOW_POOL_TIMEOUT", 30),
+        ),
+        "slow_pool_recycle": _from_app_or_env_int(
+            "DB_SLOW_POOL_RECYCLE",
+            getattr(config_class, "DB_SLOW_POOL_RECYCLE", config_class.DB_POOL_RECYCLE),
+        ),
         "slow_fetchmany_size": _from_app_or_env_int(
             "DB_SLOW_FETCHMANY_SIZE",
             5000,
@@ -234,6 +272,7 @@ def get_pool_status() -> Dict[str, Any]:
         "saturation": saturation,
         "slow_query_active": get_slow_query_active_count(),
         "slow_query_waiting": get_slow_query_waiting_count(),
+        "slow_pool_enabled": bool(runtime.get("slow_pool_enabled", False)),
     }
 
 
@@ -311,6 +350,43 @@ def get_health_engine():
             runtime["health_pool_timeout"],
         )
     return _HEALTH_ENGINE
+
+
+def get_slow_engine():
+    """Get dedicated SQLAlchemy engine for slow-query workloads.
+
+    Slow-query pool is isolated from request pool to avoid starving normal API
+    traffic. This engine is used only when DB_SLOW_POOL_ENABLED=true.
+    """
+    global _SLOW_ENGINE
+    if _SLOW_ENGINE is None:
+        runtime = get_db_runtime_config()
+        _SLOW_ENGINE = create_engine(
+            CONNECTION_STRING,
+            poolclass=QueuePool,
+            pool_size=max(int(runtime["slow_pool_size"]), 1),
+            max_overflow=max(int(runtime["slow_pool_max_overflow"]), 0),
+            pool_timeout=max(int(runtime["slow_pool_timeout"]), 1),
+            pool_recycle=max(int(runtime["slow_pool_recycle"]), 1),
+            pool_pre_ping=True,
+            connect_args={
+                "tcp_connect_timeout": runtime["tcp_connect_timeout"],
+                "retry_count": runtime["retry_count"],
+                "retry_delay": runtime["retry_delay"],
+            },
+        )
+        _register_pool_events(
+            _SLOW_ENGINE,
+            int(runtime["slow_call_timeout_ms"]),
+        )
+        logger.info(
+            "Slow-query engine created (pool_size=%s, max_overflow=%s, pool_timeout=%s, pool_recycle=%s)",
+            runtime["slow_pool_size"],
+            runtime["slow_pool_max_overflow"],
+            runtime["slow_pool_timeout"],
+            runtime["slow_pool_recycle"],
+        )
+    return _SLOW_ENGINE
 
 
 def _register_pool_events(engine, call_timeout_ms: int):
@@ -413,12 +489,16 @@ def dispose_engine():
 
     Call this during application shutdown to cleanly release resources.
     """
-    global _ENGINE, _HEALTH_ENGINE, _DB_RUNTIME_CONFIG, _SLOW_QUERY_SEMAPHORE
+    global _ENGINE, _HEALTH_ENGINE, _SLOW_ENGINE, _DB_RUNTIME_CONFIG, _SLOW_QUERY_SEMAPHORE
     stop_keepalive()
     if _HEALTH_ENGINE is not None:
         _HEALTH_ENGINE.dispose()
         logger.info("Health engine disposed")
         _HEALTH_ENGINE = None
+    if _SLOW_ENGINE is not None:
+        _SLOW_ENGINE.dispose()
+        logger.info("Slow-query engine disposed")
+        _SLOW_ENGINE = None
     if _ENGINE is not None:
         _ENGINE.dispose()
         logger.info("Database engine disposed, all connections closed")
@@ -493,6 +573,44 @@ def get_db_connection():
         ora_code = _extract_ora_code(exc)
         logger.error(f"Database connection failed - ORA-{ora_code}: {exc}")
         return None
+
+
+def _get_slow_query_connection(
+    runtime: Dict[str, Any],
+    timeout_ms: int,
+):
+    """Acquire a DB-API connection for slow queries.
+
+    Returns:
+        tuple(connection, pooled)
+        - connection: DB-API connection-like object
+        - pooled: True when sourced from isolated slow pool
+    """
+    if bool(runtime.get("slow_pool_enabled", False)):
+        engine = get_slow_engine()
+        conn = engine.raw_connection()
+        conn.call_timeout = timeout_ms
+        logger.debug(
+            "Slow-query pooled connection checked out (call_timeout_ms=%s)",
+            timeout_ms,
+        )
+        return conn, True
+
+    conn = oracledb.connect(
+        **DB_CONFIG,
+        tcp_connect_timeout=runtime["tcp_connect_timeout"],
+        retry_count=runtime["retry_count"],
+        retry_delay=runtime["retry_delay"],
+    )
+    conn.call_timeout = timeout_ms
+    with _DIRECT_CONN_LOCK:
+        global _DIRECT_CONN_COUNTER
+        _DIRECT_CONN_COUNTER += 1
+    logger.debug(
+        "Slow-query direct connection established (call_timeout_ms=%s)",
+        timeout_ms,
+    )
+    return conn, False
 
 
 def _extract_ora_code(exc: Exception) -> str:
@@ -616,11 +734,11 @@ def read_sql_df_slow(
     params: Optional[Dict[str, Any]] = None,
     timeout_seconds: Optional[int] = None,
 ) -> pd.DataFrame:
-    """Execute a slow SQL query with a custom timeout via direct oracledb connection.
+    """Execute a slow SQL query with a custom timeout.
 
-    Unlike read_sql_df which uses the pooled engine (55s timeout),
-    this creates a dedicated connection with a longer call_timeout
-    for known-slow queries (e.g. full table scans on large tables).
+    Unlike read_sql_df which uses the main request pool (55s timeout),
+    this path uses a slow-query channel with longer call_timeout
+    (isolated slow pool when enabled, otherwise direct connection).
 
     Concurrency is limited by a semaphore (DB_SLOW_MAX_CONCURRENT) to
     prevent Oracle connection exhaustion.
@@ -663,19 +781,12 @@ def read_sql_df_slow(
     logger.info("Slow query starting (active=%s, timeout_ms=%s)", active, timeout_ms)
     start_time = time.time()
     conn = None
+    pooled = False
     try:
-        conn = oracledb.connect(
-            **DB_CONFIG,
-            tcp_connect_timeout=runtime["tcp_connect_timeout"],
-            retry_count=runtime["retry_count"],
-            retry_delay=runtime["retry_delay"],
-        )
-        conn.call_timeout = timeout_ms
-        with _DIRECT_CONN_LOCK:
-            global _DIRECT_CONN_COUNTER
-            _DIRECT_CONN_COUNTER += 1
+        conn, pooled = _get_slow_query_connection(runtime, timeout_ms)
         logger.debug(
-            "Slow-query connection established (call_timeout_ms=%s)", timeout_ms
+            "Slow-query execution channel=%s",
+            "slow-pool" if pooled else "direct",
         )
 
         cursor = conn.cursor()
@@ -766,20 +877,13 @@ def read_sql_df_slow_iter(
     logger.info("Slow query iter starting (active=%s, timeout_ms=%s, batch_size=%s)", active, timeout_ms, batch_size)
     start_time = time.time()
     conn = None
+    pooled = False
     total_rows = 0
     try:
-        conn = oracledb.connect(
-            **DB_CONFIG,
-            tcp_connect_timeout=runtime["tcp_connect_timeout"],
-            retry_count=runtime["retry_count"],
-            retry_delay=runtime["retry_delay"],
-        )
-        conn.call_timeout = timeout_ms
-        with _DIRECT_CONN_LOCK:
-            global _DIRECT_CONN_COUNTER
-            _DIRECT_CONN_COUNTER += 1
+        conn, pooled = _get_slow_query_connection(runtime, timeout_ms)
         logger.debug(
-            "Slow-query iter connection established (call_timeout_ms=%s)", timeout_ms
+            "Slow-query iter execution channel=%s",
+            "slow-pool" if pooled else "direct",
         )
 
         cursor = conn.cursor()

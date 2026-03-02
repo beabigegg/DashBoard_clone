@@ -385,7 +385,7 @@ def _resolve_by_lot_id(lot_ids: List[str]) -> Dict[str, Any]:
         CONTAINER_FILTER=builder.get_conditions_sql(),
     )
 
-    df = read_sql_df(sql, builder.params)
+    df = read_sql_df_slow(sql, builder.params)
     data = _df_to_records(df)
     matched, not_found, expansion_info = _match_rows_by_tokens(
         lot_ids,
@@ -424,7 +424,7 @@ def _resolve_by_wafer_lot(wafer_lots: List[str]) -> Dict[str, Any]:
         WAFER_FILTER=builder.get_conditions_sql(),
     )
 
-    df = read_sql_df(sql, builder.params)
+    df = read_sql_df_slow(sql, builder.params)
     data = _df_to_records(df)
     matched, not_found, expansion_info = _match_rows_by_tokens(
         wafer_lots,
@@ -482,7 +482,7 @@ def _resolve_by_gd_lot_id(gd_lot_ids: List[str]) -> Dict[str, Any]:
         CONTAINER_FILTER=builder.get_conditions_sql(),
     )
 
-    df = read_sql_df(sql, builder.params)
+    df = read_sql_df_slow(sql, builder.params)
     data = _df_to_records(df)
     matched, not_found, expansion_info = _match_rows_by_tokens(
         gd_lot_ids,
@@ -574,7 +574,7 @@ def _resolve_by_serial_number(serial_numbers: List[str]) -> Dict[str, Any]:
             config['sql_name'],
             **{config['filter_key']: builder.get_conditions_sql()},
         )
-        df = read_sql_df(sql, builder.params)
+        df = read_sql_df_slow(sql, builder.params)
         data = _df_to_records(df)
         matched, _, _ = _match_rows_by_tokens(
             tokens,
@@ -660,7 +660,7 @@ def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
         WORK_ORDER_FILTER=builder.get_conditions_sql(),
     )
 
-    df = read_sql_df(sql, builder.params)
+    df = read_sql_df_slow(sql, builder.params)
     data = _df_to_records(df)
     matched, not_found, expansion_info = _match_rows_by_tokens(
         work_orders,
@@ -703,7 +703,7 @@ def _resolve_by_gd_work_order(work_orders: List[str]) -> Dict[str, Any]:
         WORK_ORDER_FILTER=builder.get_conditions_sql(),
     )
 
-    df = read_sql_df(sql, builder.params)
+    df = read_sql_df_slow(sql, builder.params)
     data = _df_to_records(df)
     matched, not_found, expansion_info = _match_rows_by_tokens(
         work_orders,
@@ -853,7 +853,7 @@ def get_adjacent_lots(
             'time_window_hours': time_window_hours,
         }
 
-        df = read_sql_df(sql, params)
+        df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
         logger.debug(f"Adjacent lots: {len(data)} records for {equipment_id}")
@@ -1127,11 +1127,8 @@ def get_lot_split_merge_history(
             f"Starting split/merge history query for MFGORDERNAME={work_order} mode={mode}"
         )
 
-        if full_history:
-            # Full mode uses dedicated slow query timeout path.
-            df = read_sql_df_slow(sql, params)
-        else:
-            df = read_sql_df(sql, params)
+        # Both modes use slow query path for timeout protection.
+        df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
         # Process records for display
@@ -1209,7 +1206,7 @@ def _get_mfg_order_for_lot(container_id: str) -> Optional[str]:
         WHERE CONTAINERID = :container_id
           AND MFGORDERNAME IS NOT NULL
         """
-        df = read_sql_df(sql, {'container_id': container_id})
+        df = read_sql_df_slow(sql, {'container_id': container_id})
         if not df.empty:
             return df.iloc[0]['MFGORDERNAME']
         return None
@@ -1304,7 +1301,7 @@ def get_lot_splits(
         sql = SQLLoader.load("query_tool/lot_splits")
         params = {'container_id': container_id}
 
-        df = read_sql_df(sql, params)
+        df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
         # Group by FINISHEDNAME to show combined structure
@@ -1395,7 +1392,7 @@ def get_lot_jobs(
             'time_end': end,
         }
 
-        df = read_sql_df(sql, params)
+        df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
         logger.debug(f"LOT jobs: {len(data)} records for {equipment_id}")
@@ -1452,7 +1449,7 @@ def get_lot_jobs_with_history(
             'time_end': end,
         }
 
-        df = read_sql_df(sql, params)
+        df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
         logger.debug(
@@ -1503,16 +1500,33 @@ def get_equipment_status_hours(
         return {'error': validation_error}
 
     try:
-        builder = QueryBuilder()
-        builder.add_in_condition("r.RESOURCEID", equipment_ids)
-        sql = SQLLoader.load_with_params(
-            "query_tool/equipment_status_hours",
-            EQUIPMENT_FILTER=builder.get_conditions_sql(),
-        )
+        from mes_dashboard.services.batch_query_engine import compute_query_hash
+        from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 
-        params = {'start_date': start_date, 'end_date': end_date}
-        params.update(builder.params)
-        df = read_sql_df(sql, params)
+        cache_hash = compute_query_hash({
+            "fn": "equipment_status_hours",
+            "equipment_ids": sorted(equipment_ids),
+            "start_date": start_date,
+            "end_date": end_date,
+        })
+        cache_key = f"qt:equip_status:{cache_hash}"
+        cached_df = redis_load_df(cache_key)
+
+        if cached_df is not None:
+            df = cached_df
+        else:
+            builder = QueryBuilder()
+            builder.add_in_condition("r.RESOURCEID", equipment_ids)
+            sql = SQLLoader.load_with_params(
+                "query_tool/equipment_status_hours",
+                EQUIPMENT_FILTER=builder.get_conditions_sql(),
+            )
+            params = {'start_date': start_date, 'end_date': end_date}
+            params.update(builder.params)
+            df = read_sql_df_slow(sql, params)
+            if df is not None and not df.empty:
+                redis_store_df(cache_key, df, ttl=300)
+
         data = _df_to_records(df)
 
         # Calculate totals
@@ -1584,7 +1598,7 @@ def get_equipment_lots(
 
         params = {'start_date': start_date, 'end_date': end_date}
         params.update(builder.params)
-        df = read_sql_df(sql, params)
+        df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
         logger.info(f"Equipment lots: {len(data)} records")
@@ -1634,7 +1648,7 @@ def get_equipment_materials(
 
         params = {'start_date': start_date, 'end_date': end_date}
         params.update(builder.params)
-        df = read_sql_df(sql, params)
+        df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
         logger.info(f"Equipment materials: {len(data)} records")
@@ -1684,7 +1698,7 @@ def get_equipment_rejects(
 
         params = {'start_date': start_date, 'end_date': end_date}
         params.update(builder.params)
-        df = read_sql_df(sql, params)
+        df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
         logger.info(f"Equipment rejects: {len(data)} records")
@@ -1736,7 +1750,7 @@ def get_equipment_jobs(
 
         params = {'start_date': start_date, 'end_date': end_date}
         params.update(builder.params)
-        df = read_sql_df(sql, params)
+        df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
         logger.info(f"Equipment jobs: {len(data)} records")

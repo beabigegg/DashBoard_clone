@@ -11,9 +11,7 @@ Cache layers:
 
 from __future__ import annotations
 
-import base64
 import hashlib
-import io
 import json
 import logging
 from functools import lru_cache
@@ -24,11 +22,7 @@ import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
-from mes_dashboard.core.redis_client import (
-    REDIS_ENABLED,
-    get_key,
-    get_redis_client,
-)
+from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 from mes_dashboard.services.filter_cache import get_workcenter_group as _get_wc_group
 from mes_dashboard.services.hold_history_service import (
     _clean_text,
@@ -79,44 +73,16 @@ def _make_query_id(params: dict) -> str:
 
 
 # ============================================================
-# Redis L2 helpers (parquet <-> base64 string)
+# Redis L2 helpers (delegated to shared redis_df_store)
 # ============================================================
 
 
-def _redis_key(query_id: str) -> str:
-    return get_key(f"{_REDIS_NAMESPACE}:{query_id}")
-
-
 def _redis_store_df(query_id: str, df: pd.DataFrame) -> None:
-    if not REDIS_ENABLED:
-        return
-    client = get_redis_client()
-    if client is None:
-        return
-    try:
-        buf = io.BytesIO()
-        df.to_parquet(buf, engine="pyarrow", index=False)
-        encoded = base64.b64encode(buf.getvalue()).decode("ascii")
-        client.setex(_redis_key(query_id), _CACHE_TTL, encoded)
-    except Exception as exc:
-        logger.warning("Failed to store DataFrame in Redis: %s", exc)
+    redis_store_df(f"{_REDIS_NAMESPACE}:{query_id}", df, ttl=_CACHE_TTL)
 
 
 def _redis_load_df(query_id: str) -> Optional[pd.DataFrame]:
-    if not REDIS_ENABLED:
-        return None
-    client = get_redis_client()
-    if client is None:
-        return None
-    try:
-        encoded = client.get(_redis_key(query_id))
-        if encoded is None:
-            return None
-        raw = base64.b64decode(encoded)
-        return pd.read_parquet(io.BytesIO(raw), engine="pyarrow")
-    except Exception as exc:
-        logger.warning("Failed to load DataFrame from Redis: %s", exc)
-        return None
+    return redis_load_df(f"{_REDIS_NAMESPACE}:{query_id}")
 
 
 # ============================================================
@@ -164,11 +130,49 @@ def execute_primary_query(
         logger.info(
             "Hold dataset cache miss for query_id=%s, querying Oracle", query_id
         )
-        sql = _load_sql("base_facts")
-        params = {"start_date": start_date, "end_date": end_date}
-        df = read_sql_df(sql, params)
-        if df is None:
-            df = pd.DataFrame()
+
+        from mes_dashboard.services.batch_query_engine import (
+            decompose_by_time_range,
+            execute_plan,
+            merge_chunks,
+            compute_query_hash,
+            should_decompose_by_time,
+        )
+
+        if should_decompose_by_time(start_date, end_date):
+            # --- Engine path for long date ranges ---
+            engine_chunks = decompose_by_time_range(start_date, end_date)
+            engine_hash = compute_query_hash(
+                {"start_date": start_date, "end_date": end_date}
+            )
+            base_sql = _load_sql("base_facts")
+
+            def _run_hold_chunk(chunk, max_rows_per_chunk=None):
+                params = {
+                    "start_date": chunk["chunk_start"],
+                    "end_date": chunk["chunk_end"],
+                }
+                result = read_sql_df(base_sql, params)
+                return result if result is not None else pd.DataFrame()
+
+            logger.info(
+                "Engine activated for hold: %d chunks (query_id=%s)",
+                len(engine_chunks), query_id,
+            )
+            execute_plan(
+                engine_chunks, _run_hold_chunk,
+                query_hash=engine_hash,
+                cache_prefix="hold",
+                chunk_ttl=_CACHE_TTL,
+            )
+            df = merge_chunks("hold", engine_hash)
+        else:
+            # --- Direct path (short query) ---
+            sql = _load_sql("base_facts")
+            params = {"start_date": start_date, "end_date": end_date}
+            df = read_sql_df(sql, params)
+            if df is None:
+                df = pd.DataFrame()
 
         if not df.empty:
             df["_QUERY_START"] = pd.Timestamp(start_date)
