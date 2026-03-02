@@ -1,4 +1,7 @@
-## MODIFIED Requirements
+## Purpose
+Define stable requirements for hold-history-api.
+
+## Requirements
 
 ### Requirement: Hold History API SHALL provide daily trend data with Redis caching
 The Hold History API SHALL return trend, reason-pareto, duration, and list data from a single cached dataset via a two-phase query pattern (POST /query + GET /view). The old independent GET endpoints for trend, reason-pareto, duration, and list SHALL be replaced.
@@ -60,3 +63,11 @@ The department endpoint SHALL remain as a separate Oracle query due to its uniqu
 - **WHEN** `GET /api/hold-history/department` is called
 - **THEN** it SHALL continue to execute its own Oracle query
 - **THEN** it SHALL NOT use the dataset cache
+
+### Requirement: Database query execution path
+The hold-history service (`hold_history_service.py`) SHALL use `read_sql_df_slow` (dedicated connection) instead of `read_sql_df` (pooled connection) for all Oracle queries.
+
+#### Scenario: Hold history queries use dedicated connection
+- **WHEN** any hold-history query is executed (trend, pareto, duration, list)
+- **THEN** it uses `read_sql_df_slow` which creates a dedicated Oracle connection outside the pool
+- **AND** the connection has a 300-second call_timeout (configurable)

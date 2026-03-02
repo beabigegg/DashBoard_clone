@@ -1,4 +1,7 @@
-## MODIFIED Requirements
+## Purpose
+Define stable requirements for hold-history-page.
+
+## Requirements
 
 ### Requirement: Hold History page SHALL display a filter bar with date range and hold type
 The page SHALL provide a filter bar for selecting date range and hold type classification. On query, the page SHALL use a two-phase flow: POST /query returns queryId, subsequent filter changes use GET /view.
@@ -32,3 +35,10 @@ The page SHALL provide a filter bar for selecting date range and hold type class
 #### Scenario: Department still uses separate API
 - **WHEN** department data needs to load or reload
 - **THEN** the page SHALL call `GET /api/hold-history/department` separately
+
+### Requirement: Frontend API timeout
+The hold-history page SHALL use a 360-second API timeout (up from 60 seconds) for all Oracle-backed API calls.
+
+#### Scenario: Large date range query completes
+- **WHEN** a user queries hold history for a long date range
+- **THEN** the frontend does not abort the request for at least 360 seconds

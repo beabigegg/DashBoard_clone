@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+Define stable requirements for query-tool-lot-trace.
+
+## Requirements
 
 ### Requirement: Query-tool page SHALL use tab-based layout separating LOT tracing from equipment queries
 The query-tool page SHALL present two top-level tabs: "LOT 追蹤" and "設備查詢", each with independent state and UI.
@@ -150,3 +153,11 @@ The legacy `frontend/src/query-tool/main.js` (448L vanilla JS) and `frontend/src
 - **WHEN** the rewrite is complete
 - **THEN** `frontend/src/query-tool/main.js` SHALL contain only the Vite entry point (createApp + mount)
 - **THEN** `frontend/src/query-tool/style.css` SHALL be deleted (all styling via Tailwind)
+
+### Requirement: Slow query timeout configuration
+The query-tool service `read_sql_df_slow` call for full split/merge history SHALL use the config-driven default timeout instead of a hardcoded 120-second timeout.
+
+#### Scenario: Full history query uses config timeout
+- **WHEN** `full_history=True` split/merge query is executed
+- **THEN** it uses `read_sql_df_slow` with the default timeout from `DB_SLOW_CALL_TIMEOUT_MS` (300s)
+- **AND** the hardcoded `timeout_seconds=120` parameter is removed

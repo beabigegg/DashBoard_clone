@@ -26,6 +26,7 @@ const BUCKET_LABELS = {
 
 const HEADERS = [
   { key: 'lot_id', label: 'LOT ID' },
+  { key: 'package', label: 'Package' },
   { key: 'product', label: 'Product' },
   { key: 'qty', label: 'QTY' },
   { key: 'step', label: '站點' },
@@ -153,6 +154,7 @@ function currentSortLabel(columnKey) {
         <tbody>
           <tr v-for="lot in sortedLots" :key="`${lot.lot_id}-${lot.step}-${lot.move_in_time}`">
             <td>{{ formatValue(lot.lot_id) }}</td>
+            <td>{{ formatValue(lot.package) }}</td>
             <td>{{ formatValue(lot.product) }}</td>
             <td class="cell-number">{{ formatQty(lot.qty) }}</td>
             <td>{{ formatValue(lot.step) }}</td>

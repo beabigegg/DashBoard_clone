@@ -1,4 +1,7 @@
-## MODIFIED Requirements
+## Purpose
+Define stable requirements for progressive-trace-ux.
+
+## Requirements
 
 ### Requirement: query-tool lineage tab SHALL load on-demand
 The query-tool lineage tree SHALL auto-fire lineage API calls after lot resolution with concurrency-limited parallel requests and progressive rendering, while preserving on-demand expand/collapse for tree navigation.
@@ -14,3 +17,10 @@ The query-tool lineage tree SHALL auto-fire lineage API calls after lot resoluti
 - **THEN** each lot's lineage data SHALL be preserved independently (not re-fetched)
 - **WHEN** a new resolve query is executed
 - **THEN** all cached lineage data SHALL be cleared
+
+### Requirement: Trace stage timeout
+The `useTraceProgress` composable's `DEFAULT_STAGE_TIMEOUT_MS` SHALL be 360000 (360 seconds) to accommodate large-scale trace operations.
+
+#### Scenario: Large trace operation completes
+- **WHEN** a trace stage (seed-resolve, lineage, or events) takes up to 300 seconds
+- **THEN** the frontend does not abort the stage request

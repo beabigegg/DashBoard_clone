@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+Define stable requirements for query-tool-equipment.
+
+## Requirements
 
 ### Requirement: Equipment tab SHALL provide equipment selection with date range filtering
 The equipment tab SHALL allow selecting multiple equipment and a date range for all sub-tab queries.
@@ -70,3 +73,10 @@ Every equipment sub-tab SHALL have its own export button calling the existing ex
 - **WHEN** the user clicks export on any equipment sub-tab
 - **THEN** the system SHALL call `POST /api/query-tool/export-csv` with the appropriate `export_type` (equipment_lots, equipment_jobs, equipment_rejects)
 - **THEN** the exported params SHALL include the current equipment_ids/equipment_names and date range
+
+### Requirement: Frontend API timeout
+The query-tool equipment query, lot detail, lot jobs table, lot resolve, lot lineage, and reverse lineage composables SHALL use a 360-second API timeout for all Oracle-backed API calls.
+
+#### Scenario: Equipment period query completes
+- **WHEN** a user queries equipment history for a long period
+- **THEN** the frontend does not abort the request for at least 360 seconds

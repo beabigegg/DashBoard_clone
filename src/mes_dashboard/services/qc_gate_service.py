@@ -158,6 +158,7 @@ def _build_lot_payload(row: pd.Series, reference_time: Optional[pd.Timestamp]) -
     return {
         'lot_id': lot_id,
         'container_id': container_id,
+        'package': _safe_value(row.get('PACKAGE_LEF')),
         'product': product,
         'qty': _safe_int(row.get('QTY')),
         'step': step,
