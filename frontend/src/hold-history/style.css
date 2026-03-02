@@ -135,6 +135,14 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
+.hold-history-summary-row .summary-card {
+  container-type: inline-size;
+}
+
+.hold-history-summary-row .summary-value {
+  font-size: clamp(14px, 12cqi, 28px);
+}
+
 .summary-card {
   border: 1px solid var(--border);
 }
