@@ -12,6 +12,7 @@ const props = defineProps({
   resolutionInfo: { type: Object, default: null },
   loading: { type: Object, required: true },
   activeFilterChips: { type: Array, default: () => [] },
+  paretoDisplayScope: { type: String, default: 'all' },
 });
 
 const emit = defineEmits([
@@ -20,6 +21,7 @@ const emit = defineEmits([
   'export-csv',
   'remove-chip',
   'pareto-scope-toggle',
+  'pareto-display-scope-change',
   'update:queryMode',
   'update:containerInputType',
   'update:containerInput',
@@ -191,6 +193,15 @@ function emitSupplementary(patch) {
           />
           Pareto 僅顯示累計前 80%
         </label>
+        <label class="filter-label">顯示範圍</label>
+        <select
+          class="dimension-select pareto-scope-select"
+          :value="paretoDisplayScope"
+          @change="$emit('pareto-display-scope-change', $event.target.value)"
+        >
+          <option value="all">全部顯示</option>
+          <option value="top20">只顯示 TOP 20</option>
+        </select>
       </div>
       <div class="supplementary-row">
         <div class="filter-group">

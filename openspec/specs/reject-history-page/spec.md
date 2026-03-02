@@ -74,33 +74,63 @@ The page SHALL show both quantity trend and rate trend to avoid mixing unit scal
 - **THEN** rate values SHALL be displayed as percentages
 
 ### Requirement: Reject History page SHALL provide reason Pareto analysis
-The page SHALL provide a Pareto view for loss reasons and support downstream filtering.
+The page SHALL display 6 Pareto charts simultaneously (不良原因, PACKAGE, TYPE, WORKFLOW, 站點, 機台) in a 3-column grid layout with cross-filter linkage, replacing the single-dimension dropdown switcher.
+
+#### Scenario: Multi-Pareto grid layout
+- **WHEN** Pareto data is loaded
+- **THEN** 6 Pareto charts SHALL be rendered simultaneously in a 3-column grid (3×2)
+- **THEN** each chart SHALL display one dimension: 不良原因, PACKAGE, TYPE, WORKFLOW, 站點, 機台
+- **THEN** there SHALL be no dimension dropdown selector
 
 #### Scenario: Pareto rendering and ordering
 - **WHEN** Pareto data is loaded
-- **THEN** items SHALL be sorted by selected metric descending
-- **THEN** a cumulative percentage line SHALL be shown
+- **THEN** items in each Pareto SHALL be sorted by selected metric descending
+- **THEN** each Pareto SHALL show a cumulative percentage line
 
 #### Scenario: Pareto 80% filter is managed in supplementary filters
 - **WHEN** the page first loads Pareto
 - **THEN** supplementary filters SHALL include "Pareto 僅顯示累計前 80%" control
 - **THEN** the control SHALL default to enabled
+- **THEN** the 80% filter SHALL apply uniformly to all 6 Pareto charts
 
-#### Scenario: TYPE/WORKFLOW/機台 support display scope selector
-- **WHEN** Pareto dimension is `TYPE`, `WORKFLOW`, or `機台`
-- **THEN** the UI SHALL provide `全部顯示` and `只顯示 TOP 20` options
-- **THEN** `全部顯示` SHALL still respect the current 80% cumulative filter setting
+#### Scenario: Cross-filter linkage between Pareto charts
+- **WHEN** user clicks an item in one Pareto chart (e.g., selects reason "A")
+- **THEN** the other 5 Pareto charts SHALL recalculate with the selection applied as a filter
+- **THEN** the clicked Pareto chart itself SHALL NOT be filtered by its own selections
+- **THEN** the detail table below SHALL apply ALL selections from ALL dimensions
 
 #### Scenario: Pareto click filtering supports multi-select
-- **WHEN** user clicks Pareto bars or table rows
+- **WHEN** user clicks Pareto bars or table rows in any dimension
 - **THEN** clicked items SHALL become active selected chips
-- **THEN** multiple selected items SHALL be supported at the same time
-- **THEN** detail list SHALL reload using current selected Pareto items as additional filter criteria
+- **THEN** multiple selected items SHALL be supported within each dimension
+- **THEN** multiple dimensions SHALL support simultaneous selections
 
 #### Scenario: Re-click clears selected item only
 - **WHEN** user clicks an already selected Pareto item
 - **THEN** only that item SHALL be removed from selection
-- **THEN** remaining selected items SHALL stay active
+- **THEN** remaining selected items across all dimensions SHALL stay active
+- **THEN** all Pareto charts SHALL recalculate to reflect the updated selections
+
+#### Scenario: Filter chips display all dimension selections
+- **WHEN** items are selected across multiple Pareto dimensions
+- **THEN** selected items SHALL be displayed as chips grouped by dimension label
+- **THEN** each chip SHALL show the dimension label and selected value (e.g., "TYPE: X")
+- **THEN** clicking a chip's remove button SHALL deselect that item and trigger recalculation
+
+#### Scenario: Responsive grid layout
+- **WHEN** viewport is desktop width (>1200px)
+- **THEN** Pareto charts SHALL render in a 3-column grid
+- **WHEN** viewport is medium width (768px–1200px)
+- **THEN** Pareto charts SHALL render in a 2-column grid
+- **WHEN** viewport is below 768px
+- **THEN** Pareto charts SHALL stack in a single column
+
+#### Scenario: TOP20/ALL display scope control
+- **WHEN** Pareto grid is displayed
+- **THEN** supplementary filters SHALL include a global "只顯示 TOP 20" toggle
+- **THEN** when enabled, applicable dimensions (TYPE, WORKFLOW, 機台) SHALL truncate to top 20 items
+- **THEN** the toggle SHALL apply uniformly to all applicable Pareto charts (not per-chart selectors)
+- **THEN** dimensions not in the applicable set (不良原因, PACKAGE, 站點) SHALL be unaffected by this toggle
 
 ### Requirement: Reject History page SHALL show paginated detail rows
 The page SHALL provide a paginated detail table for investigation and traceability.
@@ -119,7 +149,7 @@ The page SHALL allow users to export records using the exact active filters.
 
 #### Scenario: Export with all active filters
 - **WHEN** user clicks "匯出 CSV"
-- **THEN** export request SHALL include current primary filters, supplementary filters, trend-date filters, metric filters, and Pareto-selected items
+- **THEN** export request SHALL include current primary filters, supplementary filters, trend-date filters, metric filters, and all Pareto-selected items from all 6 dimensions
 - **THEN** downloaded file SHALL contain exactly the same rows currently represented by the detail list filter context
 
 #### Scenario: Export remains UTF-8 Excel compatible
@@ -197,7 +227,8 @@ The page template SHALL delegate sections to focused sub-components, following t
 - **THEN** the filter panel SHALL be a separate `FilterPanel.vue` component
 - **THEN** the KPI summary cards SHALL be a separate `SummaryCards.vue` component
 - **THEN** the trend chart SHALL be a separate `TrendChart.vue` component
-- **THEN** the pareto section (chart + table) SHALL be a separate `ParetoSection.vue` component
+- **THEN** the pareto grid SHALL be a separate `ParetoGrid.vue` component containing 6 `ParetoSection.vue` instances
+- **THEN** each individual pareto chart+table SHALL be a `ParetoSection.vue` component
 - **THEN** the detail table with pagination SHALL be a separate `DetailTable.vue` component
 
 #### Scenario: App.vue acts as orchestrator

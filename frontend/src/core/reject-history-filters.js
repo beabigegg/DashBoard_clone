@@ -173,8 +173,7 @@ export function buildViewParams(queryId, {
   metricFilter = 'all',
   trendDates = [],
   detailReason = '',
-  paretoDimension = '',
-  paretoValues = [],
+  paretoSelections = {},
   page = 1,
   perPage = 50,
   policyFilters = {},
@@ -198,13 +197,19 @@ export function buildViewParams(queryId, {
   if (detailReason) {
     params.detail_reason = detailReason;
   }
-  const normalizedParetoDimension = normalizeText(paretoDimension).toLowerCase();
-  const normalizedParetoValues = normalizeArray(paretoValues);
-  if (normalizedParetoDimension) {
-    params.pareto_dimension = normalizedParetoDimension;
-  }
-  if (normalizedParetoValues.length > 0) {
-    params.pareto_values = normalizedParetoValues;
+  const selectionParamMap = {
+    reason: 'sel_reason',
+    package: 'sel_package',
+    type: 'sel_type',
+    workflow: 'sel_workflow',
+    workcenter: 'sel_workcenter',
+    equipment: 'sel_equipment',
+  };
+  for (const [dimension, paramName] of Object.entries(selectionParamMap)) {
+    const normalizedValues = normalizeArray(paretoSelections?.[dimension]);
+    if (normalizedValues.length > 0) {
+      params[paramName] = normalizedValues;
+    }
   }
   params.page = page || 1;
   params.per_page = perPage || 50;

@@ -256,6 +256,54 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertIs(kwargs['exclude_pb_diode'], False)
         mock_sql_pareto.assert_not_called()
 
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
+    def test_batch_pareto_passes_multi_dimension_selection_params(self, mock_batch_pareto):
+        mock_batch_pareto.return_value = {
+            'dimensions': {
+                'reason': {'items': []},
+                'package': {'items': []},
+                'type': {'items': []},
+                'workflow': {'items': []},
+                'workcenter': {'items': []},
+                'equipment': {'items': []},
+            }
+        }
+
+        response = self.client.get(
+            '/api/reject-history/batch-pareto'
+            '?query_id=qid-001'
+            '&metric_mode=reject_total'
+            '&pareto_scope=all'
+            '&pareto_display_scope=top20'
+            '&sel_reason=001_A'
+            '&sel_type=TYPE-A'
+            '&sel_type=TYPE-B'
+            '&include_excluded_scrap=true'
+            '&exclude_material_scrap=false'
+            '&exclude_pb_diode=false'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        _, kwargs = mock_batch_pareto.call_args
+        self.assertEqual(kwargs['query_id'], 'qid-001')
+        self.assertEqual(kwargs['pareto_display_scope'], 'top20')
+        self.assertEqual(kwargs['pareto_scope'], 'all')
+        self.assertEqual(kwargs['pareto_selections'], {'reason': ['001_A'], 'type': ['TYPE-A', 'TYPE-B']})
+        self.assertIs(kwargs['include_excluded_scrap'], True)
+        self.assertIs(kwargs['exclude_material_scrap'], False)
+        self.assertIs(kwargs['exclude_pb_diode'], False)
+
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto', return_value=None)
+    def test_batch_pareto_cache_miss_returns_400(self, _mock_batch_pareto):
+        response = self.client.get('/api/reject-history/batch-pareto?query_id=missing-qid')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload['success'])
+        self.assertEqual(payload['error'], 'cache_miss')
+
     @patch('mes_dashboard.routes.reject_history_routes.apply_view')
     def test_view_passes_pareto_multi_select_filters(self, mock_apply_view):
         mock_apply_view.return_value = {
@@ -296,6 +344,58 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertFalse(payload['success'])
         mock_apply_view.assert_not_called()
 
+    @patch('mes_dashboard.routes.reject_history_routes.apply_view')
+    def test_view_passes_multi_dimension_selection_filters(self, mock_apply_view):
+        mock_apply_view.return_value = {
+            'analytics_raw': [],
+            'summary': {},
+            'detail': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 1}},
+        }
+
+        response = self.client.get(
+            '/api/reject-history/view'
+            '?query_id=qid-001'
+            '&sel_reason=001_A'
+            '&sel_type=TYPE-A'
+            '&sel_workflow=WF-01'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        _, kwargs = mock_apply_view.call_args
+        self.assertEqual(kwargs['pareto_selections'], {
+            'reason': ['001_A'],
+            'type': ['TYPE-A'],
+            'workflow': ['WF-01'],
+        })
+        self.assertIsNone(kwargs['pareto_dimension'])
+        self.assertIsNone(kwargs['pareto_values'])
+
+    @patch('mes_dashboard.routes.reject_history_routes.apply_view')
+    def test_view_sel_filters_take_precedence_over_legacy_dimension(self, mock_apply_view):
+        mock_apply_view.return_value = {
+            'analytics_raw': [],
+            'summary': {},
+            'detail': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 1}},
+        }
+
+        response = self.client.get(
+            '/api/reject-history/view'
+            '?query_id=qid-001'
+            '&sel_reason=001_A'
+            '&pareto_dimension=invalid'
+            '&pareto_values=bad'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        _, kwargs = mock_apply_view.call_args
+        self.assertEqual(kwargs['pareto_selections'], {'reason': ['001_A']})
+        self.assertIsNone(kwargs['pareto_dimension'])
+        self.assertIsNone(kwargs['pareto_values'])
+
     @patch('mes_dashboard.routes.reject_history_routes._list_to_csv')
     @patch('mes_dashboard.routes.reject_history_routes.export_csv_from_cache')
     def test_export_cached_passes_pareto_multi_select_filters(
@@ -332,6 +432,34 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
         mock_export_cached.assert_not_called()
+
+    @patch('mes_dashboard.routes.reject_history_routes._list_to_csv')
+    @patch('mes_dashboard.routes.reject_history_routes.export_csv_from_cache')
+    def test_export_cached_passes_multi_dimension_selection_filters(
+        self,
+        mock_export_cached,
+        mock_list_to_csv,
+    ):
+        mock_export_cached.return_value = [{'LOT': 'LOT-001'}]
+        mock_list_to_csv.return_value = iter(['A,B\n', '1,2\n'])
+
+        response = self.client.get(
+            '/api/reject-history/export-cached'
+            '?query_id=qid-001'
+            '&sel_reason=001_A'
+            '&sel_type=TYPE-A'
+            '&sel_equipment=EQ-01'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = mock_export_cached.call_args
+        self.assertEqual(kwargs['pareto_selections'], {
+            'reason': ['001_A'],
+            'type': ['TYPE-A'],
+            'equipment': ['EQ-01'],
+        })
+        self.assertIsNone(kwargs['pareto_dimension'])
+        self.assertIsNone(kwargs['pareto_values'])
 
     @patch('mes_dashboard.routes.reject_history_routes.query_list')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 6))

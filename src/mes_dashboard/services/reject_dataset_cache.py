@@ -398,6 +398,7 @@ def apply_view(
     detail_reason: Optional[str] = None,
     pareto_dimension: Optional[str] = None,
     pareto_values: Optional[List[str]] = None,
+    pareto_selections: Optional[Dict[str, List[str]]] = None,
     page: int = 1,
     per_page: int = 50,
     include_excluded_scrap: bool = False,
@@ -446,6 +447,7 @@ def apply_view(
         detail_df,
         pareto_dimension=pareto_dimension,
         pareto_values=pareto_values,
+        pareto_selections=pareto_selections,
     )
 
     detail_page = _paginate_detail(detail_df, page=page, per_page=per_page)
@@ -514,10 +516,32 @@ def _apply_pareto_selection_filter(
     *,
     pareto_dimension: Optional[str] = None,
     pareto_values: Optional[List[str]] = None,
+    pareto_selections: Optional[Dict[str, List[str]]] = None,
 ) -> pd.DataFrame:
     """Apply Pareto multi-select filters on detail/export datasets."""
     if df is None or df.empty:
         return df
+
+    normalized_selections = _normalize_pareto_selections(pareto_selections)
+    if normalized_selections:
+        filtered = df
+        for dim in _PARETO_DIMENSIONS:
+            selected_values = normalized_selections.get(dim)
+            if not selected_values:
+                continue
+            dim_col = _DIM_TO_DF_COLUMN.get(dim)
+            if not dim_col:
+                raise ValueError(f"不支援的 pareto_dimension: {dim}")
+            if dim_col not in filtered.columns:
+                return filtered.iloc[0:0]
+            value_set = set(selected_values)
+            normalized_dimension_values = filtered[dim_col].map(
+                lambda value: _normalize_text(value) or "(未知)"
+            )
+            filtered = filtered[normalized_dimension_values.isin(value_set)]
+            if filtered.empty:
+                return filtered
+        return filtered
 
     normalized_values = _normalize_pareto_values(pareto_values)
     if not normalized_values:
@@ -769,6 +793,143 @@ _DIM_TO_DF_COLUMN = {
     "workcenter": "WORKCENTER_GROUP",
     "equipment": "PRIMARY_EQUIPMENTNAME",
 }
+_PARETO_DIMENSIONS = tuple(_DIM_TO_DF_COLUMN.keys())
+_PARETO_TOP20_DIMENSIONS = {"type", "workflow", "equipment"}
+
+
+def _normalize_metric_mode(metric_mode: str) -> str:
+    mode = _normalize_text(metric_mode).lower()
+    if mode not in {"reject_total", "defect"}:
+        raise ValueError("Invalid metric_mode, supported: reject_total, defect")
+    return mode
+
+
+def _normalize_pareto_scope(pareto_scope: str) -> str:
+    scope = _normalize_text(pareto_scope).lower() or "top80"
+    if scope not in {"top80", "all"}:
+        raise ValueError("Invalid pareto_scope, supported: top80, all")
+    return scope
+
+
+def _normalize_pareto_display_scope(display_scope: str) -> str:
+    scope = _normalize_text(display_scope).lower() or "all"
+    if scope not in {"all", "top20"}:
+        raise ValueError("Invalid pareto_display_scope, supported: all, top20")
+    return scope
+
+
+def _normalize_pareto_selections(
+    pareto_selections: Optional[Dict[str, List[str]]],
+) -> Dict[str, List[str]]:
+    normalized: Dict[str, List[str]] = {}
+    for dim, values in (pareto_selections or {}).items():
+        dim_key = _normalize_text(dim).lower()
+        if not dim_key:
+            continue
+        if dim_key not in _DIM_TO_DF_COLUMN:
+            raise ValueError(f"不支援的 pareto_dimension: {dim}")
+        normalized_values = _normalize_pareto_values(values)
+        if normalized_values:
+            normalized[dim_key] = normalized_values
+    return normalized
+
+
+def _build_dimension_pareto_items(
+    df: pd.DataFrame,
+    *,
+    dim_col: str,
+    metric_mode: str,
+    pareto_scope: str,
+) -> List[Dict[str, Any]]:
+    if df is None or df.empty:
+        return []
+    if dim_col not in df.columns:
+        return []
+
+    metric_col = "DEFECT_QTY" if metric_mode == "defect" else "REJECT_TOTAL_QTY"
+    if metric_col not in df.columns:
+        return []
+
+    agg_dict = {}
+    for col in ["MOVEIN_QTY", "REJECT_TOTAL_QTY", "DEFECT_QTY"]:
+        if col in df.columns:
+            agg_dict[col] = (col, "sum")
+
+    grouped = df.groupby(dim_col, sort=False).agg(**agg_dict).reset_index()
+    if grouped.empty:
+        return []
+
+    if "CONTAINERID" in df.columns:
+        lot_counts = (
+            df.groupby(dim_col)["CONTAINERID"]
+            .nunique()
+            .reset_index()
+            .rename(columns={"CONTAINERID": "AFFECTED_LOT_COUNT"})
+        )
+        grouped = grouped.merge(lot_counts, on=dim_col, how="left")
+    else:
+        grouped["AFFECTED_LOT_COUNT"] = 0
+
+    grouped["METRIC_VALUE"] = grouped[metric_col].fillna(0)
+    grouped = grouped[grouped["METRIC_VALUE"] > 0].sort_values(
+        "METRIC_VALUE", ascending=False
+    )
+    if grouped.empty:
+        return []
+
+    total_metric = grouped["METRIC_VALUE"].sum()
+    grouped["PCT"] = (grouped["METRIC_VALUE"] / total_metric * 100).round(4)
+    grouped["CUM_PCT"] = grouped["PCT"].cumsum().round(4)
+
+    items: List[Dict[str, Any]] = []
+    for _, row in grouped.iterrows():
+        items.append({
+            "reason": _normalize_text(row.get(dim_col)) or "(未知)",
+            "metric_value": _as_float(row.get("METRIC_VALUE")),
+            "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
+            "REJECT_TOTAL_QTY": _as_int(row.get("REJECT_TOTAL_QTY")),
+            "DEFECT_QTY": _as_int(row.get("DEFECT_QTY")),
+            "count": _as_int(row.get("AFFECTED_LOT_COUNT")),
+            "pct": round(_as_float(row.get("PCT")), 4),
+            "cumPct": round(_as_float(row.get("CUM_PCT")), 4),
+        })
+
+    if pareto_scope == "top80" and items:
+        top_items = [item for item in items if _as_float(item.get("cumPct")) <= 80.0]
+        if not top_items:
+            top_items = [items[0]]
+        return top_items
+    return items
+
+
+def _apply_cross_filter(
+    df: pd.DataFrame,
+    selections: Dict[str, List[str]],
+    exclude_dim: str,
+) -> pd.DataFrame:
+    if df is None or df.empty or not selections:
+        return df
+
+    filtered = df
+    for dim in _PARETO_DIMENSIONS:
+        if dim == exclude_dim:
+            continue
+        selected_values = selections.get(dim)
+        if not selected_values:
+            continue
+        dim_col = _DIM_TO_DF_COLUMN.get(dim)
+        if not dim_col:
+            raise ValueError(f"不支援的 pareto_dimension: {dim}")
+        if dim_col not in filtered.columns:
+            return filtered.iloc[0:0]
+        value_set = set(selected_values)
+        normalized_dimension_values = filtered[dim_col].map(
+            lambda value: _normalize_text(value) or "(未知)"
+        )
+        filtered = filtered[normalized_dimension_values.isin(value_set)]
+        if filtered.empty:
+            return filtered
+    return filtered
 
 
 def compute_dimension_pareto(
@@ -786,6 +947,14 @@ def compute_dimension_pareto(
     exclude_pb_diode: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """Compute dimension pareto from cached DataFrame (no Oracle query)."""
+    metric_mode = _normalize_metric_mode(metric_mode)
+    pareto_scope = _normalize_pareto_scope(pareto_scope)
+    dimension = _normalize_text(dimension).lower() or "reason"
+    if dimension not in _DIM_TO_DF_COLUMN:
+        raise ValueError(
+            f"Invalid dimension, supported: {', '.join(sorted(_DIM_TO_DF_COLUMN.keys()))}"
+        )
+
     df = _get_cached_df(query_id)
     if df is None:
         return None
@@ -800,7 +969,7 @@ def compute_dimension_pareto(
     if df is None or df.empty:
         return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
 
-    dim_col = _DIM_TO_DF_COLUMN.get(dimension, "LOSSREASONNAME")
+    dim_col = _DIM_TO_DF_COLUMN.get(dimension)
     if dim_col not in df.columns:
         return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
 
@@ -823,71 +992,102 @@ def compute_dimension_pareto(
         if filtered.empty:
             return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
 
-    # Determine metric column
-    if metric_mode == "defect":
-        metric_col = "DEFECT_QTY"
-    else:
-        metric_col = "REJECT_TOTAL_QTY"
-
-    if metric_col not in filtered.columns:
-        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
-
-    # Group by dimension
-    agg_dict = {}
-    for col in ["MOVEIN_QTY", "REJECT_TOTAL_QTY", "DEFECT_QTY"]:
-        if col in filtered.columns:
-            agg_dict[col] = (col, "sum")
-
-    grouped = filtered.groupby(dim_col, sort=False).agg(**agg_dict).reset_index()
-
-    # Count distinct lots
-    if "CONTAINERID" in filtered.columns:
-        lot_counts = (
-            filtered.groupby(dim_col)["CONTAINERID"]
-            .nunique()
-            .reset_index()
-            .rename(columns={"CONTAINERID": "AFFECTED_LOT_COUNT"})
-        )
-        grouped = grouped.merge(lot_counts, on=dim_col, how="left")
-    else:
-        grouped["AFFECTED_LOT_COUNT"] = 0
-
-    # Compute metric and sort
-    grouped["METRIC_VALUE"] = grouped[metric_col].fillna(0)
-    grouped = grouped[grouped["METRIC_VALUE"] > 0].sort_values(
-        "METRIC_VALUE", ascending=False
+    items = _build_dimension_pareto_items(
+        filtered,
+        dim_col=dim_col,
+        metric_mode=metric_mode,
+        pareto_scope=pareto_scope,
     )
-    if grouped.empty:
-        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
-
-    total_metric = grouped["METRIC_VALUE"].sum()
-    grouped["PCT"] = (grouped["METRIC_VALUE"] / total_metric * 100).round(4)
-    grouped["CUM_PCT"] = grouped["PCT"].cumsum().round(4)
-
-    all_items = []
-    for _, row in grouped.iterrows():
-        all_items.append({
-            "reason": _normalize_text(row.get(dim_col)) or "(未知)",
-            "metric_value": _as_float(row.get("METRIC_VALUE")),
-            "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
-            "REJECT_TOTAL_QTY": _as_int(row.get("REJECT_TOTAL_QTY")),
-            "DEFECT_QTY": _as_int(row.get("DEFECT_QTY")),
-            "count": _as_int(row.get("AFFECTED_LOT_COUNT")),
-            "pct": round(_as_float(row.get("PCT")), 4),
-            "cumPct": round(_as_float(row.get("CUM_PCT")), 4),
-        })
-
-    items = list(all_items)
-    if pareto_scope == "top80" and items:
-        top_items = [item for item in items if _as_float(item.get("cumPct")) <= 80.0]
-        if not top_items:
-            top_items = [items[0]]
-        items = top_items
 
     return {
         "items": items,
         "dimension": dimension,
         "metric_mode": metric_mode,
+    }
+
+
+def compute_batch_pareto(
+    *,
+    query_id: str,
+    metric_mode: str = "reject_total",
+    pareto_scope: str = "top80",
+    pareto_display_scope: str = "all",
+    packages: Optional[List[str]] = None,
+    workcenter_groups: Optional[List[str]] = None,
+    reason: Optional[str] = None,
+    trend_dates: Optional[List[str]] = None,
+    pareto_selections: Optional[Dict[str, List[str]]] = None,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
+) -> Optional[Dict[str, Any]]:
+    """Compute all six Pareto dimensions from cached DataFrame (no Oracle query)."""
+    metric_mode = _normalize_metric_mode(metric_mode)
+    pareto_scope = _normalize_pareto_scope(pareto_scope)
+    pareto_display_scope = _normalize_pareto_display_scope(pareto_display_scope)
+    normalized_selections = _normalize_pareto_selections(pareto_selections)
+
+    df = _get_cached_df(query_id)
+    if df is None:
+        return None
+
+    df = _apply_policy_filters(
+        df,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    if df is None or df.empty:
+        return {
+            "dimensions": {
+                dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
+                for dim in _PARETO_DIMENSIONS
+            }
+        }
+
+    filtered = _apply_supplementary_filters(
+        df,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reason=reason,
+    )
+    if filtered is None or filtered.empty:
+        return {
+            "dimensions": {
+                dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
+                for dim in _PARETO_DIMENSIONS
+            }
+        }
+
+    if trend_dates and "TXN_DAY" in filtered.columns:
+        date_set = set(trend_dates)
+        filtered = filtered[
+            filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
+        ]
+
+    dimensions: Dict[str, Dict[str, Any]] = {}
+    for dim in _PARETO_DIMENSIONS:
+        dim_col = _DIM_TO_DF_COLUMN.get(dim)
+        dim_df = _apply_cross_filter(filtered, normalized_selections, exclude_dim=dim)
+        items = _build_dimension_pareto_items(
+            dim_df,
+            dim_col=dim_col,
+            metric_mode=metric_mode,
+            pareto_scope=pareto_scope,
+        )
+        if pareto_display_scope == "top20" and dim in _PARETO_TOP20_DIMENSIONS:
+            items = items[:20]
+        dimensions[dim] = {
+            "items": items,
+            "dimension": dim,
+            "metric_mode": metric_mode,
+        }
+
+    return {
+        "dimensions": dimensions,
+        "metric_mode": metric_mode,
+        "pareto_scope": pareto_scope,
+        "pareto_display_scope": pareto_display_scope,
     }
 
 
@@ -907,6 +1107,7 @@ def export_csv_from_cache(
     detail_reason: Optional[str] = None,
     pareto_dimension: Optional[str] = None,
     pareto_values: Optional[List[str]] = None,
+    pareto_selections: Optional[Dict[str, List[str]]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
@@ -944,6 +1145,7 @@ def export_csv_from_cache(
         filtered,
         pareto_dimension=pareto_dimension,
         pareto_values=pareto_values,
+        pareto_selections=pareto_selections,
     )
 
     rows = []

@@ -186,3 +186,109 @@ def test_apply_view_rejects_invalid_pareto_dimension(monkeypatch):
             pareto_dimension="invalid-dimension",
             pareto_values=["X"],
         )
+
+
+def test_compute_batch_pareto_applies_cross_filter_exclude_self(monkeypatch):
+    df = pd.DataFrame(
+        [
+            {
+                "CONTAINERID": "C1",
+                "TXN_DAY": pd.Timestamp("2026-02-01"),
+                "LOSSREASONNAME": "R-A",
+                "PRODUCTLINENAME": "PKG-1",
+                "PJ_TYPE": "TYPE-1",
+                "WORKFLOWNAME": "WF-1",
+                "WORKCENTER_GROUP": "WB-1",
+                "PRIMARY_EQUIPMENTNAME": "EQ-1",
+                "SCRAP_OBJECTTYPE": "LOT",
+                "LOSSREASON_CODE": "001_A",
+                "MOVEIN_QTY": 100,
+                "REJECT_TOTAL_QTY": 100,
+                "DEFECT_QTY": 0,
+            },
+            {
+                "CONTAINERID": "C2",
+                "TXN_DAY": pd.Timestamp("2026-02-01"),
+                "LOSSREASONNAME": "R-A",
+                "PRODUCTLINENAME": "PKG-2",
+                "PJ_TYPE": "TYPE-2",
+                "WORKFLOWNAME": "WF-2",
+                "WORKCENTER_GROUP": "WB-2",
+                "PRIMARY_EQUIPMENTNAME": "EQ-2",
+                "SCRAP_OBJECTTYPE": "LOT",
+                "LOSSREASON_CODE": "001_A",
+                "MOVEIN_QTY": 100,
+                "REJECT_TOTAL_QTY": 50,
+                "DEFECT_QTY": 0,
+            },
+            {
+                "CONTAINERID": "C3",
+                "TXN_DAY": pd.Timestamp("2026-02-01"),
+                "LOSSREASONNAME": "R-B",
+                "PRODUCTLINENAME": "PKG-1",
+                "PJ_TYPE": "TYPE-2",
+                "WORKFLOWNAME": "WF-2",
+                "WORKCENTER_GROUP": "WB-1",
+                "PRIMARY_EQUIPMENTNAME": "EQ-1",
+                "SCRAP_OBJECTTYPE": "LOT",
+                "LOSSREASON_CODE": "002_B",
+                "MOVEIN_QTY": 100,
+                "REJECT_TOTAL_QTY": 40,
+                "DEFECT_QTY": 0,
+            },
+            {
+                "CONTAINERID": "C4",
+                "TXN_DAY": pd.Timestamp("2026-02-01"),
+                "LOSSREASONNAME": "R-B",
+                "PRODUCTLINENAME": "PKG-3",
+                "PJ_TYPE": "TYPE-3",
+                "WORKFLOWNAME": "WF-3",
+                "WORKCENTER_GROUP": "WB-3",
+                "PRIMARY_EQUIPMENTNAME": "EQ-3",
+                "SCRAP_OBJECTTYPE": "LOT",
+                "LOSSREASON_CODE": "002_B",
+                "MOVEIN_QTY": 100,
+                "REJECT_TOTAL_QTY": 30,
+                "DEFECT_QTY": 0,
+            },
+        ]
+    )
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _query_id: df)
+    monkeypatch.setattr(
+        "mes_dashboard.services.scrap_reason_exclusion_cache.get_excluded_reasons",
+        lambda: [],
+    )
+
+    result = cache_svc.compute_batch_pareto(
+        query_id="qid-batch-1",
+        metric_mode="reject_total",
+        pareto_scope="all",
+        include_excluded_scrap=True,
+        pareto_selections={
+            "reason": ["R-A"],
+            "type": ["TYPE-2"],
+        },
+    )
+
+    reason_items = result["dimensions"]["reason"]["items"]
+    type_items = result["dimensions"]["type"]["items"]
+    package_items = result["dimensions"]["package"]["items"]
+
+    assert {item["reason"] for item in reason_items} == {"R-A", "R-B"}
+    assert {item["reason"] for item in type_items} == {"TYPE-1", "TYPE-2"}
+    assert [item["reason"] for item in package_items] == ["PKG-2"]
+
+
+def test_apply_pareto_selection_filter_supports_multi_dimension_and_logic():
+    df = _build_detail_filter_df()
+
+    filtered = cache_svc._apply_pareto_selection_filter(
+        df,
+        pareto_selections={
+            "reason": ["001_A"],
+            "type": ["TYPE-B"],
+        },
+    )
+
+    assert len(filtered) == 1
+    assert set(filtered["CONTAINERNAME"].tolist()) == {"LOT-002"}

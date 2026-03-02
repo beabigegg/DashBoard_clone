@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildRejectOptionsRequestParams,
+  buildViewParams,
   pruneRejectFilterSelections,
 } from '../src/core/reject-history-filters.js';
 import {
@@ -60,6 +61,45 @@ test('reject-history prune removes invalid selected values', () => {
   assert.deepEqual(pruned.filters.packages, ['PKG-A']);
   assert.equal(pruned.filters.reason, '');
   assert.equal(pruned.removedCount, 3);
+});
+
+test('reject-history view params include multi-dimension pareto selections', () => {
+  const params = buildViewParams('qid-001', {
+    supplementaryFilters: {
+      packages: ['PKG-A'],
+      workcenterGroups: ['WB'],
+      reason: '001_A',
+    },
+    trendDates: ['2026-02-01'],
+    paretoSelections: {
+      reason: ['001_A'],
+      type: ['TYPE-A', 'TYPE-B'],
+      workflow: ['WF-01'],
+    },
+    page: 2,
+    perPage: 80,
+    policyFilters: {
+      includeExcludedScrap: true,
+      excludeMaterialScrap: false,
+      excludePbDiode: false,
+    },
+  });
+
+  assert.deepEqual(params, {
+    query_id: 'qid-001',
+    packages: ['PKG-A'],
+    workcenter_groups: ['WB'],
+    reason: '001_A',
+    trend_dates: ['2026-02-01'],
+    sel_reason: ['001_A'],
+    sel_type: ['TYPE-A', 'TYPE-B'],
+    sel_workflow: ['WF-01'],
+    page: 2,
+    per_page: 80,
+    include_excluded_scrap: 'true',
+    exclude_material_scrap: 'false',
+    exclude_pb_diode: 'false',
+  });
 });
 
 test('resource-history derives families from upstream group and flags', () => {

@@ -9,14 +9,6 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
 
-const DIMENSION_OPTIONS = [
-  { value: 'reason', label: '不良原因' },
-  { value: 'package', label: 'PACKAGE' },
-  { value: 'type', label: 'TYPE' },
-  { value: 'workflow', label: 'WORKFLOW' },
-  { value: 'workcenter', label: '站點' },
-  { value: 'equipment', label: '機台' },
-];
 const DISPLAY_SCOPE_TOP20_DIMENSIONS = new Set(['type', 'workflow', 'equipment']);
 
 const props = defineProps({
@@ -26,22 +18,32 @@ const props = defineProps({
   metricLabel: { type: String, default: '報廢量' },
   loading: { type: Boolean, default: false },
   dimension: { type: String, default: 'reason' },
-  showDimensionSelector: { type: Boolean, default: false },
+  dimensionLabel: { type: String, default: 'Pareto' },
   displayScope: { type: String, default: 'all' },
 });
 
-const emit = defineEmits(['item-toggle', 'dimension-change', 'display-scope-change']);
+const emit = defineEmits(['item-toggle']);
 
-const hasData = computed(() => Array.isArray(props.items) && props.items.length > 0);
-const selectedValueSet = computed(() => new Set((props.selectedValues || []).map((item) => String(item || '').trim())));
-const showDisplayScopeSelector = computed(
-  () => DISPLAY_SCOPE_TOP20_DIMENSIONS.has(props.dimension),
-);
+const selectedValueSet = computed(
+  () => new Set((props.selectedValues || []).map((item) => String(item || '').trim()),
+));
 
-const dimensionLabel = computed(() => {
-  const opt = DIMENSION_OPTIONS.find((o) => o.value === props.dimension);
-  return opt ? opt.label : '報廢原因';
+const displayItems = computed(() => {
+  const items = Array.isArray(props.items) ? props.items : [];
+  if (
+    props.displayScope === 'top20'
+    && DISPLAY_SCOPE_TOP20_DIMENSIONS.has(props.dimension)
+  ) {
+    return items.slice(0, 20);
+  }
+  return items;
 });
+
+const hasData = computed(() => displayItems.value.length > 0);
+
+const showTop20Badge = computed(
+  () => props.displayScope === 'top20' && DISPLAY_SCOPE_TOP20_DIMENSIONS.has(props.dimension),
+);
 
 function isSelected(value) {
   return selectedValueSet.value.has(String(value || '').trim());
@@ -56,7 +58,7 @@ function formatPct(value) {
 }
 
 const chartOption = computed(() => {
-  const items = props.items || [];
+  const items = displayItems.value;
   return {
     tooltip: {
       trigger: 'axis',
@@ -80,17 +82,18 @@ const chartOption = computed(() => {
       left: 52,
       right: 52,
       top: 20,
-      bottom: 96,
+      bottom: items.length > 10 ? 110 : 96,
     },
     xAxis: {
       type: 'category',
       data: items.map((item) => item.reason || '(未填寫)'),
       axisLabel: {
         interval: 0,
-        rotate: items.length > 6 ? 35 : 0,
-        fontSize: 11,
+        rotate: items.length > 10 ? 55 : items.length > 5 ? 35 : 0,
+        fontSize: items.length > 15 ? 9 : items.length > 8 ? 10 : 11,
         overflow: 'truncate',
-        width: 100,
+        width: items.length > 10 ? 60 : 80,
+        hideOverlap: true,
       },
     },
     yAxis: [
@@ -137,7 +140,7 @@ function handleChartClick(params) {
   if (params?.seriesType !== 'bar') {
     return;
   }
-  const itemValue = props.items?.[params.dataIndex]?.reason;
+  const itemValue = displayItems.value?.[params.dataIndex]?.reason;
   if (itemValue) {
     emit('item-toggle', itemValue);
   }
@@ -149,26 +152,8 @@ function handleChartClick(params) {
     <div class="card-header pareto-header">
       <div class="card-title">
         {{ metricLabel }} vs {{ dimensionLabel }}（Pareto）
+        <span v-if="showTop20Badge" class="pareto-date-badge">TOP 20</span>
         <span v-for="d in selectedDates" :key="d" class="pareto-date-badge">{{ d }}</span>
-      </div>
-      <div class="pareto-controls">
-        <select
-          v-if="showDimensionSelector"
-          class="dimension-select"
-          :value="dimension"
-          @change="emit('dimension-change', $event.target.value)"
-        >
-          <option v-for="opt in DIMENSION_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-        </select>
-        <select
-          v-if="showDisplayScopeSelector"
-          class="dimension-select pareto-scope-select"
-          :value="displayScope"
-          @change="emit('display-scope-change', $event.target.value)"
-        >
-          <option value="all">全部顯示</option>
-          <option value="top20">只顯示 TOP 20</option>
-        </select>
       </div>
     </div>
     <div class="card-body pareto-layout">
@@ -188,7 +173,7 @@ function handleChartClick(params) {
           </thead>
           <tbody>
             <tr
-              v-for="item in items"
+              v-for="item in displayItems"
               :key="item.reason"
               :class="{ active: isSelected(item.reason) }"
             >
@@ -201,7 +186,7 @@ function handleChartClick(params) {
               <td>{{ formatPct(item.pct) }}</td>
               <td>{{ formatPct(item.cumPct) }}</td>
             </tr>
-            <tr v-if="!items || items.length === 0">
+            <tr v-if="displayItems.length === 0">
               <td colspan="4" class="placeholder">No data</td>
             </tr>
           </tbody>
