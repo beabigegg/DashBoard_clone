@@ -25,7 +25,7 @@ const lots = ref([]);
 
 const filterBar = reactive({
   holdType: 'all',
-  reason: '',
+  reason: [],
 });
 
 const filterOptions = ref({
@@ -126,14 +126,15 @@ const reasonOptions = computed(() => {
 
 const splitHold = computed(() => {
   const base = splitHoldByType(hold.value);
-  const activeReason = String(filterBar.reason || '').trim();
-  if (!activeReason) {
+  const activeReasons = (filterBar.reason || []).map((v) => String(v).trim()).filter(Boolean);
+  if (!activeReasons.length) {
     return base;
   }
 
+  const reasonSet = new Set(activeReasons);
   return {
-    quality: base.quality.filter((item) => String(item?.reason || '').trim() === activeReason),
-    nonQuality: base.nonQuality.filter((item) => String(item?.reason || '').trim() === activeReason),
+    quality: base.quality.filter((item) => reasonSet.has(String(item?.reason || '').trim())),
+    nonQuality: base.nonQuality.filter((item) => reasonSet.has(String(item?.reason || '').trim())),
   };
 });
 
@@ -212,8 +213,9 @@ function buildFilterBarParams() {
   const params = {
     hold_type: filterBar.holdType || 'all',
   };
-  if (filterBar.reason) {
-    params.reason = filterBar.reason;
+  const reasonCsv = serializeFilterValue(filterBar.reason);
+  if (reasonCsv) {
+    params.reason = reasonCsv;
   }
   return params;
 }
@@ -362,8 +364,9 @@ function updateUrlState() {
   if (filterBar.holdType) {
     params.set('hold_type', filterBar.holdType);
   }
-  if (filterBar.reason) {
-    params.set('reason', filterBar.reason);
+  const reasonCsv = serializeFilterValue(filterBar.reason);
+  if (reasonCsv) {
+    params.set('reason', reasonCsv);
   }
   if (matrixFilter.value?.workcenter) {
     params.set('workcenter', matrixFilter.value.workcenter);
@@ -503,9 +506,11 @@ function navigateToHoldDetail(reason) {
 
 function handleFilterChange(next) {
   const nextHoldType = normalizeHoldType(next?.holdType || 'all');
-  const nextReason = String(next?.reason || '').trim();
+  const nextReason = normalizeArrayValues(next?.reason);
 
-  if (filterBar.holdType === nextHoldType && filterBar.reason === nextReason) {
+  const currentReasonCsv = serializeFilterValue(filterBar.reason);
+  const nextReasonCsv = serializeFilterValue(nextReason);
+  if (filterBar.holdType === nextHoldType && currentReasonCsv === nextReasonCsv) {
     return;
   }
 
@@ -584,7 +589,7 @@ async function manualRefresh() {
 
 async function initializePage() {
   filterBar.holdType = normalizeHoldType(getUrlParam('hold_type') || 'all');
-  filterBar.reason = getUrlParam('reason');
+  filterBar.reason = parseCsvParam('reason');
 
   updateFilters({
     workorder: parseCsvParam('workorder'),

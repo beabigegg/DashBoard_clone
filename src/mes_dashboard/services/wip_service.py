@@ -1086,7 +1086,10 @@ def get_wip_matrix(
                 )
 
             if reason_filter:
-                df = df[df['HOLDREASONNAME'] == reason_filter]
+                if isinstance(reason_filter, (list, tuple)):
+                    df = df[df['HOLDREASONNAME'].isin(reason_filter)]
+                else:
+                    df = df[df['HOLDREASONNAME'] == reason_filter]
 
             # Filter by WORKCENTER_GROUP and PACKAGE_LEF
             df = df[df['WORKCENTER_GROUP'].notna() & df['PACKAGE_LEF'].notna()]
@@ -2631,8 +2634,17 @@ def get_hold_detail_summary(
                     include_dummy=include_dummy,
                 )
 
+            # Extract all distinct reasons before applying reason filter
+            top_reasons = sorted(
+                df['HOLDREASONNAME'].dropna().astype(str).str.strip()
+                .loc[lambda s: s != ''].unique().tolist()
+            )
+
             if reason:
-                df = df[df['HOLDREASONNAME'] == reason]
+                if isinstance(reason, (list, tuple)):
+                    df = df[df['HOLDREASONNAME'].isin(reason)]
+                else:
+                    df = df[df['HOLDREASONNAME'] == reason]
 
             if df.empty:
                 return {
@@ -2641,6 +2653,7 @@ def get_hold_detail_summary(
                     'avgAge': 0,
                     'maxAge': 0,
                     'workcenterCount': 0,
+                    'topReasons': top_reasons,
                     'dataUpdateDate': get_cached_sys_date(),
                 }
 
@@ -2654,6 +2667,7 @@ def get_hold_detail_summary(
                 'avgAge': round(float(df['AGEBYDAYS'].mean()), 1),
                 'maxAge': float(df['AGEBYDAYS'].max()),
                 'workcenterCount': df['WORKCENTER_GROUP'].nunique(),
+                'topReasons': top_reasons,
                 'dataUpdateDate': get_cached_sys_date(),
             }
         except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
@@ -3099,7 +3113,10 @@ def get_hold_detail_lots(
                 )
 
             if reason:
-                df = df[df['HOLDREASONNAME'] == reason]
+                if isinstance(reason, (list, tuple)):
+                    df = df[df['HOLDREASONNAME'].isin(reason)]
+                else:
+                    df = df[df['HOLDREASONNAME'] == reason]
             if treemap_reason:
                 df = df[df['HOLDREASONNAME'] == treemap_reason]
 
@@ -3362,7 +3379,10 @@ def get_hold_overview_treemap(
                 )
 
             if reason:
-                df = df[df['HOLDREASONNAME'] == reason]
+                if isinstance(reason, (list, tuple)):
+                    df = df[df['HOLDREASONNAME'].isin(reason)]
+                else:
+                    df = df[df['HOLDREASONNAME'] == reason]
 
             df = df[df['WORKCENTER_GROUP'].notna() & df['HOLDREASONNAME'].notna()]
             if df.empty:

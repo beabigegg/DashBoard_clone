@@ -41,6 +41,15 @@ _VALID_HOLD_TYPES = {'quality', 'non-quality', 'all'}
 _VALID_AGE_RANGES = {'0-1', '1-3', '3-7', '7+'}
 
 
+def _parse_reason_list() -> 'Optional[list[str]]':
+    """Parse comma-separated reason parameter into a list, or None if empty."""
+    raw = request.args.get('reason', '').strip()
+    if not raw:
+        return None
+    values = [v.strip() for v in raw.split(',') if v.strip()]
+    return values or None
+
+
 def _parse_hold_type(default: str = 'all') -> tuple[Optional[str], Optional[tuple[dict, int]]]:
     raw = request.args.get('hold_type', '').strip().lower()
     hold_type = raw or default
@@ -83,7 +92,7 @@ def api_hold_overview_summary():
     if error:
         return jsonify(error[0]), error[1]
 
-    reason = request.args.get('reason', '').strip() or None
+    reason = _parse_reason_list()
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
     pj_type = request.args.get('type', '').strip() or None
@@ -114,7 +123,7 @@ def api_hold_overview_matrix():
     if error:
         return jsonify(error[0]), error[1]
 
-    reason = request.args.get('reason', '').strip() or None
+    reason = _parse_reason_list()
     workorder = request.args.get('workorder', '').strip() or None
     lotid = request.args.get('lotid', '').strip() or None
     pj_type = request.args.get('type', '').strip() or None
@@ -145,7 +154,7 @@ def api_hold_overview_treemap():
     if error:
         return jsonify(error[0]), error[1]
 
-    reason = request.args.get('reason', '').strip() or None
+    reason = _parse_reason_list()
     workcenter = request.args.get('workcenter', '').strip() or None
     package = request.args.get('package', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
@@ -170,7 +179,7 @@ def api_hold_overview_lots():
     if error:
         return jsonify(error[0]), error[1]
 
-    reason = request.args.get('reason', '').strip() or None
+    reason = _parse_reason_list()
     treemap_reason = request.args.get('treemap_reason', '').strip() or None
     workcenter = request.args.get('workcenter', '').strip() or None
     package = request.args.get('package', '').strip() or None

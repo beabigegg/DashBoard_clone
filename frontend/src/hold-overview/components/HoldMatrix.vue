@@ -92,7 +92,7 @@ function onPackageClick(pkg) {
 
 <template>
   <div v-if="workcenters.length === 0" class="placeholder">No data available</div>
-  <table v-else class="matrix-table hold-matrix-table">
+  <table v-else class="hold-matrix-table">
     <thead>
       <tr>
         <th>Workcenter</th>

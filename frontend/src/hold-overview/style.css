@@ -199,6 +199,7 @@
   text-align: right;
   border: 1px solid #e5e7eb;
   white-space: nowrap;
+  color: #222;
 }
 
 .hold-matrix-table th {
@@ -231,10 +232,27 @@
 
 .hold-matrix-table .clickable {
   cursor: pointer;
+  color: #222;
+}
+
+.hold-matrix-table td:first-child.clickable {
+  color: var(--primary);
+}
+
+.hold-matrix-table td:first-child.clickable:hover {
+  text-decoration: underline;
 }
 
 .hold-matrix-table .clickable:hover {
   background: #eef2ff;
+}
+
+.hold-matrix-table tbody tr:hover td {
+  background: #f0f4ff;
+}
+
+.hold-matrix-table tbody tr:hover td:first-child {
+  background: #e8ecff;
 }
 
 .hold-matrix-table .total-row td,

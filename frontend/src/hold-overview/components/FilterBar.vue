@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import MultiSelect from '../../resource-shared/components/MultiSelect.vue';
 
 const props = defineProps({
   holdType: {
@@ -7,8 +8,8 @@ const props = defineProps({
     default: 'all',
   },
   reason: {
-    type: String,
-    default: '',
+    type: Array,
+    default: () => [],
   },
   reasons: {
     type: Array,
@@ -29,18 +30,6 @@ const HOLD_TYPE_OPTIONS = Object.freeze([
 ]);
 
 const holdTypeModel = computed(() => props.holdType || 'all');
-
-const reasonModel = computed({
-  get() {
-    return props.reason || '';
-  },
-  set(nextValue) {
-    emit('change', {
-      holdType: props.holdType || 'all',
-      reason: nextValue || '',
-    });
-  },
-});
 
 const reasonOptions = computed(() => {
   const unique = new Set();
@@ -66,7 +55,14 @@ function selectHoldType(nextValue) {
   }
   emit('change', {
     holdType: normalized,
-    reason: props.reason || '',
+    reason: props.reason || [],
+  });
+}
+
+function onReasonChange(nextValues) {
+  emit('change', {
+    holdType: props.holdType || 'all',
+    reason: nextValues || [],
   });
 }
 </script>
@@ -93,18 +89,15 @@ function selectHoldType(nextValue) {
     </div>
 
     <div class="filter-group reason-group hold-overview-reason-group">
-      <label class="filter-label" for="hold-overview-reason">Reason</label>
-      <select
-        id="hold-overview-reason"
-        v-model="reasonModel"
-        class="reason-select"
+      <span class="filter-label">Reason</span>
+      <MultiSelect
+        :model-value="reason"
+        :options="reasonOptions"
         :disabled="disabled"
-      >
-        <option value="">全部</option>
-        <option v-for="item in reasonOptions" :key="item" :value="item">
-          {{ item }}
-        </option>
-      </select>
+        :searchable="true"
+        placeholder="全部"
+        @update:model-value="onReasonChange"
+      />
     </div>
   </section>
 </template>
