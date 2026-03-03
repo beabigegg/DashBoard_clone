@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
   startDate: {
@@ -20,42 +20,42 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['change']);
+const emit = defineEmits(['apply', 'hold-type-change']);
 
-function emitChange(next) {
-  emit('change', {
-    startDate: next.startDate ?? props.startDate,
-    endDate: next.endDate ?? props.endDate,
-    holdType: next.holdType ?? props.holdType,
-  });
-}
+// Local date state — changes don't auto-trigger queries
+const localStartDate = ref(props.startDate);
+const localEndDate = ref(props.endDate);
 
-const startDateModel = computed({
-  get() {
-    return props.startDate || '';
+// Sync from parent when props change (URL restore, programmatic set)
+watch(
+  () => props.startDate,
+  (v) => {
+    localStartDate.value = v;
   },
-  set(nextValue) {
-    emitChange({ startDate: nextValue || '' });
+);
+watch(
+  () => props.endDate,
+  (v) => {
+    localEndDate.value = v;
   },
-});
+);
 
-const endDateModel = computed({
-  get() {
-    return props.endDate || '';
-  },
-  set(nextValue) {
-    emitChange({ endDate: nextValue || '' });
-  },
-});
-
+// Hold type still emits immediately (cache-only refresh, no Oracle query)
 const holdTypeModel = computed({
   get() {
     return props.holdType || 'quality';
   },
   set(nextValue) {
-    emitChange({ holdType: nextValue || 'quality' });
+    emit('hold-type-change', nextValue || 'quality');
   },
 });
+
+function handleApply() {
+  emit('apply', {
+    startDate: localStartDate.value,
+    endDate: localEndDate.value,
+  });
+}
 </script>
 
 <template>
@@ -64,7 +64,7 @@ const holdTypeModel = computed({
       <label class="filter-label" for="hold-history-start-date">開始日期</label>
       <input
         id="hold-history-start-date"
-        v-model="startDateModel"
+        v-model="localStartDate"
         class="date-input"
         type="date"
         :disabled="disabled"
@@ -75,7 +75,7 @@ const holdTypeModel = computed({
       <label class="filter-label" for="hold-history-end-date">結束日期</label>
       <input
         id="hold-history-end-date"
-        v-model="endDateModel"
+        v-model="localEndDate"
         class="date-input"
         type="date"
         :disabled="disabled"
@@ -94,6 +94,18 @@ const holdTypeModel = computed({
         <option value="non-quality">非品質異常</option>
         <option value="all">全部</option>
       </select>
+    </div>
+
+    <div class="filter-group filter-action-group">
+      <button
+        type="button"
+        class="btn btn-primary btn-query"
+        :disabled="disabled"
+        @click="handleApply"
+      >
+        <template v-if="disabled"><span class="btn-spinner"></span>查詢中...</template>
+        <template v-else>查詢</template>
+      </button>
     </div>
   </section>
 </template>

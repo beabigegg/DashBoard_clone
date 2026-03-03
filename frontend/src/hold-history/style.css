@@ -100,6 +100,38 @@
   box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);
 }
 
+.filter-action-group {
+  display: flex;
+  align-items: flex-end;
+}
+
+.btn-query {
+  white-space: nowrap;
+}
+
+.btn-query:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .checkbox-group {
   display: inline-flex;
   flex-wrap: wrap;
@@ -109,13 +141,24 @@
 .checkbox-option {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 8px;
+  gap: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: #f8fafc;
   cursor: pointer;
   font-size: 13px;
+  color: #475569;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.checkbox-option input[type='checkbox'] {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .checkbox-option.active {

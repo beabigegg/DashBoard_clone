@@ -352,34 +352,34 @@ const holdTypeLabel = computed(() => {
 
 // ---- Event handlers ----
 
-function handleFilterChange(next) {
+function handleApply(next) {
   const nextStartDate = next?.startDate || '';
   const nextEndDate = next?.endDate || '';
-  const nextHoldType = next?.holdType || 'quality';
-
-  const dateChanged = filterBar.startDate !== nextStartDate || filterBar.endDate !== nextEndDate;
-  const holdTypeChanged = filterBar.holdType !== nextHoldType;
-
-  if (!dateChanged && !holdTypeChanged) {
-    return;
-  }
 
   filterBar.startDate = nextStartDate;
   filterBar.endDate = nextEndDate;
-  filterBar.holdType = nextHoldType;
   reasonFilter.value = '';
   durationFilter.value = '';
   recordType.value = ['new'];
   page.value = 1;
   updateUrlState();
 
-  if (dateChanged) {
-    // Date changed -> new primary query (Oracle)
-    void executePrimaryQuery();
-  } else {
-    // Only hold_type changed -> view refresh (cache only)
-    void refreshView();
-  }
+  void executePrimaryQuery();
+}
+
+function handleHoldTypeChange(nextHoldType) {
+  const holdType = nextHoldType || 'quality';
+  if (filterBar.holdType === holdType) return;
+
+  filterBar.holdType = holdType;
+  reasonFilter.value = '';
+  durationFilter.value = '';
+  recordType.value = ['new'];
+  page.value = 1;
+  updateUrlState();
+
+  // Hold type only → view refresh (cache read, no Oracle query)
+  void refreshView();
 }
 
 function handleRecordTypeChange() {
@@ -502,7 +502,8 @@ onMounted(() => {
       :end-date="filterBar.endDate"
       :hold-type="filterBar.holdType"
       :disabled="loading.global"
-      @change="handleFilterChange"
+      @apply="handleApply"
+      @hold-type-change="handleHoldTypeChange"
     />
 
     <SummaryCards :summary="summary" />
