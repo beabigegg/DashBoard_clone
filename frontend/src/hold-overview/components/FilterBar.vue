@@ -4,7 +4,7 @@ import { computed } from 'vue';
 const props = defineProps({
   holdType: {
     type: String,
-    default: 'quality',
+    default: 'all',
   },
   reason: {
     type: String,
@@ -28,7 +28,7 @@ const HOLD_TYPE_OPTIONS = Object.freeze([
   { value: 'all', label: '全部' },
 ]);
 
-const holdTypeModel = computed(() => props.holdType || 'quality');
+const holdTypeModel = computed(() => props.holdType || 'all');
 
 const reasonModel = computed({
   get() {
@@ -36,7 +36,7 @@ const reasonModel = computed({
   },
   set(nextValue) {
     emit('change', {
-      holdType: props.holdType || 'quality',
+      holdType: props.holdType || 'all',
       reason: nextValue || '',
     });
   },
@@ -60,7 +60,7 @@ function selectHoldType(nextValue) {
   if (props.disabled) {
     return;
   }
-  const normalized = nextValue || 'quality';
+  const normalized = nextValue || 'all';
   if (normalized === holdTypeModel.value) {
     return;
   }

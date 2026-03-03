@@ -50,10 +50,10 @@ def hold_detail_page():
     reason = request.args.get('reason', '').strip()
     if not reason:
         # Redirect to overview route; in SPA mode this becomes canonical shell URL.
-        overview_redirect = maybe_redirect_to_canonical_shell('/wip-overview')
+        overview_redirect = maybe_redirect_to_canonical_shell('/hold-overview')
         if overview_redirect is not None:
             return overview_redirect
-        return redirect('/wip-overview')
+        return redirect('/hold-overview')
 
     canonical_redirect = maybe_redirect_to_canonical_shell('/hold-detail')
     if canonical_redirect is not None:

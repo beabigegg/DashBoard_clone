@@ -1,26 +1,49 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
-import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
+import HoldLotTable from '../wip-shared/components/HoldLotTable.vue';
+import ParetoSection from '../wip-shared/components/ParetoSection.vue';
 
+import FilterPanel from '../wip-overview/components/FilterPanel.vue';
 import SummaryCards from '../hold-detail/components/SummaryCards.vue';
 import FilterBar from './components/FilterBar.vue';
 import FilterIndicator from './components/FilterIndicator.vue';
 import HoldMatrix from './components/HoldMatrix.vue';
-import LotTable from './components/LotTable.vue';
 
 const API_TIMEOUT = 60000;
 const DEFAULT_PER_PAGE = 50;
+const FILTER_OPTION_DEBOUNCE_MS = 120;
 
 const summary = ref(null);
 const matrix = ref(null);
+const hold = ref(null);
 const lots = ref([]);
 
 const filterBar = reactive({
-  holdType: 'quality',
+  holdType: 'all',
   reason: '',
+});
+
+const filterOptions = ref({
+  workorders: [],
+  lotids: [],
+  packages: [],
+  types: [],
+  firstnames: [],
+  waferdescs: [],
+});
+
+const filters = reactive({
+  workorder: [],
+  lotid: [],
+  package: [],
+  type: [],
+  firstname: [],
+  waferdesc: [],
 });
 
 const matrixFilter = ref(null);
@@ -42,6 +65,8 @@ const errorMessage = ref('');
 const lotsError = ref('');
 
 let activeRequestId = 0;
+let filterOptionsDebounceTimer = null;
+let filterOptionsRequestToken = 0;
 
 const holdTypeLabel = computed(() => {
   if (filterBar.holdType === 'non-quality') {
@@ -53,7 +78,8 @@ const holdTypeLabel = computed(() => {
   return '品質異常';
 });
 
-const hasCascadeFilters = computed(() => Boolean(matrixFilter.value));
+const showQualityPareto = computed(() => filterBar.holdType !== 'non-quality');
+const showNonQualityPareto = computed(() => filterBar.holdType !== 'quality');
 
 const lotFilterText = computed(() => {
   const parts = [];
@@ -98,6 +124,19 @@ const reasonOptions = computed(() => {
   );
 });
 
+const splitHold = computed(() => {
+  const base = splitHoldByType(hold.value);
+  const activeReason = String(filterBar.reason || '').trim();
+  if (!activeReason) {
+    return base;
+  }
+
+  return {
+    quality: base.quality.filter((item) => String(item?.reason || '').trim() === activeReason),
+    nonQuality: base.nonQuality.filter((item) => String(item?.reason || '').trim() === activeReason),
+  };
+});
+
 function nextRequestId() {
   activeRequestId += 1;
   return activeRequestId;
@@ -124,41 +163,54 @@ function getUrlParam(name) {
   return new URLSearchParams(window.location.search).get(name)?.trim() || '';
 }
 
+function parseCsvParam(name) {
+  const raw = getUrlParam(name);
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function normalizeArrayValues(values) {
+  if (!values) {
+    return [];
+  }
+  if (Array.isArray(values)) {
+    return values.map((value) => String(value).trim()).filter(Boolean);
+  }
+  return String(values)
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function serializeFilterValue(values) {
+  return normalizeArrayValues(values).join(',');
+}
+
 function normalizeHoldType(value) {
   const holdType = String(value || '').trim();
   if (holdType === 'quality' || holdType === 'non-quality' || holdType === 'all') {
     return holdType;
   }
-  return 'quality';
+  return 'all';
 }
 
-function updateUrlState() {
-  const params = new URLSearchParams();
-
-  if (filterBar.holdType) {
-    params.set('hold_type', filterBar.holdType);
-  }
-  if (filterBar.reason) {
-    params.set('reason', filterBar.reason);
-  }
-  if (matrixFilter.value?.workcenter) {
-    params.set('workcenter', matrixFilter.value.workcenter);
-  }
-  if (matrixFilter.value?.package) {
-    params.set('package', matrixFilter.value.package);
-  }
-  if (page.value > 1) {
-    params.set('page', String(page.value));
-  }
-
-  const query = params.toString();
-  const nextUrl = query ? `/hold-overview?${query}` : '/hold-overview';
-  replaceRuntimeHistory(nextUrl);
+function updateFilters(nextFilters) {
+  filters.workorder = normalizeArrayValues(nextFilters.workorder);
+  filters.lotid = normalizeArrayValues(nextFilters.lotid);
+  filters.package = normalizeArrayValues(nextFilters.package);
+  filters.type = normalizeArrayValues(nextFilters.type);
+  filters.firstname = normalizeArrayValues(nextFilters.firstname);
+  filters.waferdesc = normalizeArrayValues(nextFilters.waferdesc);
 }
 
 function buildFilterBarParams() {
   const params = {
-    hold_type: filterBar.holdType || 'quality',
+    hold_type: filterBar.holdType || 'all',
   };
   if (filterBar.reason) {
     params.reason = filterBar.reason;
@@ -177,18 +229,38 @@ function buildMatrixFilterParams() {
   return params;
 }
 
-function buildLotsParams() {
+function buildAllFilterParams() {
   return {
     ...buildFilterBarParams(),
+    ...buildWipOverviewQueryParams(filters),
+  };
+}
+
+function buildLotsParams() {
+  return {
+    ...buildAllFilterParams(),
     ...buildMatrixFilterParams(),
     page: page.value,
     per_page: Number(pagination.value?.perPage || DEFAULT_PER_PAGE),
   };
 }
 
+function buildFilterOptionsParams(sourceFilters = filters) {
+  const params = {
+    ...buildWipOverviewQueryParams(sourceFilters),
+    status: 'HOLD',
+  };
+
+  if (filterBar.holdType && filterBar.holdType !== 'all') {
+    params.hold_type = filterBar.holdType;
+  }
+
+  return params;
+}
+
 async function fetchSummary(signal) {
   const result = await apiGet('/api/hold-overview/summary', {
-    params: buildFilterBarParams(),
+    params: buildAllFilterParams(),
     timeout: API_TIMEOUT,
     signal,
   });
@@ -197,11 +269,20 @@ async function fetchSummary(signal) {
 
 async function fetchMatrix(signal) {
   const result = await apiGet('/api/hold-overview/matrix', {
-    params: buildFilterBarParams(),
+    params: buildAllFilterParams(),
     timeout: API_TIMEOUT,
     signal,
   });
   return unwrapApiResult(result, 'Failed to fetch hold matrix');
+}
+
+async function fetchHold(signal) {
+  const result = await apiGet('/api/wip/overview/hold', {
+    params: buildAllFilterParams(),
+    timeout: API_TIMEOUT,
+    signal,
+  });
+  return unwrapApiResult(result, 'Failed to fetch hold data');
 }
 
 async function fetchLots(signal) {
@@ -211,6 +292,50 @@ async function fetchLots(signal) {
     signal,
   });
   return unwrapApiResult(result, 'Failed to fetch hold lots');
+}
+
+async function loadFilterOptions(sourceFilters = filters) {
+  const requestToken = ++filterOptionsRequestToken;
+
+  try {
+    const result = await apiGet('/api/wip/meta/filter-options', {
+      params: buildFilterOptionsParams(sourceFilters),
+      timeout: API_TIMEOUT,
+      silent: true,
+    });
+    const data = unwrapApiResult(result, '載入篩選選項失敗');
+
+    if (requestToken !== filterOptionsRequestToken) {
+      return;
+    }
+
+    filterOptions.value = {
+      workorders: Array.isArray(data?.workorders) ? data.workorders : [],
+      lotids: Array.isArray(data?.lotids) ? data.lotids : [],
+      packages: Array.isArray(data?.packages) ? data.packages : [],
+      types: Array.isArray(data?.types) ? data.types : [],
+      firstnames: Array.isArray(data?.firstnames) ? data.firstnames : [],
+      waferdescs: Array.isArray(data?.waferdescs) ? data.waferdescs : [],
+    };
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      console.warn('載入 WIP 篩選選項失敗:', error);
+    }
+  }
+}
+
+function scheduleFilterOptionsReload(nextDraftFilters) {
+  if (filterOptionsDebounceTimer) {
+    clearTimeout(filterOptionsDebounceTimer);
+  }
+
+  filterOptionsDebounceTimer = setTimeout(() => {
+    void loadFilterOptions(nextDraftFilters);
+  }, FILTER_OPTION_DEBOUNCE_MS);
+}
+
+function onFilterDraftChange(nextDraftFilters) {
+  scheduleFilterOptionsReload(nextDraftFilters);
 }
 
 function updateLotsState(payload) {
@@ -229,6 +354,56 @@ function showRefreshSuccess() {
   window.setTimeout(() => {
     refreshSuccess.value = false;
   }, 1500);
+}
+
+function updateUrlState() {
+  const params = new URLSearchParams();
+
+  if (filterBar.holdType) {
+    params.set('hold_type', filterBar.holdType);
+  }
+  if (filterBar.reason) {
+    params.set('reason', filterBar.reason);
+  }
+  if (matrixFilter.value?.workcenter) {
+    params.set('workcenter', matrixFilter.value.workcenter);
+  }
+  if (matrixFilter.value?.package) {
+    params.set('matrix_package', matrixFilter.value.package);
+  }
+
+  const workorder = serializeFilterValue(filters.workorder);
+  const lotid = serializeFilterValue(filters.lotid);
+  const pkg = serializeFilterValue(filters.package);
+  const type = serializeFilterValue(filters.type);
+  const firstname = serializeFilterValue(filters.firstname);
+  const waferdesc = serializeFilterValue(filters.waferdesc);
+
+  if (workorder) {
+    params.set('workorder', workorder);
+  }
+  if (lotid) {
+    params.set('lotid', lotid);
+  }
+  if (pkg) {
+    params.set('package', pkg);
+  }
+  if (type) {
+    params.set('type', type);
+  }
+  if (firstname) {
+    params.set('firstname', firstname);
+  }
+  if (waferdesc) {
+    params.set('waferdesc', waferdesc);
+  }
+  if (page.value > 1) {
+    params.set('page', String(page.value));
+  }
+
+  const query = params.toString();
+  const nextUrl = query ? `/hold-overview?${query}` : '/hold-overview';
+  replaceRuntimeHistory(nextUrl);
 }
 
 const { createAbortSignal, clearAbortController, triggerRefresh } = useAutoRefresh({
@@ -251,9 +426,10 @@ async function loadAllData(showOverlay = true) {
   lotsError.value = '';
 
   try {
-    const [summaryData, matrixData, lotsData] = await Promise.all([
+    const [summaryData, matrixData, holdData, lotsData] = await Promise.all([
       fetchSummary(signal),
       fetchMatrix(signal),
+      fetchHold(signal),
       fetchLots(signal),
     ]);
     if (isStaleRequest(requestId)) {
@@ -262,6 +438,7 @@ async function loadAllData(showOverlay = true) {
 
     summary.value = summaryData;
     matrix.value = matrixData;
+    hold.value = holdData;
     updateLotsState(lotsData);
     showRefreshSuccess();
   } catch (error) {
@@ -317,9 +494,17 @@ async function loadLots() {
   }
 }
 
+function navigateToHoldDetail(reason) {
+  if (!reason) {
+    return;
+  }
+  navigateToRuntimeRoute(`/hold-detail?reason=${encodeURIComponent(reason)}`);
+}
+
 function handleFilterChange(next) {
-  const nextHoldType = next?.holdType || 'quality';
-  const nextReason = next?.reason || '';
+  const nextHoldType = normalizeHoldType(next?.holdType || 'all');
+  const nextReason = String(next?.reason || '').trim();
+
   if (filterBar.holdType === nextHoldType && filterBar.reason === nextReason) {
     return;
   }
@@ -329,6 +514,7 @@ function handleFilterChange(next) {
   matrixFilter.value = null;
   page.value = 1;
   updateUrlState();
+  void loadFilterOptions(filters);
   void loadAllData(false);
 }
 
@@ -347,6 +533,31 @@ function clearMatrixFilter() {
   page.value = 1;
   updateUrlState();
   void loadLots();
+}
+
+function applyFilters(nextFilters) {
+  updateFilters(nextFilters);
+  matrixFilter.value = null;
+  page.value = 1;
+  updateUrlState();
+  void loadFilterOptions(filters);
+  void loadAllData(false);
+}
+
+function clearAllFilters() {
+  updateFilters({
+    workorder: [],
+    lotid: [],
+    package: [],
+    type: [],
+    firstname: [],
+    waferdesc: [],
+  });
+  matrixFilter.value = null;
+  page.value = 1;
+  updateUrlState();
+  void loadFilterOptions(filters);
+  void loadAllData(false);
 }
 
 function prevPage() {
@@ -371,23 +582,50 @@ async function manualRefresh() {
   await triggerRefresh({ resetTimer: true, force: true });
 }
 
-onMounted(() => {
-  filterBar.holdType = normalizeHoldType(getUrlParam('hold_type'));
+async function initializePage() {
+  filterBar.holdType = normalizeHoldType(getUrlParam('hold_type') || 'all');
   filterBar.reason = getUrlParam('reason');
+
+  updateFilters({
+    workorder: parseCsvParam('workorder'),
+    lotid: parseCsvParam('lotid'),
+    package: parseCsvParam('package'),
+    type: parseCsvParam('type'),
+    firstname: parseCsvParam('firstname'),
+    waferdesc: parseCsvParam('waferdesc'),
+  });
+
   const workcenter = getUrlParam('workcenter');
-  const pkg = getUrlParam('package');
-  if (workcenter || pkg) {
+  const matrixPkg = getUrlParam('matrix_package');
+  if (workcenter || matrixPkg) {
     matrixFilter.value = {
       workcenter: workcenter || null,
-      package: pkg || null,
+      package: matrixPkg || null,
     };
   }
+
   const parsedPage = Number.parseInt(getUrlParam('page'), 10);
   if (Number.isFinite(parsedPage) && parsedPage > 0) {
     page.value = parsedPage;
   }
+
   updateUrlState();
-  void loadAllData(true);
+
+  await Promise.all([
+    loadFilterOptions(filters),
+    loadAllData(true),
+  ]);
+}
+
+onMounted(() => {
+  void initializePage();
+});
+
+onBeforeUnmount(() => {
+  if (filterOptionsDebounceTimer) {
+    clearTimeout(filterOptionsDebounceTimer);
+    filterOptionsDebounceTimer = null;
+  }
 });
 </script>
 
@@ -395,7 +633,7 @@ onMounted(() => {
   <div class="dashboard hold-overview-page">
     <header class="header">
       <div class="header-left">
-        <h1>Hold Lot Overview</h1>
+        <h1>Hold 即時概況</h1>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
       </div>
       <div class="header-right">
@@ -411,6 +649,15 @@ onMounted(() => {
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
 
+    <FilterPanel
+      :filters="filters"
+      :options="filterOptions"
+      :loading="refreshing"
+      @apply="applyFilters"
+      @clear="clearAllFilters"
+      @draft-change="onFilterDraftChange"
+    />
+
     <FilterBar
       :hold-type="filterBar.holdType"
       :reason="filterBar.reason"
@@ -421,33 +668,52 @@ onMounted(() => {
 
     <SummaryCards :summary="summary" />
 
-    <section class="card">
-      <div class="card-header">
-        <div class="card-title">Workcenter x Package Matrix (QTY)</div>
-      </div>
-      <div class="card-body matrix-container">
-        <HoldMatrix :data="matrix" :active-filter="matrixFilter" @select="handleMatrixSelect" />
-      </div>
+    <section class="content-grid">
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">Workcenter x Package Matrix (QTY)</div>
+        </div>
+        <div class="card-body matrix-container">
+          <HoldMatrix :data="matrix" :active-filter="matrixFilter" @select="handleMatrixSelect" />
+        </div>
+      </section>
+
+      <section class="pareto-grid">
+        <ParetoSection
+          v-if="showQualityPareto"
+          type="quality"
+          title="品質異常 Hold"
+          :items="splitHold.quality"
+          @drilldown="navigateToHoldDetail"
+        />
+        <ParetoSection
+          v-if="showNonQualityPareto"
+          type="non-quality"
+          title="非品質異常 Hold"
+          :items="splitHold.nonQuality"
+          @drilldown="navigateToHoldDetail"
+        />
+      </section>
+
+      <FilterIndicator
+        :matrix-filter="matrixFilter"
+        :show-clear-all="true"
+        @clear-matrix="clearMatrixFilter"
+        @clear-all="clearMatrixFilter"
+      />
+
+      <HoldLotTable
+        :lots="lots"
+        :pagination="pagination"
+        :loading="lotsLoading"
+        :error-message="lotsError"
+        :has-active-filters="hasLotFilterText"
+        :filter-text="lotFilterText"
+        @clear-filters="clearMatrixFilter"
+        @prev-page="prevPage"
+        @next-page="nextPage"
+      />
     </section>
-
-    <FilterIndicator
-      :matrix-filter="matrixFilter"
-      :show-clear-all="true"
-      @clear-matrix="clearMatrixFilter"
-      @clear-all="clearMatrixFilter"
-    />
-
-    <LotTable
-      :lots="lots"
-      :pagination="pagination"
-      :loading="lotsLoading"
-      :error-message="lotsError"
-      :has-active-filters="hasLotFilterText"
-      :filter-text="lotFilterText"
-      @clear-filters="clearMatrixFilter"
-      @prev-page="prevPage"
-      @next-page="nextPage"
-    />
   </div>
 
   <div v-if="initialLoading" class="loading-overlay">

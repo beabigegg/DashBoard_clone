@@ -5,10 +5,10 @@ import { apiGet } from '../core/api.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
 import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
+import HoldLotTable from '../wip-shared/components/HoldLotTable.vue';
 
 import AgeDistribution from './components/AgeDistribution.vue';
 import DistributionTable from './components/DistributionTable.vue';
-import LotTable from './components/LotTable.vue';
 import SummaryCards from './components/SummaryCards.vue';
 
 const API_TIMEOUT = 60000;
@@ -104,7 +104,7 @@ const holdType = computed(() => {
 });
 
 const holdTypeLabel = computed(() => (holdType.value === 'quality' ? '品質異常' : '非品質異常'));
-const backToOverviewHref = toRuntimeRoute('/wip-overview');
+const backToOverviewHref = toRuntimeRoute('/hold-overview');
 
 const headerStyle = computed(() => ({
   '--header-gradient': holdType.value === 'quality'
@@ -292,7 +292,7 @@ onMounted(() => {
   }
 
   if (!reason.value) {
-    navigateToRuntimeRoute('/wip-overview', { replace: true });
+    navigateToRuntimeRoute('/hold-overview', { replace: true });
     return;
   }
   updateUrlState();
@@ -304,7 +304,7 @@ onMounted(() => {
   <div class="dashboard hold-detail-page">
     <header class="header" :style="headerStyle">
       <div class="header-left">
-        <a :href="backToOverviewHref" class="btn btn-back">&larr; WIP Overview</a>
+        <a :href="backToOverviewHref" class="btn btn-back">&larr; Hold Overview</a>
         <h1>Hold Detail: {{ reason }}</h1>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
       </div>
@@ -343,13 +343,14 @@ onMounted(() => {
       />
     </section>
 
-    <LotTable
+    <HoldLotTable
       :lots="lots"
       :pagination="pagination"
       :loading="lotsLoading"
       :error-message="lotsError"
       :has-active-filters="hasActiveFilters"
       :filter-text="filterText"
+      title="Lot Details"
       @clear-filters="clearFilters"
       @prev-page="prevPage"
       @next-page="nextPage"

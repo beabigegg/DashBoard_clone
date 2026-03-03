@@ -3,15 +3,11 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
-import {
-  buildWipOverviewQueryParams,
-  splitHoldByType,
-} from '../core/wip-derive.js';
+import { buildWipOverviewQueryParams } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
 import FilterPanel from './components/FilterPanel.vue';
 import MatrixTable from './components/MatrixTable.vue';
-import ParetoSection from './components/ParetoSection.vue';
 import StatusCards from './components/StatusCards.vue';
 import SummaryCards from './components/SummaryCards.vue';
 
@@ -20,7 +16,6 @@ const FILTER_OPTION_DEBOUNCE_MS = 120;
 
 const summary = ref(null);
 const matrix = ref(null);
-const hold = ref(null);
 const filterOptions = ref({
   workorders: [],
   lotids: [],
@@ -115,15 +110,6 @@ async function fetchMatrix(signal) {
   return unwrapApiResult(result, 'Failed to fetch matrix');
 }
 
-async function fetchHold(signal) {
-  const result = await apiGet('/api/wip/overview/hold', {
-    params: buildFilters(),
-    timeout: API_TIMEOUT,
-    signal,
-  });
-  return unwrapApiResult(result, 'Failed to fetch hold data');
-}
-
 async function loadFilterOptions(sourceFilters = filters) {
   const requestToken = ++filterOptionsRequestToken;
 
@@ -188,8 +174,6 @@ const matrixTitle = computed(() => {
   return `${base} - ${activeStatusFilter.value.toUpperCase()} Only`;
 });
 
-const splitHold = computed(() => splitHoldByType(hold.value));
-
 const { createAbortSignal, triggerRefresh } = useAutoRefresh({
   onRefresh: () => loadAllData(false),
   autoStart: true,
@@ -214,15 +198,13 @@ async function loadAllData(showOverlay = true) {
   errorMessage.value = '';
 
   try {
-    const [summaryData, matrixData, holdData] = await Promise.all([
+    const [summaryData, matrixData] = await Promise.all([
       fetchSummary(signal),
       fetchMatrix(signal),
-      fetchHold(signal),
     ]);
 
     summary.value = summaryData;
     matrix.value = matrixData;
-    hold.value = holdData;
     showRefreshSuccess();
   } catch (error) {
     if (error?.name === 'AbortError') {
@@ -256,6 +238,15 @@ async function loadMatrixOnly() {
 }
 
 function toggleStatusFilter(status) {
+  if (status === 'quality-hold') {
+    navigateToRuntimeRoute('/hold-overview?hold_type=quality');
+    return;
+  }
+  if (status === 'non-quality-hold') {
+    navigateToRuntimeRoute('/hold-overview?hold_type=non-quality');
+    return;
+  }
+
   activeStatusFilter.value = activeStatusFilter.value === status ? null : status;
   updateUrlState();
   void loadMatrixOnly();
@@ -365,13 +356,6 @@ function navigateToDetail(workcenter) {
   navigateToRuntimeRoute(`/wip-detail?${params.toString()}`);
 }
 
-function navigateToHoldDetail(reason) {
-  if (!reason) {
-    return;
-  }
-  navigateToRuntimeRoute(`/hold-detail?reason=${encodeURIComponent(reason)}`);
-}
-
 async function manualRefresh() {
   await triggerRefresh({ resetTimer: true, force: true });
 }
@@ -449,20 +433,6 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section class="pareto-grid">
-        <ParetoSection
-          type="quality"
-          title="品質異常 Hold"
-          :items="splitHold.quality"
-          @drilldown="navigateToHoldDetail"
-        />
-        <ParetoSection
-          type="non-quality"
-          title="非品質異常 Hold"
-          :items="splitHold.nonQuality"
-          @drilldown="navigateToHoldDetail"
-        />
-      </section>
     </section>
   </div>
 

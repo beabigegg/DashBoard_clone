@@ -21,7 +21,7 @@ The page SHALL show summary statistics for a specific hold reason.
 
 #### Scenario: Missing reason parameter
 - **WHEN** the page loads without a `reason` URL parameter
-- **THEN** the page SHALL redirect to `/wip-overview`
+- **THEN** the page SHALL redirect to `/hold-overview`
 
 ### Requirement: Hold Detail page SHALL display age distribution
 The page SHALL show the distribution of hold lots by age at current station.
@@ -57,7 +57,7 @@ The page SHALL display detailed lot information with server-side pagination.
 
 #### Scenario: Lot table rendering
 - **WHEN** lot data is loaded from `GET /api/wip/hold-detail/lots`
-- **THEN** a table SHALL display with 10 columns: LOTID, WORKORDER, QTY, Package, Workcenter, Spec, Age, Hold By, Dept, Hold Comment
+- **THEN** a table SHALL display with 13 columns: LOTID, WORKORDER, QTY, Product, Package, Workcenter, Hold Reason, Spec, Age, Hold By, Dept, Hold Comment, Future Hold Comment
 - **THEN** age values SHALL display with "天" suffix
 
 #### Scenario: Filter indicator
@@ -74,12 +74,12 @@ The page SHALL display detailed lot information with server-side pagination.
 - **WHEN** any filter is toggled
 - **THEN** pagination SHALL reset to page 1
 
-### Requirement: Hold Detail page SHALL have back navigation to Overview
-The page SHALL provide a way to return to the WIP Overview page.
+### Requirement: Hold Detail page SHALL have back navigation to Hold Overview
+The page SHALL provide a way to return to the Hold Overview page.
 
 #### Scenario: Back button
-- **WHEN** user clicks the "← WIP Overview" button in the header
-- **THEN** the page SHALL navigate to `/wip-overview`
+- **WHEN** user clicks the "← Hold Overview" button in the header
+- **THEN** the page SHALL navigate to `/hold-overview`
 
 ### Requirement: Hold Detail page SHALL auto-refresh and handle request cancellation
 The page SHALL automatically refresh data and prevent stale request pile-up.

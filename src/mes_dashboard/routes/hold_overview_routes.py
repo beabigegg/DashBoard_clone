@@ -41,7 +41,7 @@ _VALID_HOLD_TYPES = {'quality', 'non-quality', 'all'}
 _VALID_AGE_RANGES = {'0-1', '1-3', '3-7', '7+'}
 
 
-def _parse_hold_type(default: str = 'quality') -> tuple[Optional[str], Optional[tuple[dict, int]]]:
+def _parse_hold_type(default: str = 'all') -> tuple[Optional[str], Optional[tuple[dict, int]]]:
     raw = request.args.get('hold_type', '').strip().lower()
     hold_type = raw or default
     if hold_type not in _VALID_HOLD_TYPES:
@@ -79,16 +79,26 @@ def hold_overview_page():
 @hold_overview_bp.route('/api/hold-overview/summary')
 def api_hold_overview_summary():
     """Return summary KPI data for hold overview page."""
-    hold_type, error = _parse_hold_type(default='quality')
+    hold_type, error = _parse_hold_type(default='all')
     if error:
         return jsonify(error[0]), error[1]
 
     reason = request.args.get('reason', '').strip() or None
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_hold_detail_summary(
         reason=reason,
         hold_type=hold_type,
+        workorder=workorder,
+        lotid=lotid,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
         include_dummy=include_dummy,
     )
     if result is not None:
@@ -100,11 +110,16 @@ def api_hold_overview_summary():
 @_HOLD_OVERVIEW_MATRIX_RATE_LIMIT
 def api_hold_overview_matrix():
     """Return hold-only workcenter x package matrix."""
-    hold_type, error = _parse_hold_type(default='quality')
+    hold_type, error = _parse_hold_type(default='all')
     if error:
         return jsonify(error[0]), error[1]
 
     reason = request.args.get('reason', '').strip() or None
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_wip_matrix(
@@ -112,6 +127,11 @@ def api_hold_overview_matrix():
         status='HOLD',
         hold_type=hold_type,
         reason=reason,
+        workorder=workorder,
+        lotid=lotid,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
     )
     if result is not None:
         return jsonify({'success': True, 'data': result})
@@ -121,7 +141,7 @@ def api_hold_overview_matrix():
 @hold_overview_bp.route('/api/hold-overview/treemap')
 def api_hold_overview_treemap():
     """Return grouped hold overview data for treemap chart."""
-    hold_type, error = _parse_hold_type(default='quality')
+    hold_type, error = _parse_hold_type(default='all')
     if error:
         return jsonify(error[0]), error[1]
 
@@ -146,7 +166,7 @@ def api_hold_overview_treemap():
 @_HOLD_OVERVIEW_LOTS_RATE_LIMIT
 def api_hold_overview_lots():
     """Return paginated hold lot details."""
-    hold_type, error = _parse_hold_type(default='quality')
+    hold_type, error = _parse_hold_type(default='all')
     if error:
         return jsonify(error[0]), error[1]
 
@@ -154,6 +174,11 @@ def api_hold_overview_lots():
     treemap_reason = request.args.get('treemap_reason', '').strip() or None
     workcenter = request.args.get('workcenter', '').strip() or None
     package = request.args.get('package', '').strip() or None
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
     age_range = request.args.get('age_range', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
     page = request.args.get('page', 1, type=int)
@@ -179,6 +204,11 @@ def api_hold_overview_lots():
         treemap_reason=treemap_reason,
         workcenter=workcenter,
         package=package,
+        workorder=workorder,
+        lotid=lotid,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
         age_range=age_range,
         include_dummy=include_dummy,
         page=page,

@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 
 import App from './App.vue';
+import '../resource-shared/styles.css';
 import '../wip-shared/styles.css';
 import './style.css';
 

@@ -225,9 +225,8 @@
 }
 
 .lot-table th:nth-child(3),
-.lot-table th:nth-child(7),
 .lot-table td:nth-child(3),
-.lot-table td:nth-child(7) {
+.lot-table td:nth-child(3) {
   text-align: right;
 }
 

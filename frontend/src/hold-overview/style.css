@@ -1,3 +1,5 @@
+@import '../wip-shared/pareto-styles.css';
+
 .hold-overview-page .header h1 {
   font-size: 24px;
 }
@@ -19,6 +21,44 @@
   background: #fef2f2;
   color: #991b1b;
   font-size: 13px;
+}
+
+.filters {
+  background: var(--card-bg);
+  padding: 16px 20px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 14px 16px;
+  align-items: start;
+}
+
+.filters .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.filters .filter-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.filters-actions {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.filters-actions .btn-primary,
+.filters-actions .btn-secondary {
+  min-width: 108px;
 }
 
 .hold-summary-row {
@@ -67,7 +107,7 @@
 }
 
 .hold-overview-hold-type-group {
-  flex: 1 1 520px;
+  flex: 0 0 auto;
 }
 
 .hold-overview-reason-group {
@@ -84,7 +124,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  min-width: 420px;
+  min-width: 320px;
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -216,6 +256,12 @@
   background: #c7d2fe;
   color: #1e3a8a;
   font-weight: 700;
+}
+
+.content-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .cascade-filter-indicator {
@@ -356,9 +402,8 @@
 }
 
 .lot-table th:nth-child(3),
-.lot-table th:nth-child(7),
 .lot-table td:nth-child(3),
-.lot-table td:nth-child(7) {
+.lot-table td:nth-child(3) {
   text-align: right;
 }
 
@@ -375,6 +420,10 @@
 @media (max-width: 1000px) {
   .hold-summary-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filters {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
 
   .filter-bar {
@@ -396,6 +445,14 @@
 @media (max-width: 768px) {
   .dashboard.hold-overview-page {
     padding: 14px;
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .filters-actions {
+    justify-content: flex-start;
   }
 
   .hold-summary-row {

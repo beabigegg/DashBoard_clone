@@ -2581,6 +2581,11 @@ def _search_types_from_oracle(
 def get_hold_detail_summary(
     reason: Optional[str] = None,
     hold_type: Optional[str] = None,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
     include_dummy: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Get summary statistics for hold lots.
@@ -2590,6 +2595,11 @@ def get_hold_detail_summary(
     Args:
         reason: Optional HOLDREASONNAME filter
         hold_type: Optional hold type filter ('quality', 'non-quality')
+        workorder: Optional WORKORDER filter
+        lotid: Optional LOTID filter
+        pj_type: Optional PJ_TYPE filter
+        firstname: Optional FIRSTNAME filter
+        waferdesc: Optional WAFERDESC filter
         include_dummy: If True, include DUMMY lots (default: False)
 
     Returns:
@@ -2601,6 +2611,11 @@ def get_hold_detail_summary(
         try:
             df = _select_with_snapshot_indexes(
                 include_dummy=include_dummy,
+                workorder=workorder,
+                lotid=lotid,
+                pj_type=pj_type,
+                firstname=firstname,
+                waferdesc=waferdesc,
                 status='HOLD',
                 hold_type=hold_type,
             )
@@ -2608,6 +2623,11 @@ def get_hold_detail_summary(
                 return _get_hold_detail_summary_from_oracle(
                     reason=reason,
                     hold_type=hold_type,
+                    workorder=workorder,
+                    lotid=lotid,
+                    pj_type=pj_type,
+                    firstname=firstname,
+                    waferdesc=waferdesc,
                     include_dummy=include_dummy,
                 )
 
@@ -2645,6 +2665,11 @@ def get_hold_detail_summary(
     return _get_hold_detail_summary_from_oracle(
         reason=reason,
         hold_type=hold_type,
+        workorder=workorder,
+        lotid=lotid,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
         include_dummy=include_dummy,
     )
 
@@ -2652,6 +2677,11 @@ def get_hold_detail_summary(
 def _get_hold_detail_summary_from_oracle(
     reason: Optional[str] = None,
     hold_type: Optional[str] = None,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
     include_dummy: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Get hold detail summary directly from Oracle (fallback)."""
@@ -2663,6 +2693,16 @@ def _get_hold_detail_summary_from_oracle(
             _add_hold_type_conditions(builder, hold_type)
         if reason:
             builder.add_param_condition("HOLDREASONNAME", reason)
+        if workorder:
+            builder.add_like_condition("WORKORDER", workorder)
+        if lotid:
+            builder.add_like_condition("LOTID", lotid)
+        if pj_type:
+            builder.add_param_condition("PJ_TYPE", pj_type)
+        if firstname:
+            builder.add_param_condition("FIRSTNAME", firstname)
+        if waferdesc:
+            builder.add_param_condition("WAFERDESC", waferdesc)
         where_clause, params = builder.build_where_only()
 
         sql = f"""
@@ -2988,6 +3028,11 @@ def get_hold_detail_lots(
     treemap_reason: Optional[str] = None,
     workcenter: Optional[str] = None,
     package: Optional[str] = None,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
     age_range: Optional[str] = None,
     include_dummy: bool = False,
     page: int = 1,
@@ -3003,6 +3048,11 @@ def get_hold_detail_lots(
         treemap_reason: Optional HOLDREASONNAME filter from treemap selection
         workcenter: Optional WORKCENTER_GROUP filter
         package: Optional PACKAGE_LEF filter
+        workorder: Optional WORKORDER filter
+        lotid: Optional LOTID filter
+        pj_type: Optional PJ_TYPE filter
+        firstname: Optional FIRSTNAME filter
+        waferdesc: Optional WAFERDESC filter
         age_range: Optional age range filter ('0-1', '1-3', '3-7', '7+')
         include_dummy: If True, include DUMMY lots (default: False)
         page: Page number (1-based)
@@ -3022,6 +3072,11 @@ def get_hold_detail_lots(
                 include_dummy=include_dummy,
                 workcenter=workcenter,
                 package=package,
+                workorder=workorder,
+                lotid=lotid,
+                pj_type=pj_type,
+                firstname=firstname,
+                waferdesc=waferdesc,
                 status='HOLD',
                 hold_type=hold_type,
             )
@@ -3032,6 +3087,11 @@ def get_hold_detail_lots(
                     treemap_reason=treemap_reason,
                     workcenter=workcenter,
                     package=package,
+                    workorder=workorder,
+                    lotid=lotid,
+                    pj_type=pj_type,
+                    firstname=firstname,
+                    waferdesc=waferdesc,
                     age_range=age_range,
                     include_dummy=include_dummy,
                     page=page,
@@ -3116,6 +3176,11 @@ def get_hold_detail_lots(
         treemap_reason=treemap_reason,
         workcenter=workcenter,
         package=package,
+        workorder=workorder,
+        lotid=lotid,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
         age_range=age_range,
         include_dummy=include_dummy,
         page=page,
@@ -3129,6 +3194,11 @@ def _get_hold_detail_lots_from_oracle(
     treemap_reason: Optional[str] = None,
     workcenter: Optional[str] = None,
     package: Optional[str] = None,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
     age_range: Optional[str] = None,
     include_dummy: bool = False,
     page: int = 1,
@@ -3151,6 +3221,16 @@ def _get_hold_detail_lots_from_oracle(
             builder.add_param_condition("WORKCENTER_GROUP", workcenter)
         if package:
             builder.add_param_condition("PACKAGE_LEF", package)
+        if workorder:
+            builder.add_like_condition("WORKORDER", workorder)
+        if lotid:
+            builder.add_like_condition("LOTID", lotid)
+        if pj_type:
+            builder.add_param_condition("PJ_TYPE", pj_type)
+        if firstname:
+            builder.add_param_condition("FIRSTNAME", firstname)
+        if waferdesc:
+            builder.add_param_condition("WAFERDESC", waferdesc)
         if age_range:
             if age_range == '0-1':
                 builder.add_condition("AGEBYDAYS >= 0 AND AGEBYDAYS < 1")

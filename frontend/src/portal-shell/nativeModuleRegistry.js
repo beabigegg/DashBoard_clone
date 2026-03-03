@@ -24,7 +24,7 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
   ),
   '/hold-overview': createNativeLoader(
     () => import('../hold-overview/App.vue'),
-    [() => import('../wip-shared/styles.css'), () => import('../hold-overview/style.css')],
+    [() => import('../resource-shared/styles.css'), () => import('../wip-shared/styles.css'), () => import('../hold-overview/style.css')],
   ),
   '/hold-detail': createNativeLoader(
     () => import('../hold-detail/App.vue'),
@@ -60,7 +60,7 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
   ),
   '/query-tool': createNativeLoader(
     () => import('../query-tool/App.vue'),
-    [() => import('../query-tool/style.css')],
+    [() => import('../wip-shared/styles.css'), () => import('../styles/tailwind.css'), () => import('../query-tool/style.css')],
   ),
   '/tables': createNativeLoader(
     () => import('../tables/App.vue'),

@@ -25,13 +25,18 @@ The page SHALL display four clickable status cards (RUN, QUEUE, 品質異常, �
 - **THEN** four status cards SHALL be displayed with color coding (green=RUN, yellow=QUEUE, red=品質異常, orange=非品質異常)
 - **THEN** each card SHALL show lot count and quantity
 
-#### Scenario: Status card click filters matrix
-- **WHEN** user clicks a status card
+#### Scenario: RUN/QUEUE card click filters matrix
+- **WHEN** user clicks the RUN or QUEUE status card
 - **THEN** the matrix table SHALL reload with the selected status filter
 - **THEN** the clicked card SHALL show an active visual state
-- **THEN** non-active cards SHALL dim to 50% opacity
 - **THEN** clicking the same card again SHALL deactivate the filter and restore all cards
 - **THEN** the URL SHALL be updated to reflect the active status filter
+
+#### Scenario: Hold card click navigates to Hold Overview
+- **WHEN** user clicks the "品質異常" status card
+- **THEN** the page SHALL navigate to `/hold-overview?hold_type=quality`
+- **WHEN** user clicks the "非品質異常" status card
+- **THEN** the page SHALL navigate to `/hold-overview?hold_type=non-quality`
 
 ### Requirement: Overview page SHALL display Workcenter × Package matrix
 The page SHALL display a cross-tabulation table of workcenters vs packages.
@@ -47,29 +52,6 @@ The page SHALL display a cross-tabulation table of workcenters vs packages.
 - **THEN** the page SHALL navigate to `/wip-detail?workcenter={name}`
 - **THEN** active filter values (workorder, lotid, package, type) SHALL be passed as URL parameters
 - **THEN** the active status filter SHALL be passed as the `status` URL parameter if set
-
-### Requirement: Overview page SHALL display Hold Pareto analysis
-The page SHALL display Pareto charts and tables for quality and non-quality hold reasons.
-
-#### Scenario: Pareto chart rendering
-- **WHEN** hold data is loaded from `GET /api/wip/overview/hold`
-- **THEN** hold items SHALL be split into quality and non-quality groups
-- **THEN** each group SHALL display an ECharts dual-axis Pareto chart (bar=QTY, line=cumulative %)
-- **THEN** items SHALL be sorted by QTY descending
-
-#### Scenario: Pareto chart drill-down
-- **WHEN** user clicks a bar in the Pareto chart
-- **THEN** the page SHALL navigate to `/hold-detail?reason={reason}`
-
-#### Scenario: Pareto table with drill-down links
-- **WHEN** Pareto data is rendered
-- **THEN** a table SHALL display below each chart with Hold Reason, Lots, QTY, and cumulative %
-- **THEN** reason names SHALL be clickable links to `/hold-detail?reason={reason}`
-
-#### Scenario: Empty hold data
-- **WHEN** a hold type has no items
-- **THEN** the chart area SHALL display a "目前無資料" message
-- **THEN** the chart SHALL be cleared
 
 ### Requirement: Overview page SHALL support autocomplete filtering
 The page SHALL provide autocomplete-enabled filter inputs for WORKORDER, LOT ID, PACKAGE, and TYPE.
