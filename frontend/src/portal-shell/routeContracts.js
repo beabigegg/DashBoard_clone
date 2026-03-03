@@ -13,6 +13,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/excel-query',
   '/query-tool',
   '/mid-section-defect',
+  '/material-trace',
 ]);
 
 const IN_SCOPE_ADMIN_ROUTES = Object.freeze([
@@ -225,6 +226,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
     title: '製程不良追溯分析',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/material-trace': buildContract({
+    route: '/material-trace',
+    routeId: 'material-trace',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: '原物料追溯查詢',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',

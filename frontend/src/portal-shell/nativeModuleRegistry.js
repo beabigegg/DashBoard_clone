@@ -70,6 +70,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../mid-section-defect/App.vue'),
     [() => import('../mid-section-defect/style.css')],
   ),
+  '/material-trace': createNativeLoader(
+    () => import('../material-trace/App.vue'),
+    [() => import('../wip-shared/styles.css'), () => import('../material-trace/style.css')],
+  ),
   '/admin/performance': createNativeLoader(
     () => import('../admin-performance/App.vue'),
     [() => import('../admin-performance/style.css')],

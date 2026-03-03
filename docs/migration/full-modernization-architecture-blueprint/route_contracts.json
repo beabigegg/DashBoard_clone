@@ -191,6 +191,18 @@
       "canonical_shell_path": "/portal-shell/mid-section-defect",
       "rollback_strategy": "fallback_to_legacy_route",
       "compatibility_policy": "redirect_to_shell_when_spa_enabled"
+    },
+    {
+      "route": "/material-trace",
+      "route_id": "material-trace",
+      "title": "Material Trace",
+      "scope": "in-scope",
+      "render_mode": "native",
+      "owner": "frontend-mes-reporting",
+      "visibility_policy": "released_or_admin",
+      "canonical_shell_path": "/portal-shell/material-trace",
+      "rollback_strategy": "fallback_to_legacy_route",
+      "compatibility_policy": "redirect_to_shell_when_spa_enabled"
     }
   ]
 }

@@ -931,6 +931,27 @@ def create_app(config_name: str | None = None) -> Flask:
             200,
         ))
 
+    @app.route('/material-trace')
+    def material_trace_page():
+        """Material trace query page served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/material-trace')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "material-trace.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'material-trace.html')
+
+        return missing_in_scope_asset_response('/material-trace', (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>原物料追溯查詢</title>"
+            "<script type=\"module\" src=\"/static/dist/material-trace.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        ))
+
     # ========================================================
     # Table Query APIs (for table_data_viewer)
     # ========================================================

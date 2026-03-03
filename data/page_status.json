@@ -100,6 +100,13 @@
       "order": 3
     },
     {
+      "route": "/material-trace",
+      "name": "原物料追溯查詢",
+      "status": "released",
+      "drawer_id": "drawer",
+      "order": 4
+    },
+    {
       "route": "/admin/pages",
       "name": "頁面管理",
       "status": "released",
