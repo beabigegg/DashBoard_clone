@@ -85,7 +85,7 @@ class TestDetectionEngineDecomposition:
 
         df = msd_svc._fetch_station_detection_data(
             start_date="2025-06-01",
-            end_date="2025-06-30",
+            end_date="2025-06-05",
             station="測試",
         )
 

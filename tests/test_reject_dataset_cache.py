@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 from unittest.mock import MagicMock
 
@@ -400,6 +401,72 @@ class TestEngineDecompositionDateRange:
         assert engine_calls["parallel"] == cache_svc._REJECT_ENGINE_PARALLEL
         assert engine_calls["max_rows_per_chunk"] == cache_svc._REJECT_ENGINE_MAX_ROWS_PER_CHUNK
 
+    def test_engine_chunk_uses_paged_fetch_without_truncation(self, monkeypatch):
+        """Engine chunk should fetch all pages (offset paging), not truncate at page size."""
+        import mes_dashboard.services.batch_query_engine as engine_mod
+
+        offsets = []
+        captured = {"df": pd.DataFrame(), "merge_kwargs": None}
+
+        def fake_read_sql(sql, params):
+            offset = int(params.get("offset", 0))
+            limit = int(params.get("limit", 0))
+            offsets.append(offset)
+            total_rows = 5
+            remaining = max(total_rows - offset, 0)
+            take = min(limit, remaining)
+            if take <= 0:
+                return pd.DataFrame()
+            return pd.DataFrame(
+                {
+                    "CONTAINERID": [f"C{offset + i}" for i in range(take)],
+                    "LOSSREASONNAME": ["R1"] * take,
+                    "REJECT_TOTAL_QTY": [1] * take,
+                }
+            )
+
+        def fake_execute_plan(chunks, query_fn, **kwargs):
+            page_size = kwargs.get("max_rows_per_chunk")
+            captured["df"] = query_fn(chunks[0], max_rows_per_chunk=page_size)
+            return kwargs.get("query_hash", "qh")
+
+        def fake_merge_chunks(prefix, qhash, **kwargs):
+            captured["merge_kwargs"] = kwargs
+            return captured["df"]
+
+        monkeypatch.setattr(cache_svc, "_REJECT_ENGINE_MAX_ROWS_PER_CHUNK", 2)
+        monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *_a, **_kw: True)
+        monkeypatch.setattr(
+            engine_mod,
+            "decompose_by_time_range",
+            lambda *_a, **_kw: [{"chunk_start": "2025-01-01", "chunk_end": "2025-01-31"}],
+        )
+        monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
+        monkeypatch.setattr(engine_mod, "merge_chunks", fake_merge_chunks)
+        monkeypatch.setattr(cache_svc, "read_sql_df", fake_read_sql)
+        monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
+        monkeypatch.setattr(cache_svc, "_prepare_sql", lambda *a, **kw: "SELECT 1 FROM dual")
+        monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+        monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
+        monkeypatch.setattr(cache_svc, "_apply_policy_filters", lambda df, **kw: df)
+        monkeypatch.setattr(cache_svc, "_store_query_result", lambda *_a, **_kw: None)
+        monkeypatch.setattr(cache_svc, "redis_clear_batch", lambda *_a, **_kw: 0)
+        monkeypatch.setattr(
+            cache_svc,
+            "_build_primary_response",
+            lambda qid, df, meta, ri: {"query_id": qid, "rows": len(df)},
+        )
+
+        result = cache_svc.execute_primary_query(
+            mode="date_range",
+            start_date="2025-01-01",
+            end_date="2025-03-01",
+        )
+
+        assert result["rows"] == 5
+        assert offsets == [0, 2, 4]
+        assert captured["merge_kwargs"] == {}
+
     def test_short_range_skips_engine(self, monkeypatch):
         """Short date range (<= threshold) uses direct path, no engine."""
         import mes_dashboard.services.batch_query_engine as engine_mod
@@ -453,7 +520,7 @@ class TestEngineDecompositionDateRange:
         result = cache_svc.execute_primary_query(
             mode="date_range",
             start_date="2025-06-01",
-            end_date="2025-06-30",
+            end_date="2025-06-10",
         )
 
         assert engine_calls["decompose"] == 0  # Engine NOT used
@@ -629,7 +696,7 @@ def test_large_result_spills_to_parquet_and_view_export_use_spool_fallback(monke
     result = cache_svc.execute_primary_query(
         mode="date_range",
         start_date="2025-01-01",
-        end_date="2025-01-31",
+        end_date="2025-01-05",
     )
 
     query_id = result["query_id"]
@@ -651,3 +718,185 @@ def test_large_result_spills_to_parquet_and_view_export_use_spool_fallback(monke
     export_rows = cache_svc.export_csv_from_cache(query_id=query_id)
     assert export_rows is not None
     assert len(export_rows) == len(df)
+
+
+def test_resolve_containers_deduplicates_container_ids(monkeypatch):
+    monkeypatch.setattr(
+        cache_svc,
+        "_RESOLVERS",
+        {
+            "lot": lambda values: {
+                "data": [
+                    {"container_id": "CID-1"},
+                    {"container_id": "CID-1"},
+                    {"container_id": "CID-2"},
+                ],
+                "input_count": len(values),
+                "not_found": [],
+                "expansion_info": {"LOT%": 2},
+            }
+        },
+    )
+    monkeypatch.setenv("CONTAINER_RESOLVE_MAX_EXPANSION_PER_TOKEN", "10")
+    monkeypatch.setenv("CONTAINER_RESOLVE_MAX_CONTAINER_IDS", "10")
+
+    resolved = cache_svc.resolve_containers("lot", ["LOT%"])
+
+    assert resolved["container_ids"] == ["CID-1", "CID-2"]
+    assert resolved["resolution_info"]["resolved_count"] == 2
+
+
+def test_resolve_containers_allows_oversized_expansion_and_sets_guardrail(monkeypatch):
+    monkeypatch.setattr(
+        cache_svc,
+        "_RESOLVERS",
+        {
+            "lot": lambda values: {
+                "data": [{"container_id": "CID-1"}],
+                "input_count": len(values),
+                "not_found": [],
+                "expansion_info": {"GA%": 999},
+            }
+        },
+    )
+    monkeypatch.setenv("CONTAINER_RESOLVE_MAX_EXPANSION_PER_TOKEN", "50")
+    monkeypatch.setenv("CONTAINER_RESOLVE_PATTERN_MIN_PREFIX_LEN", "2")
+
+    resolved = cache_svc.resolve_containers("lot", ["GA%"])
+    guardrail = resolved["resolution_info"].get("guardrail") or {}
+    assert guardrail.get("overflow") is True
+    assert len(guardrail.get("expansion_offenders") or []) == 1
+
+
+def test_partial_failure_in_response_meta(monkeypatch):
+    import mes_dashboard.services.batch_query_engine as engine_mod
+
+    df = pd.DataFrame({"CONTAINERID": ["C1"], "LOSSREASONNAME": ["R1"], "REJECT_TOTAL_QTY": [1]})
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
+    monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
+    monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+    monkeypatch.setattr(cache_svc, "_prepare_sql", lambda *a, **kw: "SELECT 1 FROM dual")
+    monkeypatch.setattr(cache_svc, "_apply_policy_filters", lambda data, **kw: data)
+    monkeypatch.setattr(cache_svc, "_store_query_result", lambda *_a, **_kw: False)
+    monkeypatch.setattr(cache_svc, "redis_clear_batch", lambda *_a, **_kw: None)
+    monkeypatch.setattr(
+        cache_svc,
+        "_build_primary_response",
+        lambda qid, result_df, meta, resolution_info: {"query_id": qid, "meta": meta},
+    )
+    monkeypatch.setattr(cache_svc, "_store_partial_failure_flag", lambda *_a, **_kw: None)
+
+    monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *_a, **_kw: True)
+    monkeypatch.setattr(
+        engine_mod,
+        "decompose_by_time_range",
+        lambda *_a, **_kw: [{"chunk_start": "2025-01-01", "chunk_end": "2025-01-10"}],
+    )
+    monkeypatch.setattr(engine_mod, "execute_plan", lambda *a, **kw: kw.get("query_hash"))
+    monkeypatch.setattr(engine_mod, "merge_chunks", lambda *a, **kw: df.copy())
+    monkeypatch.setattr(
+        engine_mod,
+        "get_batch_progress",
+        lambda *_a, **_kw: {
+            "has_partial_failure": "True",
+            "failed": "2",
+            "failed_ranges": json.dumps([{"start": "2025-01-01", "end": "2025-01-10"}]),
+        },
+    )
+
+    result = cache_svc.execute_primary_query(
+        mode="date_range",
+        start_date="2025-01-01",
+        end_date="2025-03-01",
+    )
+    meta = result.get("meta") or {}
+    assert meta.get("has_partial_failure") is True
+    assert meta.get("failed_chunk_count") == 2
+    assert meta.get("failed_ranges") == [{"start": "2025-01-01", "end": "2025-01-10"}]
+
+
+def test_cache_hit_restores_partial_failure(monkeypatch):
+    cached_df = pd.DataFrame({"CONTAINERID": ["C1"], "LOSSREASONNAME": ["R1"], "REJECT_TOTAL_QTY": [1]})
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: cached_df)
+    monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
+    monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+    monkeypatch.setattr(cache_svc, "_apply_policy_filters", lambda data, **kw: data)
+    monkeypatch.setattr(
+        cache_svc,
+        "_load_partial_failure_flag",
+        lambda _qid: {
+            "has_partial_failure": True,
+            "failed_chunk_count": 3,
+            "failed_ranges": [],
+        },
+    )
+    monkeypatch.setattr(
+        cache_svc,
+        "_build_primary_response",
+        lambda qid, result_df, meta, resolution_info: {"query_id": qid, "meta": meta},
+    )
+
+    result = cache_svc.execute_primary_query(
+        mode="date_range",
+        start_date="2025-01-01",
+        end_date="2025-01-31",
+    )
+    meta = result.get("meta") or {}
+    assert meta.get("has_partial_failure") is True
+    assert meta.get("failed_chunk_count") == 3
+    assert meta.get("failed_ranges") == []
+
+
+@pytest.mark.parametrize(
+    "store_result,expected_ttl",
+    [
+        (True, cache_svc._REJECT_ENGINE_SPOOL_TTL_SECONDS),
+        (False, cache_svc._CACHE_TTL),
+    ],
+)
+def test_partial_failure_ttl_matches_spool(monkeypatch, store_result, expected_ttl):
+    import mes_dashboard.services.batch_query_engine as engine_mod
+
+    df = pd.DataFrame({"CONTAINERID": ["C1"], "LOSSREASONNAME": ["R1"], "REJECT_TOTAL_QTY": [1]})
+    captured = {"ttls": []}
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
+    monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
+    monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+    monkeypatch.setattr(cache_svc, "_prepare_sql", lambda *a, **kw: "SELECT 1 FROM dual")
+    monkeypatch.setattr(cache_svc, "_apply_policy_filters", lambda data, **kw: data)
+    monkeypatch.setattr(cache_svc, "_store_query_result", lambda *_a, **_kw: store_result)
+    monkeypatch.setattr(cache_svc, "redis_clear_batch", lambda *_a, **_kw: None)
+    monkeypatch.setattr(
+        cache_svc,
+        "_build_primary_response",
+        lambda qid, result_df, meta, resolution_info: {"query_id": qid, "meta": meta},
+    )
+    monkeypatch.setattr(
+        cache_svc,
+        "_store_partial_failure_flag",
+        lambda _qid, _failed, _ranges, ttl: captured["ttls"].append(ttl),
+    )
+
+    monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *_a, **_kw: True)
+    monkeypatch.setattr(
+        engine_mod,
+        "decompose_by_time_range",
+        lambda *_a, **_kw: [{"chunk_start": "2025-01-01", "chunk_end": "2025-01-10"}],
+    )
+    monkeypatch.setattr(engine_mod, "execute_plan", lambda *a, **kw: kw.get("query_hash"))
+    monkeypatch.setattr(engine_mod, "merge_chunks", lambda *a, **kw: df.copy())
+    monkeypatch.setattr(
+        engine_mod,
+        "get_batch_progress",
+        lambda *_a, **_kw: {"has_partial_failure": "True", "failed": "1", "failed_ranges": "[]"},
+    )
+
+    cache_svc.execute_primary_query(
+        mode="date_range",
+        start_date="2025-01-01",
+        end_date="2025-03-01",
+    )
+    assert captured["ttls"] == [expected_ttl]

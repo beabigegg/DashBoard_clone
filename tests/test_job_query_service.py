@@ -191,7 +191,7 @@ class TestErrorLeakageProtection:
     def test_query_error_masks_internal_details(self, mock_read):
         mock_read.side_effect = RuntimeError("ORA-00942: table or view does not exist")
 
-        result = get_jobs_by_resources(["RES001"], "2024-01-01", "2024-01-31")
+        result = get_jobs_by_resources(["RES001"], "2024-01-01", "2024-01-05")
 
         assert result["error"] == QUERY_ERROR_MESSAGE
         assert "ORA-00942" not in result["error"]

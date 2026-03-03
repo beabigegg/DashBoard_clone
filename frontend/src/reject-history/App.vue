@@ -5,6 +5,7 @@ import { apiGet, apiPost } from '../core/api.js';
 import {
   buildViewParams,
   parseMultiLineInput,
+  validateDateRange,
 } from '../core/reject-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
@@ -104,14 +105,14 @@ const availableFilters = ref({ workcenterGroups: [], packages: [], reasons: [] }
 const supplementaryFilters = reactive({
   packages: [],
   workcenterGroups: [],
-  reason: '',
+  reasons: [],
 });
 
 // ---- Interactive state ----
 const page = ref(1);
 const selectedTrendDates = ref([]);
 const trendLegendSelected = ref({ '扣帳報廢量': true, '不扣帳報廢量': true });
-const paretoDisplayScope = ref('all');
+const paretoDisplayScope = ref('top20');
 const paretoSelections = reactive(createEmptyParetoSelections());
 const paretoData = reactive(createEmptyParetoData());
 
@@ -146,6 +147,7 @@ const loading = reactive({
   exporting: false,
 });
 const errorMessage = ref('');
+const partialFailureWarning = ref('');
 const lastQueryAt = ref('');
 
 // ---- Request staleness tracking ----
@@ -241,8 +243,8 @@ function buildBatchParetoParams() {
   if (supplementaryFilters.workcenterGroups.length > 0) {
     params.workcenter_groups = supplementaryFilters.workcenterGroups;
   }
-  if (supplementaryFilters.reason) {
-    params.reason = supplementaryFilters.reason;
+  if (supplementaryFilters.reasons.length > 0) {
+    params.reasons = supplementaryFilters.reasons;
   }
   if (selectedTrendDates.value.length > 0) {
     params.trend_dates = selectedTrendDates.value;
@@ -301,11 +303,20 @@ async function executePrimaryQuery() {
   loading.querying = true;
   loading.list = true;
   errorMessage.value = '';
+  partialFailureWarning.value = '';
 
   try {
     const body = { mode: queryMode.value };
 
     if (queryMode.value === 'date_range') {
+      const dateValidationError = validateDateRange(
+        draftFilters.startDate,
+        draftFilters.endDate,
+      );
+      if (dateValidationError) {
+        errorMessage.value = dateValidationError;
+        return;
+      }
       body.start_date = draftFilters.startDate;
       body.end_date = draftFilters.endDate;
     } else {
@@ -321,6 +332,19 @@ async function executePrimaryQuery() {
     if (isStaleRequest(requestId)) return;
 
     const result = unwrapApiResult(resp, '主查詢執行失敗');
+    const meta = result.meta || {};
+    if (meta.has_partial_failure) {
+      const failedChunkCount = Number(meta.failed_chunk_count || 0);
+      const failedRanges = Array.isArray(meta.failed_ranges) ? meta.failed_ranges : [];
+      if (failedRanges.length > 0) {
+        const rangesText = failedRanges
+          .map((item) => `${item.start} ~ ${item.end}`)
+          .join('、');
+        partialFailureWarning.value = `警告：以下日期區間的資料擷取失敗（${failedChunkCount} 個批次）：${rangesText}。目前顯示結果可能不完整。`;
+      } else {
+        partialFailureWarning.value = `警告：${failedChunkCount} 個查詢批次的資料擷取失敗。目前顯示結果可能不完整。`;
+      }
+    }
 
     committedPrimary.mode = queryMode.value;
     committedPrimary.startDate = draftFilters.startDate;
@@ -344,7 +368,7 @@ async function executePrimaryQuery() {
 
     supplementaryFilters.packages = [];
     supplementaryFilters.workcenterGroups = [];
-    supplementaryFilters.reason = '';
+    supplementaryFilters.reasons = [];
     page.value = 1;
     selectedTrendDates.value = [];
     resetParetoSelections();
@@ -445,7 +469,7 @@ function clearFilters() {
   draftFilters.excludeMaterialScrap = true;
   draftFilters.excludePbDiode = true;
   draftFilters.paretoTop80 = true;
-  paretoDisplayScope.value = 'all';
+  paretoDisplayScope.value = 'top20';
   resetParetoSelections();
   void executePrimaryQuery();
 }
@@ -520,7 +544,7 @@ function clearParetoSelection() {
 function onSupplementaryChange(filters) {
   supplementaryFilters.packages = filters.packages || [];
   supplementaryFilters.workcenterGroups = filters.workcenterGroups || [];
-  supplementaryFilters.reason = filters.reason || '';
+  supplementaryFilters.reasons = filters.reasons || [];
   page.value = 1;
   selectedTrendDates.value = [];
   resetParetoSelections();
@@ -545,7 +569,7 @@ function removeFilterChip(chip) {
   }
 
   if (chip.type === 'reason') {
-    supplementaryFilters.reason = '';
+    supplementaryFilters.reasons = supplementaryFilters.reasons.filter((r) => r !== chip.value);
     page.value = 1;
     updateUrlState();
     void Promise.all([refreshView(), fetchBatchPareto()]);
@@ -584,7 +608,7 @@ async function exportCsv() {
     params.set('query_id', queryId.value);
     for (const pkg of supplementaryFilters.packages) params.append('packages', pkg);
     for (const wc of supplementaryFilters.workcenterGroups) params.append('workcenter_groups', wc);
-    if (supplementaryFilters.reason) params.set('reason', supplementaryFilters.reason);
+    for (const r of supplementaryFilters.reasons) params.append('reasons', r);
     params.set('metric_filter', metricFilterParam());
     for (const date of selectedTrendDates.value) params.append('trend_dates', date);
     for (const [dimension, key] of Object.entries(PARETO_SELECTION_PARAM_MAP)) {
@@ -760,13 +784,13 @@ const activeFilterChips = computed(() => {
     value: '',
   });
 
-  if (supplementaryFilters.reason) {
+  for (const reason of supplementaryFilters.reasons) {
     chips.push({
-      key: `reason:${supplementaryFilters.reason}`,
-      label: `原因: ${supplementaryFilters.reason}`,
+      key: `reason:${reason}`,
+      label: `原因: ${reason}`,
       removable: true,
       type: 'reason',
-      value: supplementaryFilters.reason,
+      value: reason,
     });
   }
 
@@ -866,16 +890,14 @@ function updateUrlState() {
 
   appendArrayParams(params, 'packages', supplementaryFilters.packages);
   appendArrayParams(params, 'workcenter_groups', supplementaryFilters.workcenterGroups);
-  if (supplementaryFilters.reason) {
-    params.set('reason', supplementaryFilters.reason);
-  }
+  appendArrayParams(params, 'reasons', supplementaryFilters.reasons);
 
   appendArrayParams(params, 'trend_dates', selectedTrendDates.value);
   for (const [dimension, key] of Object.entries(PARETO_SELECTION_PARAM_MAP)) {
     appendArrayParams(params, key, paretoSelections[dimension] || []);
   }
 
-  if (paretoDisplayScope.value !== 'all') {
+  if (paretoDisplayScope.value !== 'top20') {
     params.set('pareto_display_scope', paretoDisplayScope.value);
   }
   if (!committedPrimary.paretoTop80) {
@@ -945,7 +967,7 @@ function restoreFromUrl() {
 
   supplementaryFilters.packages = readArrayParam(params, 'packages');
   supplementaryFilters.workcenterGroups = readArrayParam(params, 'workcenter_groups');
-  supplementaryFilters.reason = String(params.get('reason') || '').trim();
+  supplementaryFilters.reasons = readArrayParam(params, 'reasons');
 
   selectedTrendDates.value = readArrayParam(params, 'trend_dates');
 
@@ -969,7 +991,7 @@ function restoreFromUrl() {
   }
 
   const urlParetoDisplayScope = String(params.get('pareto_display_scope') || '').trim().toLowerCase();
-  paretoDisplayScope.value = urlParetoDisplayScope === 'top20' ? 'top20' : 'all';
+  paretoDisplayScope.value = urlParetoDisplayScope === 'all' ? 'all' : 'top20';
 
   const parsedPage = Number(params.get('page') || '1');
   page.value = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
@@ -1001,6 +1023,9 @@ onMounted(() => {
     </header>
 
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
+    <div v-if="partialFailureWarning" class="warning-banner">
+      {{ partialFailureWarning }}
+    </div>
 
     <FilterPanel
       :filters="draftFilters"

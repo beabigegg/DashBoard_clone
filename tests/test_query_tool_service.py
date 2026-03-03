@@ -117,53 +117,24 @@ class TestValidateLotInput:
         assert result is not None
         assert '至少一個' in result
 
-    def test_exceeds_lot_id_limit(self):
-        """Should reject LOT IDs exceeding limit."""
-        values = [f'GA{i:09d}' for i in range(MAX_LOT_IDS + 1)]
-        result = validate_lot_input('lot_id', values)
-        assert result is not None
-        assert '超過上限' in result
-        assert str(MAX_LOT_IDS) in result
-
-    def test_exceeds_serial_number_limit(self):
-        """Should reject serial numbers exceeding limit."""
-        values = [f'SN{i:06d}' for i in range(MAX_SERIAL_NUMBERS + 1)]
-        result = validate_lot_input('serial_number', values)
-        assert result is not None
-        assert '超過上限' in result
-        assert str(MAX_SERIAL_NUMBERS) in result
-
-    def test_exceeds_work_order_limit(self):
-        """Should reject work orders exceeding limit."""
-        values = [f'WO{i:06d}' for i in range(MAX_WORK_ORDERS + 1)]
-        result = validate_lot_input('work_order', values)
-        assert result is not None
-        assert '超過上限' in result
-        assert str(MAX_WORK_ORDERS) in result
-
-    def test_exceeds_gd_work_order_limit(self):
-        """Should reject GD work orders exceeding limit."""
-        values = [f'GD{i:06d}' for i in range(MAX_GD_WORK_ORDERS + 1)]
-        result = validate_lot_input('gd_work_order', values)
-        assert result is not None
-        assert '超過上限' in result
-        assert str(MAX_GD_WORK_ORDERS) in result
-
-    def test_exactly_at_limit(self):
-        """Should accept values exactly at limit."""
-        values = [f'GA{i:09d}' for i in range(MAX_LOT_IDS)]
+    def test_large_input_list_allowed_when_no_count_cap(self, monkeypatch):
+        """Should allow large lists when count cap is disabled."""
+        monkeypatch.setenv("CONTAINER_RESOLVE_INPUT_MAX_VALUES", "0")
+        values = [f'GA{i:09d}' for i in range(MAX_LOT_IDS + 50)]
         result = validate_lot_input('lot_id', values)
         assert result is None
 
-    def test_unknown_input_type_uses_default_limit(self):
-        """Should use default limit for unknown input types."""
-        values = [f'X{i}' for i in range(MAX_LOT_IDS)]
-        result = validate_lot_input('unknown_type', values)
-        assert result is None
-
-        values_over = [f'X{i}' for i in range(MAX_LOT_IDS + 1)]
-        result = validate_lot_input('unknown_type', values_over)
+    def test_rejects_too_broad_wildcard_pattern(self, monkeypatch):
+        """Should reject broad wildcard like '%' to prevent full scan."""
+        monkeypatch.setenv("CONTAINER_RESOLVE_PATTERN_MIN_PREFIX_LEN", "2")
+        result = validate_lot_input('lot_id', ['%'])
         assert result is not None
+        assert '萬用字元條件過於寬鬆' in result
+
+    def test_accepts_wildcard_with_prefix(self, monkeypatch):
+        monkeypatch.setenv("CONTAINER_RESOLVE_PATTERN_MIN_PREFIX_LEN", "2")
+        result = validate_lot_input('lot_id', ['GA25%'])
+        assert result is None
 
 
 class TestValidateEquipmentInput:

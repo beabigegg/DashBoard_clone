@@ -150,7 +150,7 @@ def get_jobs_by_resources(
 ) -> Dict[str, Any]:
     """Query jobs for selected resources within date range.
 
-    For date ranges exceeding BATCH_QUERY_TIME_THRESHOLD_DAYS (default 60),
+    For date ranges exceeding BATCH_QUERY_TIME_THRESHOLD_DAYS (default 10),
     the query is decomposed into monthly chunks via BatchQueryEngine.
     Results are cached in Redis to avoid redundant Oracle queries.
 

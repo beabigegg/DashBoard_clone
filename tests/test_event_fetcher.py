@@ -198,3 +198,60 @@ def test_fetch_events_sanitizes_nan_values(
     result = EventFetcher.fetch_events(["CID-1"], "upstream_history")
 
     assert result["CID-1"][0]["VALUE"] is None
+
+
+@patch("mes_dashboard.services.event_fetcher.cache_set")
+@patch("mes_dashboard.services.event_fetcher.cache_get", return_value=None)
+@patch("mes_dashboard.services.event_fetcher.read_sql_df_slow_iter")
+@patch("mes_dashboard.services.event_fetcher.SQLLoader.load")
+def test_fetch_events_raises_when_parallel_batch_fails_and_partial_disabled(
+    mock_sql_load,
+    mock_iter,
+    _mock_cache_get,
+    _mock_cache_set,
+    monkeypatch,
+):
+    mock_sql_load.return_value = "SELECT * FROM t WHERE h.CONTAINERID = :container_id {{ WORKCENTER_FILTER }}"
+    monkeypatch.setattr("mes_dashboard.services.event_fetcher.EVENT_FETCHER_ALLOW_PARTIAL_RESULTS", False)
+    monkeypatch.setattr("mes_dashboard.services.event_fetcher.EVENT_FETCHER_MAX_WORKERS", 2)
+
+    def _side_effect(sql, params, timeout_seconds=60):
+        if "CID-1000" in params.values():
+            raise RuntimeError("chunk fail")
+        return iter([])
+
+    mock_iter.side_effect = _side_effect
+    cids = [f"CID-{i}" for i in range(1001)]  # force >1 batch
+
+    try:
+        EventFetcher.fetch_events(cids, "history")
+        assert False, "expected RuntimeError"
+    except RuntimeError as exc:
+        assert "chunk failed" in str(exc)
+
+
+@patch("mes_dashboard.services.event_fetcher.cache_set")
+@patch("mes_dashboard.services.event_fetcher.cache_get", return_value=None)
+@patch("mes_dashboard.services.event_fetcher.read_sql_df_slow_iter")
+@patch("mes_dashboard.services.event_fetcher.SQLLoader.load")
+def test_fetch_events_allows_partial_when_enabled(
+    mock_sql_load,
+    mock_iter,
+    _mock_cache_get,
+    _mock_cache_set,
+    monkeypatch,
+):
+    mock_sql_load.return_value = "SELECT * FROM t WHERE h.CONTAINERID = :container_id {{ WORKCENTER_FILTER }}"
+    monkeypatch.setattr("mes_dashboard.services.event_fetcher.EVENT_FETCHER_ALLOW_PARTIAL_RESULTS", True)
+    monkeypatch.setattr("mes_dashboard.services.event_fetcher.EVENT_FETCHER_MAX_WORKERS", 2)
+
+    def _side_effect(sql, params, timeout_seconds=60):
+        if "CID-1000" in params.values():
+            raise RuntimeError("chunk fail")
+        return iter([])
+
+    mock_iter.side_effect = _side_effect
+    cids = [f"CID-{i}" for i in range(1001)]
+
+    result = EventFetcher.fetch_events(cids, "history")
+    assert result == {}

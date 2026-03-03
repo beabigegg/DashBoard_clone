@@ -863,7 +863,7 @@ def _fetch_station_detection_data(
 ) -> Optional[pd.DataFrame]:
     """Execute station_detection.sql and return raw DataFrame.
 
-    For date ranges exceeding BATCH_QUERY_TIME_THRESHOLD_DAYS (default 60),
+    For date ranges exceeding BATCH_QUERY_TIME_THRESHOLD_DAYS (default 10),
     the query is decomposed into monthly chunks via BatchQueryEngine to
     prevent Oracle timeout on high-volume stations.
     """

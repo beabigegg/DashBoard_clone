@@ -32,7 +32,7 @@ function emitSupplementary(patch) {
   emit('supplementary-change', {
     packages: props.supplementaryFilters.packages || [],
     workcenterGroups: props.supplementaryFilters.workcenterGroups || [],
-    reason: props.supplementaryFilters.reason || '',
+    reasons: props.supplementaryFilters.reasons || [],
     ...patch,
   });
 }
@@ -86,23 +86,23 @@ function emitSupplementary(patch) {
 
       <!-- Container mode -->
       <template v-else>
-        <div class="filter-group">
-          <label class="filter-label" for="container-type">輸入類型</label>
-          <select
-            id="container-type"
-            class="filter-input"
-            :value="containerInputType"
-            @change="$emit('update:containerInputType', $event.target.value)"
-          >
-            <option value="lot">LOT</option>
-            <option value="work_order">工單</option>
-            <option value="wafer_lot">WAFER LOT</option>
-          </select>
-        </div>
-        <div class="filter-group filter-group-wide">
-          <label class="filter-label" for="container-input"
-            >輸入值 (每行一個，支援 * 或 % wildcard)</label
-          >
+        <div class="filter-group filter-group-full container-input-group">
+          <div class="container-label-row">
+            <label class="filter-label" for="container-type">輸入類型</label>
+            <select
+              id="container-type"
+              class="filter-input container-type-select"
+              :value="containerInputType"
+              @change="$emit('update:containerInputType', $event.target.value)"
+            >
+              <option value="lot">LOT</option>
+              <option value="work_order">工單</option>
+              <option value="wafer_lot">WAFER LOT</option>
+            </select>
+            <label class="filter-label" for="container-input"
+              >輸入值 (每行一個，支援 * 或 % wildcard)</label
+            >
+          </div>
           <textarea
             id="container-input"
             class="filter-input filter-textarea"
@@ -227,22 +227,14 @@ function emitSupplementary(patch) {
         </div>
 
         <div class="filter-group">
-          <label class="filter-label" for="supp-reason">報廢原因</label>
-          <select
-            id="supp-reason"
-            class="filter-input"
-            :value="supplementaryFilters.reason"
-            @change="emitSupplementary({ reason: $event.target.value })"
-          >
-            <option value="">全部原因</option>
-            <option
-              v-for="r in availableFilters.reasons || []"
-              :key="r"
-              :value="r"
-            >
-              {{ r }}
-            </option>
-          </select>
+          <label class="filter-label">報廢原因</label>
+          <MultiSelect
+            :model-value="supplementaryFilters.reasons"
+            :options="availableFilters.reasons || []"
+            placeholder="全部原因"
+            searchable
+            @update:model-value="emitSupplementary({ reasons: $event })"
+          />
         </div>
       </div>
     </div>

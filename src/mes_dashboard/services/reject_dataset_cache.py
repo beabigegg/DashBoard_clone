@@ -33,6 +33,13 @@ from mes_dashboard.core.redis_df_store import (
     redis_store_df,
 )
 from mes_dashboard.services.filter_cache import get_specs_for_groups
+from mes_dashboard.services.container_resolution_policy import (
+    assess_resolution_result,
+    extract_container_ids,
+    normalize_input_values,
+    validate_resolution_request,
+    validate_resolution_result,
+)
 from mes_dashboard.services.reject_history_service import (
     _as_float,
     _as_int,
@@ -118,6 +125,93 @@ def _redis_delete_df(query_id: str) -> None:
         return
 
 
+def _partial_failure_key(query_id: str) -> str:
+    return f"{_REDIS_NAMESPACE}:{query_id}:partial_failure"
+
+
+def _store_partial_failure_flag(
+    query_id: str,
+    failed_count: int,
+    failed_ranges: Optional[List[Dict[str, str]]],
+    ttl: int,
+) -> None:
+    """Persist partial-failure metadata for cache-hit responses."""
+    client = get_redis_client()
+    if client is None:
+        return
+    key = get_key(_partial_failure_key(query_id))
+    mapping = {
+        "has_partial_failure": "True",
+        "failed_chunk_count": str(max(int(failed_count), 0)),
+        "failed_ranges": json.dumps(failed_ranges or [], ensure_ascii=False, default=str),
+    }
+    try:
+        client.hset(key, mapping=mapping)
+        client.expire(key, max(int(ttl), 1))
+    except Exception as exc:
+        logger.warning("Failed to store partial failure flag (query_id=%s): %s", query_id, exc)
+
+
+def _load_partial_failure_flag(query_id: str) -> Dict[str, Any]:
+    """Load persisted partial-failure metadata for cache-hit responses."""
+    client = get_redis_client()
+    if client is None:
+        return {}
+    key = get_key(_partial_failure_key(query_id))
+    try:
+        raw = client.hgetall(key)
+    except Exception:
+        return {}
+    if not raw:
+        return {}
+
+    has_partial = str(raw.get("has_partial_failure", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if not has_partial:
+        return {}
+
+    failed_count_raw = raw.get("failed_chunk_count", raw.get("failed", "0"))
+    try:
+        failed_count = max(int(str(failed_count_raw)), 0)
+    except Exception:
+        failed_count = 0
+
+    failed_ranges: List[Dict[str, str]] = []
+    raw_ranges = raw.get("failed_ranges", "[]")
+    try:
+        parsed_ranges = json.loads(raw_ranges) if raw_ranges else []
+        if isinstance(parsed_ranges, list):
+            for item in parsed_ranges:
+                if not isinstance(item, dict):
+                    continue
+                start = str(item.get("start", "")).strip()
+                end = str(item.get("end", "")).strip()
+                if start and end:
+                    failed_ranges.append({"start": start, "end": end})
+    except Exception:
+        failed_ranges = []
+
+    return {
+        "has_partial_failure": True,
+        "failed_chunk_count": failed_count,
+        "failed_ranges": failed_ranges,
+    }
+
+
+def _clear_partial_failure_flag(query_id: str) -> None:
+    client = get_redis_client()
+    if client is None:
+        return
+    try:
+        client.delete(get_key(_partial_failure_key(query_id)))
+    except Exception:
+        return
+
+
 # ============================================================
 # Cache read (L1 → L2 → None)
 # ============================================================
@@ -151,10 +245,10 @@ def _store_df(query_id: str, df: pd.DataFrame) -> None:
     clear_spooled_df(_REDIS_NAMESPACE, query_id)
 
 
-def _store_query_result(query_id: str, df: pd.DataFrame) -> None:
-    """Store result using Redis for small sets and parquet spill for large sets."""
+def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
+    """Store result and return True when persisted via parquet spill."""
     if df is None or df.empty:
-        return
+        return False
 
     df_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
     should_spill = _REJECT_ENGINE_SPILL_ENABLED and (
@@ -177,7 +271,7 @@ def _store_query_result(query_id: str, df: pd.DataFrame) -> None:
                 len(df),
                 df_mb,
             )
-            return
+            return True
         logger.warning(
             "Parquet spill failed, fallback to dataset cache (query_id=%s, rows=%d, size_mb=%.1f)",
             query_id,
@@ -186,6 +280,7 @@ def _store_query_result(query_id: str, df: pd.DataFrame) -> None:
         )
 
     _store_df(query_id, df)
+    return False
 
 
 # ============================================================
@@ -204,27 +299,48 @@ def resolve_containers(
     input_type: str, values: List[str]
 ) -> Dict[str, Any]:
     """Dispatch to existing resolver → return container IDs + resolution info."""
+    cleaned_values = normalize_input_values(values)
+    validation_error = validate_resolution_request(input_type, cleaned_values)
+    if validation_error:
+        raise ValueError(validation_error)
+
     resolver = _RESOLVERS.get(input_type)
     if resolver is None:
         raise ValueError(f"不支援的輸入類型: {input_type}")
 
-    result = resolver(values)
+    result = resolver(cleaned_values)
     if "error" in result:
         raise ValueError(result["error"])
 
-    container_ids = []
-    for row in result.get("data", []):
-        cid = row.get("container_id")
-        if cid:
-            container_ids.append(cid)
+    guard_assessment = assess_resolution_result(result)
+    overflow_tokens = guard_assessment.get("expansion_offenders") or []
+    overflow_total = bool(guard_assessment.get("over_container_limit"))
+    if overflow_tokens or overflow_total:
+        logger.warning(
+            "Container resolution guardrail overflow (input_type=%s, offenders=%s, resolved=%s, max=%s); continuing with ID decomposition",
+            input_type,
+            len(overflow_tokens),
+            guard_assessment.get("resolved_container_ids"),
+            guard_assessment.get("max_container_ids"),
+        )
+    # strict=False: don't block oversized resolution; continue to downstream ID chunking.
+    _ = validate_resolution_result(result, strict=False)
+
+    container_ids = extract_container_ids(result.get("data", []))
 
     return {
         "container_ids": container_ids,
         "resolution_info": {
-            "input_count": result.get("input_count", len(values)),
+            "input_count": result.get("input_count", len(cleaned_values)),
             "resolved_count": len(container_ids),
             "not_found": result.get("not_found", []),
             "expansion_info": result.get("expansion_info", {}),
+            "guardrail": {
+                "overflow": bool(overflow_tokens or overflow_total),
+                "expansion_offenders": overflow_tokens,
+                "resolved_container_ids": guard_assessment.get("resolved_container_ids"),
+                "max_container_ids": guard_assessment.get("max_container_ids"),
+            },
         },
     }
 
@@ -323,6 +439,9 @@ def execute_primary_query(
     cached_df = _get_cached_df(query_id)
     if cached_df is not None:
         logger.info("Dataset cache hit for query_id=%s", query_id)
+        cached_partial_meta = _load_partial_failure_flag(query_id)
+        if cached_partial_meta:
+            meta.update(cached_partial_meta)
         filtered = _apply_policy_filters(
             cached_df,
             include_excluded_scrap=include_excluded_scrap,
@@ -342,6 +461,7 @@ def execute_primary_query(
         decompose_by_ids,
         execute_plan,
         merge_chunks,
+        get_batch_progress,
         compute_query_hash,
         should_decompose_by_time,
         should_decompose_by_ids,
@@ -352,6 +472,7 @@ def execute_primary_query(
     engine_chunks: Optional[list] = None
     engine_parallel = 1
     engine_hash: Optional[str] = None
+    partial_failure_meta: Dict[str, Any] = {}
 
     if mode == "date_range" and should_decompose_by_time(start_date, end_date):
         engine_chunks = decompose_by_time_range(
@@ -380,7 +501,13 @@ def execute_primary_query(
         redis_clear_batch("reject", engine_hash)
 
         def _run_reject_chunk(chunk, max_rows_per_chunk=None):
-            """Execute one chunk of the reject query via read_sql_df_slow."""
+            """Execute one chunk of the reject query via read_sql_df_slow.
+
+            NOTE:
+                `max_rows_per_chunk` is used as paging size per Oracle roundtrip,
+                not a hard cap. We continue fetching until a page returns less
+                than page size, so chunk results are complete (no truncation).
+            """
             chunk_where_parts: List[str] = []
             chunk_params: Dict[str, Any] = {}
             chunk_wf_filter = ""
@@ -420,11 +547,29 @@ def execute_primary_query(
                 base_where=chunk_where,
                 workflow_filter=chunk_wf_filter,
             )
-            limit = max_rows_per_chunk if max_rows_per_chunk else 500000
-            chunk_params["offset"] = 0
-            chunk_params["limit"] = limit
-            result = read_sql_df(chunk_sql, chunk_params)
-            return result if result is not None else pd.DataFrame()
+            page_size = int(max_rows_per_chunk) if max_rows_per_chunk else 500000
+            page_size = max(page_size, 1)
+            offset = 0
+            frames: List[pd.DataFrame] = []
+
+            while True:
+                page_params = dict(chunk_params)
+                page_params["offset"] = offset
+                page_params["limit"] = page_size
+                page_df = read_sql_df(chunk_sql, page_params)
+                if page_df is None or page_df.empty:
+                    break
+                frames.append(page_df)
+                fetched = len(page_df)
+                if fetched < page_size:
+                    break
+                offset += page_size
+
+            if not frames:
+                return pd.DataFrame()
+            if len(frames) == 1:
+                return frames[0]
+            return pd.concat(frames, ignore_index=True)
 
         execute_plan(
             engine_chunks,
@@ -439,8 +584,39 @@ def execute_primary_query(
         df = merge_chunks(
             "reject",
             engine_hash,
-            max_total_rows=_REJECT_ENGINE_MAX_TOTAL_ROWS,
         )
+        progress_meta = get_batch_progress("reject", engine_hash) or {}
+        has_partial_failure = str(
+            progress_meta.get("has_partial_failure", "")
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        if has_partial_failure:
+            failed_raw = progress_meta.get("failed", "0")
+            try:
+                failed_count = max(int(str(failed_raw)), 0)
+            except Exception:
+                failed_count = 0
+
+            failed_ranges: List[Dict[str, str]] = []
+            raw_failed_ranges = progress_meta.get("failed_ranges", "")
+            if raw_failed_ranges:
+                try:
+                    parsed = json.loads(raw_failed_ranges)
+                except Exception:
+                    parsed = []
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        if not isinstance(item, dict):
+                            continue
+                        start = str(item.get("start", "")).strip()
+                        end = str(item.get("end", "")).strip()
+                        if start and end:
+                            failed_ranges.append({"start": start, "end": end})
+
+            partial_failure_meta = {
+                "has_partial_failure": True,
+                "failed_chunk_count": failed_count,
+                "failed_ranges": failed_ranges,
+            }
     else:
         # --- Direct path (short query, no engine overhead) ---
         sql = _prepare_sql(
@@ -456,8 +632,24 @@ def execute_primary_query(
             df = pd.DataFrame()
 
     # ---- Cache unfiltered, return filtered ----
+    if partial_failure_meta:
+        meta.update(partial_failure_meta)
+
+    stored_via_spool = False
     if not df.empty:
-        _store_query_result(query_id, df)
+        stored_via_spool = _store_query_result(query_id, df)
+        if partial_failure_meta.get("has_partial_failure"):
+            flag_ttl = (
+                _REJECT_ENGINE_SPOOL_TTL_SECONDS if stored_via_spool else _CACHE_TTL
+            )
+            _store_partial_failure_flag(
+                query_id,
+                partial_failure_meta.get("failed_chunk_count", 0),
+                partial_failure_meta.get("failed_ranges"),
+                flag_ttl,
+            )
+        else:
+            _clear_partial_failure_flag(query_id)
     if engine_hash:
         redis_clear_batch("reject", engine_hash)
 
@@ -558,7 +750,7 @@ def apply_view(
     query_id: str,
     packages: Optional[List[str]] = None,
     workcenter_groups: Optional[List[str]] = None,
-    reason: Optional[str] = None,
+    reasons: Optional[List[str]] = None,
     metric_filter: str = "all",
     trend_dates: Optional[List[str]] = None,
     detail_reason: Optional[str] = None,
@@ -588,7 +780,7 @@ def apply_view(
         df,
         packages=packages,
         workcenter_groups=workcenter_groups,
-        reason=reason,
+        reasons=reasons,
         metric_filter=metric_filter,
     )
 
@@ -630,7 +822,7 @@ def _apply_supplementary_filters(
     *,
     packages: Optional[List[str]] = None,
     workcenter_groups: Optional[List[str]] = None,
-    reason: Optional[str] = None,
+    reasons: Optional[List[str]] = None,
     metric_filter: str = "all",
 ) -> pd.DataFrame:
     """Apply supplementary filters via pandas boolean indexing."""
@@ -654,8 +846,10 @@ def _apply_supplementary_filters(
             elif "WORKCENTER_GROUP" in df.columns:
                 mask &= df["WORKCENTER_GROUP"].isin(wc_groups)
 
-    if reason and "LOSSREASONNAME" in df.columns:
-        mask &= df["LOSSREASONNAME"].str.strip() == reason.strip()
+    if reasons and "LOSSREASONNAME" in df.columns:
+        reason_set = {r.strip() for r in reasons if r.strip()}
+        if reason_set:
+            mask &= df["LOSSREASONNAME"].str.strip().isin(reason_set)
 
     if metric_filter == "reject" and "REJECT_TOTAL_QTY" in df.columns:
         mask &= df["REJECT_TOTAL_QTY"] > 0
@@ -1106,7 +1300,7 @@ def compute_dimension_pareto(
     pareto_scope: str = "top80",
     packages: Optional[List[str]] = None,
     workcenter_groups: Optional[List[str]] = None,
-    reason: Optional[str] = None,
+    reasons: Optional[List[str]] = None,
     trend_dates: Optional[List[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
@@ -1144,7 +1338,7 @@ def compute_dimension_pareto(
         df,
         packages=packages,
         workcenter_groups=workcenter_groups,
-        reason=reason,
+        reasons=reasons,
     )
     if filtered is None or filtered.empty:
         return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
@@ -1180,7 +1374,7 @@ def compute_batch_pareto(
     pareto_display_scope: str = "all",
     packages: Optional[List[str]] = None,
     workcenter_groups: Optional[List[str]] = None,
-    reason: Optional[str] = None,
+    reasons: Optional[List[str]] = None,
     trend_dates: Optional[List[str]] = None,
     pareto_selections: Optional[Dict[str, List[str]]] = None,
     include_excluded_scrap: bool = False,
@@ -1215,7 +1409,7 @@ def compute_batch_pareto(
         df,
         packages=packages,
         workcenter_groups=workcenter_groups,
-        reason=reason,
+        reasons=reasons,
     )
     if filtered is None or filtered.empty:
         return {
@@ -1267,7 +1461,7 @@ def export_csv_from_cache(
     query_id: str,
     packages: Optional[List[str]] = None,
     workcenter_groups: Optional[List[str]] = None,
-    reason: Optional[str] = None,
+    reasons: Optional[List[str]] = None,
     metric_filter: str = "all",
     trend_dates: Optional[List[str]] = None,
     detail_reason: Optional[str] = None,
@@ -1294,7 +1488,7 @@ def export_csv_from_cache(
         df,
         packages=packages,
         workcenter_groups=workcenter_groups,
-        reason=reason,
+        reasons=reasons,
         metric_filter=metric_filter,
     )
 

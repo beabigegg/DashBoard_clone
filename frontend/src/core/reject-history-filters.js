@@ -35,7 +35,7 @@ export function toRejectFilterSnapshot(input = {}) {
     endDate: normalizeText(input.endDate),
     workcenterGroups: normalizeArray(input.workcenterGroups),
     packages: normalizeArray(input.packages),
-    reason: normalizeText(input.reason),
+    reasons: normalizeArray(input.reasons),
     includeExcludedScrap: normalizeBoolean(input.includeExcludedScrap, false),
     excludeMaterialScrap: normalizeBoolean(input.excludeMaterialScrap, true),
     excludePbDiode: normalizeBoolean(input.excludePbDiode, true),
@@ -77,7 +77,7 @@ export function pruneRejectFilterSelections(filters = {}, options = {}) {
   const removed = {
     workcenterGroups: [],
     packages: [],
-    reason: '',
+    reasons: [],
   };
 
   if (hasWorkcenterOptions) {
@@ -100,9 +100,14 @@ export function pruneRejectFilterSelections(filters = {}, options = {}) {
     });
   }
 
-  if (next.reason && hasReasonOptions && !validReasons.has(next.reason)) {
-    removed.reason = next.reason;
-    next.reason = '';
+  if (hasReasonOptions) {
+    next.reasons = next.reasons.filter((value) => {
+      if (validReasons.has(value)) {
+        return true;
+      }
+      removed.reasons.push(value);
+      return false;
+    });
   }
 
   return {
@@ -111,7 +116,7 @@ export function pruneRejectFilterSelections(filters = {}, options = {}) {
     removedCount:
       removed.workcenterGroups.length +
       removed.packages.length +
-      (removed.reason ? 1 : 0),
+      removed.reasons.length,
   };
 }
 
@@ -126,13 +131,13 @@ export function buildRejectOptionsRequestParams(filters = {}) {
     exclude_material_scrap: next.excludeMaterialScrap,
     exclude_pb_diode: next.excludePbDiode,
   };
-  if (next.reason) {
-    params.reason = next.reason;
+  if (next.reasons.length > 0) {
+    params.reasons = next.reasons;
   }
   return params;
 }
 
-export function buildRejectCommonQueryParams(filters = {}, { reason = '' } = {}) {
+export function buildRejectCommonQueryParams(filters = {}, { reasons: extraReasons = [] } = {}) {
   const next = toRejectFilterSnapshot(filters);
   const params = {
     start_date: next.startDate,
@@ -143,9 +148,9 @@ export function buildRejectCommonQueryParams(filters = {}, { reason = '' } = {})
     exclude_material_scrap: next.excludeMaterialScrap,
     exclude_pb_diode: next.excludePbDiode,
   };
-  const effectiveReason = normalizeText(reason) || next.reason;
-  if (effectiveReason) {
-    params.reasons = [effectiveReason];
+  const merged = normalizeArray([...next.reasons, ...normalizeArray(extraReasons)]);
+  if (merged.length > 0) {
+    params.reasons = merged;
   }
   return params;
 }
@@ -168,6 +173,30 @@ export function parseMultiLineInput(text) {
   return result;
 }
 
+export function validateDateRange(startDate, endDate) {
+  const MAX_QUERY_DAYS = 730;
+  const start = normalizeText(startDate);
+  const end = normalizeText(endDate);
+  if (!start || !end) {
+    return '請先設定開始與結束日期';
+  }
+
+  const startDt = new Date(`${start}T00:00:00`);
+  const endDt = new Date(`${end}T00:00:00`);
+  if (Number.isNaN(startDt.getTime()) || Number.isNaN(endDt.getTime())) {
+    return '日期格式不正確';
+  }
+  if (endDt < startDt) {
+    return '結束日期必須大於起始日期';
+  }
+  const dayMs = 24 * 60 * 60 * 1000;
+  const days = Math.floor((endDt - startDt) / dayMs) + 1;
+  if (days > MAX_QUERY_DAYS) {
+    return '查詢範圍不可超過 730 天（約兩年）';
+  }
+  return '';
+}
+
 export function buildViewParams(queryId, {
   supplementaryFilters = {},
   metricFilter = 'all',
@@ -185,8 +214,8 @@ export function buildViewParams(queryId, {
   if (supplementaryFilters.workcenterGroups?.length > 0) {
     params.workcenter_groups = supplementaryFilters.workcenterGroups;
   }
-  if (supplementaryFilters.reason) {
-    params.reason = supplementaryFilters.reason;
+  if (supplementaryFilters.reasons?.length > 0) {
+    params.reasons = supplementaryFilters.reasons;
   }
   if (metricFilter && metricFilter !== 'all') {
     params.metric_filter = metricFilter;

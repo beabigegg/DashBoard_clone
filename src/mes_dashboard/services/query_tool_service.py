@@ -28,6 +28,12 @@ import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.sql import QueryBuilder, SQLLoader
+from mes_dashboard.services.container_resolution_policy import (
+    assess_resolution_result,
+    normalize_input_values,
+    validate_resolution_request,
+    validate_resolution_result,
+)
 from mes_dashboard.services.event_fetcher import EventFetcher
 
 try:
@@ -99,23 +105,7 @@ def validate_lot_input(input_type: str, values: List[str]) -> Optional[str]:
     Returns:
         Error message if validation fails, None if valid.
     """
-    if not values:
-        return '請輸入至少一個查詢條件'
-
-    limits = {
-        'lot_id': MAX_LOT_IDS,
-        'wafer_lot': MAX_LOT_IDS,
-        'gd_lot_id': MAX_LOT_IDS,
-        'serial_number': MAX_SERIAL_NUMBERS,
-        'work_order': MAX_WORK_ORDERS,
-        'gd_work_order': MAX_GD_WORK_ORDERS,
-    }
-
-    limit = limits.get(input_type, MAX_LOT_IDS)
-    if len(values) > limit:
-        return f'輸入數量超過上限 ({limit} 筆)'
-
-    return None
+    return validate_resolution_request(input_type, values)
 
 
 def validate_equipment_input(equipment_ids: List[str]) -> Optional[str]:
@@ -344,25 +334,48 @@ def resolve_lots(input_type: str, values: List[str]) -> Dict[str, Any]:
         return {'error': validation_error}
 
     # Clean values
-    cleaned = [v.strip() for v in values if v.strip()]
+    cleaned = normalize_input_values(values)
     if not cleaned:
         return {'error': '請輸入有效的查詢條件'}
 
     try:
         if input_type == 'lot_id':
-            return _resolve_by_lot_id(cleaned)
+            result = _resolve_by_lot_id(cleaned)
         elif input_type == 'wafer_lot':
-            return _resolve_by_wafer_lot(cleaned)
+            result = _resolve_by_wafer_lot(cleaned)
         elif input_type == 'gd_lot_id':
-            return _resolve_by_gd_lot_id(cleaned)
+            result = _resolve_by_gd_lot_id(cleaned)
         elif input_type == 'serial_number':
-            return _resolve_by_serial_number(cleaned)
+            result = _resolve_by_serial_number(cleaned)
         elif input_type == 'work_order':
-            return _resolve_by_work_order(cleaned)
+            result = _resolve_by_work_order(cleaned)
         elif input_type == 'gd_work_order':
-            return _resolve_by_gd_work_order(cleaned)
+            result = _resolve_by_gd_work_order(cleaned)
         else:
             return {'error': f'不支援的輸入類型: {input_type}'}
+
+        guard_assessment = assess_resolution_result(result)
+        overflow_tokens = guard_assessment.get("expansion_offenders") or []
+        overflow_total = bool(guard_assessment.get("over_container_limit"))
+        if overflow_tokens or overflow_total:
+            logger.warning(
+                "Resolution guardrail overflow (input_type=%s, offenders=%s, resolved=%s, max=%s); continuing with decompose path",
+                input_type,
+                len(overflow_tokens),
+                guard_assessment.get("resolved_container_ids"),
+                guard_assessment.get("max_container_ids"),
+            )
+            result["guardrail"] = {
+                "overflow": True,
+                "expansion_offenders": overflow_tokens,
+                "resolved_container_ids": guard_assessment.get("resolved_container_ids"),
+                "max_container_ids": guard_assessment.get("max_container_ids"),
+            }
+        # Keep compatibility: validation API remains available for strict call sites.
+        guard_error = validate_resolution_result(result, strict=False)
+        if guard_error:
+            return {'error': guard_error}
+        return result
 
     except Exception as exc:
         logger.error(f"LOT resolution failed: {exc}")

@@ -21,6 +21,10 @@ logger = logging.getLogger("mes_dashboard.event_fetcher")
 ORACLE_IN_BATCH_SIZE = 1000
 EVENT_FETCHER_MAX_WORKERS = int(os.getenv('EVENT_FETCHER_MAX_WORKERS', '2'))
 CACHE_SKIP_CID_THRESHOLD = int(os.getenv('EVENT_FETCHER_CACHE_SKIP_CID_THRESHOLD', '10000'))
+EVENT_FETCHER_ALLOW_PARTIAL_RESULTS = (
+    os.getenv('EVENT_FETCHER_ALLOW_PARTIAL_RESULTS', 'false').strip().lower()
+    in {'1', 'true', 'yes', 'on'}
+)
 
 _DOMAIN_SPECS: Dict[str, Dict[str, Any]] = {
     "history": {
@@ -280,16 +284,23 @@ class EventFetcher:
             for batch in batches:
                 _fetch_and_group_batch(batch)
         else:
+            failures = []
             with ThreadPoolExecutor(max_workers=min(len(batches), EVENT_FETCHER_MAX_WORKERS)) as executor:
                 futures = {executor.submit(_fetch_and_group_batch, b): b for b in batches}
                 for future in as_completed(futures):
                     try:
                         future.result()
-                    except Exception:
+                    except Exception as exc:
+                        failures.append((futures[future], exc))
                         logger.error(
                             "EventFetcher batch query failed domain=%s batch_size=%s",
                             domain, len(futures[future]), exc_info=True,
                         )
+            if failures and not EVENT_FETCHER_ALLOW_PARTIAL_RESULTS:
+                failed_cids = sum(len(batch) for batch, _ in failures)
+                raise RuntimeError(
+                    f"EventFetcher chunk failed (domain={domain}, failed_chunks={len(failures)}, failed_cids={failed_cids})"
+                )
 
         result = dict(grouped)
         del grouped

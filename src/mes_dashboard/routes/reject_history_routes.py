@@ -11,6 +11,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.core.utils import parse_bool_query
 from mes_dashboard.services.reject_dataset_cache import (
     apply_view,
@@ -344,7 +345,7 @@ def api_reject_history_reason_pareto():
                 pareto_scope=pareto_scope,
                 packages=_parse_multi_param("packages") or None,
                 workcenter_groups=_parse_multi_param("workcenter_groups") or None,
-                reason=request.args.get("reason", "").strip() or None,
+                reasons=_parse_multi_param("reasons") or None,
                 trend_dates=_parse_multi_param("trend_dates") or None,
                 include_excluded_scrap=include_excluded_scrap,
                 exclude_material_scrap=exclude_material_scrap,
@@ -404,7 +405,7 @@ def api_reject_history_batch_pareto():
             pareto_display_scope=pareto_display_scope,
             packages=_parse_multi_param("packages") or None,
             workcenter_groups=_parse_multi_param("workcenter_groups") or None,
-            reason=request.args.get("reason", "").strip() or None,
+            reasons=_parse_multi_param("reasons") or None,
             trend_dates=_parse_multi_param("trend_dates") or None,
             pareto_selections=_parse_multi_pareto_selections(),
             include_excluded_scrap=include_excluded_scrap,
@@ -548,7 +549,9 @@ def api_reject_history_analytics():
 @reject_history_bp.route("/api/reject-history/query", methods=["POST"])
 def api_reject_history_query():
     """Primary query: execute Oracle → cache DataFrame → return results."""
-    body = request.get_json(silent=True) or {}
+    body, payload_error = parse_json_payload(require_non_empty_object=True)
+    if payload_error is not None:
+        return jsonify({"success": False, "error": payload_error.message}), payload_error.status_code
 
     mode = str(body.get("mode", "")).strip()
     if mode not in ("date_range", "container"):
@@ -599,7 +602,7 @@ def api_reject_history_view():
     page = request.args.get("page", 1, type=int) or 1
     per_page = request.args.get("per_page", 50, type=int) or 50
     metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
-    reason = request.args.get("reason", "").strip() or None
+    reasons = _parse_multi_param("reasons") or None
     detail_reason = request.args.get("detail_reason", "").strip() or None
     pareto_selections = _parse_multi_pareto_selections()
     pareto_dimension = None
@@ -618,7 +621,7 @@ def api_reject_history_view():
             query_id=query_id,
             packages=_parse_multi_param("packages") or None,
             workcenter_groups=_parse_multi_param("workcenter_groups") or None,
-            reason=reason,
+            reasons=reasons,
             metric_filter=metric_filter,
             trend_dates=_parse_multi_param("trend_dates") or None,
             detail_reason=detail_reason,
@@ -653,7 +656,7 @@ def api_reject_history_export_cached():
         return jsonify({"success": False, "error": "缺少必要參數: query_id"}), 400
 
     metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
-    reason = request.args.get("reason", "").strip() or None
+    reasons = _parse_multi_param("reasons") or None
     detail_reason = request.args.get("detail_reason", "").strip() or None
     pareto_selections = _parse_multi_pareto_selections()
     pareto_dimension = None
@@ -672,7 +675,7 @@ def api_reject_history_export_cached():
             query_id=query_id,
             packages=_parse_multi_param("packages") or None,
             workcenter_groups=_parse_multi_param("workcenter_groups") or None,
-            reason=reason,
+            reasons=reasons,
             metric_filter=metric_filter,
             trend_dates=_parse_multi_param("trend_dates") or None,
             detail_reason=detail_reason,

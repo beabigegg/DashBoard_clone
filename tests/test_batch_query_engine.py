@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Unit tests for BatchQueryEngine module."""
 
+import json
 import pytest
 from unittest.mock import patch, MagicMock, call
 
@@ -482,8 +483,8 @@ class TestChunkFailureResilience:
                 skip_cached=False,
             )
 
-        # All 3 chunks attempted
-        assert call_count["n"] == 3
+        # One chunk retried once due retryable timeout pattern.
+        assert call_count["n"] == 4
         # Final metadata should reflect partial failure
         last = hset_calls[-1]
         assert last["status"] == "partial"
@@ -567,10 +568,147 @@ class TestShouldDecompose:
         assert should_decompose_by_time("2025-01-01", "2025-12-31")
 
     def test_short_range_false(self):
-        assert not should_decompose_by_time("2025-01-01", "2025-02-01")
+        assert not should_decompose_by_time("2025-01-01", "2025-01-11")
 
     def test_large_ids_true(self):
         assert should_decompose_by_ids(list(range(2000)))
 
     def test_small_ids_false(self):
         assert not should_decompose_by_ids(list(range(500)))
+
+
+class TestRetryAndFailedRanges:
+    def _mock_redis(self):
+        mock_client = MagicMock()
+        stored = {}
+        hashes = {}
+
+        mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
+        mock_client.get.side_effect = lambda k: stored.get(k)
+        mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
+        mock_client.hset.side_effect = lambda k, mapping=None: hashes.setdefault(k, {}).update(mapping or {})
+        mock_client.hgetall.side_effect = lambda k: hashes.get(k, {})
+        mock_client.expire.return_value = None
+        return mock_client
+
+    def test_transient_failure_retried_once(self):
+        import mes_dashboard.core.redis_df_store as rds
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        mock_client = self._mock_redis()
+        call_count = {"n": 0}
+
+        def flaky_query_fn(chunk, max_rows_per_chunk=None):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise TimeoutError("connection timed out")
+            return pd.DataFrame({"V": [1]})
+
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client), \
+             patch.object(bqe, "get_redis_client", return_value=mock_client):
+            execute_plan(
+                [{"chunk_start": "2025-01-01", "chunk_end": "2025-01-10"}],
+                flaky_query_fn,
+                query_hash="retryonce",
+                cache_prefix="retry",
+                skip_cached=False,
+            )
+            progress = bqe.get_batch_progress("retry", "retryonce")
+
+        assert call_count["n"] == 2
+        assert progress is not None
+        assert progress.get("status") == "completed"
+        assert progress.get("failed") == "0"
+
+    def test_memory_guard_not_retried(self):
+        import mes_dashboard.core.redis_df_store as rds
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        mock_client = self._mock_redis()
+        call_count = {"n": 0}
+
+        def large_df_query_fn(chunk, max_rows_per_chunk=None):
+            call_count["n"] += 1
+            return pd.DataFrame({"V": [1]})
+
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client), \
+             patch.object(bqe, "get_redis_client", return_value=mock_client), \
+             patch.object(bqe, "BATCH_CHUNK_MAX_MEMORY_MB", 0):
+            execute_plan(
+                [{"chunk_start": "2025-01-01", "chunk_end": "2025-01-10"}],
+                large_df_query_fn,
+                query_hash="memnoretry",
+                cache_prefix="retry",
+                skip_cached=False,
+            )
+
+        assert call_count["n"] == 1
+
+    def test_failed_ranges_tracked(self):
+        import mes_dashboard.core.redis_df_store as rds
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        mock_client = self._mock_redis()
+
+        def query_fn(chunk, max_rows_per_chunk=None):
+            if chunk["chunk_start"] == "2025-01-11":
+                raise RuntimeError("chunk failure")
+            return pd.DataFrame({"V": [1]})
+
+        chunks = [
+            {"chunk_start": "2025-01-01", "chunk_end": "2025-01-10"},
+            {"chunk_start": "2025-01-11", "chunk_end": "2025-01-20"},
+            {"chunk_start": "2025-01-21", "chunk_end": "2025-01-30"},
+        ]
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client), \
+             patch.object(bqe, "get_redis_client", return_value=mock_client):
+            execute_plan(
+                chunks,
+                query_fn,
+                query_hash="franges",
+                cache_prefix="retry",
+                skip_cached=False,
+            )
+            progress = bqe.get_batch_progress("retry", "franges")
+
+        assert progress is not None
+        assert progress.get("has_partial_failure") == "True"
+        assert progress.get("failed") == "1"
+        failed_ranges = json.loads(progress.get("failed_ranges", "[]"))
+        assert failed_ranges == [{"start": "2025-01-11", "end": "2025-01-20"}]
+
+    def test_id_batch_chunk_no_failed_ranges(self):
+        import mes_dashboard.core.redis_df_store as rds
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        mock_client = self._mock_redis()
+
+        def query_fn(chunk, max_rows_per_chunk=None):
+            if chunk.get("ids") == ["B"]:
+                raise RuntimeError("id chunk failed")
+            return pd.DataFrame({"V": [1]})
+
+        chunks = [
+            {"ids": ["A"]},
+            {"ids": ["B"]},
+        ]
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client), \
+             patch.object(bqe, "get_redis_client", return_value=mock_client):
+            execute_plan(
+                chunks,
+                query_fn,
+                query_hash="idfail",
+                cache_prefix="retry",
+                skip_cached=False,
+            )
+            progress = bqe.get_batch_progress("retry", "idfail")
+
+        assert progress is not None
+        assert progress.get("has_partial_failure") == "True"
+        assert progress.get("failed") == "1"
+        failed_ranges = json.loads(progress.get("failed_ranges", "[]"))
+        assert failed_ranges == []

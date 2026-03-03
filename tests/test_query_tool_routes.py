@@ -14,7 +14,7 @@ from unittest.mock import patch, MagicMock
 from mes_dashboard import create_app
 from mes_dashboard.core.cache import NoOpCache
 from mes_dashboard.core.rate_limit import reset_rate_limits_for_tests
-from mes_dashboard.services.query_tool_service import MAX_DATE_RANGE_DAYS, MAX_LOT_IDS
+from mes_dashboard.services.query_tool_service import MAX_DATE_RANGE_DAYS
 
 
 @pytest.fixture
@@ -118,20 +118,19 @@ class TestResolveEndpoint:
         data = json.loads(response.data)
         assert 'error' in data
 
-    def test_values_over_limit(self, client):
-        """Should reject values exceeding limit."""
-        values = [f'GA{i:09d}' for i in range(MAX_LOT_IDS + 1)]
+    def test_rejects_too_broad_wildcard(self, client):
+        """Should reject wildcard patterns that are too broad."""
         response = client.post(
             '/api/query-tool/resolve',
             json={
                 'input_type': 'lot_id',
-                'values': values
+                'values': ['%']
             }
         )
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '超過上限' in data['error'] or str(MAX_LOT_IDS) in data['error']
+        assert '萬用字元條件過於寬鬆' in data['error']
 
     @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
     def test_resolve_success(self, mock_resolve, client):

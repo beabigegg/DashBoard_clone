@@ -56,6 +56,18 @@ from mes_dashboard.core.redis_df_store import (
 
 logger = logging.getLogger("mes_dashboard.batch_query_engine")
 
+
+_RETRYABLE_PATTERNS = (
+    "dpy-4024",
+    "ora-01013",
+    "ora-03113",
+    "ora-03135",
+    "ora-12514",
+    "ora-12541",
+    "timeout",
+    "timed out",
+)
+
 # ============================================================
 # Configuration (env-overridable)
 # ============================================================
@@ -65,7 +77,7 @@ BATCH_CHUNK_MAX_MEMORY_MB: int = int(
 )
 
 BATCH_QUERY_TIME_THRESHOLD_DAYS: int = int(
-    os.getenv("BATCH_QUERY_TIME_THRESHOLD_DAYS", "60")
+    os.getenv("BATCH_QUERY_TIME_THRESHOLD_DAYS", "10")
 )
 
 BATCH_QUERY_ID_THRESHOLD: int = int(
@@ -196,6 +208,7 @@ def _update_progress(
     failed: int,
     status: str = "running",
     has_partial_failure: bool = False,
+    failed_ranges: Optional[List[Dict[str, str]]] = None,
     ttl: int = 900,
 ) -> None:
     """Write/update batch progress metadata to Redis."""
@@ -212,6 +225,10 @@ def _update_progress(
         "status": status,
         "has_partial_failure": str(has_partial_failure),
     }
+    if failed_ranges is not None:
+        mapping["failed_ranges"] = json.dumps(
+            failed_ranges, ensure_ascii=False, default=str
+        )
     try:
         client.hset(key, mapping=mapping)
         client.expire(key, ttl)
@@ -279,6 +296,7 @@ def execute_plan(
     completed = 0
     failed = 0
     has_partial_failure = False
+    failed_range_list: Optional[List[Dict[str, str]]] = None
 
     _update_progress(
         cache_prefix, query_hash,
@@ -296,7 +314,9 @@ def execute_plan(
                 _update_progress(
                     cache_prefix, query_hash,
                     total=total, completed=completed, failed=failed,
-                    has_partial_failure=has_partial_failure, ttl=chunk_ttl,
+                    has_partial_failure=has_partial_failure,
+                    failed_ranges=failed_range_list,
+                    ttl=chunk_ttl,
                 )
                 continue
             ok = _execute_single_chunk(
@@ -308,14 +328,24 @@ def execute_plan(
             else:
                 failed += 1
                 has_partial_failure = True
+                if failed_range_list is None:
+                    failed_range_list = []
+                chunk_start = chunk.get("chunk_start")
+                chunk_end = chunk.get("chunk_end")
+                if chunk_start and chunk_end:
+                    failed_range_list.append(
+                        {"start": str(chunk_start), "end": str(chunk_end)}
+                    )
             _update_progress(
                 cache_prefix, query_hash,
                 total=total, completed=completed, failed=failed,
-                has_partial_failure=has_partial_failure, ttl=chunk_ttl,
+                has_partial_failure=has_partial_failure,
+                failed_ranges=failed_range_list,
+                ttl=chunk_ttl,
             )
     else:
         # --- Parallel path ---
-        completed, failed, has_partial_failure = _execute_parallel(
+        completed, failed, has_partial_failure, failed_range_list = _execute_parallel(
             chunks, query_fn, cache_prefix, query_hash,
             chunk_ttl, max_rows_per_chunk, skip_cached,
             effective_parallel,
@@ -327,6 +357,7 @@ def execute_plan(
         total=total, completed=completed, failed=failed,
         status=final_status,
         has_partial_failure=has_partial_failure,
+        failed_ranges=failed_range_list,
         ttl=chunk_ttl,
     )
 
@@ -366,53 +397,59 @@ def _execute_single_chunk(
     query_hash: str,
     chunk_ttl: int,
     max_rows_per_chunk: Optional[int],
+    max_retries: int = 1,
 ) -> bool:
     """Run one chunk through *query_fn*, apply guards, store result.
 
     Returns True on success, False on failure.
     """
-    try:
-        df = query_fn(chunk, max_rows_per_chunk=max_rows_per_chunk)
-        if df is None:
-            df = pd.DataFrame()
+    attempts = max(0, int(max_retries)) + 1
+    for attempt in range(attempts):
+        try:
+            df = query_fn(chunk, max_rows_per_chunk=max_rows_per_chunk)
+            if df is None:
+                df = pd.DataFrame()
 
-        # ---- Memory guard ----
-        mem_bytes = df.memory_usage(deep=True).sum()
-        mem_mb = mem_bytes / (1024 * 1024)
-        if mem_mb > BATCH_CHUNK_MAX_MEMORY_MB:
-            logger.warning(
-                "Chunk %d memory %.1f MB exceeds limit %d MB — discarded",
-                idx, mem_mb, BATCH_CHUNK_MAX_MEMORY_MB,
+            # ---- Memory guard ----
+            mem_bytes = df.memory_usage(deep=True).sum()
+            mem_mb = mem_bytes / (1024 * 1024)
+            if mem_mb > BATCH_CHUNK_MAX_MEMORY_MB:
+                logger.warning(
+                    "Chunk %d memory %.1f MB exceeds limit %d MB — discarded",
+                    idx, mem_mb, BATCH_CHUNK_MAX_MEMORY_MB,
+                )
+                return False
+
+            # ---- Store to Redis ----
+            stored = redis_store_chunk(cache_prefix, query_hash, idx, df, ttl=chunk_ttl)
+            if not stored:
+                logger.warning(
+                    "Chunk %d failed to persist into Redis, marking as failed", idx
+                )
+                return False
+
+            logger.debug(
+                "Chunk %d completed: %d rows, %.1f MB",
+                idx, len(df), mem_mb,
+            )
+            return True
+
+        except Exception as exc:
+            should_retry = attempt < attempts - 1 and _is_retryable_error(exc)
+            if should_retry:
+                logger.warning(
+                    "Chunk %d transient failure on attempt %d/%d: %s; retrying",
+                    idx,
+                    attempt + 1,
+                    attempts,
+                    exc,
+                )
+                continue
+            logger.error(
+                "Chunk %d failed: %s", idx, exc, exc_info=True,
             )
             return False
-
-        # ---- Truncation flag ----
-        truncated = (
-            max_rows_per_chunk is not None
-            and len(df) == max_rows_per_chunk
-        )
-        if truncated:
-            logger.info("Chunk %d returned exactly max_rows_per_chunk=%d (truncated)", idx, max_rows_per_chunk)
-
-        # ---- Store to Redis ----
-        stored = redis_store_chunk(cache_prefix, query_hash, idx, df, ttl=chunk_ttl)
-        if not stored:
-            logger.warning(
-                "Chunk %d failed to persist into Redis, marking as failed", idx
-            )
-            return False
-
-        logger.debug(
-            "Chunk %d completed: %d rows, %.1f MB",
-            idx, len(df), mem_mb,
-        )
-        return True
-
-    except Exception as exc:
-        logger.error(
-            "Chunk %d failed: %s", idx, exc, exc_info=True,
-        )
-        return False
+    return False
 
 
 def _execute_parallel(
@@ -427,12 +464,13 @@ def _execute_parallel(
 ) -> tuple:
     """Execute chunks in parallel via ThreadPoolExecutor.
 
-    Returns (completed, failed, has_partial_failure).
+    Returns (completed, failed, has_partial_failure, failed_ranges).
     """
     total = len(chunks)
     completed = 0
     failed = 0
     has_partial_failure = False
+    failed_range_list: Optional[List[Dict[str, str]]] = None
 
     futures = {}
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -445,10 +483,10 @@ def _execute_parallel(
                 idx, chunk, query_fn,
                 cache_prefix, query_hash, chunk_ttl, max_rows_per_chunk,
             )
-            futures[future] = idx
+            futures[future] = (idx, chunk)
 
         for future in as_completed(futures):
-            idx = futures[future]
+            idx, chunk = futures[future]
             try:
                 ok = future.result()
                 if ok:
@@ -456,18 +494,46 @@ def _execute_parallel(
                 else:
                     failed += 1
                     has_partial_failure = True
+                    if failed_range_list is None:
+                        failed_range_list = []
+                    chunk_start = chunk.get("chunk_start")
+                    chunk_end = chunk.get("chunk_end")
+                    if chunk_start and chunk_end:
+                        failed_range_list.append(
+                            {"start": str(chunk_start), "end": str(chunk_end)}
+                        )
             except Exception as exc:
                 logger.error("Chunk %d future error: %s", idx, exc)
                 failed += 1
                 has_partial_failure = True
+                if failed_range_list is None:
+                    failed_range_list = []
+                chunk_start = chunk.get("chunk_start")
+                chunk_end = chunk.get("chunk_end")
+                if chunk_start and chunk_end:
+                    failed_range_list.append(
+                        {"start": str(chunk_start), "end": str(chunk_end)}
+                    )
 
             _update_progress(
                 cache_prefix, query_hash,
                 total=total, completed=completed, failed=failed,
-                has_partial_failure=has_partial_failure, ttl=chunk_ttl,
+                has_partial_failure=has_partial_failure,
+                failed_ranges=failed_range_list,
+                ttl=chunk_ttl,
             )
 
-    return completed, failed, has_partial_failure
+    return completed, failed, has_partial_failure, failed_range_list
+
+
+def _is_retryable_error(exc: Exception) -> bool:
+    """Return True for transient Oracle/network timeout errors."""
+    if isinstance(exc, (TimeoutError, ConnectionError, OSError)):
+        return True
+    text = str(exc).strip().lower()
+    if not text:
+        return False
+    return any(pattern in text for pattern in _RETRYABLE_PATTERNS)
 
 
 # ============================================================

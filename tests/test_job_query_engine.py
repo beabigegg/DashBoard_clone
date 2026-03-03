@@ -77,7 +77,7 @@ class TestJobQueryEngineDecomposition:
         result = job_svc.get_jobs_by_resources(
             resource_ids=["R1"],
             start_date="2025-06-01",
-            end_date="2025-06-30",
+            end_date="2025-06-05",
         )
 
         assert engine_calls["execute"] == 0  # Engine NOT used

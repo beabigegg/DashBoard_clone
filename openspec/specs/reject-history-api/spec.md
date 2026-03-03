@@ -14,6 +14,28 @@ The API SHALL validate date parameters and basic paging bounds before executing 
 - **WHEN** `end_date` is earlier than `start_date`
 - **THEN** the API SHALL return HTTP 400 and SHALL NOT run SQL queries
 
+#### Scenario: Date range exceeds maximum
+- **WHEN** the date range between `start_date` and `end_date` exceeds 730 days
+- **THEN** the API SHALL return HTTP 400 with error message "日期範圍不可超過 730 天"
+
+### Requirement: Reject History API primary query response SHALL include partial failure metadata
+The primary query endpoint SHALL include batch execution completeness information in the response `meta` field when chunks fail during batch query execution.
+
+#### Scenario: Partial failure metadata in response
+- **WHEN** `POST /api/reject-history/query` completes with some chunks failing
+- **THEN** the response SHALL include `meta.has_partial_failure: true`
+- **THEN** the response SHALL include `meta.failed_chunk_count` as a positive integer
+- **THEN** the response SHALL include `meta.failed_ranges` as an array of `{start, end}` date strings (if available)
+- **THEN** the HTTP status SHALL still be 200 (data is partially available)
+
+#### Scenario: No partial failure metadata on full success
+- **WHEN** `POST /api/reject-history/query` completes with all chunks succeeding
+- **THEN** the response `meta` SHALL NOT include `has_partial_failure`, `failed_chunk_count`, or `failed_ranges`
+
+#### Scenario: Partial failure metadata preserved on cache hit
+- **WHEN** `POST /api/reject-history/query` returns cached data that originally had partial failures
+- **THEN** the response SHALL include the same `meta.has_partial_failure`, `meta.failed_chunk_count`, and `meta.failed_ranges` as the original response
+
 ### Requirement: Reject History API SHALL provide summary metrics endpoint
 The API SHALL provide aggregated summary metrics for the selected filter context.
 
