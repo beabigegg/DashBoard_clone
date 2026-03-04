@@ -73,7 +73,7 @@ _RETRYABLE_PATTERNS = (
 # ============================================================
 
 BATCH_CHUNK_MAX_MEMORY_MB: int = int(
-    os.getenv("BATCH_CHUNK_MAX_MEMORY_MB", "256")
+    os.getenv("BATCH_CHUNK_MAX_MEMORY_MB", "192")
 )
 
 BATCH_QUERY_TIME_THRESHOLD_DAYS: int = int(

@@ -110,7 +110,7 @@ onMounted(async () => {
       <SectionCard>
         <template #header>
           <div class="job-query-title-row">
-            <strong>工單結果</strong>
+            <strong>維修紀錄</strong>
             <span class="job-query-muted">{{ jobs.length }} 筆</span>
           </div>
         </template>

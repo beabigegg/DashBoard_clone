@@ -13,8 +13,8 @@ keepalive = 5         # Keep-alive connections timeout
 
 # Worker lifecycle management - prevent state accumulation.
 # Make these configurable so high-load test environments can raise the ceiling.
-max_requests = int(os.getenv("GUNICORN_MAX_REQUESTS", "5000"))
-max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "500"))
+max_requests = int(os.getenv("GUNICORN_MAX_REQUESTS", "1200"))
+max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "300"))
 
 
 # ============================================================

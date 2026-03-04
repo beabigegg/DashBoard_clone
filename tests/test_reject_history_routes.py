@@ -304,6 +304,17 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertFalse(payload['success'])
         self.assertEqual(payload['error'], 'cache_miss')
 
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
+    def test_batch_pareto_memory_guard_returns_400(self, mock_batch_pareto):
+        mock_batch_pareto.side_effect = MemoryError('目前服務記憶體負載較高')
+
+        response = self.client.get('/api/reject-history/batch-pareto?query_id=qid-oom')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload['success'])
+        self.assertIn('記憶體負載較高', payload['error'])
+
     @patch('mes_dashboard.routes.reject_history_routes.apply_view')
     def test_view_passes_pareto_multi_select_filters(self, mock_apply_view):
         mock_apply_view.return_value = {
@@ -481,6 +492,135 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('attachment; filename=reject_history_2026-02-01_to_2026-02-07.csv', response.headers.get('Content-Disposition', ''))
         self.assertIn('text/csv', response.headers.get('Content-Type', ''))
+
+
+    # ================================================================
+    # 5.3 – Pareto materialization metadata & fallback route tests
+    # ================================================================
+
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
+    def test_batch_pareto_exposes_materialized_metadata_on_hit(self, mock_batch_pareto):
+        """When materialized snapshot serves the request, meta must appear."""
+        mock_batch_pareto.return_value = {
+            'dimensions': {
+                'reason': {'items': [], 'dimension': 'reason', 'metric_mode': 'reject_total'},
+            },
+            '_pareto_meta': {
+                'pareto_source': 'materialized',
+                'pareto_schema_version': 1,
+                'pareto_snapshot_built_at': 1700000000.0,
+                'pareto_snapshot_age_s': 5.0,
+            },
+        }
+
+        response = self.client.get('/api/reject-history/batch-pareto?query_id=qid-mat')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        # _pareto_meta should be extracted to top-level 'meta'
+        self.assertIn('meta', payload)
+        self.assertEqual(payload['meta']['pareto_source'], 'materialized')
+        self.assertEqual(payload['meta']['pareto_schema_version'], 1)
+        # _pareto_meta should NOT be in data
+        self.assertNotIn('_pareto_meta', payload['data'])
+
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
+    def test_batch_pareto_exposes_fallback_metadata(self, mock_batch_pareto):
+        """When falling back to legacy, meta must include fallback reason."""
+        mock_batch_pareto.return_value = {
+            'dimensions': {
+                'reason': {'items': [], 'dimension': 'reason', 'metric_mode': 'reject_total'},
+            },
+            '_pareto_meta': {
+                'pareto_source': 'legacy',
+                'pareto_fallback_reason': 'miss',
+            },
+        }
+
+        response = self.client.get('/api/reject-history/batch-pareto?query_id=qid-fb')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        self.assertIn('meta', payload)
+        self.assertEqual(payload['meta']['pareto_source'], 'legacy')
+        self.assertEqual(payload['meta']['pareto_fallback_reason'], 'miss')
+
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
+    def test_batch_pareto_no_meta_when_absent(self, mock_batch_pareto):
+        """When no _pareto_meta is in the result, response has no meta key."""
+        mock_batch_pareto.return_value = {
+            'dimensions': {
+                'reason': {'items': []},
+            },
+        }
+
+        response = self.client.get('/api/reject-history/batch-pareto?query_id=qid-nometa')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        self.assertNotIn('meta', payload)
+
+    @patch('mes_dashboard.routes.reject_history_routes.compute_dimension_pareto')
+    def test_reason_pareto_exposes_materialized_metadata(self, mock_dim_pareto):
+        """reason-pareto with query_id should expose pareto metadata."""
+        mock_dim_pareto.return_value = {
+            'items': [{'reason': 'A', 'metric_value': 10, 'pct': 100, 'cumPct': 100}],
+            'dimension': 'reason',
+            'metric_mode': 'reject_total',
+            '_pareto_meta': {
+                'pareto_source': 'materialized',
+                'pareto_schema_version': 1,
+            },
+        }
+
+        response = self.client.get(
+            '/api/reject-history/reason-pareto'
+            '?start_date=2026-01-01&end_date=2026-01-31'
+            '&query_id=qid-rp'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        self.assertIn('meta', payload)
+        self.assertEqual(payload['meta']['pareto_source'], 'materialized')
+
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
+    def test_batch_pareto_stale_fallback_reason(self, mock_batch_pareto):
+        """Stale snapshot fallback must carry 'stale' reason code."""
+        mock_batch_pareto.return_value = {
+            'dimensions': {'reason': {'items': []}},
+            '_pareto_meta': {
+                'pareto_source': 'legacy',
+                'pareto_fallback_reason': 'stale',
+            },
+        }
+
+        response = self.client.get('/api/reject-history/batch-pareto?query_id=qid-stale')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload['meta']['pareto_fallback_reason'], 'stale')
+
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
+    def test_batch_pareto_build_failed_fallback_reason(self, mock_batch_pareto):
+        """Build failure fallback must carry 'build_failed' reason code."""
+        mock_batch_pareto.return_value = {
+            'dimensions': {'reason': {'items': []}},
+            '_pareto_meta': {
+                'pareto_source': 'legacy',
+                'pareto_fallback_reason': 'build_failed',
+            },
+        }
+
+        response = self.client.get('/api/reject-history/batch-pareto?query_id=qid-bf')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload['meta']['pareto_fallback_reason'], 'build_failed')
 
 
 if __name__ == '__main__':

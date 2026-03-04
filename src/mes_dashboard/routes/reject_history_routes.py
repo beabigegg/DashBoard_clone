@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date, timedelta
 from typing import Optional
@@ -33,6 +34,7 @@ from mes_dashboard.services.reject_history_service import (
 )
 
 reject_history_bp = Blueprint("reject_history", __name__)
+logger = logging.getLogger("mes_dashboard.reject_history_routes")
 _REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS = int(
     os.getenv("REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS", "14400")
 )
@@ -352,7 +354,8 @@ def api_reject_history_reason_pareto():
                 exclude_pb_diode=exclude_pb_diode,
             )
             if result is not None:
-                return jsonify({"success": True, "data": result, "meta": {}})
+                pareto_meta = result.pop("_pareto_meta", None) or {}
+                return jsonify({"success": True, "data": result, "meta": pareto_meta})
             # Cache expired, fall through to Oracle query
 
         result = query_dimension_pareto(
@@ -377,6 +380,9 @@ def api_reject_history_reason_pareto():
         )
         return jsonify({"success": True, "data": data, "meta": meta})
     except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except MemoryError as exc:
+        logger.warning("Reject history reason-pareto memory guard: %s", exc)
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:
         return jsonify({"success": False, "error": "查詢柏拉圖資料失敗"}), 500
@@ -414,7 +420,14 @@ def api_reject_history_batch_pareto():
         )
         if result is None:
             return jsonify({"success": False, "error": "cache_miss"}), 400
-        return jsonify({"success": True, "data": result})
+        pareto_meta = result.pop("_pareto_meta", None)
+        resp: dict = {"success": True, "data": result}
+        if pareto_meta:
+            resp["meta"] = pareto_meta
+        return jsonify(resp)
+    except MemoryError as exc:
+        logger.warning("Reject history batch-pareto memory guard: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 400
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:
@@ -640,6 +653,9 @@ def api_reject_history_view():
 
         return jsonify({"success": True, "data": result})
 
+    except MemoryError as exc:
+        logger.warning("Reject history view memory guard: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 400
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:
@@ -706,6 +722,9 @@ def api_reject_history_export_cached():
             },
         )
 
+    except MemoryError as exc:
+        logger.warning("Reject history export-cached memory guard: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 400
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:

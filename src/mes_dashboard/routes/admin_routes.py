@@ -364,6 +364,15 @@ def api_performance_detail():
         "worker_pid": os.getpid(),
     }
 
+    # ---- Pareto materialization telemetry ----
+    pareto_materialization = None
+    try:
+        from mes_dashboard.services.reject_pareto_materialized import get_telemetry
+        pareto_materialization = get_telemetry()
+    except Exception as exc:
+        logger.warning("Failed to collect pareto materialization telemetry: %s", exc)
+        pareto_materialization = {"error": str(exc)}
+
     return jsonify({
         "success": True,
         "data": {
@@ -372,6 +381,7 @@ def api_performance_detail():
             "route_cache": route_cache,
             "db_pool": db_pool,
             "direct_connections": direct_connections,
+            "pareto_materialization": pareto_materialization,
         },
     })
 

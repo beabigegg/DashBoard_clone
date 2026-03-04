@@ -283,6 +283,21 @@ def test_compute_batch_pareto_applies_cross_filter_exclude_self(monkeypatch):
     assert [item["reason"] for item in package_items] == ["PKG-2"]
 
 
+def test_compute_batch_pareto_memory_guard_rejects_large_cached_dataset(monkeypatch):
+    df = _build_detail_filter_df()
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _query_id: df)
+    monkeypatch.setattr(cache_svc, "_df_memory_mb", lambda _df: 128.0)
+    monkeypatch.setattr(cache_svc, "_REJECT_DERIVE_MAX_INPUT_MB", 64)
+
+    with pytest.raises(MemoryError, match="超過 64 MB 上限"):
+        cache_svc.compute_batch_pareto(
+            query_id="qid-batch-mem-guard",
+            metric_mode="reject_total",
+            pareto_scope="all",
+        )
+
+
 def test_apply_pareto_selection_filter_supports_multi_dimension_and_logic():
     df = _build_detail_filter_df()
 

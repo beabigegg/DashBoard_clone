@@ -11,6 +11,7 @@ Cache layers:
 
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import logging
@@ -67,12 +68,12 @@ _CACHE_MAX_SIZE = 8
 _REDIS_NAMESPACE = "reject_dataset"
 _CACHE_SCHEMA_VERSION = 4
 _REJECT_ENGINE_GRAIN_DAYS = max(1, int(os.getenv("REJECT_ENGINE_GRAIN_DAYS", "10")))
-_REJECT_ENGINE_PARALLEL = max(1, int(os.getenv("REJECT_ENGINE_PARALLEL", "2")))
+_REJECT_ENGINE_PARALLEL = max(1, int(os.getenv("REJECT_ENGINE_PARALLEL", "1")))
 _REJECT_ENGINE_MAX_ROWS_PER_CHUNK = max(
     1, int(os.getenv("REJECT_ENGINE_MAX_ROWS_PER_CHUNK", "50000"))
 )
 _REJECT_ENGINE_MAX_TOTAL_ROWS = max(
-    1, int(os.getenv("REJECT_ENGINE_MAX_TOTAL_ROWS", "300000"))
+    1, int(os.getenv("REJECT_ENGINE_MAX_TOTAL_ROWS", "200000"))
 )
 _REJECT_ENGINE_SPILL_ENABLED = os.getenv("REJECT_ENGINE_SPILL_ENABLED", "true").strip().lower() in {
     "1",
@@ -81,11 +82,27 @@ _REJECT_ENGINE_SPILL_ENABLED = os.getenv("REJECT_ENGINE_SPILL_ENABLED", "true").
     "on",
 }
 _REJECT_ENGINE_MAX_RESULT_MB = max(
-    1, int(os.getenv("REJECT_ENGINE_MAX_RESULT_MB", "64"))
+    1, int(os.getenv("REJECT_ENGINE_MAX_RESULT_MB", "48"))
 )
 _REJECT_ENGINE_SPOOL_TTL_SECONDS = max(
     300, int(os.getenv("REJECT_ENGINE_SPOOL_TTL_SECONDS", "21600"))
 )
+_REJECT_DERIVE_MAX_INPUT_MB = max(
+    16, int(os.getenv("REJECT_DERIVE_MAX_INPUT_MB", "96"))
+)
+_REJECT_DERIVE_MAX_PROJECTED_RSS_MB = max(
+    _REJECT_DERIVE_MAX_INPUT_MB + 64,
+    int(os.getenv("REJECT_DERIVE_MAX_PROJECTED_RSS_MB", "1100")),
+)
+_REJECT_DERIVE_WORKING_SET_FACTOR = max(
+    1.0, float(os.getenv("REJECT_DERIVE_WORKING_SET_FACTOR", "1.8"))
+)
+_REJECT_DERIVE_FORCE_GC = os.getenv("REJECT_DERIVE_FORCE_GC", "true").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("reject_dataset", _dataset_cache, "Reject Dataset (L1, 15min)")
@@ -281,6 +298,78 @@ def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
 
     _store_df(query_id, df)
     return False
+
+
+def _df_memory_mb(df: pd.DataFrame) -> float:
+    if df is None or df.empty:
+        return 0.0
+    try:
+        return float(df.memory_usage(deep=True).sum()) / (1024 * 1024)
+    except Exception:
+        return 0.0
+
+
+def _process_rss_mb() -> Optional[float]:
+    try:
+        import psutil  # local import: optional runtime dependency
+    except Exception:
+        return None
+    try:
+        process = psutil.Process(os.getpid())
+        return float(process.memory_info().rss) / (1024 * 1024)
+    except Exception:
+        return None
+
+
+def _enforce_interactive_memory_guard(df: pd.DataFrame, *, operation: str, query_id: str) -> None:
+    """Prevent expensive cache-based recomputation from pushing worker memory over limit."""
+    if df is None or df.empty:
+        return
+
+    df_mb = _df_memory_mb(df)
+    if df_mb > float(_REJECT_DERIVE_MAX_INPUT_MB):
+        logger.warning(
+            "Reject %s due to dataset size guard (query_id=%s, df_mb=%.1f, limit_mb=%d)",
+            operation,
+            query_id,
+            df_mb,
+            _REJECT_DERIVE_MAX_INPUT_MB,
+        )
+        raise MemoryError(
+            f"{operation}資料量約 {df_mb:.1f} MB，超過 {_REJECT_DERIVE_MAX_INPUT_MB} MB 上限，請縮小篩選條件後重試"
+        )
+
+    rss_mb = _process_rss_mb()
+    if rss_mb is None:
+        return
+
+    projected_rss_mb = rss_mb + (df_mb * float(_REJECT_DERIVE_WORKING_SET_FACTOR))
+    if projected_rss_mb > float(_REJECT_DERIVE_MAX_PROJECTED_RSS_MB):
+        logger.warning(
+            "Reject %s due to projected RSS guard (query_id=%s, rss_mb=%.1f, df_mb=%.1f, factor=%.2f, projected_mb=%.1f, limit_mb=%d)",
+            operation,
+            query_id,
+            rss_mb,
+            df_mb,
+            _REJECT_DERIVE_WORKING_SET_FACTOR,
+            projected_rss_mb,
+            _REJECT_DERIVE_MAX_PROJECTED_RSS_MB,
+        )
+        raise MemoryError(
+            (
+                f"目前服務記憶體負載較高（RSS {rss_mb:.1f} MB），暫停{operation}計算以保護系統，"
+                "請稍後再試或縮小篩選條件"
+            )
+        )
+
+
+def _maybe_collect_after_interactive_compute() -> None:
+    if not _REJECT_DERIVE_FORCE_GC:
+        return
+    try:
+        gc.collect()
+    except Exception:
+        return
 
 
 # ============================================================
@@ -768,53 +857,57 @@ def apply_view(
     if df is None:
         return None
 
-    # Apply policy filters first (cache stores unfiltered data)
-    df = _apply_policy_filters(
-        df,
-        include_excluded_scrap=include_excluded_scrap,
-        exclude_material_scrap=exclude_material_scrap,
-        exclude_pb_diode=exclude_pb_diode,
-    )
+    _enforce_interactive_memory_guard(df, operation="視圖查詢", query_id=query_id)
+    try:
+        # Apply policy filters first (cache stores unfiltered data)
+        df = _apply_policy_filters(
+            df,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
+        )
 
-    filtered = _apply_supplementary_filters(
-        df,
-        packages=packages,
-        workcenter_groups=workcenter_groups,
-        reasons=reasons,
-        metric_filter=metric_filter,
-    )
+        filtered = _apply_supplementary_filters(
+            df,
+            packages=packages,
+            workcenter_groups=workcenter_groups,
+            reasons=reasons,
+            metric_filter=metric_filter,
+        )
 
-    # Analytics always uses full date range (supplementary-filtered only).
-    # The frontend derives trend from analytics_raw and filters Pareto by
-    # selectedTrendDates client-side.
-    analytics_raw = _derive_analytics_raw(filtered)
-    summary = _derive_summary_from_analytics(analytics_raw)
+        # Analytics always uses full date range (supplementary-filtered only).
+        # The frontend derives trend from analytics_raw and filters Pareto by
+        # selectedTrendDates client-side.
+        analytics_raw = _derive_analytics_raw(filtered)
+        summary = _derive_summary_from_analytics(analytics_raw)
 
-    # Detail list: additionally filter by detail_reason and trend_dates
-    detail_df = filtered
-    if trend_dates:
-        date_set = set(trend_dates)
-        detail_df = detail_df[
-            detail_df["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
-        ]
-    if detail_reason:
-        detail_df = detail_df[
-            detail_df["LOSSREASONNAME"].str.strip() == detail_reason.strip()
-        ]
-    detail_df = _apply_pareto_selection_filter(
-        detail_df,
-        pareto_dimension=pareto_dimension,
-        pareto_values=pareto_values,
-        pareto_selections=pareto_selections,
-    )
+        # Detail list: additionally filter by detail_reason and trend_dates
+        detail_df = filtered
+        if trend_dates:
+            date_set = set(trend_dates)
+            detail_df = detail_df[
+                detail_df["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
+            ]
+        if detail_reason:
+            detail_df = detail_df[
+                detail_df["LOSSREASONNAME"].str.strip() == detail_reason.strip()
+            ]
+        detail_df = _apply_pareto_selection_filter(
+            detail_df,
+            pareto_dimension=pareto_dimension,
+            pareto_values=pareto_values,
+            pareto_selections=pareto_selections,
+        )
 
-    detail_page = _paginate_detail(detail_df, page=page, per_page=per_page)
+        detail_page = _paginate_detail(detail_df, page=page, per_page=per_page)
 
-    return {
-        "analytics_raw": analytics_raw,
-        "summary": summary,
-        "detail": detail_page,
-    }
+        return {
+            "analytics_raw": analytics_raw,
+            "summary": summary,
+            "detail": detail_page,
+        }
+    finally:
+        _maybe_collect_after_interactive_compute()
 
 
 def _apply_supplementary_filters(
@@ -1306,7 +1399,11 @@ def compute_dimension_pareto(
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
 ) -> Optional[Dict[str, Any]]:
-    """Compute dimension pareto from cached DataFrame (no Oracle query)."""
+    """Compute dimension pareto from cached DataFrame (no Oracle query).
+
+    Prefers materialized Pareto snapshots when available, falling back to
+    legacy DataFrame-based computation on miss/stale/build-failure.
+    """
     metric_mode = _normalize_metric_mode(metric_mode)
     pareto_scope = _normalize_pareto_scope(pareto_scope)
     dimension = _normalize_text(dimension).lower() or "reason"
@@ -1315,55 +1412,86 @@ def compute_dimension_pareto(
             f"Invalid dimension, supported: {', '.join(sorted(_DIM_TO_DF_COLUMN.keys()))}"
         )
 
+    # ---- Materialized read-through path ------------------------------------
+    from mes_dashboard.services.reject_pareto_materialized import (
+        try_materialized_dimension_pareto,
+    )
+
+    mat_result, mat_meta = try_materialized_dimension_pareto(
+        query_id,
+        lambda: _get_cached_df(query_id),
+        dimension=dimension,
+        metric_mode=metric_mode,
+        pareto_scope=pareto_scope,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reasons=reasons,
+        trend_dates=trend_dates,
+    )
+    if mat_result is not None:
+        mat_result["_pareto_meta"] = mat_meta
+        return mat_result
+
+    # ---- Legacy DataFrame-based compute (fallback) -------------------------
     df = _get_cached_df(query_id)
     if df is None:
         return None
 
-    # Keep cache-based pareto behavior aligned with primary/view policy filters.
-    df = _apply_policy_filters(
-        df,
-        include_excluded_scrap=include_excluded_scrap,
-        exclude_material_scrap=exclude_material_scrap,
-        exclude_pb_diode=exclude_pb_diode,
-    )
-    if df is None or df.empty:
-        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
-
-    dim_col = _DIM_TO_DF_COLUMN.get(dimension)
-    if dim_col not in df.columns:
-        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
-
-    # Apply supplementary filters
-    filtered = _apply_supplementary_filters(
-        df,
-        packages=packages,
-        workcenter_groups=workcenter_groups,
-        reasons=reasons,
-    )
-    if filtered is None or filtered.empty:
-        return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
-
-    # Apply trend date filter
-    if trend_dates and "TXN_DAY" in filtered.columns:
-        date_set = set(trend_dates)
-        filtered = filtered[
-            filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
-        ]
-        if filtered.empty:
+    _enforce_interactive_memory_guard(df, operation="柏拉圖查詢", query_id=query_id)
+    try:
+        # Keep cache-based pareto behavior aligned with primary/view policy filters.
+        df = _apply_policy_filters(
+            df,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
+        )
+        if df is None or df.empty:
             return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
 
-    items = _build_dimension_pareto_items(
-        filtered,
-        dim_col=dim_col,
-        metric_mode=metric_mode,
-        pareto_scope=pareto_scope,
-    )
+        dim_col = _DIM_TO_DF_COLUMN.get(dimension)
+        if dim_col not in df.columns:
+            return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
 
-    return {
-        "items": items,
-        "dimension": dimension,
-        "metric_mode": metric_mode,
-    }
+        # Apply supplementary filters
+        filtered = _apply_supplementary_filters(
+            df,
+            packages=packages,
+            workcenter_groups=workcenter_groups,
+            reasons=reasons,
+        )
+        if filtered is None or filtered.empty:
+            return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
+
+        # Apply trend date filter
+        if trend_dates and "TXN_DAY" in filtered.columns:
+            date_set = set(trend_dates)
+            filtered = filtered[
+                filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
+            ]
+            if filtered.empty:
+                return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
+
+        items = _build_dimension_pareto_items(
+            filtered,
+            dim_col=dim_col,
+            metric_mode=metric_mode,
+            pareto_scope=pareto_scope,
+        )
+
+        result = {
+            "items": items,
+            "dimension": dimension,
+            "metric_mode": metric_mode,
+        }
+        if mat_meta:
+            result["_pareto_meta"] = mat_meta
+        return result
+    finally:
+        _maybe_collect_after_interactive_compute()
 
 
 def compute_batch_pareto(
@@ -1381,74 +1509,110 @@ def compute_batch_pareto(
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
 ) -> Optional[Dict[str, Any]]:
-    """Compute all six Pareto dimensions from cached DataFrame (no Oracle query)."""
+    """Compute all six Pareto dimensions from cached DataFrame (no Oracle query).
+
+    Prefers materialized Pareto snapshots when available, falling back to
+    legacy DataFrame-based computation on miss/stale/build-failure.
+    """
     metric_mode = _normalize_metric_mode(metric_mode)
     pareto_scope = _normalize_pareto_scope(pareto_scope)
     pareto_display_scope = _normalize_pareto_display_scope(pareto_display_scope)
     normalized_selections = _normalize_pareto_selections(pareto_selections)
 
+    # ---- Materialized read-through path ------------------------------------
+    from mes_dashboard.services.reject_pareto_materialized import (
+        try_materialized_batch_pareto,
+    )
+
+    mat_result, mat_meta = try_materialized_batch_pareto(
+        query_id,
+        lambda: _get_cached_df(query_id),
+        metric_mode=metric_mode,
+        pareto_scope=pareto_scope,
+        pareto_display_scope=pareto_display_scope,
+        pareto_selections=normalized_selections,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reasons=reasons,
+        trend_dates=trend_dates,
+    )
+    if mat_result is not None:
+        mat_result["_pareto_meta"] = mat_meta
+        return mat_result
+
+    # ---- Legacy DataFrame-based compute (fallback) -------------------------
     df = _get_cached_df(query_id)
     if df is None:
         return None
 
-    df = _apply_policy_filters(
-        df,
-        include_excluded_scrap=include_excluded_scrap,
-        exclude_material_scrap=exclude_material_scrap,
-        exclude_pb_diode=exclude_pb_diode,
-    )
-    if df is None or df.empty:
-        return {
-            "dimensions": {
-                dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
-                for dim in _PARETO_DIMENSIONS
-            }
-        }
-
-    filtered = _apply_supplementary_filters(
-        df,
-        packages=packages,
-        workcenter_groups=workcenter_groups,
-        reasons=reasons,
-    )
-    if filtered is None or filtered.empty:
-        return {
-            "dimensions": {
-                dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
-                for dim in _PARETO_DIMENSIONS
-            }
-        }
-
-    if trend_dates and "TXN_DAY" in filtered.columns:
-        date_set = set(trend_dates)
-        filtered = filtered[
-            filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
-        ]
-
-    dimensions: Dict[str, Dict[str, Any]] = {}
-    for dim in _PARETO_DIMENSIONS:
-        dim_col = _DIM_TO_DF_COLUMN.get(dim)
-        dim_df = _apply_cross_filter(filtered, normalized_selections, exclude_dim=dim)
-        items = _build_dimension_pareto_items(
-            dim_df,
-            dim_col=dim_col,
-            metric_mode=metric_mode,
-            pareto_scope=pareto_scope,
+    _enforce_interactive_memory_guard(df, operation="柏拉圖批次查詢", query_id=query_id)
+    try:
+        df = _apply_policy_filters(
+            df,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
         )
-        if pareto_display_scope == "top20" and dim in _PARETO_TOP20_DIMENSIONS:
-            items = items[:20]
-        dimensions[dim] = {
-            "items": items,
-            "dimension": dim,
-            "metric_mode": metric_mode,
-        }
+        if df is None or df.empty:
+            return {
+                "dimensions": {
+                    dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
+                    for dim in _PARETO_DIMENSIONS
+                }
+            }
 
-    return {
-        "dimensions": dimensions,
-        "metric_mode": metric_mode,
-        "pareto_scope": pareto_scope,
-        "pareto_display_scope": pareto_display_scope,
-    }
+        filtered = _apply_supplementary_filters(
+            df,
+            packages=packages,
+            workcenter_groups=workcenter_groups,
+            reasons=reasons,
+        )
+        if filtered is None or filtered.empty:
+            return {
+                "dimensions": {
+                    dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
+                    for dim in _PARETO_DIMENSIONS
+                }
+            }
+
+        if trend_dates and "TXN_DAY" in filtered.columns:
+            date_set = set(trend_dates)
+            filtered = filtered[
+                filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
+            ]
+
+        dimensions: Dict[str, Dict[str, Any]] = {}
+        for dim in _PARETO_DIMENSIONS:
+            dim_col = _DIM_TO_DF_COLUMN.get(dim)
+            dim_df = _apply_cross_filter(filtered, normalized_selections, exclude_dim=dim)
+            items = _build_dimension_pareto_items(
+                dim_df,
+                dim_col=dim_col,
+                metric_mode=metric_mode,
+                pareto_scope=pareto_scope,
+            )
+            if pareto_display_scope == "top20" and dim in _PARETO_TOP20_DIMENSIONS:
+                items = items[:20]
+            dimensions[dim] = {
+                "items": items,
+                "dimension": dim,
+                "metric_mode": metric_mode,
+            }
+
+        result = {
+            "dimensions": dimensions,
+            "metric_mode": metric_mode,
+            "pareto_scope": pareto_scope,
+            "pareto_display_scope": pareto_display_scope,
+        }
+        if mat_meta:
+            result["_pareto_meta"] = mat_meta
+        return result
+    finally:
+        _maybe_collect_after_interactive_compute()
 
 
 # ============================================================
@@ -1477,63 +1641,67 @@ def export_csv_from_cache(
     if df is None:
         return None
 
-    df = _apply_policy_filters(
-        df,
-        include_excluded_scrap=include_excluded_scrap,
-        exclude_material_scrap=exclude_material_scrap,
-        exclude_pb_diode=exclude_pb_diode,
-    )
-
-    filtered = _apply_supplementary_filters(
-        df,
-        packages=packages,
-        workcenter_groups=workcenter_groups,
-        reasons=reasons,
-        metric_filter=metric_filter,
-    )
-
-    if trend_dates:
-        date_set = set(trend_dates)
-        filtered = filtered[
-            filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
-        ]
-    if detail_reason and "LOSSREASONNAME" in filtered.columns:
-        filtered = filtered[
-            filtered["LOSSREASONNAME"].str.strip() == detail_reason.strip()
-        ]
-    filtered = _apply_pareto_selection_filter(
-        filtered,
-        pareto_dimension=pareto_dimension,
-        pareto_values=pareto_values,
-        pareto_selections=pareto_selections,
-    )
-
-    rows = []
-    for _, row in filtered.iterrows():
-        rows.append(
-            {
-                "LOT": _normalize_text(row.get("CONTAINERNAME")),
-                "WORKCENTER": _normalize_text(row.get("WORKCENTERNAME")),
-                "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
-                "Package": _normalize_text(row.get("PRODUCTLINENAME")),
-                "FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
-                "TYPE": _normalize_text(row.get("PJ_TYPE")),
-                "WORKFLOW": _normalize_text(row.get("WORKFLOWNAME")),
-                "PRODUCT": _normalize_text(row.get("PRODUCTNAME")),
-                "原因": _normalize_text(row.get("LOSSREASONNAME")),
-                "EQUIPMENT": _normalize_text(row.get("EQUIPMENTNAME")),
-                "COMMENT": _normalize_text(row.get("REJECTCOMMENT")),
-                "SPEC": _normalize_text(row.get("SPECNAME")),
-                "REJECT_QTY": _as_int(row.get("REJECT_QTY")),
-                "STANDBY_QTY": _as_int(row.get("STANDBY_QTY")),
-                "QTYTOPROCESS_QTY": _as_int(row.get("QTYTOPROCESS_QTY")),
-                "INPROCESS_QTY": _as_int(row.get("INPROCESS_QTY")),
-                "PROCESSED_QTY": _as_int(row.get("PROCESSED_QTY")),
-                "扣帳報廢量": _as_int(row.get("REJECT_TOTAL_QTY")),
-                "不扣帳報廢量": _as_int(row.get("DEFECT_QTY")),
-                "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
-                "報廢時間": _to_datetime_str(row.get("TXN_TIME")),
-                "日期": _to_date_str(row.get("TXN_DAY")),
-            }
+    _enforce_interactive_memory_guard(df, operation="CSV匯出", query_id=query_id)
+    try:
+        df = _apply_policy_filters(
+            df,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
         )
-    return rows
+
+        filtered = _apply_supplementary_filters(
+            df,
+            packages=packages,
+            workcenter_groups=workcenter_groups,
+            reasons=reasons,
+            metric_filter=metric_filter,
+        )
+
+        if trend_dates:
+            date_set = set(trend_dates)
+            filtered = filtered[
+                filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
+            ]
+        if detail_reason and "LOSSREASONNAME" in filtered.columns:
+            filtered = filtered[
+                filtered["LOSSREASONNAME"].str.strip() == detail_reason.strip()
+            ]
+        filtered = _apply_pareto_selection_filter(
+            filtered,
+            pareto_dimension=pareto_dimension,
+            pareto_values=pareto_values,
+            pareto_selections=pareto_selections,
+        )
+
+        rows = []
+        for _, row in filtered.iterrows():
+            rows.append(
+                {
+                    "LOT": _normalize_text(row.get("CONTAINERNAME")),
+                    "WORKCENTER": _normalize_text(row.get("WORKCENTERNAME")),
+                    "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
+                    "Package": _normalize_text(row.get("PRODUCTLINENAME")),
+                    "FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
+                    "TYPE": _normalize_text(row.get("PJ_TYPE")),
+                    "WORKFLOW": _normalize_text(row.get("WORKFLOWNAME")),
+                    "PRODUCT": _normalize_text(row.get("PRODUCTNAME")),
+                    "原因": _normalize_text(row.get("LOSSREASONNAME")),
+                    "EQUIPMENT": _normalize_text(row.get("EQUIPMENTNAME")),
+                    "COMMENT": _normalize_text(row.get("REJECTCOMMENT")),
+                    "SPEC": _normalize_text(row.get("SPECNAME")),
+                    "REJECT_QTY": _as_int(row.get("REJECT_QTY")),
+                    "STANDBY_QTY": _as_int(row.get("STANDBY_QTY")),
+                    "QTYTOPROCESS_QTY": _as_int(row.get("QTYTOPROCESS_QTY")),
+                    "INPROCESS_QTY": _as_int(row.get("INPROCESS_QTY")),
+                    "PROCESSED_QTY": _as_int(row.get("PROCESSED_QTY")),
+                    "扣帳報廢量": _as_int(row.get("REJECT_TOTAL_QTY")),
+                    "不扣帳報廢量": _as_int(row.get("DEFECT_QTY")),
+                    "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
+                    "報廢時間": _to_datetime_str(row.get("TXN_TIME")),
+                    "日期": _to_date_str(row.get("TXN_DAY")),
+                }
+            )
+        return rows
+    finally:
+        _maybe_collect_after_interactive_compute()

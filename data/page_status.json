@@ -30,8 +30,8 @@
       "route": "/reject-history",
       "name": "報廢歷史查詢",
       "status": "released",
-      "drawer_id": "drawer-2",
-      "order": 4
+      "drawer_id": "drawer",
+      "order": 1
     },
     {
       "route": "/wip-detail",
@@ -83,28 +83,28 @@
       "name": "設備維修查詢",
       "status": "released",
       "drawer_id": "drawer",
-      "order": 1
+      "order": 2
     },
     {
       "route": "/query-tool",
       "name": "批次追蹤工具",
       "status": "released",
-      "drawer_id": "drawer",
+      "drawer_id": "drawer-3",
       "order": 2
     },
     {
       "route": "/mid-section-defect",
       "name": "製程不良追溯分析",
       "status": "released",
-      "drawer_id": "drawer",
+      "drawer_id": "drawer-3",
       "order": 3
     },
     {
       "route": "/material-trace",
       "name": "原物料追溯查詢",
       "status": "released",
-      "drawer_id": "drawer",
-      "order": 4
+      "drawer_id": "drawer-3",
+      "order": 3
     },
     {
       "route": "/admin/pages",
@@ -151,6 +151,12 @@
       "id": "drawer-2",
       "name": "歷史報表",
       "order": 2,
+      "admin_only": false
+    },
+    {
+      "id": "drawer-3",
+      "name": "追溯工具",
+      "order": 4,
       "admin_only": false
     }
   ]
