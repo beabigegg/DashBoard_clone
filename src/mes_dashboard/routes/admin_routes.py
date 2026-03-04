@@ -373,6 +373,15 @@ def api_performance_detail():
         logger.warning("Failed to collect pareto materialization telemetry: %s", exc)
         pareto_materialization = {"error": str(exc)}
 
+    # ---- Worker memory guard telemetry ----
+    worker_memory_guard = None
+    try:
+        from mes_dashboard.core.worker_memory_guard import get_memory_guard_telemetry
+        worker_memory_guard = get_memory_guard_telemetry()
+    except Exception as exc:
+        logger.warning("Failed to collect worker memory guard telemetry: %s", exc)
+        worker_memory_guard = {"error": str(exc)}
+
     return jsonify({
         "success": True,
         "data": {
@@ -382,6 +391,7 @@ def api_performance_detail():
             "db_pool": db_pool,
             "direct_connections": direct_connections,
             "pareto_materialization": pareto_materialization,
+            "worker_memory_guard": worker_memory_guard,
         },
     })
 

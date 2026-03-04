@@ -452,6 +452,8 @@ def create_app(config_name: str | None = None) -> Flask:
             init_query_spool_cleanup(app)  # Start parquet spool cleanup worker
             from mes_dashboard.core.metrics_history import start_metrics_history
             start_metrics_history(app)  # Start metrics history collector
+            from mes_dashboard.core.worker_memory_guard import start_worker_memory_guard
+            start_worker_memory_guard()  # Start RSS memory guard
     _register_shutdown_hooks(app)
 
     # Register API routes

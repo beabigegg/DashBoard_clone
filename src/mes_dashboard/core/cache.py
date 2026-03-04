@@ -124,6 +124,22 @@ def get_all_process_cache_stats() -> dict[str, dict]:
     }
 
 
+def emergency_clear_all_process_caches() -> int:
+    """Clear all registered ProcessLevelCache instances (memory pressure relief).
+
+    Returns the number of caches cleared.
+    """
+    cleared = 0
+    for name, (_, inst) in _PROCESS_CACHE_REGISTRY.items():
+        if callable(getattr(inst, "clear", None)):
+            try:
+                inst.clear()
+                cleared += 1
+            except Exception:
+                pass
+    return cleared
+
+
 def _resolve_cache_max_size(env_name: str, default: int) -> int:
     value = os.getenv(env_name)
     if value is None:

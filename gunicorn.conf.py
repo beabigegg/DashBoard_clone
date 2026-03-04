@@ -23,7 +23,14 @@ max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "300"))
 
 def worker_exit(server, worker):
     """Clean up background threads and database connections when worker exits."""
-    # Stop background sync threads first
+    # Stop RSS memory guard first
+    try:
+        from mes_dashboard.core.worker_memory_guard import stop_worker_memory_guard
+        stop_worker_memory_guard()
+    except Exception as e:
+        server.log.warning(f"Error stopping worker memory guard: {e}")
+
+    # Stop background sync threads
     try:
         from mes_dashboard.services.realtime_equipment_cache import (
             stop_equipment_status_sync_worker

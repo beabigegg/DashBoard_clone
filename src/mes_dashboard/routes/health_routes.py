@@ -491,6 +491,21 @@ def health_check():
     )
     runtime_contract = build_runtime_contract_diagnostics(strict=False)
 
+    # Check worker memory pressure
+    try:
+        from mes_dashboard.core.worker_memory_guard import get_memory_guard_telemetry
+        mem_guard = get_memory_guard_telemetry()
+        if mem_guard and mem_guard.get("enabled"):
+            mem_level = mem_guard.get("level", "normal")
+            mem_pct = mem_guard.get("rss_pct", 0)
+            if mem_level == "evict" or mem_level == "restart":
+                warnings.append(f"Worker 記憶體壓力偏高（{mem_pct:.0f}%），已自動清空快取")
+                status = "degraded"
+            elif mem_level == "warn":
+                warnings.append(f"Worker 記憶體使用偏高（{mem_pct:.0f}%）")
+    except Exception:
+        pass
+
     # Check equipment status cache
     equipment_status_cache = get_equipment_status_cache_status()
     if equipment_status_cache.get('enabled') and not equipment_status_cache.get('loaded'):
