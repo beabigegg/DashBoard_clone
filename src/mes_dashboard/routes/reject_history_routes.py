@@ -38,6 +38,9 @@ logger = logging.getLogger("mes_dashboard.reject_history_routes")
 _REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS = int(
     os.getenv("REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS", "14400")
 )
+_REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS = max(
+    1, int(os.getenv("REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS", "183"))
+)
 
 _REJECT_HISTORY_LIST_RATE_LIMIT = configured_rate_limit(
     bucket="reject-history-list",
@@ -60,6 +63,22 @@ def _default_date_range() -> tuple[str, str]:
     end = date.today()
     start = end - timedelta(days=29)
     return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+
+def _validate_primary_query_date_range(start_date: str, end_date: str) -> Optional[str]:
+    try:
+        start = date.fromisoformat(start_date)
+        end = date.fromisoformat(end_date)
+    except ValueError:
+        return "start_date / end_date 日期格式需為 YYYY-MM-DD"
+
+    if end < start:
+        return "結束日期必須大於起始日期"
+
+    range_days = (end - start).days + 1
+    if range_days > _REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS:
+        return f"查詢範圍不可超過 {_REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS} 天（最多半年）"
+    return None
 
 
 def _parse_date_range(required: bool = True) -> tuple[Optional[str], Optional[str], Optional[tuple[dict, int]]]:
@@ -133,6 +152,8 @@ _PARETO_SELECTION_PARAMS = {
     "workcenter": "sel_workcenter",
     "equipment": "sel_equipment",
 }
+_REJECT_PARETO_SCOPE_FIXED = "top80"
+_REJECT_BATCH_PARETO_DISPLAY_SCOPE_FIXED = "top20"
 
 
 def _parse_common_bools() -> tuple[Optional[tuple[dict, int]], bool, bool, bool]:
@@ -333,7 +354,7 @@ def api_reject_history_reason_pareto():
         return jsonify(bool_error[0]), bool_error[1]
 
     metric_mode = request.args.get("metric_mode", "reject_total").strip().lower() or "reject_total"
-    pareto_scope = request.args.get("pareto_scope", "top80").strip().lower() or "top80"
+    pareto_scope = _REJECT_PARETO_SCOPE_FIXED
     dimension = request.args.get("dimension", "reason").strip().lower() or "reason"
     query_id = request.args.get("query_id", "").strip()
 
@@ -400,8 +421,8 @@ def api_reject_history_batch_pareto():
         return jsonify(bool_error[0]), bool_error[1]
 
     metric_mode = request.args.get("metric_mode", "reject_total").strip().lower() or "reject_total"
-    pareto_scope = request.args.get("pareto_scope", "top80").strip().lower() or "top80"
-    pareto_display_scope = request.args.get("pareto_display_scope", "all").strip().lower() or "all"
+    pareto_scope = _REJECT_PARETO_SCOPE_FIXED
+    pareto_display_scope = _REJECT_BATCH_PARETO_DISPLAY_SCOPE_FIXED
 
     try:
         result = compute_batch_pareto(
@@ -587,6 +608,12 @@ def api_reject_history_query():
             kwargs["end_date"] = str(body.get("end_date", "")).strip()
             if not kwargs["start_date"] or not kwargs["end_date"]:
                 return jsonify({"success": False, "error": "date_range mode 需要 start_date 和 end_date"}), 400
+            date_range_error = _validate_primary_query_date_range(
+                kwargs["start_date"],
+                kwargs["end_date"],
+            )
+            if date_range_error:
+                return jsonify({"success": False, "error": date_range_error}), 400
         else:
             kwargs["container_input_type"] = str(body.get("container_input_type", "lot")).strip()
             container_values = body.get("container_values", [])

@@ -173,6 +173,92 @@ def test_apply_view_and_export_share_same_pareto_multi_select_filter(monkeypatch
     assert len(export_rows) == 2
 
 
+def test_apply_view_prefers_cache_sql_before_legacy(monkeypatch):
+    from mes_dashboard.services import reject_cache_sql_runtime as sql_runtime
+
+    sql_payload = {
+        "analytics_raw": [{"bucket_date": "2026-02-01", "reason": "001_A"}],
+        "summary": {"MOVEIN_QTY": 100},
+        "detail": {
+            "items": [{"CONTAINERNAME": "LOT-001"}],
+            "pagination": {"page": 1, "perPage": 50, "total": 1, "totalPages": 1},
+        },
+    }
+    monkeypatch.setattr(
+        sql_runtime,
+        "try_compute_view_from_spool",
+        lambda **kwargs: (dict(sql_payload), {"view_source": "cache_sql"}),
+    )
+
+    def _fail_if_legacy(*_args, **_kwargs):
+        raise AssertionError("legacy DataFrame fallback should not be used")
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", _fail_if_legacy)
+
+    result = cache_svc.apply_view(query_id="qid-view-sql-first")
+    assert result["detail"]["pagination"]["total"] == 1
+    assert result["detail"]["items"][0]["CONTAINERNAME"] == "LOT-001"
+
+
+def test_apply_view_fail_fast_when_cache_sql_unavailable_and_legacy_disabled(monkeypatch):
+    from mes_dashboard.services import reject_cache_sql_runtime as sql_runtime
+
+    monkeypatch.setattr(
+        sql_runtime,
+        "try_compute_view_from_spool",
+        lambda **kwargs: (None, {"view_sql_fallback_reason": "cache_sql_spool_miss"}),
+    )
+    monkeypatch.setattr(
+        cache_svc,
+        "_REJECT_CACHE_SQL_VIEW_FALLBACK_LEGACY_ENABLED",
+        False,
+    )
+
+    with pytest.raises(RuntimeError, match="cache-sql view unavailable"):
+        cache_svc.apply_view(query_id="qid-view-fail-fast")
+
+
+def test_export_csv_from_cache_prefers_cache_sql_stream_before_legacy(monkeypatch):
+    from mes_dashboard.services import reject_cache_sql_runtime as sql_runtime
+
+    sql_rows = iter([
+        {"LOT": "LOT-001", "TYPE": "TYPE-A"},
+        {"LOT": "LOT-002", "TYPE": "TYPE-B"},
+    ])
+    monkeypatch.setattr(
+        sql_runtime,
+        "try_iter_export_rows_from_spool",
+        lambda **kwargs: (sql_rows, {"export_source": "cache_sql"}),
+    )
+
+    def _fail_if_legacy(*_args, **_kwargs):
+        raise AssertionError("legacy DataFrame fallback should not be used")
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", _fail_if_legacy)
+
+    rows = list(cache_svc.export_csv_from_cache(query_id="qid-export-sql-first") or [])
+    assert len(rows) == 2
+    assert rows[0]["LOT"] == "LOT-001"
+
+
+def test_export_csv_from_cache_fail_fast_when_cache_sql_unavailable_and_legacy_disabled(monkeypatch):
+    from mes_dashboard.services import reject_cache_sql_runtime as sql_runtime
+
+    monkeypatch.setattr(
+        sql_runtime,
+        "try_iter_export_rows_from_spool",
+        lambda **kwargs: (None, {"export_sql_fallback_reason": "cache_sql_spool_miss"}),
+    )
+    monkeypatch.setattr(
+        cache_svc,
+        "_REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED",
+        False,
+    )
+
+    with pytest.raises(RuntimeError, match="cache-sql export unavailable"):
+        cache_svc.export_csv_from_cache(query_id="qid-export-fail-fast")
+
+
 def test_apply_view_rejects_invalid_pareto_dimension(monkeypatch):
     df = _build_detail_filter_df()
     monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _query_id: df)
@@ -283,6 +369,126 @@ def test_compute_batch_pareto_applies_cross_filter_exclude_self(monkeypatch):
     assert [item["reason"] for item in package_items] == ["PKG-2"]
 
 
+def test_compute_batch_pareto_prefers_cache_sql_before_legacy(monkeypatch):
+    from mes_dashboard.services import reject_cache_sql_runtime as sql_runtime
+    from mes_dashboard.services import reject_pareto_materialized as mat_runtime
+
+    monkeypatch.setattr(
+        mat_runtime,
+        "try_materialized_batch_pareto",
+        lambda *args, **kwargs: (None, {"pareto_source": "legacy", "pareto_fallback_reason": "miss"}),
+    )
+
+    sql_result = {
+        "dimensions": {
+            "reason": {"items": [{"reason": "R-A", "metric_value": 10}], "dimension": "reason", "metric_mode": "reject_total"},
+            "package": {"items": [], "dimension": "package", "metric_mode": "reject_total"},
+            "type": {"items": [], "dimension": "type", "metric_mode": "reject_total"},
+            "workflow": {"items": [], "dimension": "workflow", "metric_mode": "reject_total"},
+            "workcenter": {"items": [], "dimension": "workcenter", "metric_mode": "reject_total"},
+            "equipment": {"items": [], "dimension": "equipment", "metric_mode": "reject_total"},
+        },
+        "metric_mode": "reject_total",
+        "pareto_scope": "all",
+        "pareto_display_scope": "top20",
+    }
+    monkeypatch.setattr(
+        sql_runtime,
+        "try_compute_batch_pareto_from_spool",
+        lambda **kwargs: (dict(sql_result), {"pareto_source": "cache_sql"}),
+    )
+
+    def _fail_if_legacy(*_args, **_kwargs):
+        raise AssertionError("legacy DataFrame fallback should not be used")
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", _fail_if_legacy)
+
+    result = cache_svc.compute_batch_pareto(
+        query_id="qid-cache-sql-first",
+        metric_mode="reject_total",
+        pareto_scope="all",
+        pareto_display_scope="top20",
+    )
+
+    assert result is not None
+    assert result["dimensions"]["reason"]["items"][0]["reason"] == "R-A"
+    assert result["_pareto_meta"]["pareto_source"] == "cache_sql"
+    assert result["_pareto_meta"]["pareto_fallback_reason"] == "miss"
+
+
+def test_compute_batch_pareto_falls_back_to_legacy_when_cache_sql_unavailable(monkeypatch):
+    from mes_dashboard.services import reject_cache_sql_runtime as sql_runtime
+    from mes_dashboard.services import reject_pareto_materialized as mat_runtime
+
+    monkeypatch.setattr(
+        mat_runtime,
+        "try_materialized_batch_pareto",
+        lambda *args, **kwargs: (None, {"pareto_source": "legacy", "pareto_fallback_reason": "miss"}),
+    )
+    monkeypatch.setattr(
+        sql_runtime,
+        "try_compute_batch_pareto_from_spool",
+        lambda **kwargs: (
+            None,
+            {
+                "pareto_source": "legacy",
+                "pareto_sql_fallback_reason": "cache_sql_spool_miss",
+            },
+        ),
+    )
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _query_id: _build_detail_filter_df())
+    monkeypatch.setattr(
+        "mes_dashboard.services.scrap_reason_exclusion_cache.get_excluded_reasons",
+        lambda: [],
+    )
+
+    result = cache_svc.compute_batch_pareto(
+        query_id="qid-cache-sql-fallback",
+        metric_mode="reject_total",
+        pareto_scope="all",
+        pareto_display_scope="top20",
+    )
+
+    assert result is not None
+    assert result["dimensions"]["reason"]["items"]
+    assert result["_pareto_meta"]["pareto_sql_fallback_reason"] == "cache_sql_spool_miss"
+
+
+def test_compute_batch_pareto_fail_fast_when_cache_sql_unavailable_and_legacy_disabled(monkeypatch):
+    from mes_dashboard.services import reject_cache_sql_runtime as sql_runtime
+    from mes_dashboard.services import reject_pareto_materialized as mat_runtime
+
+    monkeypatch.setattr(
+        mat_runtime,
+        "try_materialized_batch_pareto",
+        lambda *args, **kwargs: (None, {"pareto_source": "legacy", "pareto_fallback_reason": "miss"}),
+    )
+    monkeypatch.setattr(
+        sql_runtime,
+        "try_compute_batch_pareto_from_spool",
+        lambda **kwargs: (
+            None,
+            {
+                "pareto_source": "legacy",
+                "pareto_sql_fallback_reason": "cache_sql_spool_miss",
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        cache_svc,
+        "_REJECT_CACHE_SQL_BATCH_PARETO_FALLBACK_LEGACY_ENABLED",
+        False,
+    )
+
+    with pytest.raises(RuntimeError, match="cache-sql batch-pareto unavailable"):
+        cache_svc.compute_batch_pareto(
+            query_id="qid-cache-sql-fail-fast",
+            metric_mode="reject_total",
+            pareto_scope="all",
+            pareto_display_scope="top20",
+        )
+
+
 def test_compute_batch_pareto_memory_guard_rejects_large_cached_dataset(monkeypatch):
     df = _build_detail_filter_df()
 
@@ -296,6 +502,62 @@ def test_compute_batch_pareto_memory_guard_rejects_large_cached_dataset(monkeypa
             metric_mode="reject_total",
             pareto_scope="all",
         )
+
+
+def test_compute_batch_pareto_memory_guard_allows_after_filter_narrowing(monkeypatch):
+    df = _build_detail_filter_df()
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _query_id: df)
+    monkeypatch.setattr(
+        cache_svc,
+        "_df_memory_mb",
+        lambda frame: 128.0 if len(frame.index) > 1 else 16.0,
+    )
+    monkeypatch.setattr(cache_svc, "_REJECT_DERIVE_MAX_INPUT_MB", 64)
+
+    result = cache_svc.compute_batch_pareto(
+        query_id="qid-batch-mem-filtered",
+        metric_mode="reject_total",
+        pareto_scope="all",
+        packages=["PKG-A"],
+    )
+
+    assert result is not None
+    assert "dimensions" in result
+
+
+def test_compute_batch_pareto_memory_guard_uses_compacted_pareto_frame(monkeypatch):
+    df = _build_detail_filter_df()
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _query_id: df)
+
+    dim_cols = {
+        "LOSSREASONNAME",
+        "PRODUCTLINENAME",
+        "PJ_TYPE",
+        "WORKFLOWNAME",
+        "WORKCENTER_GROUP",
+        "PRIMARY_EQUIPMENTNAME",
+    }
+
+    def fake_df_memory_mb(frame):
+        has_object_dim = any(
+            col in frame.columns and str(frame[col].dtype) == "object"
+            for col in dim_cols
+        )
+        return 128.0 if has_object_dim else 16.0
+
+    monkeypatch.setattr(cache_svc, "_df_memory_mb", fake_df_memory_mb)
+    monkeypatch.setattr(cache_svc, "_REJECT_DERIVE_MAX_INPUT_MB", 64)
+
+    result = cache_svc.compute_batch_pareto(
+        query_id="qid-batch-mem-compact",
+        metric_mode="reject_total",
+        pareto_scope="all",
+    )
+
+    assert result is not None
+    assert "dimensions" in result
 
 
 def test_apply_pareto_selection_filter_supports_multi_dimension_and_logic():
@@ -416,27 +678,19 @@ class TestEngineDecompositionDateRange:
         assert engine_calls["parallel"] == cache_svc._REJECT_ENGINE_PARALLEL
         assert engine_calls["max_rows_per_chunk"] == cache_svc._REJECT_ENGINE_MAX_ROWS_PER_CHUNK
 
-    def test_engine_chunk_uses_paged_fetch_without_truncation(self, monkeypatch):
-        """Engine chunk should fetch all pages (offset paging), not truncate at page size."""
+    def test_engine_chunk_uses_primary_sql_without_offset_limit(self, monkeypatch):
+        """Engine chunk should execute once via primary SQL without list pagination binds."""
         import mes_dashboard.services.batch_query_engine as engine_mod
 
-        offsets = []
-        captured = {"df": pd.DataFrame(), "merge_kwargs": None}
+        captured = {"df": pd.DataFrame(), "merge_kwargs": None, "params": None, "sql_name": None}
 
         def fake_read_sql(sql, params):
-            offset = int(params.get("offset", 0))
-            limit = int(params.get("limit", 0))
-            offsets.append(offset)
-            total_rows = 5
-            remaining = max(total_rows - offset, 0)
-            take = min(limit, remaining)
-            if take <= 0:
-                return pd.DataFrame()
+            captured["params"] = dict(params or {})
             return pd.DataFrame(
                 {
-                    "CONTAINERID": [f"C{offset + i}" for i in range(take)],
-                    "LOSSREASONNAME": ["R1"] * take,
-                    "REJECT_TOTAL_QTY": [1] * take,
+                    "CONTAINERID": [f"C{i}" for i in range(5)],
+                    "LOSSREASONNAME": ["R1"] * 5,
+                    "REJECT_TOTAL_QTY": [1] * 5,
                 }
             )
 
@@ -460,7 +714,6 @@ class TestEngineDecompositionDateRange:
         monkeypatch.setattr(engine_mod, "merge_chunks", fake_merge_chunks)
         monkeypatch.setattr(cache_svc, "read_sql_df", fake_read_sql)
         monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
-        monkeypatch.setattr(cache_svc, "_prepare_sql", lambda *a, **kw: "SELECT 1 FROM dual")
         monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
         monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
         monkeypatch.setattr(cache_svc, "_apply_policy_filters", lambda df, **kw: df)
@@ -471,6 +724,11 @@ class TestEngineDecompositionDateRange:
             "_build_primary_response",
             lambda qid, df, meta, ri: {"query_id": qid, "rows": len(df)},
         )
+        monkeypatch.setattr(
+            cache_svc,
+            "_prepare_sql",
+            lambda name, **kw: captured.update({"sql_name": name}) or "SELECT 1 FROM dual",
+        )
 
         result = cache_svc.execute_primary_query(
             mode="date_range",
@@ -479,8 +737,49 @@ class TestEngineDecompositionDateRange:
         )
 
         assert result["rows"] == 5
-        assert offsets == [0, 2, 4]
+        assert captured["sql_name"] == cache_svc._REJECT_PRIMARY_SQL_TEMPLATE
+        assert "offset" not in (captured["params"] or {})
+        assert "limit" not in (captured["params"] or {})
         assert captured["merge_kwargs"] == {}
+
+    def test_direct_path_uses_primary_sql_without_offset_limit(self, monkeypatch):
+        """Direct path should execute dedicated primary SQL without list pagination binds."""
+        import mes_dashboard.services.batch_query_engine as engine_mod
+
+        captured = {"params": None, "sql_name": None}
+
+        monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *_a, **_kw: False)
+        monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
+        monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+        monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
+        monkeypatch.setattr(cache_svc, "_apply_policy_filters", lambda df, **kw: df)
+        monkeypatch.setattr(cache_svc, "_store_query_result", lambda *_a, **_kw: None)
+        monkeypatch.setattr(
+            cache_svc,
+            "_build_primary_response",
+            lambda qid, df, meta, ri: {"query_id": qid, "rows": len(df)},
+        )
+        monkeypatch.setattr(
+            cache_svc,
+            "_prepare_sql",
+            lambda name, **kw: captured.update({"sql_name": name}) or "SELECT 1 FROM dual",
+        )
+
+        def fake_read_sql(_sql, params):
+            captured["params"] = dict(params or {})
+            return pd.DataFrame({"CONTAINERID": ["C1"]})
+
+        monkeypatch.setattr(cache_svc, "read_sql_df", fake_read_sql)
+
+        result = cache_svc.execute_primary_query(
+            mode="date_range",
+            start_date="2025-01-01",
+            end_date="2025-01-10",
+        )
+
+        assert result["rows"] == 1
+        assert captured["sql_name"] == cache_svc._REJECT_PRIMARY_SQL_TEMPLATE
+        assert captured["params"] == {"start_date": "2025-01-01", "end_date": "2025-01-10"}
 
     def test_short_range_skips_engine(self, monkeypatch):
         """Short date range (<= threshold) uses direct path, no engine."""

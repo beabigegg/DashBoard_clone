@@ -279,6 +279,7 @@ def test_query_list_pagination_and_caps(monkeypatch):
     captured = {}
 
     def _fake_read_sql_df(_sql, params=None):
+        captured["sql"] = _sql
         captured["params"] = dict(params or {})
         return pd.DataFrame(
             [
@@ -328,6 +329,8 @@ def test_query_list_pagination_and_caps(monkeypatch):
     assert captured["params"]["offset"] == 200
     assert captured["params"]["limit"] == 200
     assert "PKG1" in captured["params"].values()
+    assert "COUNT(*) OVER () AS TOTAL_COUNT" in captured["sql"]
+    assert "OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY" in captured["sql"]
 
 
 def test_export_csv_contains_semantic_headers(monkeypatch):

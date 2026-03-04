@@ -98,5 +98,28 @@
   - `:end_date = TRUNC(SYSDATE - 1)`
 - 每月第一天補跑前 31 天，避免補數漏失。
 
+## Cache-SQL Rollout（DuckDB）
+- 階段順序：`batch-pareto -> view -> export-cached`
+- 預設全開：
+  - `REJECT_CACHE_SQL_ENABLED=true`
+  - `REJECT_CACHE_SQL_BATCH_PARETO_ENABLED=true`
+  - `REJECT_CACHE_SQL_VIEW_ENABLED=true`
+  - `REJECT_CACHE_SQL_EXPORT_ENABLED=true`
+- 回退策略（預設回退 legacy）：
+  - `REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED=true`
+  - 可用 endpoint 級旗標單獨控制 `*_FALLBACK_LEGACY_ENABLED`
+- 灰度建議：
+  - 先只開 `batch-pareto`，觀察 `pareto_source` 與 fallback reason
+  - 再開 `view`，確認 `detail.pagination` 與舊版一致
+  - 最後開 `export-cached`，確認 CSV 欄位/筆數與 view detail 篩選範圍一致
+
+## 驗證清單（前端提示與匯出一致性）
+- 前端「柏拉圖顯示限制（80%/Top20）」僅影響畫面顯示，不影響明細與匯出範圍。
+- 使用相同 `query_id + filters` 比對：
+  - `GET /api/reject-history/view` 的 `detail.pagination.total`
+  - `GET /api/reject-history/export-cached` 的匯出總筆數
+  - 兩者應一致（display-only truncation 不得裁掉 export row）。
+- 若觸發 cache-SQL fail-fast（`*_FALLBACK_LEGACY_ENABLED=false`），前端需提示使用者重試或縮小條件。
+
 ## 已知環境備註
 - `tests/test_navigation_contract.py` 需要 `docs/migration/portal-no-iframe/baseline_drawer_visibility.json`。目前工作區缺少此 baseline 檔案，屬既有環境缺口，與本次 reject-history 開發內容無直接耦合。

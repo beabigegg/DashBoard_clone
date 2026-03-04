@@ -167,6 +167,7 @@ check_dependencies() {
     python -c "import gunicorn" 2>/dev/null || missing+=("gunicorn")
     python -c "import pandas" 2>/dev/null || missing+=("pandas")
     python -c "import oracledb" 2>/dev/null || missing+=("oracledb")
+    python -c "import duckdb" 2>/dev/null || missing+=("duckdb")
 
     if [ ${#missing[@]} -gt 0 ]; then
         log_error "Missing dependencies: ${missing[*]}"

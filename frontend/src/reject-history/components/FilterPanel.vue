@@ -12,7 +12,7 @@ const props = defineProps({
   resolutionInfo: { type: Object, default: null },
   loading: { type: Object, required: true },
   activeFilterChips: { type: Array, default: () => [] },
-  paretoDisplayScope: { type: String, default: 'all' },
+  primaryQueryMaxDays: { type: Number, default: 183 },
 });
 
 const emit = defineEmits([
@@ -20,8 +20,6 @@ const emit = defineEmits([
   'clear',
   'export-csv',
   'remove-chip',
-  'pareto-scope-toggle',
-  'pareto-display-scope-change',
   'update:queryMode',
   'update:containerInputType',
   'update:containerInput',
@@ -81,6 +79,9 @@ function emitSupplementary(patch) {
             type="date"
             class="filter-input"
           />
+        </div>
+        <div class="filter-group-full date-limit-hint">
+          日期區間最多 {{ primaryQueryMaxDays }} 天（半年）。超過請改用較短區間分次查詢。
         </div>
       </template>
 
@@ -185,23 +186,10 @@ function emitSupplementary(patch) {
     <div v-if="queryId" class="supplementary-panel">
       <div class="supplementary-header">補充篩選 (快取內篩選)</div>
       <div class="supplementary-toolbar">
-        <label class="checkbox-pill">
-          <input
-            :checked="filters.paretoTop80"
-            type="checkbox"
-            @change="$emit('pareto-scope-toggle', $event.target.checked)"
-          />
-          Pareto 僅顯示累計前 80%
-        </label>
-        <label class="filter-label">顯示範圍</label>
-        <select
-          class="dimension-select pareto-scope-select"
-          :value="paretoDisplayScope"
-          @change="$emit('pareto-display-scope-change', $event.target.value)"
-        >
-          <option value="all">全部顯示</option>
-          <option value="top20">只顯示 TOP 20</option>
-        </select>
+        <div class="pareto-fixed-note">
+          Pareto 固定累計前 80%，且 TYPE / WORKFLOW / EQUIPMENT 僅顯示 TOP 20。
+          明細與匯出 CSV 仍保留完整篩選結果，不受此顯示限制影響。
+        </div>
       </div>
       <div class="supplementary-row">
         <div class="filter-group">

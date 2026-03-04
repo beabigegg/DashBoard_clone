@@ -335,6 +335,31 @@ def load_spooled_df(namespace: str, query_id: str) -> Optional[pd.DataFrame]:
     return df
 
 
+def get_spool_file_path(namespace: str, query_id: str) -> Optional[str]:
+    """Resolve spool parquet path for query_id without loading DataFrame."""
+    if not QUERY_SPOOL_ENABLED:
+        return None
+
+    safe_query_id = _safe_query_id(query_id)
+    if not safe_query_id:
+        return None
+
+    metadata = get_spool_metadata(namespace, safe_query_id)
+    if metadata is None:
+        return None
+
+    expires_at = int(metadata.get("expires_at") or 0)
+    if expires_at and expires_at <= int(time.time()):
+        clear_spooled_df(namespace, safe_query_id)
+        return None
+
+    path = _path_from_relative(str(metadata.get("relative_path") or ""))
+    if path is None or not path.exists():
+        clear_spooled_df(namespace, safe_query_id, remove_file=False)
+        return None
+    return str(path)
+
+
 def clear_spooled_df(namespace: str, query_id: str, *, remove_file: bool = True) -> None:
     safe_query_id = _safe_query_id(query_id)
     if not safe_query_id:

@@ -2,7 +2,6 @@
 
 ## Purpose
 Batch query engine resilience features: failed chunk range tracking, transient error retry, and partial failure metadata propagation to API consumers.
-
 ## Requirements
 ### Requirement: BatchQueryEngine SHALL track failed chunk time ranges in progress metadata
 The engine SHALL record the time ranges of failed chunks in Redis progress metadata so consumers can report which date intervals have missing data.
@@ -84,3 +83,28 @@ The cache service SHALL read batch execution metadata and include partial failur
 - **THEN** the partial failure flag SHALL be stored with TTL equal to `_REJECT_ENGINE_SPOOL_TTL_SECONDS` (default 21600 seconds)
 - **WHEN** partial failure is detected and the query result is stored in L1/L2 Redis cache
 - **THEN** the partial failure flag SHALL be stored with TTL equal to `_CACHE_TTL` (default 900 seconds)
+
+### Requirement: reject_dataset_cache batch primary execution SHALL avoid paginated replay loops
+Batch chunk execution for reject-history primary query SHALL avoid page-by-page replay against paginated list SQL semantics.
+
+#### Scenario: Chunk execution avoids offset iteration
+- **WHEN** batch engine executes a reject-history chunk in `execute_primary_query()`
+- **THEN** chunk execution SHALL NOT iterate through `offset` pages to assemble full chunk data
+- **THEN** chunk execution SHALL retrieve chunk data via the dedicated primary SQL path
+
+#### Scenario: Chunk bind contract excludes pagination parameters
+- **WHEN** chunk query parameters are prepared for batch execution
+- **THEN** `offset` and `limit` SHALL NOT be required bind variables for normal chunk retrieval
+
+### Requirement: Partial-failure resilience SHALL remain intact after source decoupling
+Decoupling from paginated list SQL SHALL NOT regress partial-failure metadata behavior.
+
+#### Scenario: Failed chunks still produce partial-failure metadata
+- **WHEN** one or more reject-history chunks fail during batch execution
+- **THEN** response `meta` SHALL still report partial-failure indicators according to existing resilience contract
+
+#### Scenario: Successful chunks still merge and continue
+- **WHEN** some chunks succeed and others fail
+- **THEN** the system SHALL continue to merge successful chunks and return partial results
+- **THEN** progress metadata SHALL remain available for diagnostics
+

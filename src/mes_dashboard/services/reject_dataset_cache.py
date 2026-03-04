@@ -16,12 +16,13 @@ import hashlib
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
+from mes_dashboard.core.feature_flags import resolve_bool_flag
 from mes_dashboard.core.query_spool_store import (
     clear_spooled_df,
     load_spooled_df,
@@ -67,6 +68,7 @@ _CACHE_TTL = 900  # 15 minutes
 _CACHE_MAX_SIZE = 8
 _REDIS_NAMESPACE = "reject_dataset"
 _CACHE_SCHEMA_VERSION = 4
+_REJECT_PRIMARY_SQL_TEMPLATE = "primary"
 _REJECT_ENGINE_GRAIN_DAYS = max(1, int(os.getenv("REJECT_ENGINE_GRAIN_DAYS", "10")))
 _REJECT_ENGINE_PARALLEL = max(1, int(os.getenv("REJECT_ENGINE_PARALLEL", "1")))
 _REJECT_ENGINE_MAX_ROWS_PER_CHUNK = max(
@@ -103,9 +105,29 @@ _REJECT_DERIVE_FORCE_GC = os.getenv("REJECT_DERIVE_FORCE_GC", "true").strip().lo
     "yes",
     "on",
 }
+_REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
+    "REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED",
+    default=True,
+)
+_REJECT_CACHE_SQL_BATCH_PARETO_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
+    "REJECT_CACHE_SQL_BATCH_PARETO_FALLBACK_LEGACY_ENABLED",
+    default=True,
+)
+_REJECT_CACHE_SQL_VIEW_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
+    "REJECT_CACHE_SQL_VIEW_FALLBACK_LEGACY_ENABLED",
+    default=True,
+)
+_REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
+    "REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED",
+    default=True,
+)
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("reject_dataset", _dataset_cache, "Reject Dataset (L1, 15min)")
+
+
+def _allow_legacy_fallback(flag_enabled: bool) -> bool:
+    return bool(_REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED and flag_enabled)
 
 
 # ============================================================
@@ -588,15 +610,14 @@ def execute_primary_query(
         # --- Engine path ---
         engine_hash = compute_query_hash(query_id_input)
         redis_clear_batch("reject", engine_hash)
+        logger.info(
+            "Reject primary SQL selected for engine execution (template=%s, chunks=%d)",
+            _REJECT_PRIMARY_SQL_TEMPLATE,
+            len(engine_chunks),
+        )
 
         def _run_reject_chunk(chunk, max_rows_per_chunk=None):
-            """Execute one chunk of the reject query via read_sql_df_slow.
-
-            NOTE:
-                `max_rows_per_chunk` is used as paging size per Oracle roundtrip,
-                not a hard cap. We continue fetching until a page returns less
-                than page size, so chunk results are complete (no truncation).
-            """
+            """Execute one reject chunk via dedicated primary SQL."""
             chunk_where_parts: List[str] = []
             chunk_params: Dict[str, Any] = {}
             chunk_wf_filter = ""
@@ -630,35 +651,22 @@ def execute_primary_query(
 
             chunk_where = " AND ".join(chunk_where_parts)
             chunk_sql = _prepare_sql(
-                "list",
+                _REJECT_PRIMARY_SQL_TEMPLATE,
                 where_clause="",
                 base_variant="lot",
                 base_where=chunk_where,
                 workflow_filter=chunk_wf_filter,
             )
-            page_size = int(max_rows_per_chunk) if max_rows_per_chunk else 500000
-            page_size = max(page_size, 1)
-            offset = 0
-            frames: List[pd.DataFrame] = []
-
-            while True:
-                page_params = dict(chunk_params)
-                page_params["offset"] = offset
-                page_params["limit"] = page_size
-                page_df = read_sql_df(chunk_sql, page_params)
-                if page_df is None or page_df.empty:
-                    break
-                frames.append(page_df)
-                fetched = len(page_df)
-                if fetched < page_size:
-                    break
-                offset += page_size
-
-            if not frames:
+            if max_rows_per_chunk:
+                logger.debug(
+                    "Reject chunk execution ignores max_rows_per_chunk on primary SQL path "
+                    "(max_rows_per_chunk=%s)",
+                    max_rows_per_chunk,
+                )
+            chunk_df = read_sql_df(chunk_sql, chunk_params)
+            if chunk_df is None:
                 return pd.DataFrame()
-            if len(frames) == 1:
-                return frames[0]
-            return pd.concat(frames, ignore_index=True)
+            return chunk_df
 
         execute_plan(
             engine_chunks,
@@ -708,15 +716,18 @@ def execute_primary_query(
             }
     else:
         # --- Direct path (short query, no engine overhead) ---
+        logger.info(
+            "Reject primary SQL selected for direct execution (template=%s)",
+            _REJECT_PRIMARY_SQL_TEMPLATE,
+        )
         sql = _prepare_sql(
-            "list",
+            _REJECT_PRIMARY_SQL_TEMPLATE,
             where_clause="",
             base_variant="lot",
             base_where=base_where,
             workflow_filter=workflow_filter,
         )
-        all_params = {**base_params, "offset": 0, "limit": 500000}
-        df = read_sql_df(sql, all_params)
+        df = read_sql_df(sql, base_params)
         if df is None:
             df = pd.DataFrame()
 
@@ -853,6 +864,54 @@ def apply_view(
     exclude_pb_diode: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """Read cache → apply filters → return derived data. Returns None if expired."""
+    from mes_dashboard.services.reject_cache_sql_runtime import (
+        try_compute_view_from_spool,
+    )
+
+    sql_result, sql_meta = try_compute_view_from_spool(
+        query_id=query_id,
+        namespace=_REDIS_NAMESPACE,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reasons=reasons,
+        metric_filter=metric_filter,
+        trend_dates=trend_dates,
+        detail_reason=detail_reason,
+        pareto_dimension=pareto_dimension,
+        pareto_values=pareto_values,
+        pareto_selections=pareto_selections,
+        page=page,
+        per_page=per_page,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+        dim_to_column=_DIM_TO_DF_COLUMN,
+    )
+    if sql_result is not None:
+        logger.info(
+            "Reject view served by cache-sql (query_id=%s, runtime=%s, source=%s, detail_total=%s, analytics_rows=%s, latency_s=%s)",
+            query_id,
+            sql_meta.get("view_runtime"),
+            sql_meta.get("view_runtime_path"),
+            (sql_result.get("detail", {}).get("pagination", {}) or {}).get("total", 0),
+            len(sql_result.get("analytics_raw", []) or []),
+            sql_meta.get("view_sql_latency_s"),
+        )
+        return sql_result
+
+    view_sql_fallback_reason = _normalize_text(
+        (sql_meta or {}).get("view_sql_fallback_reason")
+    ) or "unknown"
+    if not _allow_legacy_fallback(_REJECT_CACHE_SQL_VIEW_FALLBACK_LEGACY_ENABLED):
+        raise RuntimeError(
+            f"cache-sql view unavailable (reason={view_sql_fallback_reason})"
+        )
+    logger.info(
+        "Reject view fallback to legacy path (query_id=%s, reason=%s)",
+        query_id,
+        view_sql_fallback_reason,
+    )
+
     df = _get_cached_df(query_id)
     if df is None:
         return None
@@ -1248,6 +1307,30 @@ _DIM_TO_DF_COLUMN = {
 }
 _PARETO_DIMENSIONS = tuple(_DIM_TO_DF_COLUMN.keys())
 _PARETO_TOP20_DIMENSIONS = {"type", "workflow", "equipment"}
+_PARETO_GUARD_REQUIRED_COLUMNS = (
+    tuple(_DIM_TO_DF_COLUMN.values())
+    + ("MOVEIN_QTY", "REJECT_TOTAL_QTY", "DEFECT_QTY", "CONTAINERID", "TXN_DAY")
+)
+
+
+def _project_pareto_guard_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Project and compact frame for Pareto memory guard and aggregation.
+
+    Batch/Dimension Pareto only need a subset of columns. Converting high-cardinality
+    text dimensions to category reduces deep-memory significantly for large ranges.
+    """
+    if df is None or df.empty:
+        return df
+
+    required_cols = [col for col in _PARETO_GUARD_REQUIRED_COLUMNS if col in df.columns]
+    projected = df.loc[:, required_cols].copy()
+    for dim_col in _DIM_TO_DF_COLUMN.values():
+        if dim_col not in projected.columns:
+            continue
+        series = projected[dim_col]
+        if str(series.dtype) == "object":
+            projected[dim_col] = series.fillna("(未知)").astype("category")
+    return projected
 
 
 def _normalize_metric_mode(metric_mode: str) -> str:
@@ -1440,7 +1523,6 @@ def compute_dimension_pareto(
     if df is None:
         return None
 
-    _enforce_interactive_memory_guard(df, operation="柏拉圖查詢", query_id=query_id)
     try:
         # Keep cache-based pareto behavior aligned with primary/view policy filters.
         df = _apply_policy_filters(
@@ -1474,6 +1556,9 @@ def compute_dimension_pareto(
             ]
             if filtered.empty:
                 return {"items": [], "dimension": dimension, "metric_mode": metric_mode}
+
+        filtered = _project_pareto_guard_frame(filtered)
+        _enforce_interactive_memory_guard(filtered, operation="柏拉圖查詢", query_id=query_id)
 
         items = _build_dimension_pareto_items(
             filtered,
@@ -1543,12 +1628,63 @@ def compute_batch_pareto(
         mat_result["_pareto_meta"] = mat_meta
         return mat_result
 
+    # ---- Cache-SQL fallback path (DuckDB over parquet spool) ----------------
+    from mes_dashboard.services.reject_cache_sql_runtime import (
+        try_compute_batch_pareto_from_spool,
+    )
+
+    sql_result, sql_meta = try_compute_batch_pareto_from_spool(
+        query_id=query_id,
+        namespace=_REDIS_NAMESPACE,
+        metric_mode=metric_mode,
+        pareto_scope=pareto_scope,
+        pareto_display_scope=pareto_display_scope,
+        pareto_selections=normalized_selections,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reasons=reasons,
+        trend_dates=trend_dates,
+        dim_to_column=_DIM_TO_DF_COLUMN,
+        top20_dimensions=_PARETO_TOP20_DIMENSIONS,
+    )
+    if sql_result is not None:
+        merged_meta: Dict[str, Any] = {}
+        if isinstance(mat_meta, dict):
+            merged_meta.update(mat_meta)
+        if isinstance(sql_meta, dict):
+            merged_meta.update(sql_meta)
+        logger.info(
+            "Reject batch-pareto served by cache-sql (query_id=%s, runtime=%s, source=%s, latency_s=%s)",
+            query_id,
+            merged_meta.get("pareto_runtime"),
+            merged_meta.get("pareto_runtime_path"),
+            merged_meta.get("pareto_sql_latency_s"),
+        )
+        if merged_meta:
+            sql_result["_pareto_meta"] = merged_meta
+        return sql_result
+
+    pareto_sql_fallback_reason = _normalize_text(
+        (sql_meta or {}).get("pareto_sql_fallback_reason")
+    ) or "unknown"
+    if not _allow_legacy_fallback(_REJECT_CACHE_SQL_BATCH_PARETO_FALLBACK_LEGACY_ENABLED):
+        raise RuntimeError(
+            f"cache-sql batch-pareto unavailable (reason={pareto_sql_fallback_reason})"
+        )
+    logger.info(
+        "Reject batch-pareto fallback to legacy path (query_id=%s, reason=%s)",
+        query_id,
+        pareto_sql_fallback_reason,
+    )
+
     # ---- Legacy DataFrame-based compute (fallback) -------------------------
     df = _get_cached_df(query_id)
     if df is None:
         return None
 
-    _enforce_interactive_memory_guard(df, operation="柏拉圖批次查詢", query_id=query_id)
     try:
         df = _apply_policy_filters(
             df,
@@ -1583,6 +1719,16 @@ def compute_batch_pareto(
             filtered = filtered[
                 filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
             ]
+            if filtered.empty:
+                return {
+                    "dimensions": {
+                        dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
+                        for dim in _PARETO_DIMENSIONS
+                    }
+                }
+
+        filtered = _project_pareto_guard_frame(filtered)
+        _enforce_interactive_memory_guard(filtered, operation="柏拉圖批次查詢", query_id=query_id)
 
         dimensions: Dict[str, Dict[str, Any]] = {}
         for dim in _PARETO_DIMENSIONS:
@@ -1608,8 +1754,18 @@ def compute_batch_pareto(
             "pareto_scope": pareto_scope,
             "pareto_display_scope": pareto_display_scope,
         }
-        if mat_meta:
-            result["_pareto_meta"] = mat_meta
+        merged_meta: Dict[str, Any] = {}
+        if isinstance(mat_meta, dict):
+            merged_meta.update(mat_meta)
+        if isinstance(sql_meta, dict):
+            merged_meta.update(sql_meta)
+        if merged_meta:
+            result["_pareto_meta"] = merged_meta
+        logger.info(
+            "Reject batch-pareto served by legacy fallback (query_id=%s, reason=%s)",
+            query_id,
+            pareto_sql_fallback_reason,
+        )
         return result
     finally:
         _maybe_collect_after_interactive_compute()
@@ -1635,8 +1791,52 @@ def export_csv_from_cache(
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
-) -> Optional[list]:
+) -> Optional[Iterable[Dict[str, Any]]]:
     """Read cache → apply filters → return list of dicts for CSV export."""
+    from mes_dashboard.services.reject_cache_sql_runtime import (
+        try_iter_export_rows_from_spool,
+    )
+
+    sql_rows, sql_meta = try_iter_export_rows_from_spool(
+        query_id=query_id,
+        namespace=_REDIS_NAMESPACE,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reasons=reasons,
+        metric_filter=metric_filter,
+        trend_dates=trend_dates,
+        detail_reason=detail_reason,
+        pareto_dimension=pareto_dimension,
+        pareto_values=pareto_values,
+        pareto_selections=pareto_selections,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+        dim_to_column=_DIM_TO_DF_COLUMN,
+    )
+    if sql_rows is not None:
+        logger.info(
+            "Reject export-cached served by cache-sql stream (query_id=%s, runtime=%s, source=%s, sql_latency_s=%s)",
+            query_id,
+            sql_meta.get("export_runtime"),
+            sql_meta.get("export_runtime_path"),
+            sql_meta.get("export_sql_query_latency_s"),
+        )
+        return sql_rows
+
+    export_sql_fallback_reason = _normalize_text(
+        (sql_meta or {}).get("export_sql_fallback_reason")
+    ) or "unknown"
+    if not _allow_legacy_fallback(_REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED):
+        raise RuntimeError(
+            f"cache-sql export unavailable (reason={export_sql_fallback_reason})"
+        )
+    logger.info(
+        "Reject export-cached fallback to legacy path (query_id=%s, reason=%s)",
+        query_id,
+        export_sql_fallback_reason,
+    )
+
     df = _get_cached_df(query_id)
     if df is None:
         return None
@@ -1674,7 +1874,7 @@ def export_csv_from_cache(
             pareto_selections=pareto_selections,
         )
 
-        rows = []
+        rows: List[Dict[str, Any]] = []
         for _, row in filtered.iterrows():
             rows.append(
                 {
@@ -1702,6 +1902,12 @@ def export_csv_from_cache(
                     "日期": _to_date_str(row.get("TXN_DAY")),
                 }
             )
+        logger.info(
+            "Reject export-cached served by legacy fallback (query_id=%s, rows=%d, reason=%s)",
+            query_id,
+            len(rows),
+            export_sql_fallback_reason,
+        )
         return rows
     finally:
         _maybe_collect_after_interactive_compute()

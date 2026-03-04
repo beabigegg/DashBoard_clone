@@ -5,6 +5,7 @@ import { apiGet, apiPost } from '../core/api.js';
 import {
   buildViewParams,
   parseMultiLineInput,
+  PRIMARY_QUERY_MAX_DAYS,
   validateDateRange,
 } from '../core/reject-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
@@ -17,8 +18,8 @@ import TrendChart from './components/TrendChart.vue';
 
 const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 50;
-const PARETO_TOP20_DIMENSIONS = new Set(['type', 'workflow', 'equipment']);
 const PARETO_DIMENSIONS = ['reason', 'package', 'type', 'workflow', 'workcenter', 'equipment'];
+const PARETO_DISPLAY_SCOPE_FIXED = 'top20';
 const PARETO_SELECTION_PARAM_MAP = {
   reason: 'sel_reason',
   package: 'sel_package',
@@ -80,7 +81,6 @@ const draftFilters = reactive({
   includeExcludedScrap: false,
   excludeMaterialScrap: true,
   excludePbDiode: true,
-  paretoTop80: true,
 });
 
 // ---- Committed primary params (for URL + chips) ----
@@ -93,7 +93,6 @@ const committedPrimary = reactive({
   includeExcludedScrap: false,
   excludeMaterialScrap: true,
   excludePbDiode: true,
-  paretoTop80: true,
 });
 
 // ---- Query result state ----
@@ -112,7 +111,6 @@ const supplementaryFilters = reactive({
 const page = ref(1);
 const selectedTrendDates = ref([]);
 const trendLegendSelected = ref({ '扣帳報廢量': true, '不扣帳報廢量': true });
-const paretoDisplayScope = ref('top20');
 const paretoSelections = reactive(createEmptyParetoSelections());
 const paretoData = reactive(createEmptyParetoData());
 
@@ -230,8 +228,8 @@ function buildBatchParetoParams() {
   const params = {
     query_id: queryId.value,
     metric_mode: paretoMetricApiMode(),
-    pareto_scope: committedPrimary.paretoTop80 ? 'top80' : 'all',
-    pareto_display_scope: paretoDisplayScope.value,
+    pareto_scope: 'top80',
+    pareto_display_scope: PARETO_DISPLAY_SCOPE_FIXED,
     include_excluded_scrap: committedPrimary.includeExcludedScrap ? 'true' : 'false',
     exclude_material_scrap: committedPrimary.excludeMaterialScrap ? 'true' : 'false',
     exclude_pb_diode: committedPrimary.excludePbDiode ? 'true' : 'false',
@@ -355,7 +353,6 @@ async function executePrimaryQuery() {
     committedPrimary.includeExcludedScrap = draftFilters.includeExcludedScrap;
     committedPrimary.excludeMaterialScrap = draftFilters.excludeMaterialScrap;
     committedPrimary.excludePbDiode = draftFilters.excludePbDiode;
-    committedPrimary.paretoTop80 = draftFilters.paretoTop80;
 
     queryId.value = result.query_id;
     resolutionInfo.value = result.resolution_info || null;
@@ -387,7 +384,7 @@ async function executePrimaryQuery() {
   } catch (error) {
     if (isStaleRequest(requestId)) return;
     if (error?.name === 'AbortError') {
-      errorMessage.value = '查詢逾時，請縮短日期範圍後重試';
+      errorMessage.value = `查詢逾時，請縮短日期範圍（最多 ${PRIMARY_QUERY_MAX_DAYS} 天）後重試`;
     } else {
       errorMessage.value = error?.message || '主查詢執行失敗';
     }
@@ -468,8 +465,6 @@ function clearFilters() {
   draftFilters.includeExcludedScrap = false;
   draftFilters.excludeMaterialScrap = true;
   draftFilters.excludePbDiode = true;
-  draftFilters.paretoTop80 = true;
-  paretoDisplayScope.value = 'top20';
   resetParetoSelections();
   void executePrimaryQuery();
 }
@@ -519,19 +514,6 @@ function onParetoItemToggle(dimension, itemValue) {
   page.value = 1;
   updateUrlState();
   void Promise.all([fetchBatchPareto(), refreshView()]);
-}
-
-function handleParetoScopeToggle(checked) {
-  draftFilters.paretoTop80 = Boolean(checked);
-  committedPrimary.paretoTop80 = Boolean(checked);
-  updateUrlState();
-  void fetchBatchPareto();
-}
-
-function onParetoDisplayScopeChange(scope) {
-  paretoDisplayScope.value = scope === 'top20' ? 'top20' : 'all';
-  updateUrlState();
-  void fetchBatchPareto();
 }
 
 function clearParetoSelection() {
@@ -897,12 +879,6 @@ function updateUrlState() {
     appendArrayParams(params, key, paretoSelections[dimension] || []);
   }
 
-  if (paretoDisplayScope.value !== 'top20') {
-    params.set('pareto_display_scope', paretoDisplayScope.value);
-  }
-  if (!committedPrimary.paretoTop80) {
-    params.set('pareto_scope_all', 'true');
-  }
   if (page.value > 1) {
     params.set('page', String(page.value));
   }
@@ -963,7 +939,6 @@ function restoreFromUrl() {
     true,
   );
   draftFilters.excludePbDiode = readBooleanParam(params, 'exclude_pb_diode', true);
-  draftFilters.paretoTop80 = !readBooleanParam(params, 'pareto_scope_all', false);
 
   supplementaryFilters.packages = readArrayParam(params, 'packages');
   supplementaryFilters.workcenterGroups = readArrayParam(params, 'workcenter_groups');
@@ -989,9 +964,6 @@ function restoreFromUrl() {
   for (const dimension of PARETO_DIMENSIONS) {
     paretoSelections[dimension] = restoredSelections[dimension];
   }
-
-  const urlParetoDisplayScope = String(params.get('pareto_display_scope') || '').trim().toLowerCase();
-  paretoDisplayScope.value = urlParetoDisplayScope === 'all' ? 'all' : 'top20';
 
   const parsedPage = Number(params.get('page') || '1');
   page.value = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
@@ -1038,13 +1010,11 @@ onMounted(() => {
       :resolution-info="resolutionInfo"
       :loading="loading"
       :active-filter-chips="activeFilterChips"
-      :pareto-display-scope="paretoDisplayScope"
+      :primary-query-max-days="PRIMARY_QUERY_MAX_DAYS"
       @apply="applyFilters"
       @clear="clearFilters"
       @export-csv="exportCsv"
       @remove-chip="removeFilterChip"
-      @pareto-scope-toggle="handleParetoScopeToggle"
-      @pareto-display-scope-change="onParetoDisplayScopeChange"
       @update:query-mode="queryMode = $event"
       @update:container-input-type="containerInputType = $event"
       @update:container-input="containerInput = $event"
@@ -1065,7 +1035,7 @@ onMounted(() => {
       <ParetoGrid
         :pareto-data="paretoData"
         :pareto-selections="paretoSelections"
-        :display-scope="paretoDisplayScope"
+        :display-scope="PARETO_DISPLAY_SCOPE_FIXED"
         :selected-dates="selectedTrendDates"
         :metric-label="paretoMetricLabel"
         :loading="loading.querying || loading.pareto"
