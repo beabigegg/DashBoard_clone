@@ -36,6 +36,10 @@ TRACE_STREAM_BATCH_SIZE = int(os.getenv("TRACE_STREAM_BATCH_SIZE", "5000"))
 # ---------------------------------------------------------------------------
 _RQ_AVAILABLE: Optional[bool] = None
 
+# TTL-based cache for RQ health checks to avoid checking every request
+_RQ_HEALTH_TTL_SECONDS = 60
+_rq_health_cache: Dict[str, Any] = {"available": None, "checked_at": 0.0}
+
 
 def _check_rq_available() -> bool:
     global _RQ_AVAILABLE
@@ -49,11 +53,55 @@ def _check_rq_available() -> bool:
 
 
 def is_async_available() -> bool:
-    """Return True if RQ is installed and Redis is reachable."""
+    """Return True if RQ is installed, Redis is reachable, and workers exist.
+
+    Results are cached for 60 seconds to avoid checking every request.
+    Falls back gracefully: if any check fails, returns False.
+    """
     if not _check_rq_available():
         return False
+
+    # Return cached result if within TTL
+    now = time.monotonic()
+    if (
+        _rq_health_cache["available"] is not None
+        and (now - _rq_health_cache["checked_at"]) < _RQ_HEALTH_TTL_SECONDS
+    ):
+        return _rq_health_cache["available"]
+
     conn = get_redis_client()
-    return conn is not None
+    if conn is None:
+        _rq_health_cache["available"] = False
+        _rq_health_cache["checked_at"] = now
+        return False
+
+    # Actual Redis ping check
+    try:
+        conn.ping()
+    except Exception:
+        logger.warning("RQ health check: Redis ping failed — marking async unavailable")
+        _rq_health_cache["available"] = False
+        _rq_health_cache["checked_at"] = now
+        return False
+
+    # RQ worker existence check
+    try:
+        import rq
+        workers = rq.Worker.all(connection=conn)
+        if not workers:
+            logger.warning("RQ health check: no workers found — marking async unavailable")
+            _rq_health_cache["available"] = False
+            _rq_health_cache["checked_at"] = now
+            return False
+    except Exception:
+        logger.warning("RQ health check: worker query failed — marking async unavailable")
+        _rq_health_cache["available"] = False
+        _rq_health_cache["checked_at"] = now
+        return False
+
+    _rq_health_cache["available"] = True
+    _rq_health_cache["checked_at"] = now
+    return True
 
 
 def _get_rq_queue():

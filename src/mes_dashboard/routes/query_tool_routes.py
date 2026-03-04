@@ -9,6 +9,7 @@ Contains Flask Blueprint for batch tracing and equipment period query endpoints:
 - CSV export functionality
 """
 
+import gc
 import hashlib
 
 from flask import Blueprint, jsonify, request, Response, render_template, current_app
@@ -343,16 +344,26 @@ def query_lot_history():
         too_large = _reject_if_batch_too_large(cids)
         if too_large is not None:
             return too_large
-        result = get_lot_history_batch(cids, workcenter_groups=workcenter_groups)
+        try:
+            result = get_lot_history_batch(cids, workcenter_groups=workcenter_groups)
+        except MemoryError as exc:
+            return jsonify({'error': str(exc)}), 503
     elif container_id:
-        result = get_lot_history(container_id, workcenter_groups=workcenter_groups)
+        try:
+            result = get_lot_history(container_id, workcenter_groups=workcenter_groups)
+        except MemoryError as exc:
+            return jsonify({'error': str(exc)}), 503
     else:
         return jsonify({'error': '請指定 CONTAINERID'}), 400
 
     if 'error' in result:
         return jsonify(result), 400
 
-    return jsonify(result)
+    response = jsonify(result)
+    total = result.get('total', 0)
+    if total > 10000:
+        gc.collect()
+    return response
 
 
 # ============================================================
@@ -425,7 +436,10 @@ def query_lot_associations():
         too_large = _reject_if_batch_too_large(cids)
         if too_large is not None:
             return too_large
-        result = get_lot_associations_batch(cids, assoc_type)
+        try:
+            result = get_lot_associations_batch(cids, assoc_type)
+        except MemoryError as exc:
+            return jsonify({'error': str(exc)}), 503
     else:
         if not container_id:
             return jsonify({'error': '請指定 CONTAINERID'}), 400
@@ -499,35 +513,42 @@ def query_equipment_period():
         return jsonify({'error': f'不支援的查詢類型: {query_type}'}), 400
 
     # Execute query based on type
-    if query_type == 'status_hours':
-        if not equipment_ids:
-            return jsonify({'error': '請選擇至少一台設備'}), 400
-        result = get_equipment_status_hours(equipment_ids, start_date, end_date)
+    try:
+        if query_type == 'status_hours':
+            if not equipment_ids:
+                return jsonify({'error': '請選擇至少一台設備'}), 400
+            result = get_equipment_status_hours(equipment_ids, start_date, end_date)
 
-    elif query_type == 'lots':
-        if not equipment_ids:
-            return jsonify({'error': '請選擇至少一台設備'}), 400
-        result = get_equipment_lots(equipment_ids, start_date, end_date)
+        elif query_type == 'lots':
+            if not equipment_ids:
+                return jsonify({'error': '請選擇至少一台設備'}), 400
+            result = get_equipment_lots(equipment_ids, start_date, end_date)
 
-    elif query_type == 'materials':
-        if not equipment_names:
-            return jsonify({'error': '請選擇至少一台設備'}), 400
-        result = get_equipment_materials(equipment_names, start_date, end_date)
+        elif query_type == 'materials':
+            if not equipment_names:
+                return jsonify({'error': '請選擇至少一台設備'}), 400
+            result = get_equipment_materials(equipment_names, start_date, end_date)
 
-    elif query_type == 'rejects':
-        if not equipment_names:
-            return jsonify({'error': '請選擇至少一台設備'}), 400
-        result = get_equipment_rejects(equipment_names, start_date, end_date)
+        elif query_type == 'rejects':
+            if not equipment_names:
+                return jsonify({'error': '請選擇至少一台設備'}), 400
+            result = get_equipment_rejects(equipment_names, start_date, end_date)
 
-    elif query_type == 'jobs':
-        if not equipment_ids:
-            return jsonify({'error': '請選擇至少一台設備'}), 400
-        result = get_equipment_jobs(equipment_ids, start_date, end_date)
+        elif query_type == 'jobs':
+            if not equipment_ids:
+                return jsonify({'error': '請選擇至少一台設備'}), 400
+            result = get_equipment_jobs(equipment_ids, start_date, end_date)
+    except MemoryError as exc:
+        return jsonify({'error': str(exc)}), 503
 
     if 'error' in result:
         return jsonify(result), 400
 
-    return jsonify(result)
+    response = jsonify(result)
+    total = result.get('total', 0)
+    if total > 10000:
+        gc.collect()
+    return response
 
 
 # ============================================================

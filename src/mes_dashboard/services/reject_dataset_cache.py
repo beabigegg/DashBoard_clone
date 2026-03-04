@@ -323,75 +323,31 @@ def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
 
 
 def _df_memory_mb(df: pd.DataFrame) -> float:
-    if df is None or df.empty:
-        return 0.0
-    try:
-        return float(df.memory_usage(deep=True).sum()) / (1024 * 1024)
-    except Exception:
-        return 0.0
+    from mes_dashboard.core.interactive_memory_guard import df_memory_mb
+    return df_memory_mb(df)
 
 
 def _process_rss_mb() -> Optional[float]:
-    try:
-        import psutil  # local import: optional runtime dependency
-    except Exception:
-        return None
-    try:
-        process = psutil.Process(os.getpid())
-        return float(process.memory_info().rss) / (1024 * 1024)
-    except Exception:
-        return None
+    from mes_dashboard.core.interactive_memory_guard import process_rss_mb
+    return process_rss_mb()
 
 
 def _enforce_interactive_memory_guard(df: pd.DataFrame, *, operation: str, query_id: str) -> None:
     """Prevent expensive cache-based recomputation from pushing worker memory over limit."""
-    if df is None or df.empty:
-        return
-
-    df_mb = _df_memory_mb(df)
-    if df_mb > float(_REJECT_DERIVE_MAX_INPUT_MB):
-        logger.warning(
-            "Reject %s due to dataset size guard (query_id=%s, df_mb=%.1f, limit_mb=%d)",
-            operation,
-            query_id,
-            df_mb,
-            _REJECT_DERIVE_MAX_INPUT_MB,
-        )
-        raise MemoryError(
-            f"{operation}資料量約 {df_mb:.1f} MB，超過 {_REJECT_DERIVE_MAX_INPUT_MB} MB 上限，請縮小篩選條件後重試"
-        )
-
-    rss_mb = _process_rss_mb()
-    if rss_mb is None:
-        return
-
-    projected_rss_mb = rss_mb + (df_mb * float(_REJECT_DERIVE_WORKING_SET_FACTOR))
-    if projected_rss_mb > float(_REJECT_DERIVE_MAX_PROJECTED_RSS_MB):
-        logger.warning(
-            "Reject %s due to projected RSS guard (query_id=%s, rss_mb=%.1f, df_mb=%.1f, factor=%.2f, projected_mb=%.1f, limit_mb=%d)",
-            operation,
-            query_id,
-            rss_mb,
-            df_mb,
-            _REJECT_DERIVE_WORKING_SET_FACTOR,
-            projected_rss_mb,
-            _REJECT_DERIVE_MAX_PROJECTED_RSS_MB,
-        )
-        raise MemoryError(
-            (
-                f"目前服務記憶體負載較高（RSS {rss_mb:.1f} MB），暫停{operation}計算以保護系統，"
-                "請稍後再試或縮小篩選條件"
-            )
-        )
+    from mes_dashboard.core.interactive_memory_guard import enforce_dataset_memory_guard
+    enforce_dataset_memory_guard(
+        df,
+        operation=operation,
+        query_id=query_id,
+        max_input_mb=float(_REJECT_DERIVE_MAX_INPUT_MB),
+        max_projected_rss_mb=float(_REJECT_DERIVE_MAX_PROJECTED_RSS_MB),
+        working_set_factor=float(_REJECT_DERIVE_WORKING_SET_FACTOR),
+    )
 
 
 def _maybe_collect_after_interactive_compute() -> None:
-    if not _REJECT_DERIVE_FORCE_GC:
-        return
-    try:
-        gc.collect()
-    except Exception:
-        return
+    from mes_dashboard.core.interactive_memory_guard import maybe_gc_collect
+    maybe_gc_collect(force=_REJECT_DERIVE_FORCE_GC)
 
 
 # ============================================================

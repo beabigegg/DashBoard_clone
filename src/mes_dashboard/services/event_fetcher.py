@@ -21,6 +21,7 @@ logger = logging.getLogger("mes_dashboard.event_fetcher")
 ORACLE_IN_BATCH_SIZE = 1000
 EVENT_FETCHER_MAX_WORKERS = int(os.getenv('EVENT_FETCHER_MAX_WORKERS', '2'))
 CACHE_SKIP_CID_THRESHOLD = int(os.getenv('EVENT_FETCHER_CACHE_SKIP_CID_THRESHOLD', '10000'))
+EVENT_FETCHER_MAX_TOTAL_ROWS = int(os.getenv('EVENT_FETCHER_MAX_TOTAL_ROWS', '500000'))
 EVENT_FETCHER_ALLOW_PARTIAL_RESULTS = (
     os.getenv('EVENT_FETCHER_ALLOW_PARTIAL_RESULTS', 'false').strip().lower()
     in {'1', 'true', 'yes', 'on'}
@@ -238,6 +239,9 @@ class EventFetcher:
             return cached
 
         grouped: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        total_row_count = [0]  # mutable counter shared across batches
+        truncated = [False]
+        max_total_rows = EVENT_FETCHER_MAX_TOTAL_ROWS
         spec = _DOMAIN_SPECS[domain]
         filter_column = spec["filter_column"]
         match_mode = spec.get("match_mode", "in")
@@ -250,6 +254,8 @@ class EventFetcher:
 
         def _fetch_and_group_batch(batch_ids):
             """Fetch a batch using fetchmany iterator and group into ``grouped``."""
+            if truncated[0]:
+                return
             builder = QueryBuilder()
             if match_mode == "contains":
                 builder.add_or_like_conditions(filter_column, batch_ids, position="both")
@@ -258,6 +264,8 @@ class EventFetcher:
             sql = EventFetcher._build_domain_sql(domain, builder.get_conditions_sql())
 
             for columns, rows in read_sql_df_slow_iter(sql, builder.params, timeout_seconds=60):
+                if truncated[0]:
+                    break
                 for row in rows:
                     record = {k: _sanitize_value(v) for k, v in zip(columns, row)}
                     if domain == "jobs":
@@ -269,11 +277,27 @@ class EventFetcher:
                                 enriched = dict(record)
                                 enriched["CONTAINERID"] = cid
                                 grouped[cid].append(enriched)
+                                total_row_count[0] += 1
+                        if total_row_count[0] >= max_total_rows:
+                            logger.warning(
+                                "EventFetcher total-row guard triggered domain=%s rows=%s limit=%s — truncating",
+                                domain, total_row_count[0], max_total_rows,
+                            )
+                            truncated[0] = True
+                            break
                         continue
                     cid = record.get("CONTAINERID")
                     if not isinstance(cid, str) or not cid:
                         continue
                     grouped[cid].append(record)
+                    total_row_count[0] += 1
+                    if total_row_count[0] >= max_total_rows:
+                        logger.warning(
+                            "EventFetcher total-row guard triggered domain=%s rows=%s limit=%s — truncating",
+                            domain, total_row_count[0], max_total_rows,
+                        )
+                        truncated[0] = True
+                        break
 
         batches = [
             normalized_ids[i:i + ORACLE_IN_BATCH_SIZE]
@@ -305,6 +329,15 @@ class EventFetcher:
         result = dict(grouped)
         del grouped
 
+        # Attach truncation metadata (backwards-compatible: callers that don't
+        # know about __meta__ simply iterate CID keys and skip non-list values).
+        if truncated[0]:
+            result["__meta__"] = {
+                "truncated": True,
+                "total_rows_fetched": total_row_count[0],
+                "max_total_rows": max_total_rows,
+            }
+
         if len(normalized_ids) <= CACHE_SKIP_CID_THRESHOLD:
             cache_set(cache_key, result, ttl=_DOMAIN_SPECS[domain]["cache_ttl"])
         else:
@@ -313,9 +346,10 @@ class EventFetcher:
                 domain, len(normalized_ids), CACHE_SKIP_CID_THRESHOLD,
             )
         logger.info(
-            "EventFetcher fetched domain=%s queried_cids=%s hit_cids=%s",
+            "EventFetcher fetched domain=%s queried_cids=%s hit_cids=%s truncated=%s",
             domain,
             len(normalized_ids),
             len(result),
+            truncated[0],
         )
         return result

@@ -89,11 +89,8 @@ def _resolve_limit_mb() -> int:
 
 def _current_rss_mb() -> Optional[float]:
     """Return current process RSS in MB via psutil (not peak)."""
-    try:
-        import psutil
-        return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
-    except Exception:
-        return None
+    from mes_dashboard.core.interactive_memory_guard import process_rss_mb
+    return process_rss_mb()
 
 
 # ============================================================

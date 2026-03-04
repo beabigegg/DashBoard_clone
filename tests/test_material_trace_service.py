@@ -13,17 +13,24 @@ import pandas as pd
 
 from mes_dashboard.services.material_trace_service import (
     _add_exact_or_pattern_condition,
+    _check_memory_guard,
+    _compute_cache_key,
     _enrich_workcenter_group,
+    _FORWARD_MAX_ROWS,
+    _IN_BATCH_SIZE,
     _is_pattern_token,
     _resolve_container_ids,
     _resolve_workcenter_names,
-    _check_memory_guard,
-    _IN_BATCH_SIZE,
     export_csv,
     forward_query,
     reverse_query,
 )
 from mes_dashboard.sql import QueryBuilder
+
+# Common patch targets for Redis / cache / GC
+_PATCH_REDIS_LOAD = "mes_dashboard.services.material_trace_service.redis_load_df"
+_PATCH_REDIS_STORE = "mes_dashboard.services.material_trace_service.redis_store_df"
+_PATCH_GC = "mes_dashboard.services.material_trace_service.maybe_gc_collect"
 
 
 # ============================================================
@@ -73,10 +80,13 @@ def _make_resolve_df(lot_names):
 
 
 class TestForwardLotQuery:
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.read_sql_df")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_forward_lot_resolves_and_enriches(self, mock_mapping, mock_sql, mock_sql_slow):
+    def test_forward_lot_resolves_and_enriches(self, mock_mapping, mock_sql, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql.return_value = _make_resolve_df(["LOT-A", "LOT-B"])
         mock_sql_slow.return_value = _make_material_df(5)
@@ -90,10 +100,13 @@ class TestForwardLotQuery:
         assert mock_sql.call_count == 1
         assert mock_sql_slow.call_count == 1
 
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.read_sql_df")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_forward_lot_all_unresolved_returns_empty(self, mock_mapping, mock_sql, mock_sql_slow):
+    def test_forward_lot_all_unresolved_returns_empty(self, mock_mapping, mock_sql, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql.return_value = pd.DataFrame()
 
@@ -111,9 +124,12 @@ class TestForwardLotQuery:
 
 
 class TestForwardWorkorderQuery:
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_forward_workorder_queries_directly(self, mock_mapping, mock_sql_slow):
+    def test_forward_workorder_queries_directly(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql_slow.return_value = _make_material_df(3)
 
@@ -130,9 +146,12 @@ class TestForwardWorkorderQuery:
 
 
 class TestReverseQuery:
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_reverse_truncation_at_10000(self, mock_mapping, mock_sql_slow):
+    def test_reverse_truncation_at_10000(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql_slow.return_value = _make_material_df(10001)
 
@@ -142,9 +161,12 @@ class TestReverseQuery:
         assert result["meta"]["max_rows"] == 10000
         assert result["pagination"]["total"] == 10000
 
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_reverse_no_truncation_under_limit(self, mock_mapping, mock_sql_slow):
+    def test_reverse_no_truncation_under_limit(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql_slow.return_value = _make_material_df(500)
 
@@ -160,10 +182,13 @@ class TestReverseQuery:
 
 
 class TestWorkcenterGroupFilter:
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.get_workcenters_for_groups")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_workcenter_group_resolves_to_names(self, mock_mapping, mock_for_groups, mock_sql_slow):
+    def test_workcenter_group_resolves_to_names(self, mock_mapping, mock_for_groups, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_for_groups.return_value = ["WC_DB_1", "WC_DB_2"]
         mock_sql_slow.return_value = _make_material_df(3)
@@ -185,10 +210,13 @@ class TestWorkcenterGroupFilter:
 
 
 class TestUnresolvedLots:
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.read_sql_df")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_partial_resolve_reports_unresolved(self, mock_mapping, mock_sql, mock_sql_slow):
+    def test_partial_resolve_reports_unresolved(self, mock_mapping, mock_sql, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         resolve_df = pd.DataFrame(
             [{"CONTAINERID": "CID_LOT_A", "CONTAINERNAME": "LOT-A"}]
@@ -225,9 +253,11 @@ class TestEnrichWorkcenterGroup:
 
 
 class TestExportCsv:
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_export_returns_utf8_bom_csv(self, mock_mapping, mock_sql_slow):
+    def test_export_returns_utf8_bom_csv(self, mock_mapping, mock_sql_slow, _rl, _rs):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql_slow.return_value = _make_material_df(3)
 
@@ -248,6 +278,7 @@ class TestExportCsv:
 
 class TestMemoryGuard:
     def test_memory_guard_raises_on_large_df(self):
+        """_check_memory_guard delegates to enforce_dataset_memory_guard; test via low limit."""
         with patch("mes_dashboard.services.material_trace_service._MAX_RESULT_MB", 0):
             df = _make_material_df(10)
             with pytest.raises(MemoryError, match="超過.*上限"):
@@ -257,6 +288,17 @@ class TestMemoryGuard:
         df = _make_material_df(5)
         _check_memory_guard(df)
 
+    def test_memory_guard_rss_projection(self):
+        """Fence 2: reject when projected RSS exceeds limit (1100 MB).
+
+        With a 5-row DF (~0.003 MB), projected = RSS + 0.003*1.8 ≈ RSS+0.006.
+        Set RSS high enough that projected > 1100 MB.
+        """
+        df = _make_material_df(5)
+        with patch("mes_dashboard.core.interactive_memory_guard.process_rss_mb", return_value=1100.0):
+            with pytest.raises(MemoryError, match="記憶體負載"):
+                _check_memory_guard(df)
+
 
 # ============================================================
 # Safeguards: IN-clause batching
@@ -264,9 +306,12 @@ class TestMemoryGuard:
 
 
 class TestInClauseBatching:
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_large_input_is_batched(self, mock_mapping, mock_sql_slow):
+    def test_large_input_is_batched(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql_slow.return_value = _make_material_df(3)
 
@@ -337,9 +382,12 @@ class TestWildcardResolve:
 
 
 class TestWildcardWorkorder:
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_workorder_wildcard_generates_like(self, mock_mapping, mock_sql_slow):
+    def test_workorder_wildcard_generates_like(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
         """Wildcard work orders produce LIKE clause in query SQL."""
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql_slow.return_value = _make_material_df(3)
@@ -348,3 +396,163 @@ class TestWildcardWorkorder:
 
         sql_text = mock_sql_slow.call_args[0][0]
         assert "LIKE" in sql_text
+
+
+# ============================================================
+# Redis cache tests
+# ============================================================
+
+
+class TestRedisCache:
+    def test_compute_cache_key_deterministic(self):
+        """Same params produce the same cache key."""
+        k1 = _compute_cache_key("workorder", ["WO-B", "WO-A"], ["G2", "G1"])
+        k2 = _compute_cache_key("workorder", ["WO-A", "WO-B"], ["G1", "G2"])
+        assert k1 == k2
+        assert k1.startswith("mt:result:")
+
+    def test_compute_cache_key_differs_by_mode(self):
+        k1 = _compute_cache_key("lot", ["V1"])
+        k2 = _compute_cache_key("workorder", ["V1"])
+        assert k1 != k2
+
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD)
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_forward_cache_hit_skips_oracle(self, mock_mapping, mock_redis_load, mock_redis_store, _gc):
+        """When Redis has cached data, Oracle is never queried."""
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        cached = _make_material_df(5)
+        cached = cached.copy()
+        cached["WORKCENTER_GROUP"] = "焊接_DB"
+        mock_redis_load.return_value = cached
+
+        result = forward_query("workorder", ["WO-001"], page=1, per_page=50)
+
+        assert result["pagination"]["total"] == 5
+        assert len(result["rows"]) == 5
+        # redis_store should NOT be called on cache hit
+        mock_redis_store.assert_not_called()
+
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD)
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_reverse_cache_hit_skips_oracle(self, mock_mapping, mock_redis_load, mock_redis_store, _gc):
+        """Reverse query also uses Redis cache."""
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        cached = _make_material_df(3)
+        cached = cached.copy()
+        cached["WORKCENTER_GROUP"] = "焊接_DB"
+        mock_redis_load.return_value = cached
+
+        result = reverse_query(["MLOT-A"], page=1, per_page=50)
+
+        assert result["pagination"]["total"] == 3
+        mock_redis_store.assert_not_called()
+
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD)
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_export_cache_hit_skips_oracle(self, mock_mapping, mock_redis_load, mock_redis_store):
+        """Export uses cached data when available."""
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        cached = _make_material_df(3)
+        cached = cached.copy()
+        cached["WORKCENTER_GROUP"] = "焊接_DB"
+        mock_redis_load.return_value = cached
+
+        csv_bytes, meta = export_csv("workorder", ["WO-001"])
+
+        assert csv_bytes[:3] == b"\xef\xbb\xbf"
+        csv_text = csv_bytes.decode("utf-8-sig")
+        assert "LOT ID" in csv_text
+        # Should NOT re-store already cached data
+        mock_redis_store.assert_not_called()
+
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_forward_cache_miss_stores_result(self, mock_mapping, mock_sql_slow, _rl, mock_redis_store, _gc):
+        """On cache miss, result is stored in Redis after query."""
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        mock_sql_slow.return_value = _make_material_df(3)
+
+        forward_query("workorder", ["WO-001"], page=1, per_page=50)
+
+        mock_redis_store.assert_called_once()
+        call_args = mock_redis_store.call_args
+        assert call_args[0][0].startswith("mt:result:")
+        assert call_args[1]["ttl"] == 300
+
+
+# ============================================================
+# Forward truncation tests (MT4)
+# ============================================================
+
+
+class TestForwardTruncation:
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_forward_truncation_at_50000(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        mock_sql_slow.return_value = _make_material_df(50001)
+
+        result = forward_query("workorder", ["WO-001"], page=1, per_page=50)
+
+        assert result["meta"]["truncated"] is True
+        assert result["meta"]["max_rows"] == _FORWARD_MAX_ROWS
+        assert result["pagination"]["total"] == _FORWARD_MAX_ROWS
+
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_forward_no_truncation_under_limit(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        mock_sql_slow.return_value = _make_material_df(500)
+
+        result = forward_query("workorder", ["WO-001"], page=1, per_page=50)
+
+        assert "truncated" not in result["meta"]
+        assert result["pagination"]["total"] == 500
+
+
+# ============================================================
+# GC collect tests (MT5)
+# ============================================================
+
+
+class TestGcCollect:
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_forward_query_calls_gc(self, mock_mapping, mock_sql_slow, _rl, _rs, mock_gc):
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        mock_sql_slow.return_value = _make_material_df(3)
+
+        forward_query("workorder", ["WO-001"], page=1, per_page=50)
+
+        mock_gc.assert_called_once()
+
+    @patch(_PATCH_GC)
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_reverse_query_calls_gc(self, mock_mapping, mock_sql_slow, _rl, _rs, mock_gc):
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        mock_sql_slow.return_value = _make_material_df(3)
+
+        reverse_query(["MLOT-A"], page=1, per_page=50)
+
+        mock_gc.assert_called_once()

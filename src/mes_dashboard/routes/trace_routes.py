@@ -21,7 +21,9 @@ from typing import Any, Dict, List, Optional
 from flask import Blueprint, Response, jsonify, request
 
 from mes_dashboard.core.cache import cache_get, cache_set
+from mes_dashboard.core.interactive_memory_guard import process_rss_mb
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.redis_client import try_acquire_lock, release_lock
 from mes_dashboard.core.response import error_response
 from mes_dashboard.services.event_fetcher import EventFetcher
 from mes_dashboard.services.lineage_engine import LineageEngine
@@ -48,6 +50,14 @@ TRACE_SLOW_THRESHOLD_SECONDS = float(os.getenv('TRACE_SLOW_THRESHOLD_SECONDS', '
 TRACE_EVENTS_MAX_WORKERS = int(os.getenv('TRACE_EVENTS_MAX_WORKERS', '2'))
 TRACE_EVENTS_CID_LIMIT = int(os.getenv('TRACE_EVENTS_CID_LIMIT', '50000'))
 TRACE_CACHE_TTL_SECONDS = 300
+
+# RSS guard: reject sync event processing when RSS exceeds this MB threshold
+TRACE_SYNC_RSS_REJECT_MB = float(os.getenv("TRACE_SYNC_RSS_REJECT_MB", "1100"))
+
+# Stampede lock for events endpoint sync path
+EVENTS_LOCK_TTL_SECONDS = 240
+EVENTS_LOCK_WAIT_TIMEOUT_SECONDS = 180
+EVENTS_LOCK_POLL_INTERVAL_SECONDS = 0.5
 
 PROFILE_QUERY_TOOL = "query_tool"
 PROFILE_QUERY_TOOL_REVERSE = "query_tool_reverse"
@@ -689,6 +699,20 @@ def events():
         if cached is not None:
             return jsonify(cached)
 
+    # --- MD2: RSS guard before sync execution ---
+    rss_now = process_rss_mb()
+    if rss_now is not None and rss_now > TRACE_SYNC_RSS_REJECT_MB:
+        logger.warning(
+            "trace events sync rejected due to RSS guard rss_mb=%.1f limit_mb=%.0f cid_count=%s",
+            rss_now, TRACE_SYNC_RSS_REJECT_MB, cid_count,
+        )
+        return error_response(
+            "SERVICE_OVERLOADED",
+            "伺服器記憶體負載過高，請稍後再試",
+            status_code=503,
+            headers={"Retry-After": "30"},
+        )
+
     logger.info(
         "trace events profile=%s domains=%s cid_count=%s correlation_cache_key=%s",
         profile,
@@ -697,61 +721,106 @@ def events():
         payload.get("cache_key"),
     )
 
-    started = time.monotonic()
-    results: Dict[str, Dict[str, Any]] = {}
-    raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
-    failed_domains: List[str] = []
+    # --- MD4: Stampede lock for sync path ---
+    cid_hash = hashlib.md5("|".join(sorted(container_ids)).encode("utf-8")).hexdigest()
+    lock_key = f"trace:events:{cid_hash}"
+    lock_acquired = try_acquire_lock(lock_key, ttl_seconds=EVENTS_LOCK_TTL_SECONDS)
 
-    with ThreadPoolExecutor(max_workers=min(len(domains), TRACE_EVENTS_MAX_WORKERS)) as executor:
-        futures = {
-            executor.submit(EventFetcher.fetch_events, container_ids, domain): domain
-            for domain in domains
+    if not lock_acquired:
+        # Another worker is processing the same CID set — poll cache for result
+        wait_start = time.monotonic()
+        while (time.monotonic() - wait_start) < EVENTS_LOCK_WAIT_TIMEOUT_SECONDS:
+            cached = cache_get(events_cache_key)
+            if cached is not None:
+                return jsonify(cached)
+            time.sleep(EVENTS_LOCK_POLL_INTERVAL_SECONDS)
+
+        logger.warning(
+            "trace events stampede lock wait timeout; proceeding with fail-open execution "
+            "cid_hash=%s cid_count=%s",
+            cid_hash[:12], cid_count,
+        )
+
+    try:
+        # Double-check cache after acquiring lock
+        if lock_acquired:
+            cached = cache_get(events_cache_key)
+            if cached is not None:
+                return jsonify(cached)
+
+        started = time.monotonic()
+        results: Dict[str, Dict[str, Any]] = {}
+        raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+        failed_domains: List[str] = []
+
+        with ThreadPoolExecutor(max_workers=min(len(domains), TRACE_EVENTS_MAX_WORKERS)) as executor:
+            futures = {
+                executor.submit(EventFetcher.fetch_events, container_ids, domain): domain
+                for domain in domains
+            }
+            for future in as_completed(futures):
+                domain = futures[future]
+                try:
+                    events_by_cid = future.result()
+                    rows = _flatten_domain_records(events_by_cid)
+                    results[domain] = {"data": rows, "count": len(rows)}
+                    if is_msd:
+                        raw_domain_results[domain] = events_by_cid
+                    # Non-MSD: events_by_cid goes out of scope here, no double retention
+                except Exception as exc:
+                    logger.error("events stage domain failed domain=%s: %s", domain, exc, exc_info=True)
+                    failed_domains.append(domain)
+
+        elapsed = time.monotonic() - started
+        if elapsed > TRACE_SLOW_THRESHOLD_SECONDS:
+            logger.warning("trace events slow elapsed=%.2fs domains=%s", elapsed, ",".join(domains))
+
+        # --- MD2: RSS guard before aggregation computation ---
+        aggregation = None
+        if profile == PROFILE_MID_SECTION_DEFECT:
+            rss_before_agg = process_rss_mb()
+            if rss_before_agg is not None and rss_before_agg > TRACE_SYNC_RSS_REJECT_MB:
+                del raw_domain_results
+                logger.warning(
+                    "trace events aggregation rejected due to RSS guard rss_mb=%.1f limit_mb=%.0f",
+                    rss_before_agg, TRACE_SYNC_RSS_REJECT_MB,
+                )
+                return error_response(
+                    "SERVICE_OVERLOADED",
+                    "伺服器記憶體負載過高，無法完成聚合計算，請稍後再試",
+                    status_code=503,
+                    headers={"Retry-After": "30"},
+                )
+
+            aggregation, agg_error = _build_msd_aggregation(payload, raw_domain_results)
+            del raw_domain_results
+            if agg_error is not None:
+                code, message, status = agg_error
+                return _error(code, message, status)
+        else:
+            del raw_domain_results
+
+        response: Dict[str, Any] = {
+            "stage": "events",
+            "results": results,
+            "aggregation": aggregation,
         }
-        for future in as_completed(futures):
-            domain = futures[future]
-            try:
-                events_by_cid = future.result()
-                rows = _flatten_domain_records(events_by_cid)
-                results[domain] = {"data": rows, "count": len(rows)}
-                if is_msd:
-                    raw_domain_results[domain] = events_by_cid
-                # Non-MSD: events_by_cid goes out of scope here, no double retention
-            except Exception as exc:
-                logger.error("events stage domain failed domain=%s: %s", domain, exc, exc_info=True)
-                failed_domains.append(domain)
 
-    elapsed = time.monotonic() - started
-    if elapsed > TRACE_SLOW_THRESHOLD_SECONDS:
-        logger.warning("trace events slow elapsed=%.2fs domains=%s", elapsed, ",".join(domains))
+        if failed_domains:
+            response["error"] = "one or more domains failed"
+            response["code"] = "EVENTS_PARTIAL_FAILURE"
+            response["failed_domains"] = sorted(failed_domains)
 
-    aggregation = None
-    if profile == PROFILE_MID_SECTION_DEFECT:
-        aggregation, agg_error = _build_msd_aggregation(payload, raw_domain_results)
-        del raw_domain_results
-        if agg_error is not None:
-            code, message, status = agg_error
-            return _error(code, message, status)
-    else:
-        del raw_domain_results
+        if not is_msd and len(container_ids) <= 10000:
+            cache_set(events_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
 
-    response: Dict[str, Any] = {
-        "stage": "events",
-        "results": results,
-        "aggregation": aggregation,
-    }
+        if len(container_ids) > 10000:
+            gc.collect()
 
-    if failed_domains:
-        response["error"] = "one or more domains failed"
-        response["code"] = "EVENTS_PARTIAL_FAILURE"
-        response["failed_domains"] = sorted(failed_domains)
-
-    if not is_msd and len(container_ids) <= 10000:
-        cache_set(events_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
-
-    if len(container_ids) > 10000:
-        gc.collect()
-
-    return jsonify(response)
+        return jsonify(response)
+    finally:
+        if lock_acquired:
+            release_lock(lock_key)
 
 
 @trace_bp.route("/job/<job_id>", methods=["GET"])

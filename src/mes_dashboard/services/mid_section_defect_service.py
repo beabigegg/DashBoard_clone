@@ -64,8 +64,8 @@ CACHE_TTL_LOSS_REASONS = 86400  # 24h for loss reason list (daily sync)
 FORWARD_PIPELINE_MAX_WORKERS = int(os.getenv('FORWARD_PIPELINE_MAX_WORKERS', '2'))
 
 # Distributed lock settings for query_analysis cold-cache path
-ANALYSIS_LOCK_TTL_SECONDS = 120
-ANALYSIS_LOCK_WAIT_TIMEOUT_SECONDS = 90
+ANALYSIS_LOCK_TTL_SECONDS = 240
+ANALYSIS_LOCK_WAIT_TIMEOUT_SECONDS = 180
 ANALYSIS_LOCK_POLL_INTERVAL_SECONDS = 0.5
 
 # Top N for chart display (rest grouped as "其他")

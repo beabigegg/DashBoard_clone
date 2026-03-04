@@ -11,6 +11,12 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df, read_sql_df_slow
+from mes_dashboard.core.interactive_memory_guard import (
+    enforce_dataset_memory_guard,
+    maybe_gc_collect,
+)
+from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
+from mes_dashboard.services.batch_query_engine import compute_query_hash
 from mes_dashboard.services.container_resolution_policy import (
     validate_resolution_request,
 )
@@ -23,6 +29,7 @@ from mes_dashboard.sql import QueryBuilder, SQLLoader
 logger = logging.getLogger("mes_dashboard.material_trace")
 
 _REVERSE_MAX_ROWS = 10_000
+_FORWARD_MAX_ROWS = 50_000
 _EXPORT_MAX_ROWS = 50_000
 
 # Safeguard: max DataFrame memory (MB) before aborting — same pattern as batch_query_engine
@@ -30,6 +37,9 @@ _MAX_RESULT_MB = int(os.getenv("MATERIAL_TRACE_MAX_RESULT_MB", "256"))
 
 # Safeguard: IN-clause batch size — Oracle has practical limits on large IN lists
 _IN_BATCH_SIZE = 1000
+
+# Redis result cache TTL (seconds)
+_CACHE_TTL = 300
 
 _CSV_COLUMNS = {
     "CONTAINERNAME": "LOT ID",
@@ -153,13 +163,20 @@ def _resolve_container_ids(
     return resolved_ids, name_to_id, unresolved
 
 
-def _check_memory_guard(df: pd.DataFrame) -> None:
-    """Raise if DataFrame exceeds memory threshold."""
-    mem_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
-    if mem_mb > _MAX_RESULT_MB:
-        raise MemoryError(
-            f"查詢結果佔用 {mem_mb:.0f} MB，超過 {_MAX_RESULT_MB} MB 上限，請縮小查詢範圍"
-        )
+def _check_memory_guard(df: pd.DataFrame, *, query_id: str = "") -> None:
+    """Raise if DataFrame exceeds memory / RSS thresholds.
+
+    Delegates to the shared interactive_memory_guard for two-fence protection.
+    Kept as a thin wrapper so existing call-sites remain unchanged.
+    """
+    enforce_dataset_memory_guard(
+        df,
+        operation="物料追溯查詢",
+        query_id=query_id,
+        max_input_mb=float(_MAX_RESULT_MB),
+        max_projected_rss_mb=1100.0,
+        working_set_factor=1.8,
+    )
 
 
 def _execute_batched_query(
@@ -239,6 +256,42 @@ def _paginate(df: pd.DataFrame, page: int, per_page: int) -> Dict[str, Any]:
 
 
 # ============================================================
+# Redis result cache helpers
+# ============================================================
+
+
+def _compute_cache_key(
+    mode: str,
+    values: List[str],
+    workcenter_groups: Optional[List[str]] = None,
+) -> str:
+    """Compute a deterministic Redis cache key for a query."""
+    cache_hash = compute_query_hash({
+        "mode": mode,
+        "values": sorted(values),
+        "workcenter_groups": sorted(workcenter_groups) if workcenter_groups else [],
+    })
+    return f"mt:result:{cache_hash}"
+
+
+def _try_load_cached_df(cache_key: str) -> Optional[pd.DataFrame]:
+    """Attempt to load a cached DataFrame from Redis."""
+    try:
+        return redis_load_df(cache_key)
+    except Exception as exc:
+        logger.debug("Redis cache load failed (%s): %s", cache_key, exc)
+        return None
+
+
+def _try_store_cached_df(cache_key: str, df: pd.DataFrame) -> None:
+    """Attempt to store a DataFrame in Redis cache."""
+    try:
+        redis_store_df(cache_key, df, ttl=_CACHE_TTL)
+    except Exception as exc:
+        logger.debug("Redis cache store failed (%s): %s", cache_key, exc)
+
+
+# ============================================================
 # Forward query (LOT ID / Work Order → Materials)
 # ============================================================
 
@@ -252,6 +305,16 @@ def forward_query(
 ) -> Dict[str, Any]:
     """Execute forward material trace query."""
     meta: Dict[str, Any] = {}
+    cache_key = _compute_cache_key(mode, values, workcenter_groups)
+
+    # Try Redis cache first (pagination and re-queries skip Oracle)
+    cached_df = _try_load_cached_df(cache_key)
+    if cached_df is not None:
+        logger.debug("Forward query cache hit: %s", cache_key)
+        result = _paginate(cached_df, page, per_page)
+        result["meta"] = meta
+        return result
+
     wc_names = _resolve_workcenter_names(workcenter_groups)
 
     if mode == "lot":
@@ -266,10 +329,22 @@ def forward_query(
     else:  # workorder
         df = _execute_batched_query("material_trace/forward_by_workorder", "m.PJ_WORKORDER", values, wc_names)
 
+    maybe_gc_collect()
+
     if df.empty:
         return {"rows": [], "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 0}, "meta": meta}
 
+    # Forward truncation — SQL fetches 50001 rows to detect overflow
+    if len(df) > _FORWARD_MAX_ROWS:
+        df = df.iloc[:_FORWARD_MAX_ROWS]
+        meta["truncated"] = True
+        meta["max_rows"] = _FORWARD_MAX_ROWS
+
     df = _enrich_workcenter_group(df)
+
+    # Store enriched result in Redis for subsequent pagination / export
+    _try_store_cached_df(cache_key, df)
+
     result = _paginate(df, page, per_page)
     result["meta"] = meta
     return result
@@ -288,9 +363,21 @@ def reverse_query(
 ) -> Dict[str, Any]:
     """Execute reverse material trace query."""
     meta: Dict[str, Any] = {}
+    cache_key = _compute_cache_key("material_lot", values, workcenter_groups)
+
+    # Try Redis cache first
+    cached_df = _try_load_cached_df(cache_key)
+    if cached_df is not None:
+        logger.debug("Reverse query cache hit: %s", cache_key)
+        result = _paginate(cached_df, page, per_page)
+        result["meta"] = meta
+        return result
+
     wc_names = _resolve_workcenter_names(workcenter_groups)
 
     df = _execute_batched_query("material_trace/reverse_by_material_lot", "m.MATERIALLOTNAME", values, wc_names)
+
+    maybe_gc_collect()
 
     if df.empty:
         return {"rows": [], "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 0}, "meta": meta}
@@ -302,6 +389,10 @@ def reverse_query(
         meta["max_rows"] = _REVERSE_MAX_ROWS
 
     df = _enrich_workcenter_group(df)
+
+    # Store enriched result in Redis for subsequent pagination / export
+    _try_store_cached_df(cache_key, df)
+
     result = _paginate(df, page, per_page)
     result["meta"] = meta
     return result
@@ -319,22 +410,37 @@ def export_csv(
 ) -> tuple[bytes, Dict[str, Any]]:
     """Export query results as UTF-8 BOM CSV."""
     meta: Dict[str, Any] = {}
-    wc_names = _resolve_workcenter_names(workcenter_groups)
 
-    if mode == "lot":
-        container_ids, _name_map, unresolved = _resolve_container_ids(values)
-        if unresolved:
-            meta["unresolved"] = unresolved
-        if not container_ids:
+    # Try Redis cache first — avoids re-querying Oracle for export
+    cache_key = _compute_cache_key(mode, values, workcenter_groups)
+    df = _try_load_cached_df(cache_key)
+
+    if df is None:
+        # Cache miss — execute query
+        wc_names = _resolve_workcenter_names(workcenter_groups)
+
+        if mode == "lot":
+            container_ids, _name_map, unresolved = _resolve_container_ids(values)
+            if unresolved:
+                meta["unresolved"] = unresolved
+            if not container_ids:
+                return _empty_csv(), meta
+
+            df = _execute_batched_query("material_trace/forward_by_lot", "m.CONTAINERID", container_ids, wc_names, allow_patterns=False)
+
+        elif mode == "workorder":
+            df = _execute_batched_query("material_trace/forward_by_workorder", "m.PJ_WORKORDER", values, wc_names)
+
+        else:  # material_lot
+            df = _execute_batched_query("material_trace/reverse_by_material_lot", "m.MATERIALLOTNAME", values, wc_names)
+
+        if df.empty:
             return _empty_csv(), meta
 
-        df = _execute_batched_query("material_trace/forward_by_lot", "m.CONTAINERID", container_ids, wc_names, allow_patterns=False)
+        df = _enrich_workcenter_group(df)
 
-    elif mode == "workorder":
-        df = _execute_batched_query("material_trace/forward_by_workorder", "m.PJ_WORKORDER", values, wc_names)
-
-    else:  # material_lot
-        df = _execute_batched_query("material_trace/reverse_by_material_lot", "m.MATERIALLOTNAME", values, wc_names)
+        # Store in cache for potential subsequent requests
+        _try_store_cached_df(cache_key, df)
 
     if df.empty:
         return _empty_csv(), meta
@@ -344,8 +450,6 @@ def export_csv(
         df = df.iloc[:_EXPORT_MAX_ROWS]
         meta["truncated"] = True
         meta["export_max_rows"] = _EXPORT_MAX_ROWS
-
-    df = _enrich_workcenter_group(df)
 
     # Select and rename columns for CSV
     available_cols = [c for c in _CSV_COLUMNS if c in df.columns]

@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
+from mes_dashboard.core import interactive_memory_guard as _img
 from mes_dashboard.services import reject_dataset_cache as cache_svc
 
 
@@ -493,7 +494,7 @@ def test_compute_batch_pareto_memory_guard_rejects_large_cached_dataset(monkeypa
     df = _build_detail_filter_df()
 
     monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _query_id: df)
-    monkeypatch.setattr(cache_svc, "_df_memory_mb", lambda _df: 128.0)
+    monkeypatch.setattr(_img, "df_memory_mb", lambda _df: 128.0)
     monkeypatch.setattr(cache_svc, "_REJECT_DERIVE_MAX_INPUT_MB", 64)
 
     with pytest.raises(MemoryError, match="超過 64 MB 上限"):
@@ -509,8 +510,8 @@ def test_compute_batch_pareto_memory_guard_allows_after_filter_narrowing(monkeyp
 
     monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _query_id: df)
     monkeypatch.setattr(
-        cache_svc,
-        "_df_memory_mb",
+        _img,
+        "df_memory_mb",
         lambda frame: 128.0 if len(frame.index) > 1 else 16.0,
     )
     monkeypatch.setattr(cache_svc, "_REJECT_DERIVE_MAX_INPUT_MB", 64)
@@ -547,7 +548,7 @@ def test_compute_batch_pareto_memory_guard_uses_compacted_pareto_frame(monkeypat
         )
         return 128.0 if has_object_dim else 16.0
 
-    monkeypatch.setattr(cache_svc, "_df_memory_mb", fake_df_memory_mb)
+    monkeypatch.setattr(_img, "df_memory_mb", fake_df_memory_mb)
     monkeypatch.setattr(cache_svc, "_REJECT_DERIVE_MAX_INPUT_MB", 64)
 
     result = cache_svc.compute_batch_pareto(

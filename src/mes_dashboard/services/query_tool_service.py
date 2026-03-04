@@ -34,6 +34,7 @@ from mes_dashboard.services.container_resolution_policy import (
     validate_resolution_request,
     validate_resolution_result,
 )
+from mes_dashboard.core.interactive_memory_guard import process_rss_mb
 from mes_dashboard.services.event_fetcher import EventFetcher
 
 try:
@@ -55,6 +56,27 @@ MAX_EQUIPMENTS = 20
 MAX_DATE_RANGE_DAYS = 365
 DEFAULT_TIME_WINDOW_HOURS = 168  # 1 week for better PJ_TYPE detection
 ADJACENT_LOTS_COUNT = 3
+QUERY_TOOL_RSS_REJECT_MB = float(os.getenv('QUERY_TOOL_RSS_REJECT_MB', '1100'))
+
+
+def _check_rss_guard(operation: str) -> None:
+    """Reject request if current worker RSS exceeds safety threshold.
+
+    Raises MemoryError with a user-facing 中文 message so the route layer
+    can convert it to a 503 / error JSON.
+    """
+    rss = process_rss_mb()
+    if rss is None:
+        return  # fail-open if psutil unavailable
+    if rss > QUERY_TOOL_RSS_REJECT_MB:
+        logger.warning(
+            "RSS guard rejected %s — rss_mb=%.1f limit_mb=%.0f",
+            operation, rss, QUERY_TOOL_RSS_REJECT_MB,
+        )
+        raise MemoryError(
+            f"目前服務記憶體負載較高（RSS {rss:.1f} MB），暫停{operation}以保護系統，"
+            "請稍後再試或縮小查詢範圍"
+        )
 
 
 def _max_batch_container_ids() -> int:
@@ -797,6 +819,7 @@ def get_lot_history(
         return {'error': '請指定 CONTAINERID'}
 
     try:
+        _check_rss_guard("LOT 生產履歷查詢")
         events_by_cid = EventFetcher.fetch_events([container_id], "history")
         rows = list(events_by_cid.get(container_id, []))
 
@@ -826,6 +849,8 @@ def get_lot_history(
             'filtered_by_groups': workcenter_groups or [],
         }
 
+    except MemoryError:
+        raise
     except Exception as exc:
         logger.error(f"LOT history query failed for {container_id}: {exc}")
         return {'error': f'查詢失敗: {str(exc)}'}
@@ -908,6 +933,7 @@ def get_lot_history_batch(
         return {'error': f'container_ids 數量不可超過 {max_ids} 筆'}
 
     try:
+        _check_rss_guard("LOT 批次生產履歷查詢")
         events_by_cid = EventFetcher.fetch_events(container_ids, "history")
 
         rows = []
@@ -938,6 +964,8 @@ def get_lot_history_batch(
             'filtered_by_groups': workcenter_groups or [],
         }
 
+    except MemoryError:
+        raise
     except Exception as exc:
         logger.error(f"LOT history batch query failed: {exc}")
         return {'error': f'查詢失敗: {str(exc)}'}
@@ -967,6 +995,7 @@ def get_lot_associations_batch(
         return {'error': f'批次查詢不支援類型: {assoc_type}'}
 
     try:
+        _check_rss_guard(f"LOT 批次{assoc_type}查詢")
         events_by_cid = EventFetcher.fetch_events(container_ids, assoc_type)
 
         rows = []
@@ -991,6 +1020,8 @@ def get_lot_associations_batch(
             'container_ids': container_ids,
         }
 
+    except MemoryError:
+        raise
     except Exception as exc:
         logger.error(f"LOT {assoc_type} batch query failed: {exc}")
         return {'error': f'查詢失敗: {str(exc)}'}
@@ -1602,6 +1633,7 @@ def get_equipment_lots(
         return {'error': validation_error}
 
     try:
+        _check_rss_guard("設備批次 LOT 查詢")
         builder = QueryBuilder()
         builder.add_in_condition("h.EQUIPMENTID", equipment_ids)
         sql = SQLLoader.load_with_params(
@@ -1622,6 +1654,8 @@ def get_equipment_lots(
             'date_range': {'start': start_date, 'end': end_date},
         }
 
+    except MemoryError:
+        raise
     except Exception as exc:
         logger.error(f"Equipment lots query failed: {exc}")
         return {'error': f'查詢失敗: {str(exc)}'}
@@ -1652,6 +1686,7 @@ def get_equipment_materials(
         return {'error': validation_error}
 
     try:
+        _check_rss_guard("設備原料消耗查詢")
         builder = QueryBuilder()
         builder.add_in_condition("EQUIPMENTNAME", equipment_names)
         sql = SQLLoader.load_with_params(
@@ -1672,6 +1707,8 @@ def get_equipment_materials(
             'date_range': {'start': start_date, 'end': end_date},
         }
 
+    except MemoryError:
+        raise
     except Exception as exc:
         logger.error(f"Equipment materials query failed: {exc}")
         return {'error': f'查詢失敗: {str(exc)}'}
@@ -1702,6 +1739,7 @@ def get_equipment_rejects(
         return {'error': validation_error}
 
     try:
+        _check_rss_guard("設備不良品查詢")
         builder = QueryBuilder()
         builder.add_in_condition("EQUIPMENTNAME", equipment_names)
         sql = SQLLoader.load_with_params(
@@ -1722,6 +1760,8 @@ def get_equipment_rejects(
             'date_range': {'start': start_date, 'end': end_date},
         }
 
+    except MemoryError:
+        raise
     except Exception as exc:
         logger.error(f"Equipment rejects query failed: {exc}")
         return {'error': f'查詢失敗: {str(exc)}'}
