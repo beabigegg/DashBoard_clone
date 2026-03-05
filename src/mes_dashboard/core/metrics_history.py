@@ -243,6 +243,55 @@ class MetricsHistoryStore:
             logger.error("Failed to query metrics snapshots: %s", exc)
             return []
 
+    def query_snapshots_aggregated(
+        self, minutes: int = 30, bucket_seconds: int = 30,
+    ) -> List[Dict[str, Any]]:
+        """Return time-bucketed aggregated snapshots for trend charts.
+
+        Groups raw rows into *bucket_seconds*-wide windows and returns
+        MAX for gauge metrics, SUM for latency_count, and worker_count.
+        """
+        if not self._initialized:
+            self.initialize()
+        cutoff = (datetime.now() - timedelta(minutes=minutes)).isoformat()
+        sql = f"""
+            SELECT
+                datetime(
+                    (CAST(strftime('%s', ts) AS INTEGER) / {bucket_seconds}) * {bucket_seconds},
+                    'unixepoch', 'localtime'
+                ) AS ts,
+                MAX(pool_saturation)    AS pool_saturation,
+                MAX(pool_checked_out)   AS pool_checked_out,
+                MAX(pool_checked_in)    AS pool_checked_in,
+                MAX(pool_overflow)      AS pool_overflow,
+                MAX(pool_max_capacity)  AS pool_max_capacity,
+                MAX(redis_used_memory)  AS redis_used_memory,
+                MAX(redis_hit_rate)     AS redis_hit_rate,
+                MAX(rc_l1_hit_rate)     AS rc_l1_hit_rate,
+                MAX(rc_l2_hit_rate)     AS rc_l2_hit_rate,
+                MAX(rc_miss_rate)       AS rc_miss_rate,
+                MAX(latency_p50_ms)     AS latency_p50_ms,
+                MAX(latency_p95_ms)     AS latency_p95_ms,
+                MAX(latency_p99_ms)     AS latency_p99_ms,
+                SUM(latency_count)      AS latency_count,
+                MAX(slow_query_active)  AS slow_query_active,
+                MAX(slow_query_waiting) AS slow_query_waiting,
+                MAX(worker_rss_bytes)   AS worker_rss_bytes,
+                COUNT(DISTINCT worker_pid) AS worker_count,
+                ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
+            FROM metrics_snapshots
+            WHERE ts >= ?
+            GROUP BY (CAST(strftime('%s', ts) AS INTEGER) / {bucket_seconds})
+            ORDER BY ts ASC
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.execute(sql, (cutoff,))
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as exc:
+            logger.error("Failed to query aggregated metrics snapshots: %s", exc)
+            return []
+
     def cleanup(self) -> int:
         if not self._initialized:
             return 0
@@ -349,13 +398,11 @@ class MetricsHistoryCollector:
                 data["slow_query_active"] = 0
                 data["slow_query_waiting"] = 0
 
-            # Worker RSS memory
+            # Worker RSS memory (current, not peak)
             try:
-                import resource
-                # ru_maxrss is in KB on Linux
-                data["worker_rss_bytes"] = resource.getrusage(
-                    resource.RUSAGE_SELF
-                ).ru_maxrss * 1024
+                from mes_dashboard.core.interactive_memory_guard import process_rss_mb
+                rss_mb = process_rss_mb()
+                data["worker_rss_bytes"] = int(rss_mb * 1024 * 1024) if rss_mb is not None else 0
             except Exception:
                 data["worker_rss_bytes"] = 0
 

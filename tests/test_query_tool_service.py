@@ -175,7 +175,7 @@ class TestResolveQueriesUseBindParams:
         import pandas as pd
 
         with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
-            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
                 mock_load.return_value = "SELECT * FROM DUAL"
                 mock_read.return_value = pd.DataFrame([
                     {
@@ -201,7 +201,7 @@ class TestResolveQueriesUseBindParams:
         import pandas as pd
 
         with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
-            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
                 mock_load.return_value = "SELECT * FROM DUAL"
                 mock_read.return_value = pd.DataFrame([
                     {
@@ -233,7 +233,7 @@ class TestResolveQueriesUseBindParams:
         import pandas as pd
 
         with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
-            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
                 mock_load.return_value = "SELECT * FROM DUAL"
                 mock_read.return_value = pd.DataFrame([
                     {
@@ -265,7 +265,7 @@ class TestResolveQueriesUseBindParams:
         import pandas as pd
 
         with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
-            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
                 mock_load.side_effect = [
                     "SELECT * FROM COMBINE",
                     "SELECT * FROM CONTAINER_NAME",
@@ -329,7 +329,7 @@ class TestResolveQueriesUseBindParams:
         import pandas as pd
 
         with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
-            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
                 mock_load.return_value = "SELECT * FROM DUAL"
                 mock_read.return_value = pd.DataFrame([
                     {
@@ -353,7 +353,7 @@ class TestResolveQueriesUseBindParams:
         import pandas as pd
 
         with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
-            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_read:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
                 mock_load.return_value = "SELECT * FROM DUAL"
                 mock_read.return_value = pd.DataFrame([
                     {
@@ -383,26 +383,24 @@ class TestResolveQueriesUseBindParams:
 
 
 class TestSplitMergeHistoryMode:
-    """Fast mode should use read_sql_df, full mode should use read_sql_df_slow."""
+    """Both modes use read_sql_df_slow for timeout protection."""
 
     def test_fast_mode_uses_time_window_and_row_limit(self):
         from unittest.mock import patch
         import pandas as pd
 
         with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
-            with patch('mes_dashboard.services.query_tool_service.read_sql_df') as mock_fast:
-                with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_slow:
-                    mock_load.return_value = "SELECT * FROM DUAL"
-                    mock_fast.return_value = pd.DataFrame([])
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_slow:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_slow.return_value = pd.DataFrame([])
 
-                    result = get_lot_split_merge_history('WO-1', full_history=False)
+                result = get_lot_split_merge_history('WO-1', full_history=False)
 
-                    assert result['mode'] == 'fast'
-                    kwargs = mock_load.call_args.kwargs
-                    assert "ADD_MONTHS(SYSDATE, -6)" in kwargs['TIME_WINDOW']
-                    assert "FETCH FIRST 500 ROWS ONLY" == kwargs['ROW_LIMIT']
-                    mock_fast.assert_called_once()
-                    mock_slow.assert_not_called()
+                assert result['mode'] == 'fast'
+                kwargs = mock_load.call_args.kwargs
+                assert "ADD_MONTHS(SYSDATE, -6)" in kwargs['TIME_WINDOW']
+                assert "FETCH FIRST 500 ROWS ONLY" == kwargs['ROW_LIMIT']
+                mock_slow.assert_called_once()
 
     def test_full_mode_uses_slow_query_without_limits(self):
         from unittest.mock import patch

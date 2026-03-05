@@ -405,7 +405,7 @@ def api_performance_history():
     minutes = request.args.get("minutes", 30, type=int)
     minutes = max(1, min(minutes, 180))
     store = get_metrics_history_store()
-    snapshots = store.query_snapshots(minutes=minutes)
+    snapshots = store.query_snapshots_aggregated(minutes=minutes)
     return jsonify({
         "success": True,
         "data": {

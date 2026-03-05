@@ -34,21 +34,21 @@ class TestHoldDetailPageRoute(TestHoldRoutesBase):
         """SPA mode should single-hop redirect missing reason to canonical shell overview."""
         response = self.client.get('/hold-detail', follow_redirects=False)
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.location.endswith('/portal-shell/wip-overview'))
+        self.assertTrue(response.location.endswith('/portal-shell/hold-overview'))
 
     def test_hold_detail_page_requires_reason_non_spa_mode(self):
         """Non-SPA mode should keep legacy overview redirect behavior."""
         self.app.config['PORTAL_SPA_ENABLED'] = False
         response = self.client.get('/hold-detail', follow_redirects=False)
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.location.endswith('/wip-overview'))
+        self.assertTrue(response.location.endswith('/hold-overview'))
 
     def test_hold_detail_page_requires_reason_has_single_redirect_hop_in_spa_mode(self):
         """Follow-redirect flow should complete with exactly one redirect hop."""
         response = self.client.get('/hold-detail', follow_redirects=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.history), 1)
-        self.assertTrue(response.history[0].location.endswith('/portal-shell/wip-overview'))
+        self.assertTrue(response.history[0].location.endswith('/portal-shell/hold-overview'))
 
     def test_hold_detail_page_with_reason(self):
         """GET /hold-detail?reason=xxx should redirect to canonical shell route."""

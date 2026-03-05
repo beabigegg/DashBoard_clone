@@ -136,6 +136,35 @@
       </div>
     </section>
 
+    <!-- Pareto Materialization -->
+    <section class="panel" v-if="perfDetail?.pareto_materialization && !perfDetail.pareto_materialization.error">
+      <h2 class="panel-title">Pareto 物化層</h2>
+      <div class="pareto-stats-grid">
+        <StatCard :value="paretoHitRateDisplay" label="命中率" />
+        <StatCard :value="perfDetail.pareto_materialization.hit" label="命中次數" />
+        <StatCard :value="perfDetail.pareto_materialization.miss" label="未命中次數" />
+        <StatCard :value="perfDetail.pareto_materialization.build" label="建構次數" />
+        <StatCard :value="perfDetail.pareto_materialization.build_ok" label="建構成功" />
+        <StatCard :value="perfDetail.pareto_materialization.build_fail" label="建構失敗" />
+        <StatCard :value="perfDetail.pareto_materialization.fallback" label="Fallback 次數" />
+        <StatCard :value="perfDetail.pareto_materialization.rejected_oversize" label="超大拒絕" />
+        <StatCard :value="paretoBuildLatencyDisplay" label="最近建構耗時" />
+        <StatCard :value="paretoPayloadDisplay" label="Snapshot 大小" />
+      </div>
+      <div class="pareto-fallback-reasons" v-if="paretoFallbackReasons.length">
+        <h3 class="sub-title">Fallback 原因分布</h3>
+        <table class="mini-table">
+          <thead><tr><th>原因</th><th>次數</th></tr></thead>
+          <tbody>
+            <tr v-for="r in paretoFallbackReasons" :key="r.reason">
+              <td>{{ r.reason }}</td>
+              <td>{{ r.count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- Cache Hit Rate Trend -->
     <TrendChart
       v-if="historyData.length > 1"
@@ -185,6 +214,28 @@
       :series="memoryTrendSeries"
       yAxisLabel="MB"
     />
+
+    <!-- Worker Memory Guard -->
+    <section class="panel" v-if="perfDetail?.worker_memory_guard?.enabled">
+      <h2 class="panel-title">Worker 記憶體守衛</h2>
+      <GaugeBar
+        label="RSS 使用率"
+        :value="perfDetail.worker_memory_guard.rss_pct"
+        :max="100"
+        unit="%"
+        :displayText="memoryGuardRssDisplay"
+        :warningThreshold="0.70"
+        :dangerThreshold="0.85"
+      />
+      <div class="memory-guard-stats">
+        <StatCard :value="perfDetail.worker_memory_guard.last_rss_mb?.toFixed(1)" label="當前 RSS (MB)" />
+        <StatCard :value="perfDetail.worker_memory_guard.limit_mb" label="上限 (MB)" />
+        <StatCard :value="memoryGuardLevelDisplay" label="壓力等級" />
+        <StatCard :value="perfDetail.worker_memory_guard.warn_count" label="警告次數" />
+        <StatCard :value="perfDetail.worker_memory_guard.evict_count" label="驅逐次數" />
+        <StatCard :value="perfDetail.worker_memory_guard.restart_count" label="重啟次數" />
+      </div>
+    </section>
 
     <!-- Worker Control -->
     <section class="panel">
@@ -408,6 +459,44 @@ const cooldownDisplay = computed(() => {
   return '就緒';
 });
 
+const memoryGuardRssDisplay = computed(() => {
+  const g = perfDetail.value?.worker_memory_guard;
+  if (!g) return '';
+  return `${g.last_rss_mb?.toFixed(1) ?? '-'} MB / ${g.limit_mb} MB (${g.rss_pct?.toFixed(1) ?? '-'}%)`;
+});
+
+const memoryGuardLevelDisplay = computed(() => {
+  const level = perfDetail.value?.worker_memory_guard?.level;
+  const levelMap = { normal: '正常', warn: '警告', evict: '驅逐中', restart: '重啟中' };
+  return levelMap[level] || level || '-';
+});
+
+const paretoHitRateDisplay = computed(() => {
+  const r = perfDetail.value?.pareto_materialization?.hit_rate;
+  return r != null ? `${(r * 100).toFixed(1)}%` : '-';
+});
+
+const paretoBuildLatencyDisplay = computed(() => {
+  const s = perfDetail.value?.pareto_materialization?.last_build_latency_s;
+  return s != null ? `${s.toFixed(2)}s` : '-';
+});
+
+const paretoPayloadDisplay = computed(() => {
+  const b = perfDetail.value?.pareto_materialization?.last_snapshot_payload_bytes;
+  if (b == null) return '-';
+  if (b < 1024) return `${b} B`;
+  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1048576).toFixed(1)} MB`;
+});
+
+const paretoFallbackReasons = computed(() => {
+  const reasons = perfDetail.value?.pareto_materialization?.fallback_reasons;
+  if (!reasons || typeof reasons !== 'object') return [];
+  return Object.entries(reasons)
+    .filter(([, count]) => count > 0)
+    .map(([reason, count]) => ({ reason, count }));
+});
+
 // --- Data Fetching ---
 async function loadSystemStatus() {
   try {
@@ -466,6 +555,7 @@ async function loadPerformanceHistory() {
     historyData.value = snapshots.map((s) => ({
       ...s,
       worker_rss_mb: s.worker_rss_bytes ? Math.round(s.worker_rss_bytes / 1048576 * 10) / 10 : 0,
+      redis_used_memory_mb: s.redis_used_memory_mb ?? (s.redis_used_memory ? Math.round(s.redis_used_memory / 1048576 * 10) / 10 : 0),
     }));
   } catch (e) {
     console.error('Failed to load performance history:', e);
@@ -486,7 +576,7 @@ const latencyTrendSeries = [
 ];
 
 const redisTrendSeries = [
-  { name: '記憶體 (bytes)', key: 'redis_used_memory', color: '#06b6d4' },
+  { name: '記憶體 (MB)', key: 'redis_used_memory_mb', color: '#06b6d4' },
 ];
 
 const hitRateTrendSeries = [

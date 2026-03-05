@@ -56,7 +56,12 @@ class TestHoldOverviewSummaryRoute(TestHoldOverviewRoutesBase):
         self.assertTrue(payload['success'])
         mock_service.assert_called_once_with(
             reason=None,
-            hold_type='quality',
+            hold_type=None,
+            workorder=None,
+            lotid=None,
+            pj_type=None,
+            firstname=None,
+            waferdesc=None,
             include_dummy=False,
         )
 
@@ -74,8 +79,13 @@ class TestHoldOverviewSummaryRoute(TestHoldOverviewRoutesBase):
         response = self.client.get('/api/hold-overview/summary?hold_type=all&reason=品質確認')
         self.assertEqual(response.status_code, 200)
         mock_service.assert_called_once_with(
-            reason='品質確認',
+            reason=['品質確認'],
             hold_type=None,
+            workorder=None,
+            lotid=None,
+            pj_type=None,
+            firstname=None,
+            waferdesc=None,
             include_dummy=False,
         )
 
@@ -114,7 +124,12 @@ class TestHoldOverviewMatrixRoute(TestHoldOverviewRoutesBase):
             include_dummy=False,
             status='HOLD',
             hold_type='non-quality',
-            reason='特殊需求管控',
+            reason=['特殊需求管控'],
+            workorder=None,
+            lotid=None,
+            pj_type=None,
+            firstname=None,
+            waferdesc=None,
         )
 
     def test_matrix_invalid_hold_type(self):
@@ -145,7 +160,7 @@ class TestHoldOverviewTreemapRoute(TestHoldOverviewRoutesBase):
         self.assertEqual(response.status_code, 200)
         mock_service.assert_called_once_with(
             hold_type='quality',
-            reason='品質確認',
+            reason=['品質確認'],
             workcenter='WB',
             package='QFN',
             include_dummy=False,
@@ -178,11 +193,16 @@ class TestHoldOverviewLotsRoute(TestHoldOverviewRoutesBase):
         )
         self.assertEqual(response.status_code, 200)
         mock_service.assert_called_once_with(
-            reason='品質確認',
+            reason=['品質確認'],
             hold_type=None,
             treemap_reason='品質確認',
             workcenter='WB',
             package='QFN',
+            workorder=None,
+            lotid=None,
+            pj_type=None,
+            firstname=None,
+            waferdesc=None,
             age_range='1-3',
             include_dummy=False,
             page=2,

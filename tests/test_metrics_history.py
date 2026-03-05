@@ -1,0 +1,222 @@
+# -*- coding: utf-8 -*-
+"""Tests for core/metrics_history module.
+
+Covers RSS measurement via process_rss_mb, multi-worker aggregation,
+time-bucket grouping, redis_used_memory_mb calculation, and the
+original (non-aggregated) query_snapshots API.
+"""
+
+from __future__ import annotations
+
+import os
+import tempfile
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from mes_dashboard.core.metrics_history import (
+    MetricsHistoryCollector,
+    MetricsHistoryStore,
+)
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+def _insert_snapshot(store, ts_str, pid, rss_bytes, **kwargs):
+    """Insert a metrics snapshot directly into the store's SQLite DB."""
+    defaults = {
+        'pool_saturation': 0.5, 'pool_checked_out': 0, 'pool_checked_in': 5,
+        'pool_overflow': 0, 'pool_max_capacity': 10, 'redis_used_memory': 0,
+        'redis_hit_rate': 0, 'rc_l1_hit_rate': 0, 'rc_l2_hit_rate': 0,
+        'rc_miss_rate': 0, 'latency_p50_ms': 0, 'latency_p95_ms': 0,
+        'latency_p99_ms': 0, 'latency_count': 0, 'slow_query_active': 0,
+        'slow_query_waiting': 0,
+    }
+    defaults.update(kwargs)
+    with store._write_lock:
+        with store._get_connection() as conn:
+            conn.execute(
+                """INSERT INTO metrics_snapshots
+                   (ts, worker_pid, worker_rss_bytes, pool_saturation, pool_checked_out,
+                    pool_checked_in, pool_overflow, pool_max_capacity, redis_used_memory,
+                    redis_hit_rate, rc_l1_hit_rate, rc_l2_hit_rate, rc_miss_rate,
+                    latency_p50_ms, latency_p95_ms, latency_p99_ms, latency_count,
+                    slow_query_active, slow_query_waiting)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (ts_str, pid, rss_bytes, defaults['pool_saturation'], defaults['pool_checked_out'],
+                 defaults['pool_checked_in'], defaults['pool_overflow'], defaults['pool_max_capacity'],
+                 defaults['redis_used_memory'], defaults['redis_hit_rate'], defaults['rc_l1_hit_rate'],
+                 defaults['rc_l2_hit_rate'], defaults['rc_miss_rate'], defaults['latency_p50_ms'],
+                 defaults['latency_p95_ms'], defaults['latency_p99_ms'], defaults['latency_count'],
+                 defaults['slow_query_active'], defaults['slow_query_waiting']),
+            )
+            conn.commit()
+
+
+# ============================================================
+# Test RSS Measurement
+# ============================================================
+
+class TestRSSMeasurement:
+    """Verify that _collect_snapshot reads RSS via process_rss_mb."""
+
+    @patch("mes_dashboard.core.metrics_history.get_metrics_history_store")
+    def test_rss_bytes_from_process_rss_mb(self, mock_get_store):
+        """Mock process_rss_mb to return 512.5 MB, verify worker_rss_bytes
+        in the stored snapshot equals int(512.5 * 1024 * 1024)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_rss.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            mock_get_store.return_value = store
+            collector = MetricsHistoryCollector(app=None, store=store)
+
+            with (
+                patch(
+                    "mes_dashboard.core.metrics_history.get_pool_status",
+                    create=True,
+                    side_effect=ImportError,
+                ),
+                patch(
+                    "mes_dashboard.core.interactive_memory_guard.process_rss_mb",
+                    return_value=512.5,
+                ) as mock_rss,
+            ):
+                collector._collect_snapshot()
+                mock_rss.assert_called_once()
+
+            rows = store.query_snapshots(minutes=5)
+            assert len(rows) >= 1
+            last = rows[-1]
+            expected_bytes = int(512.5 * 1024 * 1024)
+            assert last["worker_rss_bytes"] == expected_bytes
+
+    @patch("mes_dashboard.core.metrics_history.get_metrics_history_store")
+    def test_resource_getrusage_not_called(self, mock_get_store):
+        """Ensure that resource.getrusage is NOT called during snapshot
+        collection -- we use psutil-based process_rss_mb instead."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_no_rusage.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+            mock_get_store.return_value = store
+            collector = MetricsHistoryCollector(app=None, store=store)
+
+            with (
+                patch(
+                    "mes_dashboard.core.interactive_memory_guard.process_rss_mb",
+                    return_value=100.0,
+                ),
+                patch("resource.getrusage") as mock_rusage,
+            ):
+                collector._collect_snapshot()
+                mock_rusage.assert_not_called()
+
+
+# ============================================================
+# Test Multi-Worker Aggregation
+# ============================================================
+
+class TestMultiWorkerAggregation:
+    """Two workers in the same 30s bucket must collapse into one row."""
+
+    def test_same_bucket_aggregation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_agg.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            ts = now.isoformat()
+
+            rss_a = 1770 * 1024 * 1024
+            rss_b = 563 * 1024 * 1024
+
+            _insert_snapshot(store, ts, pid=1001, rss_bytes=rss_a, pool_saturation=0.8)
+            _insert_snapshot(store, ts, pid=1002, rss_bytes=rss_b, pool_saturation=0.3)
+
+            rows = store.query_snapshots_aggregated(minutes=5)
+            assert len(rows) == 1, f"Expected 1 aggregated row, got {len(rows)}"
+
+            row = rows[0]
+            assert row["worker_rss_bytes"] == rss_a  # MAX
+            assert row["worker_count"] == 2
+
+
+# ============================================================
+# Test Different Time Buckets
+# ============================================================
+
+class TestDifferentTimeBuckets:
+    """Snapshots 60 seconds apart must land in separate 30s buckets."""
+
+    def test_two_buckets(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_buckets.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            ts1 = now.isoformat()
+            ts2 = (now - timedelta(seconds=60)).isoformat()
+
+            _insert_snapshot(store, ts1, pid=1001, rss_bytes=500 * 1024 * 1024)
+            _insert_snapshot(store, ts2, pid=1001, rss_bytes=400 * 1024 * 1024)
+
+            rows = store.query_snapshots_aggregated(minutes=5)
+            assert len(rows) == 2, f"Expected 2 rows for different buckets, got {len(rows)}"
+
+
+# ============================================================
+# Test redis_used_memory_mb Calculation
+# ============================================================
+
+class TestRedisUsedMemoryMb:
+    """Aggregated query must compute redis_used_memory_mb = bytes / 1048576."""
+
+    def test_redis_memory_conversion(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_redis_mb.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            redis_bytes = 268435456  # 256 MB
+            now = datetime.now()
+            _insert_snapshot(
+                store,
+                now.isoformat(),
+                pid=1001,
+                rss_bytes=0,
+                redis_used_memory=redis_bytes,
+            )
+
+            rows = store.query_snapshots_aggregated(minutes=5)
+            assert len(rows) == 1
+            assert rows[0]["redis_used_memory_mb"] == 256.0
+
+
+# ============================================================
+# Test Original query_snapshots Still Works
+# ============================================================
+
+class TestQuerySnapshotsNoAggregation:
+    """The non-aggregated query_snapshots must return all rows as-is."""
+
+    def test_no_aggregation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_raw.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            ts = now.isoformat()
+
+            _insert_snapshot(store, ts, pid=2001, rss_bytes=100 * 1024 * 1024)
+            _insert_snapshot(store, ts, pid=2002, rss_bytes=200 * 1024 * 1024)
+
+            rows = store.query_snapshots(minutes=5)
+            assert len(rows) == 2, f"Expected 2 raw rows, got {len(rows)}"
