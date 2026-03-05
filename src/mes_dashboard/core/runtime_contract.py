@@ -88,12 +88,12 @@ def validate_runtime_contract(
     pid_file = Path(str(cfg["watchdog_pid_file"])).resolve()
     state_file = Path(str(cfg["watchdog_state_file"])).resolve()
 
-    if restart_flag.parent != runtime_dir:
+    if not restart_flag.is_relative_to(runtime_dir):
         errors.append(
             "WATCHDOG_RESTART_FLAG must be under WATCHDOG_RUNTIME_DIR "
             f"({restart_flag} not under {runtime_dir})."
         )
-    if pid_file.parent != runtime_dir:
+    if not pid_file.is_relative_to(runtime_dir):
         errors.append(
             "WATCHDOG_PID_FILE must be under WATCHDOG_RUNTIME_DIR "
             f"({pid_file} not under {runtime_dir})."

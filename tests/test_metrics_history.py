@@ -200,6 +200,63 @@ class TestRedisUsedMemoryMb:
 
 
 # ============================================================
+# Test Timezone Handling in Aggregation
+# ============================================================
+
+class TestTimezoneHandling:
+    """Aggregated timestamps must match the original local-time ts,
+    not be shifted by the server timezone offset."""
+
+    def test_aggregated_ts_matches_local_time(self):
+        """The bucketed ts should stay close to the original local time,
+        not be shifted by ±timezone offset."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_tz.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            ts_str = now.isoformat()
+            _insert_snapshot(store, ts_str, pid=1001, rss_bytes=100 * 1024 * 1024)
+
+            rows = store.query_snapshots_aggregated(minutes=5)
+            assert len(rows) == 1
+
+            # Parse the aggregated ts back and check it's within 30s of original
+            agg_ts = rows[0]["ts"]  # format: "YYYY-MM-DD HH:MM:SS"
+            agg_dt = datetime.strptime(agg_ts, "%Y-%m-%d %H:%M:%S")
+            delta = abs((now - agg_dt).total_seconds())
+            assert delta < 30, (
+                f"Aggregated ts '{agg_ts}' is {delta:.0f}s away from original "
+                f"'{ts_str}' — likely a timezone double-conversion bug"
+            )
+
+
+# ============================================================
+# Test Purge
+# ============================================================
+
+class TestPurge:
+    """purge() must delete all rows from metrics_snapshots."""
+
+    def test_purge_deletes_all(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_purge.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            for i in range(5):
+                ts = (now - timedelta(seconds=i * 30)).isoformat()
+                _insert_snapshot(store, ts, pid=1001, rss_bytes=100 * 1024 * 1024)
+
+            assert len(store.query_snapshots(minutes=5)) == 5
+            deleted = store.purge()
+            assert deleted == 5
+            assert len(store.query_snapshots(minutes=5)) == 0
+
+
+# ============================================================
 # Test Original query_snapshots Still Works
 # ============================================================
 

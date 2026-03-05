@@ -415,6 +415,125 @@ def api_performance_history():
     })
 
 
+@admin_bp.route("/api/performance-history/purge", methods=["POST"])
+@admin_required
+def api_performance_history_purge():
+    """API: Purge all historical metrics snapshots (stale data cleanup)."""
+    from mes_dashboard.core.metrics_history import get_metrics_history_store
+
+    store = get_metrics_history_store()
+    deleted = store.purge()
+    return jsonify({
+        "success": True,
+        "data": {"deleted": deleted},
+    })
+
+
+@admin_bp.route("/api/storage-info", methods=["GET"])
+@admin_required
+def api_storage_info():
+    """API: Return sizes of SQLite databases, log files, and archive dir."""
+    base = Path(__file__).resolve().parents[3]  # project root
+    logs_dir = base / "logs"
+    archive_dir = logs_dir / "archive"
+
+    def _file_info(p: Path) -> dict:
+        try:
+            st = p.stat()
+            return {"path": str(p.relative_to(base)), "size_bytes": st.st_size}
+        except OSError:
+            return {"path": str(p.relative_to(base)), "size_bytes": 0}
+
+    # SQLite databases
+    sqlite_files = [_file_info(f) for f in sorted(logs_dir.glob("*.sqlite"))]
+
+    # Active log files
+    log_files = [_file_info(f) for f in sorted(logs_dir.glob("*.log"))]
+
+    # Archive directory
+    archive_files = []
+    archive_total = 0
+    if archive_dir.is_dir():
+        for f in sorted(archive_dir.iterdir()):
+            if f.is_file():
+                info = _file_info(f)
+                archive_files.append(info)
+                archive_total += info["size_bytes"]
+
+    total = (
+        sum(f["size_bytes"] for f in sqlite_files)
+        + sum(f["size_bytes"] for f in log_files)
+        + archive_total
+    )
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "sqlite_files": sqlite_files,
+            "log_files": log_files,
+            "archive_files": archive_files,
+            "archive_total_bytes": archive_total,
+            "total_bytes": total,
+        },
+    })
+
+
+@admin_bp.route("/api/log-files/cleanup", methods=["POST"])
+@admin_required
+def api_log_files_cleanup():
+    """API: Truncate active log files and/or purge archive directory."""
+    base = Path(__file__).resolve().parents[3]
+    logs_dir = base / "logs"
+    archive_dir = logs_dir / "archive"
+
+    data = request.get_json(silent=True) or {}
+    targets = data.get("targets", ["archive", "logs"])  # default: both
+
+    logger.debug("Log file cleanup: base=%s, logs_dir=%s, archive_dir=%s", base, logs_dir, archive_dir)
+
+    cleaned = {"log_files": [], "archive_files": []}
+    total_freed = 0
+
+    # Truncate active .log files (not SQLite — those have their own cleanup)
+    if "logs" in targets:
+        for f in logs_dir.glob("*.log"):
+            try:
+                size = f.stat().st_size
+                if size > 0:
+                    f.write_text("")
+                    cleaned["log_files"].append(str(f.name))
+                    total_freed += size
+            except OSError as exc:
+                logger.warning("Failed to truncate %s: %s", f, exc)
+
+    # Remove archive files
+    if "archive" in targets:
+        if archive_dir.is_dir():
+            for f in archive_dir.iterdir():
+                if f.is_file():
+                    try:
+                        size = f.stat().st_size
+                        f.unlink()
+                        cleaned["archive_files"].append(str(f.name))
+                        total_freed += size
+                    except OSError as exc:
+                        logger.warning("Failed to remove archive file %s: %s", f, exc)
+
+    user = getattr(g, "username", "unknown")
+    logger.info(
+        "Log file cleanup by %s: freed %d bytes, targets=%s",
+        user, total_freed, targets,
+    )
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "freed_bytes": total_freed,
+            "cleaned": cleaned,
+        },
+    })
+
+
 @admin_bp.route("/api/logs/cleanup", methods=["POST"])
 @admin_required
 def api_logs_cleanup():

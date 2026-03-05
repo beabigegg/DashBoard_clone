@@ -583,6 +583,46 @@ body {
   font-weight: 500;
 }
 
+/* Storage Management Panel */
+.storage-total {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 12px;
+}
+
+.storage-section {
+  margin-bottom: 16px;
+}
+
+.storage-section h4 {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.storage-section .mini-table {
+  width: 100%;
+  font-size: 0.82rem;
+}
+
+.storage-section .mini-table th,
+.storage-section .mini-table td {
+  padding: 4px 10px;
+}
+
+.storage-section .mini-table th {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.storage-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 768px) {
   .memory-guard-stats {
     grid-template-columns: repeat(3, 1fr);

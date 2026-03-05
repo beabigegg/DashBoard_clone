@@ -237,6 +237,73 @@
       </div>
     </section>
 
+    <!-- Storage Management -->
+    <section class="panel" v-if="storageInfo">
+      <h2 class="panel-title">儲存空間管理</h2>
+      <p class="storage-total">總使用量：{{ formatBytes(storageInfo.total_bytes) }}</p>
+
+      <div class="storage-section">
+        <h4>SQLite 資料庫</h4>
+        <table class="mini-table">
+          <thead><tr><th>檔案</th><th>大小</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr v-for="f in storageInfo.sqlite_files" :key="f.path">
+              <td>{{ f.path }}</td>
+              <td>{{ formatBytes(f.size_bytes) }}</td>
+              <td>
+                <button
+                  v-if="f.path.includes('metrics_history')"
+                  class="btn btn-sm btn-danger"
+                  :disabled="storagePurging"
+                  @click="purgeMetricsHistory"
+                >清除快照</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="storage-section">
+        <h4>Log 檔案</h4>
+        <table class="mini-table">
+          <thead><tr><th>檔案</th><th>大小</th></tr></thead>
+          <tbody>
+            <tr v-for="f in storageInfo.log_files" :key="f.path">
+              <td>{{ f.path }}</td>
+              <td>{{ formatBytes(f.size_bytes) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="storage-section" v-if="storageInfo.archive_files?.length">
+        <h4>Archive ({{ storageInfo.archive_files.length }} 檔, {{ formatBytes(storageInfo.archive_total_bytes) }})</h4>
+        <table class="mini-table">
+          <thead><tr><th>檔案</th><th>大小</th></tr></thead>
+          <tbody>
+            <tr v-for="f in storageInfo.archive_files" :key="f.path">
+              <td>{{ f.path }}</td>
+              <td>{{ formatBytes(f.size_bytes) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="storage-actions">
+        <button class="btn btn-sm" :disabled="storagePurging" @click="cleanupLogFiles(['logs'])">
+          {{ storagePurging ? '清理中...' : '清空 Log 檔案' }}
+        </button>
+        <button
+          class="btn btn-sm"
+          :disabled="storagePurging || !storageInfo.archive_files?.length"
+          @click="cleanupLogFiles(['archive'])"
+        >清空 Archive</button>
+        <button class="btn btn-sm btn-danger" :disabled="storagePurging" @click="cleanupLogFiles(['logs', 'archive'])">
+          全部清理
+        </button>
+      </div>
+    </section>
+
     <!-- Worker Control -->
     <section class="panel">
       <h2 class="panel-title">Worker 控制</h2>
@@ -352,6 +419,8 @@ const logLimit = 50;
 const showRestartModal = ref(false);
 const restartLoading = ref(false);
 const cleanupLoading = ref(false);
+const storageInfo = ref(null);
+const storagePurging = ref(false);
 
 const latencyChartRef = ref(null);
 let chartInstance = null;
@@ -562,6 +631,51 @@ async function loadPerformanceHistory() {
   }
 }
 
+async function loadStorageInfo() {
+  try {
+    const res = await apiGet('/admin/api/storage-info');
+    storageInfo.value = res?.data || null;
+  } catch (e) {
+    console.error('Failed to load storage info:', e);
+  }
+}
+
+async function purgeMetricsHistory() {
+  if (!confirm('確定要清除所有效能快照資料？清除後趨勢圖將重新累積。')) return;
+  storagePurging.value = true;
+  try {
+    await apiPost('/admin/api/performance-history/purge', {});
+    await Promise.all([loadStorageInfo(), loadPerformanceHistory()]);
+  } catch (e) {
+    console.error('Failed to purge metrics history:', e);
+  } finally {
+    storagePurging.value = false;
+  }
+}
+
+async function cleanupLogFiles(targets) {
+  const label = targets.includes('logs') && targets.includes('archive') ? '所有 Log 和 Archive'
+    : targets.includes('archive') ? 'Archive 目錄' : 'Log 檔案';
+  if (!confirm(`確定要清理${label}？`)) return;
+  storagePurging.value = true;
+  try {
+    await apiPost('/admin/api/log-files/cleanup', { targets });
+    await loadStorageInfo();
+  } catch (e) {
+    console.error('Failed to cleanup log files:', e);
+  } finally {
+    storagePurging.value = false;
+  }
+}
+
+function formatBytes(bytes) {
+  if (bytes == null || bytes === 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+  return `${(bytes / 1073741824).toFixed(2)} GB`;
+}
+
 // --- Trend Chart Series Configs ---
 const poolTrendSeries = [
   { name: '飽和度', key: 'pool_saturation', color: '#6366f1' },
@@ -599,6 +713,7 @@ async function refreshAll() {
       loadPerformanceHistory(),
       loadLogs(),
       loadWorkerStatus(),
+      loadStorageInfo(),
     ]);
   } finally {
     loading.value = false;

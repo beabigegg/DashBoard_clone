@@ -254,10 +254,14 @@ class MetricsHistoryStore:
         if not self._initialized:
             self.initialize()
         cutoff = (datetime.now() - timedelta(minutes=minutes)).isoformat()
+        # NOTE: stored ts is naive local time (datetime.now().isoformat()).
+        # SQLite strftime('%s', ts) treats input as UTC by default, so we
+        # add 'utc' modifier to tell SQLite "this is local time → convert
+        # to UTC first", then convert back with 'localtime' for display.
         sql = f"""
             SELECT
                 datetime(
-                    (CAST(strftime('%s', ts) AS INTEGER) / {bucket_seconds}) * {bucket_seconds},
+                    (CAST(strftime('%s', ts, 'utc') AS INTEGER) / {bucket_seconds}) * {bucket_seconds},
                     'unixepoch', 'localtime'
                 ) AS ts,
                 MAX(pool_saturation)    AS pool_saturation,
@@ -281,7 +285,7 @@ class MetricsHistoryStore:
                 ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
             FROM metrics_snapshots
             WHERE ts >= ?
-            GROUP BY (CAST(strftime('%s', ts) AS INTEGER) / {bucket_seconds})
+            GROUP BY (CAST(strftime('%s', ts, 'utc') AS INTEGER) / {bucket_seconds})
             ORDER BY ts ASC
         """
         try:
@@ -327,6 +331,26 @@ class MetricsHistoryStore:
         except Exception as exc:
             logger.error("Failed to cleanup metrics history: %s", exc)
         return deleted
+
+    def purge(self) -> int:
+        """Delete ALL rows from the metrics_snapshots table.
+
+        Useful after schema/measurement fixes to discard stale data
+        (e.g. peak-RSS or timezone-shifted timestamps).
+        """
+        if not self._initialized:
+            self.initialize()
+        try:
+            with self._write_lock:
+                with self._get_connection() as conn:
+                    cursor = conn.execute("DELETE FROM metrics_snapshots")
+                    deleted = cursor.rowcount
+                    conn.commit()
+            logger.info("Purged all %d metrics history rows", deleted)
+            return deleted
+        except Exception as exc:
+            logger.error("Failed to purge metrics history: %s", exc)
+            return 0
 
 
 # ============================================================
