@@ -12,7 +12,7 @@ const props = defineProps({
   resolutionInfo: { type: Object, default: null },
   loading: { type: Object, required: true },
   activeFilterChips: { type: Array, default: () => [] },
-  primaryQueryMaxDays: { type: Number, default: 183 },
+  primaryQueryMaxDays: { type: Number, default: 190 },
 });
 
 const emit = defineEmits([
@@ -81,7 +81,7 @@ function emitSupplementary(patch) {
           />
         </div>
         <div class="filter-group-full date-limit-hint">
-          日期區間最多 {{ primaryQueryMaxDays }} 天（半年）。超過請改用較短區間分次查詢。
+          日期區間最多 {{ primaryQueryMaxDays }} 天（約半年）。超過請改用較短區間分次查詢。
         </div>
       </template>
 

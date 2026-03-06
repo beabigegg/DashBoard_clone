@@ -312,14 +312,29 @@ export function useTraceProgress({ profile } = {}) {
         if (streamUrl) {
           job_progress.progress = 'streaming';
 
-          const streamedResult = { stage: 'events', results: {}, aggregation: null };
+          const streamedResult = {
+            stage: 'events',
+            results: {},
+            aggregation: null,
+            quality_meta: null,
+            domain_quality_meta: {},
+          };
           let totalRecords = 0;
 
           await consumeNDJSONStream(streamUrl, {
             signal: controller.signal,
             onChunk: (chunk) => {
               if (chunk.type === 'domain_start') {
-                streamedResult.results[chunk.domain] = { data: [], count: 0, total: chunk.total };
+                const domainQualityMeta = chunk.quality_meta || null;
+                streamedResult.results[chunk.domain] = {
+                  data: [],
+                  count: 0,
+                  total: chunk.total,
+                  quality_meta: domainQualityMeta,
+                };
+                if (domainQualityMeta) {
+                  streamedResult.domain_quality_meta[chunk.domain] = domainQualityMeta;
+                }
               } else if (chunk.type === 'records' && streamedResult.results[chunk.domain]) {
                 const domainResult = streamedResult.results[chunk.domain];
                 domainResult.data.push(...chunk.data);
@@ -328,6 +343,11 @@ export function useTraceProgress({ profile } = {}) {
                 job_progress.progress = `streaming: ${totalRecords} records`;
               } else if (chunk.type === 'aggregation') {
                 streamedResult.aggregation = chunk.data;
+              } else if (chunk.type === 'quality_meta') {
+                streamedResult.quality_meta = chunk.quality_meta || null;
+                if (chunk.domain_quality_meta && typeof chunk.domain_quality_meta === 'object') {
+                  streamedResult.domain_quality_meta = chunk.domain_quality_meta;
+                }
               } else if (chunk.type === 'warning') {
                 streamedResult.error = chunk.code;
                 streamedResult.failed_domains = chunk.failed_domains;

@@ -35,6 +35,7 @@ from mes_dashboard.services.container_resolution_policy import (
     validate_resolution_result,
 )
 from mes_dashboard.core.interactive_memory_guard import process_rss_mb
+from mes_dashboard.core.query_quality_contract import unpack_event_fetch_result
 from mes_dashboard.services.event_fetcher import EventFetcher
 
 try:
@@ -57,6 +58,56 @@ MAX_DATE_RANGE_DAYS = 365
 DEFAULT_TIME_WINDOW_HOURS = 168  # 1 week for better PJ_TYPE detection
 ADJACENT_LOTS_COUNT = 3
 QUERY_TOOL_RSS_REJECT_MB = float(os.getenv('QUERY_TOOL_RSS_REJECT_MB', '1100'))
+QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE = int(os.getenv('QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE', '200'))
+QUERY_TOOL_DETAIL_MAX_PER_PAGE = int(os.getenv('QUERY_TOOL_DETAIL_MAX_PER_PAGE', '500'))
+
+
+def _fetch_domain_records(container_ids: List[str], domain: str) -> tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Any]]:
+    payload = EventFetcher.fetch_events(container_ids, domain)
+    return unpack_event_fetch_result(payload, domain=domain)
+
+
+def _sanitize_page(value: Any) -> int:
+    try:
+        return max(int(value or 1), 1)
+    except Exception:
+        return 1
+
+
+def _sanitize_per_page(value: Any) -> int:
+    if value is None:
+        return max(QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE, 1)
+    try:
+        per_page = int(value)
+    except Exception:
+        per_page = QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE
+    if per_page <= 0:
+        return 0
+    return min(max(per_page, 1), max(QUERY_TOOL_DETAIL_MAX_PER_PAGE, 1))
+
+
+def _paginate_rows(rows: List[Dict[str, Any]], page: int, per_page: int) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
+    total = len(rows)
+    if per_page <= 0:
+        pagination = {
+            "page": 1,
+            "per_page": total or 0,
+            "total": total,
+            "total_pages": 1,
+        }
+        return rows, pagination
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    current_page = max(1, min(page, total_pages))
+    start = (current_page - 1) * per_page
+    end = start + per_page
+    pagination = {
+        "page": current_page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": total_pages,
+    }
+    return rows[start:end], pagination
 
 
 def _check_rss_guard(operation: str) -> None:
@@ -820,7 +871,7 @@ def get_lot_history(
 
     try:
         _check_rss_guard("LOT 生產履歷查詢")
-        events_by_cid = EventFetcher.fetch_events([container_id], "history")
+        events_by_cid, _quality_meta = _fetch_domain_records([container_id], "history")
         rows = list(events_by_cid.get(container_id, []))
 
         if workcenter_groups:
@@ -916,6 +967,9 @@ def get_adjacent_lots(
 def get_lot_history_batch(
     container_ids: List[str],
     workcenter_groups: Optional[List[str]] = None,
+    *,
+    page: int = 1,
+    per_page: int = 0,
 ) -> Dict[str, Any]:
     """Get production history for multiple LOTs in a single EventFetcher call.
 
@@ -934,7 +988,7 @@ def get_lot_history_batch(
 
     try:
         _check_rss_guard("LOT 批次生產履歷查詢")
-        events_by_cid = EventFetcher.fetch_events(container_ids, "history")
+        events_by_cid, quality_meta = _fetch_domain_records(container_ids, "history")
 
         rows = []
         for cid in container_ids:
@@ -949,8 +1003,14 @@ def get_lot_history_batch(
                     if row.get('WORKCENTERNAME') in workcenter_set
                 ]
 
-        _enrich_workcenter_group(rows)
-        data = _df_to_records(pd.DataFrame(rows))
+        paged_rows, pagination = _paginate_rows(
+            rows,
+            _sanitize_page(page),
+            _sanitize_per_page(per_page),
+        )
+
+        _enrich_workcenter_group(paged_rows)
+        data = _df_to_records(pd.DataFrame(paged_rows))
 
         logger.debug(
             f"LOT history batch: {len(data)} records for "
@@ -959,9 +1019,11 @@ def get_lot_history_batch(
 
         return {
             'data': data,
-            'total': len(data),
+            'total': len(rows),
             'container_ids': container_ids,
             'filtered_by_groups': workcenter_groups or [],
+            'pagination': pagination,
+            'quality_meta': quality_meta,
         }
 
     except MemoryError:
@@ -974,6 +1036,9 @@ def get_lot_history_batch(
 def get_lot_associations_batch(
     container_ids: List[str],
     assoc_type: str,
+    *,
+    page: int = 1,
+    per_page: int = 0,
 ) -> Dict[str, Any]:
     """Get association data for multiple LOTs in a single EventFetcher call.
 
@@ -996,7 +1061,7 @@ def get_lot_associations_batch(
 
     try:
         _check_rss_guard(f"LOT 批次{assoc_type}查詢")
-        events_by_cid = EventFetcher.fetch_events(container_ids, assoc_type)
+        events_by_cid, quality_meta = _fetch_domain_records(container_ids, assoc_type)
 
         rows = []
         for cid in container_ids:
@@ -1005,9 +1070,13 @@ def get_lot_associations_batch(
         # Keep timeline grouping consistent with history rows.
         # Especially for materials, workcenter names like "焊_DB_料" need to map
         # to the same WORKCENTER_GROUP used by LOT history tracks.
-        _enrich_workcenter_group(rows)
-
-        data = _df_to_records(pd.DataFrame(rows))
+        paged_rows, pagination = _paginate_rows(
+            rows,
+            _sanitize_page(page),
+            _sanitize_per_page(per_page),
+        )
+        _enrich_workcenter_group(paged_rows)
+        data = _df_to_records(pd.DataFrame(paged_rows))
 
         logger.debug(
             f"LOT {assoc_type} batch: {len(data)} records for "
@@ -1016,8 +1085,10 @@ def get_lot_associations_batch(
 
         return {
             'data': data,
-            'total': len(data),
+            'total': len(rows),
             'container_ids': container_ids,
+            'pagination': pagination,
+            'quality_meta': quality_meta,
         }
 
     except MemoryError:
@@ -1044,7 +1115,7 @@ def get_lot_materials(container_id: str) -> Dict[str, Any]:
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        events_by_cid = EventFetcher.fetch_events([container_id], "materials")
+        events_by_cid, _quality_meta = _fetch_domain_records([container_id], "materials")
         rows = list(events_by_cid.get(container_id, []))
         _enrich_workcenter_group(rows)
         data = _df_to_records(pd.DataFrame(rows))
@@ -1075,7 +1146,7 @@ def get_lot_rejects(container_id: str) -> Dict[str, Any]:
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        events_by_cid = EventFetcher.fetch_events([container_id], "rejects")
+        events_by_cid, _quality_meta = _fetch_domain_records([container_id], "rejects")
         data = _df_to_records(pd.DataFrame(events_by_cid.get(container_id, [])))
 
         logger.debug(f"LOT rejects: {len(data)} records for {container_id}")
@@ -1104,7 +1175,7 @@ def get_lot_holds(container_id: str) -> Dict[str, Any]:
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        events_by_cid = EventFetcher.fetch_events([container_id], "holds")
+        events_by_cid, _quality_meta = _fetch_domain_records([container_id], "holds")
         data = _df_to_records(pd.DataFrame(events_by_cid.get(container_id, [])))
 
         logger.debug(f"LOT holds: {len(data)} records for {container_id}")
@@ -1611,7 +1682,10 @@ def get_equipment_status_hours(
 def get_equipment_lots(
     equipment_ids: List[str],
     start_date: str,
-    end_date: str
+    end_date: str,
+    *,
+    page: int = 1,
+    per_page: int = 0,
 ) -> Dict[str, Any]:
     """Get lots processed by equipment in a time period.
 
@@ -1644,14 +1718,20 @@ def get_equipment_lots(
         params = {'start_date': start_date, 'end_date': end_date}
         params.update(builder.params)
         df = read_sql_df_slow(sql, params)
-        data = _df_to_records(df)
+        records = _df_to_records(df)
+        paged_rows, pagination = _paginate_rows(
+            records,
+            _sanitize_page(page),
+            _sanitize_per_page(per_page),
+        )
 
-        logger.info(f"Equipment lots: {len(data)} records")
+        logger.info(f"Equipment lots: {len(records)} records")
 
         return {
-            'data': data,
-            'total': len(data),
+            'data': paged_rows,
+            'total': len(records),
             'date_range': {'start': start_date, 'end': end_date},
+            'pagination': pagination,
         }
 
     except MemoryError:

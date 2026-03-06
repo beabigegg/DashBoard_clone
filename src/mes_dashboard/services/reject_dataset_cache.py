@@ -34,6 +34,11 @@ from mes_dashboard.core.redis_df_store import (
     redis_load_df,
     redis_store_df,
 )
+from mes_dashboard.core.partial_failure_contract import (
+    build_partial_failure_meta,
+    parse_partial_failure_meta,
+    serialize_partial_failure_meta,
+)
 from mes_dashboard.services.filter_cache import get_specs_for_groups
 from mes_dashboard.services.container_resolution_policy import (
     assess_resolution_result,
@@ -179,11 +184,12 @@ def _store_partial_failure_flag(
     if client is None:
         return
     key = get_key(_partial_failure_key(query_id))
-    mapping = {
-        "has_partial_failure": "True",
-        "failed_chunk_count": str(max(int(failed_count), 0)),
-        "failed_ranges": json.dumps(failed_ranges or [], ensure_ascii=False, default=str),
-    }
+    mapping = serialize_partial_failure_meta(
+        build_partial_failure_meta(
+            failed_count=failed_count,
+            failed_ranges=failed_ranges or [],
+        )
+    )
     try:
         client.hset(key, mapping=mapping)
         client.expire(key, max(int(ttl), 1))
@@ -201,44 +207,7 @@ def _load_partial_failure_flag(query_id: str) -> Dict[str, Any]:
         raw = client.hgetall(key)
     except Exception:
         return {}
-    if not raw:
-        return {}
-
-    has_partial = str(raw.get("has_partial_failure", "")).strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    if not has_partial:
-        return {}
-
-    failed_count_raw = raw.get("failed_chunk_count", raw.get("failed", "0"))
-    try:
-        failed_count = max(int(str(failed_count_raw)), 0)
-    except Exception:
-        failed_count = 0
-
-    failed_ranges: List[Dict[str, str]] = []
-    raw_ranges = raw.get("failed_ranges", "[]")
-    try:
-        parsed_ranges = json.loads(raw_ranges) if raw_ranges else []
-        if isinstance(parsed_ranges, list):
-            for item in parsed_ranges:
-                if not isinstance(item, dict):
-                    continue
-                start = str(item.get("start", "")).strip()
-                end = str(item.get("end", "")).strip()
-                if start and end:
-                    failed_ranges.append({"start": start, "end": end})
-    except Exception:
-        failed_ranges = []
-
-    return {
-        "has_partial_failure": True,
-        "failed_chunk_count": failed_count,
-        "failed_ranges": failed_ranges,
-    }
+    return parse_partial_failure_meta(raw)
 
 
 def _clear_partial_failure_flag(query_id: str) -> None:
@@ -639,37 +608,9 @@ def execute_primary_query(
             engine_hash,
         )
         progress_meta = get_batch_progress("reject", engine_hash) or {}
-        has_partial_failure = str(
-            progress_meta.get("has_partial_failure", "")
-        ).strip().lower() in {"1", "true", "yes", "on"}
-        if has_partial_failure:
-            failed_raw = progress_meta.get("failed", "0")
-            try:
-                failed_count = max(int(str(failed_raw)), 0)
-            except Exception:
-                failed_count = 0
-
-            failed_ranges: List[Dict[str, str]] = []
-            raw_failed_ranges = progress_meta.get("failed_ranges", "")
-            if raw_failed_ranges:
-                try:
-                    parsed = json.loads(raw_failed_ranges)
-                except Exception:
-                    parsed = []
-                if isinstance(parsed, list):
-                    for item in parsed:
-                        if not isinstance(item, dict):
-                            continue
-                        start = str(item.get("start", "")).strip()
-                        end = str(item.get("end", "")).strip()
-                        if start and end:
-                            failed_ranges.append({"start": start, "end": end})
-
-            partial_failure_meta = {
-                "has_partial_failure": True,
-                "failed_chunk_count": failed_count,
-                "failed_ranges": failed_ranges,
-            }
+        progress_partial = parse_partial_failure_meta(progress_meta)
+        if progress_partial:
+            partial_failure_meta = progress_partial
     else:
         # --- Direct path (short query, no engine overhead) ---
         logger.info(

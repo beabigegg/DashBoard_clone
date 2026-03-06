@@ -5,6 +5,7 @@ import { exportCsv } from '../utils/csv.js';
 import { normalizeText, toDateInputValue, uniqueValues } from '../utils/values.js';
 
 const EQUIPMENT_SUB_TABS = Object.freeze(['lots', 'jobs', 'rejects', 'timeline']);
+const DEFAULT_LOTS_PER_PAGE = 200;
 
 function normalizeSubTab(value) {
   const tab = normalizeText(value).toLowerCase();
@@ -44,6 +45,7 @@ export function useEquipmentQuery(initial = {}) {
   const endDate = ref(normalizeText(initial.endDate) || rangeDefaults.endDate);
 
   const lotsRows = ref([]);
+  const lotsPagination = ref({ page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 });
   const jobsRows = ref([]);
   const rejectsRows = ref([]);
   const statusRows = ref([]);
@@ -101,17 +103,22 @@ export function useEquipmentQuery(initial = {}) {
     return '';
   }
 
-  function buildQueryPayload(queryType) {
-    return {
+  function buildQueryPayload(queryType, options = {}) {
+    const payload = {
       equipment_ids: selectedEquipmentIds.value,
       equipment_names: selectedEquipmentNames.value,
       start_date: startDate.value,
       end_date: endDate.value,
       query_type: queryType,
     };
+    if (queryType === 'lots') {
+      payload.page = Number(options.page || lotsPagination.value.page || 1);
+      payload.per_page = Number(options.perPage || lotsPagination.value.per_page || DEFAULT_LOTS_PER_PAGE);
+    }
+    return payload;
   }
 
-  async function fetchEquipmentPeriod(queryType) {
+  async function fetchEquipmentPeriod(queryType, options = {}) {
     const validation = validateFilters();
     if (validation) {
       throw new Error(validation);
@@ -119,11 +126,11 @@ export function useEquipmentQuery(initial = {}) {
 
     const payload = await apiPost(
       '/api/query-tool/equipment-period',
-      buildQueryPayload(queryType),
+      buildQueryPayload(queryType, options),
       { timeout: 360000, silent: true },
     );
 
-    return Array.isArray(payload?.data) ? payload.data : [];
+    return payload || {};
   }
 
   async function loadEquipmentOptions() {
@@ -146,13 +153,20 @@ export function useEquipmentQuery(initial = {}) {
     }
   }
 
-  async function queryLots() {
+  async function queryLots({ page = null } = {}) {
     loading.lots = true;
     errors.filters = '';
     errors.lots = '';
 
     try {
-      lotsRows.value = await fetchEquipmentPeriod('lots');
+      const payload = await fetchEquipmentPeriod('lots', { page, perPage: DEFAULT_LOTS_PER_PAGE });
+      lotsRows.value = Array.isArray(payload?.data) ? payload.data : [];
+      lotsPagination.value = payload?.pagination || {
+        page: Number(page || 1),
+        per_page: DEFAULT_LOTS_PER_PAGE,
+        total: lotsRows.value.length,
+        total_pages: 1,
+      };
       queried.lots = true;
       return true;
     } catch (error) {
@@ -161,6 +175,7 @@ export function useEquipmentQuery(initial = {}) {
         errors.filters = errors.lots;
       }
       lotsRows.value = [];
+      lotsPagination.value = { page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 };
       return false;
     } finally {
       loading.lots = false;
@@ -173,7 +188,8 @@ export function useEquipmentQuery(initial = {}) {
     errors.jobs = '';
 
     try {
-      jobsRows.value = await fetchEquipmentPeriod('jobs');
+      const payload = await fetchEquipmentPeriod('jobs');
+      jobsRows.value = Array.isArray(payload?.data) ? payload.data : [];
       queried.jobs = true;
       return true;
     } catch (error) {
@@ -194,7 +210,8 @@ export function useEquipmentQuery(initial = {}) {
     errors.rejects = '';
 
     try {
-      rejectsRows.value = await fetchEquipmentPeriod('rejects');
+      const payload = await fetchEquipmentPeriod('rejects');
+      rejectsRows.value = Array.isArray(payload?.data) ? payload.data : [];
       queried.rejects = true;
       return true;
     } catch (error) {
@@ -219,13 +236,19 @@ export function useEquipmentQuery(initial = {}) {
     try {
       const [statusData, lotsData, jobsData] = await Promise.all([
         fetchEquipmentPeriod('status_hours'),
-        fetchEquipmentPeriod('lots'),
+        fetchEquipmentPeriod('lots', { page: 1, perPage: DEFAULT_LOTS_PER_PAGE }),
         fetchEquipmentPeriod('jobs'),
       ]);
 
-      statusRows.value = statusData;
-      lotsRows.value = lotsData;
-      jobsRows.value = jobsData;
+      statusRows.value = Array.isArray(statusData?.data) ? statusData.data : [];
+      lotsRows.value = Array.isArray(lotsData?.data) ? lotsData.data : [];
+      jobsRows.value = Array.isArray(jobsData?.data) ? jobsData.data : [];
+      lotsPagination.value = lotsData?.pagination || {
+        page: 1,
+        per_page: DEFAULT_LOTS_PER_PAGE,
+        total: lotsRows.value.length,
+        total_pages: 1,
+      };
 
       queried.timeline = true;
       queried.status_hours = true;
@@ -241,6 +264,7 @@ export function useEquipmentQuery(initial = {}) {
         errors.filters = message;
       }
       statusRows.value = [];
+      lotsPagination.value = { page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 };
       return false;
     } finally {
       loading.timeline = false;
@@ -346,6 +370,7 @@ export function useEquipmentQuery(initial = {}) {
     endDate,
     activeSubTab,
     lotsRows,
+    lotsPagination,
     jobsRows,
     rejectsRows,
     statusRows,

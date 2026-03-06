@@ -312,6 +312,27 @@ class TestLotHistoryEndpoint:
         assert 'error' in payload
         mock_batch.assert_not_called()
 
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history_batch')
+    def test_lot_history_batch_forwards_pagination_and_quality_meta(self, mock_batch, client):
+        mock_batch.return_value = {
+            'data': [{'CONTAINERID': 'A'}],
+            'total': 10,
+            'pagination': {'page': 2, 'per_page': 5, 'total': 10, 'total_pages': 2},
+            'quality_meta': {'status': 'truncated', 'reasons': ['max_total_rows_exceeded']},
+        }
+
+        response = client.get('/api/query-tool/lot-history?container_ids=A,B&page=2&per_page=5')
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['pagination']['page'] == 2
+        assert payload['pagination']['per_page'] == 5
+        assert payload['quality_meta']['status'] == 'truncated'
+        mock_batch.assert_called_once()
+        kwargs = mock_batch.call_args.kwargs
+        assert kwargs['page'] == 2
+        assert kwargs['per_page'] == 5
+
 
 class TestAdjacentLotsEndpoint:
     """Tests for /api/query-tool/adjacent-lots endpoint."""
@@ -467,6 +488,28 @@ class TestLotAssociationsEndpoint:
         payload = response.get_json()
         assert 'error' in payload
         mock_batch.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_associations_batch')
+    def test_lot_associations_batch_forwards_pagination_and_quality_meta(self, mock_batch, client):
+        mock_batch.return_value = {
+            'data': [{'CONTAINERID': 'A'}],
+            'total': 4,
+            'pagination': {'page': 1, 'per_page': 2, 'total': 4, 'total_pages': 2},
+            'quality_meta': {'status': 'complete', 'reasons': []},
+        }
+
+        response = client.get(
+            '/api/query-tool/lot-associations?type=materials&container_ids=A,B&page=1&per_page=2'
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['pagination']['total_pages'] == 2
+        assert payload['quality_meta']['status'] == 'complete'
+        mock_batch.assert_called_once()
+        kwargs = mock_batch.call_args.kwargs
+        assert kwargs['page'] == 1
+        assert kwargs['per_page'] == 2
 
 
 class TestQueryToolRateLimit:
@@ -725,6 +768,35 @@ class TestEquipmentPeriodEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_equipment_lots')
+    def test_equipment_lots_forwards_pagination(self, mock_lots, client):
+        mock_lots.return_value = {
+            'data': [{'CONTAINERID': 'CID-1'}],
+            'total': 3,
+            'pagination': {'page': 2, 'per_page': 1, 'total': 3, 'total_pages': 3},
+        }
+
+        response = client.post(
+            '/api/query-tool/equipment-period',
+            json={
+                'equipment_ids': ['EQ001'],
+                'start_date': '2024-01-01',
+                'end_date': '2024-01-31',
+                'query_type': 'lots',
+                'page': 2,
+                'per_page': 1,
+            }
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['pagination']['page'] == 2
+        assert payload['pagination']['per_page'] == 1
+        mock_lots.assert_called_once()
+        kwargs = mock_lots.call_args.kwargs
+        assert kwargs['page'] == 2
+        assert kwargs['per_page'] == 1
 
 
 class TestExportCsvEndpoint:

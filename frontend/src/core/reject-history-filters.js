@@ -29,7 +29,7 @@ function normalizeBoolean(value, fallback = false) {
   return Boolean(value);
 }
 
-export const PRIMARY_QUERY_MAX_DAYS = 183;
+export const PRIMARY_QUERY_MAX_DAYS = 190;
 
 export function toRejectFilterSnapshot(input = {}) {
   return {
@@ -193,7 +193,7 @@ export function validateDateRange(startDate, endDate) {
   const dayMs = 24 * 60 * 60 * 1000;
   const days = Math.floor((endDt - startDt) / dayMs) + 1;
   if (days > PRIMARY_QUERY_MAX_DAYS) {
-    return `查詢範圍不可超過 ${PRIMARY_QUERY_MAX_DAYS} 天（最多半年）`;
+    return `查詢範圍不可超過 ${PRIMARY_QUERY_MAX_DAYS} 天（約半年）`;
   }
   return '';
 }

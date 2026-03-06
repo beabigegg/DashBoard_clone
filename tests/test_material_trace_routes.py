@@ -5,8 +5,9 @@ Tests input validation, pagination structure, and CSV export.
 """
 
 import json
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from mes_dashboard import create_app
 from mes_dashboard.core.cache import NoOpCache
@@ -144,6 +145,7 @@ class TestQueryPagination:
                 "total_pages": 2,
             },
             "meta": {},
+            "quality_meta": {"status": "complete", "reasons": []},
         }
 
         response = client.post(
@@ -162,6 +164,7 @@ class TestQueryPagination:
         assert pag["total"] == 100
         assert pag["total_pages"] == 2
         assert len(payload["rows"]) == 1
+        assert payload["quality_meta"]["status"] == "complete"
 
     @patch("mes_dashboard.routes.material_trace_routes.forward_query")
     def test_query_passes_page_param(self, mock_fwd, client):
@@ -169,6 +172,7 @@ class TestQueryPagination:
             "rows": [],
             "pagination": {"page": 3, "per_page": 50, "total": 200, "total_pages": 4},
             "meta": {},
+            "quality_meta": {"status": "complete", "reasons": []},
         }
 
         response = client.post(
@@ -189,6 +193,7 @@ class TestQueryPagination:
             "rows": [],
             "pagination": {"page": 1, "per_page": 50, "total": 0, "total_pages": 0},
             "meta": {},
+            "quality_meta": {"status": "truncated", "max_rows": 10000, "reasons": ["row_guard_truncated"]},
         }
 
         response = client.post(
@@ -198,6 +203,8 @@ class TestQueryPagination:
         )
 
         assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["quality_meta"]["status"] == "truncated"
         mock_rev.assert_called_once()
 
 
@@ -210,7 +217,10 @@ class TestExportEndpoint:
     @patch("mes_dashboard.routes.material_trace_routes.export_csv")
     def test_export_returns_csv_content_type(self, mock_export, client):
         csv_content = b"\xef\xbb\xbfLOT ID,\xe5\xb7\xa5\xe5\x96\xae\n"
-        mock_export.return_value = (csv_content, {})
+        mock_export.return_value = (
+            iter([csv_content]),
+            {"meta": {}, "quality_meta": {"status": "complete", "reasons": []}},
+        )
 
         response = client.post(
             "/api/material-trace/export",
@@ -222,11 +232,23 @@ class TestExportEndpoint:
         assert "text/csv" in response.content_type
         # Check UTF-8 BOM
         assert response.data[:3] == b"\xef\xbb\xbf"
+        assert response.headers.get("X-Query-Quality-Status") == "complete"
 
     @patch("mes_dashboard.routes.material_trace_routes.export_csv")
     def test_export_truncated_sets_header(self, mock_export, client):
         csv_content = b"\xef\xbb\xbfheader\nrow\n"
-        mock_export.return_value = (csv_content, {"truncated": True, "export_max_rows": 50000})
+        mock_export.return_value = (
+            iter([csv_content]),
+            {
+                "meta": {"truncated": True, "export_max_rows": 50000},
+                "quality_meta": {
+                    "status": "truncated",
+                    "reasons": ["export_max_rows_exceeded"],
+                    "max_rows": 50000,
+                    "observed_rows": 88888,
+                },
+            },
+        )
 
         response = client.post(
             "/api/material-trace/export",
@@ -236,6 +258,9 @@ class TestExportEndpoint:
 
         assert response.status_code == 200
         assert response.headers.get("X-Truncated") == "true"
+        assert response.headers.get("X-Max-Rows") == "50000"
+        assert response.headers.get("X-Query-Quality-Status") == "truncated"
+        assert response.headers.get("X-Query-Quality-Max-Rows") == "50000"
 
     def test_export_validation_same_as_query(self, client):
         """Export should reject invalid mode same as query."""

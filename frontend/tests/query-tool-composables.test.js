@@ -145,7 +145,12 @@ test('useEquipmentQuery performs timeline multi-query and keeps validation error
         return { data: [{ STATUSNAME: 'RUN', HOURS: 12 }] };
       }
       if (payload.query_type === 'lots') {
-        return { data: [{ CONTAINERID: 'CID-1001' }] };
+        const page = Number(payload.page || 1);
+        const perPage = Number(payload.per_page || 200);
+        return {
+          data: [{ CONTAINERID: `CID-100${page}` }],
+          pagination: { page, per_page: perPage, total: 3, total_pages: 3 },
+        };
       }
       if (payload.query_type === 'jobs') {
         return { data: [{ JOBID: 'JOB-001' }] };
@@ -176,6 +181,18 @@ test('useEquipmentQuery performs timeline multi-query and keeps validation error
     assert.equal(equipment.statusRows.value.length, 1);
     assert.equal(equipment.jobsRows.value.length, 1);
     assert.equal(equipment.lotsRows.value.length, 1);
+    assert.equal(equipment.lotsPagination.value.total_pages, 3);
+
+    const timelineLotsCall = postCalls.find((call) => call.payload.query_type === 'lots');
+    assert.equal(timelineLotsCall.payload.page, 1);
+    assert.equal(timelineLotsCall.payload.per_page, 200);
+
+    const page2Ok = await equipment.queryLots({ page: 2 });
+    assert.equal(page2Ok, true);
+    const latestLotsCall = postCalls.filter((call) => call.payload.query_type === 'lots').at(-1);
+    assert.equal(latestLotsCall.payload.page, 2);
+    assert.equal(latestLotsCall.payload.per_page, 200);
+    assert.equal(equipment.lotsPagination.value.page, 2);
 
     equipment.setSelectedEquipmentIds([]);
     const invalid = await equipment.queryLots();
@@ -194,20 +211,45 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
       getCalls.push(url);
       const parsed = new URL(url, 'http://local.test');
       if (parsed.pathname === '/api/query-tool/lot-history') {
+        const page = Number(parsed.searchParams.get('page') || 1);
+        const perPage = Number(parsed.searchParams.get('per_page') || 200);
         return {
-          data: [
-            {
-              CONTAINERID: 'CID-001',
-              EQUIPMENTID: 'EQ-01',
-              TRACKINTIMESTAMP: '2026-02-01 08:00:00',
-              TRACKOUTTIMESTAMP: '2026-02-01 08:30:00',
-            },
-          ],
+          data: page === 1
+            ? [
+                {
+                  CONTAINERID: 'CID-001',
+                  EQUIPMENTID: 'EQ-01',
+                  TRACKINTIMESTAMP: '2026-02-01 08:00:00',
+                  TRACKOUTTIMESTAMP: '2026-02-01 08:30:00',
+                },
+              ]
+            : [
+                {
+                  CONTAINERID: 'CID-002',
+                  EQUIPMENTID: 'EQ-02',
+                  TRACKINTIMESTAMP: '2026-02-01 09:00:00',
+                  TRACKOUTTIMESTAMP: '2026-02-01 09:30:00',
+                },
+              ],
+          pagination: { page, per_page: perPage, total: 3, total_pages: 2 },
+          quality_meta: {
+            status: page === 1 ? 'truncated' : 'complete',
+            reasons: page === 1 ? ['max_total_rows_exceeded'] : [],
+          },
         };
       }
       if (parsed.pathname === '/api/query-tool/lot-associations') {
         const assocType = parsed.searchParams.get('type');
-        return { data: [{ TYPE: assocType, CONTAINERID: 'CID-001' }] };
+        const page = Number(parsed.searchParams.get('page') || 1);
+        const perPage = Number(parsed.searchParams.get('per_page') || 200);
+        return {
+          data: [{ TYPE: assocType, CONTAINERID: 'CID-001' }],
+          pagination: { page, per_page: perPage, total: 1, total_pages: 1 },
+          quality_meta: {
+            status: assocType === 'materials' ? 'partial' : 'complete',
+            reasons: assocType === 'materials' ? ['chunk_failure'] : [],
+          },
+        };
       }
       if (parsed.pathname === '/api/query-tool/workcenter-groups') {
         return { data: [{ name: 'WB', sequence: 1 }] };
@@ -223,11 +265,25 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
     assert.equal(detail.historyRows.value.length, 1);
     assert.equal(detail.associationRows.holds.length, 1);
     assert.equal(detail.associationRows.materials.length, 1);
+    assert.equal(detail.pagination.history.total_pages, 2);
+    assert.equal(detail.qualityMeta.history?.status, 'truncated');
+    assert.equal(detail.qualityMeta.materials?.status, 'partial');
 
     const historyCall = getCalls.find((url) => url.startsWith('/api/query-tool/lot-history?'));
     assert.ok(historyCall, 'lot-history API should be called');
     const historyParams = new URL(historyCall, 'http://local.test').searchParams;
     assert.equal(historyParams.get('container_ids'), 'CID-001,CID-002');
+    assert.equal(historyParams.get('page'), '1');
+    assert.equal(historyParams.get('per_page'), '200');
+
+    const page2 = await detail.setSubTabPage('history', 2);
+    assert.equal(page2, true);
+    assert.equal(detail.pagination.history.page, 2);
+    assert.equal(detail.qualityMeta.history?.status, 'complete');
+    const page2Call = getCalls.filter((url) => url.startsWith('/api/query-tool/lot-history?')).at(-1);
+    const page2Params = new URL(page2Call, 'http://local.test').searchParams;
+    assert.equal(page2Params.get('page'), '2');
+    assert.equal(page2Params.get('per_page'), '200');
 
     await detail.setSelectedWorkcenterGroups(['WB']);
     const latestHistoryCall = getCalls.filter((url) => url.startsWith('/api/query-tool/lot-history?')).at(-1);

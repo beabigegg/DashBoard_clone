@@ -11,6 +11,7 @@ Contains Flask Blueprint for batch tracing and equipment period query endpoints:
 
 import gc
 import hashlib
+import os
 
 from flask import Blueprint, jsonify, request, Response, render_template, current_app
 
@@ -53,6 +54,8 @@ def _resolve_export_cids(params: dict) -> list[str]:
 
 # Create Blueprint
 query_tool_bp = Blueprint('query_tool', __name__)
+_QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE = int(os.getenv('QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE', '200'))
+_QUERY_TOOL_DETAIL_MAX_PER_PAGE = int(os.getenv('QUERY_TOOL_DETAIL_MAX_PER_PAGE', '500'))
 
 _QUERY_TOOL_RESOLVE_RATE_LIMIT = configured_rate_limit(
     bucket="query-tool-resolve",
@@ -111,6 +114,21 @@ def _reject_if_batch_too_large(container_ids: list[str]):
     if len(container_ids) <= max_ids:
         return None
     return jsonify({'error': f'container_ids 數量不可超過 {max_ids} 筆'}), 413
+
+
+def _sanitize_page(value: str | int | None) -> int:
+    try:
+        return max(int(value or 1), 1)
+    except Exception:
+        return 1
+
+
+def _sanitize_per_page(value: str | int | None) -> int:
+    try:
+        per_page = int(value or _QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE)
+    except Exception:
+        per_page = _QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE
+    return min(max(per_page, 1), max(_QUERY_TOOL_DETAIL_MAX_PER_PAGE, 1))
 
 
 def _format_lot_materials_export_rows(rows):
@@ -335,6 +353,8 @@ def query_lot_history():
         workcenter_groups = [
             g.strip() for g in workcenter_groups_param.split(',') if g.strip()
         ]
+    page = _sanitize_page(request.args.get('page'))
+    per_page = _sanitize_per_page(request.args.get('per_page'))
 
     # Batch mode: container_ids takes precedence
     if container_ids_param:
@@ -345,7 +365,12 @@ def query_lot_history():
         if too_large is not None:
             return too_large
         try:
-            result = get_lot_history_batch(cids, workcenter_groups=workcenter_groups)
+            result = get_lot_history_batch(
+                cids,
+                workcenter_groups=workcenter_groups,
+                page=page,
+                per_page=per_page,
+            )
         except MemoryError as exc:
             return jsonify({'error': str(exc)}), 503
     elif container_id:
@@ -422,6 +447,8 @@ def query_lot_associations():
     container_ids_param = request.args.get('container_ids')
     container_id = request.args.get('container_id')
     assoc_type = request.args.get('type')
+    page = _sanitize_page(request.args.get('page'))
+    per_page = _sanitize_per_page(request.args.get('per_page'))
 
     valid_types = ['materials', 'rejects', 'holds', 'splits', 'jobs']
     if assoc_type not in valid_types:
@@ -437,7 +464,12 @@ def query_lot_associations():
         if too_large is not None:
             return too_large
         try:
-            result = get_lot_associations_batch(cids, assoc_type)
+            result = get_lot_associations_batch(
+                cids,
+                assoc_type,
+                page=page,
+                per_page=per_page,
+            )
         except MemoryError as exc:
             return jsonify({'error': str(exc)}), 503
     else:
@@ -498,6 +530,8 @@ def query_equipment_period():
     start_date = data.get('start_date')
     end_date = data.get('end_date')
     query_type = data.get('query_type')
+    page = _sanitize_page(data.get('page'))
+    per_page = _sanitize_per_page(data.get('per_page'))
 
     # Validate date range
     if not start_date or not end_date:
@@ -522,7 +556,13 @@ def query_equipment_period():
         elif query_type == 'lots':
             if not equipment_ids:
                 return jsonify({'error': '請選擇至少一台設備'}), 400
-            result = get_equipment_lots(equipment_ids, start_date, end_date)
+            result = get_equipment_lots(
+                equipment_ids,
+                start_date,
+                end_date,
+                page=page,
+                per_page=per_page,
+            )
 
         elif query_type == 'materials':
             if not equipment_names:

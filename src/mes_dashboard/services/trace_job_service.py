@@ -17,6 +17,15 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple
 
+from mes_dashboard.core.query_quality_contract import (
+    QUALITY_SCOPE_DOMAIN,
+    QUALITY_SCOPE_QUERY,
+    QUALITY_STATUS_FAILED,
+    build_quality_meta,
+    merge_quality_metas,
+    normalize_quality_meta,
+    unpack_event_fetch_result,
+)
 from mes_dashboard.core.redis_client import get_key, get_redis_client
 
 logger = logging.getLogger("mes_dashboard.trace_job_service")
@@ -277,8 +286,10 @@ def _get_chunked_result(
     """Reconstruct result from chunked Redis keys."""
     meta = json.loads(raw_meta)
     domain_info = meta.get("domains", {})
+    domain_quality_meta_raw = meta.get("domain_quality_meta", {})
 
     results: Dict[str, Any] = {}
+    result_domain_quality_meta: Dict[str, Dict[str, Any]] = {}
     target_domains = [domain] if domain else list(domain_info.keys())
 
     for d in target_domains:
@@ -299,17 +310,47 @@ def _get_chunked_result(
         if limit > 0:
             rows = rows[:limit]
 
-        results[d] = {"data": rows, "count": len(rows), "total": total}
+        raw_domain_meta = None
+        if isinstance(domain_quality_meta_raw, dict):
+            raw_domain_meta = domain_quality_meta_raw.get(d)
+        if raw_domain_meta is None:
+            raw_domain_meta = info.get("quality_meta") if isinstance(info, dict) else None
+        domain_meta = normalize_quality_meta(
+            raw_domain_meta,
+            default_scope=QUALITY_SCOPE_DOMAIN,
+        )
+        if not domain_meta.get("domain"):
+            domain_meta["domain"] = d
+        result_domain_quality_meta[d] = domain_meta
+
+        results[d] = {
+            "data": rows,
+            "count": len(rows),
+            "total": total,
+            "quality_meta": domain_meta,
+        }
 
     aggregation = None
     raw_agg = conn.get(_result_aggregation_key(job_id))
     if raw_agg is not None:
         aggregation = json.loads(raw_agg)
 
+    quality_meta = normalize_quality_meta(
+        meta.get("quality_meta"),
+        default_scope=QUALITY_SCOPE_QUERY,
+    )
+    if not meta.get("quality_meta"):
+        quality_meta = merge_quality_metas(
+            result_domain_quality_meta.values(),
+            scope=QUALITY_SCOPE_QUERY,
+        )
+
     result: Dict[str, Any] = {
         "stage": "events",
         "results": results,
         "aggregation": aggregation,
+        "quality_meta": quality_meta,
+        "domain_quality_meta": result_domain_quality_meta,
     }
 
     if meta.get("failed_domains"):
@@ -330,11 +371,12 @@ def stream_job_result_ndjson(job_id: str):
 
     1. ``{"type":"meta", ...}``
     2. For each domain:
-       - ``{"type":"domain_start", "domain":"...", "total":N}``
+       - ``{"type":"domain_start", "domain":"...", "total":N, "quality_meta":{...}}``
        - ``{"type":"records", "domain":"...", "batch":i, "count":N, "data":[...]}``
        - ``{"type":"domain_end", "domain":"...", "count":N}``
     3. ``{"type":"aggregation", "data":{...}}`` (if present)
-    4. ``{"type":"complete", "total_records":N}``
+    4. ``{"type":"quality_meta", "quality_meta":{...}, "domain_quality_meta":{...}}``
+    5. ``{"type":"complete", "total_records":N}``
     """
     conn = get_redis_client()
     if conn is None:
@@ -354,6 +396,7 @@ def stream_job_result_ndjson(job_id: str):
 
     meta = json.loads(raw_meta)
     domain_info = meta.get("domains", {})
+    domain_quality_meta = meta.get("domain_quality_meta", {})
 
     yield _ndjson_line({
         "type": "meta",
@@ -366,11 +409,23 @@ def stream_job_result_ndjson(job_id: str):
     for domain_name, info in domain_info.items():
         num_chunks = info.get("chunks", 0)
         domain_total = info.get("total", 0)
+        raw_domain_meta = None
+        if isinstance(domain_quality_meta, dict):
+            raw_domain_meta = domain_quality_meta.get(domain_name)
+        if raw_domain_meta is None and isinstance(info, dict):
+            raw_domain_meta = info.get("quality_meta")
+        normalized_domain_meta = normalize_quality_meta(
+            raw_domain_meta,
+            default_scope=QUALITY_SCOPE_DOMAIN,
+        )
+        if not normalized_domain_meta.get("domain"):
+            normalized_domain_meta["domain"] = domain_name
 
         yield _ndjson_line({
             "type": "domain_start",
             "domain": domain_name,
             "total": domain_total,
+            "quality_meta": normalized_domain_meta,
         })
 
         domain_count = 0
@@ -410,6 +465,17 @@ def stream_job_result_ndjson(job_id: str):
         })
 
     yield _ndjson_line({
+        "type": "quality_meta",
+        "quality_meta": normalize_quality_meta(
+            meta.get("quality_meta"),
+            default_scope=QUALITY_SCOPE_QUERY,
+        ),
+        "domain_quality_meta": (
+            domain_quality_meta if isinstance(domain_quality_meta, dict) else {}
+        ),
+    })
+
+    yield _ndjson_line({
         "type": "complete",
         "total_records": total_records,
     })
@@ -429,9 +495,12 @@ def _store_chunked_result(
     results: Dict[str, Dict[str, Any]],
     aggregation: Optional[Dict[str, Any]],
     failed_domains: List[str],
+    quality_meta: Optional[Dict[str, Any]] = None,
+    domain_quality_meta: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> None:
     """Store job result as chunked Redis keys for streaming retrieval."""
     domain_info: Dict[str, Dict[str, Any]] = {}
+    normalized_domain_quality_meta: Dict[str, Dict[str, Any]] = {}
 
     for domain_name, domain_data in results.items():
         rows = domain_data.get("data", [])
@@ -448,7 +517,24 @@ def _store_chunked_result(
                 json.dumps(chunk, default=str, ensure_ascii=False),
             )
 
-        domain_info[domain_name] = {"chunks": len(chunks), "total": total}
+        raw_domain_meta = None
+        if isinstance(domain_quality_meta, dict):
+            raw_domain_meta = domain_quality_meta.get(domain_name)
+        if raw_domain_meta is None:
+            raw_domain_meta = domain_data.get("quality_meta")
+        normalized_domain_meta = normalize_quality_meta(
+            raw_domain_meta,
+            default_scope=QUALITY_SCOPE_DOMAIN,
+        )
+        if not normalized_domain_meta.get("domain"):
+            normalized_domain_meta["domain"] = domain_name
+        normalized_domain_quality_meta[domain_name] = normalized_domain_meta
+
+        domain_info[domain_name] = {
+            "chunks": len(chunks),
+            "total": total,
+            "quality_meta": normalized_domain_meta,
+        }
 
     if aggregation is not None:
         conn.setex(
@@ -457,10 +543,22 @@ def _store_chunked_result(
             json.dumps(aggregation, default=str, ensure_ascii=False),
         )
 
+    normalized_quality_meta = normalize_quality_meta(
+        quality_meta,
+        default_scope=QUALITY_SCOPE_QUERY,
+    )
+    if quality_meta is None:
+        normalized_quality_meta = merge_quality_metas(
+            normalized_domain_quality_meta.values(),
+            scope=QUALITY_SCOPE_QUERY,
+        )
+
     result_meta = {
         "profile": profile,
         "domains": domain_info,
         "failed_domains": sorted(failed_domains) if failed_domains else [],
+        "quality_meta": normalized_quality_meta,
+        "domain_quality_meta": normalized_domain_quality_meta,
     }
     conn.setex(
         _result_meta_key(job_id),
@@ -506,6 +604,7 @@ def execute_trace_events_job(
         results: Dict[str, Dict[str, Any]] = {}
         raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
         failed_domains: List[str] = []
+        domain_quality_meta: Dict[str, Dict[str, Any]] = {}
 
         is_msd = (profile == "mid_section_defect")
 
@@ -519,9 +618,18 @@ def execute_trace_events_job(
             for future in as_completed(futures):
                 domain = futures[future]
                 try:
-                    events_by_cid = future.result()
+                    events_payload = future.result()
+                    events_by_cid, quality_meta = unpack_event_fetch_result(
+                        events_payload,
+                        domain=domain,
+                    )
                     rows = _flatten_domain_records(events_by_cid)
-                    results[domain] = {"data": rows, "count": len(rows)}
+                    results[domain] = {
+                        "data": rows,
+                        "count": len(rows),
+                        "quality_meta": quality_meta,
+                    }
+                    domain_quality_meta[domain] = quality_meta
                     if is_msd:
                         raw_domain_results[domain] = events_by_cid
                 except Exception as exc:
@@ -530,23 +638,51 @@ def execute_trace_events_job(
                         job_id, domain, exc, exc_info=True,
                     )
                     failed_domains.append(domain)
+                    failed_meta = build_quality_meta(
+                        status=QUALITY_STATUS_FAILED,
+                        scope=QUALITY_SCOPE_DOMAIN,
+                        domain=domain,
+                        reasons=["domain_fetch_failed"],
+                    )
+                    domain_quality_meta[domain] = failed_meta
+                    results[domain] = {
+                        "data": [],
+                        "count": 0,
+                        "quality_meta": failed_meta,
+                    }
 
         _update_meta(job_id, progress="building response")
 
         aggregation = None
         if is_msd:
-            aggregation, agg_error = _build_job_msd_aggregation(payload, raw_domain_results)
+            aggregation, agg_error = _build_job_msd_aggregation(
+                payload,
+                raw_domain_results,
+                domain_quality_meta=domain_quality_meta,
+            )
             del raw_domain_results
             if agg_error is not None:
                 raise RuntimeError(agg_error)
         else:
             del raw_domain_results
 
+        quality_meta = merge_quality_metas(
+            domain_quality_meta.values(),
+            scope=QUALITY_SCOPE_QUERY,
+        )
+
         # Store result in Redis as chunked keys for streaming retrieval
         conn = get_redis_client()
         if conn is not None:
             _store_chunked_result(
-                conn, job_id, profile, results, aggregation, failed_domains,
+                conn,
+                job_id,
+                profile,
+                results,
+                aggregation,
+                failed_domains,
+                quality_meta=quality_meta,
+                domain_quality_meta=domain_quality_meta,
             )
 
         _update_meta(
@@ -596,6 +732,7 @@ def _flatten_domain_records(
 def _build_job_msd_aggregation(
     payload: Dict[str, Any],
     domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    domain_quality_meta: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """Build MSD aggregation inside worker process (no Flask context)."""
     from mes_dashboard.services.mid_section_defect_service import (
@@ -656,6 +793,9 @@ def _build_job_msd_aggregation(
         station=station,
         direction=direction,
         mode=mode,
+        upstream_quality_meta=(domain_quality_meta or {}).get("upstream_history"),
+        materials_quality_meta=(domain_quality_meta or {}).get("materials"),
+        downstream_quality_meta=(domain_quality_meta or {}).get("downstream_rejects"),
     )
     if aggregation is None:
         return None, "aggregation service unavailable"

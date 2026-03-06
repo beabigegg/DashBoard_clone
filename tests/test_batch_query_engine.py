@@ -491,6 +491,7 @@ class TestChunkFailureResilience:
         assert last["completed"] == "2"
         assert last["failed"] == "1"
         assert last["has_partial_failure"] == "True"
+        assert last["failed_chunk_count"] == "1"
 
     def test_chunk_store_failure_is_marked_partial(self):
         import mes_dashboard.core.redis_df_store as rds
@@ -677,6 +678,7 @@ class TestRetryAndFailedRanges:
         assert progress is not None
         assert progress.get("has_partial_failure") == "True"
         assert progress.get("failed") == "1"
+        assert progress.get("failed_chunk_count") == "1"
         failed_ranges = json.loads(progress.get("failed_ranges", "[]"))
         assert failed_ranges == [{"start": "2025-01-11", "end": "2025-01-20"}]
 
@@ -710,5 +712,6 @@ class TestRetryAndFailedRanges:
         assert progress is not None
         assert progress.get("has_partial_failure") == "True"
         assert progress.get("failed") == "1"
+        assert progress.get("failed_chunk_count") == "1"
         failed_ranges = json.loads(progress.get("failed_ranges", "[]"))
         assert failed_ranges == []

@@ -142,9 +142,9 @@ class TestWipAndHoldPagesE2E:
         response = _get_with_retry(f"{app_server}/hold-detail", attempts=3, timeout=10.0)
         assert response.status_code == 302
         if spa_enabled:
-            assert response.headers.get("Location") == "/portal-shell/wip-overview"
+            assert response.headers.get("Location") == "/portal-shell/hold-overview"
         else:
-            assert response.headers.get("Location") == "/wip-overview"
+            assert response.headers.get("Location") == "/hold-overview"
 
     def test_hold_detail_calls_summary_distribution_and_lots(self, page: Page, app_server: str):
         reason = _pick_hold_reason(app_server)

@@ -11,6 +11,8 @@ const LOT_SUB_TABS = Object.freeze([
   'holds',
   'jobs',
 ]);
+const PAGED_SUB_TABS = new Set(['history', 'materials', 'rejects', 'holds']);
+const DEFAULT_PER_PAGE = 200;
 
 const ASSOCIATION_TABS = new Set(['materials', 'rejects', 'holds', 'jobs']);
 
@@ -49,6 +51,35 @@ function emptyAssociations() {
     rejects: [],
     holds: [],
     jobs: [],
+  };
+}
+
+function emptyPagination(perPage = DEFAULT_PER_PAGE) {
+  return {
+    page: 1,
+    per_page: perPage,
+    total: 0,
+    total_pages: 1,
+  };
+}
+
+function emptyPaginationMap() {
+  return {
+    history: emptyPagination(),
+    materials: emptyPagination(),
+    rejects: emptyPagination(),
+    holds: emptyPagination(),
+    jobs: emptyPagination(0),
+  };
+}
+
+function emptyQualityMetaMap() {
+  return {
+    history: null,
+    materials: null,
+    rejects: null,
+    holds: null,
+    jobs: null,
   };
 }
 
@@ -121,6 +152,8 @@ export function useLotDetail(initial = {}) {
 
   const historyRows = ref([]);
   const associationRows = reactive(emptyAssociations());
+  const pagination = reactive(emptyPaginationMap());
+  const qualityMeta = reactive(emptyQualityMetaMap());
 
   const loading = reactive({
     workcenterGroups: false,
@@ -140,6 +173,11 @@ export function useLotDetail(initial = {}) {
     const nextAssociations = emptyAssociations();
     Object.keys(nextAssociations).forEach((key) => {
       associationRows[key] = nextAssociations[key];
+    });
+    const nextPagination = emptyPaginationMap();
+    Object.keys(nextPagination).forEach((key) => {
+      pagination[key] = nextPagination[key];
+      qualityMeta[key] = null;
     });
 
     const nextLoaded = emptyTabFlags();
@@ -179,7 +217,7 @@ export function useLotDetail(initial = {}) {
     }
   }
 
-  async function loadHistory({ force = false } = {}) {
+  async function loadHistory({ force = false, page = null } = {}) {
     const cids = getActiveCids();
     if (cids.length === 0) {
       return false;
@@ -200,6 +238,9 @@ export function useLotDetail(initial = {}) {
       } else {
         params.set('container_id', cids[0]);
       }
+      const targetPage = Number(page || pagination.history.page || 1);
+      params.set('page', String(targetPage));
+      params.set('per_page', String(pagination.history.per_page || DEFAULT_PER_PAGE));
       if (selectedWorkcenterGroups.value.length > 0) {
         params.set('workcenter_groups', selectedWorkcenterGroups.value.join(','));
       }
@@ -210,18 +251,27 @@ export function useLotDetail(initial = {}) {
       });
 
       historyRows.value = Array.isArray(payload?.data) ? payload.data : [];
+      pagination.history = payload?.pagination || {
+        page: targetPage,
+        per_page: pagination.history.per_page || DEFAULT_PER_PAGE,
+        total: historyRows.value.length,
+        total_pages: 1,
+      };
+      qualityMeta.history = payload?.quality_meta || null;
       loaded.history = true;
       return true;
     } catch (error) {
       errors.history = error?.message || '載入 LOT 歷程失敗';
       historyRows.value = [];
+      pagination.history = emptyPagination();
+      qualityMeta.history = null;
       return false;
     } finally {
       loading.history = false;
     }
   }
 
-  async function loadAssociation(tab, { force = false, silentError = false } = {}) {
+  async function loadAssociation(tab, { force = false, silentError = false, page = null } = {}) {
     const associationType = normalizeSubTab(tab);
     if (!ASSOCIATION_TABS.has(associationType)) {
       return false;
@@ -268,6 +318,8 @@ export function useLotDetail(initial = {}) {
         });
 
         associationRows[associationType] = Array.isArray(payload?.data) ? payload.data : [];
+        pagination[associationType] = emptyPagination(0);
+        qualityMeta[associationType] = null;
       } else {
         // Non-jobs tabs: batch all CIDs into a single request
         const params = new URLSearchParams();
@@ -277,6 +329,11 @@ export function useLotDetail(initial = {}) {
           params.set('container_id', cids[0]);
         }
         params.set('type', associationType);
+        const targetPage = Number(page || pagination[associationType].page || 1);
+        if (PAGED_SUB_TABS.has(associationType)) {
+          params.set('page', String(targetPage));
+          params.set('per_page', String(pagination[associationType].per_page || DEFAULT_PER_PAGE));
+        }
 
         const payload = await apiGet(`/api/query-tool/lot-associations?${params.toString()}`, {
           timeout: 360000,
@@ -284,12 +341,28 @@ export function useLotDetail(initial = {}) {
         });
 
         associationRows[associationType] = Array.isArray(payload?.data) ? payload.data : [];
+        if (PAGED_SUB_TABS.has(associationType)) {
+          pagination[associationType] = payload?.pagination || {
+            page: targetPage,
+            per_page: pagination[associationType].per_page || DEFAULT_PER_PAGE,
+            total: associationRows[associationType].length,
+            total_pages: 1,
+          };
+          qualityMeta[associationType] = payload?.quality_meta || null;
+        } else {
+          pagination[associationType] = emptyPagination(0);
+          qualityMeta[associationType] = null;
+        }
       }
 
       loaded[associationType] = true;
       return true;
     } catch (error) {
       associationRows[associationType] = [];
+      pagination[associationType] = PAGED_SUB_TABS.has(associationType)
+        ? emptyPagination()
+        : emptyPagination(0);
+      qualityMeta[associationType] = null;
       if (!silentError) {
         errors[associationType] = error?.message || '載入關聯資料失敗';
       }
@@ -364,6 +437,18 @@ export function useLotDetail(initial = {}) {
     return loadHistory({ force: true });
   }
 
+  async function setSubTabPage(tab, nextPage) {
+    const normalized = normalizeSubTab(tab);
+    if (!PAGED_SUB_TABS.has(normalized)) {
+      return false;
+    }
+    const pageNumber = Number(nextPage || 1);
+    if (normalized === 'history') {
+      return loadHistory({ force: true, page: pageNumber });
+    }
+    return loadAssociation(normalized, { force: true, page: pageNumber });
+  }
+
   function getRowsByTab(tab) {
     const normalized = normalizeSubTab(tab);
     if (normalized === 'history') {
@@ -429,6 +514,8 @@ export function useLotDetail(initial = {}) {
     selectedWorkcenterGroups,
     historyRows,
     associationRows,
+    pagination,
+    qualityMeta,
     loading,
     loaded,
     exporting,
@@ -441,6 +528,7 @@ export function useLotDetail(initial = {}) {
     setSelectedContainerId,
     setSelectedContainerIds,
     setSelectedWorkcenterGroups,
+    setSubTabPage,
     getRowsByTab,
     exportSubTab,
     clearTabData,

@@ -25,13 +25,13 @@ def _post_reject_query(app_server: str, body: dict, timeout: float = 420.0) -> r
 class TestRejectHistoryLongRangeE2E:
     """Real backend E2E checks for long-range reject history query."""
 
-    def test_query_365_day_range_returns_success(self, app_server: str):
+    def test_query_190_day_range_returns_success(self, app_server: str):
         response = _post_reject_query(
             app_server,
             {
                 "mode": "date_range",
                 "start_date": "2025-01-01",
-                "end_date": "2025-12-31",
+                "end_date": "2025-07-09",
                 "include_excluded_scrap": False,
                 "exclude_material_scrap": True,
                 "exclude_pb_diode": True,
@@ -49,7 +49,7 @@ class TestRejectHistoryLongRangeE2E:
             {
                 "mode": "date_range",
                 "start_date": "2025-01-01",
-                "end_date": "2025-12-31",
+                "end_date": "2025-07-09",
             },
         )
         assert query_resp.status_code == 200, query_resp.text[:500]
@@ -79,7 +79,7 @@ class TestRejectHistoryLongRangeE2E:
             {
                 "mode": "date_range",
                 "start_date": "2025-01-01",
-                "end_date": "2025-12-31",
+                "end_date": "2025-07-09",
             },
         )
         assert query_resp.status_code == 200, query_resp.text[:500]

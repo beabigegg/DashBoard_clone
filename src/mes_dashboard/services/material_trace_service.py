@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import csv
 import io
+import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 import pandas as pd
 
@@ -15,6 +17,16 @@ from mes_dashboard.core.interactive_memory_guard import (
     enforce_dataset_memory_guard,
     maybe_gc_collect,
 )
+from mes_dashboard.core.query_quality_contract import (
+    QUALITY_SCOPE_EXPORT,
+    QUALITY_SCOPE_QUERY,
+    QUALITY_STATUS_COMPLETE,
+    QUALITY_STATUS_PARTIAL,
+    QUALITY_STATUS_TRUNCATED,
+    build_quality_meta,
+    normalize_quality_meta,
+)
+from mes_dashboard.core.redis_client import get_key, get_redis_client
 from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 from mes_dashboard.services.batch_query_engine import compute_query_hash
 from mes_dashboard.services.container_resolution_policy import (
@@ -40,6 +52,7 @@ _IN_BATCH_SIZE = 1000
 
 # Redis result cache TTL (seconds)
 _CACHE_TTL = 300
+_META_SUFFIX = ":meta"
 
 _CSV_COLUMNS = {
     "CONTAINERNAME": "LOT ID",
@@ -255,6 +268,155 @@ def _paginate(df: pd.DataFrame, page: int, per_page: int) -> Dict[str, Any]:
     }
 
 
+def _build_query_quality_meta(
+    *,
+    truncated: bool = False,
+    observed_rows: Optional[int] = None,
+    max_rows: Optional[int] = None,
+    reasons: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    return build_quality_meta(
+        status=QUALITY_STATUS_TRUNCATED if truncated else QUALITY_STATUS_COMPLETE,
+        scope=QUALITY_SCOPE_QUERY,
+        reasons=reasons or ([] if not truncated else ["row_guard_truncated"]),
+        observed_rows=observed_rows,
+        max_rows=max_rows,
+    )
+
+
+def _to_export_quality_meta(
+    query_quality_meta: Optional[Dict[str, Any]],
+    *,
+    observed_rows: int,
+    max_rows: Optional[int] = None,
+    reasons: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    base = normalize_quality_meta(query_quality_meta, default_scope=QUALITY_SCOPE_QUERY)
+    base_status = str(base.get("status") or QUALITY_STATUS_COMPLETE).lower()
+    merged_reasons = list(base.get("reasons") or [])
+    for reason in reasons or []:
+        if reason and reason not in merged_reasons:
+            merged_reasons.append(reason)
+
+    status = base_status
+    if max_rows is not None:
+        status = QUALITY_STATUS_TRUNCATED
+    elif base_status not in {
+        QUALITY_STATUS_COMPLETE,
+        QUALITY_STATUS_TRUNCATED,
+        QUALITY_STATUS_PARTIAL,
+    }:
+        status = QUALITY_STATUS_COMPLETE
+
+    resolved_max_rows = max_rows if max_rows is not None else base.get("max_rows")
+    resolved_observed_rows = (
+        observed_rows
+        if max_rows is not None
+        else (base.get("observed_rows") or observed_rows)
+    )
+
+    return build_quality_meta(
+        status=status,
+        scope=QUALITY_SCOPE_EXPORT,
+        reasons=merged_reasons,
+        observed_rows=resolved_observed_rows,
+        max_rows=resolved_max_rows,
+        failed_domains=base.get("failed_domains") or [],
+        failed_ranges=base.get("failed_ranges") or [],
+        truncated_domains=base.get("truncated_domains") or [],
+    )
+
+
+def _meta_cache_key(cache_key: str) -> str:
+    return f"{cache_key}{_META_SUFFIX}"
+
+
+def _try_load_cached_meta(cache_key: str) -> Dict[str, Any]:
+    client = get_redis_client()
+    if client is None:
+        return {}
+
+    try:
+        raw = client.get(get_key(_meta_cache_key(cache_key)))
+    except Exception as exc:
+        logger.debug("Redis meta load failed (%s): %s", cache_key, exc)
+        return {}
+
+    if not raw:
+        return {}
+
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return {}
+
+    if not isinstance(parsed, dict):
+        return {}
+
+    return {
+        "meta": parsed.get("meta") if isinstance(parsed.get("meta"), dict) else {},
+        "quality_meta": normalize_quality_meta(
+            parsed.get("quality_meta"),
+            default_scope=QUALITY_SCOPE_QUERY,
+        ),
+    }
+
+
+def _try_store_cached_meta(
+    cache_key: str,
+    *,
+    meta: Optional[Dict[str, Any]],
+    quality_meta: Optional[Dict[str, Any]],
+    ttl: int = _CACHE_TTL,
+) -> None:
+    client = get_redis_client()
+    if client is None:
+        return
+    payload = {
+        "meta": meta if isinstance(meta, dict) else {},
+        "quality_meta": normalize_quality_meta(
+            quality_meta,
+            default_scope=QUALITY_SCOPE_QUERY,
+        ),
+    }
+    try:
+        client.setex(
+            get_key(_meta_cache_key(cache_key)),
+            max(int(ttl), 1),
+            json.dumps(payload, ensure_ascii=False, default=str),
+        )
+    except Exception as exc:
+        logger.debug("Redis meta store failed (%s): %s", cache_key, exc)
+
+
+def _csv_row_bytes(values: List[Any]) -> bytes:
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(values)
+    return buf.getvalue().encode("utf-8")
+
+
+def _iter_csv_bytes(df: pd.DataFrame) -> Generator[bytes, None, None]:
+    """Yield CSV bytes with UTF-8 BOM while preserving header order."""
+    yield b"\xef\xbb\xbf"
+
+    available_cols = [c for c in _CSV_COLUMNS if c in df.columns]
+    if df.empty:
+        selected_cols = list(_CSV_COLUMNS.keys())
+    else:
+        selected_cols = available_cols or list(_CSV_COLUMNS.keys())
+    header_labels = [_CSV_COLUMNS[c] for c in selected_cols]
+    yield _csv_row_bytes(header_labels)
+
+    if df.empty:
+        return
+
+    export_df = df.reindex(columns=selected_cols).astype(object)
+    export_df = export_df.where(export_df.notna(), "")
+    for row in export_df.itertuples(index=False, name=None):
+        yield _csv_row_bytes([value if value is not None else "" for value in row])
+
+
 # ============================================================
 # Redis result cache helpers
 # ============================================================
@@ -305,14 +467,23 @@ def forward_query(
 ) -> Dict[str, Any]:
     """Execute forward material trace query."""
     meta: Dict[str, Any] = {}
+    quality_meta = _build_query_quality_meta()
     cache_key = _compute_cache_key(mode, values, workcenter_groups)
 
     # Try Redis cache first (pagination and re-queries skip Oracle)
     cached_df = _try_load_cached_df(cache_key)
     if cached_df is not None:
         logger.debug("Forward query cache hit: %s", cache_key)
+        cached_meta = _try_load_cached_meta(cache_key)
+        if isinstance(cached_meta.get("meta"), dict):
+            meta.update(cached_meta.get("meta") or {})
+        quality_meta = normalize_quality_meta(
+            cached_meta.get("quality_meta"),
+            default_scope=QUALITY_SCOPE_QUERY,
+        )
         result = _paginate(cached_df, page, per_page)
         result["meta"] = meta
+        result["quality_meta"] = quality_meta
         return result
 
     wc_names = _resolve_workcenter_names(workcenter_groups)
@@ -322,7 +493,12 @@ def forward_query(
         if unresolved:
             meta["unresolved"] = unresolved
         if not container_ids:
-            return {"rows": [], "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 0}, "meta": meta}
+            return {
+                "rows": [],
+                "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 0},
+                "meta": meta,
+                "quality_meta": quality_meta,
+            }
 
         df = _execute_batched_query("material_trace/forward_by_lot", "m.CONTAINERID", container_ids, wc_names, allow_patterns=False)
 
@@ -332,21 +508,34 @@ def forward_query(
     maybe_gc_collect()
 
     if df.empty:
-        return {"rows": [], "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 0}, "meta": meta}
+        return {
+            "rows": [],
+            "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 0},
+            "meta": meta,
+            "quality_meta": quality_meta,
+        }
 
     # Forward truncation — SQL fetches 50001 rows to detect overflow
     if len(df) > _FORWARD_MAX_ROWS:
+        observed_rows = len(df)
         df = df.iloc[:_FORWARD_MAX_ROWS]
         meta["truncated"] = True
         meta["max_rows"] = _FORWARD_MAX_ROWS
+        quality_meta = _build_query_quality_meta(
+            truncated=True,
+            observed_rows=observed_rows,
+            max_rows=_FORWARD_MAX_ROWS,
+        )
 
     df = _enrich_workcenter_group(df)
 
     # Store enriched result in Redis for subsequent pagination / export
     _try_store_cached_df(cache_key, df)
+    _try_store_cached_meta(cache_key, meta=meta, quality_meta=quality_meta)
 
     result = _paginate(df, page, per_page)
     result["meta"] = meta
+    result["quality_meta"] = quality_meta
     return result
 
 
@@ -363,14 +552,23 @@ def reverse_query(
 ) -> Dict[str, Any]:
     """Execute reverse material trace query."""
     meta: Dict[str, Any] = {}
+    quality_meta = _build_query_quality_meta()
     cache_key = _compute_cache_key("material_lot", values, workcenter_groups)
 
     # Try Redis cache first
     cached_df = _try_load_cached_df(cache_key)
     if cached_df is not None:
         logger.debug("Reverse query cache hit: %s", cache_key)
+        cached_meta = _try_load_cached_meta(cache_key)
+        if isinstance(cached_meta.get("meta"), dict):
+            meta.update(cached_meta.get("meta") or {})
+        quality_meta = normalize_quality_meta(
+            cached_meta.get("quality_meta"),
+            default_scope=QUALITY_SCOPE_QUERY,
+        )
         result = _paginate(cached_df, page, per_page)
         result["meta"] = meta
+        result["quality_meta"] = quality_meta
         return result
 
     wc_names = _resolve_workcenter_names(workcenter_groups)
@@ -380,21 +578,34 @@ def reverse_query(
     maybe_gc_collect()
 
     if df.empty:
-        return {"rows": [], "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 0}, "meta": meta}
+        return {
+            "rows": [],
+            "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 0},
+            "meta": meta,
+            "quality_meta": quality_meta,
+        }
 
     # Check truncation (SQL fetches 10001 rows to detect overflow)
     if len(df) > _REVERSE_MAX_ROWS:
+        observed_rows = len(df)
         df = df.iloc[:_REVERSE_MAX_ROWS]
         meta["truncated"] = True
         meta["max_rows"] = _REVERSE_MAX_ROWS
+        quality_meta = _build_query_quality_meta(
+            truncated=True,
+            observed_rows=observed_rows,
+            max_rows=_REVERSE_MAX_ROWS,
+        )
 
     df = _enrich_workcenter_group(df)
 
     # Store enriched result in Redis for subsequent pagination / export
     _try_store_cached_df(cache_key, df)
+    _try_store_cached_meta(cache_key, meta=meta, quality_meta=quality_meta)
 
     result = _paginate(df, page, per_page)
     result["meta"] = meta
+    result["quality_meta"] = quality_meta
     return result
 
 
@@ -407,13 +618,21 @@ def export_csv(
     mode: str,
     values: List[str],
     workcenter_groups: Optional[List[str]] = None,
-) -> tuple[bytes, Dict[str, Any]]:
-    """Export query results as UTF-8 BOM CSV."""
+) -> tuple[Generator[bytes, None, None], Dict[str, Any]]:
+    """Export query results as UTF-8 BOM CSV stream."""
     meta: Dict[str, Any] = {}
+    base_query_quality = _build_query_quality_meta()
 
     # Try Redis cache first — avoids re-querying Oracle for export
     cache_key = _compute_cache_key(mode, values, workcenter_groups)
     df = _try_load_cached_df(cache_key)
+    cached_meta = _try_load_cached_meta(cache_key)
+    if isinstance(cached_meta.get("meta"), dict):
+        meta.update(cached_meta.get("meta") or {})
+    base_query_quality = normalize_quality_meta(
+        cached_meta.get("quality_meta"),
+        default_scope=QUALITY_SCOPE_QUERY,
+    )
 
     if df is None:
         # Cache miss — execute query
@@ -424,7 +643,8 @@ def export_csv(
             if unresolved:
                 meta["unresolved"] = unresolved
             if not container_ids:
-                return _empty_csv(), meta
+                export_quality_meta = _to_export_quality_meta(base_query_quality, observed_rows=0)
+                return _empty_csv(), {"meta": meta, "quality_meta": export_quality_meta}
 
             df = _execute_batched_query("material_trace/forward_by_lot", "m.CONTAINERID", container_ids, wc_names, allow_patterns=False)
 
@@ -435,36 +655,51 @@ def export_csv(
             df = _execute_batched_query("material_trace/reverse_by_material_lot", "m.MATERIALLOTNAME", values, wc_names)
 
         if df.empty:
-            return _empty_csv(), meta
+            export_quality_meta = _to_export_quality_meta(base_query_quality, observed_rows=0)
+            return _empty_csv(), {"meta": meta, "quality_meta": export_quality_meta}
 
         df = _enrich_workcenter_group(df)
 
+        if len(df) > _FORWARD_MAX_ROWS and mode in {"lot", "workorder"}:
+            base_query_quality = _build_query_quality_meta(
+                truncated=True,
+                observed_rows=len(df),
+                max_rows=_FORWARD_MAX_ROWS,
+            )
+        elif len(df) > _REVERSE_MAX_ROWS and mode == "material_lot":
+            base_query_quality = _build_query_quality_meta(
+                truncated=True,
+                observed_rows=len(df),
+                max_rows=_REVERSE_MAX_ROWS,
+            )
+
         # Store in cache for potential subsequent requests
         _try_store_cached_df(cache_key, df)
+        _try_store_cached_meta(cache_key, meta=meta, quality_meta=base_query_quality)
 
     if df.empty:
-        return _empty_csv(), meta
+        export_quality_meta = _to_export_quality_meta(base_query_quality, observed_rows=0)
+        return _empty_csv(), {"meta": meta, "quality_meta": export_quality_meta}
 
     # Truncate if over export limit
+    observed_rows = len(df)
+    export_truncated = False
     if len(df) > _EXPORT_MAX_ROWS:
         df = df.iloc[:_EXPORT_MAX_ROWS]
         meta["truncated"] = True
         meta["export_max_rows"] = _EXPORT_MAX_ROWS
+        export_truncated = True
 
-    # Select and rename columns for CSV
-    available_cols = [c for c in _CSV_COLUMNS if c in df.columns]
-    export_df = df[available_cols].rename(columns=_CSV_COLUMNS)
+    export_quality_meta = _to_export_quality_meta(
+        base_query_quality,
+        observed_rows=observed_rows,
+        max_rows=_EXPORT_MAX_ROWS if export_truncated else None,
+        reasons=["export_max_rows_exceeded"] if export_truncated else [],
+    )
 
-    buf = io.BytesIO()
-    buf.write(b"\xef\xbb\xbf")  # UTF-8 BOM
-    buf.write(export_df.fillna("").to_csv(index=False).encode("utf-8"))
-    return buf.getvalue(), meta
+    return _iter_csv_bytes(df), {"meta": meta, "quality_meta": export_quality_meta}
 
 
-def _empty_csv() -> bytes:
-    """Return an empty CSV with headers only."""
-    buf = io.BytesIO()
-    buf.write(b"\xef\xbb\xbf")
-    headers = ",".join(_CSV_COLUMNS.values()) + "\n"
-    buf.write(headers.encode("utf-8"))
-    return buf.getvalue()
+def _empty_csv() -> Generator[bytes, None, None]:
+    """Return an empty CSV stream with headers only."""
+    return _iter_csv_bytes(pd.DataFrame())

@@ -48,6 +48,14 @@ import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
+from mes_dashboard.core.query_quality_contract import (
+    QUALITY_SCOPE_QUERY,
+    QUALITY_STATUS_COMPLETE,
+    build_quality_meta,
+    merge_quality_metas,
+    normalize_quality_meta,
+    unpack_event_fetch_result,
+)
 from mes_dashboard.core.redis_client import try_acquire_lock, release_lock
 from mes_dashboard.sql import SQLLoader
 from mes_dashboard.services.event_fetcher import EventFetcher
@@ -300,6 +308,9 @@ def build_trace_aggregation_from_events(
     upstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     materials_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     downstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    upstream_quality_meta: Optional[Dict[str, Any]] = None,
+    materials_quality_meta: Optional[Dict[str, Any]] = None,
+    downstream_quality_meta: Optional[Dict[str, Any]] = None,
     station: str = '測試',
     direction: str = 'backward',
     mode: str = 'date_range',
@@ -314,6 +325,9 @@ def build_trace_aggregation_from_events(
             upstream_events_by_cid=upstream_events_by_cid,
             materials_events_by_cid=materials_events_by_cid,
             downstream_events_by_cid=downstream_events_by_cid,
+            upstream_quality_meta=upstream_quality_meta,
+            materials_quality_meta=materials_quality_meta,
+            downstream_quality_meta=downstream_quality_meta,
             station=station,
             direction=direction,
         )
@@ -330,6 +344,12 @@ def build_trace_aggregation_from_events(
         return None
     if detection_df.empty:
         empty_result = _empty_result(direction)
+        quality_meta = _build_trace_quality_meta(
+            direction,
+            upstream_quality_meta=upstream_quality_meta,
+            materials_quality_meta=materials_quality_meta,
+            downstream_quality_meta=downstream_quality_meta,
+        )
         return {
             'kpi': empty_result['kpi'],
             'charts': empty_result['charts'],
@@ -337,6 +357,7 @@ def build_trace_aggregation_from_events(
             'available_loss_reasons': empty_result['available_loss_reasons'],
             'genealogy_status': empty_result['genealogy_status'],
             'detail_total_count': 0,
+            'quality_meta': quality_meta,
         }
 
     available_loss_reasons = sorted(
@@ -380,6 +401,12 @@ def build_trace_aggregation_from_events(
             filtered_df, defect_cids, wip_by_cid, downstream_rejects, station_order,
         )
 
+        quality_meta = _build_trace_quality_meta(
+            direction,
+            upstream_quality_meta=upstream_quality_meta,
+            materials_quality_meta=materials_quality_meta,
+            downstream_quality_meta=downstream_quality_meta,
+        )
         return {
             'kpi': _build_forward_kpi(detection_data, forward_attr),
             'charts': _build_forward_charts(forward_attr, detection_data),
@@ -388,6 +415,7 @@ def build_trace_aggregation_from_events(
             'genealogy_status': genealogy_status,
             'detail_total_count': len(detail),
             'attribution': [],
+            'quality_meta': quality_meta,
         }
 
     # Backward direction
@@ -417,6 +445,12 @@ def build_trace_aggregation_from_events(
         roots=lineage_roots,
     )
 
+    quality_meta = _build_trace_quality_meta(
+        direction,
+        upstream_quality_meta=upstream_quality_meta,
+        materials_quality_meta=materials_quality_meta,
+        downstream_quality_meta=downstream_quality_meta,
+    )
     return {
         'kpi': _build_kpi(filtered_df, attribution, normalized_loss_reasons),
         'charts': _build_all_charts(
@@ -429,6 +463,7 @@ def build_trace_aggregation_from_events(
         'genealogy_status': genealogy_status,
         'detail_total_count': len(detail),
         'attribution': attribution,
+        'quality_meta': quality_meta,
     }
 
 
@@ -441,12 +476,21 @@ def _build_trace_aggregation_container_mode(
     upstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     materials_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     downstream_events_by_cid: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    upstream_quality_meta: Optional[Dict[str, Any]] = None,
+    materials_quality_meta: Optional[Dict[str, Any]] = None,
+    downstream_quality_meta: Optional[Dict[str, Any]] = None,
     station: str = '測試',
     direction: str = 'backward',
 ) -> Optional[Dict[str, Any]]:
     """Container mode aggregation: same attribution pipeline, no date range."""
     if not seed_container_ids:
         empty_result = _empty_result(direction)
+        quality_meta = _build_trace_quality_meta(
+            direction,
+            upstream_quality_meta=upstream_quality_meta,
+            materials_quality_meta=materials_quality_meta,
+            downstream_quality_meta=downstream_quality_meta,
+        )
         return {
             'kpi': empty_result['kpi'],
             'charts': empty_result['charts'],
@@ -455,6 +499,7 @@ def _build_trace_aggregation_container_mode(
             'genealogy_status': 'ready',
             'detail_total_count': 0,
             'attribution': [],
+            'quality_meta': quality_meta,
         }
 
     normalized_loss_reasons = parse_loss_reasons_param(loss_reasons)
@@ -464,6 +509,12 @@ def _build_trace_aggregation_container_mode(
         return None
     if detection_df.empty:
         empty_result = _empty_result(direction)
+        quality_meta = _build_trace_quality_meta(
+            direction,
+            upstream_quality_meta=upstream_quality_meta,
+            materials_quality_meta=materials_quality_meta,
+            downstream_quality_meta=downstream_quality_meta,
+        )
         return {
             'kpi': empty_result['kpi'],
             'charts': empty_result['charts'],
@@ -473,6 +524,7 @@ def _build_trace_aggregation_container_mode(
             'detail_total_count': 0,
             'attribution': [],
             'container_mode_hint': '所選容器在此偵測站無記錄',
+            'quality_meta': quality_meta,
         }
 
     available_loss_reasons = sorted(
@@ -516,6 +568,12 @@ def _build_trace_aggregation_container_mode(
             filtered_df, defect_cids, wip_by_cid, downstream_rejects, station_order,
         )
 
+        quality_meta = _build_trace_quality_meta(
+            direction,
+            upstream_quality_meta=upstream_quality_meta,
+            materials_quality_meta=materials_quality_meta,
+            downstream_quality_meta=downstream_quality_meta,
+        )
         return {
             'kpi': _build_forward_kpi(detection_data, forward_attr),
             'charts': _build_forward_charts(forward_attr, detection_data),
@@ -524,6 +582,7 @@ def _build_trace_aggregation_container_mode(
             'genealogy_status': genealogy_status,
             'detail_total_count': len(detail),
             'attribution': [],
+            'quality_meta': quality_meta,
         }
 
     # Backward direction
@@ -553,6 +612,12 @@ def _build_trace_aggregation_container_mode(
         roots=lineage_roots,
     )
 
+    quality_meta = _build_trace_quality_meta(
+        direction,
+        upstream_quality_meta=upstream_quality_meta,
+        materials_quality_meta=materials_quality_meta,
+        downstream_quality_meta=downstream_quality_meta,
+    )
     return {
         'kpi': _build_kpi(filtered_df, attribution, normalized_loss_reasons),
         'charts': _build_all_charts(
@@ -565,6 +630,7 @@ def _build_trace_aggregation_container_mode(
         'genealogy_status': genealogy_status,
         'detail_total_count': len(detail),
         'attribution': attribution,
+        'quality_meta': quality_meta,
     }
 
 
@@ -1245,7 +1311,11 @@ def _fetch_upstream_history(
         return {}
 
     unique_cids = list(set(all_cids))
-    events_by_cid = EventFetcher.fetch_events(unique_cids, "upstream_history")
+    events_payload = EventFetcher.fetch_events(unique_cids, "upstream_history")
+    events_by_cid, _quality_meta = unpack_event_fetch_result(
+        events_payload,
+        domain="upstream_history",
+    )
     result = _normalize_upstream_event_records(events_by_cid)
 
     logger.info(
@@ -1271,7 +1341,11 @@ def _fetch_downstream_rejects(
         return {}
 
     unique_cids = list(set(tracked_cids))
-    events_by_cid = EventFetcher.fetch_events(unique_cids, "downstream_rejects")
+    events_payload = EventFetcher.fetch_events(unique_cids, "downstream_rejects")
+    events_by_cid, _quality_meta = unpack_event_fetch_result(
+        events_payload,
+        domain="downstream_rejects",
+    )
 
     result: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for cid, events in events_by_cid.items():
@@ -1343,10 +1417,14 @@ def _normalize_upstream_event_records(
     """Normalize EventFetcher upstream payload into attribution-ready records."""
     result: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for cid, events in events_by_cid.items():
+        if not isinstance(events, list):
+            continue
         cid_value = _safe_str(cid)
         if not cid_value:
             continue
         for event in events:
+            if not isinstance(event, dict):
+                continue
             group_name = _safe_str(event.get('WORKCENTER_GROUP'))
             if not group_name:
                 group_name = '(未知)'
@@ -1367,10 +1445,14 @@ def _normalize_materials_event_records(
     """Normalize EventFetcher materials payload into attribution-ready records."""
     result: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for cid, events in events_by_cid.items():
+        if not isinstance(events, list):
+            continue
         cid_value = _safe_str(cid)
         if not cid_value:
             continue
         for event in events:
+            if not isinstance(event, dict):
+                continue
             part = _safe_str(event.get('MATERIALPARTNAME'))
             if not part:
                 continue
@@ -1390,10 +1472,14 @@ def _normalize_downstream_event_records(
     """Normalize EventFetcher downstream_rejects payload into forward-pipeline-ready records."""
     result: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for cid, events in events_by_cid.items():
+        if not isinstance(events, list):
+            continue
         cid_value = _safe_str(cid)
         if not cid_value:
             continue
         for event in events:
+            if not isinstance(event, dict):
+                continue
             group_name = _safe_str(event.get('WORKCENTER_GROUP'))
             if not group_name:
                 continue
@@ -1405,6 +1491,31 @@ def _normalize_downstream_event_records(
                 'txndate': _safe_str(event.get('TXNDATE')),
             })
     return dict(result)
+
+
+def _build_trace_quality_meta(
+    direction: str,
+    *,
+    upstream_quality_meta: Optional[Dict[str, Any]] = None,
+    materials_quality_meta: Optional[Dict[str, Any]] = None,
+    downstream_quality_meta: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    domain_metas: List[Dict[str, Any]] = []
+    if upstream_quality_meta is not None:
+        domain_metas.append(normalize_quality_meta(upstream_quality_meta))
+    if direction == 'forward':
+        if downstream_quality_meta is not None:
+            domain_metas.append(normalize_quality_meta(downstream_quality_meta))
+    else:
+        if materials_quality_meta is not None:
+            domain_metas.append(normalize_quality_meta(materials_quality_meta))
+
+    if not domain_metas:
+        return build_quality_meta(
+            status=QUALITY_STATUS_COMPLETE,
+            scope=QUALITY_SCOPE_QUERY,
+        )
+    return merge_quality_metas(domain_metas, scope=QUALITY_SCOPE_QUERY)
 
 
 # ============================================================

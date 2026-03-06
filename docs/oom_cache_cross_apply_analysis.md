@@ -220,6 +220,52 @@ Phase 3（進階優化, 5-7 天）:
 
 ---
 
+## Query Quality Meta 操作規範（跨工具）
+
+### 契約欄位（API payload）
+
+- `quality_meta.status`: `complete | partial | truncated | failed`
+- `quality_meta.reasons`: 機器可讀原因陣列（例：`chunk_failure`, `max_total_rows_exceeded`, `export_max_rows_exceeded`）
+- `quality_meta.scope`: `domain | query | export`
+- 選配欄位：`max_rows`, `observed_rows`, `failed_domains`, `failed_ranges`, `failed_chunk_count`, `has_partial_failure`
+
+### 非完整結果（partial/truncated）處理原則
+
+- 後端回應維持 HTTP `200`，但必須帶 `quality_meta.status != complete`。
+- 前端在圖表/表格前顯示可見警示，不得靜默當成完整資料。
+- 匯出（CSV）需附機器可讀 header：
+  - `X-Query-Quality-Status`
+  - `X-Query-Quality-Reasons`
+  - `X-Query-Quality-Observed-Rows`（有值才帶）
+  - `X-Query-Quality-Max-Rows`（有值才帶）
+  - 相容 header：`X-Truncated`, `X-Max-Rows`
+
+### 相容性說明（EventFetcher）
+
+- 新契約：`{ records_by_cid, quality_meta }`
+- 舊契約：`{ CID: [...], "__meta__": {...} }`
+- 透過 `unpack_event_fetch_result()` 進行相容轉接，逐步淘汰舊 shape。
+
+---
+
+## Rollout Checklist（含回滾）
+
+1. Deploy 前核對 `.env` 與 `.env.example`：`EVENT_FETCHER_MAX_TOTAL_ROWS`, `QUERY_TOOL_RSS_REJECT_MB`, `TRACE_SYNC_RSS_REJECT_MB`, `MATERIAL_TRACE_MAX_RESULT_MB`。
+2. Smoke 測試：
+   - `query-tool` batch 明細分頁（history/materials/rejects/holds + equipment lots）
+   - `material-trace` query 與 export（含 header 檢查）
+   - `trace` sync/async/NDJSON `quality_meta` 一致性
+3. 觀察期指標：
+   - worker RSS 峰值
+   - 429/503 比率
+   - `quality_meta.status != complete` 佔比
+4. 回滾路徑：
+   - 短期：前端維持舊 `meta` fallback（已保留），避免畫面中斷。
+   - 後端：必要時將呼叫端切回 `unpack_event_fetch_result()` compatibility 讀取，恢復舊 payload 消費行為。
+   - 若高壓告警升高，先下調高成本入口（例如縮小每頁/最大列數）再回退版本。
+
+---
+
 ## 相關檔案索引
 
 | 類別 | 關鍵檔案路徑 |

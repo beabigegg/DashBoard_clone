@@ -47,6 +47,10 @@ from typing import (
 
 import pandas as pd
 
+from mes_dashboard.core.partial_failure_contract import (
+    build_partial_failure_meta,
+    serialize_partial_failure_meta,
+)
 from mes_dashboard.core.redis_client import get_key, get_redis_client
 from mes_dashboard.core.redis_df_store import (
     redis_chunk_exists,
@@ -217,18 +221,21 @@ def _update_progress(
         return
     key = get_key(f"batch:{cache_prefix}:{query_hash}:meta")
     pct = round(completed / total * 100, 1) if total else 0
+    partial_meta = build_partial_failure_meta(
+        failed_count=failed,
+        failed_ranges=failed_ranges if has_partial_failure else [],
+    )
+    if has_partial_failure:
+        partial_meta["has_partial_failure"] = True
+
     mapping = {
         "total": str(total),
         "completed": str(completed),
         "failed": str(failed),
         "pct": str(pct),
         "status": status,
-        "has_partial_failure": str(has_partial_failure),
     }
-    if failed_ranges is not None:
-        mapping["failed_ranges"] = json.dumps(
-            failed_ranges, ensure_ascii=False, default=str
-        )
+    mapping.update(serialize_partial_failure_meta(partial_meta))
     try:
         client.hset(key, mapping=mapping)
         client.expire(key, ttl)

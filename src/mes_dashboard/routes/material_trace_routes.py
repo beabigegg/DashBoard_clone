@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, Response, jsonify
+from flask import Blueprint, Response, jsonify, stream_with_context
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
@@ -148,18 +148,37 @@ def api_material_trace_export():
         return jsonify({"success": False, "error": error}), 400
 
     try:
-        csv_bytes, meta = export_csv(mode, values, workcenter_groups)
+        csv_stream, export_meta = export_csv(mode, values, workcenter_groups)
+        meta = export_meta.get("meta") if isinstance(export_meta, dict) else {}
+        quality_meta = export_meta.get("quality_meta") if isinstance(export_meta, dict) else {}
+        status = str((quality_meta or {}).get("status", "complete")).strip().lower() or "complete"
+        reasons = quality_meta.get("reasons") if isinstance(quality_meta, dict) else []
+        reason_header = ",".join([str(r).strip() for r in (reasons or []) if str(r).strip()])
 
         response = Response(
-            csv_bytes,
+            stream_with_context(csv_stream),
             mimetype="text/csv; charset=utf-8",
             headers={
                 "Content-Disposition": "attachment; filename=material_trace.csv",
+                "X-Query-Quality-Status": status,
+                "X-Query-Quality-Reasons": reason_header,
             },
         )
-        if meta.get("truncated"):
+        if isinstance(quality_meta, dict):
+            observed_rows = quality_meta.get("observed_rows")
+            max_rows = quality_meta.get("max_rows")
+            if observed_rows is not None:
+                response.headers["X-Query-Quality-Observed-Rows"] = str(observed_rows)
+            if max_rows is not None:
+                response.headers["X-Query-Quality-Max-Rows"] = str(max_rows)
+
+        if status == "truncated" or (isinstance(meta, dict) and meta.get("truncated")):
             response.headers["X-Truncated"] = "true"
-            response.headers["X-Max-Rows"] = str(meta.get("export_max_rows", ""))
+            response.headers["X-Max-Rows"] = str(
+                (meta or {}).get("export_max_rows")
+                or (quality_meta or {}).get("max_rows")
+                or ""
+            )
         return response
 
     except MemoryError as exc:

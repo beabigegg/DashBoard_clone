@@ -11,6 +11,7 @@ from mes_dashboard.services.mid_section_defect_service import (
     _attribute_materials,
     _attribute_wafer_roots,
     _build_detail_table,
+    _normalize_upstream_event_records,
     build_trace_aggregation_from_events,
     export_csv,
     query_analysis,
@@ -255,6 +256,76 @@ def test_query_station_options_returns_ordered_list():
     assert result[0]['order'] == 0
     assert result[-1]['name'] == '測試'
     assert result[-1]['order'] == 11
+
+
+def test_normalize_upstream_event_records_ignores_metadata_side_channel_fields():
+    rows = _normalize_upstream_event_records(
+        {
+            "CID-1": [
+                {
+                    "WORKCENTER_GROUP": "測試",
+                    "EQUIPMENTID": "EQ-1",
+                    "EQUIPMENTNAME": "EQ-1",
+                    "SPECNAME": "SPEC-1",
+                    "TRACKINQTY": 10,
+                }
+            ],
+            "__meta__": {"truncated": True},
+            "CID-2": "not-a-list",
+            "CID-3": [None, {"WORKCENTER_GROUP": "中段", "EQUIPMENTNAME": "EQ-3"}],
+        }
+    )
+
+    assert "__meta__" not in rows
+    assert "CID-2" not in rows
+    assert rows["CID-1"][0]["equipment_name"] == "EQ-1"
+    assert rows["CID-3"][0]["equipment_name"] == "EQ-3"
+
+
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_build_trace_aggregation_surfaces_non_complete_quality_meta(mock_fetch_detection):
+    mock_fetch_detection.return_value = pd.DataFrame([
+        {
+            'CONTAINERID': 'CID-001',
+            'CONTAINERNAME': 'LOT-001',
+            'TRACKINQTY': 100,
+            'REJECTQTY': 0,
+            'LOSSREASONNAME': None,
+            'WORKFLOW': 'WF-A',
+            'PRODUCTLINENAME': 'PKG-A',
+            'PJ_TYPE': 'TYPE-A',
+            'DETECTION_EQUIPMENTNAME': 'EQ-01',
+            'TRACKINTIMESTAMP': '2025-01-10 10:00:00',
+            'FINISHEDRUNCARD': 'FR-001',
+        },
+    ])
+
+    result = build_trace_aggregation_from_events(
+        '2025-01-01',
+        '2025-01-31',
+        seed_container_ids=['CID-001'],
+        lineage_ancestors={'CID-001': []},
+        upstream_events_by_cid={'CID-001': []},
+        materials_events_by_cid={'CID-001': []},
+        upstream_quality_meta={
+            'status': 'truncated',
+            'scope': 'domain',
+            'domain': 'upstream_history',
+            'reasons': ['max_total_rows_exceeded'],
+            'observed_rows': 1000,
+            'max_rows': 500,
+        },
+        materials_quality_meta={
+            'status': 'complete',
+            'scope': 'domain',
+            'domain': 'materials',
+            'reasons': [],
+        },
+    )
+
+    assert result is not None
+    assert result['quality_meta']['status'] == 'truncated'
+    assert 'upstream_history' in result['quality_meta'].get('truncated_domains', [])
 
 
 # --- _attribute_materials tests ---

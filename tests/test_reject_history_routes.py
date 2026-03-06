@@ -171,7 +171,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
-        self.assertIn('183', payload['error'])
+        self.assertIn('190', payload['error'])
         mock_execute.assert_not_called()
 
     @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
@@ -190,7 +190,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
             json={
                 'mode': 'date_range',
                 'start_date': '2025-01-01',
-                'end_date': '2025-07-02',
+                'end_date': '2025-07-09',
                 'include_excluded_scrap': False,
                 'exclude_material_scrap': True,
                 'exclude_pb_diode': True,

@@ -57,6 +57,14 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  pagination: {
+    type: Object,
+    required: true,
+  },
+  qualityMeta: {
+    type: Object,
+    required: true,
+  },
   workcenterGroups: {
     type: Array,
     default: () => [],
@@ -67,7 +75,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['change-sub-tab', 'update-workcenter-groups', 'export-tab']);
+const emit = defineEmits(['change-sub-tab', 'update-workcenter-groups', 'export-tab', 'change-page']);
 
 const tabMeta = Object.freeze({
   history: { label: '歷程', emptyText: '無歷程資料' },
@@ -163,6 +171,28 @@ const activeColumnOrder = computed(() => {
   return [];
 });
 
+const activePagination = computed(() => {
+  return props.pagination?.[props.activeSubTab] || {
+    page: 1,
+    per_page: 0,
+    total: activeRows.value.length,
+    total_pages: 1,
+  };
+});
+
+const activeQualityMeta = computed(() => props.qualityMeta?.[props.activeSubTab] || null);
+const shouldShowQualityWarning = computed(() => {
+  const status = String(activeQualityMeta.value?.status || '').toLowerCase();
+  return status && status !== 'complete';
+});
+const qualityWarningText = computed(() => {
+  const status = String(activeQualityMeta.value?.status || '').toLowerCase();
+  if (!status || status === 'complete') return '';
+  if (status === 'truncated') return '此分頁資料可能已截斷，請縮小查詢範圍後重試。';
+  if (status === 'partial') return '此分頁資料為部分結果，請留意缺漏風險。';
+  return '此分頁資料完整性異常，請留意查詢結果。';
+});
+
 const canExport = computed(() => {
   return !activeLoading.value && activeRows.value.length > 0;
 });
@@ -230,6 +260,9 @@ const detailCountLabel = computed(() => {
         <p v-if="activeError" class="error-banner">
           {{ activeError }}
         </p>
+        <p v-if="shouldShowQualityWarning" class="query-tool-warning">
+          {{ qualityWarningText }}
+        </p>
 
         <div v-if="activeSubTab === 'history'" class="space-y-3">
         <LotTimeline
@@ -270,6 +303,34 @@ const detailCountLabel = computed(() => {
         :loading="activeLoading"
         :empty-text="activeLoaded ? activeEmptyText : '尚未查詢此分頁資料'"
       />
+
+      <div
+        v-if="activePagination.total_pages > 1"
+        class="query-tool-pagination"
+      >
+        <span class="query-tool-muted">
+          第 {{ activePagination.page }} / {{ activePagination.total_pages }} 頁，共
+          {{ activePagination.total }} 筆
+        </span>
+        <div class="query-tool-pagination-actions">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            :disabled="activeLoading || activePagination.page <= 1"
+            @click="emit('change-page', { tab: activeSubTab, page: activePagination.page - 1 })"
+          >
+            上一頁
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            :disabled="activeLoading || activePagination.page >= activePagination.total_pages"
+            @click="emit('change-page', { tab: activeSubTab, page: activePagination.page + 1 })"
+          >
+            下一頁
+          </button>
+        </div>
+      </div>
       </template>
     </div>
   </section>

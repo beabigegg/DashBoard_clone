@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Stress tests for reject-history long-range query stability."""
+"""Stress tests for reject-history half-year query stability."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ except Exception:  # pragma: no cover - optional runtime dependency
     reason="Long-range reject-history stress disabled; set RUN_LONG_STRESS=1 to run.",
 )
 class TestRejectHistoryLongRangeStress:
-    """Concurrent long-range reject-history queries should stay recoverable."""
+    """Concurrent half-year reject-history queries should stay recoverable."""
 
     @staticmethod
     def _redis_used_memory_bytes() -> int | None:
@@ -48,7 +48,7 @@ class TestRejectHistoryLongRangeStress:
                 json={
                     "mode": "date_range",
                     "start_date": f"{year}-01-01",
-                    "end_date": f"{year}-12-31",
+                    "end_date": f"{year}-07-09",
                     "exclude_material_scrap": True,
                     "exclude_pb_diode": True,
                 },
@@ -64,7 +64,7 @@ class TestRejectHistoryLongRangeStress:
         except Exception as exc:  # pragma: no cover - runtime/network dependent
             return False, time.time() - start, str(exc)[:180]
 
-    def test_concurrent_365_day_queries_no_crash(self, base_url: str, stress_result):
+    def test_concurrent_190_day_queries_no_crash(self, base_url: str, stress_result):
         result = stress_result("Reject History Long-Range Concurrent")
         timeout = float(os.environ.get("STRESS_REJECT_HISTORY_TIMEOUT", "420"))
         concurrent_users = int(os.environ.get("STRESS_REJECT_HISTORY_CONCURRENCY", "3"))

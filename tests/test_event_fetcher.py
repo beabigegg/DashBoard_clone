@@ -5,6 +5,11 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from mes_dashboard.core.query_quality_contract import (
+    QUALITY_STATUS_COMPLETE,
+    QUALITY_STATUS_PARTIAL,
+    QUALITY_STATUS_TRUNCATED,
+)
 from mes_dashboard.services.event_fetcher import EventFetcher
 
 
@@ -46,7 +51,8 @@ def test_fetch_events_cache_hit_skips_db(mock_cache_get, mock_iter):
 
     result = EventFetcher.fetch_events(["CID-1"], "materials")
 
-    assert result["CID-1"][0]["CONTAINERID"] == "CID-1"
+    assert result["records_by_cid"]["CID-1"][0]["CONTAINERID"] == "CID-1"
+    assert result["quality_meta"]["status"] == QUALITY_STATUS_COMPLETE
     mock_iter.assert_not_called()
 
 
@@ -68,7 +74,8 @@ def test_fetch_events_upstream_history_branch(
 
     result = EventFetcher.fetch_events(["CID-1", "CID-2"], "upstream_history")
 
-    assert sorted(result.keys()) == ["CID-1", "CID-2"]
+    assert sorted(result["records_by_cid"].keys()) == ["CID-1", "CID-2"]
+    assert result["quality_meta"]["status"] == QUALITY_STATUS_COMPLETE
     assert mock_sql_load.call_args.args[0] == "mid_section_defect/upstream_history"
     sql_arg, params_arg = mock_iter.call_args.args
     assert len(params_arg) == 2
@@ -197,7 +204,7 @@ def test_fetch_events_sanitizes_nan_values(
 
     result = EventFetcher.fetch_events(["CID-1"], "upstream_history")
 
-    assert result["CID-1"][0]["VALUE"] is None
+    assert result["records_by_cid"]["CID-1"][0]["VALUE"] is None
 
 
 @patch("mes_dashboard.services.event_fetcher.cache_set")
@@ -254,4 +261,55 @@ def test_fetch_events_allows_partial_when_enabled(
     cids = [f"CID-{i}" for i in range(1001)]
 
     result = EventFetcher.fetch_events(cids, "history")
-    assert result == {}
+    assert result["records_by_cid"] == {}
+    assert result["quality_meta"]["status"] == QUALITY_STATUS_PARTIAL
+    assert "chunk_failure" in result["quality_meta"]["reasons"]
+    assert result["quality_meta"]["has_partial_failure"] is True
+    assert result["quality_meta"]["failed_chunk_count"] == 1
+
+
+@patch("mes_dashboard.services.event_fetcher.cache_get")
+def test_fetch_events_cache_hit_legacy_meta_is_adapted(mock_cache_get):
+    mock_cache_get.return_value = {
+        "CID-1": [{"CONTAINERID": "CID-1"}],
+        "__meta__": {
+            "truncated": True,
+            "total_rows_fetched": 200,
+            "max_total_rows": 100,
+        },
+    }
+
+    result = EventFetcher.fetch_events(["CID-1"], "history")
+    assert "__meta__" not in result["records_by_cid"]
+    assert result["quality_meta"]["status"] == QUALITY_STATUS_TRUNCATED
+    assert result["quality_meta"]["observed_rows"] == 200
+    assert result["quality_meta"]["max_rows"] == 100
+
+
+@patch("mes_dashboard.services.event_fetcher.cache_set")
+@patch("mes_dashboard.services.event_fetcher.cache_get", return_value=None)
+@patch("mes_dashboard.services.event_fetcher.read_sql_df_slow_iter")
+@patch("mes_dashboard.services.event_fetcher.SQLLoader.load")
+def test_fetch_events_truncation_meta_contains_row_limit_context(
+    mock_sql_load,
+    mock_iter,
+    _mock_cache_get,
+    _mock_cache_set,
+    monkeypatch,
+):
+    mock_sql_load.return_value = "SELECT * FROM t WHERE h.CONTAINERID = :container_id {{ WORKCENTER_FILTER }}"
+    monkeypatch.setattr("mes_dashboard.services.event_fetcher.EVENT_FETCHER_MAX_TOTAL_ROWS", 2)
+    mock_iter.side_effect = _iter_result(
+        ["CONTAINERID", "EVENTTYPE"],
+        [
+            ("CID-1", "A"),
+            ("CID-1", "B"),
+            ("CID-1", "C"),
+        ],
+    )
+
+    result = EventFetcher.fetch_events(["CID-1"], "history")
+    assert len(result["records_by_cid"]["CID-1"]) == 2
+    assert result["quality_meta"]["status"] == QUALITY_STATUS_TRUNCATED
+    assert result["quality_meta"]["observed_rows"] == 2
+    assert result["quality_meta"]["max_rows"] == 2

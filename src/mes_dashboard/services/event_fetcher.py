@@ -13,6 +13,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List
 
 from mes_dashboard.core.cache import cache_get, cache_set
+from mes_dashboard.core.partial_failure_contract import build_partial_failure_meta
+from mes_dashboard.core.query_quality_contract import (
+    QUALITY_SCOPE_DOMAIN,
+    QUALITY_STATUS_COMPLETE,
+    QUALITY_STATUS_PARTIAL,
+    QUALITY_STATUS_TRUNCATED,
+    build_event_fetch_result,
+    build_quality_meta,
+    unpack_event_fetch_result,
+)
 from mes_dashboard.core.database import read_sql_df_slow_iter
 from mes_dashboard.sql import QueryBuilder, SQLLoader
 
@@ -224,19 +234,28 @@ class EventFetcher:
     def fetch_events(
         container_ids: List[str],
         domain: str,
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> Dict[str, Any]:
         """Fetch event records grouped by CONTAINERID."""
         if domain not in _DOMAIN_SPECS:
             raise ValueError(f"Unsupported event domain: {domain}")
 
         normalized_ids = _normalize_ids(container_ids)
         if not normalized_ids:
-            return {}
+            return build_event_fetch_result(
+                {},
+                build_quality_meta(
+                    status=QUALITY_STATUS_COMPLETE,
+                    scope=QUALITY_SCOPE_DOMAIN,
+                    domain=domain,
+                    observed_rows=0,
+                ),
+            )
 
         cache_key = EventFetcher._cache_key(domain, normalized_ids)
         cached = cache_get(cache_key)
         if cached is not None:
-            return cached
+            cached_records, cached_meta = unpack_event_fetch_result(cached, domain=domain)
+            return build_event_fetch_result(cached_records, cached_meta)
 
         grouped: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         total_row_count = [0]  # mutable counter shared across batches
@@ -307,6 +326,7 @@ class EventFetcher:
         if len(batches) <= 1:
             for batch in batches:
                 _fetch_and_group_batch(batch)
+            failures = []
         else:
             failures = []
             with ThreadPoolExecutor(max_workers=min(len(batches), EVENT_FETCHER_MAX_WORKERS)) as executor:
@@ -326,17 +346,47 @@ class EventFetcher:
                     f"EventFetcher chunk failed (domain={domain}, failed_chunks={len(failures)}, failed_cids={failed_cids})"
                 )
 
-        result = dict(grouped)
+        records_by_cid = dict(grouped)
         del grouped
 
-        # Attach truncation metadata (backwards-compatible: callers that don't
-        # know about __meta__ simply iterate CID keys and skip non-list values).
+        reasons: List[str] = []
+        status = QUALITY_STATUS_COMPLETE
+        failed_ranges: List[Dict[str, str]] = []
+        partial_meta: Dict[str, Any] = {}
+
         if truncated[0]:
-            result["__meta__"] = {
-                "truncated": True,
-                "total_rows_fetched": total_row_count[0],
-                "max_total_rows": max_total_rows,
-            }
+            status = QUALITY_STATUS_TRUNCATED
+            reasons.append("max_total_rows_exceeded")
+
+        if failures:
+            status = QUALITY_STATUS_PARTIAL
+            reasons.append("chunk_failure")
+            for batch, _ in failures:
+                if not batch:
+                    continue
+                failed_ranges.append({
+                    "start": str(batch[0]),
+                    "end": str(batch[-1]),
+                })
+            partial_meta = build_partial_failure_meta(
+                failed_count=len(failures),
+                failed_ranges=failed_ranges,
+            )
+
+        quality_meta = build_quality_meta(
+            status=status,
+            scope=QUALITY_SCOPE_DOMAIN,
+            domain=domain,
+            reasons=reasons,
+            observed_rows=total_row_count[0],
+            max_rows=max_total_rows if truncated[0] else None,
+            failed_ranges=failed_ranges,
+            extra={
+                "has_partial_failure": partial_meta.get("has_partial_failure", False),
+                "failed_chunk_count": partial_meta.get("failed_chunk_count", 0),
+            } if partial_meta else None,
+        )
+        result = build_event_fetch_result(records_by_cid, quality_meta)
 
         if len(normalized_ids) <= CACHE_SKIP_CID_THRESHOLD:
             cache_set(cache_key, result, ttl=_DOMAIN_SPECS[domain]["cache_ttl"])
@@ -349,7 +399,7 @@ class EventFetcher:
             "EventFetcher fetched domain=%s queried_cids=%s hit_cids=%s truncated=%s",
             domain,
             len(normalized_ids),
-            len(result),
+            len(records_by_cid),
             truncated[0],
         )
         return result

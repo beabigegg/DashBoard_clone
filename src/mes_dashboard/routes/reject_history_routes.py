@@ -39,7 +39,7 @@ _REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS = int(
     os.getenv("REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS", "14400")
 )
 _REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS = max(
-    1, int(os.getenv("REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS", "183"))
+    1, int(os.getenv("REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS", "190"))
 )
 
 _REJECT_HISTORY_LIST_RATE_LIMIT = configured_rate_limit(
@@ -77,7 +77,7 @@ def _validate_primary_query_date_range(start_date: str, end_date: str) -> Option
 
     range_days = (end - start).days + 1
     if range_days > _REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS:
-        return f"查詢範圍不可超過 {_REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS} 天（最多半年）"
+        return f"查詢範圍不可超過 {_REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS} 天（約半年）"
     return None
 
 

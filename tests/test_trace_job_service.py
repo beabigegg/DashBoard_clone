@@ -137,8 +137,20 @@ def test_get_job_result_found_chunked(mock_redis):
     """Should return reconstructed result from chunked Redis keys."""
     result_meta = {
         "profile": "query_tool",
-        "domains": {"history": {"chunks": 1, "total": 1}},
+        "domains": {
+            "history": {
+                "chunks": 1,
+                "total": 1,
+                "quality_meta": {
+                    "status": "complete",
+                    "scope": "domain",
+                    "domain": "history",
+                    "reasons": [],
+                },
+            }
+        },
         "failed_domains": [],
+        "quality_meta": {"status": "complete", "scope": "query", "reasons": []},
     }
     chunk_data = [{"CONTAINERID": "CID-1"}]
 
@@ -162,6 +174,8 @@ def test_get_job_result_found_chunked(mock_redis):
     assert result["stage"] == "events"
     assert result["results"]["history"]["count"] == 1
     assert result["results"]["history"]["total"] == 1
+    assert result["results"]["history"]["quality_meta"]["status"] == "complete"
+    assert result["quality_meta"]["status"] == "complete"
 
 
 @patch.object(tjs, "get_redis_client")
@@ -207,10 +221,11 @@ def test_get_job_result_with_domain_filter(mock_redis):
     result_meta = {
         "profile": "query_tool",
         "domains": {
-            "history": {"chunks": 1, "total": 3},
-            "materials": {"chunks": 1, "total": 1},
+            "history": {"chunks": 1, "total": 3, "quality_meta": {"status": "complete", "scope": "domain", "domain": "history", "reasons": []}},
+            "materials": {"chunks": 1, "total": 1, "quality_meta": {"status": "complete", "scope": "domain", "domain": "materials", "reasons": []}},
         },
         "failed_domains": [],
+        "quality_meta": {"status": "complete", "scope": "query", "reasons": []},
     }
     history_chunk = [{"id": 1}, {"id": 2}, {"id": 3}]
     materials_chunk = [{"id": 10}]
@@ -237,6 +252,8 @@ def test_get_job_result_with_domain_filter(mock_redis):
     assert "materials" not in result["results"]
     assert result["results"]["history"]["data"] == [{"id": 2}]
     assert result["results"]["history"]["total"] == 3
+    assert result["results"]["history"]["quality_meta"]["status"] == "complete"
+    assert result["quality_meta"]["status"] == "complete"
 
 
 # ---------------------------------------------------------------------------
@@ -396,15 +413,25 @@ def test_stream_ndjson_chunked(mock_redis):
     parsed = [json.loads(line) for line in lines]
 
     types = [p["type"] for p in parsed]
-    assert types == ["meta", "domain_start", "records", "records", "domain_end", "complete"]
+    assert types == [
+        "meta",
+        "domain_start",
+        "records",
+        "records",
+        "domain_end",
+        "quality_meta",
+        "complete",
+    ]
 
     assert parsed[0]["domains"] == ["history"]
     assert parsed[1]["domain"] == "history"
     assert parsed[1]["total"] == 3
+    assert parsed[1]["quality_meta"]["domain"] == "history"
     assert parsed[2]["count"] == 2
     assert parsed[3]["count"] == 1
     assert parsed[4]["count"] == 3
-    assert parsed[5]["total_records"] == 3
+    assert parsed[5]["quality_meta"]["status"] == "complete"
+    assert parsed[6]["total_records"] == 3
 
 
 @patch.object(tjs, "get_redis_client")
@@ -494,6 +521,7 @@ def test_stream_ndjson_with_failed_domains(mock_redis):
 
     types = [p["type"] for p in parsed]
     assert "warning" in types
+    assert "quality_meta" in types
 
     warning = [p for p in parsed if p["type"] == "warning"][0]
     assert warning["code"] == "EVENTS_PARTIAL_FAILURE"

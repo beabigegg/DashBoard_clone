@@ -112,6 +112,14 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  detailPagination: {
+    type: Object,
+    required: true,
+  },
+  detailQualityMeta: {
+    type: Object,
+    required: true,
+  },
   workcenterGroups: {
     type: Array,
     default: () => [],
@@ -130,6 +138,7 @@ const emit = defineEmits([
   'change-sub-tab',
   'update-workcenter-groups',
   'export-lot-tab',
+  'change-page',
 ]);
 </script>
 
@@ -178,11 +187,14 @@ const emit = defineEmits([
       :errors="detailErrors"
       :history-rows="historyRows"
       :association-rows="associationRows"
+      :pagination="detailPagination"
+      :quality-meta="detailQualityMeta"
       :workcenter-groups="workcenterGroups"
       :selected-workcenter-groups="selectedWorkcenterGroups"
       @change-sub-tab="emit('change-sub-tab', $event)"
       @update-workcenter-groups="emit('update-workcenter-groups', $event)"
       @export-tab="emit('export-lot-tab', $event)"
+      @change-page="emit('change-page', $event)"
     />
   </div>
 </template>

@@ -170,9 +170,7 @@ async function executePrimaryQuery(page = 1) {
     if (result.meta?.unresolved?.length > 0) {
       unresolvedWarning.value = `以下 LOT ID 無法解析：${result.meta.unresolved.join('、')}`;
     }
-    if (result.meta?.truncated) {
-      warningMessage.value = `查詢結果超過 ${result.meta.max_rows?.toLocaleString() || '10,000'} 筆上限，請縮小查詢範圍`;
-    }
+    warningMessage.value = buildQualityWarning(result.quality_meta, result.meta);
   } catch (err) {
     errorMessage.value = err.message || '查詢失敗，請稍後再試';
     rows.value = [];
@@ -183,6 +181,22 @@ async function executePrimaryQuery(page = 1) {
 
 function goToPage(page) {
   executePrimaryQuery(page);
+}
+
+function buildQualityWarning(qualityMeta, fallbackMeta = null) {
+  const status = String(qualityMeta?.status || '').toLowerCase();
+  const maxRows = qualityMeta?.max_rows || fallbackMeta?.max_rows;
+  if (!status || status === 'complete') {
+    return '';
+  }
+  if (status === 'truncated') {
+    const maxRowsText = Number(maxRows || 0).toLocaleString();
+    return `查詢結果可能已截斷（上限 ${maxRowsText || '10,000'} 筆），請縮小查詢範圍`;
+  }
+  if (status === 'partial') {
+    return '查詢結果為部分資料，請留意可能缺漏';
+  }
+  return '查詢結果完整性異常，請稍後重試或縮小查詢範圍';
 }
 
 async function exportCsv() {
@@ -207,6 +221,19 @@ async function exportCsv() {
       const data = await response.json().catch(() => ({}));
       errorMessage.value = data.error || '匯出失敗';
       return;
+    }
+
+    const exportStatus = String(response.headers.get('X-Query-Quality-Status') || '').toLowerCase();
+    if (exportStatus && exportStatus !== 'complete') {
+      warningMessage.value = buildQualityWarning(
+        {
+          status: exportStatus,
+          max_rows: response.headers.get('X-Query-Quality-Max-Rows') || response.headers.get('X-Max-Rows'),
+        },
+        null,
+      );
+    } else if (String(response.headers.get('X-Truncated') || '').toLowerCase() === 'true') {
+      warningMessage.value = '匯出結果可能已截斷，請縮小查詢範圍後重試';
     }
 
     const blob = await response.blob();

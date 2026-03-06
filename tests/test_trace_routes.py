@@ -336,7 +336,15 @@ def test_events_partial_failure_returns_200_with_code(mock_fetch_events):
     def _side_effect(_container_ids, domain):
         if domain == 'history':
             return {
-                'CID-001': [{'CONTAINERID': 'CID-001', 'EVENTTYPE': 'TRACK_IN'}]
+                'records_by_cid': {
+                    'CID-001': [{'CONTAINERID': 'CID-001', 'EVENTTYPE': 'TRACK_IN'}],
+                },
+                'quality_meta': {
+                    'status': 'complete',
+                    'scope': 'domain',
+                    'domain': 'history',
+                    'reasons': [],
+                },
             }
         raise RuntimeError('domain failed')
 
@@ -358,6 +366,9 @@ def test_events_partial_failure_returns_200_with_code(mock_fetch_events):
     assert payload['code'] == 'EVENTS_PARTIAL_FAILURE'
     assert 'materials' in payload['failed_domains']
     assert payload['results']['history']['count'] == 1
+    assert payload['results']['history']['quality_meta']['status'] == 'complete'
+    assert payload['results']['materials']['quality_meta']['status'] == 'failed'
+    assert payload['quality_meta']['status'] == 'partial'
 
 
 @patch('mes_dashboard.routes.trace_routes.build_trace_aggregation_from_events')
@@ -367,14 +378,22 @@ def test_events_mid_section_defect_with_aggregation(
     mock_build_aggregation,
 ):
     mock_fetch_events.return_value = {
-        'CID-001': [
-            {
-                'CONTAINERID': 'CID-001',
-                'WORKCENTER_GROUP': '測試',
-                'EQUIPMENTID': 'EQ-01',
-                'EQUIPMENTNAME': 'EQ-01',
-            }
-        ]
+        'records_by_cid': {
+            'CID-001': [
+                {
+                    'CONTAINERID': 'CID-001',
+                    'WORKCENTER_GROUP': '測試',
+                    'EQUIPMENTID': 'EQ-01',
+                    'EQUIPMENTNAME': 'EQ-01',
+                }
+            ]
+        },
+        'quality_meta': {
+            'status': 'complete',
+            'scope': 'domain',
+            'domain': 'upstream_history',
+            'reasons': [],
+        },
     }
     mock_build_aggregation.return_value = {
         'kpi': {'total_input': 100},
@@ -405,6 +424,8 @@ def test_events_mid_section_defect_with_aggregation(
     payload = response.get_json()
     assert payload['aggregation']['kpi']['total_input'] == 100
     assert payload['aggregation']['genealogy_status'] == 'ready'
+    assert payload['results']['upstream_history']['quality_meta']['status'] == 'complete'
+    assert payload['quality_meta']['status'] == 'complete'
     mock_build_aggregation.assert_called_once()
 
 

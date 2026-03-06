@@ -349,6 +349,14 @@ async function handleExportReverseTab(tab) {
   await reverseDetail.exportSubTab(tab);
 }
 
+async function handleLotDetailPageChange({ tab, page }) {
+  await lotDetail.setSubTabPage(tab, page);
+}
+
+async function handleReverseDetailPageChange({ tab, page }) {
+  await reverseDetail.setSubTabPage(tab, page);
+}
+
 async function handleChangeEquipmentSubTab(tab) {
   await equipmentQuery.setActiveSubTab(tab, { autoQuery: true });
 }
@@ -495,6 +503,8 @@ watch(
           :active-sub-tab="lotDetail.activeSubTab.value"
           :history-rows="lotDetail.historyRows.value"
           :association-rows="lotDetail.associationRows"
+          :detail-pagination="lotDetail.pagination"
+          :detail-quality-meta="lotDetail.qualityMeta"
           :workcenter-groups="lotDetail.workcenterGroups.value"
           :selected-workcenter-groups="lotDetail.selectedWorkcenterGroups.value"
           @update:input-type="lotResolve.setInputType($event)"
@@ -504,6 +514,7 @@ watch(
           @change-sub-tab="handleChangeLotSubTab"
           @update-workcenter-groups="handleWorkcenterGroupChange"
           @export-lot-tab="handleExportLotTab"
+          @change-page="handleLotDetailPageChange"
         />
 
         <SerialReverseTraceView
@@ -535,6 +546,8 @@ watch(
           :active-sub-tab="reverseDetail.activeSubTab.value"
           :history-rows="reverseDetail.historyRows.value"
           :association-rows="reverseDetail.associationRows"
+          :detail-pagination="reverseDetail.pagination"
+          :detail-quality-meta="reverseDetail.qualityMeta"
           :workcenter-groups="reverseDetail.workcenterGroups.value"
           :selected-workcenter-groups="reverseDetail.selectedWorkcenterGroups.value"
           @update:input-type="reverseResolve.setInputType($event)"
@@ -544,6 +557,7 @@ watch(
           @change-sub-tab="handleChangeReverseSubTab"
           @update-workcenter-groups="handleReverseWorkcenterGroupChange"
           @export-lot-tab="handleExportReverseTab"
+          @change-page="handleReverseDetailPageChange"
         />
 
         <EquipmentView
@@ -557,6 +571,7 @@ watch(
           :loading="equipmentQuery.loading"
           :errors="equipmentQuery.errors"
           :lots-rows="equipmentQuery.lotsRows.value"
+          :lots-pagination="equipmentQuery.lotsPagination.value"
           :jobs-rows="equipmentQuery.jobsRows.value"
           :rejects-rows="equipmentQuery.rejectsRows.value"
           :status-rows="equipmentQuery.statusRows.value"
@@ -568,6 +583,7 @@ watch(
           @reset-date-range="equipmentQuery.resetDateRange(30)"
           @query-active-sub-tab="handleQueryEquipmentActiveTab"
           @change-sub-tab="handleChangeEquipmentSubTab"
+          @change-lots-page="equipmentQuery.queryLots({ page: $event })"
           @export-sub-tab="handleExportEquipmentSubTab"
         />
       </div>

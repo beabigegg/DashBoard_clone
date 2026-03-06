@@ -44,6 +44,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  lotsPagination: {
+    type: Object,
+    default: () => ({ page: 1, per_page: 0, total: 0, total_pages: 1 }),
+  },
   jobsRows: {
     type: Array,
     default: () => [],
@@ -73,6 +77,7 @@ const emit = defineEmits([
   'reset-date-range',
   'query-active-sub-tab',
   'change-sub-tab',
+  'change-lots-page',
   'export-sub-tab',
 ]);
 
@@ -164,7 +169,7 @@ const subTabs = Object.keys(tabMeta);
           </button>
         </div>
 
-        <EquipmentLotsTable
+      <EquipmentLotsTable
         v-if="activeSubTab === 'lots'"
         :rows="lotsRows"
         :loading="loading.lots"
@@ -173,6 +178,33 @@ const subTabs = Object.keys(tabMeta);
         :exporting="exporting.lots"
         @export="emit('export-sub-tab', 'lots')"
       />
+      <div
+        v-if="activeSubTab === 'lots' && (lotsPagination?.total_pages || 1) > 1"
+        class="query-tool-pagination"
+      >
+        <span class="query-tool-muted">
+          第 {{ lotsPagination.page }} / {{ lotsPagination.total_pages }} 頁，共
+          {{ lotsPagination.total }} 筆
+        </span>
+        <div class="query-tool-pagination-actions">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            :disabled="loading.lots || lotsPagination.page <= 1"
+            @click="emit('change-lots-page', lotsPagination.page - 1)"
+          >
+            上一頁
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            :disabled="loading.lots || lotsPagination.page >= lotsPagination.total_pages"
+            @click="emit('change-lots-page', lotsPagination.page + 1)"
+          >
+            下一頁
+          </button>
+        </div>
+      </div>
 
       <EquipmentJobsPanel
         v-else-if="activeSubTab === 'jobs'"

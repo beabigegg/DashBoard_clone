@@ -22,6 +22,15 @@ from flask import Blueprint, Response, jsonify, request
 
 from mes_dashboard.core.cache import cache_get, cache_set
 from mes_dashboard.core.interactive_memory_guard import process_rss_mb
+from mes_dashboard.core.query_quality_contract import (
+    QUALITY_SCOPE_DOMAIN,
+    QUALITY_SCOPE_QUERY,
+    QUALITY_STATUS_FAILED,
+    build_quality_meta,
+    merge_quality_metas,
+    normalize_quality_meta,
+    unpack_event_fetch_result,
+)
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.redis_client import try_acquire_lock, release_lock
 from mes_dashboard.core.response import error_response
@@ -416,6 +425,51 @@ def _flatten_domain_records(events_by_cid: Dict[str, List[Dict[str, Any]]]) -> L
     return rows
 
 
+def _ensure_events_quality_meta(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(payload, dict):
+        return payload
+
+    results = payload.get("results")
+    domain_quality_meta: Dict[str, Dict[str, Any]] = {}
+    if isinstance(results, dict):
+        for domain, domain_result in results.items():
+            if not isinstance(domain_result, dict):
+                continue
+            domain_meta = normalize_quality_meta(
+                domain_result.get("quality_meta"),
+                default_scope=QUALITY_SCOPE_DOMAIN,
+            )
+            if not domain_meta.get("domain"):
+                domain_meta["domain"] = domain
+            domain_result["quality_meta"] = domain_meta
+            domain_quality_meta[domain] = domain_meta
+
+    raw_domain_meta = payload.get("domain_quality_meta")
+    if isinstance(raw_domain_meta, dict):
+        for domain, meta in raw_domain_meta.items():
+            if domain in domain_quality_meta:
+                continue
+            normalized = normalize_quality_meta(meta, default_scope=QUALITY_SCOPE_DOMAIN)
+            if not normalized.get("domain"):
+                normalized["domain"] = domain
+            domain_quality_meta[domain] = normalized
+
+    if payload.get("quality_meta"):
+        quality_meta = normalize_quality_meta(
+            payload.get("quality_meta"),
+            default_scope=QUALITY_SCOPE_QUERY,
+        )
+    else:
+        quality_meta = merge_quality_metas(
+            domain_quality_meta.values(),
+            scope=QUALITY_SCOPE_QUERY,
+        )
+
+    payload["quality_meta"] = quality_meta
+    payload["domain_quality_meta"] = domain_quality_meta
+    return payload
+
+
 def _parse_lineage_payload(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     lineage = payload.get("lineage")
     if isinstance(lineage, dict):
@@ -444,6 +498,7 @@ def _parse_lineage_roots(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
 def _build_msd_aggregation(
     payload: Dict[str, Any],
     domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    domain_quality_meta: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> tuple[Optional[Dict[str, Any]], Optional[tuple[str, str, int]]]:
     params = payload.get("params")
     if not isinstance(params, dict):
@@ -486,6 +541,9 @@ def _build_msd_aggregation(
         station=station,
         direction=direction,
         mode=mode,
+        upstream_quality_meta=(domain_quality_meta or {}).get("upstream_history"),
+        materials_quality_meta=(domain_quality_meta or {}).get("materials"),
+        downstream_quality_meta=(domain_quality_meta or {}).get("downstream_rejects"),
     )
     if aggregation is None:
         return None, ("EVENTS_AGGREGATION_FAILED", "aggregation service unavailable", 503)
@@ -697,7 +755,7 @@ def events():
     if not is_msd:
         cached = cache_get(events_cache_key)
         if cached is not None:
-            return jsonify(cached)
+            return jsonify(_ensure_events_quality_meta(cached))
 
     # --- MD2: RSS guard before sync execution ---
     rss_now = process_rss_mb()
@@ -732,7 +790,7 @@ def events():
         while (time.monotonic() - wait_start) < EVENTS_LOCK_WAIT_TIMEOUT_SECONDS:
             cached = cache_get(events_cache_key)
             if cached is not None:
-                return jsonify(cached)
+                return jsonify(_ensure_events_quality_meta(cached))
             time.sleep(EVENTS_LOCK_POLL_INTERVAL_SECONDS)
 
         logger.warning(
@@ -746,12 +804,13 @@ def events():
         if lock_acquired:
             cached = cache_get(events_cache_key)
             if cached is not None:
-                return jsonify(cached)
+                return jsonify(_ensure_events_quality_meta(cached))
 
         started = time.monotonic()
         results: Dict[str, Dict[str, Any]] = {}
         raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
         failed_domains: List[str] = []
+        domain_quality_meta: Dict[str, Dict[str, Any]] = {}
 
         with ThreadPoolExecutor(max_workers=min(len(domains), TRACE_EVENTS_MAX_WORKERS)) as executor:
             futures = {
@@ -761,15 +820,36 @@ def events():
             for future in as_completed(futures):
                 domain = futures[future]
                 try:
-                    events_by_cid = future.result()
+                    events_payload = future.result()
+                    events_by_cid, quality_meta = unpack_event_fetch_result(
+                        events_payload,
+                        domain=domain,
+                    )
                     rows = _flatten_domain_records(events_by_cid)
-                    results[domain] = {"data": rows, "count": len(rows)}
+                    results[domain] = {
+                        "data": rows,
+                        "count": len(rows),
+                        "quality_meta": quality_meta,
+                    }
+                    domain_quality_meta[domain] = quality_meta
                     if is_msd:
                         raw_domain_results[domain] = events_by_cid
                     # Non-MSD: events_by_cid goes out of scope here, no double retention
                 except Exception as exc:
                     logger.error("events stage domain failed domain=%s: %s", domain, exc, exc_info=True)
                     failed_domains.append(domain)
+                    failed_meta = build_quality_meta(
+                        status=QUALITY_STATUS_FAILED,
+                        scope=QUALITY_SCOPE_DOMAIN,
+                        domain=domain,
+                        reasons=["domain_fetch_failed"],
+                    )
+                    results[domain] = {
+                        "data": [],
+                        "count": 0,
+                        "quality_meta": failed_meta,
+                    }
+                    domain_quality_meta[domain] = failed_meta
 
         elapsed = time.monotonic() - started
         if elapsed > TRACE_SLOW_THRESHOLD_SECONDS:
@@ -792,7 +872,11 @@ def events():
                     headers={"Retry-After": "30"},
                 )
 
-            aggregation, agg_error = _build_msd_aggregation(payload, raw_domain_results)
+            aggregation, agg_error = _build_msd_aggregation(
+                payload,
+                raw_domain_results,
+                domain_quality_meta=domain_quality_meta,
+            )
             del raw_domain_results
             if agg_error is not None:
                 code, message, status = agg_error
@@ -800,10 +884,17 @@ def events():
         else:
             del raw_domain_results
 
+        query_quality_meta = merge_quality_metas(
+            domain_quality_meta.values(),
+            scope=QUALITY_SCOPE_QUERY,
+        )
+
         response: Dict[str, Any] = {
             "stage": "events",
             "results": results,
             "aggregation": aggregation,
+            "quality_meta": query_quality_meta,
+            "domain_quality_meta": domain_quality_meta,
         }
 
         if failed_domains:

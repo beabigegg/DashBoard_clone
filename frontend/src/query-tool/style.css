@@ -447,6 +447,30 @@ body {
   font-size: 13px;
 }
 
+.query-tool-warning {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+}
+
+.query-tool-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.query-tool-pagination-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* ---- MultiSelect 元件 ---- */
 .multi-select {
   position: relative;

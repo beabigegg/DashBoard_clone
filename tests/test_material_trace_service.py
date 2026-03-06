@@ -97,6 +97,7 @@ class TestForwardLotQuery:
         assert len(result["rows"]) == 5
         assert result["rows"][0]["WORKCENTER_GROUP"] == "焊接_DB"
         assert result["meta"] == {}
+        assert result["quality_meta"]["status"] == "complete"
         assert mock_sql.call_count == 1
         assert mock_sql_slow.call_count == 1
 
@@ -115,6 +116,7 @@ class TestForwardLotQuery:
         assert result["rows"] == []
         assert result["pagination"]["total"] == 0
         assert result["meta"]["unresolved"] == ["UNKNOWN-LOT"]
+        assert result["quality_meta"]["status"] == "complete"
         mock_sql_slow.assert_not_called()
 
 
@@ -159,6 +161,7 @@ class TestReverseQuery:
 
         assert result["meta"]["truncated"] is True
         assert result["meta"]["max_rows"] == 10000
+        assert result["quality_meta"]["status"] == "truncated"
         assert result["pagination"]["total"] == 10000
 
     @patch(_PATCH_GC)
@@ -173,6 +176,7 @@ class TestReverseQuery:
         result = reverse_query(["MLOT-A"], page=1, per_page=50)
 
         assert "truncated" not in result["meta"]
+        assert result["quality_meta"]["status"] == "complete"
         assert result["pagination"]["total"] == 500
 
 
@@ -261,7 +265,9 @@ class TestExportCsv:
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql_slow.return_value = _make_material_df(3)
 
-        csv_bytes, meta = export_csv("workorder", ["WO-001"])
+        csv_stream, export_meta = export_csv("workorder", ["WO-001"])
+        assert not isinstance(csv_stream, (bytes, bytearray))
+        csv_bytes = b"".join(csv_stream)
 
         assert csv_bytes[:3] == b"\xef\xbb\xbf"
         csv_text = csv_bytes.decode("utf-8-sig")
@@ -269,6 +275,23 @@ class TestExportCsv:
         assert "料號" in csv_text
         lines = csv_text.strip().split("\n")
         assert len(lines) == 4
+        assert export_meta["quality_meta"]["status"] == "complete"
+
+    @patch(_PATCH_REDIS_STORE)
+    @patch(_PATCH_REDIS_LOAD, return_value=None)
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_export_empty_result_keeps_header_contract(self, mock_mapping, mock_sql_slow, _rl, _rs):
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        mock_sql_slow.return_value = pd.DataFrame()
+
+        csv_stream, export_meta = export_csv("workorder", ["WO-001"])
+        csv_text = b"".join(csv_stream).decode("utf-8-sig")
+
+        header = csv_text.splitlines()[0]
+        assert "LOT ID" in header
+        assert "工單" in header
+        assert export_meta["quality_meta"]["status"] == "complete"
 
 
 # ============================================================
@@ -419,19 +442,26 @@ class TestRedisCache:
     @patch(_PATCH_GC)
     @patch(_PATCH_REDIS_STORE)
     @patch(_PATCH_REDIS_LOAD)
+    @patch("mes_dashboard.services.material_trace_service._try_load_cached_meta")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_forward_cache_hit_skips_oracle(self, mock_mapping, mock_redis_load, mock_redis_store, _gc):
+    def test_forward_cache_hit_skips_oracle(self, mock_mapping, mock_meta_load, mock_redis_load, mock_redis_store, _gc):
         """When Redis has cached data, Oracle is never queried."""
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         cached = _make_material_df(5)
         cached = cached.copy()
         cached["WORKCENTER_GROUP"] = "焊接_DB"
         mock_redis_load.return_value = cached
+        mock_meta_load.return_value = {
+            "meta": {"truncated": True, "max_rows": 50000},
+            "quality_meta": {"status": "truncated", "scope": "query", "reasons": ["row_guard_truncated"], "max_rows": 50000},
+        }
 
         result = forward_query("workorder", ["WO-001"], page=1, per_page=50)
 
         assert result["pagination"]["total"] == 5
         assert len(result["rows"]) == 5
+        assert result["meta"]["truncated"] is True
+        assert result["quality_meta"]["status"] == "truncated"
         # redis_store should NOT be called on cache hit
         mock_redis_store.assert_not_called()
 
@@ -454,20 +484,27 @@ class TestRedisCache:
 
     @patch(_PATCH_REDIS_STORE)
     @patch(_PATCH_REDIS_LOAD)
+    @patch("mes_dashboard.services.material_trace_service._try_load_cached_meta")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_export_cache_hit_skips_oracle(self, mock_mapping, mock_redis_load, mock_redis_store):
+    def test_export_cache_hit_skips_oracle(self, mock_mapping, mock_meta_load, mock_redis_load, mock_redis_store):
         """Export uses cached data when available."""
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         cached = _make_material_df(3)
         cached = cached.copy()
         cached["WORKCENTER_GROUP"] = "焊接_DB"
         mock_redis_load.return_value = cached
+        mock_meta_load.return_value = {
+            "meta": {},
+            "quality_meta": {"status": "complete", "scope": "query", "reasons": []},
+        }
 
-        csv_bytes, meta = export_csv("workorder", ["WO-001"])
+        csv_stream, export_meta = export_csv("workorder", ["WO-001"])
+        csv_bytes = b"".join(csv_stream)
 
         assert csv_bytes[:3] == b"\xef\xbb\xbf"
         csv_text = csv_bytes.decode("utf-8-sig")
         assert "LOT ID" in csv_text
+        assert export_meta["quality_meta"]["status"] == "complete"
         # Should NOT re-store already cached data
         mock_redis_store.assert_not_called()
 
@@ -508,6 +545,7 @@ class TestForwardTruncation:
 
         assert result["meta"]["truncated"] is True
         assert result["meta"]["max_rows"] == _FORWARD_MAX_ROWS
+        assert result["quality_meta"]["status"] == "truncated"
         assert result["pagination"]["total"] == _FORWARD_MAX_ROWS
 
     @patch(_PATCH_GC)
@@ -522,6 +560,7 @@ class TestForwardTruncation:
         result = forward_query("workorder", ["WO-001"], page=1, per_page=50)
 
         assert "truncated" not in result["meta"]
+        assert result["quality_meta"]["status"] == "complete"
         assert result["pagination"]["total"] == 500
 
 

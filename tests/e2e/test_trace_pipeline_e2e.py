@@ -455,10 +455,10 @@ class TestTraceNDJSONStream:
             lines = _parse_ndjson(resp.text)
             types = [ln["type"] for ln in lines]
 
-            # Protocol: meta → domain_start → records(×3) → domain_end → complete
+            # Protocol: meta → domain_start → records(×3) → domain_end → quality_meta → complete
             assert types[0] == "meta"
             assert types[1] == "domain_start"
-            assert types[-2] == "domain_end"
+            assert types[-2] == "quality_meta"
             assert types[-1] == "complete"
 
             # Verify meta line
