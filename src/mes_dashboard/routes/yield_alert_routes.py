@@ -217,10 +217,13 @@ def api_yield_alert_view():
     except (TypeError, ValueError):
         return jsonify({"success": False, "error": "risk_threshold/min_scrap_qty 需為數值"}), 400
 
+    granularity = str(request.args.get("granularity", "day") or "day").strip().lower()
+
     try:
         result = apply_cached_view(
             query_id=query_id,
             filters=filters,
+            granularity=granularity,
             page=page,
             per_page=per_page,
             sort_by=sort_by,

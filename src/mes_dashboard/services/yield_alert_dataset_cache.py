@@ -29,6 +29,7 @@ from mes_dashboard.services.yield_alert_service import (
     MAX_PAGE_SIZE,
     MAX_QUERY_DAYS,
     VALID_SORT_FIELDS,
+    _YIELD_WORKCENTER_GROUP_ORDER,
     _bucket_to_text,
     _build_normalized_exclusion_tokens,
     _compute_reject_linkage,
@@ -48,7 +49,7 @@ logger = logging.getLogger("mes_dashboard.yield_alert_dataset_cache")
 _CACHE_TTL = max(30, int(os.getenv("YIELD_ALERT_CACHE_TTL_SECONDS", "300")))
 _CACHE_MAX_SIZE = max(1, int(os.getenv("YIELD_ALERT_DATASET_CACHE_MAX_SIZE", "6")))
 _REDIS_NAMESPACE = "yield_alert_dataset"
-_CACHE_SCHEMA_VERSION = 3
+_CACHE_SCHEMA_VERSION = 4
 
 _DETAIL_COLUMNS = [
     "DATE_BUCKET",
@@ -81,16 +82,143 @@ _FILTER_COLUMN_MAP = {
 }
 
 _TX_DEDUP_COLUMNS = [
-    "DATE_BUCKET", "WORKORDER", "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
+    "DATE_BUCKET", "WORKORDER",
+    "DEPARTMENT_NAME", "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
     "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
 ]
 
 
 def _dedup_tx_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Drop reason dimension to avoid TRANSACTION_QTY double-counting."""
+    """Collapse the reason dimension to compute accurate TRANSACTION_QTY.
+
+    Uses groupby+sum instead of drop_duplicates so that multiple move
+    transactions sharing the same non-reason dimensions are ALL counted,
+    even when they map to the same DEPARTMENT_GROUP but originate from
+    distinct DEPARTMENT_NAMEs (sub-stations).
+    """
     if df.empty:
         return df
-    return df.drop_duplicates(subset=_TX_DEDUP_COLUMNS)
+    return df.groupby(_TX_DEDUP_COLUMNS, as_index=False)["TRANSACTION_QTY"].sum()
+
+
+_VALID_GRANULARITIES = frozenset({"day", "week", "month", "year"})
+_DEPT_SEQ_MAP: dict[str, int] = {g: i for i, g in enumerate(_YIELD_WORKCENTER_GROUP_ORDER)}
+
+_GRANULARITY_LABEL = {"day": "日", "week": "週", "month": "月", "year": "年"}
+
+
+def _bucket_date_str(date_val: Any, granularity: str) -> str:
+    """Convert a single DATE_BUCKET value to a time-period bucket label (scalar fallback)."""
+    try:
+        dt = pd.Timestamp(str(date_val)[:10])
+    except Exception:
+        return str(date_val)[:10]
+    if granularity == "week":
+        monday = dt - pd.Timedelta(days=dt.weekday())
+        return monday.strftime("%Y-%m-%d")
+    if granularity == "month":
+        return dt.strftime("%Y-%m")
+    if granularity == "year":
+        return dt.strftime("%Y")
+    return dt.strftime("%Y-%m-%d")
+
+
+def _vectorized_bucket(series: pd.Series, granularity: str) -> pd.Series:
+    """Vectorized date bucketing — avoids per-row Python lambda on large DataFrames."""
+    if granularity == "day":
+        # DATE_BUCKET is already stored as 'YYYY-MM-DD' strings; just normalise
+        return series.astype(str).str[:10]
+    dt = pd.to_datetime(series.astype(str).str[:10], format="%Y-%m-%d", errors="coerce")
+    if granularity == "week":
+        return (dt - pd.to_timedelta(dt.dt.dayofweek, unit="D")).dt.strftime("%Y-%m-%d")
+    if granularity == "month":
+        return dt.dt.strftime("%Y-%m")
+    if granularity == "year":
+        return dt.dt.strftime("%Y")
+    return dt.dt.strftime("%Y-%m-%d")
+
+
+def _build_heatmap_data(
+    *,
+    tx_df: pd.DataFrame,
+    scrap_df: pd.DataFrame,
+    granularity: str,
+) -> list[dict[str, Any]]:
+    """Return station × date yield% matrix rows from pre-computed tx/scrap DataFrames."""
+    if tx_df.empty:
+        return []
+
+    # Vectorized date bucketing — avoids per-row Python lambda on large DataFrames
+    date_str_tx = _vectorized_bucket(tx_df["DATE_BUCKET"], granularity)
+    tx_grouped = tx_df.groupby([date_str_tx, tx_df["DEPARTMENT_GROUP"]], as_index=False)["TRANSACTION_QTY"].sum()
+    tx_grouped.columns = ["DATE_STR", "DEPARTMENT_GROUP", "TRANSACTION_QTY"]
+
+    if scrap_df.empty:
+        scrap_grouped = pd.DataFrame(columns=["DATE_STR", "DEPARTMENT_GROUP", "SCRAP_QTY"])
+    else:
+        date_str_sc = _vectorized_bucket(scrap_df["DATE_BUCKET"], granularity)
+        scrap_grouped = scrap_df.groupby([date_str_sc, scrap_df["DEPARTMENT_GROUP"]], as_index=False)["SCRAP_QTY"].sum()
+        scrap_grouped.columns = ["DATE_STR", "DEPARTMENT_GROUP", "SCRAP_QTY"]
+
+    merged = tx_grouped.merge(scrap_grouped, on=["DATE_STR", "DEPARTMENT_GROUP"], how="left")
+    merged["SCRAP_QTY"] = pd.to_numeric(merged["SCRAP_QTY"], errors="coerce").fillna(0.0)
+    merged["TRANSACTION_QTY"] = pd.to_numeric(merged["TRANSACTION_QTY"], errors="coerce").fillna(0.0)
+
+    tx_arr = merged["TRANSACTION_QTY"].to_numpy(dtype=float)
+    sc_arr = merged["SCRAP_QTY"].to_numpy(dtype=float)
+    depts = merged["DEPARTMENT_GROUP"].tolist()
+    dates = merged["DATE_STR"].tolist()
+
+    result: list[dict[str, Any]] = [
+        {
+            "station": dept,
+            "station_seq": _DEPT_SEQ_MAP.get(dept, 999),
+            "date": date,
+            "transaction_qty": round(float(tx), 4),
+            "scrap_qty": round(float(sc), 4),
+            "yield_pct": 100.0 if tx <= 0 else round((1 - sc / tx) * 100, 4),
+        }
+        for dept, date, tx, sc in zip(depts, dates, tx_arr, sc_arr)
+    ]
+    result.sort(key=lambda x: (_DEPT_SEQ_MAP.get(x["station"], 999), x["date"]))
+    return result
+
+
+def _build_station_summary(
+    *,
+    tx_df: pd.DataFrame,
+    scrap_df: pd.DataFrame,
+) -> list[dict[str, Any]]:
+    """Return per-station yield summary sorted by yield_pct ascending (worst first)."""
+    if tx_df.empty:
+        return []
+
+    tx_grouped = tx_df.groupby("DEPARTMENT_GROUP", as_index=False)["TRANSACTION_QTY"].sum()
+
+    if scrap_df.empty:
+        scrap_grouped = pd.DataFrame(columns=["DEPARTMENT_GROUP", "SCRAP_QTY"])
+    else:
+        scrap_grouped = scrap_df.groupby("DEPARTMENT_GROUP", as_index=False)["SCRAP_QTY"].sum()
+
+    merged = tx_grouped.merge(scrap_grouped, on="DEPARTMENT_GROUP", how="left")
+    merged["SCRAP_QTY"] = pd.to_numeric(merged["SCRAP_QTY"], errors="coerce").fillna(0.0)
+    merged["TRANSACTION_QTY"] = pd.to_numeric(merged["TRANSACTION_QTY"], errors="coerce").fillna(0.0)
+
+    tx_arr = merged["TRANSACTION_QTY"].to_numpy(dtype=float)
+    sc_arr = merged["SCRAP_QTY"].to_numpy(dtype=float)
+
+    result: list[dict[str, Any]] = [
+        {
+            "station": dept,
+            "station_seq": _DEPT_SEQ_MAP.get(dept, 999),
+            "transaction_qty": round(float(tx), 4),
+            "scrap_qty": round(float(sc), 4),
+            "yield_pct": 100.0 if tx <= 0 else round((1 - sc / tx) * 100, 4),
+        }
+        for dept, tx, sc in zip(merged["DEPARTMENT_GROUP"].tolist(), tx_arr, sc_arr)
+    ]
+    result.sort(key=lambda x: (x["yield_pct"], _DEPT_SEQ_MAP.get(x["station"], 999)))
+    return result
 
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
@@ -338,13 +466,16 @@ def _apply_reason_policy(df: pd.DataFrame, *, excluded_reason_tokens: set[str]) 
         return df
     normalized_excluded = _build_normalized_exclusion_tokens(excluded_reason_tokens)
 
+    # Negative SCRAP_QTY = reversal/correction; always include regardless of reason code.
+    reversal_mask = df["SCRAP_QTY"] < 0
+
     mask = df["REASON_CODE"] != "UNMAPPED_REASON"
     if normalized_excluded:
         mask &= ~df["REASON_CODE"].isin(normalized_excluded)
     if excluded_reason_tokens:
         mask &= ~df["REASON_RAW_UPPER"].isin(excluded_reason_tokens)
         mask &= ~df["REASON_NAME_UPPER"].isin(excluded_reason_tokens)
-    return df[mask]
+    return df[mask | reversal_mask]
 
 
 def _to_numeric(value: Any, fallback: float = 0.0) -> float:
@@ -356,25 +487,12 @@ def _to_numeric(value: Any, fallback: float = 0.0) -> float:
 
 def _build_summary_and_trend(
     *,
-    detail_df: pd.DataFrame,
-    departments: list[str],
-    process_categories: list[str],
-    excluded_reason_tokens: set[str],
+    tx_df: pd.DataFrame,
+    scrap_df: pd.DataFrame,
+    granularity: str = "day",
 ) -> tuple[dict[str, float], list[dict[str, float]]]:
-    if departments:
-        detail_filtered = detail_df[detail_df["DEPARTMENT_GROUP"].isin(departments)]
-    else:
-        detail_filtered = detail_df
-
-    if process_categories:
-        detail_filtered = detail_filtered[detail_filtered["PROCESS_CATEGORY"].isin(process_categories)]
-
-    # TRANSACTION_QTY: deduplicate to avoid counting the same move twice per reason
-    tx_df = _dedup_tx_df(detail_filtered)
+    """Build overall summary and date-bucketed trend from pre-computed tx/scrap DataFrames."""
     transaction_qty = _safe_float(tx_df["TRANSACTION_QTY"].sum()) if not tx_df.empty else 0.0
-
-    # SCRAP_QTY: apply reason exclusion policy
-    scrap_df = _apply_reason_policy(detail_filtered, excluded_reason_tokens=excluded_reason_tokens)
     scrap_qty = _safe_float(scrap_df["SCRAP_QTY"].sum()) if not scrap_df.empty else 0.0
 
     yield_pct = 100.0 if transaction_qty <= 0 else round((1 - (scrap_qty / transaction_qty)) * 100, 4)
@@ -386,19 +504,15 @@ def _build_summary_and_trend(
 
     tx_by_date: dict[str, float] = {}
     if not tx_df.empty:
-        grouped_tx = tx_df.groupby("DATE_BUCKET", as_index=False)["TRANSACTION_QTY"].sum()
-        tx_by_date = {
-            str(row["DATE_BUCKET"]): _safe_float(row["TRANSACTION_QTY"])
-            for _, row in grouped_tx.iterrows()
-        }
+        date_str = _vectorized_bucket(tx_df["DATE_BUCKET"], granularity)
+        grouped_tx = tx_df.groupby(date_str, as_index=True)["TRANSACTION_QTY"].sum()
+        tx_by_date = {str(k): _safe_float(v) for k, v in grouped_tx.items()}
 
     scrap_by_date: dict[str, float] = {}
     if not scrap_df.empty:
-        grouped_scrap = scrap_df.groupby("DATE_BUCKET", as_index=False)["SCRAP_QTY"].sum()
-        scrap_by_date = {
-            str(row["DATE_BUCKET"]): _safe_float(row["SCRAP_QTY"])
-            for _, row in grouped_scrap.iterrows()
-        }
+        date_str = _vectorized_bucket(scrap_df["DATE_BUCKET"], granularity)
+        grouped_scrap = scrap_df.groupby(date_str, as_index=True)["SCRAP_QTY"].sum()
+        scrap_by_date = {str(k): _safe_float(v) for k, v in grouped_scrap.items()}
 
     trend_items: list[dict[str, float]] = []
     for bucket in sorted(set(tx_by_date.keys()) | set(scrap_by_date.keys())):
@@ -434,7 +548,7 @@ def _build_alerts_view(
     filtered = _apply_dimension_filters(detail_df, filters)
     filtered = _apply_reason_policy(filtered, excluded_reason_tokens=excluded_reason_tokens)
     if not filtered.empty:
-        filtered = filtered[filtered["SCRAP_QTY"] > 0]
+        filtered = filtered[filtered["SCRAP_QTY"] != 0]
 
     if filtered.empty:
         empty_quality = {
@@ -633,6 +747,7 @@ def apply_view(
     *,
     query_id: str,
     filters: Optional[dict[str, Any]] = None,
+    granularity: str = "day",
     page: int = 1,
     per_page: int = DEFAULT_PAGE_SIZE,
     sort_by: str = "date_bucket",
@@ -651,17 +766,38 @@ def apply_view(
     normalized_risk = _to_numeric(risk_threshold, 98.0)
     normalized_min_scrap = _to_numeric(min_scrap_qty, 1.0)
     normalized_filters = _normalize_filter_values(filters)
+    normalized_granularity = granularity if granularity in _VALID_GRANULARITIES else "day"
 
     detail_df = payload["detail_df"]
     linkage_df = payload["linkage_df"]
 
     started = time.perf_counter()
     excluded_reason_tokens = _load_excluded_reason_tokens()
+    _dept_filter = normalized_filters.get("departments", [])
+    _proc_filter = normalized_filters.get("process_category", [])
+
+    # Pre-compute dept/process-filtered views once — shared by summary, trend, heatmap, station_summary
+    detail_filt = detail_df
+    if _dept_filter:
+        detail_filt = detail_filt[detail_filt["DEPARTMENT_GROUP"].isin(_dept_filter)]
+    if _proc_filter:
+        detail_filt = detail_filt[detail_filt["PROCESS_CATEGORY"].isin(_proc_filter)]
+    tx_df_base = _dedup_tx_df(detail_filt)
+    scrap_df_base = _apply_reason_policy(detail_filt, excluded_reason_tokens=excluded_reason_tokens)
+
     summary, trend_items = _build_summary_and_trend(
-        detail_df=detail_df,
-        departments=normalized_filters.get("departments", []),
-        process_categories=normalized_filters.get("process_category", []),
-        excluded_reason_tokens=excluded_reason_tokens,
+        tx_df=tx_df_base,
+        scrap_df=scrap_df_base,
+        granularity=normalized_granularity,
+    )
+    heatmap_items = _build_heatmap_data(
+        tx_df=tx_df_base,
+        scrap_df=scrap_df_base,
+        granularity=normalized_granularity,
+    )
+    station_summary_items = _build_station_summary(
+        tx_df=tx_df_base,
+        scrap_df=scrap_df_base,
     )
     _linkage_ready = linkage_df is not None and not linkage_df.empty
     alerts = _build_alerts_view(
@@ -684,7 +820,14 @@ def apply_view(
         "summary": summary,
         "trend": {
             "items": trend_items,
-            "granularity": "day",
+            "granularity": normalized_granularity,
+        },
+        "heatmap": {
+            "items": heatmap_items,
+            "granularity": normalized_granularity,
+        },
+        "station_summary": {
+            "items": station_summary_items,
         },
         "alerts": alerts,
         "meta": {

@@ -5,6 +5,9 @@ import { apiGet, apiPost } from '../core/api.js';
 import MultiSelect from '../resource-shared/components/MultiSelect.vue';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { buildDrilldownNotice, toQueryParams } from './utils.js';
+import YieldHeatmap from './YieldHeatmap.vue';
+import YieldStationChart from './YieldStationChart.vue';
+import YieldTrendChart from './YieldTrendChart.vue';
 
 const API_TIMEOUT = 90000;
 const DEFAULT_PER_PAGE = 50;
@@ -39,8 +42,18 @@ const committedDateRange = reactive({
   end_date: '',
 });
 
+const granularity = ref('day');
+const GRANULARITY_OPTIONS = [
+  { value: 'day', label: '日' },
+  { value: 'week', label: '週' },
+  { value: 'month', label: '月' },
+  { value: 'year', label: '年' },
+];
+
 const summary = ref({ transaction_qty: 0, scrap_qty: 0, yield_pct: 100 });
 const trend = ref([]);
+const heatmapData = ref([]);
+const stationSummary = ref([]);
 const alerts = ref([]);
 const pagination = ref({ page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 1 });
 const sortState = reactive({ sort_by: 'date_bucket', sort_dir: 'desc' });
@@ -89,10 +102,6 @@ const alertEmptyMessage = computed(() => {
   if (alertLoading.value) return '告警資料載入中...';
   return '目前無符合條件的告警候選';
 });
-const trendEmptyMessage = computed(() => {
-  if (!hasQueried.value) return '請先設定日期並查詢';
-  return '尚無趨勢資料';
-});
 
 const summaryCards = computed(() => [
   {
@@ -115,24 +124,6 @@ const summaryCards = computed(() => [
   },
 ]);
 
-const linePoints = computed(() => {
-  if (!trend.value.length) {
-    return '';
-  }
-  const w = 640;
-  const h = 140;
-  const values = trend.value.map((item) => Number(item.yield_pct || 0));
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(max - min, 0.0001);
-  return values
-    .map((value, index) => {
-      const x = (index / Math.max(values.length - 1, 1)) * w;
-      const y = h - ((value - min) / span) * h;
-      return `${x},${y}`;
-    })
-    .join(' ');
-});
 
 function setDefaultDateRange() {
   const end = new Date();
@@ -153,6 +144,7 @@ function syncUrlState() {
     functions: parsedFilters.value.functions,
     risk_threshold: parsedFilters.value.risk_threshold,
     min_scrap_qty: parsedFilters.value.min_scrap_qty,
+    granularity: granularity.value,
     page: pagination.value.page,
     per_page: pagination.value.per_page,
     sort_by: sortState.sort_by,
@@ -213,6 +205,9 @@ function restoreFromUrl() {
   const sortDir = String(params.get('sort_dir') || '').trim().toLowerCase();
   if (sortBy) sortState.sort_by = sortBy;
   if (sortDir === 'asc' || sortDir === 'desc') sortState.sort_dir = sortDir;
+
+  const gran = String(params.get('granularity') || '').trim().toLowerCase();
+  if (['day', 'week', 'month', 'year'].includes(gran)) granularity.value = gran;
 }
 
 async function loadFilterOptions() {
@@ -272,6 +267,7 @@ async function loadCachedView(page = 1) {
       functions: parsedFilters.value.functions,
       risk_threshold: parsedFilters.value.risk_threshold,
       min_scrap_qty: parsedFilters.value.min_scrap_qty,
+      granularity: granularity.value,
       page,
       per_page: pagination.value.per_page,
       sort_by: sortState.sort_by,
@@ -286,6 +282,8 @@ async function loadCachedView(page = 1) {
 
   summary.value = resp.data?.summary || summary.value;
   trend.value = resp.data?.trend?.items || [];
+  heatmapData.value = resp.data?.heatmap?.items || [];
+  stationSummary.value = resp.data?.station_summary?.items || [];
   alerts.value = resp.data?.alerts?.items || [];
   pagination.value = resp.data?.alerts?.pagination || pagination.value;
 
@@ -403,6 +401,8 @@ function resetFilters() {
   setDefaultDateRange();
   summary.value = { transaction_qty: 0, scrap_qty: 0, yield_pct: 100 };
   trend.value = [];
+  heatmapData.value = [];
+  stationSummary.value = [];
   alerts.value = [];
   pagination.value = { page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 1 };
   linkageWarning.value = '';
@@ -415,17 +415,6 @@ onMounted(() => {
   setDefaultDateRange();
   restoreFromUrl();
   loadFilterOptions();
-  if (filters.start_date && filters.end_date) {
-    // Always start via primary-query path on mount.
-    // If dataset cache is still valid the backend returns instantly (no Oracle re-query).
-    // If cache has expired the backend rebuilds it before we call loadCachedView,
-    // avoiding the cross-worker race where loadCachedView sees a miss right after
-    // executePrimaryQuery stored to a different process-level cache slot.
-    queryId.value = '';
-    committedDateRange.start_date = '';
-    committedDateRange.end_date = '';
-    runQuery(pagination.value.page || 1);
-  }
 });
 </script>
 
@@ -456,7 +445,7 @@ onMounted(() => {
       <div class="filter-row one">
         <div class="filter-actions">
           <button class="btn btn-primary" :disabled="!canSubmit" @click="runQuery(1)">
-            {{ isDateStageDirty ? '執行日期查詢' : '重新查詢日期範圍' }}
+            {{ loading ? '查詢中...' : isDateStageDirty ? '執行日期查詢' : '重新查詢日期範圍' }}
           </button>
           <button class="btn btn-secondary" :disabled="loading" @click="resetFilters">清除條件</button>
         </div>
@@ -469,9 +458,10 @@ onMounted(() => {
         <span>不重新查 Oracle</span>
       </header>
       <template v-if="queryId">
+        <!-- Dimension selects -->
         <div class="filter-row three">
           <label>
-            站別群組(可多選)
+            站別群組
             <MultiSelect
               v-model="filters.workcenterGroups"
               :options="workcenterGroupOptions"
@@ -518,16 +508,31 @@ onMounted(() => {
             />
           </label>
         </div>
-        <div class="filter-row three">
-          <label>
+        <!-- Control bar: thresholds + granularity + submit in one line -->
+        <div class="control-bar">
+          <label class="ctrl-item">
             風險門檻良率(%)
-            <input v-model="filters.risk_threshold" class="text-input" type="number" step="0.1" min="0" max="100" />
+            <input v-model="filters.risk_threshold" class="text-input ctrl-input" type="number" step="0.1" min="0" max="100" />
           </label>
-          <label>
+          <label class="ctrl-item">
             最小報廢量
-            <input v-model="filters.min_scrap_qty" class="text-input" type="number" step="0.1" min="0" />
+            <input v-model="filters.min_scrap_qty" class="text-input ctrl-input" type="number" step="0.1" min="0" />
           </label>
-          <div class="filter-actions">
+          <div class="ctrl-item">
+            <span class="ctrl-label">時間聚合</span>
+            <div class="granularity-toggle">
+              <button
+                v-for="opt in GRANULARITY_OPTIONS"
+                :key="opt.value"
+                class="gran-btn"
+                :class="{ active: granularity === opt.value }"
+                @click="granularity = opt.value"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
+          <div class="ctrl-item ctrl-action">
             <button class="btn btn-primary" :disabled="!canApplySupplementary" @click="runQuery(1)">
               {{ submitLabel }}
             </button>
@@ -550,37 +555,24 @@ onMounted(() => {
       </article>
     </section>
 
-    <section class="trend-panel">
-      <header>
-        <h2>良率趨勢 (日)</h2>
-        <span v-if="trendLoading">載入中...</span>
-      </header>
-      <div v-if="trend.length > 1" class="trend-chart">
-        <svg viewBox="0 0 640 160" role="img" aria-label="yield trend line chart">
-          <polyline :points="linePoints" fill="none" stroke="#2563eb" stroke-width="3" />
-        </svg>
-      </div>
-      <p v-else class="empty-note">{{ trendEmptyMessage }}</p>
-      <div class="trend-table-wrap" v-if="trend.length > 0">
-        <table class="trend-table">
-          <thead>
-            <tr>
-              <th>日期</th>
-              <th>移轉量</th>
-              <th>報廢量</th>
-              <th>良率(%)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in trend" :key="row.date_bucket">
-              <td>{{ row.date_bucket }}</td>
-              <td>{{ Number(row.transaction_qty || 0).toLocaleString() }}</td>
-              <td>{{ Number(row.scrap_qty || 0).toLocaleString() }}</td>
-              <td>{{ Number(row.yield_pct || 0).toFixed(2) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <section v-if="hasQueried" class="trend-panel">
+      <span v-if="trendLoading" class="loading-badge">載入中...</span>
+      <YieldTrendChart
+        :trend="trend"
+        :risk-threshold="Number(filters.risk_threshold || 98)"
+        :granularity="granularity"
+      />
+    </section>
+
+    <section v-if="hasQueried" class="heatmap-panel">
+      <YieldHeatmap :heatmap="heatmapData" :granularity="granularity" />
+    </section>
+
+    <section v-if="hasQueried && stationSummary.length > 0" class="station-summary-panel">
+      <YieldStationChart
+        :station-summary="stationSummary"
+        :risk-threshold="Number(filters.risk_threshold || 98)"
+      />
     </section>
 
     <section class="alerts-panel">
