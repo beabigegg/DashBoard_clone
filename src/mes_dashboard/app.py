@@ -591,16 +591,26 @@ def create_app(config_name: str | None = None) -> Flask:
         """Portal SPA shell page served as pure Vite HTML output."""
         dist_dir = os.path.join(app.static_folder or "", "dist")
         dist_html = os.path.join(dist_dir, "portal-shell.html")
+
+        def _inject_csrf(html: str) -> str:
+            csrf_meta = f'<meta name="csrf-token" content="{get_csrf_token()}">'
+            return html.replace("<meta charset", f"{csrf_meta}\n    <meta charset", 1)
+
         if os.path.exists(dist_html):
-            return send_from_directory(dist_dir, "portal-shell.html")
+            with open(dist_html, "r", encoding="utf-8") as f:
+                html = f.read()
+            return _inject_csrf(html), 200, {"Content-Type": "text/html; charset=utf-8"}
 
         nested_dist_dir = os.path.join(dist_dir, "src", "portal-shell")
         nested_dist_html = os.path.join(nested_dist_dir, "index.html")
         if os.path.exists(nested_dist_html):
-            return send_from_directory(nested_dist_dir, "index.html")
+            with open(nested_dist_html, "r", encoding="utf-8") as f:
+                html = f.read()
+            return _inject_csrf(html), 200, {"Content-Type": "text/html; charset=utf-8"}
 
         return (
             "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            f"<meta name=\"csrf-token\" content=\"{get_csrf_token()}\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
             "<title>MES Portal Shell</title>"
             "<link rel=\"stylesheet\" href=\"/static/dist/tailwind.css\">"
@@ -887,6 +897,32 @@ def create_app(config_name: str | None = None) -> Flask:
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
             "<title>報廢歷史查詢</title>"
             "<script type=\"module\" src=\"/static/dist/reject-history.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        ))
+
+    @app.route('/yield-alert-center')
+    def yield_alert_center_page():
+        """Yield alert center page served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/yield-alert-center')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "yield-alert-center.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'yield-alert-center.html')
+
+        nested_dist_dir = os.path.join(dist_dir, "src", "yield-alert-center")
+        nested_dist_html = os.path.join(nested_dist_dir, "index.html")
+        if os.path.exists(nested_dist_html):
+            return send_from_directory(nested_dist_dir, "index.html")
+
+        return missing_in_scope_asset_response('/yield-alert-center', (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>Yield Alert Center</title>"
+            "<script type=\"module\" src=\"/static/dist/yield-alert-center.js\"></script>"
             "</head><body><div id='app'></div></body></html>",
             200,
         ))

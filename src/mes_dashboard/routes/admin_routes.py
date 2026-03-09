@@ -11,8 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, current_app, g, jsonify, render_template, request, send_from_directory
+from flask import Blueprint, current_app, g, jsonify, make_response, render_template, request, send_from_directory
 
+from mes_dashboard.core.csrf import get_csrf_token
 from mes_dashboard.core.permissions import admin_required
 from mes_dashboard.core.response import error_response, TOO_MANY_REQUESTS
 from mes_dashboard.core.resilience import (
@@ -71,7 +72,12 @@ _last_restart_request: float = 0.0
 def performance():
     """Performance monitoring dashboard (Vue SPA)."""
     dist_dir = os.path.join(current_app.static_folder or "", "dist")
-    return send_from_directory(dist_dir, "admin-performance.html")
+    html_path = os.path.join(dist_dir, "admin-performance.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        html = f.read()
+    csrf_meta = f'<meta name="csrf-token" content="{get_csrf_token()}">'
+    html = html.replace("<meta charset", f"{csrf_meta}\n    <meta charset", 1)
+    return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
 
 
 @admin_bp.route("/api/system-status", methods=["GET"])
