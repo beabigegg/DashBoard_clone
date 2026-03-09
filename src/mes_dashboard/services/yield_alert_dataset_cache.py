@@ -33,6 +33,7 @@ from mes_dashboard.services.yield_alert_service import (
     _build_normalized_exclusion_tokens,
     _compute_reject_linkage,
     _load_excluded_reason_tokens,
+    _normalize_process_category,
     _normalize_tokens,
     _normalize_yield_department_group,
     _risk_level,
@@ -47,9 +48,8 @@ logger = logging.getLogger("mes_dashboard.yield_alert_dataset_cache")
 _CACHE_TTL = max(30, int(os.getenv("YIELD_ALERT_CACHE_TTL_SECONDS", "300")))
 _CACHE_MAX_SIZE = max(1, int(os.getenv("YIELD_ALERT_DATASET_CACHE_MAX_SIZE", "6")))
 _REDIS_NAMESPACE = "yield_alert_dataset"
-_CACHE_SCHEMA_VERSION = 2
+_CACHE_SCHEMA_VERSION = 3
 
-_MOVE_COLUMNS = ["DATE_BUCKET", "DEPARTMENT_NAME", "DEPARTMENT_GROUP", "TRANSACTION_QTY"]
 _DETAIL_COLUMNS = [
     "DATE_BUCKET",
     "WORKORDER",
@@ -57,6 +57,7 @@ _DETAIL_COLUMNS = [
     "REASON_NAME",
     "DEPARTMENT_NAME",
     "DEPARTMENT_GROUP",
+    "PROCESS_CATEGORY",
     "LINE_NAME",
     "PACKAGE_NAME",
     "TYPE_NAME",
@@ -72,12 +73,24 @@ _LINKAGE_COLUMNS = ["CANONICAL_KEY", "REJECT_TOTAL_QTY"]
 
 _FILTER_COLUMN_MAP = {
     "departments": "DEPARTMENT_GROUP",
+    "process_category": "PROCESS_CATEGORY",
     "lines": "LINE_NAME",
     "packages": "PACKAGE_NAME",
     "types": "TYPE_NAME",
     "functions": "FUNCTION_NAME",
-    "operations": "OPERATION_TEXT",
 }
+
+_TX_DEDUP_COLUMNS = [
+    "DATE_BUCKET", "WORKORDER", "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
+    "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
+]
+
+
+def _dedup_tx_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop reason dimension to avoid TRANSACTION_QTY double-counting."""
+    if df.empty:
+        return df
+    return df.drop_duplicates(subset=_TX_DEDUP_COLUMNS)
 
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
@@ -93,24 +106,8 @@ def _detail_cache_key(query_id: str) -> str:
     return f"{_REDIS_NAMESPACE}:{query_id}:detail"
 
 
-def _move_cache_key(query_id: str) -> str:
-    return f"{_REDIS_NAMESPACE}:{query_id}:move"
-
-
 def _linkage_cache_key(query_id: str) -> str:
     return f"{_REDIS_NAMESPACE}:{query_id}:linkage"
-
-
-def _prepare_move_df(df: Optional[pd.DataFrame]) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame(columns=_MOVE_COLUMNS)
-
-    prepared = df.copy()
-    prepared["DATE_BUCKET"] = prepared["DATE_BUCKET"].map(_bucket_to_text)
-    prepared["DEPARTMENT_NAME"] = prepared["DEPARTMENT_NAME"].fillna("(NA)").astype(str).str.strip()
-    prepared["DEPARTMENT_GROUP"] = prepared["DEPARTMENT_NAME"].map(_normalize_yield_department_group)
-    prepared["TRANSACTION_QTY"] = pd.to_numeric(prepared["TRANSACTION_QTY"], errors="coerce").fillna(0.0)
-    return prepared[_MOVE_COLUMNS]
 
 
 def _prepare_detail_df(df: Optional[pd.DataFrame]) -> pd.DataFrame:
@@ -124,6 +121,7 @@ def _prepare_detail_df(df: Optional[pd.DataFrame]) -> pd.DataFrame:
     prepared["REASON_NAME"] = prepared["REASON_NAME"].fillna("(未填寫)").astype(str).str.strip()
     prepared["DEPARTMENT_NAME"] = prepared["DEPARTMENT_NAME"].fillna("(NA)").astype(str).str.strip()
     prepared["DEPARTMENT_GROUP"] = prepared["DEPARTMENT_NAME"].map(_normalize_yield_department_group)
+    prepared["PROCESS_CATEGORY"] = prepared["DEPARTMENT_GROUP"].map(_normalize_process_category)
     prepared["LINE_NAME"] = prepared["LINE_NAME"].fillna("(NA)").astype(str).str.strip()
     prepared["PACKAGE_NAME"] = prepared["PACKAGE_NAME"].fillna("(NA)").astype(str).str.strip()
     prepared["TYPE_NAME"] = prepared["TYPE_NAME"].fillna("(NA)").astype(str).str.strip()
@@ -150,14 +148,12 @@ def _prepare_linkage_df(linked: dict[str, float]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=_LINKAGE_COLUMNS)
 
 
-def _store_payload(query_id: str, *, move_df: pd.DataFrame, detail_df: pd.DataFrame, linkage_df: pd.DataFrame) -> None:
+def _store_payload(query_id: str, *, detail_df: pd.DataFrame, linkage_df: pd.DataFrame) -> None:
     payload = {
-        "move_df": move_df,
         "detail_df": detail_df,
         "linkage_df": linkage_df,
     }
     _dataset_cache.set(query_id, payload)
-    redis_store_df(_move_cache_key(query_id), move_df, ttl=_CACHE_TTL)
     redis_store_df(_detail_cache_key(query_id), detail_df, ttl=_CACHE_TTL)
     redis_store_df(_linkage_cache_key(query_id), linkage_df, ttl=_CACHE_TTL)
 
@@ -167,37 +163,19 @@ def _get_cached_payload(query_id: str) -> Optional[dict[str, pd.DataFrame]]:
     if isinstance(payload, dict):
         return payload
 
-    move_df = redis_load_df(_move_cache_key(query_id))
     detail_df = redis_load_df(_detail_cache_key(query_id))
-    if move_df is None or detail_df is None:
+    if detail_df is None:
         return None
     linkage_df = redis_load_df(_linkage_cache_key(query_id))
     if linkage_df is None:
         linkage_df = pd.DataFrame(columns=_LINKAGE_COLUMNS)
 
     payload = {
-        "move_df": move_df,
         "detail_df": detail_df,
         "linkage_df": linkage_df,
     }
     _dataset_cache.set(query_id, payload)
     return payload
-
-
-def _load_primary_move_df(start_date: str, end_date: str) -> pd.DataFrame:
-    sql = """
-        SELECT
-            TRUNC(m.TXN_DATE) AS DATE_BUCKET,
-            NVL(TRIM(m.DEPARTMENT_NAME), '(NA)') AS DEPARTMENT_NAME,
-            SUM(NVL(m.TRANSACTION_QUANTITY, 0)) AS TRANSACTION_QTY
-        FROM DWH.ERP_WIP_MOVETXN m
-        WHERE m.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
-          AND m.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
-        GROUP BY
-            TRUNC(m.TXN_DATE),
-            NVL(TRIM(m.DEPARTMENT_NAME), '(NA)')
-    """
-    return _prepare_move_df(read_sql_df_slow(sql, {"start_date": start_date, "end_date": end_date}))
 
 
 def _load_primary_detail_df(start_date: str, end_date: str) -> pd.DataFrame:
@@ -218,6 +196,9 @@ def _load_primary_detail_df(start_date: str, end_date: str) -> pd.DataFrame:
         FROM DWH.ERP_WIP_MOVETXN_DETAIL d
         WHERE d.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
           AND d.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
+          AND UPPER(NVL(TRIM(d.WIP_ENTITY_NAME), '-')) LIKE 'GA%'
+          AND d.PACKAGE IS NOT NULL
+          AND TRIM(d.PACKAGE) NOT IN ('N/A', 'NA', '(NA)', '(N/A)', 'NULL')
         GROUP BY
             TRUNC(d.TXN_DATE),
             NVL(TRIM(d.WIP_ENTITY_NAME), '(NA)'),
@@ -259,30 +240,75 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
     cached = _get_cached_payload(query_id)
     if cached is not None:
         logger.info("Yield alert dataset cache hit: query_id=%s", query_id)
+        linkage_ready = cached.get("linkage_df") is not None and not cached["linkage_df"].empty
         return {
             "query_id": query_id,
             "meta": {
                 "cache_hit": True,
                 "max_query_days": MAX_QUERY_DAYS,
+                "linkage_ready": linkage_ready,
             },
         }
 
     logger.info("Yield alert dataset cache miss: query_id=%s", query_id)
     started = time.perf_counter()
-    move_df = _load_primary_move_df(start_date, end_date)
     detail_df = _load_primary_detail_df(start_date, end_date)
-    linkage_df = _build_linkage_df(start_date, end_date, detail_df)
     elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
 
-    _store_payload(query_id, move_df=move_df, detail_df=detail_df, linkage_df=linkage_df)
+    logger.info(
+        "Yield alert detail loaded: query_id=%s detail_rows=%s scrap_rows=%s latency_ms=%.2f",
+        query_id,
+        len(detail_df),
+        int((detail_df["SCRAP_QTY"] > 0).sum()) if not detail_df.empty else 0,
+        elapsed_ms,
+    )
+    linkage_df = pd.DataFrame(columns=_LINKAGE_COLUMNS)
+    _store_payload(query_id, detail_df=detail_df, linkage_df=linkage_df)
     return {
         "query_id": query_id,
         "meta": {
             "cache_hit": False,
             "query_latency_ms": elapsed_ms,
             "max_query_days": MAX_QUERY_DAYS,
-            "move_rows": int(len(move_df)),
             "detail_rows": int(len(detail_df)),
+            "linkage_ready": False,
+        },
+    }
+
+
+def execute_linkage_query(*, query_id: str) -> Optional[dict[str, Any]]:
+    """Compute reject linkage for a cached dataset and update the cache."""
+    payload = _get_cached_payload(query_id)
+    if payload is None:
+        return None
+
+    detail_df = payload["detail_df"]
+    if detail_df.empty:
+        return {
+            "query_id": query_id,
+            "meta": {"linkage_ready": True, "linkage_rows": 0},
+        }
+
+    # Derive date range from the cached data
+    start_date = str(detail_df["DATE_BUCKET"].min())[:10]
+    end_date = str(detail_df["DATE_BUCKET"].max())[:10]
+
+    started = time.perf_counter()
+    linkage_df = _build_linkage_df(start_date, end_date, detail_df)
+    elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+
+    # Update cache with computed linkage
+    _store_payload(query_id, detail_df=detail_df, linkage_df=linkage_df)
+    logger.info(
+        "Yield alert linkage computed: query_id=%s rows=%s latency_ms=%.2f",
+        query_id, len(linkage_df), elapsed_ms,
+    )
+    return {
+        "query_id": query_id,
+        "meta": {
+            "linkage_ready": True,
+            "linkage_rows": int(len(linkage_df)),
+            "query_latency_ms": elapsed_ms,
         },
     }
 
@@ -330,22 +356,27 @@ def _to_numeric(value: Any, fallback: float = 0.0) -> float:
 
 def _build_summary_and_trend(
     *,
-    move_df: pd.DataFrame,
     detail_df: pd.DataFrame,
     departments: list[str],
+    process_categories: list[str],
     excluded_reason_tokens: set[str],
 ) -> tuple[dict[str, float], list[dict[str, float]]]:
     if departments:
-        move_filtered = move_df[move_df["DEPARTMENT_GROUP"].isin(departments)]
         detail_filtered = detail_df[detail_df["DEPARTMENT_GROUP"].isin(departments)]
     else:
-        move_filtered = move_df
         detail_filtered = detail_df
 
-    detail_filtered = _apply_reason_policy(detail_filtered, excluded_reason_tokens=excluded_reason_tokens)
+    if process_categories:
+        detail_filtered = detail_filtered[detail_filtered["PROCESS_CATEGORY"].isin(process_categories)]
 
-    transaction_qty = _safe_float(move_filtered["TRANSACTION_QTY"].sum()) if not move_filtered.empty else 0.0
-    scrap_qty = _safe_float(detail_filtered["SCRAP_QTY"].sum()) if not detail_filtered.empty else 0.0
+    # TRANSACTION_QTY: deduplicate to avoid counting the same move twice per reason
+    tx_df = _dedup_tx_df(detail_filtered)
+    transaction_qty = _safe_float(tx_df["TRANSACTION_QTY"].sum()) if not tx_df.empty else 0.0
+
+    # SCRAP_QTY: apply reason exclusion policy
+    scrap_df = _apply_reason_policy(detail_filtered, excluded_reason_tokens=excluded_reason_tokens)
+    scrap_qty = _safe_float(scrap_df["SCRAP_QTY"].sum()) if not scrap_df.empty else 0.0
+
     yield_pct = 100.0 if transaction_qty <= 0 else round((1 - (scrap_qty / transaction_qty)) * 100, 4)
     summary = {
         "transaction_qty": round(transaction_qty, 4),
@@ -354,16 +385,16 @@ def _build_summary_and_trend(
     }
 
     tx_by_date: dict[str, float] = {}
-    if not move_filtered.empty:
-        grouped_tx = move_filtered.groupby("DATE_BUCKET", as_index=False)["TRANSACTION_QTY"].sum()
+    if not tx_df.empty:
+        grouped_tx = tx_df.groupby("DATE_BUCKET", as_index=False)["TRANSACTION_QTY"].sum()
         tx_by_date = {
             str(row["DATE_BUCKET"]): _safe_float(row["TRANSACTION_QTY"])
             for _, row in grouped_tx.iterrows()
         }
 
     scrap_by_date: dict[str, float] = {}
-    if not detail_filtered.empty:
-        grouped_scrap = detail_filtered.groupby("DATE_BUCKET", as_index=False)["SCRAP_QTY"].sum()
+    if not scrap_df.empty:
+        grouped_scrap = scrap_df.groupby("DATE_BUCKET", as_index=False)["SCRAP_QTY"].sum()
         scrap_by_date = {
             str(row["DATE_BUCKET"]): _safe_float(row["SCRAP_QTY"])
             for _, row in grouped_scrap.iterrows()
@@ -390,6 +421,7 @@ def _build_alerts_view(
     *,
     detail_df: pd.DataFrame,
     linkage_df: pd.DataFrame,
+    linkage_ready: bool,
     filters: dict[str, list[str]],
     page: int,
     per_page: int,
@@ -437,6 +469,7 @@ def _build_alerts_view(
                 "REASON_CODE",
                 "REASON_NAME",
                 "DEPARTMENT_GROUP",
+                "PROCESS_CATEGORY",
                 "LINE_NAME",
                 "PACKAGE_NAME",
                 "TYPE_NAME",
@@ -488,6 +521,7 @@ def _build_alerts_view(
             "reason_code": str(row.get("REASON_CODE") or "").strip(),
             "reason_name": str(row.get("REASON_NAME") or "").strip(),
             "department": str(row.get("DEPARTMENT_GROUP") or "(NA)"),
+            "process_category": str(row.get("PROCESS_CATEGORY") or "OTHER"),
             "line": str(row.get("LINE_NAME") or "(NA)"),
             "package": str(row.get("PACKAGE_NAME") or "(NA)"),
             "type": str(row.get("TYPE_NAME") or "(NA)"),
@@ -539,6 +573,16 @@ def _build_alerts_view(
     total_scrap = matched_qty + partial_qty + unmatched_qty
     unmatched_ratio = 0.0 if total_scrap <= 0 else round(unmatched_qty / total_scrap, 4)
 
+    if not linkage_ready:
+        quality_warning = False
+        quality_warning_code = "linkage_not_ready"
+    elif unmatched_ratio >= LINKAGE_WARN_UNMATCHED_RATIO:
+        quality_warning = True
+        quality_warning_code = "high_unmatched_ratio"
+    else:
+        quality_warning = False
+        quality_warning_code = None
+
     return {
         "items": page_rows,
         "pagination": {
@@ -556,8 +600,8 @@ def _build_alerts_view(
             "unmatched_scrap_qty": round(unmatched_qty, 4),
             "total_scrap_qty": round(total_scrap, 4),
             "unmatched_ratio": unmatched_ratio,
-            "warning": unmatched_ratio >= LINKAGE_WARN_UNMATCHED_RATIO,
-            "warning_code": "high_unmatched_ratio" if unmatched_ratio >= LINKAGE_WARN_UNMATCHED_RATIO else None,
+            "warning": quality_warning,
+            "warning_code": quality_warning_code,
         },
         "sort": {"sort_by": sort_by, "sort_dir": sort_dir},
     }
@@ -572,13 +616,16 @@ def _compute_filter_options(detail_df: pd.DataFrame) -> dict[str, list[str]]:
         ("packages", "PACKAGE_NAME"),
         ("types", "TYPE_NAME"),
         ("functions", "FUNCTION_NAME"),
-        ("operations", "OPERATION_TEXT"),
     ]:
         values = sorted({
             str(v) for v in detail_df[col].dropna()
             if str(v) not in ("(NA)", "-1", "")
         })
         options[key] = values
+    options["process_categories"] = sorted({
+        str(v) for v in detail_df["PROCESS_CATEGORY"].dropna()
+        if str(v) not in ("OTHER", "")
+    })
     return options
 
 
@@ -605,21 +652,22 @@ def apply_view(
     normalized_min_scrap = _to_numeric(min_scrap_qty, 1.0)
     normalized_filters = _normalize_filter_values(filters)
 
-    move_df = payload["move_df"]
     detail_df = payload["detail_df"]
     linkage_df = payload["linkage_df"]
 
     started = time.perf_counter()
     excluded_reason_tokens = _load_excluded_reason_tokens()
     summary, trend_items = _build_summary_and_trend(
-        move_df=move_df,
         detail_df=detail_df,
         departments=normalized_filters.get("departments", []),
+        process_categories=normalized_filters.get("process_category", []),
         excluded_reason_tokens=excluded_reason_tokens,
     )
+    _linkage_ready = linkage_df is not None and not linkage_df.empty
     alerts = _build_alerts_view(
         detail_df=detail_df,
         linkage_df=linkage_df,
+        linkage_ready=_linkage_ready,
         filters=normalized_filters,
         page=normalized_page,
         per_page=normalized_per_page,
@@ -646,6 +694,7 @@ def apply_view(
             "reason_exclusion_applied": True,
             "excluded_reason_count": len(excluded_reason_tokens),
             "cache": {"query_id": query_id},
+            "linkage_ready": _linkage_ready,
         },
         "filter_options": _compute_filter_options(payload["detail_df"]),
     }

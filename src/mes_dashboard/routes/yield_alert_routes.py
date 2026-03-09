@@ -14,6 +14,7 @@ from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.services.yield_alert_dataset_cache import (
     apply_view as apply_cached_view,
+    execute_linkage_query,
     execute_primary_query,
 )
 from mes_dashboard.services.yield_alert_service import (
@@ -153,6 +154,32 @@ def api_yield_alert_query():
     except Exception:
         logger.exception("Yield alert primary query failed")
         return jsonify({"success": False, "error": "主查詢執行失敗"}), 500
+
+
+@yield_alert_bp.route("/api/yield-alert/analyze", methods=["POST"])
+@_QUERY_RATE_LIMIT
+def api_yield_alert_analyze():
+    if not _YIELD_ALERT_ENABLED:
+        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+
+    body, payload_error = parse_json_payload(require_non_empty_object=True)
+    if payload_error is not None:
+        return jsonify({"success": False, "error": payload_error.message}), payload_error.status_code
+
+    query_id = str(body.get("query_id", "")).strip()
+    if not query_id:
+        return jsonify({"success": False, "error": "缺少必要參數: query_id"}), 400
+
+    try:
+        result = execute_linkage_query(query_id=query_id)
+        if result is None:
+            resp = make_response(jsonify({"success": False, "error": "cache_expired"}), 410)
+            resp.headers["Cache-Control"] = "no-store"
+            return resp
+        return jsonify({"success": True, **result})
+    except Exception:
+        logger.exception("Yield alert linkage analysis failed")
+        return jsonify({"success": False, "error": "告警連結分析失敗"}), 500
 
 
 @yield_alert_bp.route("/api/yield-alert/view", methods=["GET"])

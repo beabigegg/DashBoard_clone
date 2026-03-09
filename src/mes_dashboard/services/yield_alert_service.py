@@ -68,6 +68,7 @@ _REASON_ALIAS_MAP = {
 }
 _UNMAPPED_REASON_CODE = "UNMAPPED_REASON"
 _YIELD_WORKCENTER_GROUP_ORDER = [
+    "切割",
     "焊接_DB",
     "焊接_WB",
     "成型",
@@ -80,6 +81,21 @@ _YIELD_WORKCENTER_GROUP_ORDER = [
     "品檢",
     "FQC",
 ]
+
+_WAFER_SORT_DEPT_GROUPS = frozenset(["切割"])
+_ASSEMBLY_DEPT_GROUPS = frozenset([
+    "焊接_DB", "焊接_WB",
+    "成型", "去膠", "水吹砂", "電鍍", "移印", "切彎腳",
+    "TMTT", "FQC", "品檢",
+])
+
+
+def _normalize_process_category(dept_group: str) -> str:
+    if dept_group in _WAFER_SORT_DEPT_GROUPS:
+        return "WAFER_SORT"
+    if dept_group in _ASSEMBLY_DEPT_GROUPS:
+        return "ASSEMBLY"
+    return "OTHER"
 
 
 def _parse_date(value: str) -> date:
@@ -138,6 +154,8 @@ def _normalize_yield_department_group(value: object) -> str:
         return "(NA)"
 
     upper = text.upper()
+    if "切割" in text or "DIE SAW" in upper or "DICING" in upper:
+        return "切割"
     if "FQC" in upper:
         return "FQC"
     if "品檢" in text or "IPQC" in upper or "OQC" in upper or "IQC" in upper:
@@ -351,6 +369,9 @@ def _query_filtered_scrap_total(
         FROM DWH.ERP_WIP_MOVETXN_DETAIL d
         WHERE d.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
           AND d.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
+          AND UPPER(NVL(TRIM(d.WIP_ENTITY_NAME), '-')) LIKE 'GA%'
+          AND d.PACKAGE IS NOT NULL
+          AND TRIM(d.PACKAGE) NOT IN ('N/A', 'NA', '(NA)', '(N/A)', 'NULL')
         {"AND " + where_sql if where_sql else ""}
         {exclusion_sql}
     """
@@ -386,6 +407,9 @@ def _query_filtered_scrap_trend(
         FROM DWH.ERP_WIP_MOVETXN_DETAIL d
         WHERE d.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
           AND d.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
+          AND UPPER(NVL(TRIM(d.WIP_ENTITY_NAME), '-')) LIKE 'GA%'
+          AND d.PACKAGE IS NOT NULL
+          AND TRIM(d.PACKAGE) NOT IN ('N/A', 'NA', '(NA)', '(N/A)', 'NULL')
         {"AND " + where_sql if where_sql else ""}
         {exclusion_sql}
         GROUP BY {bucket_expr}

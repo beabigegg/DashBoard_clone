@@ -49,8 +49,6 @@ const lineOptions = ref([]);
 const packageOptions = ref([]);
 const typeOptions = ref([]);
 const functionOptions = ref([]);
-const operationOptions = ref([]);
-
 const filters = reactive({
   start_date: '',
   end_date: '',
@@ -59,7 +57,6 @@ const filters = reactive({
   packages: [],
   types: [],
   functions: [],
-  operations: [],
   risk_threshold: '98',
   min_scrap_qty: '1',
 });
@@ -74,7 +71,6 @@ const parsedFilters = computed(() => ({
   packages: filters.packages,
   types: filters.types,
   functions: filters.functions,
-  operations: filters.operations,
   risk_threshold: filters.risk_threshold,
   min_scrap_qty: filters.min_scrap_qty,
 }));
@@ -155,7 +151,6 @@ function syncUrlState() {
     packages: parsedFilters.value.packages,
     types: parsedFilters.value.types,
     functions: parsedFilters.value.functions,
-    operations: parsedFilters.value.operations,
     risk_threshold: parsedFilters.value.risk_threshold,
     min_scrap_qty: parsedFilters.value.min_scrap_qty,
     page: pagination.value.page,
@@ -199,7 +194,6 @@ function restoreFromUrl() {
   filters.packages = readArrayParam(params, 'packages');
   filters.types = readArrayParam(params, 'types');
   filters.functions = readArrayParam(params, 'functions');
-  filters.operations = readArrayParam(params, 'operations');
 
   const riskThreshold = String(params.get('risk_threshold') || '').trim();
   const minScrapQty = String(params.get('min_scrap_qty') || '').trim();
@@ -276,7 +270,6 @@ async function loadCachedView(page = 1) {
       packages: parsedFilters.value.packages,
       types: parsedFilters.value.types,
       functions: parsedFilters.value.functions,
-      operations: parsedFilters.value.operations,
       risk_threshold: parsedFilters.value.risk_threshold,
       min_scrap_qty: parsedFilters.value.min_scrap_qty,
       page,
@@ -301,7 +294,6 @@ async function loadCachedView(page = 1) {
   if (fo.packages?.length) packageOptions.value = fo.packages;
   if (fo.types?.length) typeOptions.value = fo.types;
   if (fo.functions?.length) functionOptions.value = fo.functions;
-  if (fo.operations?.length) operationOptions.value = fo.operations;
 
   const quality = resp.data?.alerts?.quality || {};
   linkageWarning.value = quality.warning
@@ -406,7 +398,6 @@ function resetFilters() {
   filters.packages = [];
   filters.types = [];
   filters.functions = [];
-  filters.operations = [];
   filters.risk_threshold = '98';
   filters.min_scrap_qty = '1';
   setDefaultDateRange();
@@ -484,7 +475,7 @@ onMounted(() => {
             <MultiSelect
               v-model="filters.workcenterGroups"
               :options="workcenterGroupOptions"
-              placeholder="請選擇站別群組 (焊接_DW 已併入 焊接_WB)"
+              placeholder="請選擇站別群組"
               :searchable="true"
             />
           </label>
@@ -507,7 +498,7 @@ onMounted(() => {
             />
           </label>
         </div>
-        <div v-if="typeOptions.length > 0 || functionOptions.length > 0 || operationOptions.length > 0" class="filter-row three">
+        <div v-if="typeOptions.length > 0 || functionOptions.length > 0" class="filter-row three">
           <label v-if="typeOptions.length > 0">
             Type
             <MultiSelect
@@ -523,15 +514,6 @@ onMounted(() => {
               v-model="filters.functions"
               :options="functionOptions"
               placeholder="請選擇 Function"
-              :searchable="true"
-            />
-          </label>
-          <label v-if="operationOptions.length > 0">
-            Operation
-            <MultiSelect
-              v-model="filters.operations"
-              :options="operationOptions"
-              placeholder="請選擇 Operation"
               :searchable="true"
             />
           </label>
