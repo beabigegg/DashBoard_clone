@@ -27,6 +27,7 @@ from mes_dashboard.services.yield_alert_service import (
     expand_workcenter_groups_to_departments,
     get_yield_workcenter_group_options,
     query_alert_candidates,
+    query_reason_detail,
     query_yield_summary,
     query_yield_trend,
 )
@@ -419,6 +420,35 @@ def api_yield_alert_alerts():
     except Exception:
         logger.exception("Yield alert candidate query failed")
         return jsonify({"success": False, "error": "查詢告警清單失敗"}), 500
+
+
+@yield_alert_bp.route("/api/yield-alert/reason-detail", methods=["GET"])
+@_QUERY_RATE_LIMIT
+def api_yield_alert_reason_detail():
+    if not _YIELD_ALERT_ENABLED:
+        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+
+    workorder = str(request.args.get("workorder", "")).strip()
+    date_bucket = str(request.args.get("date_bucket", "")).strip()
+    reason_code = str(request.args.get("reason_code", "")).strip()
+    department = str(request.args.get("department", "")).strip()
+
+    if not workorder or not date_bucket:
+        return jsonify({"success": False, "error": "缺少必要參數: workorder, date_bucket"}), 400
+
+    try:
+        items = query_reason_detail(workorder=workorder, date_bucket=date_bucket, reason_code=reason_code, department=department)
+        return jsonify({
+            "success": True,
+            "data": {
+                "items": items,
+                "workorder": workorder,
+                "date_bucket": date_bucket,
+            },
+        })
+    except Exception:
+        logger.exception("Yield alert reason detail query failed")
+        return jsonify({"success": False, "error": "查詢報廢明細失敗"}), 500
 
 
 @yield_alert_bp.route("/api/yield-alert/drilldown-context", methods=["GET"])

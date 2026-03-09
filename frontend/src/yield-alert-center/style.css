@@ -282,8 +282,7 @@
 }
 
 /* ── Pills ── */
-.risk-pill,
-.match-pill {
+.risk-pill {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
@@ -307,19 +306,24 @@
   color: #0f766e;
 }
 
-.match-exact {
-  background: #ddf4ff;
-  color: #0b4c73;
+/* ── Reason detail expand row ── */
+.reason-detail-row td {
+  background: #f8f9fb;
+  padding: 0;
 }
 
-.match-partial {
-  background: #fff2cc;
-  color: #8a6116;
+.reason-sub-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 8px 16px;
+  width: calc(100% - 32px);
 }
 
-.match-none {
-  background: #fbe9e7;
-  color: #8c2f25;
+.reason-sub-table th,
+.reason-sub-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ya-border);
+  text-align: left;
 }
 
 /* ── Misc ── */

@@ -3,8 +3,8 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
 import MultiSelect from '../resource-shared/components/MultiSelect.vue';
-import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
-import { buildDrilldownNotice, toQueryParams } from './utils.js';
+import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { toQueryParams } from './utils.js';
 import YieldHeatmap from './YieldHeatmap.vue';
 import YieldStationChart from './YieldStationChart.vue';
 import YieldTrendChart from './YieldTrendChart.vue';
@@ -29,11 +29,13 @@ const loading = ref(false);
 const trendLoading = ref(false);
 const summaryLoading = ref(false);
 const alertLoading = ref(false);
-const drilldownLoadingKey = ref('');
 
 const errorMessage = ref('');
 const warningMessage = ref('');
-const linkageWarning = ref('');
+
+const expandedRowKey = ref('');
+const reasonDetailRows = ref([]);
+const reasonDetailLoading = ref(false);
 
 const queryId = ref('');
 const hasQueried = ref(false);
@@ -293,10 +295,6 @@ async function loadCachedView(page = 1) {
   if (fo.types?.length) typeOptions.value = fo.types;
   if (fo.functions?.length) functionOptions.value = fo.functions;
 
-  const quality = resp.data?.alerts?.quality || {};
-  linkageWarning.value = quality.warning
-    ? `映射未匹配比例偏高 (${Number(quality.unmatched_ratio || 0) * 100}%)，請留意資料完整性`
-    : '';
 }
 
 async function runQuery(page = 1) {
@@ -307,7 +305,6 @@ async function runQuery(page = 1) {
   loading.value = true;
   errorMessage.value = '';
   warningMessage.value = '';
-  linkageWarning.value = '';
 
   try {
     if (isDateStageDirty.value) {
@@ -354,35 +351,32 @@ function riskClass(level) {
   return 'risk-low';
 }
 
-async function openDrilldown(row) {
-  const key = `${row.date_bucket}|${row.workorder}|${row.reason_code}`;
-  if (drilldownLoadingKey.value) {
+async function toggleReasonDetail(row) {
+  const rowKey = `${row.date_bucket}|${row.workorder}|${row.reason_code}`;
+  if (expandedRowKey.value === rowKey) {
+    expandedRowKey.value = '';
     return;
   }
-  drilldownLoadingKey.value = key;
-  warningMessage.value = '';
+  expandedRowKey.value = rowKey;
+  reasonDetailRows.value = [];
+  reasonDetailLoading.value = true;
   try {
-    const resp = await apiGet('/api/yield-alert/drilldown-context', {
+    const resp = await apiGet('/api/yield-alert/reason-detail', {
       params: {
-        date_bucket: row.date_bucket,
         workorder: row.workorder,
-        reason_code: row.reason_code,
+        date_bucket: row.date_bucket,
+        reason_code: row.reason_code || '',
+        department: row.department || '',
       },
       timeout: API_TIMEOUT,
     });
-    if (!resp.success || !resp.data?.launch_href) {
-      throw new Error(resp.error || '建立追溯連結失敗');
+    if (resp.success) {
+      reasonDetailRows.value = resp.data?.items || [];
     }
-
-    const notice = buildDrilldownNotice(resp.data.match_status, resp.data.fallback_reason);
-    if (notice) {
-      warningMessage.value = notice;
-    }
-    navigateToRuntimeRoute(resp.data.launch_href);
-  } catch (error) {
-    errorMessage.value = error.message || '開啟追溯頁面失敗';
+  } catch (_error) {
+    reasonDetailRows.value = [];
   } finally {
-    drilldownLoadingKey.value = '';
+    reasonDetailLoading.value = false;
   }
 }
 
@@ -405,7 +399,8 @@ function resetFilters() {
   stationSummary.value = [];
   alerts.value = [];
   pagination.value = { page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 1 };
-  linkageWarning.value = '';
+  expandedRowKey.value = '';
+  reasonDetailRows.value = [];
   warningMessage.value = '';
   errorMessage.value = '';
   syncUrlState();
@@ -545,7 +540,6 @@ onMounted(() => {
     <section class="status-stack">
       <div v-if="errorMessage" class="status error">{{ errorMessage }}</div>
       <div v-if="warningMessage" class="status warn">{{ warningMessage }}</div>
-      <div v-if="linkageWarning" class="status warn">{{ linkageWarning }}</div>
     </section>
 
     <section class="summary-grid">
@@ -591,36 +585,61 @@ onMounted(() => {
               <th><button class="th-btn" @click="onSort('scrap_qty')">報廢量</button></th>
               <th><button class="th-btn" @click="onSort('yield_pct')">良率(%)</button></th>
               <th><button class="th-btn" @click="onSort('risk_score')">風險分數</button></th>
-              <th>映射狀態</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in alerts" :key="`${row.date_bucket}-${row.workorder}-${row.reason_code}-${row.department}`">
-              <td>{{ row.date_bucket }}</td>
-              <td>{{ row.workorder }}</td>
-              <td>{{ row.reason_code }}</td>
-              <td>{{ row.department }}</td>
-              <td>{{ Number(row.scrap_qty || 0).toLocaleString() }}</td>
-              <td>{{ Number(row.yield_pct || 0).toFixed(2) }}</td>
-              <td>
-                <span class="risk-pill" :class="riskClass(row.risk_level)">
-                  {{ row.risk_level }} · {{ Number(row.risk_score || 0).toFixed(2) }}
-                </span>
-              </td>
-              <td>
-                <span class="match-pill" :class="`match-${row.match_status}`">{{ row.match_status }}</span>
-              </td>
-              <td>
-                <button
-                  class="btn btn-mini"
-                  :disabled="Boolean(drilldownLoadingKey)"
-                  @click="openDrilldown(row)"
-                >
-                  {{ drilldownLoadingKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}` ? '開啟中...' : '查看追溯' }}
-                </button>
-              </td>
-            </tr>
+            <template v-for="row in alerts" :key="`${row.date_bucket}-${row.workorder}-${row.reason_code}-${row.department}`">
+              <tr>
+                <td>{{ row.date_bucket }}</td>
+                <td>{{ row.workorder }}</td>
+                <td>{{ row.reason_code }}</td>
+                <td>{{ row.department }}</td>
+                <td>{{ Number(row.scrap_qty || 0).toLocaleString() }}</td>
+                <td>{{ Number(row.yield_pct || 0).toFixed(2) }}</td>
+                <td>
+                  <span class="risk-pill" :class="riskClass(row.risk_level)">
+                    {{ row.risk_level }} · {{ Number(row.risk_score || 0).toFixed(2) }}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    class="btn btn-mini"
+                    @click="toggleReasonDetail(row)"
+                  >
+                    {{ reasonDetailLoading && expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}` ? '載入中...' : expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}` ? '收合' : '查看原因' }}
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}`" class="reason-detail-row">
+                <td colspan="8">
+                  <div v-if="reasonDetailLoading" class="empty-note">載入中...</div>
+                  <div v-else-if="reasonDetailRows.length === 0" class="empty-note">找不到對應的 MES 報廢明細</div>
+                  <table v-else class="reason-sub-table">
+                    <thead>
+                      <tr>
+                        <th>LOT號</th>
+                        <th>站別</th>
+                        <th>報廢原因</th>
+                        <th>原因代碼</th>
+                        <th>報廢量</th>
+                        <th>備註</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(detail, idx) in reasonDetailRows" :key="idx">
+                        <td>{{ detail.containername }}</td>
+                        <td>{{ detail.workcentername }}</td>
+                        <td>{{ detail.lossreasonname }}</td>
+                        <td>{{ detail.lossreason_code }}</td>
+                        <td>{{ Number(detail.reject_total_qty || 0).toLocaleString() }}</td>
+                        <td>{{ detail.rejectcomment }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
