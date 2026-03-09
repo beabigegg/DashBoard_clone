@@ -14,6 +14,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/query-tool',
   '/mid-section-defect',
   '/material-trace',
+  '/yield-alert-center',
 ]);
 
 const IN_SCOPE_ADMIN_ROUTES = Object.freeze([
@@ -237,6 +238,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
     title: '原物料追溯查詢',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/yield-alert-center': buildContract({
+    route: '/yield-alert-center',
+    routeId: 'yield-alert-center',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: 'Yield Alert Center',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',

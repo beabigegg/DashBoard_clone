@@ -1,0 +1,59 @@
+-- Yield Alert candidate base rows from ERP detail table
+-- Parameters:
+--   :start_date - YYYY-MM-DD
+--   :end_date   - YYYY-MM-DD
+--   + optional QueryBuilder params in {{ WHERE_CLAUSE }}
+WITH grouped AS (
+    SELECT
+        TRUNC(d.TXN_DATE) AS DATE_BUCKET,
+        NVL(TRIM(d.WIP_ENTITY_NAME), '(NA)') AS WIP_ENTITY_NAME,
+        NVL(TRIM(d.REASON_CODE), NVL(TRIM(d.REASON_NAME), '(UNMAPPED)')) AS REASON_RAW,
+        NVL(TRIM(d.REASON_NAME), '(未填寫)') AS REASON_NAME,
+        NVL(TRIM(d.DEPARTMENT_NAME), '(NA)') AS DEPARTMENT_NAME,
+        NVL(TRIM(d.LINE), '(NA)') AS LINE_NAME,
+        NVL(TRIM(d.PACKAGE), '(NA)') AS PACKAGE_NAME,
+        NVL(TRIM(d.TYPE), '(NA)') AS TYPE_NAME,
+        NVL(TRIM(d.FUNCTION), '(NA)') AS FUNCTION_NAME,
+        NVL(d.OPERATION_SEQ_NUM, -1) AS OPERATION_SEQ_NUM,
+        SUM(NVL(d.TRANSACTION_QUANTITY, 0)) AS TRANSACTION_QTY,
+        SUM(NVL(d.SCRAP_QUANTITY, 0)) AS SCRAP_QTY
+    FROM DWH.ERP_WIP_MOVETXN_DETAIL d
+    WHERE d.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
+      AND d.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
+{{ WHERE_CLAUSE }}
+{{ EXCLUSION_CLAUSE }}
+    GROUP BY
+        TRUNC(d.TXN_DATE),
+        NVL(TRIM(d.WIP_ENTITY_NAME), '(NA)'),
+        NVL(TRIM(d.REASON_CODE), NVL(TRIM(d.REASON_NAME), '(UNMAPPED)')),
+        NVL(TRIM(d.REASON_NAME), '(未填寫)'),
+        NVL(TRIM(d.DEPARTMENT_NAME), '(NA)'),
+        NVL(TRIM(d.LINE), '(NA)'),
+        NVL(TRIM(d.PACKAGE), '(NA)'),
+        NVL(TRIM(d.TYPE), '(NA)'),
+        NVL(TRIM(d.FUNCTION), '(NA)'),
+        NVL(d.OPERATION_SEQ_NUM, -1)
+)
+SELECT
+    DATE_BUCKET,
+    WIP_ENTITY_NAME,
+    REASON_RAW,
+    REASON_NAME,
+    DEPARTMENT_NAME,
+    LINE_NAME,
+    PACKAGE_NAME,
+    TYPE_NAME,
+    FUNCTION_NAME,
+    OPERATION_SEQ_NUM,
+    TRANSACTION_QTY,
+    SCRAP_QTY,
+    CASE
+        WHEN TRANSACTION_QTY = 0 THEN 100
+        ELSE ROUND((1 - SCRAP_QTY / NULLIF(TRANSACTION_QTY, 0)) * 100, 4)
+    END AS YIELD_PCT,
+    CASE
+        WHEN TRANSACTION_QTY = 0 THEN 0
+        ELSE ROUND((SCRAP_QTY / NULLIF(TRANSACTION_QTY, 0)) * 100, 4)
+    END AS SCRAP_RATE_PCT
+FROM grouped
+WHERE SCRAP_QTY > 0

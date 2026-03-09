@@ -29,7 +29,8 @@ export default defineConfig(({ mode }) => ({
         'qc-gate': resolve(__dirname, 'src/qc-gate/index.html'),
         'mid-section-defect': resolve(__dirname, 'src/mid-section-defect/index.html'),
         'admin-performance': resolve(__dirname, 'src/admin-performance/index.html'),
-        'material-trace': resolve(__dirname, 'src/material-trace/index.html')
+        'material-trace': resolve(__dirname, 'src/material-trace/index.html'),
+        'yield-alert-center': resolve(__dirname, 'src/yield-alert-center/index.html')
       },
       output: {
         entryFileNames: '[name].js',

@@ -107,6 +107,13 @@
       "order": 3
     },
     {
+      "route": "/yield-alert-center",
+      "name": "Yield Alert Center",
+      "status": "released",
+      "drawer_id": "drawer-3",
+      "order": 4
+    },
+    {
       "route": "/admin/pages",
       "name": "頁面管理",
       "status": "released",

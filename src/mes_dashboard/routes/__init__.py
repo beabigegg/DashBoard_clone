@@ -21,6 +21,7 @@ from .mid_section_defect_routes import mid_section_defect_bp
 from .trace_routes import trace_bp
 from .reject_history_routes import reject_history_bp
 from .material_trace_routes import material_trace_bp
+from .yield_alert_routes import yield_alert_bp
 
 
 def register_routes(app) -> None:
@@ -40,6 +41,7 @@ def register_routes(app) -> None:
     app.register_blueprint(trace_bp)
     app.register_blueprint(reject_history_bp)
     app.register_blueprint(material_trace_bp)
+    app.register_blueprint(yield_alert_bp)
 
 __all__ = [
     'wip_bp',
@@ -59,5 +61,6 @@ __all__ = [
     'trace_bp',
     'reject_history_bp',
     'material_trace_bp',
+    'yield_alert_bp',
     'register_routes',
 ]

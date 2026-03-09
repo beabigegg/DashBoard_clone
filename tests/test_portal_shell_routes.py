@@ -334,7 +334,7 @@ def test_wave_b_native_routes_are_reachable(monkeypatch):
     client = app.test_client()
     _login_as_admin(client)
 
-    for route in ["/job-query", "/excel-query", "/query-tool"]:
+    for route in ["/job-query", "/excel-query", "/query-tool", "/yield-alert-center"]:
         response = client.get(route)
         assert response.status_code == 200, f"{route} should be reachable"
 
@@ -430,6 +430,7 @@ def test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled(m
         "/excel-query": "/portal-shell/excel-query",
         "/query-tool": "/portal-shell/query-tool",
         "/mid-section-defect": "/portal-shell/mid-section-defect",
+        "/yield-alert-center?start_date=2026-03-01": "/portal-shell/yield-alert-center?start_date=2026-03-01",
     }
 
     for direct_url, canonical_url in cases.items():

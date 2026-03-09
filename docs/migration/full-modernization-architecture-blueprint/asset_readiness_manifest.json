@@ -14,7 +14,8 @@
     "/tables": ["tables.js"],
     "/excel-query": ["excel-query.js"],
     "/query-tool": ["query-tool.js"],
-    "/mid-section-defect": ["mid-section-defect.js"]
+    "/mid-section-defect": ["mid-section-defect.js"],
+    "/yield-alert-center": ["yield-alert-center.js"]
   },
   "deferred_routes": []
 }

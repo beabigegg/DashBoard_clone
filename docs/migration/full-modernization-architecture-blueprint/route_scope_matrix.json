@@ -14,6 +14,7 @@
     { "route": "/excel-query", "category": "report" },
     { "route": "/query-tool", "category": "report" },
     { "route": "/mid-section-defect", "category": "report" },
+    { "route": "/yield-alert-center", "category": "report" },
     { "route": "/admin/pages", "category": "admin" },
     { "route": "/admin/performance", "category": "admin" }
   ],

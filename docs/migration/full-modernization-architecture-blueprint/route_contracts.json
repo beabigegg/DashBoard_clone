@@ -203,6 +203,18 @@
       "canonical_shell_path": "/portal-shell/material-trace",
       "rollback_strategy": "fallback_to_legacy_route",
       "compatibility_policy": "redirect_to_shell_when_spa_enabled"
+    },
+    {
+      "route": "/yield-alert-center",
+      "route_id": "yield-alert-center",
+      "title": "Yield Alert Center",
+      "scope": "in-scope",
+      "render_mode": "native",
+      "owner": "frontend-mes-reporting",
+      "visibility_policy": "released_or_admin",
+      "canonical_shell_path": "/portal-shell/yield-alert-center",
+      "rollback_strategy": "fallback_to_legacy_route",
+      "compatibility_policy": "redirect_to_shell_when_spa_enabled"
     }
   ]
 }
