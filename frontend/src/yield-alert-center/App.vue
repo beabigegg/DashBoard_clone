@@ -7,6 +7,7 @@ import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { toQueryParams } from './utils.js';
 import YieldHeatmap from './YieldHeatmap.vue';
 import YieldStationChart from './YieldStationChart.vue';
+import YieldPackageChart from './YieldPackageChart.vue';
 import YieldTrendChart from './YieldTrendChart.vue';
 
 const API_TIMEOUT = 90000;
@@ -56,6 +57,7 @@ const summary = ref({ transaction_qty: 0, scrap_qty: 0, yield_pct: 100 });
 const trend = ref([]);
 const heatmapData = ref([]);
 const stationSummary = ref([]);
+const packageSummary = ref([]);
 const alerts = ref([]);
 const pagination = ref({ page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 1 });
 const sortState = reactive({ sort_by: 'date_bucket', sort_dir: 'desc' });
@@ -286,6 +288,7 @@ async function loadCachedView(page = 1) {
   trend.value = resp.data?.trend?.items || [];
   heatmapData.value = resp.data?.heatmap?.items || [];
   stationSummary.value = resp.data?.station_summary?.items || [];
+  packageSummary.value = resp.data?.package_summary?.items || [];
   alerts.value = resp.data?.alerts?.items || [];
   pagination.value = resp.data?.alerts?.pagination || pagination.value;
 
@@ -345,6 +348,11 @@ function onSort(field) {
   runQuery(1);
 }
 
+function sortIcon(field) {
+  if (sortState.sort_by !== field) return ' \u2195';
+  return sortState.sort_dir === 'asc' ? ' \u2191' : ' \u2193';
+}
+
 function riskClass(level) {
   if (level === 'high') return 'risk-high';
   if (level === 'medium') return 'risk-medium';
@@ -352,7 +360,7 @@ function riskClass(level) {
 }
 
 async function toggleReasonDetail(row) {
-  const rowKey = `${row.date_bucket}|${row.workorder}|${row.reason_code}`;
+  const rowKey = `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}`;
   if (expandedRowKey.value === rowKey) {
     expandedRowKey.value = '';
     return;
@@ -397,6 +405,7 @@ function resetFilters() {
   trend.value = [];
   heatmapData.value = [];
   stationSummary.value = [];
+  packageSummary.value = [];
   alerts.value = [];
   pagination.value = { page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 1 };
   expandedRowKey.value = '';
@@ -569,6 +578,13 @@ onMounted(() => {
       />
     </section>
 
+    <section v-if="hasQueried && packageSummary.length > 0" class="package-summary-panel">
+      <YieldPackageChart
+        :package-summary="packageSummary"
+        :risk-threshold="Number(filters.risk_threshold || 98)"
+      />
+    </section>
+
     <section class="alerts-panel">
       <header>
         <h2>告警候選清單</h2>
@@ -578,15 +594,15 @@ onMounted(() => {
         <table class="alert-table">
           <thead>
             <tr>
-              <th><button class="th-btn" @click="onSort('date_bucket')">日期</button></th>
-              <th><button class="th-btn" @click="onSort('workorder')">工單</button></th>
+              <th>日期</th>
+              <th>工單</th>
               <th>原因碼</th>
               <th>站別群組</th>
               <th>Package</th>
               <th>Type</th>
-              <th><button class="th-btn" @click="onSort('scrap_qty')">報廢量</button></th>
-              <th><button class="th-btn" @click="onSort('yield_pct')">良率(%)</button></th>
-              <th><button class="th-btn" @click="onSort('risk_score')">風險分數</button></th>
+              <th><button class="th-btn" :class="{ active: sortState.sort_by === 'scrap_qty' }" @click="onSort('scrap_qty')">報廢量{{ sortIcon('scrap_qty') }}</button></th>
+              <th><button class="th-btn" :class="{ active: sortState.sort_by === 'yield_pct' }" @click="onSort('yield_pct')">良率(%){{ sortIcon('yield_pct') }}</button></th>
+              <th><button class="th-btn" :class="{ active: sortState.sort_by === 'risk_score' }" @click="onSort('risk_score')">風險分數{{ sortIcon('risk_score') }}</button></th>
               <th>操作</th>
             </tr>
           </thead>
@@ -611,11 +627,11 @@ onMounted(() => {
                     class="btn btn-mini"
                     @click="toggleReasonDetail(row)"
                   >
-                    {{ reasonDetailLoading && expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}` ? '載入中...' : expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}` ? '收合' : '查看原因' }}
+                    {{ reasonDetailLoading && expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}` ? '載入中...' : expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}` ? '收合' : '查看原因' }}
                   </button>
                 </td>
               </tr>
-              <tr v-if="expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}`" class="reason-detail-row">
+              <tr v-if="expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}`" class="reason-detail-row">
                 <td colspan="10">
                   <div v-if="reasonDetailLoading" class="empty-note">載入中...</div>
                   <div v-else-if="reasonDetailRows.length === 0" class="empty-note">找不到對應的 MES 報廢明細</div>

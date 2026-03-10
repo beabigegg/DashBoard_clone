@@ -35,6 +35,8 @@ VALID_SORT_FIELDS = {
     "date_bucket": "date_bucket",
     "workorder": "workorder",
     "reason_code": "reason_code",
+    "package": "package",
+    "type": "type",
     "scrap_qty": "scrap_qty",
     "yield_pct": "yield_pct",
     "risk_score": "risk_score",

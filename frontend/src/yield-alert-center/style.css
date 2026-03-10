@@ -62,7 +62,8 @@
 .trend-panel,
 .alerts-panel,
 .heatmap-panel,
-.station-summary-panel {
+.station-summary-panel,
+.package-summary-panel {
   background: var(--ya-panel);
   border: 1px solid var(--ya-border);
   border-radius: 10px;
@@ -279,6 +280,15 @@
   font-weight: 600;
   cursor: pointer;
   padding: 0;
+  white-space: nowrap;
+}
+
+.th-btn:hover {
+  color: var(--ya-primary);
+}
+
+.th-btn.active {
+  color: var(--ya-primary);
 }
 
 /* ── Pills ── */
@@ -524,7 +534,8 @@
 }
 
 /* ── Station summary panel ── */
-.station-summary-panel {
+.station-summary-panel,
+.package-summary-panel {
   margin-bottom: 12px;
 }
 

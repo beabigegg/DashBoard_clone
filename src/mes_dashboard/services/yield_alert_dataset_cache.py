@@ -221,6 +221,42 @@ def _build_station_summary(
     return result
 
 
+def _build_package_summary(
+    *,
+    tx_df: pd.DataFrame,
+    scrap_df: pd.DataFrame,
+) -> list[dict[str, Any]]:
+    """Return per-package yield summary sorted by scrap_qty descending (worst first)."""
+    if tx_df.empty:
+        return []
+
+    tx_grouped = tx_df.groupby("PACKAGE_NAME", as_index=False)["TRANSACTION_QTY"].sum()
+
+    if scrap_df.empty:
+        scrap_grouped = pd.DataFrame(columns=["PACKAGE_NAME", "SCRAP_QTY"])
+    else:
+        scrap_grouped = scrap_df.groupby("PACKAGE_NAME", as_index=False)["SCRAP_QTY"].sum()
+
+    merged = tx_grouped.merge(scrap_grouped, on="PACKAGE_NAME", how="left")
+    merged["SCRAP_QTY"] = pd.to_numeric(merged["SCRAP_QTY"], errors="coerce").fillna(0.0)
+    merged["TRANSACTION_QTY"] = pd.to_numeric(merged["TRANSACTION_QTY"], errors="coerce").fillna(0.0)
+
+    tx_arr = merged["TRANSACTION_QTY"].to_numpy(dtype=float)
+    sc_arr = merged["SCRAP_QTY"].to_numpy(dtype=float)
+
+    result: list[dict[str, Any]] = [
+        {
+            "package": pkg,
+            "transaction_qty": round(float(tx), 4),
+            "scrap_qty": round(float(sc), 4),
+            "yield_pct": 100.0 if tx <= 0 else round((1 - sc / tx) * 100, 4),
+        }
+        for pkg, tx, sc in zip(merged["PACKAGE_NAME"].tolist(), tx_arr, sc_arr)
+    ]
+    result.sort(key=lambda x: (-x["scrap_qty"], x["yield_pct"]))
+    return result
+
+
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("yield_alert_dataset", _dataset_cache, "Yield Alert Dataset (L1)")
 
@@ -799,6 +835,10 @@ def apply_view(
         tx_df=tx_df_base,
         scrap_df=scrap_df_base,
     )
+    package_summary_items = _build_package_summary(
+        tx_df=tx_df_base,
+        scrap_df=scrap_df_base,
+    )
     _linkage_ready = linkage_df is not None and not linkage_df.empty
     alerts = _build_alerts_view(
         detail_df=detail_df,
@@ -828,6 +868,9 @@ def apply_view(
         },
         "station_summary": {
             "items": station_summary_items,
+        },
+        "package_summary": {
+            "items": package_summary_items,
         },
         "alerts": alerts,
         "meta": {
