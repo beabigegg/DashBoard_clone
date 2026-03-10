@@ -423,7 +423,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="yield-alert-page">
+  <div class="yield-alert-page theme-yield-alert-center">
     <div class="ya-header">
       <div class="ya-header-left">
         <h1>{{ pageTitle }}</h1>

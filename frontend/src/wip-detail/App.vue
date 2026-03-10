@@ -451,7 +451,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="dashboard wip-detail-page">
+  <div class="dashboard wip-detail-page theme-wip-detail">
     <header class="header">
       <div class="header-left">
         <a :href="backUrl" class="btn btn-back">&larr; Overview</a>

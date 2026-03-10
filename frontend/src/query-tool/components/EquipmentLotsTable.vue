@@ -54,7 +54,7 @@ const columns = Object.freeze([
 <template>
   <div>
     <div class="query-tool-section-header">
-      <h4 class="card-title">生產紀錄</h4>
+      <h4 class="card-title ui-card-title">生產紀錄</h4>
       <ExportButton
         :disabled="exportDisabled"
         :loading="exporting"

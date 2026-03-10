@@ -536,7 +536,7 @@ void initPage();
 </script>
 
 <template>
-  <div class="page-container">
+  <div class="page-container theme-mid-section-defect">
     <header class="page-header">
       <h1>製程不良追溯分析</h1>
       <p class="header-desc">{{ headerSubtitle }}</p>

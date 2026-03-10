@@ -436,7 +436,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="resource-page">
+  <div class="resource-page theme-resource">
     <div class="dashboard">
       <StatusHeader
         :cache-level="cacheLevel"

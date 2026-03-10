@@ -441,7 +441,7 @@ watch(
 </script>
 
 <template>
-  <div class="dashboard query-tool-page">
+  <div class="dashboard query-tool-page theme-query-tool">
     <header class="header query-tool-header">
       <div class="header-left">
         <h1>批次追蹤工具</h1>
@@ -449,8 +449,8 @@ watch(
       </div>
     </header>
 
-    <section class="card">
-      <div class="card-header">
+    <section class="card ui-card">
+      <div class="card-header ui-card-header">
         <nav class="query-tool-tab-bar" aria-label="query-tool tabs">
           <button
             v-for="tab in tabItems"
@@ -467,7 +467,7 @@ watch(
         </nav>
       </div>
 
-      <div class="card-body">
+      <div class="card-body ui-card-body">
         <div class="query-tool-tab-desc">
           <p class="query-tool-tab-desc-label">目前頁籤</p>
           <h2 class="query-tool-tab-desc-title">{{ activeTabMeta.label }}</h2>

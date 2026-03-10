@@ -1,4 +1,4 @@
-:root {
+.theme-mid-section-defect {
   --msd-bg: #f5f7fb;
   --msd-card-bg: #ffffff;
   --msd-text: #1f2937;
@@ -8,17 +8,6 @@
   --msd-shadow-md: 0 8px 22px rgba(15, 23, 42, 0.1);
   --msd-primary: #6366f1;
   --msd-primary-dark: #4f46e5;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
-  background: var(--msd-bg);
-  color: var(--msd-text);
 }
 
 .page-container {

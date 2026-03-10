@@ -2,27 +2,29 @@
 Define stable requirements for tailwind-design-system.
 ## Requirements
 ### Requirement: Frontend styles SHALL be governed by Tailwind design tokens
-The frontend SHALL enforce a token-governed style system for in-scope routes. Shared visual semantics SHALL be expressed through token-backed Tailwind/shared layers, and ad-hoc page-local hard-coded values for shared semantics SHALL require explicit exception governance.
+The frontend SHALL enforce `frontend/tailwind.config.js` as the single source of truth for design tokens. Shared visual semantics SHALL be expressed through token-backed Tailwind/shared layers, and token consumption in CSS SHALL use `theme()` rather than route-local token variables.
 
 #### Scenario: Shared token usage across in-scope modules
-- **WHEN** two in-scope modules render equivalent UI semantics (e.g., card, filter chip, primary action, status indicator)
-- **THEN** they SHALL use the same token-backed style semantics
+- **WHEN** two modules render equivalent UI semantics (for example card, filter chip, primary action, status indicator)
+- **THEN** they SHALL use the same token-backed semantics from `tailwind.config.js`
 - **THEN** visual output SHALL remain consistent across those modules
 
-#### Scenario: Token governance review
-- **WHEN** an in-scope route introduces new shared UI styling
-- **THEN** the styling SHALL map to shared tokens/layers or be recorded in an approved exception registry
+#### Scenario: Token introduction and consumption governance
+- **WHEN** a new design token is introduced
+- **THEN** it SHALL be added under `theme.extend` in `frontend/tailwind.config.js`
+- **THEN** CSS token consumption SHALL use `theme('...')` paths instead of introducing route-local `:root` token variables
 
 ### Requirement: Tailwind migration SHALL support coexistence with legacy CSS
-Tailwind migration SHALL support controlled coexistence only as a transition state for this phase. In-scope routes SHALL move toward isolation-first style ownership and SHALL NOT introduce new page-global CSS side effects for route-local concerns.
+Tailwind migration SHALL allow controlled legacy coexistence only as a time-bounded transition state. New or modified route styles SHALL NOT introduce additional token-like `:root` definitions or route-global selectors for local presentation behavior.
 
 #### Scenario: In-scope global selector control
-- **WHEN** in-scope route styles are reviewed
-- **THEN** new route-local styling SHALL NOT introduce page-global selectors (`:root`, `body`) for local presentation behavior
+- **WHEN** route styles are reviewed during migration
+- **THEN** new route-local styling SHALL NOT introduce `:root`, `body`, or `html` rules for local presentation behavior
 
-#### Scenario: Deferred route coexistence allowance
-- **WHEN** deferred routes (`/tables`, `/excel-query`, `/query-tool`, `/mid-section-defect`) are evaluated during this phase
-- **THEN** existing coexistence posture SHALL be allowed and handled by a follow-up modernization change
+#### Scenario: Legacy coexistence is tracked with exit criteria
+- **WHEN** a route cannot complete token/theme migration in the same change
+- **THEN** the route SHALL be listed in a tracked exception registry with owner and removal milestone
+- **THEN** introducing new legacy patterns without an approved exception SHALL fail governance review
 
 ### Requirement: New shared UI components SHALL prefer Tailwind-first styling
 Newly introduced shared components SHALL be implemented with Tailwind-first conventions to avoid expanding duplicated page-local CSS.
@@ -31,4 +33,12 @@ Newly introduced shared components SHALL be implemented with Tailwind-first conv
 - **WHEN** a new shared component is introduced in migration scope
 - **THEN** its primary style contract SHALL be expressed through Tailwind utilities/components
 - **THEN** page-local CSS additions SHALL be minimized and justified
+
+### Requirement: Repeated shared visual semantics SHALL be abstracted into shared component classes
+When equivalent visual semantics are repeated across routes, shared styling SHALL be abstracted into reusable `ui-*` component classes under `frontend/src/styles/tailwind.css` `@layer components`.
+
+#### Scenario: Shared semantic appears repeatedly
+- **WHEN** an equivalent utility/style combination appears in three or more places across route modules
+- **THEN** the style SHALL be extracted as a shared `ui-*` component class
+- **THEN** route modules SHALL consume the shared class instead of duplicating local declarations
 

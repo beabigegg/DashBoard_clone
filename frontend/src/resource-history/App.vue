@@ -552,7 +552,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="resource-page">
+  <div class="resource-page theme-resource-history">
     <div class="dashboard">
       <header class="header-gradient history-header">
         <h1>設備歷史績效</h1>

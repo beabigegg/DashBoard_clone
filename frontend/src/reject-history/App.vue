@@ -976,7 +976,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="dashboard reject-history-page">
+  <div class="dashboard reject-history-page theme-reject-history">
     <header class="header reject-history-header">
       <div class="header-left">
         <h1>報廢歷史查詢</h1>

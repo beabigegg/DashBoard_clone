@@ -19,7 +19,7 @@ test('shell route view uses direct RouterView host (no transition blank-state)',
 
 test('Wave A chart components keep autoresize and tooltip configuration', () => {
   const chartFiles = [
-    'src/wip-overview/components/ParetoSection.vue',
+    'src/wip-shared/components/ParetoSection.vue',
     'src/qc-gate/components/QcGateChart.vue',
     'src/hold-history/components/DailyTrend.vue',
     'src/hold-history/components/ReasonPareto.vue',

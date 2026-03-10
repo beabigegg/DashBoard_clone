@@ -117,11 +117,11 @@ const chartOption = computed(() => {
 </script>
 
 <template>
-  <section class="card">
-    <div class="card-header">
-      <div class="card-title">Daily Trend</div>
+  <section class="card ui-card">
+    <div class="card-header ui-card-header">
+      <div class="card-title ui-card-title">Daily Trend</div>
     </div>
-    <div class="card-body">
+    <div class="card-body ui-card-body">
       <div v-if="hasData" class="trend-chart-wrap">
         <VChart :option="chartOption" autoresize />
       </div>

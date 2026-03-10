@@ -93,10 +93,10 @@ const subTabs = Object.keys(tabMeta);
 
 <template>
   <div class="space-y-3">
-    <section class="card">
-      <div class="card-body">
+    <section class="card ui-card">
+      <div class="card-body ui-card-body">
         <FilterToolbar>
-          <label class="filter-group" style="min-width: 320px">
+          <label class="filter-group filter-group--equipment">
             <span class="filter-label">設備（可複選）</span>
             <MultiSelect
               :model-value="selectedEquipmentIds"
@@ -148,14 +148,14 @@ const subTabs = Object.keys(tabMeta);
           </template>
         </FilterToolbar>
 
-        <p v-if="errors.filters" class="error-banner" style="margin-top: 8px">
+        <p v-if="errors.filters" class="error-banner error-banner--mt8">
           {{ errors.filters }}
         </p>
       </div>
     </section>
 
-    <section class="card">
-      <div class="card-body">
+    <section class="card ui-card">
+      <div class="card-body ui-card-body">
         <div class="query-tool-sub-tab-bar">
           <button
             v-for="tab in subTabs"
@@ -245,3 +245,13 @@ const subTabs = Object.keys(tabMeta);
     </section>
   </div>
 </template>
+
+<style scoped>
+.filter-group--equipment {
+  min-width: 320px;
+}
+
+.error-banner--mt8 {
+  margin-top: 8px;
+}
+</style>

@@ -262,7 +262,7 @@ function onDocumentClick(e) {
 </script>
 
 <template>
-  <div class="dashboard" @click="onDocumentClick">
+  <div class="dashboard theme-material-trace" @click="onDocumentClick">
     <!-- Header -->
     <div class="header material-trace-header">
       <div class="header-left">
@@ -276,13 +276,13 @@ function onDocumentClick(e) {
     <div v-if="warningMessage" class="warning-banner">{{ warningMessage }}</div>
 
     <!-- Query Card -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">查詢條件</span>
+    <div class="card ui-card">
+      <div class="card-header ui-card-header">
+        <span class="card-title ui-card-title">查詢條件</span>
       </div>
-      <div class="card-body">
+      <div class="card-body ui-card-body">
         <!-- Mode tabs -->
-        <div class="mode-tab-row" style="margin-bottom: 14px">
+        <div class="mode-tab-row mode-tab-row--spaced">
           <button
             class="mode-tab"
             :class="{ active: queryMode === 'forward' }"
@@ -407,16 +407,16 @@ function onDocumentClick(e) {
     </div>
 
     <!-- Result Card -->
-    <div v-if="hasResults || loading" class="card">
-      <div class="card-header">
-        <span class="card-title">
+    <div v-if="hasResults || loading" class="card ui-card">
+      <div class="card-header ui-card-header">
+        <span class="card-title ui-card-title">
           查詢結果
           <template v-if="pagination.total > 0">
             （共 {{ pagination.total.toLocaleString() }} 筆）
           </template>
         </span>
       </div>
-      <div class="card-body">
+      <div class="card-body ui-card-body">
         <!-- Loading overlay -->
         <div class="detail-table-wrap" :class="{ 'is-loading': loading }">
           <div v-if="loading" class="table-loading-overlay">

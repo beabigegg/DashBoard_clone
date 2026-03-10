@@ -301,7 +301,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="dashboard hold-detail-page">
+  <div class="dashboard hold-detail-page theme-hold-detail">
     <header class="header" :style="headerStyle">
       <div class="header-left">
         <a :href="backToOverviewHref" class="btn btn-back">&larr; Hold Overview</a>

@@ -175,8 +175,7 @@ async function loadTxn(jobId) {
               <td>
                 <button
                   type="button"
-                  class="btn btn-ghost"
-                  style="padding: 2px 8px; font-size: 11px"
+                  class="btn btn-ghost btn-mini"
                   @click="loadTxn(row?.JOBID)"
                 >
                   查看交易歷程
@@ -198,7 +197,7 @@ async function loadTxn(jobId) {
 
     <div v-if="selectedJobId">
       <div class="query-tool-section-header">
-        <h4 class="card-title">交易歷程：{{ selectedJobId }}</h4>
+        <h4 class="card-title ui-card-title">交易歷程：{{ selectedJobId }}</h4>
         <span class="query-tool-muted">{{ txnRows.length }} 筆</span>
       </div>
 
@@ -244,3 +243,10 @@ async function loadTxn(jobId) {
     </div>
   </section>
 </template>
+
+<style scoped>
+.btn-mini {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+</style>

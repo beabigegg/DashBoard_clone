@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => ({
     outDir: '../src/mes_dashboard/static/dist',
     emptyOutDir: false,
     sourcemap: mode !== 'production',
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       input: {
         portal: resolve(__dirname, 'src/portal/main.js'),

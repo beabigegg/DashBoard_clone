@@ -390,7 +390,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="dashboard wip-overview-page">
+  <div class="dashboard wip-overview-page theme-wip-overview">
     <header class="header">
       <h1>WIP 即時概況</h1>
       <div class="header-right">
@@ -424,11 +424,11 @@ onBeforeUnmount(() => {
     />
 
     <section class="content-grid">
-      <section class="card">
-        <div class="card-header">
-          <div class="card-title">{{ matrixTitle }}</div>
+      <section class="card ui-card">
+        <div class="card-header ui-card-header">
+          <div class="card-title ui-card-title">{{ matrixTitle }}</div>
         </div>
-        <div class="card-body matrix-container">
+        <div class="card-body ui-card-body matrix-container">
           <MatrixTable :data="matrix" @drilldown="navigateToDetail" />
         </div>
       </section>

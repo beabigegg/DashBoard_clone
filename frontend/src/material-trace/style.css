@@ -11,6 +11,10 @@
   width: fit-content;
 }
 
+.mode-tab-row--spaced {
+  margin-bottom: 14px;
+}
+
 .mode-tab {
   padding: 7px 16px;
   border: none;

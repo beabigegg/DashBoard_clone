@@ -22,9 +22,9 @@ function formatNumber(value) {
 </script>
 
 <template>
-  <section class="card">
-    <div class="card-header">
-      <div class="card-title">
+  <section class="card ui-card">
+    <div class="card-header ui-card-header">
+      <div class="card-title ui-card-title">
         明細列表
         <span v-if="selectedParetoCount > 0" class="detail-reason-badge">
           Pareto 篩選: {{ selectedParetoSummary || `${selectedParetoCount} 項` }}
@@ -32,7 +32,7 @@ function formatNumber(value) {
         </span>
       </div>
     </div>
-    <div class="card-body detail-table-wrap" :class="{ 'is-loading': loading }">
+    <div class="card-body ui-card-body detail-table-wrap" :class="{ 'is-loading': loading }">
       <div v-if="loading" class="table-loading-overlay"><span class="table-spinner"></span></div>
       <table class="detail-table">
         <thead>

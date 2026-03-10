@@ -51,8 +51,8 @@ function handleResolve() {
 </script>
 
 <template>
-  <section class="card">
-    <div class="card-body">
+  <section class="card ui-card">
+    <div class="card-body ui-card-body">
       <FilterToolbar>
         <label class="filter-group">
           <span class="filter-label">查詢類型</span>
@@ -84,7 +84,7 @@ function handleResolve() {
         </template>
       </FilterToolbar>
 
-      <div style="margin-top: 12px">
+      <div class="mt-filter-section">
         <textarea
           :value="inputText"
           class="query-tool-textarea"
@@ -104,3 +104,9 @@ function handleResolve() {
     </div>
   </section>
 </template>
+
+<style scoped>
+.mt-filter-section {
+  margin-top: 12px;
+}
+</style>

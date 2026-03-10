@@ -119,7 +119,7 @@ const sortedRows = computed(() => {
             <th>EQUIPMENT</th>
             <th>COMMENT</th>
             <th
-              style="cursor: pointer"
+              class="row-clickable"
               @click="showRejectBreakdown = !showRejectBreakdown"
             >
               扣帳報廢量 <span>{{ showRejectBreakdown ? '▾' : '▸' }}</span>
@@ -166,3 +166,9 @@ const sortedRows = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.row-clickable {
+  cursor: pointer;
+}
+</style>

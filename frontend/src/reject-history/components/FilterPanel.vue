@@ -37,11 +37,11 @@ function emitSupplementary(patch) {
 </script>
 
 <template>
-  <section class="card">
-    <div class="card-header">
-      <div class="card-title">查詢條件</div>
+  <section class="card ui-card">
+    <div class="card-header ui-card-header">
+      <div class="card-title ui-card-title">查詢條件</div>
     </div>
-    <div class="card-body filter-panel">
+    <div class="card-body ui-card-body filter-panel">
       <!-- Mode toggle tabs -->
       <div class="filter-group-full mode-tab-row">
         <button
@@ -165,7 +165,7 @@ function emitSupplementary(patch) {
     <!-- Resolution info (container mode) -->
     <div
       v-if="resolutionInfo && queryMode === 'container'"
-      class="card-body resolution-info"
+      class="card-body ui-card-body resolution-info"
     >
       已解析 {{ resolutionInfo.resolved_count }} 筆容器
       <template v-if="resolutionInfo.expansion_info && Object.keys(resolutionInfo.expansion_info).length > 1">
@@ -228,7 +228,7 @@ function emitSupplementary(patch) {
     </div>
 
     <div
-      class="card-body active-filter-chip-row"
+      class="card-body ui-card-body active-filter-chip-row"
       v-if="activeFilterChips.length > 0"
     >
       <div class="filter-label">套用中篩選</div>

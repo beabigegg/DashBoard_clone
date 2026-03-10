@@ -118,7 +118,7 @@ def _is_production_env(app: Flask) -> bool:
     return env_value in {"prod", "production"}
 
 
-def _build_security_headers(production: bool, *, allow_unsafe_eval: bool = False) -> dict[str, str]:
+def _build_security_headers(*, allow_unsafe_eval: bool = False) -> dict[str, str]:
     script_directives = ["'self'", "'unsafe-inline'"]
     if allow_unsafe_eval:
         script_directives.append("'unsafe-eval'")
@@ -139,9 +139,74 @@ def _build_security_headers(production: bool, *, allow_unsafe_eval: bool = False
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "strict-origin-when-cross-origin",
     }
-    if production:
-        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return headers
+
+
+def _resolve_trusted_proxy_ips(app: Flask) -> tuple[str, ...]:
+    configured_sources = os.getenv("TRUSTED_PROXY_IPS")
+    if configured_sources is None:
+        configured_sources = app.config.get("TRUSTED_PROXY_IPS")
+    if isinstance(configured_sources, str):
+        return tuple(
+            part.strip()
+            for part in configured_sources.split(",")
+            if part.strip()
+        )
+    return tuple(configured_sources or ())
+
+
+def _is_request_secure(app: Flask) -> bool:
+    if request.is_secure:
+        return True
+
+    trust_proxy_headers = resolve_bool_flag(
+        "TRUST_PROXY_HEADERS",
+        config=app.config,
+        default=bool(app.config.get("TRUST_PROXY_HEADERS", False)),
+    )
+    if not trust_proxy_headers:
+        return False
+
+    trusted_sources = set(_resolve_trusted_proxy_ips(app))
+    remote_addr = request.remote_addr or ""
+    if trusted_sources and remote_addr not in trusted_sources:
+        return False
+
+    forwarded_proto = str(request.headers.get("X-Forwarded-Proto", "")).split(",")[0].strip().lower()
+    if forwarded_proto == "https":
+        return True
+
+    forwarded_ssl = str(request.headers.get("X-Forwarded-Ssl", "")).strip().lower()
+    return forwarded_ssl in {"on", "1", "true"}
+
+
+def _normalize_session_cookie_security(
+    response,
+    *,
+    secure: bool,
+    session_cookie_name: str,
+):
+    set_cookie_headers = response.headers.getlist("Set-Cookie")
+    if not set_cookie_headers:
+        return
+
+    prefix = f"{session_cookie_name}="
+    updated_headers: list[str] = []
+    for raw_cookie in set_cookie_headers:
+        if not raw_cookie.startswith(prefix):
+            updated_headers.append(raw_cookie)
+            continue
+
+        parts = [part.strip() for part in raw_cookie.split(";")]
+        has_secure = any(part.lower() == "secure" for part in parts[1:])
+        if secure and not has_secure:
+            parts.append("Secure")
+        elif not secure and has_secure:
+            parts = [part for part in parts if part.lower() != "secure"]
+
+        updated_headers.append("; ".join(parts))
+
+    response.headers.setlist("Set-Cookie", updated_headers)
 
 
 def _resolve_secret_key(app: Flask) -> str:
@@ -174,17 +239,7 @@ def _validate_production_security_settings(app: Flask) -> None:
         default=bool(app.config.get("TRUST_PROXY_HEADERS", False)),
     )
     if trust_proxy_headers:
-        configured_sources = os.getenv("TRUSTED_PROXY_IPS")
-        if configured_sources is None:
-            configured_sources = app.config.get("TRUSTED_PROXY_IPS")
-        if isinstance(configured_sources, str):
-            trusted_sources = tuple(
-                part.strip()
-                for part in configured_sources.split(",")
-                if part.strip()
-            )
-        else:
-            trusted_sources = tuple(configured_sources or ())
+        trusted_sources = _resolve_trusted_proxy_ips(app)
         if not trusted_sources:
             raise RuntimeError(
                 "TRUST_PROXY_HEADERS=true requires TRUSTED_PROXY_IPS in production."
@@ -412,6 +467,7 @@ def create_app(config_name: str | None = None) -> Flask:
     config_class = get_config(config_name)
     app.config.from_object(config_class)
     app.config["PORTAL_SPA_ENABLED"] = _resolve_portal_spa_enabled(app)
+    is_production = _is_production_env(app)
 
     # Session configuration with environment-aware secret validation.
     app.secret_key = _resolve_secret_key(app)
@@ -419,19 +475,18 @@ def create_app(config_name: str | None = None) -> Flask:
     _validate_production_security_settings(app)
 
     # Session cookie security settings
-    # SECURE: Only send cookie over HTTPS in production.
-    app.config['SESSION_COOKIE_SECURE'] = _is_production_env(app)
+    # Always normalize Secure flag in after_request using actual request scheme.
+    app.config['SESSION_COOKIE_SECURE'] = False
     # HTTPONLY: Prevent JavaScript access to session cookie (XSS protection)
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     # SAMESITE: strict in production, relaxed for local development usability.
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Strict' if _is_production_env(app) else 'Lax'
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Strict' if is_production else 'Lax'
 
     # Configure logging first
     _configure_logging(app)
     _validate_runtime_contract(app)
     _validate_in_scope_asset_readiness(app)
     security_headers = _build_security_headers(
-        _is_production_env(app),
         allow_unsafe_eval=_resolve_csp_allow_unsafe_eval(app),
     )
 
@@ -533,8 +588,21 @@ def create_app(config_name: str | None = None) -> Flask:
 
     @app.after_request
     def apply_security_headers(response):
+        request_is_secure = _is_request_secure(app)
         for header, value in security_headers.items():
             response.headers.setdefault(header, value)
+        if is_production and request_is_secure:
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
+        else:
+            response.headers.pop("Strict-Transport-Security", None)
+        _normalize_session_cookie_security(
+            response,
+            secure=request_is_secure,
+            session_cookie_name=str(app.config.get("SESSION_COOKIE_NAME", "session")),
+        )
         return response
 
     # ========================================================

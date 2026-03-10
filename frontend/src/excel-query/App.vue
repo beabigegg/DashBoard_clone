@@ -54,7 +54,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="excel-query-page u-content-shell">
+  <div class="excel-query-page u-content-shell theme-excel-query">
     <header class="excel-query-header">
       <h1>Excel 批次查詢</h1>
     </header>

@@ -61,7 +61,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="tables-page">
+  <div class="tables-page theme-tables">
     <div class="container">
       <header class="header">
         <div>

@@ -52,9 +52,9 @@ const workcenterOptions = computed(() => {
 <template>
   <div>
     <div class="query-tool-section-header">
-      <h4 class="card-title">歷程資料</h4>
+      <h4 class="card-title ui-card-title">歷程資料</h4>
 
-      <label class="filter-group" style="min-width: 260px">
+      <label class="filter-group filter-group--wide">
         <span class="filter-label">站點群組篩選</span>
         <MultiSelect
           :model-value="selectedWorkcenterGroups"
@@ -99,3 +99,9 @@ const workcenterOptions = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.filter-group--wide {
+  min-width: 260px;
+}
+</style>

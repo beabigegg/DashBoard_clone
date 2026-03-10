@@ -223,8 +223,8 @@ const detailCountLabel = computed(() => {
 </script>
 
 <template>
-  <section class="card">
-    <div class="card-body">
+  <section class="card ui-card">
+    <div class="card-body ui-card-body">
       <div v-if="!selectedContainerId" class="placeholder">
         請從上方血緣樹選擇節點後查看明細。
       </div>
@@ -232,7 +232,7 @@ const detailCountLabel = computed(() => {
       <template v-else>
         <div class="query-tool-section-header">
           <div>
-            <div class="card-title">LOT 明細{{ detailCountLabel }}</div>
+            <div class="card-title ui-card-title">LOT 明細{{ detailCountLabel }}</div>
             <span class="query-tool-muted">{{ detailDisplayNames }}</span>
           </div>
 

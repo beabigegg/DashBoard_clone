@@ -12,7 +12,8 @@ export default {
           100: '#e0e7ff',
           500: '#667eea',
           600: '#5a67d8',
-          700: '#4c51bf'
+          700: '#4c51bf',
+          800: '#4338ca'
         },
         accent: {
           500: '#764ba2'
@@ -20,17 +21,27 @@ export default {
         surface: {
           app: '#f5f7fa',
           card: '#ffffff',
-          muted: '#f8fafc'
+          muted: '#f8fafc',
+          hover: '#f1f5f9',
+          active: '#eef2ff'
         },
         stroke: {
           soft: '#e2e8f0',
-          panel: '#e3e8f2'
+          panel: '#e3e8f2',
+          input: '#dbe4ef'
+        },
+        text: {
+          primary: '#1f2937',
+          secondary: '#64748b',
+          muted: '#94a3b8',
+          subtle: '#475569'
         },
         state: {
           success: '#22c55e',
           warning: '#f59e0b',
           danger: '#ef4444',
-          neutral: '#9ca3af'
+          neutral: '#9ca3af',
+          info: '#3b82f6'
         }
       },
       fontFamily: {

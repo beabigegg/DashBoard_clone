@@ -19,7 +19,7 @@ test('reject-history draft options params include full context', () => {
     endDate: '2026-02-07',
     workcenterGroups: ['WB'],
     packages: ['PKG-A'],
-    reason: '001_A',
+    reasons: ['001_A'],
     includeExcludedScrap: true,
     excludeMaterialScrap: false,
     excludePbDiode: true,
@@ -30,7 +30,7 @@ test('reject-history draft options params include full context', () => {
     end_date: '2026-02-07',
     workcenter_groups: ['WB'],
     packages: ['PKG-A'],
-    reason: '001_A',
+    reasons: ['001_A'],
     include_excluded_scrap: true,
     exclude_material_scrap: false,
     exclude_pb_diode: true,
@@ -44,7 +44,7 @@ test('reject-history prune removes invalid selected values', () => {
       endDate: '2026-02-07',
       workcenterGroups: ['WB', 'FA'],
       packages: ['PKG-A', 'PKG-Z'],
-      reason: '999_X',
+      reasons: ['999_X'],
       includeExcludedScrap: false,
       excludeMaterialScrap: true,
       excludePbDiode: true,
@@ -59,7 +59,7 @@ test('reject-history prune removes invalid selected values', () => {
 
   assert.deepEqual(pruned.filters.workcenterGroups, ['WB']);
   assert.deepEqual(pruned.filters.packages, ['PKG-A']);
-  assert.equal(pruned.filters.reason, '');
+  assert.deepEqual(pruned.filters.reasons, []);
   assert.equal(pruned.removedCount, 3);
 });
 
@@ -68,7 +68,7 @@ test('reject-history view params include multi-dimension pareto selections', () 
     supplementaryFilters: {
       packages: ['PKG-A'],
       workcenterGroups: ['WB'],
-      reason: '001_A',
+      reasons: ['001_A'],
     },
     trendDates: ['2026-02-01'],
     paretoSelections: {
@@ -89,7 +89,7 @@ test('reject-history view params include multi-dimension pareto selections', () 
     query_id: 'qid-001',
     packages: ['PKG-A'],
     workcenter_groups: ['WB'],
-    reason: '001_A',
+    reasons: ['001_A'],
     trend_dates: ['2026-02-01'],
     sel_reason: ['001_A'],
     sel_type: ['TYPE-A', 'TYPE-B'],

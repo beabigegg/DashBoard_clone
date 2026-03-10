@@ -635,7 +635,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="dashboard hold-overview-page">
+  <div class="dashboard hold-overview-page theme-hold-overview">
     <header class="header">
       <div class="header-left">
         <h1>Hold 即時概況</h1>
@@ -674,11 +674,11 @@ onBeforeUnmount(() => {
     <SummaryCards :summary="summary" />
 
     <section class="content-grid">
-      <section class="card">
-        <div class="card-header">
-          <div class="card-title">Workcenter x Package Matrix (QTY)</div>
+      <section class="card ui-card">
+        <div class="card-header ui-card-header">
+          <div class="card-title ui-card-title">Workcenter x Package Matrix (QTY)</div>
         </div>
-        <div class="card-body matrix-container">
+        <div class="card-body ui-card-body matrix-container">
           <HoldMatrix :data="matrix" :active-filter="matrixFilter" @select="handleMatrixSelect" />
         </div>
       </section>

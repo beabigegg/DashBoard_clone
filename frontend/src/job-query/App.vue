@@ -58,7 +58,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="job-query-page u-content-shell">
+  <div class="job-query-page u-content-shell theme-job-query">
     <header class="job-query-header">
       <h1>設備維修查詢</h1>
     </header>

@@ -148,15 +148,15 @@ function handleChartClick(params) {
 </script>
 
 <template>
-  <section class="card">
-    <div class="card-header pareto-header">
-      <div class="card-title">
+  <section class="card ui-card">
+    <div class="card-header ui-card-header pareto-header">
+      <div class="card-title ui-card-title">
         {{ metricLabel }} vs {{ dimensionLabel }}（Pareto）
         <span v-if="showTop20Badge" class="pareto-date-badge">TOP 20</span>
         <span v-for="d in selectedDates" :key="d" class="pareto-date-badge">{{ d }}</span>
       </div>
     </div>
-    <div class="card-body pareto-layout">
+    <div class="card-body ui-card-body pareto-layout">
       <div class="pareto-chart-wrap">
         <VChart :option="chartOption" autoresize @click="handleChartClick" />
         <div v-if="!hasData && !loading" class="placeholder chart-empty">No data</div>

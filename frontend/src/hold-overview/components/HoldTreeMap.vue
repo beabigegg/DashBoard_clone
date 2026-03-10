@@ -207,10 +207,10 @@ function handleChartClick(params) {
 <template>
   <section class="treemap-section">
     <div class="treemap-legend">
-      <span><i class="legend-color" style="--legend-color: #22c55e"></i>綠(&lt;1天)</span>
-      <span><i class="legend-color" style="--legend-color: #eab308"></i>黃(1-3天)</span>
-      <span><i class="legend-color" style="--legend-color: #f97316"></i>橙(3-7天)</span>
-      <span><i class="legend-color" style="--legend-color: #ef4444"></i>紅(&gt;7天)</span>
+      <span><i class="legend-color legend-green"></i>綠(&lt;1天)</span>
+      <span><i class="legend-color legend-yellow"></i>黃(1-3天)</span>
+      <span><i class="legend-color legend-orange"></i>橙(3-7天)</span>
+      <span><i class="legend-color legend-red"></i>紅(&gt;7天)</span>
     </div>
 
     <VChart
@@ -223,3 +223,10 @@ function handleChartClick(params) {
     <div v-else class="placeholder treemap-empty">目前無 Hold 資料</div>
   </section>
 </template>
+
+<style scoped>
+.legend-green { --legend-color: #22c55e; }
+.legend-yellow { --legend-color: #eab308; }
+.legend-orange { --legend-color: #f97316; }
+.legend-red { --legend-color: #ef4444; }
+</style>

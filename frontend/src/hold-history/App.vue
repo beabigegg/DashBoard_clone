@@ -484,7 +484,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="dashboard hold-history-page">
+  <div class="dashboard hold-history-page theme-hold-history">
     <header class="header hold-history-header">
       <div class="header-left">
         <h1>Hold 歷史績效</h1>

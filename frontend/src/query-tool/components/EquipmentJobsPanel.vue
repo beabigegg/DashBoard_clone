@@ -65,7 +65,7 @@ const columns = Object.freeze([
 <template>
   <div>
     <div class="query-tool-section-header">
-      <h4 class="card-title">維修紀錄</h4>
+      <h4 class="card-title ui-card-title">維修紀錄</h4>
       <ExportButton
         :disabled="exportDisabled"
         :loading="exporting"
@@ -99,15 +99,15 @@ const columns = Object.freeze([
 
         <tbody>
           <template v-for="(row, rowIndex) in rows" :key="rowKey(row, rowIndex)">
-            <tr style="cursor: pointer" @click="toggleRow(row, rowIndex)">
-              <td style="text-align: center">{{ isExpanded(row, rowIndex) ? '▾' : '▸' }}</td>
+            <tr class="row-clickable" @click="toggleRow(row, rowIndex)">
+              <td class="td-center">{{ isExpanded(row, rowIndex) ? '▾' : '▸' }}</td>
               <td v-for="column in columns" :key="`${rowIndex}-${column}`">
                 {{ formatCellValue(row[column]) }}
               </td>
             </tr>
 
             <tr v-if="isExpanded(row, rowIndex)">
-              <td colspan="9" style="padding: 8px 10px">
+              <td colspan="9" class="td-detail-body">
                 <div class="grid gap-2 text-[11px] text-slate-600 md:grid-cols-2">
                   <p><span class="font-semibold text-slate-700">RESOURCEID:</span> {{ formatCellValue(row.RESOURCEID) }}</p>
                   <p><span class="font-semibold text-slate-700">JOBMODELNAME:</span> {{ formatCellValue(row.JOBMODELNAME) }}</p>
@@ -123,3 +123,15 @@ const columns = Object.freeze([
     </div>
   </div>
 </template>
+
+<style scoped>
+.row-clickable {
+  cursor: pointer;
+}
+.td-center {
+  text-align: center;
+}
+.td-detail-body {
+  padding: 8px 10px;
+}
+</style>

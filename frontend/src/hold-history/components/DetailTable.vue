@@ -77,13 +77,13 @@ function hideTip() {
 </script>
 
 <template>
-  <section class="card">
-    <div class="card-header detail-header">
-      <div class="card-title">Hold / Release 明細</div>
+  <section class="card ui-card">
+    <div class="card-header ui-card-header detail-header">
+      <div class="card-title ui-card-title">Hold / Release 明細</div>
       <div class="table-info">{{ pageSummary }}</div>
     </div>
 
-    <div class="card-body detail-table-wrap">
+    <div class="card-body ui-card-body detail-table-wrap">
       <table class="detail-table">
         <thead>
           <tr>

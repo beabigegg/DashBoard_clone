@@ -22,11 +22,11 @@ function formatNumber(value) {
 </script>
 
 <template>
-  <section class="card distribution-card">
-    <div class="card-header">
-      <div class="card-title">{{ title }}</div>
+  <section class="card ui-card distribution-card">
+    <div class="card-header ui-card-header">
+      <div class="card-title ui-card-title">{{ title }}</div>
     </div>
-    <div class="card-body">
+    <div class="card-body ui-card-body">
       <table class="dist-table">
         <thead>
           <tr>

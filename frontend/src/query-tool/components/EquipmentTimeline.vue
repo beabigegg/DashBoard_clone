@@ -211,7 +211,7 @@ const showEmpty = computed(() => tracks.value.length === 0 || (tracks.value.ever
 <template>
   <div>
     <div class="query-tool-section-header">
-      <h4 class="card-title">設備 Timeline</h4>
+      <h4 class="card-title ui-card-title">設備 Timeline</h4>
       <ExportButton
         :disabled="exportDisabled"
         :loading="exporting"

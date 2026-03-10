@@ -1,5 +1,5 @@
 <template>
-  <div class="perf-dashboard">
+  <div class="perf-dashboard theme-admin-performance">
     <!-- Header -->
     <header class="perf-header">
       <div class="perf-header-inner">

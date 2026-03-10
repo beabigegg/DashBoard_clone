@@ -101,11 +101,11 @@ function handleChartClick(params) {
 </script>
 
 <template>
-  <section class="card">
-    <div class="card-header">
-      <div class="card-title">Hold Duration Distribution</div>
+  <section class="card ui-card">
+    <div class="card-header ui-card-header">
+      <div class="card-title ui-card-title">Hold Duration Distribution</div>
     </div>
-    <div class="card-body">
+    <div class="card-body ui-card-body">
       <div v-if="hasData" class="duration-chart-wrap">
         <VChart :option="chartOption" autoresize @click="handleChartClick" />
       </div>

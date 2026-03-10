@@ -99,7 +99,7 @@ function handleManualRefresh() {
 </script>
 
 <template>
-  <div class="qc-gate-page">
+  <div class="qc-gate-page theme-qc-gate">
     <header class="qc-gate-header">
       <div>
         <h1>QC-GATE 狀態</h1>

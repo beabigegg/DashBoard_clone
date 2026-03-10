@@ -94,10 +94,10 @@ function handleLegendChange(params) {
 
 <template>
   <section class="chart-grid">
-    <article class="card">
-      <div class="card-header"><div class="card-title">報廢量趨勢</div></div>
-      <div class="card-body chart-wrap">
-        <VChart :option="chartOption" :autoresize="{ throttle: 100 }" style="width: 100%; height: 100%" @click="handleChartClick" @legendselectchanged="handleLegendChange" />
+    <article class="card ui-card">
+      <div class="card-header ui-card-header"><div class="card-title ui-card-title">報廢量趨勢</div></div>
+      <div class="card-body ui-card-body chart-wrap">
+        <VChart class="chart-canvas" :option="chartOption" :autoresize="{ throttle: 100 }" @click="handleChartClick" @legendselectchanged="handleLegendChange" />
         <div v-if="!hasData && !loading" class="placeholder chart-empty">No data</div>
       </div>
     </article>

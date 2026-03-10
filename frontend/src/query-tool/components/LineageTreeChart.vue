@@ -707,12 +707,12 @@ function exportRelationCsv() {
 </script>
 
 <template>
-  <section class="card"><div class="card-body">
+  <section class="card ui-card"><div class="card-body ui-card-body">
     <div class="query-tool-section-header">
       <div>
-        <h3 class="card-title">{{ title }}</h3>
+        <h3 class="card-title ui-card-title">{{ title }}</h3>
         <p class="query-tool-muted">{{ description }}</p>
-        <p class="query-tool-muted" style="font-size: 11px">
+        <p class="query-tool-muted lineage-direction-note">
           讀圖方向由左至右；節點前綴 <code>←拆/←併/←晶/←重</code> 代表本節點由左側來源而來，
           <code>→拆/→併/→晶/→重</code> 代表左側節點由本節點而來。
         </p>
@@ -780,7 +780,7 @@ function exportRelationCsv() {
     </p>
 
     <!-- Loading overlay -->
-    <div v-if="loading" class="placeholder" style="padding: 48px 12px">
+    <div v-if="loading" class="placeholder lineage-loading-placeholder">
       正在載入血緣資料…
     </div>
 
@@ -801,11 +801,11 @@ function exportRelationCsv() {
       />
     </div>
 
-    <details v-if="relationRows.length > 0" style="margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc; padding: 8px 12px">
-      <summary style="cursor: pointer; font-size: 12px; font-weight: 600; color: #334155">
+    <details v-if="relationRows.length > 0" class="lineage-relation-details">
+      <summary class="lineage-relation-summary">
         關係清單（{{ relationRows.length }}）
       </summary>
-      <div class="query-tool-table-wrap short" style="margin-top: 8px; max-height: 224px">
+      <div class="query-tool-table-wrap short lineage-relation-table-wrap">
         <table class="query-tool-table">
           <thead>
             <tr>
@@ -819,33 +819,33 @@ function exportRelationCsv() {
               v-for="row in relationRows.slice(0, 200)"
               :key="row.key"
             >
-              <td style="font-family: monospace; font-size: 11px">
+              <td class="lineage-relation-cell mono">
                 {{ row.fromName }}
               </td>
-              <td style="font-family: monospace; font-size: 11px">
+              <td class="lineage-relation-cell mono">
                 {{ row.toName }}
               </td>
-              <td style="font-size: 11px">
+              <td class="lineage-relation-cell">
                 {{ row.edgeLabel }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p v-if="relationRows.length > 200" class="query-tool-muted" style="margin-top: 4px; font-size: 11px">
+      <p v-if="relationRows.length > 200" class="query-tool-muted lineage-relation-note">
         僅顯示前 200 筆，請搭配上方樹圖與節點點選進一步縮小範圍。
       </p>
     </details>
 
     <!-- Not found warning -->
-    <div v-if="notFound.length > 0" class="query-tool-success" style="border-color: #fde68a; background: #fefce8; color: #92400e">
+    <div v-if="notFound.length > 0" class="query-tool-success lineage-not-found">
       未命中：{{ notFound.join(', ') }}
     </div>
 
     <!-- Selection summary -->
-    <div v-if="selectedContainerIds.length > 0" class="query-tool-success" style="border-color: #c7d2fe; background: rgba(238,242,255,0.6); color: inherit">
+    <div v-if="selectedContainerIds.length > 0" class="query-tool-success lineage-selected-summary">
       <div class="flex flex-wrap items-center gap-1.5">
-        <span class="mr-1 text-xs font-medium" style="color: #4338ca">已選 {{ selectedContainerIds.length }} 個節點</span>
+        <span class="mr-1 text-xs font-medium lineage-selected-count">已選 {{ selectedContainerIds.length }} 個節點</span>
         <span
           v-for="cid in selectedContainerIds.slice(0, 8)"
           :key="cid"
@@ -863,5 +863,62 @@ function exportRelationCsv() {
 .lineage-tree-chart {
   width: 100%;
   min-height: 300px;
+}
+
+.lineage-direction-note {
+  font-size: 11px;
+}
+
+.lineage-loading-placeholder {
+  padding: 48px 12px;
+}
+
+.lineage-relation-details {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 8px 12px;
+}
+
+.lineage-relation-summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.lineage-relation-table-wrap {
+  margin-top: 8px;
+  max-height: 224px;
+}
+
+.lineage-relation-cell {
+  font-size: 11px;
+}
+
+.lineage-relation-cell.mono {
+  font-family: monospace;
+}
+
+.lineage-relation-note {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.lineage-not-found {
+  border-color: #fde68a;
+  background: #fefce8;
+  color: #92400e;
+}
+
+.lineage-selected-summary {
+  border-color: #c7d2fe;
+  background: rgba(238, 242, 255, 0.6);
+  color: inherit;
+}
+
+.lineage-selected-count {
+  color: #4338ca;
 }
 </style>

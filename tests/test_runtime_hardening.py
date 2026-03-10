@@ -171,6 +171,31 @@ def test_hsts_header_enabled_in_production(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "test-production-secret-key")
     monkeypatch.setenv("REALTIME_EQUIPMENT_CACHE_ENABLED", "false")
     monkeypatch.setenv("RUNTIME_CONTRACT_ENFORCE", "false")
+    monkeypatch.setenv("TRUST_PROXY_HEADERS", "true")
+    monkeypatch.setenv("TRUSTED_PROXY_IPS", "127.0.0.1")
+    db._ENGINE = None
+    db._HEALTH_ENGINE = None
+
+    app = create_app("production")
+    app.config["TESTING"] = True
+    # Simulate HTTPS via trusted proxy header so HSTS is emitted.
+    response = app.test_client().get(
+        "/",
+        follow_redirects=True,
+        headers={"X-Forwarded-Proto": "https"},
+    )
+
+    assert response.status_code == 200
+    assert "Strict-Transport-Security" in response.headers
+
+    _shutdown(app)
+
+
+def test_hsts_header_omitted_over_plain_http(monkeypatch):
+    """HSTS must NOT be sent when the request arrives over plain HTTP."""
+    monkeypatch.setenv("SECRET_KEY", "test-production-secret-key")
+    monkeypatch.setenv("REALTIME_EQUIPMENT_CACHE_ENABLED", "false")
+    monkeypatch.setenv("RUNTIME_CONTRACT_ENFORCE", "false")
     db._ENGINE = None
     db._HEALTH_ENGINE = None
 
@@ -179,7 +204,7 @@ def test_hsts_header_enabled_in_production(monkeypatch):
     response = app.test_client().get("/", follow_redirects=True)
 
     assert response.status_code == 200
-    assert "Strict-Transport-Security" in response.headers
+    assert "Strict-Transport-Security" not in response.headers
 
     _shutdown(app)
 
