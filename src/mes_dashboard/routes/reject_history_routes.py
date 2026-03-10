@@ -59,6 +59,14 @@ _REJECT_HISTORY_EXPORT_RATE_LIMIT = configured_rate_limit(
     default_window_seconds=60,
 )
 
+_REJECT_HISTORY_QUERY_RATE_LIMIT = configured_rate_limit(
+    bucket="reject-history-query",
+    max_attempts_env="REJECT_HISTORY_QUERY_RATE_LIMIT_MAX_REQUESTS",
+    window_seconds_env="REJECT_HISTORY_QUERY_RATE_LIMIT_WINDOW_SECONDS",
+    default_max_attempts=10,
+    default_window_seconds=60,
+)
+
 
 def _default_date_range() -> tuple[str, str]:
     end = date.today()
@@ -582,6 +590,7 @@ def api_reject_history_analytics():
 
 
 @reject_history_bp.route("/api/reject-history/query", methods=["POST"])
+@_REJECT_HISTORY_QUERY_RATE_LIMIT
 def api_reject_history_query():
     """Primary query: execute Oracle → cache DataFrame → return results."""
     body, payload_error = parse_json_payload(require_non_empty_object=True)

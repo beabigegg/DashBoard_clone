@@ -360,6 +360,71 @@ def get_spool_file_path(namespace: str, query_id: str) -> Optional[str]:
     return str(path)
 
 
+def register_spool_file(
+    namespace: str,
+    query_id: str,
+    src_path: "Path",
+    row_count: int,
+    *,
+    ttl_seconds: Optional[int] = None,
+) -> bool:
+    """Register an already-written parquet file in the spool metadata store.
+
+    Moves *src_path* to the canonical spool location and creates the Redis
+    metadata pointer. Returns True on success. This avoids reloading the full
+    DataFrame into memory (use after streaming writes via ParquetWriter).
+    """
+    if not QUERY_SPOOL_ENABLED:
+        return False
+
+    safe_query_id = _safe_query_id(query_id)
+    if not safe_query_id:
+        logger.warning("Invalid query_id for register_spool_file: %s", query_id)
+        return False
+
+    client = get_redis_client()
+    if client is None:
+        logger.warning("Redis unavailable, skip register_spool_file for query_id=%s", safe_query_id)
+        return False
+
+    ttl = max(int(ttl_seconds or QUERY_SPOOL_TTL_SECONDS), 60)
+
+    try:
+        import pyarrow.parquet as _pq
+        schema = _pq.read_schema(str(src_path))
+        columns = [str(f.name) for f in schema]
+    except Exception:
+        columns = []
+
+    try:
+        dest = _target_path(namespace, safe_query_id)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        Path(src_path).replace(dest)
+
+        now_ts = int(time.time())
+        metadata = {
+            "schema_version": _SPOOL_SCHEMA_VERSION,
+            "namespace": _normalize_namespace(namespace),
+            "query_id": safe_query_id,
+            "relative_path": str(dest.relative_to(_spool_root())),
+            "row_count": int(row_count),
+            "column_count": int(len(columns)),
+            "columns_hash": _columns_hash(columns),
+            "created_at": now_ts,
+            "expires_at": now_ts + ttl,
+            "file_size_bytes": int(dest.stat().st_size),
+        }
+        client.setex(
+            get_key(_meta_key(namespace, safe_query_id)),
+            ttl,
+            json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+        )
+        return True
+    except Exception as exc:
+        logger.warning("Failed to register spool file (query_id=%s): %s", safe_query_id, exc)
+        return False
+
+
 def clear_spooled_df(namespace: str, query_id: str, *, remove_file: bool = True) -> None:
     safe_query_id = _safe_query_id(query_id)
     if not safe_query_id:

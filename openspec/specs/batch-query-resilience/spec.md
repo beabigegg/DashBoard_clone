@@ -68,7 +68,7 @@ The cache service SHALL read batch execution metadata and include partial failur
 
 #### Scenario: Metadata read before redis_clear_batch
 - **WHEN** `execute_primary_query()` calls `get_batch_progress()`
-- **THEN** the call SHALL occur after `merge_chunks()` and before `redis_clear_batch()`
+- **THEN** the call SHALL occur after merge (whether via `merge_chunks()` or `merge_chunks_to_spool()`) and before `redis_clear_batch()`
 
 #### Scenario: No partial failure on successful query
 - **WHEN** all chunks complete successfully
@@ -107,4 +107,3 @@ Decoupling from paginated list SQL SHALL NOT regress partial-failure metadata be
 - **WHEN** some chunks succeed and others fail
 - **THEN** the system SHALL continue to merge successful chunks and return partial results
 - **THEN** progress metadata SHALL remain available for diagnostics
-

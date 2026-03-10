@@ -121,6 +121,7 @@ _REJECT_DERIVE_FORCE_GC = os.getenv("REJECT_DERIVE_FORCE_GC", "true").strip().lo
     "yes",
     "on",
 }
+REJECT_QUERY_RSS_REJECT_MB = float(os.getenv("REJECT_QUERY_RSS_REJECT_MB", "900"))
 _REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
     "REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED",
     default=True,
@@ -580,6 +581,20 @@ def execute_primary_query(
         logger.info("Dataset cache hit for query_id=%s", query_id)
         return _build_response_from_cache(cached_df)
 
+    # ---- RSS front-door guard (before acquiring query lock) ----
+    current_rss = _process_rss_mb()
+    if current_rss is not None and current_rss >= REJECT_QUERY_RSS_REJECT_MB:
+        logger.warning(
+            "Reject primary query rejected: RSS %.1f MB >= threshold %.1f MB",
+            current_rss,
+            REJECT_QUERY_RSS_REJECT_MB,
+        )
+        raise RejectPrimaryQueryOverloadError(
+            "系統記憶體使用率過高，請稍後重試",
+            code="SERVICE_OVERLOADED",
+            retry_after=30,
+        )
+
     lock_owner = f"{os.getpid()}:{uuid.uuid4().hex}"
     has_query_lock = False
     try:
@@ -614,9 +629,13 @@ def execute_primary_query(
             decompose_by_time_range,
             execute_plan,
             get_batch_progress,
-            merge_chunks,
+            merge_chunks_to_spool,
             should_decompose_by_ids,
             should_decompose_by_time,
+        )
+        from mes_dashboard.core.query_spool_store import (
+            QUERY_SPOOL_DIR,
+            register_spool_file,
         )
 
         use_engine = False
@@ -698,14 +717,19 @@ def execute_primary_query(
                     workflow_filter=chunk_wf_filter,
                 )
                 if max_rows_per_chunk:
-                    logger.debug(
-                        "Reject chunk execution ignores max_rows_per_chunk on primary SQL path "
-                        "(max_rows_per_chunk=%s)",
-                        max_rows_per_chunk,
+                    chunk_sql = (
+                        f"SELECT * FROM ({chunk_sql}) WHERE ROWNUM <= {int(max_rows_per_chunk) + 1}"
                     )
                 chunk_df = read_sql_df(chunk_sql, chunk_params)
                 if chunk_df is None:
                     return pd.DataFrame()
+                if max_rows_per_chunk and len(chunk_df) == int(max_rows_per_chunk) + 1:
+                    logger.warning(
+                        "Reject chunk hit max_rows_per_chunk limit (max=%d), truncating to %d rows",
+                        int(max_rows_per_chunk),
+                        int(max_rows_per_chunk),
+                    )
+                    chunk_df = chunk_df.head(int(max_rows_per_chunk))
                 return chunk_df
 
             try:
@@ -720,9 +744,10 @@ def execute_primary_query(
                     max_rows_per_chunk=_REJECT_ENGINE_MAX_ROWS_PER_CHUNK,
                 )
                 try:
-                    df = merge_chunks(
+                    spool_tmp_path, spool_row_count = merge_chunks_to_spool(
                         "reject",
                         engine_hash,
+                        spool_dir=QUERY_SPOOL_DIR,
                         max_total_rows=_REJECT_ENGINE_MAX_TOTAL_ROWS,
                         overflow_mode="error",
                     )
@@ -738,12 +763,38 @@ def execute_primary_query(
                         code="RESULT_TOO_LARGE",
                         retry_after=15,
                     ) from exc
+                # 4.6: read progress BEFORE redis_clear_batch
                 progress_meta = get_batch_progress("reject", engine_hash) or {}
                 progress_partial = parse_partial_failure_meta(progress_meta)
                 if progress_partial:
                     partial_failure_meta = progress_partial
             finally:
                 redis_clear_batch("reject", engine_hash)
+
+            # 4.5: Register streamed spool file and load df for response
+            if spool_tmp_path is not None:
+                spool_registered = register_spool_file(
+                    _REDIS_NAMESPACE,
+                    query_id,
+                    spool_tmp_path,
+                    spool_row_count,
+                    ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
+                )
+                if spool_registered:
+                    df = _get_cached_df(query_id) or pd.DataFrame()
+                else:
+                    # Fallback: spool_tmp_path still exists if register_spool_file did not move it
+                    from pathlib import Path as _Path
+                    _p = _Path(spool_tmp_path)
+                    if _p.exists():
+                        try:
+                            df = pd.read_parquet(str(_p), engine="pyarrow")
+                        except Exception:
+                            df = pd.DataFrame()
+                    else:
+                        df = pd.DataFrame()
+            else:
+                df = pd.DataFrame()
         else:
             # --- Direct path (short query, no engine overhead) ---
             logger.info(

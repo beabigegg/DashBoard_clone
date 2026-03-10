@@ -773,3 +773,81 @@ class TestRetryAndFailedRanges:
         assert progress.get("failed_chunk_count") == "1"
         failed_ranges = json.loads(progress.get("failed_ranges", "[]"))
         assert failed_ranges == []
+
+# ============================================================
+# 6.1 merge_chunks_to_spool
+# ============================================================
+
+
+class TestMergeChunksToSpool:
+    """Tests for the streaming spool merge path."""
+
+    def test_normal_flow_writes_parquet_and_returns_path(self, tmp_path):
+        """merge_chunks_to_spool writes parquet and returns (path, row_count)."""
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        chunk1 = pd.DataFrame({"A": [1, 2, 3], "B": ["x", "y", "z"]})
+        chunk2 = pd.DataFrame({"A": [4, 5], "B": ["a", "b"]})
+
+        with patch.object(bqe, "iterate_chunks", return_value=iter([chunk1, chunk2])):
+            spool_path, total_rows = bqe.merge_chunks_to_spool(
+                "reject", "testhash", spool_dir=tmp_path
+            )
+
+        assert total_rows == 5
+        assert spool_path is not None
+        assert spool_path.exists()
+        # Verify file is readable parquet
+        result_df = pd.read_parquet(str(spool_path), engine="pyarrow")
+        assert len(result_df) == 5
+        assert list(result_df["A"]) == [1, 2, 3, 4, 5]
+
+    def test_empty_result_returns_none_zero(self, tmp_path):
+        """Empty chunks produce (None, 0) and no spool file."""
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        with patch.object(bqe, "iterate_chunks", return_value=iter([])):
+            spool_path, total_rows = bqe.merge_chunks_to_spool(
+                "reject", "emptyhash", spool_dir=tmp_path
+            )
+
+        assert spool_path is None
+        assert total_rows == 0
+        # No stray parquet files
+        assert not list(tmp_path.glob("*.parquet"))
+
+    def test_overflow_error_raises_and_cleans_up(self, tmp_path):
+        """overflow_mode='error' raises MergeChunksMaxRowsExceeded and deletes partial file."""
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        chunk1 = pd.DataFrame({"V": range(100)})
+        chunk2 = pd.DataFrame({"V": range(100)})
+
+        with patch.object(bqe, "iterate_chunks", return_value=iter([chunk1, chunk2])):
+            with pytest.raises(bqe.MergeChunksMaxRowsExceeded):
+                bqe.merge_chunks_to_spool(
+                    "reject",
+                    "overhash",
+                    spool_dir=tmp_path,
+                    max_total_rows=150,
+                    overflow_mode="error",
+                )
+
+        # Partial spool file must be cleaned up
+        assert not list(tmp_path.glob("*overhash*.parquet"))
+
+    def test_exception_deletes_partial_file(self, tmp_path):
+        """Any unexpected exception cleans up the partial spool file."""
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        def _bad_chunks(*_a, **_kw):
+            yield pd.DataFrame({"V": [1, 2]})
+            raise RuntimeError("simulated IO error")
+
+        with patch.object(bqe, "iterate_chunks", side_effect=_bad_chunks):
+            with pytest.raises(RuntimeError, match="simulated IO error"):
+                bqe.merge_chunks_to_spool(
+                    "reject", "badhash", spool_dir=tmp_path
+                )
+
+        assert not list(tmp_path.glob("*badhash*.parquet"))

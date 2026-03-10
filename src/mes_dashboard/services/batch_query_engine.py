@@ -659,7 +659,144 @@ def iterate_chunks(
 
 
 # ============================================================
-# 7. Convenience: should_use_engine?
+# 7. Streaming merge to spool (memory-efficient path)
+# ============================================================
+
+
+def merge_chunks_to_spool(
+    cache_prefix: str,
+    query_hash: str,
+    spool_dir,
+    max_total_rows: Optional[int] = None,
+    overflow_mode: str = "error",
+):
+    """Stream-merge Redis chunks into a single parquet spool file.
+
+    Iterates chunks one-by-one via :func:`iterate_chunks` and appends each
+    to a ``pyarrow.parquet.ParquetWriter``.  Peak memory is proportional to a
+    single chunk rather than the full result set.
+
+    Args:
+        cache_prefix: Redis cache namespace (e.g. ``"reject"``).
+        query_hash:   Hash key identifying the batch job.
+        spool_dir:    Directory in which to write the temp parquet file.
+        max_total_rows: Hard row cap. Behaviour on breach is controlled by
+            *overflow_mode*.
+        overflow_mode: ``"error"`` raises :exc:`MergeChunksMaxRowsExceeded`;
+            ``"truncate"`` stops writing and returns partial results.
+
+    Returns:
+        ``(Path, total_rows)`` on success, or ``(None, 0)`` for empty results.
+
+    Raises:
+        :exc:`MergeChunksMaxRowsExceeded`: when ``overflow_mode="error"`` and
+            the row cap is exceeded.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    from pathlib import Path as _Path
+
+    if overflow_mode not in {"truncate", "error"}:
+        raise ValueError("overflow_mode must be either 'truncate' or 'error'")
+
+    spool_dir = _Path(spool_dir)
+    spool_dir.mkdir(parents=True, exist_ok=True)
+    tmp_path = spool_dir / f"{cache_prefix}_{query_hash}_streaming.tmp.parquet"
+
+    writer: Optional[pq.ParquetWriter] = None
+    schema: Optional[pa.Schema] = None
+    total_rows = 0
+    chunk_index = 0
+
+    try:
+        for df_chunk in iterate_chunks(cache_prefix, query_hash):
+            if df_chunk.empty:
+                chunk_index += 1
+                continue
+
+            if max_total_rows is not None and total_rows >= max_total_rows:
+                if overflow_mode == "error":
+                    raise MergeChunksMaxRowsExceeded(
+                        max_total_rows=max_total_rows,
+                        observed_rows=total_rows + len(df_chunk),
+                        chunk_index=chunk_index,
+                    )
+                logger.warning(
+                    "merge_chunks_to_spool reached max_total_rows=%d (prefix=%s)",
+                    max_total_rows,
+                    cache_prefix,
+                )
+                break
+
+            # Clip last chunk when needed
+            if max_total_rows is not None:
+                remaining = max_total_rows - total_rows
+                if len(df_chunk) > remaining:
+                    if overflow_mode == "error":
+                        raise MergeChunksMaxRowsExceeded(
+                            max_total_rows=max_total_rows,
+                            observed_rows=total_rows + len(df_chunk),
+                            chunk_index=chunk_index,
+                        )
+                    df_chunk = df_chunk.head(remaining).copy()
+
+            table = pa.Table.from_pandas(df_chunk, preserve_index=False)
+
+            if writer is None:
+                schema = table.schema
+                writer = pq.ParquetWriter(str(tmp_path), schema)
+
+            # Align schema for subsequent chunks (drop unexpected columns, fill missing)
+            if table.schema != schema:
+                try:
+                    table = table.cast(schema)
+                except Exception:
+                    # Best-effort: select only columns in schema
+                    common_cols = [f.name for f in schema if f.name in table.schema.names]
+                    if not common_cols:
+                        chunk_index += 1
+                        continue
+                    table = table.select(common_cols).cast(
+                        pa.schema([schema.field(c) for c in common_cols])
+                    )
+
+            writer.write_table(table)
+            total_rows += len(df_chunk)
+            chunk_index += 1
+
+    except Exception:
+        if writer is not None:
+            try:
+                writer.close()
+            except Exception:
+                pass
+            writer = None
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+        raise
+    finally:
+        if writer is not None:
+            writer.close()
+
+    if total_rows == 0 or not tmp_path.exists():
+        if tmp_path.exists():
+            tmp_path.unlink()
+        return None, 0
+
+    logger.info(
+        "merge_chunks_to_spool complete (prefix=%s, rows=%d, path=%s)",
+        cache_prefix,
+        total_rows,
+        tmp_path,
+    )
+    return tmp_path, total_rows
+
+
+# ============================================================
+# 8. Convenience: should_use_engine?
 # ============================================================
 
 

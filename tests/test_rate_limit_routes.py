@@ -66,3 +66,23 @@ def test_hold_overview_lots_rate_limit_returns_429(_mock_limit, mock_service):
     assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
     assert response.headers.get('Retry-After') == '3'
     mock_service.assert_not_called()
+
+import json as _json
+
+
+@patch('mes_dashboard.services.reject_dataset_cache.execute_primary_query')
+@patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 30))
+def test_reject_history_query_rate_limit_returns_429(_mock_limit, mock_service):
+    """POST /api/reject-history/query returns 429 when rate limit is triggered."""
+    client = _client()
+    response = client.post(
+        '/api/reject-history/query',
+        data=_json.dumps({"mode": "date_range", "start_date": "2026-01-01", "end_date": "2026-01-30"}),
+        content_type='application/json',
+    )
+
+    assert response.status_code == 429
+    payload = response.get_json()
+    assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
+    assert response.headers.get('Retry-After') == '30'
+    mock_service.assert_not_called()

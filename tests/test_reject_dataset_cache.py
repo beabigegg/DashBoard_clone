@@ -584,9 +584,10 @@ def test_apply_pareto_selection_filter_supports_multi_dimension_and_logic():
 class TestEngineDecompositionDateRange:
     """Verify engine routing for long date ranges."""
 
-    def test_365_day_range_triggers_engine(self, monkeypatch):
+    def test_365_day_range_triggers_engine(self, monkeypatch, tmp_path):
         """5.9: 365-day date range → chunks decomposed, engine path used."""
         import mes_dashboard.services.batch_query_engine as engine_mod
+        import mes_dashboard.core.query_spool_store as spool_store
 
         # Track calls via engine module (local imports inside function pull from here)
         engine_calls = {
@@ -617,14 +618,18 @@ class TestEngineDecompositionDateRange:
             "REJECT_TOTAL_QTY": [10],
         })
 
-        def fake_merge_chunks(prefix, qhash, **kwargs):
+        def fake_merge_chunks_to_spool(prefix, qhash, spool_dir, **kwargs):
             engine_calls["merge"] += 1
-            return result_df
+            p = tmp_path / "result.parquet"
+            result_df.to_parquet(str(p), engine="pyarrow", index=False)
+            return p, len(result_df)
 
         # Mock on engine module (local imports will pick these up)
         monkeypatch.setattr(engine_mod, "decompose_by_time_range", tracked_decompose)
         monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
-        monkeypatch.setattr(engine_mod, "merge_chunks", fake_merge_chunks)
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", fake_merge_chunks_to_spool)
+        # register_spool_file returns False → fallback reads from spool_tmp_path
+        monkeypatch.setattr(spool_store, "register_spool_file", lambda *a, **kw: False)
         # Mock service-level helpers
         monkeypatch.setattr(
             "mes_dashboard.services.reject_dataset_cache._prepare_sql",
@@ -679,9 +684,10 @@ class TestEngineDecompositionDateRange:
         assert engine_calls["parallel"] == cache_svc._REJECT_ENGINE_PARALLEL
         assert engine_calls["max_rows_per_chunk"] == cache_svc._REJECT_ENGINE_MAX_ROWS_PER_CHUNK
 
-    def test_engine_chunk_uses_primary_sql_without_offset_limit(self, monkeypatch):
+    def test_engine_chunk_uses_primary_sql_without_offset_limit(self, monkeypatch, tmp_path):
         """Engine chunk should execute once via primary SQL without list pagination binds."""
         import mes_dashboard.services.batch_query_engine as engine_mod
+        import mes_dashboard.core.query_spool_store as spool_store
 
         captured = {"df": pd.DataFrame(), "merge_kwargs": None, "params": None, "sql_name": None}
 
@@ -700,9 +706,11 @@ class TestEngineDecompositionDateRange:
             captured["df"] = query_fn(chunks[0], max_rows_per_chunk=page_size)
             return kwargs.get("query_hash", "qh")
 
-        def fake_merge_chunks(prefix, qhash, **kwargs):
+        def fake_merge_chunks_to_spool(prefix, qhash, spool_dir, **kwargs):
             captured["merge_kwargs"] = kwargs
-            return captured["df"]
+            p = tmp_path / "result.parquet"
+            captured["df"].to_parquet(str(p), engine="pyarrow", index=False)
+            return p, len(captured["df"])
 
         monkeypatch.setattr(cache_svc, "_REJECT_ENGINE_MAX_ROWS_PER_CHUNK", 2)
         monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *_a, **_kw: True)
@@ -712,7 +720,8 @@ class TestEngineDecompositionDateRange:
             lambda *_a, **_kw: [{"chunk_start": "2025-01-01", "chunk_end": "2025-01-31"}],
         )
         monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
-        monkeypatch.setattr(engine_mod, "merge_chunks", fake_merge_chunks)
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", fake_merge_chunks_to_spool)
+        monkeypatch.setattr(spool_store, "register_spool_file", lambda *a, **kw: False)
         monkeypatch.setattr(cache_svc, "read_sql_df", fake_read_sql)
         monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
         monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
@@ -741,10 +750,9 @@ class TestEngineDecompositionDateRange:
         assert captured["sql_name"] == cache_svc._REJECT_PRIMARY_SQL_TEMPLATE
         assert "offset" not in (captured["params"] or {})
         assert "limit" not in (captured["params"] or {})
-        assert captured["merge_kwargs"] == {
-            "max_total_rows": cache_svc._REJECT_ENGINE_MAX_TOTAL_ROWS,
-            "overflow_mode": "error",
-        }
+        # Verify merge_chunks_to_spool received correct kwargs
+        assert captured["merge_kwargs"].get("max_total_rows") == cache_svc._REJECT_ENGINE_MAX_TOTAL_ROWS
+        assert captured["merge_kwargs"].get("overflow_mode") == "error"
 
     def test_direct_path_uses_primary_sql_without_offset_limit(self, monkeypatch):
         """Direct path should execute dedicated primary SQL without list pagination binds."""
@@ -853,9 +861,10 @@ class TestEngineDecompositionDateRange:
 class TestEngineDecompositionContainerIDs:
     """Verify engine routing for large container ID sets."""
 
-    def test_large_container_set_triggers_engine(self, monkeypatch):
+    def test_large_container_set_triggers_engine(self, monkeypatch, tmp_path):
         """5.10: 1500 container IDs → engine ID batching activated."""
         import mes_dashboard.services.batch_query_engine as engine_mod
+        import mes_dashboard.core.query_spool_store as spool_store
 
         engine_calls = {"execute": 0, "merge": 0}
         fake_ids = [f"CID-{i:04d}" for i in range(1500)]
@@ -868,12 +877,15 @@ class TestEngineDecompositionContainerIDs:
 
         result_df = pd.DataFrame({"CONTAINERID": fake_ids[:5]})
 
-        def fake_merge_chunks(prefix, qhash, **kwargs):
+        def fake_merge_chunks_to_spool(prefix, qhash, spool_dir, **kwargs):
             engine_calls["merge"] += 1
-            return result_df
+            p = tmp_path / "result.parquet"
+            result_df.to_parquet(str(p), engine="pyarrow", index=False)
+            return p, len(result_df)
 
         monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
-        monkeypatch.setattr(engine_mod, "merge_chunks", fake_merge_chunks)
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", fake_merge_chunks_to_spool)
+        monkeypatch.setattr(spool_store, "register_spool_file", lambda *a, **kw: False)
         monkeypatch.setattr(
             "mes_dashboard.services.reject_dataset_cache.resolve_containers",
             lambda input_type, values: {
@@ -1174,11 +1186,16 @@ def test_cache_hit_restores_partial_failure(monkeypatch):
         (False, cache_svc._CACHE_TTL),
     ],
 )
-def test_partial_failure_ttl_matches_spool(monkeypatch, store_result, expected_ttl):
+def test_partial_failure_ttl_matches_spool(monkeypatch, tmp_path, store_result, expected_ttl):
     import mes_dashboard.services.batch_query_engine as engine_mod
+    import mes_dashboard.core.query_spool_store as spool_store
 
     df = pd.DataFrame({"CONTAINERID": ["C1"], "LOSSREASONNAME": ["R1"], "REJECT_TOTAL_QTY": [1]})
     captured = {"ttls": []}
+
+    # Write df to parquet so the fallback path can load it
+    spool_parquet = tmp_path / "spool.parquet"
+    df.to_parquet(str(spool_parquet), engine="pyarrow", index=False)
 
     monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
     monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
@@ -1205,7 +1222,14 @@ def test_partial_failure_ttl_matches_spool(monkeypatch, store_result, expected_t
         lambda *_a, **_kw: [{"chunk_start": "2025-01-01", "chunk_end": "2025-01-10"}],
     )
     monkeypatch.setattr(engine_mod, "execute_plan", lambda *a, **kw: kw.get("query_hash"))
-    monkeypatch.setattr(engine_mod, "merge_chunks", lambda *a, **kw: df.copy())
+    # merge_chunks_to_spool returns the pre-written parquet file
+    monkeypatch.setattr(
+        engine_mod,
+        "merge_chunks_to_spool",
+        lambda *a, **kw: (spool_parquet, len(df)),
+    )
+    # register_spool_file returns False → fallback reads from spool_parquet
+    monkeypatch.setattr(spool_store, "register_spool_file", lambda *a, **kw: False)
     monkeypatch.setattr(
         engine_mod,
         "get_batch_progress",
@@ -1218,3 +1242,103 @@ def test_partial_failure_ttl_matches_spool(monkeypatch, store_result, expected_t
         end_date="2025-03-01",
     )
     assert captured["ttls"] == [expected_ttl]
+
+
+# ============================================================
+# 6.3  RSS guard → 503 SERVICE_OVERLOADED
+# ============================================================
+
+
+def test_execute_primary_query_rss_guard_raises_service_overloaded(monkeypatch):
+    """execute_primary_query raises SERVICE_OVERLOADED when RSS exceeds threshold."""
+    from mes_dashboard.services.reject_dataset_cache import (
+        execute_primary_query,
+        RejectPrimaryQueryOverloadError,
+    )
+    import mes_dashboard.services.reject_dataset_cache as cache_svc
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
+    monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
+    monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+    monkeypatch.setattr(cache_svc, "_process_rss_mb", lambda: 950.0)
+
+    with pytest.raises(RejectPrimaryQueryOverloadError) as exc_info:
+        execute_primary_query(
+            mode="date_range",
+            start_date="2026-01-01",
+            end_date="2026-03-01",
+        )
+
+    assert exc_info.value.code == "SERVICE_OVERLOADED"
+    assert exc_info.value.retry_after == 30
+
+
+# ============================================================
+# 6.4  SQL ROWNUM wrapping in _run_reject_chunk
+# ============================================================
+
+
+def test_run_reject_chunk_wraps_sql_with_rownum(monkeypatch, tmp_path):
+    """_run_reject_chunk wraps chunk SQL with ROWNUM when max_rows_per_chunk is set."""
+    import mes_dashboard.services.reject_dataset_cache as cache_svc
+    import mes_dashboard.services.batch_query_engine as engine_mod
+
+    captured_sql = []
+
+    def _fake_read_sql(sql, params):
+        captured_sql.append(sql)
+        return pd.DataFrame({"V": list(range(5))})
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
+    monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
+    monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+    monkeypatch.setattr(cache_svc, "_prepare_sql", lambda *a, **kw: "INNER_SQL")
+    monkeypatch.setattr(cache_svc, "_apply_policy_filters", lambda data, **kw: data)
+    monkeypatch.setattr(cache_svc, "_store_query_result", lambda *_a, **_kw: False)
+    monkeypatch.setattr(cache_svc, "redis_clear_batch", lambda *_a, **_kw: None)
+    monkeypatch.setattr(cache_svc, "_process_rss_mb", lambda: 0.0)
+    monkeypatch.setattr(
+        cache_svc,
+        "_build_primary_response",
+        lambda qid, result_df, meta, resolution_info: {"query_id": qid},
+    )
+    monkeypatch.setattr(cache_svc, "read_sql_df", _fake_read_sql)
+
+    captured_fn = {}
+
+    def _fake_execute_plan(chunks, chunk_fn, *, max_rows_per_chunk=None, **kw):
+        captured_fn["fn"] = chunk_fn
+        captured_fn["max_rows"] = max_rows_per_chunk
+
+    monkeypatch.setattr(engine_mod, "execute_plan", _fake_execute_plan)
+    monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *_a, **_kw: True)
+    monkeypatch.setattr(
+        engine_mod,
+        "decompose_by_time_range",
+        lambda *_a, **_kw: [{"chunk_start": "2026-01-01", "chunk_end": "2026-01-10"}],
+    )
+
+    # mock merge_chunks_to_spool to avoid needing full spool infra
+    from pathlib import Path
+    fake_spool = tmp_path / "fake.parquet"
+    pd.DataFrame({"V": [1]}).to_parquet(str(fake_spool), engine="pyarrow", index=False)
+
+    import mes_dashboard.core.query_spool_store as spool_store
+    monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: (fake_spool, 1))
+    # register_spool_file returns False → fallback reads from fake_spool directly
+    monkeypatch.setattr(spool_store, "register_spool_file", lambda *a, **kw: False)
+
+    cache_svc.execute_primary_query(
+        mode="date_range",
+        start_date="2026-01-01",
+        end_date="2026-03-01",
+    )
+
+    # Now call the captured chunk_fn with max_rows_per_chunk to verify ROWNUM wrapping
+    assert "fn" in captured_fn, "execute_plan was not called with a chunk_fn"
+    chunk_fn = captured_fn["fn"]
+    max_rows = captured_fn["max_rows"] or 100
+
+    chunk_fn({"chunk_start": "2026-01-01", "chunk_end": "2026-01-05"}, max_rows_per_chunk=max_rows)
+    assert len(captured_sql) >= 1, "read_sql_df was not called"
+    assert "ROWNUM" in captured_sql[-1], f"Expected ROWNUM in SQL, got: {captured_sql[-1]}"
