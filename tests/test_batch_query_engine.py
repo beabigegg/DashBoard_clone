@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock, call
 import pandas as pd
 
 from mes_dashboard.services.batch_query_engine import (
+    MergeChunksMaxRowsExceeded,
     compute_query_hash,
     decompose_by_ids,
     decompose_by_time_range,
@@ -389,6 +390,63 @@ class TestMergeChunks:
 
         assert len(merged) == 4
         assert list(merged["A"]) == [1, 2, 3, 4]
+
+    def test_merge_raises_when_overflow_mode_error(self):
+        import mes_dashboard.core.redis_df_store as rds
+
+        mock_client = MagicMock()
+        stored = {}
+        mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
+        mock_client.get.side_effect = lambda k: stored.get(k)
+        mock_client.hgetall.return_value = {"total": "2", "completed": "2", "failed": "0"}
+        mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
+
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client):
+            rds.redis_store_chunk("t", "strict", 0, pd.DataFrame({"A": [1, 2]}))
+            rds.redis_store_chunk("t", "strict", 1, pd.DataFrame({"A": [3, 4]}))
+
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client), \
+             patch.object(bqe, "get_redis_client", return_value=mock_client):
+            with pytest.raises(MergeChunksMaxRowsExceeded):
+                merge_chunks(
+                    "t",
+                    "strict",
+                    max_total_rows=3,
+                    overflow_mode="error",
+                )
+
+    def test_merge_raises_when_cap_already_reached_and_next_chunk_exists(self):
+        import mes_dashboard.core.redis_df_store as rds
+
+        mock_client = MagicMock()
+        stored = {}
+        mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
+        mock_client.get.side_effect = lambda k: stored.get(k)
+        mock_client.hgetall.return_value = {"total": "3", "completed": "3", "failed": "0"}
+        mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
+
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client):
+            rds.redis_store_chunk("t", "strict_cap", 0, pd.DataFrame({"A": [1, 2]}))
+            rds.redis_store_chunk("t", "strict_cap", 1, pd.DataFrame({"A": [3]}))
+            rds.redis_store_chunk("t", "strict_cap", 2, pd.DataFrame({"A": [4]}))
+
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client), \
+             patch.object(bqe, "get_redis_client", return_value=mock_client):
+            with pytest.raises(MergeChunksMaxRowsExceeded):
+                merge_chunks(
+                    "t",
+                    "strict_cap",
+                    max_total_rows=3,
+                    overflow_mode="error",
+                )
 
 
 # ============================================================

@@ -96,6 +96,12 @@
           "name": "製程不良追溯分析",
           "status": "released",
           "order": 3
+        },
+        {
+          "route": "/yield-alert-center",
+          "name": "Yield Alert Center",
+          "status": "released",
+          "order": 4
         }
       ]
     },
@@ -228,6 +234,12 @@
           "name": "製程不良追溯分析",
           "status": "released",
           "order": 3
+        },
+        {
+          "route": "/yield-alert-center",
+          "name": "Yield Alert Center",
+          "status": "released",
+          "order": 4
         }
       ]
     }

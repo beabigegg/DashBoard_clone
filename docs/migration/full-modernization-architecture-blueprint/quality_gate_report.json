@@ -2,8 +2,7 @@
   "mode": "block",
   "errors": [],
   "warnings": [
-    "/excel-query uses shell tokens without fallback ['--portal-shadow-panel'] in frontend/src/excel-query/style.css with approved exception",
-    "missing dist asset for /yield-alert-center: yield-alert-center.js"
+    "/excel-query uses shell tokens without fallback ['--portal-shadow-panel'] in frontend/src/excel-query/style.css with approved exception"
   ],
   "info": [],
   "passed": true

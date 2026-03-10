@@ -2,6 +2,20 @@
 """Health check endpoints for MES Dashboard.
 
 Provides /health and /health/deep endpoints for monitoring service status.
+
+CONTRACT EXCEPTION — DO NOT ENVELOPE
+-------------------------------------
+Endpoints in this module (/health, /health/deep, /health/frontend-shell) are
+classified as `health-exception` in the API contract unification governance.
+They intentionally maintain a top-level response structure (not wrapped in
+`{ success, data, meta }`) because:
+  - External monitoring systems and the portal-shell health UI depend on the
+    stable top-level fields (e.g. `status`, `services`, `checks`).
+  - Wrapping into success_response() would break these consumers silently.
+
+Do NOT apply success_response() or error_response() to these routes.
+This exception is permanent unless a coordinated migration with all consumers
+is planned and executed under a separate change.
 """
 
 from __future__ import annotations

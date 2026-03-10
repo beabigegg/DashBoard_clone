@@ -36,14 +36,7 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generator,
-    List,
-    Optional,
-)
+from typing import Any, Callable, Dict, Generator, List, Optional
 
 import pandas as pd
 
@@ -548,11 +541,25 @@ def _is_retryable_error(exc: Exception) -> bool:
 # ============================================================
 
 
+class MergeChunksMaxRowsExceeded(RuntimeError):
+    """Raised when merge_chunks exceeds max_total_rows in strict mode."""
+
+    def __init__(self, *, max_total_rows: int, observed_rows: int, chunk_index: int):
+        super().__init__(
+            "merge_chunks max_total_rows exceeded "
+            f"(max_total_rows={max_total_rows}, observed_rows={observed_rows}, chunk_index={chunk_index})"
+        )
+        self.max_total_rows = int(max_total_rows)
+        self.observed_rows = int(observed_rows)
+        self.chunk_index = int(chunk_index)
+
+
 def merge_chunks(
     cache_prefix: str,
     query_hash: str,
     total: Optional[int] = None,
     max_total_rows: Optional[int] = None,
+    overflow_mode: str = "truncate",
 ) -> pd.DataFrame:
     """Load all chunks from Redis and concatenate into one DataFrame.
 
@@ -568,10 +575,26 @@ def merge_chunks(
 
     dfs: List[pd.DataFrame] = []
     total_rows = 0
+    if overflow_mode not in {"truncate", "error"}:
+        raise ValueError("overflow_mode must be either 'truncate' or 'error'")
+
     for idx in range(total):
         df = redis_load_chunk(cache_prefix, query_hash, idx)
         if df is not None and not df.empty:
             if max_total_rows is not None and total_rows >= max_total_rows:
+                if overflow_mode == "error":
+                    observed_rows = total_rows + len(df)
+                    logger.warning(
+                        "merge_chunks overflow in strict mode after cap reached: max_total_rows=%d, observed_rows=%d, chunk=%d",
+                        max_total_rows,
+                        observed_rows,
+                        idx,
+                    )
+                    raise MergeChunksMaxRowsExceeded(
+                        max_total_rows=max_total_rows,
+                        observed_rows=observed_rows,
+                        chunk_index=idx,
+                    )
                 logger.warning(
                     "merge_chunks reached max_total_rows=%d (prefix=%s, query_hash=%s)",
                     max_total_rows,
@@ -584,6 +607,19 @@ def merge_chunks(
                 if remaining <= 0:
                     break
                 if len(df) > remaining:
+                    if overflow_mode == "error":
+                        observed_rows = total_rows + len(df)
+                        logger.warning(
+                            "merge_chunks overflow in strict mode: max_total_rows=%d, observed_rows=%d, chunk=%d",
+                            max_total_rows,
+                            observed_rows,
+                            idx,
+                        )
+                        raise MergeChunksMaxRowsExceeded(
+                            max_total_rows=max_total_rows,
+                            observed_rows=observed_rows,
+                            chunk_index=idx,
+                        )
                     df = df.head(remaining).copy()
                     logger.warning(
                         "merge_chunks truncated chunk %d to %d rows (max_total_rows=%d)",

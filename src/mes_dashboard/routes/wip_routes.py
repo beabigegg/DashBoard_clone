@@ -5,9 +5,15 @@ Contains Flask Blueprint for WIP-related API endpoints.
 Uses DWH.DW_MES_LOT_V view for real-time WIP data.
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, request
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.response import (
+    success_response,
+    validation_error,
+    not_found_error,
+    internal_error,
+)
 from mes_dashboard.core.utils import parse_bool_query
 from mes_dashboard.services.wip_service import (
     get_wip_summary,
@@ -82,8 +88,8 @@ def api_overview_summary():
         waferdesc=waferdesc,
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 @wip_bp.route('/overview/matrix')
@@ -119,17 +125,11 @@ def api_overview_matrix():
 
     # Validate status parameter
     if status and status not in ('RUN', 'QUEUE', 'HOLD'):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid status. Use RUN, QUEUE, or HOLD'
-        }), 400
+        return validation_error('Invalid status. Use RUN, QUEUE, or HOLD')
 
     # Validate hold_type parameter
     if hold_type and hold_type not in ('quality', 'non-quality'):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid hold_type. Use quality or non-quality'
-        }), 400
+        return validation_error('Invalid hold_type. Use quality or non-quality')
 
     result = get_wip_matrix(
         include_dummy=include_dummy,
@@ -143,8 +143,8 @@ def api_overview_matrix():
         waferdesc=waferdesc,
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 @wip_bp.route('/overview/hold')
@@ -181,8 +181,8 @@ def api_overview_hold():
         waferdesc=waferdesc,
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 # ============================================================
@@ -236,17 +236,11 @@ def api_detail(workcenter: str):
 
     # Validate status parameter
     if status and status not in ('RUN', 'QUEUE', 'HOLD'):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid status. Use RUN, QUEUE, or HOLD'
-        }), 400
+        return validation_error('Invalid status. Use RUN, QUEUE, or HOLD')
 
     # Validate hold_type parameter
     if hold_type and hold_type not in ('quality', 'non-quality'):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid hold_type. Use quality or non-quality'
-        }), 400
+        return validation_error('Invalid hold_type. Use quality or non-quality')
 
     result = get_wip_detail(
         workcenter=workcenter,
@@ -264,8 +258,8 @@ def api_detail(workcenter: str):
     )
 
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 @wip_bp.route('/lot/<lotid>')
@@ -281,8 +275,8 @@ def api_lot_detail(lotid: str):
     result = get_lot_detail(lotid)
 
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '找不到此批號'}), 404
+        return success_response(result)
+    return not_found_error('找不到此批號')
 
 
 # ============================================================
@@ -303,8 +297,8 @@ def api_meta_workcenters():
 
     result = get_workcenters(include_dummy=include_dummy)
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 @wip_bp.route('/meta/packages')
@@ -321,8 +315,8 @@ def api_meta_packages():
 
     result = get_packages(include_dummy=include_dummy)
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 @wip_bp.route('/meta/filter-options')
@@ -346,8 +340,8 @@ def api_meta_filter_options():
         waferdesc=waferdesc,
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 @wip_bp.route('/meta/search')
@@ -385,14 +379,11 @@ def api_meta_search():
 
     # Validate search field
     if search_field not in ('workorder', 'lotid', 'package', 'pj_type'):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid field. Use "workorder", "lotid", "package", or "pj_type"'
-        }), 400
+        return validation_error('Invalid field. Use "workorder", "lotid", "package", or "pj_type"')
 
     # Validate query length
     if len(q) < 2:
-        return jsonify({'success': True, 'data': {'items': []}})
+        return success_response({'items': []})
 
     # Perform search with cross-filters (exclude the field being searched)
     if search_field == 'workorder':
@@ -417,5 +408,5 @@ def api_meta_search():
         )
 
     if result is not None:
-        return jsonify({'success': True, 'data': {'items': result}})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response({'items': result})
+    return internal_error()

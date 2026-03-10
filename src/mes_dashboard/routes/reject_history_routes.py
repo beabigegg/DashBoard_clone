@@ -15,6 +15,7 @@ from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.core.utils import parse_bool_query
 from mes_dashboard.services.reject_dataset_cache import (
+    RejectPrimaryQueryOverloadError,
     apply_view,
     compute_batch_pareto,
     compute_dimension_pareto,
@@ -626,6 +627,13 @@ def api_reject_history_query():
 
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
+    except RejectPrimaryQueryOverloadError as exc:
+        response = jsonify(
+            {"success": False, "error": str(exc), "code": exc.code}
+        )
+        response.status_code = 503
+        response.headers["Retry-After"] = str(exc.retry_after)
+        return response
     except Exception:
         import traceback
         traceback.print_exc()

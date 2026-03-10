@@ -45,12 +45,14 @@ class TestOverviewSummaryRoute(TestWipRoutesBase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(data['success'])
+        self.assertIn('meta', data)
+        self.assertIn('timestamp', data['meta'])
         self.assertEqual(data['data']['totalLots'], 9073)
         self.assertEqual(data['data']['byWipStatus']['hold']['lots'], 120)
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_summary')
     def test_returns_error_on_failure(self, mock_get_summary):
-        """Should return success=False and 500 on failure."""
+        """Should return success=False with error envelope and 500 on failure."""
         mock_get_summary.return_value = None
 
         response = self.client.get('/api/wip/overview/summary')
@@ -58,7 +60,8 @@ class TestOverviewSummaryRoute(TestWipRoutesBase):
 
         self.assertEqual(response.status_code, 500)
         self.assertFalse(data['success'])
-        self.assertIn('error', data)
+        self.assertEqual(data['error']['code'], 'INTERNAL_ERROR')
+        self.assertIn('timestamp', data['meta'])
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_summary')
     def test_passes_filters_and_include_dummy(self, mock_get_summary):
@@ -122,22 +125,26 @@ class TestOverviewMatrixRoute(TestWipRoutesBase):
         self.assertFalse(data['success'])
 
     def test_rejects_invalid_status(self):
-        """Invalid status should return 400."""
+        """Invalid status should return 400 with error envelope."""
         response = self.client.get('/api/wip/overview/matrix?status=INVALID')
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(data['success'])
-        self.assertIn('Invalid status', data['error'])
+        self.assertEqual(data['error']['code'], 'VALIDATION_ERROR')
+        self.assertIn('Invalid status', data['error']['message'])
+        self.assertIn('timestamp', data['meta'])
 
     def test_rejects_invalid_hold_type(self):
-        """Invalid hold_type should return 400."""
+        """Invalid hold_type should return 400 with error envelope."""
         response = self.client.get('/api/wip/overview/matrix?status=HOLD&hold_type=oops')
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(data['success'])
-        self.assertIn('Invalid hold_type', data['error'])
+        self.assertEqual(data['error']['code'], 'VALIDATION_ERROR')
+        self.assertIn('Invalid hold_type', data['error']['message'])
+        self.assertIn('timestamp', data['meta'])
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_matrix')
     def test_passes_filters_to_service(self, mock_get_matrix):
@@ -362,22 +369,26 @@ class TestDetailRoute(TestWipRoutesBase):
         self.assertFalse(data['success'])
 
     def test_rejects_invalid_status(self):
-        """Invalid status should return 400."""
+        """Invalid status should return 400 with error envelope."""
         response = self.client.get('/api/wip/detail/焊接_DB?status=INVALID')
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(data['success'])
-        self.assertIn('Invalid status', data['error'])
+        self.assertEqual(data['error']['code'], 'VALIDATION_ERROR')
+        self.assertIn('Invalid status', data['error']['message'])
+        self.assertIn('timestamp', data['meta'])
 
     def test_rejects_invalid_hold_type(self):
-        """Invalid hold_type should return 400."""
+        """Invalid hold_type should return 400 with error envelope."""
         response = self.client.get('/api/wip/detail/焊接_DB?status=HOLD&hold_type=oops')
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(data['success'])
-        self.assertIn('Invalid hold_type', data['error'])
+        self.assertEqual(data['error']['code'], 'VALIDATION_ERROR')
+        self.assertIn('Invalid hold_type', data['error']['message'])
+        self.assertIn('timestamp', data['meta'])
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_detail')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 7))

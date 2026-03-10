@@ -741,7 +741,10 @@ class TestEngineDecompositionDateRange:
         assert captured["sql_name"] == cache_svc._REJECT_PRIMARY_SQL_TEMPLATE
         assert "offset" not in (captured["params"] or {})
         assert "limit" not in (captured["params"] or {})
-        assert captured["merge_kwargs"] == {}
+        assert captured["merge_kwargs"] == {
+            "max_total_rows": cache_svc._REJECT_ENGINE_MAX_TOTAL_ROWS,
+            "overflow_mode": "error",
+        }
 
     def test_direct_path_uses_primary_sql_without_offset_limit(self, monkeypatch):
         """Direct path should execute dedicated primary SQL without list pagination binds."""

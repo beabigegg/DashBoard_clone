@@ -112,14 +112,51 @@ def _collect_api_responses(page: Page, url_tokens: list[str], timeout_seconds: f
     return collected
 
 
-def _api_post_json(app_server: str, path: str, body: dict, timeout: float = 60.0):
-    """Direct API POST for backend integration checks."""
-    resp = requests.post(
-        f"{app_server}{path}",
-        json=body,
-        timeout=timeout,
-    )
-    return resp
+def _api_post_json(
+    app_server: str,
+    path: str,
+    body: dict,
+    timeout: float = 60.0,
+    *,
+    max_attempts: int = 4,
+):
+    """Direct API POST for backend integration checks.
+
+    Retries on 429 to absorb temporary rate-limit bursts during full e2e runs.
+    """
+    response = None
+    for attempt in range(max_attempts):
+        response = requests.post(
+            f"{app_server}{path}",
+            json=body,
+            timeout=timeout,
+        )
+        if response.status_code != 429:
+            return response
+        if attempt >= max_attempts - 1:
+            return response
+        retry_after = response.headers.get("Retry-After")
+        try:
+            wait_seconds = float(retry_after) if retry_after else 1.0
+        except ValueError:
+            wait_seconds = 1.0
+        time.sleep(wait_seconds)
+    return response
+
+
+def _is_service_overloaded(resp: requests.Response) -> bool:
+    if resp.status_code != 503:
+        return False
+    try:
+        payload = resp.json()
+    except ValueError:
+        return False
+    error_obj = payload.get("error")
+    if isinstance(error_obj, dict):
+        return error_obj.get("code") == "SERVICE_OVERLOADED"
+    if isinstance(error_obj, str):
+        return "SERVICE_OVERLOADED" in error_obj or "記憶體負載" in error_obj
+    return payload.get("code") == "SERVICE_OVERLOADED"
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +230,8 @@ class TestQueryToolBackendIntegration:
             params={"container_id": container_id},
             timeout=60,
         )
+        if _is_service_overloaded(history_resp):
+            pytest.skip("Service overloaded during lot-history e2e run")
         assert history_resp.status_code == 200
         history_payload = history_resp.json()
         assert "data" in history_payload

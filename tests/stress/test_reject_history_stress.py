@@ -42,13 +42,18 @@ class TestRejectHistoryLongRangeStress:
     def _run_query(base_url: str, timeout: float, seed: int) -> tuple[bool, float, str]:
         start = time.time()
         try:
-            year = 2024 + (seed % 2)
+            start_date = os.environ.get("STRESS_REJECT_HISTORY_START_DATE")
+            end_date = os.environ.get("STRESS_REJECT_HISTORY_END_DATE")
+            if not start_date or not end_date:
+                year = 2024 + (seed % 2)
+                start_date = f"{year}-01-01"
+                end_date = f"{year}-07-09"
             response = requests.post(
                 f"{base_url}/api/reject-history/query",
                 json={
                     "mode": "date_range",
-                    "start_date": f"{year}-01-01",
-                    "end_date": f"{year}-07-09",
+                    "start_date": start_date,
+                    "end_date": end_date,
                     "exclude_material_scrap": True,
                     "exclude_pb_diode": True,
                 },

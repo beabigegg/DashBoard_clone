@@ -202,6 +202,34 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertTrue(payload['success'])
         mock_execute.assert_called_once()
 
+    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
+    def test_query_returns_503_when_primary_overload(self, mock_execute):
+        from mes_dashboard.services.reject_dataset_cache import RejectPrimaryQueryOverloadError
+
+        mock_execute.side_effect = RejectPrimaryQueryOverloadError(
+            "同條件查詢正在執行中，請稍後重試",
+            code="QUERY_IN_FLIGHT",
+            retry_after=5,
+        )
+
+        response = self.client.post(
+            '/api/reject-history/query',
+            json={
+                'mode': 'date_range',
+                'start_date': '2025-01-01',
+                'end_date': '2025-07-09',
+                'include_excluded_scrap': False,
+                'exclude_material_scrap': True,
+                'exclude_pb_diode': True,
+            },
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(payload['success'])
+        self.assertEqual(payload['code'], 'QUERY_IN_FLIGHT')
+        self.assertEqual(response.headers.get('Retry-After'), '5')
+
     @patch('mes_dashboard.routes.reject_history_routes.query_trend')
     def test_trend_invalid_granularity_returns_400(self, mock_trend):
         mock_trend.side_effect = ValueError('Invalid granularity. Use day, week, or month')

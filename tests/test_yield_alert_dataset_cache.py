@@ -26,7 +26,6 @@ def test_execute_primary_query_returns_cached_query_id(monkeypatch):
 
 def test_execute_primary_query_loads_and_stores_when_cache_miss(monkeypatch):
     calls: dict[str, bool] = {"stored": False}
-    move_df = pd.DataFrame([{"DATE_BUCKET": "2026-02-21", "DEPARTMENT_NAME": "焊接_WB", "TRANSACTION_QTY": 100.0}])
     detail_df = pd.DataFrame(
         [
             {
@@ -36,6 +35,7 @@ def test_execute_primary_query_loads_and_stores_when_cache_miss(monkeypatch):
                 "REASON_NAME": "031_TEST",
                 "DEPARTMENT_NAME": "焊接_WB",
                 "DEPARTMENT_GROUP": "焊接_WB",
+                "PROCESS_CATEGORY": "WB",
                 "LINE_NAME": "L1",
                 "PACKAGE_NAME": "PKG",
                 "TYPE_NAME": "TYPE",
@@ -49,15 +49,12 @@ def test_execute_primary_query_loads_and_stores_when_cache_miss(monkeypatch):
             }
         ]
     )
-    linkage_df = pd.DataFrame([{"CANONICAL_KEY": "2026-02-21|WO-1|031", "REJECT_TOTAL_QTY": 1.0}])
 
     monkeypatch.setattr(dataset_cache, "_get_cached_payload", lambda _query_id: None)
-    monkeypatch.setattr(dataset_cache, "_load_primary_move_df", lambda *_args, **_kwargs: move_df)
     monkeypatch.setattr(dataset_cache, "_load_primary_detail_df", lambda *_args, **_kwargs: detail_df)
-    monkeypatch.setattr(dataset_cache, "_build_linkage_df", lambda *_args, **_kwargs: linkage_df)
 
-    def _fake_store(query_id, *, move_df, detail_df, linkage_df):  # noqa: ANN001
-        if query_id and not move_df.empty and not detail_df.empty and not linkage_df.empty:
+    def _fake_store(query_id, *, detail_df, linkage_df):  # noqa: ANN001
+        if query_id and not detail_df.empty and linkage_df is not None:
             calls["stored"] = True
 
     monkeypatch.setattr(dataset_cache, "_store_payload", _fake_store)
@@ -89,6 +86,7 @@ def test_apply_view_uses_cached_data_for_secondary_filters(monkeypatch):
                 "REASON_NAME": "031_腳架氧化",
                 "DEPARTMENT_NAME": "焊接_WB",
                 "DEPARTMENT_GROUP": "焊接_WB",
+                "PROCESS_CATEGORY": "WB",
                 "LINE_NAME": "L1",
                 "PACKAGE_NAME": "PKG-A",
                 "TYPE_NAME": "TYPE-A",
@@ -107,6 +105,7 @@ def test_apply_view_uses_cached_data_for_secondary_filters(monkeypatch):
                 "REASON_NAME": "(UNMAPPED)",
                 "DEPARTMENT_NAME": "焊接_WB",
                 "DEPARTMENT_GROUP": "焊接_WB",
+                "PROCESS_CATEGORY": "WB",
                 "LINE_NAME": "L1",
                 "PACKAGE_NAME": "PKG-A",
                 "TYPE_NAME": "TYPE-A",
@@ -125,6 +124,7 @@ def test_apply_view_uses_cached_data_for_secondary_filters(monkeypatch):
                 "REASON_NAME": "031_腳架氧化",
                 "DEPARTMENT_NAME": "成型",
                 "DEPARTMENT_GROUP": "成型",
+                "PROCESS_CATEGORY": "OTHER",
                 "LINE_NAME": "L9",
                 "PACKAGE_NAME": "PKG-Z",
                 "TYPE_NAME": "TYPE-Z",
@@ -154,7 +154,7 @@ def test_apply_view_uses_cached_data_for_secondary_filters(monkeypatch):
     )
 
     assert result is not None
-    assert round(result["summary"]["transaction_qty"], 3) == 14039.147
+    assert round(result["summary"]["transaction_qty"], 3) == 14239.147
     assert round(result["summary"]["scrap_qty"], 3) == 17.155
     assert result["alerts"]["pagination"]["total"] == 1
     assert result["alerts"]["items"][0]["department"] == "焊接_WB"
@@ -167,6 +167,5 @@ def test_apply_view_uses_cached_data_for_secondary_filters(monkeypatch):
         min_scrap_qty=0,
     )
     assert with_line_filter["alerts"]["pagination"]["total"] == 0
-    assert round(with_line_filter["summary"]["transaction_qty"], 3) == 14039.147
+    assert round(with_line_filter["summary"]["transaction_qty"], 3) == 14239.147
     assert round(with_line_filter["summary"]["scrap_qty"], 3) == 17.155
-

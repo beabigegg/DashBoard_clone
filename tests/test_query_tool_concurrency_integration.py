@@ -98,7 +98,7 @@ class TestQueryToolConcurrencyIntegration:
         app,
     ):
         """Concurrent mixed batch endpoints should preserve response contract."""
-        mock_history_batch.side_effect = lambda cids, workcenter_groups=None: {
+        mock_history_batch.side_effect = lambda cids, workcenter_groups=None, **_kwargs: {
             "data": [
                 {
                     "CONTAINERID": cid,
@@ -108,7 +108,7 @@ class TestQueryToolConcurrencyIntegration:
             ],
             "total": len(cids),
         }
-        mock_assoc_batch.side_effect = lambda cids, assoc_type: {
+        mock_assoc_batch.side_effect = lambda cids, assoc_type, **_kwargs: {
             "data": [
                 {"CONTAINERID": cid, "TYPE": assoc_type}
                 for cid in cids

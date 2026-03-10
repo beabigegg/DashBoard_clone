@@ -1,49 +1,134 @@
-# MES Dashboard - API 重構計畫 (v1.0)
+# MES Dashboard — API Contract Migration Plan (v2.0)
 
-##### **1. 目標與策略**
-
-本計畫的目標是將專案中所有 API 端點的實現，統一至 `api_development_contract.md` 所定義的規範。
-
-我們採用**漸進式重構策略**：
-*   **立即生效**：所有**新開發**的 API 端點必須嚴格遵守新契約。
-*   **分批修復**：對於既有端點，我們將分批次、按優先級進行重構。
+> Updated by: api-contract-unification change (openspec/changes/api-contract-unification)
+> Previous version: v1.0 (single-task plan)
 
 ---
 
-##### **2. 重構任務**
+## 1. Target State
 
-###### **任務 1: `wip_routes.py` 重構 (高優先級)**
+All standard JSON API endpoints SHALL return the unified response envelope defined in
+`api_development_contract.md`:
 
-*   **目標**：將此核心模組中所有手動的 `jsonify` 呼叫，替換為 `core/response.py` 的輔助函式。
-*   **執行步驟**：
-    1.  在檔案頂部引入所需函式：`from mes_dashboard.core.response import success_response, validation_error, not_found_error, internal_error`。
-    2.  將 `return jsonify({'success': True, 'data': result})` 替換為 `return success_response(result)`。
-    3.  將 `return jsonify({'success': False, 'error': 'Invalid status...'}), 400` 替換為 `return validation_error('Invalid status...')`。
-    4.  將 `return jsonify({'success': False, 'error': '查詢失敗'}), 500` 替換為 `return internal_error()`。可以的話，根據上下文替換為更精確的錯誤，例如 `db_query_error()`。
-    5.  將 `return jsonify({'success': False, 'error': '找不到此批號'}), 404` 替換為 `return not_found_error('找不到此批號')`。
+```json
+// Success
+{ "success": true, "data": <payload>, "meta": { "timestamp": "<iso>" } }
 
-###### **任務 2: `health_routes.py` 處理 (中優先級)**
+// Error
+{ "success": false, "error": { "code": "<ERROR_CODE>", "message": "<human>" }, "meta": { "timestamp": "<iso>" } }
+```
 
-*   **目標**：評估並決定此特殊端點的處理方式。
-*   **執行步驟**：
-    1.  **評估依賴**：確認是否有外部的監控系統（如 Prometheus, Datadog）正在使用 `/health` 或 `/health/deep` 端點，並且依賴其目前**完全自訂**的 JSON 結構。
-    2.  **決策與執行**：
-        *   **如果存在外部依賴**：我們應將此端點視為一個**特例**。在契約文件中明確標註 `health_routes.py` 因外部整合需求，可不遵循標準回應外層 (envelope)，但內部仍應盡可能使用標準的錯誤處理邏輯。
-        *   **如果不存在外部依賴**：為了內部一致性，應進行重構。將其巨大的回應內容整個作為 `data` 欄位的值，並用 `success_response` 包裝。
-            *   **範例**: `return success_response({ 'status': status, 'services': services, ... })`。
+Helpers in `src/mes_dashboard/core/response.py` MUST be used for all standard endpoints.
+Manual `jsonify(...)` calls are prohibited in the `standard-json` migration scope.
 
-###### **任務 3: 審計並重構其餘所有路由檔案 (持續性任務)**
+---
 
-*   **目標**：將契約規範應用於專案的所有 API 端點。
-*   **執行步驟**：
-    1.  建立一個包含所有路由檔案的檢查清單。
-    2.  按照「順便重構」原則，或在團隊有空閒時間時，逐一對清單中的檔案執行與「任務 1」相同的重構步驟。
-    *   **檢查清單**:
-        *   [ ] `admin_routes.py`
-        *   [ ] `auth_routes.py`
-        *   [ ] `dashboard_routes.py`
-        *   [ ] `excel_query_routes.py`
-        *   [ ] `hold_history_routes.py`
-        *   [ ] `hold_overview_routes.py`
-        *   [ ] `hold_routes.py`
-        *   [ ] (依此類推，列出所有檔案)
+## 2. Endpoint Classification
+
+| Class | Description | Contract Rule |
+|-------|-------------|---------------|
+| `standard-json` | Regular JSON API endpoints (all `*_routes.py` except health) | Must use envelope helpers |
+| `health-exception` | `/health`, `/health/deep`, `/health/frontend-shell` | Keep top-level payload; NO envelope wrapping |
+| `stream-download-exception` | CSV/NDJSON/file streaming endpoints | Success: keep stream; Error responses: use envelope |
+| `legacy-transition` | `app.py` inline APIs (`/api/query_table`, etc.) | Documented as temporary exceptions; retire in Wave D |
+
+---
+
+## 3. Migration Waves
+
+### Wave A — `wip_routes.py` ✅ COMPLETE
+
+**Files changed:**
+- `src/mes_dashboard/routes/wip_routes.py` — all 25 `jsonify` calls replaced with helpers
+- `src/mes_dashboard/core/response.py` — added `CACHE_EXPIRED`, `CACHE_MISS` error codes + helpers
+- `tests/test_wip_routes.py` — updated assertions to verify `error.code`/`error.message` envelope
+- `tests/test_api_contract.py` — new contract guardrail tests (zero-jsonify, baseline regression, envelope shape, health exception)
+- `src/mes_dashboard/routes/health_routes.py` — added contract exception notation
+
+**Acceptance criteria met:**
+- [x] Zero manual `jsonify` in `wip_routes.py`
+- [x] All success responses via `success_response(...)`
+- [x] All error responses via `validation_error(...)` / `not_found_error(...)` / `internal_error(...)`
+- [x] Health endpoints protected with exception notation and contract tests
+- [x] Rate-limit 429 already uses error envelope (via `rate_limit.py`)
+- [x] Frontend `api.js` backward-compatible (handles both old string and new object error formats)
+- [x] No regression in pages not using wip routes
+
+---
+
+### Wave B — High-flow standard-JSON routes (planned)
+
+**Recommended order:** `resource_routes.py` → `dashboard_routes.py` → `hold_routes.py` + `hold_overview_routes.py`
+
+**Start condition:** Wave A tests green, no frontend regression.
+
+**Each file requires:**
+1. Replace `jsonify({'success': True, 'data': ...})` → `success_response(...)`
+2. Replace `jsonify({'success': False, 'error': '...'})` → `validation_error/not_found_error/internal_error`
+3. Update corresponding tests
+4. Update `_JSONIFY_BASELINE` in `test_api_contract.py` to reflect new lower counts
+
+---
+
+### Wave C — Cache-signal routes + coordinated frontend migration (planned)
+
+**Scope:** Routes emitting `cache_expired`/`cache_miss` string signals:
+- `hold_history_routes.py`
+- `reject_history_routes.py`
+- `resource_history_routes.py`
+- `yield_alert_routes.py`
+
+**Frontend pages to update simultaneously:**
+- `frontend/src/reject-history/App.vue` — lines checking `resp?.error === 'cache_miss'` / `'cache_expired'`
+- `frontend/src/hold-history/App.vue`
+- `frontend/src/resource-history/App.vue`
+- `frontend/src/yield-alert-center/App.vue`
+
+**Migration:** Replace `{"error": "cache_expired"}` → use `cache_expired_error()` helper (code: `CACHE_EXPIRED`).
+Frontend must switch string comparison to `error.errorCode === 'CACHE_EXPIRED'`.
+
+**Start condition:** Wave B complete.
+
+---
+
+### Wave D — Legacy bridge APIs + remaining routes (planned)
+
+**Scope:**
+- `reject_history_routes.py`, `yield_alert_routes.py`, `query_tool_routes.py`, `admin_routes.py`
+- `app.py` inline APIs: `/api/query_table`, `/api/get_table_columns`, `/api/get_table_info`, `/api/portal/navigation`
+
+**Start condition:** Wave C complete.
+
+---
+
+## 4. Helper Quick Reference
+
+See `src/mes_dashboard/core/response.py` module docstring for the full usage guide.
+
+| Scenario | Helper |
+|----------|--------|
+| Success | `success_response(data)` |
+| Validation / bad params | `validation_error(message)` |
+| Not found | `not_found_error(message)` |
+| Internal error | `internal_error(details)` |
+| DB down | `db_connection_error(details)` |
+| Rate limit | `too_many_requests_error()` |
+| Cache expired | `cache_expired_error(details)` |
+| Cache miss | `cache_miss_error(details)` |
+
+---
+
+## 5. Guardrails
+
+- `tests/test_api_contract.py::TestWipRoutesContractCompliance` — zero jsonify in `wip_routes.py`
+- `tests/test_api_contract.py::TestJsonifyBaselineRegression` — total jsonify count must not exceed baseline
+- `tests/test_api_contract.py::TestHealthEndpointContractException` — health endpoints must NOT use envelope
+- `tests/test_api_contract.py::TestStandardJsonEnvelopeShape` — success/error envelope shape verified
+
+---
+
+## 6. Rollback Strategy
+
+- Each wave = one git commit group (route file + tests + frontend if applicable)
+- Revert a wave by reverting its commit group
+- Health endpoints are never touched; they cannot regress from this migration

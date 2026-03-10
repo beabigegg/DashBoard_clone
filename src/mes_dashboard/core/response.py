@@ -2,6 +2,28 @@
 """Standard API response format utilities for MES Dashboard.
 
 Provides consistent response envelope for all API endpoints.
+
+## Helper Usage Guide
+
+### Scenario → Helper mapping
+
+| Scenario | Helper | HTTP status |
+|----------|--------|-------------|
+| Query/action success | `success_response(data)` | 200 |
+| Invalid param/body | `validation_error(message)` | 400 |
+| Resource not found | `not_found_error(message)` | 404 |
+| Rate limit exceeded | `too_many_requests_error()` | 429 |
+| DB connection down | `db_connection_error(details)` | 503 |
+| DB query timeout | `db_query_timeout_error(details)` | 504 |
+| Circuit breaker open | `circuit_breaker_error(details)` | 503 |
+| DB pool exhausted | `pool_exhausted_error(details)` | 503 |
+| Cache expired | `cache_expired_error(details)` | 410 |
+| Cache miss (not yet loaded) | `cache_miss_error(details)` | 400 |
+| Other server error | `internal_error(details)` | 500 |
+
+### Contract exception endpoints (DO NOT use success_response on these)
+- `/health`, `/health/deep`, `/health/frontend-shell` — keep top-level payload structure
+- CSV/NDJSON/file download success responses — keep streaming format
 """
 
 from __future__ import annotations
@@ -35,6 +57,10 @@ TOO_MANY_REQUESTS = "TOO_MANY_REQUESTS"
 
 # Server errors
 INTERNAL_ERROR = "INTERNAL_ERROR"
+
+# Cache signals (used as flow-control error codes in cache-backed routes)
+CACHE_EXPIRED = "CACHE_EXPIRED"
+CACHE_MISS = "CACHE_MISS"
 
 
 # ============================================================
@@ -258,4 +284,32 @@ def internal_error(details: Optional[str] = None):
         "伺服器內部錯誤",
         details,
         status_code=500
+    )
+
+
+def cache_expired_error(details: Optional[str] = None):
+    """Return a cache expired error response (HTTP 410).
+
+    Use when a cache-backed endpoint detects its cached data has expired
+    and cannot serve the request without a fresh load.
+    """
+    return error_response(
+        CACHE_EXPIRED,
+        "快取資料已過期，請稍後再試",
+        details,
+        status_code=410
+    )
+
+
+def cache_miss_error(details: Optional[str] = None):
+    """Return a cache miss error response (HTTP 400).
+
+    Use when a cache-backed endpoint is queried before its cache has been
+    populated (e.g. initial load not yet complete).
+    """
+    return error_response(
+        CACHE_MISS,
+        "快取資料尚未就緒，請稍後再試",
+        details,
+        status_code=400
     )

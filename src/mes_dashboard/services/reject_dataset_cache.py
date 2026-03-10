@@ -16,6 +16,8 @@ import hashlib
 import json
 import logging
 import os
+import time
+import uuid
 from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
@@ -94,6 +96,15 @@ _REJECT_ENGINE_MAX_RESULT_MB = max(
 _REJECT_ENGINE_SPOOL_TTL_SECONDS = max(
     300, int(os.getenv("REJECT_ENGINE_SPOOL_TTL_SECONDS", "21600"))
 )
+_REJECT_ENGINE_QUERY_LOCK_TTL_SECONDS = max(
+    60, int(os.getenv("REJECT_ENGINE_QUERY_LOCK_TTL_SECONDS", "1200"))
+)
+_REJECT_ENGINE_QUERY_WAIT_SECONDS = max(
+    1, int(os.getenv("REJECT_ENGINE_QUERY_WAIT_SECONDS", "180"))
+)
+_REJECT_ENGINE_QUERY_WAIT_POLL_SECONDS = max(
+    0.1, float(os.getenv("REJECT_ENGINE_QUERY_WAIT_POLL_SECONDS", "1.0"))
+)
 _REJECT_DERIVE_MAX_INPUT_MB = max(
     16, int(os.getenv("REJECT_DERIVE_MAX_INPUT_MB", "96"))
 )
@@ -129,6 +140,15 @@ _REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("reject_dataset", _dataset_cache, "Reject Dataset (L1, 15min)")
+
+
+class RejectPrimaryQueryOverloadError(RuntimeError):
+    """Operational overload guardrail for reject primary query."""
+
+    def __init__(self, message: str, *, code: str, retry_after: int = 30):
+        super().__init__(message)
+        self.code = str(code)
+        self.retry_after = max(1, int(retry_after))
 
 
 def _allow_legacy_fallback(flag_enabled: bool) -> bool:
@@ -218,6 +238,76 @@ def _clear_partial_failure_flag(query_id: str) -> None:
         client.delete(get_key(_partial_failure_key(query_id)))
     except Exception:
         return
+
+
+def _query_lock_key(query_id: str) -> str:
+    return f"{_REDIS_NAMESPACE}:{query_id}:inflight"
+
+
+def _acquire_query_lock(query_id: str, owner: str) -> bool:
+    """Acquire cross-worker single-flight lock; fail-open when Redis is unavailable."""
+    client = get_redis_client()
+    if client is None:
+        return True
+    key = get_key(_query_lock_key(query_id))
+    try:
+        acquired = client.set(
+            key,
+            owner,
+            nx=True,
+            ex=_REJECT_ENGINE_QUERY_LOCK_TTL_SECONDS,
+        )
+        return bool(acquired)
+    except Exception as exc:
+        logger.warning("Query lock acquisition failed (query_id=%s): %s", query_id, exc)
+        return True
+
+
+def _release_query_lock(query_id: str, owner: str) -> None:
+    client = get_redis_client()
+    if client is None:
+        return
+    key = get_key(_query_lock_key(query_id))
+    try:
+        current = client.get(key)
+        if current is None:
+            return
+        if isinstance(current, bytes):
+            current = current.decode("utf-8", errors="ignore")
+        if str(current) == str(owner):
+            client.delete(key)
+    except Exception as exc:
+        logger.warning("Query lock release failed (query_id=%s): %s", query_id, exc)
+
+
+def _is_query_lock_active(query_id: str) -> bool:
+    client = get_redis_client()
+    if client is None:
+        return False
+    key = get_key(_query_lock_key(query_id))
+    try:
+        return bool(client.exists(key))
+    except Exception:
+        return False
+
+
+def _wait_for_inflight_query_result(query_id: str) -> Optional[pd.DataFrame]:
+    """Wait for in-flight owner to finish and publish cache."""
+    deadline = time.monotonic() + float(_REJECT_ENGINE_QUERY_WAIT_SECONDS)
+    poll = float(_REJECT_ENGINE_QUERY_WAIT_POLL_SECONDS)
+    while time.monotonic() < deadline:
+        cached_df = _get_cached_df(query_id)
+        if cached_df is not None:
+            return cached_df
+        if not _is_query_lock_active(query_id):
+            return None
+        time.sleep(poll)
+
+    raise RejectPrimaryQueryOverloadError(
+        "同條件查詢仍在執行中，請稍後重試",
+        code="QUERY_IN_FLIGHT_TIMEOUT",
+        retry_after=max(3, int(round(poll))),
+    )
 
 
 # ============================================================
@@ -471,192 +561,236 @@ def execute_primary_query(
     }
     query_id = _make_query_id(query_id_input)
 
-    # ---- Check cache first ----
-    cached_df = _get_cached_df(query_id)
-    if cached_df is not None:
-        logger.info("Dataset cache hit for query_id=%s", query_id)
+    def _build_response_from_cache(df: pd.DataFrame) -> Dict[str, Any]:
         cached_partial_meta = _load_partial_failure_flag(query_id)
+        response_meta = dict(meta)
         if cached_partial_meta:
-            meta.update(cached_partial_meta)
-        filtered = _apply_policy_filters(
-            cached_df,
+            response_meta.update(cached_partial_meta)
+        filtered_df = _apply_policy_filters(
+            df,
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
         )
-        return _build_primary_response(
-            query_id, filtered, meta, resolution_info
-        )
+        return _build_primary_response(query_id, filtered_df, response_meta, resolution_info)
 
-    # ---- Execute Oracle query (NO policy filters — cache unfiltered) ----
-    logger.info("Dataset cache miss for query_id=%s, querying Oracle", query_id)
+    # ---- Check cache first ----
+    cached_df = _get_cached_df(query_id)
+    if cached_df is not None:
+        logger.info("Dataset cache hit for query_id=%s", query_id)
+        return _build_response_from_cache(cached_df)
 
-    # Decide whether to route through BatchQueryEngine
-    from mes_dashboard.services.batch_query_engine import (
-        decompose_by_time_range,
-        decompose_by_ids,
-        execute_plan,
-        merge_chunks,
-        get_batch_progress,
-        compute_query_hash,
-        should_decompose_by_time,
-        should_decompose_by_ids,
-        BATCH_QUERY_TIME_THRESHOLD_DAYS,
-    )
-
-    use_engine = False
-    engine_chunks: Optional[list] = None
-    engine_parallel = 1
-    engine_hash: Optional[str] = None
-    partial_failure_meta: Dict[str, Any] = {}
-
-    if mode == "date_range" and should_decompose_by_time(start_date, end_date):
-        engine_chunks = decompose_by_time_range(
-            start_date,
-            end_date,
-            grain_days=_REJECT_ENGINE_GRAIN_DAYS,
-        )
-        engine_parallel = _REJECT_ENGINE_PARALLEL
-        use_engine = True
-        logger.info(
-            "Engine activated for date_range: %d chunks (query_id=%s, grain_days=%d, parallel=%d)",
-            len(engine_chunks), query_id, _REJECT_ENGINE_GRAIN_DAYS, engine_parallel,
-        )
-    elif mode == "container" and should_decompose_by_ids(container_ids):
-        id_batches = decompose_by_ids(container_ids)
-        engine_chunks = [{"ids": batch} for batch in id_batches]
-        use_engine = True
-        logger.info(
-            "Engine activated for container IDs: %d batches (query_id=%s)",
-            len(engine_chunks), query_id,
-        )
-
-    if use_engine and engine_chunks:
-        # --- Engine path ---
-        engine_hash = compute_query_hash(query_id_input)
-        redis_clear_batch("reject", engine_hash)
-        logger.info(
-            "Reject primary SQL selected for engine execution (template=%s, chunks=%d)",
-            _REJECT_PRIMARY_SQL_TEMPLATE,
-            len(engine_chunks),
-        )
-
-        def _run_reject_chunk(chunk, max_rows_per_chunk=None):
-            """Execute one reject chunk via dedicated primary SQL."""
-            chunk_where_parts: List[str] = []
-            chunk_params: Dict[str, Any] = {}
-            chunk_wf_filter = ""
-
-            if "chunk_start" in chunk:
-                # Time-range chunk
-                chunk_where_parts.append(
-                    "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
-                    " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+    lock_owner = f"{os.getpid()}:{uuid.uuid4().hex}"
+    has_query_lock = False
+    try:
+        has_query_lock = _acquire_query_lock(query_id, lock_owner)
+        if not has_query_lock:
+            logger.info("Reject query in-flight, waiting for existing run (query_id=%s)", query_id)
+            waited_df = _wait_for_inflight_query_result(query_id)
+            if waited_df is not None:
+                logger.info("Reject query reused completed in-flight result (query_id=%s)", query_id)
+                return _build_response_from_cache(waited_df)
+            has_query_lock = _acquire_query_lock(query_id, lock_owner)
+            if not has_query_lock:
+                raise RejectPrimaryQueryOverloadError(
+                    "同條件查詢正在執行中，請稍後重試",
+                    code="QUERY_IN_FLIGHT",
+                    retry_after=5,
                 )
-                chunk_params["start_date"] = chunk["chunk_start"]
-                chunk_params["end_date"] = chunk["chunk_end"]
-            elif "ids" in chunk:
-                # ID-batch chunk
-                b = QueryBuilder()
-                b.add_in_condition("r.CONTAINERID", chunk["ids"])
-                cid_w, cid_p = b.build_where_only()
-                cid_c = cid_w.strip()
-                if cid_c.upper().startswith("WHERE "):
-                    cid_c = cid_c[6:].strip()
-                chunk_where_parts.append(cid_c)
-                chunk_params.update(cid_p)
-                # Workflow filter for container mode
-                wfb = QueryBuilder()
-                wfb.add_in_condition("r0.CONTAINERID", chunk["ids"])
-                wf_w, _ = wfb.build_where_only()
-                wf_c = wf_w.strip()
-                if wf_c.upper().startswith("WHERE "):
-                    wf_c = wf_c[6:].strip()
-                chunk_wf_filter = wf_c
 
-            chunk_where = " AND ".join(chunk_where_parts)
-            chunk_sql = _prepare_sql(
+        cached_df = _get_cached_df(query_id)
+        if cached_df is not None:
+            logger.info("Dataset cache hit after lock for query_id=%s", query_id)
+            return _build_response_from_cache(cached_df)
+
+        # ---- Execute Oracle query (NO policy filters — cache unfiltered) ----
+        logger.info("Dataset cache miss for query_id=%s, querying Oracle", query_id)
+
+        # Decide whether to route through BatchQueryEngine
+        from mes_dashboard.services.batch_query_engine import (
+            MergeChunksMaxRowsExceeded,
+            compute_query_hash,
+            decompose_by_ids,
+            decompose_by_time_range,
+            execute_plan,
+            get_batch_progress,
+            merge_chunks,
+            should_decompose_by_ids,
+            should_decompose_by_time,
+        )
+
+        use_engine = False
+        engine_chunks: Optional[list] = None
+        engine_parallel = 1
+        engine_hash: Optional[str] = None
+        partial_failure_meta: Dict[str, Any] = {}
+
+        if mode == "date_range" and should_decompose_by_time(start_date, end_date):
+            engine_chunks = decompose_by_time_range(
+                start_date,
+                end_date,
+                grain_days=_REJECT_ENGINE_GRAIN_DAYS,
+            )
+            engine_parallel = _REJECT_ENGINE_PARALLEL
+            use_engine = True
+            logger.info(
+                "Engine activated for date_range: %d chunks (query_id=%s, grain_days=%d, parallel=%d)",
+                len(engine_chunks), query_id, _REJECT_ENGINE_GRAIN_DAYS, engine_parallel,
+            )
+        elif mode == "container" and should_decompose_by_ids(container_ids):
+            id_batches = decompose_by_ids(container_ids)
+            engine_chunks = [{"ids": batch} for batch in id_batches]
+            use_engine = True
+            logger.info(
+                "Engine activated for container IDs: %d batches (query_id=%s)",
+                len(engine_chunks), query_id,
+            )
+
+        if use_engine and engine_chunks:
+            # --- Engine path ---
+            engine_hash = compute_query_hash(query_id_input)
+            redis_clear_batch("reject", engine_hash)
+            logger.info(
+                "Reject primary SQL selected for engine execution (template=%s, chunks=%d)",
+                _REJECT_PRIMARY_SQL_TEMPLATE,
+                len(engine_chunks),
+            )
+
+            def _run_reject_chunk(chunk, max_rows_per_chunk=None):
+                """Execute one reject chunk via dedicated primary SQL."""
+                chunk_where_parts: List[str] = []
+                chunk_params: Dict[str, Any] = {}
+                chunk_wf_filter = ""
+
+                if "chunk_start" in chunk:
+                    # Time-range chunk
+                    chunk_where_parts.append(
+                        "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
+                        " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+                    )
+                    chunk_params["start_date"] = chunk["chunk_start"]
+                    chunk_params["end_date"] = chunk["chunk_end"]
+                elif "ids" in chunk:
+                    # ID-batch chunk
+                    b = QueryBuilder()
+                    b.add_in_condition("r.CONTAINERID", chunk["ids"])
+                    cid_w, cid_p = b.build_where_only()
+                    cid_c = cid_w.strip()
+                    if cid_c.upper().startswith("WHERE "):
+                        cid_c = cid_c[6:].strip()
+                    chunk_where_parts.append(cid_c)
+                    chunk_params.update(cid_p)
+                    # Workflow filter for container mode
+                    wfb = QueryBuilder()
+                    wfb.add_in_condition("r0.CONTAINERID", chunk["ids"])
+                    wf_w, _ = wfb.build_where_only()
+                    wf_c = wf_w.strip()
+                    if wf_c.upper().startswith("WHERE "):
+                        wf_c = wf_c[6:].strip()
+                    chunk_wf_filter = wf_c
+
+                chunk_where = " AND ".join(chunk_where_parts)
+                chunk_sql = _prepare_sql(
+                    _REJECT_PRIMARY_SQL_TEMPLATE,
+                    where_clause="",
+                    base_variant="lot",
+                    base_where=chunk_where,
+                    workflow_filter=chunk_wf_filter,
+                )
+                if max_rows_per_chunk:
+                    logger.debug(
+                        "Reject chunk execution ignores max_rows_per_chunk on primary SQL path "
+                        "(max_rows_per_chunk=%s)",
+                        max_rows_per_chunk,
+                    )
+                chunk_df = read_sql_df(chunk_sql, chunk_params)
+                if chunk_df is None:
+                    return pd.DataFrame()
+                return chunk_df
+
+            try:
+                execute_plan(
+                    engine_chunks,
+                    _run_reject_chunk,
+                    parallel=engine_parallel,
+                    skip_cached=False,
+                    query_hash=engine_hash,
+                    cache_prefix="reject",
+                    chunk_ttl=_CACHE_TTL,
+                    max_rows_per_chunk=_REJECT_ENGINE_MAX_ROWS_PER_CHUNK,
+                )
+                try:
+                    df = merge_chunks(
+                        "reject",
+                        engine_hash,
+                        max_total_rows=_REJECT_ENGINE_MAX_TOTAL_ROWS,
+                        overflow_mode="error",
+                    )
+                except MergeChunksMaxRowsExceeded as exc:
+                    logger.warning(
+                        "Reject primary query exceeded max_total_rows=%d (query_id=%s, observed_rows=%d)",
+                        _REJECT_ENGINE_MAX_TOTAL_ROWS,
+                        query_id,
+                        exc.observed_rows,
+                    )
+                    raise RejectPrimaryQueryOverloadError(
+                        f"查詢結果超過上限（{_REJECT_ENGINE_MAX_TOTAL_ROWS:,} 筆），請縮小條件後重試",
+                        code="RESULT_TOO_LARGE",
+                        retry_after=15,
+                    ) from exc
+                progress_meta = get_batch_progress("reject", engine_hash) or {}
+                progress_partial = parse_partial_failure_meta(progress_meta)
+                if progress_partial:
+                    partial_failure_meta = progress_partial
+            finally:
+                redis_clear_batch("reject", engine_hash)
+        else:
+            # --- Direct path (short query, no engine overhead) ---
+            logger.info(
+                "Reject primary SQL selected for direct execution (template=%s)",
+                _REJECT_PRIMARY_SQL_TEMPLATE,
+            )
+            sql = _prepare_sql(
                 _REJECT_PRIMARY_SQL_TEMPLATE,
                 where_clause="",
                 base_variant="lot",
-                base_where=chunk_where,
-                workflow_filter=chunk_wf_filter,
+                base_where=base_where,
+                workflow_filter=workflow_filter,
             )
-            if max_rows_per_chunk:
-                logger.debug(
-                    "Reject chunk execution ignores max_rows_per_chunk on primary SQL path "
-                    "(max_rows_per_chunk=%s)",
-                    max_rows_per_chunk,
+            df = read_sql_df(sql, base_params)
+            if df is None:
+                df = pd.DataFrame()
+
+        # ---- Cache unfiltered, return filtered ----
+        if partial_failure_meta:
+            meta.update(partial_failure_meta)
+
+        stored_via_spool = False
+        if not df.empty:
+            stored_via_spool = _store_query_result(query_id, df)
+            if partial_failure_meta.get("has_partial_failure"):
+                flag_ttl = (
+                    _REJECT_ENGINE_SPOOL_TTL_SECONDS if stored_via_spool else _CACHE_TTL
                 )
-            chunk_df = read_sql_df(chunk_sql, chunk_params)
-            if chunk_df is None:
-                return pd.DataFrame()
-            return chunk_df
+                _store_partial_failure_flag(
+                    query_id,
+                    partial_failure_meta.get("failed_chunk_count", 0),
+                    partial_failure_meta.get("failed_ranges"),
+                    flag_ttl,
+                )
+            else:
+                _clear_partial_failure_flag(query_id)
 
-        execute_plan(
-            engine_chunks,
-            _run_reject_chunk,
-            parallel=engine_parallel,
-            skip_cached=False,
-            query_hash=engine_hash,
-            cache_prefix="reject",
-            chunk_ttl=_CACHE_TTL,
-            max_rows_per_chunk=_REJECT_ENGINE_MAX_ROWS_PER_CHUNK,
+        filtered = _apply_policy_filters(
+            df,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
         )
-        df = merge_chunks(
-            "reject",
-            engine_hash,
-        )
-        progress_meta = get_batch_progress("reject", engine_hash) or {}
-        progress_partial = parse_partial_failure_meta(progress_meta)
-        if progress_partial:
-            partial_failure_meta = progress_partial
-    else:
-        # --- Direct path (short query, no engine overhead) ---
-        logger.info(
-            "Reject primary SQL selected for direct execution (template=%s)",
-            _REJECT_PRIMARY_SQL_TEMPLATE,
-        )
-        sql = _prepare_sql(
-            _REJECT_PRIMARY_SQL_TEMPLATE,
-            where_clause="",
-            base_variant="lot",
-            base_where=base_where,
-            workflow_filter=workflow_filter,
-        )
-        df = read_sql_df(sql, base_params)
-        if df is None:
-            df = pd.DataFrame()
-
-    # ---- Cache unfiltered, return filtered ----
-    if partial_failure_meta:
-        meta.update(partial_failure_meta)
-
-    stored_via_spool = False
-    if not df.empty:
-        stored_via_spool = _store_query_result(query_id, df)
-        if partial_failure_meta.get("has_partial_failure"):
-            flag_ttl = (
-                _REJECT_ENGINE_SPOOL_TTL_SECONDS if stored_via_spool else _CACHE_TTL
-            )
-            _store_partial_failure_flag(
-                query_id,
-                partial_failure_meta.get("failed_chunk_count", 0),
-                partial_failure_meta.get("failed_ranges"),
-                flag_ttl,
-            )
-        else:
-            _clear_partial_failure_flag(query_id)
-    if engine_hash:
-        redis_clear_batch("reject", engine_hash)
-
-    filtered = _apply_policy_filters(
-        df,
-        include_excluded_scrap=include_excluded_scrap,
-        exclude_material_scrap=exclude_material_scrap,
-        exclude_pb_diode=exclude_pb_diode,
-    )
-    return _build_primary_response(query_id, filtered, meta, resolution_info)
+        return _build_primary_response(query_id, filtered, meta, resolution_info)
+    finally:
+        if has_query_lock:
+            _release_query_lock(query_id, lock_owner)
 
 
 def _apply_policy_filters(

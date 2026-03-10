@@ -149,16 +149,20 @@ def _build_heatmap_data(
         return []
 
     # Vectorized date bucketing — avoids per-row Python lambda on large DataFrames
-    date_str_tx = _vectorized_bucket(tx_df["DATE_BUCKET"], granularity)
-    tx_grouped = tx_df.groupby([date_str_tx, tx_df["DEPARTMENT_GROUP"]], as_index=False)["TRANSACTION_QTY"].sum()
-    tx_grouped.columns = ["DATE_STR", "DEPARTMENT_GROUP", "TRANSACTION_QTY"]
+    tx_bucketed = tx_df.copy()
+    tx_bucketed["DATE_STR"] = _vectorized_bucket(tx_bucketed["DATE_BUCKET"], granularity)
+    tx_grouped = (
+        tx_bucketed.groupby(["DATE_STR", "DEPARTMENT_GROUP"], as_index=False)["TRANSACTION_QTY"].sum()
+    )
 
     if scrap_df.empty:
         scrap_grouped = pd.DataFrame(columns=["DATE_STR", "DEPARTMENT_GROUP", "SCRAP_QTY"])
     else:
-        date_str_sc = _vectorized_bucket(scrap_df["DATE_BUCKET"], granularity)
-        scrap_grouped = scrap_df.groupby([date_str_sc, scrap_df["DEPARTMENT_GROUP"]], as_index=False)["SCRAP_QTY"].sum()
-        scrap_grouped.columns = ["DATE_STR", "DEPARTMENT_GROUP", "SCRAP_QTY"]
+        scrap_bucketed = scrap_df.copy()
+        scrap_bucketed["DATE_STR"] = _vectorized_bucket(scrap_bucketed["DATE_BUCKET"], granularity)
+        scrap_grouped = (
+            scrap_bucketed.groupby(["DATE_STR", "DEPARTMENT_GROUP"], as_index=False)["SCRAP_QTY"].sum()
+        )
 
     merged = tx_grouped.merge(scrap_grouped, on=["DATE_STR", "DEPARTMENT_GROUP"], how="left")
     merged["SCRAP_QTY"] = pd.to_numeric(merged["SCRAP_QTY"], errors="coerce").fillna(0.0)
