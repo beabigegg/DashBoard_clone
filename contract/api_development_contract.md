@@ -1,4 +1,4 @@
-### **MES Dashboard - 後端 API 開發契約規範 (v1.0)**
+### **MES Dashboard - 後端 API 開發契約規範 (v1.1)**
 
 #### **1. 目的**
 
@@ -71,3 +71,14 @@
     3.  呼叫對應的服務層 (Service Layer) 函式來執行業務邏輯。
     4.  使用 `core/response.py` 的輔助函式來格式化並回傳最終結果。
 *   **契約 5.2**：**嚴禁**在路由處理函式中撰寫複雜的業務邏輯或直接進行資料庫操作。
+
+---
+
+#### **6. API 盤點清單同步治理 (API Inventory Governance)**
+
+**原則：API 契約盤點必須可追蹤且與實際路由同步。**
+
+*   **契約 6.1**: `contract/api_inventory.md` 為 API 契約治理盤點清單，記錄端點分類與例外邊界。
+*   **契約 6.2**: 若有新增、刪除、重新命名、搬移任何 API 端點（包含 `routes/*.py` 與 `app.py` 的 `/api/*` bridge 端點），必須在**同一個變更**同步更新 `contract/api_inventory.md`。
+*   **契約 6.3**: 每個 API 端點都必須被分類為 `standard-json`、`health-exception`、`stream-download-exception` 或 `legacy-transition` 之一。
+*   **契約 6.4**: 新增或變更例外端點時，必須在盤點清單補上例外原因、影響範圍與對應驗證（測試或檢查機制）說明。
