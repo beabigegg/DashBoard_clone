@@ -862,6 +862,52 @@ def query_alert_candidates(
     }
 
 
+def query_reason_detail(*, workorder: str, date_bucket: str, reason_code: str = "", department: str = "") -> list[dict]:
+    if not workorder or not date_bucket:
+        return []
+
+    sql = SQLLoader.load("yield_alert/reason_detail")
+    params: dict = {
+        "workorder": workorder,
+        "date_bucket": date_bucket,
+        "reason_code": reason_code.strip().upper() if reason_code and reason_code.strip() else None,
+        "department": department.strip() if department and department.strip() else None,
+    }
+    df = read_sql_df_slow(sql, params)
+
+    items: list[dict] = []
+    for _, row in df.iterrows():
+        txn_time = row.get("TXN_TIME")
+        if hasattr(txn_time, "strftime"):
+            txn_time_str = txn_time.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            txn_time_str = str(txn_time or "")[:19]
+        items.append({
+            "txn_time": txn_time_str,
+            "containername": str(row.get("CONTAINERNAME") or ""),
+            "workcentername": str(row.get("WORKCENTERNAME") or ""),
+            "workcenter_group": str(row.get("WORKCENTER_GROUP") or ""),
+            "specname": str(row.get("SPECNAME") or ""),
+            "equipmentname": str(row.get("EQUIPMENTNAME") or ""),
+            "productname": str(row.get("PRODUCTNAME") or ""),
+            "pj_function": str(row.get("PJ_FUNCTION") or ""),
+            "pj_type": str(row.get("PJ_TYPE") or ""),
+            "package_name": str(row.get("PACKAGE_NAME") or ""),
+            "lossreasonname": str(row.get("LOSSREASONNAME") or ""),
+            "lossreason_code": str(row.get("LOSSREASON_CODE") or ""),
+            "rejectcomment": str(row.get("REJECTCOMMENT") or ""),
+            "scrap_objecttype": str(row.get("SCRAP_OBJECTTYPE") or ""),
+            "reject_qty": _safe_float(row.get("REJECT_QTY")),
+            "standby_qty": _safe_float(row.get("STANDBY_QTY")),
+            "qtytoprocess_qty": _safe_float(row.get("QTYTOPROCESS_QTY")),
+            "inprocess_qty": _safe_float(row.get("INPROCESS_QTY")),
+            "processed_qty": _safe_float(row.get("PROCESSED_QTY")),
+            "reject_total_qty": _safe_float(row.get("REJECT_TOTAL_QTY")),
+            "defect_qty": _safe_float(row.get("DEFECT_QTY")),
+        })
+    return items
+
+
 def build_drilldown_payload(
     *,
     date_bucket: str,

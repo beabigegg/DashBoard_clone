@@ -582,6 +582,8 @@ onMounted(() => {
               <th><button class="th-btn" @click="onSort('workorder')">工單</button></th>
               <th>原因碼</th>
               <th>站別群組</th>
+              <th>Package</th>
+              <th>Type</th>
               <th><button class="th-btn" @click="onSort('scrap_qty')">報廢量</button></th>
               <th><button class="th-btn" @click="onSort('yield_pct')">良率(%)</button></th>
               <th><button class="th-btn" @click="onSort('risk_score')">風險分數</button></th>
@@ -595,6 +597,8 @@ onMounted(() => {
                 <td>{{ row.workorder }}</td>
                 <td>{{ row.reason_code }}</td>
                 <td>{{ row.department }}</td>
+                <td>{{ row.package || '' }}</td>
+                <td>{{ row.type || '' }}</td>
                 <td>{{ Number(row.scrap_qty || 0).toLocaleString() }}</td>
                 <td>{{ Number(row.yield_pct || 0).toFixed(2) }}</td>
                 <td>
@@ -612,31 +616,45 @@ onMounted(() => {
                 </td>
               </tr>
               <tr v-if="expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}`" class="reason-detail-row">
-                <td colspan="8">
+                <td colspan="10">
                   <div v-if="reasonDetailLoading" class="empty-note">載入中...</div>
                   <div v-else-if="reasonDetailRows.length === 0" class="empty-note">找不到對應的 MES 報廢明細</div>
-                  <table v-else class="reason-sub-table">
-                    <thead>
-                      <tr>
-                        <th>LOT號</th>
-                        <th>站別</th>
-                        <th>報廢原因</th>
-                        <th>原因代碼</th>
-                        <th>報廢量</th>
-                        <th>備註</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(detail, idx) in reasonDetailRows" :key="idx">
-                        <td>{{ detail.containername }}</td>
-                        <td>{{ detail.workcentername }}</td>
-                        <td>{{ detail.lossreasonname }}</td>
-                        <td>{{ detail.lossreason_code }}</td>
-                        <td>{{ Number(detail.reject_total_qty || 0).toLocaleString() }}</td>
-                        <td>{{ detail.rejectcomment }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div v-else class="reason-sub-wrap">
+                    <table class="reason-sub-table">
+                      <thead>
+                        <tr>
+                          <th>LOT</th>
+                          <th>站別</th>
+                          <th>Package</th>
+                          <th>Function</th>
+                          <th>Type</th>
+                          <th>Product</th>
+                          <th>原因</th>
+                          <th>Equipment</th>
+                          <th>Comment</th>
+                          <th>扣帳報廢量</th>
+                          <th>不扣帳報廢量</th>
+                          <th>報廢時間</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(detail, idx) in reasonDetailRows" :key="idx">
+                          <td>{{ detail.containername }}</td>
+                          <td>{{ detail.workcentername }}</td>
+                          <td>{{ detail.package_name }}</td>
+                          <td>{{ detail.pj_function }}</td>
+                          <td>{{ detail.pj_type }}</td>
+                          <td>{{ detail.productname }}</td>
+                          <td>{{ detail.lossreasonname }}</td>
+                          <td>{{ detail.equipmentname }}</td>
+                          <td>{{ detail.rejectcomment }}</td>
+                          <td class="num">{{ Number(detail.reject_total_qty || 0).toLocaleString() }}</td>
+                          <td class="num">{{ Number(detail.defect_qty || 0).toLocaleString() }}</td>
+                          <td class="nowrap">{{ detail.txn_time }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </td>
               </tr>
             </template>

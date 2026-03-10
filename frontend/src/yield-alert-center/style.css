@@ -312,11 +312,17 @@
   padding: 0;
 }
 
+.reason-sub-wrap {
+  overflow-x: auto;
+  margin: 8px 16px;
+  width: calc(100% - 32px);
+}
+
 .reason-sub-table {
   border-collapse: collapse;
   font-size: 12px;
-  margin: 8px 16px;
-  width: calc(100% - 32px);
+  width: 100%;
+  min-width: 1100px;
 }
 
 .reason-sub-table th,
@@ -324,6 +330,17 @@
   padding: 6px 10px;
   border-bottom: 1px solid var(--ya-border);
   text-align: left;
+  white-space: nowrap;
+}
+
+.reason-sub-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.reason-sub-table td.nowrap {
+  font-size: 11px;
+  color: var(--ya-muted);
 }
 
 /* ── Misc ── */
