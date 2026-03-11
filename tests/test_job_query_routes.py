@@ -234,8 +234,9 @@ class TestQueryJobs:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert data['data']['total'] == 1
-        assert data['data']['data'][0]['JOBID'] == 'JOB001'
+        assert isinstance(data['data'], list)
+        assert len(data['data']) == 1
+        assert data['data'][0]['JOBID'] == 'JOB001'
 
     @patch('mes_dashboard.routes.job_query_routes.get_jobs_by_resources')
     def test_query_jobs_service_error(self, mock_query, client):
@@ -279,8 +280,9 @@ class TestQueryJobTxnHistory:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert data['data']['total'] == 1
-        assert data['data']['job_id'] == 'JOB001'
+        assert isinstance(data['data'], list)
+        assert len(data['data']) == 1
+        assert data['data'][0]['JOBTXNHISTORYID'] == 'TXN001'
 
     @patch('mes_dashboard.routes.job_query_routes.get_job_txn_history')
     def test_get_txn_history_service_error(self, mock_query, client):

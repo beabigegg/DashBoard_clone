@@ -141,7 +141,7 @@ def query_jobs():
     if 'error' in result:
         return validation_error(result.get('error', '查詢失敗'))
 
-    return success_response(result)
+    return success_response(result.get('data', []))
 
 
 @job_query_bp.route('/api/job-query/txn/<job_id>', methods=['GET'])
@@ -162,7 +162,7 @@ def query_job_txn_history(job_id: str):
     if 'error' in result:
         return validation_error(result.get('error', '查詢失敗'))
 
-    return success_response(result)
+    return success_response(result.get('data', []))
 
 
 @job_query_bp.route('/api/job-query/export', methods=['POST'])
