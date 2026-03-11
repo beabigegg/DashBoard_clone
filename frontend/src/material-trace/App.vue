@@ -152,14 +152,15 @@ async function executePrimaryQuery(page = 1) {
     const result = await apiPost('/api/material-trace/query', body, { timeout: API_TIMEOUT });
 
     if (!result.success) {
-      errorMessage.value = result.error || '查詢失敗';
+      errorMessage.value = result.error?.message || '查詢失敗';
       rows.value = [];
       pagination.value = { page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 0 };
       return;
     }
 
-    rows.value = result.rows || [];
-    pagination.value = result.pagination || {
+    const payload = result.data || {};
+    rows.value = payload.rows || [];
+    pagination.value = payload.pagination || {
       page: 1,
       per_page: DEFAULT_PER_PAGE,
       total: 0,
@@ -167,10 +168,10 @@ async function executePrimaryQuery(page = 1) {
     };
 
     // Handle meta warnings
-    if (result.meta?.unresolved?.length > 0) {
-      unresolvedWarning.value = `以下 LOT ID 無法解析：${result.meta.unresolved.join('、')}`;
+    if (payload.meta?.unresolved?.length > 0) {
+      unresolvedWarning.value = `以下 LOT ID 無法解析：${payload.meta.unresolved.join('、')}`;
     }
-    warningMessage.value = buildQualityWarning(result.quality_meta, result.meta);
+    warningMessage.value = buildQualityWarning(payload.quality_meta, payload.meta);
   } catch (err) {
     errorMessage.value = err.message || '查詢失敗，請稍後再試';
     rows.value = [];
@@ -219,7 +220,7 @@ async function exportCsv() {
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      errorMessage.value = data.error || '匯出失敗';
+      errorMessage.value = data.error?.message || '匯出失敗';
       return;
     }
 
