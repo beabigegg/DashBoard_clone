@@ -1,7 +1,10 @@
+import logging
 import os
 
+_gunicorn_logger = logging.getLogger("gunicorn.startup")
+
 bind = os.getenv("GUNICORN_BIND", "0.0.0.0:8080")
-workers = int(os.getenv("GUNICORN_WORKERS", "2"))  # 2 workers for redundancy
+workers = int(os.getenv("GUNICORN_WORKERS", "3"))  # 3 workers for redundancy
 threads = int(os.getenv("GUNICORN_THREADS", "4"))
 worker_class = "gthread"
 
@@ -20,6 +23,34 @@ max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "300"))
 # ============================================================
 # Worker Lifecycle Hooks
 # ============================================================
+
+def on_starting(server):
+    """Check system memory sufficiency before starting workers."""
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        available_mb = vm.available / (1024 * 1024)
+        rq_workers = int(os.getenv("RQ_WORKER_COUNT_ESTIMATE", "2"))  # trace + reject
+        required_mb = workers * 400 + rq_workers * 200
+        if available_mb >= required_mb:
+            server.log.info(
+                "Startup memory check: %.0f MB available, %.0f MB required — OK",
+                available_mb,
+                required_mb,
+            )
+        else:
+            shortfall = required_mb - available_mb
+            server.log.warning(
+                "Startup memory check: %.0f MB available, %.0f MB required — "
+                "shortfall %.0f MB. Consider reducing GUNICORN_WORKERS from %d.",
+                available_mb,
+                required_mb,
+                shortfall,
+                workers,
+            )
+    except Exception as exc:
+        server.log.warning("Startup memory check failed (skipping): %s", exc)
+
 
 def worker_exit(server, worker):
     """Clean up background threads and database connections when worker exits."""

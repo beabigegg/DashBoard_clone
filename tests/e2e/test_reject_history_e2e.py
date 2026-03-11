@@ -28,7 +28,7 @@ def _post_reject_query(
         if response.status_code != 503:
             return response
         payload = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
-        if payload.get("code") != "SERVICE_OVERLOADED":
+        if payload.get("code") != "SERVICE_UNAVAILABLE":
             return response
         if attempt >= max_attempts - 1:
             return response
@@ -39,6 +39,50 @@ def _post_reject_query(
             wait_seconds = 2.0
         time.sleep(wait_seconds)
     return response
+
+
+def _poll_async_job(app_server: str, job_id: str, timeout_seconds: float = 300.0) -> dict:
+    """Poll async job until terminal state, return final status dict."""
+    status_url = f"{app_server}/api/reject-history/job/{job_id}"
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        resp = requests.get(status_url, timeout=30)
+        assert resp.status_code == 200, f"Job status returned {resp.status_code}: {resp.text[:300]}"
+        payload = resp.json()
+        status = payload.get("data", payload)
+        if status.get("status") in ("completed", "finished", "failed"):
+            return status
+        time.sleep(3)
+    pytest.fail(f"Job {job_id} did not reach terminal state within {timeout_seconds}s")
+
+
+def _query_and_wait(app_server: str, body: dict) -> str:
+    """POST query, handle both sync 200 and async 202, return query_id."""
+    query_resp = _post_reject_query(app_server, body)
+    query_payload = query_resp.json()
+    assert query_payload.get("success") is True, query_payload
+
+    if query_resp.status_code == 200:
+        query_id = query_payload.get("query_id")
+        assert query_id, f"Sync 200 response missing query_id: {query_payload}"
+        return query_id
+
+    if query_resp.status_code == 202:
+        data = query_payload.get("data", query_payload)
+        job_id = data.get("job_id")
+        query_id = data.get("query_id")
+        assert job_id, f"Async 202 response missing job_id: {query_payload}"
+        assert query_id, f"Async 202 response missing query_id: {query_payload}"
+
+        final = _poll_async_job(app_server, job_id)
+        assert final.get("status") in ("completed", "finished"), (
+            f"Async job failed: {final}"
+        )
+        return query_id
+
+    pytest.fail(
+        f"Unexpected status {query_resp.status_code}: {query_resp.text[:500]}"
+    )
 
 
 @pytest.mark.e2e
@@ -68,12 +112,19 @@ class TestRejectHistoryLongRangeE2E:
             assert payload.get("query_id")
             return
 
+        if response.status_code == 202:
+            payload = response.json()
+            assert payload.get("success") is True, payload
+            data = payload.get("data", payload)
+            assert data.get("job_id"), "202 response missing job_id"
+            return
+
         assert response.status_code == 503, response.text[:500]
         payload = response.json()
         assert payload.get("code") == "RESULT_TOO_LARGE", payload
 
     def test_query_then_view_returns_cached_result(self, app_server: str):
-        query_resp = _post_reject_query(
+        query_id = _query_and_wait(
             app_server,
             {
                 "mode": "date_range",
@@ -83,11 +134,6 @@ class TestRejectHistoryLongRangeE2E:
                 "exclude_pb_diode": True,
             },
         )
-        assert query_resp.status_code == 200, query_resp.text[:500]
-        query_payload = query_resp.json()
-        assert query_payload.get("success") is True, query_payload
-        query_id = query_payload.get("query_id")
-        assert query_id
 
         view_resp = requests.get(
             f"{app_server}/api/reject-history/view",
@@ -105,7 +151,7 @@ class TestRejectHistoryLongRangeE2E:
         assert view_payload.get("success") is True, view_payload
 
     def test_query_then_export_cached_returns_csv(self, app_server: str):
-        query_resp = _post_reject_query(
+        query_id = _query_and_wait(
             app_server,
             {
                 "mode": "date_range",
@@ -115,11 +161,6 @@ class TestRejectHistoryLongRangeE2E:
                 "exclude_pb_diode": True,
             },
         )
-        assert query_resp.status_code == 200, query_resp.text[:500]
-        query_payload = query_resp.json()
-        assert query_payload.get("success") is True, query_payload
-        query_id = query_payload.get("query_id")
-        assert query_id
 
         export_resp = requests.get(
             f"{app_server}/api/reject-history/export-cached",

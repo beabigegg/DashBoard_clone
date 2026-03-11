@@ -1245,12 +1245,12 @@ def test_partial_failure_ttl_matches_spool(monkeypatch, tmp_path, store_result, 
 
 
 # ============================================================
-# 6.3  RSS guard → 503 SERVICE_OVERLOADED
+# 6.3  RSS guard → 503 SERVICE_UNAVAILABLE
 # ============================================================
 
 
 def test_execute_primary_query_rss_guard_raises_service_overloaded(monkeypatch):
-    """execute_primary_query raises SERVICE_OVERLOADED when RSS exceeds threshold."""
+    """execute_primary_query raises SERVICE_UNAVAILABLE when RSS exceeds threshold."""
     from mes_dashboard.services.reject_dataset_cache import (
         execute_primary_query,
         RejectPrimaryQueryOverloadError,
@@ -1269,7 +1269,7 @@ def test_execute_primary_query_rss_guard_raises_service_overloaded(monkeypatch):
             end_date="2026-03-01",
         )
 
-    assert exc_info.value.code == "SERVICE_OVERLOADED"
+    assert exc_info.value.code == "SERVICE_UNAVAILABLE"
     assert exc_info.value.retry_after == 30
 
 

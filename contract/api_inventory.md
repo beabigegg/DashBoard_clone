@@ -19,7 +19,7 @@ This file is the governed inventory for API contract classification and exceptio
 | `hold_routes.py` | All JSON API endpoints |
 | `hold_overview_routes.py` | All JSON API endpoints |
 | `hold_history_routes.py` | All JSON API endpoints |
-| `reject_history_routes.py` | All JSON API endpoints |
+| `reject_history_routes.py` | All JSON API endpoints — includes `GET /api/reject-history/job/<job_id>` (async job status); `POST /api/reject-history/query` may return HTTP 202 with `{"async": true, "job_id": ..., "status_url": ...}` when query is enqueued as background job |
 | `resource_routes.py` | All JSON API endpoints |
 | `resource_history_routes.py` | All JSON API endpoints |
 | `yield_alert_routes.py` | All JSON API endpoints |
@@ -36,6 +36,8 @@ This file is the governed inventory for API contract classification and exceptio
 | File | Endpoints | Reason |
 | :--- | :--- | :--- |
 | `health_routes.py` | `/health`, `/health/deep`, `/health/frontend-shell` | Consumed by monitoring systems and shell health UI |
+
+**Compatibility note (2026-03-11):** `/health` and `/health/deep` responses now include additive `system_memory` (`{total_mb, available_mb, used_pct, pressure}`) and `async_workers` (`{rq_available, workers, queues, slots}`) blocks. These are backward-compatible additions (contract §6.4: additive fields are allowed). `/admin/api/performance-detail` also includes `async_workers` in the response. Monitoring integrations that parse these endpoints by strict schema must be updated if they reject unknown keys.
 
 ### stream-download-exception (success can be non-JSON stream; JSON errors still use envelope)
 

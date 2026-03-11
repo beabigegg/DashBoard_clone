@@ -383,6 +383,15 @@ def api_performance_detail():
         logger.warning("Failed to collect worker memory guard telemetry: %s", exc)
         worker_memory_guard = {"error": str(exc)}
 
+    # ---- Async workers (RQ) ----
+    async_workers = None
+    try:
+        from mes_dashboard.services.rq_monitor_service import get_rq_monitor_summary
+        async_workers = get_rq_monitor_summary()
+    except Exception as exc:
+        logger.warning("Failed to collect RQ monitor telemetry: %s", exc)
+        async_workers = {"error": str(exc)}
+
     return success_response({
         "redis": redis_detail,
         "process_caches": process_caches,
@@ -391,6 +400,7 @@ def api_performance_detail():
         "direct_connections": direct_connections,
         "pareto_materialization": pareto_materialization,
         "worker_memory_guard": worker_memory_guard,
+        "async_workers": async_workers,
     })
 
 

@@ -143,6 +143,11 @@ class TestGuardGraduatedResponse:
         from mes_dashboard.core.worker_memory_guard import _telemetry
 
         guard = self._make_guard(1000)
+        # Mock psutil to report safe system memory (<85%) so _check_system_memory()
+        # does not trigger a second eviction alongside the RSS eviction.
+        mock_vmem = MagicMock()
+        mock_vmem.percent = 50.0
+        mock_vmem.available = 8 * 1024 ** 3  # 8 GB free
         with patch(
             "mes_dashboard.core.worker_memory_guard._current_rss_mb",
             side_effect=[880.0, 600.0],  # before evict, after evict
@@ -151,7 +156,8 @@ class TestGuardGraduatedResponse:
                 "mes_dashboard.core.cache.emergency_clear_all_process_caches",
                 return_value=3,
             ) as mock_clear:
-                guard._check_rss()
+                with patch("psutil.virtual_memory", return_value=mock_vmem):
+                    guard._check_rss()
 
         assert _telemetry.last_level == "evict"
         assert _telemetry.evict_count == 1

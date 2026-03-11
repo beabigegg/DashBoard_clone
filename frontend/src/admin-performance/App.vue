@@ -237,6 +237,128 @@
       </div>
     </section>
 
+    <!-- Async Workers -->
+    <section
+      class="panel"
+      v-if="perfDetail?.async_workers && !perfDetail.async_workers.error"
+    >
+      <h2 class="panel-title">非同步查詢 Worker</h2>
+
+      <!-- Status cards row -->
+      <div class="status-cards-grid">
+        <div class="status-card">
+          <div class="status-card-title">RQ 可用性</div>
+          <StatusDot
+            :status="asyncWorkers.rq_available ? 'healthy' : 'error'"
+            :label="asyncWorkers.rq_available ? '可用' : '不可用'"
+          />
+        </div>
+        <div class="status-card">
+          <div class="status-card-title">Worker 占用</div>
+          <StatusDot
+            :status="asyncWorkers.workers?.summary?.busy > 0 ? 'degraded' : 'healthy'"
+            :label="`${asyncWorkers.workers?.summary?.busy ?? 0}/${asyncWorkers.workers?.summary?.total ?? 0} 忙碌`"
+          />
+        </div>
+        <div class="status-card">
+          <div class="status-card-title">佇列排隊</div>
+          <StatCard :value="asyncWorkers.queues?.total_queued ?? 0" label="" />
+        </div>
+        <div class="status-card">
+          <div class="status-card-title">失敗任務</div>
+          <StatCard :value="asyncWorkers.queues?.total_failed ?? 0" label="" />
+        </div>
+      </div>
+
+      <!-- Slots gauge -->
+      <GaugeBar
+        v-if="heavyQuerySlots"
+        label="Heavy Query 並行槽位"
+        :value="heavyQuerySlots.active"
+        :max="heavyQuerySlots.max"
+        :displayText="`${heavyQuerySlots.active} / ${heavyQuerySlots.max} (${heavyQuerySlots.utilization_pct?.toFixed(1) ?? 0}%)`"
+        :warningThreshold="0.60"
+        :dangerThreshold="0.85"
+      />
+
+      <!-- Worker state table -->
+      <h3 class="sub-title">Worker 狀態</h3>
+      <table class="mini-table" v-if="rqWorkers.length">
+        <thead>
+          <tr>
+            <th>名稱</th>
+            <th>狀態</th>
+            <th>目前任務</th>
+            <th>佇列</th>
+            <th>成功</th>
+            <th>失敗</th>
+            <th>已運行</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="w in rqWorkers" :key="w.name">
+            <td>{{ w.name }}</td>
+            <td>
+              <span class="rq-worker-state-dot" :class="`rq-worker-state-dot--${workerStateColor(w.state)}`"></span>
+              {{ w.state }}
+            </td>
+            <td class="rq-job-id">{{ w.current_job || '-' }}</td>
+            <td>{{ w.queues?.join(', ') || '-' }}</td>
+            <td>{{ w.successful_job_count ?? 0 }}</td>
+            <td>{{ w.failed_job_count ?? 0 }}</td>
+            <td>{{ formatUptime(w.birth_date) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted" v-else>無活躍 Worker</p>
+
+      <!-- Queue state table -->
+      <h3 class="sub-title">佇列狀態</h3>
+      <table class="mini-table" v-if="rqQueues.length">
+        <thead>
+          <tr>
+            <th>佇列名稱</th>
+            <th>排隊深度</th>
+            <th>執行中</th>
+            <th>失敗</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="q in rqQueues" :key="q.name">
+            <td>{{ q.name }}</td>
+            <td>{{ q.depth ?? 0 }}</td>
+            <td>{{ q.started ?? 0 }}</td>
+            <td>{{ q.failed ?? 0 }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted" v-else>無佇列資料</p>
+    </section>
+    <section class="panel panel-disabled" v-else-if="perfDetail && perfDetail.async_workers?.error">
+      <h2 class="panel-title">非同步查詢 Worker</h2>
+      <p class="muted">RQ Worker 監控不可用：{{ perfDetail.async_workers.error }}</p>
+    </section>
+    <section class="panel panel-disabled" v-else-if="perfDetail && !perfDetail.async_workers">
+      <h2 class="panel-title">非同步查詢 Worker</h2>
+      <p class="muted">RQ Worker 監控不可用</p>
+    </section>
+
+    <!-- Async Worker Trend -->
+    <TrendChart
+      v-if="historyData.length > 1"
+      title="非同步 Worker 趨勢"
+      :snapshots="historyData"
+      :series="asyncWorkerTrendSeries"
+    />
+
+    <!-- Queue Depth & Slots Trend -->
+    <TrendChart
+      v-if="historyData.length > 1"
+      title="佇列深度 & 槽位趨勢"
+      :snapshots="historyData"
+      :series="asyncQueueTrendSeries"
+    />
+
     <!-- Storage Management -->
     <section class="panel" v-if="storageInfo">
       <h2 class="panel-title">儲存空間管理</h2>
@@ -566,6 +688,35 @@ const paretoFallbackReasons = computed(() => {
     .map(([reason, count]) => ({ reason, count }));
 });
 
+// --- Async Workers ---
+const asyncWorkers = computed(() => perfDetail.value?.async_workers || {});
+const rqWorkers = computed(() => asyncWorkers.value.workers?.workers || []);
+const rqQueues = computed(() => asyncWorkers.value.queues?.queues || []);
+const heavyQuerySlots = computed(() => asyncWorkers.value.slots || null);
+
+function workerStateColor(state) {
+  if (state === 'busy') return 'amber';
+  if (state === 'idle') return 'green';
+  return 'gray';
+}
+
+function formatUptime(birthDate) {
+  if (!birthDate) return '-';
+  try {
+    const diffMs = Date.now() - new Date(birthDate).getTime();
+    if (isNaN(diffMs) || diffMs < 0) return '-';
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  } catch {
+    return '-';
+  }
+}
+
 // --- Data Fetching ---
 async function loadSystemStatus() {
   try {
@@ -701,6 +852,16 @@ const hitRateTrendSeries = [
 
 const memoryTrendSeries = [
   { name: 'RSS (MB)', key: 'worker_rss_mb', color: 'rgb(139, 92, 246)' },
+];
+
+const asyncWorkerTrendSeries = [
+  { name: '忙碌 Workers', key: 'rq_workers_busy', color: 'rgb(245, 158, 11)' },
+  { name: '總 Workers', key: 'rq_workers_total', color: 'rgb(34, 197, 94)' },
+];
+
+const asyncQueueTrendSeries = [
+  { name: '佇列深度', key: 'rq_queue_depth', color: 'rgb(99, 102, 241)' },
+  { name: '並行槽位', key: 'heavy_query_slots_active', color: 'rgb(239, 68, 68)' },
 ];
 
 async function refreshAll() {

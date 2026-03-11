@@ -42,7 +42,7 @@ def _post_events(base_url, profile, container_ids, domains=None, timeout=60):
             code = (response.json().get("error") or {}).get("code")
         except ValueError:
             code = None
-        if code != "SERVICE_OVERLOADED" or attempt >= 3:
+        if code != "SERVICE_UNAVAILABLE" or attempt >= 3:
             return response
         retry_after = response.headers.get("Retry-After")
         try:
@@ -74,12 +74,16 @@ def _resolve_cids(base_url, work_order):
         time.sleep(wait_seconds)
     if resp.status_code != 200:
         return []
-    data = resp.json()
-    lots = data.get("data", [])
+    payload = resp.json()
+    # success_response wraps: {"data": {"data": [...]}, "success": true}
+    inner = payload.get("data", payload)
+    lots = inner.get("data", inner) if isinstance(inner, dict) else inner
+    if not isinstance(lots, list):
+        lots = []
     return [
         str(lot.get("container_id") or lot.get("CONTAINERID") or "")
         for lot in lots
-        if lot.get("container_id") or lot.get("CONTAINERID")
+        if isinstance(lot, dict) and (lot.get("container_id") or lot.get("CONTAINERID"))
     ]
 
 
@@ -176,7 +180,7 @@ def _maybe_skip_on_service_overload(resp, context: str):
         code = (resp.json().get("error") or {}).get("code")
     except ValueError:
         code = None
-    if code == "SERVICE_OVERLOADED":
+    if code == "SERVICE_UNAVAILABLE":
         pytest.skip(f"{context}: service overload guard active")
 
 
@@ -221,7 +225,7 @@ class TestTraceAdmissionControl:
         _maybe_skip_on_service_overload(resp, "trace sync small cid")
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text[:200]}"
-        data = resp.json()
+        data = resp.json().get("data", resp.json())
         assert data["stage"] == "events"
         assert "results" in data
         assert "history" in data["results"]
@@ -238,7 +242,7 @@ class TestTraceAdmissionControl:
                             domains=["history", "materials"])
         _maybe_skip_on_service_overload(resp, "trace sync data structure")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json().get("data", resp.json())
         for domain in ["history", "materials"]:
             assert domain in data["results"], f"Missing domain '{domain}'"
             d = data["results"][domain]
@@ -324,7 +328,8 @@ class TestTraceAsyncJobQueue:
         if resp.status_code != 202:
             pytest.skip("Async not available (RQ worker not running)")
 
-        data = resp.json()
+        payload = resp.json()
+        data = payload.get("data", payload)
         assert data["async"] is True
         assert data["stage"] == "events"
         assert "job_id" in data
@@ -344,13 +349,13 @@ class TestTraceAsyncJobQueue:
         if enqueue_resp.status_code != 202:
             pytest.skip("Async not available")
 
-        job_id = enqueue_resp.json()["job_id"]
+        job_id = enqueue_resp.json().get("data", enqueue_resp.json())["job_id"]
 
         status_resp = requests.get(
             f"{base}/api/trace/job/{job_id}", timeout=10,
         )
         assert status_resp.status_code == 200
-        status = status_resp.json()
+        status = status_resp.json().get("data", status_resp.json())
         assert status["job_id"] == job_id
         assert status["status"] in ("queued", "started", "finished", "failed")
         assert status["profile"] == "query_tool"
@@ -368,7 +373,7 @@ class TestTraceAsyncJobQueue:
         if enqueue_resp.status_code != 202:
             pytest.skip("Async not available")
 
-        job_id = enqueue_resp.json()["job_id"]
+        job_id = enqueue_resp.json().get("data", enqueue_resp.json())["job_id"]
         status_url = f"{base}/api/trace/job/{job_id}"
 
         # Poll until terminal state (max 120s — fake CIDs will fail fast)
@@ -378,7 +383,7 @@ class TestTraceAsyncJobQueue:
         while time.time() < deadline:
             resp = requests.get(status_url, timeout=10)
             assert resp.status_code == 200
-            final_status = resp.json()
+            final_status = resp.json().get("data", resp.json())
             if final_status["status"] in ("finished", "failed"):
                 terminal = True
                 break
@@ -394,7 +399,7 @@ class TestTraceAsyncJobQueue:
                 f"{base}/api/trace/job/{job_id}/result", timeout=10,
             )
             assert result_resp.status_code == 200
-            result = result_resp.json()
+            result = result_resp.json().get("data", result_resp.json())
             assert result["stage"] == "events"
             assert "results" in result
 
@@ -475,7 +480,7 @@ class TestTraceNDJSONStream:
             assert resp.status_code == 409
             data = resp.json()
             assert data["error"]["code"] == "JOB_NOT_COMPLETE"
-            assert data["status"] == "started"
+            assert data.get("meta", {}).get("job_status") == "started"
         finally:
             rclient.delete(meta_key)
 
@@ -686,7 +691,7 @@ class TestTraceNDJSONStream:
                 f"{base}/api/trace/job/{job_id}/result", timeout=10,
             )
             assert result_resp.status_code == 200
-            result_data = result_resp.json()
+            result_data = result_resp.json().get("data", result_resp.json())
 
             # Get via stream endpoint
             stream_resp = requests.get(
@@ -732,7 +737,7 @@ class TestTraceAsyncToStream:
                                 domains=["history"])
             _maybe_skip_on_service_overload(resp, "trace async lifecycle sync fallback")
             assert resp.status_code == 200
-            data = resp.json()
+            data = resp.json().get("data", resp.json())
             assert data["stage"] == "events"
             assert "history" in data["results"]
             # Sync path proven — stream is tested in TestTraceNDJSONStream
@@ -741,7 +746,7 @@ class TestTraceAsyncToStream:
         # If we have enough CIDs, test full async lifecycle
         resp = _post_events(base, "query_tool", real_cids, domains=["history"])
         assert resp.status_code == 202
-        job_id = resp.json()["job_id"]
+        job_id = resp.json().get("data", resp.json())["job_id"]
 
         # Poll until finished
         deadline = time.time() + 180
@@ -750,7 +755,7 @@ class TestTraceAsyncToStream:
             status_resp = requests.get(
                 f"{base}/api/trace/job/{job_id}", timeout=10,
             )
-            final_status = status_resp.json()
+            final_status = status_resp.json().get("data", status_resp.json())
             if final_status["status"] in ("finished", "failed"):
                 break
             time.sleep(2)

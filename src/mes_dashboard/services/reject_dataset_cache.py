@@ -30,6 +30,10 @@ from mes_dashboard.core.query_spool_store import (
     load_spooled_df,
     store_spooled_df,
 )
+from mes_dashboard.core.global_concurrency import (
+    acquire_heavy_query_slot,
+    release_heavy_query_slot,
+)
 from mes_dashboard.core.redis_client import get_key, get_redis_client
 from mes_dashboard.core.redis_df_store import (
     redis_clear_batch,
@@ -100,7 +104,7 @@ _REJECT_ENGINE_QUERY_LOCK_TTL_SECONDS = max(
     60, int(os.getenv("REJECT_ENGINE_QUERY_LOCK_TTL_SECONDS", "1200"))
 )
 _REJECT_ENGINE_QUERY_WAIT_SECONDS = max(
-    1, int(os.getenv("REJECT_ENGINE_QUERY_WAIT_SECONDS", "180"))
+    1, int(os.getenv("REJECT_ENGINE_QUERY_WAIT_SECONDS", "90"))
 )
 _REJECT_ENGINE_QUERY_WAIT_POLL_SECONDS = max(
     0.1, float(os.getenv("REJECT_ENGINE_QUERY_WAIT_POLL_SECONDS", "1.0"))
@@ -306,7 +310,7 @@ def _wait_for_inflight_query_result(query_id: str) -> Optional[pd.DataFrame]:
 
     raise RejectPrimaryQueryOverloadError(
         "同條件查詢仍在執行中，請稍後重試",
-        code="QUERY_IN_FLIGHT_TIMEOUT",
+        code="SERVICE_UNAVAILABLE",
         retry_after=max(3, int(round(poll))),
     )
 
@@ -473,6 +477,273 @@ def resolve_containers(
 
 
 # ============================================================
+# Core execution helper (usable by both sync path and RQ worker)
+# ============================================================
+
+
+def _execute_and_spool(
+    *,
+    query_id: str,
+    mode: str,
+    base_where: str,
+    base_params: Dict[str, Any],
+    workflow_filter: str = "",
+    container_ids: Optional[List[str]] = None,
+    progress_callback=None,
+) -> Dict[str, Any]:
+    """Execute Oracle query and store result in spool/cache.
+
+    This function contains the pure Oracle-execution and result-storage logic,
+    extracted from ``execute_primary_query`` so it can be called from both the
+    synchronous Gunicorn path and the asynchronous RQ worker path.
+
+    Args:
+        query_id: Pre-computed deterministic hash for this query.
+        mode: "date_range" or "container".
+        base_where: SQL WHERE clause fragment (no leading "WHERE ").
+        base_params: Bind parameters dict for the WHERE clause.
+        workflow_filter: Extra WHERE fragment for workflow_lookup CTE (container mode).
+        container_ids: List of container IDs (container mode).
+        progress_callback: Optional callable(status, progress_str, pct_int) invoked
+            after each chunk completes.  May be None.
+
+    Returns:
+        partial_failure_meta dict (may be empty).
+
+    Raises:
+        RejectPrimaryQueryOverloadError: On RSS guard or result-size overflow.
+        Exception: Any Oracle or engine error is propagated to the caller.
+    """
+    from mes_dashboard.services.batch_query_engine import (
+        MergeChunksMaxRowsExceeded,
+        compute_query_hash,
+        decompose_by_ids,
+        decompose_by_time_range,
+        execute_plan,
+        get_batch_progress,
+        merge_chunks_to_spool,
+        should_decompose_by_ids,
+        should_decompose_by_time,
+    )
+    from mes_dashboard.core.query_spool_store import (
+        QUERY_SPOOL_DIR,
+        register_spool_file,
+    )
+
+    _chunk_counter = [0]
+    partial_failure_meta: Dict[str, Any] = {}
+    use_engine = False
+    engine_chunks: Optional[list] = None
+    engine_parallel = 1
+    engine_hash: Optional[str] = None
+
+    # Parse start_date/end_date from base_params for decompose check
+    start_date = base_params.get("start_date")
+    end_date = base_params.get("end_date")
+
+    if mode == "date_range" and start_date and end_date and should_decompose_by_time(start_date, end_date):
+        engine_chunks = decompose_by_time_range(
+            start_date,
+            end_date,
+            grain_days=_REJECT_ENGINE_GRAIN_DAYS,
+        )
+        engine_parallel = _REJECT_ENGINE_PARALLEL
+        use_engine = True
+        logger.info(
+            "Engine activated for date_range: %d chunks (query_id=%s, grain_days=%d, parallel=%d)",
+            len(engine_chunks), query_id, _REJECT_ENGINE_GRAIN_DAYS, engine_parallel,
+        )
+    elif mode == "container" and container_ids and should_decompose_by_ids(container_ids):
+        id_batches = decompose_by_ids(container_ids)
+        engine_chunks = [{"ids": batch} for batch in id_batches]
+        use_engine = True
+        logger.info(
+            "Engine activated for container IDs: %d batches (query_id=%s)",
+            len(engine_chunks), query_id,
+        )
+
+    df: pd.DataFrame = pd.DataFrame()
+    spool_tmp_path: Optional[str] = None
+    spool_row_count: int = 0
+
+    if use_engine and engine_chunks:
+        total_chunks = len(engine_chunks)
+
+        def _run_reject_chunk(chunk, max_rows_per_chunk=None):
+            chunk_where_parts: List[str] = []
+            chunk_params: Dict[str, Any] = {}
+            chunk_wf_filter = ""
+
+            if "chunk_start" in chunk:
+                chunk_where_parts.append(
+                    "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
+                    " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+                )
+                chunk_params["start_date"] = chunk["chunk_start"]
+                chunk_params["end_date"] = chunk["chunk_end"]
+            elif "ids" in chunk:
+                b = QueryBuilder()
+                b.add_in_condition("r.CONTAINERID", chunk["ids"])
+                cid_w, cid_p = b.build_where_only()
+                cid_c = cid_w.strip()
+                if cid_c.upper().startswith("WHERE "):
+                    cid_c = cid_c[6:].strip()
+                chunk_where_parts.append(cid_c)
+                chunk_params.update(cid_p)
+                wfb = QueryBuilder()
+                wfb.add_in_condition("r0.CONTAINERID", chunk["ids"])
+                wf_w, _ = wfb.build_where_only()
+                wf_c = wf_w.strip()
+                if wf_c.upper().startswith("WHERE "):
+                    wf_c = wf_c[6:].strip()
+                chunk_wf_filter = wf_c
+
+            chunk_where = " AND ".join(chunk_where_parts)
+            chunk_sql = _prepare_sql(
+                _REJECT_PRIMARY_SQL_TEMPLATE,
+                where_clause="",
+                base_variant="lot",
+                base_where=chunk_where,
+                workflow_filter=chunk_wf_filter,
+            )
+            if max_rows_per_chunk:
+                chunk_sql = (
+                    f"SELECT * FROM ({chunk_sql}) WHERE ROWNUM <= {int(max_rows_per_chunk) + 1}"
+                )
+            chunk_df = read_sql_df(chunk_sql, chunk_params)
+            if chunk_df is None:
+                return pd.DataFrame()
+            if max_rows_per_chunk and len(chunk_df) == int(max_rows_per_chunk) + 1:
+                chunk_df = chunk_df.head(int(max_rows_per_chunk))
+
+            # Report progress after each chunk
+            if progress_callback is not None:
+                _chunk_counter[0] += 1
+                completed = _chunk_counter[0]
+                pct = int(completed / total_chunks * 100) if total_chunks > 0 else 0
+                try:
+                    progress_callback("running", f"{completed}/{total_chunks}", pct)
+                except Exception:
+                    pass
+
+            return chunk_df
+
+        # Build engine hash from the query_id_input-equivalent fields
+        engine_hash_input = {
+            "cache_schema_version": _CACHE_SCHEMA_VERSION,
+            "mode": mode,
+            "start_date": start_date,
+            "end_date": end_date,
+            "container_values": sorted(container_ids or []),
+        }
+        engine_hash = compute_query_hash(engine_hash_input)
+        redis_clear_batch("reject", engine_hash)
+        logger.info(
+            "Reject primary SQL selected for engine execution (template=%s, chunks=%d)",
+            _REJECT_PRIMARY_SQL_TEMPLATE,
+            len(engine_chunks),
+        )
+
+        try:
+            execute_plan(
+                engine_chunks,
+                _run_reject_chunk,
+                parallel=engine_parallel,
+                skip_cached=False,
+                query_hash=engine_hash,
+                cache_prefix="reject",
+                chunk_ttl=_CACHE_TTL,
+                max_rows_per_chunk=_REJECT_ENGINE_MAX_ROWS_PER_CHUNK,
+            )
+            try:
+                spool_tmp_path, spool_row_count = merge_chunks_to_spool(
+                    "reject",
+                    engine_hash,
+                    spool_dir=QUERY_SPOOL_DIR,
+                    max_total_rows=_REJECT_ENGINE_MAX_TOTAL_ROWS,
+                    overflow_mode="error",
+                )
+            except MergeChunksMaxRowsExceeded as exc:
+                logger.warning(
+                    "Reject primary query exceeded max_total_rows=%d (query_id=%s, observed_rows=%d)",
+                    _REJECT_ENGINE_MAX_TOTAL_ROWS,
+                    query_id,
+                    exc.observed_rows,
+                )
+                raise RejectPrimaryQueryOverloadError(
+                    f"查詢結果超過上限（{_REJECT_ENGINE_MAX_TOTAL_ROWS:,} 筆），請縮小條件後重試",
+                    code="RESULT_TOO_LARGE",
+                    retry_after=15,
+                ) from exc
+            progress_meta = get_batch_progress("reject", engine_hash) or {}
+            progress_partial = parse_partial_failure_meta(progress_meta)
+            if progress_partial:
+                partial_failure_meta = progress_partial
+        finally:
+            redis_clear_batch("reject", engine_hash)
+
+        if spool_tmp_path is not None:
+            spool_registered = register_spool_file(
+                _REDIS_NAMESPACE,
+                query_id,
+                spool_tmp_path,
+                spool_row_count,
+                ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
+            )
+            if spool_registered:
+                _cached = _get_cached_df(query_id)
+                df = _cached if _cached is not None else pd.DataFrame()
+            else:
+                from pathlib import Path as _Path
+                _p = _Path(spool_tmp_path)
+                if _p.exists():
+                    try:
+                        df = pd.read_parquet(str(_p), engine="pyarrow")
+                    except Exception:
+                        df = pd.DataFrame()
+    else:
+        # Direct path (short query, no engine overhead)
+        logger.info(
+            "Reject primary SQL selected for direct execution (template=%s)",
+            _REJECT_PRIMARY_SQL_TEMPLATE,
+        )
+        sql = _prepare_sql(
+            _REJECT_PRIMARY_SQL_TEMPLATE,
+            where_clause="",
+            base_variant="lot",
+            base_where=base_where,
+            workflow_filter=workflow_filter,
+        )
+        df = read_sql_df(sql, base_params)
+        if df is None:
+            df = pd.DataFrame()
+        # Report 100% for direct path
+        if progress_callback is not None:
+            try:
+                progress_callback("running", "1/1", 100)
+            except Exception:
+                pass
+
+    # Store result
+    if not df.empty:
+        stored_via_spool = _store_query_result(query_id, df)
+        if partial_failure_meta.get("has_partial_failure"):
+            flag_ttl = (
+                _REJECT_ENGINE_SPOOL_TTL_SECONDS if stored_via_spool else _CACHE_TTL
+            )
+            _store_partial_failure_flag(
+                query_id,
+                partial_failure_meta.get("failed_chunk_count", 0),
+                partial_failure_meta.get("failed_ranges"),
+                flag_ttl,
+            )
+        else:
+            _clear_partial_failure_flag(query_id)
+
+    return partial_failure_meta
+
+
+# ============================================================
 # Primary query
 # ============================================================
 
@@ -591,12 +862,14 @@ def execute_primary_query(
         )
         raise RejectPrimaryQueryOverloadError(
             "系統記憶體使用率過高，請稍後重試",
-            code="SERVICE_OVERLOADED",
+            code="SERVICE_UNAVAILABLE",
             retry_after=30,
         )
 
     lock_owner = f"{os.getpid()}:{uuid.uuid4().hex}"
     has_query_lock = False
+    _slot_owner: Optional[str] = None
+    _slot_acquired = False
     try:
         has_query_lock = _acquire_query_lock(query_id, lock_owner)
         if not has_query_lock:
@@ -609,7 +882,7 @@ def execute_primary_query(
             if not has_query_lock:
                 raise RejectPrimaryQueryOverloadError(
                     "同條件查詢正在執行中，請稍後重試",
-                    code="QUERY_IN_FLIGHT",
+                    code="SERVICE_UNAVAILABLE",
                     retry_after=5,
                 )
 
@@ -620,6 +893,10 @@ def execute_primary_query(
 
         # ---- Execute Oracle query (NO policy filters — cache unfiltered) ----
         logger.info("Dataset cache miss for query_id=%s, querying Oracle", query_id)
+
+        # Acquire global concurrency slot (fail-open: proceeds if Redis unavailable)
+        _slot_owner = f"sync:{os.getpid()}:{lock_owner}"
+        _slot_acquired = acquire_heavy_query_slot(_slot_owner)
 
         # Decide whether to route through BatchQueryEngine
         from mes_dashboard.services.batch_query_engine import (
@@ -781,7 +1058,8 @@ def execute_primary_query(
                     ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
                 )
                 if spool_registered:
-                    df = _get_cached_df(query_id) or pd.DataFrame()
+                    _cached = _get_cached_df(query_id)
+                    df = _cached if _cached is not None else pd.DataFrame()
                 else:
                     # Fallback: spool_tmp_path still exists if register_spool_file did not move it
                     from pathlib import Path as _Path
@@ -840,6 +1118,8 @@ def execute_primary_query(
         )
         return _build_primary_response(query_id, filtered, meta, resolution_info)
     finally:
+        if _slot_acquired and _slot_owner:
+            release_heavy_query_slot(_slot_owner)
         if has_query_lock:
             _release_query_lock(query_id, lock_owner)
 

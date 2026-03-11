@@ -765,7 +765,7 @@ def events():
             rss_now, TRACE_SYNC_RSS_REJECT_MB, cid_count,
         )
         return error_response(
-            "SERVICE_OVERLOADED",
+            "SERVICE_UNAVAILABLE",
             "伺服器記憶體負載過高，請稍後再試",
             status_code=503,
             headers={"Retry-After": "30"},
@@ -866,7 +866,7 @@ def events():
                     rss_before_agg, TRACE_SYNC_RSS_REJECT_MB,
                 )
                 return error_response(
-                    "SERVICE_OVERLOADED",
+                    "SERVICE_UNAVAILABLE",
                     "伺服器記憶體負載過高，無法完成聚合計算，請稍後再試",
                     status_code=503,
                     headers={"Retry-After": "30"},

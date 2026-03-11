@@ -11,6 +11,7 @@ from flask import Blueprint, request
 
 from mes_dashboard.core.response import (
     VALIDATION_ERROR,
+    SERVICE_UNAVAILABLE,
     cache_expired_error,
     error_response,
     internal_error,
@@ -20,6 +21,7 @@ from mes_dashboard.core.response import (
 )
 
 from mes_dashboard.core.cache import cache_get, cache_set
+from mes_dashboard.core.database import get_slow_query_active_count
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.services.yield_alert_dataset_cache import (
@@ -52,6 +54,8 @@ _YIELD_ALERT_ENABLED = os.getenv("YIELD_ALERT_CENTER_ENABLED", "true").strip().l
     "yes",
     "on",
 }
+
+_HEAVY_QUERY_REJECT_THRESHOLD = max(1, int(os.getenv("HEAVY_QUERY_REJECT_THRESHOLD", "4")))
 
 _DEFAULT_CACHE_TTL = max(30, int(os.getenv("YIELD_ALERT_CACHE_TTL_SECONDS", "300")))
 
@@ -154,6 +158,19 @@ def api_yield_alert_query():
     end_date = str(body.get("end_date", "")).strip()
     if not start_date or not end_date:
         return validation_error("缺少必要參數: start_date, end_date")
+
+    # Phase 0: concurrency fast-rejection
+    try:
+        if get_slow_query_active_count() >= _HEAVY_QUERY_REJECT_THRESHOLD:
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "系統忙碌中，請稍後再試",
+                status_code=503,
+                meta={"retry_after_seconds": 30},
+                headers={"Retry-After": "30"},
+            )
+    except Exception:
+        pass
 
     try:
         result = execute_primary_query(start_date=start_date, end_date=end_date)

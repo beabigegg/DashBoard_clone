@@ -4,9 +4,18 @@
 Bidirectional traceability from any detection station to upstream/downstream.
 """
 
+import os
+
 from flask import Blueprint, request, Response
 
-from mes_dashboard.core.response import success_response, validation_error, internal_error
+from mes_dashboard.core.response import (
+    success_response,
+    validation_error,
+    internal_error,
+    error_response,
+    SERVICE_UNAVAILABLE,
+)
+from mes_dashboard.core.database import get_slow_query_active_count
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.services.mid_section_defect_service import (
     query_analysis,
@@ -21,6 +30,8 @@ mid_section_defect_bp = Blueprint(
     __name__,
     url_prefix='/api/mid-section-defect'
 )
+
+_HEAVY_QUERY_REJECT_THRESHOLD = max(1, int(os.getenv("HEAVY_QUERY_REJECT_THRESHOLD", "4")))
 
 _ANALYSIS_RATE_LIMIT = configured_rate_limit(
     bucket="mid-section-defect-analysis",
@@ -80,6 +91,19 @@ def api_analysis():
 
     if not start_date or not end_date:
         return validation_error('必須提供 start_date 和 end_date 參數')
+
+    # Phase 0: concurrency fast-rejection
+    try:
+        if get_slow_query_active_count() >= _HEAVY_QUERY_REJECT_THRESHOLD:
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "系統忙碌中，請稍後再試",
+                status_code=503,
+                meta={"retry_after_seconds": 30},
+                headers={"Retry-After": "30"},
+            )
+    except Exception:
+        pass
 
     result = query_analysis(start_date, end_date, loss_reasons, station, direction)
 

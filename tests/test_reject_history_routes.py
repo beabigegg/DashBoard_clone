@@ -208,7 +208,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         mock_execute.side_effect = RejectPrimaryQueryOverloadError(
             "同條件查詢正在執行中，請稍後重試",
-            code="QUERY_IN_FLIGHT",
+            code="SERVICE_UNAVAILABLE",
             retry_after=5,
         )
 
@@ -227,7 +227,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 503)
         self.assertFalse(payload['success'])
-        self.assertEqual(payload['error']['code'], 'QUERY_IN_FLIGHT')
+        self.assertEqual(payload['error']['code'], 'SERVICE_UNAVAILABLE')
         self.assertEqual(response.headers.get('Retry-After'), '5')
 
     @patch('mes_dashboard.routes.reject_history_routes.query_trend')

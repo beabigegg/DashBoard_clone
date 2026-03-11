@@ -9,6 +9,7 @@ import {
   validateDateRange,
 } from '../core/reject-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling.js';
 
 import DetailTable from './components/DetailTable.vue';
 import FilterPanel from './components/FilterPanel.vue';
@@ -147,6 +148,17 @@ const loading = reactive({
 const errorMessage = ref('');
 const partialFailureWarning = ref('');
 const lastQueryAt = ref('');
+
+// ---- Async job progress state ----
+const jobProgress = reactive({
+  active: false,
+  jobId: null,
+  status: null,
+  progress: '',
+  pct: 0,
+  elapsedSeconds: 0,
+});
+let _jobAbortController = null;
 
 // ---- Request staleness tracking ----
 let activeRequestId = 0;
@@ -296,12 +308,79 @@ async function fetchBatchPareto() {
 }
 
 // ---- Primary query (POST /query → Oracle → cache) ----
+function cancelAsyncJob() {
+  if (_jobAbortController) {
+    _jobAbortController.abort();
+    _jobAbortController = null;
+  }
+  jobProgress.active = false;
+}
+
+async function _loadViewAfterQuery(queryIdValue) {
+  // After a successful query (sync or async), load view data via /view
+  committedPrimary.mode = queryMode.value;
+  committedPrimary.startDate = draftFilters.startDate;
+  committedPrimary.endDate = draftFilters.endDate;
+  committedPrimary.containerInputType = containerInputType.value;
+  committedPrimary.containerValues =
+    queryMode.value === 'container' ? parseMultiLineInput(containerInput.value) : [];
+  committedPrimary.includeExcludedScrap = draftFilters.includeExcludedScrap;
+  committedPrimary.excludeMaterialScrap = draftFilters.excludeMaterialScrap;
+  committedPrimary.excludePbDiode = draftFilters.excludePbDiode;
+
+  queryId.value = queryIdValue;
+}
+
+async function _applyQueryResult(result) {
+  const meta = result.meta || {};
+  if (meta.has_partial_failure) {
+    const failedChunkCount = Number(meta.failed_chunk_count || 0);
+    const failedRanges = Array.isArray(meta.failed_ranges) ? meta.failed_ranges : [];
+    if (failedRanges.length > 0) {
+      const rangesText = failedRanges
+        .map((item) => `${item.start} ~ ${item.end}`)
+        .join('、');
+      partialFailureWarning.value = `警告：以下日期區間的資料擷取失敗（${failedChunkCount} 個批次）：${rangesText}。目前顯示結果可能不完整。`;
+    } else {
+      partialFailureWarning.value = `警告：${failedChunkCount} 個查詢批次的資料擷取失敗。目前顯示結果可能不完整。`;
+    }
+  }
+
+  resolutionInfo.value = result.resolution_info || null;
+  const af = result.available_filters || {};
+  availableFilters.value = {
+    workcenterGroups: af.workcenter_groups || af.workcenterGroups || [],
+    packages: af.packages || [],
+    reasons: af.reasons || [],
+  };
+
+  supplementaryFilters.packages = [];
+  supplementaryFilters.workcenterGroups = [];
+  supplementaryFilters.reasons = [];
+  page.value = 1;
+  selectedTrendDates.value = [];
+  resetParetoSelections();
+  resetParetoData();
+
+  analyticsRawItems.value = Array.isArray(result.analytics_raw)
+    ? result.analytics_raw
+    : [];
+  summary.value = result.summary || summary.value;
+  detail.value = result.detail || detail.value;
+
+  await fetchBatchPareto();
+
+  lastQueryAt.value = new Date().toLocaleString('zh-TW');
+  updateUrlState();
+}
+
 async function executePrimaryQuery() {
   const requestId = nextRequestId();
   loading.querying = true;
   loading.list = true;
   errorMessage.value = '';
   partialFailureWarning.value = '';
+  cancelAsyncJob();
 
   try {
     const body = { mode: queryMode.value };
@@ -329,62 +408,60 @@ async function executePrimaryQuery() {
     const resp = await apiPost('/api/reject-history/query', body, { timeout: API_TIMEOUT });
     if (isStaleRequest(requestId)) return;
 
-    const result = unwrapApiResult(resp, '主查詢執行失敗');
-    const meta = result.meta || {};
-    if (meta.has_partial_failure) {
-      const failedChunkCount = Number(meta.failed_chunk_count || 0);
-      const failedRanges = Array.isArray(meta.failed_ranges) ? meta.failed_ranges : [];
-      if (failedRanges.length > 0) {
-        const rangesText = failedRanges
-          .map((item) => `${item.start} ~ ${item.end}`)
-          .join('、');
-        partialFailureWarning.value = `警告：以下日期區間的資料擷取失敗（${failedChunkCount} 個批次）：${rangesText}。目前顯示結果可能不完整。`;
-      } else {
-        partialFailureWarning.value = `警告：${failedChunkCount} 個查詢批次的資料擷取失敗。目前顯示結果可能不完整。`;
+    // ---- Async 202 path ----
+    if (resp?._status === 202 || (resp?.async === true && resp?.job_id)) {
+      const jobId = resp.job_id;
+      const statusUrl = resp.status_url || `/api/reject-history/job/${jobId}`;
+      const preQueryId = resp.query_id;
+
+      jobProgress.active = true;
+      jobProgress.jobId = jobId;
+      jobProgress.status = 'queued';
+      jobProgress.progress = '';
+      jobProgress.pct = 0;
+
+      const controller = new AbortController();
+      _jobAbortController = controller;
+
+      try {
+        await pollJobUntilComplete(statusUrl, {
+          signal: controller.signal,
+          onProgress: (statusResp) => {
+            if (isStaleRequest(requestId)) return;
+            jobProgress.status = statusResp.status;
+            jobProgress.progress = statusResp.progress || '';
+            jobProgress.pct = statusResp.pct || 0;
+            jobProgress.elapsedSeconds = statusResp.elapsed_seconds || 0;
+          },
+        });
+      } finally {
+        if (_jobAbortController === controller) _jobAbortController = null;
+        jobProgress.active = false;
       }
+
+      if (isStaleRequest(requestId)) return;
+
+      // Load view data using the pre-computed query_id from the 202 response
+      await _loadViewAfterQuery(preQueryId);
+
+      // Refresh view to populate result data from cache
+      await refreshView();
+      return;
     }
 
-    committedPrimary.mode = queryMode.value;
-    committedPrimary.startDate = draftFilters.startDate;
-    committedPrimary.endDate = draftFilters.endDate;
-    committedPrimary.containerInputType = containerInputType.value;
-    committedPrimary.containerValues =
-      queryMode.value === 'container' ? parseMultiLineInput(containerInput.value) : [];
-    committedPrimary.includeExcludedScrap = draftFilters.includeExcludedScrap;
-    committedPrimary.excludeMaterialScrap = draftFilters.excludeMaterialScrap;
-    committedPrimary.excludePbDiode = draftFilters.excludePbDiode;
+    // ---- Sync 200 path (original behavior) ----
+    const result = unwrapApiResult(resp, '主查詢執行失敗');
+    await _loadViewAfterQuery(result.query_id);
+    await _applyQueryResult(result);
 
-    queryId.value = result.query_id;
-    resolutionInfo.value = result.resolution_info || null;
-    const af = result.available_filters || {};
-    availableFilters.value = {
-      workcenterGroups: af.workcenter_groups || af.workcenterGroups || [],
-      packages: af.packages || [],
-      reasons: af.reasons || [],
-    };
-
-    supplementaryFilters.packages = [];
-    supplementaryFilters.workcenterGroups = [];
-    supplementaryFilters.reasons = [];
-    page.value = 1;
-    selectedTrendDates.value = [];
-    resetParetoSelections();
-    resetParetoData();
-
-    analyticsRawItems.value = Array.isArray(result.analytics_raw)
-      ? result.analytics_raw
-      : [];
-    summary.value = result.summary || summary.value;
-    detail.value = result.detail || detail.value;
-
-    await fetchBatchPareto();
-
-    lastQueryAt.value = new Date().toLocaleString('zh-TW');
-    updateUrlState();
   } catch (error) {
     if (isStaleRequest(requestId)) return;
     if (error?.name === 'AbortError') {
-      errorMessage.value = `查詢逾時，請縮短日期範圍（最多 ${PRIMARY_QUERY_MAX_DAYS} 天）後重試`;
+      errorMessage.value = '查詢已取消';
+    } else if (error?.errorCode === 'JOB_FAILED') {
+      errorMessage.value = error?.message || '背景查詢失敗';
+    } else if (error?.errorCode === 'JOB_POLL_TIMEOUT') {
+      errorMessage.value = '背景查詢超時，請稍後重試';
     } else {
       errorMessage.value = error?.message || '主查詢執行失敗';
     }
@@ -392,6 +469,7 @@ async function executePrimaryQuery() {
     if (isStaleRequest(requestId)) return;
     loading.querying = false;
     loading.list = false;
+    jobProgress.active = false;
   }
 }
 
@@ -997,6 +1075,23 @@ onMounted(() => {
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
     <div v-if="partialFailureWarning" class="warning-banner">
       {{ partialFailureWarning }}
+    </div>
+
+    <!-- Async job progress overlay -->
+    <div v-if="jobProgress.active" class="async-job-progress-overlay">
+      <div class="async-job-progress-card">
+        <div class="async-job-progress-title">背景查詢中…</div>
+        <div class="async-job-progress-text">
+          {{ jobProgress.progress || jobProgress.status || '處理中' }}
+          <span v-if="jobProgress.pct > 0">（{{ jobProgress.pct }}%）</span>
+        </div>
+        <div v-if="jobProgress.elapsedSeconds > 0" class="async-job-progress-elapsed">
+          已等待 {{ jobProgress.elapsedSeconds }} 秒
+        </div>
+        <button type="button" class="btn btn-light async-job-cancel-btn" @click="cancelAsyncJob">
+          取消查詢
+        </button>
+      </div>
     </div>
 
     <FilterPanel

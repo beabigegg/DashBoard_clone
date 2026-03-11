@@ -506,6 +506,7 @@ def health_check():
     runtime_contract = build_runtime_contract_diagnostics(strict=False)
 
     # Check worker memory pressure
+    system_memory: dict = {}
     try:
         from mes_dashboard.core.worker_memory_guard import get_memory_guard_telemetry
         mem_guard = get_memory_guard_telemetry()
@@ -520,6 +521,20 @@ def health_check():
     except Exception:
         pass
 
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        sys_used_pct = vm.percent
+        sys_pressure = "critical" if sys_used_pct > 90 else ("high" if sys_used_pct > 80 else "normal")
+        system_memory = {
+            "total_mb": round(vm.total / (1024 * 1024), 0),
+            "available_mb": round(vm.available / (1024 * 1024), 0),
+            "used_pct": round(sys_used_pct, 1),
+            "pressure": sys_pressure,
+        }
+    except Exception as exc:
+        system_memory = {"error": str(exc)}
+
     # Check equipment status cache
     equipment_status_cache = get_equipment_status_cache_status()
     if equipment_status_cache.get('enabled') and not equipment_status_cache.get('loaded'):
@@ -527,6 +542,17 @@ def health_check():
 
     # Check workcenter mapping
     workcenter_mapping = get_workcenter_mapping_status()
+
+    # Async workers (RQ) status — on-demand, no daemon
+    async_workers: dict = {}
+    try:
+        from mes_dashboard.services.rq_monitor_service import get_rq_monitor_summary
+        async_workers = get_rq_monitor_summary()
+        ws = async_workers.get("workers", {}).get("summary", {})
+        if ws.get("total", 0) == 0 and async_workers.get("rq_available") is False:
+            warnings.append("RQ Worker 離線，非同步查詢不可用")
+    except Exception:
+        pass
 
     response = {
         'status': status,
@@ -556,6 +582,8 @@ def health_check():
         'resource_cache': resource_cache,
         'equipment_status_cache': equipment_status_cache,
         'workcenter_mapping': workcenter_mapping,
+        'system_memory': system_memory,
+        'async_workers': async_workers,
     }
 
     if errors:
@@ -693,6 +721,32 @@ def deep_health_check():
         cache_freshness = 'stale'
         warnings.append("Cache data may be stale")
 
+    deep_system_memory: dict = {}
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        sys_used_pct = vm.percent
+        sys_pressure = "critical" if sys_used_pct > 90 else ("high" if sys_used_pct > 80 else "normal")
+        deep_system_memory = {
+            "total_mb": round(vm.total / (1024 * 1024), 0),
+            "available_mb": round(vm.available / (1024 * 1024), 0),
+            "used_pct": round(sys_used_pct, 1),
+            "pressure": sys_pressure,
+        }
+    except Exception as exc:
+        deep_system_memory = {"error": str(exc)}
+
+    # Async workers (RQ) status
+    deep_async_workers: dict = {}
+    try:
+        from mes_dashboard.services.rq_monitor_service import get_rq_monitor_summary
+        deep_async_workers = get_rq_monitor_summary()
+        dw_summary = deep_async_workers.get("workers", {}).get("summary", {})
+        if dw_summary.get("total", 0) == 0 and deep_async_workers.get("rq_available") is False:
+            warnings.append("RQ Worker 離線，非同步查詢不可用")
+    except Exception:
+        pass
+
     response = {
         'status': status,
         'degraded_reason': degraded_reason,
@@ -739,7 +793,9 @@ def deep_health_check():
             'slow_query_count': metrics.get('slow_count'),
             'slow_query_rate': metrics.get('slow_rate'),
             'worker_pid': metrics.get('worker_pid')
-        }
+        },
+        'system_memory': deep_system_memory,
+        'async_workers': deep_async_workers,
     }
 
     if warnings:

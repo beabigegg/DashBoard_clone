@@ -153,10 +153,10 @@ def _is_service_overloaded(resp: requests.Response) -> bool:
         return False
     error_obj = payload.get("error")
     if isinstance(error_obj, dict):
-        return error_obj.get("code") == "SERVICE_OVERLOADED"
+        return error_obj.get("code") == "SERVICE_UNAVAILABLE"
     if isinstance(error_obj, str):
-        return "SERVICE_OVERLOADED" in error_obj or "記憶體負載" in error_obj
-    return payload.get("code") == "SERVICE_OVERLOADED"
+        return "SERVICE_UNAVAILABLE" in error_obj or "記憶體負載" in error_obj
+    return payload.get("code") == "SERVICE_UNAVAILABLE"
 
 
 # ---------------------------------------------------------------------------

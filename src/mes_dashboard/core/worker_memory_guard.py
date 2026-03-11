@@ -60,6 +60,10 @@ _HARD_RATIO = _float_env("WORKER_RSS_HARD_RATIO", 0.95)
 _CHECK_INTERVAL = _int_env("WORKER_RSS_CHECK_INTERVAL", 15)
 _RESTART_COOLDOWN = _int_env("WORKER_RSS_RESTART_COOLDOWN", 120)
 
+# System memory thresholds
+_SYSTEM_MEM_WARN_PCT = _float_env("SYSTEM_MEM_WARN_PCT", 85.0)
+_SYSTEM_MEM_REJECT_PCT = _float_env("SYSTEM_MEM_REJECT_PCT", 92.0)
+
 
 # ============================================================
 # RSS Limit Auto-Detection
@@ -102,6 +106,8 @@ class _Telemetry:
         "warn_count", "evict_count", "restart_count",
         "last_rss_mb", "last_check_at", "last_level",
         "limit_mb", "rss_pct",
+        "system_memory_pressure",
+        "system_mem_used_pct", "system_mem_available_mb",
     )
 
     def __init__(self) -> None:
@@ -113,6 +119,9 @@ class _Telemetry:
         self.last_level: str = "normal"
         self.limit_mb: int = 0
         self.rss_pct: float = 0.0
+        self.system_memory_pressure: bool = False
+        self.system_mem_used_pct: float = 0.0
+        self.system_mem_available_mb: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -125,6 +134,9 @@ class _Telemetry:
             "evict_count": self.evict_count,
             "restart_count": self.restart_count,
             "check_interval": _CHECK_INTERVAL,
+            "system_memory_pressure": self.system_memory_pressure,
+            "system_mem_used_pct": round(self.system_mem_used_pct, 1),
+            "system_mem_available_mb": round(self.system_mem_available_mb, 0),
         }
 
 
@@ -191,6 +203,55 @@ class _WorkerMemoryGuard:
             except Exception as exc:
                 logger.debug("RSS guard check error: %s", exc)
 
+    def _check_system_memory(self) -> None:
+        """Check system-level memory and update telemetry flags."""
+        try:
+            import psutil
+            vm = psutil.virtual_memory()
+            used_pct = vm.percent
+            available_mb = vm.available / (1024 * 1024)
+
+            _telemetry.system_mem_used_pct = used_pct
+            _telemetry.system_mem_available_mb = available_mb
+
+            if used_pct > _SYSTEM_MEM_REJECT_PCT:
+                if not _telemetry.system_memory_pressure:
+                    logger.warning(
+                        "System memory pressure CRITICAL: %.1f%% used (threshold=%.0f%%), "
+                        "setting reject flag",
+                        used_pct, _SYSTEM_MEM_REJECT_PCT,
+                    )
+                _telemetry.system_memory_pressure = True
+                # Also trigger cache eviction
+                from mes_dashboard.core.cache import emergency_clear_all_process_caches
+                import gc
+                emergency_clear_all_process_caches()
+                gc.collect()
+            elif used_pct > _SYSTEM_MEM_WARN_PCT:
+                if _telemetry.system_memory_pressure:
+                    logger.info(
+                        "System memory pressure cleared (%.1f%% used)",
+                        used_pct,
+                    )
+                _telemetry.system_memory_pressure = False
+                logger.warning(
+                    "System memory warning: %.1f%% used (threshold=%.0f%%), triggering eviction",
+                    used_pct, _SYSTEM_MEM_WARN_PCT,
+                )
+                from mes_dashboard.core.cache import emergency_clear_all_process_caches
+                import gc
+                emergency_clear_all_process_caches()
+                gc.collect()
+            else:
+                if _telemetry.system_memory_pressure:
+                    logger.info(
+                        "System memory pressure cleared (%.1f%% used)",
+                        used_pct,
+                    )
+                _telemetry.system_memory_pressure = False
+        except Exception as exc:
+            logger.debug("System memory check error: %s", exc)
+
     def _check_rss(self) -> None:
         rss_mb = _current_rss_mb()
         if rss_mb is None:
@@ -202,6 +263,9 @@ class _WorkerMemoryGuard:
         _telemetry.last_rss_mb = rss_mb
         _telemetry.last_check_at = now
         _telemetry.rss_pct = pct
+
+        # Check system memory in the same cycle
+        self._check_system_memory()
 
         # --- Level 1: Normal ---
         if rss_mb < self._warn_mb:

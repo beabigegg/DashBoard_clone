@@ -60,7 +60,13 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     latency_count INTEGER,
     slow_query_active INTEGER,
     slow_query_waiting INTEGER,
-    worker_rss_bytes INTEGER
+    worker_rss_bytes INTEGER,
+    system_mem_available_mb REAL,
+    system_mem_used_pct REAL,
+    rq_workers_total INTEGER,
+    rq_workers_busy INTEGER,
+    rq_queue_depth INTEGER,
+    heavy_query_slots_active INTEGER
 );
 """
 
@@ -69,6 +75,12 @@ _MIGRATION_COLUMNS = [
     ("slow_query_active", "INTEGER"),
     ("slow_query_waiting", "INTEGER"),
     ("worker_rss_bytes", "INTEGER"),
+    ("system_mem_available_mb", "REAL"),
+    ("system_mem_used_pct", "REAL"),
+    ("rq_workers_total", "INTEGER"),
+    ("rq_workers_busy", "INTEGER"),
+    ("rq_queue_depth", "INTEGER"),
+    ("heavy_query_slots_active", "INTEGER"),
 ]
 
 CREATE_INDEX_SQL = (
@@ -83,6 +95,9 @@ COLUMNS = [
     "rc_l1_hit_rate", "rc_l2_hit_rate", "rc_miss_rate",
     "latency_p50_ms", "latency_p95_ms", "latency_p99_ms", "latency_count",
     "slow_query_active", "slow_query_waiting", "worker_rss_bytes",
+    "system_mem_available_mb", "system_mem_used_pct",
+    "rq_workers_total", "rq_workers_busy", "rq_queue_depth",
+    "heavy_query_slots_active",
 ]
 
 
@@ -198,8 +213,11 @@ class MetricsHistoryStore:
                              redis_used_memory, redis_hit_rate,
                              rc_l1_hit_rate, rc_l2_hit_rate, rc_miss_rate,
                              latency_p50_ms, latency_p95_ms, latency_p99_ms, latency_count,
-                             slow_query_active, slow_query_waiting, worker_rss_bytes)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                             slow_query_active, slow_query_waiting, worker_rss_bytes,
+                             system_mem_available_mb, system_mem_used_pct,
+                             rq_workers_total, rq_workers_busy,
+                             rq_queue_depth, heavy_query_slots_active)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                         """,
                         (
                             ts, pid,
@@ -220,6 +238,12 @@ class MetricsHistoryStore:
                             data.get("slow_query_active"),
                             data.get("slow_query_waiting"),
                             data.get("worker_rss_bytes"),
+                            data.get("system_mem_available_mb"),
+                            data.get("system_mem_used_pct"),
+                            data.get("rq_workers_total"),
+                            data.get("rq_workers_busy"),
+                            data.get("rq_queue_depth"),
+                            data.get("heavy_query_slots_active"),
                         ),
                     )
                     conn.commit()
@@ -281,6 +305,12 @@ class MetricsHistoryStore:
                 MAX(slow_query_active)  AS slow_query_active,
                 MAX(slow_query_waiting) AS slow_query_waiting,
                 MAX(worker_rss_bytes)   AS worker_rss_bytes,
+                MIN(system_mem_available_mb) AS system_mem_available_mb,
+                MAX(system_mem_used_pct) AS system_mem_used_pct,
+                MAX(rq_workers_total)   AS rq_workers_total,
+                MAX(rq_workers_busy)    AS rq_workers_busy,
+                MAX(rq_queue_depth)     AS rq_queue_depth,
+                MAX(heavy_query_slots_active) AS heavy_query_slots_active,
                 COUNT(DISTINCT worker_pid) AS worker_count,
                 ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
             FROM metrics_snapshots
@@ -430,6 +460,16 @@ class MetricsHistoryCollector:
             except Exception:
                 data["worker_rss_bytes"] = 0
 
+            # System memory (total machine memory)
+            try:
+                import psutil
+                vm = psutil.virtual_memory()
+                data["system_mem_available_mb"] = round(vm.available / (1024 * 1024), 1)
+                data["system_mem_used_pct"] = round(vm.percent, 1)
+            except Exception:
+                data["system_mem_available_mb"] = None
+                data["system_mem_used_pct"] = None
+
             # Redis
             try:
                 from mes_dashboard.core.redis_client import (
@@ -488,6 +528,21 @@ class MetricsHistoryCollector:
                 }
             except Exception:
                 data["latency"] = {}
+
+            # RQ worker & queue metrics
+            try:
+                from mes_dashboard.services.rq_monitor_service import (
+                    get_rq_worker_details,
+                    get_rq_queue_details,
+                )
+                from mes_dashboard.core.global_concurrency import get_active_slot_count
+                w = get_rq_worker_details().get("summary", {})
+                data["rq_workers_total"] = w.get("total", 0)
+                data["rq_workers_busy"] = w.get("busy", 0)
+                data["rq_queue_depth"] = get_rq_queue_details().get("total_queued", 0)
+                data["heavy_query_slots_active"] = get_active_slot_count()
+            except Exception:
+                pass  # columns stay None → SQLite stores NULL
 
             self._store.write_snapshot(data)
         except Exception as exc:

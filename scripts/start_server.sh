@@ -37,6 +37,9 @@ WATCHDOG_ENABLED="${WATCHDOG_ENABLED:-true}"
 # RQ trace worker configuration
 TRACE_WORKER_ENABLED="${TRACE_WORKER_ENABLED:-true}"
 TRACE_WORKER_QUEUE="${TRACE_WORKER_QUEUE:-trace-events}"
+# RQ reject query worker configuration
+RQ_REJECT_WORKER_ENABLED="${RQ_REJECT_WORKER_ENABLED:-true}"
+RQ_REJECT_WORKER_QUEUE="${RQ_REJECT_WORKER_QUEUE:-reject-query}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -87,6 +90,10 @@ resolve_runtime_paths() {
     WATCHDOG_PROCESS_PID_FILE="${WATCHDOG_PROCESS_PID_FILE:-${WATCHDOG_RUNTIME_DIR}/worker_watchdog.pid}"
     RQ_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_trace_worker.pid"
     RQ_WORKER_LOG="${LOG_DIR}/rq_worker.log"
+    RQ_REJECT_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_reject_worker.pid"
+    RQ_REJECT_WORKER_LOG="${LOG_DIR}/rq_reject_worker.log"
+    RQ_LOG_FORMAT="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    RQ_DATE_FORMAT="%Y-%m-%d %H:%M:%S"
     PID_FILE="${WATCHDOG_PID_FILE}"
     export WATCHDOG_RUNTIME_DIR WATCHDOG_RESTART_FLAG WATCHDOG_PID_FILE WATCHDOG_STATE_FILE WATCHDOG_PROCESS_PID_FILE
 }
@@ -572,11 +579,23 @@ rotate_logs() {
         log_info "Archived watchdog.log -> archive/watchdog_${ts}.log"
     fi
 
+    if [ -f "$RQ_WORKER_LOG" ] && [ -s "$RQ_WORKER_LOG" ]; then
+        mv "$RQ_WORKER_LOG" "${LOG_DIR}/archive/rq_worker_${ts}.log"
+        log_info "Archived rq_worker.log -> archive/rq_worker_${ts}.log"
+    fi
+
+    if [ -f "$RQ_REJECT_WORKER_LOG" ] && [ -s "$RQ_REJECT_WORKER_LOG" ]; then
+        mv "$RQ_REJECT_WORKER_LOG" "${LOG_DIR}/archive/rq_reject_worker_${ts}.log"
+        log_info "Archived rq_reject_worker.log -> archive/rq_reject_worker_${ts}.log"
+    fi
+
     # Clean up old archives (keep last 10)
     cd "${LOG_DIR}/archive" 2>/dev/null && \
         ls -t access_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
         ls -t error_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
-        ls -t watchdog_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f
+        ls -t watchdog_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
+        ls -t rq_worker_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
+        ls -t rq_reject_worker_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f
     cd "$ROOT"
 
     # Create fresh log files
@@ -755,9 +774,9 @@ start_rq_worker() {
     log_info "Starting RQ trace worker (queue: ${TRACE_WORKER_QUEUE})..."
     local redis_url="${REDIS_URL:-redis://localhost:6379/0}"
     if command -v setsid >/dev/null 2>&1; then
-        setsid rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
+        setsid rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
     else
-        nohup rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
+        nohup rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
     fi
     local pid=$!
     echo "$pid" > "$RQ_WORKER_PID_FILE"
@@ -816,6 +835,112 @@ rq_worker_status() {
         echo -e "  RQ Worker:${GREEN} RUNNING${NC} (PID: ${pid}, queue: ${TRACE_WORKER_QUEUE})"
     else
         echo -e "  RQ Worker:${RED} STOPPED${NC}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# RQ Reject Query Worker functions (independent from trace worker)
+# ---------------------------------------------------------------------------
+get_rq_reject_worker_pid() {
+    local saved_pid=""
+    if [ -f "${RQ_REJECT_WORKER_PID_FILE:-}" ]; then
+        saved_pid=$(cat "${RQ_REJECT_WORKER_PID_FILE}" 2>/dev/null || true)
+        if [ -n "$saved_pid" ] && kill -0 "$saved_pid" 2>/dev/null; then
+            echo "$saved_pid"
+            return 0
+        fi
+    fi
+    local discovered_pid
+    discovered_pid=$(pgrep -f "[r]q worker.*${RQ_REJECT_WORKER_QUEUE}" 2>/dev/null | head -1 || true)
+    if [ -n "$discovered_pid" ]; then
+        echo "$discovered_pid"
+        return 0
+    fi
+    return 1
+}
+
+is_rq_reject_worker_running() {
+    get_rq_reject_worker_pid &>/dev/null
+}
+
+start_rq_reject_worker() {
+    if ! is_enabled "${RQ_REJECT_WORKER_ENABLED:-true}"; then
+        log_info "RQ reject worker is disabled (RQ_REJECT_WORKER_ENABLED=${RQ_REJECT_WORKER_ENABLED:-true})"
+        return 0
+    fi
+
+    resolve_runtime_paths
+
+    if is_rq_reject_worker_running; then
+        local pid
+        pid=$(get_rq_reject_worker_pid)
+        log_info "RQ reject worker already running (PID: ${pid})"
+        return 0
+    fi
+
+    local redis_url="redis://127.0.0.1:6379/0"
+    if [ -n "${REDIS_URL:-}" ]; then
+        redis_url="${REDIS_URL}"
+    fi
+
+    log_info "Starting RQ reject worker (queue: ${RQ_REJECT_WORKER_QUEUE})..."
+
+    if command -v setsid &>/dev/null; then
+        setsid rq worker "${RQ_REJECT_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_REJECT_WORKER_LOG}" 2>&1 < /dev/null &
+    else
+        nohup rq worker "${RQ_REJECT_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_REJECT_WORKER_LOG}" 2>&1 < /dev/null &
+    fi
+    local worker_pid=$!
+    echo "$worker_pid" > "${RQ_REJECT_WORKER_PID_FILE}"
+    sleep 1
+    if kill -0 "$worker_pid" 2>/dev/null; then
+        log_success "RQ reject worker started (PID: ${worker_pid}, queue: ${RQ_REJECT_WORKER_QUEUE})"
+        return 0
+    else
+        log_error "RQ reject worker failed to start"
+        return 1
+    fi
+}
+
+stop_rq_reject_worker() {
+    if ! is_rq_reject_worker_running; then
+        log_info "RQ reject worker is not running"
+        return 0
+    fi
+
+    local pid
+    pid=$(get_rq_reject_worker_pid)
+    log_info "Stopping RQ reject worker (PID: ${pid})..."
+    if kill "$pid" 2>/dev/null; then
+        local wait=0
+        while kill -0 "$pid" 2>/dev/null && [ "$wait" -lt 10 ]; do
+            sleep 1
+            wait=$((wait+1))
+        done
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+        rm -f "${RQ_REJECT_WORKER_PID_FILE:-}" 2>/dev/null || true
+        log_success "RQ reject worker stopped"
+        return 0
+    else
+        log_error "Failed to stop RQ reject worker"
+        return 1
+    fi
+}
+
+rq_reject_worker_status() {
+    if ! is_enabled "${RQ_REJECT_WORKER_ENABLED:-true}"; then
+        echo -e "  RQ Reject Worker:${YELLOW} DISABLED${NC}"
+        return 0
+    fi
+
+    if is_rq_reject_worker_running; then
+        local pid
+        pid=$(get_rq_reject_worker_pid)
+        echo -e "  RQ Reject Worker:${GREEN} RUNNING${NC} (PID: ${pid}, queue: ${RQ_REJECT_WORKER_QUEUE})"
+    else
+        echo -e "  RQ Reject Worker:${RED} STOPPED${NC}"
     fi
 }
 
@@ -897,6 +1022,7 @@ do_start() {
             log_info "Logs: ${LOG_DIR}/"
             start_watchdog || return 1
             start_rq_worker
+            start_rq_reject_worker
             echo "[$(timestamp)] Server started (PID: ${pid})" >> "$STARTUP_LOG"
         else
             log_error "Failed to start server"
@@ -958,6 +1084,7 @@ do_stop() {
         fi
     fi
 
+    stop_rq_reject_worker
     stop_rq_worker
     stop_watchdog
 }
@@ -1005,6 +1132,7 @@ do_status() {
         echo -e "  Watchdog:${YELLOW} DISABLED${NC}"
     fi
     rq_worker_status
+    rq_reject_worker_status
 
     if is_running; then
         echo ""

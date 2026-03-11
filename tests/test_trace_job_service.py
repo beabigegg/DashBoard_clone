@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import mes_dashboard.services.async_query_job_service as aqs
 import mes_dashboard.services.trace_job_service as tjs
 
 
@@ -16,10 +17,10 @@ import mes_dashboard.services.trace_job_service as tjs
 # ---------------------------------------------------------------------------
 def test_is_async_available_true():
     """Should return True when rq is importable, Redis is up, and workers exist."""
-    tjs._RQ_AVAILABLE = None  # reset cached flag
-    tjs._rq_health_cache["available"] = None  # reset health cache
+    aqs._RQ_AVAILABLE = None  # reset cached flag (now lives in shared module)
+    aqs._rq_health_cache["available"] = None  # reset health cache
     mock_conn = MagicMock()
-    with patch.object(tjs, "get_redis_client", return_value=mock_conn), \
+    with patch.object(aqs, "get_redis_client", return_value=mock_conn), \
          patch("rq.Worker") as mock_worker_cls:
         mock_worker_cls.all.return_value = [MagicMock()]  # simulate one worker
         assert tjs.is_async_available() is True
@@ -27,9 +28,9 @@ def test_is_async_available_true():
 
 def test_is_async_available_false_no_redis():
     """Should return False when Redis is unavailable."""
-    tjs._RQ_AVAILABLE = True
-    tjs._rq_health_cache["available"] = None  # reset health cache
-    with patch.object(tjs, "get_redis_client", return_value=None):
+    aqs._RQ_AVAILABLE = True
+    aqs._rq_health_cache["available"] = None  # reset health cache (shared module)
+    with patch.object(aqs, "get_redis_client", return_value=None):
         assert tjs.is_async_available() is False
 
 

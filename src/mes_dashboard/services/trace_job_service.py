@@ -15,7 +15,7 @@ import os
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple  # noqa: F401
 
 from mes_dashboard.core.query_quality_contract import (
     QUALITY_SCOPE_DOMAIN,
@@ -41,76 +41,25 @@ TRACE_EVENTS_MAX_WORKERS = int(os.getenv("TRACE_EVENTS_MAX_WORKERS", "2"))
 TRACE_STREAM_BATCH_SIZE = int(os.getenv("TRACE_STREAM_BATCH_SIZE", "5000"))
 
 # ---------------------------------------------------------------------------
-# RQ queue accessor
+# RQ health check — delegates to shared async_query_job_service
 # ---------------------------------------------------------------------------
-_RQ_AVAILABLE: Optional[bool] = None
-
-# TTL-based cache for RQ health checks to avoid checking every request
-_RQ_HEALTH_TTL_SECONDS = 60
-_rq_health_cache: Dict[str, Any] = {"available": None, "checked_at": 0.0}
-
-
-def _check_rq_available() -> bool:
-    global _RQ_AVAILABLE
-    if _RQ_AVAILABLE is None:
-        try:
-            import rq  # noqa: F401
-            _RQ_AVAILABLE = True
-        except ImportError:
-            _RQ_AVAILABLE = False
-    return _RQ_AVAILABLE
-
 
 def is_async_available() -> bool:
     """Return True if RQ is installed, Redis is reachable, and workers exist.
 
-    Results are cached for 60 seconds to avoid checking every request.
-    Falls back gracefully: if any check fails, returns False.
+    Delegates to the shared async_query_job_service.is_async_available() to
+    avoid duplicate health-check logic and share the 60-second TTL cache.
     """
-    if not _check_rq_available():
-        return False
+    from mes_dashboard.services.async_query_job_service import (
+        is_async_available as _shared_is_async_available,
+    )
+    return _shared_is_async_available()
 
-    # Return cached result if within TTL
-    now = time.monotonic()
-    if (
-        _rq_health_cache["available"] is not None
-        and (now - _rq_health_cache["checked_at"]) < _RQ_HEALTH_TTL_SECONDS
-    ):
-        return _rq_health_cache["available"]
 
-    conn = get_redis_client()
-    if conn is None:
-        _rq_health_cache["available"] = False
-        _rq_health_cache["checked_at"] = now
-        return False
-
-    # Actual Redis ping check
-    try:
-        conn.ping()
-    except Exception:
-        logger.warning("RQ health check: Redis ping failed — marking async unavailable")
-        _rq_health_cache["available"] = False
-        _rq_health_cache["checked_at"] = now
-        return False
-
-    # RQ worker existence check
-    try:
-        import rq
-        workers = rq.Worker.all(connection=conn)
-        if not workers:
-            logger.warning("RQ health check: no workers found — marking async unavailable")
-            _rq_health_cache["available"] = False
-            _rq_health_cache["checked_at"] = now
-            return False
-    except Exception:
-        logger.warning("RQ health check: worker query failed — marking async unavailable")
-        _rq_health_cache["available"] = False
-        _rq_health_cache["checked_at"] = now
-        return False
-
-    _rq_health_cache["available"] = True
-    _rq_health_cache["checked_at"] = now
-    return True
+def _check_rq_available() -> bool:
+    """Check if RQ is installed (delegates to shared service)."""
+    from mes_dashboard.services.async_query_job_service import _check_rq_installed
+    return _check_rq_installed()
 
 
 def _get_rq_queue():
@@ -591,6 +540,9 @@ def execute_trace_events_job(
     This function runs in a dedicated RQ worker process — outside gunicorn —
     so it does not compete for gunicorn worker threads or the DB connection pool.
     """
+    from mes_dashboard.rq_worker_preload import ensure_rq_logging
+    ensure_rq_logging()
+
     from mes_dashboard.services.event_fetcher import EventFetcher
 
     logger.info(

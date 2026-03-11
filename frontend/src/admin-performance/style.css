@@ -617,3 +617,35 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Async Workers Panel */
+.theme-admin-performance .rq-worker-state-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.theme-admin-performance .rq-worker-state-dot--amber {
+  background: theme('colors.state.warning');
+}
+
+.theme-admin-performance .rq-worker-state-dot--green {
+  background: theme('colors.state.success');
+}
+
+.theme-admin-performance .rq-worker-state-dot--gray {
+  background: theme('colors.text.muted');
+}
+
+.theme-admin-performance .rq-job-id {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+  color: theme('colors.text.secondary');
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

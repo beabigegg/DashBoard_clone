@@ -38,6 +38,40 @@ class TestRejectHistoryLongRangeStress:
         except Exception:
             return None
 
+    # Expected guardrail error patterns — these indicate the system
+    # correctly rejected an oversized query, not a crash.
+    _GUARDRAIL_PATTERNS = (
+        "RESULT_TOO_LARGE",
+        "SERVICE_UNAVAILABLE",
+        "超過上限",
+        "HTTP 400",
+        "HTTP 503",
+    )
+
+    @classmethod
+    def _is_guardrail_response(cls, error_msg: str) -> bool:
+        """Return True if the error is an expected guardrail/backpressure response."""
+        return any(pat in error_msg for pat in cls._GUARDRAIL_PATTERNS)
+
+    @staticmethod
+    def _poll_async_job(base_url: str, job_id: str, timeout: float) -> tuple[bool, str]:
+        """Poll async job until terminal state. Returns (ok, query_id_or_error)."""
+        status_url = f"{base_url}/api/reject-history/job/{job_id}"
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            resp = requests.get(status_url, timeout=30)
+            if resp.status_code != 200:
+                return False, f"Job status HTTP {resp.status_code}"
+            payload = resp.json()
+            status = payload.get("data", payload)
+            job_status = status.get("status")
+            if job_status in ("completed", "finished"):
+                return True, status.get("query_id", "")
+            if job_status == "failed":
+                return False, f"Job failed: {str(status.get('error', ''))[:120]}"
+            time.sleep(3)
+        return False, f"Job {job_id} timed out"
+
     @staticmethod
     def _run_query(base_url: str, timeout: float, seed: int) -> tuple[bool, float, str]:
         start = time.time()
@@ -60,12 +94,33 @@ class TestRejectHistoryLongRangeStress:
                 timeout=timeout,
             )
             duration = time.time() - start
-            if response.status_code != 200:
-                return False, duration, f"HTTP {response.status_code}"
             payload = response.json()
-            if payload.get("success") is True and payload.get("query_id"):
-                return True, duration, ""
-            return False, duration, f"success={payload.get('success')} error={payload.get('error')}"
+
+            if response.status_code == 200:
+                data = payload.get("data", payload)
+                query_id = data.get("query_id") or payload.get("query_id")
+                if payload.get("success") is True and query_id:
+                    return True, duration, ""
+                return False, duration, f"success={payload.get('success')} error={payload.get('error')}"
+
+            if response.status_code == 202:
+                data = payload.get("data", payload)
+                job_id = data.get("job_id")
+                if not job_id:
+                    return False, duration, "202 missing job_id"
+                ok, msg = TestRejectHistoryLongRangeStress._poll_async_job(
+                    base_url, job_id, timeout - duration,
+                )
+                total_duration = time.time() - start
+                if ok:
+                    return True, total_duration, ""
+                return False, total_duration, msg
+
+            if response.status_code == 503:
+                code = payload.get("code", "")
+                return False, duration, f"HTTP 503 ({code})"
+
+            return False, duration, f"HTTP {response.status_code}"
         except Exception as exc:  # pragma: no cover - runtime/network dependent
             return False, time.time() - start, str(exc)[:180]
 
@@ -92,9 +147,28 @@ class TestRejectHistoryLongRangeStress:
                     result.add_failure(error, duration)
         result.total_duration = time.time() - started
 
+        # Classify errors: guardrail responses (backpressure, result-too-large)
+        # are expected behaviour, not crashes.
+        guardrail_count = sum(
+            1 for e in result.errors if self._is_guardrail_response(e)
+        )
+        unexpected_failures = result.failed_requests - guardrail_count
+        handled_rate = (
+            (result.successful_requests + guardrail_count) / result.total_requests * 100
+            if result.total_requests
+            else 0.0
+        )
+
         print(result.report())
+        print(f"Guardrail rejections: {guardrail_count}")
+        print(f"Unexpected failures:  {unexpected_failures}")
+        print(f"Handled rate:         {handled_rate:.2f}%")
+
         assert result.total_requests == total_requests
-        assert result.success_rate >= 90.0, f"Success rate too low: {result.success_rate:.2f}%"
+        assert handled_rate >= 90.0, (
+            f"Handled rate too low: {handled_rate:.2f}% "
+            f"(unexpected failures: {unexpected_failures})"
+        )
 
         health_resp = requests.get(f"{base_url}/health", timeout=10)
         assert health_resp.status_code in (200, 503)

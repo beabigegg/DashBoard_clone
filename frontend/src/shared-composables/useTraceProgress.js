@@ -1,12 +1,11 @@
 import { reactive, ref } from 'vue';
 
 import { apiGet, apiPost, ensureMesApiAvailable } from '../core/api.js';
+import { pollJobUntilComplete } from './useAsyncJobPolling.js';
 
 ensureMesApiAvailable();
 
 const DEFAULT_STAGE_TIMEOUT_MS = 360000;
-const JOB_POLL_INTERVAL_MS = 3000;
-const JOB_POLL_MAX_MS = 1800000; // 30 minutes
 const PROFILE_DOMAINS = Object.freeze({
   query_tool: ['history', 'materials', 'rejects', 'holds', 'jobs'],
   mid_section_defect: ['upstream_history', 'materials'],
@@ -73,50 +72,7 @@ function collectAllContainerIds(seedContainerIds, lineagePayload, direction) {
   return merged;
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Poll an async trace job until it completes or fails.
- *
- * @param {string} statusUrl - The job status endpoint URL
- * @param {object} options - { signal, onProgress }
- * @returns {Promise<string>} The final status ('finished' or throws)
- */
-async function pollJobUntilComplete(statusUrl, { signal, onProgress } = {}) {
-  const started = Date.now();
-
-  while (true) {
-    if (signal?.aborted) {
-      throw new DOMException('Aborted', 'AbortError');
-    }
-
-    const status = await apiGet(statusUrl, { timeout: 15000, signal });
-
-    if (typeof onProgress === 'function') {
-      onProgress(status);
-    }
-
-    if (status.status === 'finished') {
-      return 'finished';
-    }
-
-    if (status.status === 'failed') {
-      const error = new Error(status.error || '非同步查詢失敗');
-      error.errorCode = 'JOB_FAILED';
-      throw error;
-    }
-
-    if (Date.now() - started > JOB_POLL_MAX_MS) {
-      const error = new Error('非同步查詢超時');
-      error.errorCode = 'JOB_POLL_TIMEOUT';
-      throw error;
-    }
-
-    await sleep(JOB_POLL_INTERVAL_MS);
-  }
-}
+// pollJobUntilComplete is imported from useAsyncJobPolling.js
 
 /**
  * Consume an NDJSON stream from the server, calling onChunk for each line.
@@ -300,10 +256,10 @@ export function useTraceProgress({ profile } = {}) {
         // Phase 1: poll until job finishes
         await pollJobUntilComplete(eventsPayload.status_url, {
           signal: controller.signal,
-          onProgress: (status) => {
-            job_progress.status = status.status;
-            job_progress.elapsed_seconds = status.elapsed_seconds || 0;
-            job_progress.progress = status.progress || '';
+          onProgress: (statusResp) => {
+            job_progress.status = statusResp.status;
+            job_progress.elapsed_seconds = statusResp.elapsed_seconds || 0;
+            job_progress.progress = statusResp.progress || '';
           },
         });
 

@@ -749,7 +749,7 @@ def merge_chunks_to_spool(
             # Align schema for subsequent chunks (drop unexpected columns, fill missing)
             if table.schema != schema:
                 try:
-                    table = table.cast(schema)
+                    table = table.cast(schema, safe=False)
                 except Exception:
                     # Best-effort: select only columns in schema
                     common_cols = [f.name for f in schema if f.name in table.schema.names]
@@ -757,7 +757,8 @@ def merge_chunks_to_spool(
                         chunk_index += 1
                         continue
                     table = table.select(common_cols).cast(
-                        pa.schema([schema.field(c) for c in common_cols])
+                        pa.schema([schema.field(c) for c in common_cols]),
+                        safe=False,
                     )
 
             writer.write_table(table)
