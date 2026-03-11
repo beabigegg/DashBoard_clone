@@ -12,6 +12,13 @@ const PROFILE_DOMAINS = Object.freeze({
   mid_section_defect_forward: ['upstream_history', 'downstream_rejects'],
 });
 
+function unwrapEnvelope(result) {
+  if (result && result.success === true && 'data' in result) {
+    return result.data;
+  }
+  return result;
+}
+
 function stageKey(stageName) {
   if (stageName === 'seed-resolve') return 'seed';
   if (stageName === 'lineage') return 'lineage';
@@ -200,11 +207,12 @@ export function useTraceProgress({ profile } = {}) {
 
     try {
       current_stage.value = 'seed-resolve';
-      const seedPayload = await apiPost(
+      const seedRaw = await apiPost(
         '/api/trace/seed-resolve',
         { profile, params },
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },
       );
+      const seedPayload = unwrapEnvelope(seedRaw);
       stage_results.seed = seedPayload;
       completed_stages.value = [...completed_stages.value, 'seed-resolve'];
 
@@ -214,7 +222,7 @@ export function useTraceProgress({ profile } = {}) {
       }
 
       current_stage.value = 'lineage';
-      const lineagePayload = await apiPost(
+      const lineageRaw = await apiPost(
         '/api/trace/lineage',
         {
           profile,
@@ -224,12 +232,13 @@ export function useTraceProgress({ profile } = {}) {
         },
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },
       );
+      const lineagePayload = unwrapEnvelope(lineageRaw);
       stage_results.lineage = lineagePayload;
       completed_stages.value = [...completed_stages.value, 'lineage'];
 
       const allContainerIds = collectAllContainerIds(seedContainerIds, lineagePayload, direction);
       current_stage.value = 'events';
-      const eventsPayload = await apiPost(
+      const eventsRaw = await apiPost(
         '/api/trace/events',
         {
           profile,
@@ -246,6 +255,7 @@ export function useTraceProgress({ profile } = {}) {
         },
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },
       );
+      const eventsPayload = unwrapEnvelope(eventsRaw);
 
       // Async path: server returned 202 with job_id
       if (eventsPayload?.async === true && eventsPayload?.status_url) {
@@ -318,10 +328,11 @@ export function useTraceProgress({ profile } = {}) {
         } else {
           // No stream_url: fall back to fetching full result
           const resultUrl = `${eventsPayload.status_url}/result`;
-          stage_results.events = await apiGet(resultUrl, {
+          const jobResultRaw = await apiGet(resultUrl, {
             timeout: DEFAULT_STAGE_TIMEOUT_MS,
             signal: controller.signal,
           });
+          stage_results.events = unwrapEnvelope(jobResultRaw);
         }
 
         job_progress.active = false;
