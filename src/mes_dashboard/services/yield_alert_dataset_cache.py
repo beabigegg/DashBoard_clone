@@ -18,10 +18,13 @@ import os
 import time
 from typing import Any, Optional
 
+import numpy as np
 import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow
+from mes_dashboard.core.interactive_memory_guard import enforce_dataset_memory_guard, maybe_gc_collect
+from mes_dashboard.core.query_spool_store import get_spool_file_path, store_spooled_df
 from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 from mes_dashboard.services.yield_alert_service import (
     DEFAULT_PAGE_SIZE,
@@ -47,9 +50,14 @@ from mes_dashboard.services.yield_alert_service import (
 logger = logging.getLogger("mes_dashboard.yield_alert_dataset_cache")
 
 _CACHE_TTL = max(30, int(os.getenv("YIELD_ALERT_CACHE_TTL_SECONDS", "300")))
-_CACHE_MAX_SIZE = max(1, int(os.getenv("YIELD_ALERT_DATASET_CACHE_MAX_SIZE", "6")))
+_CACHE_MAX_SIZE = max(1, int(os.getenv("YIELD_ALERT_DATASET_CACHE_MAX_SIZE", "3")))
 _REDIS_NAMESPACE = "yield_alert_dataset"
 _CACHE_SCHEMA_VERSION = 4
+_SPOOL_NAMESPACE = "yield_alert_dataset"
+
+_VIEW_MAX_INPUT_MB = float(os.getenv("YIELD_ALERT_VIEW_MAX_INPUT_MB", "96"))
+_VIEW_MAX_PROJECTED_RSS_MB = float(os.getenv("YIELD_ALERT_VIEW_MAX_PROJECTED_RSS_MB", "1100"))
+_VIEW_WORKING_SET_FACTOR = float(os.getenv("YIELD_ALERT_VIEW_WORKING_SET_FACTOR", "2.5"))
 
 _DETAIL_COLUMNS = [
     "DATE_BUCKET",
@@ -149,8 +157,7 @@ def _build_heatmap_data(
         return []
 
     # Vectorized date bucketing — avoids per-row Python lambda on large DataFrames
-    tx_bucketed = tx_df.copy()
-    tx_bucketed["DATE_STR"] = _vectorized_bucket(tx_bucketed["DATE_BUCKET"], granularity)
+    tx_bucketed = tx_df.assign(DATE_STR=_vectorized_bucket(tx_df["DATE_BUCKET"], granularity))
     tx_grouped = (
         tx_bucketed.groupby(["DATE_STR", "DEPARTMENT_GROUP"], as_index=False)["TRANSACTION_QTY"].sum()
     )
@@ -158,8 +165,7 @@ def _build_heatmap_data(
     if scrap_df.empty:
         scrap_grouped = pd.DataFrame(columns=["DATE_STR", "DEPARTMENT_GROUP", "SCRAP_QTY"])
     else:
-        scrap_bucketed = scrap_df.copy()
-        scrap_bucketed["DATE_STR"] = _vectorized_bucket(scrap_bucketed["DATE_BUCKET"], granularity)
+        scrap_bucketed = scrap_df.assign(DATE_STR=_vectorized_bucket(scrap_df["DATE_BUCKET"], granularity))
         scrap_grouped = (
             scrap_bucketed.groupby(["DATE_STR", "DEPARTMENT_GROUP"], as_index=False)["SCRAP_QTY"].sum()
         )
@@ -423,6 +429,11 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
     detail_df = _load_primary_detail_df(start_date, end_date)
     elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
 
+    # NOTE: No memory guard here — follows reject module pattern.
+    # Primary query only loads → spool to parquet → store cache → release.
+    # DuckDB handles heavy aggregation out-of-core via parquet spool.
+    # Guard is applied in apply_view's pandas fallback path only.
+
     logger.info(
         "Yield alert detail loaded: query_id=%s detail_rows=%s scrap_rows=%s latency_ms=%.2f",
         query_id,
@@ -432,6 +443,10 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
     )
     linkage_df = pd.DataFrame(columns=_LINKAGE_COLUMNS)
     _store_payload(query_id, detail_df=detail_df, linkage_df=linkage_df)
+    try:
+        store_spooled_df(_SPOOL_NAMESPACE, query_id, detail_df)
+    except Exception as _spool_exc:
+        logger.warning("Yield alert spool write failed (query_id=%s): %s", query_id, _spool_exc)
     return {
         "query_id": query_id,
         "meta": {
@@ -571,6 +586,18 @@ def _build_summary_and_trend(
     return summary, trend_items
 
 
+_ALERTS_SORT_COLUMN: dict[str, str] = {
+    "date_bucket": "DATE_BUCKET",
+    "workorder": "WORKORDER",
+    "reason_code": "REASON_CODE",
+    "package": "PACKAGE_NAME",
+    "type": "TYPE_NAME",
+    "scrap_qty": "SCRAP_QTY",
+    "yield_pct": "_yield_pct",
+    "risk_score": "_risk_score",
+}
+
+
 def _build_alerts_view(
     *,
     detail_df: pd.DataFrame,
@@ -590,58 +617,80 @@ def _build_alerts_view(
     if not filtered.empty:
         filtered = filtered[filtered["SCRAP_QTY"] != 0]
 
+    _empty_quality = {
+        "matched": 0, "partially_matched": 0, "unmatched": 0,
+        "matched_scrap_qty": 0.0, "partially_matched_scrap_qty": 0.0,
+        "unmatched_scrap_qty": 0.0, "total_scrap_qty": 0.0,
+        "unmatched_ratio": 0.0, "warning": False, "warning_code": None,
+    }
     if filtered.empty:
-        empty_quality = {
-            "matched": 0,
-            "partially_matched": 0,
-            "unmatched": 0,
-            "matched_scrap_qty": 0.0,
-            "partially_matched_scrap_qty": 0.0,
-            "unmatched_scrap_qty": 0.0,
-            "total_scrap_qty": 0.0,
-            "unmatched_ratio": 0.0,
-            "warning": False,
-            "warning_code": None,
-        }
         return {
             "items": [],
-            "pagination": {
-                "page": 1,
-                "per_page": per_page,
-                "total": 0,
-                "total_pages": 1,
-            },
-            "quality": empty_quality,
+            "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 1},
+            "quality": _empty_quality,
             "sort": {"sort_by": sort_by, "sort_dir": sort_dir},
         }
 
     grouped = (
         filtered.groupby(
             [
-                "DATE_BUCKET",
-                "WORKORDER",
-                "REASON_CODE",
-                "REASON_NAME",
-                "DEPARTMENT_GROUP",
-                "PROCESS_CATEGORY",
-                "LINE_NAME",
-                "PACKAGE_NAME",
-                "TYPE_NAME",
-                "FUNCTION_NAME",
-                "OPERATION_TEXT",
+                "DATE_BUCKET", "WORKORDER", "REASON_CODE", "REASON_NAME",
+                "DEPARTMENT_GROUP", "PROCESS_CATEGORY", "LINE_NAME", "PACKAGE_NAME",
+                "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
             ],
             dropna=False,
             as_index=False,
-        )[["TRANSACTION_QTY", "SCRAP_QTY"]]
-        .sum()
+        )[["TRANSACTION_QTY", "SCRAP_QTY"]].sum()
     )
 
+    # Vectorized derivations — avoids per-row Python loop on large DataFrames
+    tx_arr = grouped["TRANSACTION_QTY"].to_numpy(dtype=float)
+    sc_arr = grouped["SCRAP_QTY"].to_numpy(dtype=float)
+    nonzero_tx = tx_arr > 0
+    _tx_safe = np.where(nonzero_tx, tx_arr, 1.0)
+    yield_pct_arr = np.where(nonzero_tx, np.round((1 - sc_arr / _tx_safe) * 100, 4), 100.0)
+    scrap_rate_pct_arr = np.where(nonzero_tx, np.round((sc_arr / _tx_safe) * 100, 4), 0.0)
+    scrap_weight_arr = np.minimum(np.maximum(sc_arr, 0.0), 200.0) / 20.0
+    risk_score_arr = np.round(np.maximum(0.0, risk_threshold - yield_pct_arr) + scrap_weight_arr, 4)
+
+    grouped = grouped.assign(
+        _yield_pct=yield_pct_arr,
+        _scrap_rate_pct=scrap_rate_pct_arr,
+        _risk_score=risk_score_arr,
+    )
+
+    # Filter by threshold (vectorized boolean mask)
+    threshold_mask = (yield_pct_arr < risk_threshold) | (sc_arr >= min_scrap_qty)
+    grouped = grouped[threshold_mask].reset_index(drop=True)
+
+    if grouped.empty:
+        return {
+            "items": [],
+            "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 1},
+            "quality": _empty_quality,
+            "sort": {"sort_by": sort_by, "sort_dir": sort_dir},
+        }
+
+    # Sort in pandas before pagination
+    sort_col = _ALERTS_SORT_COLUMN.get(sort_by, "DATE_BUCKET")
+    if sort_col in grouped.columns:
+        grouped = grouped.sort_values(
+            sort_col, ascending=(sort_dir == "asc"), kind="stable"
+        ).reset_index(drop=True)
+
+    total = len(grouped)
+    total_pages = max(1, math.ceil(total / per_page))
+    normalized_page = min(max(1, page), total_pages)
+    start_idx = (normalized_page - 1) * per_page
+    end_idx = start_idx + per_page
+
+    # Build linkage maps
     linkage_exact: dict[str, float] = {}
     linkage_prefix: dict[str, float] = {}
     if linkage_df is not None and not linkage_df.empty:
-        for _, row in linkage_df.iterrows():
-            key = str(row.get("CANONICAL_KEY") or "").strip()
-            qty = _safe_float(row.get("REJECT_TOTAL_QTY"))
+        for _, lrow in linkage_df.iterrows():
+            key = str(lrow.get("CANONICAL_KEY") or "").strip()
+            qty = _safe_float(lrow.get("REJECT_TOTAL_QTY"))
             if not key:
                 continue
             linkage_exact[key] = qty
@@ -650,26 +699,44 @@ def _build_alerts_view(
                 prefix = f"{parts[0]}|{parts[1]}|"
                 linkage_prefix[prefix] = linkage_prefix.get(prefix, 0.0) + qty
 
-    rows: list[dict[str, Any]] = []
-    matched = 0
-    partial = 0
-    unmatched = 0
-    matched_qty = 0.0
-    partial_qty = 0.0
-    unmatched_qty = 0.0
+    # Vectorized linkage quality metrics across ALL filtered rows
+    date_ser = grouped["DATE_BUCKET"].astype(str).str[:10]
+    wo_ser = grouped["WORKORDER"].fillna("(NA)").astype(str).str.strip().str.upper()
+    rc_ser = grouped["REASON_CODE"].fillna("UNMAPPED_REASON").astype(str).str.strip()
+    canonical_key_ser = date_ser + "|" + wo_ser + "|" + rc_ser
+    prefix_key_ser = date_ser + "|" + wo_ser + "|"
 
-    for _, row in grouped.iterrows():
+    exact_qty_ser = canonical_key_ser.map(linkage_exact).fillna(0.0)
+    partial_lookup_ser = prefix_key_ser.map(linkage_prefix).fillna(0.0)
+    is_exact = exact_qty_ser > 0
+    is_partial = (~is_exact) & (partial_lookup_ser > 0)
+    is_unmatched = ~(is_exact | is_partial)
+
+    sc_ser = grouped["SCRAP_QTY"].astype(float)
+    matched = int(is_exact.sum())
+    partial_count = int(is_partial.sum())
+    unmatched_count = int(is_unmatched.sum())
+    matched_qty = float(sc_ser[is_exact].sum())
+    partial_qty = float(sc_ser[is_partial].sum())
+    unmatched_qty = float(sc_ser[is_unmatched].sum())
+
+    # Build page items — iterrows only on the current page slice
+    page_df = grouped.iloc[start_idx:end_idx]
+    page_canonical_keys = canonical_key_ser.iloc[start_idx:end_idx].tolist()
+    page_prefix_keys = prefix_key_ser.iloc[start_idx:end_idx].tolist()
+
+    page_rows: list[dict[str, Any]] = []
+    for (_, row), canonical_key, prefix_key in zip(
+        page_df.iterrows(), page_canonical_keys, page_prefix_keys
+    ):
         transaction_qty = _safe_float(row.get("TRANSACTION_QTY"))
         scrap_qty = _safe_float(row.get("SCRAP_QTY"))
-        yield_pct = 100.0 if transaction_qty <= 0 else round((1 - (scrap_qty / transaction_qty)) * 100, 4)
+        yield_pct = _safe_float(row.get("_yield_pct"))
+        scrap_rate_pct = _safe_float(row.get("_scrap_rate_pct"))
+        risk_score = _safe_float(row.get("_risk_score"))
+        risk_level, _ = _risk_level(yield_pct, scrap_qty, risk_threshold)
 
-        if yield_pct >= risk_threshold and scrap_qty < min_scrap_qty:
-            continue
-
-        scrap_rate_pct = 0.0 if transaction_qty <= 0 else round((scrap_qty / transaction_qty) * 100, 4)
-        risk_level, risk_score = _risk_level(yield_pct, scrap_qty, risk_threshold)
-
-        item = {
+        item: dict[str, Any] = {
             "date_bucket": str(row.get("DATE_BUCKET") or ""),
             "workorder": str(row.get("WORKORDER") or "").strip(),
             "reason_code": str(row.get("REASON_CODE") or "").strip(),
@@ -692,37 +759,18 @@ def _build_alerts_view(
             "reject_total_qty": 0.0,
         }
 
-        canonical_key = build_canonical_key(item["date_bucket"], item["workorder"], item["reason_code"])
         exact_qty = _safe_float(linkage_exact.get(canonical_key, 0.0))
         if exact_qty > 0:
             item["match_status"] = "exact"
             item["reject_total_qty"] = round(exact_qty, 4)
-            matched += 1
-            matched_qty += item["scrap_qty"]
         else:
-            prefix_key = f"{item['date_bucket']}|{item['workorder'].upper()}|"
-            partial_qty_candidate = _safe_float(linkage_prefix.get(prefix_key, 0.0))
-            if partial_qty_candidate > 0:
+            partial_qty_val = _safe_float(linkage_prefix.get(prefix_key, 0.0))
+            if partial_qty_val > 0:
                 item["match_status"] = "partial"
                 item["fallback_reason"] = "reason_code_not_exact"
-                item["reject_total_qty"] = round(partial_qty_candidate, 4)
-                partial += 1
-                partial_qty += item["scrap_qty"]
-            else:
-                unmatched += 1
-                unmatched_qty += item["scrap_qty"]
+                item["reject_total_qty"] = round(partial_qty_val, 4)
 
-        rows.append(item)
-
-    reverse = sort_dir == "desc"
-    rows.sort(key=lambda item: item.get(sort_by), reverse=reverse)
-
-    total = len(rows)
-    total_pages = max(1, int(math.ceil(total / per_page)))
-    normalized_page = min(max(1, page), total_pages)
-    start_idx = (normalized_page - 1) * per_page
-    end_idx = start_idx + per_page
-    page_rows = rows[start_idx:end_idx]
+        page_rows.append(item)
 
     total_scrap = matched_qty + partial_qty + unmatched_qty
     unmatched_ratio = 0.0 if total_scrap <= 0 else round(unmatched_qty / total_scrap, 4)
@@ -747,8 +795,8 @@ def _build_alerts_view(
         },
         "quality": {
             "matched": matched,
-            "partially_matched": partial,
-            "unmatched": unmatched,
+            "partially_matched": partial_count,
+            "unmatched": unmatched_count,
             "matched_scrap_qty": round(matched_qty, 4),
             "partially_matched_scrap_qty": round(partial_qty, 4),
             "unmatched_scrap_qty": round(unmatched_qty, 4),
@@ -783,6 +831,109 @@ def _compute_filter_options(detail_df: pd.DataFrame) -> dict[str, list[str]]:
     return options
 
 
+def _enrich_alerts_with_linkage(
+    alerts: dict[str, Any],
+    *,
+    linkage_df: Optional[pd.DataFrame],
+    linkage_ready: bool,
+) -> None:
+    """Add linkage matching to alert page items and compute quality metrics in-place.
+
+    When ``_quality_keys`` is present in ``alerts`` (set by DuckDB SQL runtime),
+    quality metrics are computed across ALL filtered alerts (full population),
+    matching the pandas path behavior. Otherwise, quality is computed on page
+    items only.
+    """
+    linkage_exact: dict[str, float] = {}
+    linkage_prefix: dict[str, float] = {}
+    if linkage_df is not None and not linkage_df.empty:
+        for _, lrow in linkage_df.iterrows():
+            key = str(lrow.get("CANONICAL_KEY") or "").strip()
+            qty = _safe_float(lrow.get("REJECT_TOTAL_QTY"))
+            if not key:
+                continue
+            linkage_exact[key] = qty
+            parts = key.split("|", 2)
+            if len(parts) == 3:
+                prefix = f"{parts[0]}|{parts[1]}|"
+                linkage_prefix[prefix] = linkage_prefix.get(prefix, 0.0) + qty
+
+    # Enrich page items with linkage match status
+    for item in alerts.get("items") or []:
+        canonical_key = build_canonical_key(
+            item["date_bucket"], item["workorder"], item["reason_code"]
+        )
+        exact_qty = _safe_float(linkage_exact.get(canonical_key, 0.0))
+        if exact_qty > 0:
+            item["match_status"] = "exact"
+            item["reject_total_qty"] = round(exact_qty, 4)
+        else:
+            prefix_key = f"{item['date_bucket']}|{item['workorder'].upper()}|"
+            partial_qty_val = _safe_float(linkage_prefix.get(prefix_key, 0.0))
+            if partial_qty_val > 0:
+                item["match_status"] = "partial"
+                item["fallback_reason"] = "reason_code_not_exact"
+                item["reject_total_qty"] = round(partial_qty_val, 4)
+
+    # Compute quality metrics across full population
+    # Use _quality_keys (from DuckDB) if available; otherwise iterate page items
+    quality_source = alerts.pop("_quality_keys", None) or alerts.get("items") or []
+
+    matched = 0
+    partial_count = 0
+    unmatched_count = 0
+    matched_qty = 0.0
+    partial_qty = 0.0
+    unmatched_qty = 0.0
+
+    for row in quality_source:
+        date_bucket = str(row.get("date_bucket") or "")
+        workorder = str(row.get("workorder") or "")
+        reason_code = str(row.get("reason_code") or "")
+        scrap_qty = _safe_float(row.get("scrap_qty"))
+
+        canonical_key = build_canonical_key(date_bucket, workorder, reason_code)
+        exact_qty = _safe_float(linkage_exact.get(canonical_key, 0.0))
+        if exact_qty > 0:
+            matched += 1
+            matched_qty += scrap_qty
+        else:
+            prefix_key = f"{date_bucket}|{workorder.upper()}|"
+            partial_qty_val = _safe_float(linkage_prefix.get(prefix_key, 0.0))
+            if partial_qty_val > 0:
+                partial_count += 1
+                partial_qty += scrap_qty
+            else:
+                unmatched_count += 1
+                unmatched_qty += scrap_qty
+
+    total_scrap = matched_qty + partial_qty + unmatched_qty
+    unmatched_ratio = 0.0 if total_scrap <= 0 else round(unmatched_qty / total_scrap, 4)
+
+    if not linkage_ready:
+        quality_warning = False
+        quality_warning_code = "linkage_not_ready"
+    elif unmatched_ratio >= LINKAGE_WARN_UNMATCHED_RATIO:
+        quality_warning = True
+        quality_warning_code = "high_unmatched_ratio"
+    else:
+        quality_warning = False
+        quality_warning_code = None
+
+    alerts["quality"] = {
+        "matched": matched,
+        "partially_matched": partial_count,
+        "unmatched": unmatched_count,
+        "matched_scrap_qty": round(matched_qty, 4),
+        "partially_matched_scrap_qty": round(partial_qty, 4),
+        "unmatched_scrap_qty": round(unmatched_qty, 4),
+        "total_scrap_qty": round(total_scrap, 4),
+        "unmatched_ratio": unmatched_ratio,
+        "warning": quality_warning,
+        "warning_code": quality_warning_code,
+    }
+
+
 def apply_view(
     *,
     query_id: str,
@@ -808,11 +959,78 @@ def apply_view(
     normalized_filters = _normalize_filter_values(filters)
     normalized_granularity = granularity if granularity in _VALID_GRANULARITIES else "day"
 
+    started = time.perf_counter()
+    excluded_reason_tokens = _load_excluded_reason_tokens()
+
+    # ── DuckDB-first path (Task 5.1) ──────────────────────────────────────────
+    from mes_dashboard.services.yield_alert_sql_runtime import try_compute_view_from_spool
+
+    sql_result, sql_meta = try_compute_view_from_spool(
+        query_id=query_id,
+        filters=normalized_filters,
+        granularity=normalized_granularity,
+        page=normalized_page,
+        per_page=normalized_per_page,
+        sort_by=normalized_sort_by,
+        sort_dir=normalized_sort_dir,
+        risk_threshold=normalized_risk,
+        min_scrap_qty=normalized_min_scrap,
+        excluded_reason_tokens=excluded_reason_tokens,
+    )
+
+    if sql_result is not None:
+        # Task 5.2: linkage matching on page rows in Python layer
+        linkage_df = payload["linkage_df"]
+        _linkage_ready = linkage_df is not None and not linkage_df.empty
+        _enrich_alerts_with_linkage(
+            sql_result["alerts"], linkage_df=linkage_df, linkage_ready=_linkage_ready
+        )
+        elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+        logger.info(
+            "Yield alert DuckDB view computed: query_id=%s latency_ms=%.2f fallback=%s",
+            query_id, elapsed_ms, sql_meta.get("view_sql_fallback_reason"),
+        )
+        return {
+            "summary": sql_result["summary"],
+            "trend": sql_result["trend"],
+            "heatmap": sql_result["heatmap"],
+            "station_summary": sql_result["station_summary"],
+            "package_summary": sql_result["package_summary"],
+            "alerts": sql_result["alerts"],
+            "meta": {
+                "query_latency_ms": elapsed_ms,
+                "max_query_days": MAX_QUERY_DAYS,
+                "max_per_page": MAX_PAGE_SIZE,
+                "reason_exclusion_applied": True,
+                "excluded_reason_count": len(excluded_reason_tokens),
+                "cache": {"query_id": query_id},
+                "linkage_ready": _linkage_ready,
+                "view_source": "duckdb",
+                **sql_meta,
+            },
+            "filter_options": sql_result["filter_options"],
+        }
+
+    # ── Task 5.3: Pandas fallback path ───────────────────────────────────────
+    if sql_meta.get("view_sql_fallback_reason"):
+        logger.info(
+            "Yield alert DuckDB fallback to pandas: query_id=%s reason=%s",
+            query_id, sql_meta.get("view_sql_fallback_reason"),
+        )
+
     detail_df = payload["detail_df"]
     linkage_df = payload["linkage_df"]
 
-    started = time.perf_counter()
-    excluded_reason_tokens = _load_excluded_reason_tokens()
+    # Task 1.3: memory guard before pandas computation
+    enforce_dataset_memory_guard(
+        detail_df,
+        operation="視圖查詢",
+        query_id=query_id,
+        max_input_mb=_VIEW_MAX_INPUT_MB,
+        max_projected_rss_mb=_VIEW_MAX_PROJECTED_RSS_MB,
+        working_set_factor=_VIEW_WORKING_SET_FACTOR,
+    )
+
     _dept_filter = normalized_filters.get("departments", [])
     _proc_filter = normalized_filters.get("process_category", [])
 
@@ -860,7 +1078,7 @@ def apply_view(
     elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
     logger.info("Yield alert cached view computed: query_id=%s latency_ms=%.2f", query_id, elapsed_ms)
 
-    return {
+    result = {
         "summary": summary,
         "trend": {
             "items": trend_items,
@@ -885,6 +1103,10 @@ def apply_view(
             "excluded_reason_count": len(excluded_reason_tokens),
             "cache": {"query_id": query_id},
             "linkage_ready": _linkage_ready,
+            "view_source": "pandas",
         },
         "filter_options": _compute_filter_options(payload["detail_df"]),
     }
+    # Task 1.3: GC after heavy pandas computation
+    maybe_gc_collect()
+    return result

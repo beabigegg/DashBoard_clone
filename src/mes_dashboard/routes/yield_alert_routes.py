@@ -175,6 +175,13 @@ def api_yield_alert_query():
     try:
         result = execute_primary_query(start_date=start_date, end_date=end_date)
         return success_response(result)
+    except MemoryError as exc:
+        return error_response(
+            SERVICE_UNAVAILABLE,
+            str(exc),
+            status_code=503,
+            headers={"Retry-After": "30"},
+        )
     except ValueError as exc:
         return error_response(VALIDATION_ERROR, str(exc), status_code=400, meta={"max_query_days": MAX_QUERY_DAYS})
     except Exception:
@@ -261,6 +268,13 @@ def api_yield_alert_view():
         data = dict(result)
         meta = dict(data.pop("meta", {}) or {})
         return success_response(data, meta=meta)
+    except MemoryError as exc:
+        return error_response(
+            SERVICE_UNAVAILABLE,
+            str(exc),
+            status_code=503,
+            headers={"Retry-After": "30"},
+        )
     except ValueError as exc:
         return error_response(
             VALIDATION_ERROR,
