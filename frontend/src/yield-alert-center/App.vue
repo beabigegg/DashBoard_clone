@@ -244,10 +244,10 @@ async function executePrimaryQuery() {
   }, {
     timeout: API_TIMEOUT,
   });
-  if (!resp.success || !resp.query_id) {
+  if (!resp.success || !resp.data?.query_id) {
     throw new Error(resp.error || '主查詢執行失敗');
   }
-  queryId.value = String(resp.query_id);
+  queryId.value = String(resp.data.query_id);
   committedDateRange.start_date = filters.start_date;
   committedDateRange.end_date = filters.end_date;
 }
