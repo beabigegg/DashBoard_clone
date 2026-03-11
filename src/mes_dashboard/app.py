@@ -659,21 +659,30 @@ def create_app(config_name: str | None = None) -> Flask:
         """Portal SPA shell page served as pure Vite HTML output."""
         dist_dir = os.path.join(app.static_folder or "", "dist")
         dist_html = os.path.join(dist_dir, "portal-shell.html")
+        shell_logger = logging.getLogger("mes_dashboard.portal_shell")
 
         def _inject_csrf(html: str) -> str:
             csrf_meta = f'<meta name="csrf-token" content="{get_csrf_token()}">'
             return html.replace("<meta charset", f"{csrf_meta}\n    <meta charset", 1)
 
-        if os.path.exists(dist_html):
-            with open(dist_html, "r", encoding="utf-8") as f:
-                html = f.read()
+        def _try_read_shell_html(path: str) -> str | None:
+            if not os.path.exists(path):
+                return None
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return f.read()
+            except OSError as exc:
+                shell_logger.warning("Failed reading portal shell html: path=%s error=%s", path, exc)
+                return None
+
+        html = _try_read_shell_html(dist_html)
+        if html is not None:
             return _inject_csrf(html), 200, {"Content-Type": "text/html; charset=utf-8"}
 
         nested_dist_dir = os.path.join(dist_dir, "src", "portal-shell")
         nested_dist_html = os.path.join(nested_dist_dir, "index.html")
-        if os.path.exists(nested_dist_html):
-            with open(nested_dist_html, "r", encoding="utf-8") as f:
-                html = f.read()
+        html = _try_read_shell_html(nested_dist_html)
+        if html is not None:
             return _inject_csrf(html), 200, {"Content-Type": "text/html; charset=utf-8"}
 
         return (

@@ -55,6 +55,32 @@ def test_portal_shell_uses_nested_dist_html_when_top_level_missing(monkeypatch):
     assert "/static/dist/tailwind.css" in html
 
 
+def test_portal_shell_fallback_html_when_nested_dist_html_unreadable(monkeypatch):
+    app = create_app("testing")
+    app.config["TESTING"] = True
+
+    def fake_exists(path: str) -> bool:
+        if path.endswith("/dist/portal-shell.html"):
+            return False
+        return path.endswith("/dist/src/portal-shell/index.html")
+
+    def fake_open(path: str, *_args, **_kwargs):
+        if path.endswith("/dist/src/portal-shell/index.html"):
+            raise OSError("simulated read failure")
+        return open(path, *_args, **_kwargs)
+
+    monkeypatch.setattr("mes_dashboard.app.os.path.exists", fake_exists)
+    monkeypatch.setattr("mes_dashboard.app.open", fake_open, raising=False)
+
+    client = app.test_client()
+    response = client.get("/portal-shell")
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+    assert "/static/dist/portal-shell.js" in html
+    assert "/static/dist/portal-shell.css" in html
+    assert "/static/dist/tailwind.css" in html
+
+
 def test_portal_navigation_non_admin_visibility_matches_release_only():
     app = create_app("testing")
     app.config["TESTING"] = True
