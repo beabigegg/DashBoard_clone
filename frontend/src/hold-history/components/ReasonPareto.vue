@@ -52,10 +52,11 @@ const chartOption = computed(() => {
       bottom: 0,
     },
     grid: {
-      left: 48,
-      right: 52,
+      left: 8,
+      right: 8,
       top: 30,
       bottom: 100,
+      containLabel: true,
     },
     xAxis: {
       type: 'category',

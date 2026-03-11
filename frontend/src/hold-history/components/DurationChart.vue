@@ -46,10 +46,11 @@ const chartOption = computed(() => {
       },
     },
     grid: {
-      left: 56,
-      right: 28,
+      left: 8,
+      right: 8,
       top: 14,
       bottom: 24,
+      containLabel: true,
     },
     xAxis: {
       type: 'value',
