@@ -11,6 +11,12 @@ import { STATUS_COLORS } from '../../resource-shared/constants.js';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent]);
 
+function resolveCssVar(varExpr) {
+  const match = String(varExpr).match(/var\((--[\w-]+)\)/);
+  if (!match) return varExpr;
+  return getComputedStyle(document.documentElement).getPropertyValue(match[1]).trim();
+}
+
 const props = defineProps({
   trend: {
     type: Array,
@@ -78,7 +84,7 @@ const chartOption = computed(() => {
       type: 'bar',
       stack: 'hours',
       itemStyle: {
-        color: STATUS_COLORS[status],
+        color: resolveCssVar(STATUS_COLORS[status]),
       },
       data: trend.map((item) => Number(item[`${status.toLowerCase()}_hours`] || 0)),
     })),

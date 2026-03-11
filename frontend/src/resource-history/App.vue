@@ -408,9 +408,9 @@ async function executePrimaryQuery() {
     });
 
     const payload = unwrapApiResult(response, '查詢失敗');
-    queryId.value = payload.query_id || '';
+    queryId.value = payload.data.query_id || '';
     lastPrimarySnapshot.value = buildPrimarySnapshot(committedFilters);
-    applyViewResult(payload);
+    applyViewResult(payload.data);
   } catch (error) {
     if (error?.name === 'AbortError') {
       queryError.value = '查詢逾時，請縮小日期範圍或資源篩選後重試';
@@ -453,7 +453,7 @@ async function refreshView() {
     }
 
     const payload = unwrapApiResult(response, '查詢失敗');
-    applyViewResult(payload);
+    applyViewResult(payload.data);
   } catch (error) {
     if (error?.message === 'cache_expired' || error?.status === 410) {
       await executePrimaryQuery();
