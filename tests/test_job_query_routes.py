@@ -60,9 +60,9 @@ class TestGetResources:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert 'data' in data['data']
-        assert data['data']['total'] == 2
-        assert data['data']['data'][0]['RESOURCEID'] in ['RES001', 'RES002']
+        assert isinstance(data['data'], list)
+        assert len(data['data']) == 2
+        assert data['data'][0]['RESOURCEID'] in ['RES001', 'RES002']
 
     @patch('mes_dashboard.services.resource_cache.get_all_resources')
     def test_get_resources_empty(self, mock_get_resources, client):

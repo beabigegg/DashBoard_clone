@@ -95,7 +95,7 @@ def get_resources():
         # Sort by WORKCENTERNAME, then RESOURCENAME
         data.sort(key=lambda x: (x.get('WORKCENTERNAME', ''), x.get('RESOURCENAME', '')))
 
-        return success_response({'data': data, 'total': len(data)})
+        return success_response(data)
 
     except Exception as exc:
         logger.exception("Failed to load job-query resources: %s", exc)
