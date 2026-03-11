@@ -281,8 +281,8 @@ const materialMappingStats = computed(() => {
 
 const colorMap = computed(() => {
   const colors = {
-    HOLD: '#f59e0b',
-    MATERIAL: '#0ea5e9',
+    HOLD: 'var(--color-token-hf59e0b)',
+    MATERIAL: 'var(--color-token-h0ea5e9)',
   };
 
   // Color by workcenter group (not compound key) so same group = same color

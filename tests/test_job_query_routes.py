@@ -60,9 +60,9 @@ class TestGetResources:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert 'total' in data
-        assert data['total'] == 2
-        assert data['data'][0]['RESOURCEID'] in ['RES001', 'RES002']
+        assert 'data' in data['data']
+        assert data['data']['total'] == 2
+        assert data['data']['data'][0]['RESOURCEID'] in ['RES001', 'RES002']
 
     @patch('mes_dashboard.services.resource_cache.get_all_resources')
     def test_get_resources_empty(self, mock_get_resources, client):
@@ -80,11 +80,11 @@ class TestGetResources:
         mock_get_resources.side_effect = Exception('ORA-01017 invalid username/password')
 
         response = client.get('/api/job-query/resources')
-        assert response.status_code == 500
+        assert response.status_code == 503
         data = json.loads(response.data)
         assert 'error' in data
-        assert data['error'] == '服務暫時無法使用'
-        assert 'ORA-01017' not in data['error']
+        assert '服務暫時無法使用' in data['error']['message']
+        assert 'ORA-01017' not in str(data['error'])
 
 
 class TestQueryJobs:
@@ -139,7 +139,7 @@ class TestQueryJobs:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '設備' in data['error']
+        assert '設備' in data['error']['message']
 
     def test_empty_resource_ids(self, client):
         """Should return error for empty resource_ids."""
@@ -167,7 +167,7 @@ class TestQueryJobs:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '日期' in data['error']
+        assert '日期' in data['error']['message']
 
     def test_missing_end_date(self, client):
         """Should return error without end_date."""
@@ -195,7 +195,7 @@ class TestQueryJobs:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '結束日期' in data['error'] or '早於' in data['error']
+        assert '結束日期' in data['error']['message'] or '早於' in data['error']['message']
 
     def test_date_range_exceeds_limit(self, client):
         """Should reject date range > 365 days."""
@@ -210,7 +210,7 @@ class TestQueryJobs:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '365' in data['error']
+        assert '365' in data['error']['message']
 
     @patch('mes_dashboard.routes.job_query_routes.get_jobs_by_resources')
     def test_query_jobs_success(self, mock_query, client):
@@ -234,8 +234,8 @@ class TestQueryJobs:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert data['total'] == 1
-        assert data['data'][0]['JOBID'] == 'JOB001'
+        assert data['data']['total'] == 1
+        assert data['data']['data'][0]['JOBID'] == 'JOB001'
 
     @patch('mes_dashboard.routes.job_query_routes.get_jobs_by_resources')
     def test_query_jobs_service_error(self, mock_query, client):
@@ -279,8 +279,8 @@ class TestQueryJobTxnHistory:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert data['total'] == 1
-        assert data['job_id'] == 'JOB001'
+        assert data['data']['total'] == 1
+        assert data['data']['job_id'] == 'JOB001'
 
     @patch('mes_dashboard.routes.job_query_routes.get_job_txn_history')
     def test_get_txn_history_service_error(self, mock_query, client):

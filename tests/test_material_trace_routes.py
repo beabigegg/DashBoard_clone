@@ -51,7 +51,7 @@ class TestQueryValidation:
         assert response.status_code == 400
         payload = response.get_json()
         assert payload["success"] is False
-        assert "無效的查詢模式" in payload["error"]
+        assert "無效的查詢模式" in payload["error"]["message"]
 
     def test_invalid_mode_returns_400(self, client):
         response = client.post(
@@ -60,7 +60,7 @@ class TestQueryValidation:
             content_type="application/json",
         )
         assert response.status_code == 400
-        assert "無效的查詢模式" in response.get_json()["error"]
+        assert "無效的查詢模式" in response.get_json()["error"]["message"]
 
     def test_empty_values_returns_400(self, client):
         response = client.post(
@@ -69,7 +69,7 @@ class TestQueryValidation:
             content_type="application/json",
         )
         assert response.status_code == 400
-        assert "請輸入至少一筆" in response.get_json()["error"]
+        assert "請輸入至少一筆" in response.get_json()["error"]["message"]
 
     def test_blank_values_returns_400(self, client):
         response = client.post(
@@ -78,7 +78,7 @@ class TestQueryValidation:
             content_type="application/json",
         )
         assert response.status_code == 400
-        assert "請輸入至少一筆" in response.get_json()["error"]
+        assert "請輸入至少一筆" in response.get_json()["error"]["message"]
 
     def test_forward_over_200_returns_400(self, client):
         values = [f"LOT-{i}" for i in range(201)]
@@ -88,7 +88,7 @@ class TestQueryValidation:
             content_type="application/json",
         )
         assert response.status_code == 400
-        assert "正向查詢上限 200 筆" in response.get_json()["error"]
+        assert "正向查詢上限 200 筆" in response.get_json()["error"]["message"]
 
     def test_workorder_over_200_returns_400(self, client):
         values = [f"WO-{i}" for i in range(201)]
@@ -98,7 +98,7 @@ class TestQueryValidation:
             content_type="application/json",
         )
         assert response.status_code == 400
-        assert "正向查詢上限 200 筆" in response.get_json()["error"]
+        assert "正向查詢上限 200 筆" in response.get_json()["error"]["message"]
 
     def test_reverse_over_50_returns_400(self, client):
         values = [f"MLOT-{i}" for i in range(51)]
@@ -108,7 +108,7 @@ class TestQueryValidation:
             content_type="application/json",
         )
         assert response.status_code == 400
-        assert "反向查詢上限 50 筆" in response.get_json()["error"]
+        assert "反向查詢上限 50 筆" in response.get_json()["error"]["message"]
 
     def test_non_json_returns_415(self, client):
         response = client.post(
@@ -116,7 +116,8 @@ class TestQueryValidation:
             data="plain text",
             content_type="text/plain",
         )
-        assert response.status_code == 415
+        assert response.status_code == 400
+        assert response.get_json()["error"]["message"] is not None
 
     def test_empty_body_returns_400(self, client):
         response = client.post(
@@ -157,14 +158,14 @@ class TestQueryPagination:
         assert response.status_code == 200
         payload = response.get_json()
         assert payload["success"] is True
-        assert "pagination" in payload
-        pag = payload["pagination"]
+        assert "pagination" in payload["data"]
+        pag = payload["data"]["pagination"]
         assert pag["page"] == 1
         assert pag["per_page"] == 50
         assert pag["total"] == 100
         assert pag["total_pages"] == 2
-        assert len(payload["rows"]) == 1
-        assert payload["quality_meta"]["status"] == "complete"
+        assert len(payload["data"]["rows"]) == 1
+        assert payload["data"]["quality_meta"]["status"] == "complete"
 
     @patch("mes_dashboard.routes.material_trace_routes.forward_query")
     def test_query_passes_page_param(self, mock_fwd, client):
@@ -204,7 +205,7 @@ class TestQueryPagination:
 
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload["quality_meta"]["status"] == "truncated"
+        assert payload["data"]["quality_meta"]["status"] == "truncated"
         mock_rev.assert_called_once()
 
 

@@ -73,11 +73,11 @@ const firstError = computed(() => {
 
 <style scoped>
 .trace-progress {
-  margin: 12px 0 16px;
-  padding: 12px 14px;
-  border: 1px solid #dbeafe;
+  margin: theme('spacing.token.p12') 0 theme('spacing.token.p16');
+  padding: theme('spacing.token.p12') theme('spacing.token.p14');
+  border: 1px solid theme('colors.token.hdbeafe');
   border-radius: 10px;
-  background: #f8fbff;
+  background: theme('colors.token.hf8fbff');
 }
 
 .trace-progress-track {
@@ -90,7 +90,7 @@ const firstError = computed(() => {
   align-items: center;
   flex: 1;
   min-width: 0;
-  color: #94a3b8;
+  color: theme('colors.token.h94a3b8');
 }
 
 .trace-progress-dot {
@@ -102,7 +102,7 @@ const firstError = computed(() => {
 }
 
 .trace-progress-label {
-  margin-left: 8px;
+  margin-left: theme('spacing.token.p8');
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -113,15 +113,15 @@ const firstError = computed(() => {
   background: currentColor;
   opacity: 0.35;
   flex: 1;
-  margin: 0 10px;
+  margin: 0 theme('spacing.token.p10');
 }
 
 .trace-progress-step.is-complete {
-  color: #16a34a;
+  color: theme('colors.token.h16a34a');
 }
 
 .trace-progress-step.is-active {
-  color: #2563eb;
+  color: theme('colors.token.h2563eb');
 }
 
 .trace-progress-step.is-active .trace-progress-dot {
@@ -129,12 +129,12 @@ const firstError = computed(() => {
 }
 
 .trace-progress-step.is-error {
-  color: #dc2626;
+  color: theme('colors.token.hdc2626');
 }
 
 .trace-progress-error {
-  margin: 10px 0 0;
-  color: #b91c1c;
+  margin: theme('spacing.token.p10') 0 0;
+  color: theme('colors.token.hb91c1c');
   font-size: 12px;
 }
 

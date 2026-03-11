@@ -116,7 +116,7 @@ def test_resource_detail_rejects_limit_over_configured_max(mock_query):
     assert response.status_code == 413
     payload = response.get_json()
     assert payload["success"] is False
-    assert "limit" in payload["error"]
+    assert "limit" in payload["error"]["message"]
     mock_query.assert_not_called()
 
 
@@ -130,7 +130,7 @@ def test_resource_detail_rejects_invalid_limit_type(mock_query):
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["success"] is False
-    assert "limit" in payload["error"]
+    assert "limit" in payload["error"]["message"]
     mock_query.assert_not_called()
 
 
@@ -144,5 +144,5 @@ def test_resource_detail_rejects_negative_offset(mock_query):
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["success"] is False
-    assert "offset" in payload["error"]
+    assert "offset" in payload["error"]["message"]
     mock_query.assert_not_called()

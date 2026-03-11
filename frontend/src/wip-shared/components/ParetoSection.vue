@@ -54,8 +54,8 @@ function onReasonDrilldown(reason) {
 }
 
 const chartOption = computed(() => {
-  const barColor = props.type === 'quality' ? '#ef4444' : '#f97316';
-  const lineColor = props.type === 'quality' ? '#991B1B' : '#9A3412';
+  const barColor = props.type === 'quality' ? 'rgb(239, 68, 68)' : 'rgb(249, 115, 22)';
+  const lineColor = props.type === 'quality' ? 'rgb(153, 27, 27)' : 'rgb(154, 52, 18)';
 
   return {
     tooltip: {

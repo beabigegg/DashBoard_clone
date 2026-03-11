@@ -84,8 +84,8 @@ class TestQueryToolConcurrencyIntegration:
 
         assert all(status == 200 for status in statuses), f"Unexpected statuses: {statuses}"
         assert all("data" in payload for payload in payloads)
-        assert all(payload.get("total") == 50 for payload in payloads)
-        assert all(len(payload.get("not_found", [])) == 0 for payload in payloads)
+        assert all(payload.get("data", {}).get("total") == 50 for payload in payloads)
+        assert all(len(payload.get("data", {}).get("not_found", [])) == 0 for payload in payloads)
 
     @patch("mes_dashboard.core.rate_limit.check_and_record", return_value=(False, 0))
     @patch("mes_dashboard.routes.query_tool_routes.get_lot_associations_batch")
@@ -143,7 +143,7 @@ class TestQueryToolConcurrencyIntegration:
 
         assert all(status == 200 for status in statuses), f"Unexpected statuses: {statuses}"
         assert all("data" in payload for payload in payloads)
-        assert all("total" in payload for payload in payloads)
+        assert all("total" in payload.get("data", {}) for payload in payloads)
         assert mock_history_batch.called
         assert mock_assoc_batch.called
 

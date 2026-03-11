@@ -27,7 +27,7 @@ def test_summary_requires_date_range(client):
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["success"] is False
-    assert "start_date" in payload["error"]
+    assert "start_date" in payload["error"]["message"]
 
 
 def test_query_requires_dates(client):
@@ -35,7 +35,7 @@ def test_query_requires_dates(client):
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["success"] is False
-    assert "start_date" in payload["error"]
+    assert "start_date" in payload["error"]["message"]
 
 
 @patch("mes_dashboard.routes.yield_alert_routes.execute_primary_query")
@@ -49,7 +49,7 @@ def test_query_returns_query_id(mock_primary, client):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["success"] is True
-    assert payload["query_id"] == "ya-001"
+    assert payload["data"]["query_id"] == "ya-001"
 
 
 def test_view_requires_query_id(client):
@@ -57,7 +57,7 @@ def test_view_requires_query_id(client):
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["success"] is False
-    assert "query_id" in payload["error"]
+    assert "query_id" in payload["error"]["message"]
 
 
 @patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
@@ -67,7 +67,7 @@ def test_view_returns_cache_expired_when_query_missing(mock_view, client):
     assert response.status_code == 410
     payload = response.get_json()
     assert payload["success"] is False
-    assert payload["error"] == "cache_expired"
+    assert payload["error"]["code"] == "CACHE_EXPIRED"
 
 
 @patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")

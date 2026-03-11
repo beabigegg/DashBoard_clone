@@ -4,8 +4,9 @@
 Bidirectional traceability from any detection station to upstream/downstream.
 """
 
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, request, Response
 
+from mes_dashboard.core.response import success_response, validation_error, internal_error
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.services.mid_section_defect_service import (
     query_analysis,
@@ -60,7 +61,7 @@ def _parse_common_params():
 @mid_section_defect_bp.route('/station-options', methods=['GET'])
 def api_station_options():
     """API: Get available detection station options for dropdown."""
-    return jsonify({'success': True, 'data': query_station_options()})
+    return success_response(query_station_options())
 
 
 @mid_section_defect_bp.route('/analysis', methods=['GET'])
@@ -78,18 +79,15 @@ def api_analysis():
     start_date, end_date, loss_reasons, station, direction = _parse_common_params()
 
     if not start_date or not end_date:
-        return jsonify({
-            'success': False,
-            'error': '必須提供 start_date 和 end_date 參數'
-        }), 400
+        return validation_error('必須提供 start_date 和 end_date 參數')
 
     result = query_analysis(start_date, end_date, loss_reasons, station, direction)
 
     if result is None:
-        return jsonify({'success': False, 'error': '查詢失敗，請稍後再試'}), 500
+        return internal_error('查詢失敗，請稍後再試')
 
     if 'error' in result:
-        return jsonify({'success': False, 'error': result['error']}), 400
+        return validation_error(result['error'])
 
     summary = {
         'kpi': result.get('kpi'),
@@ -101,7 +99,7 @@ def api_analysis():
         'attribution': result.get('attribution', []),
     }
 
-    return jsonify({'success': True, 'data': summary})
+    return success_response(summary)
 
 
 @mid_section_defect_bp.route('/analysis/detail', methods=['GET'])
@@ -117,10 +115,7 @@ def api_analysis_detail():
     start_date, end_date, loss_reasons, station, direction = _parse_common_params()
 
     if not start_date or not end_date:
-        return jsonify({
-            'success': False,
-            'error': '必須提供 start_date 和 end_date 參數'
-        }), 400
+        return validation_error('必須提供 start_date 和 end_date 參數')
 
     page = max(request.args.get('page', 1, type=int), 1)
     page_size = max(1, min(request.args.get('page_size', 200, type=int), 500))
@@ -131,12 +126,12 @@ def api_analysis_detail():
     )
 
     if result is None:
-        return jsonify({'success': False, 'error': '查詢失敗，請稍後再試'}), 500
+        return internal_error('查詢失敗，請稍後再試')
 
     if 'error' in result:
-        return jsonify({'success': False, 'error': result['error']}), 400
+        return validation_error(result['error'])
 
-    return jsonify({'success': True, 'data': result})
+    return success_response(result)
 
 
 @mid_section_defect_bp.route('/loss-reasons', methods=['GET'])
@@ -145,9 +140,9 @@ def api_loss_reasons():
     result = query_all_loss_reasons()
 
     if result is None:
-        return jsonify({'success': False, 'error': '查詢失敗，請稍後再試'}), 500
+        return internal_error('查詢失敗，請稍後再試')
 
-    return jsonify({'success': True, 'data': result})
+    return success_response(result)
 
 
 @mid_section_defect_bp.route('/export', methods=['GET'])
@@ -161,10 +156,7 @@ def api_export():
     start_date, end_date, loss_reasons, station, direction = _parse_common_params()
 
     if not start_date or not end_date:
-        return jsonify({
-            'success': False,
-            'error': '必須提供 start_date 和 end_date 參數'
-        }), 400
+        return validation_error('必須提供 start_date 和 end_date 參數')
 
     filename = f"defect_trace_{station}_{direction}_{start_date}_to_{end_date}.csv"
 

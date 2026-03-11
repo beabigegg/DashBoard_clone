@@ -98,14 +98,14 @@ import './portal.css';
       if (resCache.enabled) {
         if (resourceCacheEnabled) {
           resourceCacheEnabled.textContent = resCache.loaded ? '已載入' : '未載入';
-          resourceCacheEnabled.style.color = resCache.loaded ? '#22c55e' : '#f59e0b';
+          resourceCacheEnabled.style.color = resCache.loaded ? 'var(--color-token-h22c55e)' : 'var(--color-token-hf59e0b)';
         }
         if (resourceCacheCount) resourceCacheCount.textContent = resCache.count ? `${resCache.count} 筆` : '--';
         if (resourceCacheUpdatedAt) resourceCacheUpdatedAt.textContent = formatDateTime(resCache.updated_at);
       } else {
         if (resourceCacheEnabled) {
           resourceCacheEnabled.textContent = '未啟用';
-          resourceCacheEnabled.style.color = '#9ca3af';
+          resourceCacheEnabled.style.color = 'var(--color-token-h9ca3af)';
         }
         if (resourceCacheCount) resourceCacheCount.textContent = '--';
         if (resourceCacheUpdatedAt) resourceCacheUpdatedAt.textContent = '--';
@@ -120,7 +120,7 @@ import './portal.css';
       }
       if (routeCacheDegraded) {
         routeCacheDegraded.textContent = routeCache.degraded ? '是' : '否';
-        routeCacheDegraded.style.color = routeCache.degraded ? '#f59e0b' : '#22c55e';
+        routeCacheDegraded.style.color = routeCache.degraded ? 'var(--color-token-hf59e0b)' : 'var(--color-token-h22c55e)';
       }
     } catch (error) {
       console.error('Health check failed:', error);

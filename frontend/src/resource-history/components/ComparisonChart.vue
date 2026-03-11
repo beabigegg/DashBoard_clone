@@ -73,10 +73,10 @@ const chartOption = computed(() => {
           itemStyle: {
             color:
               Number(item.ou_pct || 0) >= 80
-                ? '#22c55e'
+                ? 'rgb(34, 197, 94)'
                 : Number(item.ou_pct || 0) >= 50
-                  ? '#f59e0b'
-                  : '#ef4444',
+                  ? 'rgb(245, 158, 11)'
+                  : 'rgb(239, 68, 68)',
           },
         })),
       },

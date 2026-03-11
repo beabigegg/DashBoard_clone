@@ -24,7 +24,7 @@ const badgeClass = computed(() => `shared-status-badge tone-${props.tone}`);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 8px;
+  padding: theme('spacing.token.p2') theme('spacing.token.p8');
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
@@ -32,22 +32,22 @@ const badgeClass = computed(() => `shared-status-badge tone-${props.tone}`);
 }
 
 .tone-neutral {
-  background: #e2e8f0;
-  color: #334155;
+  background: theme('colors.slate.200');
+  color: theme('colors.slate.700');
 }
 
 .tone-success {
-  background: #dcfce7;
-  color: #166534;
+  background: theme('colors.green.100');
+  color: theme('colors.green.800');
 }
 
 .tone-warning {
-  background: #fef3c7;
-  color: #92400e;
+  background: theme('colors.amber.100');
+  color: theme('colors.amber.800');
 }
 
 .tone-danger {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: theme('colors.red.100');
+  color: theme('colors.red.700');
 }
 </style>

@@ -22,10 +22,10 @@ const props = defineProps({
 const emit = defineEmits(['select-segment']);
 
 const BUCKETS = [
-  { key: 'lt_6h', label: '<6hr', color: '#22c55e' },
-  { key: '6h_12h', label: '6-12hr', color: '#facc15' },
-  { key: '12h_24h', label: '12-24hr', color: '#fb923c' },
-  { key: 'gt_24h', label: '>24hr', color: '#ef4444' },
+  { key: 'lt_6h', label: '<6hr', color: 'rgb(34, 197, 94)' },
+  { key: '6h_12h', label: '6-12hr', color: 'rgb(250, 204, 21)' },
+  { key: '12h_24h', label: '12-24hr', color: 'rgb(251, 146, 60)' },
+  { key: 'gt_24h', label: '>24hr', color: 'rgb(239, 68, 68)' },
 ];
 
 function isSelected(stationName, bucketKey) {
@@ -55,7 +55,7 @@ const chartOption = computed(() => {
       icon: 'roundRect',
       itemHeight: 10,
       textStyle: {
-        color: '#334155',
+        color: 'rgb(51, 65, 85)',
       },
     },
     grid: {
@@ -69,7 +69,7 @@ const chartOption = computed(() => {
       type: 'category',
       data: stationNames,
       axisLabel: {
-        color: '#334155',
+        color: 'rgb(51, 65, 85)',
         fontSize: 11,
         interval: 0,
         rotate: stationNames.length > 8 ? 30 : 0,
@@ -79,7 +79,7 @@ const chartOption = computed(() => {
       },
       axisLine: {
         lineStyle: {
-          color: '#cbd5e1',
+          color: 'rgb(203, 213, 225)',
         },
       },
     },
@@ -87,15 +87,15 @@ const chartOption = computed(() => {
       type: 'value',
       name: 'LOT 數',
       nameTextStyle: {
-        color: '#64748b',
+        color: 'rgb(100, 116, 139)',
         padding: [0, 16, 0, 0],
       },
       axisLabel: {
-        color: '#475569',
+        color: 'rgb(71, 85, 105)',
       },
       splitLine: {
         lineStyle: {
-          color: '#e2e8f0',
+          color: 'rgb(226, 232, 240)',
           type: 'dashed',
         },
       },
@@ -119,7 +119,7 @@ const chartOption = computed(() => {
         };
       }),
       itemStyle: {
-        borderColor: '#ffffff',
+        borderColor: 'rgb(255, 255, 255)',
         borderWidth: 1,
       },
     })),

@@ -95,7 +95,7 @@ class TestHoldDetailSummaryRoute(TestHoldRoutesBase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(data['success'])
-        self.assertIn('reason', data['error'])
+        self.assertIn('reason', data['error']['message'])
 
     @patch('mes_dashboard.routes.hold_routes.get_hold_detail_summary')
     def test_returns_error_on_failure(self, mock_get_summary):
@@ -281,7 +281,7 @@ class TestHoldDetailLotsRoute(TestHoldRoutesBase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(data['success'])
-        self.assertIn('age_range', data['error'])
+        self.assertIn('age_range', data['error']['message'])
 
     @patch('mes_dashboard.routes.hold_routes.get_hold_detail_lots')
     def test_limits_per_page_to_200(self, mock_get_lots):

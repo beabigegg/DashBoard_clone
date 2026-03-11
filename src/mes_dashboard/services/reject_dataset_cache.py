@@ -1473,13 +1473,13 @@ def _build_dimension_pareto_items(
         if col in df.columns:
             agg_dict[col] = (col, "sum")
 
-    grouped = df.groupby(dim_col, sort=False).agg(**agg_dict).reset_index()
+    grouped = df.groupby(dim_col, sort=False, observed=False).agg(**agg_dict).reset_index()
     if grouped.empty:
         return []
 
     if "CONTAINERID" in df.columns:
         lot_counts = (
-            df.groupby(dim_col)["CONTAINERID"]
+            df.groupby(dim_col, observed=False)["CONTAINERID"]
             .nunique()
             .reset_index()
             .rename(columns={"CONTAINERID": "AFFECTED_LOT_COUNT"})

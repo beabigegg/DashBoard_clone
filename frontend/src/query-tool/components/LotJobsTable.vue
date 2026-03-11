@@ -246,7 +246,7 @@ async function loadTxn(jobId) {
 
 <style scoped>
 .btn-mini {
-  padding: 2px 8px;
+  padding: theme('spacing.token.p2') theme('spacing.token.p8');
   font-size: 11px;
 }
 </style>

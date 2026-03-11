@@ -72,14 +72,14 @@ const chartOption = computed(() => {
         name: '投入數',
         type: 'bar',
         data: inputQty,
-        itemStyle: { color: '#93c5fd', borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: 'rgb(147, 197, 253)', borderRadius: [3, 3, 0, 0] },
         barMaxWidth: 30,
       },
       {
         name: '不良數',
         type: 'bar',
         data: defectQty,
-        itemStyle: { color: '#fca5a5', borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: 'rgb(252, 165, 165)', borderRadius: [3, 3, 0, 0] },
         barMaxWidth: 30,
       },
       {
@@ -89,8 +89,8 @@ const chartOption = computed(() => {
         data: defectRate,
         symbol: 'circle',
         symbolSize: 5,
-        lineStyle: { color: '#ef4444', width: 2 },
-        itemStyle: { color: '#ef4444' },
+        lineStyle: { color: 'rgb(239, 68, 68)', width: 2 },
+        itemStyle: { color: 'rgb(239, 68, 68)' },
       },
     ],
   };

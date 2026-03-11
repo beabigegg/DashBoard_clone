@@ -6,32 +6,32 @@
 
 .hold-type-badge {
   display: inline-block;
-  padding: 4px 10px;
+  padding: theme('spacing.token.p4') theme('spacing.token.p10');
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color: theme('colors.white');
 }
 
 .error-banner {
-  margin-bottom: 14px;
-  padding: 10px 12px;
+  margin-bottom: theme('spacing.nav');
+  padding: theme('spacing.token.p10') theme('spacing.block');
   border-radius: 6px;
-  background: #fef2f2;
-  color: #991b1b;
+  background: theme('colors.token.hfef2f2');
+  color: theme('colors.token.h991b1b');
   font-size: 13px;
 }
 
 .filters {
   background: var(--card-bg);
-  padding: 16px 20px;
+  padding: theme('spacing.token.p16') theme('spacing.shell');
   border-radius: 10px;
-  margin-bottom: 16px;
+  margin-bottom: theme('spacing.token.p16');
   box-shadow: var(--shadow);
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
-  gap: 14px 16px;
+  gap: theme('spacing.nav') 16px;
   align-items: start;
 }
 
@@ -70,13 +70,13 @@
   border-radius: 10px;
   box-shadow: var(--shadow);
   overflow: hidden;
-  margin-bottom: 14px;
+  margin-bottom: theme('spacing.nav');
 }
 
 .card-header {
-  padding: 14px 20px;
+  padding: theme('spacing.nav') theme('spacing.shell');
   border-bottom: 1px solid var(--border);
-  background: #fafbfc;
+  background: theme('colors.token.hfafbfc');
 }
 
 .card-title {
@@ -86,14 +86,14 @@
 }
 
 .card-body {
-  padding: 16px;
+  padding: theme('spacing.token.p16');
 }
 
 .filter-bar {
   display: flex;
   align-items: flex-end;
-  gap: 20px;
-  padding: 16px 20px;
+  gap: theme('spacing.shell');
+  padding: theme('spacing.token.p16') theme('spacing.shell');
 }
 
 .hold-overview-filter-bar {
@@ -125,35 +125,35 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   min-width: 320px;
-  padding: 4px;
+  padding: theme('spacing.token.p4');
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: #f8fafc;
+  background: theme('colors.surface.muted');
 }
 
 .hold-type-btn {
   appearance: none;
   border: none;
   background: transparent;
-  color: #475569;
+  color: theme('colors.text.subtle');
   font-size: 14px;
   font-weight: 600;
   line-height: 1.25;
-  padding: 10px 14px;
+  padding: theme('spacing.token.p10') theme('spacing.nav');
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .hold-type-btn:hover:not(:disabled) {
-  background: #eef2ff;
-  color: #3730a3;
+  background: theme('colors.brand.50');
+  color: theme('colors.token.h3730a3');
 }
 
 .hold-type-btn.active {
-  background: #dbeafe;
-  color: #1e3a8a;
-  box-shadow: inset 0 0 0 1px #93c5fd;
+  background: theme('colors.token.hdbeafe');
+  color: theme('colors.token.h1e3a8a');
+  box-shadow: inset 0 0 0 1px theme('colors.token.h93c5fd');
 }
 
 .hold-type-btn:focus-visible {
@@ -168,11 +168,11 @@
 
 .reason-select {
   min-width: 240px;
-  padding: 8px 10px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 13px;
-  background: #fff;
+  background: theme('colors.white');
 }
 
 .reason-select:focus {
@@ -195,20 +195,20 @@
 
 .hold-matrix-table th,
 .hold-matrix-table td {
-  padding: 8px 10px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
   text-align: right;
-  border: 1px solid #e5e7eb;
+  border: 1px solid theme('colors.token.he5e7eb');
   white-space: nowrap;
-  color: #222;
+  color: theme('colors.token.h222222');
 }
 
 .hold-matrix-table th {
-  background: #f3f4f6;
+  background: theme('colors.token.hf3f4f6');
   font-weight: 600;
   position: sticky;
   top: 0;
   z-index: 1;
-  border-bottom: 2px solid #cbd5e1;
+  border-bottom: 2px solid theme('colors.token.hcbd5e1');
 }
 
 .hold-matrix-table th:first-child {
@@ -216,8 +216,8 @@
   position: sticky;
   left: 0;
   z-index: 3;
-  background: #e5e7eb;
-  border-right: 2px solid #cbd5e1;
+  background: theme('colors.token.he5e7eb');
+  border-right: 2px solid theme('colors.token.hcbd5e1');
 }
 
 .hold-matrix-table td:first-child {
@@ -226,13 +226,13 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  background: #f9fafb;
-  border-right: 2px solid #cbd5e1;
+  background: theme('colors.token.hf9fafb');
+  border-right: 2px solid theme('colors.token.hcbd5e1');
 }
 
 .hold-matrix-table .clickable {
   cursor: pointer;
-  color: #222;
+  color: theme('colors.token.h222222');
 }
 
 .hold-matrix-table td:first-child.clickable {
@@ -244,42 +244,42 @@
 }
 
 .hold-matrix-table .clickable:hover {
-  background: #eef2ff;
+  background: theme('colors.brand.50');
 }
 
 .hold-matrix-table tbody tr:hover td {
-  background: #f0f4ff;
+  background: theme('colors.token.hf0f4ff');
 }
 
 .hold-matrix-table tbody tr:hover td:first-child {
-  background: #e8ecff;
+  background: theme('colors.token.he8ecff');
 }
 
 .hold-matrix-table .total-row td,
 .hold-matrix-table .total-col {
-  background: #e5e7eb;
+  background: theme('colors.token.he5e7eb');
   font-weight: 700;
 }
 
 .hold-matrix-table tr.active td {
-  background: #e0e7ff;
+  background: theme('colors.brand.100');
 }
 
 .hold-matrix-table tr.active td:first-child {
-  background: #c7d2fe;
+  background: theme('colors.token.hc7d2fe');
 }
 
 .hold-matrix-table td.active,
 .hold-matrix-table th.active {
-  background: #c7d2fe;
-  color: #1e3a8a;
+  background: theme('colors.token.hc7d2fe');
+  color: theme('colors.token.h1e3a8a');
   font-weight: 700;
 }
 
 .content-grid {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: theme('spacing.nav');
 }
 
 .cascade-filter-indicator {
@@ -287,27 +287,27 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 2px 0 14px;
+  margin: theme('spacing.token.p2') 0 theme('spacing.nav');
 }
 
 .filter-chip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: theme('spacing.token.p6') theme('spacing.block');
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
 }
 
 .filter-chip.matrix {
-  background: #e0e7ff;
-  color: #3730a3;
+  background: theme('colors.brand.100');
+  color: theme('colors.token.h3730a3');
 }
 
 .filter-chip.treemap {
-  background: #fee2e2;
-  color: #991b1b;
+  background: theme('colors.token.hfee2e2');
+  color: theme('colors.token.h991b1b');
 }
 
 .chip-clear {
@@ -320,12 +320,12 @@
 }
 
 .clear-all-btn {
-  padding: 6px 12px;
+  padding: theme('spacing.token.p6') theme('spacing.block');
   font-size: 12px;
 }
 
 .treemap-body {
-  padding: 12px 14px 14px;
+  padding: theme('spacing.block') theme('spacing.nav') theme('spacing.nav');
 }
 
 .treemap-section {
@@ -344,7 +344,7 @@
   flex-wrap: wrap;
   gap: 10px;
   font-size: 12px;
-  color: #475569;
+  color: theme('colors.text.subtle');
 }
 
 .legend-color {
@@ -352,7 +352,7 @@
   height: 10px;
   border-radius: 50%;
   display: inline-block;
-  margin-right: 5px;
+  margin-right: theme('spacing.token.p5');
   background: var(--legend-color);
 }
 
@@ -374,11 +374,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
+  padding: theme('spacing.nav') theme('spacing.shell');
   border-bottom: 1px solid var(--border);
-  background: #fafbfc;
+  background: theme('colors.token.hfafbfc');
   flex-wrap: wrap;
-  gap: 12px;
+  gap: theme('spacing.block');
 }
 
 .table-title {
@@ -405,14 +405,14 @@
 
 .lot-table th,
 .lot-table td {
-  padding: 10px 12px;
+  padding: theme('spacing.token.p10') theme('spacing.block');
   text-align: left;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid theme('colors.token.hf0f0f0');
   white-space: nowrap;
 }
 
 .lot-table th {
-  background: #f8f9fa;
+  background: theme('colors.token.hf8f9fa');
   font-weight: 600;
   position: sticky;
   top: 0;
@@ -426,7 +426,7 @@
 }
 
 .lot-table tbody tr:hover {
-  background: #f8f9fc;
+  background: theme('colors.token.hf8f9fc');
 }
 
 @media (max-width: 1450px) {
@@ -462,7 +462,7 @@
 
 @media (max-width: 768px) {
   .dashboard.hold-overview-page {
-    padding: 14px;
+    padding: theme('spacing.nav');
   }
 
   .filters {
@@ -478,6 +478,6 @@
   }
 
   .header {
-    padding: 14px;
+    padding: theme('spacing.nav');
   }
 }

@@ -62,11 +62,11 @@ def test_seed_resolve_query_tool_success(mock_resolve_lots):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'seed-resolve'
-    assert payload['seed_count'] == 1
-    assert payload['seeds'][0]['container_id'] == 'CID-001'
-    assert payload['seeds'][0]['container_name'] == 'LOT-001'
-    assert payload['cache_key'].startswith('trace:seed:query_tool:')
+    assert payload['data']['stage'] == 'seed-resolve'
+    assert payload['data']['seed_count'] == 1
+    assert payload['data']['seeds'][0]['container_id'] == 'CID-001'
+    assert payload['data']['seeds'][0]['container_name'] == 'LOT-001'
+    assert payload['data']['cache_key'].startswith('trace:seed:query_tool:')
 
 
 @patch('mes_dashboard.routes.trace_routes.resolve_lots')
@@ -94,11 +94,11 @@ def test_seed_resolve_query_tool_reverse_success(mock_resolve_lots):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'seed-resolve'
-    assert payload['seed_count'] == 1
-    assert payload['seeds'][0]['container_id'] == 'CID-SN'
-    assert payload['seeds'][0]['container_name'] == 'LOT-SN'
-    assert payload['cache_key'].startswith('trace:seed:query_tool_reverse:')
+    assert payload['data']['stage'] == 'seed-resolve'
+    assert payload['data']['seed_count'] == 1
+    assert payload['data']['seeds'][0]['container_id'] == 'CID-SN'
+    assert payload['data']['seeds'][0]['container_name'] == 'LOT-SN'
+    assert payload['data']['cache_key'].startswith('trace:seed:query_tool_reverse:')
 
 
 @patch('mes_dashboard.routes.trace_routes.resolve_lots')
@@ -126,8 +126,8 @@ def test_seed_resolve_query_tool_reverse_gd_lot_id_success(mock_resolve_lots):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['seed_count'] == 1
-    assert payload['seeds'][0]['container_name'] == 'GD25060502-A11'
+    assert payload['data']['seed_count'] == 1
+    assert payload['data']['seeds'][0]['container_name'] == 'GD25060502-A11'
 
 
 def test_seed_resolve_query_tool_rejects_reverse_only_type():
@@ -186,9 +186,9 @@ def test_seed_resolve_mid_section_defect_container_supports_reverse_input_types(
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'seed-resolve'
-    assert payload['seed_count'] == 1
-    assert payload['seeds'][0]['container_id'] == 'CID-MSD'
+    assert payload['data']['stage'] == 'seed-resolve'
+    assert payload['data']['seed_count'] == 1
+    assert payload['data']['seeds'][0]['container_id'] == 'CID-MSD'
 
 
 def test_seed_resolve_invalid_profile_returns_400():
@@ -244,14 +244,14 @@ def test_lineage_success_returns_forward_tree(mock_resolve_tree):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'lineage'
-    assert payload['roots'] == ['CID-ROOT']
-    assert payload['children_map']['CID-ROOT'] == ['CID-A']
-    assert payload['children_map']['CID-A'] == ['CID-001']
-    assert payload['leaf_serials']['CID-001'] == ['SN-001']
-    assert payload['total_nodes'] == 3
-    assert payload['names']['CID-ROOT'] == 'WAFER-001'
-    assert payload['names']['CID-A'] == 'LOT-A'
+    assert payload['data']['stage'] == 'lineage'
+    assert payload['data']['roots'] == ['CID-ROOT']
+    assert payload['data']['children_map']['CID-ROOT'] == ['CID-A']
+    assert payload['data']['children_map']['CID-A'] == ['CID-001']
+    assert payload['data']['leaf_serials']['CID-001'] == ['SN-001']
+    assert payload['data']['total_nodes'] == 3
+    assert payload['data']['names']['CID-ROOT'] == 'WAFER-001'
+    assert payload['data']['names']['CID-A'] == 'LOT-A'
 
 
 @patch('mes_dashboard.routes.trace_routes.LineageEngine.resolve_full_genealogy')
@@ -285,14 +285,14 @@ def test_lineage_reverse_profile_returns_ancestors(mock_resolve_genealogy):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'lineage'
-    assert payload['roots'] == ['CID-SN']
-    assert sorted(payload['ancestors']['CID-SN']) == ['CID-A', 'CID-B']
-    assert payload['parent_map']['CID-SN'] == ['CID-A']
-    assert payload['merge_edges']['CID-SN'] == ['CID-A']
-    assert payload['names']['CID-A'] == 'LOT-A'
-    assert payload['nodes']['CID-SN']['node_type'] == 'GD'
-    assert payload['edges'][0]['edge_type'] == 'gd_rework_source'
+    assert payload['data']['stage'] == 'lineage'
+    assert payload['data']['roots'] == ['CID-SN']
+    assert sorted(payload['data']['ancestors']['CID-SN']) == ['CID-A', 'CID-B']
+    assert payload['data']['parent_map']['CID-SN'] == ['CID-A']
+    assert payload['data']['merge_edges']['CID-SN'] == ['CID-A']
+    assert payload['data']['names']['CID-A'] == 'LOT-A'
+    assert payload['data']['nodes']['CID-SN']['node_type'] == 'GD'
+    assert payload['data']['edges'][0]['edge_type'] == 'gd_rework_source'
 
 
 @patch(
@@ -362,13 +362,13 @@ def test_events_partial_failure_returns_200_with_code(mock_fetch_events):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'events'
-    assert payload['code'] == 'EVENTS_PARTIAL_FAILURE'
-    assert 'materials' in payload['failed_domains']
-    assert payload['results']['history']['count'] == 1
-    assert payload['results']['history']['quality_meta']['status'] == 'complete'
-    assert payload['results']['materials']['quality_meta']['status'] == 'failed'
-    assert payload['quality_meta']['status'] == 'partial'
+    assert payload['data']['stage'] == 'events'
+    assert payload['data']['code'] == 'EVENTS_PARTIAL_FAILURE'
+    assert 'materials' in payload['data']['failed_domains']
+    assert payload['data']['results']['history']['count'] == 1
+    assert payload['data']['results']['history']['quality_meta']['status'] == 'complete'
+    assert payload['data']['results']['materials']['quality_meta']['status'] == 'failed'
+    assert payload['data']['quality_meta']['status'] == 'partial'
 
 
 @patch('mes_dashboard.routes.trace_routes.build_trace_aggregation_from_events')
@@ -422,10 +422,10 @@ def test_events_mid_section_defect_with_aggregation(
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['aggregation']['kpi']['total_input'] == 100
-    assert payload['aggregation']['genealogy_status'] == 'ready'
-    assert payload['results']['upstream_history']['quality_meta']['status'] == 'complete'
-    assert payload['quality_meta']['status'] == 'complete'
+    assert payload['data']['aggregation']['kpi']['total_input'] == 100
+    assert payload['data']['aggregation']['genealogy_status'] == 'ready'
+    assert payload['data']['results']['upstream_history']['quality_meta']['status'] == 'complete'
+    assert payload['data']['quality_meta']['status'] == 'complete'
     mock_build_aggregation.assert_called_once()
 
 
@@ -544,7 +544,7 @@ def test_non_msd_events_cache_unchanged(mock_cache_set, mock_cache_get, mock_fet
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'events'
+    assert payload['data']['stage'] == 'events'
     # EventFetcher should NOT have been called — served from cache
     mock_fetch_events.assert_not_called()
 
@@ -615,7 +615,7 @@ def test_events_msd_bypasses_cid_limit(
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'events'
+    assert payload['data']['stage'] == 'events'
     mock_fetch_events.assert_called()
 
 
@@ -638,7 +638,7 @@ def test_events_non_msd_within_limit_proceeds(mock_fetch_events):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'events'
+    assert payload['data']['stage'] == 'events'
 
 
 # ---- Async job queue tests ----
@@ -669,9 +669,9 @@ def test_events_routes_to_async_above_threshold(
 
     assert response.status_code == 202
     payload = response.get_json()
-    assert payload['async'] is True
-    assert payload['job_id'] == 'trace-evt-abc123'
-    assert '/api/trace/job/trace-evt-abc123' in payload['status_url']
+    assert payload['data']['async'] is True
+    assert payload['data']['job_id'] == 'trace-evt-abc123'
+    assert '/api/trace/job/trace-evt-abc123' in payload['data']['status_url']
 
 
 @patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
@@ -702,7 +702,7 @@ def test_events_falls_back_to_sync_when_async_unavailable(
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'events'
+    assert payload['data']['stage'] == 'events'
     mock_fetch_events.assert_called()
 
 
@@ -760,8 +760,8 @@ def test_job_status_found(mock_status):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['status'] == 'started'
-    assert payload['job_id'] == 'trace-evt-abc'
+    assert payload['data']['status'] == 'started'
+    assert payload['data']['job_id'] == 'trace-evt-abc'
 
 
 @patch('mes_dashboard.routes.trace_routes.get_job_status', return_value=None)
@@ -789,7 +789,7 @@ def test_job_result_success(mock_status, mock_result):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload['stage'] == 'events'
+    assert payload['data']['stage'] == 'events'
 
 
 @patch('mes_dashboard.routes.trace_routes.get_job_status')
@@ -885,5 +885,5 @@ def test_events_async_response_includes_stream_url(mock_enqueue, mock_async):
 
     assert response.status_code == 202
     data = response.get_json()
-    assert data["stream_url"] == "/api/trace/job/trace-evt-xyz/stream"
-    assert data["status_url"] == "/api/trace/job/trace-evt-xyz"
+    assert data["data"]["stream_url"] == "/api/trace/job/trace-evt-xyz/stream"
+    assert data["data"]["status_url"] == "/api/trace/job/trace-evt-xyz"

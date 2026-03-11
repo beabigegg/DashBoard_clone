@@ -13,22 +13,22 @@ import { normalizeText } from '../utils/values.js';
 use([CanvasRenderer, TreeChart, TooltipComponent]);
 
 const NODE_COLORS = {
-  wafer: '#2563EB',
-  gc: '#06B6D4',
-  ga: '#10B981',
-  gd: '#EF4444',
-  root: '#3B82F6',
-  branch: '#10B981',
-  leaf: '#F59E0B',
-  serial: '#94A3B8',
+  wafer: 'rgb(37, 99, 235)',
+  gc: 'rgb(6, 182, 212)',
+  ga: 'rgb(16, 185, 129)',
+  gd: 'rgb(239, 68, 68)',
+  root: 'rgb(59, 130, 246)',
+  branch: 'rgb(16, 185, 129)',
+  leaf: 'rgb(245, 158, 11)',
+  serial: 'rgb(148, 163, 184)',
 };
 
 const EDGE_STYLES = Object.freeze({
-  split_from: { color: '#CBD5E1', type: 'solid', width: 1.5 },
-  merge_source: { color: '#F59E0B', type: 'dashed', width: 1.8 },
-  wafer_origin: { color: '#2563EB', type: 'dotted', width: 1.8 },
-  gd_rework_source: { color: '#EF4444', type: 'dashed', width: 1.8 },
-  default: { color: '#CBD5E1', type: 'solid', width: 1.5 },
+  split_from: { color: 'rgb(203, 213, 225)', type: 'solid', width: 1.5 },
+  merge_source: { color: 'rgb(245, 158, 11)', type: 'dashed', width: 1.8 },
+  wafer_origin: { color: 'rgb(37, 99, 235)', type: 'dotted', width: 1.8 },
+  gd_rework_source: { color: 'rgb(239, 68, 68)', type: 'dashed', width: 1.8 },
+  default: { color: 'rgb(203, 213, 225)', type: 'solid', width: 1.5 },
 });
 
 const EDGE_TAGS = Object.freeze({
@@ -288,7 +288,7 @@ function buildNode(cid, visited, parentCid = '') {
         },
         label: {
           fontSize: 10,
-          color: '#64748B',
+          color: 'rgb(100, 116, 139)',
         },
         symbol: 'diamond',
         symbolSize: 6,
@@ -324,7 +324,7 @@ function buildNode(cid, visited, parentCid = '') {
     children,
     itemStyle: {
       color,
-      borderColor: isSelected ? '#1D4ED8' : color,
+      borderColor: isSelected ? 'rgb(29, 78, 216)' : color,
       borderWidth: isSelected ? 3 : 1,
     },
     label: {
@@ -333,7 +333,7 @@ function buildNode(cid, visited, parentCid = '') {
       distance: children.length > 0 ? 8 : 6,
       fontWeight: isSelected ? 'bold' : 'normal',
       fontSize: isSerialLike ? 10 : 11,
-      color: isSelected ? '#1E3A8A' : (isSerialLike ? '#64748B' : '#334155'),
+      color: isSelected ? 'rgb(30, 58, 138)' : (isSerialLike ? 'rgb(100, 116, 139)' : 'rgb(51, 65, 85)'),
       formatter: () => displayLabel,
     },
     symbol: isSerialLike ? 'diamond' : (nodeType === 'root' ? 'roundRect' : 'circle'),
@@ -449,13 +449,13 @@ const TREE_SERIES_DEFAULTS = Object.freeze({
     position: 'right',
     distance: 6,
     fontSize: 11,
-    color: '#334155',
+    color: 'rgb(51, 65, 85)',
     overflow: 'break',
     ...LABEL_BASE_STYLE,
   },
   lineStyle: {
     width: 1.5,
-    color: '#CBD5E1',
+    color: 'rgb(203, 213, 225)',
     curveness: 0.5,
   },
   emphasis: {
@@ -484,21 +484,21 @@ const chartOption = computed(() => {
       const val = data.value || {};
       const lines = [`<b>${data.name}</b>`];
       if (val.type === 'serial') {
-        lines.push('<span style="color:#64748B">成品序列號</span>');
+        lines.push('<span style="color:rgb(100, 116, 139)">成品序列號</span>');
       } else if (val.type === 'wafer') {
-        lines.push('<span style="color:#2563EB">Wafer LOT</span>');
+        lines.push('<span style="color:rgb(37, 99, 235)">Wafer LOT</span>');
       } else if (val.type === 'gc') {
-        lines.push('<span style="color:#06B6D4">GC LOT</span>');
+        lines.push('<span style="color:rgb(6, 182, 212)">GC LOT</span>');
       } else if (val.type === 'ga') {
-        lines.push('<span style="color:#10B981">GA LOT</span>');
+        lines.push('<span style="color:rgb(16, 185, 129)">GA LOT</span>');
       } else if (val.type === 'gd') {
-        lines.push('<span style="color:#EF4444">GD LOT（重工）</span>');
+        lines.push('<span style="color:rgb(239, 68, 68)">GD LOT（重工）</span>');
       } else if (val.type === 'root') {
-        lines.push('<span style="color:#3B82F6">根節點（晶批）</span>');
+        lines.push('<span style="color:rgb(59, 130, 246)">根節點（晶批）</span>');
       } else if (val.type === 'leaf') {
-        lines.push('<span style="color:#F59E0B">末端節點</span>');
+        lines.push('<span style="color:rgb(245, 158, 11)">末端節點</span>');
       } else if (val.type === 'branch') {
-        lines.push('<span style="color:#10B981">中間節點</span>');
+        lines.push('<span style="color:rgb(16, 185, 129)">中間節點</span>');
       }
       if (val.edgeType) {
         const sentence = relationSentence({
@@ -508,13 +508,13 @@ const chartOption = computed(() => {
           currentName: data.name,
         });
         if (sentence) {
-          lines.push(`<span style="color:#0F172A;font-size:11px">讀法: ${sentence}</span>`);
+          lines.push(`<span style="color:rgb(15, 23, 42);font-size:11px">讀法: ${sentence}</span>`);
         }
         const directionTag = val.relationTag ? `（${val.relationTag}）` : '';
-        lines.push(`<span style="color:#94A3B8;font-size:11px">關係型別: ${val.edgeType}${directionTag}</span>`);
+        lines.push(`<span style="color:rgb(148, 163, 184);font-size:11px">關係型別: ${val.edgeType}${directionTag}</span>`);
       }
       if (val.cid && val.cid !== data.name) {
-        lines.push(`<span style="color:#94A3B8;font-size:11px">CID: ${val.cid}</span>`);
+        lines.push(`<span style="color:rgb(148, 163, 184);font-size:11px">CID: ${val.cid}</span>`);
       }
       return lines.join('<br/>');
     },
@@ -674,7 +674,7 @@ async function exportTreeAsPng() {
     const dataUrl = instance.getDataURL({
       type: 'png',
       pixelRatio: Math.max(2, Math.min(4, window.devicePixelRatio || 2)),
-      backgroundColor: '#FFFFFF',
+      backgroundColor: 'rgb(255, 255, 255)',
     });
     triggerDownloadByUrl(dataUrl, buildExportFileName('png'));
   } catch (error) {
@@ -870,26 +870,26 @@ function exportRelationCsv() {
 }
 
 .lineage-loading-placeholder {
-  padding: 48px 12px;
+  padding: theme('spacing.token.p48') theme('spacing.token.p12');
 }
 
 .lineage-relation-details {
-  margin-top: 12px;
+  margin-top: theme('spacing.token.p12');
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #f8fafc;
-  padding: 8px 12px;
+  background: theme('colors.token.hf8fafc');
+  padding: theme('spacing.token.p8') theme('spacing.token.p12');
 }
 
 .lineage-relation-summary {
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  color: #334155;
+  color: theme('colors.token.h334155');
 }
 
 .lineage-relation-table-wrap {
-  margin-top: 8px;
+  margin-top: theme('spacing.token.p8');
   max-height: 224px;
 }
 
@@ -902,23 +902,23 @@ function exportRelationCsv() {
 }
 
 .lineage-relation-note {
-  margin-top: 4px;
+  margin-top: theme('spacing.token.p4');
   font-size: 11px;
 }
 
 .lineage-not-found {
-  border-color: #fde68a;
-  background: #fefce8;
-  color: #92400e;
+  border-color: theme('colors.token.hfde68a');
+  background: theme('colors.token.hfefce8');
+  color: theme('colors.token.h92400e');
 }
 
 .lineage-selected-summary {
-  border-color: #c7d2fe;
+  border-color: theme('colors.token.hc7d2fe');
   background: rgba(238, 242, 255, 0.6);
   color: inherit;
 }
 
 .lineage-selected-count {
-  color: #4338ca;
+  color: theme('colors.token.h4338ca');
 }
 </style>

@@ -6,20 +6,20 @@
 
 .hold-type-badge {
   display: inline-block;
-  padding: 4px 10px;
+  padding: theme('spacing.token.p4') theme('spacing.token.p10');
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color: theme('colors.token.hffffff');
 }
 
 .error-banner {
-  margin-bottom: 14px;
-  padding: 10px 12px;
+  margin-bottom: theme('spacing.token.p14');
+  padding: theme('spacing.token.p10') theme('spacing.token.p12');
   border-radius: 6px;
-  background: #fef2f2;
-  color: #991b1b;
+  background: theme('colors.token.hfef2f2');
+  color: theme('colors.token.h991b1b');
   font-size: 13px;
 }
 
@@ -31,20 +31,20 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--muted);
-  margin-bottom: 12px;
+  margin-bottom: theme('spacing.token.p12');
 }
 
 .age-distribution {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: theme('spacing.token.p16');
 }
 
 .age-card {
   background: var(--card-bg);
   border-radius: 10px;
-  padding: 16px;
+  padding: theme('spacing.token.p16');
   border: 2px solid var(--border);
   box-shadow: var(--shadow);
   cursor: pointer;
@@ -58,13 +58,13 @@
 
 .age-card.active {
   border-color: var(--primary);
-  background: #f0f4ff;
+  background: theme('colors.token.hf0f4ff');
 }
 
 .age-label {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: theme('spacing.token.p10');
   color: var(--text);
 }
 
@@ -92,7 +92,7 @@
   font-size: 20px;
   font-weight: 700;
   color: var(--primary);
-  margin-top: 8px;
+  margin-top: theme('spacing.token.p8');
   text-align: right;
 }
 
@@ -100,7 +100,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: theme('spacing.token.p16');
 }
 
 .card {
@@ -111,9 +111,9 @@
 }
 
 .card-header {
-  padding: 14px 20px;
+  padding: theme('spacing.token.p14') theme('spacing.token.p20');
   border-bottom: 1px solid var(--border);
-  background: #fafbfc;
+  background: theme('colors.token.hfafbfc');
 }
 
 .card-title {
@@ -136,12 +136,12 @@
 
 .dist-table th,
 .dist-table td {
-  padding: 10px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: theme('spacing.token.p10') theme('spacing.token.p16');
+  border-bottom: 1px solid theme('colors.token.hf0f0f0');
 }
 
 .dist-table th {
-  background: #f8f9fa;
+  background: theme('colors.token.hf8f9fa');
   font-weight: 600;
   text-align: left;
 }
@@ -161,11 +161,11 @@
 }
 
 .dist-table tbody tr:hover {
-  background: #f0f4ff;
+  background: theme('colors.token.hf0f4ff');
 }
 
 .dist-table tbody tr.active {
-  background: #e0e7ff;
+  background: theme('colors.token.he0e7ff');
 }
 
 .table-section {
@@ -179,9 +179,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
+  padding: theme('spacing.token.p14') theme('spacing.token.p20');
   border-bottom: 1px solid var(--border);
-  background: #fafbfc;
+  background: theme('colors.token.hfafbfc');
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -210,14 +210,14 @@
 
 .lot-table th,
 .lot-table td {
-  padding: 10px 12px;
+  padding: theme('spacing.token.p10') theme('spacing.token.p12');
   text-align: left;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid theme('colors.token.hf0f0f0');
   white-space: nowrap;
 }
 
 .lot-table th {
-  background: #f8f9fa;
+  background: theme('colors.token.hf8f9fa');
   font-weight: 600;
   position: sticky;
   top: 0;
@@ -231,7 +231,7 @@
 }
 
 .lot-table tbody tr:hover {
-  background: #f8f9fc;
+  background: theme('colors.token.hf8f9fc');
 }
 
 @media (max-width: 1400px) {

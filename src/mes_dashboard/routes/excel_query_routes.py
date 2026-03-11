@@ -8,8 +8,9 @@ Provides endpoints for:
 - CSV export
 """
 
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, request, Response
 
+from mes_dashboard.core.response import success_response, validation_error, internal_error
 from mes_dashboard.config.tables import TABLES_CONFIG
 from mes_dashboard.core.database import get_table_columns, get_table_column_metadata
 from mes_dashboard.services.excel_query_service import (
@@ -36,30 +37,30 @@ def upload_excel():
     Returns column list and preview data.
     """
     if 'file' not in request.files:
-        return jsonify({'error': '未選擇檔案'}), 400
+        return validation_error('未選擇檔案')
 
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': '未選擇檔案'}), 400
+        return validation_error('未選擇檔案')
 
     # Check file extension
     allowed_extensions = {'.xlsx', '.xls'}
     import os
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in allowed_extensions:
-        return jsonify({'error': '只支援 .xlsx 或 .xls 檔案'}), 400
+        return validation_error('只支援 .xlsx 或 .xls 檔案')
 
     # Parse Excel
     result = parse_excel(file)
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
     # Cache the file content for later use
     file.seek(0)
     _uploaded_excel_cache['current'] = file.read()
     _uploaded_excel_cache['filename'] = file.filename
 
-    return jsonify(result)
+    return success_response(result)
 
 
 @excel_query_bp.route('/column-values', methods=['POST'])
@@ -69,10 +70,10 @@ def get_column_values():
     column_name = data.get('column_name')
 
     if not column_name:
-        return jsonify({'error': '請指定欄位名稱'}), 400
+        return validation_error('請指定欄位名稱')
 
     if 'current' not in _uploaded_excel_cache:
-        return jsonify({'error': '請先上傳 Excel 檔案'}), 400
+        return validation_error('請先上傳 Excel 檔案')
 
     # Create file-like object from cached content
     import io
@@ -80,9 +81,9 @@ def get_column_values():
 
     result = get_column_unique_values(file_like, column_name)
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
-    return jsonify(result)
+    return success_response(result)
 
 
 @excel_query_bp.route('/tables', methods=['GET'])
@@ -96,7 +97,7 @@ def get_tables():
                 'display_name': table['display_name'],
                 'category': category
             })
-    return jsonify({'tables': tables})
+    return success_response({'tables': tables})
 
 
 @excel_query_bp.route('/table-columns', methods=['POST'])
@@ -106,13 +107,13 @@ def get_table_cols():
     table_name = data.get('table_name')
 
     if not table_name:
-        return jsonify({'error': '請指定資料表名稱'}), 400
+        return validation_error('請指定資料表名稱')
 
     columns = get_table_columns(table_name)
     if not columns:
-        return jsonify({'error': f'無法取得資料表 {table_name} 的欄位'}), 400
+        return validation_error(f'無法取得資料表 {table_name} 的欄位')
 
-    return jsonify({'columns': columns})
+    return success_response({'columns': columns})
 
 
 @excel_query_bp.route('/table-metadata', methods=['POST'])
@@ -130,12 +131,12 @@ def get_table_metadata():
     table_name = data.get('table_name')
 
     if not table_name:
-        return jsonify({'error': '請指定資料表名稱'}), 400
+        return validation_error('請指定資料表名稱')
 
     # Get column metadata from Oracle
     metadata = get_table_column_metadata(table_name)
     if 'error' in metadata and not metadata.get('columns'):
-        return jsonify({'error': f'無法取得資料表 {table_name} 的欄位資訊'}), 400
+        return validation_error(f'無法取得資料表 {table_name} 的欄位資訊')
 
     # Find table config for additional info
     table_config = None
@@ -163,7 +164,7 @@ def get_table_metadata():
             '包含查詢可能較慢，建議配合日期範圍縮小查詢範圍'
         )
 
-    return jsonify(result)
+    return success_response(result)
 
 
 @excel_query_bp.route('/column-type', methods=['POST'])
@@ -179,10 +180,10 @@ def get_excel_column_type():
     column_name = data.get('column_name')
 
     if not column_name:
-        return jsonify({'error': '請指定欄位名稱'}), 400
+        return validation_error('請指定欄位名稱')
 
     if 'current' not in _uploaded_excel_cache:
-        return jsonify({'error': '請先上傳 Excel 檔案'}), 400
+        return validation_error('請先上傳 Excel 檔案')
 
     import io
     file_like = io.BytesIO(_uploaded_excel_cache['current'])
@@ -191,15 +192,12 @@ def get_excel_column_type():
     from mes_dashboard.services.excel_query_service import get_column_unique_values
     values_result = get_column_unique_values(file_like, column_name)
     if 'error' in values_result:
-        return jsonify(values_result), 400
+        return validation_error(values_result.get('error', '查詢失敗'))
 
     # Detect type from values
     type_info = detect_excel_column_type(values_result['values'])
 
-    return jsonify({
-        'column_name': column_name,
-        **type_info
-    })
+    return success_response({'column_name': column_name, **type_info})
 
 
 @excel_query_bp.route('/execute-advanced', methods=['POST'])
@@ -231,18 +229,18 @@ def execute_advanced_query():
 
     # Validation
     if not table_name:
-        return jsonify({'error': '請指定資料表'}), 400
+        return validation_error('請指定資料表')
     if not search_column:
-        return jsonify({'error': '請指定查詢欄位'}), 400
+        return validation_error('請指定查詢欄位')
     if not return_columns or not isinstance(return_columns, list):
-        return jsonify({'error': '請指定回傳欄位'}), 400
+        return validation_error('請指定回傳欄位')
     if not search_values or not isinstance(search_values, list):
-        return jsonify({'error': '無查詢值'}), 400
+        return validation_error('無查詢值')
 
     # Validate query_type
     valid_types = {'in', 'like_contains', 'like_prefix', 'like_suffix'}
     if query_type not in valid_types:
-        return jsonify({'error': f'無效的查詢類型: {query_type}'}), 400
+        return validation_error(f'無效的查詢類型: {query_type}')
 
     # Validate date range if provided
     if date_from and date_to:
@@ -251,11 +249,11 @@ def execute_advanced_query():
             d_from = datetime.strptime(date_from, '%Y-%m-%d')
             d_to = datetime.strptime(date_to, '%Y-%m-%d')
             if d_from > d_to:
-                return jsonify({'error': '起始日期不可晚於結束日期'}), 400
+                return validation_error('起始日期不可晚於結束日期')
             if (d_to - d_from).days > 365:
-                return jsonify({'error': '日期範圍不可超過 365 天'}), 400
+                return validation_error('日期範圍不可超過 365 天')
         except ValueError:
-            return jsonify({'error': '日期格式錯誤，請使用 YYYY-MM-DD'}), 400
+            return validation_error('日期格式錯誤，請使用 YYYY-MM-DD')
 
     result = execute_advanced_batch_query(
         table_name=table_name,
@@ -269,9 +267,9 @@ def execute_advanced_query():
     )
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
-    return jsonify(result)
+    return success_response(result)
 
 
 @excel_query_bp.route('/execute', methods=['POST'])
@@ -295,13 +293,13 @@ def execute_query():
 
     # Validation
     if not table_name:
-        return jsonify({'error': '請指定資料表'}), 400
+        return validation_error('請指定資料表')
     if not search_column:
-        return jsonify({'error': '請指定查詢欄位'}), 400
+        return validation_error('請指定查詢欄位')
     if not return_columns or not isinstance(return_columns, list):
-        return jsonify({'error': '請指定回傳欄位'}), 400
+        return validation_error('請指定回傳欄位')
     if not search_values or not isinstance(search_values, list):
-        return jsonify({'error': '無查詢值'}), 400
+        return validation_error('無查詢值')
 
     result = execute_batch_query(
         table_name=table_name,
@@ -311,9 +309,9 @@ def execute_query():
     )
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
-    return jsonify(result)
+    return success_response(result)
 
 
 @excel_query_bp.route('/export-csv', methods=['POST'])
@@ -331,7 +329,7 @@ def export_csv():
 
     # Validation
     if not all([table_name, search_column, return_columns, search_values]):
-        return jsonify({'error': '缺少必要參數'}), 400
+        return validation_error('缺少必要參數')
 
     result = execute_batch_query(
         table_name=table_name,
@@ -341,7 +339,7 @@ def export_csv():
     )
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
     # Generate CSV
     csv_content = generate_csv_content(result['data'], result['columns'])

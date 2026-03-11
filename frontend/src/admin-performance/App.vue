@@ -678,29 +678,29 @@ function formatBytes(bytes) {
 
 // --- Trend Chart Series Configs ---
 const poolTrendSeries = [
-  { name: '飽和度', key: 'pool_saturation', color: '#6366f1' },
-  { name: '使用中', key: 'pool_checked_out', color: '#f59e0b' },
-  { name: '慢查詢執行中', key: 'slow_query_active', color: '#ef4444' },
+  { name: '飽和度', key: 'pool_saturation', color: 'rgb(99, 102, 241)' },
+  { name: '使用中', key: 'pool_checked_out', color: 'rgb(245, 158, 11)' },
+  { name: '慢查詢執行中', key: 'slow_query_active', color: 'rgb(239, 68, 68)' },
 ];
 
 const latencyTrendSeries = [
-  { name: 'P50', key: 'latency_p50_ms', color: '#22c55e' },
-  { name: 'P95', key: 'latency_p95_ms', color: '#f59e0b' },
-  { name: 'P99', key: 'latency_p99_ms', color: '#ef4444' },
+  { name: 'P50', key: 'latency_p50_ms', color: 'rgb(34, 197, 94)' },
+  { name: 'P95', key: 'latency_p95_ms', color: 'rgb(245, 158, 11)' },
+  { name: 'P99', key: 'latency_p99_ms', color: 'rgb(239, 68, 68)' },
 ];
 
 const redisTrendSeries = [
-  { name: '記憶體 (MB)', key: 'redis_used_memory_mb', color: '#06b6d4' },
+  { name: '記憶體 (MB)', key: 'redis_used_memory_mb', color: 'rgb(6, 182, 212)' },
 ];
 
 const hitRateTrendSeries = [
-  { name: 'Redis 命中率', key: 'redis_hit_rate', color: '#22c55e' },
-  { name: 'L1 命中率', key: 'rc_l1_hit_rate', color: '#2563eb' },
-  { name: 'L2 命中率', key: 'rc_l2_hit_rate', color: '#f59e0b' },
+  { name: 'Redis 命中率', key: 'redis_hit_rate', color: 'rgb(34, 197, 94)' },
+  { name: 'L1 命中率', key: 'rc_l1_hit_rate', color: 'rgb(37, 99, 235)' },
+  { name: 'L2 命中率', key: 'rc_l2_hit_rate', color: 'rgb(245, 158, 11)' },
 ];
 
 const memoryTrendSeries = [
-  { name: 'RSS (MB)', key: 'worker_rss_mb', color: '#8b5cf6' },
+  { name: 'RSS (MB)', key: 'worker_rss_mb', color: 'rgb(139, 92, 246)' },
 ];
 
 async function refreshAll() {
@@ -813,7 +813,7 @@ function updateLatencyChart() {
       {
         type: 'bar',
         data: counts,
-        itemStyle: { color: '#6366f1' },
+        itemStyle: { color: 'rgb(99, 102, 241)' },
         barMaxWidth: 40,
       },
     ],

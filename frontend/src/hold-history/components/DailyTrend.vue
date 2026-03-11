@@ -82,7 +82,7 @@ const chartOption = computed(() => {
         name: 'Release',
         type: 'bar',
         data: release,
-        itemStyle: { color: '#16a34a' },
+        itemStyle: { color: 'rgb(22, 163, 74)' },
         barMaxWidth: 18,
       },
       {
@@ -90,7 +90,7 @@ const chartOption = computed(() => {
         type: 'bar',
         stack: 'negative',
         data: newHold,
-        itemStyle: { color: '#dc2626' },
+        itemStyle: { color: 'rgb(220, 38, 38)' },
         barMaxWidth: 18,
       },
       {
@@ -98,7 +98,7 @@ const chartOption = computed(() => {
         type: 'bar',
         stack: 'negative',
         data: futureHold,
-        itemStyle: { color: '#f97316' },
+        itemStyle: { color: 'rgb(249, 115, 22)' },
         barMaxWidth: 18,
       },
       {
@@ -107,8 +107,8 @@ const chartOption = computed(() => {
         yAxisIndex: 1,
         data: stock,
         smooth: true,
-        lineStyle: { width: 2, color: '#2563eb' },
-        itemStyle: { color: '#2563eb' },
+        lineStyle: { width: 2, color: 'rgb(37, 99, 235)' },
+        itemStyle: { color: 'rgb(37, 99, 235)' },
         symbolSize: 5,
       },
     ],

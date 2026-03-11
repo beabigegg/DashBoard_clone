@@ -90,7 +90,7 @@ const chartOption = computed(() => {
       left: 'center',
       bottom: 4,
       inRange: {
-        color: ['#ef4444', '#f59e0b', '#22c55e'],
+        color: ['rgb(239, 68, 68)', 'rgb(245, 158, 11)', 'rgb(34, 197, 94)'],
       },
     },
     series: [

@@ -81,7 +81,7 @@ class TestResourceHistoryQueryAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = json.loads(response.data)
         self.assertFalse(data['success'])
-        self.assertIn('start_date', data['error'])
+        self.assertIn('start_date', data['error']['message'])
 
     def test_missing_end_date(self):
         """Missing end_date should return 400."""
@@ -93,7 +93,7 @@ class TestResourceHistoryQueryAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = json.loads(response.data)
         self.assertFalse(data['success'])
-        self.assertIn('end_date', data['error'])
+        self.assertIn('end_date', data['error']['message'])
 
     @patch('mes_dashboard.routes.resource_history_routes.execute_primary_query')
     def test_successful_query(self, mock_query):
@@ -122,11 +122,11 @@ class TestResourceHistoryQueryAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(data['success'])
-        self.assertIn('query_id', data)
-        self.assertIn('summary', data)
-        self.assertIn('detail', data)
-        self.assertIn('kpi', data['summary'])
-        self.assertIn('trend', data['summary'])
+        self.assertIn('query_id', data['data'])
+        self.assertIn('summary', data['data'])
+        self.assertIn('detail', data['data'])
+        self.assertIn('kpi', data['data']['summary'])
+        self.assertIn('trend', data['data']['summary'])
 
     @patch('mes_dashboard.routes.resource_history_routes.execute_primary_query')
     def test_query_with_filters(self, mock_query):
@@ -177,7 +177,7 @@ class TestResourceHistoryViewAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = json.loads(response.data)
         self.assertFalse(data['success'])
-        self.assertIn('query_id', data['error'])
+        self.assertIn('query_id', data['error']['message'])
 
     @patch('mes_dashboard.routes.resource_history_routes.apply_view')
     def test_cache_expired(self, mock_view):
@@ -189,7 +189,7 @@ class TestResourceHistoryViewAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 410)
         data = json.loads(response.data)
         self.assertFalse(data['success'])
-        self.assertEqual(data['error'], 'cache_expired')
+        self.assertEqual(data['error']['code'], 'CACHE_EXPIRED')
 
     @patch('mes_dashboard.routes.resource_history_routes.apply_view')
     def test_successful_view(self, mock_view):
@@ -216,8 +216,8 @@ class TestResourceHistoryViewAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(data['success'])
-        self.assertIn('summary', data)
-        self.assertIn('detail', data)
+        self.assertIn('summary', data['data'])
+        self.assertIn('detail', data['data'])
 
 
 class TestResourceHistoryExportAPI(unittest.TestCase):

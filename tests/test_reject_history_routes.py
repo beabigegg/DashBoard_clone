@@ -171,7 +171,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
-        self.assertIn('190', payload['error'])
+        self.assertIn('190', payload['error']['message'])
         mock_execute.assert_not_called()
 
     @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
@@ -227,7 +227,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 503)
         self.assertFalse(payload['success'])
-        self.assertEqual(payload['code'], 'QUERY_IN_FLIGHT')
+        self.assertEqual(payload['error']['code'], 'QUERY_IN_FLIGHT')
         self.assertEqual(response.headers.get('Retry-After'), '5')
 
     @patch('mes_dashboard.routes.reject_history_routes.query_trend')
@@ -379,7 +379,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
-        self.assertEqual(payload['error'], 'cache_miss')
+        self.assertEqual(payload['error']['code'], 'CACHE_MISS')
 
     @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
     def test_batch_pareto_memory_guard_returns_400(self, mock_batch_pareto):
@@ -390,7 +390,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
-        self.assertIn('記憶體負載較高', payload['error'])
+        self.assertIn('記憶體負載較高', payload['error']['message'])
 
     @patch('mes_dashboard.routes.reject_history_routes.apply_view')
     def test_view_passes_pareto_multi_select_filters(self, mock_apply_view):
@@ -425,7 +425,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 410)
         self.assertFalse(payload['success'])
-        self.assertEqual(payload['error'], 'cache_expired')
+        self.assertEqual(payload['error']['code'], 'CACHE_EXPIRED')
 
     @patch('mes_dashboard.routes.reject_history_routes.apply_view')
     def test_view_invalid_pareto_dimension_returns_400(self, mock_apply_view):
@@ -537,7 +537,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 410)
         self.assertFalse(payload['success'])
-        self.assertEqual(payload['error'], 'cache_expired')
+        self.assertEqual(payload['error']['code'], 'CACHE_EXPIRED')
 
     @patch('mes_dashboard.routes.reject_history_routes._list_to_csv')
     @patch('mes_dashboard.routes.reject_history_routes.export_csv_from_cache')
@@ -687,7 +687,8 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload['success'])
-        self.assertNotIn('meta', payload)
+        # meta always present (contains at least 'timestamp'), but no pareto_source key
+        self.assertNotIn('pareto_source', payload.get('meta', {}))
 
     @patch('mes_dashboard.routes.reject_history_routes.compute_dimension_pareto')
     def test_reason_pareto_exposes_materialized_metadata(self, mock_dim_pareto):

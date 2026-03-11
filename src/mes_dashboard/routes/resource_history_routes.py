@@ -7,10 +7,16 @@ Two-phase flow: POST /query (Oracle → cache) + GET /view (cache → derived vi
 
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request, redirect, Response
+from flask import Blueprint, request, redirect, Response
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.config.constants import CACHE_TTL_FILTER_OPTIONS
+from mes_dashboard.core.response import (
+    cache_expired_error,
+    internal_error,
+    success_response,
+    validation_error,
+)
 from mes_dashboard.services.resource_history_service import (
     get_filter_options,
     export_csv,
@@ -58,8 +64,8 @@ def api_resource_history_options():
             cache_set(cache_key, options, ttl=CACHE_TTL_FILTER_OPTIONS)
 
     if options is not None:
-        return jsonify({'success': True, 'data': options})
-    return jsonify({'success': False, 'error': '查詢篩選選項失敗'}), 500
+        return success_response(options)
+    return internal_error()
 
 
 # ============================================================
@@ -124,7 +130,7 @@ def api_resource_history_query():
     try:
         _validate_dates(start_date, end_date)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
 
     filters = _parse_resource_filters(body)
 
@@ -135,9 +141,9 @@ def api_resource_history_query():
             granularity=granularity,
             **filters,
         )
-        return jsonify({"success": True, **result})
+        return success_response(result)
     except Exception as exc:
-        return jsonify({"success": False, "error": f"查詢失敗: {exc}"}), 500
+        return internal_error(str(exc))
 
 
 @resource_history_bp.route('/view', methods=['GET'])
@@ -155,13 +161,13 @@ def api_resource_history_view():
     granularity = request.args.get("granularity", "day")
 
     if not query_id:
-        return jsonify({"success": False, "error": "必須提供 query_id"}), 400
+        return validation_error("必須提供 query_id")
 
     result = apply_view(query_id=query_id, granularity=granularity)
     if result is None:
-        return jsonify({"success": False, "error": "cache_expired"}), 410
+        return cache_expired_error()
 
-    return jsonify({"success": True, **result})
+    return success_response(result)
 
 
 # ============================================================
@@ -198,25 +204,16 @@ def api_resource_history_export():
 
     # Validate required parameters
     if not start_date or not end_date:
-        return jsonify({
-            'success': False,
-            'error': '必須提供 start_date 和 end_date 參數'
-        }), 400
+        return validation_error('必須提供 start_date 和 end_date 參數')
 
     # Validate export date range (max 365 days)
     try:
         sd = datetime.strptime(start_date, '%Y-%m-%d')
         ed = datetime.strptime(end_date, '%Y-%m-%d')
         if (ed - sd).days > 365:
-            return jsonify({
-                'success': False,
-                'error': 'CSV 匯出範圍不可超過一年 (365 天)'
-            }), 400
+            return validation_error('CSV 匯出範圍不可超過一年 (365 天)')
     except ValueError:
-        return jsonify({
-            'success': False,
-            'error': '日期格式錯誤，請使用 YYYY-MM-DD'
-        }), 400
+        return validation_error('日期格式錯誤，請使用 YYYY-MM-DD')
 
     # Generate filename
     filename = f"resource_history_{start_date}_to_{end_date}.csv"

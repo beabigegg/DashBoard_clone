@@ -14,18 +14,18 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  gap: theme('spacing.block');
+  padding: theme('spacing.block');
+  border-radius: theme('borderRadius.card');
+  border: 1px solid theme('colors.stroke.soft');
+  background: theme('colors.surface.muted');
 }
 
 .shared-filter-toolbar-main,
 .shared-filter-toolbar-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: theme('spacing.2');
   align-items: center;
 }
 </style>

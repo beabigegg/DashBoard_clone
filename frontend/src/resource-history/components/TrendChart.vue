@@ -59,7 +59,7 @@ const chartOption = computed(() => {
         symbolSize: 6,
         areaStyle: { opacity: 0.2 },
         lineStyle: { width: 2 },
-        itemStyle: { color: '#2563eb' },
+        itemStyle: { color: 'rgb(37, 99, 235)' },
         data: trend.map((item) => Number(item.ou_pct || 0)),
       },
       {
@@ -69,7 +69,7 @@ const chartOption = computed(() => {
         symbolSize: 6,
         areaStyle: { opacity: 0.2 },
         lineStyle: { width: 2 },
-        itemStyle: { color: '#16a34a' },
+        itemStyle: { color: 'rgb(22, 163, 74)' },
         data: trend.map((item) => Number(item.availability_pct || 0)),
       },
     ],

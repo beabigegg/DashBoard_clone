@@ -94,7 +94,7 @@ const chartOption = computed(() => {
         itemStyle: {
           color(params) {
             const reason = reasons[params.dataIndex] || '';
-            return reason === props.activeReason ? '#dc2626' : '#1d4ed8';
+            return reason === props.activeReason ? 'rgb(220, 38, 38)' : 'rgb(29, 78, 216)';
           },
           borderRadius: [4, 4, 0, 0],
         },
@@ -105,8 +105,8 @@ const chartOption = computed(() => {
         type: 'line',
         yAxisIndex: 1,
         data: cumPct,
-        lineStyle: { color: '#f59e0b', width: 2 },
-        itemStyle: { color: '#f59e0b' },
+        lineStyle: { color: 'rgb(245, 158, 11)', width: 2 },
+        itemStyle: { color: 'rgb(245, 158, 11)' },
         symbolSize: 6,
       },
     ],

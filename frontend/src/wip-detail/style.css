@@ -6,23 +6,23 @@
 }
 
 .error-banner {
-  margin-bottom: 14px;
-  padding: 10px 12px;
+  margin-bottom: theme('spacing.nav');
+  padding: theme('spacing.token.p10') theme('spacing.block');
   border-radius: 6px;
-  background: #fef2f2;
-  color: #991b1b;
+  background: theme('colors.token.hfef2f2');
+  color: theme('colors.token.h991b1b');
   font-size: 13px;
 }
 
 .filters {
   background: var(--card-bg);
-  padding: 16px 20px;
+  padding: theme('spacing.token.p16') theme('spacing.shell');
   border-radius: 10px;
-  margin-bottom: 16px;
+  margin-bottom: theme('spacing.token.p16');
   box-shadow: var(--shadow);
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
-  gap: 14px 16px;
+  gap: theme('spacing.nav') 16px;
   align-items: start;
 }
 
@@ -72,39 +72,39 @@
 }
 
 .detail-summary-row .summary-card.status-run {
-  background: #f0fdf4;
-  border-color: #22c55e;
+  background: theme('colors.token.hf0fdf4');
+  border-color: theme('colors.state.success');
 }
 
 .detail-summary-row .summary-card.status-queue {
-  background: #fffbeb;
-  border-color: #f59e0b;
+  background: theme('colors.token.hfffbeb');
+  border-color: theme('colors.state.warning');
 }
 
 .detail-summary-row .summary-card.status-quality-hold {
-  background: #fef2f2;
-  border-color: #ef4444;
+  background: theme('colors.token.hfef2f2');
+  border-color: theme('colors.state.danger');
 }
 
 .detail-summary-row .summary-card.status-non-quality-hold {
-  background: #fff7ed;
-  border-color: #f97316;
+  background: theme('colors.token.hfff7ed');
+  border-color: theme('colors.token.hf97316');
 }
 
 .detail-summary-row .summary-card.status-run .summary-value {
-  color: #166534;
+  color: theme('colors.token.h166534');
 }
 
 .detail-summary-row .summary-card.status-queue .summary-value {
-  color: #92400e;
+  color: theme('colors.token.h92400e');
 }
 
 .detail-summary-row .summary-card.status-quality-hold .summary-value {
-  color: #991b1b;
+  color: theme('colors.token.h991b1b');
 }
 
 .detail-summary-row .summary-card.status-non-quality-hold .summary-value {
-  color: #9a3412;
+  color: theme('colors.token.h9a3412');
 }
 
 .detail-summary-row .summary-card.active {
@@ -130,9 +130,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
+  padding: theme('spacing.nav') theme('spacing.shell');
   border-bottom: 1px solid var(--border);
-  background: #fafbfc;
+  background: theme('colors.token.hfafbfc');
 }
 
 .table-title {
@@ -165,8 +165,8 @@
 }
 
 .table-container th {
-  background: #f8f9fa;
-  padding: 10px 12px;
+  background: theme('colors.token.hf8f9fa');
+  padding: theme('spacing.token.p10') theme('spacing.block');
   text-align: left;
   border-bottom: 2px solid var(--border);
   font-weight: 600;
@@ -174,20 +174,20 @@
 }
 
 .table-container td {
-  padding: 10px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: theme('spacing.token.p10') theme('spacing.block');
+  border-bottom: 1px solid theme('colors.token.hf0f0f0');
   white-space: nowrap;
 }
 
 .table-container th.fixed-col,
 .table-container td.fixed-col {
   position: sticky;
-  background: #fff;
+  background: theme('colors.white');
   z-index: 5;
 }
 
 .table-container th.fixed-col {
-  background: #f8f9fa;
+  background: theme('colors.token.hf8f9fa');
   z-index: 11;
 }
 
@@ -217,15 +217,15 @@
 }
 
 .table-container tbody tr:hover td {
-  background: #f8f9fc;
+  background: theme('colors.token.hf8f9fc');
 }
 
 .table-container tbody tr:hover td.fixed-col {
-  background: #f0f2ff;
+  background: theme('colors.token.hf0f2ff');
 }
 
 .spec-col {
-  background: #e8ebff;
+  background: theme('colors.token.he8ebff');
   text-align: center;
   font-size: 12px;
   min-width: 80px;
@@ -237,25 +237,25 @@
 }
 
 .spec-cell.has-data {
-  background: #d4edda;
-  color: #155724;
+  background: theme('colors.token.hd4edda');
+  color: theme('colors.token.h155724');
 }
 
 .wip-status-run {
-  color: #166534;
-  background: #f0fdf4;
+  color: theme('colors.token.h166534');
+  background: theme('colors.token.hf0fdf4');
   font-weight: 600;
 }
 
 .wip-status-queue {
-  color: #92400e;
-  background: #fffbeb;
+  color: theme('colors.token.h92400e');
+  background: theme('colors.token.hfffbeb');
   font-weight: 600;
 }
 
 .wip-status-hold {
-  color: #991b1b;
-  background: #fef2f2;
+  color: theme('colors.token.h991b1b');
+  background: theme('colors.token.hfef2f2');
   font-weight: 600;
 }
 
@@ -277,7 +277,7 @@
 
 .lot-id-link.active {
   background: rgba(102, 126, 234, 0.15);
-  padding: 2px 6px;
+  padding: theme('spacing.token.p2') theme('spacing.token.p6');
   border-radius: 4px;
 }
 
@@ -285,7 +285,7 @@
   background: var(--card-bg);
   border-radius: 10px;
   box-shadow: var(--shadow);
-  margin-top: 16px;
+  margin-top: theme('spacing.token.p16');
   overflow: hidden;
 }
 
@@ -297,15 +297,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
+  padding: theme('spacing.nav') theme('spacing.shell');
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%);
 }
 
 .lot-detail-title {
   font-size: 16px;
   font-weight: 600;
-  color: #fff;
+  color: theme('colors.white');
   display: flex;
   align-items: center;
   gap: 10px;
@@ -313,7 +313,7 @@
 
 .lot-detail-title .lot-id {
   background: rgba(255, 255, 255, 0.2);
-  padding: 4px 12px;
+  padding: theme('spacing.token.p4') theme('spacing.block');
   border-radius: 6px;
   font-family: monospace;
 }
@@ -321,8 +321,8 @@
 .lot-detail-close {
   background: rgba(255, 255, 255, 0.2);
   border: none;
-  color: #fff;
-  padding: 6px 12px;
+  color: theme('colors.white');
+  padding: theme('spacing.token.p6') theme('spacing.block');
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
@@ -333,7 +333,7 @@
 }
 
 .lot-detail-content {
-  padding: 20px;
+  padding: theme('spacing.shell');
 }
 
 .lot-detail-grid {
@@ -343,24 +343,24 @@
 }
 
 .lot-detail-section {
-  background: #f8f9fa;
+  background: theme('colors.token.hf8f9fa');
   border-radius: 8px;
-  padding: 14px;
+  padding: theme('spacing.nav');
 }
 
 .lot-detail-section-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--primary);
-  margin-bottom: 12px;
-  padding-bottom: 6px;
+  margin-bottom: theme('spacing.block');
+  padding-bottom: theme('spacing.token.p6');
   border-bottom: 2px solid var(--primary);
 }
 
 .lot-detail-field {
   display: flex;
   flex-direction: column;
-  margin-bottom: 10px;
+  margin-bottom: theme('spacing.token.p10');
 }
 
 .lot-detail-field:last-child {
@@ -370,7 +370,7 @@
 .lot-detail-label {
   font-size: 11px;
   color: var(--muted);
-  margin-bottom: 2px;
+  margin-bottom: theme('spacing.token.p2');
 }
 
 .lot-detail-value {
@@ -380,28 +380,28 @@
 }
 
 .lot-detail-value.status-run {
-  color: #166534;
+  color: theme('colors.token.h166534');
   font-weight: 600;
 }
 
 .lot-detail-value.status-queue {
-  color: #92400e;
+  color: theme('colors.token.h92400e');
   font-weight: 600;
 }
 
 .lot-detail-value.status-hold {
-  color: #991b1b;
+  color: theme('colors.token.h991b1b');
   font-weight: 600;
 }
 
 .lot-detail-loading {
   text-align: center;
-  padding: 40px;
+  padding: theme('spacing.token.p40');
   color: var(--muted);
 }
 
 .lot-detail-loading.error {
-  color: #991b1b;
+  color: theme('colors.token.h991b1b');
 }
 
 @media (max-width: 1400px) {

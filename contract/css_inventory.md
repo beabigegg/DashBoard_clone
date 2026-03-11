@@ -1,8 +1,10 @@
 # CSS Inventory (Governed Source List)
 
-Updated: 2026-03-10
+Updated: 2026-03-11
 
 This file is the governed inventory for authored CSS source files in `frontend/src/**/*.css`.
+
+Governance status (2026-03-11): `css-governance-check` = 0 errors, 0 warnings.
 
 - Included: human-authored source CSS files under `frontend/src/`
 - Excluded: build outputs under `src/mes_dashboard/static/dist/`

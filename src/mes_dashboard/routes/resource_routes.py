@@ -6,7 +6,7 @@ Contains Flask Blueprint for resource/equipment-related API endpoints.
 
 import math
 import logging
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, request, current_app
 
 from mes_dashboard.core.database import (
     get_db_connection,
@@ -16,7 +16,15 @@ from mes_dashboard.core.database import (
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
-from mes_dashboard.core.response import INTERNAL_ERROR, error_response
+from mes_dashboard.core.response import (
+    INTERNAL_ERROR,
+    VALIDATION_ERROR,
+    error_response,
+    success_response,
+    validation_error,
+    internal_error,
+    service_unavailable_error,
+)
 from mes_dashboard.core.utils import get_days_back, parse_bool_query
 
 
@@ -170,8 +178,8 @@ def api_resource_by_status():
         else:
             data = None
     if data is not None:
-        return jsonify({'success': True, 'data': data})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(data)
+    return internal_error('查詢失敗')
 
 
 @resource_bp.route('/by_workcenter')
@@ -188,8 +196,8 @@ def api_resource_by_workcenter():
         else:
             data = None
     if data is not None:
-        return jsonify({'success': True, 'data': data})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(data)
+    return internal_error('查詢失敗')
 
 
 @resource_bp.route('/workcenter_status_matrix')
@@ -206,8 +214,8 @@ def api_resource_workcenter_status_matrix():
         else:
             data = None
     if data is not None:
-        return jsonify({'success': True, 'data': data})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(data)
+    return internal_error('查詢失敗')
 
 
 @resource_bp.route('/detail', methods=['POST'])
@@ -216,11 +224,11 @@ def api_resource_detail():
     """API: Resource detail with filters."""
     data, payload_error = parse_json_payload(require_object=True)
     if payload_error is not None:
-        return jsonify({'success': False, 'error': payload_error.message}), payload_error.status_code
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     filters = data.get('filters')
     if filters is not None and not isinstance(filters, dict):
-        return jsonify({'success': False, 'error': 'filters 必須為物件'}), 400
+        return validation_error('filters 必須為物件')
 
     default_limit = _config_int("RESOURCE_DETAIL_DEFAULT_LIMIT", 500)
     max_limit = _config_int("RESOURCE_DETAIL_MAX_LIMIT", default_limit)
@@ -228,26 +236,26 @@ def api_resource_detail():
     try:
         limit = int(data.get('limit', default_limit))
     except (TypeError, ValueError):
-        return jsonify({'success': False, 'error': 'limit 必須為整數'}), 400
+        return validation_error('limit 必須為整數')
     if limit < 1:
-        return jsonify({'success': False, 'error': 'limit 必須大於 0'}), 400
+        return validation_error('limit 必須大於 0')
     if limit > max_limit:
-        return jsonify({'success': False, 'error': f'limit 不可超過 {max_limit}'}), 413
+        return error_response(VALIDATION_ERROR, f'limit 不可超過 {max_limit}', status_code=413)
 
     try:
         offset = int(data.get('offset', 0))
     except (TypeError, ValueError):
-        return jsonify({'success': False, 'error': 'offset 必須為整數'}), 400
+        return validation_error('offset 必須為整數')
     if offset < 0:
-        return jsonify({'success': False, 'error': 'offset 不可小於 0'}), 400
+        return validation_error('offset 不可小於 0')
 
     days_back = get_days_back(filters)
 
     df = query_resource_detail(filters, limit, offset, days_back)
     if df is not None:
         records = df.to_dict(orient='records')
-        return jsonify({'success': True, 'data': records, 'count': len(records), 'offset': offset})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(records, meta={'count': len(records), 'offset': offset})
+    return internal_error('查詢失敗')
 
 
 @resource_bp.route('/filter_options')
@@ -261,8 +269,8 @@ def api_resource_filter_options():
         if options:
             cache_set(cache_key, options)
     if options:
-        return jsonify({'success': True, 'data': options})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(options)
+    return internal_error('查詢失敗')
 
 
 @resource_bp.route('/status_values')
@@ -270,7 +278,7 @@ def api_resource_status_values():
     """API: Get all distinct status values with counts (for verification)."""
     connection = get_db_connection()
     if not connection:
-        return jsonify({'success': False, 'error': '數據庫連接失敗'}), 500
+        return internal_error('數據庫連接失敗')
 
     try:
         sql = """
@@ -288,7 +296,7 @@ def api_resource_status_values():
         connection.close()
 
         data = [{'status': row[0], 'count': row[1]} for row in rows]
-        return jsonify({'success': True, 'data': data})
+        return success_response(data)
     except Exception as exc:
         if connection:
             connection.close()
@@ -344,11 +352,7 @@ def api_resource_status():
         )
         # Clean NaN/NaT values for valid JSON
         cleaned_data = _clean_nan_values(data)
-        return jsonify({
-            'success': True,
-            'data': cleaned_data,
-            'count': len(cleaned_data),
-        })
+        return success_response(cleaned_data, meta={'count': len(cleaned_data)})
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:
@@ -371,7 +375,7 @@ def api_resource_status_options():
         cache_key = make_cache_key("resource_status_options")
         cached = cache_get(cache_key)
         if cached is not None:
-            return jsonify({'success': True, 'data': cached})
+            return success_response(cached)
 
         wc_groups = get_workcenter_groups() or []
 
@@ -383,7 +387,7 @@ def api_resource_status_options():
         }
         cache_set(cache_key, data, ttl=300)
 
-        return jsonify({'success': True, 'data': data})
+        return success_response(data)
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:
@@ -426,7 +430,7 @@ def api_resource_status_summary():
         )
         # Clean NaN/NaT values for valid JSON
         cleaned_data = _clean_nan_values(data)
-        return jsonify({'success': True, 'data': cleaned_data})
+        return success_response(cleaned_data)
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:
@@ -467,7 +471,7 @@ def api_resource_status_matrix():
         )
         # Clean NaN/NaT values for valid JSON
         cleaned_data = _clean_nan_values(data)
-        return jsonify({'success': True, 'data': cleaned_data})
+        return success_response(cleaned_data)
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:

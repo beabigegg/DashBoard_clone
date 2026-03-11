@@ -4,9 +4,14 @@
 import os
 from typing import Optional
 
-from flask import Blueprint, current_app, jsonify, request, send_from_directory
+from flask import Blueprint, current_app, request, send_from_directory
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.response import (
+    internal_error,
+    success_response,
+    validation_error,
+)
 from mes_dashboard.core.utils import parse_bool_query
 from mes_dashboard.core.modernization_policy import (
     missing_in_scope_asset_response,
@@ -50,14 +55,11 @@ def _parse_reason_list() -> 'Optional[list[str]]':
     return values or None
 
 
-def _parse_hold_type(default: str = 'all') -> tuple[Optional[str], Optional[tuple[dict, int]]]:
+def _parse_hold_type(default: str = 'all') -> tuple[Optional[str], Optional[object]]:
     raw = request.args.get('hold_type', '').strip().lower()
     hold_type = raw or default
     if hold_type not in _VALID_HOLD_TYPES:
-        return None, (
-            {'success': False, 'error': 'Invalid hold_type. Use quality, non-quality, or all'},
-            400,
-        )
+        return None, validation_error('Invalid hold_type. Use quality, non-quality, or all')
     if hold_type == 'all':
         return None, None
     return hold_type, None
@@ -90,7 +92,7 @@ def api_hold_overview_summary():
     """Return summary KPI data for hold overview page."""
     hold_type, error = _parse_hold_type(default='all')
     if error:
-        return jsonify(error[0]), error[1]
+        return error
 
     reason = _parse_reason_list()
     workorder = request.args.get('workorder', '').strip() or None
@@ -111,8 +113,8 @@ def api_hold_overview_summary():
         include_dummy=include_dummy,
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 @hold_overview_bp.route('/api/hold-overview/matrix')
@@ -121,7 +123,7 @@ def api_hold_overview_matrix():
     """Return hold-only workcenter x package matrix."""
     hold_type, error = _parse_hold_type(default='all')
     if error:
-        return jsonify(error[0]), error[1]
+        return error
 
     reason = _parse_reason_list()
     workorder = request.args.get('workorder', '').strip() or None
@@ -143,8 +145,8 @@ def api_hold_overview_matrix():
         waferdesc=waferdesc,
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 @hold_overview_bp.route('/api/hold-overview/treemap')
@@ -152,7 +154,7 @@ def api_hold_overview_treemap():
     """Return grouped hold overview data for treemap chart."""
     hold_type, error = _parse_hold_type(default='all')
     if error:
-        return jsonify(error[0]), error[1]
+        return error
 
     reason = _parse_reason_list()
     workcenter = request.args.get('workcenter', '').strip() or None
@@ -167,8 +169,8 @@ def api_hold_overview_treemap():
         include_dummy=include_dummy,
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()
 
 
 @hold_overview_bp.route('/api/hold-overview/lots')
@@ -177,7 +179,7 @@ def api_hold_overview_lots():
     """Return paginated hold lot details."""
     hold_type, error = _parse_hold_type(default='all')
     if error:
-        return jsonify(error[0]), error[1]
+        return error
 
     reason = _parse_reason_list()
     treemap_reason = request.args.get('treemap_reason', '').strip() or None
@@ -194,10 +196,7 @@ def api_hold_overview_lots():
     per_page = request.args.get('per_page', 50, type=int)
 
     if age_range and age_range not in _VALID_AGE_RANGES:
-        return jsonify({
-            'success': False,
-            'error': 'Invalid age_range. Use 0-1, 1-3, 3-7, or 7+',
-        }), 400
+        return validation_error('Invalid age_range. Use 0-1, 1-3, 3-7, or 7+')
 
     if page is None:
         page = 1
@@ -224,5 +223,5 @@ def api_hold_overview_lots():
         page_size=per_page,
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error()

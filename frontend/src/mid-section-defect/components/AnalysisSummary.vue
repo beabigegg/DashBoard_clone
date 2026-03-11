@@ -114,16 +114,16 @@ function formatInputType(value) {
 
 <style scoped>
 .summary-panel {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color, theme('colors.token.he5e7eb'));
   border-radius: 8px;
-  background: var(--bg-secondary, #f9fafb);
-  margin-bottom: 16px;
+  background: var(--bg-secondary, theme('colors.token.hf9fafb'));
+  margin-bottom: theme('spacing.token.p16');
 }
 .summary-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: theme('spacing.token.p10') theme('spacing.token.p16');
   cursor: pointer;
   user-select: none;
 }
@@ -131,14 +131,14 @@ function formatInputType(value) {
   font-size: 14px;
   font-weight: 600;
   margin: 0;
-  color: var(--text-primary, #1f2937);
+  color: var(--text-primary, theme('colors.token.h1f2937'));
 }
 .summary-toggle {
   font-size: 12px;
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary, theme('colors.token.h9ca3af'));
 }
 .summary-body {
-  padding: 0 16px 14px;
+  padding: 0 theme('spacing.token.p16') theme('spacing.token.p14');
 }
 .summary-grid {
   display: grid;
@@ -154,8 +154,8 @@ function formatInputType(value) {
 .block-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary, #6b7280);
-  margin: 0 0 6px;
+  color: var(--text-secondary, theme('colors.token.h6b7280'));
+  margin: 0 0 theme('spacing.token.p6');
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -164,12 +164,12 @@ function formatInputType(value) {
   margin: 0;
   padding: 0;
   font-size: 13px;
-  color: var(--text-primary, #374151);
+  color: var(--text-primary, theme('colors.token.h374151'));
   line-height: 1.7;
 }
 .block-text {
   font-size: 12px;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary, theme('colors.token.h6b7280'));
   line-height: 1.6;
   margin: 0;
 }

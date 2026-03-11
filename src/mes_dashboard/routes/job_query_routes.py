@@ -9,10 +9,18 @@ Contains Flask Blueprint for maintenance job query endpoints:
 
 import logging
 
-from flask import Blueprint, jsonify, request, Response, render_template
+from flask import Blueprint, request, Response, render_template
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell
+from mes_dashboard.core.response import (
+    success_response,
+    validation_error,
+    internal_error,
+    service_unavailable_error,
+    error_response,
+    VALIDATION_ERROR,
+)
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.services.job_query_service import (
     get_jobs_by_resources,
@@ -72,7 +80,7 @@ def get_resources():
     try:
         resources = get_all_resources()
         if not resources:
-            return jsonify({'error': '無法載入設備資料'}), 500
+            return internal_error('無法載入設備資料')
 
         # Return minimal data for selection UI
         data = []
@@ -87,14 +95,11 @@ def get_resources():
         # Sort by WORKCENTERNAME, then RESOURCENAME
         data.sort(key=lambda x: (x.get('WORKCENTERNAME', ''), x.get('RESOURCENAME', '')))
 
-        return jsonify({
-            'data': data,
-            'total': len(data)
-        })
+        return success_response({'data': data, 'total': len(data)})
 
     except Exception as exc:
         logger.exception("Failed to load job-query resources: %s", exc)
-        return jsonify({'error': '服務暫時無法使用'}), 500
+        return service_unavailable_error('服務暫時無法使用')
 
 
 @job_query_bp.route('/api/job-query/jobs', methods=['POST'])
@@ -113,7 +118,7 @@ def query_jobs():
     """
     data, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({'error': payload_error.message}), payload_error.status_code
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     resource_ids = data.get('resource_ids', [])
     start_date = data.get('start_date')
@@ -121,22 +126,22 @@ def query_jobs():
 
     # Validation
     if not resource_ids:
-        return jsonify({'error': '請選擇至少一台設備'}), 400
+        return validation_error('請選擇至少一台設備')
     if len(resource_ids) > MAX_RESOURCE_IDS:
-        return jsonify({'error': f'設備數量不可超過 {MAX_RESOURCE_IDS} 台'}), 400
+        return validation_error(f'設備數量不可超過 {MAX_RESOURCE_IDS} 台')
     if not start_date or not end_date:
-        return jsonify({'error': '請指定日期範圍'}), 400
+        return validation_error('請指定日期範圍')
 
-    validation_error = validate_date_range(start_date, end_date)
-    if validation_error:
-        return jsonify({'error': validation_error}), 400
+    date_range_err = validate_date_range(start_date, end_date)
+    if date_range_err:
+        return validation_error(date_range_err)
 
     result = get_jobs_by_resources(resource_ids, start_date, end_date)
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
-    return jsonify(result)
+    return success_response(result)
 
 
 @job_query_bp.route('/api/job-query/txn/<job_id>', methods=['GET'])
@@ -150,14 +155,14 @@ def query_job_txn_history(job_id: str):
     Returns transaction history list.
     """
     if not job_id:
-        return jsonify({'error': '請指定工單 ID'}), 400
+        return validation_error('請指定工單 ID')
 
     result = get_job_txn_history(job_id)
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
-    return jsonify(result)
+    return success_response(result)
 
 
 @job_query_bp.route('/api/job-query/export', methods=['POST'])
@@ -176,7 +181,7 @@ def export_jobs():
     """
     data, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({'error': payload_error.message}), payload_error.status_code
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     resource_ids = data.get('resource_ids', [])
     start_date = data.get('start_date')
@@ -184,15 +189,15 @@ def export_jobs():
 
     # Validation
     if not resource_ids:
-        return jsonify({'error': '請選擇至少一台設備'}), 400
+        return validation_error('請選擇至少一台設備')
     if len(resource_ids) > MAX_RESOURCE_IDS:
-        return jsonify({'error': f'設備數量不可超過 {MAX_RESOURCE_IDS} 台'}), 400
+        return validation_error(f'設備數量不可超過 {MAX_RESOURCE_IDS} 台')
     if not start_date or not end_date:
-        return jsonify({'error': '請指定日期範圍'}), 400
+        return validation_error('請指定日期範圍')
 
-    validation_error = validate_date_range(start_date, end_date)
-    if validation_error:
-        return jsonify({'error': validation_error}), 400
+    date_range_err = validate_date_range(start_date, end_date)
+    if date_range_err:
+        return validation_error(date_range_err)
 
     # Stream CSV response
     return Response(

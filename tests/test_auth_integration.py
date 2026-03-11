@@ -299,7 +299,7 @@ class TestAdminAPI:
 
         data = json.loads(response.data)
         assert data["success"] is True
-        assert "pages" in data
+        assert "pages" in data["data"]
 
     def test_get_drawers_without_login(self, client):
         """Test drawer API requires login."""
@@ -328,8 +328,8 @@ class TestAdminAPI:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data["success"] is True
-        assert "drawers" in data
-        assert any(drawer["id"] == "reports" for drawer in data["drawers"])
+        assert "drawers" in data["data"]
+        assert any(drawer["id"] == "reports" for drawer in data["data"]["drawers"])
 
     def test_create_drawer_duplicate_name_conflict(self, client):
         """Test creating duplicate drawer name returns 409."""

@@ -108,8 +108,8 @@ const backToOverviewHref = toRuntimeRoute('/hold-overview');
 
 const headerStyle = computed(() => ({
   '--header-gradient': holdType.value === 'quality'
-    ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-    : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+    ? 'linear-gradient(135deg, var(--color-token-hef4444) 0%, var(--color-token-hdc2626) 100%)'
+    : 'linear-gradient(135deg, var(--color-token-hf97316) 0%, var(--color-token-hea580c) 100%)',
 }));
 
 const filterText = computed(() => {

@@ -11,11 +11,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, current_app, g, jsonify, make_response, render_template, request, send_from_directory
+from flask import Blueprint, current_app, g, make_response, render_template, request, send_from_directory
 
 from mes_dashboard.core.csrf import get_csrf_token
 from mes_dashboard.core.permissions import admin_required
-from mes_dashboard.core.response import error_response, TOO_MANY_REQUESTS
+from mes_dashboard.core.response import (
+    error_response,
+    internal_error,
+    not_found_error,
+    success_response,
+    validation_error,
+    TOO_MANY_REQUESTS,
+)
 from mes_dashboard.core.resilience import (
     build_recovery_recommendation,
     get_resilience_thresholds,
@@ -150,48 +157,45 @@ def api_system_status():
         get_equipment_status_cache_status
     )
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "database": {
-                "status": db_status,
-                "error": db_error
+    return success_response({
+        "database": {
+            "status": db_status,
+            "error": db_error
+        },
+        "redis": {
+            "status": redis_status,
+            "enabled": REDIS_ENABLED
+        },
+        "circuit_breaker": circuit_breaker,
+        "cache": {
+            "wip": get_cache_status(),
+            "resource": get_resource_cache_status(),
+            "equipment": get_equipment_status_cache_status()
+        },
+        "runtime_resilience": {
+            "degraded_reason": degraded_reason,
+            "pool_runtime": pool_runtime,
+            "pool_state": pool_state,
+            "route_cache": route_cache,
+            "thresholds": thresholds,
+            "alerts": alerts,
+            "restart_churn": restart_churn,
+            "policy_state": {
+                "state": policy_state.get("state"),
+                "allowed": policy_state.get("allowed"),
+                "cooldown": policy_state.get("cooldown"),
+                "blocked": policy_state.get("blocked"),
+                "cooldown_remaining_seconds": remaining,
             },
-            "redis": {
-                "status": redis_status,
-                "enabled": REDIS_ENABLED
+            "recovery_recommendation": recommendation,
+            "restart_cooldown": {
+                "active": in_cooldown,
+                "remaining_seconds": remaining if in_cooldown else 0,
             },
-            "circuit_breaker": circuit_breaker,
-            "cache": {
-                "wip": get_cache_status(),
-                "resource": get_resource_cache_status(),
-                "equipment": get_equipment_status_cache_status()
-            },
-            "runtime_resilience": {
-                "degraded_reason": degraded_reason,
-                "pool_runtime": pool_runtime,
-                "pool_state": pool_state,
-                "route_cache": route_cache,
-                "thresholds": thresholds,
-                "alerts": alerts,
-                "restart_churn": restart_churn,
-                "policy_state": {
-                    "state": policy_state.get("state"),
-                    "allowed": policy_state.get("allowed"),
-                    "cooldown": policy_state.get("cooldown"),
-                    "blocked": policy_state.get("blocked"),
-                    "cooldown_remaining_seconds": remaining,
-                },
-                "recovery_recommendation": recommendation,
-                "restart_cooldown": {
-                    "active": in_cooldown,
-                    "remaining_seconds": remaining if in_cooldown else 0,
-                },
-            },
-            "runtime_contract": runtime_contract,
-            "single_port_bind": GUNICORN_BIND,
-            "worker_pid": os.getpid()
-        }
+        },
+        "runtime_contract": runtime_contract,
+        "single_port_bind": GUNICORN_BIND,
+        "worker_pid": os.getpid()
     })
 
 
@@ -204,20 +208,17 @@ def api_metrics():
     summary = get_metrics_summary()
     metrics = get_query_metrics()
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "p50_ms": summary.get("p50_ms"),
-            "p95_ms": summary.get("p95_ms"),
-            "p99_ms": summary.get("p99_ms"),
-            "count": summary.get("count"),
-            "slow_count": summary.get("slow_count"),
-            "slow_rate": summary.get("slow_rate"),
-            "worker_pid": summary.get("worker_pid"),
-            "collected_at": summary.get("collected_at"),
-            # Include latency distribution for charts
-            "latencies": metrics.get_latencies()[-100:]  # Last 100 for chart
-        }
+    return success_response({
+        "p50_ms": summary.get("p50_ms"),
+        "p95_ms": summary.get("p95_ms"),
+        "p99_ms": summary.get("p99_ms"),
+        "count": summary.get("count"),
+        "slow_count": summary.get("slow_count"),
+        "slow_rate": summary.get("slow_rate"),
+        "worker_pid": summary.get("worker_pid"),
+        "collected_at": summary.get("collected_at"),
+        # Include latency distribution for charts
+        "latencies": metrics.get_latencies()[-100:]  # Last 100 for chart
     })
 
 
@@ -228,13 +229,10 @@ def api_logs():
     from mes_dashboard.core.log_store import get_log_store, LOG_STORE_ENABLED
 
     if not LOG_STORE_ENABLED:
-        return jsonify({
-            "success": True,
-            "data": {
-                "logs": [],
-                "enabled": False,
-                "total": 0
-            }
+        return success_response({
+            "logs": [],
+            "enabled": False,
+            "total": 0
         })
 
     # Query parameters
@@ -258,15 +256,12 @@ def api_logs():
         since=since
     )
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "logs": logs,
-            "count": len(logs),
-            "total": total,
-            "enabled": True,
-            "stats": log_store.get_stats()
-        }
+    return success_response({
+        "logs": logs,
+        "count": len(logs),
+        "total": total,
+        "enabled": True,
+        "stats": log_store.get_stats()
     })
 
 
@@ -388,17 +383,14 @@ def api_performance_detail():
         logger.warning("Failed to collect worker memory guard telemetry: %s", exc)
         worker_memory_guard = {"error": str(exc)}
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "redis": redis_detail,
-            "process_caches": process_caches,
-            "route_cache": route_cache,
-            "db_pool": db_pool,
-            "direct_connections": direct_connections,
-            "pareto_materialization": pareto_materialization,
-            "worker_memory_guard": worker_memory_guard,
-        },
+    return success_response({
+        "redis": redis_detail,
+        "process_caches": process_caches,
+        "route_cache": route_cache,
+        "db_pool": db_pool,
+        "direct_connections": direct_connections,
+        "pareto_materialization": pareto_materialization,
+        "worker_memory_guard": worker_memory_guard,
     })
 
 
@@ -412,12 +404,9 @@ def api_performance_history():
     minutes = max(1, min(minutes, 180))
     store = get_metrics_history_store()
     snapshots = store.query_snapshots_aggregated(minutes=minutes)
-    return jsonify({
-        "success": True,
-        "data": {
-            "snapshots": snapshots,
-            "count": len(snapshots),
-        },
+    return success_response({
+        "snapshots": snapshots,
+        "count": len(snapshots),
     })
 
 
@@ -429,10 +418,7 @@ def api_performance_history_purge():
 
     store = get_metrics_history_store()
     deleted = store.purge()
-    return jsonify({
-        "success": True,
-        "data": {"deleted": deleted},
-    })
+    return success_response({"deleted": deleted})
 
 
 @admin_bp.route("/api/storage-info", methods=["GET"])
@@ -472,15 +458,12 @@ def api_storage_info():
         + archive_total
     )
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "sqlite_files": sqlite_files,
-            "log_files": log_files,
-            "archive_files": archive_files,
-            "archive_total_bytes": archive_total,
-            "total_bytes": total,
-        },
+    return success_response({
+        "sqlite_files": sqlite_files,
+        "log_files": log_files,
+        "archive_files": archive_files,
+        "archive_total_bytes": archive_total,
+        "total_bytes": total,
     })
 
 
@@ -531,12 +514,9 @@ def api_log_files_cleanup():
         user, total_freed, targets,
     )
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "freed_bytes": total_freed,
-            "cleaned": cleaned,
-        },
+    return success_response({
+        "freed_bytes": total_freed,
+        "cleaned": cleaned,
     })
 
 
@@ -552,10 +532,7 @@ def api_logs_cleanup():
     from mes_dashboard.core.log_store import get_log_store, LOG_STORE_ENABLED
 
     if not LOG_STORE_ENABLED:
-        return jsonify({
-            "success": False,
-            "error": "Log store is disabled"
-        }), 400
+        return validation_error("Log store is disabled")
 
     log_store = get_log_store()
 
@@ -571,18 +548,15 @@ def api_logs_cleanup():
     user = getattr(g, "username", "unknown")
     logger.info(f"Log cleanup triggered by {user}: deleted {deleted} entries")
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "deleted": deleted,
-            "before": {
-                "count": stats_before.get("count", 0),
-                "size_bytes": stats_before.get("size_bytes", 0)
-            },
-            "after": {
-                "count": stats_after.get("count", 0),
-                "size_bytes": stats_after.get("size_bytes", 0)
-            }
+    return success_response({
+        "deleted": deleted,
+        "before": {
+            "count": stats_before.get("count", 0),
+            "size_bytes": stats_before.get("size_bytes", 0)
+        },
+        "after": {
+            "count": stats_after.get("count", 0),
+            "size_bytes": stats_after.get("size_bytes", 0)
         }
     })
 
@@ -788,28 +762,25 @@ def api_worker_restart():
         },
     )
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "message": "Restart requested. Workers will reload shortly.",
-            "requested_by": user,
-            "requested_at": timestamp,
-            "policy_state": {
-                "state": policy_state.get("state"),
-                "allowed": policy_state.get("allowed"),
-                "cooldown": policy_state.get("cooldown"),
-                "blocked": policy_state.get("blocked"),
-                "cooldown_remaining_seconds": policy_state.get("cooldown_remaining_seconds"),
-            },
-            "decision": decision,
-            "single_port_bind": GUNICORN_BIND,
-            "watchdog": {
-                "runtime_dir": WATCHDOG_RUNTIME_DIR,
-                "flag_path": RESTART_FLAG_PATH,
-                "pid_path": WATCHDOG_PID_PATH,
-                "state_path": RESTART_STATE_PATH,
-            },
-        }
+    return success_response({
+        "message": "Restart requested. Workers will reload shortly.",
+        "requested_by": user,
+        "requested_at": timestamp,
+        "policy_state": {
+            "state": policy_state.get("state"),
+            "allowed": policy_state.get("allowed"),
+            "cooldown": policy_state.get("cooldown"),
+            "blocked": policy_state.get("blocked"),
+            "cooldown_remaining_seconds": policy_state.get("cooldown_remaining_seconds"),
+        },
+        "decision": decision,
+        "single_port_bind": GUNICORN_BIND,
+        "watchdog": {
+            "runtime_dir": WATCHDOG_RUNTIME_DIR,
+            "flag_path": RESTART_FLAG_PATH,
+            "pid_path": WATCHDOG_PID_PATH,
+            "state_path": RESTART_STATE_PATH,
+        },
     })
 
 
@@ -855,60 +826,57 @@ def api_worker_status():
     except Exception:
         pass
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "worker_pid": os.getpid(),
-            "worker_start_time": worker_start_time,
-            "runtime_contract": {
-                "version": runtime_contract["contract"]["version"],
-                "validation": {
-                    "valid": runtime_contract["valid"],
-                    "errors": runtime_contract["errors"],
-                },
-                "single_port_bind": GUNICORN_BIND,
-                "watchdog": {
-                    "runtime_dir": WATCHDOG_RUNTIME_DIR,
-                    "flag_path": RESTART_FLAG_PATH,
-                    "flag_exists": Path(RESTART_FLAG_PATH).exists(),
-                    "pid_path": WATCHDOG_PID_PATH,
-                    "pid_exists": Path(WATCHDOG_PID_PATH).exists(),
-                    "state_path": RESTART_STATE_PATH,
-                    "state_exists": Path(RESTART_STATE_PATH).exists(),
-                },
+    return success_response({
+        "worker_pid": os.getpid(),
+        "worker_start_time": worker_start_time,
+        "runtime_contract": {
+            "version": runtime_contract["contract"]["version"],
+            "validation": {
+                "valid": runtime_contract["valid"],
+                "errors": runtime_contract["errors"],
             },
-            "cooldown": {
-                "active": bool(policy_state.get("cooldown")),
-                "remaining_seconds": int(policy_state.get("cooldown_remaining_seconds") or 0)
+            "single_port_bind": GUNICORN_BIND,
+            "watchdog": {
+                "runtime_dir": WATCHDOG_RUNTIME_DIR,
+                "flag_path": RESTART_FLAG_PATH,
+                "flag_exists": Path(RESTART_FLAG_PATH).exists(),
+                "pid_path": WATCHDOG_PID_PATH,
+                "pid_exists": Path(WATCHDOG_PID_PATH).exists(),
+                "state_path": RESTART_STATE_PATH,
+                "state_exists": Path(RESTART_STATE_PATH).exists(),
             },
-            "resilience": {
-                "thresholds": thresholds,
-                "alerts": {
-                    "restart_churn_exceeded": bool(churn.get("exceeded")),
-                    "restart_blocked": bool(policy_state.get("blocked")),
-                },
-                "restart_churn": churn,
-                "policy_state": {
-                    "state": policy_state.get("state"),
-                    "allowed": policy_state.get("allowed"),
-                    "cooldown": policy_state.get("cooldown"),
-                    "blocked": policy_state.get("blocked"),
-                    "cooldown_remaining_seconds": policy_state.get("cooldown_remaining_seconds"),
-                    "attempts_in_window": policy_state.get("attempts_in_window"),
-                    "retry_budget": policy_state.get("retry_budget"),
-                    "churn_threshold": policy_state.get("churn_threshold"),
-                    "window_seconds": policy_state.get("window_seconds"),
-                },
-                "recovery_recommendation": recommendation,
+        },
+        "cooldown": {
+            "active": bool(policy_state.get("cooldown")),
+            "remaining_seconds": int(policy_state.get("cooldown_remaining_seconds") or 0)
+        },
+        "resilience": {
+            "thresholds": thresholds,
+            "alerts": {
+                "restart_churn_exceeded": bool(churn.get("exceeded")),
+                "restart_blocked": bool(policy_state.get("blocked")),
             },
-            "restart_history": history,
-            "last_restart": {
-                "requested_by": last_restart.get("requested_by"),
-                "requested_at": last_restart.get("requested_at"),
-                "requested_ip": last_restart.get("requested_ip"),
-                "completed_at": last_restart.get("completed_at"),
-                "success": last_restart.get("success")
-            }
+            "restart_churn": churn,
+            "policy_state": {
+                "state": policy_state.get("state"),
+                "allowed": policy_state.get("allowed"),
+                "cooldown": policy_state.get("cooldown"),
+                "blocked": policy_state.get("blocked"),
+                "cooldown_remaining_seconds": policy_state.get("cooldown_remaining_seconds"),
+                "attempts_in_window": policy_state.get("attempts_in_window"),
+                "retry_budget": policy_state.get("retry_budget"),
+                "churn_threshold": policy_state.get("churn_threshold"),
+                "window_seconds": policy_state.get("window_seconds"),
+            },
+            "recovery_recommendation": recommendation,
+        },
+        "restart_history": history,
+        "last_restart": {
+            "requested_by": last_restart.get("requested_by"),
+            "requested_at": last_restart.get("requested_at"),
+            "requested_ip": last_restart.get("requested_ip"),
+            "completed_at": last_restart.get("completed_at"),
+            "success": last_restart.get("success")
         }
     })
 
@@ -928,14 +896,14 @@ def pages():
 @admin_required
 def api_get_pages():
     """API: Get all page configurations."""
-    return jsonify({"success": True, "pages": get_all_pages()})
+    return success_response({"pages": get_all_pages()})
 
 
 @admin_bp.route("/api/drawers", methods=["GET"])
 @admin_required
 def api_get_drawers():
     """API: Get all drawer configurations."""
-    return jsonify({"success": True, "drawers": get_all_drawers()})
+    return success_response({"drawers": get_all_drawers()})
 
 
 @admin_bp.route("/api/drawers", methods=["POST"])
@@ -950,14 +918,14 @@ def api_create_drawer():
     try:
         drawer = create_drawer(name=name, order=order, admin_only=admin_only)
     except DrawerConflictError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 409
+        return error_response("CONFLICT", str(exc), status_code=409)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception as exc:  # pragma: no cover - defensive fallback
         logger.exception("Failed to create drawer")
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return internal_error(str(exc))
 
-    return jsonify({"success": True, "drawer": drawer}), 201
+    return success_response({"drawer": drawer}, status_code=201)
 
 
 @admin_bp.route("/api/drawers/<drawer_id>", methods=["PUT"])
@@ -975,21 +943,21 @@ def api_update_drawer(drawer_id: str):
         updates["admin_only"] = bool(payload.get("admin_only"))
 
     if not updates:
-        return jsonify({"success": False, "error": "No drawer fields to update"}), 400
+        return validation_error("No drawer fields to update")
 
     try:
         drawer = update_drawer(drawer_id, **updates)
     except DrawerNotFoundError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 404
+        return not_found_error(str(exc))
     except DrawerConflictError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 409
+        return error_response("CONFLICT", str(exc), status_code=409)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception as exc:  # pragma: no cover - defensive fallback
         logger.exception("Failed to update drawer %s", drawer_id)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return internal_error(str(exc))
 
-    return jsonify({"success": True, "drawer": drawer})
+    return success_response({"drawer": drawer})
 
 
 @admin_bp.route("/api/drawers/<drawer_id>", methods=["DELETE"])
@@ -999,14 +967,14 @@ def api_delete_drawer(drawer_id: str):
     try:
         delete_drawer(drawer_id)
     except DrawerNotFoundError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 404
+        return not_found_error(str(exc))
     except DrawerConflictError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 409
+        return error_response("CONFLICT", str(exc), status_code=409)
     except Exception as exc:  # pragma: no cover - defensive fallback
         logger.exception("Failed to delete drawer %s", drawer_id)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return internal_error(str(exc))
 
-    return jsonify({"success": True})
+    return success_response({})
 
 
 @admin_bp.route("/api/pages/<path:route>", methods=["PUT"])
@@ -1016,7 +984,7 @@ def api_update_page(route: str):
     data = request.get_json(silent=True) or {}
     updatable_fields = {"status", "name", "drawer_id", "order"}
     if not any(field in data for field in updatable_fields):
-        return jsonify({"success": False, "error": "No page fields to update"}), 400
+        return validation_error("No page fields to update")
 
     # Ensure route starts with /
     if not route.startswith("/"):
@@ -1024,14 +992,11 @@ def api_update_page(route: str):
 
     status = data.get("status")
     if "status" in data and status not in ("released", "dev"):
-        return jsonify({"success": False, "error": "Invalid status"}), 400
+        return validation_error("Invalid status")
     if "status" not in data:
         status = get_page_status(route)
         if status is None:
-            return jsonify({
-                "success": False,
-                "error": "Status is required for unregistered pages",
-            }), 400
+            return validation_error("Status is required for unregistered pages")
 
     update_kwargs: dict[str, Any] = {}
     if "name" in data:
@@ -1043,8 +1008,8 @@ def api_update_page(route: str):
 
     try:
         set_page_status(route, status, **update_kwargs)
-        return jsonify({"success": True})
+        return success_response({})
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return internal_error(str(e))

@@ -13,9 +13,15 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from flask import Blueprint, current_app, jsonify, request, send_from_directory
+from flask import Blueprint, current_app, request, send_from_directory
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.response import (
+    cache_expired_error,
+    internal_error,
+    success_response,
+    validation_error,
+)
 from mes_dashboard.core.modernization_policy import (
     missing_in_scope_asset_response,
     maybe_redirect_to_canonical_shell,
@@ -121,15 +127,15 @@ def api_hold_history_query():
     start_date = _validate_date(str(body.get('start_date', '')).strip())
     end_date = _validate_date(str(body.get('end_date', '')).strip())
     if not start_date or not end_date:
-        return jsonify({'success': False, 'error': '缺少必要參數: start_date, end_date'}), 400
+        return validation_error('缺少必要參數: start_date, end_date')
 
     if end_date < start_date:
-        return jsonify({'success': False, 'error': 'end_date 不可早於 start_date'}), 400
+        return validation_error('end_date 不可早於 start_date')
 
     hold_type = _normalize_hold_type(str(body.get('hold_type', '')))
     record_type = _normalize_record_type(str(body.get('record_type', '')))
     if record_type is None:
-        return jsonify({'success': False, 'error': 'Invalid record_type'}), 400
+        return validation_error('Invalid record_type')
 
     try:
         result = execute_primary_query(
@@ -138,10 +144,10 @@ def api_hold_history_query():
             hold_type=hold_type,
             record_type=record_type,
         )
-        return jsonify({'success': True, 'data': result})
+        return success_response(result)
     except Exception as exc:
         logger.error("Hold history primary query failed: %s", exc)
-        return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return internal_error()
 
 
 # ============================================================
@@ -155,17 +161,17 @@ def api_hold_history_view():
     """Read cached DataFrame, apply filters, return derived views."""
     query_id = request.args.get('query_id', '').strip()
     if not query_id:
-        return jsonify({'success': False, 'error': '缺少 query_id'}), 400
+        return validation_error('缺少 query_id')
 
     hold_type = _normalize_hold_type(request.args.get('hold_type', ''))
     reason = request.args.get('reason', '').strip() or None
     record_type = _normalize_record_type(request.args.get('record_type', ''))
     if record_type is None:
-        return jsonify({'success': False, 'error': 'Invalid record_type'}), 400
+        return validation_error('Invalid record_type')
 
     raw_duration = request.args.get('duration_range', '').strip() or None
     if raw_duration and raw_duration not in _VALID_DURATION_RANGES:
-        return jsonify({'success': False, 'error': 'Invalid duration_range'}), 400
+        return validation_error('Invalid duration_range')
 
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
@@ -184,9 +190,9 @@ def api_hold_history_view():
         )
     except Exception as exc:
         logger.error("Hold history view failed: %s", exc)
-        return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return internal_error()
 
     if result is None:
-        return jsonify({'success': False, 'error': 'cache_expired'}), 410
+        return cache_expired_error()
 
-    return jsonify({'success': True, 'data': result})
+    return success_response(result)

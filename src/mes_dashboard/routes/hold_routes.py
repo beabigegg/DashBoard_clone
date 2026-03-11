@@ -7,8 +7,9 @@ Contains Flask Blueprint for Hold Detail page and API endpoints.
 import html
 import os
 
-from flask import Blueprint, current_app, jsonify, redirect, request, send_from_directory
+from flask import Blueprint, current_app, redirect, request, send_from_directory
 
+from mes_dashboard.core.response import success_response, validation_error, internal_error
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.utils import parse_bool_query
 from mes_dashboard.core.modernization_policy import (
@@ -94,7 +95,7 @@ def api_hold_detail_summary():
     """
     reason = request.args.get('reason', '').strip()
     if not reason:
-        return jsonify({'success': False, 'error': '缺少必要參數: reason'}), 400
+        return validation_error('缺少必要參數: reason')
 
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
@@ -103,8 +104,8 @@ def api_hold_detail_summary():
         include_dummy=include_dummy
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error('查詢失敗')
 
 
 @hold_bp.route('/api/wip/hold-detail/distribution')
@@ -120,7 +121,7 @@ def api_hold_detail_distribution():
     """
     reason = request.args.get('reason', '').strip()
     if not reason:
-        return jsonify({'success': False, 'error': '缺少必要參數: reason'}), 400
+        return validation_error('缺少必要參數: reason')
 
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
@@ -129,8 +130,8 @@ def api_hold_detail_distribution():
         include_dummy=include_dummy
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error('查詢失敗')
 
 
 @hold_bp.route('/api/wip/hold-detail/lots')
@@ -152,7 +153,7 @@ def api_hold_detail_lots():
     """
     reason = request.args.get('reason', '').strip()
     if not reason:
-        return jsonify({'success': False, 'error': '缺少必要參數: reason'}), 400
+        return validation_error('缺少必要參數: reason')
 
     workcenter = request.args.get('workcenter', '').strip() or None
     package = request.args.get('package', '').strip() or None
@@ -169,10 +170,7 @@ def api_hold_detail_lots():
 
     # Validate age_range parameter
     if age_range and age_range not in ('0-1', '1-3', '3-7', '7+'):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid age_range. Use 0-1, 1-3, 3-7, or 7+'
-        }), 400
+        return validation_error('Invalid age_range. Use 0-1, 1-3, 3-7, or 7+')
 
     result = get_hold_detail_lots(
         reason=reason,
@@ -184,5 +182,5 @@ def api_hold_detail_lots():
         page_size=per_page
     )
     if result is not None:
-        return jsonify({'success': True, 'data': result})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(result)
+    return internal_error('查詢失敗')

@@ -18,7 +18,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, request
 
 from mes_dashboard.core.cache import cache_get, cache_set
 from mes_dashboard.core.interactive_memory_guard import process_rss_mb
@@ -33,7 +33,7 @@ from mes_dashboard.core.query_quality_contract import (
 )
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.redis_client import try_acquire_lock, release_lock
-from mes_dashboard.core.response import error_response
+from mes_dashboard.core.response import error_response, success_response
 from mes_dashboard.services.event_fetcher import EventFetcher
 from mes_dashboard.services.lineage_engine import LineageEngine
 from mes_dashboard.services.mid_section_defect_service import (
@@ -570,7 +570,7 @@ def seed_resolve():
     seed_cache_key = _seed_cache_key(profile, params)
     cached = cache_get(seed_cache_key)
     if cached is not None:
-        return jsonify(cached)
+        return success_response(cached)
 
     request_cache_key = payload.get("cache_key")
     logger.info(
@@ -600,7 +600,7 @@ def seed_resolve():
         "cache_key": seed_cache_key,
     }
     cache_set(seed_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
-    return jsonify(response)
+    return success_response(response)
 
 
 @trace_bp.route("/lineage", methods=["POST"])
@@ -621,7 +621,7 @@ def lineage():
     lineage_cache_key = _lineage_cache_key(profile, container_ids)
     cached = cache_get(lineage_cache_key)
     if cached is not None:
-        return jsonify(cached)
+        return success_response(cached)
 
     logger.info(
         "trace lineage profile=%s count=%s correlation_cache_key=%s",
@@ -678,7 +678,7 @@ def lineage():
         logger.warning("trace lineage slow elapsed=%.2fs", elapsed)
 
     cache_set(lineage_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
-    return jsonify(response)
+    return success_response(response)
 
 
 @trace_bp.route("/events", methods=["POST"])
@@ -721,13 +721,13 @@ def events():
                 "trace events routed to async job_id=%s profile=%s cid_count=%s",
                 job_id, profile, cid_count,
             )
-            return jsonify({
+            return success_response({
                 "stage": "events",
                 "async": True,
                 "job_id": job_id,
                 "status_url": f"/api/trace/job/{job_id}",
                 "stream_url": f"/api/trace/job/{job_id}/stream",
-            }), 202
+            }, status_code=202)
         logger.warning("trace async enqueue failed cid_count=%s: %s", cid_count, err)
 
     if not is_msd and cid_count > TRACE_EVENTS_CID_LIMIT:
@@ -755,7 +755,7 @@ def events():
     if not is_msd:
         cached = cache_get(events_cache_key)
         if cached is not None:
-            return jsonify(_ensure_events_quality_meta(cached))
+            return success_response(_ensure_events_quality_meta(cached))
 
     # --- MD2: RSS guard before sync execution ---
     rss_now = process_rss_mb()
@@ -790,7 +790,7 @@ def events():
         while (time.monotonic() - wait_start) < EVENTS_LOCK_WAIT_TIMEOUT_SECONDS:
             cached = cache_get(events_cache_key)
             if cached is not None:
-                return jsonify(_ensure_events_quality_meta(cached))
+                return success_response(_ensure_events_quality_meta(cached))
             time.sleep(EVENTS_LOCK_POLL_INTERVAL_SECONDS)
 
         logger.warning(
@@ -804,7 +804,7 @@ def events():
         if lock_acquired:
             cached = cache_get(events_cache_key)
             if cached is not None:
-                return jsonify(_ensure_events_quality_meta(cached))
+                return success_response(_ensure_events_quality_meta(cached))
 
         started = time.monotonic()
         results: Dict[str, Dict[str, Any]] = {}
@@ -908,7 +908,7 @@ def events():
         if len(container_ids) > 10000:
             gc.collect()
 
-        return jsonify(response)
+        return success_response(response)
     finally:
         if lock_acquired:
             release_lock(lock_key)
@@ -921,7 +921,7 @@ def job_status(job_id: str):
     status = get_job_status(job_id)
     if status is None:
         return _error("JOB_NOT_FOUND", "job not found or expired", 404)
-    return jsonify(status)
+    return success_response(status)
 
 
 @trace_bp.route("/job/<job_id>/result", methods=["GET"])
@@ -933,10 +933,12 @@ def job_result(job_id: str):
         return _error("JOB_NOT_FOUND", "job not found or expired", 404)
 
     if status["status"] not in ("finished",):
-        return jsonify({
-            "error": {"code": "JOB_NOT_COMPLETE", "message": "job has not completed yet"},
-            "status": status["status"],
-        }), 409
+        return error_response(
+            "JOB_NOT_COMPLETE",
+            "job has not completed yet",
+            status_code=409,
+            meta={"job_status": status["status"]},
+        )
 
     domain = request.args.get("domain")
     offset = request.args.get("offset", 0, type=int)
@@ -946,7 +948,7 @@ def job_result(job_id: str):
     if result is None:
         return _error("JOB_RESULT_EXPIRED", "job result has expired", 404)
 
-    return jsonify(result)
+    return success_response(result)
 
 
 @trace_bp.route("/job/<job_id>/stream", methods=["GET"])
@@ -958,10 +960,12 @@ def job_stream(job_id: str):
         return _error("JOB_NOT_FOUND", "job not found or expired", 404)
 
     if status["status"] != "finished":
-        return jsonify({
-            "error": {"code": "JOB_NOT_COMPLETE", "message": "job has not completed yet"},
-            "status": status["status"],
-        }), 409
+        return error_response(
+            "JOB_NOT_COMPLETE",
+            "job has not completed yet",
+            status_code=409,
+            meta={"job_status": status["status"]},
+        )
 
     return Response(
         stream_job_result_ndjson(job_id),

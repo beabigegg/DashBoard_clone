@@ -107,6 +107,6 @@ function handleResolve() {
 
 <style scoped>
 .mt-filter-section {
-  margin-top: 12px;
+  margin-top: theme('spacing.token.p12');
 }
 </style>

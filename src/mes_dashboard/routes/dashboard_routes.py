@@ -4,9 +4,10 @@
 Contains Flask Blueprint for dashboard/KPI-related API endpoints.
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, request
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
+from mes_dashboard.core.response import internal_error, success_response
 from mes_dashboard.core.utils import get_days_back
 from mes_dashboard.services.dashboard_service import (
     query_dashboard_kpi,
@@ -34,8 +35,8 @@ def api_dashboard_kpi():
         if kpi:
             cache_set(cache_key, kpi)
     if kpi:
-        return jsonify({'success': True, 'data': kpi})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(kpi)
+    return internal_error()
 
 
 @dashboard_bp.route('/workcenter_cards', methods=['POST'])
@@ -52,8 +53,8 @@ def api_dashboard_workcenter_cards():
         if cards is not None:
             cache_set(cache_key, cards)
     if cards is not None:
-        return jsonify({'success': True, 'data': cards})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(cards)
+    return internal_error()
 
 
 @dashboard_bp.route('/detail', methods=['POST'])
@@ -67,14 +68,13 @@ def api_dashboard_detail():
     df, max_status_time = query_resource_detail_with_job(filters, limit, offset)
     if df is not None:
         records = df.to_dict(orient='records')
-        return jsonify({
-            'success': True,
-            'data': records,
+        return success_response({
+            'records': records,
             'count': len(records),
             'offset': offset,
-            'max_status_time': max_status_time
+            'max_status_time': max_status_time,
         })
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+    return internal_error()
 
 
 @dashboard_bp.route('/ou_trend', methods=['POST'])
@@ -91,8 +91,8 @@ def api_dashboard_ou_trend():
         if trend is not None:
             cache_set(cache_key, trend, ttl=300)  # 5 min cache
     if trend is not None:
-        return jsonify({'success': True, 'data': trend})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(trend)
+    return internal_error()
 
 
 @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
@@ -109,5 +109,5 @@ def api_dashboard_utilization_heatmap():
         if heatmap is not None:
             cache_set(cache_key, heatmap, ttl=300)  # 5 min cache
     if heatmap is not None:
-        return jsonify({'success': True, 'data': heatmap})
-    return jsonify({'success': False, 'error': '查詢失敗'}), 500
+        return success_response(heatmap)
+    return internal_error()

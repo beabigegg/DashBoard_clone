@@ -88,7 +88,7 @@ const chartOption = computed(() => {
         barMaxWidth: 36,
         data: rows.map((r) => {
           const v = Number(r.scrap_qty ?? 0);
-          return { value: v, itemStyle: { color: '#6366f1' } };
+          return { value: v, itemStyle: { color: 'rgb(99, 102, 241)' } };
         }),
       },
       {
@@ -98,8 +98,8 @@ const chartOption = computed(() => {
         smooth: true,
         symbol: 'circle',
         symbolSize: 6,
-        lineStyle: { width: 2, color: '#f59e0b' },
-        itemStyle: { color: '#f59e0b' },
+        lineStyle: { width: 2, color: 'rgb(245, 158, 11)' },
+        itemStyle: { color: 'rgb(245, 158, 11)' },
         data: rows.map((r) => {
           const v = Number(r.yield_pct ?? 0);
           return v;
@@ -107,7 +107,7 @@ const chartOption = computed(() => {
         markLine: {
           silent: true,
           symbol: 'none',
-          lineStyle: { type: 'dashed', color: '#ef4444', width: 1 },
+          lineStyle: { type: 'dashed', color: 'rgb(239, 68, 68)', width: 1 },
           data: [{ yAxis: threshold, label: { formatter: `門檻 ${threshold}%`, fontSize: 10 } }],
         },
       },

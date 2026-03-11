@@ -7,7 +7,17 @@ import logging
 import os
 from datetime import date, timedelta
 
-from flask import Blueprint, jsonify, make_response, request
+from flask import Blueprint, request
+
+from mes_dashboard.core.response import (
+    VALIDATION_ERROR,
+    cache_expired_error,
+    error_response,
+    internal_error,
+    not_found_error,
+    success_response,
+    validation_error,
+)
 
 from mes_dashboard.core.cache import cache_get, cache_set
 from mes_dashboard.core.rate_limit import configured_rate_limit
@@ -60,20 +70,19 @@ def _default_date_range() -> tuple[str, str]:
     return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
 
 
-def _parse_date_range(required: bool = True) -> tuple[str | None, str | None, tuple[dict, int] | None]:
+def _parse_date_range(required: bool = True):
     start_date = str(request.args.get("start_date", "")).strip()
     end_date = str(request.args.get("end_date", "")).strip()
 
     if not start_date or not end_date:
         if required:
-            return None, None, (
-                {
-                    "success": False,
-                    "error": "缺少必要參數: start_date, end_date",
-                    "meta": {"max_query_days": MAX_QUERY_DAYS},
-                },
-                400,
+            date_error = error_response(
+                VALIDATION_ERROR,
+                "缺少必要參數: start_date, end_date",
+                status_code=400,
+                meta={"max_query_days": MAX_QUERY_DAYS},
             )
+            return None, None, date_error
         start_date, end_date = _default_date_range()
 
     return start_date, end_date, None
@@ -120,8 +129,7 @@ def _cache_response(namespace: str, payload_key: dict, compute_fn):
         cached_payload = dict(cached)
         meta = dict(cached_payload.get("meta") or {})
         meta["cache"] = {"hit": True, "key": cache_key}
-        cached_payload["meta"] = meta
-        return jsonify(cached_payload)
+        return success_response(cached_payload.get("data"), meta=meta)
 
     logger.info("Yield alert cache miss: namespace=%s key=%s", namespace, cache_key)
     payload = compute_fn()
@@ -129,94 +137,92 @@ def _cache_response(namespace: str, payload_key: dict, compute_fn):
     meta["cache"] = {"hit": False, "key": cache_key}
     payload["meta"] = meta
     cache_set(cache_key, payload, ttl=_DEFAULT_CACHE_TTL)
-    return jsonify(payload)
+    return success_response(payload.get("data"), meta=meta)
 
 
 @yield_alert_bp.route("/api/yield-alert/query", methods=["POST"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_query():
     if not _YIELD_ALERT_ENABLED:
-        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+        return not_found_error("yield_alert_disabled")
 
     body, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({"success": False, "error": payload_error.message}), payload_error.status_code
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     start_date = str(body.get("start_date", "")).strip()
     end_date = str(body.get("end_date", "")).strip()
     if not start_date or not end_date:
-        return jsonify({"success": False, "error": "缺少必要參數: start_date, end_date"}), 400
+        return validation_error("缺少必要參數: start_date, end_date")
 
     try:
         result = execute_primary_query(start_date=start_date, end_date=end_date)
-        return jsonify({"success": True, **result})
+        return success_response(result)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc), "meta": {"max_query_days": MAX_QUERY_DAYS}}), 400
+        return error_response(VALIDATION_ERROR, str(exc), status_code=400, meta={"max_query_days": MAX_QUERY_DAYS})
     except Exception:
         logger.exception("Yield alert primary query failed")
-        return jsonify({"success": False, "error": "主查詢執行失敗"}), 500
+        return internal_error("主查詢執行失敗")
 
 
 @yield_alert_bp.route("/api/yield-alert/analyze", methods=["POST"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_analyze():
     if not _YIELD_ALERT_ENABLED:
-        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+        return not_found_error("yield_alert_disabled")
 
     body, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({"success": False, "error": payload_error.message}), payload_error.status_code
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     query_id = str(body.get("query_id", "")).strip()
     if not query_id:
-        return jsonify({"success": False, "error": "缺少必要參數: query_id"}), 400
+        return validation_error("缺少必要參數: query_id")
 
     try:
         result = execute_linkage_query(query_id=query_id)
         if result is None:
-            resp = make_response(jsonify({"success": False, "error": "cache_expired"}), 410)
-            resp.headers["Cache-Control"] = "no-store"
-            return resp
-        return jsonify({"success": True, **result})
+            return cache_expired_error()
+        return success_response(result)
     except Exception:
         logger.exception("Yield alert linkage analysis failed")
-        return jsonify({"success": False, "error": "告警連結分析失敗"}), 500
+        return internal_error("告警連結分析失敗")
 
 
 @yield_alert_bp.route("/api/yield-alert/view", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_view():
     if not _YIELD_ALERT_ENABLED:
-        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+        return not_found_error("yield_alert_disabled")
 
     query_id = str(request.args.get("query_id", "")).strip()
     if not query_id:
-        return jsonify({"success": False, "error": "缺少必要參數: query_id"}), 400
+        return validation_error("缺少必要參數: query_id")
 
     filters = _common_filters()
 
     try:
         page = max(1, int(request.args.get("page", "1") or 1))
     except (TypeError, ValueError):
-        return jsonify({"success": False, "error": "page 必須為正整數"}), 400
+        return validation_error("page 必須為正整數")
     try:
         per_page = int(request.args.get("per_page", str(DEFAULT_PAGE_SIZE)) or DEFAULT_PAGE_SIZE)
     except (TypeError, ValueError):
-        return jsonify({"success": False, "error": "per_page 必須為正整數"}), 400
+        return validation_error("per_page 必須為正整數")
     per_page = min(max(1, per_page), MAX_PAGE_SIZE)
 
     sort_by = str(request.args.get("sort_by", "date_bucket") or "date_bucket").strip()
     if sort_by not in VALID_SORT_FIELDS:
-        return jsonify({"success": False, "error": f"sort_by 不支援，允許值: {', '.join(sorted(VALID_SORT_FIELDS))}"}), 400
+        return validation_error(f"sort_by 不支援，允許值: {', '.join(sorted(VALID_SORT_FIELDS))}")
     sort_dir = str(request.args.get("sort_dir", "desc") or "desc").strip().lower()
     if sort_dir not in {"asc", "desc"}:
-        return jsonify({"success": False, "error": "sort_dir 僅支援 asc/desc"}), 400
+        return validation_error("sort_dir 僅支援 asc/desc")
 
     try:
         risk_threshold = float(request.args.get("risk_threshold", "98"))
         min_scrap_qty = float(request.args.get("min_scrap_qty", "1"))
     except (TypeError, ValueError):
-        return jsonify({"success": False, "error": "risk_threshold/min_scrap_qty 需為數值"}), 400
+        return validation_error("risk_threshold/min_scrap_qty 需為數值")
 
     granularity = str(request.args.get("granularity", "day") or "day").strip().lower()
 
@@ -233,35 +239,32 @@ def api_yield_alert_view():
             min_scrap_qty=min_scrap_qty,
         )
         if result is None:
-            resp = make_response(jsonify({"success": False, "error": "cache_expired"}), 410)
-            resp.headers["Cache-Control"] = "no-store"
-            return resp
+            return cache_expired_error()
 
         data = dict(result)
         meta = dict(data.pop("meta", {}) or {})
-        return jsonify({"success": True, "data": data, "meta": meta})
+        return success_response(data, meta=meta)
     except ValueError as exc:
-        return jsonify(
-            {
-                "success": False,
-                "error": str(exc),
-                "meta": {"max_query_days": MAX_QUERY_DAYS, "max_per_page": MAX_PAGE_SIZE},
-            }
-        ), 400
+        return error_response(
+            VALIDATION_ERROR,
+            str(exc),
+            status_code=400,
+            meta={"max_query_days": MAX_QUERY_DAYS, "max_per_page": MAX_PAGE_SIZE},
+        )
     except Exception:
         logger.exception("Yield alert cached view query failed")
-        return jsonify({"success": False, "error": "視圖查詢失敗"}), 500
+        return internal_error("視圖查詢失敗")
 
 
 @yield_alert_bp.route("/api/yield-alert/summary", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_summary():
     if not _YIELD_ALERT_ENABLED:
-        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+        return not_found_error("yield_alert_disabled")
 
     start_date, end_date, date_error = _parse_date_range(required=True)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return date_error
 
     filters = _common_filters()
 
@@ -286,21 +289,21 @@ def api_yield_alert_summary():
     try:
         return _cache_response("summary", payload_key, _compute)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc), "meta": {"max_query_days": MAX_QUERY_DAYS}}), 400
+        return error_response(VALIDATION_ERROR, str(exc), status_code=400, meta={"max_query_days": MAX_QUERY_DAYS})
     except Exception:
         logger.exception("Yield alert summary query failed")
-        return jsonify({"success": False, "error": "查詢良率摘要失敗"}), 500
+        return internal_error("查詢良率摘要失敗")
 
 
 @yield_alert_bp.route("/api/yield-alert/trend", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_trend():
     if not _YIELD_ALERT_ENABLED:
-        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+        return not_found_error("yield_alert_disabled")
 
     start_date, end_date, date_error = _parse_date_range(required=True)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return date_error
 
     granularity = str(request.args.get("granularity", "day") or "day").strip().lower()
     filters = _common_filters()
@@ -331,46 +334,46 @@ def api_yield_alert_trend():
     try:
         return _cache_response("trend", payload_key, _compute)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc), "meta": {"max_query_days": MAX_QUERY_DAYS}}), 400
+        return error_response(VALIDATION_ERROR, str(exc), status_code=400, meta={"max_query_days": MAX_QUERY_DAYS})
     except Exception:
         logger.exception("Yield alert trend query failed")
-        return jsonify({"success": False, "error": "查詢良率趨勢失敗"}), 500
+        return internal_error("查詢良率趨勢失敗")
 
 
 @yield_alert_bp.route("/api/yield-alert/alerts", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_alerts():
     if not _YIELD_ALERT_ENABLED:
-        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+        return not_found_error("yield_alert_disabled")
 
     start_date, end_date, date_error = _parse_date_range(required=True)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return date_error
 
     filters = _common_filters()
 
     try:
         page = max(1, int(request.args.get("page", "1") or 1))
     except (TypeError, ValueError):
-        return jsonify({"success": False, "error": "page 必須為正整數"}), 400
+        return validation_error("page 必須為正整數")
     try:
         per_page = int(request.args.get("per_page", str(DEFAULT_PAGE_SIZE)) or DEFAULT_PAGE_SIZE)
     except (TypeError, ValueError):
-        return jsonify({"success": False, "error": "per_page 必須為正整數"}), 400
+        return validation_error("per_page 必須為正整數")
     per_page = min(max(1, per_page), MAX_PAGE_SIZE)
 
     sort_by = str(request.args.get("sort_by", "date_bucket") or "date_bucket").strip()
     if sort_by not in VALID_SORT_FIELDS:
-        return jsonify({"success": False, "error": f"sort_by 不支援，允許值: {', '.join(sorted(VALID_SORT_FIELDS))}"}), 400
+        return validation_error(f"sort_by 不支援，允許值: {', '.join(sorted(VALID_SORT_FIELDS))}")
     sort_dir = str(request.args.get("sort_dir", "desc") or "desc").strip().lower()
     if sort_dir not in {"asc", "desc"}:
-        return jsonify({"success": False, "error": "sort_dir 僅支援 asc/desc"}), 400
+        return validation_error("sort_dir 僅支援 asc/desc")
 
     try:
         risk_threshold = float(request.args.get("risk_threshold", "98"))
         min_scrap_qty = float(request.args.get("min_scrap_qty", "1"))
     except (TypeError, ValueError):
-        return jsonify({"success": False, "error": "risk_threshold/min_scrap_qty 需為數值"}), 400
+        return validation_error("risk_threshold/min_scrap_qty 需為數值")
 
     payload_key = {
         "start_date": start_date,
@@ -410,23 +413,22 @@ def api_yield_alert_alerts():
     try:
         return _cache_response("alerts", payload_key, _compute)
     except ValueError as exc:
-        return jsonify(
-            {
-                "success": False,
-                "error": str(exc),
-                "meta": {"max_query_days": MAX_QUERY_DAYS, "max_per_page": MAX_PAGE_SIZE},
-            }
-        ), 400
+        return error_response(
+            VALIDATION_ERROR,
+            str(exc),
+            status_code=400,
+            meta={"max_query_days": MAX_QUERY_DAYS, "max_per_page": MAX_PAGE_SIZE},
+        )
     except Exception:
         logger.exception("Yield alert candidate query failed")
-        return jsonify({"success": False, "error": "查詢告警清單失敗"}), 500
+        return internal_error("查詢告警清單失敗")
 
 
 @yield_alert_bp.route("/api/yield-alert/reason-detail", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_reason_detail():
     if not _YIELD_ALERT_ENABLED:
-        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+        return not_found_error("yield_alert_disabled")
 
     workorder = str(request.args.get("workorder", "")).strip()
     date_bucket = str(request.args.get("date_bucket", "")).strip()
@@ -434,35 +436,32 @@ def api_yield_alert_reason_detail():
     department = str(request.args.get("department", "")).strip()
 
     if not workorder or not date_bucket:
-        return jsonify({"success": False, "error": "缺少必要參數: workorder, date_bucket"}), 400
+        return validation_error("缺少必要參數: workorder, date_bucket")
 
     try:
         items = query_reason_detail(workorder=workorder, date_bucket=date_bucket, reason_code=reason_code, department=department)
-        return jsonify({
-            "success": True,
-            "data": {
-                "items": items,
-                "workorder": workorder,
-                "date_bucket": date_bucket,
-            },
+        return success_response({
+            "items": items,
+            "workorder": workorder,
+            "date_bucket": date_bucket,
         })
     except Exception:
         logger.exception("Yield alert reason detail query failed")
-        return jsonify({"success": False, "error": "查詢報廢明細失敗"}), 500
+        return internal_error("查詢報廢明細失敗")
 
 
 @yield_alert_bp.route("/api/yield-alert/drilldown-context", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_drilldown_context():
     if not _YIELD_ALERT_ENABLED:
-        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+        return not_found_error("yield_alert_disabled")
 
     date_bucket = str(request.args.get("date_bucket", "")).strip()
     workorder = str(request.args.get("workorder", "")).strip()
     reason_code = str(request.args.get("reason_code", "")).strip()
 
     if not date_bucket or not workorder:
-        return jsonify({"success": False, "error": "缺少必要參數: date_bucket, workorder"}), 400
+        return validation_error("缺少必要參數: date_bucket, workorder")
 
     try:
         payload = build_drilldown_payload(
@@ -470,28 +469,23 @@ def api_yield_alert_drilldown_context():
             workorder=workorder,
             reason_code=reason_code,
         )
-        return jsonify({"success": True, "data": payload})
+        return success_response(payload)
     except Exception:
         logger.exception("Yield alert drilldown context failed")
-        return jsonify({"success": False, "error": "建立追溯連結失敗"}), 500
+        return internal_error("建立追溯連結失敗")
 
 
 @yield_alert_bp.route("/api/yield-alert/filter-options", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_filter_options():
     if not _YIELD_ALERT_ENABLED:
-        return jsonify({"success": False, "error": "yield_alert_disabled"}), 404
+        return not_found_error("yield_alert_disabled")
 
     try:
         groups = get_yield_workcenter_group_options()
-        return jsonify(
-            {
-                "success": True,
-                "data": {
-                    "workcenter_groups": groups,
-                },
-            }
-        )
+        return success_response({
+            "workcenter_groups": groups,
+        })
     except Exception:
         logger.exception("Yield alert filter options query failed")
-        return jsonify({"success": False, "error": "載入站別群組選項失敗"}), 500
+        return internal_error("載入站別群組選項失敗")

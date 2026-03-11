@@ -48,12 +48,12 @@ const chartOption = computed(() => {
       {
         name: '扣帳報廢量',
         type: 'bar',
-        color: '#dc2626',
+        color: 'rgb(220, 38, 38)',
         data: items.map((item) => Number(item.REJECT_TOTAL_QTY || 0)),
         itemStyle: {
           color(params) {
             const date = items[params.dataIndex]?.bucket_date || '';
-            return dateSet && !dateSet.has(date) ? '#f9a8a8' : '#dc2626';
+            return dateSet && !dateSet.has(date) ? 'rgb(249, 168, 168)' : 'rgb(220, 38, 38)';
           },
         },
         barMaxWidth: 28,
@@ -61,12 +61,12 @@ const chartOption = computed(() => {
       {
         name: '不扣帳報廢量',
         type: 'bar',
-        color: '#0284c7',
+        color: 'rgb(2, 132, 199)',
         data: items.map((item) => Number(item.DEFECT_QTY || 0)),
         itemStyle: {
           color(params) {
             const date = items[params.dataIndex]?.bucket_date || '';
-            return dateSet && !dateSet.has(date) ? '#a5d8f0' : '#0284c7';
+            return dateSet && !dateSet.has(date) ? 'rgb(165, 216, 240)' : 'rgb(2, 132, 199)';
           },
         },
         barMaxWidth: 28,

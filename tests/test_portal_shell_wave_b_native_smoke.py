@@ -81,7 +81,7 @@ def test_job_query_native_smoke_query_search_export(client):
     ):
         resources = client.get("/api/job-query/resources")
         assert resources.status_code == 200
-        assert resources.get_json()["total"] == 1
+        assert resources.get_json()["data"]["total"] == 1
 
         query = client.post(
             "/api/job-query/jobs",
@@ -92,7 +92,7 @@ def test_job_query_native_smoke_query_search_export(client):
             },
         )
         assert query.status_code == 200
-        assert query.get_json()["total"] == 1
+        assert query.get_json()["data"]["total"] == 1
 
         export = client.post(
             "/api/job-query/export",
@@ -126,14 +126,14 @@ def test_excel_query_native_smoke_upload_detect_query_export(client):
         content_type="multipart/form-data",
     )
     assert upload.status_code == 200
-    assert "LOT_ID" in upload.get_json()["columns"]
+    assert "LOT_ID" in upload.get_json()["data"]["columns"]
 
     detect = client.post(
         "/api/excel-query/column-type",
         json={"column_name": "LOT_ID"},
     )
     assert detect.status_code == 200
-    assert detect.get_json()["column_name"] == "LOT_ID"
+    assert detect.get_json()["data"]["column_name"] == "LOT_ID"
 
     with (
         patch(
@@ -164,7 +164,7 @@ def test_excel_query_native_smoke_upload_detect_query_export(client):
             },
         )
         assert query.status_code == 200
-        assert query.get_json()["total"] == 1
+        assert query.get_json()["data"]["total"] == 1
 
         export = client.post(
             "/api/excel-query/export-csv",
@@ -213,17 +213,17 @@ def test_query_tool_native_smoke_resolve_history_association(client):
             json={"input_type": "lot_id", "values": ["GA23100020-A00-001"]},
         )
         assert resolve.status_code == 200
-        assert resolve.get_json()["total"] == 1
+        assert resolve.get_json()["data"]["total"] == 1
 
         history = client.get("/api/query-tool/lot-history?container_id=488103800029578b")
         assert history.status_code == 200
-        assert history.get_json()["total"] == 1
+        assert history.get_json()["data"]["total"] == 1
 
         associations = client.get(
             "/api/query-tool/lot-associations?container_id=488103800029578b&type=materials"
         )
         assert associations.status_code == 200
-        assert associations.get_json()["total"] == 1
+        assert associations.get_json()["data"]["total"] == 1
 
 
 def test_reject_history_native_smoke_query_sections_and_export(client):

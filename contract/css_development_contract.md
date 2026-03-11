@@ -1,4 +1,4 @@
-### **MES Dashboard - 前端 CSS 開發契約規範 (v1.0)**
+### **MES Dashboard - 前端 CSS 開發契約規範 (v1.1)**
 
 #### **1. 目的**
 
@@ -28,6 +28,7 @@
           background: linear-gradient(135deg, var(--portal-brand-start) 0%, var(--portal-brand-end) 100%); /* 引用非 tailwind.config.js 的變數 */
         }
         ```
+*   **契約 2.4 (例外邊界原則)**：對於第三方圖表函式庫（如 ECharts）若因 API 限制無法直接使用 Tailwind `theme()`，允許在 **JS/Vue 圖表設定物件** 中使用色碼，但仍需遵守第 6 節「圖表與函式庫例外治理」。
 
 ---
 
@@ -92,14 +93,28 @@
 
 ---
 
-#### **6. CSS 清單同步治理 (CSS Inventory Governance)**
+#### **6. 圖表與函式庫例外治理 (Chart/Library Exception Governance)**
+
+**原則：允許必要例外，但必須可稽核、可收斂。**
+
+*   **契約 6.1 (例外適用範圍)**：例外只適用於第三方圖表函式庫設定（例如 ECharts `option`、`itemStyle`、`visualMap`、`lineStyle`）。不適用於一般 `.css` 規則、Vue `<template style="...">`、一般 DOM 樣式。
+*   **契約 6.2 (優先 token 映射)**：圖表顏色應優先由「集中 palette/token 映射」取得，不得在多處散落重複硬編碼同一組色碼。
+*   **契約 6.3 (允許保留 HEX 的條件)**：若函式庫場景必須保留 HEX，需滿足：
+    *   色碼位於圖表設定上下文。
+    *   該色碼具備明確語意（如 `danger`, `warning`, `seriesA`），避免 magic value。
+    *   同一檔案內重複色碼需抽離為常數或 palette 物件。
+*   **契約 6.4 (治理與追蹤)**：圖表例外需透過 `frontend/scripts/css-governance-check.js` 以 warning/allow-candidate 方式被盤點；非圖表上下文的 HEX 視為違規（error）。
+
+---
+
+#### **7. CSS 清單同步治理 (CSS Inventory Governance)**
 
 **原則：CSS 檔案清單必須可追蹤且與實際程式碼同步。**
 
-*   **契約 6.1**: `contract/css_inventory.md` 為前端 CSS 來源檔清單（`frontend/src/**/*.css`）的治理索引。
-*   **契約 6.2**: 若有新增、刪除、重新命名、搬移任何 `frontend/src/**/*.css` 檔案，必須在**同一個變更**同步更新 `contract/css_inventory.md`。
-*   **契約 6.3**: 若 CSS 規則大幅搬移（例如從 route-local 移至 shared layer），也必須同步更新清單中的 scope/notes 欄位，避免清單與實際結構失真。
-*   **契約 6.4**: `src/mes_dashboard/static/dist/*` 產物檔案不屬於清單治理範圍，不得手動維護於此清單。
+*   **契約 7.1**: `contract/css_inventory.md` 為前端 CSS 來源檔清單（`frontend/src/**/*.css`）的治理索引。
+*   **契約 7.2**: 若有新增、刪除、重新命名、搬移任何 `frontend/src/**/*.css` 檔案，必須在**同一個變更**同步更新 `contract/css_inventory.md`。
+*   **契約 7.3**: 若 CSS 規則大幅搬移（例如從 route-local 移至 shared layer），也必須同步更新清單中的 scope/notes 欄位，避免清單與實際結構失真。
+*   **契約 7.4**: `src/mes_dashboard/static/dist/*` 產物檔案不屬於清單治理範圍，不得手動維護於此清單。
 
 ---
 
@@ -111,5 +126,6 @@
 | 製作一個**一次性**的卡片佈局 | 在 Vue 模板中直接使用 Tailwind **功能類別** | `YourComponent.vue` |
 | 建立一個到處都會用的**通用按鈕** | 在 `@layer components` 中建立 `.ui-button` 類別 | `styles/tailwind.css` |
 | 建立一個只在**設備管理頁**使用的圖表樣式 | 在 `.theme-resource` 下建立對應類別 | `resource-shared/styles.css` |
+| 在 ECharts 設定中需要顏色 | 優先走集中 palette/token 映射；必要時可保留 HEX 並列入例外治理 | `*.vue` / `*.js` 圖表設定 |
 | 修改全站的**預設背景色**或**字體** | 修改 `@layer base` 中的 `body` 規則 | `styles/tailwind.css` |
 | 新增/刪除/改名一個 CSS 檔案 | 同步更新 CSS 清單並一併提交 | `contract/css_inventory.md` |

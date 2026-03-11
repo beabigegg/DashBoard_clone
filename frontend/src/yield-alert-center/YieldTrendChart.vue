@@ -34,7 +34,7 @@ const chartOption = computed(() => {
   return {
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'cross', crossStyle: { color: '#999' } },
+      axisPointer: { type: 'cross', crossStyle: { color: 'rgb(153, 153, 153)' } },
       formatter(params) {
         const idx = params[0]?.dataIndex ?? 0;
         const item = items[idx] || {};
@@ -58,7 +58,7 @@ const chartOption = computed(() => {
       min: yMin,
       max: yMax,
       axisLabel: { formatter: '{value}%', fontSize: 11 },
-      splitLine: { lineStyle: { type: 'dashed', color: '#e5e7eb' } },
+      splitLine: { lineStyle: { type: 'dashed', color: 'rgb(229, 231, 235)' } },
     },
     series: [
       {
@@ -67,18 +67,18 @@ const chartOption = computed(() => {
         smooth: true,
         symbolSize: 5,
         symbol: 'circle',
-        areaStyle: { opacity: 0.12, color: '#2563eb' },
-        lineStyle: { width: 2, color: '#2563eb' },
-        itemStyle: { color: '#2563eb' },
+        areaStyle: { opacity: 0.12, color: 'rgb(37, 99, 235)' },
+        lineStyle: { width: 2, color: 'rgb(37, 99, 235)' },
+        itemStyle: { color: 'rgb(37, 99, 235)' },
         data: yieldVals,
         markLine: {
           silent: true,
           symbol: 'none',
           data: [{ yAxis: threshold }],
-          lineStyle: { color: '#ef4444', type: 'dashed', width: 1.5 },
+          lineStyle: { color: 'rgb(239, 68, 68)', type: 'dashed', width: 1.5 },
           label: {
             formatter: `門檻 ${threshold}%`,
-            color: '#ef4444',
+            color: 'rgb(239, 68, 68)',
             fontSize: 11,
             position: 'end',
           },

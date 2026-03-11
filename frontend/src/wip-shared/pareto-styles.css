@@ -1,7 +1,7 @@
 .pareto-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: theme('spacing.4');
 }
 
 .pareto-section {
@@ -12,19 +12,19 @@
 }
 
 .pareto-header {
-  padding: 12px 16px;
+  padding: theme('spacing.3') theme('spacing.4');
   border-bottom: 1px solid var(--border);
-  background: #fafbfc;
+  background: theme('colors.token.hfafbfc');
 }
 
 .pareto-header.quality {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  border-bottom-color: #fca5a5;
+  background: linear-gradient(135deg, theme('colors.token.hfee2e2') 0%, theme('colors.token.hfecaca') 100%);
+  border-bottom-color: theme('colors.token.hfca5a5');
 }
 
 .pareto-header.non-quality {
-  background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
-  border-bottom-color: #fdba74;
+  background: linear-gradient(135deg, theme('colors.token.hffedd5') 0%, theme('colors.token.hfed7aa') 100%);
+  border-bottom-color: theme('colors.token.hfdba74');
 }
 
 .pareto-title {
@@ -33,18 +33,18 @@
   color: var(--text);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: theme('spacing.2');
 }
 
 .pareto-title .badge {
   font-size: 11px;
-  padding: 2px 8px;
+  padding: theme('spacing.token.p2') theme('spacing.2');
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.1);
 }
 
 .pareto-body {
-  padding: 12px;
+  padding: theme('spacing.3');
 }
 
 .pareto-chart {
@@ -65,18 +65,18 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
-  margin-top: 12px;
+  margin-top: theme('spacing.3');
 }
 
 .pareto-table th,
 .pareto-table td {
-  padding: 8px 10px;
+  padding: theme('spacing.2') theme('spacing.token.p10');
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid theme('colors.token.he5e7eb');
 }
 
 .pareto-table th {
-  background: #f9fafb;
+  background: theme('colors.token.hf9fafb');
   font-weight: 600;
   font-size: 11px;
   color: var(--muted);
@@ -93,7 +93,7 @@
 }
 
 .pareto-table tbody tr:hover {
-  background: #f3f4f6;
+  background: theme('colors.token.hf3f4f6');
 }
 
 .pareto-table .reason-link {

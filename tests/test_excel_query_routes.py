@@ -79,7 +79,7 @@ class TestUploadExcel:
         )
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert '.xlsx' in data['error'] or '.xls' in data['error']
+        assert '.xlsx' in data['error']['message'] or '.xls' in data['error']['message']
 
     def test_upload_valid_excel(self, client, mock_excel_file):
         """Should successfully parse valid Excel file."""
@@ -90,9 +90,9 @@ class TestUploadExcel:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert 'columns' in data
-        assert 'LOT_ID' in data['columns']
-        assert 'preview' in data
+        assert 'columns' in data['data']
+        assert 'LOT_ID' in data['data']['columns']
+        assert 'preview' in data['data']
 
 
 class TestGetColumnValues:
@@ -134,8 +134,8 @@ class TestGetColumnValues:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert 'values' in data
-        assert 'LOT001' in data['values']
+        assert 'values' in data['data']
+        assert 'LOT001' in data['data']['values']
 
 
 class TestGetTables:
@@ -146,8 +146,8 @@ class TestGetTables:
         response = client.get('/api/excel-query/tables')
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert 'tables' in data
-        assert isinstance(data['tables'], list)
+        assert 'tables' in data['data']
+        assert isinstance(data['data']['tables'], list)
 
 
 class TestTableMetadata:
@@ -177,8 +177,8 @@ class TestTableMetadata:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert 'columns' in data
-        assert len(data['columns']) == 2
+        assert 'columns' in data['data']
+        assert len(data['data']['columns']) == 2
 
     @patch('mes_dashboard.routes.excel_query_routes.get_table_column_metadata')
     def test_metadata_not_found(self, mock_metadata, client):
@@ -233,7 +233,7 @@ class TestExecuteAdvancedQuery:
         )
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert 'invalid' in data['error'].lower() or '無效' in data['error']
+        assert 'invalid' in data['error']['message'].lower() or '無效' in data['error']['message']
 
     def test_invalid_date_format(self, client):
         """Should reject invalid date format."""
@@ -250,7 +250,7 @@ class TestExecuteAdvancedQuery:
         )
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert '格式' in data['error'] or 'format' in data['error'].lower()
+        assert '格式' in data['error']['message'] or 'format' in data['error']['message'].lower()
 
     def test_date_range_reversed(self, client):
         """Should reject if start date > end date."""
@@ -267,7 +267,7 @@ class TestExecuteAdvancedQuery:
         )
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert '起始' in data['error'] or 'start' in data['error'].lower()
+        assert '起始' in data['error']['message'] or 'start' in data['error']['message'].lower()
 
     def test_date_range_exceeds_limit(self, client):
         """Should reject date range > 365 days."""
@@ -284,7 +284,7 @@ class TestExecuteAdvancedQuery:
         )
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert '365' in data['error']
+        assert '365' in data['error']['message']
 
     @patch('mes_dashboard.routes.excel_query_routes.execute_advanced_batch_query')
     def test_execute_in_query(self, mock_execute, client):
@@ -307,7 +307,7 @@ class TestExecuteAdvancedQuery:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['total'] == 1
+        assert data['data']['total'] == 1
 
     @patch('mes_dashboard.routes.excel_query_routes.execute_advanced_batch_query')
     def test_execute_like_contains(self, mock_execute, client):
@@ -330,7 +330,7 @@ class TestExecuteAdvancedQuery:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['total'] == 2
+        assert data['data']['total'] == 2
 
     @patch('mes_dashboard.routes.excel_query_routes.execute_advanced_batch_query')
     def test_execute_with_date_range(self, mock_execute, client):
@@ -393,7 +393,7 @@ class TestExecuteQuery:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['total'] == 1
+        assert data['data']['total'] == 1
 
 
 class TestExportCSV:
@@ -470,5 +470,5 @@ class TestGetExcelColumnType:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert 'detected_type' in data
-        assert 'type_label' in data
+        assert 'detected_type' in data['data']
+        assert 'type_label' in data['data']

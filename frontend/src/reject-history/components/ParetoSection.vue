@@ -118,7 +118,7 @@ const chartOption = computed(() => {
         itemStyle: {
           color(params) {
             const reason = items[params.dataIndex]?.reason || '';
-            return isSelected(reason) ? '#b91c1c' : '#2563eb';
+            return isSelected(reason) ? 'rgb(185, 28, 28)' : 'rgb(37, 99, 235)';
           },
           borderRadius: [4, 4, 0, 0],
         },
@@ -128,8 +128,8 @@ const chartOption = computed(() => {
         type: 'line',
         yAxisIndex: 1,
         data: items.map((item) => Number(item.cumPct || 0)),
-        lineStyle: { color: '#f59e0b', width: 2 },
-        itemStyle: { color: '#f59e0b' },
+        lineStyle: { color: 'rgb(245, 158, 11)', width: 2 },
+        itemStyle: { color: 'rgb(245, 158, 11)' },
         symbolSize: 6,
       },
     ],

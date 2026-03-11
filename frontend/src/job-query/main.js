@@ -459,18 +459,18 @@ function renderTxnCell(txn, apiKey) {
         // Load job history
         async function loadJobHistory(jobId, idx) {
             const container = document.getElementById(`txn-content-${idx}`);
-            container.innerHTML = '<div class="loading" style="padding: 20px;"><div class="loading-spinner"></div></div>';
+            container.innerHTML = '<div class="loading" style="padding: var(--spacing-token-p20);"><div class="loading-spinner"></div></div>';
 
             try {
                 const data = await MesApi.get(`/api/job-query/txn/${jobId}`);
 
                 if (data.error) {
-                    container.innerHTML = `<div class="error" style="margin: 10px 20px;">${escapeHtml(data.error)}</div>`;
+                    container.innerHTML = `<div class="error" style="margin: var(--spacing-token-p10) var(--spacing-token-p20);">${escapeHtml(data.error)}</div>`;
                     return;
                 }
 
                 if (!data.data || data.data.length === 0) {
-                    container.innerHTML = '<div style="padding: 20px; color: #666;">無交易歷史記錄</div>';
+                    container.innerHTML = '<div style="padding: var(--spacing-token-p20); color: var(--color-token-h666666);">無交易歷史記錄</div>';
                     return;
                 }
 
@@ -500,7 +500,7 @@ function renderTxnCell(txn, apiKey) {
                 container.innerHTML = html;
 
             } catch (error) {
-                container.innerHTML = `<div class="error" style="margin: 10px 20px;">載入失敗: ${escapeHtml(error.message)}</div>`;
+                container.innerHTML = `<div class="error" style="margin: var(--spacing-token-p10) var(--spacing-token-p20);">載入失敗: ${escapeHtml(error.message)}</div>`;
             }
         }
 

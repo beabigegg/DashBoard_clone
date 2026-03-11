@@ -20,13 +20,13 @@ export const STATUS_AGGREGATION = Object.freeze({
 });
 
 export const STATUS_COLORS = Object.freeze({
-  PRD: '#22c55e',
-  SBY: '#3b82f6',
-  UDT: '#ef4444',
-  SDT: '#f59e0b',
-  EGT: '#8b5cf6',
-  NST: '#64748b',
-  OTHER: '#94a3b8',
+  PRD: 'var(--color-token-h22c55e)',
+  SBY: 'var(--color-token-h3b82f6)',
+  UDT: 'var(--color-token-hef4444)',
+  SDT: 'var(--color-token-hf59e0b)',
+  EGT: 'var(--color-token-h8b5cf6)',
+  NST: 'var(--color-token-h64748b)',
+  OTHER: 'var(--color-token-h94a3b8)',
 });
 
 export const OU_BADGE_THRESHOLDS = Object.freeze({

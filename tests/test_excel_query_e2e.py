@@ -69,9 +69,9 @@ class TestBasicQueryWorkflow:
         )
         assert upload_response.status_code == 200
         upload_data = json.loads(upload_response.data)
-        assert 'columns' in upload_data
-        assert 'LOT_ID' in upload_data['columns']
-        assert 'preview' in upload_data
+        assert 'columns' in upload_data['data']
+        assert 'LOT_ID' in upload_data['data']['columns']
+        assert 'preview' in upload_data['data']
 
         # Step 2: Get column values
         values_response = client.post(
@@ -80,8 +80,8 @@ class TestBasicQueryWorkflow:
         )
         assert values_response.status_code == 200
         values_data = json.loads(values_response.data)
-        assert 'values' in values_data
-        assert set(values_data['values']) == {'LOT001', 'LOT002', 'LOT003'}
+        assert 'values' in values_data['data']
+        assert set(values_data['data']['values']) == {'LOT001', 'LOT002', 'LOT003'}
 
         # Step 3: Execute query
         mock_execute.return_value = {
@@ -105,7 +105,7 @@ class TestBasicQueryWorkflow:
         )
         assert execute_response.status_code == 200
         execute_data = json.loads(execute_response.data)
-        assert execute_data['total'] == 3
+        assert execute_data['data']['total'] == 3
 
 
 class TestAdvancedQueryWorkflow:
@@ -135,7 +135,7 @@ class TestAdvancedQueryWorkflow:
             json={'column_name': 'SEARCH_PATTERN'}
         )
         assert values_response.status_code == 200
-        search_values = json.loads(values_response.data)['values']
+        search_values = json.loads(values_response.data)['data']['values']
 
         # Execute LIKE contains query
         mock_execute.return_value = {
@@ -161,7 +161,7 @@ class TestAdvancedQueryWorkflow:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['total'] == 4
+        assert data['data']['total'] == 4
 
     @patch('mes_dashboard.routes.excel_query_routes.execute_advanced_batch_query')
     def test_date_range_workflow(self, mock_execute, client):
@@ -201,7 +201,7 @@ class TestAdvancedQueryWorkflow:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['total'] == 1
+        assert data['data']['total'] == 1
 
     @patch('mes_dashboard.routes.excel_query_routes.execute_advanced_batch_query')
     def test_combined_like_and_date_workflow(self, mock_execute, client):
@@ -270,7 +270,7 @@ class TestColumnTypeDetection:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['detected_type'] == 'date'
+        assert data['data']['detected_type'] == 'date'
 
     def test_detect_number_column(self, client):
         """Test detecting numeric type from Excel column."""
@@ -295,7 +295,7 @@ class TestColumnTypeDetection:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['detected_type'] == 'number'
+        assert data['data']['detected_type'] == 'number'
 
     def test_detect_id_column(self, client):
         """Test detecting ID type from Excel column."""
@@ -320,7 +320,7 @@ class TestColumnTypeDetection:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['detected_type'] == 'id'
+        assert data['data']['detected_type'] == 'id'
 
 
 class TestTableMetadataWorkflow:
@@ -348,7 +348,7 @@ class TestTableMetadataWorkflow:
             '/api/excel-query/column-type',
             json={'column_name': 'LOT_ID'}
         )
-        excel_type = json.loads(excel_type_response.data)['detected_type']
+        excel_type = json.loads(excel_type_response.data)['data']['detected_type']
 
         # Step 3: Get table metadata
         mock_metadata.return_value = {
@@ -367,8 +367,8 @@ class TestTableMetadataWorkflow:
         metadata = json.loads(metadata_response.data)
 
         # Verify column types are returned
-        assert len(metadata['columns']) == 3
-        lot_col = next(c for c in metadata['columns'] if c['name'] == 'LOT_ID')
+        assert len(metadata['data']['columns']) == 3
+        lot_col = next(c for c in metadata['data']['columns'] if c['name'] == 'LOT_ID')
         assert lot_col['data_type'] == 'VARCHAR2'
 
 
@@ -394,7 +394,7 @@ class TestValidationWorkflow:
             '/api/excel-query/column-values',
             json={'column_name': 'VALUE'}
         )
-        all_values = json.loads(values_response.data)['values']
+        all_values = json.loads(values_response.data)['data']['values']
 
         # Attempt LIKE query with too many values
         response = client.post(
@@ -480,7 +480,7 @@ class TestBackwardCompatibility:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['total'] == 1
+        assert data['data']['total'] == 1
 
     @patch('mes_dashboard.routes.excel_query_routes.execute_batch_query')
     @patch('mes_dashboard.routes.excel_query_routes.generate_csv_content')

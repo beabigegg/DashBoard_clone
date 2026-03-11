@@ -65,7 +65,7 @@ const chartOption = computed(() => {
         data: rows.map((r) => {
           const v = Number(r.yield_pct ?? 0);
           const color =
-            v >= threshold ? '#22c55e' : v >= threshold - 3 ? '#f59e0b' : '#ef4444';
+            v >= threshold ? 'rgb(34, 197, 94)' : v >= threshold - 3 ? 'rgb(245, 158, 11)' : 'rgb(239, 68, 68)';
           return { value: v, itemStyle: { color } };
         }),
         label: {
@@ -73,7 +73,7 @@ const chartOption = computed(() => {
           position: 'right',
           formatter: (p) => `${Number(p.value ?? 0).toFixed(1)}%`,
           fontSize: 11,
-          color: '#555',
+          color: 'rgb(85, 85, 85)',
         },
       },
     ],

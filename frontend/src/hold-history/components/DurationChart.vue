@@ -69,7 +69,7 @@ const chartOption = computed(() => {
         itemStyle: {
           color(params) {
             const range = labels[params.dataIndex] || '';
-            return range === props.activeRange ? '#dc2626' : '#7c3aed';
+            return range === props.activeRange ? 'rgb(220, 38, 38)' : 'rgb(124, 58, 237)';
           },
           borderRadius: [0, 4, 4, 0],
         },

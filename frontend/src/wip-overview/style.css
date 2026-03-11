@@ -7,19 +7,19 @@
 }
 
 .error-banner {
-  margin-bottom: 14px;
-  padding: 10px 12px;
+  margin-bottom: theme('spacing.token.p14');
+  padding: theme('spacing.token.p10') theme('spacing.token.p12');
   border-radius: 6px;
-  background: #fef2f2;
-  color: #991b1b;
+  background: theme('colors.token.hfef2f2');
+  color: theme('colors.token.h991b1b');
   font-size: 13px;
 }
 
 .filters {
   background: var(--card-bg);
-  padding: 16px 20px;
+  padding: theme('spacing.token.p16') theme('spacing.token.p20');
   border-radius: 10px;
-  margin-bottom: 16px;
+  margin-bottom: theme('spacing.token.p16');
   box-shadow: var(--shadow);
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
@@ -61,13 +61,13 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: theme('spacing.token.p16');
 }
 
 .wip-status-card {
   background: var(--card-bg);
   border-radius: 10px;
-  padding: 12px 16px;
+  padding: theme('spacing.token.p12') theme('spacing.token.p16');
   border: 2px solid;
   box-shadow: var(--shadow);
   cursor: pointer;
@@ -85,7 +85,7 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: theme('spacing.token.p8');
 }
 
 .wip-status-card .status-header .dot {
@@ -109,39 +109,39 @@
 }
 
 .wip-status-card.run {
-  background: #f0fdf4;
-  border-color: #22c55e;
+  background: theme('colors.token.hf0fdf4');
+  border-color: theme('colors.token.h22c55e');
 }
 
 .wip-status-card.queue {
-  background: #fffbeb;
-  border-color: #f59e0b;
+  background: theme('colors.token.hfffbeb');
+  border-color: theme('colors.token.hf59e0b');
 }
 
 .wip-status-card.quality-hold {
-  background: #fef2f2;
-  border-color: #ef4444;
+  background: theme('colors.token.hfef2f2');
+  border-color: theme('colors.token.hef4444');
 }
 
 .wip-status-card.non-quality-hold {
-  background: #fff7ed;
-  border-color: #f97316;
+  background: theme('colors.token.hfff7ed');
+  border-color: theme('colors.token.hf97316');
 }
 
 .wip-status-card.run .status-header {
-  color: #166534;
+  color: theme('colors.token.h166534');
 }
 
 .wip-status-card.queue .status-header {
-  color: #92400e;
+  color: theme('colors.token.h92400e');
 }
 
 .wip-status-card.quality-hold .status-header {
-  color: #991b1b;
+  color: theme('colors.token.h991b1b');
 }
 
 .wip-status-card.non-quality-hold .status-header {
-  color: #9a3412;
+  color: theme('colors.token.h9a3412');
 }
 
 .wip-status-card.active {
@@ -150,22 +150,22 @@
 }
 
 .wip-status-card.run.active {
-  background: #dcfce7;
+  background: theme('colors.token.hdcfce7');
   box-shadow: 0 6px 25px rgba(34, 197, 94, 0.5);
 }
 
 .wip-status-card.queue.active {
-  background: #fef3c7;
+  background: theme('colors.token.hfef3c7');
   box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5);
 }
 
 .wip-status-card.quality-hold.active {
-  background: #fee2e2;
+  background: theme('colors.token.hfee2e2');
   box-shadow: 0 6px 25px rgba(239, 68, 68, 0.5);
 }
 
 .wip-status-card.non-quality-hold.active {
-  background: #ffedd5;
+  background: theme('colors.token.hffedd5');
   box-shadow: 0 6px 25px rgba(249, 115, 22, 0.5);
 }
 
@@ -187,9 +187,9 @@
 }
 
 .card-header {
-  padding: 14px 20px;
+  padding: theme('spacing.token.p14') theme('spacing.token.p20');
   border-bottom: 1px solid var(--border);
-  background: #fafbfc;
+  background: theme('colors.token.hfafbfc');
 }
 
 .card-title {
@@ -199,7 +199,7 @@
 }
 
 .card-body {
-  padding: 16px;
+  padding: theme('spacing.token.p16');
   overflow-x: auto;
 }
 
@@ -217,19 +217,19 @@
 
 .matrix-table th,
 .matrix-table td {
-  padding: 8px 10px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
   text-align: right;
-  border: 1px solid #e5e7eb;
+  border: 1px solid theme('colors.token.he5e7eb');
   white-space: nowrap;
 }
 
 .matrix-table th {
-  background: #f3f4f6;
+  background: theme('colors.token.hf3f4f6');
   font-weight: 600;
   position: sticky;
   top: 0;
   z-index: 1;
-  border-bottom: 2px solid #cbd5e1;
+  border-bottom: 2px solid theme('colors.token.hcbd5e1');
 }
 
 .matrix-table th:first-child {
@@ -238,8 +238,8 @@
   left: 0;
   top: 0;
   z-index: 3;
-  background: #e5e7eb;
-  border-right: 2px solid #cbd5e1;
+  background: theme('colors.token.he5e7eb');
+  border-right: 2px solid theme('colors.token.hcbd5e1');
 }
 
 .matrix-table td:first-child {
@@ -247,22 +247,22 @@
   font-weight: 600;
   position: sticky;
   left: 0;
-  background: #f9fafb;
+  background: theme('colors.token.hf9fafb');
   z-index: 1;
-  border-right: 2px solid #cbd5e1;
+  border-right: 2px solid theme('colors.token.hcbd5e1');
 }
 
 .matrix-table tbody tr:hover td {
-  background: #f0f4ff;
+  background: theme('colors.token.hf0f4ff');
 }
 
 .matrix-table tbody tr:hover td:first-child {
-  background: #e8ecff;
+  background: theme('colors.token.he8ecff');
 }
 
 .matrix-table .total-row td,
 .matrix-table .total-col {
-  background: #e5e7eb;
+  background: theme('colors.token.he5e7eb');
   font-weight: 700;
 }
 

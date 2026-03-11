@@ -151,7 +151,7 @@ class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
-        self.assertIn('query_id', payload['error'])
+        self.assertIn('query_id', payload['error']['message'])
 
     def test_view_invalid_record_type_returns_400(self):
         response = self.client.get(
@@ -180,7 +180,7 @@ class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 410)
         self.assertFalse(payload['success'])
-        self.assertEqual(payload['error'], 'cache_expired')
+        self.assertEqual(payload['error']['code'], 'CACHE_EXPIRED')
 
     @patch('mes_dashboard.routes.hold_history_routes.apply_view')
     def test_view_success(self, mock_view):

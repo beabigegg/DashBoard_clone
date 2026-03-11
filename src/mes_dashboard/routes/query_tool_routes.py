@@ -13,12 +13,23 @@ import gc
 import hashlib
 import os
 
-from flask import Blueprint, jsonify, request, Response, render_template, current_app
+from flask import Blueprint, request, Response, render_template, current_app
 
 from mes_dashboard.core.cache import cache_get, cache_set
 from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
+from mes_dashboard.core.response import (
+    success_response,
+    validation_error,
+    not_found_error,
+    internal_error,
+    service_unavailable_error,
+    error_response,
+    VALIDATION_ERROR,
+    INTERNAL_ERROR,
+    NOT_FOUND,
+)
 from mes_dashboard.services.query_tool_service import (
     resolve_lots,
     get_lot_history,
@@ -113,7 +124,7 @@ def _reject_if_batch_too_large(container_ids: list[str]):
     max_ids = _query_tool_max_container_ids()
     if len(container_ids) <= max_ids:
         return None
-    return jsonify({'error': f'container_ids 數量不可超過 {max_ids} 筆'}), 413
+    return error_response(VALIDATION_ERROR, f'container_ids 數量不可超過 {max_ids} 筆', status_code=413)
 
 
 def _sanitize_page(value: str | int | None) -> int:
@@ -285,7 +296,7 @@ def resolve_lot_input():
     """
     data, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({'error': payload_error.message}), payload_error.status_code
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     input_type = data.get('input_type')
     values = data.get('values', [])
@@ -293,12 +304,12 @@ def resolve_lot_input():
     # Validate input type
     valid_types = ['lot_id', 'wafer_lot', 'serial_number', 'work_order', 'gd_work_order', 'gd_lot_id']
     if input_type not in valid_types:
-        return jsonify({'error': f'不支援的查詢類型: {input_type}'}), 400
+        return validation_error(f'不支援的查詢類型: {input_type}')
 
     # Validate values
-    validation_error = validate_lot_input(input_type, values)
-    if validation_error:
-        return jsonify({'error': validation_error}), 400
+    lot_input_err = validate_lot_input(input_type, values)
+    if lot_input_err:
+        return validation_error(lot_input_err)
 
     cache_values = [
         v.strip()
@@ -313,17 +324,17 @@ def resolve_lot_input():
         cache_key = f"qt:resolve:{input_type}:{values_hash}"
         cached = cache_get(cache_key)
         if cached is not None:
-            return jsonify(cached)
+            return success_response(cached)
 
     result = resolve_lots(input_type, values)
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
     if cache_key is not None:
         cache_set(cache_key, result, ttl=60)
 
-    return jsonify(result)
+    return success_response(result)
 
 
 # ============================================================
@@ -360,7 +371,7 @@ def query_lot_history():
     if container_ids_param:
         cids = [c.strip() for c in container_ids_param.split(',') if c.strip()]
         if not cids:
-            return jsonify({'error': '請指定 CONTAINERID'}), 400
+            return validation_error('請指定 CONTAINERID')
         too_large = _reject_if_batch_too_large(cids)
         if too_large is not None:
             return too_large
@@ -372,23 +383,23 @@ def query_lot_history():
                 per_page=per_page,
             )
         except MemoryError as exc:
-            return jsonify({'error': str(exc)}), 503
+            return service_unavailable_error(str(exc))
     elif container_id:
         try:
             result = get_lot_history(container_id, workcenter_groups=workcenter_groups)
         except MemoryError as exc:
-            return jsonify({'error': str(exc)}), 503
+            return service_unavailable_error(str(exc))
     else:
-        return jsonify({'error': '請指定 CONTAINERID'}), 400
+        return validation_error('請指定 CONTAINERID')
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
-    response = jsonify(result)
+    resp, status = success_response(result)
     total = result.get('total', 0)
     if total > 10000:
         gc.collect()
-    return response
+    return resp, status
 
 
 # ============================================================
@@ -415,14 +426,14 @@ def query_adjacent_lots():
     time_window = request.args.get('time_window', 24, type=int)
 
     if not all([equipment_id, target_time]):
-        return jsonify({'error': '請指定設備和目標時間'}), 400
+        return validation_error('請指定設備和目標時間')
 
     result = get_adjacent_lots(equipment_id, target_time, time_window)
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
-    return jsonify(result)
+    return success_response(result)
 
 
 # ============================================================
@@ -452,14 +463,14 @@ def query_lot_associations():
 
     valid_types = ['materials', 'rejects', 'holds', 'splits', 'jobs']
     if assoc_type not in valid_types:
-        return jsonify({'error': f'不支援的關聯類型: {assoc_type}'}), 400
+        return validation_error(f'不支援的關聯類型: {assoc_type}')
 
     # Batch mode for materials/rejects/holds
     batch_types = {'materials', 'rejects', 'holds'}
     if container_ids_param and assoc_type in batch_types:
         cids = [c.strip() for c in container_ids_param.split(',') if c.strip()]
         if not cids:
-            return jsonify({'error': '請指定 CONTAINERID'}), 400
+            return validation_error('請指定 CONTAINERID')
         too_large = _reject_if_batch_too_large(cids)
         if too_large is not None:
             return too_large
@@ -471,10 +482,10 @@ def query_lot_associations():
                 per_page=per_page,
             )
         except MemoryError as exc:
-            return jsonify({'error': str(exc)}), 503
+            return service_unavailable_error(str(exc))
     else:
         if not container_id:
-            return jsonify({'error': '請指定 CONTAINERID'}), 400
+            return validation_error('請指定 CONTAINERID')
 
         if assoc_type == 'materials':
             result = get_lot_materials(container_id)
@@ -491,14 +502,14 @@ def query_lot_associations():
             time_end = request.args.get('time_end')
 
             if not all([equipment_id, time_start, time_end]):
-                return jsonify({'error': '查詢 JOB 需指定設備和時間範圍'}), 400
+                return validation_error('查詢 JOB 需指定設備和時間範圍')
 
             result = get_lot_jobs(equipment_id, time_start, time_end)
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
-    return jsonify(result)
+    return success_response(result)
 
 
 # ============================================================
@@ -523,7 +534,7 @@ def query_equipment_period():
     """
     data, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({'error': payload_error.message}), payload_error.status_code
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     equipment_ids = data.get('equipment_ids', [])
     equipment_names = data.get('equipment_names', [])
@@ -535,27 +546,27 @@ def query_equipment_period():
 
     # Validate date range
     if not start_date or not end_date:
-        return jsonify({'error': '請指定日期範圍'}), 400
+        return validation_error('請指定日期範圍')
 
-    validation_error = validate_date_range(start_date, end_date)
-    if validation_error:
-        return jsonify({'error': validation_error}), 400
+    date_range_err = validate_date_range(start_date, end_date)
+    if date_range_err:
+        return validation_error(date_range_err)
 
     # Validate query type
     valid_types = ['status_hours', 'lots', 'materials', 'rejects', 'jobs']
     if query_type not in valid_types:
-        return jsonify({'error': f'不支援的查詢類型: {query_type}'}), 400
+        return validation_error(f'不支援的查詢類型: {query_type}')
 
     # Execute query based on type
     try:
         if query_type == 'status_hours':
             if not equipment_ids:
-                return jsonify({'error': '請選擇至少一台設備'}), 400
+                return validation_error('請選擇至少一台設備')
             result = get_equipment_status_hours(equipment_ids, start_date, end_date)
 
         elif query_type == 'lots':
             if not equipment_ids:
-                return jsonify({'error': '請選擇至少一台設備'}), 400
+                return validation_error('請選擇至少一台設備')
             result = get_equipment_lots(
                 equipment_ids,
                 start_date,
@@ -566,29 +577,29 @@ def query_equipment_period():
 
         elif query_type == 'materials':
             if not equipment_names:
-                return jsonify({'error': '請選擇至少一台設備'}), 400
+                return validation_error('請選擇至少一台設備')
             result = get_equipment_materials(equipment_names, start_date, end_date)
 
         elif query_type == 'rejects':
             if not equipment_names:
-                return jsonify({'error': '請選擇至少一台設備'}), 400
+                return validation_error('請選擇至少一台設備')
             result = get_equipment_rejects(equipment_names, start_date, end_date)
 
         elif query_type == 'jobs':
             if not equipment_ids:
-                return jsonify({'error': '請選擇至少一台設備'}), 400
+                return validation_error('請選擇至少一台設備')
             result = get_equipment_jobs(equipment_ids, start_date, end_date)
     except MemoryError as exc:
-        return jsonify({'error': str(exc)}), 503
+        return service_unavailable_error(str(exc))
 
     if 'error' in result:
-        return jsonify(result), 400
+        return validation_error(result.get('error', '查詢失敗'))
 
-    response = jsonify(result)
+    resp, status = success_response(result)
     total = result.get('total', 0)
     if total > 10000:
         gc.collect()
-    return response
+    return resp, status
 
 
 # ============================================================
@@ -606,7 +617,7 @@ def get_equipment_list():
     try:
         resources = get_all_resources()
         if not resources:
-            return jsonify({'error': '無法載入設備資料'}), 500
+            return internal_error('無法載入設備資料')
 
         # Return minimal data for selection UI
         data = []
@@ -621,13 +632,13 @@ def get_equipment_list():
         # Sort by WORKCENTERNAME, then RESOURCENAME
         data.sort(key=lambda x: (x.get('WORKCENTERNAME', ''), x.get('RESOURCENAME', '')))
 
-        return jsonify({
+        return success_response({
             'data': data,
             'total': len(data)
         })
 
     except Exception as exc:
-        return jsonify({'error': f'載入設備資料失敗: {str(exc)}'}), 500
+        return internal_error(f'載入設備資料失敗: {str(exc)}')
 
 
 # ============================================================
@@ -646,15 +657,15 @@ def get_workcenter_groups_list():
     try:
         groups = get_workcenter_groups()
         if groups is None:
-            return jsonify({'error': '無法載入站點群組資料'}), 500
+            return internal_error('無法載入站點群組資料')
 
-        return jsonify({
+        return success_response({
             'data': groups,
             'total': len(groups)
         })
 
     except Exception as exc:
-        return jsonify({'error': f'載入站點群組失敗: {str(exc)}'}), 500
+        return internal_error(f'載入站點群組失敗: {str(exc)}')
 
 
 # ============================================================
@@ -672,14 +683,14 @@ def get_equipment_recent_jobs(equipment_id):
 
     equipment_id = str(equipment_id or '').strip()
     if not equipment_id:
-        return jsonify({'error': '請指定設備ID'}), 400
+        return validation_error('請指定設備ID')
 
     try:
         sql = SQLLoader.load("query_tool/equipment_recent_jobs")
         df = read_sql_df(sql, {'equipment_id': equipment_id})
 
         if df is None or df.empty:
-            return jsonify({'data': [], 'total': 0})
+            return success_response({'data': [], 'total': 0})
 
         data = []
         for _, row in df.iterrows():
@@ -694,10 +705,10 @@ def get_equipment_recent_jobs(equipment_id):
                 'RESOURCENAME': str(row.get('RESOURCENAME') or ''),
             })
 
-        return jsonify({'data': data, 'total': len(data)})
+        return success_response({'data': data, 'total': len(data)})
 
     except Exception as exc:
-        return jsonify({'error': f'載入維修紀錄失敗: {str(exc)}'}), 500
+        return internal_error(f'載入維修紀錄失敗: {str(exc)}')
 
 
 # ============================================================
@@ -722,7 +733,7 @@ def export_csv():
     """
     data, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({'error': payload_error.message}), payload_error.status_code
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     export_type = data.get('export_type')
     params = data.get('params', {})
@@ -735,7 +746,7 @@ def export_csv():
         if export_type == 'lot_history':
             cids = _resolve_export_cids(params)
             if not cids:
-                return jsonify({'error': '請指定 CONTAINERID'}), 400
+                return validation_error('請指定 CONTAINERID')
             if len(cids) > 1:
                 result = get_lot_history_batch(cids)
             else:
@@ -753,7 +764,7 @@ def export_csv():
         elif export_type == 'lot_materials':
             cids = _resolve_export_cids(params)
             if not cids:
-                return jsonify({'error': '請指定 CONTAINERID'}), 400
+                return validation_error('請指定 CONTAINERID')
             if len(cids) > 1:
                 result = get_lot_associations_batch(cids, 'materials')
             else:
@@ -763,7 +774,7 @@ def export_csv():
         elif export_type == 'lot_rejects':
             cids = _resolve_export_cids(params)
             if not cids:
-                return jsonify({'error': '請指定 CONTAINERID'}), 400
+                return validation_error('請指定 CONTAINERID')
             if len(cids) > 1:
                 result = get_lot_associations_batch(cids, 'rejects')
             else:
@@ -773,7 +784,7 @@ def export_csv():
         elif export_type == 'lot_holds':
             cids = _resolve_export_cids(params)
             if not cids:
-                return jsonify({'error': '請指定 CONTAINERID'}), 400
+                return validation_error('請指定 CONTAINERID')
             if len(cids) > 1:
                 result = get_lot_associations_batch(cids, 'holds')
             else:
@@ -850,15 +861,15 @@ def export_csv():
             filename = 'equipment_jobs.csv'
 
         else:
-            return jsonify({'error': f'不支援的匯出類型: {export_type}'}), 400
+            return validation_error(f'不支援的匯出類型: {export_type}')
 
         if result is None or 'error' in result:
             error_msg = result.get('error', '查詢失敗') if result else '查詢失敗'
-            return jsonify({'error': error_msg}), 400
+            return validation_error(error_msg)
 
         export_data = result.get('data', [])
         if not export_data:
-            return jsonify({'error': '查無資料'}), 404
+            return not_found_error('查無資料')
 
         if export_type == 'lot_materials':
             export_data = _format_lot_materials_export_rows(export_data)
@@ -883,4 +894,4 @@ def export_csv():
         )
 
     except Exception as exc:
-        return jsonify({'error': f'匯出失敗: {str(exc)}'}), 500
+        return internal_error(f'匯出失敗: {str(exc)}')

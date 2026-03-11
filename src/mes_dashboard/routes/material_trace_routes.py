@@ -5,10 +5,16 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, Response, jsonify, stream_with_context
+from flask import Blueprint, Response, stream_with_context
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
+from mes_dashboard.core.response import (
+    internal_error,
+    service_unavailable_error,
+    success_response,
+    validation_error,
+)
 from mes_dashboard.services.container_resolution_policy import (
     validate_resolution_request,
 )
@@ -113,11 +119,11 @@ def api_material_trace_query():
     """Execute material trace query (forward or reverse)."""
     body, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({"success": False, "error": payload_error.message}), payload_error.status_code
+        return validation_error(payload_error.message)
 
     error, mode, values, workcenter_groups, page, per_page = _validate_query_params(body)
     if error:
-        return jsonify({"success": False, "error": error}), 400
+        return validation_error(error)
 
     try:
         if mode in _FORWARD_MODES:
@@ -125,14 +131,14 @@ def api_material_trace_query():
         else:
             result = reverse_query(values, workcenter_groups, page, per_page)
 
-        return jsonify({"success": True, **result})
+        return success_response(result)
 
     except MemoryError as exc:
         logger.warning("Material trace query memory guard: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
         logger.exception("Material trace query failed: mode=%s", mode)
-        return jsonify({"success": False, "error": "查詢失敗，請稍後再試"}), 500
+        return internal_error()
 
 
 @material_trace_bp.route("/api/material-trace/export", methods=["POST"])
@@ -141,11 +147,11 @@ def api_material_trace_export():
     """Export material trace query results as CSV."""
     body, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({"success": False, "error": payload_error.message}), payload_error.status_code
+        return validation_error(payload_error.message)
 
     error, mode, values, workcenter_groups, _page, _per_page = _validate_query_params(body)
     if error:
-        return jsonify({"success": False, "error": error}), 400
+        return validation_error(error)
 
     try:
         csv_stream, export_meta = export_csv(mode, values, workcenter_groups)
@@ -183,10 +189,10 @@ def api_material_trace_export():
 
     except MemoryError as exc:
         logger.warning("Material trace export memory guard: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
         logger.exception("Material trace export failed: mode=%s", mode)
-        return jsonify({"success": False, "error": "匯出失敗，請稍後再試"}), 500
+        return internal_error()
 
 
 @material_trace_bp.route("/api/material-trace/filter-options", methods=["GET"])
@@ -194,11 +200,8 @@ def api_material_trace_filter_options():
     """Return workcenter group options for filter dropdown."""
     groups = get_workcenter_groups()
     if groups is None:
-        return jsonify({"success": False, "error": "站群組資料載入中"}), 503
+        return service_unavailable_error("站群組資料載入中")
 
-    return jsonify({
-        "success": True,
-        "data": {
-            "workcenter_groups": [g["name"] for g in groups],
-        },
+    return success_response({
+        "workcenter_groups": [g["name"] for g in groups],
     })

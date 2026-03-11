@@ -37,9 +37,9 @@ const displayValue = computed(() => {
 });
 
 const fillColor = computed(() => {
-  if (ratio.value >= props.dangerThreshold) return '#ef4444';
-  if (ratio.value >= props.warningThreshold) return '#f59e0b';
-  return '#22c55e';
+  if (ratio.value >= props.dangerThreshold) return 'var(--color-token-hef4444)';
+  if (ratio.value >= props.warningThreshold) return 'var(--color-token-hf59e0b)';
+  return 'var(--color-token-h22c55e)';
 });
 
 const fillStyle = computed(() => ({

@@ -57,12 +57,12 @@ const emit = defineEmits(['export']);
 const STATUS_KEYS = Object.freeze(['PRD', 'SBY', 'UDT', 'SDT']);
 
 const colorMap = Object.freeze({
-  PRD: '#16a34a',
-  SBY: '#f59e0b',
-  UDT: '#ef4444',
-  SDT: '#64748b',
-  LOT: '#2563eb',
-  JOB: '#9333ea',
+  PRD: 'var(--color-token-h16a34a)',
+  SBY: 'var(--color-token-hf59e0b)',
+  UDT: 'var(--color-token-hef4444)',
+  SDT: 'var(--color-token-h64748b)',
+  LOT: 'var(--color-token-h2563eb)',
+  JOB: 'var(--color-token-h9333ea)',
 });
 
 function toDate(value) {

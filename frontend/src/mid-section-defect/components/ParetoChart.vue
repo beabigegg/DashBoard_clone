@@ -132,7 +132,7 @@ const chartOption = computed(() => {
         name: '不良數',
         type: 'bar',
         data: defectQty,
-        itemStyle: { color: '#6366f1', borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: 'rgb(99, 102, 241)', borderRadius: [3, 3, 0, 0] },
         barMaxWidth: 40,
       },
       {
@@ -142,8 +142,8 @@ const chartOption = computed(() => {
         data: defectRate,
         symbol: 'circle',
         symbolSize: 6,
-        lineStyle: { color: '#f59e0b', width: 2 },
-        itemStyle: { color: '#f59e0b' },
+        lineStyle: { color: 'rgb(245, 158, 11)', width: 2 },
+        itemStyle: { color: 'rgb(245, 158, 11)' },
       },
       {
         name: '累計占比',
@@ -152,13 +152,13 @@ const chartOption = computed(() => {
         data: cumulativePct,
         symbol: 'diamond',
         symbolSize: 6,
-        lineStyle: { color: '#ef4444', width: 2, type: 'dashed' },
-        itemStyle: { color: '#ef4444' },
+        lineStyle: { color: 'rgb(239, 68, 68)', width: 2, type: 'dashed' },
+        itemStyle: { color: 'rgb(239, 68, 68)' },
         markLine: {
           silent: true,
           symbol: 'none',
-          label: { show: true, position: 'insideEndTop', formatter: '80%', fontSize: 10, color: '#94a3b8' },
-          lineStyle: { color: '#94a3b8', type: 'dotted', width: 1 },
+          label: { show: true, position: 'insideEndTop', formatter: '80%', fontSize: 10, color: 'rgb(148, 163, 184)' },
+          lineStyle: { color: 'rgb(148, 163, 184)', type: 'dotted', width: 1 },
           data: [{ yAxis: 80 }],
         },
       },
@@ -202,16 +202,16 @@ function handleChartClick(params) {
 <style scoped>
 .sort-toggle {
   font-size: 11px;
-  padding: 1px 6px;
-  border: 1px solid var(--border-color, #d1d5db);
+  padding: theme('spacing.token.p1') theme('spacing.token.p6');
+  border: 1px solid var(--border-color, theme('colors.token.hd1d5db'));
   border-radius: 4px;
-  background: var(--bg-secondary, #f9fafb);
-  color: var(--text-secondary, #6b7280);
+  background: var(--bg-secondary, theme('colors.token.hf9fafb'));
+  color: var(--text-secondary, theme('colors.token.h6b7280'));
   cursor: pointer;
-  margin-left: 6px;
+  margin-left: theme('spacing.token.p6');
   white-space: nowrap;
 }
 .sort-toggle:hover {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary, theme('colors.token.hf3f4f6'));
 }
 </style>

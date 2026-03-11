@@ -252,6 +252,6 @@ const subTabs = Object.keys(tabMeta);
 }
 
 .error-banner--mt8 {
-  margin-top: 8px;
+  margin-top: theme('spacing.token.p8');
 }
 </style>

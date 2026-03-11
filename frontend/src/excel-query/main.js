@@ -518,7 +518,7 @@ window.__FIELD_CONTRACTS__['excel_query:result_table'] = getPageContract('excel_
             `;
 
             if (data.data.length === 0) {
-                tableDiv.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">查無資料</div>';
+                tableDiv.innerHTML = '<div style="padding: var(--spacing-token-p40); text-align: center; color: var(--color-token-h999999);">查無資料</div>';
             } else {
                 let html = '<table><thead><tr>';
                 data.columns.forEach(col => {
@@ -531,7 +531,7 @@ window.__FIELD_CONTRACTS__['excel_query:result_table'] = getPageContract('excel_
                     html += '<tr>';
                     data.columns.forEach(col => {
                         if (row[col] === null || row[col] === undefined) {
-                            html += '<td><i style="color:#999">NULL</i></td>';
+                            html += '<td><i style="color:var(--color-token-h999999)">NULL</i></td>';
                         } else {
                             html += `<td>${escapeHtml(safeText(row[col]))}</td>`;
                         }
@@ -541,7 +541,7 @@ window.__FIELD_CONTRACTS__['excel_query:result_table'] = getPageContract('excel_
                 html += '</tbody></table>';
 
                 if (data.data.length > 1000) {
-                    html += `<div style="padding: 15px; text-align: center; color: #666; background: #f8f9fa;">
+                    html += `<div style="padding: var(--spacing-token-p15); text-align: center; color: var(--color-token-h666666); background: var(--color-token-hf8f9fa);">
                         顯示前 1000 筆，完整資料請匯出 CSV
                     </div>`;
                 }

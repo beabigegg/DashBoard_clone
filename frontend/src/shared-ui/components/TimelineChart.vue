@@ -217,7 +217,7 @@ const timelineTicks = computed(() => {
 });
 
 const colorFallback = Object.freeze({
-  default: '#94a3b8',
+  default: 'var(--color-token-h94a3b8)',
 });
 
 function resolveColor(type) {
@@ -419,25 +419,25 @@ function eventPath(type, x, y) {
             :viewBox="`0 0 ${chartWidth} ${svgHeight}`"
             class="block"
           >
-            <rect x="0" y="0" :width="chartWidth" :height="svgHeight" fill="#ffffff" />
+            <rect x="0" y="0" :width="chartWidth" :height="svgHeight" fill="var(--color-token-hffffff)" />
 
             <!-- Time axis -->
             <g>
-              <line x1="0" :x2="chartWidth" :y1="AXIS_HEIGHT - 1" :y2="AXIS_HEIGHT - 1" stroke="#cbd5e1" stroke-width="1" />
+              <line x1="0" :x2="chartWidth" :y1="AXIS_HEIGHT - 1" :y2="AXIS_HEIGHT - 1" stroke="var(--color-token-hcbd5e1)" stroke-width="1" />
               <g v-for="tick in timelineTicks" :key="tick.timeMs">
                 <line
                   :x1="xByTimestamp(tick.timeMs)"
                   :x2="xByTimestamp(tick.timeMs)"
                   y1="0"
                   :y2="svgHeight"
-                  stroke="#e2e8f0"
+                  stroke="var(--color-token-he2e8f0)"
                   stroke-width="1"
                   stroke-dasharray="2 3"
                 />
                 <text
                   :x="xByTimestamp(tick.timeMs) + 3"
                   y="13"
-                  fill="#475569"
+                  fill="var(--color-token-h475569)"
                   font-size="10"
                   font-family="ui-monospace, monospace"
                 >
@@ -453,7 +453,7 @@ function eventPath(type, x, y) {
                 :y="rowTopByIndex(trackIndex)"
                 :width="chartWidth"
                 :height="trackRowHeight"
-                :fill="trackIndex % 2 === 0 ? '#f8fafc' : '#f1f5f9'"
+                :fill="trackIndex % 2 === 0 ? 'var(--color-token-hf8fafc)' : 'var(--color-token-hf1f5f9)'"
                 opacity="0.45"
               />
 
@@ -484,7 +484,7 @@ function eventPath(type, x, y) {
                   v-if="normalizeEvent(eventItem) && normalizeText(eventItem.trackId) === normalizeText(track.id)"
                   :d="eventPath(eventItem.shape || eventItem.type, xByTimestamp(normalizeEvent(eventItem).timeMs), rowTopByIndex(trackIndex) + (trackRowHeight / 2))"
                   :fill="eventItem.color || resolveColor(eventItem.type)"
-                  stroke="#0f172a"
+                  stroke="var(--color-token-h0f172a)"
                   stroke-width="0.5"
                   class="cursor-pointer"
                   @mousemove="handleEventHover($event, eventItem, track.label)"

@@ -132,6 +132,6 @@ const columns = Object.freeze([
   text-align: center;
 }
 .td-detail-body {
-  padding: 8px 10px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
 }
 </style>

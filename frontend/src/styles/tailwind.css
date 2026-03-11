@@ -12,19 +12,72 @@
   :root {
     --portal-shell-max-width: none;
     --portal-shell-gap: 12px;
-    --portal-shell-bg: #f5f7fa;
+    --portal-shell-bg: theme('colors.token.hf5f7fa');
     --portal-sidebar-width: 240px;
     --shell-header-height: 56px;
-    --portal-panel-bg: #ffffff;
-    --portal-text-primary: #1f2937;
-    --portal-text-secondary: #64748b;
-    --portal-brand-start: #667eea;
-    --portal-brand-end: #764ba2;
+    --portal-panel-bg: theme('colors.token.hffffff');
+    --portal-text-primary: theme('colors.token.h1f2937');
+    --portal-text-secondary: theme('colors.token.h64748b');
+    --portal-brand-start: theme('colors.token.h667eea');
+    --portal-brand-end: theme('colors.token.h764ba2');
     --portal-radius-shell: 10px;
     --portal-radius-card: 8px;
     --portal-shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
     --portal-shadow-panel: 0 2px 10px rgba(0, 0, 0, 0.08);
     --portal-z-overlay: 1000;
+    --spacing-token-p1: theme('spacing.token.p1');
+    --spacing-token-p2: theme('spacing.token.p2');
+    --spacing-token-p3: theme('spacing.token.p3');
+    --spacing-token-p4: theme('spacing.token.p4');
+    --spacing-token-p5: theme('spacing.token.p5');
+    --spacing-token-p6: theme('spacing.token.p6');
+    --spacing-token-p7: theme('spacing.token.p7');
+    --spacing-token-p8: theme('spacing.token.p8');
+    --spacing-token-p9: theme('spacing.token.p9');
+    --spacing-token-p10: theme('spacing.token.p10');
+    --spacing-token-p12: theme('spacing.token.p12');
+    --spacing-token-p14: theme('spacing.token.p14');
+    --spacing-token-p15: theme('spacing.token.p15');
+    --spacing-token-p16: theme('spacing.token.p16');
+    --spacing-token-p18: theme('spacing.token.p18');
+    --spacing-token-p20: theme('spacing.token.p20');
+    --spacing-token-p22: theme('spacing.token.p22');
+    --spacing-token-p24: theme('spacing.token.p24');
+    --spacing-token-p26: theme('spacing.token.p26');
+    --spacing-token-p28: theme('spacing.token.p28');
+    --spacing-token-p32: theme('spacing.token.p32');
+    --spacing-token-p36: theme('spacing.token.p36');
+    --spacing-token-p40: theme('spacing.token.p40');
+    --spacing-token-p48: theme('spacing.token.p48');
+    --spacing-token-p50: theme('spacing.token.p50');
+    --spacing-token-p80: theme('spacing.token.p80');
+    --color-token-h0ea5e9: theme('colors.token.h0ea5e9');
+    --color-token-h0f172a: theme('colors.token.h0f172a');
+    --color-token-h10b981: theme('colors.token.h10b981');
+    --color-token-h16a34a: theme('colors.token.h16a34a');
+    --color-token-h22c55e: theme('colors.token.h22c55e');
+    --color-token-h2563eb: theme('colors.token.h2563eb');
+    --color-token-h3b82f6: theme('colors.token.h3b82f6');
+    --color-token-h475569: theme('colors.token.h475569');
+    --color-token-h6366f1: theme('colors.token.h6366f1');
+    --color-token-h64748b: theme('colors.token.h64748b');
+    --color-token-h666666: theme('colors.token.h666666');
+    --color-token-h8b5cf6: theme('colors.token.h8b5cf6');
+    --color-token-h9333ea: theme('colors.token.h9333ea');
+    --color-token-h94a3b8: theme('colors.token.h94a3b8');
+    --color-token-h999999: theme('colors.token.h999999');
+    --color-token-h9ca3af: theme('colors.token.h9ca3af');
+    --color-token-hcbd5e1: theme('colors.token.hcbd5e1');
+    --color-token-hdc2626: theme('colors.token.hdc2626');
+    --color-token-he2e8f0: theme('colors.token.he2e8f0');
+    --color-token-hea580c: theme('colors.token.hea580c');
+    --color-token-hef4444: theme('colors.token.hef4444');
+    --color-token-hf1f5f9: theme('colors.token.hf1f5f9');
+    --color-token-hf59e0b: theme('colors.token.hf59e0b');
+    --color-token-hf8f9fa: theme('colors.token.hf8f9fa');
+    --color-token-hf8fafc: theme('colors.token.hf8fafc');
+    --color-token-hf97316: theme('colors.token.hf97316');
+    --color-token-hffffff: theme('colors.token.hffffff');
   }
 
   body {
@@ -65,66 +118,66 @@
   /* Canonical definitions — route-local duplicates can be removed progressively */
   .error-banner,
   .ui-error-banner {
-    padding: 10px 14px;
-    border: 1px solid #fecaca;
+    padding: theme('spacing.token.p10') theme('spacing.token.p14');
+    border: 1px solid theme('colors.token.hfecaca');
     border-radius: 8px;
-    background: #fef2f2;
-    color: #991b1b;
+    background: theme('colors.token.hfef2f2');
+    color: theme('colors.token.h991b1b');
     font-size: 13px;
-    margin-bottom: 14px;
+    margin-bottom: theme('spacing.token.p14');
   }
 
   .warning-banner,
   .ui-warning-banner {
-    padding: 10px 14px;
-    border: 1px solid #fde68a;
+    padding: theme('spacing.token.p10') theme('spacing.token.p14');
+    border: 1px solid theme('colors.token.hfde68a');
     border-radius: 8px;
-    background: #fffbeb;
-    color: #b45309;
+    background: theme('colors.token.hfffbeb');
+    color: theme('colors.token.hb45309');
     font-size: 13px;
-    margin-bottom: 14px;
+    margin-bottom: theme('spacing.token.p14');
   }
 
   /* === Shared Card (repeated ≥3 routes) === */
   .ui-card {
-    background: #ffffff;
+    background: theme('colors.token.hffffff');
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
     overflow: hidden;
-    margin-bottom: 14px;
+    margin-bottom: theme('spacing.token.p14');
   }
 
   .ui-card-header {
-    padding: 14px 18px;
-    border-bottom: 1px solid #e2e8f0;
-    background: #f8fafc;
+    padding: theme('spacing.token.p14') theme('spacing.token.p18');
+    border-bottom: 1px solid theme('colors.token.he2e8f0');
+    background: theme('colors.token.hf8fafc');
     border-radius: 10px 10px 0 0;
   }
 
   .ui-card-title {
     font-size: 15px;
     font-weight: 700;
-    color: #0f172a;
+    color: theme('colors.token.h0f172a');
   }
 
   .ui-card-body {
-    padding: 14px 16px;
+    padding: theme('spacing.token.p14') theme('spacing.token.p16');
   }
 
   /* === Shared Section Card (repeated ≥3 routes) === */
   .ui-section-card {
-    background: #ffffff;
+    background: theme('colors.token.hffffff');
     border-radius: 10px;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-    margin-bottom: 16px;
+    margin-bottom: theme('spacing.token.p16');
   }
 
   .ui-section-inner {
-    padding: 14px 16px;
+    padding: theme('spacing.token.p14') theme('spacing.token.p16');
   }
 
   .ui-section-title {
-    margin: 0 0 12px;
+    margin: 0 0 theme('spacing.token.p12');
     font-size: 16px;
     font-weight: 700;
   }
@@ -136,7 +189,7 @@
     justify-content: center;
     border: none;
     border-radius: 8px;
-    padding: 8px 20px;
+    padding: theme('spacing.token.p8') theme('spacing.token.p20');
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -145,7 +198,7 @@
 
   .ui-btn-primary {
     background: theme('colors.brand.500');
-    color: #ffffff;
+    color: theme('colors.token.hffffff');
   }
 
   .ui-btn-primary:hover:not(:disabled) {
@@ -159,7 +212,7 @@
 
   .ui-btn-ghost {
     background: theme('colors.surface.hover');
-    color: #334155;
+    color: theme('colors.token.h334155');
     border: 1px solid theme('colors.stroke.soft');
   }
 
@@ -168,7 +221,7 @@
   }
 
   .ui-btn-sm {
-    padding: 4px 10px;
+    padding: theme('spacing.token.p4') theme('spacing.token.p10');
     border: 1px solid theme('colors.stroke.soft');
     border-radius: 6px;
     background: theme('colors.surface.muted');
@@ -188,16 +241,16 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 12px;
-    padding: 16px 20px;
+    padding: theme('spacing.token.p16') theme('spacing.token.p20');
     border-radius: 12px;
-    margin-bottom: 16px;
+    margin-bottom: theme('spacing.token.p16');
     background: linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%);
     box-shadow: theme('boxShadow.shell');
   }
 
   .ui-page-header h1 {
     margin: 0;
-    color: #ffffff;
+    color: theme('colors.token.hffffff');
     font-size: 24px;
     letter-spacing: 0.2px;
   }

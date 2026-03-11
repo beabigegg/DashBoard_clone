@@ -62,7 +62,7 @@ function buildLeafItem(item, activeFilter) {
     qty,
     avgAge,
     itemStyle: {
-      borderColor: isActive ? '#111827' : '#ffffff',
+      borderColor: isActive ? 'rgb(17, 24, 39)' : 'rgb(255, 255, 255)',
       borderWidth: isActive ? 3 : 1,
       opacity: isInactive ? 0.72 : 1,
     },
@@ -121,10 +121,10 @@ const chartOption = computed(() => ({
     show: false,
     dimension: 1,
     pieces: [
-      { lt: 1, color: '#22c55e' },
-      { gte: 1, lt: 3, color: '#eab308' },
-      { gte: 3, lt: 7, color: '#f97316' },
-      { gte: 7, color: '#ef4444' },
+      { lt: 1, color: 'rgb(34, 197, 94)' },
+      { gte: 1, lt: 3, color: 'rgb(234, 179, 8)' },
+      { gte: 3, lt: 7, color: 'rgb(249, 115, 22)' },
+      { gte: 7, color: 'rgb(239, 68, 68)' },
     ],
   },
   series: [
@@ -139,7 +139,7 @@ const chartOption = computed(() => ({
       upperLabel: {
         show: true,
         height: 24,
-        color: '#0f172a',
+        color: 'rgb(15, 23, 42)',
         fontWeight: 600,
       },
       label: {
@@ -150,14 +150,14 @@ const chartOption = computed(() => ({
         },
       },
       itemStyle: {
-        borderColor: '#ffffff',
+        borderColor: 'rgb(255, 255, 255)',
         borderWidth: 1,
         gapWidth: 2,
       },
       levels: [
         {
           itemStyle: {
-            borderColor: '#d1d5db',
+            borderColor: 'rgb(209, 213, 219)',
             borderWidth: 1,
             gapWidth: 2,
           },
@@ -167,7 +167,7 @@ const chartOption = computed(() => ({
         },
         {
           itemStyle: {
-            borderColor: '#ffffff',
+            borderColor: 'rgb(255, 255, 255)',
             borderWidth: 1,
             gapWidth: 1,
           },
@@ -225,8 +225,8 @@ function handleChartClick(params) {
 </template>
 
 <style scoped>
-.legend-green { --legend-color: #22c55e; }
-.legend-yellow { --legend-color: #eab308; }
-.legend-orange { --legend-color: #f97316; }
-.legend-red { --legend-color: #ef4444; }
+.legend-green { --legend-color: theme('colors.token.h22c55e'); }
+.legend-yellow { --legend-color: theme('colors.token.heab308'); }
+.legend-orange { --legend-color: theme('colors.token.hf97316'); }
+.legend-red { --legend-color: theme('colors.token.hef4444'); }
 </style>

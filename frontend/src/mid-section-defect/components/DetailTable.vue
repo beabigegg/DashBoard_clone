@@ -193,17 +193,17 @@ function getSuspectHits(row) {
 <style scoped>
 .suspect-cell {
   font-size: 12px;
-  color: var(--text-primary, #374151);
+  color: var(--text-primary, theme('colors.token.h374151'));
 }
 .hit-ratio {
-  color: var(--text-tertiary, #9ca3af);
-  margin-left: 4px;
+  color: var(--text-tertiary, theme('colors.token.h9ca3af'));
+  margin-left: theme('spacing.token.p4');
 }
 .hit-full {
-  color: #059669;
+  color: theme('colors.emerald.600');
   font-weight: 600;
 }
 .no-hit {
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary, theme('colors.token.h9ca3af'));
 }
 </style>

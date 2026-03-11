@@ -115,8 +115,8 @@ function formatNumber(v) {
   top: 0;
   right: -320px;
   width: 300px;
-  background: var(--bg-primary, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-primary, theme('colors.token.hffffff'));
+  border: 1px solid var(--border-color, theme('colors.token.he5e7eb'));
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   z-index: 100;
@@ -126,8 +126,8 @@ function formatNumber(v) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  padding: theme('spacing.token.p10') theme('spacing.token.p14');
+  border-bottom: 1px solid var(--border-color, theme('colors.token.he5e7eb'));
 }
 .panel-title {
   margin: 0;
@@ -139,34 +139,34 @@ function formatNumber(v) {
   border: none;
   font-size: 18px;
   cursor: pointer;
-  color: var(--text-tertiary, #9ca3af);
-  padding: 0 4px;
+  color: var(--text-tertiary, theme('colors.token.h9ca3af'));
+  padding: 0 theme('spacing.token.p4');
   line-height: 1;
 }
 .panel-section {
-  padding: 10px 14px;
+  padding: theme('spacing.token.p10') theme('spacing.token.p14');
 }
 .panel-section + .panel-section {
-  border-top: 1px solid var(--border-color, #f3f4f6);
+  border-top: 1px solid var(--border-color, theme('colors.token.hf3f4f6'));
 }
 .section-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary, theme('colors.token.h6b7280'));
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin: 0 0 8px;
+  margin: 0 0 theme('spacing.token.p8');
 }
 .attr-table {
   width: 100%;
   border-collapse: collapse;
 }
 .attr-table td {
-  padding: 3px 0;
+  padding: theme('spacing.token.p3') 0;
   line-height: 1.4;
 }
 .attr-key {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary, theme('colors.token.h6b7280'));
   width: 90px;
   white-space: nowrap;
 }
@@ -178,37 +178,37 @@ function formatNumber(v) {
 .jobs-table th {
   text-align: left;
   font-weight: 600;
-  color: var(--text-secondary, #6b7280);
-  padding: 4px 6px 4px 0;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-secondary, theme('colors.token.h6b7280'));
+  padding: theme('spacing.token.p4') theme('spacing.token.p6') theme('spacing.token.p4') 0;
+  border-bottom: 1px solid var(--border-color, theme('colors.token.he5e7eb'));
   font-size: 11px;
 }
 .jobs-table td {
-  padding: 4px 6px 4px 0;
-  border-bottom: 1px solid var(--border-color, #f3f4f6);
+  padding: theme('spacing.token.p4') theme('spacing.token.p6') theme('spacing.token.p4') 0;
+  border-bottom: 1px solid var(--border-color, theme('colors.token.hf3f4f6'));
 }
 .job-interval {
   font-size: 11px;
   line-height: 1.5;
 }
 .interval-sep {
-  margin: 0 2px;
-  color: var(--text-tertiary, #9ca3af);
+  margin: 0 theme('spacing.token.p2');
+  color: var(--text-tertiary, theme('colors.token.h9ca3af'));
 }
 .interval-ongoing {
-  color: #f59e0b;
+  color: theme('colors.state.warning');
   font-size: 10px;
   font-weight: 500;
 }
 .jobs-loading,
 .jobs-empty {
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary, theme('colors.token.h9ca3af'));
   font-size: 12px;
-  padding: 4px 0;
+  padding: theme('spacing.token.p4') 0;
 }
 .jobs-error {
-  color: #ef4444;
+  color: theme('colors.state.danger');
   font-size: 12px;
-  padding: 4px 0;
+  padding: theme('spacing.token.p4') 0;
 }
 </style>

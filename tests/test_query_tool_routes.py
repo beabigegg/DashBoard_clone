@@ -130,7 +130,7 @@ class TestResolveEndpoint:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '萬用字元條件過於寬鬆' in data['error']
+        assert '萬用字元條件過於寬鬆' in data['error']['message']
 
     @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
     def test_resolve_success(self, mock_resolve, client):
@@ -159,8 +159,8 @@ class TestResolveEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert data['total'] == 1
-        assert data['data'][0]['lot_id'] == 'GA23100020-A00-001'
+        assert data['data']['total'] == 1
+        assert data['data']['data'][0]['lot_id'] == 'GA23100020-A00-001'
 
     @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
     def test_resolve_supports_gd_lot_id(self, mock_resolve, client):
@@ -187,8 +187,8 @@ class TestResolveEndpoint:
 
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['total'] == 1
-        assert payload['data'][0]['lot_id'] == 'GD25060502-A11'
+        assert payload['data']['total'] == 1
+        assert payload['data']['data'][0]['lot_id'] == 'GD25060502-A11'
 
     @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
     def test_resolve_not_found(self, mock_resolve, client):
@@ -209,8 +209,8 @@ class TestResolveEndpoint:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['total'] == 0
-        assert 'INVALID-LOT-ID' in data['not_found']
+        assert data['data']['total'] == 0
+        assert 'INVALID-LOT-ID' in data['data']['not_found']
 
     @patch('mes_dashboard.routes.query_tool_routes.resolve_lots')
     @patch('mes_dashboard.routes.query_tool_routes.cache_get')
@@ -229,7 +229,7 @@ class TestResolveEndpoint:
 
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['total'] == 1
+        assert payload['data']['total'] == 1
         mock_resolve.assert_not_called()
 
     @patch('mes_dashboard.routes.query_tool_routes.cache_set')
@@ -291,7 +291,7 @@ class TestLotHistoryEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert data['total'] == 1
+        assert data['data']['total'] == 1
 
     @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
     def test_lot_history_service_error(self, mock_query, client):
@@ -325,9 +325,9 @@ class TestLotHistoryEndpoint:
 
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['pagination']['page'] == 2
-        assert payload['pagination']['per_page'] == 5
-        assert payload['quality_meta']['status'] == 'truncated'
+        assert payload['data']['pagination']['page'] == 2
+        assert payload['data']['pagination']['per_page'] == 5
+        assert payload['data']['quality_meta']['status'] == 'truncated'
         mock_batch.assert_called_once()
         kwargs = mock_batch.call_args.kwargs
         assert kwargs['page'] == 2
@@ -398,7 +398,7 @@ class TestAdjacentLotsEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert data['total'] == 3
+        assert data['data']['total'] == 3
         # Verify service was called without spec_name
         mock_query.assert_called_once()
         call_args = mock_query.call_args
@@ -431,7 +431,7 @@ class TestLotAssociationsEndpoint:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '不支援' in data['error'] or 'type' in data['error'].lower()
+        assert '不支援' in data['error']['message'] or 'type' in data['error']['message'].lower()
 
     @patch('mes_dashboard.routes.query_tool_routes.get_lot_materials')
     def test_lot_materials_success(self, mock_query, client):
@@ -453,7 +453,7 @@ class TestLotAssociationsEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert data['total'] == 1
+        assert data['data']['total'] == 1
 
     @patch('mes_dashboard.routes.query_tool_routes.get_lot_splits')
     def test_lot_splits_default_fast_mode(self, mock_query, client):
@@ -504,8 +504,8 @@ class TestLotAssociationsEndpoint:
 
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['pagination']['total_pages'] == 2
-        assert payload['quality_meta']['status'] == 'complete'
+        assert payload['data']['pagination']['total_pages'] == 2
+        assert payload['data']['quality_meta']['status'] == 'complete'
         mock_batch.assert_called_once()
         kwargs = mock_batch.call_args.kwargs
         assert kwargs['page'] == 1
@@ -658,7 +658,7 @@ class TestEquipmentPeriodEndpoint:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '查詢類型' in data['error'] or 'type' in data['error'].lower()
+        assert '查詢類型' in data['error']['message'] or 'type' in data['error']['message'].lower()
 
     def test_empty_equipment_ids(self, client):
         """Should return error for empty equipment_ids."""
@@ -717,7 +717,7 @@ class TestEquipmentPeriodEndpoint:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '結束日期' in data['error'] or '早於' in data['error']
+        assert '結束日期' in data['error']['message'] or '早於' in data['error']['message']
 
     def test_date_range_exceeds_limit(self, client):
         """Should reject date range greater than service max days."""
@@ -733,7 +733,7 @@ class TestEquipmentPeriodEndpoint:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert str(MAX_DATE_RANGE_DAYS) in data['error']
+        assert str(MAX_DATE_RANGE_DAYS) in data['error']['message']
 
     def test_invalid_query_type(self, client):
         """Should reject invalid query_type."""
@@ -749,7 +749,7 @@ class TestEquipmentPeriodEndpoint:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '查詢類型' in data['error'] or 'type' in data['error'].lower()
+        assert '查詢類型' in data['error']['message'] or 'type' in data['error']['message'].lower()
 
     @patch('mes_dashboard.routes.query_tool_routes.get_equipment_status_hours')
     def test_equipment_status_hours_success(self, mock_status, client):
@@ -791,8 +791,8 @@ class TestEquipmentPeriodEndpoint:
 
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['pagination']['page'] == 2
-        assert payload['pagination']['per_page'] == 1
+        assert payload['data']['pagination']['page'] == 2
+        assert payload['data']['pagination']['per_page'] == 1
         mock_lots.assert_called_once()
         kwargs = mock_lots.call_args.kwargs
         assert kwargs['page'] == 2
@@ -850,7 +850,7 @@ class TestExportCsvEndpoint:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '不支援' in data['error'] or 'type' in data['error'].lower()
+        assert '不支援' in data['error']['message'] or 'type' in data['error']['message'].lower()
 
     @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
     def test_export_lot_history_success(self, mock_get_history, client):
@@ -1096,7 +1096,7 @@ class TestExportCsvBatchEndpoint:
 
         assert response.status_code == 400
         data = response.get_json()
-        assert 'CONTAINERID' in data.get('error', '')
+        assert 'CONTAINERID' in data.get('error', {}).get('message', '')
 
     @patch('mes_dashboard.routes.query_tool_routes.get_lot_jobs_with_history')
     def test_export_lot_jobs_calls_with_history(self, mock_jobs_hist, client):
@@ -1157,8 +1157,8 @@ class TestEquipmentListEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert 'total' in data
-        assert data['total'] == 2
+        assert 'data' in data['data']
+        assert data['data']['total'] == 2
 
     @patch('mes_dashboard.services.resource_cache.get_all_resources')
     def test_get_equipment_list_empty(self, mock_get_resources, client):
@@ -1197,8 +1197,8 @@ class TestWorkcenterGroupsEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'data' in data
-        assert len(data['data']) == 2
-        assert data['total'] == 2
+        assert len(data['data']['data']) == 2
+        assert data['data']['total'] == 2
 
     @patch('mes_dashboard.services.filter_cache.get_workcenter_groups')
     def test_handles_cache_failure(self, mock_get_groups, client):
@@ -1248,9 +1248,9 @@ class TestEquipmentRecentJobsEndpoint:
 
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert len(data['data']) == 1
-        assert data['data'][0]['JOBID'] == 'JOB-001'
-        assert data['total'] == 1
+        assert len(data['data']['data']) == 1
+        assert data['data']['data'][0]['JOBID'] == 'JOB-001'
+        assert data['data']['total'] == 1
 
     @patch('mes_dashboard.core.database.read_sql_df')
     @patch('mes_dashboard.sql.SQLLoader.load', return_value='SELECT 1')
@@ -1263,8 +1263,8 @@ class TestEquipmentRecentJobsEndpoint:
 
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['data'] == []
-        assert data['total'] == 0
+        assert data['data']['data'] == []
+        assert data['data']['total'] == 0
 
     @patch('mes_dashboard.core.database.read_sql_df')
     @patch('mes_dashboard.sql.SQLLoader.load', return_value='SELECT 1')
@@ -1336,4 +1336,4 @@ class TestLotHistoryWithWorkcenterFilter:
 
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data.get('filtered_by_groups') == ['DB']
+        assert data['data'].get('filtered_by_groups') == ['DB']

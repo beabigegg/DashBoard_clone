@@ -8,9 +8,19 @@ import os
 from datetime import date, timedelta
 from typing import Optional
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, request
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
+from mes_dashboard.core.response import (
+    success_response,
+    validation_error,
+    not_found_error,
+    internal_error,
+    cache_expired_error,
+    cache_miss_error,
+    error_response,
+    VALIDATION_ERROR,
+)
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.core.utils import parse_bool_query
@@ -216,11 +226,11 @@ def _parse_multi_pareto_selections() -> dict[str, list[str]]:
 def api_reject_history_options():
     start_date, end_date, date_error = _parse_date_range(required=False)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return validation_error(date_error[0].get("error", "日期格式錯誤"))
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
-        return jsonify(bool_error[0]), bool_error[1]
+        return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
     workcenter_groups = _parse_multi_param("workcenter_groups") or None
     packages = _parse_multi_param("packages") or None
@@ -247,7 +257,7 @@ def api_reject_history_options():
     cache_key = make_cache_key("reject_history_options_v2", filters=cache_filters)
     cached_payload = cache_get(cache_key)
     if cached_payload is not None:
-        return jsonify(cached_payload)
+        return success_response(cached_payload.get("data", cached_payload), meta=cached_payload.get("meta"))
 
     try:
         result = get_filter_options(
@@ -273,22 +283,22 @@ def api_reject_history_options():
             payload,
             ttl=max(_REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS, 1),
         )
-        return jsonify(payload)
+        return success_response(data, meta=meta)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
-        return jsonify({"success": False, "error": "查詢篩選選項失敗"}), 500
+        return internal_error("查詢篩選選項失敗")
 
 
 @reject_history_bp.route("/api/reject-history/summary", methods=["GET"])
 def api_reject_history_summary():
     start_date, end_date, date_error = _parse_date_range(required=True)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return validation_error(date_error[0].get("error", "日期格式錯誤"))
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
-        return jsonify(bool_error[0]), bool_error[1]
+        return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
     try:
         result = query_summary(
@@ -308,22 +318,22 @@ def api_reject_history_summary():
             exclude_material_scrap,
             exclude_pb_diode,
         )
-        return jsonify({"success": True, "data": data, "meta": meta})
+        return success_response(data, meta=meta)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
-        return jsonify({"success": False, "error": "查詢摘要資料失敗"}), 500
+        return internal_error("查詢摘要資料失敗")
 
 
 @reject_history_bp.route("/api/reject-history/trend", methods=["GET"])
 def api_reject_history_trend():
     start_date, end_date, date_error = _parse_date_range(required=True)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return validation_error(date_error[0].get("error", "日期格式錯誤"))
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
-        return jsonify(bool_error[0]), bool_error[1]
+        return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
     granularity = request.args.get("granularity", "day").strip().lower() or "day"
     try:
@@ -345,22 +355,22 @@ def api_reject_history_trend():
             exclude_material_scrap,
             exclude_pb_diode,
         )
-        return jsonify({"success": True, "data": data, "meta": meta})
+        return success_response(data, meta=meta)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
-        return jsonify({"success": False, "error": "查詢趨勢資料失敗"}), 500
+        return internal_error("查詢趨勢資料失敗")
 
 
 @reject_history_bp.route("/api/reject-history/reason-pareto", methods=["GET"])
 def api_reject_history_reason_pareto():
     start_date, end_date, date_error = _parse_date_range(required=True)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return validation_error(date_error[0].get("error", "日期格式錯誤"))
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
-        return jsonify(bool_error[0]), bool_error[1]
+        return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
     metric_mode = request.args.get("metric_mode", "reject_total").strip().lower() or "reject_total"
     pareto_scope = _REJECT_PARETO_SCOPE_FIXED
@@ -385,7 +395,7 @@ def api_reject_history_reason_pareto():
             )
             if result is not None:
                 pareto_meta = result.pop("_pareto_meta", None) or {}
-                return jsonify({"success": True, "data": result, "meta": pareto_meta})
+                return success_response(result, meta=pareto_meta)
             # Cache expired, fall through to Oracle query
 
         result = query_dimension_pareto(
@@ -408,14 +418,14 @@ def api_reject_history_reason_pareto():
             exclude_material_scrap,
             exclude_pb_diode,
         )
-        return jsonify({"success": True, "data": data, "meta": meta})
+        return success_response(data, meta=meta)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except MemoryError as exc:
         logger.warning("Reject history reason-pareto memory guard: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
-        return jsonify({"success": False, "error": "查詢柏拉圖資料失敗"}), 500
+        return internal_error("查詢柏拉圖資料失敗")
 
 
 @reject_history_bp.route("/api/reject-history/batch-pareto", methods=["GET"])
@@ -423,11 +433,11 @@ def api_reject_history_batch_pareto():
     """Batch pareto view: compute all dimensions from cache only."""
     query_id = request.args.get("query_id", "").strip()
     if not query_id:
-        return jsonify({"success": False, "error": "缺少必要參數: query_id"}), 400
+        return validation_error("缺少必要參數: query_id")
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
-        return jsonify(bool_error[0]), bool_error[1]
+        return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
     metric_mode = request.args.get("metric_mode", "reject_total").strip().lower() or "reject_total"
     pareto_scope = _REJECT_PARETO_SCOPE_FIXED
@@ -449,19 +459,16 @@ def api_reject_history_batch_pareto():
             exclude_pb_diode=exclude_pb_diode,
         )
         if result is None:
-            return jsonify({"success": False, "error": "cache_miss"}), 400
+            return cache_miss_error()
         pareto_meta = result.pop("_pareto_meta", None)
-        resp: dict = {"success": True, "data": result}
-        if pareto_meta:
-            resp["meta"] = pareto_meta
-        return jsonify(resp)
+        return success_response(result, meta=pareto_meta)
     except MemoryError as exc:
         logger.warning("Reject history batch-pareto memory guard: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
-        return jsonify({"success": False, "error": "查詢批次柏拉圖失敗"}), 500
+        return internal_error("查詢批次柏拉圖失敗")
 
 
 @reject_history_bp.route("/api/reject-history/list", methods=["GET"])
@@ -469,11 +476,11 @@ def api_reject_history_batch_pareto():
 def api_reject_history_list():
     start_date, end_date, date_error = _parse_date_range(required=True)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return validation_error(date_error[0].get("error", "日期格式錯誤"))
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
-        return jsonify(bool_error[0]), bool_error[1]
+        return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
     page = request.args.get("page", 1, type=int) or 1
     per_page = request.args.get("per_page", 50, type=int) or 50
@@ -500,11 +507,11 @@ def api_reject_history_list():
             exclude_material_scrap,
             exclude_pb_diode,
         )
-        return jsonify({"success": True, "data": data, "meta": meta})
+        return success_response(data, meta=meta)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
-        return jsonify({"success": False, "error": "查詢明細資料失敗"}), 500
+        return internal_error("查詢明細資料失敗")
 
 
 @reject_history_bp.route("/api/reject-history/export", methods=["GET"])
@@ -512,11 +519,11 @@ def api_reject_history_list():
 def api_reject_history_export():
     start_date, end_date, date_error = _parse_date_range(required=True)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return validation_error(date_error[0].get("error", "日期格式錯誤"))
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
-        return jsonify(bool_error[0]), bool_error[1]
+        return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
     metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
     filename = f"reject_history_{start_date}_to_{end_date}.csv"
@@ -541,20 +548,20 @@ def api_reject_history_export():
             },
         )
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
-        return jsonify({"success": False, "error": "匯出 CSV 失敗"}), 500
+        return internal_error("匯出 CSV 失敗")
 
 
 @reject_history_bp.route("/api/reject-history/analytics", methods=["GET"])
 def api_reject_history_analytics():
     start_date, end_date, date_error = _parse_date_range(required=True)
     if date_error:
-        return jsonify(date_error[0]), date_error[1]
+        return validation_error(date_error[0].get("error", "日期格式錯誤"))
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
-        return jsonify(bool_error[0]), bool_error[1]
+        return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
     metric_mode = request.args.get("metric_mode", "reject_total").strip().lower() or "reject_total"
 
@@ -577,11 +584,11 @@ def api_reject_history_analytics():
             exclude_material_scrap,
             exclude_pb_diode,
         )
-        return jsonify({"success": True, "data": data, "meta": meta})
+        return success_response(data, meta=meta)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
-        return jsonify({"success": False, "error": "查詢分析資料失敗"}), 500
+        return internal_error("查詢分析資料失敗")
 
 
 # ============================================================
@@ -595,11 +602,11 @@ def api_reject_history_query():
     """Primary query: execute Oracle → cache DataFrame → return results."""
     body, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
-        return jsonify({"success": False, "error": payload_error.message}), payload_error.status_code
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     mode = str(body.get("mode", "")).strip()
     if mode not in ("date_range", "container"):
-        return jsonify({"success": False, "error": "mode 必須為 date_range 或 container"}), 400
+        return validation_error("mode 必須為 date_range 或 container")
 
     include_excluded_scrap = bool(body.get("include_excluded_scrap", False))
     exclude_material_scrap = bool(body.get("exclude_material_scrap", True))
@@ -617,36 +624,36 @@ def api_reject_history_query():
             kwargs["start_date"] = str(body.get("start_date", "")).strip()
             kwargs["end_date"] = str(body.get("end_date", "")).strip()
             if not kwargs["start_date"] or not kwargs["end_date"]:
-                return jsonify({"success": False, "error": "date_range mode 需要 start_date 和 end_date"}), 400
+                return validation_error("date_range mode 需要 start_date 和 end_date")
             date_range_error = _validate_primary_query_date_range(
                 kwargs["start_date"],
                 kwargs["end_date"],
             )
             if date_range_error:
-                return jsonify({"success": False, "error": date_range_error}), 400
+                return validation_error(date_range_error)
         else:
             kwargs["container_input_type"] = str(body.get("container_input_type", "lot")).strip()
             container_values = body.get("container_values", [])
             if not isinstance(container_values, list) or not container_values:
-                return jsonify({"success": False, "error": "container mode 需要 container_values 陣列"}), 400
+                return validation_error("container mode 需要 container_values 陣列")
             kwargs["container_values"] = [str(v).strip() for v in container_values if str(v).strip()]
 
         result = execute_primary_query(**kwargs)
-        return jsonify({"success": True, **result})
+        return success_response(result)
 
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except RejectPrimaryQueryOverloadError as exc:
-        response = jsonify(
-            {"success": False, "error": str(exc), "code": exc.code}
+        return error_response(
+            exc.code,
+            str(exc),
+            status_code=503,
+            headers={"Retry-After": str(exc.retry_after)},
         )
-        response.status_code = 503
-        response.headers["Retry-After"] = str(exc.retry_after)
-        return response
     except Exception:
         import traceback
         traceback.print_exc()
-        return jsonify({"success": False, "error": "主查詢執行失敗"}), 500
+        return internal_error("主查詢執行失敗")
 
 
 @reject_history_bp.route("/api/reject-history/view", methods=["GET"])
@@ -654,7 +661,7 @@ def api_reject_history_view():
     """Supplementary view: read cache → filter → return derived data."""
     query_id = request.args.get("query_id", "").strip()
     if not query_id:
-        return jsonify({"success": False, "error": "缺少必要參數: query_id"}), 400
+        return validation_error("缺少必要參數: query_id")
 
     page = request.args.get("page", 1, type=int) or 1
     per_page = request.args.get("per_page", 50, type=int) or 50
@@ -667,7 +674,7 @@ def api_reject_history_view():
     if not pareto_selections:
         pareto_error, pareto_dimension, pareto_values = _parse_pareto_selection()
         if pareto_error:
-            return jsonify(pareto_error[0]), pareto_error[1]
+            return validation_error(pareto_error[0].get("error", "查詢失敗"))
 
     include_excluded_scrap = request.args.get("include_excluded_scrap", "false").lower() == "true"
     exclude_material_scrap = request.args.get("exclude_material_scrap", "true").lower() != "false"
@@ -693,19 +700,19 @@ def api_reject_history_view():
         )
 
         if result is None:
-            return jsonify({"success": False, "error": "cache_expired"}), 410
+            return cache_expired_error()
 
-        return jsonify({"success": True, "data": result})
+        return success_response(result)
 
     except MemoryError as exc:
         logger.warning("Reject history view memory guard: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
         import traceback
         traceback.print_exc()
-        return jsonify({"success": False, "error": "視圖查詢失敗"}), 500
+        return internal_error("視圖查詢失敗")
 
 
 @reject_history_bp.route("/api/reject-history/export-cached", methods=["GET"])
@@ -713,7 +720,7 @@ def api_reject_history_export_cached():
     """Export CSV from cached dataset."""
     query_id = request.args.get("query_id", "").strip()
     if not query_id:
-        return jsonify({"success": False, "error": "缺少必要參數: query_id"}), 400
+        return validation_error("缺少必要參數: query_id")
 
     metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
     reasons = _parse_multi_param("reasons") or None
@@ -724,7 +731,7 @@ def api_reject_history_export_cached():
     if not pareto_selections:
         pareto_error, pareto_dimension, pareto_values = _parse_pareto_selection()
         if pareto_error:
-            return jsonify(pareto_error[0]), pareto_error[1]
+            return validation_error(pareto_error[0].get("error", "查詢失敗"))
 
     include_excluded_scrap = request.args.get("include_excluded_scrap", "false").lower() == "true"
     exclude_material_scrap = request.args.get("exclude_material_scrap", "true").lower() != "false"
@@ -748,7 +755,7 @@ def api_reject_history_export_cached():
         )
 
         if rows is None:
-            return jsonify({"success": False, "error": "cache_expired"}), 410
+            return cache_expired_error()
 
         headers = [
             "LOT", "WORKCENTER", "WORKCENTER_GROUP", "Package", "FUNCTION",
@@ -768,8 +775,8 @@ def api_reject_history_export_cached():
 
     except MemoryError as exc:
         logger.warning("Reject history export-cached memory guard: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
+        return validation_error(str(exc))
     except Exception:
-        return jsonify({"success": False, "error": "匯出 CSV 失敗"}), 500
+        return internal_error("匯出 CSV 失敗")

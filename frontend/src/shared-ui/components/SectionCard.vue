@@ -14,25 +14,25 @@
 
 <style scoped>
 .shared-section-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #fff;
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: theme('borderRadius.shell');
+  background: theme('colors.surface.card');
 }
 
 .shared-section-card-header,
 .shared-section-card-footer {
-  padding: 12px 16px;
+  padding: theme('spacing.block') theme('spacing.4');
 }
 
 .shared-section-card-body {
-  padding: 16px;
+  padding: theme('spacing.4');
 }
 
 .shared-section-card-header {
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid theme('colors.stroke.soft');
 }
 
 .shared-section-card-footer {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid theme('colors.stroke.soft');
 }
 </style>
