@@ -210,7 +210,7 @@ export function useReverseLineage(initial = {}) {
 
     while (attempt <= MAX_429_RETRY) {
       try {
-        return await apiPost(
+        const envelope = await apiPost(
           '/api/trace/lineage',
           {
             profile: 'query_tool_reverse',
@@ -218,6 +218,7 @@ export function useReverseLineage(initial = {}) {
           },
           { timeout: 360000, silent: true },
         );
+        return envelope?.data || {};
       } catch (error) {
         const status = Number(error?.status || 0);
         if (status !== 429 || attempt >= MAX_429_RETRY) {

@@ -138,7 +138,8 @@ async function loadTxn(jobId) {
       timeout: 360000,
       silent: true,
     });
-    txnRows.value = Array.isArray(payload?.data) ? payload.data : [];
+    const inner = payload?.data || {};
+    txnRows.value = Array.isArray(inner?.data) ? inner.data : [];
   } catch (error) {
     txnError.value = error?.message || '載入交易歷程失敗';
     txnRows.value = [];

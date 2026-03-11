@@ -199,7 +199,7 @@ export function useLotLineage(initial = {}) {
 
     while (attempt <= MAX_429_RETRY) {
       try {
-        return await apiPost(
+        const envelope = await apiPost(
           '/api/trace/lineage',
           {
             profile: 'query_tool',
@@ -207,6 +207,7 @@ export function useLotLineage(initial = {}) {
           },
           { timeout: 360000, silent: true },
         );
+        return envelope?.data || {};
       } catch (error) {
         const status = Number(error?.status || 0);
         if (status !== 429 || attempt >= MAX_429_RETRY) {

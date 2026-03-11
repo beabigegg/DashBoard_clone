@@ -206,7 +206,8 @@ export function useLotDetail(initial = {}) {
         silent: true,
       });
 
-      workcenterGroups.value = Array.isArray(payload?.data) ? payload.data : [];
+      const inner = payload?.data || {};
+      workcenterGroups.value = Array.isArray(inner?.data) ? inner.data : [];
       return true;
     } catch (error) {
       errors.workcenterGroups = error?.message || '載入站點群組失敗';
@@ -250,14 +251,15 @@ export function useLotDetail(initial = {}) {
         silent: true,
       });
 
-      historyRows.value = Array.isArray(payload?.data) ? payload.data : [];
-      pagination.history = payload?.pagination || {
+      const inner = payload?.data || {};
+      historyRows.value = Array.isArray(inner?.data) ? inner.data : [];
+      pagination.history = inner?.pagination || {
         page: targetPage,
         per_page: pagination.history.per_page || DEFAULT_PER_PAGE,
         total: historyRows.value.length,
         total_pages: 1,
       };
-      qualityMeta.history = payload?.quality_meta || null;
+      qualityMeta.history = inner?.quality_meta || null;
       loaded.history = true;
       return true;
     } catch (error) {
@@ -317,7 +319,8 @@ export function useLotDetail(initial = {}) {
           silent: true,
         });
 
-        associationRows[associationType] = Array.isArray(payload?.data) ? payload.data : [];
+        const inner = payload?.data || {};
+        associationRows[associationType] = Array.isArray(inner?.data) ? inner.data : [];
         pagination[associationType] = emptyPagination(0);
         qualityMeta[associationType] = null;
       } else {
@@ -340,15 +343,16 @@ export function useLotDetail(initial = {}) {
           silent: true,
         });
 
-        associationRows[associationType] = Array.isArray(payload?.data) ? payload.data : [];
+        const inner = payload?.data || {};
+        associationRows[associationType] = Array.isArray(inner?.data) ? inner.data : [];
         if (PAGED_SUB_TABS.has(associationType)) {
-          pagination[associationType] = payload?.pagination || {
+          pagination[associationType] = inner?.pagination || {
             page: targetPage,
             per_page: pagination[associationType].per_page || DEFAULT_PER_PAGE,
             total: associationRows[associationType].length,
             total_pages: 1,
           };
-          qualityMeta[associationType] = payload?.quality_meta || null;
+          qualityMeta[associationType] = inner?.quality_meta || null;
         } else {
           pagination[associationType] = emptyPagination(0);
           qualityMeta[associationType] = null;

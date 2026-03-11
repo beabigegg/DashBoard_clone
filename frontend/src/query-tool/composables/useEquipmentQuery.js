@@ -130,7 +130,7 @@ export function useEquipmentQuery(initial = {}) {
       { timeout: 360000, silent: true },
     );
 
-    return payload || {};
+    return payload?.data || {};
   }
 
   async function loadEquipmentOptions() {
@@ -142,7 +142,8 @@ export function useEquipmentQuery(initial = {}) {
         timeout: 360000,
         silent: true,
       });
-      equipmentOptions.value = Array.isArray(payload?.data) ? payload.data : [];
+      const inner = payload?.data || {};
+      equipmentOptions.value = Array.isArray(inner?.data) ? inner.data : [];
       return true;
     } catch (error) {
       errors.equipmentOptions = error?.message || '載入設備清單失敗';

@@ -95,7 +95,10 @@ def get_resources():
         # Sort by WORKCENTERNAME, then RESOURCENAME
         data.sort(key=lambda x: (x.get('WORKCENTERNAME', ''), x.get('RESOURCENAME', '')))
 
-        return success_response(data)
+        return success_response({
+            'data': data,
+            'total': len(data),
+        })
 
     except Exception as exc:
         logger.exception("Failed to load job-query resources: %s", exc)
@@ -141,7 +144,7 @@ def query_jobs():
     if 'error' in result:
         return validation_error(result.get('error', '查詢失敗'))
 
-    return success_response(result.get('data', []))
+    return success_response(result)
 
 
 @job_query_bp.route('/api/job-query/txn/<job_id>', methods=['GET'])
@@ -162,7 +165,7 @@ def query_job_txn_history(job_id: str):
     if 'error' in result:
         return validation_error(result.get('error', '查詢失敗'))
 
-    return success_response(result.get('data', []))
+    return success_response(result)
 
 
 @job_query_bp.route('/api/job-query/export', methods=['POST'])

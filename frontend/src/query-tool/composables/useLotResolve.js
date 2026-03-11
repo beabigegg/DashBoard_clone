@@ -137,9 +137,10 @@ export function useLotResolve(initial = {}) {
         { timeout: 360000, silent: true },
       );
 
-      resolvedLots.value = Array.isArray(payload?.data) ? payload.data : [];
-      notFound.value = Array.isArray(payload?.not_found) ? payload.not_found : [];
-      expansionInfo.value = payload?.expansion_info || {};
+      const inner = payload?.data || {};
+      resolvedLots.value = Array.isArray(inner?.data) ? inner.data : [];
+      notFound.value = Array.isArray(inner?.not_found) ? inner.not_found : [];
+      expansionInfo.value = inner?.expansion_info || {};
 
       successMessage.value = `解析完成：${resolvedLots.value.length} 筆，未命中 ${notFound.value.length} 筆`;
 
