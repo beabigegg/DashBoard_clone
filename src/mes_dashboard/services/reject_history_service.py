@@ -228,9 +228,6 @@ def _build_where_clause(
     if exclude_pb_diode and not any(p.startswith("PB_") for p in normalized_packages):
         builder.add_condition("b.PRODUCTLINENAME NOT LIKE 'PB\\_%' ESCAPE '\\'")
         pb_diode_exclusion_applied = True
-    if normalized_categories:
-        builder.add_in_condition("b.REJECTCATEGORYNAME", normalized_categories)
-
     exclusions_applied = False
     excluded_reason_codes = []
     reason_name_prefix_policy_applied = False
@@ -280,12 +277,6 @@ _DEFAULT_BASE_WHERE = (
     " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
 )
 
-_DEFAULT_WORKFLOW_FILTER = (
-    "r0.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
-    " AND r0.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
-)
-
-
 def _prepare_sql(
     name: str,
     *,
@@ -295,13 +286,11 @@ def _prepare_sql(
     base_variant: str = "",
     base_where: str = "",
     dimension_column: str = "",
-    workflow_filter: str = "",
 ) -> str:
     sql = _load_sql(name)
     sql = sql.replace("{{ BASE_QUERY }}", _base_query_sql(base_variant))
     sql = sql.replace("{{ BASE_WITH_CTE }}", _base_with_cte_sql("base", base_variant))
     sql = sql.replace("{{ BASE_WHERE }}", base_where or _DEFAULT_BASE_WHERE)
-    sql = sql.replace("{{ WORKFLOW_FILTER }}", workflow_filter or _DEFAULT_WORKFLOW_FILTER)
     sql = sql.replace("{{ WHERE_CLAUSE }}", where_clause or "")
     sql = sql.replace("{{ BUCKET_EXPR }}", bucket_expr or "TRUNC(b.TXN_DAY)")
     sql = sql.replace("{{ METRIC_COLUMN }}", metric_column or "b.REJECT_TOTAL_QTY")
@@ -593,9 +582,6 @@ _DIMENSION_COLUMN_MAP = {
     "reason": "b.LOSSREASONNAME",
     "package": "b.PRODUCTLINENAME",
     "type": "b.PJ_TYPE",
-    "workflow": "b.WORKFLOWNAME",
-    "workcenter": "b.WORKCENTER_GROUP",
-    "equipment": "b.PRIMARY_EQUIPMENTNAME",
 }
 
 
@@ -762,7 +748,6 @@ def query_list(
                     "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
                     "WORKCENTERNAME": _normalize_text(row.get("WORKCENTERNAME")),
                     "SPECNAME": _normalize_text(row.get("SPECNAME")),
-                    "WORKFLOWNAME": _normalize_text(row.get("WORKFLOWNAME")),
                     "EQUIPMENTNAME": _normalize_text(row.get("EQUIPMENTNAME")),
                     "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
                     "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
@@ -839,7 +824,6 @@ def export_csv(
                     "Package": _normalize_text(row.get("PRODUCTLINENAME")),
                     "FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
                     "TYPE": _normalize_text(row.get("PJ_TYPE")),
-                    "WORKFLOW": _normalize_text(row.get("WORKFLOWNAME")),
                     "PRODUCT": _normalize_text(row.get("PRODUCTNAME")),
                     "原因": _normalize_text(row.get("LOSSREASONNAME")),
                     "EQUIPMENT": _normalize_text(row.get("EQUIPMENTNAME")),
@@ -865,7 +849,6 @@ def export_csv(
         "Package",
         "FUNCTION",
         "TYPE",
-        "WORKFLOW",
         "PRODUCT",
         "原因",
         "EQUIPMENT",

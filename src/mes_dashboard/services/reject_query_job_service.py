@@ -190,7 +190,6 @@ def execute_reject_query_job(
                 mode=mode,
                 base_where=base_where,
                 base_params=base_params,
-                workflow_filter="",
                 container_ids=None,
                 progress_callback=_progress,
             )

@@ -379,5 +379,5 @@ def test_export_csv_contains_semantic_headers(monkeypatch):
 
     assert "扣帳報廢量" in payload
     assert "不扣帳報廢量" in payload
-    assert "WORKFLOW" in payload
+    assert "WORKFLOW" not in payload
     assert "2026-02-03" in payload

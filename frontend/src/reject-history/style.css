@@ -147,6 +147,23 @@
   font-size: 13px;
 }
 
+.async-job-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: theme('spacing.token.p14');
+  padding: theme('spacing.token.p10') theme('spacing.token.p12');
+  border-radius: 6px;
+  background: theme('colors.token.heff6ff');
+  border: 1px solid theme('colors.token.hbfdbfe');
+  font-size: 13px;
+}
+
+.async-job-status-text {
+  flex: 1;
+  color: theme('colors.token.h1d4ed8');
+}
+
 .filter-panel {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

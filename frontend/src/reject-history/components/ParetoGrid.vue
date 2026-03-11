@@ -5,9 +5,6 @@ const DIMENSIONS = [
   { key: 'reason', label: '不良原因' },
   { key: 'package', label: 'PACKAGE' },
   { key: 'type', label: 'TYPE' },
-  { key: 'workflow', label: 'WORKFLOW' },
-  { key: 'workcenter', label: '站點' },
-  { key: 'equipment', label: '機台' },
 ];
 
 const props = defineProps({

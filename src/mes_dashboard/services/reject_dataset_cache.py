@@ -487,7 +487,6 @@ def _execute_and_spool(
     mode: str,
     base_where: str,
     base_params: Dict[str, Any],
-    workflow_filter: str = "",
     container_ids: Optional[List[str]] = None,
     progress_callback=None,
 ) -> Dict[str, Any]:
@@ -502,7 +501,6 @@ def _execute_and_spool(
         mode: "date_range" or "container".
         base_where: SQL WHERE clause fragment (no leading "WHERE ").
         base_params: Bind parameters dict for the WHERE clause.
-        workflow_filter: Extra WHERE fragment for workflow_lookup CTE (container mode).
         container_ids: List of container IDs (container mode).
         progress_callback: Optional callable(status, progress_str, pct_int) invoked
             after each chunk completes.  May be None.
@@ -515,7 +513,6 @@ def _execute_and_spool(
         Exception: Any Oracle or engine error is propagated to the caller.
     """
     from mes_dashboard.services.batch_query_engine import (
-        MergeChunksMaxRowsExceeded,
         compute_query_hash,
         decompose_by_ids,
         decompose_by_time_range,
@@ -572,7 +569,6 @@ def _execute_and_spool(
         def _run_reject_chunk(chunk, max_rows_per_chunk=None):
             chunk_where_parts: List[str] = []
             chunk_params: Dict[str, Any] = {}
-            chunk_wf_filter = ""
 
             if "chunk_start" in chunk:
                 chunk_where_parts.append(
@@ -590,21 +586,12 @@ def _execute_and_spool(
                     cid_c = cid_c[6:].strip()
                 chunk_where_parts.append(cid_c)
                 chunk_params.update(cid_p)
-                wfb = QueryBuilder()
-                wfb.add_in_condition("r0.CONTAINERID", chunk["ids"])
-                wf_w, _ = wfb.build_where_only()
-                wf_c = wf_w.strip()
-                if wf_c.upper().startswith("WHERE "):
-                    wf_c = wf_c[6:].strip()
-                chunk_wf_filter = wf_c
-
             chunk_where = " AND ".join(chunk_where_parts)
             chunk_sql = _prepare_sql(
                 _REJECT_PRIMARY_SQL_TEMPLATE,
                 where_clause="",
                 base_variant="lot",
                 base_where=chunk_where,
-                workflow_filter=chunk_wf_filter,
             )
             if max_rows_per_chunk:
                 chunk_sql = (
@@ -655,26 +642,11 @@ def _execute_and_spool(
                 chunk_ttl=_CACHE_TTL,
                 max_rows_per_chunk=_REJECT_ENGINE_MAX_ROWS_PER_CHUNK,
             )
-            try:
-                spool_tmp_path, spool_row_count = merge_chunks_to_spool(
-                    "reject",
-                    engine_hash,
-                    spool_dir=QUERY_SPOOL_DIR,
-                    max_total_rows=_REJECT_ENGINE_MAX_TOTAL_ROWS,
-                    overflow_mode="error",
-                )
-            except MergeChunksMaxRowsExceeded as exc:
-                logger.warning(
-                    "Reject primary query exceeded max_total_rows=%d (query_id=%s, observed_rows=%d)",
-                    _REJECT_ENGINE_MAX_TOTAL_ROWS,
-                    query_id,
-                    exc.observed_rows,
-                )
-                raise RejectPrimaryQueryOverloadError(
-                    f"查詢結果超過上限（{_REJECT_ENGINE_MAX_TOTAL_ROWS:,} 筆），請縮小條件後重試",
-                    code="RESULT_TOO_LARGE",
-                    retry_after=15,
-                ) from exc
+            spool_tmp_path, spool_row_count = merge_chunks_to_spool(
+                "reject",
+                engine_hash,
+                spool_dir=QUERY_SPOOL_DIR,
+            )
             progress_meta = get_batch_progress("reject", engine_hash) or {}
             progress_partial = parse_partial_failure_meta(progress_meta)
             if progress_partial:
@@ -712,7 +684,6 @@ def _execute_and_spool(
             where_clause="",
             base_variant="lot",
             base_where=base_where,
-            workflow_filter=workflow_filter,
         )
         df = read_sql_df(sql, base_params)
         if df is None:
@@ -765,7 +736,6 @@ def execute_primary_query(
     base_where_parts: List[str] = []
     base_params: Dict[str, Any] = {}
     resolution_info: Optional[Dict[str, Any]] = None
-    workflow_filter: str = ""  # empty = use default date-based filter
     container_ids: List[str] = []  # populated in container mode
 
     if mode == "date_range":
@@ -799,16 +769,6 @@ def execute_primary_query(
             cid_condition = cid_condition[6:].strip()
         base_where_parts.append(cid_condition)
         base_params.update(cid_params)
-
-        # Build workflow_filter for the workflow_lookup CTE (uses r0 alias).
-        # Reuses the same bind param names (p0, p1, ...) already in base_params.
-        wf_builder = QueryBuilder()
-        wf_builder.add_in_condition("r0.CONTAINERID", container_ids)
-        wf_where, _ = wf_builder.build_where_only()
-        wf_condition = wf_where.strip()
-        if wf_condition.upper().startswith("WHERE "):
-            wf_condition = wf_condition[6:].strip()
-        workflow_filter = wf_condition
 
     else:
         raise ValueError(f"不支援的查詢模式: {mode}")
@@ -956,7 +916,6 @@ def execute_primary_query(
                 """Execute one reject chunk via dedicated primary SQL."""
                 chunk_where_parts: List[str] = []
                 chunk_params: Dict[str, Any] = {}
-                chunk_wf_filter = ""
 
                 if "chunk_start" in chunk:
                     # Time-range chunk
@@ -976,14 +935,6 @@ def execute_primary_query(
                         cid_c = cid_c[6:].strip()
                     chunk_where_parts.append(cid_c)
                     chunk_params.update(cid_p)
-                    # Workflow filter for container mode
-                    wfb = QueryBuilder()
-                    wfb.add_in_condition("r0.CONTAINERID", chunk["ids"])
-                    wf_w, _ = wfb.build_where_only()
-                    wf_c = wf_w.strip()
-                    if wf_c.upper().startswith("WHERE "):
-                        wf_c = wf_c[6:].strip()
-                    chunk_wf_filter = wf_c
 
                 chunk_where = " AND ".join(chunk_where_parts)
                 chunk_sql = _prepare_sql(
@@ -991,7 +942,6 @@ def execute_primary_query(
                     where_clause="",
                     base_variant="lot",
                     base_where=chunk_where,
-                    workflow_filter=chunk_wf_filter,
                 )
                 if max_rows_per_chunk:
                     chunk_sql = (
@@ -1020,26 +970,11 @@ def execute_primary_query(
                     chunk_ttl=_CACHE_TTL,
                     max_rows_per_chunk=_REJECT_ENGINE_MAX_ROWS_PER_CHUNK,
                 )
-                try:
-                    spool_tmp_path, spool_row_count = merge_chunks_to_spool(
-                        "reject",
-                        engine_hash,
-                        spool_dir=QUERY_SPOOL_DIR,
-                        max_total_rows=_REJECT_ENGINE_MAX_TOTAL_ROWS,
-                        overflow_mode="error",
-                    )
-                except MergeChunksMaxRowsExceeded as exc:
-                    logger.warning(
-                        "Reject primary query exceeded max_total_rows=%d (query_id=%s, observed_rows=%d)",
-                        _REJECT_ENGINE_MAX_TOTAL_ROWS,
-                        query_id,
-                        exc.observed_rows,
-                    )
-                    raise RejectPrimaryQueryOverloadError(
-                        f"查詢結果超過上限（{_REJECT_ENGINE_MAX_TOTAL_ROWS:,} 筆），請縮小條件後重試",
-                        code="RESULT_TOO_LARGE",
-                        retry_after=15,
-                    ) from exc
+                spool_tmp_path, spool_row_count = merge_chunks_to_spool(
+                    "reject",
+                    engine_hash,
+                    spool_dir=QUERY_SPOOL_DIR,
+                )
                 # 4.6: read progress BEFORE redis_clear_batch
                 progress_meta = get_batch_progress("reject", engine_hash) or {}
                 progress_partial = parse_partial_failure_meta(progress_meta)
@@ -1084,7 +1019,6 @@ def execute_primary_query(
                 where_clause="",
                 base_variant="lot",
                 base_where=base_where,
-                workflow_filter=workflow_filter,
             )
             df = read_sql_df(sql, base_params)
             if df is None:
@@ -1288,6 +1222,9 @@ def apply_view(
             exclude_pb_diode=exclude_pb_diode,
         )
 
+        # Extract available filters from policy-filtered (pre-supplementary) data
+        available = _extract_available_filters(df)
+
         filtered = _apply_supplementary_filters(
             df,
             packages=packages,
@@ -1326,6 +1263,7 @@ def apply_view(
             "analytics_raw": analytics_raw,
             "summary": summary,
             "detail": detail_page,
+            "available_filters": available,
         }
     finally:
         _maybe_collect_after_interactive_compute()
@@ -1601,7 +1539,6 @@ def _paginate_detail(
                 "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
                 "WORKCENTERNAME": _normalize_text(row.get("WORKCENTERNAME")),
                 "SPECNAME": _normalize_text(row.get("SPECNAME")),
-                "WORKFLOWNAME": _normalize_text(row.get("WORKFLOWNAME")),
                 "EQUIPMENTNAME": _normalize_text(row.get("EQUIPMENTNAME")),
                 "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
                 "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
@@ -1663,12 +1600,9 @@ _DIM_TO_DF_COLUMN = {
     "reason": "LOSSREASONNAME",
     "package": "PRODUCTLINENAME",
     "type": "PJ_TYPE",
-    "workflow": "WORKFLOWNAME",
-    "workcenter": "WORKCENTER_GROUP",
-    "equipment": "PRIMARY_EQUIPMENTNAME",
 }
 _PARETO_DIMENSIONS = tuple(_DIM_TO_DF_COLUMN.keys())
-_PARETO_TOP20_DIMENSIONS = {"type", "workflow", "equipment"}
+_PARETO_TOP20_DIMENSIONS = {"type"}
 _PARETO_GUARD_REQUIRED_COLUMNS = (
     tuple(_DIM_TO_DF_COLUMN.values())
     + ("MOVEIN_QTY", "REJECT_TOTAL_QTY", "DEFECT_QTY", "CONTAINERID", "TXN_DAY")
@@ -2246,7 +2180,6 @@ def export_csv_from_cache(
                     "Package": _normalize_text(row.get("PRODUCTLINENAME")),
                     "FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
                     "TYPE": _normalize_text(row.get("PJ_TYPE")),
-                    "WORKFLOW": _normalize_text(row.get("WORKFLOWNAME")),
                     "PRODUCT": _normalize_text(row.get("PRODUCTNAME")),
                     "原因": _normalize_text(row.get("LOSSREASONNAME")),
                     "EQUIPMENT": _normalize_text(row.get("EQUIPMENTNAME")),

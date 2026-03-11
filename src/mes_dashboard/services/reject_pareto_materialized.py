@@ -417,7 +417,7 @@ def build_snapshot(
 # ---------------------------------------------------------------------------
 
 # Dimensions that support top-20 display truncation
-_PARETO_TOP20_DIMENSIONS = {"type", "workflow", "equipment"}
+_PARETO_TOP20_DIMENSIONS = {"type"}
 
 
 def evaluate(

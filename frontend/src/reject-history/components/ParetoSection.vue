@@ -9,7 +9,7 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
 
-const DISPLAY_SCOPE_TOP20_DIMENSIONS = new Set(['type', 'workflow', 'equipment']);
+const DISPLAY_SCOPE_TOP20_DIMENSIONS = new Set(['type']);
 
 const props = defineProps({
   items: { type: Array, default: () => [] },

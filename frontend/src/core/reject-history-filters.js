@@ -231,9 +231,6 @@ export function buildViewParams(queryId, {
     reason: 'sel_reason',
     package: 'sel_package',
     type: 'sel_type',
-    workflow: 'sel_workflow',
-    workcenter: 'sel_workcenter',
-    equipment: 'sel_equipment',
   };
   for (const [dimension, paramName] of Object.entries(selectionParamMap)) {
     const normalizedValues = normalizeArray(paretoSelections?.[dimension]);

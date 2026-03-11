@@ -19,31 +19,6 @@ WITH spec_map AS (
     WHERE SPEC IS NOT NULL
     GROUP BY SPEC
 ),
-reject_scope AS (
-    SELECT DISTINCT
-        r.WIPTRACKINGGROUPKEYID
-    FROM DWH.DW_MES_LOTREJECTHISTORY r
-    WHERE {{ BASE_WHERE }}
-      AND r.WIPTRACKINGGROUPKEYID IS NOT NULL
-),
-wip_workflow_map AS (
-    SELECT
-        WIPTRACKINGGROUPKEYID,
-        WORKFLOWNAME
-    FROM (
-        SELECT
-            lwh.WIPTRACKINGGROUPKEYID,
-            lwh.WORKFLOWNAME,
-            ROW_NUMBER() OVER (
-                PARTITION BY lwh.WIPTRACKINGGROUPKEYID
-                ORDER BY lwh.MOVEOUTTIMESTAMP DESC NULLS LAST
-            ) AS rn
-        FROM DWH.DW_MES_LOTWIPHISTORY lwh
-        INNER JOIN reject_scope rs
-            ON rs.WIPTRACKINGGROUPKEYID = lwh.WIPTRACKINGGROUPKEYID
-    )
-    WHERE rn = 1
-),
 reject_raw AS (
     SELECT
         r.TXNDATE,
@@ -51,7 +26,7 @@ reject_raw AS (
         TO_CHAR(TRUNC(r.TXNDATE), 'YYYY-MM') AS TXN_MONTH,
         r.CONTAINERID,
         NVL(TRIM(c.CONTAINERNAME), TRIM(r.CONTAINERID)) AS CONTAINERNAME,
-        NVL(TRIM(r.PJ_WORKORDER), TRIM(c.MFGORDERNAME)) AS PJ_WORKORDER,
+        TRIM(r.PJ_WORKORDER) AS PJ_WORKORDER,
         NVL(TRIM(c.PJ_TYPE), '(NA)') AS PJ_TYPE,
         NVL(TRIM(c.PJ_FUNCTION), '(NA)') AS PJ_FUNCTION,
         NVL(TRIM(c.PRODUCTNAME), '(NA)') AS PRODUCTNAME,
@@ -62,45 +37,11 @@ reject_raw AS (
         NVL(sm.WORKCENTERSEQUENCE_GROUP, 999) AS WORKCENTERSEQUENCE_GROUP,
         NVL(TRIM(r.SPECNAME), '(NA)') AS SPECNAME,
         NVL(TRIM(r.EQUIPMENTNAME), '(NA)') AS EQUIPMENTNAME,
-        NVL(
-            TRIM(REGEXP_SUBSTR(r.EQUIPMENTNAME, '[^,]+', 1, 1)),
-            '(NA)'
-        ) AS PRIMARY_EQUIPMENTNAME,
-        NVL(
-            TRIM(lwh.WORKFLOWNAME),
-            NVL(
-                TRIM((
-                    SELECT w.WORKFLOWNAME
-                    FROM DWH.DW_MES_WIP w
-                    WHERE c.CONTAINERNAME IS NOT NULL
-                      AND w.CONTAINERNAME = c.CONTAINERNAME
-                      AND NVL(TRIM(w.SPECNAME), '-') = NVL(TRIM(r.SPECNAME), '-')
-                      AND w.TXNDATE <= r.TXNDATE
-                      AND TRIM(w.WORKFLOWNAME) IS NOT NULL
-                    ORDER BY w.TXNDATE DESC
-                    FETCH FIRST 1 ROW ONLY
-                )),
-                NVL(
-                    TRIM((
-                        SELECT w.WORKFLOWNAME
-                        FROM DWH.DW_MES_WIP w
-                        WHERE c.CONTAINERNAME IS NOT NULL
-                          AND w.CONTAINERNAME = c.CONTAINERNAME
-                          AND NVL(TRIM(w.SPECNAME), '-') = NVL(TRIM(r.SPECNAME), '-')
-                          AND TRIM(w.WORKFLOWNAME) IS NOT NULL
-                        ORDER BY w.TXNDATE DESC
-                        FETCH FIRST 1 ROW ONLY
-                    )),
-                    '(NA)'
-                )
-            )
-        ) AS WORKFLOWNAME,
         NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') AS LOSSREASONNAME,
         NVL(
             TRIM(REGEXP_SUBSTR(NVL(TRIM(r.LOSSREASONNAME), '(未填寫)'), '^[^_[:space:]-]+')),
             NVL(TRIM(r.LOSSREASONNAME), '(未填寫)')
         ) AS LOSSREASON_CODE,
-        NVL(TRIM(r.REJECTCATEGORYNAME), '(未填寫)') AS REJECTCATEGORYNAME,
         TRIM(r.REJECTCOMMENT) AS REJECTCOMMENT,
         NVL(r.MOVEINQTY, 0) AS MOVEINQTY,
         NVL(r.REJECTQTY, 0) AS REJECT_QTY,
@@ -124,8 +65,6 @@ reject_raw AS (
     FROM DWH.DW_MES_LOTREJECTHISTORY r
     LEFT JOIN DWH.DW_MES_CONTAINER c
       ON c.CONTAINERID = r.CONTAINERID
-    LEFT JOIN wip_workflow_map lwh
-      ON lwh.WIPTRACKINGGROUPKEYID = r.WIPTRACKINGGROUPKEYID
     LEFT JOIN spec_map sm
       ON sm.SPEC = TRIM(r.SPECNAME)
     WHERE {{ BASE_WHERE }}
@@ -142,18 +81,14 @@ daily_agg AS (
         WORKCENTERSEQUENCE_GROUP,
         WORKCENTERNAME,
         SPECNAME,
-        WORKFLOWNAME,
         EQUIPMENTNAME,
-        PRIMARY_EQUIPMENTNAME,
         PRODUCTLINENAME,
         SCRAP_OBJECTTYPE,
         PJ_TYPE,
         LOSSREASONNAME,
         LOSSREASON_CODE,
-        REJECTCATEGORYNAME,
         MAX(REJECTCOMMENT) AS REJECTCOMMENT,
         MIN(TXNDATE) AS TXN_TIME,
-        COUNT(*) AS REJECT_EVENT_ROWS,
         COUNT(DISTINCT PJ_WORKORDER) AS AFFECTED_WORKORDER_COUNT,
         SUM(CASE WHEN EVENT_RN = 1 THEN MOVEINQTY ELSE 0 END) AS MOVEIN_QTY,
         SUM(REJECT_QTY) AS REJECT_QTY,
@@ -175,15 +110,12 @@ daily_agg AS (
         WORKCENTERSEQUENCE_GROUP,
         WORKCENTERNAME,
         SPECNAME,
-        WORKFLOWNAME,
         EQUIPMENTNAME,
-        PRIMARY_EQUIPMENTNAME,
         PRODUCTLINENAME,
         SCRAP_OBJECTTYPE,
         PJ_TYPE,
         LOSSREASONNAME,
-        LOSSREASON_CODE,
-        REJECTCATEGORYNAME
+        LOSSREASON_CODE
 )
 SELECT
     TXN_TIME,
@@ -197,17 +129,13 @@ SELECT
     WORKCENTERSEQUENCE_GROUP,
     WORKCENTERNAME,
     SPECNAME,
-    WORKFLOWNAME,
     EQUIPMENTNAME,
-    PRIMARY_EQUIPMENTNAME,
     PRODUCTLINENAME,
     SCRAP_OBJECTTYPE,
     PJ_TYPE,
     LOSSREASONNAME,
     LOSSREASON_CODE,
-    REJECTCATEGORYNAME,
     REJECTCOMMENT,
-    REJECT_EVENT_ROWS,
     AFFECTED_WORKORDER_COUNT,
     MOVEIN_QTY,
     REJECT_QTY,

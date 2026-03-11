@@ -173,17 +173,11 @@ _VALID_PARETO_DIMENSIONS = {
     "reason",
     "package",
     "type",
-    "workflow",
-    "workcenter",
-    "equipment",
 }
 _PARETO_SELECTION_PARAMS = {
     "reason": "sel_reason",
     "package": "sel_package",
     "type": "sel_type",
-    "workflow": "sel_workflow",
-    "workcenter": "sel_workcenter",
-    "equipment": "sel_equipment",
 }
 _REJECT_PARETO_SCOPE_FIXED = "top80"
 _REJECT_BATCH_PARETO_DISPLAY_SCOPE_FIXED = "top20"
@@ -876,7 +870,7 @@ def api_reject_history_export_cached():
 
         headers = [
             "LOT", "WORKCENTER", "WORKCENTER_GROUP", "Package", "FUNCTION",
-            "TYPE", "WORKFLOW", "PRODUCT", "原因", "EQUIPMENT", "COMMENT", "SPEC",
+            "TYPE", "PRODUCT", "原因", "EQUIPMENT", "COMMENT", "SPEC",
             "REJECT_QTY", "STANDBY_QTY", "QTYTOPROCESS_QTY", "INPROCESS_QTY",
             "PROCESSED_QTY", "扣帳報廢量", "不扣帳報廢量", "MOVEIN_QTY",
             "報廢時間", "日期",

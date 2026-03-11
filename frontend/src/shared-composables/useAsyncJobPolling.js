@@ -49,7 +49,9 @@ export async function pollJobUntilComplete(statusUrl, {
       throw new DOMException('Aborted', 'AbortError');
     }
 
-    const status = await apiGet(statusUrl, { timeout: 15000, signal });
+    const raw = await apiGet(statusUrl, { timeout: 15000, signal });
+    // Unwrap the standard API envelope { success, data, meta }
+    const status = raw?.data || raw;
 
     if (typeof onProgress === 'function') {
       onProgress(status);

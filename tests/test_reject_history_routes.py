@@ -340,9 +340,6 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
                 'reason': {'items': []},
                 'package': {'items': []},
                 'type': {'items': []},
-                'workflow': {'items': []},
-                'workcenter': {'items': []},
-                'equipment': {'items': []},
             }
         }
 
@@ -406,17 +403,17 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         response = self.client.get(
             '/api/reject-history/view'
             '?query_id=qid-001'
-            '&pareto_dimension=workflow'
-            '&pareto_values=WF-A'
-            '&pareto_values=WF-B'
+            '&pareto_dimension=type'
+            '&pareto_values=TYPE-A'
+            '&pareto_values=TYPE-B'
         )
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload['success'])
         _, kwargs = mock_apply_view.call_args
-        self.assertEqual(kwargs['pareto_dimension'], 'workflow')
-        self.assertEqual(kwargs['pareto_values'], ['WF-A', 'WF-B'])
+        self.assertEqual(kwargs['pareto_dimension'], 'type')
+        self.assertEqual(kwargs['pareto_values'], ['TYPE-A', 'TYPE-B'])
 
     @patch('mes_dashboard.routes.reject_history_routes.apply_view', return_value=None)
     def test_view_cache_expired_returns_410(self, _mock_apply_view):
@@ -454,7 +451,6 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
             '?query_id=qid-001'
             '&sel_reason=001_A'
             '&sel_type=TYPE-A'
-            '&sel_workflow=WF-01'
         )
         payload = json.loads(response.data)
 
@@ -464,7 +460,6 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(kwargs['pareto_selections'], {
             'reason': ['001_A'],
             'type': ['TYPE-A'],
-            'workflow': ['WF-01'],
         })
         self.assertIsNone(kwargs['pareto_dimension'])
         self.assertIsNone(kwargs['pareto_values'])
@@ -554,7 +549,6 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
             '?query_id=qid-001'
             '&sel_reason=001_A'
             '&sel_type=TYPE-A'
-            '&sel_equipment=EQ-01'
         )
 
         self.assertEqual(response.status_code, 200)
@@ -562,7 +556,6 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(kwargs['pareto_selections'], {
             'reason': ['001_A'],
             'type': ['TYPE-A'],
-            'equipment': ['EQ-01'],
         })
         self.assertIsNone(kwargs['pareto_dimension'])
         self.assertIsNone(kwargs['pareto_values'])

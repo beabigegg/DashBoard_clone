@@ -26,9 +26,7 @@ def _build_sample_df(n_lots: int = 10) -> pd.DataFrame:
     reasons = ["001_CRACK", "002_CONTAMINATION", "003_SCRATCH"]
     packages = ["PKG_A", "PKG_B"]
     types = ["NORMAL", "REWORK"]
-    workflows = ["WF_MAIN", "WF_ALT"]
     workcenters = ["WC_GRP_1", "WC_GRP_2"]
-    equipments = ["EQ_001", "EQ_002", "EQ_003"]
     for i in range(n_lots):
         lot = f"LOT{i:04d}"
         # Each lot has 1-3 reject events
@@ -38,9 +36,7 @@ def _build_sample_df(n_lots: int = 10) -> pd.DataFrame:
                 "LOSSREASONNAME": reasons[(i + j) % len(reasons)],
                 "PRODUCTLINENAME": packages[i % len(packages)],
                 "PJ_TYPE": types[j % len(types)],
-                "WORKFLOWNAME": workflows[i % len(workflows)],
                 "WORKCENTER_GROUP": workcenters[i % len(workcenters)],
-                "PRIMARY_EQUIPMENTNAME": equipments[(i + j) % len(equipments)],
                 "REJECT_TOTAL_QTY": 10 + i,
                 "DEFECT_QTY": 5 + j,
                 "MOVEIN_QTY": 100 + i * 10,
@@ -248,9 +244,7 @@ class TestGuardrailEnforcement:
                 "LOSSREASONNAME": f"{i:03d}_REASON",
                 "PRODUCTLINENAME": f"PKG_{i}",
                 "PJ_TYPE": f"TYPE_{i}",
-                "WORKFLOWNAME": f"WF_{i}",
                 "WORKCENTER_GROUP": f"WC_{i}",
-                "PRIMARY_EQUIPMENTNAME": f"EQ_{i}",
                 "REJECT_TOTAL_QTY": 10,
                 "DEFECT_QTY": 5,
                 "MOVEIN_QTY": 100,
@@ -330,7 +324,7 @@ class TestBuildAndEvaluate:
         result = build_snapshot(df)
         assert result is None
 
-    def test_evaluate_returns_all_six_dimensions(self):
+    def test_evaluate_returns_all_four_dimensions(self):
         from mes_dashboard.services.reject_pareto_materialized import (
             build_snapshot,
             evaluate,
@@ -341,7 +335,7 @@ class TestBuildAndEvaluate:
         result = evaluate(snapshot, metric_mode="reject_total", pareto_scope="all")
 
         dims = result["dimensions"]
-        expected_dims = {"reason", "package", "type", "workflow", "workcenter", "equipment"}
+        expected_dims = {"reason", "package", "type"}
         assert set(dims.keys()) == expected_dims
         for dim_name, dim_data in dims.items():
             assert "items" in dim_data
@@ -379,9 +373,7 @@ class TestBuildAndEvaluate:
                 "LOSSREASONNAME": f"{i:03d}_REASON",
                 "PRODUCTLINENAME": "PKG_A",
                 "PJ_TYPE": f"TYPE_{i:03d}",
-                "WORKFLOWNAME": "WF_MAIN",
                 "WORKCENTER_GROUP": "WC_1",
-                "PRIMARY_EQUIPMENTNAME": "EQ_1",
                 "REJECT_TOTAL_QTY": 10 + i,
                 "DEFECT_QTY": 5,
                 "MOVEIN_QTY": 100,

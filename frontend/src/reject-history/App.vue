@@ -19,15 +19,12 @@ import TrendChart from './components/TrendChart.vue';
 
 const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 50;
-const PARETO_DIMENSIONS = ['reason', 'package', 'type', 'workflow', 'workcenter', 'equipment'];
+const PARETO_DIMENSIONS = ['reason', 'package', 'type'];
 const PARETO_DISPLAY_SCOPE_FIXED = 'top20';
 const PARETO_SELECTION_PARAM_MAP = {
   reason: 'sel_reason',
   package: 'sel_package',
   type: 'sel_type',
-  workflow: 'sel_workflow',
-  workcenter: 'sel_workcenter',
-  equipment: 'sel_equipment',
 };
 
 function createEmptyParetoSelections() {
@@ -35,9 +32,6 @@ function createEmptyParetoSelections() {
     reason: [],
     package: [],
     type: [],
-    workflow: [],
-    workcenter: [],
-    equipment: [],
   };
 }
 
@@ -46,9 +40,6 @@ function createEmptyParetoData() {
     reason: { items: [], dimension: 'reason', metric_mode: 'reject_total' },
     package: { items: [], dimension: 'package', metric_mode: 'reject_total' },
     type: { items: [], dimension: 'type', metric_mode: 'reject_total' },
-    workflow: { items: [], dimension: 'workflow', metric_mode: 'reject_total' },
-    workcenter: { items: [], dimension: 'workcenter', metric_mode: 'reject_total' },
-    equipment: { items: [], dimension: 'equipment', metric_mode: 'reject_total' },
   };
 }
 
@@ -60,12 +51,6 @@ function getDimensionLabel(dimension) {
       return 'PACKAGE';
     case 'type':
       return 'TYPE';
-    case 'workflow':
-      return 'WORKFLOW';
-    case 'workcenter':
-      return '站點';
-    case 'equipment':
-      return '機台';
     default:
       return 'Pareto';
   }
@@ -405,14 +390,30 @@ async function executePrimaryQuery() {
     body.exclude_material_scrap = draftFilters.excludeMaterialScrap;
     body.exclude_pb_diode = draftFilters.excludePbDiode;
 
+    // Reset display state before new query — hide stale data from previous queryId
+    queryId.value = '';
+    analyticsRawItems.value = [];
+    summary.value = { MOVEIN_QTY: 0, REJECT_TOTAL_QTY: 0, DEFECT_QTY: 0, REJECT_RATE_PCT: 0, DEFECT_RATE_PCT: 0, REJECT_SHARE_PCT: 0, AFFECTED_LOT_COUNT: 0, AFFECTED_WORKORDER_COUNT: 0 };
+    detail.value = { items: [], pagination: { page: 1, perPage: DEFAULT_PER_PAGE, total: 0, totalPages: 1 } };
+    supplementaryFilters.packages = [];
+    supplementaryFilters.workcenterGroups = [];
+    supplementaryFilters.reasons = [];
+    availableFilters.value = { workcenterGroups: [], packages: [], reasons: [] };
+    resolutionInfo.value = null;
+    page.value = 1;
+    selectedTrendDates.value = [];
+    resetParetoSelections();
+    resetParetoData();
+
     const resp = await apiPost('/api/reject-history/query', body, { timeout: API_TIMEOUT });
     if (isStaleRequest(requestId)) return;
 
     // ---- Async 202 path ----
-    if (resp?._status === 202 || (resp?.async === true && resp?.job_id)) {
-      const jobId = resp.job_id;
-      const statusUrl = resp.status_url || `/api/reject-history/job/${jobId}`;
-      const preQueryId = resp.query_id;
+    const respData = resp?.data || {};
+    if (resp?._status === 202 || (respData.async === true && respData.job_id)) {
+      const jobId = respData.job_id;
+      const statusUrl = respData.status_url || `/api/reject-history/job/${jobId}`;
+      const preQueryId = respData.query_id;
 
       jobProgress.active = true;
       jobProgress.jobId = jobId;
@@ -446,13 +447,21 @@ async function executePrimaryQuery() {
 
       // Refresh view to populate result data from cache
       await refreshView();
+
+      // refreshView() increments activeRequestId, making the outer finally stale.
+      // Explicitly clear loading state and fetch pareto here.
+      loading.querying = false;
+      lastQueryAt.value = new Date().toLocaleString('zh-TW');
+      updateUrlState();
+      await fetchBatchPareto();
       return;
     }
 
     // ---- Sync 200 path (original behavior) ----
     const result = unwrapApiResult(resp, '主查詢執行失敗');
-    await _loadViewAfterQuery(result.query_id);
-    await _applyQueryResult(result);
+    const resultData = result.data || result;
+    await _loadViewAfterQuery(resultData.query_id);
+    await _applyQueryResult(resultData);
 
   } catch (error) {
     if (isStaleRequest(requestId)) return;
@@ -515,6 +524,16 @@ async function refreshView() {
       : analyticsRawItems.value;
     summary.value = data.summary || summary.value;
     detail.value = data.detail || detail.value;
+
+    // Populate available filters (needed for async path and refreshes)
+    const af = data.available_filters;
+    if (af) {
+      availableFilters.value = {
+        workcenterGroups: af.workcenter_groups || af.workcenterGroups || [],
+        packages: af.packages || [],
+        reasons: af.reasons || [],
+      };
+    }
 
     updateUrlState();
   } catch (error) {
@@ -1077,23 +1096,6 @@ onMounted(() => {
       {{ partialFailureWarning }}
     </div>
 
-    <!-- Async job progress overlay -->
-    <div v-if="jobProgress.active" class="async-job-progress-overlay">
-      <div class="async-job-progress-card">
-        <div class="async-job-progress-title">背景查詢中…</div>
-        <div class="async-job-progress-text">
-          {{ jobProgress.progress || jobProgress.status || '處理中' }}
-          <span v-if="jobProgress.pct > 0">（{{ jobProgress.pct }}%）</span>
-        </div>
-        <div v-if="jobProgress.elapsedSeconds > 0" class="async-job-progress-elapsed">
-          已等待 {{ jobProgress.elapsedSeconds }} 秒
-        </div>
-        <button type="button" class="btn btn-light async-job-cancel-btn" @click="cancelAsyncJob">
-          取消查詢
-        </button>
-      </div>
-    </div>
-
     <FilterPanel
       :filters="draftFilters"
       :query-mode="queryMode"
@@ -1115,6 +1117,17 @@ onMounted(() => {
       @update:container-input="containerInput = $event"
       @supplementary-change="onSupplementaryChange"
     />
+
+    <!-- Async job inline status bar (non-blocking, shows progress text + cancel) -->
+    <div v-if="jobProgress.active" class="async-job-status-bar">
+      <span class="btn-spinner"></span>
+      <span class="async-job-status-text">
+        {{ jobProgress.progress || '背景查詢中...' }}
+        <template v-if="jobProgress.pct > 0">（{{ jobProgress.pct }}%）</template>
+        <template v-if="jobProgress.elapsedSeconds > 0"> · 已等待 {{ jobProgress.elapsedSeconds }} 秒</template>
+      </span>
+      <button type="button" class="btn btn-light" @click="cancelAsyncJob">取消查詢</button>
+    </div>
 
     <template v-if="queryId">
       <SummaryCards :cards="kpiCards" />

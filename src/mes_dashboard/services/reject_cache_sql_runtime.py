@@ -77,6 +77,40 @@ def _available_columns(conn) -> set[str]:
     return {str(row[1]) for row in rows if len(row) > 1}
 
 
+def _extract_available_filters_sql(
+    conn,
+    cols: set[str],
+    policy_conditions: List[str],
+    policy_params: List[Any],
+) -> dict:
+    """Extract distinct filter options via DuckDB using only policy filters."""
+    where = "WHERE " + " AND ".join(policy_conditions) if policy_conditions else ""
+    result: dict = {"workcenter_groups": [], "packages": [], "reasons": []}
+
+    if "WORKCENTER_GROUP" in cols:
+        sql = f'SELECT DISTINCT TRIM(CAST("WORKCENTER_GROUP" AS VARCHAR)) AS v FROM reject_src {where} ORDER BY 1'
+        rows = _fetch_dict_rows(conn, sql, policy_params)
+        result["workcenter_groups"] = sorted(
+            {_normalize_text(r["v"]) for r in rows if _normalize_text(r.get("v"))}
+        )
+
+    if "PRODUCTLINENAME" in cols:
+        sql = f'SELECT DISTINCT TRIM(CAST("PRODUCTLINENAME" AS VARCHAR)) AS v FROM reject_src {where} ORDER BY 1'
+        rows = _fetch_dict_rows(conn, sql, policy_params)
+        result["packages"] = sorted(
+            {_normalize_text(r["v"]) for r in rows if _normalize_text(r.get("v"))}
+        )
+
+    if "LOSSREASONNAME" in cols:
+        sql = f'SELECT DISTINCT TRIM(CAST("LOSSREASONNAME" AS VARCHAR)) AS v FROM reject_src {where} ORDER BY 1'
+        rows = _fetch_dict_rows(conn, sql, policy_params)
+        result["reasons"] = sorted(
+            {_normalize_text(r["v"]) for r in rows if _normalize_text(r.get("v"))}
+        )
+
+    return result
+
+
 def _build_base_filters(
     *,
     cols: set[str],
@@ -342,7 +376,6 @@ def _detail_item_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
         "WORKCENTERNAME": _normalize_text(row.get("WORKCENTERNAME")),
         "SPECNAME": _normalize_text(row.get("SPECNAME")),
-        "WORKFLOWNAME": _normalize_text(row.get("WORKFLOWNAME")),
         "EQUIPMENTNAME": _normalize_text(row.get("EQUIPMENTNAME")),
         "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
         "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
@@ -377,7 +410,6 @@ def _export_row_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "Package": _normalize_text(row.get("PRODUCTLINENAME")),
         "FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
         "TYPE": _normalize_text(row.get("PJ_TYPE")),
-        "WORKFLOW": _normalize_text(row.get("WORKFLOWNAME")),
         "PRODUCT": _normalize_text(row.get("PRODUCTNAME")),
         "原因": _normalize_text(row.get("LOSSREASONNAME")),
         "EQUIPMENT": _normalize_text(row.get("EQUIPMENTNAME")),
@@ -620,6 +652,23 @@ def try_compute_view_from_spool(
         if not cols:
             return None, {"view_sql_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
 
+        # Policy-only filters (for available_filters extraction)
+        policy_conditions, policy_params = _build_base_filters(
+            cols=cols,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
+            packages=None,
+            workcenter_groups=None,
+            reasons=None,
+            trend_dates=None,
+            metric_filter="all",
+        )
+        available_filters = _extract_available_filters_sql(
+            conn, cols, policy_conditions, policy_params,
+        )
+
+        # Full filters (policy + supplementary)
         base_conditions, base_params = _build_base_filters(
             cols=cols,
             include_excluded_scrap=include_excluded_scrap,
@@ -713,7 +762,6 @@ def try_compute_view_from_spool(
             "WORKCENTER_GROUP",
             "WORKCENTERNAME",
             "SPECNAME",
-            "WORKFLOWNAME",
             "EQUIPMENTNAME",
             "PRODUCTLINENAME",
             "PJ_TYPE",
@@ -763,6 +811,7 @@ def try_compute_view_from_spool(
                     "totalPages": total_pages,
                 },
             },
+            "available_filters": available_filters,
         }, {
             "view_source": "cache_sql",
             "view_runtime": "duckdb",
@@ -860,7 +909,6 @@ def try_iter_export_rows_from_spool(
             "WORKCENTER_GROUP",
             "WORKCENTERNAME",
             "SPECNAME",
-            "WORKFLOWNAME",
             "EQUIPMENTNAME",
             "PRODUCTLINENAME",
             "PJ_TYPE",
