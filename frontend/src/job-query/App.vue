@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 
-import MultiSelect from '../resource-shared/components/MultiSelect.vue';
+import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import StatusBadge from '../shared-ui/components/StatusBadge.vue';

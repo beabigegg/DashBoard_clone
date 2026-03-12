@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 
-import MultiSelect from '../../resource-shared/components/MultiSelect.vue';
+import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 import { formatCellValue } from '../utils/values.js';
 
 const props = defineProps({

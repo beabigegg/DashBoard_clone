@@ -1,5 +1,5 @@
 <script setup>
-import MultiSelect from '../../resource-shared/components/MultiSelect.vue';
+import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../../shared-ui/components/FilterToolbar.vue';
 
 import EquipmentJobsPanel from './EquipmentJobsPanel.vue';
