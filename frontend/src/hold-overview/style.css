@@ -397,6 +397,11 @@
   max-height: 520px;
 }
 
+.theme-hold-overview .table-container.paginating {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .lot-table {
   width: 100%;
   border-collapse: collapse;

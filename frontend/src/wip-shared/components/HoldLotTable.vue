@@ -28,6 +28,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  paginating: {
+    type: Boolean,
+    default: false,
+  },
   title: {
     type: String,
     default: 'Hold Lot Details',
@@ -82,7 +86,7 @@ const pageInfo = computed(() => {
       <div class="table-info">{{ tableInfo }}</div>
     </div>
 
-    <div class="table-container">
+    <div class="table-container" :class="{ paginating: paginating }">
       <table class="lot-table">
         <thead>
           <tr>

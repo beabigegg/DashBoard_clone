@@ -132,7 +132,7 @@ The page SHALL display a TreeMap chart showing hold lot distribution by workcent
 - **THEN** the TreeMap area SHALL display "目前無 Hold 資料"
 
 ### Requirement: Hold Overview page SHALL display paginated lot details
-The page SHALL display a detailed lot table with server-side pagination.
+The page SHALL display a detailed lot table with server-side pagination, preserving scroll position and table layout during page navigation.
 
 #### Scenario: Lot table rendering
 - **WHEN** lot data is loaded from `GET /api/hold-overview/lots`
@@ -148,6 +148,20 @@ The page SHALL display a detailed lot table with server-side pagination.
 - **WHEN** total lots exceeds per_page (50)
 - **THEN** Prev/Next buttons and page info SHALL display
 - **THEN** page info SHALL show "顯示 {start} - {end} / {total}"
+
+#### Scenario: Page navigation preserves scroll position
+- **WHEN** user clicks Next or Prev
+- **THEN** data SHALL reload with the updated page number
+- **THEN** page scroll position SHALL NOT reset to the top
+- **THEN** the table content SHALL remain visible in the DOM during loading
+- **THEN** a loading overlay SHALL appear on the table section to indicate progress
+- **THEN** summary, matrix, hold pareto, and treemap sections SHALL NOT be refreshed as part of pagination
+
+#### Scenario: Table overlay during pagination
+- **WHEN** pagination is in progress
+- **THEN** the table rows SHALL be visible but visually dimmed (opacity reduced)
+- **THEN** user interaction with table rows SHALL be disabled during loading
+- **THEN** once data loads, the overlay SHALL be removed and new rows SHALL display
 
 #### Scenario: Filter changes reset pagination
 - **WHEN** any filter changes (filter bar, matrix click, or WIP filter apply)

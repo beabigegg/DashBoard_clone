@@ -58,6 +58,7 @@ const page = ref(1);
 
 const initialLoading = ref(true);
 const lotsLoading = ref(false);
+const paginationLoading = ref(false);
 const refreshing = ref(false);
 const refreshSuccess = ref(false);
 const refreshError = ref(false);
@@ -497,6 +498,34 @@ async function loadLots() {
   }
 }
 
+async function loadLotsPage() {
+  const requestId = nextRequestId();
+  clearAbortController('hold-overview-all');
+  const signal = createAbortSignal('hold-overview-lots');
+
+  paginationLoading.value = true;
+  lotsError.value = '';
+
+  try {
+    const lotsData = await fetchLots(signal);
+    if (isStaleRequest(requestId)) {
+      return;
+    }
+    updateLotsState(lotsData);
+  } catch (error) {
+    if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
+      return;
+    }
+    const message = error?.message || '載入 Lot 資料失敗';
+    lotsError.value = message;
+  } finally {
+    if (isStaleRequest(requestId)) {
+      return;
+    }
+    paginationLoading.value = false;
+  }
+}
+
 function navigateToHoldDetail(reason) {
   if (!reason) {
     return;
@@ -571,7 +600,7 @@ function prevPage() {
   }
   page.value -= 1;
   updateUrlState();
-  void loadLots();
+  void loadLotsPage();
 }
 
 function nextPage() {
@@ -580,7 +609,7 @@ function nextPage() {
   }
   page.value += 1;
   updateUrlState();
-  void loadLots();
+  void loadLotsPage();
 }
 
 async function manualRefresh() {
@@ -711,6 +740,7 @@ onBeforeUnmount(() => {
         :lots="lots"
         :pagination="pagination"
         :loading="lotsLoading"
+        :paginating="paginationLoading"
         :error-message="lotsError"
         :has-active-filters="hasLotFilterText"
         :filter-text="lotFilterText"
