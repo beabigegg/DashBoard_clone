@@ -22,6 +22,7 @@ from .trace_routes import trace_bp
 from .reject_history_routes import reject_history_bp
 from .material_trace_routes import material_trace_bp
 from .yield_alert_routes import yield_alert_bp
+from .spool_routes import spool_bp
 
 
 def register_routes(app) -> None:
@@ -42,6 +43,7 @@ def register_routes(app) -> None:
     app.register_blueprint(reject_history_bp)
     app.register_blueprint(material_trace_bp)
     app.register_blueprint(yield_alert_bp)
+    app.register_blueprint(spool_bp)
 
 __all__ = [
     'wip_bp',
@@ -62,5 +64,6 @@ __all__ = [
     'reject_history_bp',
     'material_trace_bp',
     'yield_alert_bp',
+    'spool_bp',
     'register_routes',
 ]

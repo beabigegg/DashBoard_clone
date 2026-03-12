@@ -213,6 +213,31 @@ def api_yield_alert_analyze():
         return internal_error("告警連結分析失敗")
 
 
+_SPOOL_DOWNLOAD_THRESHOLD = int(os.environ.get("YIELD_ALERT_SPOOL_THRESHOLD", "5000"))
+_YIELD_ALERT_SPOOL_NAMESPACE = "yield_alert_dataset"
+
+
+def _inject_spool_info(data: dict, query_id: str) -> None:
+    """Add spool_download_url and total_row_count to view response when applicable.
+
+    This allows the frontend to switch to DuckDB-WASM mode for large datasets.
+    Only injects when a spool file exists and row_count >= threshold.
+    """
+    try:
+        from mes_dashboard.core.query_spool_store import get_spool_metadata
+        metadata = get_spool_metadata(_YIELD_ALERT_SPOOL_NAMESPACE, query_id)
+        if metadata is None:
+            return
+        row_count = int(metadata.get("row_count") or 0)
+        data["total_row_count"] = row_count
+        if row_count >= _SPOOL_DOWNLOAD_THRESHOLD:
+            data["spool_download_url"] = (
+                f"/api/spool/{_YIELD_ALERT_SPOOL_NAMESPACE}/{query_id}.parquet"
+            )
+    except Exception:
+        pass  # Best-effort; do not break the view response
+
+
 @yield_alert_bp.route("/api/yield-alert/view", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_view():
@@ -267,6 +292,10 @@ def api_yield_alert_view():
 
         data = dict(result)
         meta = dict(data.pop("meta", {}) or {})
+
+        # Task 7.1: Inject spool_download_url + total_row_count for large datasets
+        _inject_spool_info(data, query_id)
+
         return success_response(data, meta=meta)
     except MemoryError as exc:
         return error_response(

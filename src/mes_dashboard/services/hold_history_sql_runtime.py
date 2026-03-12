@@ -1,0 +1,541 @@
+# -*- coding: utf-8 -*-
+"""DuckDB SQL runtime for hold-history view computation.
+
+Provides out-of-core view aggregation (trend / reason_pareto / duration / list)
+by querying Parquet spool files directly via DuckDB, avoiding full DataFrame
+loads into pandas.
+
+Entry point: ``try_compute_view_from_spool``
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import time
+from typing import Any, Dict, List, Optional, Tuple
+
+from mes_dashboard.core.feature_flags import resolve_bool_flag
+from mes_dashboard.core.query_spool_store import get_spool_file_path
+
+logger = logging.getLogger("mes_dashboard.hold_history_sql_runtime")
+
+# ── Feature flag ──────────────────────────────────────────────────────────────
+_SQL_VIEW_ENABLED = resolve_bool_flag("HOLD_HISTORY_SQL_VIEW_ENABLED", default=True)
+
+SQL_FALLBACK_DISABLED = "hold_history_sql_disabled"
+SQL_FALLBACK_DEP_MISSING = "hold_history_sql_dependency_missing"
+SQL_FALLBACK_SPOOL_MISS = "hold_history_sql_spool_miss"
+SQL_FALLBACK_RUNTIME_ERROR = "hold_history_sql_runtime_error"
+
+_SPOOL_NAMESPACE = "hold_dataset"
+
+
+# ── SQL helpers ───────────────────────────────────────────────────────────────
+
+def _qid(name: str) -> str:
+    """Quote a DuckDB identifier."""
+    return '"' + str(name).replace('"', '""') + '"'
+
+
+def _sql_str_literal(value: str) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _attach_spool_view(conn: Any, parquet_path: str) -> None:
+    conn.execute(
+        "CREATE OR REPLACE TEMP VIEW hold_src AS "
+        f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
+    )
+
+
+def _fetch_dict_rows(conn: Any, sql: str, params: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
+    cursor = conn.execute(sql, params or [])
+    columns = [desc[0] for desc in (cursor.description or [])]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+
+def _sf(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _si(value: Any, default: int = 0) -> int:
+    try:
+        return int(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _sstr(value: Any, default: str = "") -> str:
+    if value is None:
+        return default
+    s = str(value).strip()
+    return s if s else default
+
+
+# ── Task 4.2: Trend SQL ───────────────────────────────────────────────────────
+
+def _query_trend(
+    conn: Any,
+    *,
+    start_date: str,
+    end_date: str,
+) -> Dict[str, Any]:
+    """Compute daily hold trend with quality / non_quality / all variants.
+
+    The 07:30 shift boundary is already baked into the ``hold_day`` and
+    ``release_day`` columns by the Oracle base_facts SQL.
+    """
+    # Generate date series from start_date to end_date
+    dates_sql = """
+        SELECT CAST(generate_series AS DATE) AS d
+        FROM generate_series(
+            CAST(? AS DATE),
+            CAST(? AS DATE),
+            INTERVAL 1 DAY
+        )
+    """
+    date_rows = _fetch_dict_rows(conn, dates_sql, [start_date, end_date])
+    dates = [str(r["d"])[:10] for r in date_rows]
+
+    days: List[Dict[str, Any]] = []
+    for date_str in dates:
+        day_data: Dict[str, Any] = {"date": date_str}
+
+        for key, type_filter in [("quality", "quality"), ("non_quality", "non-quality"), ("all", None)]:
+            type_clause = f"AND \"HOLD_TYPE\" = {_sql_str_literal(type_filter)}" if type_filter else ""
+
+            # holdQty: total QTY on hold as of this day
+            hold_sql = f"""
+                SELECT COALESCE(SUM("QTY"), 0) AS v
+                FROM hold_src
+                WHERE CAST("hold_day" AS DATE) <= CAST(? AS DATE)
+                  AND (
+                    "release_day" IS NULL
+                    OR CAST("release_day" AS DATE) > CAST(? AS DATE)
+                  )
+                  {type_clause}
+            """
+            hold_rows = _fetch_dict_rows(conn, hold_sql, [date_str, date_str])
+            hold_qty = _si(hold_rows[0]["v"]) if hold_rows else 0
+
+            # newHoldQty: QTY of new holds arriving this day (dedup via RN_HOLD_DAY=1)
+            new_sql = f"""
+                SELECT COALESCE(SUM("QTY"), 0) AS v
+                FROM hold_src
+                WHERE CAST("hold_day" AS DATE) = CAST(? AS DATE)
+                  AND "RN_HOLD_DAY" = 1
+                  {type_clause}
+            """
+            new_rows = _fetch_dict_rows(conn, new_sql, [date_str])
+            new_hold_qty = _si(new_rows[0]["v"]) if new_rows else 0
+
+            # releaseQty: QTY released on this day
+            release_sql = f"""
+                SELECT COALESCE(SUM("QTY"), 0) AS v
+                FROM hold_src
+                WHERE CAST("release_day" AS DATE) = CAST(? AS DATE)
+                  {type_clause}
+            """
+            release_rows = _fetch_dict_rows(conn, release_sql, [date_str])
+            release_qty = _si(release_rows[0]["v"]) if release_rows else 0
+
+            # futureHoldQty: QTY of future holds on this day
+            future_sql = f"""
+                SELECT COALESCE(SUM("QTY"), 0) AS v
+                FROM hold_src
+                WHERE CAST("hold_day" AS DATE) = CAST(? AS DATE)
+                  AND "IS_FUTURE_HOLD" = 1
+                  AND "FUTURE_HOLD_FLAG" = 1
+                  {type_clause}
+            """
+            future_rows = _fetch_dict_rows(conn, future_sql, [date_str])
+            future_hold_qty = _si(future_rows[0]["v"]) if future_rows else 0
+
+            day_data[key] = {
+                "holdQty": hold_qty,
+                "newHoldQty": new_hold_qty,
+                "releaseQty": release_qty,
+                "futureHoldQty": future_hold_qty,
+            }
+
+        days.append(day_data)
+
+    return {"days": days}
+
+
+# ── Task 4.3: Reason Pareto SQL ───────────────────────────────────────────────
+
+def _query_reason_pareto(
+    conn: Any,
+    *,
+    hold_type: str = "quality",
+    record_type: str = "new",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Compute reason Pareto: GROUP BY HOLDREASONNAME, DESC by count."""
+    type_clause = _build_hold_type_clause(hold_type)
+    record_clause = _build_record_type_clause(record_type, start_date, end_date)
+
+    where_parts = []
+    if type_clause:
+        where_parts.append(type_clause)
+    if record_clause:
+        where_parts.append(record_clause)
+    where_sql = "WHERE " + " AND ".join(where_parts) if where_parts else ""
+
+    sql = f"""
+        SELECT
+            COALESCE(CAST("HOLDREASONNAME" AS VARCHAR), '') AS reason,
+            COUNT(*) AS cnt,
+            COALESCE(SUM("QTY"), 0) AS qty
+        FROM hold_src
+        {where_sql}
+        GROUP BY COALESCE(CAST("HOLDREASONNAME" AS VARCHAR), '')
+        ORDER BY qty DESC
+    """
+    rows = _fetch_dict_rows(conn, sql)
+    total_qty = sum(_si(r.get("qty")) for r in rows)
+
+    items: List[Dict[str, Any]] = []
+    cumulative = 0.0
+    for r in rows:
+        qty = _si(r.get("qty"))
+        pct = round((qty / total_qty * 100) if total_qty > 0 else 0, 2)
+        cumulative += pct
+        reason = _sstr(r.get("reason")) or "(未填寫)"
+        items.append({
+            "reason": reason,
+            "count": _si(r.get("cnt")),
+            "qty": qty,
+            "pct": pct,
+            "cumPct": round(cumulative, 2),
+        })
+
+    return {"items": items}
+
+
+# ── Task 4.4: Duration SQL ────────────────────────────────────────────────────
+
+def _query_duration(
+    conn: Any,
+    *,
+    hold_type: str = "quality",
+    record_type: str = "new",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Compute hold duration distribution via CASE buckets in DuckDB."""
+    type_clause = _build_hold_type_clause(hold_type)
+    record_clause = _build_record_type_clause(record_type, start_date, end_date)
+
+    where_parts = ['"RELEASETXNDATE" IS NOT NULL']
+    if type_clause:
+        where_parts.append(type_clause)
+    if record_clause:
+        where_parts.append(record_clause)
+    where_sql = "WHERE " + " AND ".join(where_parts)
+
+    sql = f"""
+        SELECT
+            CASE
+                WHEN "HOLD_HOURS" < 4      THEN '<4h'
+                WHEN "HOLD_HOURS" < 24     THEN '4-24h'
+                WHEN "HOLD_HOURS" < 72     THEN '1-3d'
+                ELSE '>3d'
+            END AS bucket,
+            COUNT(*) AS cnt,
+            COALESCE(SUM("QTY"), 0) AS qty
+        FROM hold_src
+        {where_sql}
+        GROUP BY 1
+    """
+    rows = _fetch_dict_rows(conn, sql)
+    bucket_map = {r["bucket"]: {"count": _si(r["cnt"]), "qty": _si(r["qty"])} for r in rows}
+    total_qty = sum(v["qty"] for v in bucket_map.values())
+
+    items: List[Dict[str, Any]] = []
+    for label in ("<4h", "4-24h", "1-3d", ">3d"):
+        entry = bucket_map.get(label, {"count": 0, "qty": 0})
+        qty = entry["qty"]
+        items.append({
+            "range": label,
+            "count": entry["count"],
+            "qty": qty,
+            "pct": round((qty / total_qty * 100) if total_qty > 0 else 0, 2),
+        })
+
+    return {"items": items}
+
+
+# ── Task 4.5: List SQL ────────────────────────────────────────────────────────
+
+def _query_list(
+    conn: Any,
+    *,
+    hold_type: str = "quality",
+    reason: Optional[str] = None,
+    record_type: str = "new",
+    duration_range: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 50,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Paginated hold list: filter by hold_type + reason, sorted by HOLDTXNDATE DESC."""
+    page = max(int(page), 1)
+    per_page = min(max(int(per_page), 1), 200)
+
+    type_clause = _build_hold_type_clause(hold_type)
+    record_clause = _build_record_type_clause(record_type, start_date, end_date)
+    duration_clause = _build_duration_clause(duration_range)
+
+    where_parts = []
+    params: List[Any] = []
+    if type_clause:
+        where_parts.append(type_clause)
+    if record_clause:
+        where_parts.append(record_clause)
+    if reason:
+        where_parts.append("TRIM(CAST(\"HOLDREASONNAME\" AS VARCHAR)) = ?")
+        params.append(reason.strip())
+    if duration_clause:
+        where_parts.append(duration_clause)
+
+    where_sql = "WHERE " + " AND ".join(where_parts) if where_parts else ""
+
+    count_sql = f"SELECT COUNT(*) AS total FROM hold_src {where_sql}"
+    count_rows = _fetch_dict_rows(conn, count_sql, params)
+    total = _si(count_rows[0]["total"]) if count_rows else 0
+
+    total_pages = max(1, math.ceil(total / per_page))
+    page = min(page, total_pages)
+    offset = (page - 1) * per_page
+
+    page_sql = f"""
+        SELECT
+            CAST("CONTAINERID" AS VARCHAR)   AS CONTAINERID,
+            CAST("LOT_ID" AS VARCHAR)        AS LOT_ID,
+            CAST("PJ_WORKORDER" AS VARCHAR)  AS PJ_WORKORDER,
+            CAST("PRODUCTNAME" AS VARCHAR)   AS PRODUCTNAME,
+            CAST("WORKCENTERNAME" AS VARCHAR) AS WORKCENTERNAME,
+            CAST("HOLDREASONNAME" AS VARCHAR) AS HOLDREASONNAME,
+            "QTY",
+            "HOLDTXNDATE",
+            CAST("HOLDEMP" AS VARCHAR)       AS HOLDEMP,
+            CAST("HOLDCOMMENTS" AS VARCHAR)  AS HOLDCOMMENTS,
+            "RELEASETXNDATE",
+            CAST("RELEASEEMP" AS VARCHAR)    AS RELEASEEMP,
+            CAST("RELEASECOMMENTS" AS VARCHAR) AS RELEASECOMMENTS,
+            "HOLD_HOURS",
+            CAST("NCRID" AS VARCHAR)         AS NCRID,
+            CAST("FUTUREHOLDCOMMENTS" AS VARCHAR) AS FUTUREHOLDCOMMENTS
+        FROM hold_src
+        {where_sql}
+        ORDER BY "HOLDTXNDATE" DESC NULLS LAST
+        LIMIT ? OFFSET ?
+    """
+    page_rows = _fetch_dict_rows(conn, page_sql, params + [per_page, offset])
+
+    # Lazy import to avoid circular dependency
+    try:
+        from mes_dashboard.services.hold_history_service import (
+            _clean_text, _format_datetime, _safe_float,
+        )
+        from mes_dashboard.services.filter_cache import get_workcenter_group as _get_wc_group
+    except Exception:
+        def _clean_text(v):  # type: ignore[misc]
+            return str(v).strip() if v is not None else None
+        def _format_datetime(v):  # type: ignore[misc]
+            return str(v) if v is not None else None
+        def _safe_float(v, d=0.0):  # type: ignore[misc]
+            try:
+                return float(v) if v is not None else d
+            except Exception:
+                return d
+        def _get_wc_group(v):  # type: ignore[misc]
+            return v
+
+    items: List[Dict[str, Any]] = []
+    for r in page_rows:
+        wc_name = _clean_text(r.get("WORKCENTERNAME"))
+        wc_group = _get_wc_group(wc_name) if wc_name else None
+        items.append({
+            "lotId": _clean_text(r.get("LOT_ID")),
+            "workorder": _clean_text(r.get("PJ_WORKORDER")),
+            "product": _clean_text(r.get("PRODUCTNAME")),
+            "workcenter": wc_group or wc_name,
+            "holdReason": _clean_text(r.get("HOLDREASONNAME")),
+            "qty": _si(r.get("QTY")),
+            "holdDate": _format_datetime(r.get("HOLDTXNDATE")),
+            "holdEmp": _clean_text(r.get("HOLDEMP")),
+            "holdComment": _clean_text(r.get("HOLDCOMMENTS")),
+            "releaseDate": _format_datetime(r.get("RELEASETXNDATE")),
+            "releaseEmp": _clean_text(r.get("RELEASEEMP")),
+            "releaseComment": _clean_text(r.get("RELEASECOMMENTS")),
+            "holdHours": round(_safe_float(r.get("HOLD_HOURS")), 2),
+            "ncr": _clean_text(r.get("NCRID")),
+            "futureHoldComment": _clean_text(r.get("FUTUREHOLDCOMMENTS")),
+        })
+
+    return {
+        "items": items,
+        "pagination": {
+            "page": page,
+            "perPage": per_page,
+            "total": total,
+            "totalPages": total_pages,
+        },
+    }
+
+
+# ── Filter clause helpers ─────────────────────────────────────────────────────
+
+def _build_hold_type_clause(hold_type: str) -> str:
+    if hold_type == "all":
+        return ""
+    ht_value = "non-quality" if hold_type == "non-quality" else "quality"
+    return f"\"HOLD_TYPE\" = {_sql_str_literal(ht_value)}"
+
+
+def _build_record_type_clause(
+    record_type: str,
+    start_date: Optional[str],
+    end_date: Optional[str],
+) -> str:
+    """Build SQL WHERE clause for record_type filter.
+
+    Mirrors _apply_record_type_filter in hold_dataset_cache.
+    """
+    types = {t.strip().lower() for t in str(record_type or "new").split(",")}
+    if types >= {"new", "on_hold", "released"}:
+        return ""
+
+    parts: List[str] = []
+    if "new" in types and start_date and end_date:
+        parts.append(
+            f"(CAST(\"hold_day\" AS DATE) >= CAST({_sql_str_literal(start_date)} AS DATE) "
+            f"AND CAST(\"hold_day\" AS DATE) <= CAST({_sql_str_literal(end_date)} AS DATE))"
+        )
+    if "on_hold" in types:
+        parts.append("\"RELEASETXNDATE\" IS NULL")
+    if "released" in types:
+        parts.append("\"RELEASETXNDATE\" IS NOT NULL")
+
+    return "(" + " OR ".join(parts) + ")" if parts else ""
+
+
+def _build_duration_clause(duration_range: Optional[str]) -> str:
+    if not duration_range:
+        return ""
+    if duration_range == "<4h":
+        return "\"HOLD_HOURS\" < 4"
+    if duration_range == "4-24h":
+        return "\"HOLD_HOURS\" >= 4 AND \"HOLD_HOURS\" < 24"
+    if duration_range == "1-3d":
+        return "\"HOLD_HOURS\" >= 24 AND \"HOLD_HOURS\" < 72"
+    if duration_range == ">3d":
+        return "\"HOLD_HOURS\" >= 72"
+    return ""
+
+
+# ── Task 4.1 + 4.6: Entry point ───────────────────────────────────────────────
+
+def try_compute_view_from_spool(
+    *,
+    query_id: str,
+    hold_type: str = "quality",
+    reason: Optional[str] = None,
+    record_type: str = "new",
+    duration_range: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 50,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """Try to compute the full view result via DuckDB over the Parquet spool.
+
+    Returns ``(result_dict, meta)`` on success, or ``(None, meta)`` on failure.
+    ``meta["view_sql_fallback_reason"]`` is set when returning None.
+    """
+    if not _SQL_VIEW_ENABLED:
+        return None, {"view_sql_fallback_reason": SQL_FALLBACK_DISABLED}
+
+    try:
+        import duckdb  # type: ignore
+    except Exception:
+        return None, {"view_sql_fallback_reason": SQL_FALLBACK_DEP_MISSING}
+
+    parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
+    if not parquet_path:
+        return None, {"view_sql_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    started_at = time.time()
+    conn = None
+    try:
+        conn = duckdb.connect(database=":memory:")
+        _attach_spool_view(conn, parquet_path)
+
+        trend = _query_trend(
+            conn,
+            start_date=start_date or "",
+            end_date=end_date or "",
+        )
+        reason_pareto = _query_reason_pareto(
+            conn,
+            hold_type=hold_type,
+            record_type=record_type,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        duration = _query_duration(
+            conn,
+            hold_type=hold_type,
+            record_type=record_type,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        list_result = _query_list(
+            conn,
+            hold_type=hold_type,
+            reason=reason,
+            record_type=record_type,
+            duration_range=duration_range,
+            page=page,
+            per_page=per_page,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        latency_s = round(time.time() - started_at, 3)
+        logger.info(
+            "hold_history_sql_runtime: view computed via DuckDB "
+            "(query_id=%s latency_s=%.3f)",
+            query_id, latency_s,
+        )
+
+        result = {
+            "trend": trend,
+            "reason_pareto": reason_pareto,
+            "duration": duration,
+            "list": list_result,
+        }
+        meta = {"view_sql_latency_s": latency_s}
+        return result, meta
+
+    except Exception as exc:
+        logger.warning(
+            "hold_history_sql_runtime: DuckDB view failed (query_id=%s): %s",
+            query_id, exc,
+        )
+        return None, {"view_sql_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass

@@ -51,6 +51,7 @@ This file is the governed inventory for API contract classification and exceptio
 | `reject_history_routes.py` | CSV export endpoints |
 | `resource_history_routes.py` | CSV export endpoints |
 | `trace_routes.py` | NDJSON stream endpoint (`/api/trace/job/<job_id>/stream`) |
+| `spool_routes.py` | `GET /api/spool/{namespace}/{query_id}.parquet` — Parquet binary download; JSON errors use envelope |
 
 ### legacy-transition (temporary bridge endpoints; retirement pending)
 

@@ -1,7 +1,9 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
+import { useYieldAlertDuckDB } from './useYieldAlertDuckDB.js';
+import { isDuckDBSupported } from '../core/duckdb-client.js';
 import MultiSelect from '../resource-shared/components/MultiSelect.vue';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { toQueryParams } from './utils.js';
@@ -79,6 +81,11 @@ const filters = reactive({
 });
 
 const pageTitle = 'Yield Alert Center';
+
+// ── DuckDB-WASM mode (Task 7.2) ───────────────────────────────────────────
+const DUCKDB_THRESHOLD = 5000;
+const duckdb = useYieldAlertDuckDB();
+const duckdbMode = ref(false);   // true when frontend DuckDB-WASM is active
 
 const parsedFilters = computed(() => ({
   start_date: filters.start_date,
@@ -261,6 +268,46 @@ async function loadCachedView(page = 1) {
   trendLoading.value = true;
   alertLoading.value = true;
 
+  // ── Task 7.2: DuckDB-WASM mode path ──────────────────────────────────
+  if (duckdbMode.value && duckdb.isActive.value) {
+    try {
+      const result = await duckdb.computeView({
+        filters: {
+          departments: parsedFilters.value.workcenter_groups,
+          lines: parsedFilters.value.lines,
+          packages: parsedFilters.value.packages,
+          types: parsedFilters.value.types,
+          functions: parsedFilters.value.functions,
+        },
+        granularity: granularity.value,
+        riskThreshold: Number(parsedFilters.value.risk_threshold) || 98,
+        minScrapQty: Number(parsedFilters.value.min_scrap_qty) || 1,
+        sortBy: sortState.sort_by,
+        sortDir: sortState.sort_dir,
+        page,
+        perPage: pagination.value.per_page,
+      });
+      summary.value = result.summary || summary.value;
+      trend.value = result.trend?.items || [];
+      heatmapData.value = result.heatmap?.items || [];
+      stationSummary.value = result.station_summary?.items || [];
+      packageSummary.value = result.package_summary?.items || [];
+      alerts.value = result.alerts?.items || [];
+      pagination.value = result.alerts?.pagination || pagination.value;
+      const fo = result.filter_options || {};
+      if (fo.lines?.length) lineOptions.value = fo.lines;
+      if (fo.packages?.length) packageOptions.value = fo.packages;
+      if (fo.types?.length) typeOptions.value = fo.types;
+      if (fo.functions?.length) functionOptions.value = fo.functions;
+      return;
+    } catch (err) {
+      console.warn('[DuckDB] computeView failed, falling back to server:', err);
+      duckdbMode.value = false;
+      duckdb.deactivate();
+    }
+  }
+
+  // ── Server-side path ──────────────────────────────────────────────────
   const resp = await apiGet('/api/yield-alert/view', {
     params: {
       query_id: queryId.value,
@@ -298,6 +345,17 @@ async function loadCachedView(page = 1) {
   if (fo.types?.length) typeOptions.value = fo.types;
   if (fo.functions?.length) functionOptions.value = fo.functions;
 
+  // ── Task 7.2: Activate DuckDB mode for large datasets ─────────────────
+  const totalRowCount = resp.data?.total_row_count ?? 0;
+  const spoolUrl = resp.data?.spool_download_url;
+  if (spoolUrl && totalRowCount >= DUCKDB_THRESHOLD && isDuckDBSupported() && !duckdbMode.value) {
+    try {
+      await duckdb.activate(spoolUrl);
+      duckdbMode.value = true;
+    } catch (err) {
+      console.warn('[DuckDB] activation failed, staying in server mode:', err);
+    }
+  }
 }
 
 async function runQuery(page = 1) {
@@ -419,6 +477,10 @@ onMounted(() => {
   setDefaultDateRange();
   restoreFromUrl();
   loadFilterOptions();
+});
+
+onUnmounted(() => {
+  duckdb.deactivate();
 });
 </script>
 
