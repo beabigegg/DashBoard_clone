@@ -199,7 +199,7 @@ async function queryDetail(client, allConditions, { page, perPage, detailReason,
   const total = Number(countRows[0]?.total || 0);
 
   const p  = Math.max(Number(page || 1), 1);
-  const pp = Math.min(Math.max(Number(perPage || 50), 1), 200);
+  const pp = Math.min(Math.max(Number(perPage || 20), 1), 200);
   const totalPages = Math.max(Math.ceil(total / pp), 1);
   const offset = (p - 1) * pp;
 
@@ -412,7 +412,7 @@ export function useRejectHistoryDuckDB() {
     paretoScope = 'top80',
     paretoSelections = {},
     page = 1,
-    perPage = 50,
+    perPage = 20,
     detailReason = null,
   } = {}) {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');

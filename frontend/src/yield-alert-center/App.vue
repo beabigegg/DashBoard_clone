@@ -13,7 +13,7 @@ import YieldPackageChart from './YieldPackageChart.vue';
 import YieldTrendChart from './YieldTrendChart.vue';
 
 const API_TIMEOUT = 90000;
-const DEFAULT_PER_PAGE = 50;
+const DEFAULT_PER_PAGE = 20;
 const DEFAULT_WORKCENTER_GROUP_OPTIONS = [
   '焊接_DB',
   '焊接_WB',
@@ -32,6 +32,7 @@ const loading = ref(false);
 const trendLoading = ref(false);
 const summaryLoading = ref(false);
 const alertLoading = ref(false);
+const paginationLoading = ref(false);
 
 const errorMessage = ref('');
 const warningMessage = ref('');
@@ -86,6 +87,7 @@ const pageTitle = 'Yield Alert Center';
 const DUCKDB_THRESHOLD = 5000;
 const duckdb = useYieldAlertDuckDB();
 const duckdbMode = ref(false);   // true when frontend DuckDB-WASM is active
+const duckdbActivating = ref(false);
 
 const parsedFilters = computed(() => ({
   start_date: filters.start_date,
@@ -99,8 +101,10 @@ const parsedFilters = computed(() => ({
   min_scrap_qty: filters.min_scrap_qty,
 }));
 
-const canSubmit = computed(() => !loading.value && Boolean(filters.start_date && filters.end_date));
-const canApplySupplementary = computed(() => !loading.value && Boolean(queryId.value) && canSubmit.value);
+const canSubmit = computed(() => !loading.value && !paginationLoading.value && Boolean(filters.start_date && filters.end_date));
+const canApplySupplementary = computed(
+  () => !loading.value && !paginationLoading.value && Boolean(queryId.value) && canSubmit.value,
+);
 const isDateStageDirty = computed(() => (
   !queryId.value
   || filters.start_date !== committedDateRange.start_date
@@ -110,7 +114,7 @@ const submitLabel = computed(() => (isDateStageDirty.value ? '查詢(日期)' : 
 const hasData = computed(() => alerts.value.length > 0);
 const alertEmptyMessage = computed(() => {
   if (!hasQueried.value) return '請先設定日期並查詢';
-  if (alertLoading.value) return '告警資料載入中...';
+  if (alertLoading.value || paginationLoading.value) return '告警資料載入中...';
   return '目前無符合條件的告警候選';
 });
 
@@ -259,14 +263,28 @@ async function executePrimaryQuery() {
   committedDateRange.end_date = filters.end_date;
 }
 
-async function loadCachedView(page = 1) {
+function buildViewParams(page) {
+  return {
+    query_id: queryId.value,
+    workcenter_groups: parsedFilters.value.workcenter_groups,
+    lines: parsedFilters.value.lines,
+    packages: parsedFilters.value.packages,
+    types: parsedFilters.value.types,
+    functions: parsedFilters.value.functions,
+    risk_threshold: parsedFilters.value.risk_threshold,
+    min_scrap_qty: parsedFilters.value.min_scrap_qty,
+    granularity: granularity.value,
+    page,
+    per_page: pagination.value.per_page,
+    sort_by: sortState.sort_by,
+    sort_dir: sortState.sort_dir,
+  };
+}
+
+async function fetchViewPayload(page = 1) {
   if (!queryId.value) {
     throw new Error('尚未建立日期查詢快取');
   }
-
-  summaryLoading.value = true;
-  trendLoading.value = true;
-  alertLoading.value = true;
 
   // ── Task 7.2: DuckDB-WASM mode path ──────────────────────────────────
   if (duckdbMode.value && duckdb.isActive.value) {
@@ -287,19 +305,7 @@ async function loadCachedView(page = 1) {
         page,
         perPage: pagination.value.per_page,
       });
-      summary.value = result.summary || summary.value;
-      trend.value = result.trend?.items || [];
-      heatmapData.value = result.heatmap?.items || [];
-      stationSummary.value = result.station_summary?.items || [];
-      packageSummary.value = result.package_summary?.items || [];
-      alerts.value = result.alerts?.items || [];
-      pagination.value = result.alerts?.pagination || pagination.value;
-      const fo = result.filter_options || {};
-      if (fo.lines?.length) lineOptions.value = fo.lines;
-      if (fo.packages?.length) packageOptions.value = fo.packages;
-      if (fo.types?.length) typeOptions.value = fo.types;
-      if (fo.functions?.length) functionOptions.value = fo.functions;
-      return;
+      return result;
     } catch (err) {
       console.warn('[DuckDB] computeView failed, falling back to server:', err);
       duckdbMode.value = false;
@@ -309,21 +315,7 @@ async function loadCachedView(page = 1) {
 
   // ── Server-side path ──────────────────────────────────────────────────
   const resp = await apiGet('/api/yield-alert/view', {
-    params: {
-      query_id: queryId.value,
-      workcenter_groups: parsedFilters.value.workcenter_groups,
-      lines: parsedFilters.value.lines,
-      packages: parsedFilters.value.packages,
-      types: parsedFilters.value.types,
-      functions: parsedFilters.value.functions,
-      risk_threshold: parsedFilters.value.risk_threshold,
-      min_scrap_qty: parsedFilters.value.min_scrap_qty,
-      granularity: granularity.value,
-      page,
-      per_page: pagination.value.per_page,
-      sort_by: sortState.sort_by,
-      sort_dir: sortState.sort_dir,
-    },
+    params: buildViewParams(page),
     timeout: API_TIMEOUT,
   });
 
@@ -331,31 +323,60 @@ async function loadCachedView(page = 1) {
     throw new Error(resp.error || '視圖查詢失敗');
   }
 
-  summary.value = resp.data?.summary || summary.value;
-  trend.value = resp.data?.trend?.items || [];
-  heatmapData.value = resp.data?.heatmap?.items || [];
-  stationSummary.value = resp.data?.station_summary?.items || [];
-  packageSummary.value = resp.data?.package_summary?.items || [];
-  alerts.value = resp.data?.alerts?.items || [];
-  pagination.value = resp.data?.alerts?.pagination || pagination.value;
+  const payload = resp.data || {};
 
-  const fo = resp.data?.filter_options || {};
+  // ── Task 7.2: Activate DuckDB mode for large datasets ─────────────────
+  const totalRowCount = payload.total_row_count ?? 0;
+  const spoolUrl = payload.spool_download_url;
+  if (
+    spoolUrl
+    && totalRowCount >= DUCKDB_THRESHOLD
+    && isDuckDBSupported()
+    && !duckdbMode.value
+    && !duckdbActivating.value
+  ) {
+    duckdbActivating.value = true;
+    // Activate in background so UI can render server payload immediately.
+    void duckdb.activate(spoolUrl)
+      .then(() => {
+        duckdbMode.value = true;
+      })
+      .catch((err) => {
+        console.warn('[DuckDB] activation failed, staying in server mode:', err);
+      })
+      .finally(() => {
+        duckdbActivating.value = false;
+      });
+  }
+
+  return payload;
+}
+
+function applyFullView(payload = {}) {
+  summary.value = payload.summary || summary.value;
+  trend.value = payload.trend?.items || [];
+  heatmapData.value = payload.heatmap?.items || [];
+  stationSummary.value = payload.station_summary?.items || [];
+  packageSummary.value = payload.package_summary?.items || [];
+  alerts.value = payload.alerts?.items || [];
+  pagination.value = payload.alerts?.pagination || pagination.value;
+
+  const fo = payload.filter_options || {};
   if (fo.lines?.length) lineOptions.value = fo.lines;
   if (fo.packages?.length) packageOptions.value = fo.packages;
   if (fo.types?.length) typeOptions.value = fo.types;
   if (fo.functions?.length) functionOptions.value = fo.functions;
+}
 
-  // ── Task 7.2: Activate DuckDB mode for large datasets ─────────────────
-  const totalRowCount = resp.data?.total_row_count ?? 0;
-  const spoolUrl = resp.data?.spool_download_url;
-  if (spoolUrl && totalRowCount >= DUCKDB_THRESHOLD && isDuckDBSupported() && !duckdbMode.value) {
-    try {
-      await duckdb.activate(spoolUrl);
-      duckdbMode.value = true;
-    } catch (err) {
-      console.warn('[DuckDB] activation failed, staying in server mode:', err);
-    }
-  }
+async function loadCachedView(page = 1) {
+  const payload = await fetchViewPayload(page);
+  applyFullView(payload);
+}
+
+async function loadAlertPage(page = 1) {
+  const payload = await fetchViewPayload(page);
+  alerts.value = payload.alerts?.items || [];
+  pagination.value = payload.alerts?.pagination || pagination.value;
 }
 
 async function runQuery(page = 1) {
@@ -364,6 +385,9 @@ async function runQuery(page = 1) {
   }
 
   loading.value = true;
+  summaryLoading.value = true;
+  trendLoading.value = true;
+  alertLoading.value = true;
   errorMessage.value = '';
   warningMessage.value = '';
 
@@ -393,6 +417,33 @@ async function runQuery(page = 1) {
   }
 }
 
+async function runAlertPage(page = 1) {
+  if (!queryId.value) {
+    return;
+  }
+  paginationLoading.value = true;
+  errorMessage.value = '';
+
+  try {
+    try {
+      await loadAlertPage(page);
+    } catch (error) {
+      if (isCacheExpiredError(error)) {
+        await executePrimaryQuery();
+        await loadAlertPage(page);
+      } else {
+        throw error;
+      }
+    }
+    hasQueried.value = true;
+    syncUrlState();
+  } catch (error) {
+    errorMessage.value = error.message || '查詢失敗，請稍後再試';
+  } finally {
+    paginationLoading.value = false;
+  }
+}
+
 function onSort(field) {
   if (!hasQueried.value) {
     return;
@@ -404,6 +455,19 @@ function onSort(field) {
     sortState.sort_dir = field === 'date_bucket' ? 'desc' : 'asc';
   }
   runQuery(1);
+}
+
+function goToPage(nextPage) {
+  const totalPages = Number(pagination.value.total_pages || 1);
+  if (
+    loading.value
+    || paginationLoading.value
+    || nextPage < 1
+    || nextPage > totalPages
+  ) {
+    return;
+  }
+  void runAlertPage(nextPage);
 }
 
 function sortIcon(field) {
@@ -466,6 +530,8 @@ function resetFilters() {
   packageSummary.value = [];
   alerts.value = [];
   pagination.value = { page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 1 };
+  paginationLoading.value = false;
+  duckdbActivating.value = false;
   expandedRowKey.value = '';
   reasonDetailRows.value = [];
   warningMessage.value = '';
@@ -480,6 +546,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  duckdbActivating.value = false;
   duckdb.deactivate();
 });
 </script>
@@ -652,7 +719,7 @@ onUnmounted(() => {
         <h2>告警候選清單</h2>
         <span>{{ pagination.total }} 筆</span>
       </header>
-      <div class="table-wrap" v-if="hasData">
+      <div class="table-wrap" :class="{ 'is-paginating': paginationLoading }" v-if="hasData">
         <table class="alert-table">
           <thead>
             <tr>
@@ -742,9 +809,9 @@ onUnmounted(() => {
       <p v-else class="empty-note">{{ alertEmptyMessage }}</p>
 
       <footer class="pagination">
-        <button class="btn btn-secondary" :disabled="loading || pagination.page <= 1" @click="runQuery(pagination.page - 1)">上一頁</button>
+        <button class="btn btn-secondary" :disabled="loading || paginationLoading || pagination.page <= 1" @click="goToPage(pagination.page - 1)">上一頁</button>
         <span>第 {{ pagination.page }} / {{ pagination.total_pages }} 頁</span>
-        <button class="btn btn-secondary" :disabled="loading || pagination.page >= pagination.total_pages" @click="runQuery(pagination.page + 1)">下一頁</button>
+        <button class="btn btn-secondary" :disabled="loading || paginationLoading || pagination.page >= pagination.total_pages" @click="goToPage(pagination.page + 1)">下一頁</button>
       </footer>
     </section>
   </div>

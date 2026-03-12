@@ -186,6 +186,41 @@ def _assert_float_close(a, b, label: str, tol: float = 0.05):
     )
 
 
+def test_resolve_view_date_range_uses_valid_input_dates(monkeypatch):
+    from mes_dashboard.services import hold_history_sql_runtime as runtime
+
+    def _should_not_be_called(*_args, **_kwargs):
+        raise AssertionError("fallback SQL query should not run when inputs are valid")
+
+    monkeypatch.setattr(runtime, "_fetch_dict_rows", _should_not_be_called)
+
+    start, end = runtime._resolve_view_date_range(
+        conn=object(),
+        start_date="2026-03-01",
+        end_date="2026-03-05",
+    )
+    assert start == "2026-03-01"
+    assert end == "2026-03-05"
+
+
+def test_resolve_view_date_range_falls_back_to_spool_bounds(monkeypatch):
+    from mes_dashboard.services import hold_history_sql_runtime as runtime
+
+    monkeypatch.setattr(
+        runtime,
+        "_fetch_dict_rows",
+        lambda conn, sql, params=None: [{"min_day": "2026-03-02", "max_day": "2026-03-09"}],
+    )
+
+    start, end = runtime._resolve_view_date_range(
+        conn=object(),
+        start_date="",
+        end_date=None,
+    )
+    assert start == "2026-03-02"
+    assert end == "2026-03-09"
+
+
 # ── Test class ───────────────────────────────────────────────────────────────
 
 class TestHoldHistorySqlParity:

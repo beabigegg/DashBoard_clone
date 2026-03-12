@@ -9,9 +9,13 @@ const props = defineProps({
   },
   pagination: {
     type: Object,
-    default: () => ({ page: 1, perPage: 50, total: 0, totalPages: 1 }),
+    default: () => ({ page: 1, perPage: 20, total: 0, totalPages: 1 }),
   },
   loading: {
+    type: Boolean,
+    default: false,
+  },
+  paginating: {
     type: Boolean,
     default: false,
   },
@@ -25,7 +29,7 @@ const emit = defineEmits(['prev-page', 'next-page']);
 
 const pageSummary = computed(() => {
   const page = Number(props.pagination?.page || 1);
-  const perPage = Number(props.pagination?.perPage || 50);
+  const perPage = Number(props.pagination?.perPage || 20);
   const total = Number(props.pagination?.total || 0);
 
   if (total <= 0) {
@@ -83,7 +87,7 @@ function hideTip() {
       <div class="table-info">{{ pageSummary }}</div>
     </div>
 
-    <div class="card-body ui-card-body detail-table-wrap">
+    <div class="card-body ui-card-body detail-table-wrap" :class="{ paginating: paginating }">
       <table class="detail-table">
         <thead>
           <tr>

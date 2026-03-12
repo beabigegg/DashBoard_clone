@@ -466,11 +466,17 @@
 
 .detail-table-wrap {
   position: relative;
-  overflow: auto;
+  overflow-x: auto;
 }
 
 .detail-table-wrap.is-loading table {
   opacity: 0.4;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.detail-table-wrap.is-paginating table {
+  opacity: 0.5;
   pointer-events: none;
   transition: opacity 0.15s ease;
 }

@@ -5,7 +5,7 @@ import { apiGet, apiPost } from '../core/api.js';
 import { parseMultiLineInput } from '../core/reject-history-filters.js';
 
 const API_TIMEOUT = 60000;
-const DEFAULT_PER_PAGE = 50;
+const DEFAULT_PER_PAGE = 20;
 const FORWARD_INPUT_LIMIT = 200;
 const REVERSE_INPUT_LIMIT = 50;
 
@@ -24,6 +24,7 @@ const workcenterSearch = ref('');
 const rows = ref([]);
 const pagination = ref({ page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 0 });
 const loading = ref(false);
+const paginationLoading = ref(false);
 const errorMessage = ref('');
 const warningMessage = ref('');
 const unresolvedWarning = ref('');
@@ -36,8 +37,10 @@ const currentInputLimit = computed(() =>
 );
 const isOverLimit = computed(() => inputCount.value > currentInputLimit.value);
 const hasResults = computed(() => rows.value.length > 0);
-const canQuery = computed(() => inputCount.value > 0 && !isOverLimit.value && !loading.value);
-const canExport = computed(() => hasResults.value && !loading.value);
+const canQuery = computed(
+  () => inputCount.value > 0 && !isOverLimit.value && !loading.value && !paginationLoading.value,
+);
+const canExport = computed(() => hasResults.value && !loading.value && !paginationLoading.value);
 
 const queryModeForApi = computed(() => {
   if (queryMode.value === 'reverse') return 'material_lot';
@@ -130,13 +133,22 @@ async function loadFilterOptions() {
   }
 }
 
-async function executePrimaryQuery(page = 1) {
-  if (!canQuery.value) return;
+async function executePrimaryQuery(page = 1, { paginationOnly = false } = {}) {
+  if (paginationOnly) {
+    if (loading.value || paginationLoading.value) return;
+  } else if (!canQuery.value) {
+    return;
+  }
 
-  errorMessage.value = '';
-  warningMessage.value = '';
-  unresolvedWarning.value = '';
-  loading.value = true;
+  if (!paginationOnly) {
+    errorMessage.value = '';
+    warningMessage.value = '';
+    unresolvedWarning.value = '';
+    loading.value = true;
+    paginationLoading.value = false;
+  } else {
+    paginationLoading.value = true;
+  }
 
   const body = {
     mode: queryModeForApi.value,
@@ -153,8 +165,10 @@ async function executePrimaryQuery(page = 1) {
 
     if (!result.success) {
       errorMessage.value = result.error?.message || '查詢失敗';
-      rows.value = [];
-      pagination.value = { page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 0 };
+      if (!paginationOnly) {
+        rows.value = [];
+        pagination.value = { page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 0 };
+      }
       return;
     }
 
@@ -174,14 +188,21 @@ async function executePrimaryQuery(page = 1) {
     warningMessage.value = buildQualityWarning(payload.quality_meta, payload.meta);
   } catch (err) {
     errorMessage.value = err.message || '查詢失敗，請稍後再試';
-    rows.value = [];
+    if (!paginationOnly) {
+      rows.value = [];
+    }
   } finally {
-    loading.value = false;
+    if (paginationOnly) {
+      paginationLoading.value = false;
+    } else {
+      loading.value = false;
+    }
   }
 }
 
 function goToPage(page) {
-  executePrimaryQuery(page);
+  if (page < 1 || page > Number(pagination.value?.total_pages || 1)) return;
+  void executePrimaryQuery(page, { paginationOnly: true });
 }
 
 function buildQualityWarning(qualityMeta, fallbackMeta = null) {
@@ -408,7 +429,7 @@ function onDocumentClick(e) {
     </div>
 
     <!-- Result Card -->
-    <div v-if="hasResults || loading" class="card ui-card">
+    <div v-if="hasResults || loading || paginationLoading" class="card ui-card">
       <div class="card-header ui-card-header">
         <span class="card-title ui-card-title">
           查詢結果
@@ -419,7 +440,7 @@ function onDocumentClick(e) {
       </div>
       <div class="card-body ui-card-body">
         <!-- Loading overlay -->
-        <div class="detail-table-wrap" :class="{ 'is-loading': loading }">
+        <div class="detail-table-wrap" :class="{ 'is-loading': loading, 'is-paginating': paginationLoading }">
           <div v-if="loading" class="table-loading-overlay">
             <span class="table-spinner"></span>
           </div>
@@ -438,7 +459,7 @@ function onDocumentClick(e) {
         </div>
 
         <!-- Empty message -->
-        <div v-if="!loading && rows.length === 0 && pagination.total === 0" class="empty-message">
+        <div v-if="!loading && !paginationLoading && rows.length === 0 && pagination.total === 0" class="empty-message">
           查無資料
         </div>
 
@@ -449,11 +470,11 @@ function onDocumentClick(e) {
             {{ pagination.total.toLocaleString() }} 筆
           </div>
           <div class="pagination-actions">
-            <button :disabled="pagination.page <= 1" @click="goToPage(pagination.page - 1)">
+            <button :disabled="loading || paginationLoading || pagination.page <= 1" @click="goToPage(pagination.page - 1)">
               上一頁
             </button>
             <button
-              :disabled="pagination.page >= pagination.total_pages"
+              :disabled="loading || paginationLoading || pagination.page >= pagination.total_pages"
               @click="goToPage(pagination.page + 1)"
             >
               下一頁

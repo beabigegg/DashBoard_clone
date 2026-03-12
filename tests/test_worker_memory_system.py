@@ -148,6 +148,22 @@ class TestSystemMemoryWarningZone:
 
         assert telemetry.system_memory_pressure is False
 
+    def test_warning_zone_eviction_respects_cooldown(self):
+        """Warning-zone eviction should be throttled by SYSTEM_MEM_EVICT_COOLDOWN."""
+        guard, _ = _make_guard_and_telemetry()
+        guard._system_warn_evict_cooldown = 300
+        vm = _make_psutil_vm(percent=88.0)
+
+        with patch("psutil.virtual_memory", return_value=vm), \
+             patch(
+                 "mes_dashboard.core.cache.emergency_clear_all_process_caches",
+                 return_value=1,
+             ) as mock_clear:
+            guard._check_system_memory()
+            guard._check_system_memory()
+
+        mock_clear.assert_called_once()
+
 
 # ---------------------------------------------------------------------------
 # _check_system_memory: critical zone (>92%)

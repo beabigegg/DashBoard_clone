@@ -63,6 +63,7 @@ _RESTART_COOLDOWN = _int_env("WORKER_RSS_RESTART_COOLDOWN", 120)
 # System memory thresholds
 _SYSTEM_MEM_WARN_PCT = _float_env("SYSTEM_MEM_WARN_PCT", 85.0)
 _SYSTEM_MEM_REJECT_PCT = _float_env("SYSTEM_MEM_REJECT_PCT", 92.0)
+_SYSTEM_MEM_EVICT_COOLDOWN = _int_env("SYSTEM_MEM_EVICT_COOLDOWN", 60)
 
 
 # ============================================================
@@ -158,6 +159,7 @@ class _WorkerMemoryGuard:
         hard_ratio: float = 0.95,
         interval: int = 15,
         cooldown: int = 120,
+        system_warn_evict_cooldown: int = _SYSTEM_MEM_EVICT_COOLDOWN,
     ):
         self._limit_mb = limit_mb
         self._warn_mb = limit_mb * warn_ratio
@@ -166,6 +168,8 @@ class _WorkerMemoryGuard:
         self._interval = max(interval, 5)
         self._cooldown = cooldown
         self._last_restart_at: float = 0.0
+        self._system_warn_evict_cooldown = max(int(system_warn_evict_cooldown), 0)
+        self._last_system_warn_evict_at: float = 0.0
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
@@ -234,14 +238,28 @@ class _WorkerMemoryGuard:
                         used_pct,
                     )
                 _telemetry.system_memory_pressure = False
-                logger.warning(
-                    "System memory warning: %.1f%% used (threshold=%.0f%%), triggering eviction",
-                    used_pct, _SYSTEM_MEM_WARN_PCT,
-                )
-                from mes_dashboard.core.cache import emergency_clear_all_process_caches
-                import gc
-                emergency_clear_all_process_caches()
-                gc.collect()
+                now = time.time()
+                elapsed = now - self._last_system_warn_evict_at
+                if (
+                    self._system_warn_evict_cooldown == 0
+                    or elapsed >= self._system_warn_evict_cooldown
+                ):
+                    logger.warning(
+                        "System memory warning: %.1f%% used (threshold=%.0f%%), triggering eviction",
+                        used_pct, _SYSTEM_MEM_WARN_PCT,
+                    )
+                    from mes_dashboard.core.cache import emergency_clear_all_process_caches
+                    import gc
+                    emergency_clear_all_process_caches()
+                    gc.collect()
+                    self._last_system_warn_evict_at = now
+                else:
+                    logger.debug(
+                        "System memory warning: %.1f%% used, eviction cooldown active "
+                        "(%.0fs remaining)",
+                        used_pct,
+                        max(self._system_warn_evict_cooldown - elapsed, 0),
+                    )
             else:
                 if _telemetry.system_memory_pressure:
                     logger.info(
@@ -351,6 +369,7 @@ def start_worker_memory_guard() -> None:
         hard_ratio=_HARD_RATIO,
         interval=_CHECK_INTERVAL,
         cooldown=_RESTART_COOLDOWN,
+        system_warn_evict_cooldown=_SYSTEM_MEM_EVICT_COOLDOWN,
     )
     _guard.start()
 

@@ -20,7 +20,7 @@ import SummaryCards from './components/SummaryCards.vue';
 import TrendChart from './components/TrendChart.vue';
 
 const API_TIMEOUT = 360000;
-const DEFAULT_PER_PAGE = 50;
+const DEFAULT_PER_PAGE = 20;
 const DUCKDB_THRESHOLD = 5000;
 const PARETO_DIMENSIONS = ['reason', 'package', 'type'];
 const PARETO_DISPLAY_SCOPE_FIXED = 'top20';
@@ -133,6 +133,7 @@ const loading = reactive({
   pareto: false,
   exporting: false,
 });
+const paginationLoading = ref(false);
 const errorMessage = ref('');
 const partialFailureWarning = ref('');
 const lastQueryAt = ref('');
@@ -384,6 +385,7 @@ async function executePrimaryQuery() {
   const requestId = nextRequestId();
   loading.querying = true;
   loading.list = true;
+  paginationLoading.value = false;
   errorMessage.value = '';
   partialFailureWarning.value = '';
   cancelAsyncJob();
@@ -509,6 +511,7 @@ async function refreshView() {
 
   const requestId = nextRequestId();
   loading.list = true;
+  paginationLoading.value = false;
   errorMessage.value = '';
 
   // ── DuckDB-WASM mode path ─────────────────────────────────────────────
@@ -641,6 +644,89 @@ async function refreshView() {
   }
 }
 
+async function refreshDetailPage() {
+  if (!queryId.value) return;
+
+  const requestId = nextRequestId();
+  paginationLoading.value = true;
+  errorMessage.value = '';
+
+  try {
+    if (duckdbMode.value && duckdb.isActive.value) {
+      try {
+        const result = await duckdb.computeView({
+          policyFilters: {
+            includeExcludedScrap: committedPrimary.includeExcludedScrap,
+            excludeMaterialScrap: committedPrimary.excludeMaterialScrap,
+            excludePbDiode: committedPrimary.excludePbDiode,
+          },
+          packages: supplementaryFilters.packages,
+          workcenterGroups: supplementaryFilters.workcenterGroups,
+          reasons: supplementaryFilters.reasons,
+          trendDates: selectedTrendDates.value,
+          metricFilter: metricFilterParam(),
+          metricMode: paretoMetricApiMode(),
+          paretoScope: 'top80',
+          paretoSelections,
+          page: page.value,
+          perPage: DEFAULT_PER_PAGE,
+        });
+        if (isStaleRequest(requestId)) return;
+
+        detail.value = result.detail || detail.value;
+        updateUrlState();
+        return;
+      } catch (err) {
+        if (isStaleRequest(requestId)) return;
+        console.warn('[DuckDB] computeView failed, falling back to server:', err);
+        duckdbMode.value = false;
+        duckdb.deactivate();
+      }
+    }
+
+    const params = buildViewParams(queryId.value, {
+      supplementaryFilters,
+      metricFilter: metricFilterParam(),
+      trendDates: selectedTrendDates.value,
+      paretoSelections,
+      page: page.value,
+      perPage: DEFAULT_PER_PAGE,
+      policyFilters: {
+        includeExcludedScrap: committedPrimary.includeExcludedScrap,
+        excludeMaterialScrap: committedPrimary.excludeMaterialScrap,
+        excludePbDiode: committedPrimary.excludePbDiode,
+      },
+    });
+
+    const resp = await apiGet('/api/reject-history/view', {
+      params,
+      timeout: API_TIMEOUT,
+    });
+    if (isStaleRequest(requestId)) return;
+
+    if (resp?.success === false && resp?.error === 'cache_expired') {
+      paginationLoading.value = false;
+      await executePrimaryQuery();
+      return;
+    }
+
+    const result = unwrapApiResult(resp, '視圖查詢失敗');
+    const data = result.data || result;
+    detail.value = data.detail || detail.value;
+    updateUrlState();
+  } catch (error) {
+    if (isStaleRequest(requestId)) return;
+    if (error?.name === 'AbortError') {
+      errorMessage.value = '查詢逾時，請縮短日期範圍後重試';
+    } else {
+      errorMessage.value = error?.message || '視圖查詢失敗';
+    }
+  } finally {
+    if (isStaleRequest(requestId)) return;
+    paginationLoading.value = false;
+  }
+}
+
 // ---- Event handlers ----
 function applyFilters() {
   void executePrimaryQuery();
@@ -659,11 +745,16 @@ function clearFilters() {
 }
 
 function goToPage(nextPage) {
-  if (nextPage < 1 || nextPage > Number(detail.value?.pagination?.totalPages || 1)) {
+  if (
+    paginationLoading.value
+    || loading.list
+    || nextPage < 1
+    || nextPage > Number(detail.value?.pagination?.totalPages || 1)
+  ) {
     return;
   }
   page.value = nextPage;
-  void refreshView();
+  void refreshDetailPage();
 }
 
 function onTrendDateClick(dateStr) {
@@ -1250,6 +1341,7 @@ onUnmounted(() => {
         :items="detail.items"
         :pagination="pagination"
         :loading="loading.list"
+        :paginating="paginationLoading"
         :selected-pareto-count="selectedParetoCount"
         :selected-pareto-summary="selectedParetoSummary"
         @go-to-page="goToPage"

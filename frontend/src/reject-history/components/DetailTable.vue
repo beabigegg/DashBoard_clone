@@ -5,9 +5,10 @@ defineProps({
   items: { type: Array, default: () => [] },
   pagination: {
     type: Object,
-    default: () => ({ page: 1, perPage: 50, total: 0, totalPages: 1 }),
+    default: () => ({ page: 1, perPage: 20, total: 0, totalPages: 1 }),
   },
   loading: { type: Boolean, default: false },
+  paginating: { type: Boolean, default: false },
   selectedParetoCount: { type: Number, default: 0 },
   selectedParetoSummary: { type: String, default: '' },
 });
@@ -32,7 +33,7 @@ function formatNumber(value) {
         </span>
       </div>
     </div>
-    <div class="card-body ui-card-body detail-table-wrap" :class="{ 'is-loading': loading }">
+    <div class="card-body ui-card-body detail-table-wrap" :class="{ 'is-loading': loading, 'is-paginating': paginating }">
       <div v-if="loading" class="table-loading-overlay"><span class="table-spinner"></span></div>
       <table class="detail-table">
         <thead>
@@ -91,11 +92,11 @@ function formatNumber(value) {
       </table>
     </div>
     <div class="pagination">
-      <button :disabled="pagination.page <= 1 || loading" @click="$emit('go-to-page', pagination.page - 1)">上一頁</button>
+      <button :disabled="pagination.page <= 1 || loading || paginating" @click="$emit('go-to-page', pagination.page - 1)">上一頁</button>
       <span class="page-info">
         第 {{ pagination.page }} / {{ pagination.totalPages }} 頁 · 共 {{ formatNumber(pagination.total) }} 筆
       </span>
-      <button :disabled="pagination.page >= pagination.totalPages || loading" @click="$emit('go-to-page', pagination.page + 1)">下一頁</button>
+      <button :disabled="pagination.page >= pagination.totalPages || loading || paginating" @click="$emit('go-to-page', pagination.page + 1)">下一頁</button>
     </div>
   </section>
 </template>

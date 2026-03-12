@@ -14,7 +14,7 @@ import ReasonPareto from './components/ReasonPareto.vue';
 import SummaryCards from './components/SummaryCards.vue';
 
 const API_TIMEOUT = 360000;
-const DEFAULT_PER_PAGE = 50;
+const DEFAULT_PER_PAGE = 20;
 
 const filterBar = reactive({
   startDate: '',
@@ -42,6 +42,7 @@ const detailData = ref({
 
 const page = ref(1);
 const initialLoading = ref(true);
+const paginationLoading = ref(false);
 const loading = reactive({
   global: false,
   list: false,
@@ -270,6 +271,53 @@ async function refreshView({ listOnly = false } = {}) {
   }
 }
 
+// ---- Pagination-only refresh (preserves scroll position) ----
+
+async function refreshViewPage() {
+  if (!queryId.value) return;
+
+  const requestId = nextRequestId();
+  paginationLoading.value = true;
+  errorMessage.value = '';
+
+  try {
+    const params = {
+      query_id: queryId.value,
+      hold_type: filterBar.holdType,
+      record_type: recordTypeCsv(),
+      page: page.value,
+      per_page: DEFAULT_PER_PAGE,
+    };
+
+    if (reasonFilter.value) {
+      params.reason = reasonFilter.value;
+    }
+    if (durationFilter.value) {
+      params.duration_range = durationFilter.value;
+    }
+
+    const resp = await apiGet('/api/hold-history/view', {
+      params,
+      timeout: API_TIMEOUT,
+    });
+    if (isStaleRequest(requestId)) return;
+
+    const result = unwrapApiResult(resp, '視圖查詢失敗');
+    detailData.value = normalizeListPayload(result.list);
+  } catch (error) {
+    if (isStaleRequest(requestId)) return;
+    if (error?.errorCode === 'CACHE_EXPIRED' || error?.status === 410) {
+      paginationLoading.value = false;
+      await executePrimaryQuery();
+      return;
+    }
+    errorMessage.value = error?.message || '載入資料失敗';
+  } finally {
+    if (isStaleRequest(requestId)) return;
+    paginationLoading.value = false;
+  }
+}
+
 // ---- Computed ----
 
 function estimateAvgHoldHours(items) {
@@ -435,22 +483,25 @@ function clearDurationFilter() {
 }
 
 function prevPage() {
-  if (page.value <= 1) {
+  if (paginationLoading.value || page.value <= 1) {
     return;
   }
   page.value -= 1;
   updateUrlState();
-  void refreshView({ listOnly: true });
+  void refreshViewPage();
 }
 
 function nextPage() {
+  if (paginationLoading.value) {
+    return;
+  }
   const totalPages = Number(detailData.value?.pagination?.totalPages || 1);
   if (page.value >= totalPages) {
     return;
   }
   page.value += 1;
   updateUrlState();
-  void refreshView({ listOnly: true });
+  void refreshViewPage();
 }
 
 async function manualRefresh() {
@@ -540,6 +591,7 @@ onMounted(() => {
       :items="detailData.items || []"
       :pagination="detailData.pagination"
       :loading="loading.list"
+      :paginating="paginationLoading"
       :error-message="errorMessage"
       @prev-page="prevPage"
       @next-page="nextPage"

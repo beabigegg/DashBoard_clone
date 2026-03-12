@@ -205,7 +205,7 @@ export function buildViewParams(queryId, {
   detailReason = '',
   paretoSelections = {},
   page = 1,
-  perPage = 50,
+  perPage = 20,
   policyFilters = {},
 } = {}) {
   const params = { query_id: queryId };
@@ -239,7 +239,7 @@ export function buildViewParams(queryId, {
     }
   }
   params.page = page || 1;
-  params.per_page = perPage || 50;
+  params.per_page = perPage || 20;
 
   // Policy filters (applied in-memory on cached data)
   if (policyFilters.includeExcludedScrap) {

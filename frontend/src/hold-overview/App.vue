@@ -15,7 +15,7 @@ import FilterIndicator from './components/FilterIndicator.vue';
 import HoldMatrix from './components/HoldMatrix.vue';
 
 const API_TIMEOUT = 60000;
-const DEFAULT_PER_PAGE = 50;
+const DEFAULT_PER_PAGE = 20;
 const FILTER_OPTION_DEBOUNCE_MS = 120;
 
 const summary = ref(null);
@@ -595,7 +595,7 @@ function clearAllFilters() {
 }
 
 function prevPage() {
-  if (page.value <= 1) {
+  if (paginationLoading.value || page.value <= 1) {
     return;
   }
   page.value -= 1;
@@ -604,7 +604,7 @@ function prevPage() {
 }
 
 function nextPage() {
-  if (page.value >= Number(pagination.value?.totalPages || 1)) {
+  if (paginationLoading.value || page.value >= Number(pagination.value?.totalPages || 1)) {
     return;
   }
   page.value += 1;

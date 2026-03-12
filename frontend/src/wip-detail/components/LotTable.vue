@@ -9,7 +9,7 @@ const props = defineProps({
     default: () => ({
       lots: [],
       specs: [],
-      pagination: { page: 1, page_size: 100, total_count: 0, total_pages: 1 },
+      pagination: { page: 1, page_size: 20, total_count: 0, total_pages: 1 },
     }),
   },
   loading: {
@@ -75,7 +75,7 @@ const tableInfo = computed(() => {
   }
 
   const page = Number(pagination.page || 1);
-  const pageSize = Number(pagination.page_size || 100);
+  const pageSize = Number(pagination.page_size || 20);
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
   return `Showing ${start} - ${end} of ${formatNumber(total)}`;

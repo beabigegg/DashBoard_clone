@@ -43,6 +43,7 @@ logger = logging.getLogger("mes_dashboard.hold_dataset_cache")
 _CACHE_TTL = 900  # 15 minutes
 _CACHE_MAX_SIZE = 8
 _REDIS_NAMESPACE = "hold_dataset"
+_DEFAULT_DETAIL_PER_PAGE = 20
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("hold_dataset", _dataset_cache, "Hold Dataset (L1, 15min)")
@@ -253,7 +254,7 @@ def execute_primary_query(
         hold_type=hold_type,
         record_type=record_type,
         page=1,
-        per_page=50,
+        per_page=_DEFAULT_DETAIL_PER_PAGE,
     )
 
     return {"query_id": query_id, **views}
@@ -282,6 +283,17 @@ def apply_view(
     ``_start_date``/``_end_date`` are passed through to the SQL runtime for
     record_type='new' boundary computation.
     """
+    resolved_start_date = _start_date
+    resolved_end_date = _end_date
+    if not resolved_start_date or not resolved_end_date:
+        query_dates = _get_query_dates(query_id) or {}
+        if not resolved_start_date:
+            start = str(query_dates.get("start") or "").strip()
+            resolved_start_date = start or None
+        if not resolved_end_date:
+            end = str(query_dates.get("end") or "").strip()
+            resolved_end_date = end or None
+
     # ── Task 4.6: Try DuckDB SQL runtime path ─────────────────────────────
     try:
         from mes_dashboard.services.hold_history_sql_runtime import (
@@ -295,8 +307,8 @@ def apply_view(
             duration_range=duration_range,
             page=page,
             per_page=per_page,
-            start_date=_start_date,
-            end_date=_end_date,
+            start_date=resolved_start_date,
+            end_date=resolved_end_date,
         )
         if sql_result is not None:
             return {**sql_result, "_meta": sql_meta}
@@ -385,7 +397,7 @@ def _empty_views() -> Dict[str, Any]:
             "items": [],
             "pagination": {
                 "page": 1,
-                "perPage": 50,
+                "perPage": _DEFAULT_DETAIL_PER_PAGE,
                 "total": 0,
                 "totalPages": 1,
             },

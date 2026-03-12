@@ -252,10 +252,19 @@
   font-size: 12px;
 }
 
-.department-table-wrap,
-.detail-table-wrap {
+.department-table-wrap {
   padding: 0;
   overflow: auto;
+}
+
+.detail-table-wrap {
+  padding: 0;
+  overflow-x: auto;
+}
+
+.detail-table-wrap.paginating {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .dept-table,

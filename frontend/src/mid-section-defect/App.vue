@@ -17,7 +17,7 @@ import SuspectContextPanel from './components/SuspectContextPanel.vue';
 ensureMesApiAvailable();
 
 const API_TIMEOUT = 360000;
-const PAGE_SIZE = 200;
+const PAGE_SIZE = 20;
 const SESSION_CACHE_KEY = 'msd:cache';
 const SESSION_CACHE_TTL = 5 * 60 * 1000; // 5 min, matches backend Redis TTL
 const CHART_TOP_N = 10;

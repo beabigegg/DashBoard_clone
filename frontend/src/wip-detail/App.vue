@@ -12,7 +12,7 @@ import LotTable from './components/LotTable.vue';
 import SummaryCards from './components/SummaryCards.vue';
 
 const API_TIMEOUT = 60000;
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 20;
 const FILTER_OPTION_DEBOUNCE_MS = 120;
 
 const workcenter = ref('');

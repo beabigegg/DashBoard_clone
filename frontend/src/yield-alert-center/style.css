@@ -269,6 +269,11 @@
   overflow: auto;
 }
 
+.table-wrap.is-paginating {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .alert-table tbody tr:hover {
   background: theme('colors.token.hf8f9ff');
 }

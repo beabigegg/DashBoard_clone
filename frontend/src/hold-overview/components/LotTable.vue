@@ -10,7 +10,7 @@ const props = defineProps({
   },
   pagination: {
     type: Object,
-    default: () => ({ page: 1, perPage: 50, total: 0, totalPages: 1 }),
+    default: () => ({ page: 1, perPage: 20, total: 0, totalPages: 1 }),
   },
   loading: {
     type: Boolean,
@@ -48,7 +48,7 @@ function formatAge(value) {
 
 const tableInfo = computed(() => {
   const page = Number(props.pagination?.page || 1);
-  const perPage = Number(props.pagination?.perPage || 50);
+  const perPage = Number(props.pagination?.perPage || 20);
   const total = Number(props.pagination?.total || 0);
 
   if (total <= 0) {

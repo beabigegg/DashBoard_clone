@@ -14,7 +14,7 @@ const props = defineProps({
   },
   pagination: {
     type: Object,
-    default: () => ({ page: 1, page_size: 200, total_count: 0, total_pages: 1 }),
+    default: () => ({ page: 1, page_size: 20, total_count: 0, total_pages: 1 }),
   },
   direction: {
     type: String,
@@ -82,7 +82,7 @@ const tableInfo = computed(() => {
   const total = Number(p.total_count || 0);
   if (total <= 0) return '暫無資料';
   const page = Number(p.page || 1);
-  const pageSize = Number(p.page_size || 200);
+  const pageSize = Number(p.page_size || 20);
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
   return `顯示 ${start} - ${end} 筆，共 ${total.toLocaleString()} 筆`;

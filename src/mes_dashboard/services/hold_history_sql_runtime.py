@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from mes_dashboard.core.feature_flags import resolve_bool_flag
@@ -74,6 +75,59 @@ def _sstr(value: Any, default: str = "") -> str:
         return default
     s = str(value).strip()
     return s if s else default
+
+
+def _is_iso_date(value: Optional[str]) -> bool:
+    text = _sstr(value, "")
+    if not text:
+        return False
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _resolve_view_date_range(
+    conn: Any,
+    *,
+    start_date: Optional[str],
+    end_date: Optional[str],
+) -> Tuple[Optional[str], Optional[str]]:
+    """Resolve safe YYYY-MM-DD bounds for trend/new-record computation.
+
+    Priority:
+    1) Caller-provided valid ISO dates.
+    2) Derive from spool data min/max(hold_day) when any bound is missing.
+    """
+    start = _sstr(start_date, "") if _is_iso_date(start_date) else ""
+    end = _sstr(end_date, "") if _is_iso_date(end_date) else ""
+
+    if start and end:
+        if end < start:
+            return end, start
+        return start, end
+
+    bounds_sql = """
+        SELECT
+            MIN(CAST("hold_day" AS DATE)) AS min_day,
+            MAX(CAST("hold_day" AS DATE)) AS max_day
+        FROM hold_src
+    """
+    rows = _fetch_dict_rows(conn, bounds_sql)
+    if rows:
+        row = rows[0] or {}
+        if not start:
+            min_day = row.get("min_day")
+            start = str(min_day)[:10] if min_day is not None else ""
+        if not end:
+            max_day = row.get("max_day")
+            end = str(max_day)[:10] if max_day is not None else ""
+
+    if start and end and end < start:
+        start, end = end, start
+
+    return (start or None), (end or None)
 
 
 # ── Task 4.2: Trend SQL ───────────────────────────────────────────────────────
@@ -480,24 +534,33 @@ def try_compute_view_from_spool(
         conn = duckdb.connect(database=":memory:")
         _attach_spool_view(conn, parquet_path)
 
-        trend = _query_trend(
+        resolved_start, resolved_end = _resolve_view_date_range(
             conn,
-            start_date=start_date or "",
-            end_date=end_date or "",
+            start_date=start_date,
+            end_date=end_date,
         )
+
+        if resolved_start and resolved_end:
+            trend = _query_trend(
+                conn,
+                start_date=resolved_start,
+                end_date=resolved_end,
+            )
+        else:
+            trend = {"days": []}
         reason_pareto = _query_reason_pareto(
             conn,
             hold_type=hold_type,
             record_type=record_type,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=resolved_start,
+            end_date=resolved_end,
         )
         duration = _query_duration(
             conn,
             hold_type=hold_type,
             record_type=record_type,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=resolved_start,
+            end_date=resolved_end,
         )
         list_result = _query_list(
             conn,
@@ -507,8 +570,8 @@ def try_compute_view_from_spool(
             duration_range=duration_range,
             page=page,
             per_page=per_page,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=resolved_start,
+            end_date=resolved_end,
         )
 
         latency_s = round(time.time() - started_at, 3)

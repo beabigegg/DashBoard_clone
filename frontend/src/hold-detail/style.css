@@ -199,7 +199,11 @@
 
 .table-container {
   overflow-x: auto;
-  max-height: 500px;
+}
+
+.table-container.paginating {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .lot-table {

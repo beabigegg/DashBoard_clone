@@ -394,7 +394,6 @@
 
 .table-container {
   overflow-x: auto;
-  max-height: 520px;
 }
 
 .theme-hold-overview .table-container.paginating {

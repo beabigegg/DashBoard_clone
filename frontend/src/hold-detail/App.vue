@@ -19,7 +19,7 @@ const distribution = ref(null);
 const lots = ref([]);
 const pagination = ref({
   page: 1,
-  perPage: 50,
+  perPage: 20,
   total: 0,
   totalPages: 1,
 });
@@ -34,6 +34,7 @@ const page = ref(1);
 const initialLoading = ref(true);
 const refreshing = ref(false);
 const lotsLoading = ref(false);
+const paginationLoading = ref(false);
 const lotsError = ref('');
 const loadError = ref('');
 const lastUpdate = computed(() => {
@@ -75,7 +76,7 @@ async function fetchLots(signal) {
   const params = {
     reason: reason.value,
     page: page.value,
-    per_page: pagination.value.perPage || 50,
+    per_page: pagination.value.perPage || 20,
   };
 
   if (filters.workcenter) {
@@ -163,6 +164,7 @@ const { createAbortSignal, clearAbortController, resetAutoRefresh, triggerRefres
 
 async function loadLots() {
   lotsLoading.value = true;
+  paginationLoading.value = false;
   lotsError.value = '';
   loadError.value = '';
   refreshing.value = true;
@@ -174,7 +176,7 @@ async function loadLots() {
     lots.value = Array.isArray(result?.lots) ? result.lots : [];
     pagination.value = {
       page: Number(result?.pagination?.page || 1),
-      perPage: Number(result?.pagination?.perPage || 50),
+      perPage: Number(result?.pagination?.perPage || 20),
       total: Number(result?.pagination?.total || 0),
       totalPages: Number(result?.pagination?.totalPages || 1),
     };
@@ -186,6 +188,30 @@ async function loadLots() {
   } finally {
     lotsLoading.value = false;
     refreshing.value = false;
+  }
+}
+
+async function loadLotsPage() {
+  const signal = createAbortSignal('hold-detail-lots');
+  paginationLoading.value = true;
+  lotsError.value = '';
+
+  try {
+    const result = await fetchLots(signal);
+    lots.value = Array.isArray(result?.lots) ? result.lots : [];
+    pagination.value = {
+      page: Number(result?.pagination?.page || 1),
+      perPage: Number(result?.pagination?.perPage || 20),
+      total: Number(result?.pagination?.total || 0),
+      totalPages: Number(result?.pagination?.totalPages || 1),
+    };
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return;
+    }
+    lotsError.value = error?.message || '載入 Lot 資料失敗';
+  } finally {
+    paginationLoading.value = false;
   }
 }
 
@@ -213,7 +239,7 @@ async function loadAllData(showOverlay = true) {
     lots.value = Array.isArray(lotsData?.lots) ? lotsData.lots : [];
     pagination.value = {
       page: Number(lotsData?.pagination?.page || 1),
-      perPage: Number(lotsData?.pagination?.perPage || 50),
+      perPage: Number(lotsData?.pagination?.perPage || 20),
       total: Number(lotsData?.pagination?.total || 0),
       totalPages: Number(lotsData?.pagination?.totalPages || 1),
     };
@@ -260,21 +286,21 @@ function clearFilters() {
 }
 
 function prevPage() {
-  if (page.value <= 1) {
+  if (paginationLoading.value || page.value <= 1) {
     return;
   }
   page.value -= 1;
   updateUrlState();
-  void loadLots();
+  void loadLotsPage();
 }
 
 function nextPage() {
-  if (page.value >= pagination.value.totalPages) {
+  if (paginationLoading.value || page.value >= pagination.value.totalPages) {
     return;
   }
   page.value += 1;
   updateUrlState();
-  void loadLots();
+  void loadLotsPage();
 }
 
 async function manualRefresh() {
@@ -347,6 +373,7 @@ onMounted(() => {
       :lots="lots"
       :pagination="pagination"
       :loading="lotsLoading"
+      :paginating="paginationLoading"
       :error-message="lotsError"
       :has-active-filters="hasActiveFilters"
       :filter-text="filterText"
