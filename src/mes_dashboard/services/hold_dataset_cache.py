@@ -22,6 +22,12 @@ import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
+from mes_dashboard.core.query_spool_store import (
+    QUERY_SPOOL_DIR,
+    load_spooled_df,
+    register_spool_file,
+)
+from mes_dashboard.core.redis_client import get_key, get_redis_client
 from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 from mes_dashboard.services.filter_cache import get_workcenter_group as _get_wc_group
 from mes_dashboard.services.hold_history_service import (
@@ -90,13 +96,54 @@ def _redis_load_df(query_id: str) -> Optional[pd.DataFrame]:
 # ============================================================
 
 
+def _store_query_dates(query_id: str, start_date: str, end_date: str) -> None:
+    """Persist query date range in Redis for record_type='new' boundary computation."""
+    client = get_redis_client()
+    if client is None:
+        return
+    try:
+        client.setex(
+            get_key(f"{_REDIS_NAMESPACE}:{query_id}:dates"),
+            _CACHE_TTL,
+            json.dumps({"start": start_date, "end": end_date}),
+        )
+    except Exception:
+        pass
+
+
+def _get_query_dates(query_id: str) -> Optional[Dict[str, str]]:
+    """Retrieve stored query date range from Redis."""
+    client = get_redis_client()
+    if client is None:
+        return None
+    try:
+        raw = client.get(get_key(f"{_REDIS_NAMESPACE}:{query_id}:dates"))
+        if raw:
+            return json.loads(raw)
+    except Exception:
+        pass
+    return None
+
+
 def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
-    """Read cache: L1 hit -> return, L1 miss -> L2 -> write L1 -> return."""
+    """Read cache: L1 hit → L2 hit → spool fallback."""
     df = _dataset_cache.get(query_id)
     if df is not None:
         return df
     df = _redis_load_df(query_id)
     if df is not None:
+        _dataset_cache.set(query_id, df)
+        return df
+    # Spool fallback (engine path writes spool instead of full Redis DataFrame)
+    df = load_spooled_df(_REDIS_NAMESPACE, query_id)
+    if df is not None:
+        # Restore _QUERY_START/_QUERY_END for Pandas record_type='new' filter
+        if "_QUERY_START" not in df.columns:
+            dates = _get_query_dates(query_id)
+            if dates:
+                df = df.copy()
+                df["_QUERY_START"] = pd.Timestamp(dates["start"])
+                df["_QUERY_END"] = pd.Timestamp(dates["end"])
         _dataset_cache.set(query_id, df)
     return df
 
@@ -134,13 +181,13 @@ def execute_primary_query(
         from mes_dashboard.services.batch_query_engine import (
             decompose_by_time_range,
             execute_plan,
-            merge_chunks,
+            merge_chunks_to_spool,
             compute_query_hash,
             should_decompose_by_time,
         )
 
         if should_decompose_by_time(start_date, end_date):
-            # --- Engine path for long date ranges ---
+            # --- Engine path for long date ranges → stream to Parquet spool ---
             engine_chunks = decompose_by_time_range(start_date, end_date)
             engine_hash = compute_query_hash(
                 {"start_date": start_date, "end_date": end_date}
@@ -165,7 +212,28 @@ def execute_primary_query(
                 cache_prefix="hold",
                 chunk_ttl=_CACHE_TTL,
             )
-            df = merge_chunks("hold", engine_hash)
+            spool_tmp_path, spool_row_count = merge_chunks_to_spool(
+                "hold",
+                engine_hash,
+                spool_dir=QUERY_SPOOL_DIR,
+            )
+            if spool_tmp_path is not None:
+                register_spool_file(
+                    _REDIS_NAMESPACE,
+                    query_id,
+                    spool_tmp_path,
+                    spool_row_count,
+                    ttl_seconds=_CACHE_TTL,
+                )
+                _store_query_dates(query_id, start_date, end_date)
+                _loaded = load_spooled_df(_REDIS_NAMESPACE, query_id)
+                df = _loaded if _loaded is not None else pd.DataFrame()
+                if not df.empty and "_QUERY_START" not in df.columns:
+                    df["_QUERY_START"] = pd.Timestamp(start_date)
+                    df["_QUERY_END"] = pd.Timestamp(end_date)
+            else:
+                df = pd.DataFrame()
+            # Spool already registered; skip Redis DataFrame store.
         else:
             # --- Direct path (short query) ---
             sql = _load_sql("base_facts")
@@ -173,11 +241,10 @@ def execute_primary_query(
             df = read_sql_df(sql, params)
             if df is None:
                 df = pd.DataFrame()
-
-        if not df.empty:
-            df["_QUERY_START"] = pd.Timestamp(start_date)
-            df["_QUERY_END"] = pd.Timestamp(end_date)
-            _store_df(query_id, df)
+            if not df.empty:
+                df["_QUERY_START"] = pd.Timestamp(start_date)
+                df["_QUERY_END"] = pd.Timestamp(end_date)
+                _store_df(query_id, df)
 
         cached_df = df
 
@@ -206,8 +273,42 @@ def apply_view(
     duration_range: Optional[str] = None,
     page: int = 1,
     per_page: int = 50,
+    _start_date: Optional[str] = None,
+    _end_date: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
-    """Read cache -> apply filters -> return derived data. Returns None if expired."""
+    """Read cache -> apply filters -> return derived data. Returns None if expired.
+
+    Tries DuckDB SQL runtime first (feature-flagged); falls back to Pandas.
+    ``_start_date``/``_end_date`` are passed through to the SQL runtime for
+    record_type='new' boundary computation.
+    """
+    # ── Task 4.6: Try DuckDB SQL runtime path ─────────────────────────────
+    try:
+        from mes_dashboard.services.hold_history_sql_runtime import (
+            try_compute_view_from_spool,
+        )
+        sql_result, sql_meta = try_compute_view_from_spool(
+            query_id=query_id,
+            hold_type=hold_type,
+            reason=reason,
+            record_type=record_type,
+            duration_range=duration_range,
+            page=page,
+            per_page=per_page,
+            start_date=_start_date,
+            end_date=_end_date,
+        )
+        if sql_result is not None:
+            return {**sql_result, "_meta": sql_meta}
+        fallback_reason = sql_meta.get("view_sql_fallback_reason", "unknown")
+        logger.debug(
+            "hold apply_view: SQL runtime fallback (reason=%s query_id=%s)",
+            fallback_reason, query_id,
+        )
+    except Exception as exc:
+        logger.warning("hold apply_view: SQL runtime error: %s", exc)
+
+    # ── Pandas fallback path ───────────────────────────────────────────────
     df = _get_cached_df(query_id)
     if df is None:
         return None

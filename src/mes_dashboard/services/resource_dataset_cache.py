@@ -22,6 +22,11 @@ import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
+from mes_dashboard.core.query_spool_store import (
+    QUERY_SPOOL_DIR,
+    load_spooled_df,
+    register_spool_file,
+)
 from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 
 logger = logging.getLogger("mes_dashboard.resource_dataset_cache")
@@ -83,6 +88,11 @@ def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
     if df is not None:
         return df
     df = _redis_load_df(query_id)
+    if df is not None:
+        _dataset_cache.set(query_id, df)
+        return df
+    # Spool fallback (engine path writes spool instead of full Redis DataFrame)
+    df = load_spooled_df(_REDIS_NAMESPACE, query_id)
     if df is not None:
         _dataset_cache.set(query_id, df)
     return df
@@ -202,7 +212,7 @@ def execute_primary_query(
         from mes_dashboard.services.batch_query_engine import (
             decompose_by_time_range,
             execute_plan,
-            merge_chunks,
+            merge_chunks_to_spool,
             compute_query_hash,
             should_decompose_by_time,
         )
@@ -211,7 +221,7 @@ def execute_primary_query(
         base_sql = base_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
 
         if should_decompose_by_time(start_date, end_date):
-            # --- Engine path for long date ranges ---
+            # --- Engine path for long date ranges → stream to Parquet spool ---
             engine_chunks = decompose_by_time_range(start_date, end_date)
             engine_hash = compute_query_hash(query_id_input)
 
@@ -233,16 +243,32 @@ def execute_primary_query(
                 cache_prefix="resource",
                 chunk_ttl=_CACHE_TTL,
             )
-            df = merge_chunks("resource", engine_hash)
+            spool_tmp_path, spool_row_count = merge_chunks_to_spool(
+                "resource",
+                engine_hash,
+                spool_dir=QUERY_SPOOL_DIR,
+            )
+            if spool_tmp_path is not None:
+                register_spool_file(
+                    _REDIS_NAMESPACE,
+                    query_id,
+                    spool_tmp_path,
+                    spool_row_count,
+                    ttl_seconds=_CACHE_TTL,
+                )
+                _loaded = load_spooled_df(_REDIS_NAMESPACE, query_id)
+                df = _loaded if _loaded is not None else pd.DataFrame()
+            else:
+                df = pd.DataFrame()
+            # Spool already registered; skip Redis DataFrame store.
         else:
             # --- Direct path (short query) ---
             params = {"start_date": start_date, "end_date": end_date}
             df = read_sql_df(base_sql, params)
             if df is None:
                 df = pd.DataFrame()
-
-        if not df.empty:
-            _store_df(query_id, df)
+            if not df.empty:
+                _store_df(query_id, df)
 
         cached_df = df
 
@@ -269,7 +295,30 @@ def apply_view(
     query_id: str,
     granularity: str = "day",
 ) -> Optional[Dict[str, Any]]:
-    """Read cache -> derive views. Returns None if expired."""
+    """Read cache -> derive views. Returns None if expired.
+
+    Tries DuckDB SQL runtime first (feature-flagged); falls back to Pandas.
+    """
+    # ── Task 3.7: Try DuckDB SQL runtime path ─────────────────────────────
+    try:
+        from mes_dashboard.services.resource_history_sql_runtime import (
+            try_compute_view_from_spool,
+        )
+        sql_result, sql_meta = try_compute_view_from_spool(
+            query_id=query_id,
+            granularity=granularity,
+        )
+        if sql_result is not None:
+            return {**sql_result, "_meta": sql_meta}
+        fallback_reason = sql_meta.get("view_sql_fallback_reason", "unknown")
+        logger.debug(
+            "resource apply_view: SQL runtime fallback (reason=%s query_id=%s)",
+            fallback_reason, query_id,
+        )
+    except Exception as exc:
+        logger.warning("resource apply_view: SQL runtime error: %s", exc)
+
+    # ── Pandas fallback path ───────────────────────────────────────────────
     df = _get_cached_df(query_id)
     if df is None:
         return None

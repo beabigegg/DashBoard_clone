@@ -1,7 +1,8 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
+import { isDuckDBSupported } from '../core/duckdb-client.js';
 import {
   buildViewParams,
   parseMultiLineInput,
@@ -10,6 +11,7 @@ import {
 } from '../core/reject-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling.js';
+import { useRejectHistoryDuckDB } from './useRejectHistoryDuckDB.js';
 
 import DetailTable from './components/DetailTable.vue';
 import FilterPanel from './components/FilterPanel.vue';
@@ -19,6 +21,7 @@ import TrendChart from './components/TrendChart.vue';
 
 const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 50;
+const DUCKDB_THRESHOLD = 5000;
 const PARETO_DIMENSIONS = ['reason', 'package', 'type'];
 const PARETO_DISPLAY_SCOPE_FIXED = 'top20';
 const PARETO_SELECTION_PARAM_MAP = {
@@ -133,6 +136,10 @@ const loading = reactive({
 const errorMessage = ref('');
 const partialFailureWarning = ref('');
 const lastQueryAt = ref('');
+
+// ---- DuckDB-WASM state ----
+const duckdb = useRejectHistoryDuckDB();
+const duckdbMode = ref(false);   // true when frontend DuckDB-WASM has taken over view computation
 
 // ---- Async job progress state ----
 const jobProgress = reactive({
@@ -254,6 +261,8 @@ function buildBatchParetoParams() {
 
 async function fetchBatchPareto() {
   if (!queryId.value) return;
+  // In DuckDB mode, batch_pareto is computed inside refreshView() — skip server call.
+  if (duckdbMode.value && duckdb.isActive.value) return;
 
   const requestId = nextParetoRequestId();
   loading.pareto = true;
@@ -352,6 +361,18 @@ async function _applyQueryResult(result) {
     : [];
   summary.value = result.summary || summary.value;
   detail.value = result.detail || detail.value;
+
+  // Activate DuckDB-WASM mode for large datasets
+  const totalRowCount = result.total_row_count ?? 0;
+  const spoolUrl = result.spool_download_url;
+  if (spoolUrl && totalRowCount >= DUCKDB_THRESHOLD && isDuckDBSupported() && !duckdbMode.value) {
+    try {
+      await duckdb.activate(spoolUrl);
+      duckdbMode.value = true;
+    } catch (err) {
+      console.warn('[DuckDB] activation failed, staying in server mode:', err);
+    }
+  }
 
   await fetchBatchPareto();
 
@@ -490,6 +511,65 @@ async function refreshView() {
   loading.list = true;
   errorMessage.value = '';
 
+  // ── DuckDB-WASM mode path ─────────────────────────────────────────────
+  if (duckdbMode.value && duckdb.isActive.value) {
+    try {
+      const result = await duckdb.computeView({
+        policyFilters: {
+          includeExcludedScrap: committedPrimary.includeExcludedScrap,
+          excludeMaterialScrap: committedPrimary.excludeMaterialScrap,
+          excludePbDiode: committedPrimary.excludePbDiode,
+        },
+        packages: supplementaryFilters.packages,
+        workcenterGroups: supplementaryFilters.workcenterGroups,
+        reasons: supplementaryFilters.reasons,
+        trendDates: selectedTrendDates.value,
+        metricFilter: metricFilterParam(),
+        metricMode: paretoMetricApiMode(),
+        paretoScope: 'top80',
+        paretoSelections,
+        page: page.value,
+        perPage: DEFAULT_PER_PAGE,
+      });
+      if (isStaleRequest(requestId)) return;
+
+      analyticsRawItems.value = Array.isArray(result.analytics_raw)
+        ? result.analytics_raw
+        : analyticsRawItems.value;
+      summary.value = result.summary || summary.value;
+      detail.value = result.detail || detail.value;
+
+      // Update pareto data from combined result
+      const dims = result.batch_pareto?.dimensions || {};
+      for (const dimension of PARETO_DIMENSIONS) {
+        paretoData[dimension] = dims[dimension] || {
+          items: [],
+          dimension,
+          metric_mode: paretoMetricApiMode(),
+        };
+      }
+
+      const af = result.available_filters;
+      if (af) {
+        availableFilters.value = {
+          workcenterGroups: af.workcenter_groups || [],
+          packages: af.packages || [],
+          reasons: af.reasons || [],
+        };
+      }
+
+      updateUrlState();
+      loading.list = false;
+      return;
+    } catch (err) {
+      if (isStaleRequest(requestId)) return;
+      console.warn('[DuckDB] computeView failed, falling back to server:', err);
+      duckdbMode.value = false;
+      duckdb.deactivate();
+    }
+  }
+
+  // ── Server-side path ──────────────────────────────────────────────────
   try {
     const params = buildViewParams(queryId.value, {
       supplementaryFilters,
@@ -533,6 +613,18 @@ async function refreshView() {
         packages: af.packages || [],
         reasons: af.reasons || [],
       };
+    }
+
+    // Activate DuckDB-WASM in background (fire-and-forget so loading.list is not blocked).
+    // fetchBatchPareto() will still run from server since duckdbMode is still false here.
+    const totalRowCount = data.total_row_count ?? 0;
+    const spoolUrl = data.spool_download_url;
+    if (spoolUrl && totalRowCount >= DUCKDB_THRESHOLD && isDuckDBSupported() && !duckdbMode.value) {
+      duckdb.activate(spoolUrl).then(() => {
+        duckdbMode.value = true;
+      }).catch(err => {
+        console.warn('[DuckDB] activation failed, staying in server mode:', err);
+      });
     }
 
     updateUrlState();
@@ -1069,6 +1161,10 @@ function restoreFromUrl() {
 onMounted(() => {
   setDefaultDateRange();
   restoreFromUrl();
+});
+
+onUnmounted(() => {
+  duckdb.deactivate();
 });
 </script>
 
