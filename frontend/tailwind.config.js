@@ -225,6 +225,14 @@ export default {
       },
       zIndex: {
         popup: '1000'
+      },
+      transitionDuration: {
+        fast: 'var(--motion-fast)',
+        normal: 'var(--motion-normal)',
+        slow: 'var(--motion-slow)',
+      },
+      transitionTimingFunction: {
+        smooth: 'var(--motion-ease)',
       }
     }
   },

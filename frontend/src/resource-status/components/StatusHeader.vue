@@ -42,7 +42,7 @@ const cacheDotClass = computed(() => {
         <span>{{ cacheText }}</span>
       </div>
       <span class="last-update">更新: {{ lastUpdate }}</span>
-      <button type="button" class="btn btn-primary" :disabled="refreshing" @click="$emit('refresh')">
+      <button type="button" class="ui-btn ui-btn--primary" :disabled="refreshing" @click="$emit('refresh')">
         重新整理
       </button>
     </div>

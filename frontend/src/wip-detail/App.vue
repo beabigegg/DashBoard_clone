@@ -5,7 +5,9 @@ import { apiGet } from '../core/api.js';
 import { replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
 import { buildWipDetailQueryParams, buildWipOverviewQueryParams } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import LotDetailPanel from './components/LotDetailPanel.vue';
 import LotTable from './components/LotTable.vue';
@@ -48,6 +50,26 @@ const selectedLotId = ref('');
 
 let filterOptionsDebounceTimer = null;
 let filterOptionsRequestToken = 0;
+
+// -- useFilterOrchestrator: status=immediate (page+lot clear+table reload), panel=draft-apply (status clear+page+lot clear+full reload) --
+const filterOrchestrator = useFilterOrchestrator({
+  fields: {
+    workorder:  { trigger: 'draft-apply', initial: [] },
+    lotid:      { trigger: 'draft-apply', initial: [] },
+    package:    { trigger: 'draft-apply', initial: [] },
+    type:       { trigger: 'draft-apply', initial: [] },
+    firstname:  { trigger: 'draft-apply', initial: [] },
+    waferdesc:  { trigger: 'draft-apply', initial: [] },
+    status:     { trigger: 'immediate', initial: null },
+  },
+  pagination: { resetOn: ['*'] },
+  onFetch(_committed) {
+    // Immediate trigger (status change) -> page reset + lot clear + table reload
+    page.value = 1;
+    selectedLotId.value = '';
+    void loadTableOnly();
+  },
+});
 
 function unwrapApiResult(result, fallbackMessage) {
   if (result?.success) {
@@ -333,10 +355,21 @@ function updateFilters(nextFilters) {
   filters.type = normalizeArrayValues(nextFilters.type);
   filters.firstname = normalizeArrayValues(nextFilters.firstname);
   filters.waferdesc = normalizeArrayValues(nextFilters.waferdesc);
+
+  // Sync to orchestrator draft
+  filterOrchestrator.draft.workorder = filters.workorder;
+  filterOrchestrator.draft.lotid = filters.lotid;
+  filterOrchestrator.draft.package = filters.package;
+  filterOrchestrator.draft.type = filters.type;
+  filterOrchestrator.draft.firstname = filters.firstname;
+  filterOrchestrator.draft.waferdesc = filters.waferdesc;
 }
 
 function applyFilters(nextFilters) {
   updateFilters(nextFilters);
+  // Apply draft fields via orchestrator; status clear + page + lot clear
+  activeStatusFilter.value = null;
+  filterOrchestrator.applyDraft();
   page.value = 1;
   selectedLotId.value = '';
   updateUrlState();
@@ -354,6 +387,7 @@ function clearFilters() {
     waferdesc: [],
   });
   activeStatusFilter.value = null;
+  filterOrchestrator.resetAll();
   page.value = 1;
   selectedLotId.value = '';
   updateUrlState();
@@ -363,10 +397,9 @@ function clearFilters() {
 
 function toggleStatusFilter(status) {
   activeStatusFilter.value = activeStatusFilter.value === status ? null : status;
-  page.value = 1;
-  selectedLotId.value = '';
+  // Delegate to orchestrator immediate field; onFetch handles page/lot/table reload
+  filterOrchestrator.updateField('status', activeStatusFilter.value);
   updateUrlState();
-  void loadTableOnly();
 }
 
 async function loadPageData() {
@@ -475,7 +508,7 @@ onBeforeUnmount(() => {
   <div class="dashboard wip-detail-page theme-wip-detail">
     <header class="header">
       <div class="header-left">
-        <a :href="backUrl" class="btn btn-back">&larr; Overview</a>
+        <a :href="backUrl" class="ui-btn ui-btn--ghost ui-btn--sm">&larr; Overview</a>
         <h1>{{ pageTitle }}</h1>
       </div>
       <div class="header-right">
@@ -485,7 +518,7 @@ onBeforeUnmount(() => {
           <span class="refresh-error" :class="{ active: refreshError }"></span>
           <span>{{ lastUpdate }}</span>
         </span>
-        <button type="button" class="btn btn-light" @click="manualRefresh">Refresh</button>
+        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="manualRefresh">Refresh</button>
       </div>
     </header>
 
@@ -520,8 +553,5 @@ onBeforeUnmount(() => {
     <LotDetailPanel :lot-id="selectedLotId" @close="closeLotDetail" />
   </div>
 
-  <div v-if="loading" class="loading-overlay">
-    <span class="loading-spinner"></span>
-    <span>Loading...</span>
-  </div>
+  <LoadingOverlay v-if="loading" tier="page" />
 </template>

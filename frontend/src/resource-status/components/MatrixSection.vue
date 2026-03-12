@@ -317,8 +317,8 @@ function handleToggleAll(expand) {
       <div class="section-header">
         <h2 class="section-title">狀態矩陣</h2>
         <div class="section-actions">
-          <button type="button" class="btn-sm" @click="handleToggleAll(true)">全部展開</button>
-          <button type="button" class="btn-sm" @click="handleToggleAll(false)">全部收合</button>
+          <button type="button" class="ui-btn ui-btn--sm" @click="handleToggleAll(true)">全部展開</button>
+          <button type="button" class="ui-btn ui-btn--sm" @click="handleToggleAll(false)">全部收合</button>
         </div>
       </div>
 

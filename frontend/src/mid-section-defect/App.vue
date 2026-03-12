@@ -2,17 +2,20 @@
 import { computed, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useTraceProgress } from '../shared-composables/useTraceProgress.js';
 import TraceProgressBar from '../shared-composables/TraceProgressBar.vue';
 
-import FilterBar from './components/FilterBar.vue';
-import KpiCards from './components/KpiCards.vue';
-import MultiSelect from './components/MultiSelect.vue';
-import ParetoChart from './components/ParetoChart.vue';
-import TrendChart from './components/TrendChart.vue';
+import EmptyState from '../shared-ui/components/EmptyState.vue';
+import MultiSelect from '../shared-ui/components/MultiSelect.vue';
+
 import AnalysisSummary from './components/AnalysisSummary.vue';
 import DetailTable from './components/DetailTable.vue';
+import FilterBar from './components/FilterBar.vue';
+import KpiCards from './components/KpiCards.vue';
+import ParetoChart from './components/ParetoChart.vue';
 import SuspectContextPanel from './components/SuspectContextPanel.vue';
+import TrendChart from './components/TrendChart.vue';
 
 ensureMesApiAvailable();
 
@@ -124,8 +127,27 @@ const hasQueried = ref(false);
 const queryError = ref('');
 const restoredFromCache = ref(false);
 
-const upstreamStationFilter = ref([]);
-const upstreamSpecFilter = ref([]);
+// --- Cascading chart filters: station -> spec prune via useFilterOrchestrator ---
+const {
+  committed: upstreamChartFilters,
+  updateField: updateUpstreamField,
+} = useFilterOrchestrator({
+  fields: {
+    station: { trigger: 'immediate', initial: [] },
+    spec:    { trigger: 'immediate', initial: [] },
+  },
+  dependencies: [
+    { when: 'station', then: ['spec'], action: 'clear' },
+  ],
+});
+const upstreamStationFilter = computed({
+  get: () => upstreamChartFilters.station,
+  set: (v) => updateUpstreamField('station', v),
+});
+const upstreamSpecFilter = computed({
+  get: () => upstreamChartFilters.spec,
+  set: (v) => updateUpstreamField('spec', v),
+});
 const upstreamStationOptions = computed(() => {
   const attribution = analysisData.value?.attribution;
   if (!Array.isArray(attribution) || attribution.length === 0) return [];
@@ -364,8 +386,8 @@ async function loadAnalysis() {
   queryError.value = '';
   restoredFromCache.value = false;
   resolutionInfo.value = null;
-  upstreamStationFilter.value = [];
-  upstreamSpecFilter.value = [];
+  updateUpstreamField('station', []);
+  updateUpstreamField('spec', []);
   trace.abort();
   trace.reset();
   loading.querying = true;
@@ -611,7 +633,7 @@ void initPage();
                           :model-value="upstreamStationFilter"
                           :options="upstreamStationOptions"
                           placeholder="全部站點"
-                          @update:model-value="upstreamStationFilter = $event; upstreamSpecFilter = []"
+                          @update:model-value="upstreamStationFilter = $event"
                         />
                         <MultiSelect
                           v-if="upstreamSpecOptions.length > 1"
@@ -668,8 +690,6 @@ void initPage();
       />
     </template>
 
-    <div v-else-if="!loading.querying" class="empty-state">
-      <p>請選擇偵測站與查詢條件，點擊「查詢」開始分析。</p>
-    </div>
+    <EmptyState v-else-if="!loading.querying" type="no-data" />
   </div>
 </template>

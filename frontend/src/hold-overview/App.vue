@@ -5,6 +5,10 @@ import { apiGet } from '../core/api.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
+import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import EmptyState from '../shared-ui/components/EmptyState.vue';
 import HoldLotTable from '../wip-shared/components/HoldLotTable.vue';
 import ParetoSection from '../wip-shared/components/ParetoSection.vue';
 
@@ -16,17 +20,11 @@ import HoldMatrix from './components/HoldMatrix.vue';
 
 const API_TIMEOUT = 60000;
 const DEFAULT_PER_PAGE = 20;
-const FILTER_OPTION_DEBOUNCE_MS = 120;
 
 const summary = ref(null);
 const matrix = ref(null);
 const hold = ref(null);
 const lots = ref([]);
-
-const filterBar = reactive({
-  holdType: 'all',
-  reason: [],
-});
 
 const filterOptions = ref({
   workorders: [],
@@ -35,15 +33,6 @@ const filterOptions = ref({
   types: [],
   firstnames: [],
   waferdescs: [],
-});
-
-const filters = reactive({
-  workorder: [],
-  lotid: [],
-  package: [],
-  type: [],
-  firstname: [],
-  waferdesc: [],
 });
 
 const matrixFilter = ref(null);
@@ -65,22 +54,55 @@ const refreshError = ref(false);
 const errorMessage = ref('');
 const lotsError = ref('');
 
-let activeRequestId = 0;
-let filterOptionsDebounceTimer = null;
-let filterOptionsRequestToken = 0;
+const { nextRequestId, isStaleRequest } = useRequestGuard();
+
+// Panel filters kept as reactive for FilterPanel compatibility
+const filters = reactive({
+  workorder: [],
+  lotid: [],
+  package: [],
+  type: [],
+  firstname: [],
+  waferdesc: [],
+});
+
+// --- useFilterOrchestrator for holdType + reason (FilterBar) ---
+const orchestrator = useFilterOrchestrator({
+  fields: {
+    holdType: { trigger: 'immediate', initial: 'all' },
+    reason: { trigger: 'immediate', initial: [] },
+  },
+  dependencies: [
+    { when: 'holdType', then: ['reason'], action: 'reload-options' },
+  ],
+  pagination: { resetOn: ['*'] },
+  urlSync: { enabled: false },
+  onFetch: (_committed) => {
+    matrixFilter.value = null;
+    page.value = 1;
+    updateUrlState();
+    void loadFilterOptions(filters);
+    void loadAllData(false);
+  },
+  onLoadOptions: async (fieldName, committed) => {
+    // reason options are derived from summary, reload via summary fetch
+    return [];
+  },
+});
 
 const holdTypeLabel = computed(() => {
-  if (filterBar.holdType === 'non-quality') {
+  const ht = orchestrator.committed.holdType;
+  if (ht === 'non-quality') {
     return '非品質異常';
   }
-  if (filterBar.holdType === 'all') {
+  if (ht === 'all') {
     return '全部';
   }
   return '品質異常';
 });
 
-const showQualityPareto = computed(() => filterBar.holdType !== 'non-quality');
-const showNonQualityPareto = computed(() => filterBar.holdType !== 'quality');
+const showQualityPareto = computed(() => orchestrator.committed.holdType !== 'non-quality');
+const showNonQualityPareto = computed(() => orchestrator.committed.holdType !== 'quality');
 
 const lotFilterText = computed(() => {
   const parts = [];
@@ -127,7 +149,7 @@ const reasonOptions = computed(() => {
 
 const splitHold = computed(() => {
   const base = splitHoldByType(hold.value);
-  const activeReasons = (filterBar.reason || []).map((v) => String(v).trim()).filter(Boolean);
+  const activeReasons = (orchestrator.committed.reason || []).map((v) => String(v).trim()).filter(Boolean);
   if (!activeReasons.length) {
     return base;
   }
@@ -139,14 +161,8 @@ const splitHold = computed(() => {
   };
 });
 
-function nextRequestId() {
-  activeRequestId += 1;
-  return activeRequestId;
-}
-
-function isStaleRequest(requestId) {
-  return requestId !== activeRequestId;
-}
+let filterOptionsDebounceTimer = null;
+let filterOptionsRequestToken = 0;
 
 function unwrapApiResult(result, fallbackMessage) {
   if (result?.success) {
@@ -212,9 +228,9 @@ function updateFilters(nextFilters) {
 
 function buildFilterBarParams() {
   const params = {
-    hold_type: filterBar.holdType || 'all',
+    hold_type: orchestrator.committed.holdType || 'all',
   };
-  const reasonCsv = serializeFilterValue(filterBar.reason);
+  const reasonCsv = serializeFilterValue(orchestrator.committed.reason);
   if (reasonCsv) {
     params.reason = reasonCsv;
   }
@@ -254,8 +270,9 @@ function buildFilterOptionsParams(sourceFilters = filters) {
     status: 'HOLD',
   };
 
-  if (filterBar.holdType && filterBar.holdType !== 'all') {
-    params.hold_type = filterBar.holdType;
+  const ht = orchestrator.committed.holdType;
+  if (ht && ht !== 'all') {
+    params.hold_type = ht;
   }
 
   return params;
@@ -334,7 +351,7 @@ function scheduleFilterOptionsReload(nextDraftFilters) {
 
   filterOptionsDebounceTimer = setTimeout(() => {
     void loadFilterOptions(nextDraftFilters);
-  }, FILTER_OPTION_DEBOUNCE_MS);
+  }, 120);
 }
 
 function onFilterDraftChange(nextDraftFilters) {
@@ -362,10 +379,11 @@ function showRefreshSuccess() {
 function updateUrlState() {
   const params = new URLSearchParams();
 
-  if (filterBar.holdType) {
-    params.set('hold_type', filterBar.holdType);
+  const ht = orchestrator.committed.holdType;
+  if (ht) {
+    params.set('hold_type', ht);
   }
-  const reasonCsv = serializeFilterValue(filterBar.reason);
+  const reasonCsv = serializeFilterValue(orchestrator.committed.reason);
   if (reasonCsv) {
     params.set('reason', reasonCsv);
   }
@@ -537,19 +555,15 @@ function handleFilterChange(next) {
   const nextHoldType = normalizeHoldType(next?.holdType || 'all');
   const nextReason = normalizeArrayValues(next?.reason);
 
-  const currentReasonCsv = serializeFilterValue(filterBar.reason);
+  const currentReasonCsv = serializeFilterValue(orchestrator.committed.reason);
   const nextReasonCsv = serializeFilterValue(nextReason);
-  if (filterBar.holdType === nextHoldType && currentReasonCsv === nextReasonCsv) {
+  if (orchestrator.committed.holdType === nextHoldType && currentReasonCsv === nextReasonCsv) {
     return;
   }
 
-  filterBar.holdType = nextHoldType;
-  filterBar.reason = nextReason;
-  matrixFilter.value = null;
-  page.value = 1;
-  updateUrlState();
-  void loadFilterOptions(filters);
-  void loadAllData(false);
+  // Use orchestrator to update fields - onFetch callback handles the rest
+  orchestrator.updateField('holdType', nextHoldType);
+  orchestrator.updateField('reason', nextReason);
 }
 
 function handleMatrixSelect(nextFilter) {
@@ -617,8 +631,14 @@ async function manualRefresh() {
 }
 
 async function initializePage() {
-  filterBar.holdType = normalizeHoldType(getUrlParam('hold_type') || 'all');
-  filterBar.reason = parseCsvParam('reason');
+  const initialHoldType = normalizeHoldType(getUrlParam('hold_type') || 'all');
+  const initialReason = parseCsvParam('reason');
+
+  // Set orchestrator committed state directly (no fetch triggered during init)
+  orchestrator.committed.holdType = initialHoldType;
+  orchestrator.draft.holdType = initialHoldType;
+  orchestrator.committed.reason = initialReason;
+  orchestrator.draft.reason = initialReason;
 
   updateFilters({
     workorder: parseCsvParam('workorder'),
@@ -677,7 +697,7 @@ onBeforeUnmount(() => {
           <span class="refresh-error" :class="{ active: refreshError }"></span>
           <span>{{ lastUpdate }}</span>
         </span>
-        <button type="button" class="btn btn-light" @click="manualRefresh">重新整理</button>
+        <button type="button" class="ui-btn ui-btn--ghost" @click="manualRefresh">重新整理</button>
       </div>
     </header>
 
@@ -693,8 +713,8 @@ onBeforeUnmount(() => {
     />
 
     <FilterBar
-      :hold-type="filterBar.holdType"
-      :reason="filterBar.reason"
+      :hold-type="orchestrator.committed.holdType"
+      :reason="orchestrator.committed.reason"
       :reasons="reasonOptions"
       :disabled="refreshing && initialLoading"
       @change="handleFilterChange"
@@ -736,23 +756,22 @@ onBeforeUnmount(() => {
         @clear-all="clearMatrixFilter"
       />
 
-      <HoldLotTable
-        :lots="lots"
-        :pagination="pagination"
-        :loading="lotsLoading"
-        :paginating="paginationLoading"
-        :error-message="lotsError"
-        :has-active-filters="hasLotFilterText"
-        :filter-text="lotFilterText"
-        @clear-filters="clearMatrixFilter"
-        @prev-page="prevPage"
-        @next-page="nextPage"
-      />
+      <div class="ui-table-wrap" :class="{ 'is-loading': lotsLoading }">
+        <HoldLotTable
+          :lots="lots"
+          :pagination="pagination"
+          :loading="lotsLoading"
+          :paginating="paginationLoading"
+          :error-message="lotsError"
+          :has-active-filters="hasLotFilterText"
+          :filter-text="lotFilterText"
+          @clear-filters="clearMatrixFilter"
+          @prev-page="prevPage"
+          @next-page="nextPage"
+        />
+      </div>
     </section>
   </div>
 
-  <div v-if="initialLoading" class="loading-overlay">
-    <span class="loading-spinner"></span>
-    <span>Loading...</span>
-  </div>
+  <LoadingOverlay v-if="initialLoading" tier="page" />
 </template>

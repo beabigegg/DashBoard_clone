@@ -3,6 +3,10 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
+import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import EmptyState from '../shared-ui/components/EmptyState.vue';
 
 import DailyTrend from './components/DailyTrend.vue';
 import DetailTable from './components/DetailTable.vue';
@@ -16,16 +20,7 @@ import SummaryCards from './components/SummaryCards.vue';
 const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 20;
 
-const filterBar = reactive({
-  startDate: '',
-  endDate: '',
-  holdType: 'quality',
-});
-
 const queryId = ref('');
-const reasonFilter = ref('');
-const durationFilter = ref('');
-const recordType = ref(['new']);
 
 const trendData = ref({ days: [] });
 const reasonParetoData = ref({ items: [] });
@@ -49,7 +44,43 @@ const loading = reactive({
 });
 
 const errorMessage = ref('');
-let activeRequestId = 0;
+const { nextRequestId, isStaleRequest } = useRequestGuard();
+
+// --- useFilterOrchestrator for two-phase query ---
+// Date fields: draft-apply -> executePrimaryQuery
+// holdType: immediate -> refreshView
+// recordType, reasonFilter, durationFilter: immediate -> refreshView
+const orchestrator = useFilterOrchestrator({
+  fields: {
+    startDate: { trigger: 'draft-apply', initial: '' },
+    endDate: { trigger: 'draft-apply', initial: '' },
+    holdType: { trigger: 'immediate', initial: 'quality' },
+    recordType: { trigger: 'immediate', initial: ['new'] },
+    reasonFilter: { trigger: 'immediate', initial: '' },
+    durationFilter: { trigger: 'immediate', initial: '' },
+  },
+  dependencies: [
+    // holdType change -> clear reason and duration, reset recordType to ['new']
+    { when: 'holdType', then: ['reasonFilter', 'durationFilter'], action: 'clear' },
+    { when: 'holdType', then: ['recordType'], action: 'reset', value: ['new'] },
+    // recordType change -> clear reason and duration
+    { when: 'recordType', then: ['reasonFilter', 'durationFilter'], action: 'clear' },
+  ],
+  pagination: { resetOn: ['*'] },
+  urlSync: { enabled: false },
+  onFetch: (_committed) => {
+    // Immediate field changed -> view refresh (supplementary, reads from cache)
+    page.value = 1;
+    updateUrlState();
+    void refreshView();
+  },
+  onPrimaryQuery: (_committed) => {
+    // Date apply -> primary query
+    page.value = 1;
+    updateUrlState();
+    void executePrimaryQuery();
+  },
+});
 
 function toDateString(value) {
   const y = value.getFullYear();
@@ -93,17 +124,10 @@ function setDefaultDateRange() {
 
   const start = new Date(year, month, 1);
   const end = new Date(year, month + 1, 0);
-  filterBar.startDate = toDateString(start);
-  filterBar.endDate = toDateString(end);
-}
-
-function nextRequestId() {
-  activeRequestId += 1;
-  return activeRequestId;
-}
-
-function isStaleRequest(requestId) {
-  return requestId !== activeRequestId;
+  orchestrator.committed.startDate = toDateString(start);
+  orchestrator.draft.startDate = toDateString(start);
+  orchestrator.committed.endDate = toDateString(end);
+  orchestrator.draft.endDate = toDateString(end);
 }
 
 function unwrapApiResult(result, fallbackMessage) {
@@ -135,23 +159,24 @@ function normalizeListPayload(payload) {
 function updateUrlState() {
   const params = new URLSearchParams();
 
-  if (filterBar.startDate) {
-    params.set('start_date', filterBar.startDate);
+  if (orchestrator.committed.startDate) {
+    params.set('start_date', orchestrator.committed.startDate);
   }
-  if (filterBar.endDate) {
-    params.set('end_date', filterBar.endDate);
+  if (orchestrator.committed.endDate) {
+    params.set('end_date', orchestrator.committed.endDate);
   }
-  if (filterBar.holdType) {
-    params.set('hold_type', filterBar.holdType);
+  if (orchestrator.committed.holdType) {
+    params.set('hold_type', orchestrator.committed.holdType);
   }
-  if (Array.isArray(recordType.value) && recordType.value.length > 0) {
-    params.set('record_type', recordType.value.join(','));
+  const rt = orchestrator.committed.recordType;
+  if (Array.isArray(rt) && rt.length > 0) {
+    params.set('record_type', rt.join(','));
   }
-  if (reasonFilter.value) {
-    params.set('reason', reasonFilter.value);
+  if (orchestrator.committed.reasonFilter) {
+    params.set('reason', orchestrator.committed.reasonFilter);
   }
-  if (durationFilter.value) {
-    params.set('duration_range', durationFilter.value);
+  if (orchestrator.committed.durationFilter) {
+    params.set('duration_range', orchestrator.committed.durationFilter);
   }
   if (page.value > 1) {
     params.set('page', String(page.value));
@@ -161,7 +186,7 @@ function updateUrlState() {
 }
 
 function recordTypeCsv() {
-  const rt = Array.isArray(recordType.value) ? recordType.value : [recordType.value];
+  const rt = Array.isArray(orchestrator.committed.recordType) ? orchestrator.committed.recordType : [orchestrator.committed.recordType];
   return rt.join(',');
 }
 
@@ -189,9 +214,9 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
 
   try {
     const body = {
-      start_date: filterBar.startDate,
-      end_date: filterBar.endDate,
-      hold_type: filterBar.holdType,
+      start_date: orchestrator.committed.startDate,
+      end_date: orchestrator.committed.endDate,
+      hold_type: orchestrator.committed.holdType,
       record_type: recordTypeCsv(),
     };
 
@@ -234,17 +259,17 @@ async function refreshView({ listOnly = false } = {}) {
   try {
     const params = {
       query_id: queryId.value,
-      hold_type: filterBar.holdType,
+      hold_type: orchestrator.committed.holdType,
       record_type: recordTypeCsv(),
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
     };
 
-    if (reasonFilter.value) {
-      params.reason = reasonFilter.value;
+    if (orchestrator.committed.reasonFilter) {
+      params.reason = orchestrator.committed.reasonFilter;
     }
-    if (durationFilter.value) {
-      params.duration_range = durationFilter.value;
+    if (orchestrator.committed.durationFilter) {
+      params.duration_range = orchestrator.committed.durationFilter;
     }
 
     const resp = await apiGet('/api/hold-history/view', {
@@ -283,17 +308,17 @@ async function refreshViewPage() {
   try {
     const params = {
       query_id: queryId.value,
-      hold_type: filterBar.holdType,
+      hold_type: orchestrator.committed.holdType,
       record_type: recordTypeCsv(),
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
     };
 
-    if (reasonFilter.value) {
-      params.reason = reasonFilter.value;
+    if (orchestrator.committed.reasonFilter) {
+      params.reason = orchestrator.committed.reasonFilter;
     }
-    if (durationFilter.value) {
-      params.duration_range = durationFilter.value;
+    if (orchestrator.committed.durationFilter) {
+      params.duration_range = orchestrator.committed.durationFilter;
     }
 
     const resp = await apiGet('/api/hold-history/view', {
@@ -346,7 +371,7 @@ function estimateAvgHoldHours(items) {
   return weightedHours / totalCount;
 }
 
-const trendTypeKey = computed(() => (filterBar.holdType === 'non-quality' ? 'non_quality' : filterBar.holdType));
+const trendTypeKey = computed(() => (orchestrator.committed.holdType === 'non-quality' ? 'non_quality' : orchestrator.committed.holdType));
 
 const selectedTrendDays = computed(() => {
   const days = Array.isArray(trendData.value?.days) ? trendData.value.days : [];
@@ -389,13 +414,21 @@ const summary = computed(() => {
 });
 
 const holdTypeLabel = computed(() => {
-  if (filterBar.holdType === 'non-quality') {
+  if (orchestrator.committed.holdType === 'non-quality') {
     return '非品質異常';
   }
-  if (filterBar.holdType === 'all') {
+  if (orchestrator.committed.holdType === 'all') {
     return '全部';
   }
   return '品質異常';
+});
+
+// Provide a local computed ref for RecordTypeFilter v-model
+const recordTypeModel = computed({
+  get: () => orchestrator.committed.recordType,
+  set: (val) => {
+    orchestrator.updateField('recordType', val);
+  },
 });
 
 // ---- Event handlers ----
@@ -404,38 +437,31 @@ function handleApply(next) {
   const nextStartDate = next?.startDate || '';
   const nextEndDate = next?.endDate || '';
 
-  filterBar.startDate = nextStartDate;
-  filterBar.endDate = nextEndDate;
-  reasonFilter.value = '';
-  durationFilter.value = '';
-  recordType.value = ['new'];
-  page.value = 1;
-  updateUrlState();
+  // Update date drafts and apply
+  orchestrator.draft.startDate = nextStartDate;
+  orchestrator.draft.endDate = nextEndDate;
+  // Reset supplementary filters before apply
+  orchestrator.committed.reasonFilter = '';
+  orchestrator.draft.reasonFilter = '';
+  orchestrator.committed.durationFilter = '';
+  orchestrator.draft.durationFilter = '';
+  orchestrator.committed.recordType = ['new'];
+  orchestrator.draft.recordType = ['new'];
 
-  void executePrimaryQuery();
+  orchestrator.applyDraft();
 }
 
 function handleHoldTypeChange(nextHoldType) {
   const holdType = nextHoldType || 'quality';
-  if (filterBar.holdType === holdType) return;
+  if (orchestrator.committed.holdType === holdType) return;
 
-  filterBar.holdType = holdType;
-  reasonFilter.value = '';
-  durationFilter.value = '';
-  recordType.value = ['new'];
-  page.value = 1;
-  updateUrlState();
-
-  // Hold type only → view refresh (cache read, no Oracle query)
-  void refreshView();
+  orchestrator.updateField('holdType', holdType);
 }
 
 function handleRecordTypeChange() {
-  reasonFilter.value = '';
-  durationFilter.value = '';
-  page.value = 1;
-  updateUrlState();
-  void refreshView();
+  // recordType is already updated via v-model computed setter
+  // Dependencies (clear reason/duration) are handled by orchestrator
+  // onFetch triggers refreshView
 }
 
 function handleReasonToggle(reason) {
@@ -444,20 +470,15 @@ function handleReasonToggle(reason) {
     return;
   }
 
-  reasonFilter.value = reasonFilter.value === nextReason ? '' : nextReason;
-  page.value = 1;
-  updateUrlState();
-  void refreshView();
+  const current = orchestrator.committed.reasonFilter;
+  orchestrator.updateField('reasonFilter', current === nextReason ? '' : nextReason);
 }
 
 function clearReasonFilter() {
-  if (!reasonFilter.value) {
+  if (!orchestrator.committed.reasonFilter) {
     return;
   }
-  reasonFilter.value = '';
-  page.value = 1;
-  updateUrlState();
-  void refreshView();
+  orchestrator.updateField('reasonFilter', '');
 }
 
 function handleDurationToggle(range) {
@@ -466,20 +487,15 @@ function handleDurationToggle(range) {
     return;
   }
 
-  durationFilter.value = durationFilter.value === nextRange ? '' : nextRange;
-  page.value = 1;
-  updateUrlState();
-  void refreshView();
+  const current = orchestrator.committed.durationFilter;
+  orchestrator.updateField('durationFilter', current === nextRange ? '' : nextRange);
 }
 
 function clearDurationFilter() {
-  if (!durationFilter.value) {
+  if (!orchestrator.committed.durationFilter) {
     return;
   }
-  durationFilter.value = '';
-  page.value = 1;
-  updateUrlState();
-  void refreshView();
+  orchestrator.updateField('durationFilter', '');
 }
 
 function prevPage() {
@@ -506,8 +522,10 @@ function nextPage() {
 
 async function manualRefresh() {
   page.value = 1;
-  reasonFilter.value = '';
-  durationFilter.value = '';
+  orchestrator.committed.reasonFilter = '';
+  orchestrator.draft.reasonFilter = '';
+  orchestrator.committed.durationFilter = '';
+  orchestrator.draft.durationFilter = '';
   updateUrlState();
   await executePrimaryQuery();
 }
@@ -516,15 +534,29 @@ onMounted(() => {
   const startDate = getUrlParam('start_date');
   const endDate = getUrlParam('end_date');
   if (startDate && endDate) {
-    filterBar.startDate = startDate;
-    filterBar.endDate = endDate;
+    orchestrator.committed.startDate = startDate;
+    orchestrator.draft.startDate = startDate;
+    orchestrator.committed.endDate = endDate;
+    orchestrator.draft.endDate = endDate;
   } else {
     setDefaultDateRange();
   }
-  filterBar.holdType = normalizeHoldType(getUrlParam('hold_type'));
-  reasonFilter.value = getUrlParam('reason');
-  durationFilter.value = getUrlParam('duration_range');
-  recordType.value = parseRecordTypeCsv(getUrlParam('record_type'));
+  const initHoldType = normalizeHoldType(getUrlParam('hold_type'));
+  orchestrator.committed.holdType = initHoldType;
+  orchestrator.draft.holdType = initHoldType;
+
+  const initReason = getUrlParam('reason');
+  orchestrator.committed.reasonFilter = initReason;
+  orchestrator.draft.reasonFilter = initReason;
+
+  const initDuration = getUrlParam('duration_range');
+  orchestrator.committed.durationFilter = initDuration;
+  orchestrator.draft.durationFilter = initDuration;
+
+  const initRecordType = parseRecordTypeCsv(getUrlParam('record_type'));
+  orchestrator.committed.recordType = initRecordType;
+  orchestrator.draft.recordType = initRecordType;
+
   const parsedPage = Number.parseInt(getUrlParam('page'), 10);
   if (Number.isFinite(parsedPage) && parsedPage > 0) {
     page.value = parsedPage;
@@ -542,16 +574,16 @@ onMounted(() => {
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
       </div>
       <div class="header-right">
-        <button type="button" class="btn btn-light" @click="manualRefresh">重新整理</button>
+        <button type="button" class="ui-btn ui-btn--primary" @click="manualRefresh">重新整理</button>
       </div>
     </header>
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
 
     <FilterBar
-      :start-date="filterBar.startDate"
-      :end-date="filterBar.endDate"
-      :hold-type="filterBar.holdType"
+      :start-date="orchestrator.committed.startDate"
+      :end-date="orchestrator.committed.endDate"
+      :hold-type="orchestrator.committed.holdType"
       :disabled="loading.global"
       @apply="handleApply"
       @hold-type-change="handleHoldTypeChange"
@@ -562,7 +594,7 @@ onMounted(() => {
     <DailyTrend :days="selectedTrendDays" />
 
     <RecordTypeFilter
-      v-model="recordType"
+      v-model="recordTypeModel"
       :disabled="loading.global"
       @update:model-value="handleRecordTypeChange"
     />
@@ -570,36 +602,35 @@ onMounted(() => {
     <section class="hold-history-chart-grid">
       <ReasonPareto
         :items="reasonParetoData.items || []"
-        :active-reason="reasonFilter"
+        :active-reason="orchestrator.committed.reasonFilter"
         @toggle="handleReasonToggle"
       />
       <DurationChart
         :items="durationData.items || []"
-        :active-range="durationFilter"
+        :active-range="orchestrator.committed.durationFilter"
         @toggle="handleDurationToggle"
       />
     </section>
 
     <FilterIndicator
-      :reason="reasonFilter"
-      :duration-range="durationFilter"
+      :reason="orchestrator.committed.reasonFilter"
+      :duration-range="orchestrator.committed.durationFilter"
       @clear-reason="clearReasonFilter"
       @clear-duration="clearDurationFilter"
     />
 
-    <DetailTable
-      :items="detailData.items || []"
-      :pagination="detailData.pagination"
-      :loading="loading.list"
-      :paginating="paginationLoading"
-      :error-message="errorMessage"
-      @prev-page="prevPage"
-      @next-page="nextPage"
-    />
+    <div class="ui-table-wrap" :class="{ 'is-loading': loading.list }">
+      <DetailTable
+        :items="detailData.items || []"
+        :pagination="detailData.pagination"
+        :loading="loading.list"
+        :paginating="paginationLoading"
+        :error-message="errorMessage"
+        @prev-page="prevPage"
+        @next-page="nextPage"
+      />
+    </div>
   </div>
 
-  <div v-if="initialLoading" class="loading-overlay">
-    <span class="loading-spinner"></span>
-    <span>Loading...</span>
-  </div>
+  <LoadingOverlay v-if="initialLoading" tier="page" />
 </template>

@@ -1,5 +1,5 @@
 <script setup>
-import MultiSelect from './MultiSelect.vue';
+import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
 const props = defineProps({
   filters: {
@@ -177,7 +177,7 @@ function updateFilters(patch) {
 
         <button
           type="button"
-          class="btn btn-primary"
+          class="ui-btn ui-btn--primary"
           :disabled="loading"
           @click="$emit('query')"
         >

@@ -3,7 +3,10 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { MATRIX_STATUS_COLUMNS, STATUS_DISPLAY_MAP, normalizeStatus } from '../resource-shared/constants.js';
+
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 
 import EquipmentGrid from './components/EquipmentGrid.vue';
 import FilterBar from './components/FilterBar.vue';
@@ -34,13 +37,27 @@ const summary = ref({
   availabilityPct: 0,
 });
 
-const filterState = reactive({
-  group: '',
-  isProduction: false,
-  isKey: false,
-  isMonitor: false,
-  families: [],
-  machines: [],
+// --- Filter orchestration with cascading: group/flags -> families -> machines ---
+const {
+  committed: filterState,
+  updateField,
+} = useFilterOrchestrator({
+  fields: {
+    group:        { trigger: 'immediate', initial: '' },
+    isProduction: { trigger: 'immediate', initial: false },
+    isKey:        { trigger: 'immediate', initial: false },
+    isMonitor:    { trigger: 'immediate', initial: false },
+    families:     { trigger: 'immediate', initial: [] },
+    machines:     { trigger: 'immediate', initial: [] },
+  },
+  dependencies: [
+    { when: 'group',        then: ['families', 'machines'], action: 'clear' },
+    { when: 'isProduction', then: ['families', 'machines'], action: 'clear' },
+    { when: 'isKey',        then: ['families', 'machines'], action: 'clear' },
+    { when: 'isMonitor',    then: ['families', 'machines'], action: 'clear' },
+    { when: 'families',     then: ['machines'],             action: 'clear' },
+  ],
+  onFetch: () => void applyFiltersAndReload(),
 });
 
 const matrixFilter = ref([]);
@@ -131,13 +148,6 @@ const machineOptions = computed(() => {
     .map((r) => ({ label: r.name, value: r.id }))
     .sort((a, b) => a.label.localeCompare(b.label));
 });
-
-function pruneInvalidSelections() {
-  const validFamilies = new Set(familyOptions.value);
-  filterState.families = filterState.families.filter((f) => validFamilies.has(f));
-  const validMachineIds = new Set(machineOptions.value.map((m) => m.value));
-  filterState.machines = filterState.machines.filter((m) => validMachineIds.has(m));
-}
 
 function resetHierarchyState() {
   Object.keys(hierarchyState).forEach((key) => {
@@ -385,28 +395,21 @@ async function applyFiltersAndReload() {
 }
 
 function updateGroup(group) {
-  filterState.group = group || '';
-  pruneInvalidSelections();
-  void applyFiltersAndReload();
+  updateField('group', group || '');
 }
 
 function updateFlags(nextFlags) {
-  filterState.isProduction = Boolean(nextFlags?.isProduction);
-  filterState.isKey = Boolean(nextFlags?.isKey);
-  filterState.isMonitor = Boolean(nextFlags?.isMonitor);
-  pruneInvalidSelections();
-  void applyFiltersAndReload();
+  updateField('isProduction', Boolean(nextFlags?.isProduction));
+  updateField('isKey', Boolean(nextFlags?.isKey));
+  updateField('isMonitor', Boolean(nextFlags?.isMonitor));
 }
 
 function updateFamilies(families) {
-  filterState.families = families || [];
-  pruneInvalidSelections();
-  void applyFiltersAndReload();
+  updateField('families', families || []);
 }
 
 function updateMachines(machines) {
-  filterState.machines = machines || [];
-  void applyFiltersAndReload();
+  updateField('machines', machines || []);
 }
 
 const { resetAutoRefresh, triggerRefresh } = useAutoRefresh({
@@ -483,9 +486,7 @@ onMounted(() => {
       />
     </div>
 
-    <div class="loading-overlay" :class="{ hidden: !loading.initial }">
-      <div class="loading-spinner"></div>
-    </div>
+    <LoadingOverlay v-if="loading.initial" tier="page" />
 
     <FloatingTooltip
       :visible="tooltipState.visible"

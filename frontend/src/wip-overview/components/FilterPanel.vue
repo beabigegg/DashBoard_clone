@@ -1,7 +1,7 @@
 <script setup>
 import { reactive, watch } from 'vue';
 
-import MultiSelect from '../../resource-shared/components/MultiSelect.vue';
+import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
 const props = defineProps({
   filters: {
@@ -118,8 +118,8 @@ function clearFilters() {
     </div>
 
     <div class="filters-actions">
-      <button type="button" class="btn-primary" :disabled="loading" @click="applyFilters">套用篩選</button>
-      <button type="button" class="btn-secondary" :disabled="loading" @click="clearFilters">清除篩選</button>
+      <button type="button" class="ui-btn ui-btn--primary" :disabled="loading" @click="applyFilters">套用篩選</button>
+      <button type="button" class="ui-btn ui-btn--ghost" :disabled="loading" @click="clearFilters">清除篩選</button>
     </div>
   </section>
 </template>

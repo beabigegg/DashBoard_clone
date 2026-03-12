@@ -19,7 +19,7 @@
   font-weight: 600;
   color: theme('colors.token.h475569');
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 
 .mode-tab:not(:last-child) {
@@ -292,47 +292,6 @@
   line-height: 1;
 }
 
-.btn.btn-primary:hover {
-  background: var(--primary-dark);
-  color: theme('colors.token.hffffff');
-}
-
-.btn.btn-secondary:hover {
-  background: theme('colors.token.h5a6268');
-  color: theme('colors.token.hffffff');
-}
-
-.btn.btn-export {
-  background: theme('colors.token.h0f766e');
-  color: theme('colors.token.hffffff');
-}
-
-.btn.btn-export:hover {
-  background: theme('colors.token.h0b5e59');
-  color: theme('colors.token.hffffff');
-}
-
-.btn.btn-export:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.btn-spinner {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: theme('colors.token.hffffff');
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  margin-right: theme('spacing.token.p6');
-  vertical-align: middle;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 .reject-summary-row {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
@@ -472,13 +431,13 @@
 .detail-table-wrap.is-loading table {
   opacity: 0.4;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--motion-fast) var(--motion-ease);
 }
 
 .detail-table-wrap.is-paginating table {
   opacity: 0.5;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--motion-fast) var(--motion-ease);
 }
 
 .table-loading-overlay {
@@ -668,21 +627,6 @@
   padding: theme('spacing.token.p8') theme('spacing.token.p10');
   border-top: 1px solid var(--border);
   background: theme('colors.token.hf8fafc');
-}
-
-.btn-sm {
-  padding: theme('spacing.token.p4') theme('spacing.token.p10');
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: theme('colors.token.hf8fafc');
-  color: var(--text);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.btn-sm:hover {
-  border-color: theme('colors.token.hc2d0e0');
-  background: theme('colors.token.heef4fb');
 }
 
 @media (max-width: 1400px) {

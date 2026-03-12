@@ -56,11 +56,6 @@
   justify-content: flex-end;
 }
 
-.filters-actions .btn-primary,
-.filters-actions .btn-secondary {
-  min-width: 108px;
-}
-
 .hold-summary-row {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
@@ -142,7 +137,7 @@
   padding: theme('spacing.token.p10') theme('spacing.nav');
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
 }
 
 .hold-type-btn:hover:not(:disabled) {

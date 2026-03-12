@@ -1,5 +1,5 @@
 <script setup>
-import MultiSelect from '../../resource-shared/components/MultiSelect.vue';
+import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
 const props = defineProps({
   filters: { type: Object, required: true },
@@ -132,29 +132,29 @@ function emitSupplementary(patch) {
         </div>
         <div class="filter-actions">
           <button
-            class="btn btn-primary"
+            class="ui-btn ui-btn--primary"
             :disabled="loading.querying"
             @click="$emit('apply')"
           >
             <template v-if="loading.querying"
-              ><span class="btn-spinner"></span>查詢中...</template
+              >查詢中...</template
             >
             <template v-else>查詢</template>
           </button>
           <button
-            class="btn btn-secondary"
+            class="ui-btn ui-btn--ghost"
             :disabled="loading.querying"
             @click="$emit('clear')"
           >
             清除條件
           </button>
           <button
-            class="btn btn-light btn-export"
+            class="ui-btn ui-btn--ghost"
             :disabled="loading.querying || loading.exporting"
             @click="$emit('export-csv')"
           >
             <template v-if="loading.exporting"
-              ><span class="btn-spinner"></span>匯出中...</template
+              >匯出中...</template
             >
             <template v-else>匯出 CSV</template>
           </button>

@@ -68,7 +68,7 @@ const hasAnyFilter = computed(() => hasMatrixFilter.value || hasTreemapFilter.va
     <button
       v-if="showClearAll"
       type="button"
-      class="btn btn-secondary clear-all-btn"
+      class="ui-btn ui-btn--ghost clear-all-btn"
       @click="emit('clear-all')"
     >
       清除所有篩選

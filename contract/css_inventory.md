@@ -1,10 +1,10 @@
 # CSS Inventory (Governed Source List)
 
-Updated: 2026-03-11
+Updated: 2026-03-12
 
 This file is the governed inventory for authored CSS source files in `frontend/src/**/*.css`.
 
-Governance status (2026-03-11): `css-governance-check` = 0 errors, 0 warnings.
+Governance status (2026-03-12): `css-governance-check` = 0 errors, 0 warnings.
 
 - Included: human-authored source CSS files under `frontend/src/`
 - Excluded: build outputs under `src/mes_dashboard/static/dist/`
@@ -13,7 +13,7 @@ Governance status (2026-03-11): `css-governance-check` = 0 errors, 0 warnings.
 
 | File | Scope | Notes |
 | :--- | :--- | :--- |
-| `frontend/src/styles/tailwind.css` | Global base + components + utilities | The only allowed global `@layer base` location |
+| `frontend/src/styles/tailwind.css` | Global base + components + utilities | The only allowed global `@layer base` location. Added: motion design tokens in `:root`, unified `ui-btn` BEM button system, `.ui-table-wrap` search trigger animation classes |
 | `frontend/src/portal-shell/style.css` | Portal shell frame | Shell layout chrome and shell-wide UI |
 | `frontend/src/portal/portal.css` | Legacy portal entry | Legacy portal host layout |
 
@@ -21,9 +21,17 @@ Governance status (2026-03-11): `css-governance-check` = 0 errors, 0 warnings.
 
 | File | Scope | Notes |
 | :--- | :--- | :--- |
-| `frontend/src/wip-shared/styles.css` | `theme-wip-*`, hold/reject/query/material/yield shared blocks | Shared WIP domain primitives |
+| `frontend/src/wip-shared/styles.css` | `theme-wip-*`, hold/reject/query/material/yield shared blocks | Shared WIP domain primitives. **Cleaned**: removed `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-light`, `.btn-back` definitions (replaced by global `ui-btn` system). |
 | `frontend/src/wip-shared/pareto-styles.css` | Pareto chart/table shared blocks | Shared pareto presentation |
-| `frontend/src/resource-shared/styles.css` | `theme-resource*` and related shared blocks | Shared resource domain primitives |
+| `frontend/src/resource-shared/styles.css` | `theme-resource*` and related shared blocks | Shared resource domain primitives. **Cleaned**: removed `.btn`, `.btn-sm`, `.btn-primary` definitions (replaced by global `ui-btn` system). |
+
+## Shared UI Component Styles (scoped — new in frontend-unified-ux)
+
+| File | Scope | Notes |
+| :--- | :--- | :--- |
+| `frontend/src/shared-ui/components/LoadingSpinner.vue` | `<style scoped>` | Inline spinner; sizes sm/md/lg |
+| `frontend/src/shared-ui/components/LoadingOverlay.vue` | `<style scoped>` | Section/page tier overlay |
+| `frontend/src/shared-ui/components/EmptyState.vue` | `<style scoped>` | Typed empty state messages |
 
 ## Route-Local Feature Layers
 

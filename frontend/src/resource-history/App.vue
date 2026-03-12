@@ -11,6 +11,9 @@ import {
   toResourceFilterSnapshot,
 } from '../core/resource-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
+
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 
 import ComparisonChart from './components/ComparisonChart.vue';
 import DetailSection from './components/DetailSection.vue';
@@ -37,8 +40,24 @@ function createDefaultFilters() {
   });
 }
 
-const draftFilters = reactive(createDefaultFilters());
-const committedFilters = reactive(createDefaultFilters());
+const {
+  committed: committedFilters,
+  draft: draftFilters,
+  updateField: updateOrchestratorField,
+} = useFilterOrchestrator({
+  fields: {
+    startDate:       { trigger: 'immediate', initial: '' },
+    endDate:         { trigger: 'immediate', initial: '' },
+    granularity:     { trigger: 'immediate', initial: 'day' },
+    workcenterGroups:{ trigger: 'immediate', initial: [] },
+    families:        { trigger: 'immediate', initial: [] },
+    machines:        { trigger: 'immediate', initial: [] },
+    isProduction:    { trigger: 'immediate', initial: false },
+    isKey:           { trigger: 'immediate', initial: false },
+    isMonitor:       { trigger: 'immediate', initial: false },
+  },
+  dependencies: [],
+});
 
 const options = reactive({
   workcenterGroups: [],
@@ -586,14 +605,18 @@ onMounted(() => {
         </div>
       </section>
 
-      <DetailSection
-        :detail-data="detailData"
-        :expanded-state="hierarchyState"
-        :loading="loading.querying"
-        @toggle-row="handleToggleRow"
-        @toggle-all="handleToggleAllRows"
-        @export-csv="exportCsv"
-      />
+      <div class="ui-table-wrap" :class="{ 'is-loading': loading.querying }">
+        <DetailSection
+          :detail-data="detailData"
+          :expanded-state="hierarchyState"
+          :loading="loading.querying"
+          @toggle-row="handleToggleRow"
+          @toggle-all="handleToggleAllRows"
+          @export-csv="exportCsv"
+        />
+      </div>
     </div>
+
+    <LoadingOverlay v-if="loading.initial" tier="page" />
   </div>
 </template>

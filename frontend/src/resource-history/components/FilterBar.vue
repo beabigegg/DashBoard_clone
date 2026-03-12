@@ -1,5 +1,5 @@
 <script setup>
-import MultiSelect from '../../resource-shared/components/MultiSelect.vue';
+import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
 const GRANULARITY_ITEMS = [
   { key: 'day', label: '日' },
@@ -147,8 +147,8 @@ function updateFilters(patch) {
           </label>
         </div>
 
-        <button type="button" class="btn btn-primary" :disabled="loading" @click="$emit('query')">查詢</button>
-        <button type="button" class="btn btn-secondary" :disabled="loading" @click="$emit('clear')">清除條件</button>
+        <button type="button" class="ui-btn ui-btn--primary" :disabled="loading" @click="$emit('query')">查詢</button>
+        <button type="button" class="ui-btn ui-btn--ghost" :disabled="loading" @click="$emit('clear')">清除條件</button>
       </div>
     </div>
   </section>

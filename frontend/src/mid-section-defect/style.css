@@ -79,7 +79,7 @@
   font-weight: 600;
   color: theme('colors.text.subtle');
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 
 .mode-tab.active {
@@ -166,45 +166,6 @@
   color: theme('colors.text.primary');
 }
 
-/* ====== Buttons ====== */
-.btn {
-  border: none;
-  border-radius: 8px;
-  padding: theme('spacing.2') theme('spacing.5');
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-primary {
-  background: var(--msd-primary);
-  color: theme('colors.surface.card');
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--msd-primary-dark);
-}
-
-.btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.btn-sm {
-  border: 1px solid var(--msd-border);
-  border-radius: 6px;
-  background: theme('colors.surface.card');
-  color: theme('colors.text.subtle');
-  font-size: 12px;
-  padding: theme('spacing.1') theme('spacing.token.p10');
-  cursor: pointer;
-}
-
-.btn-sm:hover:not(:disabled) {
-  background: theme('colors.surface.hover');
-}
-
 /* ====== Filter Select ====== */
 .filter-select {
   border: 1px solid var(--msd-border);
@@ -231,7 +192,7 @@
   font-size: 13px;
   padding: theme('spacing.2') theme('spacing.token.p14');
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
   white-space: nowrap;
 }
 
@@ -706,7 +667,7 @@
 
 .trace-fade-enter-active,
 .trace-fade-leave-active {
-  transition: opacity 0.3s ease-in;
+  transition: opacity var(--motion-slow) var(--motion-ease);
 }
 
 .trace-fade-enter-from,

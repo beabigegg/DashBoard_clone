@@ -78,6 +78,12 @@
     --color-token-hf8fafc: theme('colors.token.hf8fafc');
     --color-token-hf97316: theme('colors.token.hf97316');
     --color-token-hffffff: theme('colors.token.hffffff');
+    --motion-fast: 150ms;
+    --motion-normal: 200ms;
+    --motion-slow: 300ms;
+    --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --hover-lift: translateY(-1px);
+    --overlay-bg: rgba(255, 255, 255, 0.9);
   }
 
   body {
@@ -182,45 +188,49 @@
     font-weight: 700;
   }
 
-  /* === Shared Buttons (repeated ≥3 routes) === */
+  /* === Shared Buttons (unified ui- BEM system) === */
   .ui-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
     border: none;
     border-radius: 8px;
     padding: theme('spacing.token.p8') theme('spacing.token.p20');
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--motion-normal) var(--motion-ease);
   }
 
-  .ui-btn-primary {
-    background: theme('colors.brand.500');
+  .ui-btn:disabled,
+  .ui-btn.is-loading {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .ui-btn--primary {
+    background: linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%);
     color: theme('colors.token.hffffff');
   }
 
-  .ui-btn-primary:hover:not(:disabled) {
-    background: theme('colors.brand.600');
+  .ui-btn--primary:hover:not(:disabled):not(.is-loading) {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    transform: var(--hover-lift);
   }
 
-  .ui-btn-primary:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .ui-btn-ghost {
+  .ui-btn--ghost {
     background: theme('colors.surface.hover');
     color: theme('colors.token.h334155');
     border: 1px solid theme('colors.stroke.soft');
   }
 
-  .ui-btn-ghost:hover:not(:disabled) {
+  .ui-btn--ghost:hover:not(:disabled):not(.is-loading) {
     background: theme('colors.stroke.soft');
   }
 
-  .ui-btn-sm {
+  .ui-btn--sm {
     padding: theme('spacing.token.p4') theme('spacing.token.p10');
     border: 1px solid theme('colors.stroke.soft');
     border-radius: 6px;
@@ -230,7 +240,7 @@
     cursor: pointer;
   }
 
-  .ui-btn-sm:hover:not(:disabled) {
+  .ui-btn--sm:hover:not(:disabled):not(.is-loading) {
     background: theme('colors.stroke.soft');
   }
 
@@ -266,6 +276,26 @@
     font-size: 12px;
     font-weight: 700;
     color: theme('colors.text.subtle');
+  }
+
+  /* === Table Loading Animation === */
+  .ui-table-wrap {
+    position: relative;
+    transition: opacity var(--motion-normal) var(--motion-ease);
+  }
+
+  .ui-table-wrap.is-loading {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  @keyframes ui-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .ui-table-wrap .fade-in {
+    animation: ui-fade-in var(--motion-slow) var(--motion-ease);
   }
 }
 

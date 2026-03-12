@@ -138,7 +138,7 @@ function getSuspectHits(row) {
         <h3 class="section-title">LOT 明細</h3>
         <div class="detail-actions">
           <span class="detail-count">{{ tableInfo }}</span>
-          <button type="button" class="btn-sm" :disabled="loading" @click="$emit('export-csv')">
+          <button type="button" class="ui-btn ui-btn--sm" :disabled="loading" @click="$emit('export-csv')">
             匯出 CSV
           </button>
         </div>

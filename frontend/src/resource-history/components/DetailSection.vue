@@ -228,9 +228,9 @@ function handleToggleAll(expand) {
       <div class="section-header">
         <h2 class="section-title">明細資料</h2>
         <div class="detail-toolbar">
-          <button type="button" class="btn-sm" :disabled="loading" @click="handleToggleAll(true)">全部展開</button>
-          <button type="button" class="btn-sm" :disabled="loading" @click="handleToggleAll(false)">全部收合</button>
-          <button type="button" class="btn-sm" :disabled="loading" @click="$emit('export-csv')">匯出 CSV</button>
+          <button type="button" class="ui-btn ui-btn--sm" :disabled="loading" @click="handleToggleAll(true)">全部展開</button>
+          <button type="button" class="ui-btn ui-btn--sm" :disabled="loading" @click="handleToggleAll(false)">全部收合</button>
+          <button type="button" class="ui-btn ui-btn--sm" :disabled="loading" @click="$emit('export-csv')">匯出 CSV</button>
         </div>
       </div>
 

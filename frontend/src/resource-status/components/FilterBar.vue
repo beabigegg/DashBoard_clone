@@ -1,5 +1,5 @@
 <script setup>
-import MultiSelect from '../../resource-shared/components/MultiSelect.vue';
+import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
 const props = defineProps({
   workcenterGroups: {

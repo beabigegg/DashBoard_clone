@@ -99,11 +99,11 @@ function handleApply() {
     <div class="filter-group filter-action-group">
       <button
         type="button"
-        class="btn btn-primary btn-query"
+        class="ui-btn ui-btn--primary"
         :disabled="disabled"
         @click="handleApply"
       >
-        <template v-if="disabled"><span class="btn-spinner"></span>查詢中...</template>
+        <template v-if="disabled">查詢中...</template>
         <template v-else>查詢</template>
       </button>
     </div>

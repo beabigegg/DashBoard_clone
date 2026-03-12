@@ -5,6 +5,10 @@ import { apiGet } from '../core/api.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
 import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
+import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import EmptyState from '../shared-ui/components/EmptyState.vue';
 import HoldLotTable from '../wip-shared/components/HoldLotTable.vue';
 
 import AgeDistribution from './components/AgeDistribution.vue';
@@ -24,12 +28,6 @@ const pagination = ref({
   totalPages: 1,
 });
 
-const filters = reactive({
-  workcenter: null,
-  package: null,
-  ageRange: null,
-});
-
 const page = ref(1);
 const initialLoading = ref(true);
 const refreshing = ref(false);
@@ -37,6 +35,30 @@ const lotsLoading = ref(false);
 const paginationLoading = ref(false);
 const lotsError = ref('');
 const loadError = ref('');
+
+const { nextRequestId, isStaleRequest } = useRequestGuard();
+
+// Three mutual-exclusive toggle filters via orchestrator
+const orchestrator = useFilterOrchestrator({
+  fields: {
+    workcenter: { trigger: 'immediate', initial: null },
+    package: { trigger: 'immediate', initial: null },
+    ageRange: { trigger: 'immediate', initial: null },
+  },
+  dependencies: [
+    { when: 'workcenter', then: ['package', 'ageRange'], action: 'clear' },
+    { when: 'package', then: ['workcenter', 'ageRange'], action: 'clear' },
+    { when: 'ageRange', then: ['workcenter', 'package'], action: 'clear' },
+  ],
+  pagination: { resetOn: ['*'] },
+  urlSync: { enabled: false },
+  onFetch: (_committed) => {
+    page.value = 1;
+    updateUrlState();
+    void loadLots();
+  },
+});
+
 const lastUpdate = computed(() => {
   return summary.value?.dataUpdateDate ? `Last Update: ${summary.value.dataUpdateDate}` : '';
 });
@@ -79,14 +101,14 @@ async function fetchLots(signal) {
     per_page: pagination.value.perPage || 20,
   };
 
-  if (filters.workcenter) {
-    params.workcenter = filters.workcenter;
+  if (orchestrator.committed.workcenter) {
+    params.workcenter = orchestrator.committed.workcenter;
   }
-  if (filters.package) {
-    params.package = filters.package;
+  if (orchestrator.committed.package) {
+    params.package = orchestrator.committed.package;
   }
-  if (filters.ageRange) {
-    params.age_range = filters.ageRange;
+  if (orchestrator.committed.ageRange) {
+    params.age_range = orchestrator.committed.ageRange;
   }
 
   const result = await apiGet('/api/wip/hold-detail/lots', {
@@ -115,14 +137,14 @@ const headerStyle = computed(() => ({
 
 const filterText = computed(() => {
   const parts = [];
-  if (filters.workcenter) {
-    parts.push(`Workcenter=${filters.workcenter}`);
+  if (orchestrator.committed.workcenter) {
+    parts.push(`Workcenter=${orchestrator.committed.workcenter}`);
   }
-  if (filters.package) {
-    parts.push(`Package=${filters.package}`);
+  if (orchestrator.committed.package) {
+    parts.push(`Package=${orchestrator.committed.package}`);
   }
-  if (filters.ageRange) {
-    parts.push(`Age=${filters.ageRange}天`);
+  if (orchestrator.committed.ageRange) {
+    parts.push(`Age=${orchestrator.committed.ageRange}天`);
   }
   return parts.join(', ');
 });
@@ -141,14 +163,14 @@ function updateUrlState() {
   const params = new URLSearchParams();
   params.set('reason', reason.value);
 
-  if (filters.workcenter) {
-    params.set('workcenter', filters.workcenter);
+  if (orchestrator.committed.workcenter) {
+    params.set('workcenter', orchestrator.committed.workcenter);
   }
-  if (filters.package) {
-    params.set('package', filters.package);
+  if (orchestrator.committed.package) {
+    params.set('package', orchestrator.committed.package);
   }
-  if (filters.ageRange) {
-    params.set('age_range', filters.ageRange);
+  if (orchestrator.committed.ageRange) {
+    params.set('age_range', orchestrator.committed.ageRange);
   }
   if (page.value > 1) {
     params.set('page', String(page.value));
@@ -163,6 +185,7 @@ const { createAbortSignal, clearAbortController, resetAutoRefresh, triggerRefres
 });
 
 async function loadLots() {
+  const requestId = nextRequestId();
   lotsLoading.value = true;
   paginationLoading.value = false;
   lotsError.value = '';
@@ -173,6 +196,9 @@ async function loadLots() {
 
   try {
     const result = await fetchLots(signal);
+    if (isStaleRequest(requestId)) {
+      return;
+    }
     lots.value = Array.isArray(result?.lots) ? result.lots : [];
     pagination.value = {
       page: Number(result?.pagination?.page || 1),
@@ -181,23 +207,30 @@ async function loadLots() {
       totalPages: Number(result?.pagination?.totalPages || 1),
     };
   } catch (error) {
-    if (error?.name === 'AbortError') {
+    if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
     lotsError.value = error?.message || '載入 Lot 資料失敗';
   } finally {
+    if (isStaleRequest(requestId)) {
+      return;
+    }
     lotsLoading.value = false;
     refreshing.value = false;
   }
 }
 
 async function loadLotsPage() {
+  const requestId = nextRequestId();
   const signal = createAbortSignal('hold-detail-lots');
   paginationLoading.value = true;
   lotsError.value = '';
 
   try {
     const result = await fetchLots(signal);
+    if (isStaleRequest(requestId)) {
+      return;
+    }
     lots.value = Array.isArray(result?.lots) ? result.lots : [];
     pagination.value = {
       page: Number(result?.pagination?.page || 1),
@@ -206,16 +239,20 @@ async function loadLotsPage() {
       totalPages: Number(result?.pagination?.totalPages || 1),
     };
   } catch (error) {
-    if (error?.name === 'AbortError') {
+    if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
     lotsError.value = error?.message || '載入 Lot 資料失敗';
   } finally {
+    if (isStaleRequest(requestId)) {
+      return;
+    }
     paginationLoading.value = false;
   }
 }
 
 async function loadAllData(showOverlay = true) {
+  const requestId = nextRequestId();
   clearAbortController('hold-detail-lots');
   const signal = createAbortSignal('hold-detail-all');
 
@@ -233,6 +270,9 @@ async function loadAllData(showOverlay = true) {
       fetchDistribution(signal),
       fetchLots(signal),
     ]);
+    if (isStaleRequest(requestId)) {
+      return;
+    }
 
     summary.value = summaryData;
     distribution.value = distributionData;
@@ -245,41 +285,36 @@ async function loadAllData(showOverlay = true) {
     };
 
   } catch (error) {
-    if (error?.name === 'AbortError') {
+    if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
     loadError.value = error?.message || '載入資料失敗';
   } finally {
+    if (isStaleRequest(requestId)) {
+      return;
+    }
     refreshing.value = false;
     initialLoading.value = false;
   }
 }
 
 function toggleAgeFilter(range) {
-  filters.ageRange = filters.ageRange === range ? null : range;
-  page.value = 1;
-  updateUrlState();
-  void loadLots();
+  const next = orchestrator.committed.ageRange === range ? null : range;
+  orchestrator.updateField('ageRange', next);
 }
 
 function toggleWorkcenterFilter(name) {
-  filters.workcenter = filters.workcenter === name ? null : name;
-  page.value = 1;
-  updateUrlState();
-  void loadLots();
+  const next = orchestrator.committed.workcenter === name ? null : name;
+  orchestrator.updateField('workcenter', next);
 }
 
 function togglePackageFilter(name) {
-  filters.package = filters.package === name ? null : name;
-  page.value = 1;
-  updateUrlState();
-  void loadLots();
+  const next = orchestrator.committed.package === name ? null : name;
+  orchestrator.updateField('package', next);
 }
 
 function clearFilters() {
-  filters.ageRange = null;
-  filters.workcenter = null;
-  filters.package = null;
+  orchestrator.resetAll();
   page.value = 1;
   updateUrlState();
   void loadLots();
@@ -309,9 +344,18 @@ async function manualRefresh() {
 
 onMounted(() => {
   reason.value = getUrlParam('reason');
-  filters.workcenter = getUrlParam('workcenter') || null;
-  filters.package = getUrlParam('package') || null;
-  filters.ageRange = getUrlParam('age_range') || null;
+
+  // Initialize orchestrator committed state directly (no fetch during init)
+  const initWorkcenter = getUrlParam('workcenter') || null;
+  const initPackage = getUrlParam('package') || null;
+  const initAgeRange = getUrlParam('age_range') || null;
+  orchestrator.committed.workcenter = initWorkcenter;
+  orchestrator.draft.workcenter = initWorkcenter;
+  orchestrator.committed.package = initPackage;
+  orchestrator.draft.package = initPackage;
+  orchestrator.committed.ageRange = initAgeRange;
+  orchestrator.draft.ageRange = initAgeRange;
+
   const parsedPage = Number.parseInt(getUrlParam('page'), 10);
   if (Number.isFinite(parsedPage) && parsedPage > 0) {
     page.value = parsedPage;
@@ -330,7 +374,7 @@ onMounted(() => {
   <div class="dashboard hold-detail-page theme-hold-detail">
     <header class="header" :style="headerStyle">
       <div class="header-left">
-        <a :href="backToOverviewHref" class="btn btn-back">&larr; Hold Overview</a>
+        <a :href="backToOverviewHref" class="ui-btn ui-btn--ghost btn-back">&larr; Hold Overview</a>
         <h1>Hold Detail: {{ reason }}</h1>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
       </div>
@@ -339,7 +383,7 @@ onMounted(() => {
           <span class="refresh-indicator" :class="{ active: refreshing }"></span>
           <span>{{ lastUpdate }}</span>
         </span>
-        <button type="button" class="btn btn-light" @click="manualRefresh">重新整理</button>
+        <button type="button" class="ui-btn ui-btn--ghost" @click="manualRefresh">重新整理</button>
       </div>
     </header>
 
@@ -350,7 +394,7 @@ onMounted(() => {
     <section class="section-title">當站滯留天數分佈 (Age at Current Station)</section>
     <AgeDistribution
       :items="distribution?.byAge || []"
-      :active-range="filters.ageRange"
+      :active-range="orchestrator.committed.ageRange"
       @toggle="toggleAgeFilter"
     />
 
@@ -358,34 +402,33 @@ onMounted(() => {
       <DistributionTable
         title="By Workcenter"
         :rows="distribution?.byWorkcenter || []"
-        :active-name="filters.workcenter"
+        :active-name="orchestrator.committed.workcenter"
         @toggle="toggleWorkcenterFilter"
       />
       <DistributionTable
         title="By Package"
         :rows="distribution?.byPackage || []"
-        :active-name="filters.package"
+        :active-name="orchestrator.committed.package"
         @toggle="togglePackageFilter"
       />
     </section>
 
-    <HoldLotTable
-      :lots="lots"
-      :pagination="pagination"
-      :loading="lotsLoading"
-      :paginating="paginationLoading"
-      :error-message="lotsError"
-      :has-active-filters="hasActiveFilters"
-      :filter-text="filterText"
-      title="Lot Details"
-      @clear-filters="clearFilters"
-      @prev-page="prevPage"
-      @next-page="nextPage"
-    />
+    <div class="ui-table-wrap" :class="{ 'is-loading': lotsLoading }">
+      <HoldLotTable
+        :lots="lots"
+        :pagination="pagination"
+        :loading="lotsLoading"
+        :paginating="paginationLoading"
+        :error-message="lotsError"
+        :has-active-filters="hasActiveFilters"
+        :filter-text="filterText"
+        title="Lot Details"
+        @clear-filters="clearFilters"
+        @prev-page="prevPage"
+        @next-page="nextPage"
+      />
+    </div>
   </div>
 
-  <div v-if="initialLoading" class="loading-overlay">
-    <span class="loading-spinner"></span>
-    <span>Loading...</span>
-  </div>
+  <LoadingOverlay v-if="initialLoading" tier="page" />
 </template>

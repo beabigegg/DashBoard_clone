@@ -90,50 +90,6 @@
   gap: 8px;
 }
 
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn,
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn-sm {
-  border: 1px solid var(--resource-border);
-  border-radius: 6px;
-  background: theme('colors.token.hf8fafc');
-  color: var(--resource-text);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn {
-  padding: theme('spacing.token.p8') theme('spacing.token.p14');
-  font-size: 13px;
-  font-weight: 600;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn-sm {
-  padding: theme('spacing.token.p4') theme('spacing.token.p10');
-  font-size: 12px;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn:hover,
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn-sm:hover {
-  border-color: theme('colors.token.hc2d0e0');
-  background: theme('colors.token.heef4fb');
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn:disabled,
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn-sm:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn-primary {
-  background: var(--resource-primary);
-  border-color: var(--resource-primary);
-  color: theme('colors.token.hffffff');
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .btn-primary:hover {
-  background: var(--resource-primary-dark);
-  border-color: var(--resource-primary-dark);
-}
-
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -149,7 +105,7 @@
   text-align: center;
   box-shadow: var(--resource-shadow);
   overflow: hidden;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: transform var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .summary-card::before {
@@ -167,7 +123,7 @@
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .summary-card.clickable:hover {
-  transform: translateY(-1px);
+  transform: var(--hover-lift);
   box-shadow: 0 7px 16px rgba(37, 99, 235, 0.12);
 }
 
@@ -328,7 +284,7 @@
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table td.clickable {
   cursor: pointer;
   font-weight: 700;
-  transition: all 0.18s ease;
+  transition: all var(--motion-fast) var(--motion-ease);
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table td.clickable:hover {
@@ -378,7 +334,7 @@
   justify-content: center;
   font-size: 11px;
   line-height: 1;
-  transition: all 0.18s ease;
+  transition: all var(--motion-fast) var(--motion-ease);
   transform: rotate(0deg);
 }
 

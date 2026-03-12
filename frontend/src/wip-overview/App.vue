@@ -5,7 +5,11 @@ import { apiGet } from '../core/api.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { buildWipOverviewQueryParams } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 
+import EmptyState from '../shared-ui/components/EmptyState.vue';
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import MatrixTable from './components/MatrixTable.vue';
 import StatusCards from './components/StatusCards.vue';
@@ -24,14 +28,6 @@ const filterOptions = ref({
   firstnames: [],
   waferdescs: [],
 });
-const filters = reactive({
-  workorder: [],
-  lotid: [],
-  package: [],
-  type: [],
-  firstname: [],
-  waferdesc: [],
-});
 
 const activeStatusFilter = ref(null);
 const loading = ref(true);
@@ -41,6 +37,34 @@ const refreshError = ref(false);
 const errorMessage = ref('');
 let filterOptionsDebounceTimer = null;
 let filterOptionsRequestToken = 0;
+
+// -- useFilterOrchestrator: status=immediate (matrix only), panel fields=draft-apply (summary+matrix) --
+const filterOrchestrator = useFilterOrchestrator({
+  fields: {
+    workorder:  { trigger: 'draft-apply', initial: [] },
+    lotid:      { trigger: 'draft-apply', initial: [] },
+    package:    { trigger: 'draft-apply', initial: [] },
+    type:       { trigger: 'draft-apply', initial: [] },
+    firstname:  { trigger: 'draft-apply', initial: [] },
+    waferdesc:  { trigger: 'draft-apply', initial: [] },
+    status:     { trigger: 'immediate', initial: null },
+  },
+  pagination: { resetOn: ['*'] },
+  onFetch(committed) {
+    // Immediate trigger (status change) -> matrix only reload
+    void loadMatrixOnly();
+  },
+});
+
+// Keep a reactive proxy to the committed filters for building query params
+const filters = reactive({
+  workorder: [],
+  lotid: [],
+  package: [],
+  type: [],
+  firstname: [],
+  waferdesc: [],
+});
 
 function unwrapApiResult(result, fallbackMessage) {
   if (result?.success) {
@@ -248,8 +272,9 @@ function toggleStatusFilter(status) {
   }
 
   activeStatusFilter.value = activeStatusFilter.value === status ? null : status;
+  // Update orchestrator immediate field
+  filterOrchestrator.updateField('status', activeStatusFilter.value);
   updateUrlState();
-  void loadMatrixOnly();
 }
 
 function updateFilters(nextFilters) {
@@ -259,6 +284,14 @@ function updateFilters(nextFilters) {
   filters.type = normalizeArrayValues(nextFilters.type);
   filters.firstname = normalizeArrayValues(nextFilters.firstname);
   filters.waferdesc = normalizeArrayValues(nextFilters.waferdesc);
+
+  // Sync to orchestrator draft
+  filterOrchestrator.draft.workorder = filters.workorder;
+  filterOrchestrator.draft.lotid = filters.lotid;
+  filterOrchestrator.draft.package = filters.package;
+  filterOrchestrator.draft.type = filters.type;
+  filterOrchestrator.draft.firstname = filters.firstname;
+  filterOrchestrator.draft.waferdesc = filters.waferdesc;
 }
 
 function updateUrlState() {
@@ -300,6 +333,8 @@ function updateUrlState() {
 
 function applyFilters(nextFilters) {
   updateFilters(nextFilters);
+  // Commit draft-apply fields via orchestrator
+  filterOrchestrator.applyDraft();
   updateUrlState();
   void loadFilterOptions(filters);
   void loadAllData(false);
@@ -315,6 +350,7 @@ function clearFilters() {
     waferdesc: [],
   });
   activeStatusFilter.value = null;
+  filterOrchestrator.resetAll();
   updateUrlState();
   void loadFilterOptions(filters);
   void loadAllData(false);
@@ -371,6 +407,10 @@ async function initializePage() {
   });
   activeStatusFilter.value = getUrlParam('status') || null;
 
+  // Sync initial values to orchestrator
+  filterOrchestrator.draft.status = activeStatusFilter.value;
+  filterOrchestrator.committed.status = activeStatusFilter.value;
+
   await Promise.all([
     loadFilterOptions(filters),
     loadAllData(true),
@@ -400,7 +440,7 @@ onBeforeUnmount(() => {
           <span class="refresh-error" :class="{ active: refreshError }"></span>
           <span>{{ lastUpdate }}</span>
         </span>
-        <button type="button" class="btn btn-light" @click="manualRefresh">重新整理</button>
+        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="manualRefresh">重新整理</button>
       </div>
     </header>
 
@@ -428,16 +468,14 @@ onBeforeUnmount(() => {
         <div class="card-header ui-card-header">
           <div class="card-title ui-card-title">{{ matrixTitle }}</div>
         </div>
-        <div class="card-body ui-card-body matrix-container">
+        <div class="card-body ui-card-body matrix-container ui-table-wrap" :class="{ 'is-loading': refreshing }">
           <MatrixTable :data="matrix" @drilldown="navigateToDetail" />
+          <EmptyState v-if="!refreshing && !matrix" type="no-data" />
         </div>
       </section>
 
     </section>
   </div>
 
-  <div v-if="loading" class="loading-overlay">
-    <span class="loading-spinner"></span>
-    <span>Loading...</span>
-  </div>
+  <LoadingOverlay v-if="loading" tier="page" />
 </template>

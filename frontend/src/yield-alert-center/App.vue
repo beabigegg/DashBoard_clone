@@ -4,9 +4,13 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { apiGet, apiPost } from '../core/api.js';
 import { useYieldAlertDuckDB } from './useYieldAlertDuckDB.js';
 import { isDuckDBSupported } from '../core/duckdb-client.js';
-import MultiSelect from '../resource-shared/components/MultiSelect.vue';
+import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { toQueryParams } from './utils.js';
+
+import EmptyState from '../shared-ui/components/EmptyState.vue';
+import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import YieldHeatmap from './YieldHeatmap.vue';
 import YieldStationChart from './YieldStationChart.vue';
 import YieldPackageChart from './YieldPackageChart.vue';
@@ -88,6 +92,33 @@ const DUCKDB_THRESHOLD = 5000;
 const duckdb = useYieldAlertDuckDB();
 const duckdbMode = ref(false);   // true when frontend DuckDB-WASM is active
 const duckdbActivating = ref(false);
+
+// -- useFilterOrchestrator: two-phase primary query, supplementary/sort -> page=1 --
+const filterOrchestrator = useFilterOrchestrator({
+  fields: {
+    start_date:       { trigger: 'draft-apply', initial: '' },
+    end_date:         { trigger: 'draft-apply', initial: '' },
+    workcenterGroups: { trigger: 'immediate', initial: [] },
+    lines:            { trigger: 'immediate', initial: [] },
+    packages:         { trigger: 'immediate', initial: [] },
+    types:            { trigger: 'immediate', initial: [] },
+    functions:        { trigger: 'immediate', initial: [] },
+    risk_threshold:   { trigger: 'immediate', initial: '98' },
+    min_scrap_qty:    { trigger: 'immediate', initial: '1' },
+    granularity:      { trigger: 'immediate', initial: 'day' },
+    sort_by:          { trigger: 'immediate', initial: 'date_bucket' },
+    sort_dir:         { trigger: 'immediate', initial: 'desc' },
+  },
+  pagination: { resetOn: ['*'] },
+  onPrimaryQuery(_committed) {
+    // Date stage changed -> full primary query
+    void runQuery(1);
+  },
+  onViewRefresh(_committed) {
+    // Supplementary/sort change -> page=1, re-query from cache
+    void runQuery(1);
+  },
+});
 
 const parsedFilters = computed(() => ({
   start_date: filters.start_date,
@@ -577,10 +608,10 @@ onUnmounted(() => {
       </div>
       <div class="filter-row one">
         <div class="filter-actions">
-          <button class="btn btn-primary" :disabled="!canSubmit" @click="runQuery(1)">
+          <button class="ui-btn ui-btn--primary" :disabled="!canSubmit" @click="runQuery(1)">
             {{ loading ? '查詢中...' : isDateStageDirty ? '執行日期查詢' : '重新查詢日期範圍' }}
           </button>
-          <button class="btn btn-secondary" :disabled="loading" @click="resetFilters">清除條件</button>
+          <button class="ui-btn ui-btn--ghost" :disabled="loading" @click="resetFilters">清除條件</button>
         </div>
       </div>
     </section>
@@ -666,13 +697,13 @@ onUnmounted(() => {
             </div>
           </div>
           <div class="ctrl-item ctrl-action">
-            <button class="btn btn-primary" :disabled="!canApplySupplementary" @click="runQuery(1)">
+            <button class="ui-btn ui-btn--primary" :disabled="!canApplySupplementary" @click="runQuery(1)">
               {{ submitLabel }}
             </button>
           </div>
         </div>
       </template>
-      <p v-else class="empty-note">請先在第一階段執行日期查詢，才能套用補充篩選。</p>
+      <EmptyState v-else type="no-data" />
     </section>
 
     <section class="status-stack">
@@ -688,7 +719,7 @@ onUnmounted(() => {
     </section>
 
     <section v-if="hasQueried" class="trend-panel">
-      <span v-if="trendLoading" class="loading-badge">載入中...</span>
+      <LoadingSpinner v-if="trendLoading" size="sm" />
       <YieldTrendChart
         :trend="trend"
         :risk-threshold="Number(filters.risk_threshold || 98)"
@@ -719,7 +750,7 @@ onUnmounted(() => {
         <h2>告警候選清單</h2>
         <span>{{ pagination.total }} 筆</span>
       </header>
-      <div class="table-wrap" :class="{ 'is-paginating': paginationLoading }" v-if="hasData">
+      <div class="table-wrap ui-table-wrap" :class="{ 'is-loading': paginationLoading }" v-if="hasData">
         <table class="alert-table">
           <thead>
             <tr>
@@ -753,7 +784,7 @@ onUnmounted(() => {
                 </td>
                 <td>
                   <button
-                    class="btn btn-mini"
+                    class="ui-btn ui-btn--ghost ui-btn--sm"
                     @click="toggleReasonDetail(row)"
                   >
                     {{ reasonDetailLoading && expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}` ? '載入中...' : expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}` ? '收合' : '查看原因' }}
@@ -762,8 +793,8 @@ onUnmounted(() => {
               </tr>
               <tr v-if="expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}`" class="reason-detail-row">
                 <td colspan="10">
-                  <div v-if="reasonDetailLoading" class="empty-note">載入中...</div>
-                  <div v-else-if="reasonDetailRows.length === 0" class="empty-note">找不到對應的 MES 報廢明細</div>
+                  <EmptyState v-if="reasonDetailLoading" type="loading" />
+                  <EmptyState v-else-if="reasonDetailRows.length === 0" type="filter-empty" />
                   <div v-else class="reason-sub-wrap">
                     <table class="reason-sub-table">
                       <thead>
@@ -806,12 +837,12 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
-      <p v-else class="empty-note">{{ alertEmptyMessage }}</p>
+      <EmptyState v-else :type="alertLoading || paginationLoading ? 'loading' : hasQueried ? 'filter-empty' : 'no-data'" />
 
       <footer class="pagination">
-        <button class="btn btn-secondary" :disabled="loading || paginationLoading || pagination.page <= 1" @click="goToPage(pagination.page - 1)">上一頁</button>
+        <button class="ui-btn ui-btn--ghost" :disabled="loading || paginationLoading || pagination.page <= 1" @click="goToPage(pagination.page - 1)">上一頁</button>
         <span>第 {{ pagination.page }} / {{ pagination.total_pages }} 頁</span>
-        <button class="btn btn-secondary" :disabled="loading || paginationLoading || pagination.page >= pagination.total_pages" @click="goToPage(pagination.page + 1)">下一頁</button>
+        <button class="ui-btn ui-btn--ghost" :disabled="loading || paginationLoading || pagination.page >= pagination.total_pages" @click="goToPage(pagination.page + 1)">下一頁</button>
       </footer>
     </section>
   </div>

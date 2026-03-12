@@ -11,8 +11,12 @@ import {
 } from '../core/reject-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling.js';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRejectHistoryDuckDB } from './useRejectHistoryDuckDB.js';
 
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
+import EmptyState from '../shared-ui/components/EmptyState.vue';
 import DetailTable from './components/DetailTable.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import ParetoGrid from './components/ParetoGrid.vue';
@@ -174,6 +178,33 @@ function nextParetoRequestId() {
 function isStaleParetoRequest(id) {
   return id !== activeParetoRequestId;
 }
+
+// -- useFilterOrchestrator: two-phase (primary query -> supplementary filters unlock) --
+const filterOrchestrator = useFilterOrchestrator({
+  fields: {
+    startDate:            { trigger: 'draft-apply', initial: '' },
+    endDate:              { trigger: 'draft-apply', initial: '' },
+    includeExcludedScrap: { trigger: 'draft-apply', initial: false },
+    excludeMaterialScrap: { trigger: 'draft-apply', initial: true },
+    excludePbDiode:       { trigger: 'draft-apply', initial: true },
+    packages:             { trigger: 'immediate', initial: [] },
+    workcenterGroups:     { trigger: 'immediate', initial: [] },
+    reasons:              { trigger: 'immediate', initial: [] },
+  },
+  pagination: { resetOn: ['*'] },
+  onPrimaryQuery(_committed) {
+    // Primary query (Apply) -> executePrimaryQuery
+    void executePrimaryQuery();
+  },
+  onViewRefresh(_committed) {
+    // Supplementary filter change -> refreshView + fetchBatchPareto
+    page.value = 1;
+    selectedTrendDates.value = [];
+    resetParetoSelections();
+    updateUrlState();
+    void Promise.all([refreshView(), fetchBatchPareto()]);
+  },
+});
 
 // ---- Helpers ----
 function toDateString(value) {
@@ -1269,7 +1300,7 @@ onUnmounted(() => {
         <div class="last-update" v-if="lastQueryAt">更新時間：{{ lastQueryAt }}</div>
         <button
           type="button"
-          class="btn btn-light"
+          class="ui-btn ui-btn--ghost ui-btn--sm"
           :disabled="loading.querying"
           @click="applyFilters"
         >
@@ -1307,13 +1338,13 @@ onUnmounted(() => {
 
     <!-- Async job inline status bar (non-blocking, shows progress text + cancel) -->
     <div v-if="jobProgress.active" class="async-job-status-bar">
-      <span class="btn-spinner"></span>
+      <LoadingSpinner size="sm" />
       <span class="async-job-status-text">
         {{ jobProgress.progress || '背景查詢中...' }}
         <template v-if="jobProgress.pct > 0">（{{ jobProgress.pct }}%）</template>
         <template v-if="jobProgress.elapsedSeconds > 0"> · 已等待 {{ jobProgress.elapsedSeconds }} 秒</template>
       </span>
-      <button type="button" class="btn btn-light" @click="cancelAsyncJob">取消查詢</button>
+      <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="cancelAsyncJob">取消查詢</button>
     </div>
 
     <template v-if="queryId">

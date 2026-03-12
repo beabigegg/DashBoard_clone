@@ -48,11 +48,11 @@
   border: 2px solid var(--border);
   box-shadow: var(--shadow);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--motion-normal) var(--motion-ease);
 }
 
 .age-card:hover {
-  transform: translateY(-2px);
+  transform: var(--hover-lift);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
@@ -157,7 +157,7 @@
 
 .dist-table tbody tr {
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--motion-fast) var(--motion-ease);
 }
 
 .dist-table tbody tr:hover {
