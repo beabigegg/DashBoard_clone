@@ -39,6 +39,7 @@ const activeStatusFilter = ref(null);
 const detailData = ref(null);
 const loading = ref(true);
 const tableLoading = ref(false);
+const paginationLoading = ref(false);
 const refreshing = ref(false);
 const refreshSuccess = ref(false);
 const refreshError = ref(false);
@@ -368,13 +369,33 @@ function toggleStatusFilter(status) {
   void loadTableOnly();
 }
 
+async function loadPageData() {
+  if (!workcenter.value) {
+    return;
+  }
+
+  const signal = createAbortSignal('wip-detail-page');
+  paginationLoading.value = true;
+
+  try {
+    detailData.value = await fetchDetail(signal);
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return;
+    }
+    errorMessage.value = error?.message || '載入表格失敗';
+  } finally {
+    paginationLoading.value = false;
+  }
+}
+
 function prevPage() {
   if (page.value <= 1) {
     return;
   }
   page.value -= 1;
   selectedLotId.value = '';
-  void loadAllData(false);
+  void loadPageData();
 }
 
 function nextPage() {
@@ -384,7 +405,7 @@ function nextPage() {
   }
   page.value += 1;
   selectedLotId.value = '';
-  void loadAllData(false);
+  void loadPageData();
 }
 
 function openLotDetail(lotId) {
@@ -488,6 +509,7 @@ onBeforeUnmount(() => {
     <LotTable
       :data="tableData"
       :loading="tableLoading"
+      :paginating="paginationLoading"
       :active-status="activeStatusFilter"
       :selected-lot-id="selectedLotId"
       @select-lot="openLotDetail"

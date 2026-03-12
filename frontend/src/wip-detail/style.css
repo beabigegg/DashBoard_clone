@@ -152,6 +152,11 @@
   max-height: 600px;
 }
 
+.table-container.paginating {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .table-container table {
   width: 100%;
   border-collapse: collapse;

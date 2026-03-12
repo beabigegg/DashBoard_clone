@@ -16,6 +16,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  paginating: {
+    type: Boolean,
+    default: false,
+  },
   activeStatus: {
     type: String,
     default: null,
@@ -90,7 +94,7 @@ const pageInfo = computed(() => {
       <div class="table-info">{{ tableInfo }}</div>
     </div>
 
-    <div class="table-container">
+    <div class="table-container" :class="{ paginating: paginating }">
       <div v-if="loading" class="placeholder">Loading...</div>
       <div v-else-if="!data.lots || data.lots.length === 0" class="placeholder">No data available</div>
       <table v-else>
