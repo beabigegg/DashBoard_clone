@@ -27,12 +27,12 @@ class TestResourceEngineDecomposition:
             "RESOURCEID": ["R1", "R2"],
         })
 
-        def fake_merge_chunks(prefix, qhash, **kwargs):
+        def fake_merge_chunks_to_spool(prefix, qhash, **kwargs):
             engine_calls["merge"] += 1
-            return result_df
+            return ("/tmp/fake_spool.parquet", 2)
 
         monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
-        monkeypatch.setattr(engine_mod, "merge_chunks", fake_merge_chunks)
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", fake_merge_chunks_to_spool)
         monkeypatch.setattr(
             "mes_dashboard.services.resource_dataset_cache._get_cached_df",
             lambda _: None,
@@ -68,6 +68,14 @@ class TestResourceEngineDecomposition:
         monkeypatch.setattr(
             "mes_dashboard.services.resource_dataset_cache._derive_detail",
             lambda df, rl, wc: {"items": [], "pagination": {"total": 2}},
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.resource_dataset_cache.register_spool_file",
+            lambda *a, **kw: None,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.resource_dataset_cache.load_spooled_df",
+            lambda *a, **kw: result_df,
         )
 
         result = cache_svc.execute_primary_query(

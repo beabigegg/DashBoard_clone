@@ -75,7 +75,8 @@ from mes_dashboard.sql import QueryBuilder
 
 logger = logging.getLogger("mes_dashboard.reject_dataset_cache")
 
-_CACHE_TTL = 900  # 15 minutes
+from mes_dashboard.config.constants import CACHE_TTL_DATASET
+_CACHE_TTL = CACHE_TTL_DATASET
 _CACHE_MAX_SIZE = 8
 _REDIS_NAMESPACE = "reject_dataset"
 _CACHE_SCHEMA_VERSION = 4

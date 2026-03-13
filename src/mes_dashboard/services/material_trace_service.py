@@ -50,8 +50,8 @@ _MAX_RESULT_MB = int(os.getenv("MATERIAL_TRACE_MAX_RESULT_MB", "256"))
 # Safeguard: IN-clause batch size — Oracle has practical limits on large IN lists
 _IN_BATCH_SIZE = 1000
 
-# Redis result cache TTL (seconds)
-_CACHE_TTL = 300
+from mes_dashboard.config.constants import CACHE_TTL_MATERIAL_TRACE
+_CACHE_TTL = CACHE_TTL_MATERIAL_TRACE
 _META_SUFFIX = ":meta"
 
 _CSV_COLUMNS = {

@@ -36,10 +36,11 @@ def test_query_analysis_start_after_end_returns_error():
 
 
 def test_query_analysis_exceeds_max_days_returns_error():
-    result = query_analysis('2025-01-01', '2026-01-02')
+    # 2023-01-01 to 2025-02-28 = 789 days > 730
+    result = query_analysis('2023-01-01', '2025-02-28')
 
     assert 'error' in result
-    assert '365' in result['error']
+    assert '730' in result['error']
 
 
 @patch('mes_dashboard.services.mid_section_defect_service.query_analysis')

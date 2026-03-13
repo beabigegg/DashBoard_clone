@@ -29,7 +29,7 @@ logger = logging.getLogger('mes_dashboard.job_query')
 
 # Constants
 BATCH_SIZE = 1000  # Oracle IN clause limit
-MAX_DATE_RANGE_DAYS = 365
+MAX_DATE_RANGE_DAYS = 730  # 2 years
 QUERY_ERROR_MESSAGE = "查詢服務暫時無法使用"
 EXPORT_ERROR_MESSAGE = "匯出服務暫時無法使用"
 
@@ -140,7 +140,8 @@ def _build_resource_filter_sql(
 # Query Functions
 # ============================================================
 
-_JOB_CACHE_TTL = 600  # 10 min for job query results
+from mes_dashboard.config.constants import CACHE_TTL_JOB_QUERY
+_JOB_CACHE_TTL = CACHE_TTL_JOB_QUERY
 
 
 def get_jobs_by_resources(

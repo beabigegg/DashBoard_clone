@@ -18,10 +18,6 @@ from mes_dashboard.services.query_tool_service import (
     _resolve_by_work_order,
     get_lot_split_merge_history,
     BATCH_SIZE,
-    MAX_LOT_IDS,
-    MAX_SERIAL_NUMBERS,
-    MAX_WORK_ORDERS,
-    MAX_GD_WORK_ORDERS,
     MAX_EQUIPMENTS,
     MAX_DATE_RANGE_DAYS,
 )
@@ -47,21 +43,22 @@ class TestValidateDateRange:
         assert '結束日期' in result or '早於' in result
 
     def test_exceeds_max_range(self):
-        """Should reject date range exceeding limit."""
-        result = validate_date_range('2023-01-01', '2024-12-31')
+        """Should reject date range exceeding 730-day limit."""
+        # 2023-01-01 to 2025-02-28 = 789 days > 730
+        result = validate_date_range('2023-01-01', '2025-02-28')
         assert result is not None
         assert str(MAX_DATE_RANGE_DAYS) in result
 
     def test_exactly_max_range(self):
-        """Should allow exactly max range days."""
-        # 365 days from 2025-01-01 is 2026-01-01
-        result = validate_date_range('2025-01-01', '2026-01-01')
+        """Should allow exactly max range days (730)."""
+        # 2023-01-01 to 2024-12-31 = 730 days
+        result = validate_date_range('2023-01-01', '2024-12-31')
         assert result is None
 
     def test_one_day_over_max_range(self):
         """Should reject one day over max range."""
-        # 366 days
-        result = validate_date_range('2025-01-01', '2026-01-02')
+        # 731 days
+        result = validate_date_range('2023-01-01', '2025-01-01')
         assert result is not None
         assert str(MAX_DATE_RANGE_DAYS) in result
 
@@ -120,7 +117,7 @@ class TestValidateLotInput:
     def test_large_input_list_allowed_when_no_count_cap(self, monkeypatch):
         """Should allow large lists when count cap is disabled."""
         monkeypatch.setenv("CONTAINER_RESOLVE_INPUT_MAX_VALUES", "0")
-        values = [f'GA{i:09d}' for i in range(MAX_LOT_IDS + 50)]
+        values = [f'GA{i:09d}' for i in range(150)]
         result = validate_lot_input('lot_id', values)
         assert result is None
 
@@ -429,25 +426,9 @@ class TestServiceConstants:
         """Batch size should be <= 1000 (Oracle limit)."""
         assert BATCH_SIZE <= 1000
 
-    def test_max_date_range_is_reasonable(self):
-        """Max date range should be 365 days."""
-        assert MAX_DATE_RANGE_DAYS == 365
-
-    def test_max_lot_ids_is_reasonable(self):
-        """Max LOT IDs should be sensible."""
-        assert 10 <= MAX_LOT_IDS <= 100
-
-    def test_max_serial_numbers_is_reasonable(self):
-        """Max serial numbers should be sensible."""
-        assert 10 <= MAX_SERIAL_NUMBERS <= 100
-
-    def test_max_work_orders_is_reasonable(self):
-        """Max work orders should match API contract."""
-        assert MAX_WORK_ORDERS == 50
-
-    def test_max_gd_work_orders_is_reasonable(self):
-        """Max GD work orders should match API contract."""
-        assert MAX_GD_WORK_ORDERS == 100
+    def test_max_date_range_is_two_years(self):
+        """Max date range should be 730 days (2 years)."""
+        assert MAX_DATE_RANGE_DAYS == 730
 
     def test_max_equipments_is_reasonable(self):
         """Max equipments should be sensible."""

@@ -678,40 +678,18 @@ def get_workcenter_groups_list():
 # ============================================================
 
 @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', methods=['GET'])
-def get_equipment_recent_jobs(equipment_id):
+def get_equipment_recent_jobs_route(equipment_id):
     """Get recent JOB records for a specific equipment (last 30 days, top 5).
 
     Used by the suspect machine context panel in mid-section-defect analysis.
     """
-    from mes_dashboard.sql import SQLLoader
-    from mes_dashboard.core.database import read_sql_df
-
-    equipment_id = str(equipment_id or '').strip()
-    if not equipment_id:
-        return validation_error('請指定設備ID')
+    from mes_dashboard.services.query_tool_service import get_equipment_recent_jobs
 
     try:
-        sql = SQLLoader.load("query_tool/equipment_recent_jobs")
-        df = read_sql_df(sql, {'equipment_id': equipment_id})
-
-        if df is None or df.empty:
-            return success_response({'data': [], 'total': 0})
-
-        data = []
-        for _, row in df.iterrows():
-            data.append({
-                'JOBID': str(row.get('JOBID') or ''),
-                'JOBSTATUS': str(row.get('JOBSTATUS') or ''),
-                'JOBMODELNAME': str(row.get('JOBMODELNAME') or ''),
-                'CREATEDATE': str(row.get('CREATEDATE') or ''),
-                'COMPLETEDATE': str(row.get('COMPLETEDATE') or ''),
-                'CAUSECODENAME': str(row.get('CAUSECODENAME') or ''),
-                'REPAIRCODENAME': str(row.get('REPAIRCODENAME') or ''),
-                'RESOURCENAME': str(row.get('RESOURCENAME') or ''),
-            })
-
-        return success_response({'data': data, 'total': len(data)})
-
+        result = get_equipment_recent_jobs(equipment_id)
+        return success_response(result)
+    except ValueError as exc:
+        return validation_error(str(exc))
     except Exception as exc:
         return internal_error(f'載入維修紀錄失敗: {str(exc)}')
 

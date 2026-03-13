@@ -25,7 +25,8 @@ logger = logging.getLogger('mes_dashboard.hold_history_service')
 
 _SQL_DIR = Path(__file__).resolve().parent.parent / 'sql' / 'hold_history'
 _VALID_HOLD_TYPES = {'quality', 'non-quality', 'all'}
-_TREND_CACHE_TTL_SECONDS = 12 * 60 * 60
+from mes_dashboard.config.constants import CACHE_TTL_HOLD_TREND
+_TREND_CACHE_TTL_SECONDS = CACHE_TTL_HOLD_TREND
 _TREND_CACHE_KEY_PREFIX = 'hold_history:daily'
 
 

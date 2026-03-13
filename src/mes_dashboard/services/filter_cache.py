@@ -19,7 +19,8 @@ logger = logging.getLogger('mes_dashboard.filter_cache')
 # Cache Configuration
 # ============================================================
 
-CACHE_TTL_SECONDS = 3600  # 1 hour cache TTL
+from mes_dashboard.config.constants import CACHE_TTL_FILTER_GENERAL
+CACHE_TTL_SECONDS = CACHE_TTL_FILTER_GENERAL
 WIP_VIEW = os.getenv("FILTER_CACHE_WIP_VIEW", "DWH.DW_MES_LOT_V")
 SPEC_WORKCENTER_VIEW = os.getenv("FILTER_CACHE_SPEC_WORKCENTER_VIEW", "DWH.DW_MES_SPEC_WORKCENTER_V")
 

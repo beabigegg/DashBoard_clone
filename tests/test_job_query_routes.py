@@ -200,19 +200,19 @@ class TestQueryJobs:
         assert '結束日期' in data['error']['message'] or '早於' in data['error']['message']
 
     def test_date_range_exceeds_limit(self, client):
-        """Should reject date range > 365 days."""
+        """Should reject date range > 730 days (2 years)."""
         response = client.post(
             '/api/job-query/jobs',
             json={
                 'resource_ids': ['RES001'],
                 'start_date': '2023-01-01',
-                'end_date': '2024-12-31'
+                'end_date': '2025-02-28'
             }
         )
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '365' in data['error']['message']
+        assert '730' in data['error']['message']
 
     @patch('mes_dashboard.routes.job_query_routes.get_jobs_by_resources')
     def test_query_jobs_success(self, mock_query, client):

@@ -46,7 +46,8 @@ PositionBucket = dict[str, list[RowPosition]]
 FlagBuckets = dict[str, list[RowPosition]]
 ResourceIndex = dict[str, Any]
 
-DEFAULT_PROCESS_CACHE_TTL_SECONDS = 30
+from mes_dashboard.config.constants import CACHE_TTL_PROCESS_L1
+DEFAULT_PROCESS_CACHE_TTL_SECONDS = CACHE_TTL_PROCESS_L1
 DEFAULT_PROCESS_CACHE_MAX_SIZE = 32
 DEFAULT_RESOURCE_SYNC_INTERVAL_SECONDS = 14_400  # 4 hours
 DEFAULT_INDEX_VERSION_CHECK_INTERVAL_SECONDS = 5

@@ -40,7 +40,8 @@ from mes_dashboard.sql.filters import CommonFilters
 
 logger = logging.getLogger("mes_dashboard.hold_dataset_cache")
 
-_CACHE_TTL = 900  # 15 minutes
+from mes_dashboard.config.constants import CACHE_TTL_DATASET
+_CACHE_TTL = CACHE_TTL_DATASET
 _CACHE_MAX_SIZE = 8
 _REDIS_NAMESPACE = "hold_dataset"
 _DEFAULT_DETAIL_PER_PAGE = 20

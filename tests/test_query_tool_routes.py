@@ -828,8 +828,8 @@ class TestEquipmentPeriodEndpoint:
             '/api/query-tool/equipment-period',
             json={
                 'equipment_ids': ['EQ001'],
-                'start_date': '2024-01-01',
-                'end_date': '2025-01-02',
+                'start_date': '2023-01-01',
+                'end_date': '2025-02-28',
                 'query_type': 'status_hours'
             }
         )
@@ -1329,7 +1329,7 @@ class TestWorkcenterGroupsEndpoint:
 class TestEquipmentRecentJobsEndpoint:
     """Tests for /api/query-tool/equipment-recent-jobs/<equipment_id> endpoint."""
 
-    @patch('mes_dashboard.core.database.read_sql_df')
+    @patch('mes_dashboard.services.query_tool_service.read_sql_df')
     @patch('mes_dashboard.sql.SQLLoader.load', return_value='SELECT 1')
     def test_returns_recent_jobs(self, _mock_sql, mock_read_sql, client):
         """Should return recent JOB records for given equipment."""
@@ -1355,7 +1355,7 @@ class TestEquipmentRecentJobsEndpoint:
         assert data['data']['data'][0]['JOBID'] == 'JOB-001'
         assert data['data']['total'] == 1
 
-    @patch('mes_dashboard.core.database.read_sql_df')
+    @patch('mes_dashboard.services.query_tool_service.read_sql_df')
     @patch('mes_dashboard.sql.SQLLoader.load', return_value='SELECT 1')
     def test_returns_empty_when_no_jobs(self, _mock_sql, mock_read_sql, client):
         """Should return empty list when no jobs found."""
@@ -1369,7 +1369,7 @@ class TestEquipmentRecentJobsEndpoint:
         assert data['data']['data'] == []
         assert data['data']['total'] == 0
 
-    @patch('mes_dashboard.core.database.read_sql_df')
+    @patch('mes_dashboard.services.query_tool_service.read_sql_df')
     @patch('mes_dashboard.sql.SQLLoader.load', return_value='SELECT 1')
     def test_handles_db_error(self, _mock_sql, mock_read_sql, client):
         """Should return 500 on database error."""

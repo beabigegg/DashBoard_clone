@@ -31,7 +31,8 @@ from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 
 logger = logging.getLogger("mes_dashboard.resource_dataset_cache")
 
-_CACHE_TTL = 900  # 15 minutes
+from mes_dashboard.config.constants import CACHE_TTL_DATASET
+_CACHE_TTL = CACHE_TTL_DATASET
 _CACHE_MAX_SIZE = 8
 _REDIS_NAMESPACE = "resource_dataset"
 

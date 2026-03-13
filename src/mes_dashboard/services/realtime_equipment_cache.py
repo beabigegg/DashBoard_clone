@@ -37,7 +37,8 @@ logger = logging.getLogger('mes_dashboard.realtime_equipment_cache')
 # Process-Level Cache (Prevents redundant JSON parsing)
 # ============================================================
 
-DEFAULT_PROCESS_CACHE_TTL_SECONDS = 30
+from mes_dashboard.config.constants import CACHE_TTL_PROCESS_L1
+DEFAULT_PROCESS_CACHE_TTL_SECONDS = CACHE_TTL_PROCESS_L1
 DEFAULT_PROCESS_CACHE_MAX_SIZE = 32
 DEFAULT_LOOKUP_TTL_SECONDS = 30
 

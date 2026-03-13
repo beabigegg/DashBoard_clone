@@ -20,7 +20,7 @@ from mes_dashboard.sql import QueryBuilder, SQLLoader
 
 logger = logging.getLogger("mes_dashboard.yield_alert_service")
 
-MAX_QUERY_DAYS = max(1, int(os.getenv("YIELD_ALERT_MAX_QUERY_DAYS", "93")))
+MAX_QUERY_DAYS = max(1, int(os.getenv("YIELD_ALERT_MAX_QUERY_DAYS", "730")))
 DEFAULT_PAGE_SIZE = max(1, int(os.getenv("YIELD_ALERT_DEFAULT_PER_PAGE", "50")))
 MAX_PAGE_SIZE = max(DEFAULT_PAGE_SIZE, int(os.getenv("YIELD_ALERT_MAX_PER_PAGE", "200")))
 ALERT_CACHE_TTL_SECONDS = max(30, int(os.getenv("YIELD_ALERT_CACHE_TTL_SECONDS", "300")))

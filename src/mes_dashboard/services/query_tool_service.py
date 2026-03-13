@@ -49,12 +49,8 @@ logger = logging.getLogger('mes_dashboard.query_tool')
 
 # Constants
 BATCH_SIZE = 1000  # Oracle IN clause limit
-MAX_LOT_IDS = 100
-MAX_SERIAL_NUMBERS = 100
-MAX_WORK_ORDERS = 50
-MAX_GD_WORK_ORDERS = 100
 MAX_EQUIPMENTS = 20
-MAX_DATE_RANGE_DAYS = 365
+MAX_DATE_RANGE_DAYS = 730  # 2 years
 DEFAULT_TIME_WINDOW_HOURS = 168  # 1 week for better PJ_TYPE detection
 ADJACENT_LOTS_COUNT = 3
 QUERY_TOOL_RSS_REJECT_MB = float(os.getenv('QUERY_TOOL_RSS_REJECT_MB', '1100'))
@@ -2027,3 +2023,41 @@ def generate_csv_stream(
         yield output.getvalue()
         output.truncate(0)
         output.seek(0)
+
+
+# ============================================================
+# Equipment Recent Jobs (for suspect context panel)
+# ============================================================
+
+def get_equipment_recent_jobs(equipment_id: str) -> Dict[str, Any]:
+    """Get recent JOB records for a specific equipment (last 30 days, top 5).
+
+    Used by the suspect machine context panel in mid-section-defect analysis.
+
+    Returns:
+        Dict with 'data' list and 'total' count.
+    """
+    equipment_id = str(equipment_id or '').strip()
+    if not equipment_id:
+        raise ValueError('請指定設備ID')
+
+    sql = SQLLoader.load("query_tool/equipment_recent_jobs")
+    df = read_sql_df(sql, {'equipment_id': equipment_id})
+
+    if df is None or df.empty:
+        return {'data': [], 'total': 0}
+
+    data = []
+    for _, row in df.iterrows():
+        data.append({
+            'JOBID': str(row.get('JOBID') or ''),
+            'JOBSTATUS': str(row.get('JOBSTATUS') or ''),
+            'JOBMODELNAME': str(row.get('JOBMODELNAME') or ''),
+            'CREATEDATE': str(row.get('CREATEDATE') or ''),
+            'COMPLETEDATE': str(row.get('COMPLETEDATE') or ''),
+            'CAUSECODENAME': str(row.get('CAUSECODENAME') or ''),
+            'REPAIRCODENAME': str(row.get('REPAIRCODENAME') or ''),
+            'RESOURCENAME': str(row.get('RESOURCENAME') or ''),
+        })
+
+    return {'data': data, 'total': len(data)}

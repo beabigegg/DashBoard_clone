@@ -46,13 +46,32 @@ EQUIPMENT_FLAG_FILTERS = {
 
 # ============================================================
 # Cache TTL Settings (in seconds)
+#
+# All cache durations are centralized here.
+# Service modules should import from this file rather than
+# defining their own _CACHE_TTL constants.
+# Some values are overridable via environment variables.
 # ============================================================
 
+import os as _os
+
+# ── API / Route-level cache TTLs ──
 CACHE_TTL_DEFAULT = 60           # Default cache TTL: 1 minute
 CACHE_TTL_FILTER_OPTIONS = 600   # Filter options: 10 minutes
 CACHE_TTL_PIVOT_COLUMNS = 300    # Pivot columns: 5 minutes
 CACHE_TTL_KPI = 60               # KPI data: 1 minute
 CACHE_TTL_TREND = 300            # Trend data: 5 minutes
+
+# ── Service-level dataset cache TTLs ──
+CACHE_TTL_DATASET = 900                 # Hold/Resource/Reject dataset: 15 min
+CACHE_TTL_HOLD_TREND = int(             # Hold history trend: 12 hours
+    _os.getenv('HOLD_TREND_CACHE_TTL_SECONDS', '43200'))
+CACHE_TTL_MATERIAL_TRACE = 300          # Material trace lineage: 5 min
+CACHE_TTL_JOB_QUERY = 600              # Job query results: 10 min
+CACHE_TTL_DETECTION = 300               # MSD detection data: 5 min
+CACHE_TTL_LOSS_REASONS = 86400          # MSD loss reason list: 24 hours
+CACHE_TTL_FILTER_GENERAL = 3600         # General filter options: 1 hour
+CACHE_TTL_PROCESS_L1 = 30              # Process-level L1 cache: 30 sec
 
 
 # ============================================================

@@ -39,21 +39,22 @@ class TestValidateDateRange:
         assert '結束日期' in result or '早於' in result
 
     def test_exceeds_max_range(self):
-        """Should reject date range exceeding limit."""
-        result = validate_date_range('2023-01-01', '2024-12-31')
+        """Should reject date range exceeding 730-day limit."""
+        # 2023-01-01 to 2025-02-28 = 789 days > 730
+        result = validate_date_range('2023-01-01', '2025-02-28')
         assert result is not None
         assert str(MAX_DATE_RANGE_DAYS) in result
 
     def test_exactly_max_range(self):
-        """Should allow exactly max range days."""
-        # 365 days from 2024-01-01 is 2024-12-31
-        result = validate_date_range('2024-01-01', '2024-12-31')
+        """Should allow exactly max range days (730)."""
+        # 2023-01-01 to 2024-12-31 = 730 days
+        result = validate_date_range('2023-01-01', '2024-12-31')
         assert result is None
 
     def test_one_day_over_max_range(self):
         """Should reject one day over max range."""
-        # 366 days
-        result = validate_date_range('2024-01-01', '2025-01-01')
+        # 731 days
+        result = validate_date_range('2023-01-01', '2025-01-01')
         assert result is not None
         assert str(MAX_DATE_RANGE_DAYS) in result
 
@@ -179,9 +180,9 @@ class TestServiceConstants:
         """Batch size should be <= 1000 (Oracle limit)."""
         assert BATCH_SIZE <= 1000
 
-    def test_max_date_range_is_year(self):
-        """Max date range should be 365 days."""
-        assert MAX_DATE_RANGE_DAYS == 365
+    def test_max_date_range_is_two_years(self):
+        """Max date range should be 730 days (2 years)."""
+        assert MAX_DATE_RANGE_DAYS == 730
 
 
 class TestErrorLeakageProtection:

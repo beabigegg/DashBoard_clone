@@ -65,9 +65,11 @@ from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS, get_group_
 logger = logging.getLogger('mes_dashboard.mid_section_defect')
 
 # Constants
-MAX_QUERY_DAYS = 365
-CACHE_TTL_DETECTION = 300       # 5 min for detection data
-CACHE_TTL_LOSS_REASONS = 86400  # 24h for loss reason list (daily sync)
+MAX_QUERY_DAYS = 730  # 2 years
+from mes_dashboard.config.constants import (
+    CACHE_TTL_DETECTION,
+    CACHE_TTL_LOSS_REASONS,
+)
 
 FORWARD_PIPELINE_MAX_WORKERS = int(os.getenv('FORWARD_PIPELINE_MAX_WORKERS', '2'))
 
