@@ -5,6 +5,7 @@ Contains Flask Blueprint for historical equipment performance analysis endpoints
 Two-phase flow: POST /query (Oracle → cache) + GET /view (cache → derived views).
 """
 
+import os
 from datetime import datetime
 
 from flask import Blueprint, request, redirect, Response
@@ -26,12 +27,68 @@ from mes_dashboard.services.resource_dataset_cache import (
     apply_view,
 )
 
+# ── Local-compute feature flags (Task 1.3) ────────────────────────────────────
+
+_RESOURCE_LOCAL_COMPUTE_ENABLED = os.environ.get(
+    "RESOURCE_HISTORY_LOCAL_COMPUTE_ENABLED", "true"
+).strip().lower() in ("1", "true", "yes")
+
+_RESOURCE_SPOOL_THRESHOLD = int(os.environ.get("RESOURCE_SPOOL_THRESHOLD", "5000"))
+_RESOURCE_SPOOL_NAMESPACE = "resource_dataset"
+
 # Create Blueprint
 resource_history_bp = Blueprint(
     'resource_history',
     __name__,
     url_prefix='/api/resource/history'
 )
+
+
+# ── Spool metadata injection helpers (Tasks 1.1, 1.4) ────────────────────────
+
+
+def _inject_resource_spool_info(data: dict, query_id: str) -> None:
+    """Inject spool_download_url, total_row_count, and resource_metadata when eligible."""
+    if not _RESOURCE_LOCAL_COMPUTE_ENABLED:
+        return
+    try:
+        from mes_dashboard.core.query_spool_store import get_spool_metadata
+        metadata = get_spool_metadata(_RESOURCE_SPOOL_NAMESPACE, query_id)
+        if metadata is None:
+            return
+        row_count = int(metadata.get("row_count") or 0)
+        data["total_row_count"] = row_count
+        if row_count >= _RESOURCE_SPOOL_THRESHOLD:
+            data["spool_download_url"] = (
+                f"/api/spool/{_RESOURCE_SPOOL_NAMESPACE}/{query_id}.parquet"
+            )
+            _inject_resource_metadata(data)
+    except Exception:
+        pass  # Best-effort; must not break the view response
+
+
+def _inject_resource_metadata(data: dict) -> None:
+    """Attach resource dimension lookup for frontend local view derivation."""
+    try:
+        from mes_dashboard.services.resource_dataset_cache import (
+            _get_resource_lookup,
+            _get_workcenter_mapping,
+        )
+        resource_lookup = _get_resource_lookup()
+        wc_mapping = _get_workcenter_mapping()
+        resource_metadata = {}
+        for historyid, info in resource_lookup.items():
+            wc_name = info.get("WORKCENTERNAME", "")
+            wc_info = wc_mapping.get(wc_name, {})
+            resource_metadata[historyid] = {
+                "workcenter": wc_info.get("group", wc_name) or wc_name,
+                "workcenter_seq": int(wc_info.get("sequence", 999)),
+                "family": info.get("RESOURCEFAMILYNAME", "") or "",
+                "resource": info.get("RESOURCENAME", "") or "",
+            }
+        data["resource_metadata"] = resource_metadata
+    except Exception:
+        pass
 
 
 # ============================================================
@@ -141,6 +198,7 @@ def api_resource_history_query():
             granularity=granularity,
             **filters,
         )
+        _inject_resource_spool_info(result, result.get("query_id", ""))
         return success_response(result)
     except Exception as exc:
         return internal_error(str(exc))
@@ -167,6 +225,7 @@ def api_resource_history_view():
     if result is None:
         return cache_expired_error()
 
+    _inject_resource_spool_info(result, query_id)
     return success_response(result)
 
 

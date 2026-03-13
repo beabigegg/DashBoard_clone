@@ -2,9 +2,11 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
+import { checkLocalComputeEligibility } from '../core/duckdb-activation-policy.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
+import { useHoldHistoryDuckDB } from './useHoldHistoryDuckDB.js';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 
@@ -21,6 +23,9 @@ const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 20;
 
 const queryId = ref('');
+
+// ── DuckDB local compute (Tasks 4.2–4.4) ─────────────────────────────────────
+const duckdb = useHoldHistoryDuckDB();
 
 const trendData = ref({ days: [] });
 const reasonParetoData = ref({ items: [] });
@@ -212,6 +217,9 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
   loading.list = true;
   errorMessage.value = '';
 
+  // Discard any previous local-compute state before evaluating new response (Task 4.4)
+  duckdb.deactivate();
+
   try {
     const body = {
       start_date: orchestrator.committed.startDate,
@@ -227,8 +235,20 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
 
     queryId.value = result.query_id;
     applyViewResult(result);
-
     updateUrlState();
+
+    // Attempt to activate local compute (Task 4.2)
+    const { eligible } = checkLocalComputeEligibility({
+      spoolDownloadUrl: result.spool_download_url,
+      totalRowCount: result.total_row_count,
+    });
+    if (eligible) {
+      try {
+        await duckdb.activate(result.spool_download_url, result.workcenter_mapping || {});
+      } catch (_) {
+        // Activation failed — remain in server-view mode (Task 4.3)
+      }
+    }
   } catch (error) {
     if (isStaleRequest(requestId)) return;
     if (error?.name === 'AbortError') {
@@ -257,6 +277,31 @@ async function refreshView({ listOnly = false } = {}) {
   errorMessage.value = '';
 
   try {
+    // Task 4.2: Use local compute when active; skip /view request
+    if (duckdb.isActive.value) {
+      try {
+        const result = await duckdb.computeView({
+          startDate: orchestrator.committed.startDate,
+          endDate: orchestrator.committed.endDate,
+          holdType: orchestrator.committed.holdType,
+          recordTypes: Array.isArray(orchestrator.committed.recordType)
+            ? orchestrator.committed.recordType
+            : [orchestrator.committed.recordType || 'new'],
+          reason: orchestrator.committed.reasonFilter || null,
+          durationRange: orchestrator.committed.durationFilter || null,
+          page: page.value,
+          perPage: DEFAULT_PER_PAGE,
+        });
+        applyViewResult(result, { listOnly });
+        return;
+      } catch (localErr) {
+        // Task 4.3: Local compute failed — fall through to server /view
+        console.warn('[hold-history] Local compute error, falling back to server:', localErr);
+        duckdb.deactivate();
+      }
+    }
+
+    // Server-side /view fallback (Task 4.3)
     const params = {
       query_id: queryId.value,
       hold_type: orchestrator.committed.holdType,
@@ -278,8 +323,9 @@ async function refreshView({ listOnly = false } = {}) {
     });
     if (isStaleRequest(requestId)) return;
 
-    // Cache expired -> auto re-execute primary query
+    // Cache expired -> auto re-execute primary query (Task 4.3)
     if (resp?.success === false && resp?.error === 'cache_expired') {
+      duckdb.deactivate();
       await executePrimaryQuery();
       return;
     }
@@ -306,6 +352,30 @@ async function refreshViewPage() {
   errorMessage.value = '';
 
   try {
+    // Task 4.4: Use local compute pagination when active (list-only, no chart refresh)
+    if (duckdb.isActive.value) {
+      try {
+        const result = await duckdb.computeView({
+          startDate: orchestrator.committed.startDate,
+          endDate: orchestrator.committed.endDate,
+          holdType: orchestrator.committed.holdType,
+          recordTypes: Array.isArray(orchestrator.committed.recordType)
+            ? orchestrator.committed.recordType
+            : [orchestrator.committed.recordType || 'new'],
+          reason: orchestrator.committed.reasonFilter || null,
+          durationRange: orchestrator.committed.durationFilter || null,
+          page: page.value,
+          perPage: DEFAULT_PER_PAGE,
+        });
+        detailData.value = normalizeListPayload(result.list);
+        return;
+      } catch (localErr) {
+        console.warn('[hold-history] Local compute pagination error, falling back:', localErr);
+        duckdb.deactivate();
+      }
+    }
+
+    // Server-side fallback (Task 4.3)
     const params = {
       query_id: queryId.value,
       hold_type: orchestrator.committed.holdType,
@@ -333,6 +403,7 @@ async function refreshViewPage() {
     if (isStaleRequest(requestId)) return;
     if (error?.errorCode === 'CACHE_EXPIRED' || error?.status === 410) {
       paginationLoading.value = false;
+      duckdb.deactivate();
       await executePrimaryQuery();
       return;
     }

@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import { apiGet, apiPost, ensureMesApiAvailable } from '../core/api.js';
 import { buildResourceKpiFromHours } from '../core/compute.js';
+import { checkLocalComputeEligibility } from '../core/duckdb-activation-policy.js';
 import {
   buildResourceHistoryQueryParams,
   deriveResourceFamilyOptions,
@@ -12,6 +13,7 @@ import {
 } from '../core/resource-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
+import { useResourceHistoryDuckDB } from './useResourceHistoryDuckDB.js';
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 
@@ -87,6 +89,9 @@ const autoPruneHint = ref('');
 
 const queryId = ref('');
 const lastPrimarySnapshot = ref('');
+
+// ── DuckDB local compute (Tasks 3.2–3.4) ─────────────────────────────────────
+const duckdb = useResourceHistoryDuckDB();
 
 const draftWatchReady = ref(false);
 let suppressDraftPrune = false;
@@ -405,6 +410,9 @@ async function executePrimaryQuery() {
   detailWarning.value = '';
   exportMessage.value = '';
 
+  // Discard any previous local-compute state before evaluating new response (Task 3.4)
+  duckdb.deactivate();
+
   try {
     updateUrlState();
 
@@ -427,9 +435,24 @@ async function executePrimaryQuery() {
     });
 
     const payload = unwrapApiResult(response, '查詢失敗');
-    queryId.value = payload.data.query_id || '';
+    const responseData = payload.data;
+    queryId.value = responseData.query_id || '';
     lastPrimarySnapshot.value = buildPrimarySnapshot(committedFilters);
-    applyViewResult(payload.data);
+    applyViewResult(responseData);
+
+    // Attempt to activate local compute (Task 3.2). Deactivate any previous session first.
+    duckdb.deactivate();
+    const { eligible } = checkLocalComputeEligibility({
+      spoolDownloadUrl: responseData.spool_download_url,
+      totalRowCount: responseData.total_row_count,
+    });
+    if (eligible) {
+      try {
+        await duckdb.activate(responseData.spool_download_url, responseData.resource_metadata || {});
+      } catch (_) {
+        // Activation failed — remain in server-view mode (Task 3.3)
+      }
+    }
   } catch (error) {
     if (error?.name === 'AbortError') {
       queryError.value = '查詢逾時，請縮小日期範圍或資源篩選後重試';
@@ -457,6 +480,22 @@ async function refreshView() {
   try {
     updateUrlState();
 
+    // Task 3.2: Use local compute when active; skip /view request
+    if (duckdb.isActive.value) {
+      try {
+        const result = await duckdb.computeView({
+          granularity: committedFilters.granularity || 'day',
+        });
+        applyViewResult(result);
+        return;
+      } catch (localErr) {
+        // Task 3.3: Local compute failed — fall through to server /view
+        console.warn('[resource-history] Local compute error, falling back to server:', localErr);
+        duckdb.deactivate();
+      }
+    }
+
+    // Server-side /view fallback (Task 3.3)
     const response = await apiGet('/api/resource/history/view', {
       timeout: API_TIMEOUT,
       silent: true,
@@ -467,6 +506,7 @@ async function refreshView() {
     });
 
     if (response?.success === false && response?.error === 'cache_expired') {
+      duckdb.deactivate();
       await executePrimaryQuery();
       return;
     }
@@ -475,6 +515,7 @@ async function refreshView() {
     applyViewResult(payload.data);
   } catch (error) {
     if (error?.message === 'cache_expired' || error?.status === 410) {
+      duckdb.deactivate();
       await executePrimaryQuery();
       return;
     }

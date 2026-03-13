@@ -1,17 +1,4 @@
-## ADDED Requirements
-
-### Requirement: Frontend SHALL load DuckDB-WASM in a Web Worker for client-side SQL computation
-The frontend SHALL initialize DuckDB-WASM inside a dedicated Web Worker to execute SQL queries against Parquet data without blocking the UI thread.
-
-#### Scenario: DuckDB-WASM initialization
-- **WHEN** a report page determines that client-side computation is needed
-- **THEN** the system SHALL lazily initialize DuckDB-WASM in a Web Worker (one-time per session)
-- **THEN** the WASM bundle SHALL be cached by the browser for subsequent loads
-
-#### Scenario: Web Worker message protocol
-- **WHEN** the main thread sends a query request to the Worker
-- **THEN** the Worker SHALL accept messages with `{ type: 'query', sql: string, parquetUrl: string }`
-- **THEN** the Worker SHALL respond with `{ type: 'result', data: Array }` or `{ type: 'error', message: string }`
+## MODIFIED Requirements
 
 ### Requirement: Frontend SHALL download Parquet spool files and register them in DuckDB-WASM
 The frontend SHALL fetch Parquet files from the spool download API and register them as DuckDB tables for local querying.
@@ -90,15 +77,3 @@ The frontend SHALL detect browser capability and fall back gracefully when DuckD
 - **WHEN** the spool download or local refresh path fails because the spool has expired
 - **THEN** the frontend SHALL tear down local mode
 - **THEN** the page SHALL resume server-side behavior or re-run the primary query using the last committed filters
-
-### Requirement: Risk score and risk level SHALL be computable on the frontend
-The yield-alert risk scoring formula SHALL be available as a frontend function for client-side computation.
-
-#### Scenario: Frontend risk score calculation
-- **WHEN** a yield-alert detail row has yield_pct and scrap_qty values
-- **THEN** risk_score SHALL be computed as `max(0, (threshold - yield_pct) + min(scrap_qty, 200) / 20.0)`
-- **THEN** risk_level SHALL be assigned as:
-  - `high` when `yield_pct < threshold - 2.0 OR scrap_qty >= 100`
-  - `medium` when `yield_pct < threshold OR scrap_qty >= 20`
-  - `low` otherwise
-- **THEN** the threshold value SHALL be provided by the server in the initial query response

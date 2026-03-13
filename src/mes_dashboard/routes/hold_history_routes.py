@@ -35,6 +35,51 @@ logger = logging.getLogger("mes_dashboard.hold_history_routes")
 
 hold_history_bp = Blueprint('hold_history', __name__)
 
+# ── Local-compute feature flags (Task 1.3) ────────────────────────────────────
+
+_HOLD_LOCAL_COMPUTE_ENABLED = os.environ.get(
+    "HOLD_HISTORY_LOCAL_COMPUTE_ENABLED", "true"
+).strip().lower() in ("1", "true", "yes")
+
+_HOLD_SPOOL_THRESHOLD = int(os.environ.get("HOLD_SPOOL_THRESHOLD", "5000"))
+_HOLD_SPOOL_NAMESPACE = "hold_dataset"
+
+
+# ── Spool metadata injection helpers (Tasks 1.2, 1.4) ────────────────────────
+
+
+def _inject_hold_spool_info(data: dict, query_id: str) -> None:
+    """Inject spool_download_url, total_row_count, and workcenter_mapping when eligible."""
+    if not _HOLD_LOCAL_COMPUTE_ENABLED:
+        return
+    try:
+        from mes_dashboard.core.query_spool_store import get_spool_metadata
+        metadata = get_spool_metadata(_HOLD_SPOOL_NAMESPACE, query_id)
+        if metadata is None:
+            return
+        row_count = int(metadata.get("row_count") or 0)
+        data["total_row_count"] = row_count
+        if row_count >= _HOLD_SPOOL_THRESHOLD:
+            data["spool_download_url"] = (
+                f"/api/spool/{_HOLD_SPOOL_NAMESPACE}/{query_id}.parquet"
+            )
+            _inject_workcenter_mapping(data)
+    except Exception:
+        pass  # Best-effort; must not break the view response
+
+
+def _inject_workcenter_mapping(data: dict) -> None:
+    """Attach workcenter → group mapping for frontend local compute."""
+    try:
+        from mes_dashboard.services.filter_cache import get_workcenter_mapping
+        mapping = get_workcenter_mapping() or {}
+        data["workcenter_mapping"] = {
+            wc_name: info.get("group", wc_name) or wc_name
+            for wc_name, info in mapping.items()
+        }
+    except Exception:
+        pass
+
 _HOLD_HISTORY_QUERY_RATE_LIMIT = configured_rate_limit(
     bucket='hold-history-query',
     max_attempts_env='HOLD_HISTORY_TREND_RATE_LIMIT_MAX_REQUESTS',
@@ -144,6 +189,7 @@ def api_hold_history_query():
             hold_type=hold_type,
             record_type=record_type,
         )
+        _inject_hold_spool_info(result, result.get("query_id", ""))
         return success_response(result)
     except Exception as exc:
         logger.error("Hold history primary query failed: %s", exc)
@@ -195,4 +241,5 @@ def api_hold_history_view():
     if result is None:
         return cache_expired_error()
 
+    _inject_hold_spool_info(result, query_id)
     return success_response(result)

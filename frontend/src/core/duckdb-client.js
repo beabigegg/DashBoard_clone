@@ -121,3 +121,27 @@ export function isDuckDBSupported() {
     return false;
   }
 }
+
+/**
+ * Download a Parquet spool file and return its ArrayBuffer.
+ * Includes CSRF token and an optional timeout (default 120s).
+ * @param {string} url  - Spool download URL
+ * @param {number} [timeout=120000]
+ * @returns {Promise<ArrayBuffer>}
+ */
+export async function fetchParquetBuffer(url, timeout = 120000) {
+  const controller = new AbortController();
+  const timerId = setTimeout(() => controller.abort(), timeout);
+  try {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: { 'X-CSRF-Token': csrfToken },
+      signal: controller.signal,
+    });
+    if (!resp.ok) throw new Error(`Spool download failed: HTTP ${resp.status}`);
+    return await resp.arrayBuffer();
+  } finally {
+    clearTimeout(timerId);
+  }
+}
