@@ -35,12 +35,14 @@ test('useLotResolve validates multi-query size and resolves deduplicated inputs'
     post: async (url, payload) => {
       postCalls.push({ url, payload });
       return {
-        data: payload.values.map((value, index) => ({
-          container_id: `CID-${index + 1}`,
-          input_value: value,
-        })),
-        not_found: [],
-        expansion_info: {},
+        data: {
+          data: payload.values.map((value, index) => ({
+            container_id: `CID-${index + 1}`,
+            input_value: value,
+          })),
+          not_found: [],
+          expansion_info: {},
+        },
       };
     },
   });
@@ -79,28 +81,30 @@ test('useLotLineage deduplicates in-flight lineage requests and stores graph dat
       postCalls.push({ url, payload });
       await new Promise((resolve) => setTimeout(resolve, 15));
       return {
-        roots: ['CID-ROOT'],
-        children_map: {
-          'CID-ROOT': ['CID-CHILD'],
-          'CID-CHILD': [],
-        },
-        names: {
-          'CID-ROOT': 'LOT-ROOT',
-          'CID-CHILD': 'LOT-CHILD',
-        },
-        nodes: {
-          'CID-ROOT': { container_name: 'LOT-ROOT', container_id: 'CID-ROOT' },
-          'CID-CHILD': { container_name: 'LOT-CHILD', container_id: 'CID-CHILD' },
-        },
-        edges: [
-          {
-            from_cid: 'CID-ROOT',
-            to_cid: 'CID-CHILD',
-            edge_type: 'split',
+        data: {
+          roots: ['CID-ROOT'],
+          children_map: {
+            'CID-ROOT': ['CID-CHILD'],
+            'CID-CHILD': [],
           },
-        ],
-        leaf_serials: {
-          'CID-CHILD': ['SN-001'],
+          names: {
+            'CID-ROOT': 'LOT-ROOT',
+            'CID-CHILD': 'LOT-CHILD',
+          },
+          nodes: {
+            'CID-ROOT': { container_name: 'LOT-ROOT', container_id: 'CID-ROOT' },
+            'CID-CHILD': { container_name: 'LOT-CHILD', container_id: 'CID-CHILD' },
+          },
+          edges: [
+            {
+              from_cid: 'CID-ROOT',
+              to_cid: 'CID-CHILD',
+              edge_type: 'split',
+            },
+          ],
+          leaf_serials: {
+            'CID-CHILD': ['SN-001'],
+          },
         },
       };
     },
@@ -131,10 +135,12 @@ test('useEquipmentQuery performs timeline multi-query and keeps validation error
     get: async (url) => {
       if (url === '/api/query-tool/equipment-list') {
         return {
-          data: [
-            { RESOURCEID: 'EQ-1', RESOURCENAME: 'EQ Alpha' },
-            { RESOURCEID: 'EQ-2', RESOURCENAME: 'EQ Beta' },
-          ],
+          data: {
+            data: [
+              { RESOURCEID: 'EQ-1', RESOURCENAME: 'EQ Alpha' },
+              { RESOURCEID: 'EQ-2', RESOURCENAME: 'EQ Beta' },
+            ],
+          },
         };
       }
       throw new Error(`unexpected GET url: ${url}`);
@@ -142,20 +148,22 @@ test('useEquipmentQuery performs timeline multi-query and keeps validation error
     post: async (url, payload) => {
       postCalls.push({ url, payload });
       if (payload.query_type === 'status_hours') {
-        return { data: [{ STATUSNAME: 'RUN', HOURS: 12 }] };
+        return { data: { data: [{ STATUSNAME: 'RUN', HOURS: 12 }] } };
       }
       if (payload.query_type === 'lots') {
         const page = Number(payload.page || 1);
         const perPage = Number(payload.per_page || 200);
         return {
-          data: [{ CONTAINERID: `CID-100${page}` }],
-          pagination: { page, per_page: perPage, total: 3, total_pages: 3 },
+          data: {
+            data: [{ CONTAINERID: `CID-100${page}` }],
+            pagination: { page, per_page: perPage, total: 3, total_pages: 3 },
+          },
         };
       }
       if (payload.query_type === 'jobs') {
-        return { data: [{ JOBID: 'JOB-001' }] };
+        return { data: { data: [{ JOBID: 'JOB-001' }] } };
       }
-      return { data: [] };
+      return { data: { data: [] } };
     },
   });
 
@@ -311,27 +319,29 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
         const page = Number(parsed.searchParams.get('page') || 1);
         const perPage = Number(parsed.searchParams.get('per_page') || 200);
         return {
-          data: page === 1
-            ? [
-                {
-                  CONTAINERID: 'CID-001',
-                  EQUIPMENTID: 'EQ-01',
-                  TRACKINTIMESTAMP: '2026-02-01 08:00:00',
-                  TRACKOUTTIMESTAMP: '2026-02-01 08:30:00',
-                },
-              ]
-            : [
-                {
-                  CONTAINERID: 'CID-002',
-                  EQUIPMENTID: 'EQ-02',
-                  TRACKINTIMESTAMP: '2026-02-01 09:00:00',
-                  TRACKOUTTIMESTAMP: '2026-02-01 09:30:00',
-                },
-              ],
-          pagination: { page, per_page: perPage, total: 3, total_pages: 2 },
-          quality_meta: {
-            status: page === 1 ? 'truncated' : 'complete',
-            reasons: page === 1 ? ['max_total_rows_exceeded'] : [],
+          data: {
+            data: page === 1
+              ? [
+                  {
+                    CONTAINERID: 'CID-001',
+                    EQUIPMENTID: 'EQ-01',
+                    TRACKINTIMESTAMP: '2026-02-01 08:00:00',
+                    TRACKOUTTIMESTAMP: '2026-02-01 08:30:00',
+                  },
+                ]
+              : [
+                  {
+                    CONTAINERID: 'CID-002',
+                    EQUIPMENTID: 'EQ-02',
+                    TRACKINTIMESTAMP: '2026-02-01 09:00:00',
+                    TRACKOUTTIMESTAMP: '2026-02-01 09:30:00',
+                  },
+                ],
+            pagination: { page, per_page: perPage, total: 3, total_pages: 2 },
+            quality_meta: {
+              status: page === 1 ? 'truncated' : 'complete',
+              reasons: page === 1 ? ['max_total_rows_exceeded'] : [],
+            },
           },
         };
       }
@@ -340,16 +350,18 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
         const page = Number(parsed.searchParams.get('page') || 1);
         const perPage = Number(parsed.searchParams.get('per_page') || 200);
         return {
-          data: [{ TYPE: assocType, CONTAINERID: 'CID-001' }],
-          pagination: { page, per_page: perPage, total: 1, total_pages: 1 },
-          quality_meta: {
-            status: assocType === 'materials' ? 'partial' : 'complete',
-            reasons: assocType === 'materials' ? ['chunk_failure'] : [],
+          data: {
+            data: [{ TYPE: assocType, CONTAINERID: 'CID-001' }],
+            pagination: { page, per_page: perPage, total: 1, total_pages: 1 },
+            quality_meta: {
+              status: assocType === 'materials' ? 'partial' : 'complete',
+              reasons: assocType === 'materials' ? ['chunk_failure'] : [],
+            },
           },
         };
       }
       if (parsed.pathname === '/api/query-tool/workcenter-groups') {
-        return { data: [{ name: 'WB', sequence: 1 }] };
+        return { data: { data: [{ name: 'WB', sequence: 1 }] } };
       }
       throw new Error(`unexpected GET url: ${url}`);
     },

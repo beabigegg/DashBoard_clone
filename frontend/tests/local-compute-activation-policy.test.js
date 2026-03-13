@@ -2,110 +2,129 @@
  * Tests for DuckDB local-compute activation policy.
  * Task 5.3 — Verifies that local mode suppresses /view requests when active
  * and that the activation policy gates correctly.
+ *
+ * Note:
+ * `duckdb-activation-policy.js` statically imports `duckdb-client.js`, which in
+ * turn imports a Vite worker (`?worker`) that Node's native test runner cannot
+ * load. To keep this test runnable under `node --test`, we load the original
+ * policy source and replace that single import with a controllable stub.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checkLocalComputeEligibility } from '../src/core/duckdb-activation-policy.js';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
-// Mock isDuckDBSupported so we can control browser support
-vi.mock('../src/core/duckdb-client.js', () => ({
-  isDuckDBSupported: vi.fn(() => true),
-  getDuckDBClient: vi.fn(),
-  fetchParquetBuffer: vi.fn(),
-}));
+globalThis.__testDuckdbSupport = () => true;
 
-import { isDuckDBSupported } from '../src/core/duckdb-client.js';
+const policyPath = new URL('../src/core/duckdb-activation-policy.js', import.meta.url);
+const policySource = await readFile(policyPath, 'utf8');
+const transformedSource = policySource.replace(
+  "import { isDuckDBSupported } from './duckdb-client.js';",
+  "const isDuckDBSupported = () => globalThis.__testDuckdbSupport();",
+);
+const policyModuleUrl = `data:text/javascript;base64,${Buffer.from(transformedSource, 'utf8').toString('base64')}`;
+const { checkLocalComputeEligibility } = await import(policyModuleUrl);
 
-describe('checkLocalComputeEligibility', () => {
-  beforeEach(() => {
-    isDuckDBSupported.mockReturnValue(true);
-  });
+function withDuckdbSupport(supported, fn) {
+  const previous = globalThis.__testDuckdbSupport;
+  globalThis.__testDuckdbSupport = () => supported;
+  try {
+    return fn();
+  } finally {
+    globalThis.__testDuckdbSupport = previous;
+  }
+}
 
-  it('returns eligible=true when all conditions met', () => {
+test('checkLocalComputeEligibility returns eligible=true when all conditions met', () => {
+  withDuckdbSupport(true, () => {
     const result = checkLocalComputeEligibility({
       spoolDownloadUrl: '/api/spool/resource_dataset/abc123.parquet',
       totalRowCount: 10000,
       threshold: 5000,
       flagEnabled: true,
     });
-    expect(result.eligible).toBe(true);
-    expect(result.reason).toBe('ok');
+    assert.equal(result.eligible, true);
+    assert.equal(result.reason, 'ok');
   });
+});
 
-  it('returns eligible=false when flag is disabled', () => {
+test('checkLocalComputeEligibility returns eligible=false when flag is disabled', () => {
+  withDuckdbSupport(true, () => {
     const result = checkLocalComputeEligibility({
       spoolDownloadUrl: '/api/spool/resource_dataset/abc123.parquet',
       totalRowCount: 10000,
       flagEnabled: false,
     });
-    expect(result.eligible).toBe(false);
-    expect(result.reason).toBe('flag_disabled');
+    assert.equal(result.eligible, false);
+    assert.equal(result.reason, 'flag_disabled');
   });
+});
 
-  it('returns eligible=false when browser does not support DuckDB', () => {
-    isDuckDBSupported.mockReturnValue(false);
+test('checkLocalComputeEligibility returns eligible=false when browser does not support DuckDB', () => {
+  withDuckdbSupport(false, () => {
     const result = checkLocalComputeEligibility({
       spoolDownloadUrl: '/api/spool/resource_dataset/abc123.parquet',
       totalRowCount: 10000,
     });
-    expect(result.eligible).toBe(false);
-    expect(result.reason).toBe('browser_unsupported');
+    assert.equal(result.eligible, false);
+    assert.equal(result.reason, 'browser_unsupported');
   });
+});
 
-  it('returns eligible=false when spool_download_url is absent', () => {
+test('checkLocalComputeEligibility returns eligible=false when spool_download_url is absent', () => {
+  withDuckdbSupport(true, () => {
     const result = checkLocalComputeEligibility({
       spoolDownloadUrl: null,
       totalRowCount: 10000,
     });
-    expect(result.eligible).toBe(false);
-    expect(result.reason).toBe('no_spool_url');
+    assert.equal(result.eligible, false);
+    assert.equal(result.reason, 'no_spool_url');
   });
+});
 
-  it('returns eligible=false when row count is below threshold', () => {
+test('checkLocalComputeEligibility returns eligible=false when row count is below threshold', () => {
+  withDuckdbSupport(true, () => {
     const result = checkLocalComputeEligibility({
       spoolDownloadUrl: '/api/spool/resource_dataset/abc123.parquet',
       totalRowCount: 100,
       threshold: 5000,
     });
-    expect(result.eligible).toBe(false);
-    expect(result.reason).toBe('below_threshold');
+    assert.equal(result.eligible, false);
+    assert.equal(result.reason, 'below_threshold');
   });
+});
 
-  it('returns eligible=false when totalRowCount equals threshold - 1', () => {
+test('checkLocalComputeEligibility returns eligible=false when totalRowCount equals threshold - 1', () => {
+  withDuckdbSupport(true, () => {
     const result = checkLocalComputeEligibility({
       spoolDownloadUrl: '/api/spool/hold_dataset/abc.parquet',
       totalRowCount: 4999,
       threshold: 5000,
     });
-    expect(result.eligible).toBe(false);
+    assert.equal(result.eligible, false);
   });
+});
 
-  it('returns eligible=true when totalRowCount exactly equals threshold', () => {
+test('checkLocalComputeEligibility returns eligible=true when totalRowCount exactly equals threshold', () => {
+  withDuckdbSupport(true, () => {
     const result = checkLocalComputeEligibility({
       spoolDownloadUrl: '/api/spool/hold_dataset/abc.parquet',
       totalRowCount: 5000,
       threshold: 5000,
     });
-    expect(result.eligible).toBe(true);
-  });
-
-  it('returns eligible=false for empty opts (no spool url)', () => {
-    const result = checkLocalComputeEligibility({});
-    expect(result.eligible).toBe(false);
+    assert.equal(result.eligible, true);
   });
 });
 
-describe('Local compute suppresses /view requests — integration contract', () => {
-  /**
-   * These tests verify the _contract_ that when local compute is active,
-   * the page composable skips server /view calls. Since the composables
-   * are Vue components, we test the decision logic that gates the API call.
-   *
-   * The actual DuckDB execution path is covered by parity tests.
-   */
+test('checkLocalComputeEligibility returns eligible=false for empty opts (no spool url)', () => {
+  withDuckdbSupport(true, () => {
+    const result = checkLocalComputeEligibility({});
+    assert.equal(result.eligible, false);
+  });
+});
 
-  it('eligible response triggers activation path (not server view)', () => {
-    // Simulate a query response with spool metadata
+test('local compute contract: eligible response triggers activation path (not server view)', () => {
+  withDuckdbSupport(true, () => {
     const queryResponse = {
       query_id: 'abc123',
       spool_download_url: '/api/spool/resource_dataset/abc123.parquet',
@@ -118,14 +137,12 @@ describe('Local compute suppresses /view requests — integration contract', () 
       spoolDownloadUrl: queryResponse.spool_download_url,
       totalRowCount: queryResponse.total_row_count,
     });
-
-    // Contract: when eligible=true, the page MUST attempt duckdb.activate()
-    // instead of calling GET /api/resource/history/view
-    expect(eligible).toBe(true);
+    assert.equal(eligible, true);
   });
+});
 
-  it('ineligible response falls back to server view path', () => {
-    // Simulate a small dataset response (no spool)
+test('local compute contract: ineligible response falls back to server view path', () => {
+  withDuckdbSupport(true, () => {
     const queryResponse = {
       query_id: 'small_query',
       total_row_count: 500,
@@ -137,18 +154,16 @@ describe('Local compute suppresses /view requests — integration contract', () 
       spoolDownloadUrl: queryResponse.spool_download_url,
       totalRowCount: queryResponse.total_row_count,
     });
-
-    // Contract: when eligible=false, the page MUST use GET /api/*/view
-    expect(eligible).toBe(false);
+    assert.equal(eligible, false);
   });
+});
 
-  it('resource history and hold history use same threshold default (5000)', () => {
+test('local compute contract: resource history and hold history use same threshold default (5000)', () => {
+  withDuckdbSupport(true, () => {
     const baseOpts = {
       spoolDownloadUrl: '/api/spool/x/y.parquet',
     };
-    // At exactly 5000 rows, both pages should activate
-    expect(checkLocalComputeEligibility({ ...baseOpts, totalRowCount: 5000 }).eligible).toBe(true);
-    // At 4999 rows, both pages should NOT activate
-    expect(checkLocalComputeEligibility({ ...baseOpts, totalRowCount: 4999 }).eligible).toBe(false);
+    assert.equal(checkLocalComputeEligibility({ ...baseOpts, totalRowCount: 5000 }).eligible, true);
+    assert.equal(checkLocalComputeEligibility({ ...baseOpts, totalRowCount: 4999 }).eligible, false);
   });
 });

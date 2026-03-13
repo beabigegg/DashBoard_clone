@@ -63,7 +63,7 @@ test('reject-history prune removes invalid selected values', () => {
   assert.equal(pruned.removedCount, 3);
 });
 
-test('reject-history view params include multi-dimension pareto selections', () => {
+test('reject-history view params include supported pareto selections', () => {
   const params = buildViewParams('qid-001', {
     supplementaryFilters: {
       packages: ['PKG-A'],
@@ -93,7 +93,6 @@ test('reject-history view params include multi-dimension pareto selections', () 
     trend_dates: ['2026-02-01'],
     sel_reason: ['001_A'],
     sel_type: ['TYPE-A', 'TYPE-B'],
-    sel_workflow: ['WF-01'],
     page: 2,
     per_page: 80,
     include_excluded_scrap: 'true',
