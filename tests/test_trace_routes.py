@@ -549,6 +549,113 @@ def test_non_msd_events_cache_unchanged(mock_cache_set, mock_cache_get, mock_fet
     mock_fetch_events.assert_not_called()
 
 
+@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+@patch('mes_dashboard.routes.trace_routes.cache_get')
+@patch('mes_dashboard.routes.trace_routes.cache_set')
+def test_cached_events_replay_preserves_non_complete_quality_meta(
+    mock_cache_set, mock_cache_get, mock_fetch_events
+):
+    """Cached events replay SHALL preserve non-complete quality_meta status (parity gate).
+
+    When a response with non-complete quality_meta is stored and later replayed from cache,
+    the replayed payload must retain the non-complete completeness semantics.
+    """
+    non_complete_cached = {
+        'stage': 'events',
+        'results': {
+            'history': {
+                'data': [],
+                'count': 0,
+                'quality_meta': {'status': 'truncated', 'scope': 'domain', 'domain': 'history', 'reasons': ['max_total_rows_exceeded']},
+            },
+        },
+        'aggregation': None,
+        'quality_meta': {'status': 'truncated', 'scope': 'query', 'reasons': ['max_total_rows_exceeded']},
+        'domain_quality_meta': {
+            'history': {'status': 'truncated', 'scope': 'domain', 'domain': 'history', 'reasons': ['max_total_rows_exceeded']},
+        },
+    }
+    mock_cache_get.return_value = non_complete_cached
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': ['CID-001'],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+
+    # Completeness metadata must be preserved through cache replay
+    assert payload['data']['quality_meta']['status'] == 'truncated', (
+        "Cached replay must preserve non-complete quality_meta.status"
+    )
+    assert payload['data']['domain_quality_meta']['history']['status'] == 'truncated', (
+        "Cached replay must preserve domain-level non-complete quality_meta"
+    )
+
+    # EventFetcher must NOT have been called — result served from cache
+    mock_fetch_events.assert_not_called()
+
+
+@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+@patch('mes_dashboard.routes.trace_routes.cache_get')
+@patch('mes_dashboard.routes.trace_routes.cache_set')
+def test_cached_events_replay_domain_partial_overrides_stale_complete_top_level(
+    mock_cache_set, mock_cache_get, mock_fetch_events
+):
+    """Stale top-level complete status must NOT hide a domain-level partial status.
+
+    A cached payload where top-level quality_meta.status='complete' but a domain
+    result carries quality_meta.status='partial' must be replayed with the top-level
+    re-derived from domain metas, yielding a non-complete top-level status.
+    This covers the silent-hide regression: top=complete, domain=partial → should warn.
+    """
+    stale_top_level_cached = {
+        'stage': 'events',
+        'results': {
+            'history': {
+                'data': [],
+                'count': 0,
+                # domain-level says partial — authoritative
+                'quality_meta': {'status': 'partial', 'scope': 'domain', 'domain': 'history', 'reasons': ['chunk_failure']},
+            },
+        },
+        'aggregation': None,
+        # top-level says complete — stale/inconsistent, must be overridden
+        'quality_meta': {'status': 'complete', 'scope': 'query', 'reasons': []},
+        'domain_quality_meta': {
+            'history': {'status': 'partial', 'scope': 'domain', 'domain': 'history', 'reasons': ['chunk_failure']},
+        },
+    }
+    mock_cache_get.return_value = stale_top_level_cached
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': ['CID-001'],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+
+    # Top-level status must be re-derived from domain metas, not taken from stale cached value
+    assert payload['data']['quality_meta']['status'] == 'partial', (
+        "_ensure_events_quality_meta must re-derive top-level status from domain metas; "
+        "stale 'complete' top-level must not hide domain-level 'partial'"
+    )
+    assert payload['data']['domain_quality_meta']['history']['status'] == 'partial'
+    mock_fetch_events.assert_not_called()
+
+
 # ---- Admission control tests ----
 
 

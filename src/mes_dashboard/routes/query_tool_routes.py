@@ -386,7 +386,12 @@ def query_lot_history():
             return service_unavailable_error(str(exc))
     elif container_id:
         try:
-            result = get_lot_history(container_id, workcenter_groups=workcenter_groups)
+            result = get_lot_history(
+                container_id,
+                workcenter_groups=workcenter_groups,
+                page=page,
+                per_page=per_page,
+            )
         except MemoryError as exc:
             return service_unavailable_error(str(exc))
     else:
@@ -488,11 +493,11 @@ def query_lot_associations():
             return validation_error('請指定 CONTAINERID')
 
         if assoc_type == 'materials':
-            result = get_lot_materials(container_id)
+            result = get_lot_materials(container_id, page=page, per_page=per_page)
         elif assoc_type == 'rejects':
-            result = get_lot_rejects(container_id)
+            result = get_lot_rejects(container_id, page=page, per_page=per_page)
         elif assoc_type == 'holds':
-            result = get_lot_holds(container_id)
+            result = get_lot_holds(container_id, page=page, per_page=per_page)
         elif assoc_type == 'splits':
             full_history = str(request.args.get('full_history', '')).strip().lower() in {'1', 'true', 'yes'}
             result = get_lot_splits(container_id, full_history=full_history)

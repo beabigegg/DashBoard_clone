@@ -225,6 +225,19 @@ const showTraceProgress = computed(() => (
   || hasTraceError.value
 ));
 const eventsAggregation = computed(() => trace.stage_results.events?.aggregation || null);
+const eventsQualityMeta = computed(() => trace.stage_results.events?.quality_meta || null);
+const hasCompletenessWarning = computed(() => {
+  if (!hasQueried.value || loading.querying) return false;
+  const status = String(eventsQualityMeta.value?.status || '').toLowerCase();
+  return Boolean(status) && status !== 'complete';
+});
+const completenessWarningText = computed(() => {
+  const status = String(eventsQualityMeta.value?.status || '').toLowerCase();
+  if (status === 'partial') return '部分事件資料尚未完整擷取，分析結果可能不完整。';
+  if (status === 'truncated') return '事件資料已截斷，超出查詢限制，分析結果可能不完整。';
+  if (status === 'failed') return '部分事件域擷取失敗，分析結果可能不完整。';
+  return '';
+});
 const showAnalysisSkeleton = computed(() => hasQueried.value && loading.querying && !eventsAggregation.value);
 const showAnalysisCharts = computed(() => hasQueried.value && (Boolean(eventsAggregation.value) || restoredFromCache.value));
 
@@ -592,6 +605,9 @@ void initPage();
     <template v-if="hasQueried">
       <div v-if="analysisData.genealogy_status === 'error'" class="warning-banner">
         追溯分析未完成（genealogy 查詢失敗），圖表僅顯示偵測站數據。
+      </div>
+      <div v-if="hasCompletenessWarning" class="warning-banner">
+        {{ completenessWarningText }}
       </div>
 
       <div v-if="showAnalysisSkeleton" class="trace-skeleton-section">

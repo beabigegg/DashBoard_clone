@@ -855,23 +855,28 @@ def _enrich_workcenter_group(rows: list) -> list:
 
 def get_lot_history(
     container_id: str,
-    workcenter_groups: Optional[List[str]] = None
+    workcenter_groups: Optional[List[str]] = None,
+    *,
+    page: int = 1,
+    per_page: int = 0,
 ) -> Dict[str, Any]:
     """Get production history for a LOT.
 
     Args:
         container_id: CONTAINERID (16-char hex)
         workcenter_groups: Optional list of WORKCENTER_GROUP names to filter by
+        page: Page number (1-based)
+        per_page: Records per page (0 = no pagination)
 
     Returns:
-        Dict with 'data' (history records) and 'total', or 'error'.
+        Dict with 'data', 'total', 'pagination', 'quality_meta', or 'error'.
     """
     if not container_id:
         return {'error': '請指定 CONTAINERID'}
 
     try:
         _check_rss_guard("LOT 生產履歷查詢")
-        events_by_cid, _quality_meta = _fetch_domain_records([container_id], "history")
+        events_by_cid, quality_meta = _fetch_domain_records([container_id], "history")
         rows = list(events_by_cid.get(container_id, []))
 
         if workcenter_groups:
@@ -888,16 +893,24 @@ def get_lot_history(
                     f"({len(workcenters)} workcenters)"
                 )
 
-        _enrich_workcenter_group(rows)
-        data = _df_to_records(pd.DataFrame(rows))
+        paged_rows, pagination = _paginate_rows(
+            rows,
+            _sanitize_page(page),
+            _sanitize_per_page(per_page),
+        )
+
+        _enrich_workcenter_group(paged_rows)
+        data = _df_to_records(pd.DataFrame(paged_rows))
 
         logger.debug(f"LOT history: {len(data)} records for {container_id}")
 
         return {
             'data': data,
-            'total': len(data),
+            'total': len(rows),
             'container_id': container_id,
             'filtered_by_groups': workcenter_groups or [],
+            'pagination': pagination,
+            'quality_meta': quality_meta,
         }
 
     except MemoryError:
@@ -1102,30 +1115,39 @@ def get_lot_associations_batch(
 # LOT Association Functions
 # ============================================================
 
-def get_lot_materials(container_id: str) -> Dict[str, Any]:
+def get_lot_materials(container_id: str, *, page: int = 1, per_page: int = 0) -> Dict[str, Any]:
     """Get material consumption records for a LOT.
 
     Args:
         container_id: CONTAINERID (16-char hex)
+        page: Page number (1-based)
+        per_page: Records per page (0 = no pagination)
 
     Returns:
-        Dict with 'data' (material records) and 'total', or 'error'.
+        Dict with 'data', 'total', 'pagination', 'quality_meta', or 'error'.
     """
     if not container_id:
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        events_by_cid, _quality_meta = _fetch_domain_records([container_id], "materials")
+        events_by_cid, quality_meta = _fetch_domain_records([container_id], "materials")
         rows = list(events_by_cid.get(container_id, []))
-        _enrich_workcenter_group(rows)
-        data = _df_to_records(pd.DataFrame(rows))
+        paged_rows, pagination = _paginate_rows(
+            rows,
+            _sanitize_page(page),
+            _sanitize_per_page(per_page),
+        )
+        _enrich_workcenter_group(paged_rows)
+        data = _df_to_records(pd.DataFrame(paged_rows))
 
         logger.debug(f"LOT materials: {len(data)} records for {container_id}")
 
         return {
             'data': data,
-            'total': len(data),
+            'total': len(rows),
             'container_id': container_id,
+            'pagination': pagination,
+            'quality_meta': quality_meta,
         }
 
     except Exception as exc:
@@ -1133,28 +1155,38 @@ def get_lot_materials(container_id: str) -> Dict[str, Any]:
         return {'error': f'查詢失敗: {str(exc)}'}
 
 
-def get_lot_rejects(container_id: str) -> Dict[str, Any]:
+def get_lot_rejects(container_id: str, *, page: int = 1, per_page: int = 0) -> Dict[str, Any]:
     """Get reject (defect) records for a LOT.
 
     Args:
         container_id: CONTAINERID (16-char hex)
+        page: Page number (1-based)
+        per_page: Records per page (0 = no pagination)
 
     Returns:
-        Dict with 'data' (reject records) and 'total', or 'error'.
+        Dict with 'data', 'total', 'pagination', 'quality_meta', or 'error'.
     """
     if not container_id:
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        events_by_cid, _quality_meta = _fetch_domain_records([container_id], "rejects")
-        data = _df_to_records(pd.DataFrame(events_by_cid.get(container_id, [])))
+        events_by_cid, quality_meta = _fetch_domain_records([container_id], "rejects")
+        rows = list(events_by_cid.get(container_id, []))
+        paged_rows, pagination = _paginate_rows(
+            rows,
+            _sanitize_page(page),
+            _sanitize_per_page(per_page),
+        )
+        data = _df_to_records(pd.DataFrame(paged_rows))
 
         logger.debug(f"LOT rejects: {len(data)} records for {container_id}")
 
         return {
             'data': data,
-            'total': len(data),
+            'total': len(rows),
             'container_id': container_id,
+            'pagination': pagination,
+            'quality_meta': quality_meta,
         }
 
     except Exception as exc:
@@ -1162,28 +1194,38 @@ def get_lot_rejects(container_id: str) -> Dict[str, Any]:
         return {'error': f'查詢失敗: {str(exc)}'}
 
 
-def get_lot_holds(container_id: str) -> Dict[str, Any]:
+def get_lot_holds(container_id: str, *, page: int = 1, per_page: int = 0) -> Dict[str, Any]:
     """Get HOLD/RELEASE records for a LOT.
 
     Args:
         container_id: CONTAINERID (16-char hex)
+        page: Page number (1-based)
+        per_page: Records per page (0 = no pagination)
 
     Returns:
-        Dict with 'data' (hold records with HOLD_STATUS and HOLD_HOURS) and 'total'.
+        Dict with 'data', 'total', 'pagination', 'quality_meta', or 'error'.
     """
     if not container_id:
         return {'error': '請指定 CONTAINERID'}
 
     try:
-        events_by_cid, _quality_meta = _fetch_domain_records([container_id], "holds")
-        data = _df_to_records(pd.DataFrame(events_by_cid.get(container_id, [])))
+        events_by_cid, quality_meta = _fetch_domain_records([container_id], "holds")
+        rows = list(events_by_cid.get(container_id, []))
+        paged_rows, pagination = _paginate_rows(
+            rows,
+            _sanitize_page(page),
+            _sanitize_per_page(per_page),
+        )
+        data = _df_to_records(pd.DataFrame(paged_rows))
 
         logger.debug(f"LOT holds: {len(data)} records for {container_id}")
 
         return {
             'data': data,
-            'total': len(data),
+            'total': len(rows),
             'container_id': container_id,
+            'pagination': pagination,
+            'quality_meta': quality_meta,
         }
 
     except Exception as exc:

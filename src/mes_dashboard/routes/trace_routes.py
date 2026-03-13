@@ -454,19 +454,35 @@ def _ensure_events_quality_meta(payload: Dict[str, Any]) -> Dict[str, Any]:
                 normalized["domain"] = domain
             domain_quality_meta[domain] = normalized
 
-    if payload.get("quality_meta"):
+    # Always re-derive the top-level quality_meta from domain metas so that a
+    # stale cached "complete" top-level cannot silently hide a domain-level
+    # partial/truncated/failed status.  Only fall back to the cached top-level
+    # value when no domain metas are available at all.
+    if domain_quality_meta:
+        quality_meta = merge_quality_metas(
+            domain_quality_meta.values(),
+            scope=QUALITY_SCOPE_QUERY,
+        )
+    elif payload.get("quality_meta"):
         quality_meta = normalize_quality_meta(
             payload.get("quality_meta"),
             default_scope=QUALITY_SCOPE_QUERY,
         )
     else:
-        quality_meta = merge_quality_metas(
-            domain_quality_meta.values(),
-            scope=QUALITY_SCOPE_QUERY,
-        )
+        quality_meta = merge_quality_metas([], scope=QUALITY_SCOPE_QUERY)
 
     payload["quality_meta"] = quality_meta
     payload["domain_quality_meta"] = domain_quality_meta
+
+    # Guard: log when a cached/replayed payload carries non-complete status
+    # to confirm completeness metadata is preserved through cache-hit paths.
+    replayed_status = quality_meta.get("status", "")
+    if replayed_status and replayed_status != "complete":
+        logger.debug(
+            "events cache-replay preserving non-complete quality_meta status=%s",
+            replayed_status,
+        )
+
     return payload
 
 

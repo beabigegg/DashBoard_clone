@@ -333,6 +333,47 @@ class TestLotHistoryEndpoint:
         assert kwargs['page'] == 2
         assert kwargs['per_page'] == 5
 
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    def test_lot_history_single_forwards_pagination_and_quality_meta(self, mock_query, client):
+        """Single-item history response SHALL include quality_meta and pagination (parity with batch)."""
+        mock_query.return_value = {
+            'data': [{'CONTAINERID': 'abc123'}],
+            'total': 3,
+            'pagination': {'page': 1, 'per_page': 200, 'total': 3, 'total_pages': 1},
+            'quality_meta': {'status': 'partial', 'reasons': ['chunk_failure']},
+            'container_id': 'abc123',
+            'filtered_by_groups': [],
+        }
+
+        response = client.get('/api/query-tool/lot-history?container_id=abc123&page=1&per_page=200')
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['data']['quality_meta']['status'] == 'partial'
+        assert 'pagination' in payload['data']
+        mock_query.assert_called_once()
+        kwargs = mock_query.call_args.kwargs
+        assert kwargs['page'] == 1
+        assert kwargs['per_page'] == 200
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
+    def test_lot_history_single_complete_status_no_warning_needed(self, mock_query, client):
+        """Single-item history with complete status should have quality_meta.status == complete."""
+        mock_query.return_value = {
+            'data': [{'CONTAINERID': 'abc123'}],
+            'total': 1,
+            'pagination': {'page': 1, 'per_page': 200, 'total': 1, 'total_pages': 1},
+            'quality_meta': {'status': 'complete', 'reasons': []},
+            'container_id': 'abc123',
+            'filtered_by_groups': [],
+        }
+
+        response = client.get('/api/query-tool/lot-history?container_id=abc123')
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['data']['quality_meta']['status'] == 'complete'
+
 
 class TestAdjacentLotsEndpoint:
     """Tests for /api/query-tool/adjacent-lots endpoint."""
@@ -510,6 +551,68 @@ class TestLotAssociationsEndpoint:
         kwargs = mock_batch.call_args.kwargs
         assert kwargs['page'] == 1
         assert kwargs['per_page'] == 2
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_materials')
+    def test_lot_materials_single_forwards_quality_meta(self, mock_query, client):
+        """Single-item materials response SHALL include quality_meta (parity with batch)."""
+        mock_query.return_value = {
+            'data': [{'MATERIALPARTNAME': 'MAT-001'}],
+            'total': 1,
+            'pagination': {'page': 1, 'per_page': 200, 'total': 1, 'total_pages': 1},
+            'quality_meta': {'status': 'truncated', 'reasons': ['max_total_rows_exceeded']},
+            'container_id': 'abc123',
+        }
+
+        response = client.get(
+            '/api/query-tool/lot-associations?container_id=abc123&type=materials&page=1&per_page=200'
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['data']['quality_meta']['status'] == 'truncated'
+        assert 'pagination' in payload['data']
+        mock_query.assert_called_once()
+        kwargs = mock_query.call_args.kwargs
+        assert kwargs['page'] == 1
+        assert kwargs['per_page'] == 200
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_rejects')
+    def test_lot_rejects_single_forwards_quality_meta(self, mock_query, client):
+        """Single-item rejects response SHALL include quality_meta (parity with batch)."""
+        mock_query.return_value = {
+            'data': [],
+            'total': 0,
+            'pagination': {'page': 1, 'per_page': 200, 'total': 0, 'total_pages': 1},
+            'quality_meta': {'status': 'partial', 'reasons': ['chunk_failure']},
+            'container_id': 'abc123',
+        }
+
+        response = client.get(
+            '/api/query-tool/lot-associations?container_id=abc123&type=rejects'
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['data']['quality_meta']['status'] == 'partial'
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_holds')
+    def test_lot_holds_single_forwards_quality_meta(self, mock_query, client):
+        """Single-item holds response SHALL include quality_meta (parity with batch)."""
+        mock_query.return_value = {
+            'data': [],
+            'total': 0,
+            'pagination': {'page': 1, 'per_page': 200, 'total': 0, 'total_pages': 1},
+            'quality_meta': {'status': 'complete', 'reasons': []},
+            'container_id': 'abc123',
+        }
+
+        response = client.get(
+            '/api/query-tool/lot-associations?container_id=abc123&type=holds'
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['data']['quality_meta']['status'] == 'complete'
 
 
 class TestQueryToolRateLimit:

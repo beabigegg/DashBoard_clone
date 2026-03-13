@@ -204,6 +204,103 @@ test('useEquipmentQuery performs timeline multi-query and keeps validation error
 });
 
 
+test('useLotDetail single-item mode captures quality_meta from response and clears on complete status', async () => {
+  let callCount = 0;
+  const restore = setupWindowMesApi({
+    get: async (url) => {
+      const parsed = new URL(url, 'http://local.test');
+      if (parsed.pathname === '/api/query-tool/lot-history') {
+        callCount++;
+        const status = callCount === 1 ? 'partial' : 'complete';
+        // apiGet returns window.MesApi.get result directly;
+        // composable reads payload?.data as the inner object containing data/pagination/quality_meta
+        return {
+          data: {
+            data: [{ CONTAINERID: 'CID-001', EQUIPMENTID: 'EQ-01' }],
+            pagination: { page: 1, per_page: 200, total: 1, total_pages: 1 },
+            quality_meta: { status, reasons: status === 'partial' ? ['chunk_failure'] : [] },
+          },
+        };
+      }
+      if (parsed.pathname === '/api/query-tool/lot-associations') {
+        return {
+          data: {
+            data: [],
+            pagination: { page: 1, per_page: 200, total: 0, total_pages: 1 },
+            quality_meta: { status: 'complete', reasons: [] },
+          },
+        };
+      }
+      return { data: {} };
+    },
+  });
+
+  try {
+    const detail = useLotDetail({ activeSubTab: 'history' });
+
+    // Single-item mode: setSelectedContainerId sends container_id param
+    const ok = await detail.setSelectedContainerId('CID-001');
+    assert.equal(ok, true);
+
+    // quality_meta should be captured from the non-complete single-item response
+    assert.equal(detail.qualityMeta.history?.status, 'partial',
+      'single-item history quality_meta should be partial');
+
+    // Refreshing with complete status should clear the warning
+    await detail.loadHistory({ force: true });
+    assert.equal(detail.qualityMeta.history?.status, 'complete',
+      'quality_meta should update to complete after refresh');
+  } finally {
+    restore();
+  }
+});
+
+
+test('useLotDetail single-item association captures quality_meta for paged tabs', async () => {
+  const restore = setupWindowMesApi({
+    get: async (url) => {
+      const parsed = new URL(url, 'http://local.test');
+      if (parsed.pathname === '/api/query-tool/lot-history') {
+        return {
+          data: {
+            data: [{ CONTAINERID: 'CID-001', EQUIPMENTID: 'EQ-01' }],
+            pagination: { page: 1, per_page: 200, total: 1, total_pages: 1 },
+            quality_meta: { status: 'complete', reasons: [] },
+          },
+        };
+      }
+      if (parsed.pathname === '/api/query-tool/lot-associations') {
+        const assocType = parsed.searchParams.get('type');
+        return {
+          data: {
+            data: [{ TYPE: assocType }],
+            pagination: { page: 1, per_page: 200, total: 1, total_pages: 1 },
+            quality_meta: { status: 'truncated', reasons: ['max_total_rows_exceeded'] },
+          },
+        };
+      }
+      return { data: {} };
+    },
+  });
+
+  try {
+    const detail = useLotDetail({ activeSubTab: 'materials' });
+    await detail.setSelectedContainerId('CID-001');
+
+    // materials is a PAGED_SUB_TAB: should capture quality_meta from single-item response
+    assert.equal(detail.qualityMeta.materials?.status, 'truncated',
+      'single-item materials quality_meta should be truncated');
+
+    // Switch to holds tab and verify that tab also gets quality_meta
+    await detail.setActiveSubTab('holds');
+    assert.equal(detail.qualityMeta.holds?.status, 'truncated',
+      'single-item holds quality_meta should be truncated');
+  } finally {
+    restore();
+  }
+});
+
+
 test('useLotDetail batches selected container ids and preserves workcenter filters in follow-up query', async () => {
   const getCalls = [];
   const restore = setupWindowMesApi({
