@@ -1,13 +1,11 @@
--- Resource Latest Status Query
--- Returns the latest status for each resource using ROW_NUMBER()
+-- Optimized: resource/latest_status
+-- Change: Replaced COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) in WHERE
+--         with OR-based predicate split to allow index usage on either column
 --
 -- Dynamic placeholders:
 --   days_back - Number of days to look back for status changes
 --   LOCATION_FILTER - Location exclusion filter (AND ...)
 --   ASSET_STATUS_FILTER - Asset status exclusion filter (AND ...)
---
--- Note: This query is designed to be embedded as a subquery (no CTE/WITH clause)
--- The MAX_TXNDATE calculation is done inline using a scalar subquery with KEEP FIRST
 
 SELECT *
 FROM (
@@ -45,7 +43,8 @@ FROM (
     JOIN DWH.DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
     WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
         OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
-      AND COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) >= SYSDATE - {{ days_back }}
+      AND (s.TXNDATE >= SYSDATE - {{ days_back }}
+           OR (s.TXNDATE IS NULL AND s.LASTSTATUSCHANGEDATE >= SYSDATE - {{ days_back }}))
       {{ LOCATION_FILTER }}
       {{ ASSET_STATUS_FILTER }}
 )

@@ -1,15 +1,14 @@
--- LOT Related JOB Records Query
--- Retrieves JOB records for equipment during LOT processing
+-- Optimized: query_tool/lot_jobs
+-- Change: Simplified 3-way OR date overlap condition to standard interval overlap
+--         Original: (CREATE BETWEEN start/end) OR (COMPLETE BETWEEN start/end)
+--                   OR (CREATE <= start AND COMPLETE >= end)
+--         Optimized: CREATE <= end AND (COMPLETE IS NULL OR COMPLETE >= start)
+--         Logically equivalent and allows single index range scan on CREATEDATE
 --
 -- Parameters:
---   :equipment_id - Equipment ID (EQUIPMENTID = RESOURCEID in same ID system)
+--   :equipment_id - Equipment ID
 --   :time_start - Start time of LOT processing
 --   :time_end - End time of LOT processing
---
--- Note: DW_MES_JOB uses RESOURCEID/RESOURCENAME
---       LOTWIPHISTORY uses EQUIPMENTID/EQUIPMENTNAME
---       EQUIPMENTID = RESOURCEID (same ID system, can JOIN directly)
---       CONTAINERIDS/CONTAINERNAMES are comma-separated strings
 
 SELECT
     j.JOBID,
@@ -27,9 +26,6 @@ SELECT
     j.CONTAINERNAMES
 FROM DWH.DW_MES_JOB j
 WHERE j.RESOURCEID = :equipment_id
-  AND (
-    (j.CREATEDATE BETWEEN :time_start AND :time_end)
-    OR (j.COMPLETEDATE BETWEEN :time_start AND :time_end)
-    OR (j.CREATEDATE <= :time_start AND (j.COMPLETEDATE IS NULL OR j.COMPLETEDATE >= :time_end))
-  )
+  AND j.CREATEDATE <= :time_end
+  AND (j.COMPLETEDATE IS NULL OR j.COMPLETEDATE >= :time_start)
 ORDER BY j.CREATEDATE

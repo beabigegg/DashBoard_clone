@@ -1,3 +1,7 @@
+-- Optimized: hold_history/reason_pareto
+-- Change: Added HOLDTXNDATE WHERE to history_base CTE to enable index scan
+--         (±1 day buffer accounts for 07:30 shift boundary)
+
 WITH history_base AS (
   SELECT
     CASE
@@ -31,6 +35,8 @@ WITH history_base AS (
       ORDER BY h.HOLDTXNDATE
     ) AS rn_future_reason
   FROM DWH.DW_MES_HOLDRELEASEHISTORY h
+  WHERE h.HOLDTXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD') - 1
+    AND h.HOLDTXNDATE <= TO_DATE(:end_date, 'YYYY-MM-DD') + 1
 ),
 filtered AS (
   SELECT

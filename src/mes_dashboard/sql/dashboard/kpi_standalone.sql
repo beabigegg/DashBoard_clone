@@ -1,6 +1,6 @@
--- Dashboard KPI Standalone Query
--- Returns overall KPI statistics for dashboard header
--- This is a self-contained query with CTE for optimal performance
+-- Optimized: dashboard/kpi_standalone
+-- Change: Narrowed inner SELECT to only columns needed by outer query
+--         (was SELECT * fetching 25+ columns; only NEWSTATUSNAME + filter columns used)
 --
 -- Placeholders:
 --   DAYS_BACK - Number of days to look back
@@ -14,28 +14,14 @@ WITH resource_latest_status AS (
         SELECT
             r.RESOURCEID,
             r.RESOURCENAME,
-            r.OBJECTCATEGORY,
-            r.OBJECTTYPE,
-            r.RESOURCEFAMILYNAME,
             r.WORKCENTERNAME,
             r.LOCATIONNAME,
-            r.VENDORNAME,
-            r.VENDORMODEL,
             r.PJ_DEPARTMENT,
             r.PJ_ASSETSSTATUS,
             r.PJ_ISPRODUCTION,
             r.PJ_ISKEY,
             r.PJ_ISMONITOR,
-            r.PJ_LOTID,
-            r.DESCRIPTION,
             s.NEWSTATUSNAME,
-            s.NEWREASONNAME,
-            s.LASTSTATUSCHANGEDATE,
-            s.OLDSTATUSNAME,
-            s.OLDREASONNAME,
-            s.AVAILABILITY,
-            s.JOBID,
-            s.TXNDATE,
             ROW_NUMBER() OVER (
                 PARTITION BY r.RESOURCEID
                 ORDER BY s.LASTSTATUSCHANGEDATE DESC NULLS LAST,

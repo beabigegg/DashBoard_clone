@@ -1,3 +1,9 @@
+-- Optimized: hold_history/trend
+-- Changes:
+--   1. Replaced LEFT JOIN ... ON 1=1 (Cartesian) with proper date-range overlap join
+--   2. Added HOLDTXNDATE WHERE clause to history_base to enable index scan
+--   3. Pre-aggregate daily metrics per hold_type before joining to calendar
+
 WITH calendar AS (
   SELECT TRUNC(TO_DATE(:start_date, 'YYYY-MM-DD')) + LEVEL - 1 AS day_date
   FROM dual
@@ -78,53 +84,69 @@ history_enriched AS (
       ELSE 'quality'
     END AS hold_type
   FROM history_base
+),
+-- Pre-aggregate: hold_qty per (day, hold_type) — snapshot of lots on hold at each day
+daily_hold AS (
+  SELECT
+    c.day_date,
+    h.hold_type,
+    SUM(CASE
+      WHEN h.hold_day <= c.day_date
+        AND (h.release_day IS NULL OR c.day_date < h.release_day)
+        AND c.day_date <= TRUNC(SYSDATE)
+        AND h.rn_hold_day = 1
+      THEN h.qty ELSE 0
+    END) AS hold_qty,
+    SUM(CASE
+      WHEN h.hold_day = c.day_date
+        AND (h.release_day IS NULL OR c.day_date <= h.release_day)
+        AND h.future_hold_flag = 1
+      THEN h.qty ELSE 0
+    END) AS new_hold_qty,
+    SUM(CASE
+      WHEN h.release_day = c.day_date
+        AND h.release_day >= h.hold_day
+      THEN h.qty ELSE 0
+    END) AS release_qty,
+    SUM(CASE
+      WHEN h.hold_day = c.day_date
+        AND (h.release_day IS NULL OR c.day_date <= h.release_day)
+        AND h.rn_hold_day = 1
+        AND h.future_hold_flag = 0
+      THEN h.qty ELSE 0
+    END) AS future_hold_qty
+  FROM calendar c
+  JOIN history_enriched h
+    ON h.hold_day <= c.day_date + 1
+    AND (h.release_day IS NULL OR h.release_day >= c.day_date)
+  GROUP BY c.day_date, h.hold_type
+),
+-- Combine with 'all' hold_type (sum of quality + non-quality)
+daily_all AS (
+  SELECT
+    day_date,
+    'all' AS hold_type,
+    SUM(hold_qty) AS hold_qty,
+    SUM(new_hold_qty) AS new_hold_qty,
+    SUM(release_qty) AS release_qty,
+    SUM(future_hold_qty) AS future_hold_qty
+  FROM daily_hold
+  GROUP BY day_date
 )
 SELECT
   TO_CHAR(c.day_date, 'YYYY-MM-DD') AS txn_date,
   t.hold_type,
-  SUM(
-    CASE
-      WHEN (t.hold_type = 'all' OR h.hold_type = t.hold_type)
-        AND h.hold_day <= c.day_date
-        AND (h.release_day IS NULL OR c.day_date < h.release_day)
-        AND c.day_date <= TRUNC(SYSDATE)
-        AND h.rn_hold_day = 1
-      THEN h.qty
-      ELSE 0
-    END
-  ) AS hold_qty,
-  SUM(
-    CASE
-      WHEN (t.hold_type = 'all' OR h.hold_type = t.hold_type)
-        AND h.hold_day = c.day_date
-        AND (h.release_day IS NULL OR c.day_date <= h.release_day)
-        AND h.future_hold_flag = 1
-      THEN h.qty
-      ELSE 0
-    END
-  ) AS new_hold_qty,
-  SUM(
-    CASE
-      WHEN (t.hold_type = 'all' OR h.hold_type = t.hold_type)
-        AND h.release_day = c.day_date
-        AND h.release_day >= h.hold_day
-      THEN h.qty
-      ELSE 0
-    END
-  ) AS release_qty,
-  SUM(
-    CASE
-      WHEN (t.hold_type = 'all' OR h.hold_type = t.hold_type)
-        AND h.hold_day = c.day_date
-        AND (h.release_day IS NULL OR c.day_date <= h.release_day)
-        AND h.rn_hold_day = 1
-        AND h.future_hold_flag = 0
-      THEN h.qty
-      ELSE 0
-    END
-  ) AS future_hold_qty
+  NVL(d.hold_qty, 0) AS hold_qty,
+  NVL(d.new_hold_qty, 0) AS new_hold_qty,
+  NVL(d.release_qty, 0) AS release_qty,
+  NVL(d.future_hold_qty, 0) AS future_hold_qty
 FROM calendar c
 CROSS JOIN hold_types t
-LEFT JOIN history_enriched h ON 1 = 1
-GROUP BY c.day_date, t.hold_type
+LEFT JOIN (
+  SELECT day_date, hold_type, hold_qty, new_hold_qty, release_qty, future_hold_qty
+  FROM daily_hold
+  UNION ALL
+  SELECT day_date, hold_type, hold_qty, new_hold_qty, release_qty, future_hold_qty
+  FROM daily_all
+) d ON d.day_date = c.day_date AND d.hold_type = t.hold_type
 ORDER BY c.day_date, t.hold_type

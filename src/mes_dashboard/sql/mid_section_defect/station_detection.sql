@@ -1,17 +1,7 @@
--- Defect Traceability - Parameterized Station Detection Data
--- Returns LOT-level data with detection station input, ALL defects, and lot metadata
---
--- Parameters:
---   :start_date - Start date (YYYY-MM-DD)
---   :end_date   - End date (YYYY-MM-DD)
---   {{ STATION_FILTER }} - Dynamic LIKE clause for workcenter group (built by Python)
---   {{ STATION_FILTER_REJECTS }} - Same pattern for reject CTE (column alias differs)
---
--- Tables used:
---   DWH.DW_MES_LOTWIPHISTORY (detection station records)
---   DWH.DW_MES_LOTREJECTHISTORY (defect records - charge-off + non-charge-off)
---   DWH.DW_MES_CONTAINER (product info + MFGORDERNAME for genealogy)
---   DWH.DW_MES_WIP (WORKFLOWNAME)
+-- Optimized: mid_section_defect/station_detection
+-- Change: Replaced SELECT DISTINCT in workflow_info with ROW_NUMBER()
+--         to ensure deterministic 1:1 join (prevents row multiplication
+--         when a container has multiple workflows)
 
 WITH detection_records AS (
     SELECT /*+ MATERIALIZE */
@@ -63,11 +53,21 @@ lot_metadata AS (
 ),
 workflow_info AS (
     SELECT /*+ MATERIALIZE */
-        DISTINCT w.CONTAINERID,
-        w.WORKFLOWNAME
-    FROM DWH.DW_MES_WIP w
-    WHERE w.CONTAINERID IN (SELECT CONTAINERID FROM detection_deduped)
-      AND w.PRODUCTLINENAME <> '點測'
+        CONTAINERID,
+        WORKFLOWNAME
+    FROM (
+        SELECT
+            w.CONTAINERID,
+            w.WORKFLOWNAME,
+            ROW_NUMBER() OVER (
+                PARTITION BY w.CONTAINERID
+                ORDER BY w.WORKFLOWNAME
+            ) AS wf_rn
+        FROM DWH.DW_MES_WIP w
+        WHERE w.CONTAINERID IN (SELECT CONTAINERID FROM detection_deduped)
+          AND w.PRODUCTLINENAME <> '點測'
+    )
+    WHERE wf_rn = 1
 )
 SELECT
     t.CONTAINERID,

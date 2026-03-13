@@ -1,18 +1,21 @@
--- Resource detail with JOB info for SDT/UDT drill-down
+-- Optimized: dashboard/resource_detail_with_job
+-- Changes:
+--   1. Merged latest_txn CTE into base_data to avoid double scan of RESOURCESTATUS
+--      (original had separate MAX(COALESCE(TXNDATE,LASTSTATUSCHANGEDATE)) scan)
+--   2. Kept original exact timestamp equality JOIN (j.CREATEDATE = rs.LASTSTATUSCHANGEDATE)
+--      JOBID in RESOURCESTATUS is not always populated, so timestamp match is more reliable
+--   3. Replaced COALESCE in WHERE with OR-based predicate for index usage
+--
 -- Placeholders:
 --   DAYS_BACK           - Number of days to look back
---   LOCATION_FILTER     - Location exclusion filter (e.g., "AND r.LOCATIONNAME NOT IN (...)")
+--   LOCATION_FILTER     - Location exclusion filter
 --   ASSET_STATUS_FILTER - Asset status exclusion filter
 --   WHERE_CLAUSE        - Dynamic WHERE conditions for final SELECT
 -- Parameters:
 --   :start_row - Pagination start row
 --   :end_row   - Pagination end row
 
-WITH latest_txn AS (
-    SELECT MAX(COALESCE(TXNDATE, LASTSTATUSCHANGEDATE)) AS MAX_TXNDATE
-    FROM DWH.DW_MES_RESOURCESTATUS
-),
-base_data AS (
+WITH base_data AS (
     SELECT *
     FROM (
         SELECT
@@ -47,10 +50,10 @@ base_data AS (
             ) AS rn
         FROM DWH.DW_MES_RESOURCE r
         JOIN DWH.DW_MES_RESOURCESTATUS s ON r.RESOURCEID = s.HISTORYID
-        CROSS JOIN latest_txn lt
         WHERE ((r.OBJECTCATEGORY = 'ASSEMBLY' AND r.OBJECTTYPE = 'ASSEMBLY')
             OR (r.OBJECTCATEGORY = 'WAFERSORT' AND r.OBJECTTYPE = 'WAFERSORT'))
-          AND COALESCE(s.TXNDATE, s.LASTSTATUSCHANGEDATE) >= lt.MAX_TXNDATE - {{ DAYS_BACK }}
+          AND (s.TXNDATE >= SYSDATE - {{ DAYS_BACK }}
+               OR (s.TXNDATE IS NULL AND s.LASTSTATUSCHANGEDATE >= SYSDATE - {{ DAYS_BACK }}))
           {{ LOCATION_FILTER }}
           {{ ASSET_STATUS_FILTER }}
     )

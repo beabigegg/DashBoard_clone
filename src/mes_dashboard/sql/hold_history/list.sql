@@ -1,3 +1,9 @@
+-- Optimized: hold_history/list
+-- Changes:
+--   1. Added HOLDTXNDATE WHERE to history_base CTE to enable index scan
+--   2. Computed hold_hours ONCE in history_base, referenced in filtered
+--      (was: 4× redundant CASE recalculation in WHERE clause)
+
 WITH history_base AS (
   SELECT
     CASE
@@ -20,16 +26,17 @@ WITH history_base AS (
     CASE
       WHEN h.HOLDREASONNAME IN ({{ NON_QUALITY_REASONS }}) THEN 'non-quality'
       ELSE 'quality'
-    END AS hold_type
+    END AS hold_type,
+    CASE
+      WHEN h.RELEASETXNDATE IS NULL THEN (SYSDATE - h.HOLDTXNDATE) * 24
+      ELSE (h.RELEASETXNDATE - h.HOLDTXNDATE) * 24
+    END AS hold_hours
   FROM DWH.DW_MES_HOLDRELEASEHISTORY h
+  WHERE h.HOLDTXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD') - 1
+    AND h.HOLDTXNDATE <= TO_DATE(:end_date, 'YYYY-MM-DD') + 1
 ),
 filtered AS (
-  SELECT
-    b.*,
-    CASE
-      WHEN b.RELEASETXNDATE IS NULL THEN (SYSDATE - b.HOLDTXNDATE) * 24
-      ELSE (b.RELEASETXNDATE - b.HOLDTXNDATE) * 24
-    END AS hold_hours
+  SELECT b.*
   FROM history_base b
   WHERE b.hold_day BETWEEN TO_DATE(:start_date, 'YYYY-MM-DD') AND TO_DATE(:end_date, 'YYYY-MM-DD')
     AND (:hold_type = 'all' OR b.hold_type = :hold_type)
@@ -38,22 +45,10 @@ filtered AS (
       OR (:include_on_hold = 1 AND b.RELEASETXNDATE IS NULL)
       OR (:include_released = 1 AND b.RELEASETXNDATE IS NOT NULL))
     AND (:duration_range IS NULL
-      OR (:duration_range = '<4h' AND
-          CASE WHEN b.RELEASETXNDATE IS NULL THEN (SYSDATE - b.HOLDTXNDATE) * 24
-               ELSE (b.RELEASETXNDATE - b.HOLDTXNDATE) * 24 END < 4)
-      OR (:duration_range = '4-24h' AND
-          CASE WHEN b.RELEASETXNDATE IS NULL THEN (SYSDATE - b.HOLDTXNDATE) * 24
-               ELSE (b.RELEASETXNDATE - b.HOLDTXNDATE) * 24 END >= 4 AND
-          CASE WHEN b.RELEASETXNDATE IS NULL THEN (SYSDATE - b.HOLDTXNDATE) * 24
-               ELSE (b.RELEASETXNDATE - b.HOLDTXNDATE) * 24 END < 24)
-      OR (:duration_range = '1-3d' AND
-          CASE WHEN b.RELEASETXNDATE IS NULL THEN (SYSDATE - b.HOLDTXNDATE) * 24
-               ELSE (b.RELEASETXNDATE - b.HOLDTXNDATE) * 24 END >= 24 AND
-          CASE WHEN b.RELEASETXNDATE IS NULL THEN (SYSDATE - b.HOLDTXNDATE) * 24
-               ELSE (b.RELEASETXNDATE - b.HOLDTXNDATE) * 24 END < 72)
-      OR (:duration_range = '>3d' AND
-          CASE WHEN b.RELEASETXNDATE IS NULL THEN (SYSDATE - b.HOLDTXNDATE) * 24
-               ELSE (b.RELEASETXNDATE - b.HOLDTXNDATE) * 24 END >= 72))
+      OR (:duration_range = '<4h'  AND b.hold_hours < 4)
+      OR (:duration_range = '4-24h' AND b.hold_hours >= 4 AND b.hold_hours < 24)
+      OR (:duration_range = '1-3d' AND b.hold_hours >= 24 AND b.hold_hours < 72)
+      OR (:duration_range = '>3d'  AND b.hold_hours >= 72))
 ),
 ranked AS (
   SELECT
