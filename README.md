@@ -2,680 +2,55 @@
 
 基於 Flask + Gunicorn + Redis + Vite 的 MES 數據報表查詢與可視化系統
 
-> 專案主執行根目錄：`DashBoard_vite/`  
-> 目前已移除舊版 `DashBoard/` 代碼，僅保留新架構。
-> 2026-02-11：`portal-shell-route-view-integration` 已完成並封存，Portal Shell 全面採用 no-iframe 的 SPA route-view 架構。
-> 2026-02-12：`full-modernization-architecture-blueprint` 已完成並封存（Phase 1），目前僅剩 `deferred-route-modernization-follow-up` 進行中（`/tables`、`/excel-query`、`/query-tool`、`/mid-section-defect`）。
+> 專案主執行根目錄：`DashBoard_vite/`
+> Portal Shell 全面採用 no-iframe 的 SPA route-view 架構。
 
 ---
 
 ## 專案狀態
 
+### 報表頁面
+
+| 功能 | 路由 | 狀態 |
+|------|------|------|
+| WIP 即時概況 | `/wip-overview` | ✅ 已完成 |
+| WIP 明細查詢 | `/wip-detail` | ✅ 已完成 |
+| Hold 明細分析 | `/hold-detail` | ✅ 已完成 |
+| Hold 即時概況（Matrix + Lot 明細） | `/hold-overview` | ✅ 已完成 |
+| Hold 歷史績效 Dashboard | `/hold-history` | ✅ 已完成 |
+| 設備即時概況 | `/resource` | ✅ 已完成 |
+| 設備歷史績效 | `/resource-history` | ✅ 已完成 |
+| QC-GATE 即時狀態報表 | `/qc-gate` | ✅ 已完成 |
+| 中段製程不良追溯分析 | `/mid-section-defect` | ✅ 已完成 |
+| 不良歷史分析 Dashboard | `/reject-history` | ✅ 已完成 |
+| 良率警示中心 | `/yield-alert-center` | ✅ 已完成 |
+| 材料追溯查詢 | `/material-trace` | ✅ 已完成 |
+| 數據表查詢工具 | `/tables` | ✅ 已完成 |
+| 設備維修查詢 | `/job-query` | ✅ 已完成 |
+| Excel 查詢工具 | `/excel-query` | ✅ 已完成 |
+| 批次追蹤工具 | `/query-tool` | ✅ 已完成 |
+
+### 管理與基礎設施
+
 | 功能 | 狀態 |
 |------|------|
-| WIP 即時概況 | ✅ 已完成 |
-| WIP 明細查詢 | ✅ 已完成 |
-| Hold 狀態分析 | ✅ 已完成 |
-| Hold 即時概況（Matrix + Lot 明細） | ✅ 已完成 |
-| Hold 歷史績效 Dashboard | ✅ 已完成 |
-| 數據表查詢工具 | ✅ 已完成 |
-| 設備狀態監控 | ✅ 已完成 |
-| 設備歷史查詢 | ✅ 已完成 |
-| 設備級聯篩選（Group/Family/Machine） | ✅ 已完成 |
-| 管理員認證系統 | ✅ 已完成 |
-| 頁面狀態管理 | ✅ 已完成 |
-| Redis 快取系統 | ✅ 已完成 |
-| SQL 查詢安全架構 | ✅ 已完成 |
-| Table Query API 白名單防注入 | ✅ 已完成 |
-| 效能監控儀表板 | ✅ 已完成 |
-| 熔斷器保護機制 | ✅ 已完成 |
-| Worker 重啟控制 | ✅ 已完成 |
-| Runtime 韌性診斷（threshold/churn/recommendation） | ✅ 已完成 |
-| WIP 共用 autocomplete core 模組 | ✅ 已完成 |
-| WIP 共用 derive core 模組（KPI/filter/chart/table） | ✅ 已完成 |
-| WIP 索引查詢加速與增量同步 | ✅ 已完成 |
-| 快取記憶體放大係數 telemetry | ✅ 已完成 |
-| Cache benchmark gate（P95/記憶體門檻） | ✅ 已完成 |
-| Worker guarded mode + manual override 稽核 | ✅ 已完成 |
-| Runtime contract 啟動校驗（conda/systemd/watchdog） | ✅ 已完成 |
-| 前端核心模組測試（Node test） | ✅ 已完成 |
-| 部署自動化 | ✅ 已完成 |
+| Portal Shell no-iframe SPA 路由 | ✅ 已完成 |
 | Portal 動態抽屜導覽管理 | ✅ 已完成 |
-| Portal Shell no-iframe 路由整合（含 fallback/guard） | ✅ 已完成 |
-| Wave B 查詢頁（job/excel/query-tool/tmtt-defect）原生化 | ✅ 已完成 |
-| Shell 健康檢查 summary/detail 契約（`/health/frontend-shell`） | ✅ 已完成 |
-| QC-GATE 即時狀態報表（Vue 3 + Vite） | ✅ 已完成 |
-| 數據表查詢頁面 Vue 3 遷移 | ✅ 已完成 |
-| WIP 三頁 Vue 3 遷移（Overview/Detail/Hold Detail） | ✅ 已完成 |
-| 全站現代化治理 Phase 1（路由治理/品質門檻/資產就緒/手動驗收） | ✅ 已完成（已封存） |
-| Deferred routes 現代化（`/tables`、`/excel-query`、`/query-tool`、`/mid-section-defect`） | ⏳ 進行中（follow-up 提案） |
-| WIP Overview/Detail 篩選條件保留 | ✅ 已完成 |
-| 設備雙頁 Vue 3 遷移（Status/History） | ✅ 已完成 |
-| 設備快取 DataFrame TTL 一致性修復 | ✅ 已完成 |
-| 中段製程不良追溯分析（TMTT → 上游） | ✅ 已完成 |
-
----
-
-## 開發歷史（Vite 重構後）
-
-- 2026-02-12：完成並封存 `full-modernization-architecture-blueprint`（Phase 1）— in-scope 報表路由全面採 canonical shell entry（`/portal-shell/...`）、補齊 admin 路由治理（`/admin/pages`、`/admin/performance`）、建立資產就緒 fail-fast 政策與前端品質門檻治理；並建立 deferred follow-up 提案承接 `/tables`、`/excel-query`、`/query-tool`、`/mid-section-defect`。
-- 2026-02-11：完成 Portal Shell route-view 全遷移（`portal-shell-route-view-integration`）— 全站移除 iframe 內容嵌入、導入 Vue Router 動態註冊與 fallback guard、補齊 Wave A/Wave B page parity 測試、健康檢查 summary/detail UX 與 `/health/frontend-shell` 契約，並完成 pre/post parity 與 smoke 證據彙整。
-- 2026-02-11：完成 table query API `table_name` 白名單驗證（`/api/query_table`、`/api/get_table_columns`）— 拒絕未註冊資料表，補上整合測試，避免 SQL injection 入口。
-- 2026-02-11：完成設備雙頁級聯篩選（`/resource`、`/resource-history`）— 新增 Group/Family/Machine 多層篩選聯動，前後端支援 `resource_ids` 條件，矩陣與明細篩選一致。
-- 2026-02-11：完成 Hold Dashboard/Portal 修補 — realtime equipment cache dedup、Portal iframe 載入修正、Hold Overview/Hold History 明細與樣式優化。
-- 2026-02-11：完成 WIP Overview/Detail 篩選狀態保留與 thundering-herd 緩解 — drill-down 往返保留 URL filters，auto refresh 引入 jitter（±15%）降低同步打點。
-- 2026-02-10：新增 Hold 即時概況（`/hold-overview`）— Hold type/reason 篩選、Workcenter×Package Matrix、Lot 明細分頁（50 筆/頁），前後端 API 全量打通（summary/matrix/lots）。
-- 2026-02-10：新增 Hold 歷史績效（`/hold-history`）— 日趨勢、原因 Pareto、滯留時長分布、明細分頁與 record type 過濾，支援 quality/non-quality/all 切換。
-- 2026-02-10：完成中段製程不良追溯分析（`/mid-section-defect`）— TMTT 測試站不良回溯至上游機台/站點/製程。三段式資料管線（TMTT 偵測 → SPLITFROMID BFS + COMBINEDASSYLOTS 合批展開 → 上游製程歷史），支援 205 種不良原因篩選、6 張 Pareto 圖表、日趨勢、LOT 明細分頁（200 筆/頁）。Loss reasons 24h Redis 快取、分析結果 5 分鐘快取、Detail API 分離（summary ~16KB + detail ~110KB/page，原 72MB 單次回應）。
-- 2026-02-09：完成設備雙頁 Vue 3 遷移（`/resource`、`/resource-history`）— 兩頁共 1,697 行 vanilla JS + 3,200 行 Jinja2 模板重寫為 Vue 3 SFC。抽取 `resource-shared/` 共用模組（CSS 基底、E10 狀態常數、HierarchyTable 三層展開樹表元件），History 頁 4 個 ECharts 圖表改用 vue-echarts，Status 頁複用 `useAutoRefresh` composable（5 分鐘自動刷新）。
-- 2026-02-09：完成 WIP 三頁 Vue 3 遷移（`/wip-overview`、`/wip-detail`、`/hold-detail`）— 三頁共 1,941 行 vanilla JS + Jinja2 重寫為 Vue 3 SFC。抽取共用 CSS/常數/元件至 `wip-shared/`，Pareto 圖改用 vue-echarts（與 QC-GATE 一致），Hold Detail 新增前端 URL params 判斷取代 Jinja2 注入。
-- 2026-02-09：完成數據表查詢頁面（`/tables`）Vue 3 遷移 — 第二個純 Vite 頁面，建立 `apiPost` POST 請求模式，237 行 vanilla JS 重寫為 Vue 3 SFC 元件。
-- 2026-02-09：修復設備快取 DataFrame TTL 一致性問題 — process-level DataFrame（30s TTL）過期後 derived index 仍為 ready，導致 `/api/resource/status` 回傳空資料。新增 Redis fallback reload。
-- 2026-02-09：新增 QC-GATE 即時狀態報表 — 第一個純 Vue 3 + Vite 頁面（脫離 Jinja2），建立後續前端遷移架構模式。
-- 2026-02-09：完成 Portal 動態抽屜導覽管理，sidebar drawer/page 配置改為 admin 可管理。
-- 2026-02-07：完成 Flask + Vite 單一 port 架構切換，舊版 `DashBoard/` 停用。
-- 2026-02-08：補齊 runtime 韌性治理（threshold/churn/recommendation）與 watchdog 可觀測欄位。
-- 2026-02-08：完成 P0 安全/穩定性硬化：
-  - production `SECRET_KEY` 缺失時啟動失敗（fail-fast）
-  - admin form + admin mutation API CSRF 防護
-  - health probe 使用獨立 DB pool，避免與主查詢池互相阻塞
-  - worker/app shutdown 統一清理 cache updater、realtime sync、Redis、DB engine
-  - `hold_detail` inline script 變數改為 `tojson` 序列化
-- 2026-02-08：完成 P1 快取/查詢效率重構：
-  - WIP 查詢路徑改為索引選擇，保留 `resource/wip` 全表快取語意
-  - WIP search index 增量同步（watermark/version）與 drift fallback
-  - health/admin 新增 cache memory amplification telemetry
-  - 建立 `scripts/run_cache_benchmarks.py` + fixture gate
-- 2026-02-08：完成 P2 運維自癒治理：
-  - runtime contract 共用化（app/start_server/watchdog/systemd）
-  - 啟動時 conda/watchdog 路徑 drift fail-fast
-  - worker restart policy（cooldown/retry budget/churn guarded mode）
-  - manual override（需 ack + reason）與結構化 audit log
-- 2026-02-08：完成 round-2 安全/穩定補強：
-  - LDAP endpoint 改為嚴格驗證（`https` + `LDAP_ALLOWED_HOSTS`）
-  - process-level cache 新增 `max_size + LRU`（WIP/Resource）
-  - circuit breaker transition logging 移至鎖外，降低 lock contention
-  - 全域安全標頭（CSP/XFO/nosniff/Referrer-Policy，production 加 HSTS）
-  - WIP detail 分頁參數加上下限（`page>=1`、`1<=page_size<=500`）
-- 2026-02-08：完成 round-3 殘餘風險修補：
-  - WIP cache publish 採 staged publish，失敗不污染舊快照
-  - WIP slow-path parse 移至鎖外；realtime equipment process cache 補齊 bounded LRU
-  - resource NaN 清理改為 depth-safe 迭代；WIP/Hold 布林查詢解析共用化
-  - filter cache view 名稱改為 env 可配置
-  - `/health`、`/health/deep` 新增 5 秒內部 memo（testing 模式禁用）
-  - 高成本 API 增加輕量 rate limit（WIP detail/matrix、Hold lots、Resource status/detail）
-  - DB 連線字串 log redaction 遮罩密碼
-- 2026-02-08：完成 round-4 殘餘治理收斂：
-  - Resource derived index 改為 row-position representation，移除 process 內 full records 複本
-  - Resource / Realtime Equipment 共用 Oracle SQL fragments，降低查詢定義漂移
-  - `resource_cache` / `realtime_equipment_cache` 型別註記與高頻常數命名收斂
-  - `page_registry` 寫檔改為 atomic replace（tmp + rename），避免設定檔半寫入
-  - 新增測試保護：共享 SQL 片段、index normalization、route bool parser 不重複定義
-
----
-
-## 遷移與驗收文件
-
-- Root cutover 盤點：`docs/root_cutover_inventory.md`
-- 頁面架構與抽屜分類：`docs/page_architecture_map.md`
-- 前端計算前移與 parity 規則：`docs/frontend_compute_shift_plan.md`
-- Portal Shell route-view 遷移基線與驗收：`docs/migration/portal-shell-route-view-integration/`
-- 全站現代化架構 Phase 1 治理文件：`docs/migration/full-modernization-architecture-blueprint/`
-- Hold 歷史頁資料口徑說明：`docs/hold_history.md`
-- Cutover gates / rollout / rollback：`docs/migration_gates_and_runbook.md`
-- 環境依賴缺口與對策：`docs/environment_gaps_and_mitigation.md`
-
----
-
-## 最新架構重點
-
-1. Portal Shell 已完成 no-iframe route-view 遷移
-- Shell 內容切換全面使用 Vue Router + native route-view，不再使用 iframe。
-- 動態抽屜導覽、fallback routing、admin 可見性規則由 `/api/portal/navigation` + route contract 驅動。
-- shell 健康狀態採 summary-first，詳細資訊由互動展開（`/health/frontend-shell`）。
-
-2. 單一 port 契約維持不變
-- Flask + Gunicorn + Vite dist 由同一服務提供（`GUNICORN_BIND`），前後端同源。
-
-3. Runtime 韌性採「降級 + 可操作建議 + policy state」
-- `/health`、`/health/deep`、`/admin/api/system-status`、`/admin/api/worker/status` 皆提供：
-  - 門檻（thresholds）
-  - policy state（`allowed` / `cooldown` / `blocked`）
-  - 重啟 churn 摘要
-  - alerts（pool/circuit/churn）
-  - recovery recommendation（值班建議動作）
-
-4. Watchdog 自癒策略具界限保護
-- restart 流程納入 cooldown + retry budget + churn window。
-- churn 超標時進入 guarded mode，需 admin manual override 才可繼續重啟。
-- state 檔保留 bounded restart history，供 policy 與稽核使用。
-
-5. 前端治理：WIP compute 共用化
-- `frontend/src/core/autocomplete.js` 作為 WIP overview/detail 共用邏輯來源。
-- `frontend/src/core/wip-derive.js` 共用 KPI/filter/chart/table 導出運算。
-- 維持既有頁面流程與 drill-down 語意，不變更操作習慣。
-
-6. P1 快取效率治理
-- 保留 `resource`、`wip` 全表快取策略（業務約束不變）。
-- 查詢改走索引選擇，並提供 memory amplification / index efficiency telemetry。
-- 以 benchmark gate 驗證 P95 延遲與記憶體放大不超過門檻。
-
-7. P0 Runtime Hardening（安全 + 穩定）
-- Production 必須提供 `SECRET_KEY`；未設定時服務拒絕啟動。
-- `/admin/login` 與 `/admin/api/*` 變更請求必須攜帶 CSRF token。
-- `/health` 資料庫連通探針使用獨立 health pool，降低 pool 飽和時誤判。
-- 關機/重啟時統一釋放 background workers 與 Redis/DB 連線資源。
-- LDAP API URL 啟動驗證：僅允許 `https` + host allowlist。
-- 全域 security headers：CSP/X-Frame-Options/X-Content-Type-Options/Referrer-Policy（production 含 HSTS）。
-
-8. 現階段仍保留部分相容路徑（非 bug，屬於分期策略）
-- in-scope 報表路由已改為 canonical shell redirect（直接進入 `/portal-shell/...`）。
-- `portal-shell` 為目前主路由容器，尚不可移除。
-- deferred scope（`/tables`、`/excel-query`、`/query-tool`、`/mid-section-defect`）與其相容模板/入口會保留到 follow-up 提案完成。
-
----
-
-## 快速開始
-
-### 首次部署
-
-```bash
-# 1. 執行部署腳本
-./scripts/deploy.sh
-
-# 2. 編輯環境設定
-nano .env
-
-# 3. 啟動服務
-./scripts/start_server.sh start
-```
-
-### 日常操作
-
-```bash
-# 啟動服務（背景執行，含 Gunicorn + worker_watchdog）
-./scripts/start_server.sh start
-
-# 停止服務
-./scripts/start_server.sh stop
-
-# 重啟服務
-./scripts/start_server.sh restart
-
-# 查看狀態
-./scripts/start_server.sh status
-
-# 查看日誌（含 watchdog）
-./scripts/start_server.sh logs follow
-./scripts/start_server.sh logs watchdog
-```
-
-訪問網址: **http://localhost:8080** （可在 .env 中配置）
-
----
-
-## 部署指南
-
-### 環境需求
-
-- Python 3.11+
-- Conda (Miniconda/Anaconda)
-- Node.js 22+（建議由 Conda `environment.yml` 管理）
-- Oracle Database 連線
-- Redis Server 7.x+ （設備狀態快取）
-
-### 部署步驟
-
-#### 1. 自動部署（推薦）
-
-```bash
-./scripts/deploy.sh
-```
-
-此腳本會自動：
-- 檢查 Conda 環境
-- 建立 `mes-dashboard` 虛擬環境
-- 安裝依賴套件
-- 複製 `.env.example` 到 `.env`
-- 驗證資料庫連線
-
-#### 2. 手動部署
-
-```bash
-# 建立 Conda 環境
-conda create -n mes-dashboard python=3.11 -y
-conda activate mes-dashboard
-
-# 安裝依賴
-pip install -r requirements.txt
-
-# 安裝前端依賴並建置（Vite）
-npm --prefix frontend install
-npm --prefix frontend test
-npm --prefix frontend run build
-
-# 設定環境變數
-cp .env.example .env
-nano .env  # 編輯資料庫連線等設定
-
-# 啟動服務
-./scripts/start_server.sh start
-```
-
-### 環境變數設定
-
-編輯 `.env` 檔案：
-
-```bash
-# 資料庫設定（必填）
-DB_HOST=your_database_host
-DB_PORT=1521
-DB_SERVICE=your_service_name
-DB_USER=your_username
-DB_PASSWORD=your_password
-
-# Flask 設定
-FLASK_ENV=production          # production | development
-SECRET_KEY=your-secret-key    # 生產環境請更換
-MAX_JSON_BODY_BYTES=262144    # JSON 請求大小上限（bytes）
-
-# 輸入預算保護（Released 高成本 API）
-QUERY_TOOL_MAX_CONTAINER_IDS=200
-RESOURCE_DETAIL_DEFAULT_LIMIT=500
-RESOURCE_DETAIL_MAX_LIMIT=500
-
-# 共用解析防護（LOT/WAFER/工單）
-CONTAINER_RESOLVE_INPUT_MAX_VALUES=0          # 0=不限制輸入筆數
-CONTAINER_RESOLVE_PATTERN_MIN_PREFIX_LEN=4    # 萬用字元前最少字首長度（例如 GA25%）
-CONTAINER_RESOLVE_MAX_EXPANSION_PER_TOKEN=2000
-CONTAINER_RESOLVE_MAX_CONTAINER_IDS=30000
-
-# EventFetcher 批次容錯策略
-EVENT_FETCHER_ALLOW_PARTIAL_RESULTS=false     # false=任一批次失敗即整體失敗，避免靜默缺資料
-
-# 反向代理信任邊界（無反向代理時務必維持 false）
-TRUST_PROXY_HEADERS=false
-TRUSTED_PROXY_IPS=127.0.0.1
-
-# CSP 相容開關（預設 false；僅在必要時啟用）
-CSP_ALLOW_UNSAFE_EVAL=false
-
-# Gunicorn 設定
-GUNICORN_BIND=0.0.0.0:8080    # 服務監聽位址
-GUNICORN_WORKERS=2             # Worker 數量
-GUNICORN_THREADS=4             # 每個 Worker 的執行緒數
-
-# DB 韌性設定
-DB_POOL_SIZE=10
-DB_MAX_OVERFLOW=20
-DB_POOL_TIMEOUT=30
-DB_POOL_RECYCLE=1800
-DB_CALL_TIMEOUT_MS=55000
-DB_POOL_EXHAUSTED_RETRY_AFTER_SECONDS=5
-
-# Health probe 專用 DB pool（與主 request pool 隔離）
-DB_HEALTH_POOL_SIZE=1
-DB_HEALTH_MAX_OVERFLOW=0
-DB_HEALTH_POOL_TIMEOUT=2
-
-# Circuit Breaker
-CIRCUIT_BREAKER_ENABLED=true
-CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
-CIRCUIT_BREAKER_FAILURE_RATE=0.5
-CIRCUIT_BREAKER_RECOVERY_TIMEOUT=30
-
-# Redis 設定
-REDIS_URL=redis://localhost:6379/0
-REDIS_ENABLED=true
-REDIS_KEY_PREFIX=mes_wip
-REDIS_MAXMEMORY=512mb
-REDIS_MAXMEMORY_POLICY=allkeys-lru
-REDIS_PERSISTENCE_ENABLED=true
-REDIS_APPENDONLY=yes
-REDIS_APPENDFSYNC=everysec
-REDIS_SAVE=900 1 300 10 60 10000
-REDIS_TTL_CLEANUP_ON_START=true
-REDIS_TTL_CLEANUP_PATTERNS=batch:*,reject_dataset:*,hold_dataset:*,resource_dataset:*,job_query:*
-
-# Watchdog runtime contract
-WATCHDOG_RUNTIME_DIR=./tmp
-WATCHDOG_RESTART_FLAG=./tmp/mes_dashboard_restart.flag
-WATCHDOG_PID_FILE=./tmp/gunicorn.pid
-WATCHDOG_STATE_FILE=./tmp/mes_dashboard_restart_state.json
-WATCHDOG_RESTART_HISTORY_MAX=50
-CONDA_BIN=/opt/miniconda3/bin/conda
-CONDA_ENV_NAME=mes-dashboard
-RUNTIME_CONTRACT_VERSION=2026.02-p2
-RUNTIME_CONTRACT_ENFORCE=true
-
-# Worker self-healing policy
-WORKER_RESTART_COOLDOWN=60
-WORKER_RESTART_RETRY_BUDGET=3
-WORKER_RESTART_WINDOW_SECONDS=600
-WORKER_RESTART_CHURN_THRESHOLD=3
-WORKER_GUARDED_MODE_ENABLED=true
-
-# Runtime resilience thresholds
-RESILIENCE_DEGRADED_ALERT_SECONDS=300
-RESILIENCE_POOL_SATURATION_WARNING=0.90
-RESILIENCE_POOL_SATURATION_CRITICAL=1.0
-RESILIENCE_RESTART_CHURN_WINDOW_SECONDS=600
-RESILIENCE_RESTART_CHURN_THRESHOLD=3
-
-# 管理員設定
-ADMIN_EMAILS=admin@example.com # 管理員郵件（逗號分隔）
-LDAP_API_URL=https://ldap-api.example.com
-LDAP_ALLOWED_HOSTS=ldap-api.example.com,ldap-api-dr.example.com
-
-# CSRF 防護（admin form/admin mutation API）
-CSRF_ENABLED=true
-
-# Process-level cache bounded LRU（WIP/Resource）
-PROCESS_CACHE_MAX_SIZE=32
-WIP_PROCESS_CACHE_MAX_SIZE=32
-RESOURCE_PROCESS_CACHE_MAX_SIZE=32
-EQUIPMENT_PROCESS_CACHE_MAX_SIZE=32
-
-# Filter cache source views (env-overridable)
-FILTER_CACHE_WIP_VIEW=DWH.DW_MES_LOT_V
-FILTER_CACHE_SPEC_WORKCENTER_VIEW=DWH.DW_MES_SPEC_WORKCENTER_V
-
-# Health internal memoization
-HEALTH_MEMO_TTL_SECONDS=5
-
-# High-cost API rate limit (in-process)
-WIP_MATRIX_RATE_LIMIT_MAX_REQUESTS=120
-WIP_MATRIX_RATE_LIMIT_WINDOW_SECONDS=60
-WIP_DETAIL_RATE_LIMIT_MAX_REQUESTS=90
-WIP_DETAIL_RATE_LIMIT_WINDOW_SECONDS=60
-HOLD_LOTS_RATE_LIMIT_MAX_REQUESTS=90
-HOLD_LOTS_RATE_LIMIT_WINDOW_SECONDS=60
-RESOURCE_DETAIL_RATE_LIMIT_MAX_REQUESTS=60
-RESOURCE_DETAIL_RATE_LIMIT_WINDOW_SECONDS=60
-RESOURCE_STATUS_RATE_LIMIT_MAX_REQUESTS=90
-RESOURCE_STATUS_RATE_LIMIT_WINDOW_SECONDS=60
-```
-
-### 生產環境注意事項
-
-1. **SECRET_KEY**: 必須設定為隨機字串
-   ```bash
-   python -c "import secrets; print(secrets.token_hex(32))"
-   ```
-
-2. **FLASK_ENV**: 設定為 `production`
-
-3. **防火牆**: 開放服務端口（預設 8080）
-
-### Conda + systemd 服務配置
-
-建議在生產環境使用同一份 `.env`（`/opt/mes-dashboard/.env`）啟動 App 與 Watchdog，與開發環境一致：
-
-```bash
-# 1. 複製 systemd 服務檔案
-sudo cp deploy/mes-dashboard.service /etc/systemd/system/
-sudo cp deploy/mes-dashboard-watchdog.service /etc/systemd/system/
-
-# 2. 確認 /opt/mes-dashboard/.env 權限（供 www-data 讀取）
-sudo chown root:www-data /opt/mes-dashboard/.env
-sudo chmod 640 /opt/mes-dashboard/.env
-
-# 3. 重新載入 systemd
-sudo systemctl daemon-reload
-
-# 4. 啟動並設定開機自動啟動
-sudo systemctl enable --now mes-dashboard mes-dashboard-watchdog
-
-# 5. 查看狀態
-sudo systemctl status mes-dashboard
-sudo systemctl status mes-dashboard-watchdog
-```
-
-執行 runtime contract 驗證：
-
-```bash
-RUNTIME_CONTRACT_ENFORCE=true ./scripts/start_server.sh check
-```
-
-### Rollback 步驟
-
-如需回滾到先前版本：
-
-```bash
-# 1. 停止服務
-./scripts/start_server.sh stop
-sudo systemctl stop mes-dashboard mes-dashboard-watchdog
-
-# 2. 回滾程式碼
-git checkout <previous-commit>
-
-# 3. 重新安裝依賴（如有變更）
-pip install -r requirements.txt
-
-# 4. 清理新版本資料（可選）
-rm -f logs/admin_logs.sqlite  # 清理 SQLite 日誌
-
-# 5. 重啟服務
-./scripts/start_server.sh start
-sudo systemctl start mes-dashboard mes-dashboard-watchdog
-```
-
----
-
-## 使用者操作指南
-
-本節提供一般使用者的操作說明。
-
-### 存取系統
-
-1. 開啟瀏覽器，輸入系統網址（預設為 `http://localhost:8080`）
-2. 進入 Portal Shell 首頁（`/portal-shell`），透過左側抽屜切換各功能模組
-
-### 基本操作
-
-#### WIP 即時概況
-- 顯示生產線 WIP（在製品）的即時統計
-- 可透過下拉選單篩選特定工作中心或產品線
-- 點擊統計卡片可展開查看詳細明細
-- 支援匯出 Excel 報表
-
-#### WIP 明細查詢
-1. 選擇篩選條件（工作中心、Package、Hold 狀態、製程站點）
-2. 點擊「查詢」按鈕執行查詢
-3. 查詢結果顯示於下方表格
-4. 點擊「匯出 Excel」下載報表
-
-#### Hold 即時概況
-- 可切換品質異常 / 非品質異常 / 全部
-- 透過 Workcenter × Package Matrix 點選快速篩選 Lot 明細
-- 支援手動刷新與分頁瀏覽
-
-#### Hold 歷史績效
-1. 選擇日期區間與 Hold 類型
-2. 查看日趨勢、原因 Pareto、滯留時長分布
-3. 以原因/時長條件篩選下方明細表
-
-#### 設備狀態監控
-- 顯示所有設備的即時狀態（PRD/SBY/UDT/SDT/EGT/NST）
-- 使用階層篩選功能：
-  - **生產設備**：僅顯示列入生產統計的設備
-  - **重點設備**：僅顯示標記為重點監控的設備
-  - **監控設備**：僅顯示需特別監控的設備
-- 5 分鐘自動刷新 + 手動刷新按鈕
-
-#### 設備歷史績效
-1. 選擇查詢日期範圍與粒度（日/週/月/年）
-2. 可多選 workcenter groups 和 families 篩選
-3. 查看趨勢折線、堆疊柱狀、workcenter 對比與 OU% 熱圖
-4. 三層階層明細表顯示各設備 hours 與百分比
-5. 支援 CSV 匯出
-
-### 管理員登入
-
-1. 點擊右上角「登入」按鈕
-2. 輸入工號和密碼（使用 LDAP 認證）
-3. 登入後可存取開發中功能頁面
-4. 管理員可使用效能監控儀表板（`/admin/performance`）
-
-### 常見問題
-
-**Q: 頁面顯示「資料載入中」很久沒反應？**
-A: 請檢查網路連線，或重新整理頁面。如持續發生請通知系統管理員。
-
-**Q: 查詢結果與預期不符？**
-A: 請確認篩選條件是否正確設定。資料來源為 MES 系統，約有 30 秒延遲。
-
-**Q: 無法匯出 Excel？**
-A: 請確認瀏覽器允許下載檔案，並檢查查詢結果是否有資料。
-
----
-
-## 功能說明
-
-### Portal 入口頁面
-
-透過側邊欄抽屜分組導覽切換各功能模組：
-- **即時報表**：WIP 即時概況、設備即時狀況、QC-GATE 狀態
-- **歷史報表**：設備歷史績效、Hold 歷史績效
-- **查詢工具**：設備維修查詢、Excel 查詢工具、Query Tool
-- **開發工具**（admin only）：TMTT 不良分析、數據表查詢、頁面管理、效能監控
-- 抽屜/頁面配置可由管理員動態管理（新增、重排、刪除）
-
-### WIP 即時概況
-
-- 總覽統計（Total Lots、Total QTY）+ 狀態卡片（RUN/QUEUE/品質異常/非品質異常）
-- Workcenter × Package 矩陣表（Top 15 欄位、sticky 首欄、Total 行列）
-- Hold Pareto 分析（品質/非品質分組、ECharts 雙軸柏拉圖 + 明細表）
-- Autocomplete 篩選（WORKORDER/LOT ID/PACKAGE/TYPE，cross-filter + 300ms debounce）
-- 矩陣點擊 drill-down 至 WIP Detail、Pareto 點擊 drill-down 至 Hold Detail；返回後保留篩選條件
-- 10 分鐘自動刷新 + AbortController 請求取消
-- **技術架構**：Vue 3 + Vite，Pareto 圖使用 vue-echarts
-
-### WIP 明細查詢
-
-- 依工作中心顯示 LOT 明細（4 sticky 欄 + 動態 Spec 欄位）
-- 狀態卡片篩選（RUN/QUEUE/品質異常/非品質異常）
-- 點擊 LOT ID 展開 inline 詳細面板（基本/產品/製程/物料/Hold/NCR 資訊）
-- Autocomplete 篩選（含 cross-filter）+ 伺服器端分頁
-- URL params 接收 Overview drill-down 參數（workcenter + filters）
-- 10 分鐘自動刷新 + AbortController 請求取消
-- **技術架構**：Vue 3 + Vite
-
-### Hold 明細分析（Hold Detail）
-
-- 依 Hold 原因顯示摘要統計（Total Lots/QTY/平均滯留/最久滯留/影響站群）
-- 品質異常/非品質異常分類（前端常數判斷，紅/橙 gradient header）
-- Age 分布卡片篩選（0-1天/1-3天/3-7天/7+天）
-- Workcenter/Package 分布表篩選
-- LOT 明細表（10 欄 + 伺服器端分頁 + 篩選指示器）
-- 10 分鐘自動刷新 + AbortController 請求取消
-- **技術架構**：Vue 3 + Vite，URL params 取代 Jinja2 注入
-
-### Hold 即時概況（Hold Overview）
-
-- Hold type / reason 篩選（quality / non-quality / all）
-- Summary cards（Total Lots / QTY / 平均滯留 / 最久滯留）
-- Workcenter × Package Matrix（QTY）點擊級聯到下方 Lot 明細
-- Lot 明細分頁（50 筆/頁）+ 篩選指示器 + 一鍵清除
-- 10 分鐘自動刷新 + visibilitychange 觸發刷新
-- **技術架構**：Vue 3 + Vite，複用 `hold-detail/SummaryCards` 與 `wip-shared/useAutoRefresh`
-
-### Hold 歷史績效（Hold History）
-
-- 日期區間 + Hold type 篩選（quality / non-quality / all）
-- Daily Trend（Hold/New Hold/Release/Future Hold）與 still-on-hold 指標
-- Record type 篩選（new/release/future）+ 原因 Pareto + 滯留時長分布
-- 明細表分頁（50 筆/頁）與 reason/duration 條件聯動
-- 手動刷新與初次載入 overlay
-- **技術架構**：Vue 3 + Vite（DailyTrend、ReasonPareto、DurationChart、DetailTable）
-
-### 設備即時概況
-
-- 即時設備狀態總覽：10 張 KPI 卡片（OU%/AVAIL%/PRD/SBY/UDT/SDT/EGT/NST/OTHER/Total）
-- 三層階層矩陣表（workcenter group → family → resource），支援展開/收合與 cell click 篩選
-- 設備卡片格（auto-fill grid），顯示狀態/位置/LOT/JOB 資訊
-- LOT/JOB 浮動 tooltip（`<Teleport>` + viewport clamp 定位）
-- 階層篩選（workcenter group + family + machine 級聯 + 生產設備/重點設備/監控設備 checkbox）
-- 5 分鐘自動刷新 + `visibilitychange` 即時刷新 + AbortController
-- Cache 狀態指示（green/yellow/red dot + 最後更新時間）
-- **技術架構**：Vue 3 + Vite，複用 `resource-shared/` 共用模組與 `useAutoRefresh` composable
-
-### 設備歷史績效
-
-- 9 張 KPI 卡片（OU%/AVAIL%/PRD/SBY/UDT/SDT/EGT/NST/機台數）
-- 4 個 vue-echarts 圖表：OU%/AVAIL% 趨勢折線、E10 狀態堆疊柱狀、workcenter OU% 橫向對比、OU% 熱圖
-- 三層階層明細表（使用 `resource-shared/HierarchyTable`），hours + percentage 格式
-- 日期區間（預設 7 天）+ 粒度切換（日/週/月/年）+ Group/Family/Machine 級聯多選篩選
-- CSV 串流匯出（`/api/resource/history/export`）
-- **技術架構**：Vue 3 + Vite，4 圖表全部使用 `<VChart :option autoresize />`
-
-### QC-GATE 即時狀態報表
-
-- 顯示所有 QC-GATE 站點的 LOT 即時分佈（堆疊條圖）
-- 等待時間四級分類：<6hr（綠）、6-12hr（黃）、12-24hr（橙）、>24hr（紅）
-- 點擊條圖區段篩選下方 LOT 明細表
-- 10 分鐘自動刷新，與 WIP 快取同步
-- 站點排序依 DW_MES_SPEC_WORKCENTER_V 製程順序
-- **技術架構**：第一個純 Vue 3 + Vite 頁面，完全脫離 Jinja2
-
-### 中段製程不良追溯分析
-
-- TMTT 測試站不良回溯至上游機台 / 站點 / 製程的反向追蹤分析
-- 三段式資料管線：
-  1. TMTT 偵測（LOTWIPHISTORY + LOTREJECTHISTORY）
-  2. LOT 族譜解析（CONTAINER.SPLITFROMID BFS 分批鏈 + PJ_COMBINEDASSYLOTS 合批展開）
-  3. 上游製程歷史（LOTWIPHISTORY by ancestor CIDs）
-- 6 張 KPI 卡片 + 6 張 Pareto 圖表（依站點/不良原因/上游機台/TMTT 機台/製程/封裝歸因）
-- 日趨勢折線圖 + LOT 明細分頁表（200 筆/頁，伺服器端 DEFECT_RATE 降序排序）
-- 不良原因多選篩選（205 種，24h Redis 快取）
-- 分析結果 5 分鐘 Redis 快取；summary API (~16 KB) 與 detail API (~110 KB/page) 分離
-- CSV 串流匯出（UTF-8 BOM，完整明細）
-- 5 分鐘自動刷新 + visibilitychange 即時刷新
-- **技術架構**：Vue 3 + Vite，Pareto/趨勢圖使用 vue-echarts，複用 `wip-shared/` 的 Pagination/useAutoRefresh
-
-### 數據表查詢工具
-
-- 顯示所有 DWH 表格的分類卡片目錄（即時數據表/現況快照表/歷史累積表/輔助表）
-- 大表標記：超過 1,000 萬筆資料的表格顯示 badge 提示
-- 選擇表格後自動載入欄位資訊，每欄提供篩選輸入
-- 支援 Enter 鍵或「查詢」按鈕觸發查詢（預設回傳最近 1000 筆）
-- 使用中的篩選條件顯示為可移除的 tag，支援一鍵清除全部
-- **技術架構**：第二個純 Vue 3 + Vite 頁面，使用 `apiPost` 建立 POST 請求模式
-
-### 管理員功能
-
-- LDAP 認證登入（支援本地測試模式）
-- 頁面狀態管理（released/dev）
-- 抽屜管理（新增、重命名、排序、刪除導覽分類）
-- 頁面歸屬管理（指派頁面到抽屜、調整顯示順序）
-- Dev 頁面僅管理員可見
-
-### 效能監控儀表板
-
-管理員專用的系統監控介面（`/admin/performance`）：
-
-- **系統狀態總覽**：Database、Redis、Circuit Breaker、Worker 狀態
-- **查詢效能指標**：P50/P95/P99 延遲、慢查詢統計、延遲分布圖
-- **系統日誌檢視**：即時日誌查詢、等級篩選、關鍵字搜尋
-- **日誌管理**：儲存統計、手動清理功能
-- **Worker 控制**：優雅重啟（透過 Watchdog 機制）
-- 自動更新（30 秒間隔）
-
-### 熔斷器保護機制
-
-Circuit Breaker 模式保護資料庫免於雪崩效應：
-
-- **CLOSED**：正常運作，請求通過
-- **OPEN**：失敗過多，請求立即拒絕
-- **HALF_OPEN**：測試恢復，允許有限請求
-
-配置方式：
-```bash
-CIRCUIT_BREAKER_ENABLED=true
-CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
-CIRCUIT_BREAKER_FAILURE_RATE=0.5
-CIRCUIT_BREAKER_RECOVERY_TIMEOUT=30
-```
+| 管理員認證系統（LDAP） | ✅ 已完成 |
+| 效能監控儀表板（`/admin/performance`） | ✅ 已完成 |
+| Redis 多層快取系統 | ✅ 已完成 |
+| DuckDB 快取查詢引擎（後端 + 前端 WASM） | ✅ 已完成 |
+| RQ 非同步任務佇列（trace/reject worker） | ✅ 已完成 |
+| 熔斷器保護機制 | ✅ 已完成 |
+| Worker 記憶體防護（RSS guard + OOM 保護） | ✅ 已完成 |
+| Worker Watchdog 重啟控制 | ✅ 已完成 |
+| Runtime 韌性診斷（threshold/churn/recommendation） | ✅ 已完成 |
+| SQL 查詢安全架構 + 白名單防注入 | ✅ 已完成 |
+| 全域安全標頭（CSP/XFO/HSTS） | ✅ 已完成 |
+| CSRF 防護（admin form/mutation API） | ✅ 已完成 |
+| 前端核心模組測試（Node test） | ✅ 已完成 |
+| CSS 治理自動檢查 | ✅ 已完成 |
+| 部署自動化 + systemd 服務 | ✅ 已完成 |
 
 ---
 
@@ -687,28 +62,31 @@ CIRCUIT_BREAKER_RECOVERY_TIMEOUT=30
 |------|------|------|
 | Python | 3.11+ | 程式語言 |
 | Flask | 3.x | Web 框架 |
-| Gunicorn | 23.x | WSGI 伺服器 |
-| SQLAlchemy | 2.x | ORM |
-| oracledb | 2.x | Oracle 驅動 |
+| Gunicorn | 21.x+ | WSGI 伺服器 |
+| SQLAlchemy | 2.x | ORM / 連線池 |
+| oracledb | 2.x+ | Oracle 驅動 |
 | Redis | 7.x | 快取伺服器 |
-| Pandas | 2.x | 資料處理 |
+| Pandas | 2.3 | 資料處理 |
+| PyArrow | 17.x+ | Parquet 序列化（Redis DataFrame 快取） |
+| DuckDB | 1.x | 快取查詢引擎（Parquet 支援的 reject/yield SQL runtime） |
+| RQ | 1.16+ | 非同步任務佇列（trace/reject heavy queries） |
 
 ### 前端技術棧
 
-| 技術 | 用途 |
-|------|------|
-| Jinja2 | 模板引擎（既有頁面） |
-| Vue 3 | UI 框架（QC-GATE、Tables、WIP 三頁、Hold Overview/History、設備雙頁、中段不良追溯已遷移） |
-| vue-echarts | ECharts Vue 封裝（QC-GATE、WIP Overview Pareto、Resource History 4 圖表、Mid-Section Defect 7 圖表） |
-| Vite 6 | 前端多頁模組打包（含 Vue SFC + HTML entry） |
-| ECharts | 圖表庫（npm tree-shaking + 舊版靜態檔案並存） |
-| Vanilla JS Modules | 互動功能與頁面邏輯（既有頁面） |
+| 技術 | 版本 | 用途 |
+|------|------|------|
+| Vue 3 | 3.5 | UI 框架（所有報表頁面已遷移） |
+| Vue Router | 4.6 | Portal Shell SPA 路由 |
+| Vite | 6.3 | 多頁模組打包（19 個 entry point） |
+| ECharts | 6.0 | 圖表庫（npm tree-shaking） |
+| vue-echarts | 8.0 | ECharts Vue 封裝 |
+| DuckDB-WASM | 1.33+ | 瀏覽器端本地運算（view compute offload） |
+| Tailwind CSS | 3.4 | 樣式框架 |
 
 ### 資料庫
 
 - Oracle Database 19c Enterprise Edition
-- 主機: 詳見 .env 檔案 (DB_HOST:DB_PORT)
-- 服務名: 詳見 .env 檔案 (DB_SERVICE)
+- 主機與服務名：詳見 `.env` 檔案（`DB_HOST`、`DB_PORT`、`DB_SERVICE`）
 
 ---
 
@@ -716,104 +94,489 @@ CIRCUIT_BREAKER_RECOVERY_TIMEOUT=30
 
 ```
 DashBoard_vite/
-├── src/mes_dashboard/          # 主程式
-│   ├── app.py                  # Flask 應用
-│   ├── config/                 # 設定
-│   │   ├── settings.py         # 環境設定
-│   │   ├── constants.py        # 常數定義
-│   │   ├── field_contracts.py  # UI/API/Export 欄位契約
-│   │   └── workcenter_groups.py # 工作中心群組設定
-│   ├── core/                   # 核心模組
-│   │   ├── database.py         # 資料庫連線
-│   │   ├── redis_client.py     # Redis 客戶端
-│   │   ├── cache.py            # 快取管理
-│   │   ├── cache_updater.py    # 快取自動更新
-│   │   ├── circuit_breaker.py  # 熔斷器
-│   │   ├── metrics.py          # 效能指標收集
-│   │   ├── log_store.py        # SQLite 日誌儲存
-│   │   ├── response.py         # API 回應格式
-│   │   └── permissions.py      # 權限管理
-│   ├── routes/                 # 路由
-│   │   ├── wip_routes.py       # WIP 相關 API
-│   │   ├── resource_routes.py  # 設備狀態 API
-│   │   ├── dashboard_routes.py # 儀表板 API
-│   │   └── ...                 # 其他路由
-│   ├── services/               # 服務層
-│   │   ├── wip_service.py      # WIP 業務邏輯
-│   │   ├── resource_service.py # 設備狀態邏輯
-│   │   ├── resource_cache.py   # 設備快取服務
-│   │   └── ...                 # 其他服務
-│   ├── sql/                    # SQL 查詢管理
-│   │   ├── loader.py           # SQLLoader (LRU 快取)
-│   │   ├── builder.py          # QueryBuilder (參數化)
-│   │   ├── filters.py          # CommonFilters
-│   │   ├── dashboard/          # 儀表板查詢
-│   │   ├── resource/           # 設備查詢
-│   │   ├── wip/                # WIP 查詢
-│   │   ├── resource_history/   # 設備歷史查詢
-│   │   └── mid_section_defect/ # 中段不良追溯查詢
-│   └── templates/              # HTML 模板
-├── frontend/                   # Vite 前端專案
-│   ├── src/core/               # 共用 API/欄位契約/計算 helper
-│   ├── src/portal/             # Portal entry
-│   ├── src/resource-shared/    # 設備雙頁共用 CSS/常數/元件
-│   ├── src/resource-status/    # 設備即時概況 (Vue 3 SFC)
-│   ├── src/resource-history/   # 設備歷史績效 (Vue 3 SFC)
-│   ├── src/job-query/          # 設備維修查詢 entry
-│   ├── src/excel-query/        # Excel 批次查詢 entry
-│   ├── src/query-tool/         # 批次追蹤工具 entry
-│   ├── src/tmtt-defect/        # TMTT 不良分析 entry
-│   ├── src/tables/             # 數據表查詢 entry (Vue 3 SFC)
-│   ├── src/qc-gate/            # QC-GATE 即時狀態 (Vue 3 SFC)
-│   ├── src/wip-shared/         # WIP 三頁共用 CSS/常數/元件
-│   ├── src/wip-overview/       # WIP 即時概況 (Vue 3 SFC)
-│   ├── src/wip-detail/         # WIP 明細查詢 (Vue 3 SFC)
-│   ├── src/hold-detail/        # Hold 狀態分析 (Vue 3 SFC)
-│   ├── src/hold-overview/      # Hold 即時概況 (Vue 3 SFC)
-│   ├── src/hold-history/       # Hold 歷史績效 (Vue 3 SFC)
-│   └── src/mid-section-defect/ # 中段不良追溯分析 (Vue 3 SFC)
+├── src/mes_dashboard/              # 後端主程式
+│   ├── app.py                      # Flask 應用工廠
+│   ├── config/                     # 設定
+│   │   ├── settings.py             # 環境設定
+│   │   ├── constants.py            # 常數定義
+│   │   ├── tables.py               # 資料表 schema
+│   │   ├── field_contracts.py      # UI/API/Export 欄位契約
+│   │   └── workcenter_groups.py    # 工作中心群組設定
+│   ├── core/                       # 核心模組（28 個）
+│   │   ├── database.py             # Oracle 連線池
+│   │   ├── redis_client.py         # Redis 客戶端
+│   │   ├── redis_df_store.py       # Parquet DataFrame 序列化
+│   │   ├── cache.py / cache_updater.py  # 快取管理 + 自動更新
+│   │   ├── circuit_breaker.py      # 熔斷器
+│   │   ├── rate_limit.py           # API 頻率限制
+│   │   ├── resilience.py           # 韌性診斷
+│   │   ├── response.py             # 統一 API 回應格式
+│   │   ├── csrf.py                 # CSRF 防護
+│   │   ├── permissions.py          # 權限管理
+│   │   ├── worker_memory_guard.py  # Worker RSS 記憶體防護
+│   │   ├── query_spool_store.py    # 查詢結果暫存（磁碟 spool）
+│   │   ├── feature_flags.py        # Feature flag 引擎
+│   │   ├── metrics.py / metrics_history.py  # 效能指標
+│   │   ├── runtime_contract.py     # Runtime 啟動校驗
+│   │   ├── worker_recovery_policy.py  # Worker 重啟策略
+│   │   └── ...                     # 其他基礎設施
+│   ├── routes/                     # 路由層（20 個 Blueprint）
+│   │   ├── wip_routes.py           # WIP API
+│   │   ├── resource_routes.py      # 設備即時 API
+│   │   ├── resource_history_routes.py  # 設備歷史 API
+│   │   ├── hold_routes.py / hold_overview_routes.py / hold_history_routes.py
+│   │   ├── reject_history_routes.py  # 不良歷史 API
+│   │   ├── yield_alert_routes.py   # 良率警示 API
+│   │   ├── material_trace_routes.py  # 材料追溯 API
+│   │   ├── mid_section_defect_routes.py  # 中段不良 API
+│   │   ├── qc_gate_routes.py       # QC-GATE API
+│   │   ├── query_tool_routes.py / job_query_routes.py / excel_query_routes.py
+│   │   ├── spool_routes.py         # 查詢結果 spool API
+│   │   ├── trace_routes.py         # 追溯非同步任務 API
+│   │   ├── admin_routes.py / auth_routes.py / health_routes.py
+│   │   └── dashboard_routes.py     # 儀表板 API
+│   ├── services/                   # 服務層（40 個模組）
+│   │   ├── wip_service.py          # WIP 業務邏輯
+│   │   ├── resource_service.py / resource_cache.py / resource_dataset_cache.py
+│   │   ├── resource_history_service.py / resource_history_sql_runtime.py
+│   │   ├── hold_dataset_cache.py / hold_history_service.py / hold_history_sql_runtime.py
+│   │   ├── reject_dataset_cache.py / reject_history_service.py / reject_cache_sql_runtime.py
+│   │   ├── reject_pareto_materialized.py  # Pareto 物化彙總層
+│   │   ├── reject_query_job_service.py    # RQ reject 查詢任務
+│   │   ├── yield_alert_service.py / yield_alert_dataset_cache.py / yield_alert_sql_runtime.py
+│   │   ├── material_trace_service.py / lineage_engine.py  # 材料追溯 + BFS 族譜引擎
+│   │   ├── mid_section_defect_service.py  # 中段不良三段管線
+│   │   ├── batch_query_engine.py   # 批次查詢引擎（Redis+Parquet 快取）
+│   │   ├── event_fetcher.py        # 非同步事件收集
+│   │   ├── async_query_job_service.py / trace_job_service.py  # RQ 任務管理
+│   │   ├── filter_cache.py         # 篩選選項快取
+│   │   ├── realtime_equipment_cache.py  # 即時設備狀態快取
+│   │   ├── page_registry.py / navigation_contract.py  # 頁面/導覽管理
+│   │   └── container_resolution_policy.py  # LOT/WAFER 解析策略
+│   ├── sql/                        # SQL 查詢模板（85+ 檔案）
+│   │   ├── loader.py / builder.py / filters.py  # SQL 基礎設施
+│   │   ├── dashboard/              # 儀表板 KPI
+│   │   ├── wip/                    # WIP 查詢
+│   │   ├── resource/ / resource_history/  # 設備查詢
+│   │   ├── hold_history/           # Hold 歷史
+│   │   ├── reject_history/         # 不良歷史（14 檔案）
+│   │   ├── yield_alert/            # 良率警示
+│   │   ├── query_tool/             # 通用查詢（22 檔案）
+│   │   ├── mid_section_defect/     # 中段不良追溯
+│   │   ├── lineage/                # LOT 族譜
+│   │   ├── material_trace/         # 材料追溯
+│   │   └── job_query/              # 設備維修
+│   └── templates/                  # HTML 模板（admin 頁面）
+├── frontend/                       # Vite 前端專案
+│   ├── src/
+│   │   ├── core/                   # 共用模組
+│   │   │   ├── api.js              # REST API 客戶端
+│   │   │   ├── duckdb-client.js    # DuckDB-WASM 客戶端
+│   │   │   ├── duckdb-activation-policy.js  # 本地運算啟用策略
+│   │   │   ├── autocomplete.js     # WIP autocomplete
+│   │   │   ├── wip-derive.js       # WIP KPI/filter/chart 導出
+│   │   │   ├── field-contracts.js  # 欄位契約
+│   │   │   ├── shell-navigation.js # 導覽結構
+│   │   │   └── ...                 # 其他 helpers
+│   │   ├── shared-ui/              # 全站共用 UI 元件
+│   │   ├── shared-composables/     # 共用 Vue composables
+│   │   ├── styles/                 # 全站 Tailwind CSS
+│   │   ├── portal-shell/           # Portal Shell SPA（主路由容器）
+│   │   ├── wip-overview/           # WIP 即時概況（Vue 3 SFC）
+│   │   ├── wip-detail/             # WIP 明細查詢（Vue 3 SFC）
+│   │   ├── wip-shared/             # WIP 共用 CSS/常數/元件
+│   │   ├── hold-detail/            # Hold 明細分析（Vue 3 SFC）
+│   │   ├── hold-overview/          # Hold 即時概況（Vue 3 SFC）
+│   │   ├── hold-history/           # Hold 歷史績效（Vue 3 SFC）
+│   │   ├── resource-status/        # 設備即時概況（Vue 3 SFC）
+│   │   ├── resource-history/       # 設備歷史績效（Vue 3 SFC）
+│   │   ├── resource-shared/        # 設備共用 CSS/常數/HierarchyTable
+│   │   ├── qc-gate/                # QC-GATE 即時狀態（Vue 3 SFC）
+│   │   ├── reject-history/         # 不良歷史分析（Vue 3 SFC）
+│   │   ├── yield-alert-center/     # 良率警示中心（Vue 3 SFC）
+│   │   ├── mid-section-defect/     # 中段不良追溯（Vue 3 SFC）
+│   │   ├── material-trace/         # 材料追溯（Vue 3 SFC）
+│   │   ├── tables/                 # 數據表查詢（Vue 3 SFC）
+│   │   ├── admin-performance/      # 效能監控（Vue 3 SFC）
+│   │   ├── job-query/              # 設備維修查詢
+│   │   ├── excel-query/            # Excel 查詢工具
+│   │   ├── query-tool/             # 批次追蹤工具
+│   │   ├── workers/                # Web Worker（DuckDB 等）
+│   │   └── portal/                 # Portal 入口
+│   ├── tests/                      # 前端測試（Node test runner）
+│   ├── vite.config.js              # 19 個 entry point 打包設定
+│   ├── tailwind.config.js          # 設計 token（色彩/間距/字型）
+│   └── package.json
 ├── shared/
-│   └── field_contracts.json    # 前後端共用欄位契約
-├── scripts/                    # 腳本
-│   ├── deploy.sh               # 部署腳本
-│   ├── start_server.sh         # 服務管理腳本
-│   └── worker_watchdog.py      # Worker 監控程式
-├── deploy/                     # 部署設定
-│   ├── mes-dashboard.service            # Gunicorn systemd 服務 (Conda)
-│   ├── mes-dashboard-watchdog.service   # Watchdog systemd 服務 (Conda)
-├── tests/                      # 測試
-├── data/                       # 資料檔案
-├── logs/                       # 日誌
-├── docs/                       # 文檔
-├── openspec/                   # 變更管理
-├── .env.example                # 環境變數範例
-├── requirements.txt            # Python 依賴
-└── gunicorn.conf.py            # Gunicorn 設定
+│   └── field_contracts.json        # 前後端共用欄位契約
+├── contract/                       # 開發契約
+│   ├── api_development_contract.md # API 開發規範
+│   ├── api_inventory.md            # API 端點清冊
+│   ├── css_development_contract.md # CSS 開發規範
+│   └── css_inventory.md            # CSS 來源清冊
+├── scripts/                        # 腳本
+│   ├── deploy.sh                   # 自動部署腳本
+│   ├── start_server.sh             # 服務生命週期管理
+│   ├── worker_watchdog.py          # Worker 健康監控
+│   ├── run_cache_benchmarks.py     # 快取效能基準
+│   ├── sql_optimization_verify.py  # SQL 優化驗證
+│   └── run_stress_tests.py         # 壓力測試
+├── deploy/                         # systemd 服務設定
+│   ├── mes-dashboard.service       # Gunicorn 服務
+│   ├── mes-dashboard-trace-worker.service   # RQ trace worker 服務
+│   ├── mes-dashboard-reject-worker.service  # RQ reject worker 服務
+│   └── mes-dashboard-watchdog.service       # Watchdog 服務
+├── tests/                          # 後端測試（pytest，127+ 檔案）
+├── docs/                           # 技術文件
+├── openspec/                       # 變更規格管理
+├── tools/                          # 資料庫/文件工具
+├── data/                           # 執行期資料
+├── logs/                           # 應用日誌
+├── .env.example                    # 環境變數範例
+├── requirements.txt                # Python 依賴
+├── environment.yml                 # Conda 環境定義
+├── gunicorn.conf.py                # Gunicorn 設定
+└── pytest.ini                      # pytest 設定
 ```
+
+---
+
+## 架構重點
+
+### 1. Portal Shell — no-iframe SPA 路由
+
+- Shell 內容切換全面使用 Vue Router + native route-view，不使用 iframe
+- 動態抽屜導覽、fallback routing、admin 可見性規則由 `/api/portal/navigation` + route contract 驅動
+- shell 健康狀態採 summary-first，詳細診斷由互動展開（`/health/frontend-shell`）
+
+### 2. 單一 Port 架構
+
+- Flask + Gunicorn + Vite dist 由同一服務提供（`GUNICORN_BIND`），前後端同源
+- Vite 建置輸出至 `static/dist/`，由 Flask 提供靜態檔案
+
+### 3. 多層快取策略
+
+- **Process-level cache**：bounded LRU（WIP/Resource/Equipment），TTL 30s
+- **Redis cache**：DataFrame Parquet 序列化、篩選選項、分析結果
+- **DuckDB SQL runtime**（後端）：Parquet 檔案上的 SQL 查詢（reject-history、yield-alert）
+- **DuckDB-WASM**（前端）：瀏覽器端 view compute offload（resource-history、hold-history）
+- **Query spool store**：大型查詢結果暫存到磁碟，避免記憶體峰值
+
+### 4. 非同步任務處理
+
+- **RQ task queue**：trace-events、reject-query 兩個 worker 佇列
+- **Event Fetcher**：批次容錯收集（可設定 partial failure 策略）
+- **Batch Query Engine**：長時間查詢拆批 + Redis+Parquet 快取
+
+### 5. Runtime 韌性
+
+- `/health`、`/health/deep`、`/admin/api/system-status` 提供門檻、policy state、restart churn 摘要與 recovery recommendation
+- Circuit Breaker（CLOSED → OPEN → HALF_OPEN）保護資料庫免於雪崩
+- Worker Watchdog：cooldown + retry budget + churn window；超標進入 guarded mode 需 admin override
+- **Worker 記憶體防護**：RSS projection + graduated response（warn → restrict → force-recycle）
+
+### 6. 安全防護
+
+- Production `SECRET_KEY` 缺失時啟動失敗（fail-fast）
+- CSRF token 驗證（admin form + admin mutation API）
+- LDAP API URL 啟動驗證（`https` + host allowlist）
+- 全域 security headers（CSP/X-Frame-Options/X-Content-Type-Options/Referrer-Policy/HSTS）
+- Table Query API `table_name` 白名單驗證
+- SQL 參數化查詢 + LIKE 萬用字元跳脫
+- 高成本 API 頻率限制（in-process rate limit）
+- 共用解析防護（LOT/WAFER 輸入筆數上限、萬用字元前最少字首長度）
+
+---
+
+## 快速開始
+
+### 首次部署
+
+```bash
+# 1. 執行部署腳本（自動建立 Conda 環境、安裝依賴、驗證連線）
+./scripts/deploy.sh
+
+# 2. 編輯環境設定
+nano .env
+
+# 3. 建置前端
+npm --prefix frontend install
+npm --prefix frontend run build
+
+# 4. 啟動服務
+./scripts/start_server.sh start
+```
+
+### 日常操作
+
+```bash
+# 啟動服務（背景執行，含 Gunicorn + Redis + RQ workers + Watchdog）
+./scripts/start_server.sh start
+
+# 停止服務
+./scripts/start_server.sh stop
+
+# 重啟服務
+./scripts/start_server.sh restart
+
+# 查看狀態
+./scripts/start_server.sh status
+
+# 查看日誌
+./scripts/start_server.sh logs follow
+./scripts/start_server.sh logs watchdog
+```
+
+訪問網址：**http://localhost:8080**（可在 `.env` 中配置 `GUNICORN_BIND`）
+
+---
+
+## 部署指南
+
+### 環境需求
+
+- Python 3.11+
+- Conda（Miniconda / Anaconda）
+- Node.js 22+（建議由 Conda `environment.yml` 管理）
+- Oracle Database 連線
+- Redis Server 7.x+
+
+### 自動部署（推薦）
+
+```bash
+./scripts/deploy.sh
+```
+
+此腳本會自動：檢查 Conda 環境 → 建立 `mes-dashboard` 虛擬環境 → 安裝依賴套件 → 複製 `.env.example` → 驗證資料庫連線。
+
+### 手動部署
+
+```bash
+# 建立 Conda 環境
+conda create -n mes-dashboard python=3.11 -y
+conda activate mes-dashboard
+
+# 安裝後端依賴
+pip install -r requirements.txt
+
+# 安裝前端依賴並建置
+npm --prefix frontend install
+npm --prefix frontend test
+npm --prefix frontend run build
+
+# 設定環境變數
+cp .env.example .env
+nano .env
+
+# 啟動服務
+./scripts/start_server.sh start
+```
+
+### 環境變數設定
+
+編輯 `.env` 檔案（完整範例見 `.env.example`）。主要類別：
+
+| 類別 | 關鍵變數 | 說明 |
+|------|----------|------|
+| 資料庫 | `DB_HOST`, `DB_PORT`, `DB_SERVICE`, `DB_USER`, `DB_PASSWORD` | Oracle 連線（必填） |
+| Flask | `FLASK_ENV`, `SECRET_KEY` | 生產環境必須設定 `SECRET_KEY` |
+| Gunicorn | `GUNICORN_BIND`, `GUNICORN_WORKERS`, `GUNICORN_THREADS` | 服務監聽與 worker 設定 |
+| Redis | `REDIS_URL`, `REDIS_ENABLED`, `REDIS_MAXMEMORY` | 快取伺服器設定 |
+| DB 韌性 | `DB_POOL_SIZE`, `DB_CALL_TIMEOUT_MS`, `CIRCUIT_BREAKER_*` | 連線池與熔斷器 |
+| 安全 | `CSRF_ENABLED`, `LDAP_API_URL`, `LDAP_ALLOWED_HOSTS`, `ADMIN_EMAILS` | 認證與授權 |
+| Worker 策略 | `WORKER_RESTART_*`, `RESILIENCE_*` | Watchdog 重啟與韌性門檻 |
+| Rate Limit | `WIP_MATRIX_RATE_LIMIT_*`, `RESOURCE_*_RATE_LIMIT_*` | 高成本 API 頻率限制 |
+| 記憶體防護 | `PROCESS_CACHE_MAX_SIZE`, `WIP_PROCESS_CACHE_MAX_SIZE` | Process-level LRU 快取 |
+
+### 生產環境注意事項
+
+1. **SECRET_KEY**：必須設定為隨機字串
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+2. **FLASK_ENV**：設定為 `production`
+3. **防火牆**：開放服務端口（預設 8080）
+
+### Conda + systemd 服務配置
+
+```bash
+# 1. 複製 systemd 服務檔案
+sudo cp deploy/mes-dashboard.service /etc/systemd/system/
+sudo cp deploy/mes-dashboard-trace-worker.service /etc/systemd/system/
+sudo cp deploy/mes-dashboard-reject-worker.service /etc/systemd/system/
+sudo cp deploy/mes-dashboard-watchdog.service /etc/systemd/system/
+
+# 2. 確認 .env 權限
+sudo chown root:www-data /opt/mes-dashboard/.env
+sudo chmod 640 /opt/mes-dashboard/.env
+
+# 3. 啟用服務
+sudo systemctl daemon-reload
+sudo systemctl enable --now mes-dashboard mes-dashboard-trace-worker mes-dashboard-reject-worker mes-dashboard-watchdog
+
+# 4. 驗證 runtime contract
+RUNTIME_CONTRACT_ENFORCE=true ./scripts/start_server.sh check
+```
+
+### Rollback 步驟
+
+```bash
+./scripts/start_server.sh stop
+sudo systemctl stop mes-dashboard mes-dashboard-trace-worker mes-dashboard-reject-worker mes-dashboard-watchdog
+git checkout <previous-commit>
+pip install -r requirements.txt
+npm --prefix frontend install && npm --prefix frontend run build
+./scripts/start_server.sh start
+sudo systemctl start mes-dashboard mes-dashboard-trace-worker mes-dashboard-reject-worker mes-dashboard-watchdog
+```
+
+---
+
+## 功能說明
+
+### Portal 入口頁面
+
+透過側邊欄抽屜分組導覽切換各功能模組：
+- **即時報表**：WIP 即時概況、設備即時概況、QC-GATE 狀態
+- **歷史報表**：設備歷史績效、Hold 歷史績效、不良歷史分析、良率警示中心
+- **查詢工具**：設備維修查詢、Excel 查詢工具、批次追蹤工具、材料追溯
+- **開發工具**（admin only）：TMTT 不良分析、數據表查詢、頁面管理、效能監控
+- 抽屜/頁面配置可由管理員動態管理（新增、重排、刪除）
+
+### WIP 即時概況
+
+- 總覽統計卡片（Total Lots/QTY + RUN/QUEUE/品質異常/非品質異常）
+- Workcenter × Package 矩陣表（Top 15 欄、sticky 首欄、Total 行列）
+- Hold Pareto 分析（ECharts 雙軸柏拉圖 + 明細表）
+- Autocomplete 篩選（WORKORDER/LOT/PACKAGE/TYPE，cross-filter + 300ms debounce）
+- 矩陣點擊 drill-down 至 WIP Detail、Pareto drill-down 至 Hold Detail；返回保留篩選條件
+- 10 分鐘自動刷新 + AbortController 請求取消
+
+### WIP 明細查詢
+
+- 依工作中心顯示 LOT 明細（4 sticky 欄 + 動態 Spec 欄位）
+- 狀態卡片篩選 + Autocomplete cross-filter + 伺服器端分頁
+- 點擊 LOT ID 展開 inline 詳細面板（基本/產品/製程/物料/Hold/NCR）
+- URL params 接收 Overview drill-down 參數
+
+### Hold 明細 / 即時概況 / 歷史績效
+
+- **Hold Detail**：依 Hold 原因摘要統計、Age 分布卡片篩選、LOT 明細分頁
+- **Hold Overview**：Summary cards + Workcenter×Package Matrix（QTY）+ Lot 明細分頁；多選 Reason 篩選
+- **Hold History**：Daily Trend + Record type 篩選 + Reason Pareto + Duration 分布 + 明細分頁
+
+### 設備即時概況
+
+- 10 張 KPI 卡片（OU%/AVAIL%/PRD/SBY/UDT/SDT/EGT/NST/OTHER/Total）
+- 三層階層矩陣表（workcenter group → family → resource），支援展開/收合與 cell click 篩選
+- 設備卡片格 + LOT/JOB 浮動 tooltip（`<Teleport>` + viewport clamp）
+- Group/Family/Machine 級聯篩選 + 生產設備/重點設備/監控設備 checkbox
+- 5 分鐘自動刷新 + `visibilitychange` 即時刷新 + Cache 狀態指示
+
+### 設備歷史績效
+
+- 9 張 KPI 卡片 + 4 個 vue-echarts 圖表（趨勢折線/堆疊柱狀/workcenter 對比/OU% 熱圖）
+- 三層階層明細表（`HierarchyTable`），hours + percentage 格式
+- 日期區間 + 粒度切換（日/週/月/年）+ Group/Family/Machine 級聯多選
+- DuckDB-WASM 前端 view compute offload + CSV 串流匯出
+
+### QC-GATE 即時狀態報表
+
+- QC-GATE 站點 LOT 即時分佈堆疊條圖（等待時間四級分類：<6hr/6-12hr/12-24hr/>24hr）
+- 點擊條圖篩選 LOT 明細表；站點依製程順序排序
+- 10 分鐘自動刷新，與 WIP 快取同步
+
+### 不良歷史分析（Reject History）
+
+- 多維度 Pareto 分析（3×2 grid：站點/不良原因/產品/封裝/機台/日期）
+- 跨 Pareto 交叉篩選聯動 + 多選篩選
+- DuckDB SQL runtime（Parquet 快取查詢）+ 物化 Pareto 彙總層
+- 大量資料 backpressure + streaming spool merge
+- RQ 非同步查詢 worker + partial failure 前端通知
+
+### 良率警示中心（Yield Alert Center）
+
+- 兩階段 dataset cache（summary + detail）
+- 站點摘要 + 熱圖 + 粒度切換（日/週/月）
+- 產品/封裝欄位 + 展開原因明細
+- DuckDB out-of-core view computation + 記憶體防護
+
+### 材料追溯查詢（Material Trace）
+
+- 雙向 LOT/材料追溯（正向 forward + 反向 reverse）
+- 非同步多階段查詢（trace-events RQ worker）+ 進度條
+- 族譜引擎（BFS 分批鏈 + 合批展開）
+
+### 中段製程不良追溯分析
+
+- TMTT 測試站不良回溯至上游機台/站點/製程
+- 三段式資料管線：TMTT 偵測 → LOT 族譜解析 → 上游製程歷史
+- 6 張 KPI 卡片 + 6 張 Pareto 圖表 + 日趨勢 + LOT 明細分頁
+- 不良原因多選篩選（205 種，24h Redis 快取）
+
+### 數據表查詢工具
+
+- DWH 表格分類卡片目錄（即時/快照/歷史/輔助）+ 大表標記
+- 選擇表格後自動載入欄位、支援每欄篩選 + tag 管理
+- 白名單驗證防止 SQL injection
+
+### 管理員功能
+
+- LDAP 認證登入（支援本地測試模式）
+- 頁面狀態管理（released/dev）+ 抽屜管理（CRUD + 排序）
+- 效能監控儀表板（`/admin/performance`）：
+  - 系統狀態總覽（Database/Redis/Circuit Breaker/Worker 狀態）
+  - 查詢效能指標（P50/P95/P99 延遲/慢查詢統計）
+  - 系統日誌檢視 + 日誌管理 + Worker 控制
+  - 多 Worker RSS 記憶體彙總監控
+  - 30 秒自動更新
 
 ---
 
 ## 測試
 
 ```bash
-# 執行所有測試
+# 執行所有後端測試
 pytest tests/ -v
 
-# 執行單元測試
-pytest tests/test_*.py -v --ignore=tests/e2e --ignore=tests/stress
+# 執行前端測試
+npm --prefix frontend test
 
-# 執行整合測試
-pytest tests/test_*_integration.py -v
+# 執行 CSS 治理檢查
+npm --prefix frontend run css:check
 
-# 執行 E2E 測試
-pytest tests/e2e/ -v
-
-# 執行壓力測試
-pytest tests/stress/ -v
-
-# Cache benchmark gate（P1）
+# Cache benchmark gate
 conda run -n mes-dashboard python scripts/run_cache_benchmarks.py --enforce
+
+# SQL 優化驗證
+conda run -n mes-dashboard python scripts/sql_optimization_verify.py
+
+# 壓力測試
+pytest tests/stress/ -v
 ```
+
+---
+
+## 開發契約
+
+本專案執行嚴格的開發契約治理，詳見 `/contract` 目錄：
+
+- **API 開發契約**（`contract/api_development_contract.md`）：統一回應格式、Route/Service 分離、API 清冊同步
+- **CSS 開發契約**（`contract/css_development_contract.md`）：Tailwind-first、Feature 樣式隔離、CSS 清冊同步
+- **欄位契約**（`shared/field_contracts.json`）：前後端共用的 UI/API/Export 欄位定義
+
+---
+
+## 相關文件
+
+| 文件 | 說明 |
+|------|------|
+| `docs/MES_Database_Reference.md` | MES 資料庫表格參考 |
+| `docs/Oracle_Authorized_Objects.md` | Oracle 存取權限規格 |
+| `docs/hold_history.md` | Hold 歷史頁資料口徑說明 |
+| `docs/migration_gates_and_runbook.md` | 遷移門檻與 Rollback Runbook |
+| `docs/environment_gaps_and_mitigation.md` | 環境依賴缺口與對策 |
+| `CLAUDE.md` | AI 輔助開發規範 |
 
 ---
 
@@ -821,215 +584,29 @@ conda run -n mes-dashboard python scripts/run_cache_benchmarks.py --enforce
 
 ### 服務無法啟動
 
-1. 檢查 Conda 環境：
-   ```bash
-   conda activate mes-dashboard
-   ```
-
-2. 檢查依賴：
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. 檢查日誌：
-   ```bash
-   ./scripts/start_server.sh logs error
-   ```
+1. 確認 Conda 環境：`conda activate mes-dashboard`
+2. 確認依賴：`pip install -r requirements.txt`
+3. 確認 runtime contract：`RUNTIME_CONTRACT_ENFORCE=true ./scripts/start_server.sh check`
+4. 查看日誌：`./scripts/start_server.sh logs error`
 
 ### 資料庫連線失敗
 
-1. 確認 `.env` 中的資料庫設定正確
-2. 確認網路可連線到資料庫伺服器
-3. 確認資料庫帳號密碼正確
+1. 確認 `.env` 中的 `DB_HOST`/`DB_PORT`/`DB_SERVICE`/`DB_USER`/`DB_PASSWORD`
+2. 確認網路連線 + 帳號密碼
+3. 檢查 circuit breaker 狀態：`/health/deep`
 
 ### Port 被占用
 
-1. 檢查 port 使用狀況：
-   ```bash
-   lsof -i :8080
-   ```
+```bash
+lsof -i :8080
+# 修改 .env 中的 GUNICORN_BIND
+```
 
-2. 修改 `.env` 中的 `GUNICORN_BIND` 設定
+### Worker OOM
 
----
-
-## 變更日誌
-
-### 2026-02-11
-
-- Portal Shell route-view 全遷移封存（`portal-shell-route-view-integration`）：
-  - Shell 導覽切換全面改為 no-iframe（Vue Router dynamic route host）
-  - Wave B 頁面（`/job-query`、`/excel-query`、`/query-tool`、`/tmtt-defect`）完成 native route-view rewrite
-  - health widget 改為 summary-first；詳細診斷由互動展開，後端提供 `/health/frontend-shell`
-  - 完成 route/query parity、cutover gate、visual regression、E2E/stress 驗證
-- 安全修補：`/api/query_table`、`/api/get_table_columns` 新增 `table_name` 白名單驗證
-  - 僅允許 `TABLES_CONFIG` 註冊表格，未授權名稱直接回傳 400
-  - 補上整合測試（拒絕惡意 table_name）
-- 設備頁篩選升級（`/resource`、`/resource-history`）：
-  - 新增 Group/Family/Machine 級聯篩選
-  - status/summary/matrix、history summary/detail/export 全線支援 `resource_ids`
-- Hold 與 Portal 修補：
-  - realtime equipment cache dedup，降低重複合併與資料抖動
-  - 修正 Hold Dashboard 視覺/明細互動細節
-- WIP 體驗與穩定性：
-  - Overview → Detail → Overview 往返保留篩選條件（URL params）
-  - auto refresh 加入 jitter（±15%）避免多頁同步 thundering-herd
-- Review hardening：
-  - 7 個高流量頁面補齊安全/穩定性/效能細節（前端請求控制、後端防護與 page 配置一致性）
-
-### 2026-02-10
-
-- 新增 Hold 即時概況（`/hold-overview`）：
-  - Hold type/reason 篩選 + Summary cards + Workcenter×Package Matrix + Lot 明細
-  - API：`/api/hold-overview/summary`、`/api/hold-overview/matrix`、`/api/hold-overview/treemap`、`/api/hold-overview/lots`
-- 新增 Hold 歷史績效（`/hold-history`）：
-  - Daily trend、Reason Pareto、Duration 分布、明細分頁（50 筆/頁）
-  - API：`/api/hold-history/trend`、`/api/hold-history/reason-pareto`、`/api/hold-history/duration`、`/api/hold-history/list`
-- 新增中段製程不良追溯分析頁面（`/mid-section-defect`）：
-  - TMTT 測試站偵測到的不良，反向追蹤至上游機台/站點/製程的歸因分析
-  - 三段式資料管線：TMTT 偵測 → LOT 族譜解析（SPLITFROMID BFS 分批鏈 + COMBINEDASSYLOTS 合批展開）→ 上游製程歷史
-  - 6 張 KPI 卡片（投入/LOT數/不良數/不良率/首要原因/影響機台數）
-  - 6 張 Pareto 圖表（站點/不良原因/上游機台/TMTT 機台/製程/封裝歸因）+ 日趨勢折線
-  - 不良原因多選篩選（205 種，全站 24h Redis 快取，`/api/mid-section-defect/loss-reasons`）
-  - Detail API 分頁分離（`/api/mid-section-defect/analysis` summary ~16 KB + `/api/mid-section-defect/analysis/detail` ~110 KB/page），原 72 MB 單次回應
-  - 伺服器端 DEFECT_RATE 降序排序 + 前端頁內欄位排序
-  - CSV 串流匯出（UTF-8 BOM，完整明細）
-  - 進入頁面不自動查詢，點擊「查詢」後才執行；首次查詢後啟動 5 分鐘自動刷新
-  - Summary + Detail page 1 平行載入（`Promise.all`）
-  - NaN 安全防護（Oracle NULL → pandas NaN，`isinstance(val, str)` 過濾）
-  - 技術架構：Vue 3 + Vite，vue-echarts 7 圖表，複用 `wip-shared/` Pagination/useAutoRefresh
-
-### 2026-02-09
-
-- 完成設備雙頁 Vue 3 遷移（`/resource`、`/resource-history`）：
-  - 兩頁共 1,697 行 vanilla JS + 3,200 行 Jinja2 模板（含 820 行重複 inline fallback script）重寫為 Vue 3 SFC
-  - 抽取 `resource-shared/` 共用模組：CSS 基底（`:root` 變數、status 顏色、tree table 樣式）、常數（`STATUS_DISPLAY_MAP`、`STATUS_AGGREGATION`、`STATUS_COLORS`、`OU_BADGE_THRESHOLDS`）、`HierarchyTable.vue` 三層展開樹表元件
-  - Resource History：4 個 ECharts 圖表改用 vue-echarts（趨勢折線、堆疊柱狀、workcenter 對比、OU% 熱圖）
-  - Resource Status：複用 `wip-shared/composables/useAutoRefresh.js`（5 分鐘間隔）
-  - Resource Status：自訂 `FloatingTooltip.vue`（`<Teleport to="body">` + viewport clamp），顯示 LOT/JOB 詳情
-  - Resource History：`MultiSelect.vue` 多選下拉（checkbox list + click-outside + select all/clear）
-  - 兩頁 Vite entry 從 `main.js` 改為 `index.html`，Flask route 改為 `send_from_directory`
-  - 移除兩份 Jinja2 模板（`resource_status.html`、`resource_history.html`）
-- 完成 WIP 三頁 Vue 3 遷移（`/wip-overview`、`/wip-detail`、`/hold-detail`）：
-  - 三頁共 1,941 行 vanilla JS + Jinja2 模板重寫為 Vue 3 SFC 元件架構
-  - 抽取 `wip-shared/` 共用模組：CSS 基底（`:root` 變數、gradient header、responsive）、常數（`NON_QUALITY_HOLD_REASONS` 11 值）、Pagination/FilterBar 元件
-  - Overview：Pareto 圖改用 vue-echarts（`<VChart autoresize>`），與 QC-GATE 一致
-  - Hold Detail：Jinja2 模板注入（`reason`、`hold_type`）改為前端 URL params + 常數判斷
-  - Hold Detail：新增 10 分鐘自動刷新 + `visibilitychange` 即時刷新 + AbortController
-  - 三頁 Vite entry 從 `main.js` 改為 `index.html`，Flask route 改為 `send_from_directory`
-  - 移除三份 Jinja2 模板（`wip_overview.html`、`wip_detail.html`、`hold_detail.html`）
-- 完成數據表查詢頁面（`/tables`）Vue 3 遷移：
-  - 237 行 vanilla JS + Jinja2 模板重寫為 Vue 3 SFC 元件（App.vue、TableCatalog.vue、DataViewer.vue）
-  - Vite entry 從 `main.js` 改為 `index.html`，Flask route 改為 `send_from_directory`
-  - 使用 `apiPost` 建立純 Vite 頁面 POST 請求模式
-  - 移除 Jinja2 模板 `templates/index.html`，完全脫離 `window.MesApi` 依賴
-- 修復設備即時概況（`/resource`）資料為空問題：
-  - 根因：process-level DataFrame cache（30s TTL）過期後，derived index 仍標記 `ready: true`
-  - `_records_from_index()` 取得 `df=None` 時直接回傳空 list
-  - 修復：新增 `_get_cached_data()` fallback，從 Redis 重新載入 DataFrame
-- 修正 `page_status.json` 設備頁面名稱：「機台狀態」→「設備即時概況」
-- 新增 QC-GATE 即時狀態報表頁面（`/qc-gate`）：
-  - 第一個純 Vue 3 + Vite 頁面，完全脫離 Jinja2 模板
-  - ECharts 堆疊條圖顯示各 QC-GATE 站點 LOT 分佈（按 6hr 時間分級）
-  - 點擊條圖篩選下方 LOT 明細表，支援排序與清除篩選
-  - 10 分鐘自動刷新 + visibilitychange 即時刷新
-  - 後端 API（`/api/qc-gate/summary`）從 WIP Redis 快取篩選，零額外 Oracle 查詢
-  - 站點排序依 `DW_MES_SPEC_WORKCENTER_V` 的 `SPEC_ORDER`
-- 前端架構升級：
-  - 引入 Vue 3、`@vitejs/plugin-vue`、`echarts`（npm）、`vue-echarts`
-  - Vite config 新增 Vue plugin、HTML entry point、`vendor-vue` chunk splitting
-  - 建立純 Vite 頁面模式（Flask `send_from_directory` 服務靜態 HTML）
-- 完成 Portal 動態抽屜導覽管理：
-  - sidebar drawer/page 配置改為 JSON 動態管理
-  - 管理員可 CRUD 抽屜、指派頁面歸屬與排序
-  - 首次啟動自動 migration 建立預設抽屜結構
-  - Gunicorn 多 worker mtime 快取一致性修復
-- `filter_cache.py` 新增 `SPEC → SPEC_ORDER` mapping 快取
-
-### 2026-02-08
-
-- 完成並封存提案 `post-migration-resilience-governance`
-- 完成並封存提案 `p1-cache-query-efficiency`
-- 完成並封存提案 `p2-ops-self-healing-runbook`
-- 新增 runtime 韌性診斷核心（thresholds / restart churn / recovery recommendation）
-- 新增 worker restart policy state（allowed/cooldown/blocked）與 guarded mode override 流程
-- health 與 admin API 新增可操作韌性欄位：
-  - `/health`、`/health/deep`
-  - `/admin/api/system-status`、`/admin/api/worker/status`
-- watchdog restart state 支援 bounded history（`WATCHDOG_RESTART_HISTORY_MAX`）
-- WIP overview/detail 抽離共用 autocomplete/filter 模組（`frontend/src/core/autocomplete.js`）
-- WIP overview/detail 導入共享 derive 模組（`frontend/src/core/wip-derive.js`）
-- 新增 cache benchmark fixture 與 baseline-vs-indexed 門檻驗證
-- 新增前端 Node 測試流程（`npm --prefix frontend test`）
-- 更新 `README.md` 與 migration runbook 文件對齊 gate
-
-### 2026-02-07
-
-- 完成並封存提案 `dashboard-vite-root-refactor`
-- 完成並封存提案 `dashboard-vite-complete-migration`
-- 完成並封存提案 `vite-jinja-report-parity-hardening`
-- 完成並封存提案 `hold-detail-vite-hardening`
-- 完成單一 port Vite 架構切換，根目錄成為唯一執行與部署主體
-- 完成 portal 抽屜分類導航、獨立頁與 drill-down 路徑對齊
-- 完成欄位契約治理與下載欄位一致性驗證
-- 完成 runtime resilience（pool/circuit/degraded contract）與 migration gates/runbook 建立
-
-### 2026-02-04
-
-- 新增效能監控儀表板（`/admin/performance`）
-- 新增熔斷器保護機制（Circuit Breaker）
-- 新增效能指標收集（P50/P95/P99 延遲、慢查詢統計）
-- 新增 SQLite 日誌儲存與管理功能
-- 新增 Worker Watchdog 重啟機制
-- 新增統一 API 回應格式（success_response/error_response）
-- 新增 404/500 錯誤頁面模板
-- 修復熔斷器 get_status() 死鎖問題
-- 修復 health_routes.py 模組匯入錯誤
-- 新增 psutil 依賴用於 Worker 狀態監控
-- 新增完整測試套件（59 個效能相關測試）
-
-### 2026-02-03
-
-- 重構 SQL 查詢管理架構，提升安全性與效能
-- 新增 SQLLoader (LRU 快取)、QueryBuilder (參數化)、CommonFilters 模組
-- 抽取 20 個 SQL 檔案至 `src/mes_dashboard/sql/` 目錄
-- 修復所有 SQL 注入風險（LIKE 萬用字元跳脫、IN 條件參數化）
-- 優化 workcenter_cards API 回應時間（55s → 0.1s）
-
-### 2026-02-02
-
-- 新增 Hold Summary 柏拉圖視覺化圖表
-- 設備頁面統一排序、階層篩選與標籤優化
-
-### 2026-01-30
-
-- 新增本地認證模式支援開發測試環境
-
-### 2026-01-29
-
-- 新增設備狀態監控頁面
-- 新增設備歷史查詢頁面
-- 整合 Redis 快取系統（30 秒自動更新）
-
-### 2026-01-28
-
-- 新增管理員認證系統（LDAP 整合）
-- 新增頁面狀態管理（released/dev）
-- 新增部署腳本 `deploy.sh`
-- 更新啟動腳本自動載入 `.env`
-- 新增完整測試套件（57 個測試）
-
-### 2026-01-27
-
-- 新增 Hold Detail 頁面
-- WIP 查詢排除原物料
-- Hold 狀態分類（品質異常/非品質異常）
-
-### 2026-01-26
-
-- 重構為 Flask App Factory 模式
-- 新增全域連線管理
-- 新增 WIP 篩選增強功能
+1. 檢查 `/admin/performance` 的 RSS 記憶體面板
+2. 調整 `PROCESS_CACHE_MAX_SIZE` 降低快取記憶體
+3. Worker memory guard 會自動 graduated response（warn → restrict → force-recycle）
 
 ---
 
@@ -1039,5 +616,5 @@ conda run -n mes-dashboard python scripts/run_cache_benchmarks.py --enforce
 
 ---
 
-**文檔版本**: 5.5
-**最後更新**: 2026-02-11
+**文檔版本**: 6.0
+**最後更新**: 2026-03-13
