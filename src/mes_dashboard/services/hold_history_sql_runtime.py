@@ -142,6 +142,9 @@ def _query_trend(
 
     The 07:30 shift boundary is already baked into the ``hold_day`` and
     ``release_day`` columns by the Oracle base_facts SQL.
+
+    Optimized: replaced N×3×4 individual queries with 4 batched queries
+    that compute all dates × hold_types in single passes via GROUP BY.
     """
     # Generate date series from start_date to end_date
     dates_sql = """
@@ -155,68 +158,106 @@ def _query_trend(
     date_rows = _fetch_dict_rows(conn, dates_sql, [start_date, end_date])
     dates = [str(r["d"])[:10] for r in date_rows]
 
+    # Pre-build empty structure
+    day_map: Dict[str, Dict[str, Dict[str, int]]] = {}
+    for d in dates:
+        day_map[d] = {
+            k: {"holdQty": 0, "newHoldQty": 0, "releaseQty": 0, "futureHoldQty": 0}
+            for k in ("quality", "non_quality", "all")
+        }
+
+    _HOLD_TYPE_KEY = {"quality": "quality", "non-quality": "non_quality"}
+
+    # ── Batch 1: holdQty (on-hold as of each day) ──
+    # Cross join dates × hold_src, group by date + hold_type
+    hold_sql = """
+        SELECT
+            CAST(cal.d AS VARCHAR) AS day_str,
+            "HOLD_TYPE" AS ht,
+            COALESCE(SUM("QTY"), 0) AS v
+        FROM generate_series(CAST(? AS DATE), CAST(? AS DATE), INTERVAL 1 DAY) cal(d)
+        JOIN hold_src h
+          ON CAST(h."hold_day" AS DATE) <= cal.d
+          AND (h."release_day" IS NULL OR CAST(h."release_day" AS DATE) > cal.d)
+        GROUP BY cal.d, "HOLD_TYPE"
+    """
+    for r in _fetch_dict_rows(conn, hold_sql, [start_date, end_date]):
+        d = str(r["day_str"])[:10]
+        if d not in day_map:
+            continue
+        qty = _si(r["v"])
+        ht_key = _HOLD_TYPE_KEY.get(str(r["ht"]), None)
+        if ht_key:
+            day_map[d][ht_key]["holdQty"] = qty
+        day_map[d]["all"]["holdQty"] = day_map[d]["all"]["holdQty"] + qty
+
+    # ── Batch 2: newHoldQty (new holds arriving on each day) ──
+    new_sql = """
+        SELECT
+            CAST("hold_day" AS VARCHAR) AS day_str,
+            "HOLD_TYPE" AS ht,
+            COALESCE(SUM("QTY"), 0) AS v
+        FROM hold_src
+        WHERE CAST("hold_day" AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+          AND "RN_HOLD_DAY" = 1
+        GROUP BY "hold_day", "HOLD_TYPE"
+    """
+    for r in _fetch_dict_rows(conn, new_sql, [start_date, end_date]):
+        d = str(r["day_str"])[:10]
+        if d not in day_map:
+            continue
+        qty = _si(r["v"])
+        ht_key = _HOLD_TYPE_KEY.get(str(r["ht"]), None)
+        if ht_key:
+            day_map[d][ht_key]["newHoldQty"] = qty
+        day_map[d]["all"]["newHoldQty"] = day_map[d]["all"]["newHoldQty"] + qty
+
+    # ── Batch 3: releaseQty (released on each day) ──
+    release_sql = """
+        SELECT
+            CAST("release_day" AS VARCHAR) AS day_str,
+            "HOLD_TYPE" AS ht,
+            COALESCE(SUM("QTY"), 0) AS v
+        FROM hold_src
+        WHERE CAST("release_day" AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+        GROUP BY "release_day", "HOLD_TYPE"
+    """
+    for r in _fetch_dict_rows(conn, release_sql, [start_date, end_date]):
+        d = str(r["day_str"])[:10]
+        if d not in day_map:
+            continue
+        qty = _si(r["v"])
+        ht_key = _HOLD_TYPE_KEY.get(str(r["ht"]), None)
+        if ht_key:
+            day_map[d][ht_key]["releaseQty"] = qty
+        day_map[d]["all"]["releaseQty"] = day_map[d]["all"]["releaseQty"] + qty
+
+    # ── Batch 4: futureHoldQty (future holds on each day) ──
+    future_sql = """
+        SELECT
+            CAST("hold_day" AS VARCHAR) AS day_str,
+            "HOLD_TYPE" AS ht,
+            COALESCE(SUM("QTY"), 0) AS v
+        FROM hold_src
+        WHERE CAST("hold_day" AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+          AND "IS_FUTURE_HOLD" = 1
+          AND "FUTURE_HOLD_FLAG" = 1
+        GROUP BY "hold_day", "HOLD_TYPE"
+    """
+    for r in _fetch_dict_rows(conn, future_sql, [start_date, end_date]):
+        d = str(r["day_str"])[:10]
+        if d not in day_map:
+            continue
+        qty = _si(r["v"])
+        ht_key = _HOLD_TYPE_KEY.get(str(r["ht"]), None)
+        if ht_key:
+            day_map[d][ht_key]["futureHoldQty"] = qty
+        day_map[d]["all"]["futureHoldQty"] = day_map[d]["all"]["futureHoldQty"] + qty
+
+    # Assemble result in date order
     days: List[Dict[str, Any]] = []
-    for date_str in dates:
-        day_data: Dict[str, Any] = {"date": date_str}
-
-        for key, type_filter in [("quality", "quality"), ("non_quality", "non-quality"), ("all", None)]:
-            type_clause = f"AND \"HOLD_TYPE\" = {_sql_str_literal(type_filter)}" if type_filter else ""
-
-            # holdQty: total QTY on hold as of this day
-            hold_sql = f"""
-                SELECT COALESCE(SUM("QTY"), 0) AS v
-                FROM hold_src
-                WHERE CAST("hold_day" AS DATE) <= CAST(? AS DATE)
-                  AND (
-                    "release_day" IS NULL
-                    OR CAST("release_day" AS DATE) > CAST(? AS DATE)
-                  )
-                  {type_clause}
-            """
-            hold_rows = _fetch_dict_rows(conn, hold_sql, [date_str, date_str])
-            hold_qty = _si(hold_rows[0]["v"]) if hold_rows else 0
-
-            # newHoldQty: QTY of new holds arriving this day (dedup via RN_HOLD_DAY=1)
-            new_sql = f"""
-                SELECT COALESCE(SUM("QTY"), 0) AS v
-                FROM hold_src
-                WHERE CAST("hold_day" AS DATE) = CAST(? AS DATE)
-                  AND "RN_HOLD_DAY" = 1
-                  {type_clause}
-            """
-            new_rows = _fetch_dict_rows(conn, new_sql, [date_str])
-            new_hold_qty = _si(new_rows[0]["v"]) if new_rows else 0
-
-            # releaseQty: QTY released on this day
-            release_sql = f"""
-                SELECT COALESCE(SUM("QTY"), 0) AS v
-                FROM hold_src
-                WHERE CAST("release_day" AS DATE) = CAST(? AS DATE)
-                  {type_clause}
-            """
-            release_rows = _fetch_dict_rows(conn, release_sql, [date_str])
-            release_qty = _si(release_rows[0]["v"]) if release_rows else 0
-
-            # futureHoldQty: QTY of future holds on this day
-            future_sql = f"""
-                SELECT COALESCE(SUM("QTY"), 0) AS v
-                FROM hold_src
-                WHERE CAST("hold_day" AS DATE) = CAST(? AS DATE)
-                  AND "IS_FUTURE_HOLD" = 1
-                  AND "FUTURE_HOLD_FLAG" = 1
-                  {type_clause}
-            """
-            future_rows = _fetch_dict_rows(conn, future_sql, [date_str])
-            future_hold_qty = _si(future_rows[0]["v"]) if future_rows else 0
-
-            day_data[key] = {
-                "holdQty": hold_qty,
-                "newHoldQty": new_hold_qty,
-                "releaseQty": release_qty,
-                "futureHoldQty": future_hold_qty,
-            }
-
-        days.append(day_data)
+    for d in dates:
+        days.append({"date": d, **day_map[d]})
 
     return {"days": days}
 

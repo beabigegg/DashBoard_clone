@@ -951,6 +951,9 @@ def get_table_columns(table_name: str) -> list:
         return []
 
 
+_TABLE_NAME_PATTERN = re.compile(r'^[A-Za-z_][A-Za-z0-9_.]*$')
+
+
 def get_table_data(
     table_name: str,
     limit: int = 1000,
@@ -959,6 +962,11 @@ def get_table_data(
 ) -> Dict[str, Any]:
     """Fetch rows from a table with optional filtering and sorting."""
     from datetime import datetime
+
+    # Defense-in-depth: validate table_name format to prevent SQL injection.
+    # Route layer also validates against TABLES_CONFIG whitelist.
+    if not table_name or not _TABLE_NAME_PATTERN.match(table_name):
+        return {'error': '不允許查詢此表'}
 
     connection = get_db_connection()
     if not connection:

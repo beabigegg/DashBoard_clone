@@ -252,6 +252,11 @@ class CommonFilters:
     # =========================================================
 
     @staticmethod
+    def _sanitize_literal(value: str) -> str:
+        """Escape single quotes in a string literal for safe SQL interpolation."""
+        return str(value).replace("'", "''")
+
+    @staticmethod
     def build_location_filter_legacy(
         locations: Optional[List[str]] = None,
         excluded_locations: Optional[List[str]] = None,
@@ -260,13 +265,15 @@ class CommonFilters:
         Build location filter SQL string (legacy format).
 
         Deprecated: Use add_location_exclusion() with QueryBuilder instead.
+        Values are sanitized against SQL injection via single-quote escaping.
         """
+        sanitize = CommonFilters._sanitize_literal
         conditions = []
         if locations:
-            loc_list = ", ".join(f"'{loc}'" for loc in locations)
+            loc_list = ", ".join(f"'{sanitize(loc)}'" for loc in locations)
             conditions.append(f"LOCATIONNAME IN ({loc_list})")
         if excluded_locations:
-            exc_list = ", ".join(f"'{loc}'" for loc in excluded_locations)
+            exc_list = ", ".join(f"'{sanitize(loc)}'" for loc in excluded_locations)
             conditions.append(
                 f"(LOCATIONNAME IS NULL OR LOCATIONNAME NOT IN ({exc_list}))"
             )
@@ -280,8 +287,10 @@ class CommonFilters:
         Build asset status filter SQL string (legacy format).
 
         Deprecated: Use add_asset_status_exclusion() with QueryBuilder instead.
+        Values are sanitized against SQL injection via single-quote escaping.
         """
         if not excluded_statuses:
             return ""
-        exc_list = ", ".join(f"'{s}'" for s in excluded_statuses)
+        sanitize = CommonFilters._sanitize_literal
+        exc_list = ", ".join(f"'{sanitize(s)}'" for s in excluded_statuses)
         return f"(PJ_ASSETSSTATUS IS NULL OR PJ_ASSETSSTATUS NOT IN ({exc_list}))"
