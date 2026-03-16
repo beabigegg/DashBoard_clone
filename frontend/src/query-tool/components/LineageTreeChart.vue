@@ -549,55 +549,37 @@ const chartOption = computed(() => {
     },
   };
 
-  // Single root → one series, full area
-  if (trees.length === 1) {
-    return {
-      tooltip,
-      toolbox,
-      series: [{
-        ...TREE_SERIES_DEFAULTS,
-        left: chartLayout.value.left,
-        right: chartLayout.value.right,
-        top: 20,
-        bottom: 20,
-        label: {
-          ...TREE_SERIES_DEFAULTS.label,
-          width: labelWidthPx.value,
-        },
-        data: [trees[0]],
-      }],
-    };
-  }
+  // Single series for unified roam/zoom — use virtual root when multiple trees
+  const seriesData = trees.length === 1
+    ? [trees[0]]
+    : [{
+        name: '',
+        value: { type: 'virtual-root', cid: '' },
+        itemStyle: { opacity: 0 },
+        label: { show: false },
+        symbol: 'none',
+        symbolSize: 0,
+        lineStyle: { opacity: 0 },
+        children: trees,
+      }];
 
-  // Multiple roots → one series per tree, each in its own vertical band
-  const leafCounts = trees.map(countLeaves);
-  const totalLeaves = leafCounts.reduce((a, b) => a + b, 0);
-  const GAP_PX = 12;
-  const totalGapPercent = ((trees.length - 1) * GAP_PX / 800) * 100;
-  const usablePercent = 100 - totalGapPercent;
-
-  let cursor = 0;
-  const series = trees.map((tree, index) => {
-    const fraction = leafCounts[index] / totalLeaves;
-    const heightPercent = Math.max(10, usablePercent * fraction);
-    const topPercent = cursor;
-    cursor += heightPercent + (GAP_PX / 800) * 100;
-
-    return {
+  return {
+    tooltip,
+    toolbox,
+    series: [{
       ...TREE_SERIES_DEFAULTS,
       left: chartLayout.value.left,
       right: chartLayout.value.right,
-      top: `${topPercent}%`,
-      height: `${heightPercent}%`,
+      top: 20,
+      bottom: 20,
+      initialTreeDepth: trees.length === 1 ? 2 : 3,
       label: {
         ...TREE_SERIES_DEFAULTS.label,
         width: labelWidthPx.value,
       },
-      data: [tree],
-    };
-  });
-
-  return { tooltip, toolbox, series };
+      data: seriesData,
+    }],
+  };
 });
 
 function handleNodeClick(params) {
