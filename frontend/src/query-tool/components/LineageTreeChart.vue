@@ -5,14 +5,14 @@ import VChart from 'vue-echarts';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { TreeChart } from 'echarts/charts';
-import { TooltipComponent } from 'echarts/components';
+import { TooltipComponent, ToolboxComponent } from 'echarts/components';
 
 import ExportButton from './ExportButton.vue';
 import LoadingOverlay from '../../shared-ui/components/LoadingOverlay.vue';
 import PaginationControl from '../../shared-ui/components/PaginationControl.vue';
 import { normalizeText } from '../utils/values.js';
 
-use([CanvasRenderer, TreeChart, TooltipComponent]);
+use([CanvasRenderer, TreeChart, TooltipComponent, ToolboxComponent]);
 
 const NODE_COLORS = {
   wafer: 'rgb(37, 99, 235)',
@@ -484,6 +484,24 @@ const chartOption = computed(() => {
     return null;
   }
 
+  const toolbox = {
+    show: true,
+    orient: 'vertical',
+    right: 8,
+    top: 8,
+    feature: {
+      restore: { title: '重置' },
+    },
+    iconStyle: {
+      borderColor: 'rgb(100, 116, 139)',
+    },
+    emphasis: {
+      iconStyle: {
+        borderColor: 'rgb(37, 99, 235)',
+      },
+    },
+  };
+
   const tooltip = {
     trigger: 'item',
     triggerOn: 'mousemove',
@@ -535,6 +553,7 @@ const chartOption = computed(() => {
   if (trees.length === 1) {
     return {
       tooltip,
+      toolbox,
       series: [{
         ...TREE_SERIES_DEFAULTS,
         left: chartLayout.value.left,
@@ -578,7 +597,7 @@ const chartOption = computed(() => {
     };
   });
 
-  return { tooltip, series };
+  return { tooltip, toolbox, series };
 });
 
 function handleNodeClick(params) {
@@ -751,6 +770,9 @@ function exportRelationCsv() {
           讀圖方向由左至右；節點前綴 <code>←拆/←併/←晶/←重</code> 代表本節點由左側來源而來，
           <code>→拆/→併/→晶/→重</code> 代表左側節點由本節點而來。
         </p>
+        <p class="query-tool-muted lineage-direction-note">
+          滾輪縮放 · 拖曳平移 · 點擊節點展開/收合分支或多選
+        </p>
       </div>
 
       <div class="flex items-center gap-3">
@@ -828,12 +850,12 @@ function exportRelationCsv() {
     </div>
 
     <!-- ECharts Tree -->
-    <div v-else class="relative overflow-x-auto">
+    <div v-else class="relative">
       <LoadingOverlay v-if="exportingTreeImage" />
       <VChart
         ref="chartRef"
         class="lineage-tree-chart"
-        :style="{ height: chartHeight, width: '100%', minWidth: chartMinWidth }"
+        :style="{ height: chartHeight, width: '100%' }"
         :option="chartOption"
         :autoresize="{ throttle: 100 }"
         @click="handleNodeClick"
