@@ -1379,6 +1379,6 @@ onUnmounted(() => {
         @clear-pareto-selection="clearParetoSelection"
       />
     </template>
-    <LoadingOverlay v-if="loading.querying" tier="page" />
+    <LoadingOverlay v-if="loading.querying && !jobProgress.active" tier="page" />
   </div>
 </template>

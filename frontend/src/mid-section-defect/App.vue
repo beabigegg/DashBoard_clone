@@ -7,7 +7,6 @@ import { useTraceProgress } from '../shared-composables/useTraceProgress.js';
 import TraceProgressBar from '../shared-composables/TraceProgressBar.vue';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
-import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 
 import AnalysisSummary from './components/AnalysisSummary.vue';
@@ -708,7 +707,5 @@ void initPage();
     </template>
 
     <EmptyState v-else-if="!loading.querying" type="no-data" />
-
-    <LoadingOverlay v-if="loading.querying" tier="page" />
   </div>
 </template>
