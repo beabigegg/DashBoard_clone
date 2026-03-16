@@ -127,7 +127,8 @@ class TestWipAndHoldPagesE2E:
         assert response is not None, "Did not observe expected detail request with URL filters"
         assert response.ok
 
-        back_href = page.locator("a.btn-back").get_attribute("href") or ""
+        back_link = page.locator("a.btn-back, a.ui-btn--ghost").filter(has_text="Overview").first
+        back_href = back_link.get_attribute("href") or ""
         parsed = urlparse(back_href)
         params = parse_qs(parsed.query)
         assert parsed.path in {"/wip-overview", "/portal-shell/wip-overview"}

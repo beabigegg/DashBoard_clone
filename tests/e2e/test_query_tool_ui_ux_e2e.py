@@ -99,7 +99,8 @@ class TestQueryToolUiUxE2E:
         equipment_resp = requests.get(f"{app_server}/api/query-tool/equipment-list", timeout=30)
         if equipment_resp.status_code != 200:
             pytest.skip("equipment-list API is unavailable")
-        equipment_items = equipment_resp.json().get("data") or []
+        raw_data = equipment_resp.json().get("data") or []
+        equipment_items = raw_data.get("data", []) if isinstance(raw_data, dict) else raw_data
         if not equipment_items:
             pytest.skip("No equipment item available for E2E test")
 

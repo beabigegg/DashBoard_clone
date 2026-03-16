@@ -86,6 +86,133 @@ def _query_and_wait(app_server: str, body: dict) -> str:
 
 
 @pytest.mark.e2e
+class TestRejectHistoryBasicE2E:
+    """Basic E2E tests for reject-history endpoints (always run)."""
+
+    def test_options_returns_filter_data(self, app_server: str):
+        """GET /options returns filter options."""
+        resp = requests.get(f"{app_server}/api/reject-history/options", timeout=30)
+        assert resp.status_code == 200
+        payload = resp.json()
+        assert payload["success"] is True
+
+    def test_query_requires_mode(self, app_server: str):
+        """POST /query without mode returns 400."""
+        resp = requests.post(
+            f"{app_server}/api/reject-history/query", json={}, timeout=30
+        )
+        assert resp.status_code == 400
+        assert resp.json()["success"] is False
+
+    def test_query_date_range_requires_dates(self, app_server: str):
+        """POST /query with mode=date_range but no dates returns 400."""
+        resp = requests.post(
+            f"{app_server}/api/reject-history/query",
+            json={"mode": "date_range"},
+            timeout=30,
+        )
+        assert resp.status_code == 400
+
+    def test_view_requires_query_id(self, app_server: str):
+        """GET /view without query_id returns 400."""
+        resp = requests.get(f"{app_server}/api/reject-history/view", timeout=30)
+        assert resp.status_code == 400
+
+    def test_view_expired_returns_410(self, app_server: str):
+        """GET /view with nonexistent query_id returns 410."""
+        resp = requests.get(
+            f"{app_server}/api/reject-history/view",
+            params={"query_id": "nonexistent-expired-id"},
+            timeout=30,
+        )
+        assert resp.status_code == 410
+        payload = resp.json()
+        assert payload["success"] is False
+
+    def test_short_range_query_view_cycle(self, app_server: str):
+        """POST /query + GET /view for a short date range (7 days)."""
+        query_resp = _post_reject_query(
+            app_server,
+            {
+                "mode": "date_range",
+                "start_date": "2026-03-01",
+                "end_date": "2026-03-07",
+            },
+            timeout=120,
+        )
+        if query_resp.status_code == 503:
+            pytest.skip("Service busy")
+        payload = query_resp.json()
+        assert payload.get("success") is True, payload
+
+        # Extract query_id regardless of sync/async
+        if query_resp.status_code == 202:
+            data = payload.get("data", payload)
+            job_id = data.get("job_id")
+            if job_id:
+                final = _poll_async_job(app_server, job_id, timeout_seconds=120)
+                assert final.get("status") in ("completed", "finished")
+            query_id = data.get("query_id")
+        else:
+            query_id = payload.get("query_id") or payload.get("data", {}).get("query_id")
+
+        assert query_id, f"No query_id: {payload}"
+
+        view_resp = requests.get(
+            f"{app_server}/api/reject-history/view",
+            params={"query_id": query_id, "page": 1, "per_page": 10},
+            timeout=60,
+        )
+        assert view_resp.status_code == 200
+        assert view_resp.json()["success"] is True
+
+    def test_summary_returns_data(self, app_server: str):
+        """GET /summary returns reject summary KPIs."""
+        resp = requests.get(
+            f"{app_server}/api/reject-history/summary",
+            params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
+            timeout=60,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_trend_returns_data(self, app_server: str):
+        """GET /trend returns reject trend."""
+        resp = requests.get(
+            f"{app_server}/api/reject-history/trend",
+            params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
+            timeout=60,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_reason_pareto_returns_data(self, app_server: str):
+        """GET /reason-pareto returns pareto analysis."""
+        resp = requests.get(
+            f"{app_server}/api/reject-history/reason-pareto",
+            params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
+            timeout=60,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_list_returns_paginated_data(self, app_server: str):
+        """GET /list returns paginated reject records."""
+        resp = requests.get(
+            f"{app_server}/api/reject-history/list",
+            params={
+                "start_date": "2026-03-01",
+                "end_date": "2026-03-07",
+                "page": 1,
+                "per_page": 10,
+            },
+            timeout=60,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+
+@pytest.mark.e2e
 @pytest.mark.skipif(
     os.environ.get("RUN_LONG_E2E") != "1",
     reason="Long-range reject-history E2E disabled; set RUN_LONG_E2E=1 to run.",

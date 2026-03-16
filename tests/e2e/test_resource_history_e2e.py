@@ -155,8 +155,12 @@ class TestResourceHistoryAPIWorkflow:
         )
 
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['success'] is True
+        resp_json = json.loads(response.data)
+        assert resp_json['success'] is True
+        # Unwrap nested success_response: actual payload is in resp_json['data']
+        data = resp_json.get('data', resp_json)
+        if isinstance(data, dict) and 'query_id' not in data and 'data' in resp_json:
+            data = resp_json['data']
         assert 'query_id' in data
 
         # Verify KPI (derived from base_df)
@@ -232,8 +236,9 @@ class TestResourceHistoryAPIWorkflow:
         )
 
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['success'] is True
+        resp_json = json.loads(response.data)
+        assert resp_json['success'] is True
+        data = resp_json.get('data', resp_json)
         assert data['detail']['total'] == 2
         assert len(data['detail']['data']) == 2
         assert data['detail']['truncated'] is False

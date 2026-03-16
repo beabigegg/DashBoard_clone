@@ -61,7 +61,9 @@ class TestMergedQueryApi:
 
         assert data['success'] is True
         assert 'data' in data
-        assert 'count' in data
+        # count may be at top level or inside meta
+        assert 'count' in data or 'count' in data.get('meta', {}), \
+            f"'count' not found in response keys={list(data.keys())} meta={data.get('meta')}"
 
         # If data exists, verify structure
         if data['data']:

@@ -112,6 +112,18 @@ def _collect_api_responses(page: Page, url_tokens: list[str], timeout_seconds: f
     return collected
 
 
+def _unwrap_data(payload: dict) -> list:
+    """Unwrap nested success_response data.
+
+    API returns {"data": {"data": [...], "total": N}, ...}.
+    Returns the inner list.
+    """
+    data = payload.get("data", [])
+    if isinstance(data, dict):
+        return data.get("data", [])
+    return data
+
+
 def _api_post_json(
     app_server: str,
     path: str,
@@ -176,8 +188,9 @@ class TestQueryToolBackendIntegration:
         assert resp.status_code == 200, f"resolve returned {resp.status_code}: {resp.text[:300]}"
         payload = resp.json()
         assert "data" in payload, f"response missing 'data': {list(payload.keys())}"
-        assert isinstance(payload["data"], list)
-        assert len(payload["data"]) > 0, "Expected at least 1 resolved lot for GA26010001"
+        items = _unwrap_data(payload)
+        assert isinstance(items, list)
+        assert len(items) > 0, "Expected at least 1 resolved lot for GA26010001"
 
     def test_resolve_returns_not_found_for_garbage(self, app_server: str):
         """POST /api/query-tool/resolve returns not_found for non-existent values."""
@@ -187,7 +200,8 @@ class TestQueryToolBackendIntegration:
         })
         assert resp.status_code == 200
         payload = resp.json()
-        not_found = payload.get("not_found", [])
+        inner = payload.get("data", {})
+        not_found = inner.get("not_found", []) if isinstance(inner, dict) else payload.get("not_found", [])
         assert "NONEXISTENT_LOT_12345" in not_found
 
     def test_workcenter_groups_endpoint(self, app_server: str):
@@ -196,7 +210,8 @@ class TestQueryToolBackendIntegration:
         assert resp.status_code == 200
         payload = resp.json()
         assert "data" in payload
-        assert isinstance(payload["data"], list)
+        items = _unwrap_data(payload)
+        assert isinstance(items, list)
 
     def test_equipment_list_endpoint(self, app_server: str):
         """GET /api/query-tool/equipment-list returns equipment options."""
@@ -204,8 +219,9 @@ class TestQueryToolBackendIntegration:
         assert resp.status_code == 200
         payload = resp.json()
         assert "data" in payload
-        assert isinstance(payload["data"], list)
-        assert len(payload["data"]) > 0, "Expected at least 1 equipment option"
+        items = _unwrap_data(payload)
+        assert isinstance(items, list)
+        assert len(items) > 0, "Expected at least 1 equipment option"
 
     def test_lot_history_with_resolved_container(self, app_server: str):
         """Resolve a work order then fetch lot history for first container."""
@@ -214,7 +230,7 @@ class TestQueryToolBackendIntegration:
             "values": ["GA26010001"],
         })
         assert resolve_resp.status_code == 200
-        lots = resolve_resp.json().get("data", [])
+        lots = _unwrap_data(resolve_resp.json())
         assert len(lots) > 0
 
         container_id = str(
@@ -235,7 +251,8 @@ class TestQueryToolBackendIntegration:
         assert history_resp.status_code == 200
         history_payload = history_resp.json()
         assert "data" in history_payload
-        assert isinstance(history_payload["data"], list)
+        history_items = _unwrap_data(history_payload)
+        assert isinstance(history_items, list)
 
     def test_lot_associations_materials(self, app_server: str):
         """Fetch materials association for a resolved container."""
@@ -243,7 +260,7 @@ class TestQueryToolBackendIntegration:
             "input_type": "work_order",
             "values": ["GA26010001"],
         })
-        lots = resolve_resp.json().get("data", [])
+        lots = _unwrap_data(resolve_resp.json())
         if not lots:
             pytest.skip("No lots resolved for GA26010001")
 
@@ -265,7 +282,7 @@ class TestQueryToolBackendIntegration:
             "input_type": "work_order",
             "values": ["GA26010001"],
         })
-        lots = resolve_resp.json().get("data", [])
+        lots = _unwrap_data(resolve_resp.json())
         if not lots:
             pytest.skip("No lots resolved for GA26010001")
 
@@ -280,7 +297,9 @@ class TestQueryToolBackendIntegration:
         })
         assert lineage_resp.status_code == 200
         payload = lineage_resp.json()
-        assert "children_map" in payload or "ancestors" in payload or "data" in payload
+        inner = payload.get("data", {})
+        assert "children_map" in payload or "ancestors" in payload or "data" in payload or \
+               (isinstance(inner, dict) and ("children_map" in inner or "ancestors" in inner))
 
 
 # ---------------------------------------------------------------------------

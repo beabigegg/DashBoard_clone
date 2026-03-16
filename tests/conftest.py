@@ -36,6 +36,9 @@ def _load_dotenv_if_present():
             if not line or line.startswith('#') or '=' not in line:
                 continue
             key, value = line.split('=', 1)
+            # Strip inline comments (e.g. "4  # PRD: 5" → "4")
+            if '#' in value:
+                value = value[:value.index('#')]
             os.environ.setdefault(key.strip(), value.strip())
 
 
