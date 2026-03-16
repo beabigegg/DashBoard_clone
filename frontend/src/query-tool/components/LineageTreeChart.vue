@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, shallowRef, triggerRef } from 'vue';
 
 import VChart from 'vue-echarts';
 import { use } from 'echarts/core';
@@ -53,6 +53,30 @@ const LABEL_BASE_STYLE = Object.freeze({
   padding: [1, 4],
 });
 
+const TOGGLE_EXPAND_STYLE = Object.freeze({
+  symbol: 'roundRect',
+  symbolSize: [18, 14],
+  itemStyle: { color: 'rgb(224, 231, 255)', borderColor: 'rgb(129, 140, 248)', borderWidth: 1 },
+  label: {
+    show: true, position: 'inside', fontSize: 11, fontWeight: 'bold',
+    color: 'rgb(67, 56, 202)', backgroundColor: 'transparent', padding: 0,
+  },
+  lineStyle: { color: 'rgb(199, 210, 254)', type: 'dotted', width: 1 },
+  emphasis: { itemStyle: { borderColor: 'rgb(79, 70, 229)', borderWidth: 2 } },
+});
+
+const TOGGLE_COLLAPSE_STYLE = Object.freeze({
+  symbol: 'roundRect',
+  symbolSize: [18, 14],
+  itemStyle: { color: 'rgb(254, 243, 199)', borderColor: 'rgb(245, 158, 11)', borderWidth: 1 },
+  label: {
+    show: true, position: 'inside', fontSize: 11, fontWeight: 'bold',
+    color: 'rgb(146, 64, 14)', backgroundColor: 'transparent', padding: 0,
+  },
+  lineStyle: { color: 'rgb(253, 230, 138)', type: 'dotted', width: 1 },
+  emphasis: { itemStyle: { borderColor: 'rgb(217, 119, 6)', borderWidth: 2 } },
+});
+
 const props = defineProps({
   treeRoots: {
     type: Array,
@@ -100,7 +124,7 @@ const props = defineProps({
   },
   description: {
     type: String,
-    default: '生產流程追溯：晶批 → 切割 → 封裝 → 成品（點擊節點可多選）',
+    default: '生產流程追溯：晶批 → 切割 → 封裝 → 成品（點擊節點篩選，+/− 展開收合）',
   },
   emptyMessage: {
     type: String,
@@ -121,6 +145,9 @@ const relationPage = ref(1);
 const RELATION_PAGE_SIZE = 50;
 
 const selectedSet = computed(() => new Set(props.selectedContainerIds.map(normalizeText).filter(Boolean)));
+
+// Track which branch CIDs are collapsed (managed by us, not ECharts)
+const collapsedCids = shallowRef(new Set());
 
 const rootsSet = computed(() => new Set(props.treeRoots.map(normalizeText).filter(Boolean)));
 
@@ -282,29 +309,54 @@ function buildNode(cid, visited, parentCid = '') {
   const serials = props.leafSerials?.get?.(id) || [];
   const childIds = entry?.children || [];
   const nodeType = detectNodeType(id, entry, serials);
-  const isSelected = selectedSet.value.has(id);
 
-  const children = childIds
-    .map((childId) => buildNode(childId, visited, id))
-    .filter(Boolean);
+  const isCollapsed = collapsedCids.value.has(id);
 
-  if (children.length === 0 && serials.length > 0) {
-    serials.forEach((sn) => {
-      children.push({
-        name: sn,
-        value: { type: 'serial', cid: id },
-        itemStyle: {
-          color: NODE_COLORS.serial,
-          borderColor: NODE_COLORS.serial,
-        },
-        label: {
-          fontSize: 10,
-          color: 'rgb(100, 116, 139)',
-        },
-        symbol: 'diamond',
-        symbolSize: 6,
+  let children;
+  if (isCollapsed && childIds.length > 0) {
+    // Collapsed: show a single [+N] placeholder to expand
+    const totalDescendants = childIds.length;
+    children = [{
+      name: `+${totalDescendants}`,
+      value: { type: 'expand-toggle', parentCid: id },
+      ...TOGGLE_COLLAPSE_STYLE,
+      label: { ...TOGGLE_COLLAPSE_STYLE.label, formatter: () => `+${totalDescendants}` },
+      children: [],
+    }];
+  } else {
+    children = childIds
+      .map((childId) => buildNode(childId, visited, id))
+      .filter(Boolean);
+
+    if (children.length === 0 && serials.length > 0) {
+      serials.forEach((sn) => {
+        children.push({
+          name: sn,
+          value: { type: 'serial', cid: id },
+          itemStyle: {
+            color: NODE_COLORS.serial,
+            borderColor: NODE_COLORS.serial,
+          },
+          label: {
+            fontSize: 10,
+            color: 'rgb(100, 116, 139)',
+          },
+          symbol: 'diamond',
+          symbolSize: 6,
+        });
       });
-    });
+    }
+
+    // Expanded branch: prepend a [−] toggle to allow collapsing
+    if (children.length > 0 && childIds.length > 0) {
+      children.unshift({
+        name: '−',
+        value: { type: 'collapse-toggle', parentCid: id },
+        ...TOGGLE_EXPAND_STYLE,
+        label: { ...TOGGLE_EXPAND_STYLE.label, formatter: () => '−' },
+        children: [],
+      });
+    }
   }
 
   // Leaf node whose display name matches a known serial → render as serial style
@@ -335,16 +387,16 @@ function buildNode(cid, visited, parentCid = '') {
     children,
     itemStyle: {
       color,
-      borderColor: isSelected ? 'rgb(29, 78, 216)' : color,
-      borderWidth: isSelected ? 3 : 1,
+      borderColor: color,
+      borderWidth: 1,
     },
     label: {
       ...LABEL_BASE_STYLE,
       position: children.length > 0 ? 'top' : 'right',
       distance: children.length > 0 ? 8 : 6,
-      fontWeight: isSelected ? 'bold' : 'normal',
+      fontWeight: 'normal',
       fontSize: isSerialLike ? 10 : 11,
-      color: isSelected ? 'rgb(30, 58, 138)' : (isSerialLike ? 'rgb(100, 116, 139)' : 'rgb(51, 65, 85)'),
+      color: isSerialLike ? 'rgb(100, 116, 139)' : 'rgb(51, 65, 85)',
       formatter: () => displayLabel,
     },
     symbol: isSerialLike ? 'diamond' : (nodeType === 'root' ? 'roundRect' : 'circle'),
@@ -353,8 +405,11 @@ function buildNode(cid, visited, parentCid = '') {
   };
 }
 
-// Build each root into its own independent tree data
+// Build each root into its own independent tree data.
+// Depends on collapsedCids so tree rebuilds when expand/collapse changes.
 const treesData = computed(() => {
+  // Access collapsedCids to establish reactive dependency
+  collapsedCids.value;
   if (props.treeRoots.length === 0) {
     return [];
   }
@@ -450,8 +505,7 @@ const TREE_SERIES_DEFAULTS = Object.freeze({
   type: 'tree',
   layout: 'orthogonal',
   orient: 'LR',
-  expandAndCollapse: true,
-  initialTreeDepth: -1,
+  expandAndCollapse: false,
   roam: true,
   symbol: 'circle',
   symbolSize: 10,
@@ -511,6 +565,9 @@ const chartOption = computed(() => {
         return '';
       }
       const val = data.value || {};
+      if (val.type === 'expand-toggle' || val.type === 'collapse-toggle') {
+        return val.type === 'expand-toggle' ? '點擊展開' : '點擊收合';
+      }
       const lines = [`<b>${data.name}</b>`];
       if (val.type === 'serial') {
         lines.push('<span style="color:rgb(100, 116, 139)">成品序列號</span>');
@@ -572,7 +629,6 @@ const chartOption = computed(() => {
       right: chartLayout.value.right,
       top: 20,
       bottom: 20,
-      initialTreeDepth: -1,
       label: {
         ...TREE_SERIES_DEFAULTS.label,
         width: labelWidthPx.value,
@@ -584,23 +640,38 @@ const chartOption = computed(() => {
 
 function handleNodeClick(params) {
   const data = params?.data;
-  if (!data?.value?.cid) {
+  if (!data?.value) return;
+
+  const nodeType = data.value.type;
+
+  // Toggle expand/collapse via our managed state
+  if (nodeType === 'collapse-toggle') {
+    const parentCid = data.value.parentCid;
+    if (parentCid) {
+      const next = new Set(collapsedCids.value);
+      next.add(parentCid);
+      collapsedCids.value = next;
+      triggerRef(collapsedCids);
+    }
     return;
   }
-  if (data.value.type === 'serial' || data.value.type === 'virtual-root') {
+  if (nodeType === 'expand-toggle') {
+    const parentCid = data.value.parentCid;
+    if (parentCid) {
+      const next = new Set(collapsedCids.value);
+      next.delete(parentCid);
+      collapsedCids.value = next;
+      triggerRef(collapsedCids);
+    }
     return;
   }
 
-  // If node has children, let ECharts handle expand/collapse natively.
-  // Only toggle selection on leaf nodes or via explicit multi-select intent.
-  const hasChildren = Array.isArray(data.children) && data.children.length > 0;
-  if (hasChildren) {
-    // ECharts already toggled expand/collapse — don't also toggle selection
-    // which would trigger a full reactive re-render and reset expand state.
-    return;
-  }
+  // Skip non-selectable types
+  if (nodeType === 'serial' || nodeType === 'virtual-root') return;
 
+  // Toggle selection for filtering
   const cid = data.value.cid;
+  if (!cid) return;
   const current = new Set(selectedSet.value);
   if (current.has(cid)) {
     current.delete(cid);
@@ -677,25 +748,41 @@ function buildCsvContent() {
   return `\uFEFF${lines.join('\r\n')}`;
 }
 
+function collectBranchCids(node, result) {
+  if (!node || typeof node !== 'object') return;
+  const childIds = props.lineageMap.get(normalizeText(node?.value?.cid))?.children;
+  if (childIds && childIds.length > 0) {
+    result.add(normalizeText(node.value.cid));
+  }
+  if (Array.isArray(node.children)) {
+    node.children.forEach((child) => collectBranchCids(child, result));
+  }
+}
+
 function expandAll() {
-  const instance = getChartInstance();
-  if (!instance) return;
-  const series = Array.isArray(chartOption.value?.series) ? chartOption.value.series : [chartOption.value?.series];
-  instance.setOption({
-    series: series.map((s) => ({ ...s, initialTreeDepth: -1 })),
-  }, false);
+  collapsedCids.value = new Set();
+  triggerRef(collapsedCids);
 }
 
 function collapseAll() {
-  const instance = getChartInstance();
-  if (!instance) return;
-  const series = Array.isArray(chartOption.value?.series) ? chartOption.value.series : [chartOption.value?.series];
-  // Depth 1 = show roots only (depth 0 hides everything including roots)
-  // With virtual root, depth 2 = virtual root + actual roots visible
-  const minDepth = treesData.value.length > 1 ? 2 : 1;
-  instance.setOption({
-    series: series.map((s) => ({ ...s, initialTreeDepth: minDepth })),
-  }, false);
+  // Collapse all branches except root nodes (so roots stay visible)
+  const allBranches = new Set();
+  treesData.value.forEach((tree) => {
+    // Don't collapse the root itself, but collapse its branch children
+    const rootCid = normalizeText(tree?.value?.cid);
+    const rootEntry = props.lineageMap.get(rootCid);
+    if (rootEntry?.children) {
+      rootEntry.children.forEach((childCid) => {
+        const childId = normalizeText(childCid);
+        const childEntry = props.lineageMap.get(childId);
+        if (childEntry?.children?.length > 0) {
+          allBranches.add(childId);
+        }
+      });
+    }
+  });
+  collapsedCids.value = allBranches;
+  triggerRef(collapsedCids);
 }
 
 function resetView() {
@@ -765,7 +852,7 @@ function exportRelationCsv() {
           <code>→拆/→併/→晶/→重</code> 代表左側節點由本節點而來。
         </p>
         <p class="query-tool-muted lineage-direction-note">
-          滾輪縮放 · 拖曳平移 · 點擊分支節點展開/收合 · 點擊末端節點選取
+          滾輪縮放 · 拖曳平移 · 點擊 <code>[−]</code> 收合 / <code>[+N]</code> 展開分支 · 點擊節點篩選下方明細
         </p>
       </div>
 
