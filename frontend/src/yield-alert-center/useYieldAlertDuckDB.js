@@ -492,16 +492,15 @@ export function useYieldAlertDuckDB() {
   async function computeView({ filters, granularity, riskThreshold, minScrapQty, sortBy, sortDir, page, perPage, excludedTokens = [] }) {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
 
-    const deptWhere = buildDimensionWhere(filters, true);
     const fullWhere = buildDimensionWhere(filters, false);
     const reasonWhere = buildReasonExclusionWhere(excludedTokens);
 
     const [summaryResult, trendItems, heatmapItems, stationItems, packageItems, alertsResult, filterOptions] = await Promise.all([
-      querySummary(_client, { deptWhere, reasonWhere }),
-      queryTrend(_client, { granularity, deptWhere, reasonWhere }),
-      queryHeatmap(_client, { granularity, deptWhere, reasonWhere }),
-      queryStationSummary(_client, { deptWhere, reasonWhere }),
-      queryPackageSummary(_client, { deptWhere, reasonWhere }),
+      querySummary(_client, { deptWhere: fullWhere, reasonWhere }),
+      queryTrend(_client, { granularity, deptWhere: fullWhere, reasonWhere }),
+      queryHeatmap(_client, { granularity, deptWhere: fullWhere, reasonWhere }),
+      queryStationSummary(_client, { deptWhere: fullWhere, reasonWhere }),
+      queryPackageSummary(_client, { deptWhere: fullWhere, reasonWhere }),
       queryAlerts(_client, { fullWhere, reasonWhere, riskThreshold, minScrapQty, sortBy, sortDir, page, perPage }),
       queryFilterOptions(_client),
     ]);

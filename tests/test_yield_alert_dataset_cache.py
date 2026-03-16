@@ -159,7 +159,8 @@ def test_apply_view_uses_cached_data_for_secondary_filters(monkeypatch):
     assert result["alerts"]["pagination"]["total"] == 1
     assert result["alerts"]["items"][0]["department"] == "焊接_WB"
 
-    # Secondary filters should be cache-based and not affect summary/trend dimensions.
+    # All supplementary filters now apply to ALL views (summary, trend, heatmap, etc.)
+    # L9 belongs to dept "成型" — filtering by dept "焊接_WB" + line "L9" yields no match
     with_line_filter = dataset_cache.apply_view(
         query_id="ya-001",
         filters={"departments": ["焊接_WB", "焊接_DW"], "lines": ["L9"]},
@@ -167,5 +168,13 @@ def test_apply_view_uses_cached_data_for_secondary_filters(monkeypatch):
         min_scrap_qty=0,
     )
     assert with_line_filter["alerts"]["pagination"]["total"] == 0
-    assert round(with_line_filter["summary"]["transaction_qty"], 3) == 14239.147
-    assert round(with_line_filter["summary"]["scrap_qty"], 3) == 17.155
+    assert with_line_filter["summary"]["transaction_qty"] == 0.0
+
+    # L1 belongs to dept "焊接_WB" — this combination narrows results correctly
+    with_l1_filter = dataset_cache.apply_view(
+        query_id="ya-001",
+        filters={"departments": ["焊接_WB", "焊接_DW"], "lines": ["L1"]},
+        risk_threshold=99,
+        min_scrap_qty=0,
+    )
+    assert with_l1_filter["summary"]["transaction_qty"] > 0

@@ -2,12 +2,12 @@
 import { computed } from 'vue';
 
 import { HeatmapChart } from 'echarts/charts';
-import { GridComponent, TooltipComponent, VisualMapComponent } from 'echarts/components';
+import { DataZoomComponent, GridComponent, TooltipComponent, VisualMapComponent } from 'echarts/components';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 
-use([CanvasRenderer, HeatmapChart, GridComponent, TooltipComponent, VisualMapComponent]);
+use([CanvasRenderer, HeatmapChart, GridComponent, TooltipComponent, VisualMapComponent, DataZoomComponent]);
 
 const props = defineProps({
   heatmap: {
@@ -50,8 +50,40 @@ const parsedHeatmap = computed(() => {
   return { stations, dates, matrixData, dataMin };
 });
 
+// Row height per station — ensure enough space for in-cell labels
+const ROW_HEIGHT = 42;
+const VISIBLE_DATE_COUNT = 14;
+
+const chartHeight = computed(() => {
+  const stationCount = parsedHeatmap.value.stations.length;
+  return Math.max(340, stationCount * ROW_HEIGHT + 140);
+});
+
+const needsDateZoom = computed(() => parsedHeatmap.value.dates.length > VISIBLE_DATE_COUNT);
+
 const chartOption = computed(() => {
   const { stations, dates, matrixData, dataMin } = parsedHeatmap.value;
+
+  // When dataZoom is active, only the visible window matters for label density
+  const visibleDateCount = needsDateZoom.value ? VISIBLE_DATE_COUNT : dates.length;
+  const showLabel = visibleDateCount <= 31 && stations.length <= 20;
+  const rotateLabel = dates.length > 10 ? 45 : 0;
+
+  const dataZoom = needsDateZoom.value
+    ? [
+        {
+          type: 'slider',
+          xAxisIndex: 0,
+          bottom: 38,
+          height: 18,
+          startValue: Math.max(0, dates.length - VISIBLE_DATE_COUNT),
+          endValue: dates.length - 1,
+          brushSelect: false,
+          labelFormatter: (_, val) => val,
+        },
+        { type: 'inside', xAxisIndex: 0 },
+      ]
+    : [];
 
   return {
     tooltip: {
@@ -67,26 +99,33 @@ const chartOption = computed(() => {
       left: 110,
       right: 20,
       top: 20,
-      bottom: 100,
+      bottom: needsDateZoom.value ? 100 : 80,
+      containLabel: false,
     },
     xAxis: {
       type: 'category',
       data: dates,
       splitArea: { show: true },
-      axisLabel: { fontSize: 10, rotate: 40 },
+      axisLabel: { fontSize: 11, rotate: rotateLabel },
     },
     yAxis: {
       type: 'category',
       data: stations,
       splitArea: { show: true },
-      axisLabel: { fontSize: 10 },
+      axisLabel: { fontSize: 11 },
     },
+    dataZoom,
     visualMap: {
       min: dataMin,
       max: 100,
+      calculable: true,
       orient: 'horizontal',
       left: 'center',
       bottom: 4,
+      itemWidth: 14,
+      itemHeight: 140,
+      text: ['100%', `${dataMin}%`],
+      textStyle: { fontSize: 11 },
       inRange: { color: ['rgb(239, 68, 68)', 'rgb(245, 158, 11)', 'rgb(34, 197, 94)'] },
     },
     series: [
@@ -94,9 +133,20 @@ const chartOption = computed(() => {
         type: 'heatmap',
         data: matrixData,
         label: {
-          show: dates.length <= 31,
-          formatter: (p) => Number(p.value?.[2] ?? 0).toFixed(1),
-          fontSize: 9,
+          show: showLabel,
+          formatter: (p) => {
+            const v = Number(p.value?.[2] ?? 0);
+            return v === 100 ? '' : v.toFixed(1);
+          },
+          fontSize: 10,
+          fontWeight: 600,
+          color: 'rgb(255, 255, 255)',
+          textShadowColor: 'rgba(0, 0, 0, 0.5)',
+          textShadowBlur: 3,
+        },
+        itemStyle: {
+          borderWidth: 1,
+          borderColor: 'rgba(255, 255, 255, 0.6)',
         },
         emphasis: {
           itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' },
@@ -110,9 +160,9 @@ const chartOption = computed(() => {
 <template>
   <article class="chart-card">
     <h3 class="chart-title">站別 × 日期 良率熱圖 ({{ GRANULARITY_LABEL[granularity] ?? granularity }})</h3>
-    <div v-if="hasData" class="chart-body" role="img" aria-label="良率熱力圖">
+    <div v-if="hasData" class="heatmap-body" :style="{ height: `${chartHeight}px` }" role="img" aria-label="良率熱力圖">
       <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>
-    <div v-else class="chart-no-data">No data</div>
+    <div v-else class="chart-no-data">尚無熱圖資料</div>
   </article>
 </template>

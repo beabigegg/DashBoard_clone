@@ -15,6 +15,7 @@ import json
 import logging
 import math
 import os
+import threading
 import time
 from typing import Any, Optional
 
@@ -25,6 +26,7 @@ from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow
 from mes_dashboard.core.interactive_memory_guard import enforce_dataset_memory_guard, maybe_gc_collect
 from mes_dashboard.core.query_spool_store import get_spool_file_path, store_spooled_df
+from mes_dashboard.core.redis_client import REDIS_ENABLED, get_redis_client
 from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 from mes_dashboard.services.yield_alert_service import (
     DEFAULT_PAGE_SIZE,
@@ -323,33 +325,87 @@ def _prepare_linkage_df(linked: dict[str, float]) -> pd.DataFrame:
 
 
 def _store_payload(query_id: str, *, detail_df: pd.DataFrame, linkage_df: pd.DataFrame) -> None:
-    payload = {
-        "detail_df": detail_df,
+    """Store dataset to L1 (in-memory, lightweight) and L2 (Redis) caches.
+
+    L1 only keeps ``linkage_df`` (tiny) — **not** ``detail_df`` (hundreds of
+    MB).  ``detail_df`` lives in Redis (L2) and the parquet spool file on
+    disk.  The DuckDB view path reads from the spool file directly; the
+    pandas fallback path loads ``detail_df`` from Redis on demand.
+    """
+    # L1: lightweight — only linkage_df + existence marker
+    _dataset_cache.set(query_id, {
+        "detail_df": None,
         "linkage_df": linkage_df,
-    }
-    _dataset_cache.set(query_id, payload)
-    redis_store_df(_detail_cache_key(query_id), detail_df, ttl=_CACHE_TTL)
-    redis_store_df(_linkage_cache_key(query_id), linkage_df, ttl=_CACHE_TTL)
+    })
+    # L2: full data in Redis
+    detail_ok = redis_store_df(_detail_cache_key(query_id), detail_df, ttl=_CACHE_TTL)
+    linkage_ok = redis_store_df(_linkage_cache_key(query_id), linkage_df, ttl=_CACHE_TTL)
+    if not detail_ok or not linkage_ok:
+        logger.warning(
+            "_store_payload: Redis store partial failure query_id=%s detail=%s linkage=%s",
+            query_id, detail_ok, linkage_ok,
+        )
 
 
 def _get_cached_payload(query_id: str) -> Optional[dict[str, pd.DataFrame]]:
+    """Return a lightweight payload dict if the query_id is known.
+
+    The returned ``detail_df`` may be ``None`` (L1 hit — only marker stored).
+    Callers that need the full detail DataFrame should call
+    ``_load_detail_df_from_redis`` explicitly.
+    """
     payload = _dataset_cache.get(query_id)
     if isinstance(payload, dict):
+        logger.debug("_get_cached_payload: L1 hit for query_id=%s", query_id)
         return payload
 
-    detail_df = redis_load_df(_detail_cache_key(query_id))
-    if detail_df is None:
-        return None
+    # L1 miss — check Redis for existence (load only linkage, not detail)
+    logger.debug("_get_cached_payload: L1 miss for query_id=%s, trying Redis", query_id)
+    # Quick existence check: try loading linkage (tiny) first
     linkage_df = redis_load_df(_linkage_cache_key(query_id))
+    # Also verify detail exists in Redis (peek only, don't load)
+    detail_exists = _redis_key_exists(_detail_cache_key(query_id))
+    if not detail_exists:
+        logger.warning(
+            "_get_cached_payload: Redis miss for query_id=%s key=%s",
+            query_id, _detail_cache_key(query_id),
+        )
+        return None
     if linkage_df is None:
         linkage_df = pd.DataFrame(columns=_LINKAGE_COLUMNS)
 
+    # Promote to L1 — lightweight (no detail_df)
     payload = {
-        "detail_df": detail_df,
+        "detail_df": None,
         "linkage_df": linkage_df,
     }
     _dataset_cache.set(query_id, payload)
+    logger.debug("_get_cached_payload: Redis confirmed for query_id=%s, lightweight L1 promoted", query_id)
     return payload
+
+
+def _redis_key_exists(key: str) -> bool:
+    """Check if a Redis key exists without loading its value."""
+    if not REDIS_ENABLED:
+        return False
+    client = get_redis_client()
+    if client is None:
+        return False
+    try:
+        from mes_dashboard.core.redis_df_store import get_key
+        return bool(client.exists(get_key(key)))
+    except Exception:
+        return False
+
+
+def _load_detail_df_from_redis(query_id: str) -> Optional[pd.DataFrame]:
+    """Load detail_df from Redis on demand (for pandas fallback path)."""
+    detail_df = redis_load_df(_detail_cache_key(query_id))
+    if detail_df is None:
+        logger.warning(
+            "_load_detail_df_from_redis: Redis miss for query_id=%s", query_id,
+        )
+    return detail_df
 
 
 def _load_primary_detail_df(start_date: str, end_date: str) -> pd.DataFrame:
@@ -442,18 +498,31 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
         elapsed_ms,
     )
     linkage_df = pd.DataFrame(columns=_LINKAGE_COLUMNS)
-    _store_payload(query_id, detail_df=detail_df, linkage_df=linkage_df)
+
+    # Spool write (parquet to disk) — synchronous so DuckDB view path
+    # can use it immediately on the subsequent /view request.
     try:
         store_spooled_df(_SPOOL_NAMESPACE, query_id, detail_df)
-    except Exception as _spool_exc:
-        logger.warning("Yield alert spool write failed (query_id=%s): %s", query_id, _spool_exc)
+    except Exception as exc:
+        logger.warning("Spool write failed (query_id=%s): %s", query_id, exc)
+
+    # L1 (lightweight marker + linkage only) + L2 Redis (full detail).
+    # detail_df is NOT kept in L1 — DuckDB reads from spool file,
+    # pandas fallback loads from Redis on demand.
+    detail_row_count = len(detail_df)
+    _store_payload(query_id, detail_df=detail_df, linkage_df=linkage_df)
+
+    # Explicitly release the large DataFrame reference to help GC
+    del detail_df
+    maybe_gc_collect()
+
     return {
         "query_id": query_id,
         "meta": {
             "cache_hit": False,
             "query_latency_ms": elapsed_ms,
             "max_query_days": MAX_QUERY_DAYS,
-            "detail_rows": int(len(detail_df)),
+            "detail_rows": int(detail_row_count),
             "linkage_ready": False,
         },
     }
@@ -465,8 +534,11 @@ def execute_linkage_query(*, query_id: str) -> Optional[dict[str, Any]]:
     if payload is None:
         return None
 
-    detail_df = payload["detail_df"]
-    if detail_df.empty:
+    # detail_df may be None in L1 (lightweight mode) — load from Redis
+    detail_df = payload.get("detail_df")
+    if detail_df is None:
+        detail_df = _load_detail_df_from_redis(query_id)
+    if detail_df is None or detail_df.empty:
         return {
             "query_id": query_id,
             "meta": {"linkage_ready": True, "linkage_rows": 0},
@@ -480,8 +552,10 @@ def execute_linkage_query(*, query_id: str) -> Optional[dict[str, Any]]:
     linkage_df = _build_linkage_df(start_date, end_date, detail_df)
     elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
 
-    # Update cache with computed linkage
+    # Update cache with computed linkage (detail_df written to Redis again, L1 stays lightweight)
     _store_payload(query_id, detail_df=detail_df, linkage_df=linkage_df)
+    del detail_df
+    maybe_gc_collect()
     logger.info(
         "Yield alert linkage computed: query_id=%s rows=%s latency_ms=%.2f",
         query_id, len(linkage_df), elapsed_ms,
@@ -948,6 +1022,10 @@ def apply_view(
 ) -> Optional[dict[str, Any]]:
     payload = _get_cached_payload(query_id)
     if payload is None:
+        logger.warning(
+            "apply_view cache miss: query_id=%s process_cache_stats=%s",
+            query_id, _dataset_cache.stats(),
+        )
         return None
 
     normalized_per_page = min(max(1, int(per_page or DEFAULT_PAGE_SIZE)), MAX_PAGE_SIZE)
@@ -1018,7 +1096,13 @@ def apply_view(
             query_id, sql_meta.get("view_sql_fallback_reason"),
         )
 
-    detail_df = payload["detail_df"]
+    # detail_df may be None in L1 (lightweight mode) — load from Redis on demand
+    detail_df = payload.get("detail_df")
+    if detail_df is None:
+        detail_df = _load_detail_df_from_redis(query_id)
+    if detail_df is None:
+        logger.warning("apply_view pandas fallback: detail_df unavailable from Redis query_id=%s", query_id)
+        return None
     linkage_df = payload["linkage_df"]
 
     # Task 1.3: memory guard before pandas computation
@@ -1031,15 +1115,8 @@ def apply_view(
         working_set_factor=_VIEW_WORKING_SET_FACTOR,
     )
 
-    _dept_filter = normalized_filters.get("departments", [])
-    _proc_filter = normalized_filters.get("process_category", [])
-
-    # Pre-compute dept/process-filtered views once — shared by summary, trend, heatmap, station_summary
-    detail_filt = detail_df
-    if _dept_filter:
-        detail_filt = detail_filt[detail_filt["DEPARTMENT_GROUP"].isin(_dept_filter)]
-    if _proc_filter:
-        detail_filt = detail_filt[detail_filt["PROCESS_CATEGORY"].isin(_proc_filter)]
+    # Apply ALL dimension filters to summary/trend/heatmap/station/package (not just dept/process)
+    detail_filt = _apply_dimension_filters(detail_df, normalized_filters)
     tx_df_base = _dedup_tx_df(detail_filt)
     scrap_df_base = _apply_reason_policy(detail_filt, excluded_reason_tokens=excluded_reason_tokens)
 

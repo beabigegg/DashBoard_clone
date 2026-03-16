@@ -765,49 +765,45 @@ def try_compute_view_from_spool(
 
         reason_excl_sql, reason_excl_params = _build_reason_exclusion_sql(excluded_reason_tokens)
 
-        # dept+process filter (for summary/trend/heatmap/station/package)
-        dept_proc_where, dept_proc_params = _build_dimension_filter_sql(
-            filters, dept_proc_only=True
-        )
-        # full filter (for alerts)
+        # Apply ALL dimension filters to every section (summary/trend/heatmap/station/package/alerts)
         full_where, full_params = _build_dimension_filter_sql(
             filters, dept_proc_only=False
         )
 
         summary = _query_summary(
             conn,
-            dept_proc_where=dept_proc_where,
-            dept_proc_params=dept_proc_params,
+            dept_proc_where=full_where,
+            dept_proc_params=full_params,
             reason_excl_sql=reason_excl_sql,
             reason_excl_params=reason_excl_params,
         )
         trend_items = _query_trend(
             conn,
             granularity=granularity,
-            dept_proc_where=dept_proc_where,
-            dept_proc_params=dept_proc_params,
+            dept_proc_where=full_where,
+            dept_proc_params=full_params,
             reason_excl_sql=reason_excl_sql,
             reason_excl_params=reason_excl_params,
         )
         heatmap_items = _query_heatmap(
             conn,
             granularity=granularity,
-            dept_proc_where=dept_proc_where,
-            dept_proc_params=dept_proc_params,
+            dept_proc_where=full_where,
+            dept_proc_params=full_params,
             reason_excl_sql=reason_excl_sql,
             reason_excl_params=reason_excl_params,
         )
         station_summary_items = _query_station_summary(
             conn,
-            dept_proc_where=dept_proc_where,
-            dept_proc_params=dept_proc_params,
+            dept_proc_where=full_where,
+            dept_proc_params=full_params,
             reason_excl_sql=reason_excl_sql,
             reason_excl_params=reason_excl_params,
         )
         package_summary_items = _query_package_summary(
             conn,
-            dept_proc_where=dept_proc_where,
-            dept_proc_params=dept_proc_params,
+            dept_proc_where=full_where,
+            dept_proc_params=full_params,
             reason_excl_sql=reason_excl_sql,
             reason_excl_params=reason_excl_params,
         )

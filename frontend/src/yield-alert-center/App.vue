@@ -16,7 +16,7 @@ import YieldStationChart from './YieldStationChart.vue';
 import YieldPackageChart from './YieldPackageChart.vue';
 import YieldTrendChart from './YieldTrendChart.vue';
 
-const API_TIMEOUT = 90000;
+const API_TIMEOUT = 180000;
 const DEFAULT_PER_PAGE = 20;
 const DEFAULT_WORKCENTER_GROUP_OPTIONS = [
   '焊接_DB',
@@ -274,9 +274,12 @@ async function loadFilterOptions() {
 }
 
 function isCacheExpiredError(error) {
-  const payloadError = String(error?.payload?.error || '').trim();
-  const message = String(error?.message || '').trim();
-  return payloadError === 'cache_expired' || message === 'cache_expired' || Number(error?.status || 0) === 410;
+  if (Number(error?.status || 0) === 410) return true;
+  const errorCode = String(error?.errorCode || error?.payload?.error?.code || error?.payload?.code || '').toUpperCase();
+  if (errorCode === 'CACHE_EXPIRED') return true;
+  const payloadError = String(error?.payload?.error || '').trim().toLowerCase();
+  if (payloadError === 'cache_expired') return true;
+  return false;
 }
 
 async function executePrimaryQuery() {
@@ -429,7 +432,7 @@ async function runQuery(page = 1) {
     try {
       await loadCachedView(page);
     } catch (error) {
-      if (!isDateStageDirty.value && isCacheExpiredError(error)) {
+      if (isCacheExpiredError(error)) {
         await executePrimaryQuery();
         await loadCachedView(page);
       } else {
@@ -439,7 +442,11 @@ async function runQuery(page = 1) {
     hasQueried.value = true;
     syncUrlState();
   } catch (error) {
-    errorMessage.value = error.message || '查詢失敗，請稍後再試';
+    if (error?.name === 'AbortError' || /abort/i.test(error?.message || '')) {
+      errorMessage.value = '查詢逾時，請縮小日期範圍後重試';
+    } else {
+      errorMessage.value = error.message || '查詢失敗，請稍後再試';
+    }
   } finally {
     loading.value = false;
     summaryLoading.value = false;
@@ -718,32 +725,34 @@ onUnmounted(() => {
       </article>
     </section>
 
-    <section v-if="hasQueried" class="trend-panel">
-      <LoadingSpinner v-if="trendLoading" size="sm" />
-      <YieldTrendChart
-        :trend="trend"
-        :risk-threshold="Number(filters.risk_threshold || 98)"
-        :granularity="granularity"
-      />
-    </section>
+    <div v-if="hasQueried" class="chart-grid">
+      <section class="trend-panel">
+        <LoadingSpinner v-if="trendLoading" size="sm" />
+        <YieldTrendChart
+          :trend="trend"
+          :risk-threshold="Number(filters.risk_threshold || 98)"
+          :granularity="granularity"
+        />
+      </section>
 
-    <section v-if="hasQueried" class="heatmap-panel">
-      <YieldHeatmap :heatmap="heatmapData" :granularity="granularity" />
-    </section>
+      <section v-if="stationSummary.length > 0" class="station-summary-panel">
+        <YieldStationChart
+          :station-summary="stationSummary"
+          :risk-threshold="Number(filters.risk_threshold || 98)"
+        />
+      </section>
 
-    <section v-if="hasQueried && stationSummary.length > 0" class="station-summary-panel">
-      <YieldStationChart
-        :station-summary="stationSummary"
-        :risk-threshold="Number(filters.risk_threshold || 98)"
-      />
-    </section>
+      <section v-if="packageSummary.length > 0" class="package-summary-panel chart-grid-full">
+        <YieldPackageChart
+          :package-summary="packageSummary"
+          :risk-threshold="Number(filters.risk_threshold || 98)"
+        />
+      </section>
 
-    <section v-if="hasQueried && packageSummary.length > 0" class="package-summary-panel">
-      <YieldPackageChart
-        :package-summary="packageSummary"
-        :risk-threshold="Number(filters.risk_threshold || 98)"
-      />
-    </section>
+      <section class="heatmap-panel chart-grid-full">
+        <YieldHeatmap :heatmap="heatmapData" :granularity="granularity" />
+      </section>
+    </div>
 
     <section class="alerts-panel">
       <header>
