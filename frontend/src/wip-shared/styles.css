@@ -203,26 +203,7 @@
   color: var(--muted);
 }
 
-:is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center) .loading-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-:is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center) .loading-spinner {
-  display: inline-block;
-  width: 24px;
-  height: 24px;
-  border: 3px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-right: theme('spacing.token.p10');
-}
+/* Loading overlay/spinner styles moved to shared-ui LoadingOverlay.vue (scoped) */
 
 @keyframes spin {
   to {

@@ -446,34 +446,7 @@
   color: var(--resource-muted);
 }
 
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .loading-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.28);
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .loading-overlay.hidden {
-  display: none;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .loading-spinner {
-  width: 42px;
-  height: 42px;
-  border: 4px solid theme('colors.token.he2e8f0');
-  border-top-color: var(--resource-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* Loading overlay/spinner styles moved to shared-ui LoadingOverlay.vue (scoped) */
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .error-banner {
   padding: theme('spacing.token.p10') theme('spacing.token.p12');

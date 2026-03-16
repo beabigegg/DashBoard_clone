@@ -33,6 +33,7 @@ defineProps({
 .loading-overlay--page {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.28);
 }
 </style>
