@@ -587,7 +587,16 @@ function handleNodeClick(params) {
   if (!data?.value?.cid) {
     return;
   }
-  if (data.value.type === 'serial') {
+  if (data.value.type === 'serial' || data.value.type === 'virtual-root') {
+    return;
+  }
+
+  // If node has children, let ECharts handle expand/collapse natively.
+  // Only toggle selection on leaf nodes or via explicit multi-select intent.
+  const hasChildren = Array.isArray(data.children) && data.children.length > 0;
+  if (hasChildren) {
+    // ECharts already toggled expand/collapse — don't also toggle selection
+    // which would trigger a full reactive re-render and reset expand state.
     return;
   }
 
@@ -681,8 +690,11 @@ function collapseAll() {
   const instance = getChartInstance();
   if (!instance) return;
   const series = Array.isArray(chartOption.value?.series) ? chartOption.value.series : [chartOption.value?.series];
+  // Depth 1 = show roots only (depth 0 hides everything including roots)
+  // With virtual root, depth 2 = virtual root + actual roots visible
+  const minDepth = treesData.value.length > 1 ? 2 : 1;
   instance.setOption({
-    series: series.map((s) => ({ ...s, initialTreeDepth: 0 })),
+    series: series.map((s) => ({ ...s, initialTreeDepth: minDepth })),
   }, false);
 }
 
@@ -753,7 +765,7 @@ function exportRelationCsv() {
           <code>→拆/→併/→晶/→重</code> 代表左側節點由本節點而來。
         </p>
         <p class="query-tool-muted lineage-direction-note">
-          滾輪縮放 · 拖曳平移 · 點擊節點展開/收合分支或多選
+          滾輪縮放 · 拖曳平移 · 點擊分支節點展開/收合 · 點擊末端節點選取
         </p>
       </div>
 
