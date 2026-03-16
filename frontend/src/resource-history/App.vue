@@ -658,6 +658,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <LoadingOverlay v-if="loading.initial" tier="page" />
+    <LoadingOverlay v-if="loading.initial || loading.querying" tier="page" />
   </div>
 </template>

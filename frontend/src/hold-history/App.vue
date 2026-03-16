@@ -703,5 +703,5 @@ onMounted(() => {
     </div>
   </div>
 
-  <LoadingOverlay v-if="initialLoading" tier="page" />
+  <LoadingOverlay v-if="initialLoading || loading.global" tier="page" />
 </template>

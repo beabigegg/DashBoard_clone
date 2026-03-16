@@ -430,5 +430,5 @@ onMounted(() => {
     </div>
   </div>
 
-  <LoadingOverlay v-if="initialLoading" tier="page" />
+  <LoadingOverlay v-if="initialLoading || refreshing" tier="page" />
 </template>

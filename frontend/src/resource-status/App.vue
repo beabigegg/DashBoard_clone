@@ -486,7 +486,7 @@ onMounted(() => {
       />
     </div>
 
-    <LoadingOverlay v-if="loading.initial" tier="page" />
+    <LoadingOverlay v-if="loading.initial || loading.refreshing" tier="page" />
 
     <FloatingTooltip
       :visible="tooltipState.visible"

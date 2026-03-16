@@ -10,6 +10,7 @@ import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrat
 import { toQueryParams } from './utils.js';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import YieldHeatmap from './YieldHeatmap.vue';
 import YieldStationChart from './YieldStationChart.vue';
@@ -854,5 +855,6 @@ onUnmounted(() => {
         <button class="ui-btn ui-btn--ghost" :disabled="loading || paginationLoading || pagination.page >= pagination.total_pages" @click="goToPage(pagination.page + 1)">下一頁</button>
       </footer>
     </section>
+    <LoadingOverlay v-if="loading" tier="page" />
   </div>
 </template>
