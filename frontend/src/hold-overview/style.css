@@ -459,6 +459,12 @@
   }
 }
 
+@media (max-width: 700px) {
+  .theme-hold-overview .filters {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .dashboard.hold-overview-page {
     padding: theme('spacing.nav');

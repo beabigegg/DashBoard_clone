@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 
 import Pagination from '../../shared-ui/components/PaginationControl.vue';
 
@@ -28,8 +29,8 @@ const props = defineProps({
 
 const emit = defineEmits(['export-csv', 'prev-page', 'next-page']);
 
-const sortField = ref('DEFECT_RATE');
-const sortAsc = ref(false);
+const dataRef = computed(() => props.data);
+const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(dataRef);
 
 const COLUMNS_BACKWARD = [
   { key: 'CONTAINERNAME', label: 'LOT ID', width: '140px' },
@@ -61,22 +62,6 @@ const activeColumns = computed(() => (
   props.direction === 'forward' ? COLUMNS_FORWARD : COLUMNS_BACKWARD
 ));
 
-const sortedData = computed(() => {
-  if (!props.data || !props.data.length) return [];
-  const field = sortField.value;
-  const asc = sortAsc.value;
-  return [...props.data].sort((a, b) => {
-    const va = a[field] ?? '';
-    const vb = b[field] ?? '';
-    if (typeof va === 'number' && typeof vb === 'number') {
-      return asc ? va - vb : vb - va;
-    }
-    const sa = String(va);
-    const sb = String(vb);
-    return asc ? sa.localeCompare(sb) : sb.localeCompare(sa);
-  });
-});
-
 const tableInfo = computed(() => {
   const p = props.pagination;
   const total = Number(p.total_count || 0);
@@ -88,18 +73,9 @@ const tableInfo = computed(() => {
   return `顯示 ${start} - ${end} 筆，共 ${total.toLocaleString()} 筆`;
 });
 
-function toggleSort(field) {
-  if (sortField.value === field) {
-    sortAsc.value = !sortAsc.value;
-  } else {
-    sortField.value = field;
-    sortAsc.value = false;
-  }
-}
-
 function sortIcon(field) {
-  if (sortField.value !== field) return '';
-  return sortAsc.value ? ' ▲' : ' ▼';
+  if (sortKey.value !== field) return ' ⇕';
+  return sortDirection.value === 'asc' ? ' ▲' : ' ▼';
 }
 
 function formatCell(value, col) {
@@ -151,7 +127,8 @@ function getSuspectHits(row) {
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
-                :style="{ width: col.width }"
+                :style="{ width: col.width, cursor: 'pointer' }"
+                :aria-sort="sortKey === col.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'"
                 class="sortable"
                 @click="toggleSort(col.key)"
               >

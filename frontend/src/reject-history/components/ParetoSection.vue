@@ -157,8 +157,8 @@ function handleChartClick(params) {
       </div>
     </div>
     <div class="card-body ui-card-body pareto-layout">
-      <div class="pareto-chart-wrap">
-        <VChart :option="chartOption" autoresize @click="handleChartClick" />
+      <div class="pareto-chart-wrap" role="img" aria-label="退貨原因柏拉圖">
+        <VChart :option="chartOption" :autoresize="{ throttle: 100 }" @click="handleChartClick" />
         <div v-if="!hasData && !loading" class="placeholder chart-empty">No data</div>
       </div>
       <div class="pareto-table-wrap">

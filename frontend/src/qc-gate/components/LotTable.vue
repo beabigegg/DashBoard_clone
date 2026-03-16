@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 
 const props = defineProps({
   lots: {
@@ -14,8 +15,8 @@ const props = defineProps({
 
 const emit = defineEmits(['clear-filter']);
 
-const sortKey = ref('wait_hours');
-const sortDirection = ref('desc');
+const lotsRef = computed(() => props.lots);
+const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(lotsRef);
 
 const BUCKET_LABELS = {
   lt_6h: '<6hr',
@@ -36,42 +37,6 @@ const HEADERS = [
   { key: 'bucket', label: '區間' },
   { key: 'status', label: '狀態' },
 ];
-
-function normalizeForSort(value, key) {
-  if (key === 'qty' || key === 'wait_hours') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  if (value == null) {
-    return '';
-  }
-  return String(value).toUpperCase();
-}
-
-function toggleSort(key) {
-  if (sortKey.value === key) {
-    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
-    return;
-  }
-  sortKey.value = key;
-  sortDirection.value = key === 'wait_hours' ? 'desc' : 'asc';
-}
-
-const sortedLots = computed(() => {
-  const rows = Array.isArray(props.lots) ? [...props.lots] : [];
-  const direction = sortDirection.value === 'asc' ? 1 : -1;
-  const key = sortKey.value;
-
-  rows.sort((left, right) => {
-    const leftValue = normalizeForSort(left?.[key], key);
-    const rightValue = normalizeForSort(right?.[key], key);
-    if (leftValue < rightValue) return -1 * direction;
-    if (leftValue > rightValue) return 1 * direction;
-    return 0;
-  });
-
-  return rows;
-});
 
 function formatValue(value, fallback = '-') {
   if (value == null || value === '') {
@@ -123,7 +88,7 @@ function bucketClass(value) {
 
 function currentSortLabel(columnKey) {
   if (sortKey.value !== columnKey) {
-    return '';
+    return '⇕';
   }
   return sortDirection.value === 'asc' ? '▲' : '▼';
 }
@@ -139,20 +104,14 @@ function currentSortLabel(columnKey) {
       <table class="lot-table">
         <thead>
           <tr>
-            <th v-for="header in HEADERS" :key="header.key">
-              <button
-                type="button"
-                class="sort-button"
-                @click="toggleSort(header.key)"
-              >
-                {{ header.label }}
-                <span class="sort-indicator">{{ currentSortLabel(header.key) }}</span>
-              </button>
+            <th v-for="header in HEADERS" :key="header.key" style="cursor:pointer" :aria-sort="sortKey === header.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" @click="toggleSort(header.key)">
+              {{ header.label }}
+              <span class="sort-indicator">{{ currentSortLabel(header.key) }}</span>
             </th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="lot in sortedLots" :key="`${lot.lot_id}-${lot.step}-${lot.move_in_time}`">
+          <tr v-for="lot in sortedData" :key="`${lot.lot_id}-${lot.step}-${lot.move_in_time}`">
             <td>{{ formatValue(lot.lot_id) }}</td>
             <td>{{ formatValue(lot.package) }}</td>
             <td>{{ formatValue(lot.product) }}</td>
@@ -168,7 +127,7 @@ function currentSortLabel(columnKey) {
             </td>
             <td>{{ formatValue(lot.status) }}</td>
           </tr>
-          <tr v-if="sortedLots.length === 0">
+          <tr v-if="sortedData.length === 0">
             <td class="table-empty" :colspan="HEADERS.length">目前無符合條件的 LOT</td>
           </tr>
         </tbody>

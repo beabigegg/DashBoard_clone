@@ -267,6 +267,22 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  :is(.theme-wip-overview, .theme-wip-detail) .refresh-indicator,
+  :is(.theme-wip-overview, .theme-wip-detail) .loading-spinner {
+    animation: none;
+  }
+
+  :is(.theme-wip-overview, .theme-wip-detail) .refresh-success.active {
+    animation: none;
+    opacity: 0;
+  }
+
+  :is(.theme-wip-overview, .theme-wip-detail) .summary-value.updated {
+    animation: none;
+  }
+}
+
 @media (max-width: 768px) {
   :is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center) .dashboard {
     padding: theme('spacing.4');

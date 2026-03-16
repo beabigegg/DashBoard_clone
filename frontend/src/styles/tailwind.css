@@ -297,6 +297,23 @@
   .ui-table-wrap .fade-in {
     animation: ui-fade-in var(--motion-slow) var(--motion-ease);
   }
+
+  /* === Zebra stripes for tables === */
+  .ui-table-wrap tbody tr:nth-child(even) {
+    background-color: theme('colors.surface.muted');
+  }
+
+  /* === Global Focus Ring === */
+  .ui-btn:focus-visible,
+  .ui-btn--primary:focus-visible,
+  .ui-btn--ghost:focus-visible,
+  .drawer-link:focus-visible,
+  .multi-select-trigger:focus-visible,
+  .pagination button:focus-visible,
+  .matrix-table td.clickable:focus-visible {
+    outline: 2px solid theme('colors.brand.500');
+    outline-offset: 2px;
+  }
 }
 
 @layer utilities {

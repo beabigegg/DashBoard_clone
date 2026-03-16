@@ -90,8 +90,8 @@ const chartOption = computed(() => {
 <template>
   <div class="trend-chart-card">
     <h4 v-if="title" class="trend-chart-title">{{ title }}</h4>
-    <div v-if="hasData" class="trend-chart-canvas" :style="{ height }">
-      <VChart :option="chartOption" autoresize />
+    <div v-if="hasData" class="trend-chart-canvas" :style="{ height }" role="img" aria-label="效能趨勢圖">
+      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>
     <div v-else class="trend-chart-empty">趨勢資料不足（需至少 2 筆快照）</div>
   </div>

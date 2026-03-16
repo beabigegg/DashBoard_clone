@@ -88,8 +88,8 @@ const chartOption = computed(() => {
 <template>
   <article class="chart-card">
     <h3 class="chart-title">Top 15 Workcenter OU%</h3>
-    <div v-if="hasData" class="chart-body">
-      <VChart :option="chartOption" autoresize />
+    <div v-if="hasData" class="chart-body" role="img" aria-label="設備稼動率比較圖">
+      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>
     <div v-else class="chart-no-data">No data</div>
   </article>

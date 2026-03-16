@@ -119,8 +119,8 @@ const chartOption = computed(() => {
 <template>
   <article class="chart-card">
     <h3 class="chart-title">各 Package 報廢量與良率</h3>
-    <div v-if="hasData" class="chart-body">
-      <VChart :option="chartOption" autoresize />
+    <div v-if="hasData" class="chart-body" role="img" aria-label="良率封裝圖">
+      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>
     <div v-else class="chart-no-data">尚無 Package 資料</div>
   </article>

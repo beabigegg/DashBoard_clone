@@ -84,8 +84,8 @@ const chartOption = computed(() => {
 <template>
   <article class="chart-card">
     <h3 class="chart-title">各站良率表現（由低到高）</h3>
-    <div v-if="hasData" class="chart-body" :style="{ height: `${chartHeight}px` }">
-      <VChart :option="chartOption" autoresize />
+    <div v-if="hasData" class="chart-body" :style="{ height: `${chartHeight}px` }" role="img" aria-label="良率站點圖">
+      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>
     <div v-else class="chart-no-data">尚無站別資料</div>
   </article>

@@ -485,6 +485,20 @@
   margin-bottom: theme('spacing.token.p12');
 }
 
+@media (prefers-reduced-motion: reduce) {
+  :is(.theme-resource, .theme-resource-history) .loading-spinner {
+    animation: none;
+  }
+
+  :is(.theme-resource, .theme-resource-history) .summary-card.clickable:hover {
+    transform: none;
+  }
+
+  :is(.theme-resource, .theme-resource-history) .expand-btn {
+    transition: none;
+  }
+}
+
 @media (max-width: 980px) {
   :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .resource-page {
     padding: theme('spacing.token.p12');
@@ -496,11 +510,6 @@
 }
 
 /* ---- MultiSelect component ---- */
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .multi-select {
-  position: relative;
-  min-width: 200px;
-}
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .multi-select-trigger {
   width: 100%;
@@ -515,18 +524,6 @@
   color: theme('colors.token.h1f2937');
   background: theme('colors.token.hffffff');
   cursor: pointer;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .multi-select-trigger:disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .multi-select-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .multi-select-arrow {
@@ -613,7 +610,4 @@
     min-width: 220px;
   }
 
-  :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .multi-select {
-    min-width: 150px;
-  }
 }

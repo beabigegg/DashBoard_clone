@@ -210,6 +210,7 @@ watch(
 
 <template>
   <div class="shell" :class="sidebarUiState.shellClass">
+    <a href="#main-content" class="sr-only focus:not-sr-only">跳至主要內容</a>
     <header class="shell-header">
       <div class="shell-header-left">
         <button
@@ -252,7 +253,7 @@ watch(
     </Transition>
 
     <main class="shell-main">
-      <aside class="sidebar" :class="sidebarUiState.sidebarClass">
+      <aside class="sidebar" :class="sidebarUiState.sidebarClass" role="navigation" aria-label="主選單">
         <div v-if="loading" class="muted">載入導覽中...</div>
         <div v-else-if="errorMessage" class="error">{{ errorMessage }}</div>
         <template v-else>
@@ -271,7 +272,7 @@ watch(
         </template>
       </aside>
 
-      <section class="shell-content">
+      <main id="main-content" class="shell-content">
         <div v-if="navigationNotice" class="notice-banner">{{ navigationNotice }}</div>
         <div class="breadcrumb">
           <span v-if="breadcrumb.drawerName">{{ breadcrumb.drawerName }}</span>
@@ -279,7 +280,7 @@ watch(
           <span>{{ breadcrumb.title }}</span>
         </div>
         <RouterView />
-      </section>
+      </main>
     </main>
   </div>
 </template>

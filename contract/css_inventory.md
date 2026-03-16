@@ -32,6 +32,7 @@ Governance status (2026-03-12): `css-governance-check` = 0 errors, 0 warnings.
 | `frontend/src/shared-ui/components/LoadingSpinner.vue` | `<style scoped>` | Inline spinner; sizes sm/md/lg |
 | `frontend/src/shared-ui/components/LoadingOverlay.vue` | `<style scoped>` | Section/page tier overlay |
 | `frontend/src/shared-ui/components/EmptyState.vue` | `<style scoped>` | Typed empty state messages |
+| `frontend/src/shared-ui/components/ErrorBanner.vue` | `<style scoped>` | Dismissible error banner; `message` prop + `action` slot + `dismiss` event |
 
 ## Route-Local Feature Layers
 

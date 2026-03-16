@@ -123,8 +123,8 @@ const chartOption = computed(() => {
       <div class="card-title ui-card-title">Daily Trend</div>
     </div>
     <div class="card-body ui-card-body">
-      <div v-if="hasData" class="trend-chart-wrap">
-        <VChart :option="chartOption" autoresize />
+      <div v-if="hasData" class="trend-chart-wrap" role="img" aria-label="Hold 每日趨勢圖">
+        <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
       </div>
       <div v-else class="placeholder">No data</div>
     </div>

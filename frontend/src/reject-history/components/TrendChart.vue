@@ -96,7 +96,7 @@ function handleLegendChange(params) {
   <section class="chart-grid">
     <article class="card ui-card">
       <div class="card-header ui-card-header"><div class="card-title ui-card-title">報廢量趨勢</div></div>
-      <div class="card-body ui-card-body chart-wrap">
+      <div class="card-body ui-card-body chart-wrap" role="img" aria-label="退貨數量趨勢圖">
         <VChart class="chart-canvas" :option="chartOption" :autoresize="{ throttle: 100 }" @click="handleChartClick" @legendselectchanged="handleLegendChange" />
         <div v-if="!hasData && !loading" class="placeholder chart-empty">No data</div>
       </div>

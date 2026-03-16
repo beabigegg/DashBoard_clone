@@ -98,13 +98,13 @@ const chartOption = computed(() => {
 </script>
 
 <template>
-  <div class="chart-card chart-card-full">
+  <div class="chart-card chart-card-full" role="img" aria-label="中段缺陷趨勢圖">
     <h3 class="chart-title">每日不良趨勢</h3>
     <VChart
       v-if="chartOption"
       class="chart-canvas chart-canvas-wide"
       :option="chartOption"
-      autoresize
+      :autoresize="{ throttle: 100 }"
     />
     <div v-else class="chart-empty">暫無資料</div>
   </div>

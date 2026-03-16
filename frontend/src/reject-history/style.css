@@ -419,6 +419,14 @@
   font-size: 12px;
 }
 
+.pareto-table tbody tr {
+  cursor: pointer;
+}
+
+.pareto-table tbody tr:hover {
+  background: theme('colors.surface.hover');
+}
+
 .pareto-table tbody tr.active {
   background: theme('colors.token.heff6ff');
 }
@@ -682,5 +690,11 @@
 
   .pareto-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-spinner {
+    animation: none;
   }
 }

@@ -175,7 +175,7 @@ function handleChartClick(params) {
 </script>
 
 <template>
-  <div class="chart-card">
+  <div class="chart-card" role="img" aria-label="中段缺陷柏拉圖">
     <div class="chart-header">
       <h3 class="chart-title">{{ title }}</h3>
       <button
@@ -192,7 +192,7 @@ function handleChartClick(params) {
       v-if="chartOption"
       class="chart-canvas"
       :option="chartOption"
-      autoresize
+      :autoresize="{ throttle: 100 }"
       @click="handleChartClick"
     />
     <div v-else class="chart-empty">暫無資料</div>

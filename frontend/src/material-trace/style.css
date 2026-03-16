@@ -451,3 +451,10 @@
     align-items: flex-start;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner,
+  .btn-spinner {
+    animation: none;
+  }
+}

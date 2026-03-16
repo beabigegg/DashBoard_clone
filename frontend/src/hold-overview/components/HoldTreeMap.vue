@@ -205,7 +205,7 @@ function handleChartClick(params) {
 </script>
 
 <template>
-  <section class="treemap-section">
+  <section class="treemap-section" role="img" aria-label="Hold 樹狀圖">
     <div class="treemap-legend">
       <span><i class="legend-color legend-green"></i>綠(&lt;1天)</span>
       <span><i class="legend-color legend-yellow"></i>黃(1-3天)</span>
@@ -217,7 +217,7 @@ function handleChartClick(params) {
       v-if="hasData"
       class="treemap-chart"
       :option="chartOption"
-      autoresize
+      :autoresize="{ throttle: 100 }"
       @click="handleChartClick"
     />
     <div v-else class="placeholder treemap-empty">目前無 Hold 資料</div>

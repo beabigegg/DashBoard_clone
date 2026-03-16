@@ -33,7 +33,7 @@ export default {
         text: {
           primary: '#1f2937',
           secondary: '#64748b',
-          muted: '#94a3b8',
+          muted: '#64748b',
           subtle: '#475569'
         },
 

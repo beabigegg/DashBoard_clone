@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 
 import Pagination from '../../shared-ui/components/PaginationControl.vue';
 
@@ -31,6 +32,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['clear-filters', 'prev-page', 'next-page']);
+
+const lotsRef = computed(() => props.lots);
+const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(lotsRef);
 
 function formatNumber(value) {
   if (value === null || value === undefined || value === '-') {
@@ -82,18 +86,18 @@ const pageInfo = computed(() => {
       <table class="lot-table">
         <thead>
           <tr>
-            <th>LOTID</th>
-            <th>WORKORDER</th>
-            <th>QTY</th>
-            <th>Product</th>
-            <th>Package</th>
-            <th>Workcenter</th>
-            <th>Hold Reason</th>
-            <th>Age</th>
-            <th>Hold By</th>
-            <th>Dept</th>
-            <th>Hold Comment</th>
-            <th>Future Hold Comment</th>
+            <th @click="toggleSort('lotId')" style="cursor:pointer" :aria-sort="sortKey === 'lotId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOTID <span>{{ sortKey === 'lotId' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('workorder')" style="cursor:pointer" :aria-sort="sortKey === 'workorder' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WORKORDER <span>{{ sortKey === 'workorder' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('qty')" style="cursor:pointer" :aria-sort="sortKey === 'qty' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">QTY <span>{{ sortKey === 'qty' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('product')" style="cursor:pointer" :aria-sort="sortKey === 'product' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Product <span>{{ sortKey === 'product' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('package')" style="cursor:pointer" :aria-sort="sortKey === 'package' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'package' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('workcenter')" style="cursor:pointer" :aria-sort="sortKey === 'workcenter' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Workcenter <span>{{ sortKey === 'workcenter' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('holdReason')" style="cursor:pointer" :aria-sort="sortKey === 'holdReason' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold Reason <span>{{ sortKey === 'holdReason' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('age')" style="cursor:pointer" :aria-sort="sortKey === 'age' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Age <span>{{ sortKey === 'age' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('holdBy')" style="cursor:pointer" :aria-sort="sortKey === 'holdBy' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold By <span>{{ sortKey === 'holdBy' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('dept')" style="cursor:pointer" :aria-sort="sortKey === 'dept' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Dept <span>{{ sortKey === 'dept' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('holdComment')" style="cursor:pointer" :aria-sort="sortKey === 'holdComment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold Comment <span>{{ sortKey === 'holdComment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('futureHoldComment')" style="cursor:pointer" :aria-sort="sortKey === 'futureHoldComment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Future Hold Comment <span>{{ sortKey === 'futureHoldComment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -103,10 +107,10 @@ const pageInfo = computed(() => {
           <tr v-else-if="errorMessage">
             <td colspan="12" class="placeholder">{{ errorMessage }}</td>
           </tr>
-          <tr v-else-if="lots.length === 0">
+          <tr v-else-if="sortedData.length === 0">
             <td colspan="12" class="placeholder">No data</td>
           </tr>
-          <tr v-for="lot in lots" v-else :key="lot.lotId">
+          <tr v-for="lot in sortedData" v-else :key="lot.lotId">
             <td>{{ lot.lotId || '-' }}</td>
             <td>{{ lot.workorder || '-' }}</td>
             <td>{{ formatNumber(lot.qty) }}</td>

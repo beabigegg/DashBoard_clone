@@ -18,6 +18,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
   searchable: {
     type: Boolean,
     default: true,
@@ -125,14 +129,25 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
     <button
       type="button"
       class="multi-select-trigger"
-      :disabled="disabled"
+      :disabled="disabled || loading"
       @click="toggleDropdown"
     >
       <span class="multi-select-text">{{ selectedText }}</span>
-      <span class="multi-select-arrow">{{ isOpen ? '▲' : '▼' }}</span>
+      <!-- Loading spinner (Task 5.2) -->
+      <span v-if="loading" class="multi-select-spinner" aria-hidden="true">
+        <svg class="ms-spinner-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="14" />
+        </svg>
+      </span>
+      <!-- SVG chevron (Task 5.3) -->
+      <span v-else class="multi-select-arrow" :class="{ 'is-open': isOpen }" aria-hidden="true">
+        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" class="ms-chevron-icon">
+          <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </span>
     </button>
 
-    <div v-if="isOpen" class="multi-select-dropdown">
+    <div v-if="isOpen && !loading" class="multi-select-dropdown">
       <input
         v-if="searchable"
         ref="searchRef"
@@ -167,3 +182,78 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
     </div>
   </div>
 </template>
+
+<style scoped>
+.multi-select-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ms-spinner-icon {
+  width: 14px;
+  height: 14px;
+  animation: ms-spin var(--motion-slow, 300ms) linear infinite;
+  color: currentColor;
+}
+
+@keyframes ms-spin {
+  to { transform: rotate(360deg); }
+}
+
+.multi-select-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform var(--motion-fast, 150ms) var(--motion-ease, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+.multi-select-arrow.is-open {
+  transform: rotate(180deg);
+}
+
+.ms-chevron-icon {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+}
+
+/* === Base structural styles (no theme dependency) === */
+.multi-select {
+  position: relative;
+  min-width: 200px;
+}
+
+.multi-select-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.multi-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.multi-select-options {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .multi-select {
+    min-width: 150px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-spinner-icon,
+  .multi-select-arrow {
+    animation: none;
+    transition: none;
+  }
+}
+</style>

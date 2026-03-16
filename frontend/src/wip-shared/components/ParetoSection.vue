@@ -143,12 +143,12 @@ function handleChartClick(params) {
       </div>
     </div>
 
-    <div class="pareto-body">
+    <div class="pareto-body" role="img" aria-label="WIP 柏拉圖">
       <VChart
         v-if="hasData"
         class="pareto-chart"
         :option="chartOption"
-        autoresize
+        :autoresize="{ throttle: 100 }"
         @click="handleChartClick"
       />
       <div v-else class="pareto-no-data">目前無資料</div>

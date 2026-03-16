@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 
 import Pagination from '../../shared-ui/components/PaginationControl.vue';
 
@@ -31,6 +32,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['select-lot', 'prev-page', 'next-page']);
+
+const lotsRef = computed(() => props.data.lots || []);
+const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(lotsRef);
 
 function formatNumber(value) {
   if (value === null || value === undefined || value === '-') {
@@ -96,19 +100,19 @@ const pageInfo = computed(() => {
 
     <div class="table-container" :class="{ paginating: paginating }">
       <div v-if="loading" class="placeholder">Loading...</div>
-      <div v-else-if="!data.lots || data.lots.length === 0" class="placeholder">No data available</div>
+      <div v-else-if="!sortedData || sortedData.length === 0" class="placeholder">No data available</div>
       <table v-else>
         <thead>
           <tr>
-            <th class="fixed-col">LOT ID</th>
-            <th class="fixed-col">Equipment</th>
-            <th class="fixed-col">WIP Status</th>
-            <th class="fixed-col">Package</th>
+            <th class="fixed-col" @click="toggleSort('lotId')" style="cursor:pointer" :aria-sort="sortKey === 'lotId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOT ID <span>{{ sortKey === 'lotId' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col" @click="toggleSort('equipment')" style="cursor:pointer" :aria-sort="sortKey === 'equipment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Equipment <span>{{ sortKey === 'equipment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col" @click="toggleSort('wipStatus')" style="cursor:pointer" :aria-sort="sortKey === 'wipStatus' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WIP Status <span>{{ sortKey === 'wipStatus' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col" @click="toggleSort('package')" style="cursor:pointer" :aria-sort="sortKey === 'package' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'package' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
             <th v-for="spec in data.specs" :key="spec" class="spec-col">{{ spec }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="lot in data.lots" :key="lot.lotId">
+          <tr v-for="lot in sortedData" :key="lot.lotId">
             <td class="fixed-col">
               <button
                 type="button"

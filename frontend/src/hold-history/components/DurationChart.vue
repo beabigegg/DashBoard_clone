@@ -107,8 +107,8 @@ function handleChartClick(params) {
       <div class="card-title ui-card-title">Hold Duration Distribution</div>
     </div>
     <div class="card-body ui-card-body">
-      <div v-if="hasData" class="duration-chart-wrap">
-        <VChart :option="chartOption" autoresize @click="handleChartClick" />
+      <div v-if="hasData" class="duration-chart-wrap" role="img" aria-label="Hold 時長分佈圖">
+        <VChart :option="chartOption" :autoresize="{ throttle: 100 }" @click="handleChartClick" />
       </div>
       <div v-else class="placeholder">No data</div>
     </div>

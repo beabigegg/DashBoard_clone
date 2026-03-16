@@ -14,6 +14,10 @@ The frontend SHALL enforce `frontend/tailwind.config.js` as the single source of
 - **THEN** it SHALL be added under `theme.extend` in `frontend/tailwind.config.js`
 - **THEN** CSS token consumption SHALL use `theme('...')` paths instead of introducing route-local `:root` token variables
 
+#### Scenario: text.muted meets WCAG AA contrast
+- **WHEN** `text.muted` is used on white/light backgrounds
+- **THEN** the token value SHALL be `#64748b` or darker to achieve minimum 4.5:1 contrast ratio
+
 ### Requirement: Tailwind migration SHALL support coexistence with legacy CSS
 Tailwind migration SHALL allow controlled legacy coexistence only as a time-bounded transition state. New or modified route styles SHALL NOT introduce additional token-like `:root` definitions or route-global selectors for local presentation behavior.
 
@@ -41,4 +45,14 @@ When equivalent visual semantics are repeated across routes, shared styling SHAL
 - **WHEN** an equivalent utility/style combination appears in three or more places across route modules
 - **THEN** the style SHALL be extracted as a shared `ui-*` component class
 - **THEN** route modules SHALL consume the shared class instead of duplicating local declarations
+
+#### Scenario: Global focus-visible rules in shared layer
+- **WHEN** focus-visible styling is needed across all interactive elements
+- **THEN** the rules SHALL be defined in `tailwind.css` `@layer components`
+- **THEN** the rules SHALL use `theme()` for color values
+
+#### Scenario: Table zebra striping in shared layer
+- **WHEN** alternating row backgrounds are needed for data tables
+- **THEN** the rule SHALL be defined in `tailwind.css` `@layer components` under `.ui-table-wrap`
+- **THEN** the background color SHALL reference `theme('colors.surface.muted')`
 

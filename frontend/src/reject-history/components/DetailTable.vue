@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 
-defineProps({
+const props = defineProps({
   items: { type: Array, default: () => [] },
   pagination: {
     type: Object,
@@ -14,6 +15,9 @@ defineProps({
 });
 
 defineEmits(['go-to-page', 'clear-pareto-selection']);
+
+const itemsRef = computed(() => props.items);
+const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(itemsRef);
 
 const showRejectBreakdown = ref(false);
 
@@ -38,16 +42,16 @@ function formatNumber(value) {
       <table class="detail-table">
         <thead>
           <tr>
-            <th>LOT</th>
-            <th>WORKCENTER</th>
-            <th>Package</th>
-            <th>FUNCTION</th>
-            <th class="col-left">TYPE</th>
-            <th>WORKFLOW</th>
-            <th>PRODUCT</th>
-            <th>原因</th>
-            <th>EQUIPMENT</th>
-            <th>COMMENT</th>
+            <th @click="toggleSort('CONTAINERNAME')" style="cursor:pointer" :aria-sort="sortKey === 'CONTAINERNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOT <span>{{ sortKey === 'CONTAINERNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('WORKCENTERNAME')" style="cursor:pointer" :aria-sort="sortKey === 'WORKCENTERNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WORKCENTER <span>{{ sortKey === 'WORKCENTERNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('PRODUCTLINENAME')" style="cursor:pointer" :aria-sort="sortKey === 'PRODUCTLINENAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'PRODUCTLINENAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('PJ_FUNCTION')" style="cursor:pointer" :aria-sort="sortKey === 'PJ_FUNCTION' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">FUNCTION <span>{{ sortKey === 'PJ_FUNCTION' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="col-left" @click="toggleSort('PJ_TYPE')" style="cursor:pointer" :aria-sort="sortKey === 'PJ_TYPE' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">TYPE <span>{{ sortKey === 'PJ_TYPE' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('WORKFLOWNAME')" style="cursor:pointer" :aria-sort="sortKey === 'WORKFLOWNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WORKFLOW <span>{{ sortKey === 'WORKFLOWNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('PRODUCTNAME')" style="cursor:pointer" :aria-sort="sortKey === 'PRODUCTNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">PRODUCT <span>{{ sortKey === 'PRODUCTNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('LOSSREASONNAME')" style="cursor:pointer" :aria-sort="sortKey === 'LOSSREASONNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">原因 <span>{{ sortKey === 'LOSSREASONNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('EQUIPMENTNAME')" style="cursor:pointer" :aria-sort="sortKey === 'EQUIPMENTNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">EQUIPMENT <span>{{ sortKey === 'EQUIPMENTNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('REJECTCOMMENT')" style="cursor:pointer" :aria-sort="sortKey === 'REJECTCOMMENT' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">COMMENT <span>{{ sortKey === 'REJECTCOMMENT' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
             <th class="th-expandable" @click="showRejectBreakdown = !showRejectBreakdown">
               扣帳報廢量 <span class="expand-icon">{{ showRejectBreakdown ? '▾' : '▸' }}</span>
             </th>
@@ -58,12 +62,12 @@ function formatNumber(value) {
               <th class="th-sub">INPROCESS</th>
               <th class="th-sub">PROCESSED</th>
             </template>
-            <th>不扣帳報廢量</th>
-            <th>報廢時間</th>
+            <th @click="toggleSort('DEFECT_QTY')" style="cursor:pointer" :aria-sort="sortKey === 'DEFECT_QTY' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">不扣帳報廢量 <span>{{ sortKey === 'DEFECT_QTY' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('TXN_TIME')" style="cursor:pointer" :aria-sort="sortKey === 'TXN_TIME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">報廢時間 <span>{{ sortKey === 'TXN_TIME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, idx) in items" :key="`${row.TXN_DAY}-${row.CONTAINERNAME}-${row.LOSSREASONNAME}-${idx}`">
+          <tr v-for="(row, idx) in sortedData" :key="`${row.TXN_DAY}-${row.CONTAINERNAME}-${row.LOSSREASONNAME}-${idx}`">
             <td>{{ row.CONTAINERNAME || '' }}</td>
             <td>{{ row.WORKCENTERNAME }}</td>
             <td>{{ row.PRODUCTLINENAME }}</td>
@@ -85,7 +89,7 @@ function formatNumber(value) {
             <td>{{ formatNumber(row.DEFECT_QTY) }}</td>
             <td class="cell-nowrap">{{ row.TXN_TIME || row.TXN_DAY }}</td>
           </tr>
-          <tr v-if="!items || items.length === 0">
+          <tr v-if="!sortedData || sortedData.length === 0">
             <td :colspan="showRejectBreakdown ? 18 : 13" class="placeholder">No data</td>
           </tr>
         </tbody>

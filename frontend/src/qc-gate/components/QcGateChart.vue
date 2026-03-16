@@ -138,12 +138,12 @@ function handleChartClick(params) {
 </script>
 
 <template>
-  <div class="qc-gate-chart">
+  <div class="qc-gate-chart" role="img" aria-label="QC Gate 圖表">
     <VChart
       v-if="stations.length"
       class="chart-canvas"
       :option="chartOption"
-      autoresize
+      :autoresize="{ throttle: 100 }"
       @click="handleChartClick"
     />
   </div>

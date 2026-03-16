@@ -9,6 +9,16 @@ The portal frontend SHALL use a single SPA shell entry and Vue Router to render 
 - **THEN** the route SHALL resolve through Vue Router with shell contract metadata
 - **THEN** the shell SHALL render the corresponding module/target without iframe fallback
 
+#### Scenario: Shell provides main content landmark
+- **WHEN** the portal shell renders
+- **THEN** the page content area SHALL be wrapped in a `<main id="main-content">` element
+- **THEN** the sidebar SHALL have `role="navigation"` and `aria-label="主選單"`
+
+#### Scenario: Shell provides skip-to-content link
+- **WHEN** the portal shell renders
+- **THEN** a visually-hidden skip link SHALL exist as the first focusable element in the DOM
+- **THEN** activating the skip link SHALL move keyboard focus to `#main-content`
+
 #### Scenario: Admin route appears as governed target
 - **WHEN** an admin user opens shell navigation
 - **THEN** `/admin/pages` and `/admin/performance` SHALL be exposed as governed navigation targets per access policy

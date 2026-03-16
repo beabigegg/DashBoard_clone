@@ -94,8 +94,8 @@ const chartOption = computed(() => {
     <h3 class="chart-title">
       良率趨勢 ({{ GRANULARITY_LABEL[granularity] ?? granularity }})
     </h3>
-    <div v-if="hasData" class="chart-body">
-      <VChart :option="chartOption" autoresize />
+    <div v-if="hasData" class="chart-body" role="img" aria-label="良率趨勢圖">
+      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>
     <div v-else class="chart-no-data">尚無趨勢資料</div>
   </article>

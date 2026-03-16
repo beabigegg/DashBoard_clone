@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive } from 'vue';
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 import Pagination from '../../shared-ui/components/PaginationControl.vue';
 
 const props = defineProps({
@@ -26,6 +27,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['prev-page', 'next-page']);
+
+const itemsRef = computed(() => props.items);
+const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(itemsRef);
 
 const pageSummary = computed(() => {
   const page = Number(props.pagination?.page || 1);
@@ -91,21 +95,21 @@ function hideTip() {
       <table class="detail-table">
         <thead>
           <tr>
-            <th>Lot ID</th>
-            <th>WorkOrder</th>
-            <th>Product</th>
-            <th>站別</th>
-            <th>Hold Reason</th>
-            <th>數量</th>
-            <th>Hold 時間</th>
-            <th>Hold 人員</th>
-            <th>Hold Comment</th>
-            <th>Release 時間</th>
-            <th>Release 人員</th>
-            <th>Release Comment</th>
-            <th>時長(hr)</th>
-            <th>NCR</th>
-            <th>Future Hold Comment</th>
+            <th @click="toggleSort('lotId')" style="cursor:pointer" :aria-sort="sortKey === 'lotId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Lot ID <span>{{ sortKey === 'lotId' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('workorder')" style="cursor:pointer" :aria-sort="sortKey === 'workorder' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WorkOrder <span>{{ sortKey === 'workorder' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('product')" style="cursor:pointer" :aria-sort="sortKey === 'product' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Product <span>{{ sortKey === 'product' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('workcenter')" style="cursor:pointer" :aria-sort="sortKey === 'workcenter' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">站別 <span>{{ sortKey === 'workcenter' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('holdReason')" style="cursor:pointer" :aria-sort="sortKey === 'holdReason' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold Reason <span>{{ sortKey === 'holdReason' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('qty')" style="cursor:pointer" :aria-sort="sortKey === 'qty' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">數量 <span>{{ sortKey === 'qty' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('holdDate')" style="cursor:pointer" :aria-sort="sortKey === 'holdDate' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold 時間 <span>{{ sortKey === 'holdDate' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('holdEmp')" style="cursor:pointer" :aria-sort="sortKey === 'holdEmp' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold 人員 <span>{{ sortKey === 'holdEmp' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('holdComment')" style="cursor:pointer" :aria-sort="sortKey === 'holdComment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold Comment <span>{{ sortKey === 'holdComment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('releaseDate')" style="cursor:pointer" :aria-sort="sortKey === 'releaseDate' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Release 時間 <span>{{ sortKey === 'releaseDate' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('releaseEmp')" style="cursor:pointer" :aria-sort="sortKey === 'releaseEmp' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Release 人員 <span>{{ sortKey === 'releaseEmp' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('releaseComment')" style="cursor:pointer" :aria-sort="sortKey === 'releaseComment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Release Comment <span>{{ sortKey === 'releaseComment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('holdHours')" style="cursor:pointer" :aria-sort="sortKey === 'holdHours' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">時長(hr) <span>{{ sortKey === 'holdHours' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('ncr')" style="cursor:pointer" :aria-sort="sortKey === 'ncr' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">NCR <span>{{ sortKey === 'ncr' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th @click="toggleSort('futureHoldComment')" style="cursor:pointer" :aria-sort="sortKey === 'futureHoldComment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Future Hold Comment <span>{{ sortKey === 'futureHoldComment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -115,10 +119,10 @@ function hideTip() {
           <tr v-else-if="errorMessage">
             <td colspan="15" class="placeholder">{{ errorMessage }}</td>
           </tr>
-          <tr v-else-if="items.length === 0">
+          <tr v-else-if="sortedData.length === 0">
             <td colspan="15" class="placeholder">No data</td>
           </tr>
-          <tr v-for="item in items" v-else :key="`${item.lotId}-${item.holdDate}-${item.releaseDate}`">
+          <tr v-for="item in sortedData" v-else :key="`${item.lotId}-${item.holdDate}-${item.releaseDate}`">
             <td>{{ item.lotId || '-' }}</td>
             <td>{{ item.workorder || '-' }}</td>
             <td>{{ item.product || '-' }}</td>

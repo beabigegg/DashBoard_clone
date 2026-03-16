@@ -8,6 +8,8 @@ import { TreeChart } from 'echarts/charts';
 import { TooltipComponent } from 'echarts/components';
 
 import ExportButton from './ExportButton.vue';
+import LoadingOverlay from '../../shared-ui/components/LoadingOverlay.vue';
+import PaginationControl from '../../shared-ui/components/PaginationControl.vue';
 import { normalizeText } from '../utils/values.js';
 
 use([CanvasRenderer, TreeChart, TooltipComponent]);
@@ -115,6 +117,8 @@ const chartRef = ref(null);
 const exportingTreeImage = ref(false);
 const exportingRelationCsv = ref(false);
 const exportErrorMessage = ref('');
+const relationPage = ref(1);
+const RELATION_PAGE_SIZE = 50;
 
 const selectedSet = computed(() => new Set(props.selectedContainerIds.map(normalizeText).filter(Boolean)));
 
@@ -172,6 +176,13 @@ const relationRows = computed(() => {
   ));
   return rows;
 });
+
+const pagedRelationRows = computed(() => relationRows.value.slice(
+  (relationPage.value - 1) * RELATION_PAGE_SIZE,
+  relationPage.value * RELATION_PAGE_SIZE,
+));
+
+const relationTotalPages = computed(() => Math.max(1, Math.ceil(relationRows.value.length / RELATION_PAGE_SIZE)));
 
 function detectNodeType(cid, entry, serials) {
   const explicitType = normalizeText(props.nodeMetaMap?.get?.(cid)?.node_type).toUpperCase();
@@ -440,8 +451,8 @@ const TREE_SERIES_DEFAULTS = Object.freeze({
   layout: 'orthogonal',
   orient: 'LR',
   expandAndCollapse: true,
-  initialTreeDepth: -1,
-  roam: 'move',
+  initialTreeDepth: 2,
+  roam: true,
   symbol: 'circle',
   symbolSize: 10,
   label: {
@@ -656,6 +667,30 @@ function buildCsvContent() {
   return `\uFEFF${lines.join('\r\n')}`;
 }
 
+function expandAll() {
+  const instance = getChartInstance();
+  if (!instance) return;
+  const series = Array.isArray(chartOption.value?.series) ? chartOption.value.series : [chartOption.value?.series];
+  instance.setOption({
+    series: series.map((s) => ({ ...s, initialTreeDepth: -1 })),
+  }, false);
+}
+
+function collapseAll() {
+  const instance = getChartInstance();
+  if (!instance) return;
+  const series = Array.isArray(chartOption.value?.series) ? chartOption.value.series : [chartOption.value?.series];
+  instance.setOption({
+    series: series.map((s) => ({ ...s, initialTreeDepth: 0 })),
+  }, false);
+}
+
+function resetView() {
+  const instance = getChartInstance();
+  if (!instance) return;
+  instance.dispatchAction({ type: 'restore' });
+}
+
 async function exportTreeAsPng() {
   if (!hasData.value || exportingTreeImage.value) {
     return;
@@ -673,7 +708,7 @@ async function exportTreeAsPng() {
 
     const dataUrl = instance.getDataURL({
       type: 'png',
-      pixelRatio: Math.max(2, Math.min(4, window.devicePixelRatio || 2)),
+      pixelRatio: Math.min(2, window.devicePixelRatio || 1),
       backgroundColor: 'rgb(255, 255, 255)',
     });
     triggerDownloadByUrl(dataUrl, buildExportFileName('png'));
@@ -719,6 +754,9 @@ function exportRelationCsv() {
       </div>
 
       <div class="flex items-center gap-3">
+        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="!hasData || loading" @click="expandAll">全部展開</button>
+        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="!hasData || loading" @click="collapseAll">全部收合</button>
+        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="!hasData || loading" @click="resetView">重置視圖</button>
         <ExportButton
           :disabled="!hasData || loading"
           :loading="exportingTreeImage"
@@ -791,12 +829,13 @@ function exportRelationCsv() {
 
     <!-- ECharts Tree -->
     <div v-else class="relative overflow-x-auto">
+      <LoadingOverlay v-if="exportingTreeImage" />
       <VChart
         ref="chartRef"
         class="lineage-tree-chart"
         :style="{ height: chartHeight, width: '100%', minWidth: chartMinWidth }"
         :option="chartOption"
-        autoresize
+        :autoresize="{ throttle: 100 }"
         @click="handleNodeClick"
       />
     </div>
@@ -816,7 +855,7 @@ function exportRelationCsv() {
           </thead>
           <tbody>
             <tr
-              v-for="row in relationRows.slice(0, 200)"
+              v-for="row in pagedRelationRows"
               :key="row.key"
             >
               <td class="lineage-relation-cell mono">
@@ -832,9 +871,12 @@ function exportRelationCsv() {
           </tbody>
         </table>
       </div>
-      <p v-if="relationRows.length > 200" class="query-tool-muted lineage-relation-note">
-        僅顯示前 200 筆，請搭配上方樹圖與節點點選進一步縮小範圍。
-      </p>
+      <PaginationControl
+        v-if="relationTotalPages > 1"
+        v-model="relationPage"
+        :total-pages="relationTotalPages"
+        :info-text="`第 ${relationPage}/${relationTotalPages} 頁，共 ${relationRows.length} 筆`"
+      />
     </details>
 
     <!-- Not found warning -->

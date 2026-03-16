@@ -270,6 +270,10 @@
   text-decoration: underline;
 }
 
+.theme-wip-overview .matrix-container {
+  overflow-x: auto;
+}
+
 @media (max-width: 1000px) {
   .filters {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
