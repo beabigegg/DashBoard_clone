@@ -1,5 +1,6 @@
 function createNativeLoader(componentLoader, styleLoaders = []) {
   let styleBootstrapPromise = null;
+  let componentModuleCache = null;
 
   return async () => {
     if (!styleBootstrapPromise) {
@@ -9,7 +10,10 @@ function createNativeLoader(componentLoader, styleLoaders = []) {
       });
     }
     await styleBootstrapPromise;
-    return componentLoader();
+    if (!componentModuleCache) {
+      componentModuleCache = await componentLoader();
+    }
+    return componentModuleCache;
   };
 }
 

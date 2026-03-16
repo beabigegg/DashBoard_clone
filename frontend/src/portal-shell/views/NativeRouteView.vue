@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { getNativeModuleLoader } from '../nativeModuleRegistry.js';
 import { buildLaunchHref } from '../routeQuery.js';
@@ -34,6 +34,22 @@ const moduleError = ref('');
 const resolvedComponent = ref(null);
 const MODULE_RECOVERY_KEY = 'portal-shell:native-module-recovered';
 const MODULE_RECOVERY_TTL_MS = 2 * 60 * 1000;
+const MODULE_LOAD_TIMEOUT_MS = 15000;
+const loadingElapsed = ref(0);
+let loadingTimer = null;
+
+function startLoadingTimer() {
+  loadingElapsed.value = 0;
+  clearInterval(loadingTimer);
+  loadingTimer = setInterval(() => {
+    loadingElapsed.value += 1;
+  }, 1000);
+}
+
+function stopLoadingTimer() {
+  clearInterval(loadingTimer);
+  loadingTimer = null;
+}
 
 function shouldRecoverWithReload(error) {
   const message = String(error?.message || error || '').toLowerCase();
@@ -81,9 +97,11 @@ async function loadNativeModule(route) {
   moduleLoading.value = true;
   moduleError.value = '';
   resolvedComponent.value = null;
+  startLoadingTimer();
 
   if (props.renderMode === 'external') {
     moduleLoading.value = false;
+    stopLoadingTimer();
     openLegacyPage();
     return;
   }
@@ -91,22 +109,31 @@ async function loadNativeModule(route) {
   const loader = getNativeModuleLoader(route);
   if (!loader) {
     moduleLoading.value = false;
+    stopLoadingTimer();
     return;
   }
 
   try {
-    const module = await loader();
+    const loadPromise = loader();
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('MODULE_LOAD_TIMEOUT')), MODULE_LOAD_TIMEOUT_MS);
+    });
+    const module = await Promise.race([loadPromise, timeoutPromise]);
     resolvedComponent.value = module?.default || null;
     if (!resolvedComponent.value) {
       moduleError.value = `Native module missing default export: ${route}`;
     }
   } catch (error) {
-    if (shouldRecoverWithReload(error) && recoverByReloadOnce()) {
+    if (error?.message === 'MODULE_LOAD_TIMEOUT') {
+      moduleError.value = `模組載入逾時 (${MODULE_LOAD_TIMEOUT_MS / 1000}s)，網路可能較慢`;
+    } else if (shouldRecoverWithReload(error) && recoverByReloadOnce()) {
       return;
+    } else {
+      moduleError.value = error?.message || `Failed to load native module: ${route}`;
     }
-    moduleError.value = error?.message || `Failed to load native module: ${route}`;
   } finally {
     moduleLoading.value = false;
+    stopLoadingTimer();
   }
 }
 
@@ -120,12 +147,16 @@ watch(
 onMounted(() => {
   void loadNativeModule(props.targetRoute);
 });
+
+onUnmounted(() => {
+  stopLoadingTimer();
+});
 </script>
 
 <template>
   <div v-if="moduleLoading" class="panel">
     <h2>{{ pageName }}</h2>
-    <p>載入 native route-view 模組中...</p>
+    <p>載入 native route-view 模組中...{{ loadingElapsed >= 3 ? ` (${loadingElapsed}s)` : '' }}</p>
   </div>
 
   <component
@@ -140,6 +171,7 @@ onMounted(() => {
     <p v-else>Native route-view integration 已啟用契約，但此頁仍暫時以既有頁面承載內容。</p>
     <p v-if="owner" class="muted">Owner: {{ owner }}</p>
     <div class="actions">
+      <button v-if="moduleError" type="button" class="btn-primary" @click="loadNativeModule(targetRoute)">重試載入</button>
       <button type="button" class="btn-primary" @click="openLegacyPage">開啟既有頁面</button>
       <a class="btn-link" :href="launchHref">直接前往 {{ launchHref }}</a>
     </div>

@@ -451,22 +451,22 @@
   margin-bottom: theme('spacing.token.p12');
 }
 
-.chart-card {
+.theme-yield-alert-center .chart-card {
   width: 100%;
 }
 
-.chart-title {
+.theme-yield-alert-center .chart-title {
   margin: 0 0 theme('spacing.token.p10');
   font-size: 15px;
   color: var(--ya-text);
 }
 
-.chart-body {
+.theme-yield-alert-center .chart-body {
   width: 100%;
   height: 340px;
 }
 
-.chart-no-data {
+.theme-yield-alert-center .chart-no-data {
   text-align: center;
   color: var(--ya-muted);
   padding: theme('spacing.token.p40') 0;

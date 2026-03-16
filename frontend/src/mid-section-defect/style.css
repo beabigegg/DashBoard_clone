@@ -417,14 +417,14 @@
   position: relative;
 }
 
-.chart-card {
+.theme-mid-section-defect .chart-card {
   background: var(--msd-card-bg);
   border-radius: 10px;
   box-shadow: var(--msd-shadow);
   padding: theme('spacing.4');
 }
 
-.chart-card-full {
+.theme-mid-section-defect .chart-card-full {
   grid-column: 1 / -1;
 }
 
@@ -436,11 +436,11 @@
   margin-bottom: theme('spacing.2');
 }
 
-.chart-header .chart-title {
+.theme-mid-section-defect .chart-header .chart-title {
   margin: 0;
 }
 
-.chart-title {
+.theme-mid-section-defect .chart-title {
   margin: 0 0 theme('spacing.2');
   font-size: 14px;
   font-weight: 600;

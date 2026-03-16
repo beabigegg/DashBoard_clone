@@ -87,7 +87,7 @@
   gap: 12px;
 }
 
-.chart-card {
+.theme-resource-history .chart-card {
   border: 1px solid var(--resource-border);
   border-radius: 10px;
   background: theme('colors.token.hffffff');
@@ -95,7 +95,7 @@
   overflow: hidden;
 }
 
-.chart-title {
+.theme-resource-history .chart-title {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
@@ -103,11 +103,11 @@
   border-bottom: 1px solid theme('colors.token.heef2f7');
 }
 
-.chart-body {
+.theme-resource-history .chart-body {
   height: 320px;
 }
 
-.chart-no-data {
+.theme-resource-history .chart-no-data {
   height: 320px;
   display: flex;
   align-items: center;
