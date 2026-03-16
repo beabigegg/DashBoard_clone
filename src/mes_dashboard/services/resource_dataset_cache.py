@@ -85,23 +85,37 @@ def _redis_load_df(query_id: str) -> Optional[pd.DataFrame]:
 
 
 def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
-    df = _dataset_cache.get(query_id)
-    if df is not None:
-        return df
+    """Load DataFrame from Redis or spool on demand — NOT promoted to L1."""
+    marker = _dataset_cache.get(query_id)
+    if marker is not None:
+        # L1 marker exists — data is in Redis or spool
+        pass
     df = _redis_load_df(query_id)
     if df is not None:
-        _dataset_cache.set(query_id, df)
         return df
     # Spool fallback (engine path writes spool instead of full Redis DataFrame)
     df = load_spooled_df(_REDIS_NAMESPACE, query_id)
-    if df is not None:
-        _dataset_cache.set(query_id, df)
     return df
 
 
+def _has_cached_df(query_id: str) -> bool:
+    """Check if query_id has cached data (L1 marker or Redis key exists)."""
+    if _dataset_cache.get(query_id) is not None:
+        return True
+    df = _redis_load_df(query_id)
+    return df is not None
+
+
 def _store_df(query_id: str, df: pd.DataFrame) -> None:
-    _dataset_cache.set(query_id, df)
+    """Store to Redis L2 + spool; L1 gets lightweight marker only."""
+    _dataset_cache.set(query_id, True)  # lightweight marker
     _redis_store_df(query_id, df)
+    # Also write spool so DuckDB view path works for direct-path queries
+    try:
+        from mes_dashboard.core.query_spool_store import store_spooled_df
+        store_spooled_df(_REDIS_NAMESPACE, query_id, df, ttl_seconds=_CACHE_TTL)
+    except Exception as exc:
+        logger.warning("resource spool write failed (query_id=%s): %s", query_id, exc)
 
 
 # ============================================================
@@ -257,6 +271,7 @@ def execute_primary_query(
                     spool_row_count,
                     ttl_seconds=_CACHE_TTL,
                 )
+                _dataset_cache.set(query_id, True)  # L1 marker
                 _loaded = load_spooled_df(_REDIS_NAMESPACE, query_id)
                 df = _loaded if _loaded is not None else pd.DataFrame()
             else:
@@ -278,6 +293,9 @@ def execute_primary_query(
 
     summary = _derive_summary(cached_df, resource_lookup, wc_mapping, granularity)
     detail = _derive_detail(cached_df, resource_lookup, wc_mapping)
+
+    # Release large DataFrame to free memory
+    del cached_df
 
     return {
         "query_id": query_id,

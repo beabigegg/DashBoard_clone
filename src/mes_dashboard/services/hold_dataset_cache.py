@@ -128,13 +128,9 @@ def _get_query_dates(query_id: str) -> Optional[Dict[str, str]]:
 
 
 def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
-    """Read cache: L1 hit → L2 hit → spool fallback."""
-    df = _dataset_cache.get(query_id)
-    if df is not None:
-        return df
+    """Load DataFrame from Redis or spool on demand — NOT promoted to L1."""
     df = _redis_load_df(query_id)
     if df is not None:
-        _dataset_cache.set(query_id, df)
         return df
     # Spool fallback (engine path writes spool instead of full Redis DataFrame)
     df = load_spooled_df(_REDIS_NAMESPACE, query_id)
@@ -146,14 +142,19 @@ def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
                 df = df.copy()
                 df["_QUERY_START"] = pd.Timestamp(dates["start"])
                 df["_QUERY_END"] = pd.Timestamp(dates["end"])
-        _dataset_cache.set(query_id, df)
     return df
 
 
 def _store_df(query_id: str, df: pd.DataFrame) -> None:
-    """Write to L1 and L2."""
-    _dataset_cache.set(query_id, df)
+    """Write to Redis L2 + spool; L1 gets lightweight marker only."""
+    _dataset_cache.set(query_id, True)  # lightweight marker
     _redis_store_df(query_id, df)
+    # Also write spool so DuckDB view path works for direct-path queries
+    try:
+        from mes_dashboard.core.query_spool_store import store_spooled_df
+        store_spooled_df(_REDIS_NAMESPACE, query_id, df, ttl_seconds=_CACHE_TTL)
+    except Exception as exc:
+        logger.warning("hold spool write failed (query_id=%s): %s", query_id, exc)
 
 
 # ============================================================
@@ -227,6 +228,7 @@ def execute_primary_query(
                     spool_row_count,
                     ttl_seconds=_CACHE_TTL,
                 )
+                _dataset_cache.set(query_id, True)  # L1 marker
                 _store_query_dates(query_id, start_date, end_date)
                 _loaded = load_spooled_df(_REDIS_NAMESPACE, query_id)
                 df = _loaded if _loaded is not None else pd.DataFrame()
@@ -257,6 +259,9 @@ def execute_primary_query(
         page=1,
         per_page=_DEFAULT_DETAIL_PER_PAGE,
     )
+
+    # Release large DataFrame to free memory
+    del cached_df
 
     return {"query_id": query_id, **views}
 

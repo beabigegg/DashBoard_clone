@@ -322,31 +322,36 @@ def _wait_for_inflight_query_result(query_id: str) -> Optional[pd.DataFrame]:
 
 
 def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
-    """Read cache: L1 hit → L2 hit → spool fallback."""
-    df = _dataset_cache.get(query_id)
-    if df is not None:
-        return df
-
+    """Load DataFrame from Redis or spool on demand — NOT promoted to L1."""
     df = _redis_load_df(query_id)
     if df is not None:
-        _dataset_cache.set(query_id, df)
         return df
 
     df = load_spooled_df(_REDIS_NAMESPACE, query_id)
-    if df is not None:
-        # Keep large payload out of L1 cache to avoid worker RSS spikes.
-        df_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
-        if df_mb <= min(float(_REJECT_ENGINE_MAX_RESULT_MB), 32.0):
-            _dataset_cache.set(query_id, df)
-        return df
-    return None
+    return df
+
+
+def _has_cached_df(query_id: str) -> bool:
+    """Check if query_id has cached data (L1 marker or Redis/spool exists)."""
+    if _dataset_cache.get(query_id) is not None:
+        return True
+    df = _redis_load_df(query_id)
+    return df is not None
 
 
 def _store_df(query_id: str, df: pd.DataFrame) -> None:
-    """Write to L1 and L2."""
-    _dataset_cache.set(query_id, df)
+    """Write to Redis L2 + spool; L1 gets lightweight marker only."""
+    _dataset_cache.set(query_id, True)  # lightweight marker
     _redis_store_df(query_id, df)
     clear_spooled_df(_REDIS_NAMESPACE, query_id)
+    # Also write spool so DuckDB view path works for direct-path queries
+    try:
+        store_spooled_df(
+            _REDIS_NAMESPACE, query_id, df,
+            ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
+        )
+    except Exception as exc:
+        logger.warning("reject spool write failed (query_id=%s): %s", query_id, exc)
 
 
 def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
@@ -367,7 +372,7 @@ def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
             ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
         )
         if spilled:
-            _dataset_cache.invalidate(query_id)
+            _dataset_cache.set(query_id, True)  # lightweight marker
             _redis_delete_df(query_id)
             logger.info(
                 "Stored query result via parquet spill (query_id=%s, rows=%d, size_mb=%.1f)",
