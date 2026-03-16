@@ -451,7 +451,7 @@ const TREE_SERIES_DEFAULTS = Object.freeze({
   layout: 'orthogonal',
   orient: 'LR',
   expandAndCollapse: true,
-  initialTreeDepth: 2,
+  initialTreeDepth: -1,
   roam: true,
   symbol: 'circle',
   symbolSize: 10,
@@ -572,7 +572,7 @@ const chartOption = computed(() => {
       right: chartLayout.value.right,
       top: 20,
       bottom: 20,
-      initialTreeDepth: trees.length === 1 ? 2 : 3,
+      initialTreeDepth: -1,
       label: {
         ...TREE_SERIES_DEFAULTS.label,
         width: labelWidthPx.value,
