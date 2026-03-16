@@ -131,6 +131,7 @@ def _build_security_headers(*, allow_unsafe_eval: bool = False) -> dict[str, str
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "
             "connect-src 'self'; "
+            "worker-src 'self' blob:; "
             "frame-ancestors 'self'; "
             "base-uri 'self'; "
             "form-action 'self'"
