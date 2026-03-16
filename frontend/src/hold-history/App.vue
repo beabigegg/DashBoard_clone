@@ -45,6 +45,7 @@ const initialLoading = ref(true);
 const paginationLoading = ref(false);
 const loading = reactive({
   global: false,
+  primaryQuery: false,
   list: false,
 });
 
@@ -214,6 +215,7 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
   }
 
   loading.global = true;
+  loading.primaryQuery = true;
   loading.list = true;
   errorMessage.value = '';
 
@@ -259,6 +261,7 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
   } finally {
     if (isStaleRequest(requestId)) return;
     loading.global = false;
+    loading.primaryQuery = false;
     loading.list = false;
     initialLoading.value = false;
   }
@@ -703,5 +706,5 @@ onMounted(() => {
     </div>
   </div>
 
-  <LoadingOverlay v-if="initialLoading || loading.global" tier="page" />
+  <LoadingOverlay v-if="initialLoading || loading.primaryQuery" tier="page" />
 </template>

@@ -79,6 +79,7 @@ const hierarchyState = reactive({});
 const loading = reactive({
   initial: true,
   querying: false,
+  primaryQuery: false,
   options: false,
 });
 
@@ -406,6 +407,7 @@ async function executePrimaryQuery() {
   }
 
   loading.querying = true;
+  loading.primaryQuery = true;
   queryError.value = '';
   detailWarning.value = '';
   exportMessage.value = '';
@@ -464,6 +466,7 @@ async function executePrimaryQuery() {
     resetHierarchyState();
   } finally {
     loading.querying = false;
+    loading.primaryQuery = false;
     loading.initial = false;
   }
 }
@@ -658,6 +661,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <LoadingOverlay v-if="loading.initial || loading.querying" tier="page" />
+    <LoadingOverlay v-if="loading.initial || loading.primaryQuery" tier="page" />
   </div>
 </template>
