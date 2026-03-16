@@ -158,6 +158,7 @@ def api_overview_hold():
         type: Optional PJ_TYPE filter (exact match)
         firstname: Optional FIRSTNAME filter (exact match)
         waferdesc: Optional WAFERDESC filter (exact match)
+        workcenter: Optional WORKCENTER_GROUP filter (exact match)
         include_dummy: Include DUMMY lots (default: false)
 
     Returns:
@@ -169,6 +170,7 @@ def api_overview_hold():
     pj_type = request.args.get('type', '').strip() or None
     firstname = request.args.get('firstname', '').strip() or None
     waferdesc = request.args.get('waferdesc', '').strip() or None
+    workcenter = request.args.get('workcenter', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_wip_hold_summary(
@@ -179,6 +181,7 @@ def api_overview_hold():
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
+        workcenter=workcenter,
     )
     if result is not None:
         return success_response(result)

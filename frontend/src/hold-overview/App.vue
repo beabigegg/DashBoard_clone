@@ -115,6 +115,7 @@ const lotFilterText = computed(() => {
   return parts.join(', ');
 });
 
+
 const hasLotFilterText = computed(() => Boolean(lotFilterText.value));
 
 const lastUpdate = computed(() => {
@@ -296,9 +297,9 @@ async function fetchMatrix(signal) {
   return unwrapApiResult(result, 'Failed to fetch hold matrix');
 }
 
-async function fetchHold(signal) {
+async function fetchHold(signal, extraParams = {}) {
   const result = await apiGet('/api/wip/overview/hold', {
-    params: buildAllFilterParams(),
+    params: { ...buildAllFilterParams(), ...extraParams },
     timeout: API_TIMEOUT,
     signal,
   });
@@ -570,7 +571,7 @@ function handleMatrixSelect(nextFilter) {
   matrixFilter.value = nextFilter;
   page.value = 1;
   updateUrlState();
-  void loadLots();
+  void loadLotsAndHold();
 }
 
 function clearMatrixFilter() {
@@ -580,7 +581,40 @@ function clearMatrixFilter() {
   matrixFilter.value = null;
   page.value = 1;
   updateUrlState();
-  void loadLots();
+  void loadLotsAndHold();
+}
+
+async function loadLotsAndHold() {
+  const requestId = nextRequestId();
+  clearAbortController('hold-overview-all');
+  const signal = createAbortSignal('hold-overview-lots');
+
+  refreshing.value = true;
+  lotsLoading.value = true;
+  refreshError.value = false;
+  errorMessage.value = '';
+  lotsError.value = '';
+
+  try {
+    const [lotsData, holdData] = await Promise.all([
+      fetchLots(signal),
+      fetchHold(signal, buildMatrixFilterParams()),
+    ]);
+    if (isStaleRequest(requestId)) return;
+    updateLotsState(lotsData);
+    hold.value = holdData;
+    showRefreshSuccess();
+  } catch (error) {
+    if (error?.name === 'AbortError' || isStaleRequest(requestId)) return;
+    refreshError.value = true;
+    const message = error?.message || '載入資料失敗';
+    errorMessage.value = message;
+    lotsError.value = message;
+  } finally {
+    if (isStaleRequest(requestId)) return;
+    refreshing.value = false;
+    lotsLoading.value = false;
+  }
 }
 
 function applyFilters(nextFilters) {

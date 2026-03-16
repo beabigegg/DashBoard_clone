@@ -56,7 +56,7 @@ const hasAnyFilter = computed(() => hasMatrixFilter.value || hasTreemapFilter.va
 <template>
   <section v-if="hasAnyFilter" class="cascade-filter-indicator">
     <div v-if="hasMatrixFilter" class="filter-chip matrix">
-      <span>Matrix 篩選：{{ matrixLabel }}</span>
+      <span>Matrix 篩選：{{ matrixLabel }}（柏拉圖 + Lot 清單已連動）</span>
       <button type="button" class="chip-clear" @click="emit('clear-matrix')">×</button>
     </div>
 

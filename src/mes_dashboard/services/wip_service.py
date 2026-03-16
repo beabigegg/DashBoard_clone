@@ -1252,6 +1252,7 @@ def get_wip_hold_summary(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    workcenter: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Get hold summary grouped by hold reason.
 
@@ -1265,6 +1266,7 @@ def get_wip_hold_summary(
         pj_type: Optional PJ_TYPE filter (exact match)
         firstname: Optional FIRSTNAME filter (exact match)
         waferdesc: Optional WAFERDESC filter (exact match)
+        workcenter: Optional WORKCENTER_GROUP filter (exact match)
 
     Returns:
         Dict with hold items sorted by lots desc:
@@ -1282,6 +1284,7 @@ def get_wip_hold_summary(
                 pj_type=pj_type,
                 firstname=firstname,
                 waferdesc=waferdesc,
+                workcenter=workcenter,
                 status='HOLD',
             )
             if df is None:
@@ -1293,6 +1296,7 @@ def get_wip_hold_summary(
                     pj_type,
                     firstname,
                     waferdesc,
+                    workcenter,
                 )
 
             # Filter for HOLD status with reason
@@ -1334,6 +1338,7 @@ def get_wip_hold_summary(
         pj_type,
         firstname,
         waferdesc,
+        workcenter,
     )
 
 
@@ -1345,6 +1350,7 @@ def _get_wip_hold_summary_from_oracle(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    workcenter: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Get WIP hold summary directly from Oracle (fallback)."""
     try:
@@ -1356,6 +1362,7 @@ def _get_wip_hold_summary_from_oracle(
         _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
         _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
+        _add_exact_filter_conditions(builder, "WORKCENTER_GROUP", workcenter)
 
         where_clause, params = builder.build_where_only()
 
