@@ -225,6 +225,7 @@ class TestOverviewHoldRoute(TestWipRoutesBase):
             pj_type='PJA',
             firstname='WF001',
             waferdesc='SiC',
+            workcenter=None,
         )
 
 
