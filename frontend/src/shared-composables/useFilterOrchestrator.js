@@ -130,9 +130,13 @@ export function useFilterOrchestrator(config) {
    */
   function applyDraft() {
     const changedFields = [];
+    let hasDraftApplyChange = false;
     for (const name of Object.keys(fieldDefs)) {
       if (draft[name] !== committed[name]) {
         changedFields.push(name);
+        if (fieldDefs[name]?.trigger === 'draft-apply') {
+          hasDraftApplyChange = true;
+        }
       }
       committed[name] = draft[name];
     }
@@ -142,8 +146,15 @@ export function useFilterOrchestrator(config) {
     resetPaginationIfNeeded('*');
     pagination.page = 1;
     syncUrlIfEnabled();
-    if (onFetch) onFetch(toRaw(committed));
-    else if (onPrimaryQuery) onPrimaryQuery(toRaw(committed));
+    // When draft-apply fields changed, use onPrimaryQuery (full re-query);
+    // otherwise fall back to onFetch (supplementary refresh from cache).
+    if (hasDraftApplyChange && onPrimaryQuery) {
+      onPrimaryQuery(toRaw(committed));
+    } else if (onFetch) {
+      onFetch(toRaw(committed));
+    } else if (onPrimaryQuery) {
+      onPrimaryQuery(toRaw(committed));
+    }
   }
 
   /**
