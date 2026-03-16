@@ -119,7 +119,7 @@ def _is_production_env(app: Flask) -> bool:
 
 
 def _build_security_headers(*, allow_unsafe_eval: bool = False) -> dict[str, str]:
-    script_directives = ["'self'", "'unsafe-inline'"]
+    script_directives = ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"]
     if allow_unsafe_eval:
         script_directives.append("'unsafe-eval'")
 
@@ -130,7 +130,7 @@ def _build_security_headers(*, allow_unsafe_eval: bool = False) -> dict[str, str
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "
-            "connect-src 'self'; "
+            "connect-src 'self' https://extensions.duckdb.org; "
             "worker-src 'self' blob:; "
             "frame-ancestors 'self'; "
             "base-uri 'self'; "

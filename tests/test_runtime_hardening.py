@@ -159,7 +159,10 @@ def test_security_headers_applied_globally(testing_app_factory):
     assert response.status_code == 200
     assert "Content-Security-Policy" in response.headers
     assert "frame-ancestors 'self'" in response.headers["Content-Security-Policy"]
-    assert "'unsafe-eval'" not in response.headers["Content-Security-Policy"]
+    csp = response.headers["Content-Security-Policy"]
+    # 'wasm-unsafe-eval' is allowed; full 'unsafe-eval' must not appear on its own
+    csp_tokens = csp.replace(";", " ").split()
+    assert "'unsafe-eval'" not in csp_tokens
     assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert "Referrer-Policy" in response.headers

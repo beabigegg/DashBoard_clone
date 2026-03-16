@@ -13,28 +13,46 @@
  */
 
 import * as duckdb from '@duckdb/duckdb-wasm';
+import duckdb_wasm_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
+import duckdb_worker_eh from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
+import duckdb_wasm_mvp from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
+import duckdb_worker_mvp from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
 
 let db = null;
 let conn = null;
 
-/** Initialise DuckDB once using the single-threaded WASM bundle. */
+/** Initialise DuckDB once using locally-bundled WASM files (CSP-safe). */
 async function initDuckDB() {
   if (db !== null) return;
 
-  const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+  const LOCAL_BUNDLES = {
+    mvp: {
+      mainModule: duckdb_wasm_mvp,
+      mainWorker: duckdb_worker_mvp,
+      pthreadWorker: null,
+    },
+    eh: {
+      mainModule: duckdb_wasm_eh,
+      mainWorker: duckdb_worker_eh,
+      pthreadWorker: null,
+    },
+  };
 
   // Select the best available bundle (prefer eh, fall back to mvp)
-  const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+  const bundle = await duckdb.selectBundle(LOCAL_BUNDLES);
 
+  // importScripts inside a blob worker requires absolute URLs
+  const workerAbsUrl = new URL(bundle.mainWorker, self.location.origin).href;
   const worker_url = URL.createObjectURL(
-    new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
+    new Blob([`importScripts("${workerAbsUrl}");`], { type: 'text/javascript' })
   );
   // We are already in a worker, so spawn a synchronous worker for DuckDB
   const duckdbWorker = new Worker(worker_url);
   const logger = new duckdb.ConsoleLogger();
 
+  const moduleAbsUrl = new URL(bundle.mainModule, self.location.origin).href;
   db = new duckdb.AsyncDuckDB(logger, duckdbWorker);
-  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  await db.instantiate(moduleAbsUrl, bundle.pthreadWorker);
   conn = await db.connect();
 
   URL.revokeObjectURL(worker_url);
