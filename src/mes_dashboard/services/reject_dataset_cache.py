@@ -340,18 +340,14 @@ def _has_cached_df(query_id: str) -> bool:
 
 
 def _store_df(query_id: str, df: pd.DataFrame) -> None:
-    """Write to Redis L2 + spool; L1 gets lightweight marker only."""
+    """Write to Redis L2 only; L1 gets lightweight marker.
+
+    Direct-path queries are small — Redis is sufficient.
+    DuckDB view path uses spool files from the engine/spill path (long queries).
+    """
     _dataset_cache.set(query_id, True)  # lightweight marker
     _redis_store_df(query_id, df)
     clear_spooled_df(_REDIS_NAMESPACE, query_id)
-    # Also write spool so DuckDB view path works for direct-path queries
-    try:
-        store_spooled_df(
-            _REDIS_NAMESPACE, query_id, df,
-            ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
-        )
-    except Exception as exc:
-        logger.warning("reject spool write failed (query_id=%s): %s", query_id, exc)
 
 
 def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
