@@ -126,7 +126,7 @@
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
 }
 
-.panel-header {
+.theme-qc-gate .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -136,7 +136,7 @@
   background: theme('colors.token.hf8fafc');
 }
 
-.panel-header h2 {
+.theme-qc-gate .panel-header h2 {
   margin: 0;
   font-size: 16px;
 }

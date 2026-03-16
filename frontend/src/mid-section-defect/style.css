@@ -138,7 +138,7 @@
 }
 
 /* ====== Filter Bar ====== */
-.filter-row {
+.theme-mid-section-defect .filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: theme('spacing.3');

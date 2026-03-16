@@ -116,7 +116,7 @@
   font-size: 13px;
 }
 
-.filter-panel {
+.theme-material-trace .filter-panel {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: theme('spacing.nav');
@@ -438,7 +438,7 @@
 }
 
 @media (max-width: 768px) {
-  .filter-panel {
+  .theme-material-trace .filter-panel {
     grid-template-columns: 1fr;
   }
 

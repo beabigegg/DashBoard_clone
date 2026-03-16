@@ -2,7 +2,7 @@
   background: linear-gradient(135deg, theme('colors.token.h667eea') 0%, theme('colors.token.h764ba2') 100%);
 }
 
-.filter-row {
+.theme-resource-history .filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -145,7 +145,7 @@
     min-width: 160px;
   }
 
-  .filter-row {
+  .theme-resource-history .filter-row {
     align-items: flex-start;
   }
 }
