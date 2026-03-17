@@ -584,9 +584,23 @@ def detect_equipment_deviations(
             ORDER BY deviation DESC
         """
         rows = _fetch_dict_rows(conn, sql, [deviation_threshold])
+
+        # Map HISTORYID (= RESOURCEID) → RESOURCENAME via resource_cache
+        name_map: Dict[str, str] = {}
+        try:
+            from mes_dashboard.services.resource_cache import get_all_resources
+            name_map = {
+                r.get("RESOURCEID", ""): r.get("RESOURCENAME", "")
+                for r in get_all_resources()
+                if r.get("RESOURCEID")
+            }
+        except Exception:
+            pass
+
         items = [
             {
                 "resource_id": str(r.get("resource_id") or ""),
+                "resource_name": name_map.get(str(r.get("resource_id") or ""), ""),
                 "date": str(r.get("data_date") or ""),
                 "current_ou_pct": round(_sf(r.get("current_ou_pct")), 2),
                 "baseline_ou_pct": round(_sf(r.get("baseline_ou_pct")), 2),

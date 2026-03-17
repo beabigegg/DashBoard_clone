@@ -57,8 +57,17 @@ def _has_spool(namespace: str) -> bool:
         return False
 
 
+_ANOMALY_SPOOL_TTL = 90_000  # 25 hours — matches anomaly Redis cache TTL
+
+
 def _copy_to_anomaly_namespace(source_ns: str, anomaly_ns: str) -> bool:
-    """Copy the latest spool Parquet from source namespace to anomaly namespace."""
+    """Copy the latest spool Parquet from source namespace to anomaly namespace.
+
+    Also registers Redis metadata so the cleanup worker does not treat
+    the copied file as an orphan.
+    """
+    import hashlib
+    import json as _json
     import shutil
 
     from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR
@@ -79,8 +88,32 @@ def _copy_to_anomaly_namespace(source_ns: str, anomaly_ns: str) -> bool:
         for old in dest_dir.glob("*.parquet"):
             old.unlink(missing_ok=True)
 
-        dest_path = dest_dir / f"anomaly_{files[0].name}"
+        # Use a stable query_id derived from the anomaly namespace
+        query_id = hashlib.sha256(anomaly_ns.encode()).hexdigest()[:16]
+        dest_path = dest_dir / f"{query_id}.parquet"
         shutil.copy2(str(files[0]), str(dest_path))
+
+        # Register in Redis so cleanup worker recognizes it (not orphan)
+        try:
+            from mes_dashboard.core.redis_client import get_key, get_redis_client
+
+            client = get_redis_client()
+            if client is not None:
+                now_ts = int(time.time())
+                meta_key = get_key(f"{anomaly_ns}:spool_meta:{query_id}")
+                metadata = {
+                    "namespace": anomaly_ns,
+                    "query_id": query_id,
+                    "relative_path": str(dest_path.relative_to(QUERY_SPOOL_DIR.resolve())),
+                    "row_count": -1,
+                    "created_at": now_ts,
+                    "expires_at": now_ts + _ANOMALY_SPOOL_TTL,
+                    "file_size_bytes": int(dest_path.stat().st_size),
+                }
+                client.setex(meta_key, _ANOMALY_SPOOL_TTL, _json.dumps(metadata))
+        except Exception as meta_exc:
+            logger.warning("Failed to register anomaly spool metadata: %s", meta_exc)
+
         logger.info(
             "Copied spool %s -> %s (%s)",
             source_ns, anomaly_ns, dest_path.name,
