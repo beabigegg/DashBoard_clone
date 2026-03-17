@@ -578,7 +578,7 @@ def detect_equipment_deviations(
                 ROUND(baseline_ou_pct - ou_pct, 2) AS deviation,
                 window_count
             FROM windowed
-            WHERE data_date = strftime(CURRENT_DATE, '%Y-%m-%d')
+            WHERE data_date = strftime(CURRENT_DATE - INTERVAL '1' DAY, '%Y-%m-%d')
               AND window_count >= 7
               AND baseline_ou_pct - ou_pct > ?
             ORDER BY deviation DESC
