@@ -113,10 +113,13 @@ def detect_yield_anomalies(
     query_id: Optional[str] = None,
     threshold: float = _DEFAULT_YIELD_THRESHOLD,
 ) -> Tuple[Optional[List[Dict[str, Any]]], Dict[str, Any]]:
-    """Detect yield anomalies via Z-score on yield_alert_dataset spool.
+    """Detect yield drop anomalies via Z-score on yield_alert_dataset spool.
+
+    Aggregates by WORKCENTER_GROUP (DEPARTMENT_GROUP) × PACKAGE × date.
+    Only reports yield *drops* (negative Z-score). Uses T-1 (previous day).
 
     Returns (items, meta). items is None when detection cannot run.
-    Each item: {line, package, date, yield_pct, z_score, direction}
+    Each item: {workcenter_group, package, date, yield_pct, z_score, rolling_avg}
     """
     if not _ANALYTICS_ENABLED:
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
@@ -143,7 +146,7 @@ def detect_yield_anomalies(
             WITH daily_yield AS (
                 SELECT
                     strftime(CAST("DATE_BUCKET" AS DATE), '%Y-%m-%d') AS data_date,
-                    TRIM(COALESCE(CAST("LINE_NAME" AS VARCHAR), '(NA)')) AS line,
+                    TRIM(COALESCE(CAST("DEPARTMENT_GROUP" AS VARCHAR), '(NA)')) AS workcenter_group,
                     TRIM(COALESCE(CAST("PACKAGE_NAME" AS VARCHAR), '(NA)')) AS package,
                     SUM(COALESCE("TRANSACTION_QTY", 0)) AS transaction_qty,
                     SUM(COALESCE("SCRAP_QTY", 0)) AS scrap_qty
@@ -153,7 +156,7 @@ def detect_yield_anomalies(
             ),
             yield_pct AS (
                 SELECT
-                    data_date, line, package, transaction_qty, scrap_qty,
+                    data_date, workcenter_group, package, transaction_qty, scrap_qty,
                     CASE WHEN transaction_qty = 0 THEN 100.0
                          ELSE ROUND((1.0 - scrap_qty / transaction_qty) * 100, 4)
                     END AS yield_pct
@@ -162,38 +165,37 @@ def detect_yield_anomalies(
             ),
             windowed AS (
                 SELECT
-                    data_date, line, package, yield_pct,
+                    data_date, workcenter_group, package, yield_pct,
                     AVG(yield_pct) OVER w AS rolling_avg,
                     STDDEV_POP(yield_pct) OVER w AS rolling_std,
                     COUNT(*) OVER w AS window_count
                 FROM yield_pct
                 WINDOW w AS (
-                    PARTITION BY line, package
+                    PARTITION BY workcenter_group, package
                     ORDER BY data_date
                     ROWS BETWEEN 13 PRECEDING AND 1 PRECEDING
                 )
             )
             SELECT
-                data_date, line, package, yield_pct,
+                data_date, workcenter_group, package, yield_pct,
                 rolling_avg, rolling_std,
                 ROUND((yield_pct - rolling_avg) / rolling_std, 3) AS z_score,
                 window_count
             FROM windowed
-            WHERE data_date = strftime(CURRENT_DATE, '%Y-%m-%d')
+            WHERE data_date = strftime(CURRENT_DATE - INTERVAL '1' DAY, '%Y-%m-%d')
               AND window_count >= 3
               AND rolling_std > 0
-              AND ABS((yield_pct - rolling_avg) / rolling_std) > ?
-            ORDER BY ABS((yield_pct - rolling_avg) / rolling_std) DESC
+              AND (yield_pct - rolling_avg) / rolling_std < -?
+            ORDER BY z_score ASC
         """
         rows = _fetch_dict_rows(conn, sql, [threshold])
         items = [
             {
-                "line": str(r.get("line") or ""),
+                "workcenter_group": str(r.get("workcenter_group") or ""),
                 "package": str(r.get("package") or ""),
                 "date": str(r.get("data_date") or ""),
                 "yield_pct": round(_sf(r.get("yield_pct")), 4),
                 "z_score": round(_sf(r.get("z_score")), 3),
-                "direction": "drop" if _sf(r.get("z_score")) < 0 else "spike",
                 "rolling_avg": round(_sf(r.get("rolling_avg")), 4),
             }
             for r in rows
@@ -220,10 +222,14 @@ def detect_reject_spikes(
     query_id: Optional[str] = None,
     spike_threshold_pct: float = _DEFAULT_SPIKE_THRESHOLD,
 ) -> Tuple[Optional[List[Dict[str, Any]]], Dict[str, Any]]:
-    """Detect reject rate spikes via moving-average comparison on reject_dataset spool.
+    """Detect reject quantity spikes via Z-score on reject_dataset spool.
+
+    Uses absolute reject quantity (not rate) as the metric.
+    Baseline is the rolling average quantity over the previous 13 days.
+    Reports T-1 (previous day) only. Only flags increases (Z > threshold).
 
     Returns (items, meta).
-    Each item: {workcenter_group, date, current_rate, baseline_rate, pct_change}
+    Each item: {workcenter_group, date, current_qty, baseline_qty, z_score}
     """
     if not _ANALYTICS_ENABLED:
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
@@ -251,39 +257,29 @@ def detect_reject_spikes(
         cols = {str(row[1]) for row in cols_cursor.fetchall() if len(row) > 1}
 
         wc_group_col = "WORKCENTER_GROUP" if "WORKCENTER_GROUP" in cols else None
-        movein_col = "MOVEIN_QTY" if "MOVEIN_QTY" in cols else None
         reject_col = "REJECT_TOTAL_QTY" if "REJECT_TOTAL_QTY" in cols else None
         day_col = "TXN_DAY" if "TXN_DAY" in cols else None
 
-        if not all([wc_group_col, movein_col, reject_col, day_col]):
+        if not all([wc_group_col, reject_col, day_col]):
             return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
 
         sql = f"""
-            WITH daily_rate AS (
+            WITH daily_qty AS (
                 SELECT
                     strftime(CAST({_qid(day_col)} AS DATE), '%Y-%m-%d') AS data_date,
                     TRIM(COALESCE(CAST({_qid(wc_group_col)} AS VARCHAR), '(NA)')) AS workcenter_group,
-                    SUM(COALESCE({_qid(movein_col)}, 0)) AS movein_qty,
                     SUM(COALESCE({_qid(reject_col)}, 0)) AS reject_qty
                 FROM reject_src
                 WHERE CAST({_qid(day_col)} AS DATE) >= CURRENT_DATE - INTERVAL '14' DAY
                 GROUP BY 1, 2
             ),
-            rate_pct AS (
-                SELECT
-                    data_date, workcenter_group,
-                    CASE WHEN movein_qty = 0 THEN 0.0
-                         ELSE ROUND(reject_qty / movein_qty * 100, 4)
-                    END AS reject_rate_pct
-                FROM daily_rate
-                WHERE movein_qty > 0
-            ),
             windowed AS (
                 SELECT
-                    data_date, workcenter_group, reject_rate_pct,
-                    AVG(reject_rate_pct) OVER w AS baseline_rate,
+                    data_date, workcenter_group, reject_qty,
+                    AVG(reject_qty) OVER w AS baseline_qty,
+                    STDDEV_POP(reject_qty) OVER w AS baseline_std,
                     COUNT(*) OVER w AS window_count
-                FROM rate_pct
+                FROM daily_qty
                 WINDOW w AS (
                     PARTITION BY workcenter_group
                     ORDER BY data_date
@@ -291,25 +287,27 @@ def detect_reject_spikes(
                 )
             )
             SELECT
-                data_date, workcenter_group, reject_rate_pct AS current_rate,
-                ROUND(baseline_rate, 4) AS baseline_rate,
-                ROUND((reject_rate_pct - baseline_rate) / baseline_rate * 100, 2) AS pct_change,
+                data_date, workcenter_group,
+                reject_qty AS current_qty,
+                ROUND(baseline_qty, 0) AS baseline_qty,
+                ROUND(baseline_std, 0) AS baseline_std,
+                ROUND((reject_qty - baseline_qty) / baseline_std, 2) AS z_score,
                 window_count
             FROM windowed
             WHERE data_date = strftime(CURRENT_DATE - INTERVAL '1' DAY, '%Y-%m-%d')
               AND window_count >= 3
-              AND baseline_rate > 0
-              AND (reject_rate_pct - baseline_rate) / baseline_rate * 100 > ?
-            ORDER BY pct_change DESC
+              AND baseline_std > 0
+              AND (reject_qty - baseline_qty) / baseline_std > ?
+            ORDER BY z_score DESC
         """
-        rows = _fetch_dict_rows(conn, sql, [spike_threshold_pct])
+        rows = _fetch_dict_rows(conn, sql, [_DEFAULT_YIELD_THRESHOLD])
         items = [
             {
                 "workcenter_group": str(r.get("workcenter_group") or ""),
                 "date": str(r.get("data_date") or ""),
-                "current_rate": round(_sf(r.get("current_rate")), 4),
-                "baseline_rate": round(_sf(r.get("baseline_rate")), 4),
-                "pct_change": round(_sf(r.get("pct_change")), 2),
+                "current_qty": int(_sf(r.get("current_qty"))),
+                "baseline_qty": int(_sf(r.get("baseline_qty"))),
+                "z_score": round(_sf(r.get("z_score")), 2),
             }
             for r in rows
         ]
@@ -390,6 +388,10 @@ def detect_hold_outliers(
             "hold_day = strftime(CURRENT_DATE, '%Y-%m-%d')"
             if "hold_day" in cols else "TRUE"
         )
+        hold_type_filter = (
+            "TRIM(LOWER(CAST(\"HOLD_TYPE\" AS VARCHAR))) = 'quality'"
+            if "HOLD_TYPE" in cols else "TRUE"
+        )
         sql = f"""
             WITH hold_base AS (
                 SELECT
@@ -400,6 +402,7 @@ def detect_hold_outliers(
                     COALESCE("HOLD_HOURS", 0) AS hold_hours
                 FROM hold_src
                 WHERE COALESCE("HOLD_HOURS", 0) > 0
+                  AND ({hold_type_filter})
                   AND ({date_filter})
             ),
             p_calc AS (
