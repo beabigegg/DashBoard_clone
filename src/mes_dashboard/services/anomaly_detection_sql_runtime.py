@@ -367,6 +367,10 @@ def detect_hold_outliers(
         )
 
         pct_val = max(0.0, min(1.0, float(percentile)))
+        date_filter = (
+            'CAST("hold_day" AS DATE) >= CURRENT_DATE - INTERVAL \'30\' DAY'
+            if "hold_day" in cols else "TRUE"
+        )
         sql = f"""
             WITH hold_base AS (
                 SELECT
@@ -377,7 +381,7 @@ def detect_hold_outliers(
                     COALESCE("HOLD_HOURS", 0) AS hold_hours
                 FROM hold_src
                 WHERE COALESCE("HOLD_HOURS", 0) > 0
-                  AND ({"CAST(\"hold_day\" AS DATE) >= CURRENT_DATE - INTERVAL '30' DAY" if "hold_day" in cols else "TRUE"})
+                  AND ({date_filter})
             ),
             p_calc AS (
                 SELECT PERCENTILE_CONT({pct_val}) WITHIN GROUP (ORDER BY hold_hours) AS p_threshold
