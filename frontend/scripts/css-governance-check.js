@@ -27,6 +27,15 @@ const EXEMPT_CSS = new Set([
   'portal/portal.css',      // portal entry — allowed
 ]);
 
+// Files that contain ECharts hex colors by design (chart-exception context).
+// These are tracked as warnings, not errors, by the chart-import heuristic.
+// Listed explicitly for governance documentation.
+const CHART_HEX_ALLOWED = new Set([
+  'wip-shared/components/ParetoSection.vue',
+  'reject-history/components/ParetoSection.vue',
+  'shared-ui/components/AiChartRenderer.vue',
+]);
+
 let errors = 0;
 let warnings = 0;
 let hexErrors = 0;

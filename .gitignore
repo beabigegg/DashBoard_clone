@@ -52,5 +52,11 @@ htmlcov/
 # Jupyter
 .ipynb_checkpoints/
 
-# Note: openspec/ is tracked (not ignored)
+# Runtime data
 tmp/
+reports/
+
+# AI/LLM generated artifacts (not source)
+Check.md
+docs/API_USAGE_CAPABILITY_REPORT.md
+docs/oom_*.md

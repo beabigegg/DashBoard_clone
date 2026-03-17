@@ -1,0 +1,774 @@
+# AI Function Registry
+# Loaded at startup by ai_function_registry.py.
+# $ENUM_NAME references are expanded from the _enums section.
+
+_enums:
+  WORKCENTER_GROUPS:
+    - 切割
+    - 焊接_DB
+    - 焊接_WB
+    - 成型
+    - 去膠
+    - 水吹砂
+    - 電鍍
+    - 移印
+    - 切彎腳
+    - TMTT
+    - 品檢
+    - FQC
+
+# ── Dashboard ────────────────────────────────────────────────────────────────
+
+dashboard_kpi:
+  description: 全廠設備 KPI 總覽，含稼動率（OU%）、RUN/IDLE/DOWN 設備數
+  service: mes_dashboard.services.dashboard_service.query_dashboard_kpi
+  chart_type: kpi
+  params: {}
+  drill_down:
+    - ou_trend
+    - workcenter_status_matrix
+
+ou_trend:
+  description: 全廠稼動率（OU%）趨勢折線圖，按日顯示近 N 天變化
+  service: mes_dashboard.services.dashboard_service.query_ou_trend
+  chart_type: trend
+  params:
+    days:
+      type: integer
+      required: false
+      default: 7
+      description: 查詢天數，預設 7 天
+  drill_down:
+    - dashboard_kpi
+    - utilization_heatmap
+
+utilization_heatmap:
+  description: 設備稼動率熱圖，按站別 × 日期顯示各站生產利用率
+  service: mes_dashboard.services.dashboard_service.query_utilization_heatmap
+  chart_type: heatmap
+  params:
+    days:
+      type: integer
+      required: false
+      default: 7
+      description: 查詢天數，預設 7 天
+  drill_down:
+    - ou_trend
+    - dashboard_kpi
+
+# ── Reject ──────────────────────────────────────────────────────────────────
+
+reject_summary:
+  description: 不良率摘要 KPI，顯示投入量、不良總數、不良率、缺陷率
+  service: mes_dashboard.services.reject_history_service.query_summary
+  chart_type: kpi
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼列表，不填代表全廠
+    packages:
+      type: list[string]
+      required: false
+      description: 產品種類篩選
+  drill_down:
+    - reject_reason_pareto
+    - reject_trend
+
+reject_reason_pareto:
+  description: 不良原因排行（Pareto 柱狀圖），可篩選站別與產品種類
+  service: mes_dashboard.services.reject_history_service.query_reason_pareto
+  chart_type: pareto
+  params:
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼列表，例如 ["焊接_WB"]，不填代表全廠
+    packages:
+      type: list[string]
+      required: false
+      description: 產品種類篩選，例如 ["SOT-23"]
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+  drill_down:
+    - reject_trend
+    - reject_lot_list
+
+reject_dimension_pareto:
+  description: 不良多維度排行（依原因/產品/類型），可切換分析維度
+  service: mes_dashboard.services.reject_history_service.query_dimension_pareto
+  chart_type: pareto
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    dimension:
+      type: string
+      required: false
+      enum:
+        - reason
+        - package
+        - type
+      default: reason
+      description: 分析維度，reason=不良原因、package=產品種類、type=不良類型
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼列表
+    packages:
+      type: list[string]
+      required: false
+      description: 產品種類篩選
+  drill_down:
+    - reject_trend
+    - reject_lot_list
+
+reject_trend:
+  description: 不良率趨勢折線圖，依日期顯示站別或全廠不良率變化
+  service: mes_dashboard.services.reject_history_service.query_trend
+  chart_type: trend
+  params:
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼列表
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+  drill_down:
+    - reject_reason_pareto
+    - reject_lot_list
+
+reject_spike_alerts:
+  description: 不良量突增警示，回傳近期異常偵測結果（Z-score 超標）
+  service: mes_dashboard.services.anomaly_detection_sql_runtime.get_cached_detail
+  chart_type: table
+  params:
+    detector:
+      type: string
+      required: false
+      enum:
+        - reject
+      default: reject
+      description: 固定為 reject，由後端填入
+  drill_down:
+    - reject_trend
+    - reject_reason_pareto
+
+reject_lot_list:
+  description: 不良批次清單，列出符合篩選條件的異常批次
+  service: mes_dashboard.services.reject_history_service.query_list
+  chart_type: table
+  params:
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼列表
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+  drill_down:
+    - reject_reason_pareto
+
+# ── Yield ────────────────────────────────────────────────────────────────────
+
+yield_summary:
+  description: 良率摘要 KPI，顯示投入量、報廢數、良率百分比
+  service: mes_dashboard.services.yield_alert_service.query_yield_summary
+  chart_type: kpi
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+  drill_down:
+    - yield_trend
+    - yield_anomaly_alerts
+
+yield_trend:
+  description: 良率趨勢折線圖，按日/週/月顯示良率變化
+  service: mes_dashboard.services.yield_alert_service.query_yield_trend
+  chart_type: trend
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    granularity:
+      type: string
+      required: false
+      enum:
+        - day
+        - week
+        - month
+      default: day
+      description: 時間粒度，day=日、week=週、month=月
+  drill_down:
+    - yield_summary
+    - yield_anomaly_alerts
+
+yield_anomaly_alerts:
+  description: 良率異常警示，回傳近期偵測到良率下降的站別與產品
+  service: mes_dashboard.services.anomaly_detection_sql_runtime.get_cached_detail
+  chart_type: table
+  params:
+    detector:
+      type: string
+      required: false
+      enum:
+        - yield
+      default: yield
+      description: 固定為 yield，由後端填入
+  drill_down:
+    - yield_anomaly_drilldown
+    - reject_trend
+
+yield_anomaly_drilldown:
+  description: 良率異常明細，查詢特定站別 × 產品的近 14 天良率趨勢
+  service: mes_dashboard.services.anomaly_detection_sql_runtime.drilldown_yield_trend
+  chart_type: trend
+  params:
+    workcenter_group:
+      type: string
+      required: true
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼
+    package:
+      type: string
+      required: true
+      description: 產品種類，例如 SOT-23
+  drill_down:
+    - reject_reason_pareto
+    - reject_lot_list
+
+yield_alert_candidates:
+  description: 良率風險清單，列出良率異常工單及風險評分（可篩選時段與門檻）
+  service: mes_dashboard.services.yield_alert_service.query_alert_candidates
+  chart_type: table
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    risk_threshold:
+      type: number
+      required: false
+      default: 98.0
+      description: 良率門檻，低於此值視為風險（預設 98%）
+  drill_down:
+    - yield_trend
+    - yield_summary
+
+# ── WIP ──────────────────────────────────────────────────────────────────────
+
+wip_summary:
+  description: 在製品（WIP）KPI 摘要，顯示全廠批次數量、RUN/QUEUE/HOLD 分佈
+  service: mes_dashboard.services.wip_service.get_wip_summary
+  chart_type: kpi
+  params:
+    package:
+      type: string
+      required: false
+      description: 產品種類篩選
+  drill_down:
+    - wip_matrix
+    - wip_hold_summary
+
+wip_matrix:
+  description: 在製品站別 × 產品矩陣，以熱圖顯示各站在製批次分佈
+  service: mes_dashboard.services.wip_service.get_wip_matrix
+  chart_type: heatmap
+  params:
+    status:
+      type: string
+      required: false
+      enum:
+        - RUN
+        - QUEUE
+        - HOLD
+      description: 篩選特定 WIP 狀態
+  drill_down:
+    - wip_summary
+    - wip_hold_summary
+
+wip_hold_summary:
+  description: 在製品 Hold 摘要，列出目前被 Hold 的批次數量與品質 Hold 分佈
+  service: mes_dashboard.services.wip_service.get_hold_detail_summary
+  chart_type: kpi
+  params: {}
+  drill_down:
+    - hold_outlier_alerts
+    - hold_history_trend
+
+wip_workcenter_detail:
+  description: 站別在製明細，列出指定站別目前所有在製批次清單
+  service: mes_dashboard.services.wip_service.get_wip_detail
+  chart_type: table
+  params:
+    workcenter:
+      type: string
+      required: true
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼，例如 焊接_WB
+    package:
+      type: string
+      required: false
+      description: 產品種類篩選
+    status:
+      type: string
+      required: false
+      enum:
+        - RUN
+        - QUEUE
+        - HOLD
+      description: 篩選特定 WIP 狀態
+  drill_down:
+    - wip_summary
+    - wip_matrix
+
+hold_overview_treemap:
+  description: Hold 分佈樹狀圖，按站別 × 原因顯示 Hold 批次分佈
+  service: mes_dashboard.services.wip_service.get_hold_overview_treemap
+  chart_type: table
+  params:
+    hold_type:
+      type: string
+      required: false
+      enum:
+        - quality
+        - non-quality
+        - all
+      default: all
+      description: Hold 類型篩選
+  drill_down:
+    - hold_lot_list
+    - hold_reason_pareto
+
+# ── Hold ─────────────────────────────────────────────────────────────────────
+
+hold_outlier_alerts:
+  description: Hold 異常警示，回傳近期偵測到異常長時間被 Hold 的批次
+  service: mes_dashboard.services.anomaly_detection_sql_runtime.get_cached_detail
+  chart_type: table
+  params:
+    detector:
+      type: string
+      required: false
+      enum:
+        - hold
+      default: hold
+      description: 固定為 hold，由後端填入
+  drill_down:
+    - hold_history_trend
+    - hold_reason_pareto
+
+hold_history_trend:
+  description: Hold 歷史趨勢，顯示指定期間內 Hold 批次數量的時間變化
+  service: mes_dashboard.services.hold_history_service.get_hold_history_trend
+  chart_type: trend
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+  drill_down:
+    - hold_reason_pareto
+    - hold_outlier_alerts
+
+hold_reason_pareto:
+  description: Hold 原因排行（Pareto），顯示最常見的 Hold 原因
+  service: mes_dashboard.services.hold_history_service.get_hold_history_reason_pareto
+  chart_type: pareto
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+  drill_down:
+    - hold_history_trend
+    - hold_outlier_alerts
+
+hold_duration_distribution:
+  description: Hold 時間分佈，顯示各時間區間的 Hold 批次數量
+  service: mes_dashboard.services.hold_history_service.get_hold_history_duration
+  chart_type: pareto
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    hold_type:
+      type: string
+      required: false
+      enum:
+        - quality
+        - non-quality
+        - all
+      default: all
+      description: Hold 類型篩選
+  drill_down:
+    - hold_reason_pareto
+    - hold_outlier_alerts
+
+hold_lot_list:
+  description: Hold 批次清單，列出符合條件的 Hold 批次詳細資訊
+  service: mes_dashboard.services.hold_history_service.get_hold_history_list
+  chart_type: table
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    hold_type:
+      type: string
+      required: false
+      enum:
+        - quality
+        - non-quality
+        - all
+      default: all
+      description: Hold 類型篩選
+    reason:
+      type: string
+      required: false
+      description: Hold 原因篩選
+  drill_down:
+    - hold_reason_pareto
+    - hold_history_trend
+
+# ── Equipment ────────────────────────────────────────────────────────────────
+
+equipment_deviation_alerts:
+  description: 設備異常警示，回傳近期偵測到產能偏低的機台群組
+  service: mes_dashboard.services.anomaly_detection_sql_runtime.get_cached_detail
+  chart_type: table
+  params:
+    detector:
+      type: string
+      required: false
+      enum:
+        - equipment
+      default: equipment
+      description: 固定為 equipment，由後端填入
+  drill_down:
+    - equipment_status_summary
+    - workcenter_status_matrix
+
+equipment_status_summary:
+  description: 設備稼動率摘要，顯示各站設備的 RUN/IDLE/DOWN 狀態分佈
+  service: mes_dashboard.services.resource_service.get_resource_status_summary
+  chart_type: kpi
+  params: {}
+  drill_down:
+    - equipment_deviation_alerts
+    - workcenter_status_matrix
+
+workcenter_status_matrix:
+  description: 站別 × 設備狀態矩陣，顯示各站 RUN/IDLE/DOWN 設備數量分佈
+  service: mes_dashboard.services.resource_service.get_workcenter_status_matrix
+  chart_type: table
+  params: {}
+  drill_down:
+    - equipment_status_summary
+    - equipment_deviation_alerts
+
+equipment_recent_jobs:
+  description: 設備近期加工批次，查詢指定設備最近的加工紀錄
+  service: mes_dashboard.services.job_query_service.get_jobs_by_resources
+  chart_type: table
+  params:
+    resource_ids:
+      type: list[string]
+      required: true
+      description: 設備 ID 列表，例如 ["WB001", "WB002"]
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+  drill_down:
+    - equipment_status_summary
+
+job_txn_history:
+  description: 加工歷程查詢，查詢指定 Job ID 的狀態變更紀錄
+  service: mes_dashboard.services.job_query_service.get_job_txn_history
+  chart_type: table
+  params:
+    job_id:
+      type: string
+      required: true
+      description: Job ID，例如 J12345678
+  drill_down:
+    - equipment_recent_jobs
+
+# ── Lot Query ────────────────────────────────────────────────────────────────
+
+lot_query:
+  description: 批次查詢，根據批次號（Lot ID）查詢該批次的詳細在製資訊
+  service: mes_dashboard.services.wip_service.get_lot_detail
+  chart_type: table
+  params:
+    lotid:
+      type: string
+      required: true
+      description: 批次號碼，例如 A12345678
+  drill_down:
+    - lot_production_history
+    - lot_rejects
+    - lot_holds
+
+lot_production_history:
+  description: 批次生產歷程，查詢指定批次在各站的加工紀錄（進出站時間、設備）
+  service: mes_dashboard.services.query_tool_service.get_lot_history
+  chart_type: table
+  params:
+    container_id:
+      type: string
+      required: true
+      description: 批次 Container ID，例如 A12345678
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別篩選
+  drill_down:
+    - lot_query
+    - lot_materials
+
+lot_rejects:
+  description: 批次不良紀錄，查詢指定批次的所有不良/缺陷紀錄
+  service: mes_dashboard.services.query_tool_service.get_lot_rejects
+  chart_type: table
+  params:
+    container_id:
+      type: string
+      required: true
+      description: 批次 Container ID
+  drill_down:
+    - lot_query
+    - reject_reason_pareto
+
+lot_holds:
+  description: 批次 Hold 紀錄，查詢指定批次的所有 Hold/Release 歷史
+  service: mes_dashboard.services.query_tool_service.get_lot_holds
+  chart_type: table
+  params:
+    container_id:
+      type: string
+      required: true
+      description: 批次 Container ID
+  drill_down:
+    - lot_query
+    - hold_reason_pareto
+
+lot_materials:
+  description: 批次材料紀錄，查詢指定批次使用的所有材料消耗紀錄
+  service: mes_dashboard.services.query_tool_service.get_lot_materials
+  chart_type: table
+  params:
+    container_id:
+      type: string
+      required: true
+      description: 批次 Container ID
+  drill_down:
+    - lot_query
+    - material_forward_trace
+
+adjacent_lots:
+  description: 前後批查詢，查詢指定設備在某時間點前後加工的批次
+  service: mes_dashboard.services.query_tool_service.get_adjacent_lots
+  chart_type: table
+  params:
+    equipment_id:
+      type: string
+      required: true
+      description: 設備 ID，例如 WB001
+    target_trackin_time:
+      type: string
+      required: true
+      description: 目標進站時間，格式 YYYY-MM-DD HH:MM:SS
+  drill_down:
+    - lot_query
+    - equipment_recent_jobs
+
+# ── Material Trace ───────────────────────────────────────────────────────────
+
+material_forward_trace:
+  description: 材料正追溯，查詢指定批次號或工單號使用了哪些材料（系統自動辨識 ID 類型）
+  service: mes_dashboard.services.material_trace_service.forward_query
+  chart_type: table
+  auto_resolve_id: true
+  params:
+    values:
+      type: list[string]
+      required: true
+      description: 批次號（Lot ID）或工單號（Work Order）列表，例如 ["A12345678"]
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別篩選
+  drill_down:
+    - material_reverse_trace
+    - lot_query
+
+material_reverse_trace:
+  description: 材料反追溯，查詢指定材料批號被用於哪些產品批次
+  service: mes_dashboard.services.material_trace_service.reverse_query
+  chart_type: table
+  params:
+    values:
+      type: list[string]
+      required: true
+      description: 材料批號列表，例如 ["MAT001"]
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別篩選
+  drill_down:
+    - material_forward_trace
+    - lot_query
+
+# ── Equipment History ────────────────────────────────────────────────────────
+
+resource_status_history:
+  description: 設備狀態歷史，查詢指定期間內設備的稼動率趨勢（按日/週/月）
+  service: mes_dashboard.services.resource_dataset_cache.execute_primary_query
+  chart_type: trend
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    granularity:
+      type: string
+      required: false
+      enum:
+        - day
+        - week
+        - month
+      default: day
+      description: 時間粒度
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別篩選
+  drill_down:
+    - equipment_status_summary
+    - ou_trend
+
+# ── Mid-Section Defect ──────────────────────────────────────────────────────
+
+mid_section_defect_analysis:
+  description: 中段缺陷追溯分析，從測試站不良追溯上游加工站的關聯性
+  service: mes_dashboard.services.mid_section_defect_service.query_analysis
+  chart_type: table
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    station:
+      type: string
+      required: false
+      default: 測試
+      description: 起始站別，預設為測試站
+    direction:
+      type: string
+      required: false
+      enum:
+        - backward
+        - forward
+      default: backward
+      description: 追溯方向，backward=往上游、forward=往下游
+  drill_down:
+    - reject_reason_pareto
+    - lot_production_history
+
+# ── Anomaly Overview ─────────────────────────────────────────────────────────
+
+anomaly_summary:
+  description: 異常偵測總覽，顯示目前各類異常（良率/不良/Hold/設備）的數量與嚴重程度
+  service: mes_dashboard.services.anomaly_detection_sql_runtime.get_cached_summary
+  chart_type: kpi
+  params: {}
+  drill_down:
+    - yield_anomaly_alerts
+    - reject_spike_alerts
+    - hold_outlier_alerts
+    - equipment_deviation_alerts

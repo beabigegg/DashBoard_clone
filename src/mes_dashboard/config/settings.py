@@ -88,6 +88,17 @@ class Config:
     # Workcenter Mapping Cache
     WORKCENTER_MAPPING_SYNC_INTERVAL = _int_env("WORKCENTER_MAPPING_SYNC_INTERVAL", 86400)  # 24 hours
 
+    # AI-Assisted Reporting — Phase 2
+    AI_QUERY_ENABLED = _bool_env("AI_QUERY_ENABLED", False)
+    AI_API_URL = os.getenv("AI_API_URL", "https://ollama_pjapi.theaken.com")
+    AI_API_KEY = os.getenv("AI_API_KEY")
+    AI_MODEL = os.getenv("AI_MODEL", "gpt-oss:120b")
+    AI_REQUEST_TIMEOUT = _int_env("AI_REQUEST_TIMEOUT", 30)
+    AI_VERIFY_TLS = _bool_env("AI_VERIFY_TLS", False)
+    AI_MAX_TOKENS = _int_env("AI_MAX_TOKENS", 500)
+    AI_RATE_LIMIT_MAX_REQUESTS = _int_env("AI_RATE_LIMIT_MAX_REQUESTS", 3)
+    AI_RATE_LIMIT_WINDOW_SECONDS = _int_env("AI_RATE_LIMIT_WINDOW_SECONDS", 60)
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""

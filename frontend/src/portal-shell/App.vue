@@ -1,7 +1,12 @@
 <script setup>
+import './ai-chat.css';
+
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import { useAiChat } from '../shared-composables/useAiChat.js';
+import AiChatPanel from '../shared-ui/components/AiChatPanel.vue';
+import AiChatTrigger from '../shared-ui/components/AiChatTrigger.vue';
 import AnomalyIndicator from './components/AnomalyIndicator.vue';
 import HealthStatus from './components/HealthStatus.vue';
 import { consumeNavigationNotice, syncNavigationRoutes } from './router.js';
@@ -16,6 +21,7 @@ import {
 
 const route = useRoute();
 const router = useRouter();
+const aiChat = useAiChat();
 const loading = ref(true);
 const errorMessage = ref('');
 const drawers = ref([]);
@@ -118,6 +124,9 @@ function handleViewportResize() {
 
 function handleGlobalKeydown(event) {
   if (event.key === 'Escape') {
+    if (aiChat.isOpen.value) {
+      aiChat.togglePanel();
+    }
     closeMobileSidebar();
   }
 }
@@ -210,7 +219,7 @@ watch(
 </script>
 
 <template>
-  <div class="shell" :class="sidebarUiState.shellClass">
+  <div class="shell theme-portal-shell" :class="sidebarUiState.shellClass">
     <a href="#main-content" class="sr-only focus:not-sr-only">跳至主要內容</a>
     <header class="shell-header">
       <div class="shell-header-left">
@@ -284,5 +293,18 @@ watch(
         <RouterView />
       </main>
     </main>
+
+    <AiChatTrigger v-if="!aiChat.isOpen.value" @click="aiChat.togglePanel" />
+    <AiChatPanel
+      v-if="aiChat.isOpen.value"
+      :messages="aiChat.messages.value"
+      :is-loading="aiChat.isLoading.value"
+      :is-rate-limited="aiChat.isRateLimited.value"
+      :can-submit="aiChat.canSubmit.value"
+      :loading-step-text="aiChat.loadingStepText.value"
+      @close="aiChat.togglePanel"
+      @submit="aiChat.submitQuestion"
+      @reset="aiChat.clearHistory"
+    />
   </div>
 </template>

@@ -62,6 +62,11 @@ INTERNAL_ERROR = "INTERNAL_ERROR"
 CACHE_EXPIRED = "CACHE_EXPIRED"
 CACHE_MISS = "CACHE_MISS"
 
+# External service errors (AI / LLM API)
+EXTERNAL_SERVICE_TIMEOUT = "EXTERNAL_SERVICE_TIMEOUT"
+EXTERNAL_SERVICE_ERROR = "EXTERNAL_SERVICE_ERROR"
+CONTEXT_LIMIT_REACHED = "CONTEXT_LIMIT_REACHED"
+
 
 # ============================================================
 # Response Functions
@@ -310,6 +315,36 @@ def cache_miss_error(details: Optional[str] = None):
     return error_response(
         CACHE_MISS,
         "快取資料尚未就緒，請稍後再試",
+        details,
+        status_code=400
+    )
+
+
+def external_service_timeout_error(details: Optional[str] = None):
+    """Return an external service timeout error response (HTTP 504)."""
+    return error_response(
+        EXTERNAL_SERVICE_TIMEOUT,
+        "AI 服務回應逾時，請稍後再試",
+        details,
+        status_code=504
+    )
+
+
+def external_service_error(details: Optional[str] = None):
+    """Return an external service error response (HTTP 502)."""
+    return error_response(
+        EXTERNAL_SERVICE_ERROR,
+        "AI 服務暫時不可用，請稍後再試",
+        details,
+        status_code=502
+    )
+
+
+def context_limit_error(details: Optional[str] = None):
+    """Return a context limit reached error response (HTTP 400)."""
+    return error_response(
+        CONTEXT_LIMIT_REACHED,
+        "對話已達上限，請開啟新對話繼續",
         details,
         status_code=400
     )

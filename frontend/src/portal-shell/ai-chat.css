@@ -1,0 +1,70 @@
+/* AI Chat — portal-shell scoped styles
+ * All rules scoped under .theme-portal-shell per CSS contract.
+ */
+
+/* Typing indicator (3 animated dots) */
+.theme-portal-shell .ai-typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p12');
+}
+
+.theme-portal-shell .ai-typing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: theme('colors.text.muted');
+  animation: ai-typing-bounce 1.2s infinite ease-in-out;
+}
+
+.theme-portal-shell .ai-typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.theme-portal-shell .ai-typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes ai-typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+/* Step text alongside typing indicator */
+.theme-portal-shell .ai-step-text {
+  font-size: theme('fontSize.xs');
+  color: theme('colors.text.muted');
+  margin-left: theme('spacing.token.p6');
+  align-self: center;
+}
+
+/* Conversation divider between independent queries */
+.theme-portal-shell .ai-conversation-divider {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.token.p8');
+  margin: theme('spacing.token.p12') 0;
+}
+
+.theme-portal-shell .ai-divider-line {
+  flex: 1;
+  height: 1px;
+  background: theme('colors.stroke.soft');
+}
+
+.theme-portal-shell .ai-divider-text {
+  font-size: theme('fontSize.2xs');
+  color: theme('colors.text.muted');
+  white-space: nowrap;
+  flex-shrink: 0;
+}

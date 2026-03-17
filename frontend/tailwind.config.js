@@ -180,6 +180,9 @@ export default {
       fontFamily: {
         sans: ['"Noto Sans TC"', '"Microsoft JhengHei"', 'system-ui', 'sans-serif']
       },
+      fontSize: {
+        '2xs': ['11px', { lineHeight: '1rem' }]
+      },
       spacing: {
         shell: '20px',
         panel: '24px',

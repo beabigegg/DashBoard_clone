@@ -15,6 +15,7 @@ Governance status (2026-03-12): `css-governance-check` = 0 errors, 0 warnings.
 | :--- | :--- | :--- |
 | `frontend/src/styles/tailwind.css` | Global base + components + utilities | The only allowed global `@layer base` location. Added: motion design tokens in `:root`, unified `ui-btn` BEM button system, `.ui-table-wrap` search trigger animation classes |
 | `frontend/src/portal-shell/style.css` | Portal shell frame | Shell layout chrome and shell-wide UI |
+| `frontend/src/portal-shell/ai-chat.css` | Portal shell AI chat | AI chat panel animations, typing indicator, step-text, and conversation divider; scoped under `.theme-portal-shell` |
 | `frontend/src/portal/portal.css` | Legacy portal entry | Legacy portal host layout |
 
 ## Shared Feature Layers
