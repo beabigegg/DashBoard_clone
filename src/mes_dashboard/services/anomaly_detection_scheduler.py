@@ -32,12 +32,14 @@ _CHECK_INTERVAL = int(os.getenv("ANOMALY_DETECTION_CHECK_INTERVAL", "60"))
 # Delay between sequential spool seed queries (seconds)
 _SEED_QUERY_DELAY = int(os.getenv("ANOMALY_SEED_QUERY_DELAY", "5"))
 
-# Dataset namespace → lookback days for seed queries
-_SPOOL_SEED_CONFIG: List[Tuple[str, int]] = [
-    ("yield_alert_dataset", 14),
-    ("reject_dataset", 14),
-    ("hold_dataset", 14),
-    ("resource_dataset", 14),
+# (source_namespace, anomaly_namespace, lookback_days)
+# source_namespace: where execute_primary_query writes (shared with user pages)
+# anomaly_namespace: isolated copy for anomaly detection (not affected by user queries)
+_SPOOL_SEED_CONFIG: List[Tuple[str, str, int]] = [
+    ("yield_alert_dataset", "anomaly_yield_dataset", 14),
+    ("reject_dataset", "anomaly_reject_dataset", 14),
+    ("hold_dataset", "anomaly_hold_dataset", 14),
+    ("resource_dataset", "anomaly_resource_dataset", 14),
 ]
 
 
@@ -55,61 +57,102 @@ def _has_spool(namespace: str) -> bool:
         return False
 
 
-def _seed_spool(namespace: str, lookback_days: int) -> bool:
-    """Trigger a primary query for a single dataset to generate its spool file.
+def _copy_to_anomaly_namespace(source_ns: str, anomaly_ns: str) -> bool:
+    """Copy the latest spool Parquet from source namespace to anomaly namespace."""
+    import shutil
 
-    Returns True if the seed completed (hit cache or queried Oracle).
+    from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR
+
+    src_dir = QUERY_SPOOL_DIR.resolve() / re.sub(r"[^A-Za-z0-9._-]", "_", source_ns)
+    if not src_dir.exists():
+        return False
+
+    try:
+        files = sorted(src_dir.glob("*.parquet"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not files:
+            return False
+
+        dest_dir = QUERY_SPOOL_DIR.resolve() / re.sub(r"[^A-Za-z0-9._-]", "_", anomaly_ns)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        # Remove old anomaly spool files before copying fresh data
+        for old in dest_dir.glob("*.parquet"):
+            old.unlink(missing_ok=True)
+
+        dest_path = dest_dir / f"anomaly_{files[0].name}"
+        shutil.copy2(str(files[0]), str(dest_path))
+        logger.info(
+            "Copied spool %s -> %s (%s)",
+            source_ns, anomaly_ns, dest_path.name,
+        )
+        return True
+    except Exception as exc:
+        logger.error("Failed to copy spool %s -> %s: %s", source_ns, anomaly_ns, exc)
+        return False
+
+
+def _seed_spool(source_ns: str, anomaly_ns: str, lookback_days: int) -> bool:
+    """Ensure source spool exists, then copy to isolated anomaly namespace.
+
+    Returns True if the anomaly spool was successfully created.
     """
     today = datetime.now()
     start_date = (today - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
     end_date = today.strftime("%Y-%m-%d")
 
-    try:
-        if namespace == "yield_alert_dataset":
-            from mes_dashboard.services.yield_alert_dataset_cache import execute_primary_query
-            execute_primary_query(start_date=start_date, end_date=end_date)
+    # Step 1: Ensure source spool has data (trigger Oracle query if needed)
+    if not _has_spool(source_ns):
+        logger.info("Source spool missing: %s — querying Oracle (%dd)", source_ns, lookback_days)
+        try:
+            if source_ns == "yield_alert_dataset":
+                from mes_dashboard.services.yield_alert_dataset_cache import execute_primary_query
+                execute_primary_query(start_date=start_date, end_date=end_date)
 
-        elif namespace == "reject_dataset":
-            from mes_dashboard.services.reject_dataset_cache import execute_primary_query
-            execute_primary_query(
-                mode="date_range", start_date=start_date, end_date=end_date,
-            )
+            elif source_ns == "reject_dataset":
+                from mes_dashboard.services.reject_dataset_cache import execute_primary_query
+                execute_primary_query(
+                    mode="date_range", start_date=start_date, end_date=end_date,
+                )
 
-        elif namespace == "hold_dataset":
-            from mes_dashboard.services.hold_dataset_cache import execute_primary_query
-            execute_primary_query(start_date=start_date, end_date=end_date)
+            elif source_ns == "hold_dataset":
+                from mes_dashboard.services.hold_dataset_cache import execute_primary_query
+                execute_primary_query(start_date=start_date, end_date=end_date)
 
-        elif namespace == "resource_dataset":
-            from mes_dashboard.services.resource_dataset_cache import execute_primary_query
-            execute_primary_query(start_date=start_date, end_date=end_date)
+            elif source_ns == "resource_dataset":
+                from mes_dashboard.services.resource_dataset_cache import execute_primary_query
+                execute_primary_query(start_date=start_date, end_date=end_date)
 
-        else:
-            logger.warning("Unknown spool namespace for seeding: %s", namespace)
+            else:
+                logger.warning("Unknown source namespace: %s", source_ns)
+                return False
+        except Exception as exc:
+            logger.error("Spool seed Oracle query failed for %s: %s", source_ns, exc)
             return False
 
-        logger.info("Spool seed complete: %s (%dd lookback)", namespace, lookback_days)
+    # Step 2: Copy source spool to isolated anomaly namespace
+    if _copy_to_anomaly_namespace(source_ns, anomaly_ns):
+        logger.info("Spool seed complete: %s -> %s (%dd)", source_ns, anomaly_ns, lookback_days)
         return True
 
-    except Exception as exc:
-        logger.error("Spool seed failed for %s: %s", namespace, exc)
-        return False
+    logger.warning("Spool seed: copy failed for %s -> %s", source_ns, anomaly_ns)
+    return False
 
 
 def _ensure_spool_data() -> int:
-    """Check all required spool files; seed missing ones sequentially.
+    """Check all anomaly spool files; seed missing ones sequentially.
 
     Returns the number of datasets seeded.
     """
     seeded = 0
-    for namespace, lookback_days in _SPOOL_SEED_CONFIG:
+    for source_ns, anomaly_ns, lookback_days in _SPOOL_SEED_CONFIG:
         if _STOP_EVENT.is_set():
             break
-        if _has_spool(namespace):
-            logger.debug("Spool exists: %s", namespace)
+        if _has_spool(anomaly_ns):
+            logger.debug("Anomaly spool exists: %s", anomaly_ns)
             continue
 
-        logger.info("Spool missing: %s — queuing seed query (%dd)", namespace, lookback_days)
-        if _seed_spool(namespace, lookback_days):
+        logger.info("Anomaly spool missing: %s — seeding from %s (%dd)", anomaly_ns, source_ns, lookback_days)
+        if _seed_spool(source_ns, anomaly_ns, lookback_days):
             seeded += 1
 
         # Delay between queries to reduce memory pressure
@@ -117,6 +160,27 @@ def _ensure_spool_data() -> int:
             _STOP_EVENT.wait(_SEED_QUERY_DELAY)
 
     return seeded
+
+
+def _refresh_all_spool() -> int:
+    """Force-refresh all anomaly spools from source (daily scheduled use).
+
+    Unlike _ensure_spool_data which skips existing spools, this always
+    re-copies fresh data from source namespaces.
+    """
+    refreshed = 0
+    for source_ns, anomaly_ns, lookback_days in _SPOOL_SEED_CONFIG:
+        if _STOP_EVENT.is_set():
+            break
+
+        logger.info("Refreshing anomaly spool: %s from %s (%dd)", anomaly_ns, source_ns, lookback_days)
+        if _seed_spool(source_ns, anomaly_ns, lookback_days):
+            refreshed += 1
+
+        if not _STOP_EVENT.is_set():
+            _STOP_EVENT.wait(_SEED_QUERY_DELAY)
+
+    return refreshed
 
 
 def _run_computation() -> bool:
@@ -174,8 +238,8 @@ def _scheduler_loop() -> None:
 
         # Run once per day at or after the scheduled hour
         if now.hour >= _SCHEDULE_HOUR and last_run_date != today_str:
-            logger.info("Anomaly detection: daily run — ensuring spool freshness...")
-            _ensure_spool_data()
+            logger.info("Anomaly detection: daily run — refreshing all anomaly spools...")
+            _refresh_all_spool()
 
             if _STOP_EVENT.is_set():
                 break

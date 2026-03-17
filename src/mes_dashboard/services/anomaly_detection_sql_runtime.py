@@ -32,10 +32,10 @@ SQL_FALLBACK_DEP_MISSING = "analytics_dependency_missing"
 SQL_FALLBACK_SPOOL_MISS = "analytics_spool_miss"
 SQL_FALLBACK_RUNTIME_ERROR = "analytics_runtime_error"
 
-_NS_YIELD = "yield_alert_dataset"
-_NS_REJECT = "reject_dataset"
-_NS_HOLD = "hold_dataset"
-_NS_RESOURCE = "resource_dataset"
+_NS_YIELD = "anomaly_yield_dataset"
+_NS_REJECT = "anomaly_reject_dataset"
+_NS_HOLD = "anomaly_hold_dataset"
+_NS_RESOURCE = "anomaly_resource_dataset"
 
 _DEFAULT_YIELD_THRESHOLD = 2.0
 _DEFAULT_SPIKE_THRESHOLD = 50.0  # pct_change threshold
