@@ -498,15 +498,45 @@ def get_anomaly_summary() -> Dict[str, Any]:
     }
 
 
+def _build_resource_dimension() -> List[Tuple[str, str, str]]:
+    """Build (resource_id, workcenter_group, resource_model) from resource_cache.
+
+    Only includes machines registered in the cache.
+    """
+    try:
+        from mes_dashboard.services.filter_cache import get_workcenter_mapping
+        from mes_dashboard.services.resource_cache import get_all_resources
+
+        wc_mapping = get_workcenter_mapping() or {}
+        result = []
+        for r in get_all_resources():
+            rid = r.get("RESOURCEID", "")
+            if not rid:
+                continue
+            wc_name = r.get("WORKCENTERNAME", "")
+            group = (wc_mapping.get(wc_name) or {}).get("group", wc_name)
+            model = r.get("RESOURCEFAMILYNAME", "") or "(NA)"
+            result.append((rid, group, model))
+        return result
+    except Exception as exc:
+        logger.warning("Failed to build resource dimension: %s", exc)
+        return []
+
+
 def detect_equipment_deviations(
     *,
     query_id: Optional[str] = None,
     deviation_threshold: float = _DEFAULT_DEVIATION_THRESHOLD,
 ) -> Tuple[Optional[List[Dict[str, Any]]], Dict[str, Any]]:
-    """Detect equipment OU% deviations against 30-day rolling baseline on resource_dataset spool.
+    """Detect equipment OU% deviations by workcenter_group × resource_model.
+
+    Only considers machines in resource_cache. Aggregates OU% per group/model
+    per day, then applies a rolling 13-day baseline window. Reports yesterday
+    only.
 
     Returns (items, meta).
-    Each item: {resource_id, date, current_ou_pct, baseline_ou_pct, deviation}
+    Each item: {workcenter_group, resource_model, machine_count, date,
+                current_ou_pct, baseline_ou_pct, deviation}
     """
     if not _ANALYTICS_ENABLED:
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
@@ -519,6 +549,11 @@ def detect_equipment_deviations(
     parquet_path = _resolve_spool_path(_NS_RESOURCE, query_id)
     if not parquet_path:
         return None, {"fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    # Build dimension: only cache-registered machines
+    dim_rows = _build_resource_dimension()
+    if not dim_rows:
+        return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
 
     started_at = time.time()
     conn = None
@@ -536,6 +571,15 @@ def detect_equipment_deviations(
         if not required.issubset(cols):
             return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
 
+        # Load dimension table into DuckDB
+        conn.execute(
+            "CREATE TEMP TABLE resource_dim "
+            "(resource_id VARCHAR, workcenter_group VARCHAR, resource_model VARCHAR)"
+        )
+        conn.executemany(
+            "INSERT INTO resource_dim VALUES (?, ?, ?)", dim_rows
+        )
+
         def _hours_col(name: str) -> str:
             return f'COALESCE("{name}", 0)' if name in cols else "0"
 
@@ -547,60 +591,62 @@ def detect_equipment_deviations(
         total = _hours_col("TOTAL_HOURS")
 
         sql = f"""
-            WITH daily_ou AS (
+            WITH machine_ou AS (
                 SELECT
-                    strftime(CAST("DATA_DATE" AS DATE), '%Y-%m-%d') AS data_date,
-                    TRIM(COALESCE(CAST("HISTORYID" AS VARCHAR), '')) AS resource_id,
+                    strftime(CAST(s."DATA_DATE" AS DATE), '%Y-%m-%d') AS data_date,
+                    d.workcenter_group,
+                    d.resource_model,
                     CASE
                         WHEN ({prd}+{sby}+{udt}+{sdt}+{egt}) = 0 THEN 0.0
-                        ELSE ROUND({prd} / ({prd}+{sby}+{udt}+{sdt}+{egt}) * 100, 2)
+                        ELSE {prd} / ({prd}+{sby}+{udt}+{sdt}+{egt}) * 100
                     END AS ou_pct
-                FROM resource_src
+                FROM resource_src s
+                INNER JOIN resource_dim d ON TRIM(CAST(s."HISTORYID" AS VARCHAR)) = d.resource_id
                 WHERE {total} > 0
-                  AND CAST("DATA_DATE" AS DATE) >= CURRENT_DATE - INTERVAL '14' DAY
+                  AND CAST(s."DATA_DATE" AS DATE) >= CURRENT_DATE - INTERVAL '14' DAY
+            ),
+            group_daily AS (
+                SELECT
+                    data_date,
+                    workcenter_group,
+                    resource_model,
+                    ROUND(AVG(ou_pct), 2) AS avg_ou_pct,
+                    COUNT(*) AS machine_count
+                FROM machine_ou
+                GROUP BY data_date, workcenter_group, resource_model
             ),
             windowed AS (
                 SELECT
-                    data_date, resource_id, ou_pct,
-                    AVG(ou_pct) OVER w AS baseline_ou_pct,
+                    data_date, workcenter_group, resource_model,
+                    avg_ou_pct, machine_count,
+                    AVG(avg_ou_pct) OVER w AS baseline_ou_pct,
                     COUNT(*) OVER w AS window_count
-                FROM daily_ou
+                FROM group_daily
                 WINDOW w AS (
-                    PARTITION BY resource_id
+                    PARTITION BY workcenter_group, resource_model
                     ORDER BY data_date
                     ROWS BETWEEN 13 PRECEDING AND 1 PRECEDING
                 )
             )
             SELECT
-                data_date, resource_id,
-                ROUND(ou_pct, 2) AS current_ou_pct,
+                data_date, workcenter_group, resource_model, machine_count,
+                ROUND(avg_ou_pct, 2) AS current_ou_pct,
                 ROUND(baseline_ou_pct, 2) AS baseline_ou_pct,
-                ROUND(baseline_ou_pct - ou_pct, 2) AS deviation,
+                ROUND(baseline_ou_pct - avg_ou_pct, 2) AS deviation,
                 window_count
             FROM windowed
             WHERE data_date = strftime(CURRENT_DATE - INTERVAL '1' DAY, '%Y-%m-%d')
               AND window_count >= 7
-              AND baseline_ou_pct - ou_pct > ?
+              AND baseline_ou_pct - avg_ou_pct > ?
             ORDER BY deviation DESC
         """
         rows = _fetch_dict_rows(conn, sql, [deviation_threshold])
 
-        # Map HISTORYID (= RESOURCEID) → RESOURCENAME via resource_cache
-        name_map: Dict[str, str] = {}
-        try:
-            from mes_dashboard.services.resource_cache import get_all_resources
-            name_map = {
-                r.get("RESOURCEID", ""): r.get("RESOURCENAME", "")
-                for r in get_all_resources()
-                if r.get("RESOURCEID")
-            }
-        except Exception:
-            pass
-
         items = [
             {
-                "resource_id": str(r.get("resource_id") or ""),
-                "resource_name": name_map.get(str(r.get("resource_id") or ""), ""),
+                "workcenter_group": str(r.get("workcenter_group") or ""),
+                "resource_model": str(r.get("resource_model") or ""),
+                "machine_count": int(r.get("machine_count") or 0),
                 "date": str(r.get("data_date") or ""),
                 "current_ou_pct": round(_sf(r.get("current_ou_pct")), 2),
                 "baseline_ou_pct": round(_sf(r.get("baseline_ou_pct")), 2),
