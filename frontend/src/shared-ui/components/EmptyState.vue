@@ -35,6 +35,6 @@ const messages = {
 .empty-state__message {
   margin: 8px 0 0;
   font-size: 13px;
-  color: var(--portal-text-secondary, #64748b);
+  color: var(--portal-text-secondary);
 }
 </style>

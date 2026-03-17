@@ -42,16 +42,16 @@ function formatNumber(value) {
       <table class="detail-table">
         <thead>
           <tr>
-            <th @click="toggleSort('CONTAINERNAME')" style="cursor:pointer" :aria-sort="sortKey === 'CONTAINERNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOT <span>{{ sortKey === 'CONTAINERNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th @click="toggleSort('WORKCENTERNAME')" style="cursor:pointer" :aria-sort="sortKey === 'WORKCENTERNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WORKCENTER <span>{{ sortKey === 'WORKCENTERNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th @click="toggleSort('PRODUCTLINENAME')" style="cursor:pointer" :aria-sort="sortKey === 'PRODUCTLINENAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'PRODUCTLINENAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th @click="toggleSort('PJ_FUNCTION')" style="cursor:pointer" :aria-sort="sortKey === 'PJ_FUNCTION' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">FUNCTION <span>{{ sortKey === 'PJ_FUNCTION' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="col-left" @click="toggleSort('PJ_TYPE')" style="cursor:pointer" :aria-sort="sortKey === 'PJ_TYPE' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">TYPE <span>{{ sortKey === 'PJ_TYPE' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th @click="toggleSort('WORKFLOWNAME')" style="cursor:pointer" :aria-sort="sortKey === 'WORKFLOWNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WORKFLOW <span>{{ sortKey === 'WORKFLOWNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th @click="toggleSort('PRODUCTNAME')" style="cursor:pointer" :aria-sort="sortKey === 'PRODUCTNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">PRODUCT <span>{{ sortKey === 'PRODUCTNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th @click="toggleSort('LOSSREASONNAME')" style="cursor:pointer" :aria-sort="sortKey === 'LOSSREASONNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">原因 <span>{{ sortKey === 'LOSSREASONNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th @click="toggleSort('EQUIPMENTNAME')" style="cursor:pointer" :aria-sort="sortKey === 'EQUIPMENTNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">EQUIPMENT <span>{{ sortKey === 'EQUIPMENTNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th @click="toggleSort('REJECTCOMMENT')" style="cursor:pointer" :aria-sort="sortKey === 'REJECTCOMMENT' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">COMMENT <span>{{ sortKey === 'REJECTCOMMENT' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('CONTAINERNAME')" :aria-sort="sortKey === 'CONTAINERNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOT <span>{{ sortKey === 'CONTAINERNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('WORKCENTERNAME')" :aria-sort="sortKey === 'WORKCENTERNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WORKCENTER <span>{{ sortKey === 'WORKCENTERNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('PRODUCTLINENAME')" :aria-sort="sortKey === 'PRODUCTLINENAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'PRODUCTLINENAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('PJ_FUNCTION')" :aria-sort="sortKey === 'PJ_FUNCTION' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">FUNCTION <span>{{ sortKey === 'PJ_FUNCTION' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="col-left cursor-pointer" @click="toggleSort('PJ_TYPE')" :aria-sort="sortKey === 'PJ_TYPE' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">TYPE <span>{{ sortKey === 'PJ_TYPE' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('WORKFLOWNAME')" :aria-sort="sortKey === 'WORKFLOWNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WORKFLOW <span>{{ sortKey === 'WORKFLOWNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('PRODUCTNAME')" :aria-sort="sortKey === 'PRODUCTNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">PRODUCT <span>{{ sortKey === 'PRODUCTNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('LOSSREASONNAME')" :aria-sort="sortKey === 'LOSSREASONNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">原因 <span>{{ sortKey === 'LOSSREASONNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('EQUIPMENTNAME')" :aria-sort="sortKey === 'EQUIPMENTNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">EQUIPMENT <span>{{ sortKey === 'EQUIPMENTNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('REJECTCOMMENT')" :aria-sort="sortKey === 'REJECTCOMMENT' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">COMMENT <span>{{ sortKey === 'REJECTCOMMENT' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
             <th class="th-expandable" @click="showRejectBreakdown = !showRejectBreakdown">
               扣帳報廢量 <span class="expand-icon">{{ showRejectBreakdown ? '▾' : '▸' }}</span>
             </th>
@@ -62,8 +62,8 @@ function formatNumber(value) {
               <th class="th-sub">INPROCESS</th>
               <th class="th-sub">PROCESSED</th>
             </template>
-            <th @click="toggleSort('DEFECT_QTY')" style="cursor:pointer" :aria-sort="sortKey === 'DEFECT_QTY' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">不扣帳報廢量 <span>{{ sortKey === 'DEFECT_QTY' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th @click="toggleSort('TXN_TIME')" style="cursor:pointer" :aria-sort="sortKey === 'TXN_TIME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">報廢時間 <span>{{ sortKey === 'TXN_TIME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('DEFECT_QTY')" :aria-sort="sortKey === 'DEFECT_QTY' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">不扣帳報廢量 <span>{{ sortKey === 'DEFECT_QTY' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('TXN_TIME')" :aria-sort="sortKey === 'TXN_TIME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">報廢時間 <span>{{ sortKey === 'TXN_TIME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
           </tr>
         </thead>
         <tbody>

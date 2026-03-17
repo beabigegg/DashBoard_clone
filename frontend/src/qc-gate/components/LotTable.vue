@@ -104,7 +104,7 @@ function currentSortLabel(columnKey) {
       <table class="lot-table">
         <thead>
           <tr>
-            <th v-for="header in HEADERS" :key="header.key" style="cursor:pointer" :aria-sort="sortKey === header.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" @click="toggleSort(header.key)">
+            <th v-for="header in HEADERS" :key="header.key" class="cursor-pointer" :aria-sort="sortKey === header.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" @click="toggleSort(header.key)">
               {{ header.label }}
               <span class="sort-indicator">{{ currentSortLabel(header.key) }}</span>
             </th>
