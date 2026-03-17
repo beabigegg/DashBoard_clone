@@ -15,6 +15,7 @@ Entry points: detect_yield_anomalies, detect_reject_spikes,
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -49,6 +50,18 @@ _REDIS_KEY_HOLD = "analytics:hold_outliers"
 _REDIS_KEY_EQUIPMENT = "analytics:equipment_deviations"
 _REDIS_KEY_COMPUTED_AT = "analytics:computed_at"
 _REDIS_CACHE_TTL = 90_000  # 25 hours
+
+# DuckDB memory limit per connection to prevent OOM with multiple workers
+_DUCKDB_MEMORY_LIMIT = os.getenv("DUCKDB_MEMORY_LIMIT", "256MB")
+
+
+def _create_duckdb_conn():
+    """Create a memory-limited DuckDB connection."""
+    import duckdb  # type: ignore
+    conn = duckdb.connect(database=":memory:")
+    conn.execute(f"SET memory_limit = '{_DUCKDB_MEMORY_LIMIT}'")
+    conn.execute("SET threads = 1")
+    return conn
 
 
 def _qid(name: str) -> str:
@@ -120,7 +133,7 @@ def detect_yield_anomalies(
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = _create_duckdb_conn()
         conn.execute(
             "CREATE OR REPLACE TEMP VIEW yield_alert_src AS "
             f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
@@ -226,7 +239,7 @@ def detect_reject_spikes(
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = _create_duckdb_conn()
         conn.execute(
             "CREATE OR REPLACE TEMP VIEW reject_src AS "
             f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
@@ -340,7 +353,7 @@ def detect_hold_outliers(
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = _create_duckdb_conn()
         conn.execute(
             "CREATE OR REPLACE TEMP VIEW hold_src AS "
             f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
@@ -503,7 +516,7 @@ def detect_equipment_deviations(
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = _create_duckdb_conn()
         conn.execute(
             "CREATE OR REPLACE TEMP VIEW resource_src AS "
             f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
