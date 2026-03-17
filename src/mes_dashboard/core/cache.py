@@ -151,7 +151,7 @@ def _resolve_cache_max_size(env_name: str, default: int) -> int:
 
 
 # Global process-level cache for WIP DataFrame (30s TTL)
-PROCESS_CACHE_MAX_SIZE = _resolve_cache_max_size("PROCESS_CACHE_MAX_SIZE", 32)
+PROCESS_CACHE_MAX_SIZE = _resolve_cache_max_size("PROCESS_CACHE_MAX_SIZE", 2)
 WIP_PROCESS_CACHE_MAX_SIZE = _resolve_cache_max_size(
     "WIP_PROCESS_CACHE_MAX_SIZE",
     PROCESS_CACHE_MAX_SIZE,
@@ -424,19 +424,33 @@ def get_cached_wip_data() -> Optional[pd.DataFrame]:
 
         try:
             start_time = time.time()
-            data_json = client.get(get_key("data"))
-            if data_json is None:
-                logger.debug("Cache miss: no data in Redis")
-                return None
+            parsed_df = None
+            source = "json"
 
-            parsed_df = pd.read_json(io.StringIO(data_json), orient='records')
+            # Try Parquet first (faster deserialization)
+            try:
+                from mes_dashboard.core.redis_df_store import redis_load_df
+                parsed_df = redis_load_df(get_key("data:parquet"))
+                if parsed_df is not None:
+                    source = "parquet"
+            except Exception:
+                pass
+
+            # Fallback to JSON
+            if parsed_df is None:
+                data_json = client.get(get_key("data"))
+                if data_json is None:
+                    logger.debug("Cache miss: no data in Redis")
+                    return None
+                parsed_df = pd.read_json(io.StringIO(data_json), orient='records')
+
             _wip_df_cache.set(cache_key, parsed_df)
             parse_time = time.time() - start_time
         except Exception as e:
             logger.warning(f"Failed to read cache: {e}")
             return None
 
-        logger.debug(f"Cache hit: loaded {len(parsed_df)} rows from Redis (parsed in {parse_time:.2f}s)")
+        logger.debug(f"Cache hit: loaded {len(parsed_df)} rows from Redis ({source}, parsed in {parse_time:.2f}s)")
         return parsed_df
 
 

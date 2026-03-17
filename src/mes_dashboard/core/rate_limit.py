@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Lightweight in-process rate limiting helpers for high-cost routes."""
+"""Lightweight rate limiting helpers for high-cost routes.
+
+Preferred backend: Redis INCR+EXPIRE (works across multiple workers).
+Fallback backend: in-process deque (single-worker / Redis unavailable).
+"""
 
 from __future__ import annotations
 
@@ -92,14 +96,13 @@ def _client_identifier() -> str:
     return remote or "unknown"
 
 
-def check_and_record(
+def _check_and_record_local(
     bucket: str,
-    *,
     client_id: str,
     max_attempts: int,
     window_seconds: int,
 ) -> tuple[bool, int]:
-    """Check and record request attempt for a bucket+client pair."""
+    """In-process deque-based rate limiting (single-worker fallback)."""
     now = time.time()
     window_start = now - max(window_seconds, 1)
 
@@ -116,6 +119,54 @@ def check_and_record(
 
         attempts.append(now)
         return False, 0
+
+
+def _check_and_record_redis(
+    bucket: str,
+    client_id: str,
+    max_attempts: int,
+    window_seconds: int,
+) -> tuple[bool, int]:
+    """Redis INCR+EXPIRE rate limiting (multi-worker safe).
+
+    Falls back to the local implementation when Redis is unavailable.
+    """
+    from mes_dashboard.core.redis_client import get_redis_client, get_key
+
+    client = get_redis_client()
+    if client is None:
+        return _check_and_record_local(bucket, client_id, max_attempts, window_seconds)
+
+    key = get_key(f"rate:{bucket}:{client_id}")
+    try:
+        count = client.incr(key)
+        if count == 1:
+            client.expire(key, max(window_seconds, 1))
+        if count > max_attempts:
+            ttl = client.ttl(key)
+            return True, max(ttl, 1)
+        return False, 0
+    except Exception:
+        return _check_and_record_local(bucket, client_id, max_attempts, window_seconds)
+
+
+def check_and_record(
+    bucket: str,
+    *,
+    client_id: str,
+    max_attempts: int,
+    window_seconds: int,
+) -> tuple[bool, int]:
+    """Check and record request attempt for a bucket+client pair.
+
+    Uses Redis when available (cross-worker accuracy), otherwise falls back
+    to the in-process deque implementation.
+    """
+    from mes_dashboard.core.redis_client import REDIS_ENABLED
+
+    if REDIS_ENABLED:
+        return _check_and_record_redis(bucket, client_id, max_attempts, window_seconds)
+    return _check_and_record_local(bucket, client_id, max_attempts, window_seconds)
 
 
 def configured_rate_limit(

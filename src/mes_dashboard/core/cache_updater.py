@@ -258,6 +258,14 @@ class CacheUpdater:
             pipe.set(get_key("meta:updated_at"), now, ex=ttl_seconds)
             pipe.execute()
 
+            # Dual-key: also store as Parquet for faster deserialization
+            try:
+                from mes_dashboard.core.redis_df_store import redis_store_df
+                redis_store_df(get_key("data:parquet"), df_copy, ttl=ttl_seconds)
+                logger.debug("WIP Parquet cache updated alongside JSON")
+            except Exception as parquet_exc:
+                logger.warning("WIP Parquet cache write failed (JSON still valid): %s", parquet_exc)
+
             return True
         except Exception as e:
             logger.error(f"Failed to update Redis cache: {e}")

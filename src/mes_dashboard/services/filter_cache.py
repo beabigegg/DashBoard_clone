@@ -5,6 +5,7 @@ Provides cached workcenter groups and resource families for filter dropdowns.
 Data is loaded from database and cached in memory with periodic refresh.
 """
 
+import json
 import logging
 import os
 import threading
@@ -12,6 +13,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
 
 from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.core.redis_client import get_redis_client, get_key, REDIS_ENABLED
 
 logger = logging.getLogger('mes_dashboard.filter_cache')
 
@@ -192,6 +194,69 @@ def get_specs_for_groups(groups: List[str]) -> List[str]:
 
 
 # ============================================================
+# Redis L2 Cache Helpers
+# ============================================================
+
+_REDIS_KEY = "filter_cache:data"
+
+# Payload keys that are persisted to / restored from Redis.
+# Internal bookkeeping keys (last_refresh, is_loading) are excluded.
+_REDIS_PAYLOAD_KEYS = (
+    'workcenter_groups',
+    'workcenter_mapping',
+    'workcenter_to_short',
+    'spec_order_mapping',
+    'spec_workcenter_mapping',
+)
+
+
+def _write_to_redis(data: dict) -> None:
+    """Serialize cache payload to Redis with TTL.
+
+    Failures are logged as warnings and silently swallowed so that a Redis
+    outage never prevents the in-memory cache from being used.
+    """
+    if not REDIS_ENABLED:
+        return
+    try:
+        client = get_redis_client()
+        if client is None:
+            return
+        payload = {k: data[k] for k in _REDIS_PAYLOAD_KEYS if k in data}
+        client.set(
+            get_key(_REDIS_KEY),
+            json.dumps(payload, default=str),
+            ex=CACHE_TTL_SECONDS,
+        )
+        logger.debug("Filter cache written to Redis (TTL=%ds)", CACHE_TTL_SECONDS)
+    except Exception as exc:
+        logger.warning("Failed to write filter cache to Redis: %s", exc)
+
+
+def _read_from_redis() -> Optional[dict]:
+    """Deserialize cache payload from Redis.
+
+    Returns:
+        Dict with payload keys, or None on miss / error / Redis disabled.
+    """
+    if not REDIS_ENABLED:
+        return None
+    try:
+        client = get_redis_client()
+        if client is None:
+            return None
+        raw = client.get(get_key(_REDIS_KEY))
+        if raw is None:
+            return None
+        data = json.loads(raw)
+        logger.debug("Filter cache restored from Redis")
+        return data
+    except Exception as exc:
+        logger.warning("Failed to read filter cache from Redis: %s", exc)
+        return None
+
+
+# ============================================================
 # Cache Management
 # ============================================================
 
@@ -247,10 +312,14 @@ def _ensure_cache_loaded(force_refresh: bool = False):
 
 
 def _load_cache() -> bool:
-    """Load all cache data from database.
+    """Load all cache data, trying Redis L2 before Oracle.
+
+    Load order:
+        1. Redis L2 — fast cross-worker hit, avoids Oracle round-trip.
+        2. Oracle   — authoritative source; result is written back to Redis.
 
     Returns:
-        True if loading succeeded, False otherwise
+        True if loading succeeded, False otherwise.
     """
     with _CACHE_LOCK:
         if _CACHE.get('is_loading'):
@@ -258,7 +327,25 @@ def _load_cache() -> bool:
         _CACHE['is_loading'] = True
 
     try:
-        # Load workcenter groups - prioritize SPEC_WORKCENTER_V
+        # --- L2: try Redis before going to Oracle ---
+        redis_data = _read_from_redis()
+        if redis_data is not None:
+            with _CACHE_LOCK:
+                for k in _REDIS_PAYLOAD_KEYS:
+                    _CACHE[k] = redis_data.get(k)
+                _CACHE['last_refresh'] = datetime.now()
+                _CACHE['is_loading'] = False
+            logger.info(
+                "Filter cache populated from Redis: %d groups, %d workcenters, "
+                "%d specs, %d spec-wc mappings",
+                len(_CACHE.get('workcenter_groups') or []),
+                len(_CACHE.get('workcenter_mapping') or {}),
+                len(_CACHE.get('spec_order_mapping') or {}),
+                len(_CACHE.get('spec_workcenter_mapping') or {}),
+            )
+            return True
+
+        # --- L3: load from Oracle ---
         wc_groups, wc_mapping, wc_short = _load_workcenter_data()
         spec_order_mapping = _load_spec_order_mapping_from_spec()
         spec_wc_mapping = _load_spec_workcenter_mapping()
@@ -273,11 +360,23 @@ def _load_cache() -> bool:
             _CACHE['is_loading'] = False
 
         logger.info(
-            f"Filter cache refreshed: {len(wc_groups or [])} groups, "
-            f"{len(wc_mapping or {})} workcenters, "
-            f"{len(spec_order_mapping or {})} specs, "
-            f"{len(spec_wc_mapping or {})} spec-wc mappings"
+            "Filter cache refreshed from Oracle: %d groups, %d workcenters, "
+            "%d specs, %d spec-wc mappings",
+            len(wc_groups or []),
+            len(wc_mapping or {}),
+            len(spec_order_mapping or {}),
+            len(spec_wc_mapping or {}),
         )
+
+        # Write Oracle result back to Redis L2 for other workers
+        _write_to_redis({
+            'workcenter_groups': wc_groups,
+            'workcenter_mapping': wc_mapping,
+            'workcenter_to_short': wc_short,
+            'spec_order_mapping': spec_order_mapping,
+            'spec_workcenter_mapping': spec_wc_mapping,
+        })
+
         return True
 
     except Exception as exc:
