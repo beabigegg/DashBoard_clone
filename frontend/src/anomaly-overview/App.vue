@@ -16,7 +16,7 @@ const sections = ref([
     label: '良率異常',
     route: '/yield-alert-center',
     apiPath: '/api/analytics/yield-anomalies',
-    algo: 'Z-score = (yield - rolling_avg) / rolling_std，window=7天，threshold=|Z|>2.0',
+    algo: 'Z-score = (yield - rolling_avg) / rolling_std，window=14天基線，僅看當日，threshold=|Z|>2.0',
     columns: [
       { key: 'date', label: '日期' },
       { key: 'line', label: '產線' },
@@ -36,7 +36,7 @@ const sections = ref([
     label: '報廢突增',
     route: '/reject-history',
     apiPath: '/api/analytics/reject-spikes',
-    algo: 'pct_change = (current - baseline) / baseline × 100，window=7天基線，threshold>50%',
+    algo: 'pct_change = (current - baseline) / baseline × 100，window=14天基線，僅看當日，threshold>50%',
     columns: [
       { key: 'date', label: '日期' },
       { key: 'workcenter_group', label: '群組' },
@@ -55,7 +55,7 @@ const sections = ref([
     label: 'Hold 離群',
     route: '/hold-history',
     apiPath: '/api/analytics/hold-outliers',
-    algo: '95th percentile of hold_hours，超過此門檻的 hold 記錄',
+    algo: '95th percentile of hold_hours（14天基線），僅看當日超過門檻的記錄',
     columns: [
       { key: 'hold_day', label: '日期' },
       { key: 'lot_id', label: 'Lot' },
@@ -75,10 +75,12 @@ const sections = ref([
     label: '稼動偏離',
     route: '/resource-history',
     apiPath: '/api/analytics/equipment-deviation',
-    algo: 'deviation = baseline_ou - current_ou，window=30天，threshold>15pp',
+    algo: 'deviation = baseline_ou - current_ou，以群組×機型聚合，window=14天基線，看前日，threshold>15pp',
     columns: [
       { key: 'date', label: '日期' },
-      { key: 'resource_id', label: '設備' },
+      { key: 'workcenter_group', label: '站別群組' },
+      { key: 'resource_model', label: '機型' },
+      { key: 'machine_count', label: '台數' },
       { key: 'current_ou_pct', label: '目前OU%' },
       { key: 'baseline_ou_pct', label: '基線OU%' },
       { key: 'deviation', label: '偏差' },
