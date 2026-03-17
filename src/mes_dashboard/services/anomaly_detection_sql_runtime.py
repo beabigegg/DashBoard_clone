@@ -108,6 +108,54 @@ def _fetch_dict_rows(
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
+def _build_reject_exclusion_clause(cols: set) -> str:
+    """Build DuckDB WHERE conditions to match reject-history exclusion rules.
+
+    Applies the same 4-layer exclusion as reject_history_service.py:
+    1. Exclude SCRAP_OBJECTTYPE = 'MATERIAL'
+    2. Exclude PB_ product lines (via PRODUCTLINENAME)
+    3. Exclude reason codes from scrap_reason_exclusion_cache
+    4. Require reason name format NNN_* and exclude XXX_/ZZZ_ prefixes
+    """
+    clauses = []
+
+    # 1. Exclude MATERIAL scrap
+    if "SCRAP_OBJECTTYPE" in cols:
+        clauses.append(
+            "UPPER(TRIM(COALESCE(CAST(\"SCRAP_OBJECTTYPE\" AS VARCHAR), '-'))) <> 'MATERIAL'"
+        )
+
+    # 2. Exclude PB_ diode product lines
+    if "PRODUCTLINENAME" in cols:
+        clauses.append(
+            "UPPER(TRIM(COALESCE(CAST(\"PRODUCTLINENAME\" AS VARCHAR), ''))) NOT LIKE 'PB\\_%' ESCAPE '\\'"
+        )
+
+    # 3. Exclude reason codes from cache
+    try:
+        from mes_dashboard.services.scrap_reason_exclusion_cache import get_excluded_reasons
+
+        excluded = sorted(get_excluded_reasons())
+        if excluded and "LOSSREASON_CODE" in cols:
+            quoted = ", ".join(f"'{c}'" for c in excluded)
+            clauses.append(
+                f"UPPER(TRIM(COALESCE(CAST(\"LOSSREASON_CODE\" AS VARCHAR), '-'))) NOT IN ({quoted})"
+            )
+    except Exception:
+        pass
+
+    # 4. Require NNN_ format and exclude XXX_/ZZZ_ prefixes
+    if "LOSSREASONNAME" in cols:
+        clauses.append(
+            "regexp_matches(UPPER(TRIM(COALESCE(CAST(\"LOSSREASONNAME\" AS VARCHAR), ''))), '^[0-9]{3}_')"
+        )
+        clauses.append(
+            "NOT regexp_matches(UPPER(TRIM(COALESCE(CAST(\"LOSSREASONNAME\" AS VARCHAR), ''))), '^(XXX|ZZZ)_')"
+        )
+
+    return (" AND ".join(clauses)) if clauses else "TRUE"
+
+
 def detect_yield_anomalies(
     *,
     query_id: Optional[str] = None,
@@ -165,7 +213,7 @@ def detect_yield_anomalies(
             ),
             windowed AS (
                 SELECT
-                    data_date, workcenter_group, package, yield_pct,
+                    data_date, workcenter_group, package, yield_pct, scrap_qty,
                     AVG(yield_pct) OVER w AS rolling_avg,
                     STDDEV_POP(yield_pct) OVER w AS rolling_std,
                     COUNT(*) OVER w AS window_count
@@ -177,7 +225,7 @@ def detect_yield_anomalies(
                 )
             )
             SELECT
-                data_date, workcenter_group, package, yield_pct,
+                data_date, workcenter_group, package, yield_pct, scrap_qty,
                 rolling_avg, rolling_std,
                 ROUND((yield_pct - rolling_avg) / rolling_std, 3) AS z_score,
                 window_count
@@ -197,6 +245,7 @@ def detect_yield_anomalies(
                 "yield_pct": round(_sf(r.get("yield_pct")), 4),
                 "z_score": round(_sf(r.get("z_score")), 3),
                 "rolling_avg": round(_sf(r.get("rolling_avg")), 4),
+                "scrap_qty": round(_sf(r.get("scrap_qty")), 2),
             }
             for r in rows
         ]
@@ -263,6 +312,8 @@ def detect_reject_spikes(
         if not all([wc_group_col, reject_col, day_col]):
             return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
 
+        exclusion_clause = _build_reject_exclusion_clause(cols)
+
         sql = f"""
             WITH daily_qty AS (
                 SELECT
@@ -271,6 +322,7 @@ def detect_reject_spikes(
                     SUM(COALESCE({_qid(reject_col)}, 0)) AS reject_qty
                 FROM reject_src
                 WHERE CAST({_qid(day_col)} AS DATE) >= CURRENT_DATE - INTERVAL '14' DAY
+                  AND ({exclusion_clause})
                 GROUP BY 1, 2
             ),
             windowed AS (
@@ -665,6 +717,321 @@ def detect_equipment_deviations(
         }
     except Exception as exc:
         logger.warning("detect_equipment_deviations failed: %s", exc)
+        return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Drilldown queries — read anomaly spool directly (no Oracle)
+# ---------------------------------------------------------------------------
+
+
+def drilldown_yield_trend(
+    workcenter_group: str, package: str
+) -> Tuple[Optional[List[Dict[str, Any]]], Dict[str, Any]]:
+    """Return 14-day daily yield trend for a workcenter_group × package.
+
+    Reads directly from anomaly_yield_dataset spool (DuckDB on Parquet).
+    """
+    if not _ANALYTICS_ENABLED:
+        return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
+    try:
+        import duckdb  # type: ignore  # noqa: F811
+    except Exception:
+        return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
+
+    parquet_path = _resolve_spool_path(_NS_YIELD, None)
+    if not parquet_path:
+        return None, {"fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    started_at = time.time()
+    conn = None
+    try:
+        conn = _create_duckdb_conn()
+        conn.execute(
+            "CREATE OR REPLACE TEMP VIEW yield_src AS "
+            f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
+        )
+        sql = """
+            SELECT
+                strftime(CAST("DATE_BUCKET" AS DATE), '%Y-%m-%d') AS data_date,
+                SUM(COALESCE("TRANSACTION_QTY", 0)) AS transaction_qty,
+                SUM(COALESCE("SCRAP_QTY", 0)) AS scrap_qty,
+                CASE WHEN SUM(COALESCE("TRANSACTION_QTY", 0)) = 0 THEN 100.0
+                     ELSE ROUND((1.0 - SUM(COALESCE("SCRAP_QTY", 0))
+                           / SUM(COALESCE("TRANSACTION_QTY", 0))) * 100, 2)
+                END AS yield_pct
+            FROM yield_src
+            WHERE CAST("DATE_BUCKET" AS DATE) >= CURRENT_DATE - INTERVAL '14' DAY
+              AND TRIM(COALESCE(CAST("DEPARTMENT_GROUP" AS VARCHAR), '')) = ?
+              AND TRIM(COALESCE(CAST("PACKAGE_NAME" AS VARCHAR), '')) = ?
+            GROUP BY 1
+            ORDER BY 1
+        """
+        rows = _fetch_dict_rows(conn, sql, [workcenter_group, package])
+        items = [
+            {
+                "date": str(r.get("data_date") or ""),
+                "yield_pct": round(_sf(r.get("yield_pct")), 2),
+                "transaction_qty": round(_sf(r.get("transaction_qty")), 2),
+                "scrap_qty": round(_sf(r.get("scrap_qty")), 2),
+            }
+            for r in rows
+        ]
+        return items, {
+            "source": "anomaly_spool_drilldown",
+            "namespace": _NS_YIELD,
+            "latency_s": round(time.time() - started_at, 3),
+            "count": len(items),
+        }
+    except Exception as exc:
+        logger.warning("drilldown_yield_trend failed: %s", exc)
+        return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def drilldown_reject_trend(
+    workcenter_group: str,
+) -> Tuple[Optional[List[Dict[str, Any]]], Dict[str, Any]]:
+    """Return 14-day daily reject quantity trend for a workcenter_group.
+
+    Reads directly from anomaly_reject_dataset spool (DuckDB on Parquet).
+    """
+    if not _ANALYTICS_ENABLED:
+        return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
+    try:
+        import duckdb  # type: ignore  # noqa: F811
+    except Exception:
+        return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
+
+    parquet_path = _resolve_spool_path(_NS_REJECT, None)
+    if not parquet_path:
+        return None, {"fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    started_at = time.time()
+    conn = None
+    try:
+        conn = _create_duckdb_conn()
+        conn.execute(
+            "CREATE OR REPLACE TEMP VIEW reject_src AS "
+            f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
+        )
+        cols_cursor = conn.execute("PRAGMA table_info('reject_src')")
+        dd_cols = {str(row[1]) for row in cols_cursor.fetchall() if len(row) > 1}
+        dd_exclusion = _build_reject_exclusion_clause(dd_cols)
+
+        sql = f"""
+            SELECT
+                strftime(CAST("TXN_DAY" AS DATE), '%Y-%m-%d') AS data_date,
+                SUM(COALESCE("REJECT_TOTAL_QTY", 0)) AS reject_qty
+            FROM reject_src
+            WHERE CAST("TXN_DAY" AS DATE) >= CURRENT_DATE - INTERVAL '14' DAY
+              AND TRIM(COALESCE(CAST("WORKCENTER_GROUP" AS VARCHAR), '')) = ?
+              AND ({dd_exclusion})
+            GROUP BY 1
+            ORDER BY 1
+        """
+        rows = _fetch_dict_rows(conn, sql, [workcenter_group])
+        items = [
+            {
+                "date": str(r.get("data_date") or ""),
+                "reject_qty": int(_sf(r.get("reject_qty"))),
+            }
+            for r in rows
+        ]
+        return items, {
+            "source": "anomaly_spool_drilldown",
+            "namespace": _NS_REJECT,
+            "latency_s": round(time.time() - started_at, 3),
+            "count": len(items),
+        }
+    except Exception as exc:
+        logger.warning("drilldown_reject_trend failed: %s", exc)
+        return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def drilldown_hold_detail(
+    lot_id: str, hold_day: str
+) -> Tuple[Optional[List[Dict[str, Any]]], Dict[str, Any]]:
+    """Return hold records for a specific lot on a specific day.
+
+    Reads directly from anomaly_hold_dataset spool (DuckDB on Parquet).
+    """
+    if not _ANALYTICS_ENABLED:
+        return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
+    try:
+        import duckdb  # type: ignore  # noqa: F811
+    except Exception:
+        return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
+
+    parquet_path = _resolve_spool_path(_NS_HOLD, None)
+    if not parquet_path:
+        return None, {"fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    started_at = time.time()
+    conn = None
+    try:
+        conn = _create_duckdb_conn()
+        conn.execute(
+            "CREATE OR REPLACE TEMP VIEW hold_src AS "
+            f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
+        )
+        sql = """
+            SELECT
+                TRIM(COALESCE(CAST("LOT_ID" AS VARCHAR), '')) AS lot_id,
+                TRIM(COALESCE(CAST("HOLDREASONNAME" AS VARCHAR), '(未填寫)')) AS hold_reason,
+                TRIM(COALESCE(CAST("WORKCENTERNAME" AS VARCHAR), '(NA)')) AS workcenter,
+                ROUND(COALESCE("HOLD_HOURS", 0), 2) AS hold_hours,
+                strftime(CAST("HOLD_DAY" AS DATE), '%Y-%m-%d') AS hold_day,
+                TRIM(COALESCE(CAST("HOLD_TYPE" AS VARCHAR), '')) AS hold_type,
+                TRIM(COALESCE(CAST("HOLDCOMMENTS" AS VARCHAR), '')) AS hold_comments,
+                TRIM(COALESCE(CAST("HOLDEMP" AS VARCHAR), '')) AS hold_emp
+            FROM hold_src
+            WHERE TRIM(COALESCE(CAST("LOT_ID" AS VARCHAR), '')) = ?
+              AND strftime(CAST("HOLD_DAY" AS DATE), '%Y-%m-%d') = ?
+            ORDER BY COALESCE("HOLD_HOURS", 0) DESC
+        """
+        rows = _fetch_dict_rows(conn, sql, [lot_id, hold_day])
+        items = [
+            {
+                "lot_id": str(r.get("lot_id") or ""),
+                "hold_reason": str(r.get("hold_reason") or ""),
+                "workcenter": str(r.get("workcenter") or ""),
+                "hold_hours": round(_sf(r.get("hold_hours")), 2),
+                "hold_day": str(r.get("hold_day") or ""),
+                "hold_type": str(r.get("hold_type") or ""),
+                "hold_comments": str(r.get("hold_comments") or ""),
+                "hold_emp": str(r.get("hold_emp") or ""),
+            }
+            for r in rows
+        ]
+        return items, {
+            "source": "anomaly_spool_drilldown",
+            "namespace": _NS_HOLD,
+            "latency_s": round(time.time() - started_at, 3),
+            "count": len(items),
+        }
+    except Exception as exc:
+        logger.warning("drilldown_hold_detail failed: %s", exc)
+        return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def drilldown_equipment_trend(
+    workcenter_group: str, resource_model: str
+) -> Tuple[Optional[List[Dict[str, Any]]], Dict[str, Any]]:
+    """Return 14-day daily OU% trend for a workcenter_group × resource_model.
+
+    Reads directly from anomaly_resource_dataset spool (DuckDB on Parquet).
+    Joins with resource_cache dimension for group/model mapping.
+    """
+    if not _ANALYTICS_ENABLED:
+        return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
+    try:
+        import duckdb  # type: ignore  # noqa: F811
+    except Exception:
+        return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
+
+    parquet_path = _resolve_spool_path(_NS_RESOURCE, None)
+    if not parquet_path:
+        return None, {"fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    dim_rows = _build_resource_dimension()
+    if not dim_rows:
+        return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
+
+    started_at = time.time()
+    conn = None
+    try:
+        conn = _create_duckdb_conn()
+        conn.execute(
+            "CREATE OR REPLACE TEMP VIEW resource_src AS "
+            f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
+        )
+
+        cols_cursor = conn.execute("PRAGMA table_info('resource_src')")
+        cols = {str(row[1]) for row in cols_cursor.fetchall() if len(row) > 1}
+
+        conn.execute(
+            "CREATE TEMP TABLE resource_dim "
+            "(resource_id VARCHAR, workcenter_group VARCHAR, resource_model VARCHAR)"
+        )
+        conn.executemany("INSERT INTO resource_dim VALUES (?, ?, ?)", dim_rows)
+
+        def _hours_col(name: str) -> str:
+            return f'COALESCE("{name}", 0)' if name in cols else "0"
+
+        prd = _hours_col("PRD_HOURS")
+        sby = _hours_col("SBY_HOURS")
+        udt = _hours_col("UDT_HOURS")
+        sdt = _hours_col("SDT_HOURS")
+        egt = _hours_col("EGT_HOURS")
+        total = _hours_col("TOTAL_HOURS")
+
+        sql = f"""
+            WITH machine_ou AS (
+                SELECT
+                    strftime(CAST(s."DATA_DATE" AS DATE), '%Y-%m-%d') AS data_date,
+                    d.workcenter_group,
+                    d.resource_model,
+                    CASE
+                        WHEN ({prd}+{sby}+{udt}+{sdt}+{egt}) = 0 THEN 0.0
+                        ELSE {prd} / ({prd}+{sby}+{udt}+{sdt}+{egt}) * 100
+                    END AS ou_pct
+                FROM resource_src s
+                INNER JOIN resource_dim d
+                    ON TRIM(CAST(s."HISTORYID" AS VARCHAR)) = d.resource_id
+                WHERE {total} > 0
+                  AND CAST(s."DATA_DATE" AS DATE) >= CURRENT_DATE - INTERVAL '14' DAY
+                  AND d.workcenter_group = ?
+                  AND d.resource_model = ?
+            )
+            SELECT
+                data_date,
+                ROUND(AVG(ou_pct), 2) AS avg_ou_pct,
+                COUNT(*) AS machine_count
+            FROM machine_ou
+            GROUP BY data_date
+            ORDER BY data_date
+        """
+        rows = _fetch_dict_rows(conn, sql, [workcenter_group, resource_model])
+        items = [
+            {
+                "date": str(r.get("data_date") or ""),
+                "avg_ou_pct": round(_sf(r.get("avg_ou_pct")), 2),
+                "machine_count": int(_sf(r.get("machine_count"))),
+            }
+            for r in rows
+        ]
+        return items, {
+            "source": "anomaly_spool_drilldown",
+            "namespace": _NS_RESOURCE,
+            "latency_s": round(time.time() - started_at, 3),
+            "count": len(items),
+        }
+    except Exception as exc:
+        logger.warning("drilldown_equipment_trend failed: %s", exc)
         return None, {"fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
     finally:
         if conn is not None:

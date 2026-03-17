@@ -262,3 +262,67 @@
 @keyframes ao-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── Drilldown Panel ──────────────────────────────────────────────────────── */
+.theme-anomaly-overview .ao-row-active td {
+  background: theme('colors.token.heef2ff');
+}
+
+.theme-anomaly-overview .ao-drilldown-row td {
+  padding: 0;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+}
+
+.theme-anomaly-overview .ao-drilldown-panel {
+  padding: theme('spacing.token.p12') theme('spacing.token.p14');
+  background: theme('colors.token.hf8fafc');
+  border-top: 2px solid theme('colors.token.h4f46e5');
+}
+
+.theme-anomaly-overview .ao-drilldown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: theme('spacing.token.p10');
+}
+
+.theme-anomaly-overview .ao-drilldown-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: theme('colors.text.primary');
+}
+
+.theme-anomaly-overview .ao-drilldown-nav {
+  font-size: 12px;
+  font-weight: 500;
+  color: theme('colors.surface.card');
+  background: theme('colors.token.h4f46e5');
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--motion-fast, 150ms) ease;
+}
+
+.theme-anomaly-overview .ao-drilldown-nav:hover {
+  background: theme('colors.token.h4338ca');
+}
+
+.theme-anomaly-overview .ao-drilldown-table {
+  font-size: 12px;
+}
+
+.theme-anomaly-overview .ao-drilldown-table th {
+  font-size: 11px;
+  padding: theme('spacing.token.p6') theme('spacing.token.p8');
+}
+
+.theme-anomaly-overview .ao-drilldown-table td {
+  padding: theme('spacing.token.p4') theme('spacing.token.p8');
+  font-variant-numeric: tabular-nums;
+}
+
+.theme-anomaly-overview .ao-drilldown-chart {
+  height: 220px;
+}

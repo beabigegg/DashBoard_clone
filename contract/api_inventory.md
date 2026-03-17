@@ -30,7 +30,7 @@ This file is the governed inventory for API contract classification and exceptio
 | `mid_section_defect_routes.py` | All JSON API endpoints |
 | `query_tool_routes.py` | All JSON API endpoints |
 | `material_trace_routes.py` | JSON endpoints except CSV export (`/api/material-trace/export`) |
-| `analytics_routes.py` | All JSON API endpoints — GET /api/analytics/yield-anomalies, GET /api/analytics/reject-spikes, GET /api/analytics/hold-outliers, GET /api/analytics/equipment-deviation, GET /api/analytics/anomaly-summary; all gated by ANALYTICS_ANOMALY_DETECTION_ENABLED feature flag |
+| `analytics_routes.py` | All JSON API endpoints — GET /api/analytics/yield-anomalies, GET /api/analytics/reject-spikes, GET /api/analytics/hold-outliers, GET /api/analytics/equipment-deviation, GET /api/analytics/anomaly-summary, GET /api/analytics/yield-anomalies/drilldown, GET /api/analytics/reject-spikes/drilldown, GET /api/analytics/hold-outliers/drilldown, GET /api/analytics/equipment-deviation/drilldown; all gated by ANALYTICS_ANOMALY_DETECTION_ENABLED feature flag |
 
 ### health-exception (keep stable top-level payload; no forced envelope wrapping)
 
