@@ -170,7 +170,7 @@ def detect_yield_anomalies(
                 WINDOW w AS (
                     PARTITION BY line, package
                     ORDER BY data_date
-                    ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING
+                    ROWS BETWEEN 13 PRECEDING AND 1 PRECEDING
                 )
             )
             SELECT
@@ -179,7 +179,8 @@ def detect_yield_anomalies(
                 ROUND((yield_pct - rolling_avg) / rolling_std, 3) AS z_score,
                 window_count
             FROM windowed
-            WHERE window_count >= 3
+            WHERE data_date = strftime(CURRENT_DATE, '%Y-%m-%d')
+              AND window_count >= 3
               AND rolling_std > 0
               AND ABS((yield_pct - rolling_avg) / rolling_std) > ?
             ORDER BY ABS((yield_pct - rolling_avg) / rolling_std) DESC
@@ -286,7 +287,7 @@ def detect_reject_spikes(
                 WINDOW w AS (
                     PARTITION BY workcenter_group
                     ORDER BY data_date
-                    ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING
+                    ROWS BETWEEN 13 PRECEDING AND 1 PRECEDING
                 )
             )
             SELECT
@@ -295,7 +296,8 @@ def detect_reject_spikes(
                 ROUND((reject_rate_pct - baseline_rate) / baseline_rate * 100, 2) AS pct_change,
                 window_count
             FROM windowed
-            WHERE window_count >= 3
+            WHERE data_date = strftime(CURRENT_DATE, '%Y-%m-%d')
+              AND window_count >= 3
               AND baseline_rate > 0
               AND (reject_rate_pct - baseline_rate) / baseline_rate * 100 > ?
             ORDER BY pct_change DESC
@@ -381,7 +383,11 @@ def detect_hold_outliers(
 
         pct_val = max(0.0, min(1.0, float(percentile)))
         date_filter = (
-            'CAST("hold_day" AS DATE) >= CURRENT_DATE - INTERVAL \'30\' DAY'
+            'CAST("hold_day" AS DATE) >= CURRENT_DATE - INTERVAL \'14\' DAY'
+            if "hold_day" in cols else "TRUE"
+        )
+        today_filter = (
+            "hold_day = strftime(CURRENT_DATE, '%Y-%m-%d')"
             if "hold_day" in cols else "TRUE"
         )
         sql = f"""
@@ -407,6 +413,7 @@ def detect_hold_outliers(
             FROM hold_base b
             CROSS JOIN p_calc p
             WHERE b.hold_hours > p.p_threshold
+              AND ({today_filter})
             ORDER BY b.hold_hours DESC
         """
         rows = _fetch_dict_rows(conn, sql)
@@ -550,7 +557,7 @@ def detect_equipment_deviations(
                     END AS ou_pct
                 FROM resource_src
                 WHERE {total} > 0
-                  AND CAST("DATA_DATE" AS DATE) >= CURRENT_DATE - INTERVAL '60' DAY
+                  AND CAST("DATA_DATE" AS DATE) >= CURRENT_DATE - INTERVAL '14' DAY
             ),
             windowed AS (
                 SELECT
@@ -561,7 +568,7 @@ def detect_equipment_deviations(
                 WINDOW w AS (
                     PARTITION BY resource_id
                     ORDER BY data_date
-                    ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING
+                    ROWS BETWEEN 13 PRECEDING AND 1 PRECEDING
                 )
             )
             SELECT
@@ -571,7 +578,8 @@ def detect_equipment_deviations(
                 ROUND(baseline_ou_pct - ou_pct, 2) AS deviation,
                 window_count
             FROM windowed
-            WHERE window_count >= 7
+            WHERE data_date = strftime(CURRENT_DATE, '%Y-%m-%d')
+              AND window_count >= 7
               AND baseline_ou_pct - ou_pct > ?
             ORDER BY deviation DESC
         """

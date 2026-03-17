@@ -36,8 +36,8 @@ _SEED_QUERY_DELAY = int(os.getenv("ANOMALY_SEED_QUERY_DELAY", "5"))
 _SPOOL_SEED_CONFIG: List[Tuple[str, int]] = [
     ("yield_alert_dataset", 14),
     ("reject_dataset", 14),
-    ("hold_dataset", 30),
-    ("resource_dataset", 60),
+    ("hold_dataset", 14),
+    ("resource_dataset", 14),
 ]
 
 
