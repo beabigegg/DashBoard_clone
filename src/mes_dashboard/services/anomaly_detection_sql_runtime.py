@@ -296,7 +296,7 @@ def detect_reject_spikes(
                 ROUND((reject_rate_pct - baseline_rate) / baseline_rate * 100, 2) AS pct_change,
                 window_count
             FROM windowed
-            WHERE data_date = strftime(CURRENT_DATE, '%Y-%m-%d')
+            WHERE data_date = strftime(CURRENT_DATE - INTERVAL '1' DAY, '%Y-%m-%d')
               AND window_count >= 3
               AND baseline_rate > 0
               AND (reject_rate_pct - baseline_rate) / baseline_rate * 100 > ?
