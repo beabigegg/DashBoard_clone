@@ -594,7 +594,9 @@ onUnmounted(() => {
   <div class="yield-alert-page theme-yield-alert-center">
     <div class="ya-header">
       <div class="ya-header-left">
-        <h1>{{ pageTitle }}</h1>
+        <div class="ya-header-title-row">
+          <h1>{{ pageTitle }}</h1>
+        </div>
         <p>以 ERP WIP 移轉/報廢資料快速定位良率風險，並回鑽報廢歷史</p>
       </div>
     </div>

@@ -82,6 +82,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../yield-alert-center/App.vue'),
     [() => import('../wip-shared/styles.css'), () => import('../resource-shared/styles.css'), () => import('../yield-alert-center/style.css')],
   ),
+  '/anomaly-overview': createNativeLoader(
+    () => import('../anomaly-overview/App.vue'),
+    [() => import('../anomaly-overview/style.css')],
+  ),
   '/admin/performance': createNativeLoader(
     () => import('../admin-performance/App.vue'),
     [() => import('../admin-performance/style.css')],

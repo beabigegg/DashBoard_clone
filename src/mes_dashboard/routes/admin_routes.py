@@ -1023,3 +1023,16 @@ def api_update_page(route: str):
         return validation_error(str(exc))
     except Exception as e:
         return internal_error(str(e))
+
+
+@admin_bp.route("/api/analytics/recalculate", methods=["POST"])
+@admin_required
+def recalculate_anomaly_detection():
+    """Manually trigger anomaly detection recalculation."""
+    try:
+        from mes_dashboard.services.anomaly_detection_scheduler import trigger_recalculation
+
+        result = trigger_recalculation()
+        return success_response(result.get("data", {}), meta=result.get("meta", {}))
+    except Exception as exc:
+        return internal_error(f"Anomaly recalculation failed: {exc}")

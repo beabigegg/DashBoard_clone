@@ -52,6 +52,10 @@ from mes_dashboard.core.query_spool_store import (
     init_query_spool_cleanup,
     stop_query_spool_cleanup_worker,
 )
+from mes_dashboard.services.anomaly_detection_scheduler import (
+    init_anomaly_detection_scheduler,
+    stop_anomaly_detection_scheduler,
+)
 from mes_dashboard.core.modernization_policy import (
     get_deferred_routes as get_deferred_routes_from_scope_matrix,
     get_missing_in_scope_assets,
@@ -401,6 +405,11 @@ def _shutdown_runtime_resources() -> None:
         logger.warning("Error stopping query spool cleanup worker: %s", exc)
 
     try:
+        stop_anomaly_detection_scheduler()
+    except Exception as exc:
+        logger.warning("Error stopping anomaly detection scheduler: %s", exc)
+
+    try:
         from mes_dashboard.core.metrics_history import stop_metrics_history
         stop_metrics_history()
     except Exception as exc:
@@ -506,6 +515,7 @@ def create_app(config_name: str | None = None) -> Flask:
             init_realtime_equipment_cache(app)  # Start realtime equipment status cache
             init_scrap_reason_exclusion_cache(app)  # Start exclusion-policy cache sync
             init_query_spool_cleanup(app)  # Start parquet spool cleanup worker
+            init_anomaly_detection_scheduler(app)  # Start anomaly detection scheduler
             from mes_dashboard.core.metrics_history import start_metrics_history
             start_metrics_history(app)  # Start metrics history collector
             from mes_dashboard.core.worker_memory_guard import start_worker_memory_guard

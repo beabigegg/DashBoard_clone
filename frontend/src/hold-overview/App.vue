@@ -721,8 +721,10 @@ onBeforeUnmount(() => {
   <div class="dashboard hold-overview-page theme-hold-overview">
     <header class="header">
       <div class="header-left">
-        <h1>Hold 即時概況</h1>
-        <span class="hold-type-badge">{{ holdTypeLabel }}</span>
+        <div class="header-title-row">
+          <h1>Hold 即時概況</h1>
+          <span class="hold-type-badge">{{ holdTypeLabel }}</span>
+        </div>
       </div>
       <div class="header-right">
         <span class="last-update">

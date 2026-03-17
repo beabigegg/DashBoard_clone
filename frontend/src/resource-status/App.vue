@@ -448,7 +448,6 @@ onMounted(() => {
         :refreshing="loading.refreshing"
         @refresh="handleManualRefresh"
       />
-
       <FilterBar
         :workcenter-groups="workcenterGroups"
         :selected-group="filterState.group"

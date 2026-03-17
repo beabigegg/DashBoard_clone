@@ -15,6 +15,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/mid-section-defect',
   '/material-trace',
   '/yield-alert-center',
+  '/anomaly-overview',
 ]);
 
 const IN_SCOPE_ADMIN_ROUTES = Object.freeze([
@@ -249,6 +250,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
     title: 'Yield Alert Center',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/anomaly-overview': buildContract({
+    route: '/anomaly-overview',
+    routeId: 'anomaly-overview',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: '異常總覽',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',

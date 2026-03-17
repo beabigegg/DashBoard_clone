@@ -39,6 +39,7 @@ Governance status (2026-03-12): `css-governance-check` = 0 errors, 0 warnings.
 | File | Primary Theme Root | Route / Feature |
 | :--- | :--- | :--- |
 | `frontend/src/admin-performance/style.css` | `theme-admin-performance` | admin-performance |
+| `frontend/src/anomaly-overview/style.css` | `theme-anomaly-overview` | anomaly-overview |
 | `frontend/src/excel-query/style.css` | `theme-excel-query` | excel-query |
 | `frontend/src/hold-detail/style.css` | `theme-hold-detail` | hold-detail |
 | `frontend/src/hold-history/style.css` | `theme-hold-history` | hold-history |

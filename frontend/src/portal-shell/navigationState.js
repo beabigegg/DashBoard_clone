@@ -3,6 +3,7 @@ import { getRouteContract, normalizeRoutePath } from './routeContracts.js';
 const STANDALONE_DRILLDOWN_ROUTES = Object.freeze([
   '/wip-detail',
   '/hold-detail',
+  '/anomaly-overview',
 ]);
 
 function safeInt(value, fallback = 9999) {

@@ -1,6 +1,6 @@
 # API Inventory (Governed Source List)
 
-Updated: 2026-03-11
+Updated: 2026-03-16
 
 This file is the governed inventory for API contract classification and exception boundaries.
 
@@ -23,13 +23,14 @@ This file is the governed inventory for API contract classification and exceptio
 | `resource_routes.py` | All JSON API endpoints |
 | `resource_history_routes.py` | All JSON API endpoints |
 | `yield_alert_routes.py` | All JSON API endpoints |
-| `admin_routes.py` | All JSON API endpoints |
+| `admin_routes.py` | All JSON API endpoints — includes `POST /api/admin/analytics/recalculate` (manual anomaly detection trigger, admin auth required) |
 | `job_query_routes.py` | All JSON API endpoints |
 | `qc_gate_routes.py` | All JSON API endpoints |
 | `trace_routes.py` | All JSON API endpoints |
 | `mid_section_defect_routes.py` | All JSON API endpoints |
 | `query_tool_routes.py` | All JSON API endpoints |
 | `material_trace_routes.py` | JSON endpoints except CSV export (`/api/material-trace/export`) |
+| `analytics_routes.py` | All JSON API endpoints — GET /api/analytics/yield-anomalies, GET /api/analytics/reject-spikes, GET /api/analytics/hold-outliers, GET /api/analytics/equipment-deviation, GET /api/analytics/anomaly-summary; all gated by ANALYTICS_ANOMALY_DETECTION_ENABLED feature flag |
 
 ### health-exception (keep stable top-level payload; no forced envelope wrapping)
 

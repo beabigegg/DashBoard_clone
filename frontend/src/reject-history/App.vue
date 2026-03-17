@@ -1294,7 +1294,9 @@ onUnmounted(() => {
   <div class="dashboard reject-history-page theme-reject-history">
     <header class="header reject-history-header">
       <div class="header-left">
-        <h1>報廢歷史查詢</h1>
+        <div class="header-title-row">
+          <h1>報廢歷史查詢</h1>
+        </div>
       </div>
       <div class="header-right">
         <div class="last-update" v-if="lastQueryAt">更新時間：{{ lastQueryAt }}</div>

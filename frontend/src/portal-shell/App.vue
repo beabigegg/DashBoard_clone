@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import AnomalyIndicator from './components/AnomalyIndicator.vue';
 import HealthStatus from './components/HealthStatus.vue';
 import { consumeNavigationNotice, syncNavigationRoutes } from './router.js';
 import { normalizeRoutePath } from './routeContracts.js';
@@ -234,6 +235,7 @@ watch(
         <h1>MES 報表入口</h1>
       </div>
       <div class="shell-header-right">
+        <AnomalyIndicator />
         <HealthStatus />
         <div class="admin-entry">
           <template v-if="isAdmin">
