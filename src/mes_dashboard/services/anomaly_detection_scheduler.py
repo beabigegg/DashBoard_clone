@@ -30,7 +30,7 @@ _SCHEDULE_HOUR = int(os.getenv("ANOMALY_DETECTION_SCHEDULE_HOUR", "8"))
 # Check interval for the scheduler loop (seconds)
 _CHECK_INTERVAL = int(os.getenv("ANOMALY_DETECTION_CHECK_INTERVAL", "60"))
 # Delay between sequential spool seed queries (seconds)
-_SEED_QUERY_DELAY = int(os.getenv("ANOMALY_SEED_QUERY_DELAY", "5"))
+_SEED_QUERY_DELAY = int(os.getenv("ANOMALY_SEED_QUERY_DELAY", "10"))
 
 # (source_namespace, anomaly_namespace, lookback_days)
 # source_namespace: where execute_primary_query writes (shared with user pages)
@@ -245,8 +245,8 @@ def _scheduler_loop() -> None:
         _CHECK_INTERVAL,
     )
 
-    # Initial: delay 10s for other services, then ensure spool data → compute
-    _STOP_EVENT.wait(10)
+    # Initial: delay 30s for other services and first user requests, then seed
+    _STOP_EVENT.wait(30)
     if _STOP_EVENT.is_set():
         return
 
