@@ -96,6 +96,8 @@ export function useAiChat() {
         queryUsed: data.query_used ?? null,
         paramsUsed: data.params_used ?? null,
         suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
+        sqlUsed: data.sql_used ?? null,
+        toolTrace: Array.isArray(data.tool_trace) ? data.tool_trace : [],
       };
 
       messages.value = [...messages.value, aiMessage];

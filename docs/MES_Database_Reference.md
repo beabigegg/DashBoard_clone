@@ -1,6 +1,6 @@
 # MES 数据库报表开发参考文档
 
-**生成时间**: 2026-02-13 17:46:29
+**生成时间**: 2026-03-18 08:07:24
 
 ---
 
@@ -71,30 +71,30 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 | # | 表名 | 用途 | 数据量 |
 |---|------|------|--------|
-| 1 | `DW_MES_CONTAINER` | 容器/批次主檔 - 目前在製容器狀態、數量與流程資訊 | 5,254,127 |
-| 2 | `DW_MES_EQUIPMENTSTATUS_WIP_V` | 設備狀態與 WIP 關聯視圖 - 即時設備狀態與工單資訊 | 2,618 |
-| 3 | `DW_MES_HM_LOTMOVEOUT` | 批次出站事件歷史表 - 出站/移出交易 | 48,936,608 |
-| 4 | `DW_MES_HOLDRELEASEHISTORY` | Hold/Release 歷史表 - 批次停工與解除紀錄 | 311,409 |
-| 5 | `DW_MES_JOB` | 設備維修工單表 - 維修工單的當前狀態與流程 | 1,257,793 |
-| 6 | `DW_MES_JOBTXNHISTORY` | 維修工單交易歷史表 - 工單狀態變更紀錄 | 9,623,710 |
-| 7 | `DW_MES_LOTMATERIALSHISTORY` | 批次物料消耗歷史表 - 用料與批次關聯 | 17,943,457 |
-| 8 | `DW_MES_LOTREJECTHISTORY` | 批次不良/報廢歷史表 - 不良原因與數量 | 15,905,008 |
-| 9 | `DW_MES_LOTWIPDATAHISTORY` | 在製數據採集歷史表 - 製程量測/參數紀錄 | 78,824,146 |
-| 10 | `DW_MES_LOTWIPHISTORY` | 在製流轉歷史表 - 批次進出站與流程軌跡 | 53,848,924 |
-| 11 | `DW_MES_LOT_V` | MES 即時 WIP 視圖 - 批次現況、工站、設備與 Hold 資訊 | 10,062 |
-| 12 | `DW_MES_MAINTENANCE` | 設備保養/維護紀錄表 - 保養計畫與點檢數據 | 53,170,778 |
+| 1 | `DW_MES_CONTAINER` | 容器/批次主檔 - 目前在製容器狀態、數量與流程資訊 | 5,313,094 |
+| 2 | `DW_MES_EQUIPMENTSTATUS_WIP_V` | 設備狀態與 WIP 關聯視圖 - 即時設備狀態與工單資訊 | 2,784 |
+| 3 | `DW_MES_HM_LOTMOVEOUT` | 批次出站事件歷史表 - 出站/移出交易 | 49,429,401 |
+| 4 | `DW_MES_HOLDRELEASEHISTORY` | Hold/Release 歷史表 - 批次停工與解除紀錄 | 312,949 |
+| 5 | `DW_MES_JOB` | 設備維修工單表 - 維修工單的當前狀態與流程 | 1,273,902 |
+| 6 | `DW_MES_JOBTXNHISTORY` | 維修工單交易歷史表 - 工單狀態變更紀錄 | 9,743,810 |
+| 7 | `DW_MES_LOTMATERIALSHISTORY` | 批次物料消耗歷史表 - 用料與批次關聯 | 18,136,445 |
+| 8 | `DW_MES_LOTREJECTHISTORY` | 批次不良/報廢歷史表 - 不良原因與數量 | 16,103,258 |
+| 9 | `DW_MES_LOTWIPDATAHISTORY` | 在製數據採集歷史表 - 製程量測/參數紀錄 | 80,316,112 |
+| 10 | `DW_MES_LOTWIPHISTORY` | 在製流轉歷史表 - 批次進出站與流程軌跡 | 54,519,619 |
+| 11 | `DW_MES_LOT_V` | MES 即時 WIP 視圖 - 批次現況、工站、設備與 Hold 資訊 | 9,923 |
+| 12 | `DW_MES_MAINTENANCE` | 設備保養/維護紀錄表 - 保養計畫與點檢數據 | 55,101,182 |
 | 13 | `DW_MES_PARTREQUESTORDER` | 維修用料請求表 - 維修/設備零件請領 | 61,396 |
-| 14 | `DW_MES_PJ_COMBINEDASSYLOTS` | 併批紀錄表 - 合批/合併批次關聯與數量資訊 | 1,975,915 |
-| 15 | `DW_MES_RESOURCE` | 資源表 - 設備/載具等資源基本資料（OBJECTCATEGORY=ASSEMBLY 時，RESOURCENAME 為設備編號） | 91,473 |
-| 16 | `DW_MES_RESOURCESTATUS` | 設備狀態變更歷史表 - 狀態切換與原因 | 66,428,898 |
-| 17 | `DW_MES_RESOURCESTATUS_SHIFT` | 設備狀態班次彙總表 - 班次級狀態/工時 | 75,566,666 |
+| 14 | `DW_MES_PJ_COMBINEDASSYLOTS` | 併批紀錄表 - 合批/合併批次關聯與數量資訊 | 1,994,711 |
+| 15 | `DW_MES_RESOURCE` | 資源表 - 設備/載具等資源基本資料（OBJECTCATEGORY=ASSEMBLY 時，RESOURCENAME 為設備編號） | 91,673 |
+| 16 | `DW_MES_RESOURCESTATUS` | 設備狀態變更歷史表 - 狀態切換與原因 | 67,681,971 |
+| 17 | `DW_MES_RESOURCESTATUS_SHIFT` | 設備狀態班次彙總表 - 班次級狀態/工時 | 76,947,961 |
 | 18 | `DW_MES_SPEC_WORKCENTER_V` | 工站/工序對照視圖 - 用於工站分組與排序映射 | 230 |
-| 19 | `DW_MES_WIP` | 在製品現況表（含歷史累積）- 當前 WIP 狀態/數量 | 80,748,581 |
-| 20 | `ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE` | ERP 報廢原因排除清單 - 控制需排除的報廢原因代碼 | 36 |
-| 21 | `ERP_WIP_MOVETXN` | ERP 工單移轉與報廢明細 - 工單層級移轉/報廢數量事件 | 10,499,947 |
-| 22 | `ERP_WIP_MOVETXN_DETAIL` | ERP 工單站點損耗明細 - 站點/產品維度移轉與報廢明細 | 36,715,771 |
+| 19 | `DW_MES_WIP` | 在製品現況表（含歷史累積）- 當前 WIP 狀態/數量 | 84,271,674 |
+| 20 | `ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE` | ERP 報廢原因排除清單 - 控制需排除的報廢原因代碼 | 39 |
+| 21 | `ERP_WIP_MOVETXN` | ERP 工單移轉與報廢明細 - 工單層級移轉/報廢數量事件 | 10,748,846 |
+| 22 | `ERP_WIP_MOVETXN_DETAIL` | ERP 工單站點損耗明細 - 站點/產品維度移轉與報廢明細 | 37,543,032 |
 
-**总数据量**: 557,177,553 行
+**总数据量**: 569,604,012 行
 
 ---
 
@@ -104,7 +104,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 容器/批次主檔 - 目前在製容器狀態、數量與流程資訊
 
-**数据量**: 5,254,127 行
+**数据量**: 5,313,094 行
 
 #### 字段列表
 
@@ -210,7 +210,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 設備狀態與 WIP 關聯視圖 - 即時設備狀態與工單資訊
 
-**数据量**: 2,618 行
+**数据量**: 2,784 行
 
 #### 字段列表
 
@@ -257,7 +257,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 批次出站事件歷史表 - 出站/移出交易
 
-**数据量**: 48,936,608 行
+**数据量**: 49,429,401 行
 
 #### 字段列表
 
@@ -354,7 +354,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: Hold/Release 歷史表 - 批次停工與解除紀錄
 
-**数据量**: 311,409 行
+**数据量**: 312,949 行
 
 #### 字段列表
 
@@ -405,7 +405,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 設備維修工單表 - 維修工單的當前狀態與流程
 
-**数据量**: 1,257,793 行
+**数据量**: 1,273,902 行
 
 #### 字段列表
 
@@ -467,7 +467,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 維修工單交易歷史表 - 工單狀態變更紀錄
 
-**数据量**: 9,623,710 行
+**数据量**: 9,743,810 行
 
 #### 字段列表
 
@@ -528,7 +528,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 批次物料消耗歷史表 - 用料與批次關聯
 
-**数据量**: 17,943,457 行
+**数据量**: 18,136,445 行
 
 #### 字段列表
 
@@ -576,7 +576,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 批次不良/報廢歷史表 - 不良原因與數量
 
-**数据量**: 15,905,008 行
+**数据量**: 16,103,258 行
 
 #### 字段列表
 
@@ -642,7 +642,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 在製數據採集歷史表 - 製程量測/參數紀錄
 
-**数据量**: 78,824,146 行
+**数据量**: 80,316,112 行
 
 #### 字段列表
 
@@ -684,7 +684,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 在製流轉歷史表 - 批次進出站與流程軌跡
 
-**数据量**: 53,848,924 行
+**数据量**: 54,519,619 行
 
 #### 字段列表
 
@@ -753,7 +753,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: MES 即時 WIP 視圖 - 批次現況、工站、設備與 Hold 資訊
 
-**数据量**: 10,062 行
+**数据量**: 9,923 行
 
 #### 字段列表
 
@@ -838,7 +838,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 設備保養/維護紀錄表 - 保養計畫與點檢數據
 
-**数据量**: 53,170,778 行
+**数据量**: 55,101,182 行
 
 #### 字段列表
 
@@ -922,7 +922,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 併批紀錄表 - 合批/合併批次關聯與數量資訊
 
-**数据量**: 1,975,915 行
+**数据量**: 1,994,711 行
 
 #### 字段列表
 
@@ -954,7 +954,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 資源表 - 設備/載具等資源基本資料（OBJECTCATEGORY=ASSEMBLY 時，RESOURCENAME 為設備編號）
 
-**数据量**: 91,473 行
+**数据量**: 91,673 行
 
 #### 字段列表
 
@@ -1052,7 +1052,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 設備狀態變更歷史表 - 狀態切換與原因
 
-**数据量**: 66,428,898 行
+**数据量**: 67,681,971 行
 
 #### 字段列表
 
@@ -1099,7 +1099,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 設備狀態班次彙總表 - 班次級狀態/工時
 
-**数据量**: 75,566,666 行
+**数据量**: 76,947,961 行
 
 #### 字段列表
 
@@ -1174,7 +1174,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: 在製品現況表（含歷史累積）- 當前 WIP 狀態/數量
 
-**数据量**: 80,748,581 行
+**数据量**: 84,271,674 行
 
 #### 字段列表
 
@@ -1260,7 +1260,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: ERP 報廢原因排除清單 - 控制需排除的報廢原因代碼
 
-**数据量**: 36 行
+**数据量**: 39 行
 
 #### 字段列表
 
@@ -1278,7 +1278,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: ERP 工單移轉與報廢明細 - 工單層級移轉/報廢數量事件
 
-**数据量**: 10,499,947 行
+**数据量**: 10,748,846 行
 
 **表注释**: 工單移轉與報廢數量明細檔
 
@@ -1313,7 +1313,7 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 **用途**: ERP 工單站點損耗明細 - 站點/產品維度移轉與報廢明細
 
-**数据量**: 36,715,771 行
+**数据量**: 37,543,032 行
 
 **表注释**: 工單各站損耗明細檔
 
@@ -1356,17 +1356,17 @@ jdbc:oracle:thin:@${DB_HOST}:${DB_PORT}:${DB_SERVICE}
 
 1. **大数据量表查询优化**
    - 以下表数据量较大，查询时务必添加时间范围限制：
-     - `DW_MES_WIP`: 80,748,581 行
-     - `DW_MES_LOTWIPDATAHISTORY`: 78,824,146 行
-     - `DW_MES_RESOURCESTATUS_SHIFT`: 75,566,666 行
-     - `DW_MES_RESOURCESTATUS`: 66,428,898 行
-     - `DW_MES_LOTWIPHISTORY`: 53,848,924 行
-     - `DW_MES_MAINTENANCE`: 53,170,778 行
-     - `DW_MES_HM_LOTMOVEOUT`: 48,936,608 行
-     - `ERP_WIP_MOVETXN_DETAIL`: 36,715,771 行
-     - `DW_MES_LOTMATERIALSHISTORY`: 17,943,457 行
-     - `DW_MES_LOTREJECTHISTORY`: 15,905,008 行
-     - `ERP_WIP_MOVETXN`: 10,499,947 行
+     - `DW_MES_WIP`: 84,271,674 行
+     - `DW_MES_LOTWIPDATAHISTORY`: 80,316,112 行
+     - `DW_MES_RESOURCESTATUS_SHIFT`: 76,947,961 行
+     - `DW_MES_RESOURCESTATUS`: 67,681,971 行
+     - `DW_MES_MAINTENANCE`: 55,101,182 行
+     - `DW_MES_LOTWIPHISTORY`: 54,519,619 行
+     - `DW_MES_HM_LOTMOVEOUT`: 49,429,401 行
+     - `ERP_WIP_MOVETXN_DETAIL`: 37,543,032 行
+     - `DW_MES_LOTMATERIALSHISTORY`: 18,136,445 行
+     - `DW_MES_LOTREJECTHISTORY`: 16,103,258 行
+     - `ERP_WIP_MOVETXN`: 10,748,846 行
 
 2. **索引使用**
    - 查询时尽量使用已建立索引的字段作为查询条件
@@ -1475,7 +1475,7 @@ ORDER BY w.CREATEDATE DESC;
 
 ### 文档更新记录
 
-- 2026-02-13: 初始版本创建
+- 2026-03-18: 初始版本创建
 
 ### 联系方式
 

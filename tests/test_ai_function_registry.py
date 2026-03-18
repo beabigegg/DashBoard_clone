@@ -16,6 +16,8 @@ from mes_dashboard.services.ai_function_registry import (
     build_round1_prompt,
     build_round2_prompt,
     build_round3_prompt,
+    build_stage1_prompt,
+    build_stage2_prompt,
     get_suggestions,
     validate_intent,
 )
@@ -224,3 +226,75 @@ class TestGetSuggestions(unittest.TestCase):
         suggestions = get_suggestions("equipment_status_summary")
         self.assertIsInstance(suggestions, list)
         self.assertGreater(len(suggestions), 0)
+
+
+class TestStage1Prompt(unittest.TestCase):
+    """Tests for build_stage1_prompt() — Text-to-SQL Stage 1."""
+
+    def test_returns_string(self):
+        prompt = build_stage1_prompt()
+        self.assertIsInstance(prompt, str)
+        self.assertGreater(len(prompt), 100)
+
+    def test_contains_all_domain_names(self):
+        from mes_dashboard.services.ai_schema_context import TABLE_DOMAINS
+        prompt = build_stage1_prompt()
+        for domain_key in TABLE_DOMAINS:
+            self.assertIn(domain_key, prompt, f"Domain '{domain_key}' missing from Stage 1 prompt")
+
+    def test_contains_mes_domain_knowledge(self):
+        prompt = build_stage1_prompt()
+        self.assertIn("GWBK", prompt)     # equipment ID format
+        self.assertIn("GA/GC", prompt)    # workorder format
+        self.assertIn("WB", prompt)       # station abbreviation
+        self.assertIn("wip_realtime", prompt)
+
+    def test_contains_json_format_instruction(self):
+        prompt = build_stage1_prompt()
+        self.assertIn('"domains"', prompt)
+        self.assertIn('"thought"', prompt)
+
+
+class TestStage2Prompt(unittest.TestCase):
+    """Tests for build_stage2_prompt() — Text-to-SQL Stage 2."""
+
+    def test_returns_string(self):
+        prompt = build_stage2_prompt(["wip_realtime"])
+        self.assertIsInstance(prompt, str)
+        self.assertGreater(len(prompt), 100)
+
+    def test_injects_wip_realtime_schema(self):
+        prompt = build_stage2_prompt(["wip_realtime"])
+        self.assertIn("DWH.DW_MES_LOT_V", prompt)
+        self.assertIn("DWH.DW_MES_EQUIPMENTSTATUS_WIP_V", prompt)
+
+    def test_injects_hold_schema(self):
+        prompt = build_stage2_prompt(["hold"])
+        self.assertIn("DWH.DW_MES_HOLDRELEASEHISTORY", prompt)
+
+    def test_does_not_inject_unrelated_schema(self):
+        prompt_wip = build_stage2_prompt(["wip_realtime"])
+        # hold table should not appear when only wip_realtime requested
+        self.assertNotIn("DWH.DW_MES_HOLDRELEASEHISTORY", prompt_wip)
+
+    def test_contains_sql_generation_rules(self):
+        prompt = build_stage2_prompt(["equipment"])
+        self.assertIn("FETCH FIRST", prompt)
+        self.assertIn(":start_date", prompt)
+        self.assertIn(":end_date", prompt)
+
+    def test_contains_json_format_instruction(self):
+        prompt = build_stage2_prompt(["reject"])
+        self.assertIn('"sql"', prompt)
+        self.assertIn('"params"', prompt)
+        self.assertIn('"explanation"', prompt)
+
+    def test_empty_domains_returns_prompt_without_schema(self):
+        prompt = build_stage2_prompt([])
+        # Should still return a valid prompt with generation rules
+        self.assertIsInstance(prompt, str)
+        self.assertIn("FETCH FIRST", prompt)
+
+
+if __name__ == "__main__":
+    unittest.main()

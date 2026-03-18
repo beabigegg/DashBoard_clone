@@ -40,6 +40,22 @@ const emit = defineEmits(['suggest']);
         :query-used="message.queryUsed"
       />
 
+      <details v-if="message.sqlUsed" class="ai-sql-details">
+        <summary class="ai-sql-summary">查看 SQL</summary>
+        <pre class="ai-sql-pre">{{ message.sqlUsed }}</pre>
+      </details>
+
+      <details v-if="message.toolTrace && message.toolTrace.length > 1" class="ai-sql-details">
+        <summary class="ai-sql-summary">查詢步驟 ({{ message.toolTrace.length }} 步)</summary>
+        <ol class="ai-trace-list">
+          <li v-for="step in message.toolTrace" :key="step.step" class="ai-trace-item">
+            <span class="ai-trace-fn">{{ step.function }}</span>
+            <span class="ai-trace-summary">{{ step.summary }}</span>
+            <span v-if="step.error" class="ai-trace-error">{{ step.error }}</span>
+          </li>
+        </ol>
+      </details>
+
       <div
         v-if="message.suggestions && message.suggestions.length > 0"
         class="ai-msg-suggestions"
@@ -143,5 +159,65 @@ const emit = defineEmits(['suggest']);
 
 .ai-suggestion-chip:hover:not(:disabled) {
   background: theme('colors.brand.100');
+}
+
+.ai-sql-details {
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ai-sql-summary {
+  padding: theme('spacing.token.p4') theme('spacing.token.p8');
+  font-size: 12px;
+  color: theme('colors.text.secondary');
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-sql-summary:hover {
+  background: theme('colors.surface.hover');
+}
+
+.ai-sql-pre {
+  margin: 0;
+  padding: theme('spacing.token.p8');
+  font-size: 12px;
+  font-family: monospace;
+  white-space: pre;
+  overflow-x: auto;
+  background: theme('colors.surface.muted');
+  border-top: 1px solid theme('colors.stroke.soft');
+}
+
+.ai-trace-list {
+  margin: 0;
+  padding: theme('spacing.token.p8') theme('spacing.token.p8') theme('spacing.token.p8') theme('spacing.token.p20');
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p4');
+}
+
+.ai-trace-item {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-trace-fn {
+  font-family: monospace;
+  color: theme('colors.brand.600');
+  font-weight: 500;
+}
+
+.ai-trace-summary {
+  color: theme('colors.text.secondary');
+}
+
+.ai-trace-error {
+  color: theme('colors.red.600');
+  font-family: monospace;
+  font-size: 11px;
 }
 </style>

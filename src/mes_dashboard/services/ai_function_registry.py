@@ -80,6 +80,176 @@ for _entry in REGISTRY.values():
 
 
 # ---------------------------------------------------------------------------
+# Prompt builders — text2sql two-stage
+# ---------------------------------------------------------------------------
+
+def build_stage1_prompt() -> str:
+    """Stage 1 prompt: classify user question into MES domains.
+
+    Injects MES domain knowledge (ID formats, station abbreviations, data source
+    selection rules) so the LLM can narrow down which tables are relevant.
+    """
+    from mes_dashboard.services.ai_schema_context import TABLE_DOMAINS
+    from mes_dashboard.services.ai_business_context import (
+        get_stage1_business_context,
+        get_stage1_domain_hints,
+    )
+
+    domain_lines = []
+    for key, entry in TABLE_DOMAINS.items():
+        domain_lines.append(f"  - {key}：{entry['description']}")
+
+    lines = [
+        "你是 MES 工廠資料系統的 SQL 分析助手。",
+        "根據使用者問題，判斷需要查詢哪些資料領域，並以 JSON 回覆。",
+        "",
+        get_stage1_business_context(),
+        "",
+        get_stage1_domain_hints(),
+        "",
+        "## 可選領域清單",
+    ] + domain_lines + [
+        "",
+        "## 回覆格式（嚴格 JSON，禁止其他文字）",
+        '{"domains": ["領域1", "領域2"], "thought": "一句話說明選擇原因"}',
+        "",
+        "若問題無法對應任何領域：",
+        '{"domains": [], "thought": "說明原因"}',
+        "",
+        "## 規則",
+        "- domains 最多 3 個",
+        "- 只能從上方清單選取",
+        "- 直接輸出 JSON，不要加 markdown 包裝",
+    ]
+    return "\n".join(lines)
+
+
+def build_stage2_prompt(domains: list[str]) -> str:
+    """Stage 2 prompt: generate Oracle SELECT SQL from domain schemas + few-shot examples."""
+    from mes_dashboard.services.ai_schema_context import (
+        get_examples_for_domains,
+        get_schemas_for_domains,
+    )
+    from mes_dashboard.services.ai_business_context import (
+        get_dynamic_metadata_block,
+    )
+
+    schema_block = get_schemas_for_domains(domains)
+    examples_block = get_examples_for_domains(domains)
+    metadata_block = get_dynamic_metadata_block(domains)
+
+    from datetime import date, timedelta
+
+    today = date.today()
+    seven_days_ago = today - timedelta(days=7)
+
+    lines = [
+        "你是 Oracle SQL 生成器。根據使用者問題生成可執行的 Oracle SELECT 語句。",
+        f"今天日期：{today.isoformat()}（使用者未指定日期時，預設 start_date={seven_days_ago.isoformat()}, end_date={today.isoformat()}）",
+        "",
+        "## 資料庫資訊",
+        "- Oracle 19c DWH，帳號為 read-only（僅 SELECT）",
+        "- 所有表名格式：DWH.TABLE_NAME",
+        "- 使用 bind variables（:param_name），不要內嵌字串值",
+        "",
+        "## 可用表 Schema",
+        schema_block,
+        "",
+        "## SQL 生成規則",
+        "1. 只能使用上方列出的表，禁止其他表",
+        "2. 只用 SELECT，禁止 INSERT/UPDATE/DELETE/DDL",
+        "3. 大表（LOT/WIP/HISTORY 類）必須加日期或 ID 條件",
+        "4. 必須加 FETCH FIRST N ROWS ONLY（N 通常為 20-100）",
+        "5. 日期條件用 :start_date 和 :end_date bind variable，params 值必須是 YYYY-MM-DD 格式的實際日期（禁止用 SYSDATE）",
+        "6. 設備名稱用 LIKE 時用 :pattern（含 %）；Hold 原因名稱用 LIKE '%S1%' 模糊比對（使用者說 S1 但實際值可能是 'S1品質異常單(PE)'）",
+        "7. 未指定日期時 params 填寫近 7 天",
+        '8. 混合大小寫欄位必須用雙引號：e."Package", e."Function"（其餘欄位全大寫，不加引號）',
+        "9. 若無法生成合理 SQL，回傳 sql: null",
+        "",
+    ]
+
+    if metadata_block:
+        lines += [metadata_block]
+
+    if examples_block:
+        lines += [
+            "## 參考 SQL 範例",
+            examples_block,
+            "",
+        ]
+
+    lines += [
+        "## 回覆格式（嚴格 JSON，禁止其他文字）",
+        '{"sql": "SELECT ...", "params": {"param1": "value1"}, "explanation": "一句話說明"}',
+        "",
+        "無法生成時：",
+        '{"sql": null, "params": {}, "explanation": "說明原因"}',
+    ]
+    return "\n".join(lines)
+
+
+def build_reviewer_prompt(domains: list[str]) -> str:
+    """Reviewer prompt: validate generated SQL against known business logic pitfalls.
+
+    This is a lightweight check BEFORE execution to catch "syntactically correct
+    but logically wrong" SQL — the class of errors that Oracle won't catch.
+    """
+    from mes_dashboard.services.ai_business_context import SYSTEM_OVERVIEW
+    from mes_dashboard.services.ai_schema_context import TABLE_DOMAINS
+
+    # Build list of allowed tables for these domains
+    allowed_tables = []
+    for d in domains:
+        entry = TABLE_DOMAINS.get(d, {})
+        allowed_tables.extend(entry.get("tables", []))
+    allowed_tables_str = ", ".join(sorted(set(allowed_tables)))
+
+    return "\n".join([
+        "你是 MES Dashboard SQL 審查員。檢查以下 SQL 是否正確回答使用者的問題。",
+        "",
+        f"## 本次查詢允許使用的表：{allowed_tables_str}",
+        "",
+        SYSTEM_OVERVIEW,
+        "",
+        "## 審查重點（已知常見錯誤）",
+        "",
+        "### 1. 即時 vs 歷史表選擇",
+        "- 問「現在/目前」狀態 → 必須用即時 View（LOT_V / EQUIPMENTSTATUS_WIP_V）",
+        "- 問「歷史/趨勢/近N天」→ 必須用歷史表（HOLDRELEASEHISTORY / LOTREJECTHISTORY 等）",
+        "- 常見錯誤：問「現在 HOLD 多少」卻查 HOLDRELEASEHISTORY",
+        "",
+        "### 2. Hold 原因比對方式",
+        "- 使用者說 S1/S2 等縮寫，系統中實際值是完整名稱（如 S2品質異常單(PE)）",
+        "- 必須用 LIKE '%S1%' 模糊比對，不能用 = 'S1' 精確比對",
+        "",
+        "### 3. 欄位語義正確性",
+        "- 不良率分母：用 MOVEINQTY（進站數量），不是 TRACKINQTY 或 QTYTOPROCESS",
+        "- WIP 狀態：用 EQUIPMENTCOUNT>0 判斷 RUN，CURRENTHOLDCOUNT>0 判斷 HOLD",
+        "- JOBID 是維修工單 ID，JOBORDER/MFGORDERNAME 才是生產工單號",
+        "- LOT_V 的工單欄位叫 WORKORDER（非 MFGORDERNAME）",
+        "",
+        "### 4. 混合大小寫欄位",
+        '- Package 和 Function 必須用雙引號："Package"、"Function"',
+        "",
+        "### 5. 日期參數",
+        "- params 中的日期必須是 YYYY-MM-DD 格式，不能是 SYSDATE",
+        "",
+        "## 回覆格式（嚴格 JSON）",
+        "",
+        "審查通過：",
+        '{"approved": true}',
+        "",
+        "審查不通過（只列出問題，不要自己改 SQL）：",
+        '{"approved": false, "issues": ["具體問題描述1", "具體問題描述2"]}',
+        "",
+        "規則：",
+        "- 只列出上述 5 類已知問題，不要做其他審查",
+        "- issues 要具體說明哪裡錯、應該怎麼做（讓 SQL 生成器能根據 issues 修正）",
+        "- 不要自己重寫 SQL",
+    ])
+
+
+# ---------------------------------------------------------------------------
 # Prompt builders — three rounds
 # ---------------------------------------------------------------------------
 

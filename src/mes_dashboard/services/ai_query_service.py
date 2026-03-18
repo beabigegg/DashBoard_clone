@@ -24,10 +24,14 @@ from mes_dashboard.services.ai_function_registry import (
     build_round1_prompt,
     build_round2_prompt,
     build_round3_prompt,
+    build_stage1_prompt,
+    build_stage2_prompt,
     get_service_function,
     get_suggestions,
     validate_intent,
 )
+
+import pandas as pd
 
 logger = logging.getLogger("mes_dashboard.ai_query_service")
 
@@ -39,7 +43,8 @@ _AI_API_KEY = os.getenv("AI_API_KEY", "")
 _AI_MODEL = os.getenv("AI_MODEL", "gpt-oss:120b")
 _AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "30"))
 _AI_VERIFY_TLS = os.getenv("AI_VERIFY_TLS", "false").strip().lower() in {"1", "true", "yes"}
-_AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "500"))
+# No max_tokens cap — internal LLM with 16K context, no token cost.
+_AI_MODE = os.getenv("AI_MODE", "text2sql")  # "text2sql" | "function"
 
 # ID type detection order for auto_resolve_id functions
 _ID_RESOLVE_ORDER = ["lot", "workorder"]
@@ -92,7 +97,7 @@ def _auto_resolve_id(function_name: str, params: dict) -> dict:
 # LLM API calls
 # ---------------------------------------------------------------------------
 
-def _call_llm(messages: list[dict], max_tokens: int | None = None) -> dict:
+def _call_llm(messages: list[dict]) -> dict:
     """POST to LLM API and return the parsed JSON dict.
 
     Raises:
@@ -109,7 +114,6 @@ def _call_llm(messages: list[dict], max_tokens: int | None = None) -> dict:
         "model": _AI_MODEL,
         "messages": messages,
         "stream": False,
-        "max_tokens": max_tokens or _AI_MAX_TOKENS,
     }
 
     response = requests.post(
@@ -156,7 +160,7 @@ def _call_llm(messages: list[dict], max_tokens: int | None = None) -> dict:
     raise RuntimeError(f"Could not extract JSON from LLM response: {content[:300]}")
 
 
-def _call_llm_text(messages: list[dict], max_tokens: int | None = None) -> str:
+def _call_llm_text(messages: list[dict]) -> str:
     """POST to LLM API and return raw text content (no JSON extraction).
 
     Used for Round 3 where the LLM returns natural language, not JSON.
@@ -171,7 +175,6 @@ def _call_llm_text(messages: list[dict], max_tokens: int | None = None) -> str:
         "model": _AI_MODEL,
         "messages": messages,
         "stream": False,
-        "max_tokens": max_tokens or _AI_MAX_TOKENS,
     }
 
     response = requests.post(
@@ -583,10 +586,451 @@ def _normalize_chart_data(function_name: str, raw: Any) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Main entry point — three-round pipeline
+# Text-to-SQL helpers
 # ---------------------------------------------------------------------------
 
-def process_query(question: str) -> dict[str, Any]:
+def _coerce_date_params(params: dict) -> dict:
+    """Convert date-like string params to datetime objects.
+
+    LLM often generates date params as:
+      - 'YYYY-MM-DD' strings  →  convert to datetime
+      - 'SYSDATE', 'SYSDATE-7' etc.  →  resolve to actual datetime
+
+    Oracle bind variables need Python datetime objects; passing string
+    literals like 'SYSDATE-7' causes ORA-01858/ORA-01861.
+    """
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+
+    result = {}
+    for key, value in params.items():
+        if not isinstance(value, str):
+            result[key] = value
+            continue
+
+        v = value.strip().upper()
+
+        # Handle SYSDATE / SYSDATE-N / SYSDATE+N
+        if v.startswith("SYSDATE"):
+            offset_days = 0
+            rest = v[7:].strip()
+            if rest:
+                m = re.match(r"^([+-])\s*(\d+)", rest)
+                if m:
+                    offset_days = int(m.group(2)) * (1 if m.group(1) == "+" else -1)
+            result[key] = now + timedelta(days=offset_days)
+            continue
+
+        # Handle YYYY-MM-DD
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", value):
+            try:
+                result[key] = datetime.strptime(value, "%Y-%m-%d")
+                continue
+            except ValueError:
+                pass
+
+        result[key] = value
+    return result
+
+
+# ---------------------------------------------------------------------------
+# SQL reviewer — LLM-based logic validation before execution
+# ---------------------------------------------------------------------------
+
+def _review_sql(
+    question: str,
+    sql: str,
+    params: dict,
+    domains: list[str],
+) -> str:
+    """Review generated SQL for business logic errors using LLM.
+
+    The reviewer only identifies issues — it does NOT rewrite SQL.
+    Issues are fed back to Stage 2 LLM for correction.
+
+    Returns:
+        issue_summary — empty string if approved, otherwise a description of problems.
+    """
+    from mes_dashboard.services.ai_function_registry import build_reviewer_prompt
+
+    review_messages = [
+        {"role": "system", "content": build_reviewer_prompt(domains)},
+        {"role": "user", "content": (
+            f"使用者問題：{question}\n"
+            f"選定的 domain：{', '.join(domains)}\n\n"
+            f"生成的 SQL：\n{sql}\n\n"
+            f"參數：{json.dumps(params, ensure_ascii=False)}\n\n"
+            f"請審查此 SQL 是否正確回答使用者的問題。"
+        )},
+    ]
+
+    try:
+        result = _call_llm(review_messages)
+    except Exception as exc:
+        logger.warning("Reviewer LLM call failed, skipping review: %s", exc)
+        return ""
+
+    if result.get("approved", True):
+        return ""
+
+    issues = result.get("issues", [])
+    issue_summary = "; ".join(issues) if issues else "審查未通過"
+    logger.info("Reviewer rejected SQL: %s", issue_summary)
+    return issue_summary
+
+
+# ---------------------------------------------------------------------------
+# SQL sanitizer — deterministic fixes for known Oracle issues
+# ---------------------------------------------------------------------------
+
+# Mixed-case columns that Oracle requires double-quoting.
+_MIXED_CASE_COLUMNS: dict[str, str] = {
+    "Package": '"Package"',
+    "Function": '"Function"',
+}
+
+# Valid column names per table (lazy-loaded from table_schema_info.json).
+_VALID_COLUMNS: dict[str, set[str]] | None = None
+
+
+def _load_valid_columns() -> dict[str, set[str]]:
+    """Load valid column names from table_schema_info.json (cached)."""
+    global _VALID_COLUMNS
+    if _VALID_COLUMNS is not None:
+        return _VALID_COLUMNS
+
+    import pathlib
+    schema_path = pathlib.Path(__file__).resolve().parents[3] / "data" / "table_schema_info.json"
+    try:
+        raw = json.loads(schema_path.read_text(encoding="utf-8"))
+        _VALID_COLUMNS = {}
+        for short_name, info in raw.items():
+            full_name = f"DWH.{short_name}"
+            cols = set(info.get("column_comments", {}).keys())
+            # Also add upper-case versions for case-insensitive matching
+            cols |= {c.upper() for c in cols}
+            _VALID_COLUMNS[full_name] = cols
+    except Exception as exc:
+        logger.warning("Failed to load table_schema_info.json: %s", exc)
+        _VALID_COLUMNS = {}
+    return _VALID_COLUMNS
+
+
+def _sanitize_sql(sql: str) -> str:
+    """Apply deterministic fixes to LLM-generated SQL before execution.
+
+    Fixes:
+      1. Mixed-case columns (Package, Function) → auto-quote
+      2. Unquoted Oracle reserved words used as aliases
+      3. Validate column names against schema (log warnings)
+    """
+    # 1. Auto-quote mixed-case columns.
+    #    Match word boundary around the column name, but skip if already quoted.
+    for col, quoted in _MIXED_CASE_COLUMNS.items():
+        # Match: e.Package or just Package (not already inside quotes)
+        # Replace with: e."Package" or "Package"
+        sql = re.sub(
+            rf'(?<!")(?<!\w){re.escape(col)}(?!")(?!\w)',
+            quoted,
+            sql,
+        )
+
+    # 2. Validate column names — extract table.column references and check.
+    #    This is best-effort; we log warnings but don't block execution.
+    valid_cols = _load_valid_columns()
+    if valid_cols:
+        # Find FROM/JOIN table references: DWH.TABLE_NAME [alias]
+        table_aliases: dict[str, str] = {}  # alias -> full_table_name
+        for m in re.finditer(
+            r"(DWH\.\w+)\s+(\w+)", sql, re.IGNORECASE
+        ):
+            full_name = m.group(1).upper()
+            alias = m.group(2).upper()
+            if alias not in ("ON", "WHERE", "GROUP", "ORDER", "FETCH", "SET", "AND", "OR", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "CROSS"):
+                table_aliases[alias] = full_name
+
+        # Find alias.COLUMN references
+        for m in re.finditer(r"(\w+)\.(\w+)", sql):
+            alias = m.group(1).upper()
+            col_name = m.group(2)
+            if alias == "DWH":
+                continue  # This is DWH.TABLE_NAME, not alias.column
+            full_table = table_aliases.get(alias)
+            if full_table and full_table in valid_cols:
+                col_upper = col_name.upper()
+                if col_upper not in valid_cols[full_table] and col_name not in valid_cols[full_table]:
+                    logger.warning(
+                        "Column '%s' not found in %s (alias %s). Valid columns: check table_schema_info.json",
+                        col_name, full_table, alias,
+                    )
+
+    return sql
+
+
+def _extract_oracle_error(exc: Exception) -> str:
+    """Extract ORA-xxxxx error code and message from an exception.
+
+    Returns a concise string like "ORA-00904: invalid identifier" or the
+    full str(exc) if no ORA- pattern is found.
+    """
+    msg = str(exc)
+    match = re.search(r"ORA-\d+[^\n]*", msg)
+    if match:
+        return match.group(0).strip()
+    return msg[:300]
+
+
+def _summarize_dataframe(df: "pd.DataFrame", max_chars: int = 4000) -> str:
+    """Truncate a DataFrame to a LLM-digestible text format.
+
+    Shows first 10 rows for large DataFrames; always stays within max_chars.
+    """
+    if df is None or df.empty:
+        return "（查詢結果為空）"
+
+    total = len(df)
+    if total > 10:
+        subset = df.head(10)
+        text = f"共 {total} 筆，顯示前 10 筆：\n{subset.to_string(index=False)}"
+    else:
+        text = df.to_string(index=False)
+
+    if len(text) > max_chars:
+        text = text[:max_chars] + "\n...(截斷)"
+    return text
+
+
+# ---------------------------------------------------------------------------
+# Text-to-SQL pipeline
+# ---------------------------------------------------------------------------
+
+def process_query_text2sql(question: str) -> dict[str, Any]:
+    """3-stage Text-to-SQL pipeline: classify → generate SQL → execute → summarize.
+
+    Returns:
+        dict with keys: answer, chart_data, query_used, params_used,
+                        sql_used, tool_trace, suggestions
+    """
+    from mes_dashboard.core.database import read_sql_df
+
+    tool_trace: list[dict[str, Any]] = []
+
+    # ── Stage 1: Domain classification ─────────────────────────────────────
+    s1_messages = [
+        {"role": "system", "content": build_stage1_prompt()},
+        {"role": "user", "content": question},
+    ]
+    try:
+        s1_result = _call_llm(s1_messages)
+    except requests.Timeout as exc:
+        raise TimeoutError("LLM API 回應逾時") from exc
+    except requests.ConnectionError as exc:
+        raise ConnectionError("LLM API 連線失敗") from exc
+    except RuntimeError as exc:
+        raise ConnectionError(str(exc)) from exc
+
+    domains: list[str] = s1_result.get("domains") or []
+    thought: str = s1_result.get("thought", "")
+    logger.info("Stage 1 result: domains=%s, thought=%s", domains, thought)
+    tool_trace.append({"step": 1, "function": "stage1_classify", "summary": f"domains={domains}"})
+
+    # No matching domain → return thought as answer
+    if not domains:
+        return {
+            "answer": thought or "抱歉，我無法判斷這個問題屬於哪個資料領域，請換個方式描述",
+            "chart_data": None,
+            "query_used": "text2sql",
+            "params_used": {},
+            "sql_used": None,
+            "tool_trace": tool_trace,
+            "suggestions": [],
+        }
+
+    # ── Stage 2: SQL generation + retry loop ────────────────────────────────
+    s2_system = build_stage2_prompt(domains)
+    s2_messages: list[dict[str, Any]] = [
+        {"role": "system", "content": s2_system},
+        {"role": "user", "content": question},
+    ]
+
+    MAX_RETRIES = 3
+    last_error: str = ""
+    df: "pd.DataFrame | None" = None
+    sql_used: str | None = None
+    params_used: dict = {}
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            s2_result = _call_llm(s2_messages)
+        except requests.Timeout as exc:
+            raise TimeoutError("LLM API 回應逾時") from exc
+        except requests.ConnectionError as exc:
+            raise ConnectionError("LLM API 連線失敗") from exc
+        except RuntimeError as exc:
+            raise ConnectionError(str(exc)) from exc
+
+        sql: str | None = s2_result.get("sql")
+        params: dict = s2_result.get("params") or {}
+        explanation: str = s2_result.get("explanation", "")
+        logger.info("Stage 2 attempt %d: sql_len=%s, explanation=%s\nSQL: %s\nParams: %s",
+                    attempt + 1, len(sql) if sql else 0, explanation, sql, params)
+
+        if not sql:
+            tool_trace.append({
+                "step": 2 + attempt,
+                "function": "stage2_generate_sql",
+                "summary": f"LLM 無法生成 SQL: {explanation}",
+            })
+            return {
+                "answer": explanation or "抱歉，無法生成對應的 SQL 查詢",
+                "chart_data": None,
+                "query_used": "text2sql",
+                "params_used": {},
+                "sql_used": None,
+                "tool_trace": tool_trace,
+                "suggestions": [],
+            }
+
+        sql_used = sql
+        params_used = params
+        tool_trace.append({
+            "step": 2 + attempt,
+            "function": "stage2_generate_sql",
+            "summary": f"生成 SQL (attempt {attempt + 1}): {sql[:80]}...",
+        })
+
+        # ── Reviewer: check SQL logic before execution ───────────────────────
+        review_issue = _review_sql(question, sql, params, domains)
+        if review_issue:
+            logger.info("Reviewer flagged issue: %s", review_issue)
+            tool_trace.append({
+                "step": 2 + attempt,
+                "function": "reviewer",
+                "summary": f"審查不通過: {review_issue[:80]}",
+            })
+            # Feed reviewer issues back to Stage 2 for correction (don't execute)
+            if attempt < MAX_RETRIES - 1:
+                s2_messages.append({"role": "assistant", "content": json.dumps(s2_result, ensure_ascii=False)})
+                s2_messages.append({
+                    "role": "user",
+                    "content": (
+                        f"SQL 審查發現以下業務邏輯問題：\n{review_issue}\n\n"
+                        f"請根據上述問題修正 SQL，重新生成。"
+                    ),
+                })
+                continue  # Skip execution, go to next attempt
+            # Last attempt — try executing anyway
+            logger.warning("Reviewer rejected on last attempt, executing anyway")
+
+        # ── Execute SQL ──────────────────────────────────────────────────────
+        sql = _sanitize_sql(sql)
+        params = _coerce_date_params(params)
+        try:
+            df = read_sql_df(sql, params)
+            logger.info("SQL executed successfully: %d rows", len(df) if df is not None else 0)
+            tool_trace.append({
+                "step": 3 + attempt,
+                "function": "execute_sql",
+                "summary": f"執行成功，回傳 {len(df) if df is not None else 0} 筆",
+            })
+            break  # Success — exit retry loop
+        except Exception as exc:
+            from mes_dashboard.core.database import DatabaseDegradedError
+            last_error = _extract_oracle_error(exc)
+            logger.warning("SQL execution failed (attempt %d): %s", attempt + 1, last_error)
+            tool_trace.append({
+                "step": 3 + attempt,
+                "function": "execute_sql",
+                "summary": f"執行失敗 (attempt {attempt + 1})",
+                "error": last_error,
+            })
+            # Timeout / pool-exhaustion / circuit-breaker → no point retrying
+            if isinstance(exc, (DatabaseDegradedError, TimeoutError)):
+                return {
+                    "answer": f"資料庫連線異常，無法執行查詢：{last_error}",
+                    "chart_data": None,
+                    "query_used": "text2sql",
+                    "params_used": params_used,
+                    "sql_used": sql_used,
+                    "tool_trace": tool_trace,
+                    "suggestions": [],
+                }
+            if attempt < MAX_RETRIES - 1:
+                # Feed error back to LLM for correction
+                s2_messages.append({"role": "assistant", "content": json.dumps(s2_result, ensure_ascii=False)})
+                s2_messages.append({
+                    "role": "user",
+                    "content": f"上面的 SQL 執行時發生錯誤：{last_error}\n請修正 SQL 並重新生成。",
+                })
+            df = None
+    else:
+        # All retries exhausted
+        return {
+            "answer": f"SQL 執行失敗（已重試 {MAX_RETRIES} 次）：{last_error}",
+            "chart_data": None,
+            "query_used": "text2sql",
+            "params_used": params_used,
+            "sql_used": sql_used,
+            "tool_trace": tool_trace,
+            "suggestions": [],
+        }
+
+    # ── Empty result ────────────────────────────────────────────────────────
+    if df is None or df.empty:
+        return {
+            "answer": "查詢完成，無符合條件的資料。",
+            "chart_data": None,
+            "query_used": "text2sql",
+            "params_used": params_used,
+            "sql_used": sql_used,
+            "tool_trace": tool_trace,
+            "suggestions": [],
+        }
+
+    # ── Stage 3: Summarize results ──────────────────────────────────────────
+    truncated = _summarize_dataframe(df)
+    r3_user_content = f"{question}\n\n## 查詢結果\n{truncated}"
+    r3_messages = [
+        {"role": "system", "content": build_round3_prompt()},
+        {"role": "user", "content": r3_user_content},
+    ]
+    try:
+        answer = _call_llm_text(r3_messages)
+        if not answer:
+            answer = "查詢完成，請參考資料。"
+    except Exception:
+        logger.warning("Stage 3 summarization failed, using fallback")
+        answer = "查詢完成，請參考資料。"
+
+    tool_trace.append({
+        "step": len(tool_trace) + 1,
+        "function": "stage3_summarize",
+        "summary": "LLM 摘要完成",
+    })
+
+    # Convert DataFrame to list-of-dicts for chart_data
+    # Replace NaN/NaT with None so JSON serialization produces null (not NaN)
+    chart_data: list[dict] | None = df.where(df.notna(), other=None).to_dict(orient="records")
+    if not chart_data:
+        chart_data = None
+
+    return {
+        "answer": answer,
+        "chart_data": chart_data,
+        "query_used": "text2sql",
+        "params_used": params_used,
+        "sql_used": sql_used,
+        "tool_trace": tool_trace,
+        "suggestions": [],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Main entry point — three-round pipeline (function call mode)
+# ---------------------------------------------------------------------------
+
+def process_query_function(question: str) -> dict[str, Any]:
     """Process a user question through the three-round LLM pipeline.
 
     Args:
@@ -606,7 +1050,7 @@ def process_query(question: str) -> dict[str, Any]:
         {"role": "user", "content": question},
     ]
     try:
-        r1_result = _call_llm(r1_messages, max_tokens=200)
+        r1_result = _call_llm(r1_messages)
     except requests.Timeout as exc:
         raise TimeoutError("LLM API 回應逾時") from exc
     except requests.ConnectionError as exc:
@@ -639,7 +1083,7 @@ def process_query(question: str) -> dict[str, Any]:
         {"role": "user", "content": question},
     ]
     try:
-        r2_result = _call_llm(r2_messages, max_tokens=300)
+        r2_result = _call_llm(r2_messages)
     except requests.Timeout as exc:
         raise TimeoutError("LLM API 回應逾時") from exc
     except requests.ConnectionError as exc:
@@ -724,7 +1168,7 @@ def process_query(question: str) -> dict[str, Any]:
         ]
 
         try:
-            answer = _call_llm_text(r3_messages, max_tokens=500)
+            answer = _call_llm_text(r3_messages)
             if not answer:
                 answer = "查詢完成，請參考圖表。"
         except Exception:
@@ -740,3 +1184,19 @@ def process_query(question: str) -> dict[str, Any]:
         "params_used": params,
         "suggestions": suggestions,
     }
+
+
+# ---------------------------------------------------------------------------
+# Dispatcher — feature flag selects pipeline
+# ---------------------------------------------------------------------------
+
+def process_query(question: str) -> dict[str, Any]:
+    """Route to text2sql or function-call pipeline based on AI_MODE env var.
+
+    AI_MODE=text2sql (default) → process_query_text2sql()
+    AI_MODE=function            → process_query_function()
+    """
+    mode = os.getenv("AI_MODE", "text2sql").strip().lower()
+    if mode == "function":
+        return process_query_function(question)
+    return process_query_text2sql(question)
