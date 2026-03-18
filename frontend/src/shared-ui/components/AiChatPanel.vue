@@ -68,7 +68,7 @@ function showDividerBefore(idx) {
   if (idx === 0) return false;
   const prev = props.messages[idx - 1];
   const curr = props.messages[idx];
-  return prev?.role === 'ai' && curr?.role === 'user';
+  return (prev?.role === 'ai' || prev?.role === 'clarification') && curr?.role === 'user';
 }
 </script>
 

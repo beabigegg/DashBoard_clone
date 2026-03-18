@@ -470,9 +470,39 @@ def _validate_runtime_contract(app: Flask) -> None:
     logging.getLogger("mes_dashboard").warning(message)
 
 
+class _NaNSafeJSONProvider(Flask.json_provider_class):  # type: ignore[misc]
+    """JSON provider that converts NaN/Infinity to null.
+
+    Pandas DataFrames produce float('nan') for NULL database columns.
+    Standard json.dumps serialises these as the literal ``NaN``, which
+    is invalid JSON and causes ``Unexpected token 'N'`` in browsers.
+    """
+
+    def dumps(self, obj, **kwargs):
+        """Serialize *obj*, replacing NaN/Infinity with None first."""
+        return super().dumps(_sanitize_nan(obj), **kwargs)
+
+
+def _sanitize_nan(obj):
+    """Recursively replace float NaN/Infinity with None."""
+    import math
+
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: _sanitize_nan(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_nan(v) for v in obj]
+    return obj
+
+
 def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the Flask app instance."""
     app = Flask(__name__, template_folder="templates")
+    app.json_provider_class = _NaNSafeJSONProvider
+    app.json = _NaNSafeJSONProvider(app)
 
     config_class = get_config(config_name)
     app.config.from_object(config_class)

@@ -158,13 +158,14 @@ def build_stage2_prompt(domains: list[str]) -> str:
         "## SQL 生成規則",
         "1. 只能使用上方列出的表，禁止其他表",
         "2. 只用 SELECT，禁止 INSERT/UPDATE/DELETE/DDL",
-        "3. 大表（LOT/WIP/HISTORY 類）必須加日期或 ID 條件",
-        "4. 必須加 FETCH FIRST N ROWS ONLY（N 通常為 20-100）",
-        "5. 日期條件用 :start_date 和 :end_date bind variable，params 值必須是 YYYY-MM-DD 格式的實際日期（禁止用 SYSDATE）",
-        "6. 設備名稱用 LIKE 時用 :pattern（含 %）；Hold 原因名稱用 LIKE '%S1%' 模糊比對（使用者說 S1 但實際值可能是 'S1品質異常單(PE)'）",
-        "7. 未指定日期時 params 填寫近 7 天",
-        '8. 混合大小寫欄位必須用雙引號：e."Package", e."Function"（其餘欄位全大寫，不加引號）',
-        "9. 若無法生成合理 SQL，回傳 sql: null",
+        "3. 歷史表（名稱含 HISTORY / MOVETXN / RESOURCESTATUS_SHIFT）必須加日期或 ID 條件；未指定日期時 params 填寫近 7 天",
+        "4. 即時 View（DW_MES_LOT_V、DW_MES_EQUIPMENTSTATUS_WIP_V）是當下快照，禁止加 SYS_DATE 日期過濾——問「目前/現在」直接查，不加日期條件",
+        "5. 必須加 FETCH FIRST N ROWS ONLY（N 通常為 20-100）",
+        "6. 日期條件用 :start_date 和 :end_date bind variable，params 值必須是 YYYY-MM-DD 格式的實際日期（禁止用 SYSDATE）",
+        "7. 工站名稱比對：使用者說「DB」「WB」等縮寫時，params 必須轉成系統全名（如 DB→'焊接_DB%', WB→'焊接_WB%', 成型→'成型%'），參考業務術語的工站對照表",
+        "8. Hold 原因名稱用 LIKE '%S1%' 模糊比對（使用者說 S1 但實際值可能是 'S1品質異常單(PE)'）",
+        '9. 混合大小寫欄位必須用雙引號：e."Package", e."Function"（其餘欄位全大寫，不加引號）',
+        "10. 若無法生成合理 SQL，回傳 sql: null",
         "",
     ]
 
@@ -217,6 +218,8 @@ def build_reviewer_prompt(domains: list[str]) -> str:
         "- 問「現在/目前」狀態 → 必須用即時 View（LOT_V / EQUIPMENTSTATUS_WIP_V）",
         "- 問「歷史/趨勢/近N天」→ 必須用歷史表（HOLDRELEASEHISTORY / LOTREJECTHISTORY 等）",
         "- 常見錯誤：問「現在 HOLD 多少」卻查 HOLDRELEASEHISTORY",
+        "- 即時 View（LOT_V / EQUIPMENTSTATUS_WIP_V）是當下快照，禁止加 SYS_DATE 日期過濾",
+        "- 常見錯誤：查 LOT_V 時加了 SYS_DATE BETWEEN 導致查不到資料",
         "",
         "### 2. Hold 原因比對方式",
         "- 使用者說 S1/S2 等縮寫，系統中實際值是完整名稱（如 S2品質異常單(PE)）",
@@ -234,6 +237,10 @@ def build_reviewer_prompt(domains: list[str]) -> str:
         "### 5. 日期參數",
         "- params 中的日期必須是 YYYY-MM-DD 格式，不能是 SYSDATE",
         "",
+        "### 6. 工站名稱參數",
+        "- workcenter_pattern 的值必須用系統全名（如 '焊接_DB%'），不能用縮寫（如 'DB%'）",
+        "- 對照：DB→焊接_DB%, WB→焊接_WB%, DW→焊接_DW%, 成型→成型%, TMTT→TMTT%, 品檢→品檢%, FQC→FQC%",
+        "",
         "## 回覆格式（嚴格 JSON）",
         "",
         "審查通過：",
@@ -243,7 +250,7 @@ def build_reviewer_prompt(domains: list[str]) -> str:
         '{"approved": false, "issues": ["具體問題描述1", "具體問題描述2"]}',
         "",
         "規則：",
-        "- 只列出上述 5 類已知問題，不要做其他審查",
+        "- 只列出上述 6 類已知問題（含即時 View 禁加日期），不要做其他審查",
         "- issues 要具體說明哪裡錯、應該怎麼做（讓 SQL 生成器能根據 issues 修正）",
         "- 不要自己重寫 SQL",
     ])
@@ -492,3 +499,63 @@ def get_suggestions(function_name: str) -> list[str]:
         suggestions.append(label)
 
     return suggestions
+
+
+# ---------------------------------------------------------------------------
+# Agent system prompt builder
+# ---------------------------------------------------------------------------
+
+def build_agent_system_prompt() -> str:
+    """Assemble the complete system prompt for AI agent mode.
+
+    Combines: role, business context, tool block, tool_call syntax,
+    clarification guidance, response format rules, and current date.
+    Target: ~4,000 tokens.
+    """
+    from datetime import date
+    from mes_dashboard.services.ai_business_context import (
+        BUSINESS_TERMINOLOGY,
+        SYSTEM_OVERVIEW,
+    )
+    from mes_dashboard.services.ai_tool_definitions import build_tool_prompt_block
+
+    today = date.today().isoformat()
+    tool_block = build_tool_prompt_block()
+
+    lines = [
+        "你是 MES Dashboard AI 助手，協助工廠人員查詢製造資料並提供分析洞察。",
+        f"今天日期：{today}",
+        "",
+        "## 系統背景",
+        SYSTEM_OVERVIEW,
+        "",
+        "## 業務術語",
+        BUSINESS_TERMINOLOGY,
+        "",
+        "## 可用工具",
+        tool_block,
+        "",
+        "## 工具呼叫語法",
+        "當你需要查詢資料時，使用以下格式呼叫工具：",
+        "<tool_call>{\"name\": \"工具名稱\", \"arguments\": {\"參數名\": \"參數值\"}}</tool_call>",
+        "",
+        "規則：",
+        "- 一次回覆可以包含多個 <tool_call> 標記",
+        "- tool_call 標記外可以寫自然語言說明你的推理過程",
+        "- 呼叫工具後，系統會自動執行並將結果注入下一輪 user message",
+        "- 如果常駐工具無法滿足需求，先用 search_tools 搜尋更多工具",
+        "- 不要重複呼叫相同工具（相同名稱+相同參數）",
+        "",
+        "## Clarification 指引",
+        "如果使用者的問題缺少必要資訊（如日期範圍、工站名稱），直接用中文詢問。",
+        "此時不要呼叫任何工具，只回覆問題即可。",
+        "",
+        "## 回應格式規則",
+        "- 最終回答用繁體中文，直接回答問題",
+        "- 點出 2-3 個關鍵數據或發現",
+        "- 回覆不超過 5 句話",
+        "- 不要輸出 markdown 標題或程式碼區塊",
+        "- 如果資料為空，說明「目前無異常」或「查詢無結果」",
+    ]
+
+    return "\n".join(lines)

@@ -72,6 +72,25 @@ const emit = defineEmits(['suggest']);
       </div>
     </div>
 
+    <!-- Clarification message (AI asking for more info) -->
+    <div v-else-if="message.role === 'clarification'" class="ai-msg-clarification">
+      <p class="text-sm whitespace-pre-wrap">{{ message.content }}</p>
+      <div
+        v-if="message.suggestions && message.suggestions.length > 0"
+        class="ai-msg-suggestions"
+      >
+        <button
+          v-for="(suggestion, idx) in message.suggestions"
+          :key="idx"
+          type="button"
+          class="ai-suggestion-chip"
+          @click="emit('suggest', suggestion)"
+        >
+          {{ suggestion }}
+        </button>
+      </div>
+    </div>
+
     <!-- Error message -->
     <div v-else-if="message.role === 'error'" class="ai-msg-error">
       {{ message.content }}
@@ -101,7 +120,8 @@ const emit = defineEmits(['suggest']);
 
 .ai-chat-msg--ai,
 .ai-chat-msg--loading,
-.ai-chat-msg--error {
+.ai-chat-msg--error,
+.ai-chat-msg--clarification {
   justify-content: flex-start;
 }
 
@@ -129,6 +149,19 @@ const emit = defineEmits(['suggest']);
   padding: theme('spacing.token.p8') theme('spacing.token.p12');
   font-size: 14px;
   border: 1px solid theme('colors.red.200');
+}
+
+.ai-msg-clarification {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p8');
+  max-width: 95%;
+  background: theme('colors.brand.50');
+  border: 1px solid theme('colors.brand.100');
+  border-radius: 12px;
+  padding: theme('spacing.token.p10') theme('spacing.token.p12');
+  color: theme('colors.text.primary');
+  font-size: 14px;
 }
 
 .ai-msg-query-used {

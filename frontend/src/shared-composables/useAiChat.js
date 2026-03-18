@@ -89,8 +89,9 @@ export function useAiChat() {
       }
 
       const data = payload.data || payload;
+      const isClarification = data.needs_clarification === true;
       const aiMessage = {
-        role: 'ai',
+        role: isClarification ? 'clarification' : 'ai',
         content: data.answer || '',
         chartData: data.chart_data ?? null,
         queryUsed: data.query_used ?? null,

@@ -16,6 +16,7 @@ TABLE_DOMAINS: dict[str, dict] = {
         "tables": [
             "DWH.DW_MES_LOT_V",
             "DWH.DW_MES_EQUIPMENTSTATUS_WIP_V",
+            "DWH.DW_MES_RESOURCE",
         ],
         "keywords": ["現在", "目前", "即時", "在製", "WIP", "機台狀態", "設備在製"],
         "description": "即時在製品 (WIP) 與設備即時狀態",
@@ -51,6 +52,8 @@ TABLE_DOMAINS: dict[str, dict] = {
             "DWH.DW_MES_RESOURCESTATUS",
             "DWH.DW_MES_RESOURCESTATUS_SHIFT",
             "DWH.DW_MES_SPEC_WORKCENTER_V",
+            "DWH.DW_MES_EQUIPMENTSTATUS_WIP_V",
+            "DWH.DW_MES_JOB",
         ],
         "keywords": ["設備", "機台", "OU", "稼動率", "設備狀態", "resource", "workcenter", "station",
                      "DB", "WB", "MOLD", "TMTT", "FVI", "PRD", "UDT", "SDT", "EGT", "SBY"],
@@ -69,6 +72,7 @@ TABLE_DOMAINS: dict[str, dict] = {
             "DWH.DW_MES_JOBTXNHISTORY",
             "DWH.DW_MES_MAINTENANCE",
             "DWH.DW_MES_PARTREQUESTORDER",
+            "DWH.DW_MES_RESOURCE",
         ],
         "keywords": ["job", "工單", "維修", "保養", "故障", "Job", "symptom", "cause", "repair"],
         "description": "設備工單 / 維修保養歷史",
@@ -96,6 +100,13 @@ TABLE_DOMAINS: dict[str, dict] = {
         ],
         "keywords": ["WIP data", "製程參數", "wip data", "wipdata", "SPC"],
         "description": "批次製程參數數據歷史 & WIP 快照",
+    },
+    "reference": {
+        "tables": [
+            "DWH.DW_MES_SPEC_WORKCENTER_V",
+        ],
+        "keywords": ["製程規格", "工站對照", "SPEC", "規格站別", "工序"],
+        "description": "製程規格與工站對照（參考表）",
     },
 }
 

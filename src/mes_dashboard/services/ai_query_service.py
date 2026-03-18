@@ -160,11 +160,11 @@ def _call_llm(messages: list[dict]) -> dict:
     raise RuntimeError(f"Could not extract JSON from LLM response: {content[:300]}")
 
 
-def _call_llm_text(messages: list[dict]) -> str:
+def call_llm_text(messages: list[dict]) -> str:
     """POST to LLM API and return raw text content (no JSON extraction).
 
-    Used for Round 3 where the LLM returns natural language, not JSON.
-    Returns empty string on any failure.
+    Used by Round 3 (natural language answer) and the agent loop.
+    Raises RuntimeError on HTTP failure.
     """
     url = f"{_AI_API_URL}/v1/chat/completions"
     headers = {
@@ -197,7 +197,7 @@ def _call_llm_text(messages: list[dict]) -> str:
 # Result truncation for Round 3
 # ---------------------------------------------------------------------------
 
-def _summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 4500) -> str:
+def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 4500) -> str:
     """Truncate query results to fit within LLM context for Round 3."""
     if chart_data is None:
         return "（查詢結果為空）"
@@ -288,7 +288,7 @@ def _summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 450
 # Chart data normalisation — raw service output → AiChartRenderer format
 # ---------------------------------------------------------------------------
 
-def _normalize_chart_data(function_name: str, raw: Any) -> Any:
+def normalize_chart_data(function_name: str, raw: Any) -> Any:
     """Transform raw service output into the shape AiChartRenderer expects."""
     if raw is None:
         return None
@@ -996,7 +996,7 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
         {"role": "user", "content": r3_user_content},
     ]
     try:
-        answer = _call_llm_text(r3_messages)
+        answer = call_llm_text(r3_messages)
         if not answer:
             answer = "查詢完成，請參考資料。"
     except Exception:
@@ -1137,7 +1137,7 @@ def process_query_function(question: str) -> dict[str, Any]:
         raise ValueError(f"參數不符合服務函式要求：{exc}") from exc
 
     logger.info("Service %s returned type=%s, is_none=%s", function_name, type(chart_data).__name__, chart_data is None)
-    chart_data = _normalize_chart_data(function_name, chart_data)
+    chart_data = normalize_chart_data(function_name, chart_data)
     logger.info("Normalized chart_data type=%s, is_none=%s, len=%s",
                 type(chart_data).__name__, chart_data is None,
                 len(chart_data) if isinstance(chart_data, (list, dict)) else "N/A")
@@ -1160,7 +1160,7 @@ def process_query_function(question: str) -> dict[str, Any]:
             answer = f"查詢完成，但 {function_name} 沒有回傳任何資料。可能該條件下無符合的紀錄。"
     else:
         # ── Round 3: Result summarization ──────────────────────────────────
-        truncated_result = _summarize_for_llm(function_name, chart_data)
+        truncated_result = summarize_for_llm(function_name, chart_data)
         r3_user_content = f"{question}\n\n## 查詢結果（{function_name}）\n{truncated_result}"
         r3_messages = [
             {"role": "system", "content": build_round3_prompt()},
@@ -1168,7 +1168,7 @@ def process_query_function(question: str) -> dict[str, Any]:
         ]
 
         try:
-            answer = _call_llm_text(r3_messages)
+            answer = call_llm_text(r3_messages)
             if not answer:
                 answer = "查詢完成，請參考圖表。"
         except Exception:
@@ -1191,12 +1191,20 @@ def process_query_function(question: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def process_query(question: str) -> dict[str, Any]:
-    """Route to text2sql or function-call pipeline based on AI_MODE env var.
+    """Route to text2sql, function-call, or agent pipeline based on AI_MODE env var.
 
     AI_MODE=text2sql (default) → process_query_text2sql()
     AI_MODE=function            → process_query_function()
+    AI_MODE=agent               → process_agent_turn()
     """
     mode = os.getenv("AI_MODE", "text2sql").strip().lower()
+    if mode == "agent":
+        from mes_dashboard.services.ai_agent_loop import process_agent_turn
+        return process_agent_turn(question)
     if mode == "function":
-        return process_query_function(question)
-    return process_query_text2sql(question)
+        result = process_query_function(question)
+        result.setdefault("needs_clarification", False)
+        return result
+    result = process_query_text2sql(question)
+    result.setdefault("needs_clarification", False)
+    return result
