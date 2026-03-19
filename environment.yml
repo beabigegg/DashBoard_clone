@@ -50,3 +50,6 @@ dependencies:
 
       # System Monitoring
       - psutil>=5.9.0,<7.0.0
+
+      # MySQL (dual-layer sync)
+      - pymysql>=1.0.0,<2.0.0

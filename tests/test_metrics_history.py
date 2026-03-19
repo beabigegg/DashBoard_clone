@@ -277,3 +277,111 @@ class TestQuerySnapshotsNoAggregation:
 
             rows = store.query_snapshots(minutes=5)
             assert len(rows) == 2, f"Expected 2 raw rows, got {len(rows)}"
+
+
+# ============================================================
+# Test Sync Fields
+# ============================================================
+
+class TestMetricsSyncFields:
+    """Test synced field, get_unsynced, mark_synced, cleanup_synced."""
+
+    def test_write_snapshot_sets_synced_zero(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_sync.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            store.write_snapshot({"pool": {}, "redis": {}, "route_cache": {}, "latency": {}})
+
+            rows = store.get_unsynced()
+            assert len(rows) == 1
+            assert rows[0]["synced"] == 0
+            assert rows[0]["sync_id"] is not None
+            assert "metrics_snapshots_" in rows[0]["sync_id"]
+
+    def test_get_unsynced_returns_only_unsynced(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_unsynced.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            _insert_snapshot(store, now.isoformat(), pid=1, rss_bytes=0)
+            _insert_snapshot(store, now.isoformat(), pid=2, rss_bytes=0)
+
+            unsynced = store.get_unsynced()
+            assert len(unsynced) == 2
+            assert all(r["synced"] == 0 for r in unsynced)
+
+    def test_mark_synced_sets_flag(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_mark.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            _insert_snapshot(store, now.isoformat(), pid=1, rss_bytes=0)
+
+            unsynced = store.get_unsynced()
+            assert len(unsynced) == 1
+
+            store.mark_synced([unsynced[0]["id"]])
+
+            still_unsynced = store.get_unsynced()
+            assert len(still_unsynced) == 0
+
+    def test_query_aggregated_excludes_synced(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_agg_excl.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            _insert_snapshot(store, now.isoformat(), pid=1, rss_bytes=100)
+            _insert_snapshot(store, now.isoformat(), pid=2, rss_bytes=200)
+
+            unsynced = store.get_unsynced()
+            # Mark one as synced
+            store.mark_synced([unsynced[0]["id"]])
+
+            rows = store.query_snapshots_aggregated(minutes=5)
+            # Only the unsynced row should contribute
+            assert len(rows) == 1
+            assert rows[0]["worker_count"] == 1
+
+    def test_cleanup_synced_removes_old(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_cleanup.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            _insert_snapshot(store, now.isoformat(), pid=1, rss_bytes=0)
+
+            unsynced = store.get_unsynced()
+            store.mark_synced([unsynced[0]["id"]])
+
+            # Backdate the ts to make it old
+            old_ts = (now - timedelta(hours=2)).isoformat()
+            conn = sqlite3.connect(db_path)
+            conn.execute("UPDATE metrics_snapshots SET ts = ? WHERE synced = 1", (old_ts,))
+            conn.commit()
+            conn.close()
+
+            deleted = store.cleanup_synced(older_than_hours=1)
+            assert deleted == 1
+
+    def test_get_unsynced_batch_size(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_batch.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            now = datetime.now()
+            for i in range(10):
+                _insert_snapshot(store, now.isoformat(), pid=i, rss_bytes=0)
+
+            batch = store.get_unsynced(batch_size=4)
+            assert len(batch) == 4

@@ -275,3 +275,102 @@ class TestSQLiteLogHandler:
 
         # Cleanup
         logger.removeHandler(handler)
+
+
+class TestLogStoreSyncFields:
+    """Test synced field, get_unsynced, mark_synced, cleanup_synced."""
+
+    @pytest.fixture
+    def temp_db_path(self):
+        fd, path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        yield path
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+    @pytest.fixture
+    def log_store(self, temp_db_path):
+        store = LogStore(db_path=temp_db_path)
+        store.initialize()
+        return store
+
+    def test_write_log_sets_synced_zero(self, log_store, temp_db_path):
+        """New log entries default to synced=0 and have a sync_id."""
+        log_store.write_log(level="INFO", logger_name="test", message="hello")
+
+        conn = sqlite3.connect(temp_db_path)
+        row = conn.execute("SELECT synced, sync_id FROM logs").fetchone()
+        conn.close()
+
+        assert row[0] == 0
+        assert row[1] is not None
+        assert "logs_" in row[1]
+
+    def test_get_unsynced_returns_unsynced(self, log_store):
+        """get_unsynced returns only synced=0 rows."""
+        log_store.write_log(level="INFO", logger_name="test", message="msg1")
+        log_store.write_log(level="INFO", logger_name="test", message="msg2")
+
+        unsynced = log_store.get_unsynced()
+        assert len(unsynced) == 2
+        assert all(r["synced"] == 0 for r in unsynced)
+
+    def test_mark_synced_updates_flag(self, log_store, temp_db_path):
+        """mark_synced sets synced=1 for the given ids."""
+        log_store.write_log(level="INFO", logger_name="test", message="msg")
+        unsynced = log_store.get_unsynced()
+        assert len(unsynced) == 1
+
+        log_store.mark_synced([unsynced[0]["id"]])
+
+        conn = sqlite3.connect(temp_db_path)
+        row = conn.execute("SELECT synced FROM logs WHERE id = ?", (unsynced[0]["id"],)).fetchone()
+        conn.close()
+        assert row[0] == 1
+
+    def test_query_logs_excludes_synced(self, log_store):
+        """query_logs only returns synced=0 rows."""
+        log_store.write_log(level="INFO", logger_name="test", message="unsynced")
+        log_store.write_log(level="INFO", logger_name="test", message="will_sync")
+
+        unsynced = log_store.get_unsynced()
+        to_sync = [r["id"] for r in unsynced if r["message"] == "will_sync"]
+        log_store.mark_synced(to_sync)
+
+        logs = log_store.query_logs(limit=100)
+        messages = [l["message"] for l in logs]
+        assert "unsynced" in messages
+        assert "will_sync" not in messages
+
+    def test_cleanup_synced_removes_old_synced(self, log_store, temp_db_path):
+        """cleanup_synced deletes old synced=1 records."""
+        log_store.write_log(level="INFO", logger_name="test", message="to_clean")
+
+        # Mark as synced
+        unsynced = log_store.get_unsynced()
+        log_store.mark_synced([unsynced[0]["id"]])
+
+        # Manually backdate the timestamp to make it "old"
+        conn = sqlite3.connect(temp_db_path)
+        old_ts = (datetime.now() - timedelta(hours=2)).isoformat()
+        conn.execute("UPDATE logs SET timestamp = ? WHERE synced = 1", (old_ts,))
+        conn.commit()
+        conn.close()
+
+        deleted = log_store.cleanup_synced(older_than_hours=1)
+        assert deleted == 1
+
+        conn = sqlite3.connect(temp_db_path)
+        count = conn.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
+        conn.close()
+        assert count == 0
+
+    def test_get_unsynced_respects_batch_size(self, log_store):
+        """get_unsynced respects batch_size."""
+        for i in range(10):
+            log_store.write_log(level="INFO", logger_name="test", message=f"msg{i}")
+
+        batch = log_store.get_unsynced(batch_size=3)
+        assert len(batch) == 3

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import socket
 import sqlite3
 import threading
 import time
@@ -51,7 +52,9 @@ CREATE TABLE IF NOT EXISTS logs (
     request_id TEXT,
     user TEXT,
     ip TEXT,
-    extra TEXT
+    extra TEXT,
+    sync_id TEXT,
+    synced INTEGER DEFAULT 0
 );
 """
 
@@ -59,7 +62,16 @@ CREATE_INDEXES_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);",
     "CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);",
     "CREATE INDEX IF NOT EXISTS idx_logs_logger ON logs(logger_name);",
+    "CREATE INDEX IF NOT EXISTS idx_logs_synced ON logs(synced);",
 ]
+
+# Columns added after initial schema — tolerate pre-existing columns.
+_MIGRATION_COLUMNS = [
+    ("sync_id", "TEXT"),
+    ("synced", "INTEGER DEFAULT 0"),
+]
+
+_HOSTNAME = socket.gethostname()
 
 
 # ============================================================
@@ -114,6 +126,15 @@ class LogStore:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(CREATE_TABLE_SQL)
+            # Migrate existing databases: add new columns if missing.
+            # Must run BEFORE index creation (indexes may reference new columns).
+            for col_name, col_def in _MIGRATION_COLUMNS:
+                try:
+                    cursor.execute(
+                        f"ALTER TABLE logs ADD COLUMN {col_name} {col_def}"
+                    )
+                except sqlite3.OperationalError:
+                    pass  # Column already exists — tolerate.
             for index_sql in CREATE_INDEXES_SQL:
                 cursor.execute(index_sql)
             conn.commit()
@@ -147,6 +168,9 @@ class LogStore:
                 pass
             self._local.connection = None
             raise
+
+    def _generate_sync_id(self, rowid: int) -> str:
+        return f"{_HOSTNAME}_logs_{rowid}"
 
     def write_log(
         self,
@@ -193,10 +217,15 @@ class LogStore:
                     cursor = conn.cursor()
                     cursor.execute(
                         """
-                        INSERT INTO logs (timestamp, level, logger_name, message, request_id, user, ip, extra)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO logs (timestamp, level, logger_name, message, request_id, user, ip, extra, synced)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
                         """,
                         (timestamp, level, logger_name, message, request_id, user, ip, extra_str)
+                    )
+                    rowid = cursor.lastrowid
+                    cursor.execute(
+                        "UPDATE logs SET sync_id = ? WHERE id = ?",
+                        (self._generate_sync_id(rowid), rowid)
                     )
                     conn.commit()
             return True
@@ -233,7 +262,7 @@ class LogStore:
         if not self._initialized:
             self.initialize()
 
-        query = "SELECT * FROM logs WHERE 1=1"
+        query = "SELECT * FROM logs WHERE synced = 0"
         params: List[Any] = []
 
         if level:
@@ -291,7 +320,7 @@ class LogStore:
         if not self._initialized:
             self.initialize()
 
-        query = "SELECT COUNT(*) FROM logs WHERE 1=1"
+        query = "SELECT COUNT(*) FROM logs WHERE synced = 0"
         params: List[Any] = []
 
         if level:
@@ -425,6 +454,103 @@ class LogStore:
                 "size_bytes": 0,
                 "error": str(e)
             }
+
+    def query_logs_all(
+        self,
+        level: Optional[str] = None,
+        q: Optional[str] = None,
+        limit: int = 200,
+        offset: int = 0,
+        since: Optional[str] = None,
+        logger_name: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Query all logs (including synced). Used for merge queries in admin API."""
+        if not LOG_STORE_ENABLED:
+            return []
+
+        if not self._initialized:
+            self.initialize()
+
+        query = "SELECT * FROM logs WHERE synced = 0"
+        params: List[Any] = []
+
+        if level:
+            query += " AND level = ?"
+            params.append(level.upper())
+        if q:
+            query += " AND message LIKE ?"
+            params.append(f"%{q}%")
+        if since:
+            query += " AND timestamp >= ?"
+            params.append(since)
+        if logger_name:
+            query += " AND logger_name LIKE ?"
+            params.append(f"{logger_name}%")
+
+        query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to query_logs_all: {e}")
+            return []
+
+    def get_unsynced(self, batch_size: int = 500) -> List[Dict[str, Any]]:
+        """Return up to batch_size unsynced log rows (synced=0)."""
+        if not self._initialized:
+            self.initialize()
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT * FROM logs WHERE synced = 0 ORDER BY id ASC LIMIT ?",
+                    (batch_size,)
+                )
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to get_unsynced logs: {e}")
+            return []
+
+    def mark_synced(self, rowids: List[int]) -> None:
+        """Mark the given log row ids as synced=1."""
+        if not rowids or not self._initialized:
+            return
+        try:
+            with self._write_lock:
+                with self._get_connection() as conn:
+                    placeholders = ",".join("?" * len(rowids))
+                    conn.execute(
+                        f"UPDATE logs SET synced = 1 WHERE id IN ({placeholders})",
+                        rowids
+                    )
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to mark_synced logs: {e}")
+
+    def cleanup_synced(self, older_than_hours: int = 1) -> int:
+        """Delete synced=1 records older than older_than_hours. Returns deleted count."""
+        if not self._initialized:
+            return 0
+        cutoff = (datetime.now() - timedelta(hours=older_than_hours)).isoformat()
+        try:
+            with self._write_lock:
+                with self._get_connection() as conn:
+                    cursor = conn.execute(
+                        "DELETE FROM logs WHERE synced = 1 AND timestamp < ?",
+                        (cutoff,)
+                    )
+                    deleted = cursor.rowcount
+                    conn.commit()
+            if deleted > 0:
+                logger.info("Cleaned up %d synced log entries", deleted)
+            return deleted
+        except Exception as e:
+            logger.error(f"Failed to cleanup_synced logs: {e}")
+            return 0
 
     def close(self) -> None:
         """Close database connections."""

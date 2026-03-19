@@ -225,44 +225,85 @@ def api_metrics():
 @admin_bp.route("/api/logs", methods=["GET"])
 @admin_required
 def api_logs():
-    """API: Get recent logs from SQLite log store."""
+    """API: Get recent logs. Merges SQLite (unsynced) + MySQL (historical) when enabled."""
     from mes_dashboard.core.log_store import get_log_store, LOG_STORE_ENABLED
+    from mes_dashboard.core.mysql_client import MYSQL_OPS_ENABLED
 
     if not LOG_STORE_ENABLED:
-        return success_response({
-            "logs": [],
-            "enabled": False,
-            "total": 0
-        })
+        return success_response({"logs": [], "enabled": False, "total": 0})
 
-    # Query parameters
     level = request.args.get("level")
     q = request.args.get("q")
-    limit = request.args.get("limit", 50, type=int)
+    limit = min(request.args.get("limit", 50, type=int), 1000)
     offset = request.args.get("offset", 0, type=int)
     since = request.args.get("since")
 
     log_store = get_log_store()
 
-    # Get total count for pagination
-    total = log_store.count_logs(level=level, q=q, since=since)
+    if MYSQL_OPS_ENABLED:
+        # --- dual-layer: SQLite unsynced + MySQL historical ---
+        sqlite_rows = log_store.query_logs_all(
+            level=level, q=q, limit=limit, since=since
+        )
+        mysql_rows = _query_mysql_logs(level=level, q=q, since=since, limit=limit)
 
-    # Get paginated logs
-    logs = log_store.query_logs(
-        level=level,
-        q=q,
-        limit=min(limit, 100),  # Cap at 100 per page
-        offset=offset,
-        since=since
-    )
+        # Merge sort by timestamp DESC
+        all_rows = sorted(
+            sqlite_rows + mysql_rows,
+            key=lambda r: r.get("timestamp") or "",
+            reverse=True,
+        )
+        merged = all_rows[offset: offset + limit]
+        total = len(all_rows)
+    else:
+        total = log_store.count_logs(level=level, q=q, since=since)
+        merged = log_store.query_logs(
+            level=level, q=q, limit=limit, offset=offset, since=since
+        )
 
     return success_response({
-        "logs": logs,
-        "count": len(logs),
+        "logs": merged,
+        "count": len(merged),
         "total": total,
         "enabled": True,
-        "stats": log_store.get_stats()
+        "stats": log_store.get_stats(),
     })
+
+
+def _query_mysql_logs(
+    level=None, q=None, since=None, limit: int = 1000
+) -> list:
+    """Query dashboard_logs from MySQL. Returns [] on any error."""
+    try:
+        from mes_dashboard.core.mysql_client import get_mysql_connection
+        from sqlalchemy import text
+
+        where = "1=1"
+        params: dict = {}
+        if level:
+            where += " AND level = :level"
+            params["level"] = level.upper()
+        if q:
+            where += " AND message LIKE :q"
+            params["q"] = f"%{q}%"
+        if since:
+            where += " AND timestamp >= :since"
+            params["since"] = since
+
+        sql = text(
+            f"SELECT sync_id, timestamp, level, logger_name, message, "
+            f"request_id, user, ip, extra FROM dashboard_logs "
+            f"WHERE {where} ORDER BY timestamp DESC LIMIT :limit"
+        )
+        params["limit"] = limit
+
+        with get_mysql_connection() as conn:
+            result = conn.execute(sql, params)
+            keys = result.keys()
+            return [dict(zip(keys, row)) for row in result.fetchall()]
+    except Exception as exc:
+        logger.warning("MySQL log query failed, falling back to SQLite only: %s", exc)
+        return []
 
 
 @admin_bp.route("/api/performance-detail", methods=["GET"])
@@ -407,17 +448,94 @@ def api_performance_detail():
 @admin_bp.route("/api/performance-history", methods=["GET"])
 @admin_required
 def api_performance_history():
-    """API: Get historical metrics snapshots for trend charts."""
+    """API: Get historical metrics. Merges SQLite (unsynced) + MySQL (historical) when enabled."""
     from mes_dashboard.core.metrics_history import get_metrics_history_store
+    from mes_dashboard.core.mysql_client import MYSQL_OPS_ENABLED
 
-    minutes = request.args.get("minutes", 30, type=int)
-    minutes = max(1, min(minutes, 180))
+    minutes = max(1, min(request.args.get("minutes", 30, type=int), 180))
+    bucket_seconds = request.args.get("bucket", 30, type=int)
     store = get_metrics_history_store()
-    snapshots = store.query_snapshots_aggregated(minutes=minutes)
-    return success_response({
-        "snapshots": snapshots,
-        "count": len(snapshots),
-    })
+
+    sqlite_snapshots = store.query_snapshots_aggregated(
+        minutes=minutes, bucket_seconds=bucket_seconds
+    )
+
+    if MYSQL_OPS_ENABLED:
+        mysql_snapshots = _query_mysql_metrics(minutes=minutes, bucket_seconds=bucket_seconds)
+        # Merge by ts ASC
+        all_snaps = sorted(
+            sqlite_snapshots + mysql_snapshots,
+            key=lambda r: r.get("ts") or "",
+        )
+        # Deduplicate by ts bucket (SQLite unsynced takes precedence)
+        seen: dict = {}
+        for snap in all_snaps:
+            ts_key = snap.get("ts")
+            if ts_key not in seen:
+                seen[ts_key] = snap
+        snapshots = list(seen.values())
+    else:
+        snapshots = sqlite_snapshots
+
+    return success_response({"snapshots": snapshots, "count": len(snapshots)})
+
+
+def _query_mysql_metrics(minutes: int = 30, bucket_seconds: int = 30) -> list:
+    """Query aggregated metrics from MySQL. Returns [] on any error."""
+    try:
+        from mes_dashboard.core.mysql_client import get_mysql_connection
+        from sqlalchemy import text
+
+        sql = text(f"""
+            SELECT
+                FROM_UNIXTIME(
+                    FLOOR(UNIX_TIMESTAMP(ts) / {bucket_seconds}) * {bucket_seconds}
+                ) AS ts,
+                MAX(pool_saturation)    AS pool_saturation,
+                MAX(pool_checked_out)   AS pool_checked_out,
+                MAX(pool_checked_in)    AS pool_checked_in,
+                MAX(pool_overflow)      AS pool_overflow,
+                MAX(pool_max_capacity)  AS pool_max_capacity,
+                MAX(redis_used_memory)  AS redis_used_memory,
+                MAX(redis_hit_rate)     AS redis_hit_rate,
+                MAX(rc_l1_hit_rate)     AS rc_l1_hit_rate,
+                MAX(rc_l2_hit_rate)     AS rc_l2_hit_rate,
+                MAX(rc_miss_rate)       AS rc_miss_rate,
+                MAX(latency_p50_ms)     AS latency_p50_ms,
+                MAX(latency_p95_ms)     AS latency_p95_ms,
+                MAX(latency_p99_ms)     AS latency_p99_ms,
+                SUM(latency_count)      AS latency_count,
+                MAX(slow_query_active)  AS slow_query_active,
+                MAX(slow_query_waiting) AS slow_query_waiting,
+                MAX(worker_rss_bytes)   AS worker_rss_bytes,
+                MIN(system_mem_available_mb) AS system_mem_available_mb,
+                MAX(system_mem_used_pct) AS system_mem_used_pct,
+                MAX(rq_workers_total)   AS rq_workers_total,
+                MAX(rq_workers_busy)    AS rq_workers_busy,
+                MAX(rq_queue_depth)     AS rq_queue_depth,
+                MAX(heavy_query_slots_active) AS heavy_query_slots_active,
+                COUNT(DISTINCT worker_pid) AS worker_count,
+                ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
+            FROM dashboard_metrics_snapshots
+            WHERE ts >= DATE_SUB(NOW(), INTERVAL :minutes MINUTE)
+            GROUP BY FLOOR(UNIX_TIMESTAMP(ts) / {bucket_seconds})
+            ORDER BY ts ASC
+        """)
+
+        with get_mysql_connection() as conn:
+            result = conn.execute(sql, {"minutes": minutes})
+            keys = result.keys()
+            rows = []
+            for row in result.fetchall():
+                d = dict(zip(keys, row))
+                # Convert datetime → ISO string to match SQLite format
+                if hasattr(d.get("ts"), "isoformat"):
+                    d["ts"] = d["ts"].strftime("%Y-%m-%d %H:%M:%S")
+                rows.append(d)
+            return rows
+    except Exception as exc:
+        logger.warning("MySQL metrics query failed, using SQLite only: %s", exc)
+        return []
 
 
 @admin_bp.route("/api/performance-history/purge", methods=["POST"])
@@ -468,12 +586,41 @@ def api_storage_info():
         + archive_total
     )
 
+    # MySQL stats (if enabled)
+    mysql_stats = None
+    try:
+        from mes_dashboard.core.mysql_client import MYSQL_OPS_ENABLED
+        if MYSQL_OPS_ENABLED:
+            from mes_dashboard.core.mysql_client import get_mysql_connection, check_mysql_health
+            from sqlalchemy import text
+            healthy = check_mysql_health()
+            logs_count = 0
+            metrics_count = 0
+            if healthy:
+                with get_mysql_connection() as conn:
+                    logs_count = conn.execute(
+                        text("SELECT COUNT(*) FROM dashboard_logs")
+                    ).scalar() or 0
+                    metrics_count = conn.execute(
+                        text("SELECT COUNT(*) FROM dashboard_metrics_snapshots")
+                    ).scalar() or 0
+            mysql_stats = {
+                "enabled": True,
+                "healthy": healthy,
+                "dashboard_logs_rows": logs_count,
+                "dashboard_metrics_snapshots_rows": metrics_count,
+            }
+    except Exception as exc:
+        logger.warning("Failed to collect MySQL stats: %s", exc)
+        mysql_stats = {"enabled": True, "healthy": False, "error": str(exc)}
+
     return success_response({
         "sqlite_files": sqlite_files,
         "log_files": log_files,
         "archive_files": archive_files,
         "archive_total_bytes": archive_total,
         "total_bytes": total,
+        "mysql": mysql_stats,
     })
 
 
@@ -537,37 +684,51 @@ def api_logs_cleanup():
 
     Supports optional parameters:
     - older_than_days: Delete logs older than N days (default: use configured retention)
-    - keep_count: Keep only the most recent N logs (optional)
+    - include_mysql: If true and MySQL enabled, also delete all MySQL dashboard_logs rows
     """
     from mes_dashboard.core.log_store import get_log_store, LOG_STORE_ENABLED
 
     if not LOG_STORE_ENABLED:
         return validation_error("Log store is disabled")
 
+    data = request.get_json(silent=True) or {}
+    include_mysql = data.get("include_mysql", False)
+
     log_store = get_log_store()
-
-    # Get current stats before cleanup
     stats_before = log_store.get_stats()
-
-    # Perform cleanup
     deleted = log_store.cleanup_old_logs()
-
-    # Get stats after cleanup
     stats_after = log_store.get_stats()
 
+    mysql_deleted = 0
+    if include_mysql:
+        try:
+            from mes_dashboard.core.mysql_client import MYSQL_OPS_ENABLED
+            if MYSQL_OPS_ENABLED:
+                from mes_dashboard.core.mysql_client import get_mysql_connection
+                from sqlalchemy import text
+                with get_mysql_connection() as conn:
+                    result = conn.execute(text("DELETE FROM dashboard_logs"))
+                    mysql_deleted = result.rowcount
+        except Exception as exc:
+            logger.warning("MySQL log cleanup failed: %s", exc)
+
     user = getattr(g, "username", "unknown")
-    logger.info(f"Log cleanup triggered by {user}: deleted {deleted} entries")
+    logger.info(
+        "Log cleanup triggered by %s: SQLite deleted %d, MySQL deleted %d",
+        user, deleted, mysql_deleted,
+    )
 
     return success_response({
         "deleted": deleted,
+        "mysql_deleted": mysql_deleted,
         "before": {
             "count": stats_before.get("count", 0),
-            "size_bytes": stats_before.get("size_bytes", 0)
+            "size_bytes": stats_before.get("size_bytes", 0),
         },
         "after": {
             "count": stats_after.get("count", 0),
-            "size_bytes": stats_after.get("size_bytes", 0)
-        }
+            "size_bytes": stats_after.get("size_bytes", 0),
+        },
     })
 
 

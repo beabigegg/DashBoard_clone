@@ -416,6 +416,18 @@ def _shutdown_runtime_resources() -> None:
         logger.warning("Error stopping metrics history: %s", exc)
 
     try:
+        from mes_dashboard.core.sync_worker import stop_sync_worker
+        stop_sync_worker()
+    except Exception as exc:
+        logger.warning("Error stopping sync worker: %s", exc)
+
+    try:
+        from mes_dashboard.core.mysql_client import dispose_mysql_engine
+        dispose_mysql_engine()
+    except Exception as exc:
+        logger.warning("Error disposing MySQL engine: %s", exc)
+
+    try:
         close_redis()
     except Exception as exc:
         logger.warning("Error closing Redis client: %s", exc)
@@ -550,6 +562,19 @@ def create_app(config_name: str | None = None) -> Flask:
             start_metrics_history(app)  # Start metrics history collector
             from mes_dashboard.core.worker_memory_guard import start_worker_memory_guard
             start_worker_memory_guard()  # Start RSS memory guard
+            # MySQL dual-layer sync (optional, controlled by MYSQL_OPS_ENABLED)
+            from mes_dashboard.core.mysql_client import MYSQL_OPS_ENABLED
+            if MYSQL_OPS_ENABLED:
+                try:
+                    from mes_dashboard.core.mysql_client import get_mysql_engine
+                    get_mysql_engine()  # Initialise engine (validates connection config)
+                    from mes_dashboard.core.sync_worker import start_sync_worker
+                    start_sync_worker()
+                except Exception as _mysql_exc:
+                    logging.getLogger("mes_dashboard").warning(
+                        "MySQL OPS init failed (system continues in SQLite-only mode): %s",
+                        _mysql_exc,
+                    )
     _register_shutdown_hooks(app)
 
     # Register API routes

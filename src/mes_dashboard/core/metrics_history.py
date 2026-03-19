@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import socket
 import sqlite3
 import threading
 import time
@@ -66,7 +67,9 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     rq_workers_total INTEGER,
     rq_workers_busy INTEGER,
     rq_queue_depth INTEGER,
-    heavy_query_slots_active INTEGER
+    heavy_query_slots_active INTEGER,
+    sync_id TEXT,
+    synced INTEGER DEFAULT 0
 );
 """
 
@@ -81,11 +84,18 @@ _MIGRATION_COLUMNS = [
     ("rq_workers_busy", "INTEGER"),
     ("rq_queue_depth", "INTEGER"),
     ("heavy_query_slots_active", "INTEGER"),
+    ("sync_id", "TEXT"),
+    ("synced", "INTEGER DEFAULT 0"),
 ]
 
 CREATE_INDEX_SQL = (
     "CREATE INDEX IF NOT EXISTS idx_metrics_ts ON metrics_snapshots(ts);"
 )
+CREATE_INDEX_SYNCED_SQL = (
+    "CREATE INDEX IF NOT EXISTS idx_metrics_synced ON metrics_snapshots(synced);"
+)
+
+_HOSTNAME = socket.gethostname()
 
 COLUMNS = [
     "ts", "worker_pid",
@@ -161,8 +171,8 @@ class MetricsHistoryStore:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(CREATE_TABLE_SQL)
-            cursor.execute(CREATE_INDEX_SQL)
             # Migrate existing databases: add new columns if missing.
+            # Must run BEFORE index creation (indexes may reference new columns).
             for col_name, col_type in _MIGRATION_COLUMNS:
                 try:
                     cursor.execute(
@@ -170,6 +180,8 @@ class MetricsHistoryStore:
                     )
                 except sqlite3.OperationalError:
                     pass  # Column already exists — tolerate duplicate column error.
+            cursor.execute(CREATE_INDEX_SQL)
+            cursor.execute(CREATE_INDEX_SYNCED_SQL)
             conn.commit()
         self._initialized = True
         logger.info("Metrics history store initialized at %s", self.db_path)
@@ -192,6 +204,9 @@ class MetricsHistoryStore:
             self._local.connection = None
             raise
 
+    def _generate_sync_id(self, rowid: int) -> str:
+        return f"{_HOSTNAME}_metrics_snapshots_{rowid}"
+
     def write_snapshot(self, data: Dict[str, Any]) -> bool:
         if not self._initialized:
             self.initialize()
@@ -204,7 +219,7 @@ class MetricsHistoryStore:
         try:
             with self._write_lock:
                 with self._get_connection() as conn:
-                    conn.execute(
+                    cursor = conn.execute(
                         """
                         INSERT INTO metrics_snapshots
                             (ts, worker_pid,
@@ -216,8 +231,9 @@ class MetricsHistoryStore:
                              slow_query_active, slow_query_waiting, worker_rss_bytes,
                              system_mem_available_mb, system_mem_used_pct,
                              rq_workers_total, rq_workers_busy,
-                             rq_queue_depth, heavy_query_slots_active)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                             rq_queue_depth, heavy_query_slots_active,
+                             synced)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                         """,
                         (
                             ts, pid,
@@ -245,6 +261,11 @@ class MetricsHistoryStore:
                             data.get("rq_queue_depth"),
                             data.get("heavy_query_slots_active"),
                         ),
+                    )
+                    rowid = cursor.lastrowid
+                    conn.execute(
+                        "UPDATE metrics_snapshots SET sync_id = ? WHERE id = ?",
+                        (self._generate_sync_id(rowid), rowid)
                     )
                     conn.commit()
             return True
@@ -314,7 +335,7 @@ class MetricsHistoryStore:
                 COUNT(DISTINCT worker_pid) AS worker_count,
                 ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
             FROM metrics_snapshots
-            WHERE ts >= ?
+            WHERE ts >= ? AND synced = 0
             GROUP BY (CAST(strftime('%s', ts, 'utc') AS INTEGER) / {bucket_seconds})
             ORDER BY ts ASC
         """
@@ -361,6 +382,58 @@ class MetricsHistoryStore:
         except Exception as exc:
             logger.error("Failed to cleanup metrics history: %s", exc)
         return deleted
+
+    def get_unsynced(self, batch_size: int = 500) -> List[Dict[str, Any]]:
+        """Return up to batch_size unsynced metrics rows (synced=0)."""
+        if not self._initialized:
+            self.initialize()
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.execute(
+                    "SELECT * FROM metrics_snapshots WHERE synced = 0 ORDER BY id ASC LIMIT ?",
+                    (batch_size,)
+                )
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as exc:
+            logger.error("Failed to get_unsynced metrics: %s", exc)
+            return []
+
+    def mark_synced(self, rowids: List[int]) -> None:
+        """Mark the given metrics row ids as synced=1."""
+        if not rowids or not self._initialized:
+            return
+        try:
+            with self._write_lock:
+                with self._get_connection() as conn:
+                    placeholders = ",".join("?" * len(rowids))
+                    conn.execute(
+                        f"UPDATE metrics_snapshots SET synced = 1 WHERE id IN ({placeholders})",
+                        rowids
+                    )
+                    conn.commit()
+        except Exception as exc:
+            logger.error("Failed to mark_synced metrics: %s", exc)
+
+    def cleanup_synced(self, older_than_hours: int = 1) -> int:
+        """Delete synced=1 metrics older than older_than_hours. Returns deleted count."""
+        if not self._initialized:
+            return 0
+        cutoff = (datetime.now() - timedelta(hours=older_than_hours)).isoformat()
+        try:
+            with self._write_lock:
+                with self._get_connection() as conn:
+                    cursor = conn.execute(
+                        "DELETE FROM metrics_snapshots WHERE synced = 1 AND ts < ?",
+                        (cutoff,)
+                    )
+                    deleted = cursor.rowcount
+                    conn.commit()
+            if deleted > 0:
+                logger.info("Cleaned up %d synced metrics rows", deleted)
+            return deleted
+        except Exception as exc:
+            logger.error("Failed to cleanup_synced metrics: %s", exc)
+            return 0
 
     def purge(self) -> int:
         """Delete ALL rows from the metrics_snapshots table.
