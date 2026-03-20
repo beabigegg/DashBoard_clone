@@ -310,9 +310,7 @@
                 <div class="admin-status">
                     {% if is_admin %}
                         <span class="admin-name">{{ admin_user.displayName }}</span>
-                        <a href="{{ url_for('auth.logout') }}">登出</a>
-                    {% else %}
-                        <a href="{{ url_for('auth.login') }}">管理員登入</a>
+                        <a href="#" onclick="event.preventDefault();fetch('/api/auth/logout',{method:'POST'}).then(()=>window.location='/portal-shell')">登出</a>
                     {% endif %}
                 </div>
             </div>
@@ -343,9 +341,6 @@
                         {% endif %}
                     {% endif %}
                 {% endfor %}
-                {% if not is_admin %}
-                <a class="sidebar-item" href="{{ url_for('auth.login') }}">管理員登入</a>
-                {% endif %}
             </nav>
 
             <section class="panel" aria-live="polite">

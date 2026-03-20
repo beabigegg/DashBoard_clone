@@ -1053,6 +1053,47 @@ def api_worker_status():
 
 
 # ============================================================
+# User Usage KPI Routes
+# ============================================================
+
+@admin_bp.route("/user-usage-kpi")
+@admin_required
+def user_usage_kpi():
+    """User usage KPI dashboard (Vue SPA)."""
+    dist_dir = os.path.join(current_app.static_folder or "", "dist")
+    html_path = os.path.join(dist_dir, "admin-user-usage-kpi.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        html = f.read()
+    csrf_meta = f'<meta name="csrf-token" content="{get_csrf_token()}">'
+    html = html.replace("<meta charset", f"{csrf_meta}\n    <meta charset", 1)
+    return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
+
+
+@admin_bp.route("/api/user-usage-kpi", methods=["GET"])
+@admin_required
+def api_user_usage_kpi():
+    """API: Get user usage KPI data."""
+    from datetime import datetime, timedelta
+
+    from mes_dashboard.services.user_usage_kpi_service import get_user_usage_kpi
+
+    default_start = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    default_end = datetime.now().strftime("%Y-%m-%d")
+
+    start_date = request.args.get("start_date", default_start)
+    end_date = request.args.get("end_date", default_end)
+    department = request.args.get("department") or None
+
+    data = get_user_usage_kpi(start_date, end_date, department)
+    data["filters"] = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "department": department,
+    }
+    return success_response(data)
+
+
+# ============================================================
 # Page Management Routes
 # ============================================================
 

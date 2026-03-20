@@ -15,7 +15,7 @@ import mes_dashboard.core.database as db
 
 def _login_as_admin(client):
     with client.session_transaction() as sess:
-        sess['admin'] = {'displayName': 'Test Admin', 'employeeNo': 'A001'}
+        sess['user'] = {'username': 'A001', 'displayName': 'Test Admin', 'mail': 'admin@test.com', 'is_admin': True}
 
 
 def _get_response_and_html(client, endpoint):

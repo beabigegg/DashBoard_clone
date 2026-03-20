@@ -11,7 +11,6 @@ from .excel_query_routes import excel_query_bp
 from .hold_routes import hold_bp
 from .hold_overview_routes import hold_overview_bp
 from .hold_history_routes import hold_history_bp
-from .auth_routes import auth_bp
 from .admin_routes import admin_bp
 from .resource_history_routes import resource_history_bp
 from .job_query_routes import job_query_bp
@@ -57,7 +56,6 @@ __all__ = [
     'hold_bp',
     'hold_overview_bp',
     'hold_history_bp',
-    'auth_bp',
     'admin_bp',
     'resource_history_bp',
     'job_query_bp',

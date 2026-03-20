@@ -9,7 +9,8 @@ import AiChatPanel from '../shared-ui/components/AiChatPanel.vue';
 import AiChatTrigger from '../shared-ui/components/AiChatTrigger.vue';
 import AnomalyIndicator from './components/AnomalyIndicator.vue';
 import HealthStatus from './components/HealthStatus.vue';
-import { consumeNavigationNotice, syncNavigationRoutes } from './router.js';
+import { useAuth } from './composables/useAuth.js';
+import { consumeNavigationNotice, setAuthState, syncNavigationRoutes } from './router.js';
 import { normalizeRoutePath } from './routeContracts.js';
 import {
   SIDEBAR_STORAGE_KEY,
@@ -22,6 +23,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 const aiChat = useAiChat();
+const auth = useAuth();
 const loading = ref(true);
 const errorMessage = ref('');
 const drawers = ref([]);
@@ -29,8 +31,7 @@ const isAdmin = ref(false);
 const adminUser = ref(null);
 const navigationNotice = ref('');
 const adminLinks = ref({
-  login: '/admin/login?next=%2Fportal-shell',
-  logout: '/admin/logout',
+  logout: null,
   pages: '/admin/pages',
   performance: '/admin/performance',
 });
@@ -41,6 +42,8 @@ const isMobile = ref(false);
 function toShellPath(targetRoute) {
   return normalizeRoutePath(targetRoute);
 }
+
+const isLoginPage = computed(() => route.path === '/login');
 
 const breadcrumb = computed(() => {
   const title = route.meta?.title || '首頁';
@@ -56,12 +59,10 @@ const adminDisplayName = computed(() => {
   return adminUser.value.displayName || adminUser.value.username || '';
 });
 
-const adminLoginHref = computed(() => {
-  if (adminLinks.value?.login) {
-    return adminLinks.value.login;
-  }
-  return `/admin/login?next=${encodeURIComponent('/portal-shell')}`;
-});
+async function handleLogout() {
+  await auth.logout();
+  await router.push('/login');
+}
 
 const sidebarUiState = computed(() =>
   buildSidebarUiState({
@@ -183,12 +184,7 @@ async function loadNavigation() {
     drawers.value = [];
     isAdmin.value = false;
     adminUser.value = null;
-    adminLinks.value = {
-      login: `/admin/login?next=${encodeURIComponent('/portal-shell')}`,
-      logout: '/admin/logout',
-      pages: '/admin/pages',
-      performance: '/admin/performance',
-    };
+    adminLinks.value = { logout: null, pages: '/admin/pages', performance: '/admin/performance' };
     syncNavigationRoutes([]);
   } finally {
     loading.value = false;
@@ -200,7 +196,27 @@ onMounted(() => {
   checkViewport();
   window.addEventListener('resize', handleViewportResize, { passive: true });
   window.addEventListener('keydown', handleGlobalKeydown);
-  void loadNavigation();
+  if (!isLoginPage.value) {
+    void loadNavigation();
+  }
+
+  // Global 401 interceptor: redirect to /login if session expires.
+  let _redirecting401 = false;
+  const _origFetch = window.fetch;
+  window.fetch = async (...args) => {
+    const res = await _origFetch(...args);
+    if (res.status === 401 && !_redirecting401) {
+      const url = String(args[0] || '');
+      if (!url.includes('/api/auth/')) {
+        _redirecting401 = true;
+        auth.stopHeartbeat();
+        setAuthState(false);
+        await router.push('/login');
+        _redirecting401 = false;
+      }
+    }
+    return res;
+  };
 });
 
 onUnmounted(() => {
@@ -216,10 +232,21 @@ watch(
   },
   { immediate: true },
 );
+
+// Reload navigation when transitioning away from login page (after successful login).
+watch(isLoginPage, (isLogin, wasLogin) => {
+  if (wasLogin && !isLogin) {
+    void loadNavigation();
+  }
+});
 </script>
 
 <template>
-  <div class="shell theme-portal-shell" :class="sidebarUiState.shellClass">
+  <!-- Login page: full-screen, no shell chrome -->
+  <RouterView v-if="isLoginPage" />
+
+  <!-- Authenticated shell: header + sidebar + content -->
+  <div v-else class="shell theme-portal-shell" :class="sidebarUiState.shellClass">
     <a href="#main-content" class="sr-only focus:not-sr-only">跳至主要內容</a>
     <header class="shell-header">
       <div class="shell-header-left">
@@ -249,12 +276,9 @@ watch(
         <div class="admin-entry">
           <template v-if="isAdmin">
             <a v-if="adminLinks?.pages" class="admin-link" :href="adminLinks.pages">管理後台</a>
-            <span v-if="adminDisplayName" class="admin-name">{{ adminDisplayName }}</span>
-            <a v-if="adminLinks?.logout" class="admin-link" :href="adminLinks.logout">登出</a>
           </template>
-          <template v-else>
-            <a class="admin-link" :href="adminLoginHref">管理員登入</a>
-          </template>
+          <span v-if="adminDisplayName" class="admin-name">{{ adminDisplayName }}</span>
+          <button type="button" class="admin-link" @click="handleLogout">登出</button>
         </div>
       </div>
     </header>

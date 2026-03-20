@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""End-to-end tests for admin authentication flow.
+"""End-to-end tests for user authentication flow.
 
-These tests simulate real user workflows through the admin authentication system.
+These tests simulate real user workflows through the unified user authentication system.
 Run with: pytest tests/e2e/test_admin_auth_e2e.py -v --run-integration
 """
 
@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app
 from mes_dashboard.services import page_registry
-from mes_dashboard.routes import auth_routes
+from mes_dashboard.routes import user_auth_routes
 
 
 @pytest.fixture
@@ -67,81 +67,84 @@ def client(app):
 @pytest.fixture(autouse=True)
 def clear_login_rate_limit():
     """Reset in-memory login attempts to avoid cross-test interference."""
-    auth_routes._login_attempts.clear()
+    user_auth_routes._login_attempts.clear()
     yield
-    auth_routes._login_attempts.clear()
+    user_auth_routes._login_attempts.clear()
 
 
 def _mock_admin_user(mail: str = "ymirliu@panjit.com.tw") -> dict:
     return {
         "username": "92367",
-        "displayName": "Test Admin",
+        "displayName": "ymirliu Test Admin",
         "mail": mail,
         "department": "Test Department",
+        "telephoneNumber": "1234",
+        "domain": "PANJIT",
     }
+
+
+def _do_api_login(client, mock_auth, mock_is_admin, username="92367", password="password123"):
+    """Helper: POST /api/auth/login."""
+    mock_auth.return_value = _mock_admin_user()
+    return client.post(
+        "/api/auth/login",
+        data=json.dumps({"username": username, "password": password}),
+        content_type="application/json",
+    )
 
 
 class TestFullLoginLogoutFlow:
     """E2E tests for complete login/logout flow."""
 
-    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
-    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    @patch('mes_dashboard.routes.user_auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.user_auth_routes.authenticate')
     def test_complete_admin_login_workflow(self, mock_auth, _mock_is_admin, client):
-        """Test complete admin login workflow."""
+        """Test complete admin login workflow via JSON API."""
         mock_auth.return_value = _mock_admin_user()
-        spa_enabled = bool(client.application.config.get("PORTAL_SPA_ENABLED", False))
 
-        # 1. Access portal entry.
-        response = client.get("/", follow_redirects=False)
-        if spa_enabled:
-            assert response.status_code == 302
-            assert response.location.rstrip("/").endswith("/portal-shell")
-        else:
-            assert response.status_code == 200
-            content = response.data.decode("utf-8")
-            assert "管理員登入" in content
-
-        # 2. Go to login page
-        response = client.get("/admin/login")
+        # 1. Login via JSON API
+        response = client.post(
+            "/api/auth/login",
+            data=json.dumps({"username": "92367", "password": "password123"}),
+            content_type="application/json",
+        )
         assert response.status_code == 200
+        data = response.get_json()
+        assert data["success"] is True
+        assert data["data"]["is_admin"] is True
 
-        # 3. Submit login form
-        response = client.post("/admin/login", data={
-            "username": "92367",
-            "password": "password123"
-        }, follow_redirects=True)
-
-        assert response.status_code == 200
-        if not spa_enabled:
-            content = response.data.decode("utf-8")
-            # Portal template should show admin identity in non-SPA mode.
-            assert "Test Admin" in content or "登出" in content
-
-        # 4. Verify session has admin
+        # 2. Verify session has user
         with client.session_transaction() as sess:
-            assert "admin" in sess
-            assert sess["admin"]["mail"] == "ymirliu@panjit.com.tw"
+            assert "user" in sess
+            assert sess["user"]["mail"] == "ymirliu@panjit.com.tw"
+            assert sess["user"]["is_admin"] is True
 
-        if spa_enabled:
-            nav = client.get("/api/portal/navigation")
-            assert nav.status_code == 200
-            assert nav.get_json()["is_admin"] is True
+        # 3. /api/auth/me should return user info
+        me_response = client.get("/api/auth/me")
+        assert me_response.status_code == 200
+        me_data = me_response.get_json()
+        assert me_data["data"]["is_admin"] is True
 
-        # 5. Access admin pages
+        # 4. Navigation shows admin
+        nav = client.get("/api/portal/navigation")
+        assert nav.status_code == 200
+        assert nav.get_json()["is_admin"] is True
+
+        # 5. Admin pages accessible
         response = client.get("/admin/pages")
         assert response.status_code == 200
 
         # 6. Logout
-        response = client.get("/admin/logout", follow_redirects=True)
+        response = client.post("/api/auth/logout")
         assert response.status_code == 200
 
         # 7. Verify logged out
         with client.session_transaction() as sess:
-            assert "admin" not in sess
+            assert "user" not in sess
 
-        # 8. Admin pages should redirect now
+        # 8. Admin pages should now be rejected
         response = client.get("/admin/pages", follow_redirects=False)
-        assert response.status_code == 302
+        assert response.status_code in (302, 401, 403)
 
 
 class TestPageAccessControlFlow:
@@ -159,17 +162,18 @@ class TestPageAccessControlFlow:
         content = response.data.decode("utf-8")
         assert "開發中" in content or "403" in content
 
-    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
-    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    @patch('mes_dashboard.routes.user_auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.user_auth_routes.authenticate')
     def test_admin_can_access_all_pages(self, mock_auth, _mock_is_admin, client, temp_page_status):
         """Test admin users can access all pages."""
         mock_auth.return_value = _mock_admin_user()
 
         # 1. Login as admin
-        client.post("/admin/login", data={
-            "username": "92367",
-            "password": "password123"
-        })
+        client.post(
+            "/api/auth/login",
+            data=json.dumps({"username": "92367", "password": "password123"}),
+            content_type="application/json",
+        )
 
         # 2. Access released page - should work
         response = client.get("/wip-overview")
@@ -183,17 +187,18 @@ class TestPageAccessControlFlow:
 class TestPageManagementFlow:
     """E2E tests for page management flow."""
 
-    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
-    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    @patch('mes_dashboard.routes.user_auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.user_auth_routes.authenticate')
     def test_admin_can_change_page_status(self, mock_auth, _mock_is_admin, client, temp_page_status):
         """Test admin can change page status via management interface."""
         mock_auth.return_value = _mock_admin_user()
 
         # 1. Login as admin
-        client.post("/admin/login", data={
-            "username": "92367",
-            "password": "password123"
-        })
+        client.post(
+            "/api/auth/login",
+            data=json.dumps({"username": "92367", "password": "password123"}),
+            content_type="application/json",
+        )
 
         # 2. Get current pages list
         response = client.get("/admin/api/pages")
@@ -215,14 +220,14 @@ class TestPageManagementFlow:
         assert status == "dev"
 
         # 5. Logout
-        client.get("/admin/logout")
+        client.post("/api/auth/logout")
 
         # 6. Now non-admin should get 403 on /wip-overview
         response = client.get("/wip-overview")
         assert response.status_code == 403
 
-    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
-    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    @patch('mes_dashboard.routes.user_auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.user_auth_routes.authenticate')
     def test_release_dev_page_makes_it_public(self, mock_auth, _mock_is_admin, client, temp_page_status):
         """Test releasing a dev page makes it publicly accessible."""
         mock_auth.return_value = _mock_admin_user()
@@ -232,10 +237,11 @@ class TestPageManagementFlow:
         assert response.status_code == 403
 
         # 2. Login as admin
-        client.post("/admin/login", data={
-            "username": "92367",
-            "password": "password123"
-        })
+        client.post(
+            "/api/auth/login",
+            data=json.dumps({"username": "92367", "password": "password123"}),
+            content_type="application/json",
+        )
 
         # 3. Release the page
         response = client.put(
@@ -246,7 +252,7 @@ class TestPageManagementFlow:
         assert response.status_code == 200
 
         # 4. Logout
-        client.get("/admin/logout")
+        client.post("/api/auth/logout")
 
         # 5. Clear cache and verify non-admin can access
         page_registry._cache = None
@@ -271,17 +277,18 @@ class TestPortalDynamicTabs:
         assert "/tables" not in routes
         assert payload.get("is_admin") is False
 
-    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
-    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    @patch('mes_dashboard.routes.user_auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.user_auth_routes.authenticate')
     def test_portal_shows_all_tabs_for_admin(self, mock_auth, _mock_is_admin, client, temp_page_status):
         """Test portal shows all tabs for admin users."""
         mock_auth.return_value = _mock_admin_user()
 
         # Login as admin
-        client.post("/admin/login", data={
-            "username": "92367",
-            "password": "password123"
-        })
+        client.post(
+            "/api/auth/login",
+            data=json.dumps({"username": "92367", "password": "password123"}),
+            content_type="application/json",
+        )
 
         response = client.get("/api/portal/navigation")
         assert response.status_code == 200
@@ -299,17 +306,18 @@ class TestPortalDynamicTabs:
 class TestSessionPersistence:
     """E2E tests for session persistence."""
 
-    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=True)
-    @patch('mes_dashboard.routes.auth_routes.authenticate')
+    @patch('mes_dashboard.routes.user_auth_routes.is_admin', return_value=True)
+    @patch('mes_dashboard.routes.user_auth_routes.authenticate')
     def test_session_persists_across_requests(self, mock_auth, _mock_is_admin, client):
-        """Test admin session persists across multiple requests."""
+        """Test user session persists across multiple requests."""
         mock_auth.return_value = _mock_admin_user()
 
         # Login
-        client.post("/admin/login", data={
-            "username": "92367",
-            "password": "password123"
-        })
+        client.post(
+            "/api/auth/login",
+            data=json.dumps({"username": "92367", "password": "password123"}),
+            content_type="application/json",
+        )
 
         # Make multiple requests
         for _ in range(5):
@@ -318,7 +326,7 @@ class TestSessionPersistence:
 
         # Session should still be valid
         with client.session_transaction() as sess:
-            assert "admin" in sess
+            assert "user" in sess
 
 
 class TestSecurityScenarios:
@@ -328,7 +336,7 @@ class TestSecurityScenarios:
         """Test admin APIs are protected."""
         # Try to get pages without login
         response = client.get("/admin/api/pages", follow_redirects=False)
-        assert response.status_code in (302, 401)
+        assert response.status_code in (302, 401, 403)
 
         # Try to update page without login
         response = client.put(
@@ -337,33 +345,36 @@ class TestSecurityScenarios:
             content_type="application/json",
             follow_redirects=False
         )
-        assert response.status_code in (302, 401)
+        assert response.status_code in (302, 401, 403)
 
-    @patch('mes_dashboard.routes.auth_routes.is_admin', return_value=False)
-    @patch('mes_dashboard.routes.auth_routes.authenticate')
-    def test_non_admin_user_cannot_login(self, mock_auth, _mock_is_admin, client):
-        """Test non-admin user cannot access admin features."""
-        mock_auth.return_value = {
-            "username": "99999",
-            "displayName": "Regular User",
-            "mail": "regular@panjit.com.tw",
-            "department": "Test",
-        }
+    def test_login_with_wrong_credentials_fails(self, client):
+        """Test login with wrong credentials returns error."""
+        with patch('mes_dashboard.routes.user_auth_routes.authenticate', return_value=None):
+            response = client.post(
+                "/api/auth/login",
+                data=json.dumps({"username": "99999", "password": "wrong"}),
+                content_type="application/json",
+            )
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data["success"] is False
 
-        # Try to login
-        response = client.post("/admin/login", data={
-            "username": "99999",
-            "password": "password123"
-        })
-
-        # Should fail (show error, not redirect)
-        assert response.status_code == 200
-        content = response.data.decode("utf-8")
-        assert "管理員" in content or "error" in content.lower()
-
-        # Should NOT have admin session
+        # Should NOT have user session
         with client.session_transaction() as sess:
-            assert "admin" not in sess
+            assert "user" not in sess
+
+    def test_me_endpoint_returns_null_when_not_logged_in(self, client):
+        """Test /api/auth/me returns null data when not authenticated."""
+        response = client.get("/api/auth/me")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["success"] is True
+        assert data["data"] is None
+
+    def test_heartbeat_requires_login(self, client):
+        """Test heartbeat endpoint requires authentication."""
+        response = client.patch("/api/auth/heartbeat")
+        assert response.status_code == 401
 
 
 if __name__ == "__main__":

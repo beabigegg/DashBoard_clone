@@ -610,9 +610,10 @@ def deep_health_check():
     from mes_dashboard.core.metrics import get_metrics_summary
     from flask import redirect, url_for, request
 
-    # Require admin authentication - redirect to login for consistency
+    # Require admin authentication - return JSON error for API consistency
     if not is_admin_logged_in():
-        return redirect(url_for("auth.login", next=request.url))
+        from flask import jsonify
+        return jsonify({"error": "請先登入管理員帳號", "login_required": True}), 401
 
     cached = _get_health_memo("deep")
     if cached is not None:

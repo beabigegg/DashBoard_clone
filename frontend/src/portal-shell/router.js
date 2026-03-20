@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
+import LoginPage from './views/LoginPage.vue';
 import NativeRouteView from './views/NativeRouteView.vue';
 import ShellHomeView from './views/ShellHomeView.vue';
 import { buildDynamicNavigationState } from './navigationState.js';
@@ -10,6 +11,10 @@ let dynamicRouteNames = [];
 let pendingNavigationNotice = '';
 let navigationSynced = false;
 
+// Auth state cache — avoids calling /api/auth/me on every navigation.
+let authChecked = false;
+let isAuthenticated = false;
+
 function toShellPath(route) {
   return normalizeRoutePath(route);
 }
@@ -17,6 +22,12 @@ function toShellPath(route) {
 export const router = createRouter({
   history: createWebHistory('/portal-shell'),
   routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: LoginPage,
+      meta: { title: '登入', public: true }
+    },
     {
       path: '/',
       name: 'shell-home',
@@ -85,7 +96,42 @@ export function consumeNavigationNotice() {
   return notice;
 }
 
-router.beforeEach((to) => {
+/**
+ * Mark the auth state as authenticated (called after successful login,
+ * so we don't immediately re-fetch /api/auth/me on the next navigation).
+ */
+export function setAuthState(authenticated) {
+  isAuthenticated = authenticated;
+  authChecked = true;
+}
+
+router.beforeEach(async (to) => {
+  // Login page is always accessible.
+  if (to.path === '/login') {
+    return true;
+  }
+
+  // Check auth on first navigation to a protected route.
+  if (!authChecked) {
+    try {
+      const res = await fetch('/api/auth/me', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        isAuthenticated = data.data !== null;
+      } else {
+        isAuthenticated = false;
+      }
+    } catch {
+      isAuthenticated = false;
+    }
+    authChecked = true;
+  }
+
+  if (!isAuthenticated) {
+    return { path: '/login', query: { next: to.fullPath } };
+  }
+
+  // Navigation route guard (only after sync).
   if (!navigationSynced) {
     return true;
   }

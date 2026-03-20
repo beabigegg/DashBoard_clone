@@ -13,7 +13,12 @@ from mes_dashboard.app import create_app
 
 def _login_as_admin(client) -> None:
     with client.session_transaction() as sess:
-        sess["admin"] = {"displayName": "Admin", "employeeNo": "A001"}
+        sess["user"] = {
+            "username": "A001",
+            "displayName": "Admin",
+            "mail": "admin@test.com",
+            "is_admin": True,
+        }
 
 
 def test_portal_shell_fallback_html_served_when_dist_missing(monkeypatch):
@@ -281,7 +286,6 @@ def test_portal_navigation_includes_admin_links_by_auth_state():
 
     non_admin_client = app.test_client()
     non_admin_payload = json.loads(non_admin_client.get("/api/portal/navigation").data.decode("utf-8"))
-    assert non_admin_payload["admin_links"]["login"].startswith("/admin/login?next=")
     assert non_admin_payload["admin_links"]["pages"] is None
     assert non_admin_payload["admin_links"]["logout"] is None
 
@@ -289,7 +293,7 @@ def test_portal_navigation_includes_admin_links_by_auth_state():
     _login_as_admin(admin_client)
     admin_payload = json.loads(admin_client.get("/api/portal/navigation").data.decode("utf-8"))
     assert admin_payload["admin_links"]["pages"] == "/admin/pages"
-    assert admin_payload["admin_links"]["logout"] == "/admin/logout"
+    assert admin_payload["admin_links"]["logout"] == "/api/auth/logout"
 
 
 def test_portal_navigation_emits_diagnostics_for_invalid_navigation_payload():

@@ -85,6 +85,33 @@ CREATE TABLE IF NOT EXISTS dashboard_metrics_snapshots (
 """
 
 
+_CREATE_LOGIN_SESSIONS = """
+CREATE TABLE IF NOT EXISTS dashboard_login_sessions (
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    sync_id      VARCHAR(255) NOT NULL,
+    session_id   VARCHAR(100) NOT NULL,
+    emp_id       VARCHAR(20)  NOT NULL,
+    username     VARCHAR(50)  NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    real_name    VARCHAR(50),
+    department   VARCHAR(200),
+    email        VARCHAR(200),
+    phone        VARCHAR(20),
+    domain       VARCHAR(50),
+    ip           VARCHAR(45),
+    login_time   DATETIME(3)  NOT NULL,
+    last_active  DATETIME(3),
+    logout_time  DATETIME(3),
+    duration_sec INT,
+    is_admin     TINYINT      DEFAULT 0,
+    synced_at    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE INDEX idx_sync_id  (sync_id),
+    INDEX        idx_login_time (login_time),
+    INDEX        idx_emp_id     (emp_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+"""
+
+
 def main() -> None:
     enabled = os.getenv("MYSQL_OPS_ENABLED", "false").lower() == "true"
     if not enabled:
@@ -105,6 +132,9 @@ def main() -> None:
 
             logger.info("Creating dashboard_metrics_snapshots table…")
             conn.execute(text(_CREATE_METRICS))
+
+            logger.info("Creating dashboard_login_sessions table…")
+            conn.execute(text(_CREATE_LOGIN_SESSIONS))
 
         logger.info("MySQL schema initialised successfully.")
     except Exception as exc:

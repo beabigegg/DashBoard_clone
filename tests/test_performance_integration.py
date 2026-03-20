@@ -30,9 +30,8 @@ def client(app):
 @pytest.fixture
 def admin_client(app, client):
     """Create authenticated admin client."""
-    # Set admin session - the permissions module checks for 'admin' key in session
     with client.session_transaction() as sess:
-        sess['admin'] = {'username': 'admin', 'role': 'admin'}
+        sess['user'] = {'username': 'admin', 'mail': 'admin@test.com', 'is_admin': True}
     yield client
 
 
@@ -75,8 +74,8 @@ class TestHealthEndpoints:
     def test_health_deep_requires_auth(self, client):
         """Deep health endpoint requires authentication."""
         response = client.get('/health/deep')
-        # Redirects to login for unauthenticated requests
-        assert response.status_code == 302
+        # Returns 401 JSON for unauthenticated requests
+        assert response.status_code in (302, 401)
 
     def test_health_deep_returns_metrics(self, admin_client):
         """Deep health endpoint returns detailed metrics."""

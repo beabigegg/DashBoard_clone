@@ -66,7 +66,7 @@ def test_promoted_deferred_route_enforces_asset_readiness_when_retirement_enable
     app.config["TESTING"] = True
     client = app.test_client()
     with client.session_transaction() as sess:
-        sess["admin"] = {"displayName": "Admin", "employeeNo": "A001"}
+        sess["user"] = {"username": "A001", "displayName": "Admin", "mail": "admin@test.com", "is_admin": True}
 
     with patch("mes_dashboard.app.os.path.exists", return_value=False):
         response = client.get("/tables")

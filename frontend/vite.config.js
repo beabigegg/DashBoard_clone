@@ -32,7 +32,8 @@ export default defineConfig(({ mode }) => ({
         'admin-performance': resolve(__dirname, 'src/admin-performance/index.html'),
         'material-trace': resolve(__dirname, 'src/material-trace/index.html'),
         'yield-alert-center': resolve(__dirname, 'src/yield-alert-center/index.html'),
-        'anomaly-overview': resolve(__dirname, 'src/anomaly-overview/index.html')
+        'anomaly-overview': resolve(__dirname, 'src/anomaly-overview/index.html'),
+        'admin-user-usage-kpi': resolve(__dirname, 'src/admin-user-usage-kpi/index.html')
       },
       output: {
         entryFileNames: '[name].js',

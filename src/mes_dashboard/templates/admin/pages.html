@@ -281,7 +281,7 @@
                     <div>{{ admin_user.mail }}</div>
                 </div>
                 {% endif %}
-                <a href="{{ url_for('auth.logout') }}" class="logout-btn">登出</a>
+                <a href="#" class="logout-btn" onclick="event.preventDefault();fetch('/api/auth/logout',{method:'POST'}).then(()=>window.location='/')">登出</a>
             </div>
         </div>
 
@@ -394,11 +394,12 @@
             const config = { ...options };
             config.headers = withCsrfHeaders(config.headers || {});
             const response = await fetch(url, config);
-            const data = await parseJsonResponse(response);
-            if (!response.ok || data.success === false) {
-                throw new Error(data.error || `HTTP ${response.status}`);
+            const json = await parseJsonResponse(response);
+            if (!response.ok || json.success === false) {
+                const msg = json.error?.message || json.error || `HTTP ${response.status}`;
+                throw new Error(msg);
             }
-            return data;
+            return json.data !== undefined ? json.data : json;
         }
 
         function drawerOptionsHtml(selectedDrawerId) {

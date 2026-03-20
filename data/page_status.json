@@ -126,6 +126,13 @@
       "status": "dev",
       "drawer_id": "dev-tools",
       "order": 2
+    },
+    {
+      "route": "/admin/user-usage-kpi",
+      "name": "使用者 KPI",
+      "status": "dev",
+      "drawer_id": "dev-tools",
+      "order": 3
     }
   ],
   "api_public": true,

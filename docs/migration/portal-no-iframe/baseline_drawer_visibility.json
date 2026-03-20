@@ -134,6 +134,12 @@
           "name": "效能監控",
           "status": "dev",
           "order": 2
+        },
+        {
+          "route": "/admin/user-usage-kpi",
+          "name": "使用者 KPI",
+          "status": "dev",
+          "order": 3
         }
       ]
     }

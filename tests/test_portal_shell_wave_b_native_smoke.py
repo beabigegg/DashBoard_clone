@@ -25,7 +25,7 @@ def client(app):
 
 def _login_as_admin(client) -> None:
     with client.session_transaction() as sess:
-        sess["admin"] = {"displayName": "Admin", "employeeNo": "A001"}
+        sess["user"] = {"username": "A001", "displayName": "Admin", "mail": "admin@test.com", "is_admin": True}
 
 
 def _build_excel_file() -> io.BytesIO:

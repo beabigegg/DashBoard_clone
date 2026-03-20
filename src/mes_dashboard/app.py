@@ -24,14 +24,14 @@ from mes_dashboard.core.database import (
     dispose_engine,
     install_log_redaction_filter,
 )
-from mes_dashboard.core.permissions import is_admin_logged_in, _is_ajax_request
+from mes_dashboard.core.permissions import is_admin_logged_in, is_user_logged_in, _is_ajax_request
 from mes_dashboard.core.csrf import (
     get_csrf_token,
     should_enforce_csrf,
     validate_csrf,
 )
 from mes_dashboard.routes import register_routes
-from mes_dashboard.routes.auth_routes import auth_bp
+from mes_dashboard.routes.user_auth_routes import user_auth_bp
 from mes_dashboard.routes.admin_routes import admin_bp
 from mes_dashboard.routes.health_routes import health_bp
 from mes_dashboard.services.page_registry import (
@@ -533,6 +533,10 @@ def create_app(config_name: str | None = None) -> Flask:
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     # SAMESITE: strict in production, relaxed for local development usability.
     app.config['SESSION_COOKIE_SAMESITE'] = 'Strict' if is_production else 'Lax'
+    # Permanent session lifetime: 8 hours (one shift), matching LDAP JWT validity.
+    from datetime import timedelta
+    _lifetime_seconds = int(os.getenv("PERMANENT_SESSION_LIFETIME", "28800"))
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(seconds=_lifetime_seconds)
 
     # Configure logging first
     _configure_logging(app)
@@ -562,6 +566,8 @@ def create_app(config_name: str | None = None) -> Flask:
             start_metrics_history(app)  # Start metrics history collector
             from mes_dashboard.core.worker_memory_guard import start_worker_memory_guard
             start_worker_memory_guard()  # Start RSS memory guard
+            from mes_dashboard.core.login_session_store import get_login_session_store
+            get_login_session_store()  # Initialize LoginSessionStore
             # MySQL dual-layer sync (optional, controlled by MYSQL_OPS_ENABLED)
             from mes_dashboard.core.mysql_client import MYSQL_OPS_ENABLED
             if MYSQL_OPS_ENABLED:
@@ -581,7 +587,7 @@ def create_app(config_name: str | None = None) -> Flask:
     register_routes(app)
 
     # Register auth, admin, and health routes
-    app.register_blueprint(auth_bp)
+    app.register_blueprint(user_auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(health_bp)
 
@@ -602,24 +608,22 @@ def create_app(config_name: str | None = None) -> Flask:
 
         # API endpoints check
         if request.path.startswith("/api/"):
+            # Auth endpoints are always public
+            if request.path.startswith("/api/auth/"):
+                return None
             if is_api_public():
                 return None
-            if not is_admin_logged_in():
+            if not is_user_logged_in():
                 from mes_dashboard.core.response import unauthorized_error
                 return unauthorized_error()
             return None
 
-        # Skip auth-related pages (login/logout)
-        if request.path.startswith("/admin/login") or request.path.startswith("/admin/logout"):
-            return None
-
-        # Admin pages require login
+        # Admin pages require admin login
         if request.path.startswith("/admin/"):
             if not is_admin_logged_in():
-                # For AJAX requests, return JSON error instead of redirect
                 if _is_ajax_request():
                     return jsonify({"error": "請先登入管理員帳號", "login_required": True}), 401
-                return redirect(url_for("auth.login", next=request.url))
+                return redirect(url_for("portal_shell_page"))
             return None
 
         # Check page status for registered pages only
@@ -700,7 +704,7 @@ def create_app(config_name: str | None = None) -> Flask:
 
         return {
             "is_admin": admin,
-            "admin_user": session.get("admin"),
+            "admin_user": session.get("user"),
             "can_view_page": can_view_page,
             "frontend_asset": frontend_asset,
             "csrf_token": get_csrf_token,
@@ -770,11 +774,11 @@ def create_app(config_name: str | None = None) -> Flask:
         admin = is_admin_logged_in()
         admin_user_payload = None
         if admin:
-            raw_admin = session.get("admin") or {}
+            raw_user = session.get("user") or {}
             admin_user_payload = {
-                "displayName": raw_admin.get("displayName"),
-                "username": raw_admin.get("username"),
-                "mail": raw_admin.get("mail"),
+                "displayName": raw_user.get("displayName"),
+                "username": raw_user.get("username"),
+                "mail": raw_user.get("mail"),
             }
         source = get_navigation_config()
         drawers: list[dict] = []
@@ -885,8 +889,7 @@ def create_app(config_name: str | None = None) -> Flask:
                 "is_admin": admin,
                 "admin_user": admin_user_payload,
                 "admin_links": {
-                    "login": f"/admin/login?next={url_for('portal_shell_page')}",
-                    "logout": "/admin/logout" if admin else None,
+                    "logout": "/api/auth/logout" if admin else None,
                     "pages": "/admin/pages" if admin else None,
                     "performance": "/admin/performance" if admin else None,
                 },

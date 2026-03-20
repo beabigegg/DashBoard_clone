@@ -91,6 +91,7 @@ def _route_css_targets() -> dict[str, list[Path]]:
         "/excel-query": [ROOT / "frontend/src/excel-query/style.css"],
         "/query-tool": [ROOT / "frontend/src/query-tool/style.css"],
         "/mid-section-defect": [ROOT / "frontend/src/mid-section-defect/style.css"],
+        "/admin/user-usage-kpi": [ROOT / "frontend/src/admin-user-usage-kpi/style.css"],
     }
 
 

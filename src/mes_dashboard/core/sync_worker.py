@@ -41,13 +41,16 @@ class SyncWorker:
         self,
         log_store=None,
         metrics_store=None,
+        login_store=None,
         interval: int = SYNC_WORKER_INTERVAL,
     ):
         from mes_dashboard.core.log_store import get_log_store
         from mes_dashboard.core.metrics_history import get_metrics_history_store
+        from mes_dashboard.core.login_session_store import get_login_session_store
 
         self._log_store = log_store or get_log_store()
         self._metrics_store = metrics_store or get_metrics_history_store()
+        self._login_store = login_store or get_login_session_store()
         self.interval = interval
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -78,6 +81,10 @@ class SyncWorker:
                 self._sync_metrics()
             except Exception as exc:
                 logger.warning("SyncWorker: metrics sync error: %s", exc)
+            try:
+                self._sync_login_sessions()
+            except Exception as exc:
+                logger.warning("SyncWorker: login session sync error: %s", exc)
             try:
                 self._cleanup_synced()
             except Exception as exc:
@@ -206,12 +213,65 @@ class SyncWorker:
             logger.warning("SyncWorker: MySQL unavailable for metrics, will retry: %s", exc)
 
     # ----------------------------------------------------------
+    # Login session sync
+    # ----------------------------------------------------------
+
+    def _sync_login_sessions(self) -> None:
+        from sqlalchemy import text
+
+        if not MYSQL_OPS_ENABLED:
+            return
+
+        rows = self._login_store.get_unsynced(batch_size=500)
+        if not rows:
+            return
+
+        try:
+            with get_mysql_connection() as conn:
+                for row in rows:
+                    conn.execute(
+                        text("""
+                            REPLACE INTO dashboard_login_sessions
+                                (sync_id, session_id, emp_id, username, display_name,
+                                 real_name, department, email, phone, domain, ip,
+                                 login_time, last_active, logout_time, duration_sec, is_admin)
+                            VALUES
+                                (:sync_id, :session_id, :emp_id, :username, :display_name,
+                                 :real_name, :department, :email, :phone, :domain, :ip,
+                                 :login_time, :last_active, :logout_time, :duration_sec, :is_admin)
+                        """),
+                        {
+                            "sync_id": row.get("sync_id"),
+                            "session_id": row.get("session_id"),
+                            "emp_id": row.get("emp_id"),
+                            "username": row.get("username"),
+                            "display_name": row.get("display_name"),
+                            "real_name": row.get("real_name"),
+                            "department": row.get("department"),
+                            "email": row.get("email"),
+                            "phone": row.get("phone"),
+                            "domain": row.get("domain"),
+                            "ip": row.get("ip"),
+                            "login_time": _parse_ts(row.get("login_time")),
+                            "last_active": _parse_ts(row.get("last_active")),
+                            "logout_time": _parse_ts(row.get("logout_time")),
+                            "duration_sec": row.get("duration_sec"),
+                            "is_admin": row.get("is_admin"),
+                        },
+                    )
+            self._login_store.mark_synced([r["id"] for r in rows])
+            logger.debug("SyncWorker: synced %d login session rows to MySQL", len(rows))
+        except Exception as exc:
+            logger.warning("SyncWorker: MySQL unavailable for login sessions, will retry: %s", exc)
+
+    # ----------------------------------------------------------
     # Cleanup
     # ----------------------------------------------------------
 
     def _cleanup_synced(self) -> None:
         self._log_store.cleanup_synced(older_than_hours=1)
         self._metrics_store.cleanup_synced(older_than_hours=1)
+        self._login_store.cleanup_synced(older_than_hours=24)
 
 
 # ============================================================

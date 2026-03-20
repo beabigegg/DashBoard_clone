@@ -21,9 +21,10 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
 const IN_SCOPE_ADMIN_ROUTES = Object.freeze([
   '/admin/pages',
   '/admin/performance',
+  '/admin/user-usage-kpi',
 ]);
 
-const DEFERRED_ROUTES = Object.freeze([]);
+const DEFERRED_ROUTES = Object.freeze(['/login']);
 
 const ALL_KNOWN_ROUTES = Object.freeze([
   ...IN_SCOPE_REPORT_ROUTES,
@@ -184,6 +185,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-platform-admin',
     title: '效能監控',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'admin_only',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/admin/user-usage-kpi': buildContract({
+    route: '/admin/user-usage-kpi',
+    routeId: 'admin-user-usage-kpi',
+    renderMode: 'native',
+    owner: 'frontend-platform-admin',
+    title: '使用者 KPI',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'admin_only',
     scope: 'in-scope',
