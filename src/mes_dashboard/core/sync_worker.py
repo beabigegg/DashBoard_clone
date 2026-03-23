@@ -23,6 +23,7 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger('mes_dashboard.sync_worker')
 
 SYNC_WORKER_INTERVAL = int(os.getenv('SYNC_WORKER_INTERVAL', '600'))  # 10 min
+MYSQL_SYNC_ENABLED: bool = os.getenv('MYSQL_SYNC_ENABLED', 'true').lower() == 'true'
 
 # Import at module level so tests can patch these names on this module.
 from mes_dashboard.core.mysql_client import (  # noqa: E402
@@ -56,6 +57,9 @@ class SyncWorker:
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> None:
+        if not MYSQL_SYNC_ENABLED:
+            logger.info("SyncWorker disabled (MYSQL_SYNC_ENABLED=false)")
+            return
         if self._thread is not None and self._thread.is_alive():
             return
         self._stop_event.clear()
