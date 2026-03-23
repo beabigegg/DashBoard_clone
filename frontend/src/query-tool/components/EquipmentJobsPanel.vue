@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 import ExportButton from './ExportButton.vue';
 import { formatCellValue } from '../utils/values.js';
 
@@ -28,6 +29,19 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['export']);
+
+const rowsRef = computed(() => props.rows);
+const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(rowsRef);
+
+function sortLabel(key) {
+  if (sortKey.value !== key) return '⇕';
+  return sortDirection.value === 'asc' ? '▲' : '▼';
+}
+
+function ariaSortFor(key) {
+  if (sortKey.value !== key) return 'none';
+  return sortDirection.value === 'asc' ? 'ascending' : 'descending';
+}
 
 const expandedIds = ref(new Set());
 
@@ -91,14 +105,21 @@ const columns = Object.freeze([
         <thead>
           <tr>
             <th>展開</th>
-            <th v-for="column in columns" :key="column">
+            <th
+              v-for="column in columns"
+              :key="column"
+              class="sortable-th"
+              :aria-sort="ariaSortFor(column)"
+              @click="toggleSort(column)"
+            >
               {{ column }}
+              <span class="sort-indicator">{{ sortLabel(column) }}</span>
             </th>
           </tr>
         </thead>
 
         <tbody>
-          <template v-for="(row, rowIndex) in rows" :key="rowKey(row, rowIndex)">
+          <template v-for="(row, rowIndex) in sortedData" :key="rowKey(row, rowIndex)">
             <tr class="row-clickable" @click="toggleRow(row, rowIndex)">
               <td class="td-center">{{ isExpanded(row, rowIndex) ? '▾' : '▸' }}</td>
               <td v-for="column in columns" :key="`${rowIndex}-${column}`">

@@ -582,6 +582,28 @@
   background: theme('colors.token.heef4fb');
 }
 
+/* ---- 排序表頭 ---- */
+.theme-query-tool .query-tool-table thead th.sortable-th {
+  cursor: pointer;
+  user-select: none;
+}
+
+.theme-query-tool .query-tool-table thead th.sortable-th:hover {
+  background: theme('colors.token.he2e8f0');
+}
+
+.theme-query-tool .sort-indicator {
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.45;
+}
+
+.theme-query-tool th.sortable-th[aria-sort='ascending'] .sort-indicator,
+.theme-query-tool th.sortable-th[aria-sort='descending'] .sort-indicator {
+  opacity: 1;
+  color: var(--primary);
+}
+
 /* ---- 表格高度變體 ---- */
 .theme-query-tool .query-tool-table-wrap.short {
   max-height: 360px;

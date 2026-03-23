@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../../core/api.js';
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 import StatusBadge from '../../shared-ui/components/StatusBadge.vue';
 import { formatCellValue, formatDateTime, parseDateTime } from '../utils/values.js';
 
@@ -74,6 +75,18 @@ const sortedRows = computed(() => {
     return bTime - aTime;
   });
 });
+
+const { sortKey, sortDirection, sortedData: displayRows, toggleSort } = useSortableTable(sortedRows);
+
+function sortLabel(key) {
+  if (sortKey.value !== key) return '⇕';
+  return sortDirection.value === 'asc' ? '▲' : '▼';
+}
+
+function ariaSortFor(key) {
+  if (sortKey.value !== key) return 'none';
+  return sortDirection.value === 'asc' ? 'ascending' : 'descending';
+}
 
 const jobColumns = computed(() => {
   return buildOrderedColumns(props.rows, JOB_COLUMN_PRIORITY);
@@ -156,7 +169,7 @@ async function loadTxn(jobId) {
         讀取中...
       </div>
 
-      <div v-else-if="sortedRows.length === 0" class="placeholder">
+      <div v-else-if="displayRows.length === 0" class="placeholder">
         {{ emptyText }}
       </div>
 
@@ -165,14 +178,21 @@ async function loadTxn(jobId) {
           <thead>
             <tr>
               <th>操作</th>
-              <th v-for="column in jobColumns" :key="column">
+              <th
+                v-for="column in jobColumns"
+                :key="column"
+                class="sortable-th"
+                :aria-sort="ariaSortFor(column)"
+                @click="toggleSort(column)"
+              >
                 {{ column === 'CONTAINERNAMES' ? 'LOT ID' : column }}
+                <span class="sort-indicator">{{ sortLabel(column) }}</span>
               </th>
             </tr>
           </thead>
 
           <tbody>
-            <tr v-for="(row, rowIndex) in sortedRows" :key="rowKey(row, rowIndex)">
+            <tr v-for="(row, rowIndex) in displayRows" :key="rowKey(row, rowIndex)">
               <td>
                 <button
                   type="button"

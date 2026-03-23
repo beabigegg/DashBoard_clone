@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 import { formatCellValue } from '../utils/values.js';
 
@@ -37,6 +38,19 @@ const COLUMN_LABELS = Object.freeze({
 const columns = computed(() =>
   Object.keys(props.rows[0] || {}).filter((col) => !HIDDEN_COLUMNS.has(col)),
 );
+
+const rowsRef = computed(() => props.rows);
+const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(rowsRef);
+
+function sortLabel(key) {
+  if (sortKey.value !== key) return '⇕';
+  return sortDirection.value === 'asc' ? '▲' : '▼';
+}
+
+function ariaSortFor(key) {
+  if (sortKey.value !== key) return 'none';
+  return sortDirection.value === 'asc' ? 'ascending' : 'descending';
+}
 
 const workcenterOptions = computed(() => {
   return props.workcenterGroups.map((group) => {
@@ -79,15 +93,22 @@ const workcenterOptions = computed(() => {
       <table class="query-tool-table">
         <thead>
           <tr>
-            <th v-for="column in columns" :key="column">
+            <th
+              v-for="column in columns"
+              :key="column"
+              class="sortable-th"
+              :aria-sort="ariaSortFor(column)"
+              @click="toggleSort(column)"
+            >
               {{ COLUMN_LABELS[column] || column }}
+              <span class="sort-indicator">{{ sortLabel(column) }}</span>
             </th>
           </tr>
         </thead>
 
         <tbody>
           <tr
-            v-for="(row, rowIndex) in rows"
+            v-for="(row, rowIndex) in sortedData"
             :key="row.HISTORYMAINLINEID || row.TRACKINTIMESTAMP || rowIndex"
           >
             <td v-for="column in columns" :key="`${rowIndex}-${column}`">
