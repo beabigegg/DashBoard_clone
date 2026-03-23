@@ -891,6 +891,7 @@ def create_app(config_name: str | None = None) -> Flask:
                 "admin_links": {
                     "logout": "/api/auth/logout" if admin else None,
                     "pages": "/admin/pages" if admin else None,
+                    "dashboard": "/admin/dashboard" if admin else None,
                     "performance": "/admin/performance" if admin else None,
                 },
                 "diagnostics": diagnostics,

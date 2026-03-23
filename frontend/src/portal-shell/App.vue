@@ -33,6 +33,7 @@ const navigationNotice = ref('');
 const adminLinks = ref({
   logout: null,
   pages: '/admin/pages',
+  dashboard: '/admin/dashboard',
   performance: '/admin/performance',
 });
 const sidebarCollapsed = ref(false);
@@ -184,7 +185,12 @@ async function loadNavigation() {
     drawers.value = [];
     isAdmin.value = false;
     adminUser.value = null;
-    adminLinks.value = { logout: null, pages: '/admin/pages', performance: '/admin/performance' };
+    adminLinks.value = {
+      logout: null,
+      pages: '/admin/pages',
+      dashboard: '/admin/dashboard',
+      performance: '/admin/performance',
+    };
     syncNavigationRoutes([]);
   } finally {
     loading.value = false;

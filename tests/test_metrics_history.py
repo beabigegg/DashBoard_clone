@@ -9,6 +9,7 @@ original (non-aggregated) query_snapshots API.
 from __future__ import annotations
 
 import os
+import sqlite3
 import tempfile
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
@@ -385,3 +386,82 @@ class TestMetricsSyncFields:
 
             batch = store.get_unsynced(batch_size=4)
             assert len(batch) == 4
+
+
+class TestCacheHitMissColumns:
+    def test_schema_contains_cache_hit_miss_columns(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_cache_cols.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            conn = sqlite3.connect(db_path)
+            rows = conn.execute("PRAGMA table_info(metrics_snapshots)").fetchall()
+            conn.close()
+            col_names = {row[1] for row in rows}
+
+            assert "cache_hit_count" in col_names
+            assert "cache_miss_count" in col_names
+
+    def test_write_snapshot_persists_cache_hit_miss_counts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_cache_counts.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            ok = store.write_snapshot(
+                {
+                    "pool": {},
+                    "redis": {},
+                    "route_cache": {},
+                    "latency": {},
+                    "cache_hit_count": 12,
+                    "cache_miss_count": 3,
+                }
+            )
+            assert ok is True
+            rows = store.query_snapshots(minutes=5)
+            assert rows[-1]["cache_hit_count"] == 12
+            assert rows[-1]["cache_miss_count"] == 3
+
+
+class TestCollectorObservability:
+    def test_collector_records_cache_hit_miss_delta(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_collector_cache_delta.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+            collector = MetricsHistoryCollector(app=None, store=store)
+
+            with patch.object(collector, "_reset_route_cache_hit_miss_counts", return_value={"hits": 7, "misses": 2}):
+                collector._collect_snapshot()
+
+            rows = store.query_snapshots(minutes=5)
+            assert rows[-1]["cache_hit_count"] == 7
+            assert rows[-1]["cache_miss_count"] == 2
+
+    def test_dead_worker_alert_warning_logged(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_dead_worker_alert.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+            collector = MetricsHistoryCollector(app=None, store=store)
+
+            with patch(
+                "mes_dashboard.services.rq_monitor_service.get_rq_worker_details",
+                return_value={"summary": {"total": 0, "busy": 0}},
+            ), patch(
+                "mes_dashboard.services.rq_monitor_service.get_rq_queue_details",
+                return_value={"total_queued": 5},
+            ), patch(
+                "mes_dashboard.core.global_concurrency.get_active_slot_count",
+                return_value=0,
+            ), patch(
+                "mes_dashboard.core.metrics_history.logger.warning"
+            ) as mock_warning:
+                collector._collect_snapshot()
+
+            assert any(
+                call.args and call.args[0].startswith("RQ dead worker alert:")
+                for call in mock_warning.call_args_list
+            )

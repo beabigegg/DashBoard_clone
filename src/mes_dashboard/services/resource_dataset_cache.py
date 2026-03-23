@@ -33,7 +33,7 @@ logger = logging.getLogger("mes_dashboard.resource_dataset_cache")
 
 from mes_dashboard.config.constants import CACHE_TTL_DATASET
 _CACHE_TTL = CACHE_TTL_DATASET
-_CACHE_MAX_SIZE = 8
+_CACHE_MAX_SIZE = 3
 _REDIS_NAMESPACE = "resource_dataset"
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
@@ -243,7 +243,11 @@ def execute_primary_query(
                     "start_date": chunk["chunk_start"],
                     "end_date": chunk["chunk_end"],
                 }
-                result = read_sql_df(base_sql, params)
+                result = read_sql_df(
+                    base_sql,
+                    params,
+                    caller="resource_dataset_cache:execute_primary_query_chunk",
+                )
                 return result if result is not None else pd.DataFrame()
 
             logger.info(
@@ -278,7 +282,11 @@ def execute_primary_query(
         else:
             # --- Direct path (short query) ---
             params = {"start_date": start_date, "end_date": end_date}
-            df = read_sql_df(base_sql, params)
+            df = read_sql_df(
+                base_sql,
+                params,
+                caller="resource_dataset_cache:execute_primary_query_direct",
+            )
             if df is None:
                 df = pd.DataFrame()
             if not df.empty:

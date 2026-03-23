@@ -20,6 +20,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
 
 const IN_SCOPE_ADMIN_ROUTES = Object.freeze([
   '/admin/pages',
+  '/admin/dashboard',
   '/admin/performance',
   '/admin/user-usage-kpi',
 ]);
@@ -178,6 +179,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     visibilityPolicy: 'admin_only',
     scope: 'in-scope',
     compatibilityPolicy: 'external_target_redirect',
+  }),
+  '/admin/dashboard': buildContract({
+    route: '/admin/dashboard',
+    routeId: 'admin-dashboard',
+    renderMode: 'native',
+    owner: 'frontend-platform-admin',
+    title: '管理儀表板',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'admin_only',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),
   '/admin/performance': buildContract({
     route: '/admin/performance',

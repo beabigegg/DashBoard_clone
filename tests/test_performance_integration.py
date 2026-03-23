@@ -388,3 +388,27 @@ class TestPerformancePage:
         assert 'performance' in data_str or '效能' in data_str
         assert '/static/dist/admin-performance.js' in html
         assert 'cdn.jsdelivr.net' not in html
+
+    def test_dashboard_page_requires_auth(self, client):
+        response = client.get('/admin/dashboard')
+        assert response.status_code == 302
+
+    def test_dashboard_page_loads(self, admin_client):
+        response = admin_client.get('/admin/dashboard')
+        assert response.status_code == 200
+        html = response.data.decode('utf-8', errors='ignore')
+        data_str = html.lower()
+        assert 'admin dashboard' in data_str or 'dashboard' in data_str
+        assert '/static/dist/admin-dashboard.js' in html
+        assert 'cdn.jsdelivr.net' not in html
+
+    def test_user_usage_kpi_page_requires_auth(self, client):
+        response = client.get('/admin/user-usage-kpi')
+        assert response.status_code == 302
+
+    def test_user_usage_kpi_page_loads(self, admin_client):
+        response = admin_client.get('/admin/user-usage-kpi')
+        assert response.status_code == 200
+        html = response.data.decode('utf-8', errors='ignore')
+        assert '/static/dist/admin-user-usage-kpi.js' in html
+        assert 'cdn.jsdelivr.net' not in html

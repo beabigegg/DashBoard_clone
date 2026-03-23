@@ -136,10 +136,16 @@
           "order": 2
         },
         {
+          "route": "/admin/dashboard",
+          "name": "管理儀表板",
+          "status": "dev",
+          "order": 3
+        },
+        {
           "route": "/admin/user-usage-kpi",
           "name": "使用者 KPI",
           "status": "dev",
-          "order": 3
+          "order": 4
         }
       ]
     }

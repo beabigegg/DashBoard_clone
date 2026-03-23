@@ -178,3 +178,40 @@ def test_apply_view_uses_cached_data_for_secondary_filters(monkeypatch):
         min_scrap_qty=0,
     )
     assert with_l1_filter["summary"]["transaction_qty"] > 0
+
+
+def test_ensure_dataset_loaded_returns_cache_hit(monkeypatch):
+    monkeypatch.setattr(dataset_cache, "_WARMUP_DAYS", 30)
+    monkeypatch.setattr(
+        dataset_cache,
+        "_get_cached_payload",
+        lambda _query_id: {"detail_df": None, "linkage_df": pd.DataFrame()},
+    )
+    calls = {"executed": 0}
+
+    def _fake_execute(*, start_date: str, end_date: str):
+        calls["executed"] += 1
+        return {"query_id": "qid"}
+
+    monkeypatch.setattr(dataset_cache, "execute_primary_query", _fake_execute)
+
+    result = dataset_cache.ensure_dataset_loaded()
+    assert result["cache_hit"] is True
+    assert calls["executed"] == 0
+
+
+def test_ensure_dataset_loaded_executes_query_on_miss(monkeypatch):
+    monkeypatch.setattr(dataset_cache, "_WARMUP_DAYS", 30)
+    monkeypatch.setattr(dataset_cache, "_get_cached_payload", lambda _query_id: None)
+    calls = {"executed": 0}
+
+    def _fake_execute(*, start_date: str, end_date: str):
+        calls["executed"] += 1
+        return {"query_id": "warmup-yield"}
+
+    monkeypatch.setattr(dataset_cache, "execute_primary_query", _fake_execute)
+
+    result = dataset_cache.ensure_dataset_loaded()
+    assert result["cache_hit"] is False
+    assert result["query_id"] == "warmup-yield"
+    assert calls["executed"] == 1

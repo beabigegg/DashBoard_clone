@@ -131,6 +131,7 @@ def test_portal_navigation_admin_includes_admin_drawer_routes():
         for page in drawer["pages"]
     }
     assert "/admin/pages" in all_routes
+    assert "/admin/dashboard" in all_routes
     assert "/admin/performance" in all_routes
     assert "/excel-query" in all_routes
 
@@ -287,12 +288,14 @@ def test_portal_navigation_includes_admin_links_by_auth_state():
     non_admin_client = app.test_client()
     non_admin_payload = json.loads(non_admin_client.get("/api/portal/navigation").data.decode("utf-8"))
     assert non_admin_payload["admin_links"]["pages"] is None
+    assert non_admin_payload["admin_links"]["dashboard"] is None
     assert non_admin_payload["admin_links"]["logout"] is None
 
     admin_client = app.test_client()
     _login_as_admin(admin_client)
     admin_payload = json.loads(admin_client.get("/api/portal/navigation").data.decode("utf-8"))
     assert admin_payload["admin_links"]["pages"] == "/admin/pages"
+    assert admin_payload["admin_links"]["dashboard"] == "/admin/dashboard"
     assert admin_payload["admin_links"]["logout"] == "/api/auth/logout"
 
 

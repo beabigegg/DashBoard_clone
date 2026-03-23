@@ -157,6 +157,18 @@
       "compatibility_policy": "redirect_to_shell_when_spa_enabled"
     },
     {
+      "route": "/admin/dashboard",
+      "route_id": "admin-dashboard",
+      "title": "Admin Dashboard",
+      "scope": "in-scope",
+      "render_mode": "native",
+      "owner": "frontend-platform-admin",
+      "visibility_policy": "admin_only",
+      "canonical_shell_path": "/portal-shell/admin/dashboard",
+      "rollback_strategy": "fallback_to_legacy_route",
+      "compatibility_policy": "redirect_to_shell_when_spa_enabled"
+    },
+    {
       "route": "/tables",
       "route_id": "tables",
       "title": "Tables",

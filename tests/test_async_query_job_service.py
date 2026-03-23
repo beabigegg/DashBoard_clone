@@ -28,6 +28,8 @@ def _reset_rq_cache():
     svc._RQ_AVAILABLE = None
     svc._rq_health_cache["available"] = None
     svc._rq_health_cache["checked_at"] = 0.0
+    with svc._FAILED_JOB_LOCK:
+        svc._FAILED_JOB_COUNT = 0
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +247,57 @@ class TestEnqueueJob:
         assert job_id == "my-custom-id"
         assert err is None
 
+    def test_default_retry_enabled_when_not_explicitly_overridden(self):
+        """Should pass default Retry config to queue.enqueue by default."""
+        mock_conn = MagicMock()
+        mock_queue = MagicMock()
+        default_retry = object()
+
+        with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_redis_client", return_value=mock_conn), \
+             patch.object(svc, "_build_default_retry", return_value=default_retry), \
+             patch("rq.Queue", return_value=mock_queue):
+            svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None)
+
+        enqueue_kwargs = mock_queue.enqueue.call_args.kwargs
+        assert enqueue_kwargs["retry"] is default_retry
+
+    def test_retry_can_be_disabled_explicitly(self):
+        """Should pass retry=None when caller disables retry."""
+        mock_conn = MagicMock()
+        mock_queue = MagicMock()
+
+        with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_redis_client", return_value=mock_conn), \
+             patch("rq.Queue", return_value=mock_queue):
+            svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None, retry=None)
+
+        enqueue_kwargs = mock_queue.enqueue.call_args.kwargs
+        assert "retry" in enqueue_kwargs
+        assert enqueue_kwargs["retry"] is None
+
+    def test_custom_retry_configuration_is_forwarded(self):
+        """Should forward caller-provided retry config to queue.enqueue."""
+        mock_conn = MagicMock()
+        mock_queue = MagicMock()
+        custom_retry = object()
+
+        with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_redis_client", return_value=mock_conn), \
+             patch("rq.Queue", return_value=mock_queue):
+            svc.enqueue_job(
+                queue_name="test-queue",
+                worker_fn=lambda: None,
+                retry=custom_retry,
+            )
+
+        enqueue_kwargs = mock_queue.enqueue.call_args.kwargs
+        assert enqueue_kwargs["retry"] is custom_retry
+
+    def test_default_timeout_is_600_seconds(self):
+        """Default timeout should match the hardening requirement (600s)."""
+        assert svc.ASYNC_JOB_DEFAULT_TIMEOUT_SECONDS == 600
+
 
 # ---------------------------------------------------------------------------
 # get_job_status
@@ -401,6 +454,9 @@ class TestUpdateJobProgress:
 # ---------------------------------------------------------------------------
 
 class TestCompleteJob:
+    def setup_method(self):
+        _reset_rq_cache()
+
     def test_sets_status_completed_with_query_id(self):
         """Should write status=completed and query_id when no error is given."""
         mock_conn = MagicMock()
@@ -456,3 +512,16 @@ class TestCompleteJob:
         mapping = call_kwargs.kwargs.get("mapping") or call_kwargs[1].get("mapping")
         assert mapping["status"] == "completed"
         assert mapping["query_id"] == ""
+
+    def test_failure_increments_failed_job_counter_and_logs_warning(self):
+        """Failed completion path should log warning and increment counter."""
+        mock_conn = MagicMock()
+        with patch.object(svc, "get_redis_client", return_value=mock_conn), \
+             patch.object(svc, "logger") as mock_logger:
+            svc.complete_job("reject", "job-fail-counter", error="DB timeout")
+
+        assert svc.get_failed_job_count() == 1
+        assert any(
+            call.args and call.args[0] == "Job failed: prefix=%s job_id=%s error=%s"
+            for call in mock_logger.warning.call_args_list
+        )

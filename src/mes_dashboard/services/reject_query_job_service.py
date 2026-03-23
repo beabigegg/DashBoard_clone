@@ -16,6 +16,10 @@ import os
 import uuid
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
+try:
+    from rq import Retry
+except Exception:  # pragma: no cover - optional dependency path
+    Retry = None  # type: ignore[assignment]
 
 from mes_dashboard.core.global_concurrency import (
     acquire_heavy_query_slot,
@@ -43,6 +47,12 @@ REJECT_JOB_TIMEOUT_SECONDS = int(os.getenv("REJECT_JOB_TIMEOUT_SECONDS", "1800")
 
 # Prefix used for Redis meta keys: reject:job:{job_id}:meta
 _JOB_PREFIX = "reject"
+
+
+def _build_retry():
+    if Retry is None:
+        return None
+    return Retry(max=2, interval=[30, 60])
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +111,7 @@ def enqueue_reject_query(
         prefix=_JOB_PREFIX,
         job_timeout=REJECT_JOB_TIMEOUT_SECONDS,
         result_ttl=REJECT_JOB_TTL_SECONDS,
+        retry=_build_retry(),
     )
 
 

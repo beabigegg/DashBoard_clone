@@ -1342,3 +1342,77 @@ def test_run_reject_chunk_wraps_sql_with_rownum(monkeypatch, tmp_path):
     chunk_fn({"chunk_start": "2026-01-01", "chunk_end": "2026-01-05"}, max_rows_per_chunk=max_rows)
     assert len(captured_sql) >= 1, "read_sql_df was not called"
     assert "ROWNUM" in captured_sql[-1], f"Expected ROWNUM in SQL, got: {captured_sql[-1]}"
+
+
+def test_ensure_dataset_loaded_returns_cache_hit_without_query(monkeypatch):
+    monkeypatch.setattr(cache_svc, "_WARMUP_DAYS", 30)
+    monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _query_id: True)
+    execute_mock = MagicMock()
+    monkeypatch.setattr(cache_svc, "execute_primary_query", execute_mock)
+
+    result = cache_svc.ensure_dataset_loaded()
+
+    assert result["cache_hit"] is True
+    assert result["query_id"]
+    execute_mock.assert_not_called()
+
+
+def test_ensure_dataset_loaded_executes_primary_query_on_cache_miss(monkeypatch):
+    monkeypatch.setattr(cache_svc, "_WARMUP_DAYS", 30)
+    monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _query_id: False)
+    execute_mock = MagicMock(return_value={"query_id": "warmup-qid"})
+    monkeypatch.setattr(cache_svc, "execute_primary_query", execute_mock)
+
+    result = cache_svc.ensure_dataset_loaded()
+
+    assert result["cache_hit"] is False
+    assert result["query_id"] == "warmup-qid"
+    execute_mock.assert_called_once()
+
+
+def test_optimize_groupby_dtypes_preserves_aggregation_parity():
+    source_df = pd.DataFrame(
+        [
+            {
+                "TXN_DAY": pd.Timestamp("2026-02-01"),
+                "LOSSREASONNAME": "001_A",
+                "REJECT_TOTAL_QTY": 10,
+            },
+            {
+                "TXN_DAY": pd.Timestamp("2026-02-01"),
+                "LOSSREASONNAME": "001_A",
+                "REJECT_TOTAL_QTY": 5,
+            },
+            {
+                "TXN_DAY": pd.Timestamp("2026-02-02"),
+                "LOSSREASONNAME": "002_B",
+                "REJECT_TOTAL_QTY": 7,
+            },
+        ]
+    )
+
+    baseline = (
+        source_df.groupby(["TXN_DAY", "LOSSREASONNAME"], observed=True)["REJECT_TOTAL_QTY"]
+        .sum()
+        .reset_index()
+        .sort_values(["TXN_DAY", "LOSSREASONNAME"])
+        .reset_index(drop=True)
+    )
+    optimized_df = cache_svc._optimize_groupby_dtypes(source_df)
+    optimized = (
+        optimized_df.groupby(["TXN_DAY", "LOSSREASONNAME"], observed=True)["REJECT_TOTAL_QTY"]
+        .sum()
+        .reset_index()
+        .sort_values(["TXN_DAY", "LOSSREASONNAME"])
+        .reset_index(drop=True)
+    )
+
+    baseline_cmp = baseline.assign(
+        TXN_DAY=baseline["TXN_DAY"].astype(str).str[:10],
+        LOSSREASONNAME=baseline["LOSSREASONNAME"].astype(str),
+    )
+    optimized_cmp = optimized.assign(
+        TXN_DAY=optimized["TXN_DAY"].astype(str).str[:10],
+        LOSSREASONNAME=optimized["LOSSREASONNAME"].astype(str),
+    )
+    pd.testing.assert_frame_equal(baseline_cmp, optimized_cmp, check_dtype=False)

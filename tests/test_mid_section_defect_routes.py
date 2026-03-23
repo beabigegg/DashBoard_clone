@@ -26,7 +26,8 @@ def teardown_function():
 
 
 @patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis')
-def test_analysis_success(mock_query_analysis):
+@patch('mes_dashboard.routes.mid_section_defect_routes.is_async_available', return_value=False)
+def test_analysis_success(_mock_async, mock_query_analysis):
     mock_query_analysis.return_value = {
         'kpi': {'total_input': 100},
         'charts': {'by_station': []},
@@ -52,7 +53,8 @@ def test_analysis_success(mock_query_analysis):
 
 
 @patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis')
-def test_analysis_with_station_and_direction(mock_query_analysis):
+@patch('mes_dashboard.routes.mid_section_defect_routes.is_async_available', return_value=False)
+def test_analysis_with_station_and_direction(_mock_async, mock_query_analysis):
     mock_query_analysis.return_value = {
         'kpi': {'detection_lot_count': 50},
         'charts': {'by_downstream_station': []},
@@ -83,7 +85,8 @@ def test_analysis_missing_dates_returns_400():
 
 
 @patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis')
-def test_analysis_service_failure_returns_500(mock_query_analysis):
+@patch('mes_dashboard.routes.mid_section_defect_routes.is_async_available', return_value=False)
+def test_analysis_service_failure_returns_500(_mock_async, mock_query_analysis):
     mock_query_analysis.return_value = None
 
     client = _client()
@@ -105,6 +108,73 @@ def test_analysis_rate_limited_returns_429(_mock_rate_limit, mock_query_analysis
     payload = response.get_json()
     assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
     mock_query_analysis.assert_not_called()
+
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.enqueue_msd_analysis', return_value=('msd-abc123', None))
+@patch('mes_dashboard.routes.mid_section_defect_routes.is_async_available', return_value=True)
+@patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis')
+def test_analysis_async_returns_202(_mock_query_analysis, _mock_async, _mock_enqueue):
+    client = _client()
+    response = client.get(
+        '/api/mid-section-defect/analysis?start_date=2025-01-01&end_date=2025-01-31'
+    )
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload['success'] is True
+    assert payload['data']['async'] is True
+    assert payload['data']['job_id'] == 'msd-abc123'
+    assert '/api/mid-section-defect/analysis/job/msd-abc123' in payload['data']['status_url']
+
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.get_msd_job_status', return_value=None)
+def test_analysis_job_status_not_found_returns_404(_mock_status):
+    client = _client()
+    response = client.get('/api/mid-section-defect/analysis/job/msd-missing')
+    assert response.status_code == 404
+
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.get_msd_job_status')
+def test_analysis_job_status_success(mock_status):
+    mock_status.return_value = {'job_id': 'msd-1', 'status': 'running'}
+    client = _client()
+    response = client.get('/api/mid-section-defect/analysis/job/msd-1')
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['data']['status'] == 'running'
+
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.get_msd_job_status')
+def test_analysis_job_result_returns_409_when_not_completed(mock_status):
+    mock_status.return_value = {'job_id': 'msd-1', 'status': 'running'}
+    client = _client()
+    response = client.get('/api/mid-section-defect/analysis/job/msd-1/result')
+    assert response.status_code == 409
+
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.get_msd_job_result')
+@patch('mes_dashboard.routes.mid_section_defect_routes.get_msd_job_status')
+def test_analysis_job_result_success(mock_status, mock_result):
+    mock_status.return_value = {
+        'job_id': 'msd-1',
+        'status': 'completed',
+        'query_id': 'mid_section_defect:None:{}',
+    }
+    mock_result.return_value = {
+        'kpi': {'total_input': 123},
+        'charts': {},
+        'daily_trend': [],
+        'available_loss_reasons': [],
+        'genealogy_status': 'ready',
+        'detail': [{'a': 1}],
+        'attribution': [],
+    }
+    client = _client()
+    response = client.get('/api/mid-section-defect/analysis/job/msd-1/result')
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['data']['kpi']['total_input'] == 123
+    assert payload['data']['detail_total_count'] == 1
 
 
 @patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis_detail')

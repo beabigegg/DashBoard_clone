@@ -16,7 +16,8 @@
     "/query-tool": ["query-tool.js"],
     "/mid-section-defect": ["mid-section-defect.js"],
     "/yield-alert-center": ["yield-alert-center.js"],
-    "/admin/user-usage-kpi": ["admin-user-usage-kpi.js"]
+    "/admin/user-usage-kpi": ["admin-user-usage-kpi.js"],
+    "/admin/dashboard": ["admin-dashboard.js"]
   },
   "deferred_routes": []
 }

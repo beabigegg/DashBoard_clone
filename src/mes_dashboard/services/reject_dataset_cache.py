@@ -18,6 +18,7 @@ import logging
 import os
 import time
 import uuid
+from datetime import date, timedelta
 from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
@@ -77,7 +78,7 @@ logger = logging.getLogger("mes_dashboard.reject_dataset_cache")
 
 from mes_dashboard.config.constants import CACHE_TTL_DATASET
 _CACHE_TTL = CACHE_TTL_DATASET
-_CACHE_MAX_SIZE = 8
+_CACHE_MAX_SIZE = 3
 _REDIS_NAMESPACE = "reject_dataset"
 _CACHE_SCHEMA_VERSION = 4
 _REJECT_PRIMARY_SQL_TEMPLATE = "primary"
@@ -146,6 +147,15 @@ _REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("reject_dataset", _dataset_cache, "Reject Dataset (L1, 15min)")
+
+_WARMUP_DAYS = max(1, int(os.getenv("REJECT_DATASET_WARMUP_DAYS", "30")))
+_GROUPBY_OPTIMIZED_COLUMNS = (
+    "TXN_DAY",
+    "LOSSREASONNAME",
+    "PRODUCTLINENAME",
+    "PJ_TYPE",
+    "WORKCENTER_GROUP",
+)
 
 
 class RejectPrimaryQueryOverloadError(RuntimeError):
@@ -345,9 +355,30 @@ def _store_df(query_id: str, df: pd.DataFrame) -> None:
     Direct-path queries are small — Redis is sufficient.
     DuckDB view path uses spool files from the engine/spill path (long queries).
     """
+    df = _optimize_groupby_dtypes(df)
     _dataset_cache.set(query_id, True)  # lightweight marker
     _redis_store_df(query_id, df)
     clear_spooled_df(_REDIS_NAMESPACE, query_id)
+
+
+def _optimize_groupby_dtypes(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert high-cardinality groupby dimensions to categorical dtype."""
+    if df is None or df.empty:
+        return df
+
+    optimized = df.copy()
+    for col in _GROUPBY_OPTIMIZED_COLUMNS:
+        if col not in optimized.columns:
+            continue
+        series = optimized[col]
+        if str(series.dtype) == "category":
+            continue
+        if col == "TXN_DAY":
+            optimized[col] = series.astype("category")
+            continue
+        if pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series):
+            optimized[col] = series.astype("category")
+    return optimized
 
 
 def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
@@ -355,16 +386,18 @@ def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
     if df is None or df.empty:
         return False
 
-    df_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
+    optimized_df = _optimize_groupby_dtypes(df)
+    df_mb = optimized_df.memory_usage(deep=True).sum() / (1024 * 1024)
     should_spill = _REJECT_ENGINE_SPILL_ENABLED and (
-        len(df) >= _REJECT_ENGINE_MAX_TOTAL_ROWS or df_mb >= _REJECT_ENGINE_MAX_RESULT_MB
+        len(optimized_df) >= _REJECT_ENGINE_MAX_TOTAL_ROWS
+        or df_mb >= _REJECT_ENGINE_MAX_RESULT_MB
     )
 
     if should_spill:
         spilled = store_spooled_df(
             _REDIS_NAMESPACE,
             query_id,
-            df,
+            optimized_df,
             ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
         )
         if spilled:
@@ -373,18 +406,18 @@ def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
             logger.info(
                 "Stored query result via parquet spill (query_id=%s, rows=%d, size_mb=%.1f)",
                 query_id,
-                len(df),
+                len(optimized_df),
                 df_mb,
             )
             return True
         logger.warning(
             "Parquet spill failed, fallback to dataset cache (query_id=%s, rows=%d, size_mb=%.1f)",
             query_id,
-            len(df),
+            len(optimized_df),
             df_mb,
         )
 
-    _store_df(query_id, df)
+    _store_df(query_id, optimized_df)
     return False
 
 
@@ -414,6 +447,15 @@ def _enforce_interactive_memory_guard(df: pd.DataFrame, *, operation: str, query
 def _maybe_collect_after_interactive_compute() -> None:
     from mes_dashboard.core.interactive_memory_guard import maybe_gc_collect
     maybe_gc_collect(force=_REJECT_DERIVE_FORCE_GC)
+
+
+def _read_sql_with_caller(sql: str, params: Dict[str, Any], caller: str) -> pd.DataFrame:
+    try:
+        return read_sql_df(sql, params, caller=caller)
+    except TypeError as exc:
+        if "caller" in str(exc):
+            return read_sql_df(sql, params)
+        raise
 
 
 # ============================================================
@@ -599,7 +641,11 @@ def _execute_and_spool(
                 chunk_sql = (
                     f"SELECT * FROM ({chunk_sql}) WHERE ROWNUM <= {int(max_rows_per_chunk) + 1}"
                 )
-            chunk_df = read_sql_df(chunk_sql, chunk_params)
+            chunk_df = _read_sql_with_caller(
+                chunk_sql,
+                chunk_params,
+                "reject_dataset_cache:_execute_and_spool_chunk",
+            )
             if chunk_df is None:
                 return pd.DataFrame()
             if max_rows_per_chunk and len(chunk_df) == int(max_rows_per_chunk) + 1:
@@ -687,7 +733,11 @@ def _execute_and_spool(
             base_variant="lot",
             base_where=base_where,
         )
-        df = read_sql_df(sql, base_params)
+        df = _read_sql_with_caller(
+            sql,
+            base_params,
+            "reject_dataset_cache:_execute_and_spool_direct",
+        )
         if df is None:
             df = pd.DataFrame()
         # Report 100% for direct path
@@ -949,7 +999,11 @@ def execute_primary_query(
                     chunk_sql = (
                         f"SELECT * FROM ({chunk_sql}) WHERE ROWNUM <= {int(max_rows_per_chunk) + 1}"
                     )
-                chunk_df = read_sql_df(chunk_sql, chunk_params)
+                chunk_df = _read_sql_with_caller(
+                    chunk_sql,
+                    chunk_params,
+                    "reject_dataset_cache:execute_primary_query_chunk",
+                )
                 if chunk_df is None:
                     return pd.DataFrame()
                 if max_rows_per_chunk and len(chunk_df) == int(max_rows_per_chunk) + 1:
@@ -1022,7 +1076,11 @@ def execute_primary_query(
                 base_variant="lot",
                 base_where=base_where,
             )
-            df = read_sql_df(sql, base_params)
+            df = _read_sql_with_caller(
+                sql,
+                base_params,
+                "reject_dataset_cache:execute_primary_query_direct",
+            )
             if df is None:
                 df = pd.DataFrame()
 
@@ -1058,6 +1116,46 @@ def execute_primary_query(
             release_heavy_query_slot(_slot_owner)
         if has_query_lock:
             _release_query_lock(query_id, lock_owner)
+
+
+def ensure_dataset_loaded() -> Dict[str, Any]:
+    """Ensure the default reject dataset exists in cache."""
+    end_date = date.today()
+    start_date = end_date - timedelta(days=_WARMUP_DAYS - 1)
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+
+    query_id_input = {
+        "cache_schema_version": _CACHE_SCHEMA_VERSION,
+        "mode": "date_range",
+        "start_date": start_date_str,
+        "end_date": end_date_str,
+        "container_input_type": None,
+        "container_values": [],
+    }
+    query_id = _make_query_id(query_id_input)
+    if _has_cached_df(query_id):
+        return {
+            "query_id": query_id,
+            "cache_hit": True,
+            "start_date": start_date_str,
+            "end_date": end_date_str,
+        }
+
+    result = execute_primary_query(
+        mode="date_range",
+        start_date=start_date_str,
+        end_date=end_date_str,
+        include_excluded_scrap=False,
+        exclude_material_scrap=True,
+        exclude_pb_diode=True,
+    )
+    return {
+        "query_id": result.get("query_id", query_id),
+        "cache_hit": False,
+        "start_date": start_date_str,
+        "end_date": end_date_str,
+    }
 
 
 def _apply_policy_filters(
@@ -1395,7 +1493,7 @@ def _derive_analytics_raw(df: pd.DataFrame) -> list:
         agg_cols["AFFECTED_WORKORDER_COUNT"] = ("AFFECTED_WORKORDER_COUNT", "sum")
 
     grouped = (
-        df.groupby(["TXN_DAY", "LOSSREASONNAME"], sort=True)
+        df.groupby(["TXN_DAY", "LOSSREASONNAME"], sort=True, observed=True)
         .agg(**agg_cols)
         .reset_index()
     )
@@ -1403,7 +1501,7 @@ def _derive_analytics_raw(df: pd.DataFrame) -> list:
     # Count distinct CONTAINERIDs per group for AFFECTED_LOT_COUNT
     if "CONTAINERID" in df.columns:
         lot_counts = (
-            df.groupby(["TXN_DAY", "LOSSREASONNAME"])["CONTAINERID"]
+            df.groupby(["TXN_DAY", "LOSSREASONNAME"], observed=True)["CONTAINERID"]
             .nunique()
             .reset_index()
             .rename(columns={"CONTAINERID": "AFFECTED_LOT_COUNT"})
@@ -1689,13 +1787,13 @@ def _build_dimension_pareto_items(
         if col in df.columns:
             agg_dict[col] = (col, "sum")
 
-    grouped = df.groupby(dim_col, sort=False, observed=False).agg(**agg_dict).reset_index()
+    grouped = df.groupby(dim_col, sort=False, observed=True).agg(**agg_dict).reset_index()
     if grouped.empty:
         return []
 
     if "CONTAINERID" in df.columns:
         lot_counts = (
-            df.groupby(dim_col, observed=False)["CONTAINERID"]
+            df.groupby(dim_col, observed=True)["CONTAINERID"]
             .nunique()
             .reset_index()
             .rename(columns={"CONTAINERID": "AFFECTED_LOT_COUNT"})

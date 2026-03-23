@@ -194,31 +194,60 @@ class MemoryTTLCache:
     This is used as the L1 cache for route-level API responses.
     """
 
-    def __init__(self) -> None:
-        self._store: dict[str, tuple[Any, float]] = {}
+    def __init__(self, max_size: int = 256) -> None:
+        self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
         self._lock = threading.Lock()
+        self._max_size = max(int(max_size), 1)
+        self._hit_count = 0
+        self._miss_count = 0
+
+    def _evict_expired_locked(self, now: float) -> None:
+        stale_keys = [key for key, (_, expires_at) in self._store.items() if expires_at <= now]
+        for key in stale_keys:
+            self._store.pop(key, None)
 
     def get(self, key: str) -> Optional[Any]:
         now = time.time()
         with self._lock:
             payload = self._store.get(key)
             if payload is None:
+                self._miss_count += 1
                 return None
             value, expires_at = payload
             if expires_at <= now:
                 self._store.pop(key, None)
+                self._miss_count += 1
                 return None
+            self._hit_count += 1
+            self._store.move_to_end(key, last=True)
             return value
 
     def set(self, key: str, value: Any, ttl: int) -> None:
         expires_at = time.time() + max(ttl, 1)
         with self._lock:
+            self._evict_expired_locked(time.time())
+            if key in self._store:
+                self._store.pop(key, None)
+            elif len(self._store) >= self._max_size:
+                self._store.popitem(last=False)
             self._store[key] = (value, expires_at)
+            self._store.move_to_end(key, last=True)
 
     def size(self) -> int:
         """Return live key count (best effort)."""
         with self._lock:
             return len(self._store)
+
+    def get_hit_miss_counts(self) -> dict[str, int]:
+        with self._lock:
+            return {"hits": int(self._hit_count), "misses": int(self._miss_count)}
+
+    def reset_hit_miss_counts(self) -> dict[str, int]:
+        with self._lock:
+            payload = {"hits": int(self._hit_count), "misses": int(self._miss_count)}
+            self._hit_count = 0
+            self._miss_count = 0
+            return payload
 
 
 class RedisJSONCache:
@@ -321,6 +350,18 @@ class LayeredCache:
         self._l1.set(key, value, ttl)
         if self._l2 is not None:
             self._l2.set(key, value, ttl)
+
+    def get_hit_miss_counts(self) -> dict[str, int]:
+        counts_fn = getattr(self._l1, "get_hit_miss_counts", None)
+        if callable(counts_fn):
+            return counts_fn()
+        return {"hits": 0, "misses": 0}
+
+    def reset_hit_miss_counts(self) -> dict[str, int]:
+        reset_fn = getattr(self._l1, "reset_hit_miss_counts", None)
+        if callable(reset_fn):
+            return reset_fn()
+        return {"hits": 0, "misses": 0}
 
     def telemetry(self) -> dict[str, Any]:
         mode = "l1+l2" if self._l2 is not None else "l1-only"

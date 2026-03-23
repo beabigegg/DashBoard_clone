@@ -156,6 +156,17 @@ class TestEnqueueRejectQuery:
         assert call_kwargs["job_timeout"] == rjs.REJECT_JOB_TIMEOUT_SECONDS
         assert call_kwargs["result_ttl"] == rjs.REJECT_JOB_TTL_SECONDS
 
+    def test_passes_retry_configuration_to_enqueue_job(self):
+        """Should pass retry config through to shared enqueue_job."""
+        mock_enqueue_job = MagicMock(return_value=("reject-retry-test", None))
+        retry_cfg = object()
+        with patch.object(rjs, "enqueue_job", mock_enqueue_job), \
+             patch.object(rjs, "_build_retry", return_value=retry_cfg):
+            rjs.enqueue_reject_query("date_range", {})
+
+        call_kwargs = mock_enqueue_job.call_args.kwargs
+        assert call_kwargs["retry"] is retry_cfg
+
 
 # ---------------------------------------------------------------------------
 # execute_reject_query_job

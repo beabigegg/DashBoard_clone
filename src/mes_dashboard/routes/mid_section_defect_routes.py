@@ -4,6 +4,7 @@
 Bidirectional traceability from any detection station to upstream/downstream.
 """
 
+import logging
 import os
 
 from flask import Blueprint, request, Response
@@ -13,10 +14,13 @@ from mes_dashboard.core.response import (
     validation_error,
     internal_error,
     error_response,
+    not_found_error,
     SERVICE_UNAVAILABLE,
 )
+from mes_dashboard.core.cache import cache_get, make_cache_key
 from mes_dashboard.core.database import get_slow_query_active_count
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.services.async_query_job_service import is_async_available
 from mes_dashboard.services.mid_section_defect_service import (
     query_analysis,
     query_analysis_detail,
@@ -24,6 +28,13 @@ from mes_dashboard.services.mid_section_defect_service import (
     query_station_options,
     export_csv,
 )
+from mes_dashboard.services.msd_query_job_service import (
+    enqueue_msd_analysis,
+    get_msd_job_result,
+    get_msd_job_status,
+)
+
+logger = logging.getLogger('mes_dashboard.mid_section_defect_routes')
 
 mid_section_defect_bp = Blueprint(
     'mid_section_defect',
@@ -69,6 +80,37 @@ def _parse_common_params():
     return start_date, end_date, loss_reasons, station, direction
 
 
+def _analysis_cache_key(
+    start_date: str,
+    end_date: str,
+    station: str,
+    direction: str,
+    loss_reasons,
+) -> str:
+    return make_cache_key(
+        "mid_section_defect",
+        filters={
+            "start_date": start_date,
+            "end_date": end_date,
+            "loss_reasons": sorted(loss_reasons) if loss_reasons else None,
+            "station": station,
+            "direction": direction,
+        },
+    )
+
+
+def _build_summary_payload(result: dict) -> dict:
+    return {
+        'kpi': result.get('kpi'),
+        'charts': result.get('charts'),
+        'daily_trend': result.get('daily_trend'),
+        'available_loss_reasons': result.get('available_loss_reasons'),
+        'genealogy_status': result.get('genealogy_status'),
+        'detail_total_count': len(result.get('detail', [])),
+        'attribution': result.get('attribution', []),
+    }
+
+
 @mid_section_defect_bp.route('/station-options', methods=['GET'])
 def api_station_options():
     """API: Get available detection station options for dropdown."""
@@ -92,7 +134,39 @@ def api_analysis():
     if not start_date or not end_date:
         return validation_error('必須提供 start_date 和 end_date 參數')
 
-    # Phase 0: concurrency fast-rejection
+    cache_key = _analysis_cache_key(
+        start_date=start_date,
+        end_date=end_date,
+        station=station,
+        direction=direction,
+        loss_reasons=loss_reasons,
+    )
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return success_response(_build_summary_payload(cached))
+
+    if is_async_available():
+        job_id, err = enqueue_msd_analysis(
+            start_date=start_date,
+            end_date=end_date,
+            station=station,
+            direction=direction,
+            loss_reasons=loss_reasons,
+        )
+        if job_id is not None:
+            return success_response(
+                {
+                    "async": True,
+                    "job_id": job_id,
+                    "status_url": f"/api/mid-section-defect/analysis/job/{job_id}",
+                },
+                status_code=202,
+            )
+        # Enqueue failure falls back to sync execution.
+        if err:
+            logger.warning("msd async enqueue failed, fallback to sync: %s", err)
+
+    # Phase 0: concurrency fast-rejection (sync fallback path only)
     try:
         if get_slow_query_active_count() >= _HEAVY_QUERY_REJECT_THRESHOLD:
             return error_response(
@@ -113,17 +187,36 @@ def api_analysis():
     if 'error' in result:
         return validation_error(result['error'])
 
-    summary = {
-        'kpi': result.get('kpi'),
-        'charts': result.get('charts'),
-        'daily_trend': result.get('daily_trend'),
-        'available_loss_reasons': result.get('available_loss_reasons'),
-        'genealogy_status': result.get('genealogy_status'),
-        'detail_total_count': len(result.get('detail', [])),
-        'attribution': result.get('attribution', []),
-    }
+    return success_response(_build_summary_payload(result))
 
-    return success_response(summary)
+
+@mid_section_defect_bp.route('/analysis/job/<job_id>', methods=['GET'])
+def api_analysis_job_status(job_id: str):
+    status = get_msd_job_status(job_id)
+    if status is None:
+        return not_found_error("job not found or expired")
+    return success_response(status)
+
+
+@mid_section_defect_bp.route('/analysis/job/<job_id>/result', methods=['GET'])
+def api_analysis_job_result(job_id: str):
+    status = get_msd_job_status(job_id)
+    if status is None:
+        return not_found_error("job not found or expired")
+
+    if status.get("status") != "completed":
+        return error_response(
+            "JOB_NOT_COMPLETE",
+            "job has not completed yet",
+            status_code=409,
+            meta={"job_status": status.get("status")},
+        )
+
+    result = get_msd_job_result(job_id)
+    if result is None:
+        return not_found_error("job result expired")
+
+    return success_response(_build_summary_payload(result))
 
 
 @mid_section_defect_bp.route('/analysis/detail', methods=['GET'])

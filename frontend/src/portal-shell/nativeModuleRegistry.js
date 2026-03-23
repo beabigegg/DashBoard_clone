@@ -90,6 +90,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../admin-performance/App.vue'),
     [() => import('../admin-performance/style.css')],
   ),
+  '/admin/dashboard': createNativeLoader(
+    () => import('../admin-dashboard/App.vue'),
+    [() => import('../styles/tailwind.css'), () => import('../admin-dashboard/style.css')],
+  ),
   '/admin/user-usage-kpi': createNativeLoader(
     () => import('../admin-user-usage-kpi/App.vue'),
     [() => import('../admin-user-usage-kpi/style.css')],

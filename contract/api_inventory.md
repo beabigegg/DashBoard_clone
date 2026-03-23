@@ -24,10 +24,16 @@ This file is the governed inventory for API contract classification and exceptio
 | `resource_history_routes.py` | All JSON API endpoints |
 | `yield_alert_routes.py` | All JSON API endpoints |
 | `admin_routes.py` | All JSON API endpoints — includes `POST /api/admin/analytics/recalculate` (manual anomaly detection trigger, admin auth required), `GET /admin/api/user-usage-kpi` (user usage KPI dashboard data, admin auth required; query params: `start_date`, `end_date`, `department`) |
+
+### Admin Page Routes (non-API)
+
+| File | Routes | Notes |
+| :--- | :--- | :--- |
+| `admin_routes.py` | `/admin/performance`, `/admin/user-usage-kpi`, `/admin/dashboard` | Admin-authenticated SPA HTML routes; CSRF token is injected into the served HTML |
 | `job_query_routes.py` | All JSON API endpoints |
 | `qc_gate_routes.py` | All JSON API endpoints |
 | `trace_routes.py` | All JSON API endpoints |
-| `mid_section_defect_routes.py` | All JSON API endpoints |
+| `mid_section_defect_routes.py` | All JSON API endpoints — includes `GET /api/mid-section-defect/analysis/job/<job_id>` and `GET /api/mid-section-defect/analysis/job/<job_id>/result`; `GET /api/mid-section-defect/analysis` may return HTTP 202 with `{"async": true, "job_id": ..., "status_url": ...}` when routed to background worker |
 | `query_tool_routes.py` | All JSON API endpoints |
 | `material_trace_routes.py` | JSON endpoints except CSV export (`/api/material-trace/export`) |
 | `analytics_routes.py` | All JSON API endpoints — GET /api/analytics/yield-anomalies, GET /api/analytics/reject-spikes, GET /api/analytics/hold-outliers, GET /api/analytics/equipment-deviation, GET /api/analytics/anomaly-summary, GET /api/analytics/yield-anomalies/drilldown, GET /api/analytics/reject-spikes/drilldown, GET /api/analytics/hold-outliers/drilldown, GET /api/analytics/equipment-deviation/drilldown; all gated by ANALYTICS_ANOMALY_DETECTION_ENABLED feature flag |

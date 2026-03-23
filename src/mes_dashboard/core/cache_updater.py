@@ -8,7 +8,7 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import pandas as pd
@@ -107,14 +107,27 @@ class CacheUpdater:
 
         # Initial resource cache load
         self._check_resource_update(force=True)
+        self._run_dataset_warmups()
 
         # Periodic updates
         while not self._stop_event.wait(self.interval):
             try:
                 self._check_and_update()
                 self._check_resource_update()
+                self._run_dataset_warmups()
             except Exception as e:
                 logger.error(f"Cache update failed: {e}", exc_info=True)
+
+    def _run_dataset_warmups(self) -> None:
+        for warmup_name, warmup_fn in (
+            ("reject_dataset", self._warmup_reject_dataset),
+            ("yield_alert_dataset", self._warmup_yield_alert_dataset),
+            ("reject_options", self._warmup_reject_options),
+        ):
+            try:
+                warmup_fn()
+            except Exception as exc:
+                logger.warning("Warmup task failed (%s): %s", warmup_name, exc)
 
     def _check_and_update(self, force: bool = False) -> bool:
         """Check SYS_DATE and update cache if needed.
@@ -178,7 +191,7 @@ class CacheUpdater:
         """
         sql = f"SELECT MAX(SYS_DATE) as SYS_DATE FROM {WIP_VIEW}"
         try:
-            df = read_sql_df(sql)
+            df = read_sql_df(sql, caller="cache_updater:_check_sys_date")
             if df is not None and not df.empty:
                 sys_date = df.iloc[0]['SYS_DATE']
                 return str(sys_date) if sys_date else None
@@ -215,7 +228,7 @@ class CacheUpdater:
             WHERE WORKORDER IS NOT NULL
         """
         try:
-            df = read_sql_df(sql)
+            df = read_sql_df(sql, caller="cache_updater:_load_full_table")
             return df
         except Exception as e:
             logger.error(f"Failed to load full table: {e}")
@@ -331,6 +344,38 @@ class CacheUpdater:
             return False
         finally:
             release_lock("resource_cache_update")
+
+    def _warmup_reject_dataset(self) -> None:
+        from mes_dashboard.services import reject_dataset_cache
+        result = reject_dataset_cache.ensure_dataset_loaded()
+        logger.info(
+            "Reject dataset warmup complete query_id=%s cache_hit=%s",
+            result.get("query_id"),
+            result.get("cache_hit"),
+        )
+
+    def _warmup_yield_alert_dataset(self) -> None:
+        from mes_dashboard.services import yield_alert_dataset_cache
+        result = yield_alert_dataset_cache.ensure_dataset_loaded()
+        logger.info(
+            "Yield-alert dataset warmup complete query_id=%s cache_hit=%s",
+            result.get("query_id"),
+            result.get("cache_hit"),
+        )
+
+    def _warmup_reject_options(self) -> None:
+        from mes_dashboard.services.reject_history_service import get_filter_options
+
+        end = datetime.now().date()
+        start = end - timedelta(days=29)
+        _ = get_filter_options(
+            start_date=start.strftime("%Y-%m-%d"),
+            end_date=end.strftime("%Y-%m-%d"),
+            include_excluded_scrap=False,
+            exclude_material_scrap=True,
+            exclude_pb_diode=True,
+        )
+        logger.info("Reject options warmup complete")
 
 
 # ============================================================

@@ -17,6 +17,7 @@ import math
 import os
 import threading
 import time
+from datetime import date, timedelta
 from typing import Any, Optional
 
 import numpy as np
@@ -52,10 +53,11 @@ from mes_dashboard.services.yield_alert_service import (
 logger = logging.getLogger("mes_dashboard.yield_alert_dataset_cache")
 
 _CACHE_TTL = max(30, int(os.getenv("YIELD_ALERT_CACHE_TTL_SECONDS", "300")))
-_CACHE_MAX_SIZE = max(1, int(os.getenv("YIELD_ALERT_DATASET_CACHE_MAX_SIZE", "3")))
+_CACHE_MAX_SIZE = max(1, int(os.getenv("YIELD_ALERT_DATASET_CACHE_MAX_SIZE", "2")))
 _REDIS_NAMESPACE = "yield_alert_dataset"
 _CACHE_SCHEMA_VERSION = 4
 _SPOOL_NAMESPACE = "yield_alert_dataset"
+_WARMUP_DAYS = max(1, int(os.getenv("YIELD_ALERT_DATASET_WARMUP_DAYS", "30")))
 
 _VIEW_MAX_INPUT_MB = float(os.getenv("YIELD_ALERT_VIEW_MAX_INPUT_MB", "96"))
 _VIEW_MAX_PROJECTED_RSS_MB = float(os.getenv("YIELD_ALERT_VIEW_MAX_PROJECTED_RSS_MB", "1100"))
@@ -441,7 +443,13 @@ def _load_primary_detail_df(start_date: str, end_date: str) -> pd.DataFrame:
             NVL(TRIM(d.FUNCTION), '(NA)'),
             NVL(d.OPERATION_SEQ_NUM, -1)
     """
-    return _prepare_detail_df(read_sql_df_slow(sql, {"start_date": start_date, "end_date": end_date}))
+    return _prepare_detail_df(
+        read_sql_df_slow(
+            sql,
+            {"start_date": start_date, "end_date": end_date},
+            caller="yield_alert_dataset_cache:_load_primary_detail_df",
+        )
+    )
 
 
 def _build_linkage_df(start_date: str, end_date: str, detail_df: pd.DataFrame) -> pd.DataFrame:
@@ -525,6 +533,37 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
             "detail_rows": int(detail_row_count),
             "linkage_ready": False,
         },
+    }
+
+
+def ensure_dataset_loaded() -> dict[str, Any]:
+    """Ensure the default yield-alert dataset exists in cache."""
+    end = date.today()
+    start = end - timedelta(days=_WARMUP_DAYS - 1)
+    start_date = start.strftime("%Y-%m-%d")
+    end_date = end.strftime("%Y-%m-%d")
+
+    query_id = _make_query_id(
+        {
+            "cache_schema_version": _CACHE_SCHEMA_VERSION,
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+    )
+    if _get_cached_payload(query_id) is not None:
+        return {
+            "query_id": query_id,
+            "cache_hit": True,
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+
+    result = execute_primary_query(start_date=start_date, end_date=end_date)
+    return {
+        "query_id": result.get("query_id", query_id),
+        "cache_hit": False,
+        "start_date": start_date,
+        "end_date": end_date,
     }
 
 

@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     rq_workers_busy INTEGER,
     rq_queue_depth INTEGER,
     heavy_query_slots_active INTEGER,
+    cache_hit_count INTEGER,
+    cache_miss_count INTEGER,
     sync_id TEXT,
     synced INTEGER DEFAULT 0
 );
@@ -84,6 +86,8 @@ _MIGRATION_COLUMNS = [
     ("rq_workers_busy", "INTEGER"),
     ("rq_queue_depth", "INTEGER"),
     ("heavy_query_slots_active", "INTEGER"),
+    ("cache_hit_count", "INTEGER"),
+    ("cache_miss_count", "INTEGER"),
     ("sync_id", "TEXT"),
     ("synced", "INTEGER DEFAULT 0"),
 ]
@@ -108,6 +112,7 @@ COLUMNS = [
     "system_mem_available_mb", "system_mem_used_pct",
     "rq_workers_total", "rq_workers_busy", "rq_queue_depth",
     "heavy_query_slots_active",
+    "cache_hit_count", "cache_miss_count",
 ]
 
 
@@ -232,8 +237,9 @@ class MetricsHistoryStore:
                              system_mem_available_mb, system_mem_used_pct,
                              rq_workers_total, rq_workers_busy,
                              rq_queue_depth, heavy_query_slots_active,
+                             cache_hit_count, cache_miss_count,
                              synced)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                         """,
                         (
                             ts, pid,
@@ -260,6 +266,8 @@ class MetricsHistoryStore:
                             data.get("rq_workers_busy"),
                             data.get("rq_queue_depth"),
                             data.get("heavy_query_slots_active"),
+                            data.get("cache_hit_count"),
+                            data.get("cache_miss_count"),
                         ),
                     )
                     rowid = cursor.lastrowid
@@ -332,6 +340,8 @@ class MetricsHistoryStore:
                 MAX(rq_workers_busy)    AS rq_workers_busy,
                 MAX(rq_queue_depth)     AS rq_queue_depth,
                 MAX(heavy_query_slots_active) AS heavy_query_slots_active,
+                SUM(cache_hit_count)    AS cache_hit_count,
+                SUM(cache_miss_count)   AS cache_miss_count,
                 COUNT(DISTINCT worker_pid) AS worker_count,
                 ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
             FROM metrics_snapshots
@@ -509,6 +519,47 @@ class MetricsHistoryCollector:
                 except Exception as exc:
                     logger.debug("Archive log cleanup failed: %s", exc)
 
+    def _reset_route_cache_hit_miss_counts(self) -> Dict[str, int]:
+        backend = None
+        try:
+            if self._app is not None:
+                with self._app.app_context():
+                    from flask import current_app
+                    backend = current_app.extensions.get("cache")
+            else:
+                from flask import current_app
+                backend = current_app.extensions.get("cache")
+        except Exception:
+            backend = None
+
+        if backend is None:
+            return {"hits": 0, "misses": 0}
+
+        reset_fn = getattr(backend, "reset_hit_miss_counts", None)
+        if callable(reset_fn):
+            try:
+                payload = reset_fn()
+                return {
+                    "hits": int(payload.get("hits", 0)),
+                    "misses": int(payload.get("misses", 0)),
+                }
+            except Exception:
+                return {"hits": 0, "misses": 0}
+
+        l1 = getattr(backend, "_l1", None)
+        reset_l1_fn = getattr(l1, "reset_hit_miss_counts", None) if l1 is not None else None
+        if callable(reset_l1_fn):
+            try:
+                payload = reset_l1_fn()
+                return {
+                    "hits": int(payload.get("hits", 0)),
+                    "misses": int(payload.get("misses", 0)),
+                }
+            except Exception:
+                return {"hits": 0, "misses": 0}
+
+        return {"hits": 0, "misses": 0}
+
     def _collect_snapshot(self) -> None:
         try:
             data: Dict[str, Any] = {}
@@ -589,6 +640,10 @@ class MetricsHistoryCollector:
             except Exception:
                 data["route_cache"] = {}
 
+            cache_counts = self._reset_route_cache_hit_miss_counts()
+            data["cache_hit_count"] = cache_counts.get("hits", 0)
+            data["cache_miss_count"] = cache_counts.get("misses", 0)
+
             # Query latency
             try:
                 from mes_dashboard.core.metrics import get_metrics_summary
@@ -614,6 +669,14 @@ class MetricsHistoryCollector:
                 data["rq_workers_busy"] = w.get("busy", 0)
                 data["rq_queue_depth"] = get_rq_queue_details().get("total_queued", 0)
                 data["heavy_query_slots_active"] = get_active_slot_count()
+                if (
+                    int(data["rq_queue_depth"] or 0) > 0
+                    and int(data["rq_workers_total"] or 0) == 0
+                ):
+                    logger.warning(
+                        "RQ dead worker alert: queue_depth=%s but no workers available",
+                        data["rq_queue_depth"],
+                    )
             except Exception:
                 pass  # columns stay None → SQLite stores NULL
 

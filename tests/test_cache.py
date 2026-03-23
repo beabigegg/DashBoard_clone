@@ -267,6 +267,39 @@ class TestMemoryTTLCache:
             cache._store['k2'] = ({'v': 2}, 9_999)
             assert cache.get('k2') is None
 
+    def test_max_size_eviction_removes_least_recently_used(self):
+        from mes_dashboard.core.cache import MemoryTTLCache
+
+        cache = MemoryTTLCache(max_size=2)
+        cache.set('k1', {'v': 1}, 60)
+        cache.set('k2', {'v': 2}, 60)
+        assert cache.get('k1') == {'v': 1}  # refresh recency
+        cache.set('k3', {'v': 3}, 60)
+
+        assert cache.get('k2') is None
+        assert cache.get('k1') == {'v': 1}
+        assert cache.get('k3') == {'v': 3}
+
+    def test_default_max_size_is_256(self):
+        from mes_dashboard.core.cache import MemoryTTLCache
+
+        cache = MemoryTTLCache()
+        assert cache._max_size == 256
+
+    def test_hit_miss_counter_and_reset(self):
+        from mes_dashboard.core.cache import MemoryTTLCache
+
+        cache = MemoryTTLCache(max_size=4)
+        cache.set('k1', {'v': 1}, 60)
+        assert cache.get('k1') == {'v': 1}
+        assert cache.get('missing') is None
+
+        counts = cache.get_hit_miss_counts()
+        assert counts == {'hits': 1, 'misses': 1}
+        reset_counts = cache.reset_hit_miss_counts()
+        assert reset_counts == {'hits': 1, 'misses': 1}
+        assert cache.get_hit_miss_counts() == {'hits': 0, 'misses': 0}
+
 
 class TestCreateDefaultCacheBackend:
     """Test default cache backend factory."""
@@ -384,3 +417,16 @@ class TestProcessLevelCache:
 
         assert cache.WIP_PROCESS_CACHE_MAX_SIZE >= 1
         assert cache._wip_df_cache.max_size == cache.WIP_PROCESS_CACHE_MAX_SIZE
+
+    def test_dataset_cache_max_size_configuration(self):
+        from mes_dashboard.services import (
+            hold_dataset_cache,
+            resource_dataset_cache,
+            reject_dataset_cache,
+            yield_alert_dataset_cache,
+        )
+
+        assert hold_dataset_cache._dataset_cache.max_size == 3
+        assert resource_dataset_cache._dataset_cache.max_size == 3
+        assert reject_dataset_cache._dataset_cache.max_size == 3
+        assert yield_alert_dataset_cache._dataset_cache.max_size == 2

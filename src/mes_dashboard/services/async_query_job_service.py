@@ -14,9 +14,14 @@ import logging
 import os
 import time
 import uuid
+import threading
 from typing import Any, Dict, Optional, Tuple
 
 from mes_dashboard.core.redis_client import get_key, get_redis_client
+try:
+    from rq import Retry
+except Exception:  # pragma: no cover - optional dependency path
+    Retry = None  # type: ignore[assignment]
 
 logger = logging.getLogger("mes_dashboard.async_query_job_service")
 
@@ -24,8 +29,11 @@ logger = logging.getLogger("mes_dashboard.async_query_job_service")
 # Configuration
 # ---------------------------------------------------------------------------
 ASYNC_JOB_DEFAULT_TTL_SECONDS = int(os.getenv("ASYNC_JOB_TTL_SECONDS", "3600"))
-ASYNC_JOB_DEFAULT_TIMEOUT_SECONDS = int(os.getenv("ASYNC_JOB_TIMEOUT_SECONDS", "1800"))
+ASYNC_JOB_DEFAULT_TIMEOUT_SECONDS = int(os.getenv("ASYNC_JOB_TIMEOUT_SECONDS", "600"))
 _RQ_HEALTH_TTL_SECONDS = 60
+_FAILED_JOB_COUNT = 0
+_FAILED_JOB_LOCK = threading.Lock()
+_DEFAULT_RETRY_SENTINEL = object()
 
 # ---------------------------------------------------------------------------
 # RQ availability cache
@@ -102,6 +110,12 @@ def _meta_key(prefix: str, job_id: str) -> str:
     return get_key(f"{prefix}:job:{job_id}:meta")
 
 
+def _build_default_retry():
+    if Retry is None:
+        return None
+    return Retry(max=2, interval=[30, 60])
+
+
 # ---------------------------------------------------------------------------
 # Core API
 # ---------------------------------------------------------------------------
@@ -115,6 +129,7 @@ def enqueue_job(
     prefix: str = "async",
     job_timeout: int = ASYNC_JOB_DEFAULT_TIMEOUT_SECONDS,
     result_ttl: int = ASYNC_JOB_DEFAULT_TTL_SECONDS,
+    retry: Any = _DEFAULT_RETRY_SENTINEL,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Enqueue a callable to a named RQ queue.
 
@@ -147,6 +162,8 @@ def enqueue_job(
     conn.expire(key, result_ttl)
 
     try:
+        if retry is _DEFAULT_RETRY_SENTINEL:
+            retry = _build_default_retry()
         from rq import Queue
         queue = Queue(queue_name, connection=conn)
         queue.enqueue(
@@ -156,6 +173,7 @@ def enqueue_job(
             job_timeout=job_timeout,
             result_ttl=result_ttl,
             failure_ttl=result_ttl,
+            retry=retry,
         )
     except Exception as exc:
         logger.error("async_query_job_service: enqueue failed job_id=%s: %s", job_id, exc, exc_info=True)
@@ -237,12 +255,21 @@ def complete_job(
     error: Optional[str] = None,
 ) -> None:
     """Mark a job as completed or failed."""
+    global _FAILED_JOB_COUNT
     conn = get_redis_client()
     if conn is None:
         return
 
     key = _meta_key(prefix, job_id)
     if error is not None:
+        logger.warning(
+            "Job failed: prefix=%s job_id=%s error=%s",
+            prefix,
+            job_id,
+            error,
+        )
+        with _FAILED_JOB_LOCK:
+            _FAILED_JOB_COUNT += 1
         fields = {
             "status": "failed",
             "error": str(error),
@@ -259,3 +286,8 @@ def complete_job(
         conn.hset(key, mapping=fields)
     except Exception as exc:
         logger.warning("async_query_job_service: complete_job failed job_id=%s: %s", job_id, exc)
+
+
+def get_failed_job_count() -> int:
+    with _FAILED_JOB_LOCK:
+        return int(_FAILED_JOB_COUNT)

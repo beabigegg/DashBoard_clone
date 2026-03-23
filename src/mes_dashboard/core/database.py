@@ -619,7 +619,11 @@ def _extract_ora_code(exc: Exception) -> str:
     return match.group(1) if match else 'UNKNOWN'
 
 
-def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
+def read_sql_df(
+    sql: str,
+    params: Optional[Dict[str, Any]] = None,
+    caller: str = "unknown",
+) -> pd.DataFrame:
     """Execute SQL query and return results as a DataFrame.
 
     Args:
@@ -683,9 +687,9 @@ def read_sql_df(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFra
             if elapsed > 1.0:
                 # Truncate SQL for logging (first 100 chars)
                 sql_preview = sql.strip().replace('\n', ' ')[:100]
-                logger.warning(f"Slow query ({elapsed:.2f}s): {sql_preview}...")
+                logger.warning("Slow query (%s, %.2fs): %s...", caller, elapsed, sql_preview)
             else:
-                logger.debug(f"Query completed in {elapsed:.3f}s, rows={len(df)}")
+                logger.debug("Query completed (%s) in %.3fs, rows=%s", caller, elapsed, len(df))
 
             return df
 
@@ -733,6 +737,7 @@ def read_sql_df_slow(
     sql: str,
     params: Optional[Dict[str, Any]] = None,
     timeout_seconds: Optional[int] = None,
+    caller: str = "unknown",
 ) -> pd.DataFrame:
     """Execute a slow SQL query with a custom timeout.
 
@@ -800,9 +805,9 @@ def read_sql_df_slow(
         elapsed = time.time() - start_time
         if elapsed > 1.0:
             sql_preview = sql.strip().replace('\n', ' ')[:100]
-            logger.warning(f"Slow query ({elapsed:.2f}s): {sql_preview}...")
+            logger.warning("Slow query (%s, %.2fs): %s...", caller, elapsed, sql_preview)
         else:
-            logger.debug(f"Query completed in {elapsed:.3f}s, rows={len(df)}")
+            logger.debug("Query completed (%s) in %.3fs, rows=%s", caller, elapsed, len(df))
 
         return df
 

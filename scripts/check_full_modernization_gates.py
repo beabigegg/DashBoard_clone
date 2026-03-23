@@ -92,6 +92,7 @@ def _route_css_targets() -> dict[str, list[Path]]:
         "/query-tool": [ROOT / "frontend/src/query-tool/style.css"],
         "/mid-section-defect": [ROOT / "frontend/src/mid-section-defect/style.css"],
         "/admin/user-usage-kpi": [ROOT / "frontend/src/admin-user-usage-kpi/style.css"],
+        "/admin/dashboard": [ROOT / "frontend/src/admin-dashboard/style.css"],
     }
 
 

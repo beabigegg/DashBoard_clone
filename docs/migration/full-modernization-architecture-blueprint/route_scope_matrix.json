@@ -17,7 +17,8 @@
     { "route": "/yield-alert-center", "category": "report" },
     { "route": "/admin/pages", "category": "admin" },
     { "route": "/admin/performance", "category": "admin" },
-    { "route": "/admin/user-usage-kpi", "category": "admin" }
+    { "route": "/admin/user-usage-kpi", "category": "admin" },
+    { "route": "/admin/dashboard", "category": "admin" }
   ],
   "deferred": []
 }
