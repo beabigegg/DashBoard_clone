@@ -420,6 +420,46 @@ class TestFeatureFlag(unittest.TestCase):
         mock_t2s.assert_called_once_with("test question")
 
 
+class TestStructuredClarificationFlow(unittest.TestCase):
+    @patch("mes_dashboard.services.ai_query_service.process_query_text2sql")
+    @patch("mes_dashboard.services.ai_query_service.advance_query_state")
+    def test_process_query_returns_clarification_before_search(self, mock_advance, mock_t2s):
+        mock_advance.return_value = {
+            "ready_to_search": False,
+            "needs_clarification": True,
+            "answer": "請問您要看摘要還是趨勢？",
+            "suggestions": ["摘要", "趨勢"],
+            "missing_slots": ["intent"],
+            "query_state": {"topic": "reject"},
+        }
+
+        result = svc.process_query("WB 不良", conversation_id="conv-1")
+
+        self.assertTrue(result["needs_clarification"])
+        self.assertEqual(result["missing_slots"], ["intent"])
+        self.assertEqual(result["query_state"], {"topic": "reject"})
+        mock_t2s.assert_not_called()
+
+    @patch("mes_dashboard.services.ai_query_service.process_query_text2sql")
+    @patch("mes_dashboard.services.ai_query_service.advance_query_state")
+    def test_process_query_uses_enriched_search_question(self, mock_advance, mock_t2s):
+        mock_advance.return_value = {
+            "ready_to_search": True,
+            "needs_clarification": False,
+            "search_question": "原始問題：WB 不良\n已確認查詢條件：\n- 主題：不良 / Reject",
+            "query_state": {"topic": "reject", "intent": "summary"},
+        }
+        mock_t2s.return_value = {"answer": "ok", "query_used": "text2sql"}
+
+        result = svc.process_query("WB 不良", conversation_id="conv-2")
+
+        mock_t2s.assert_called_once()
+        called_question = mock_t2s.call_args.args[0]
+        self.assertIn("主題：不良 / Reject", called_question)
+        self.assertFalse(result["needs_clarification"])
+        self.assertEqual(result["query_state"], {"topic": "reject", "intent": "summary"})
+
+
 class TestText2SqlTimeoutError(unittest.TestCase):
     """SQL execution timeout → return error immediately, no retry."""
 

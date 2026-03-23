@@ -16,6 +16,7 @@ from mes_dashboard.services.ai_function_registry import (
     build_round1_prompt,
     build_round2_prompt,
     build_round3_prompt,
+    build_reviewer_prompt,
     build_stage1_prompt,
     build_stage2_prompt,
     get_suggestions,
@@ -248,6 +249,10 @@ class TestStage1Prompt(unittest.TestCase):
         self.assertIn("GA/GC", prompt)    # workorder format
         self.assertIn("WB", prompt)       # station abbreviation
         self.assertIn("wip_realtime", prompt)
+        self.assertIn("品質 Hold", prompt)
+        self.assertIn("2N7002K", prompt)
+        self.assertIn("CONTAINERID", prompt)
+        self.assertIn("FINISHEDRUNCARD", prompt)
 
     def test_contains_json_format_instruction(self):
         prompt = build_stage1_prompt()
@@ -282,6 +287,27 @@ class TestStage2Prompt(unittest.TestCase):
         self.assertIn("FETCH FIRST", prompt)
         self.assertIn(":start_date", prompt)
         self.assertIn(":end_date", prompt)
+
+    def test_stage2_prompt_contains_quality_hold_rule(self):
+        prompt = build_stage2_prompt(["wip_realtime"])
+        self.assertIn("品質異常 Hold / 品質 Hold", prompt)
+        self.assertIn("不可用 HOLDREASONNAME LIKE '%品質異常%'", prompt)
+
+    def test_stage2_prompt_contains_product_type_rule(self):
+        prompt = build_stage2_prompt(["wip_realtime"])
+        self.assertIn("2N7002K", prompt)
+        self.assertIn("優先使用 PJ_TYPE", prompt)
+
+    def test_stage2_prompt_contains_id_without_date_rule(self):
+        prompt = build_stage2_prompt(["lot_history"])
+        self.assertIn("已指定 lot / workorder", prompt)
+        self.assertIn("可不加日期限制", prompt)
+        self.assertIn("GA26020001", prompt)
+
+    def test_reviewer_prompt_contains_id_resolution_rules(self):
+        prompt = build_reviewer_prompt(["lot_history", "genealogy"])
+        self.assertIn("resolve 成 CONTAINERID", prompt)
+        self.assertIn("FINISHEDRUNCARD 不是通用主鍵", prompt)
 
     def test_contains_json_format_instruction(self):
         prompt = build_stage2_prompt(["reject"])

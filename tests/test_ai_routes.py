@@ -12,6 +12,7 @@ from unittest.mock import patch
 import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app
 from mes_dashboard.core.rate_limit import reset_rate_limits_for_tests
+from mes_dashboard.services.ai_query_understanding import reset_query_sessions_for_tests
 
 
 class TestAiRoutesBase(unittest.TestCase):
@@ -23,6 +24,7 @@ class TestAiRoutesBase(unittest.TestCase):
         self.app.config["TESTING"] = True
         self.client = self.app.test_client()
         reset_rate_limits_for_tests()
+        reset_query_sessions_for_tests()
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +109,7 @@ class TestAiQuerySuccess(TestAiRoutesBase):
 
     @patch("mes_dashboard.routes.ai_routes.ai_query_service.process_query")
     def test_ai_query_passes_only_question(self, mock_process):
-        """Route must call process_query with keyword argument question only."""
+        """Route must pass question and conversation_id to service."""
         mock_process.return_value = self._MOCK_RESULT
 
         with patch("mes_dashboard.routes.ai_routes._AI_QUERY_ENABLED", True):
@@ -116,7 +118,35 @@ class TestAiQuerySuccess(TestAiRoutesBase):
                 json={"question": "查詢不良", "conversation_id": "should-be-ignored"},
             )
 
-        mock_process.assert_called_once_with(question="查詢不良")
+        mock_process.assert_called_once_with(
+            question="查詢不良",
+            conversation_id="should-be-ignored",
+        )
+
+    @patch("mes_dashboard.routes.ai_routes.ai_query_service.process_query")
+    def test_ai_query_returns_clarification_payload(self, mock_process):
+        mock_process.return_value = {
+            "answer": "請問您要看摘要還是趨勢？",
+            "chart_data": None,
+            "query_used": None,
+            "params_used": None,
+            "suggestions": ["摘要", "趨勢"],
+            "needs_clarification": True,
+            "missing_slots": ["intent"],
+            "query_state": {"topic": "reject"},
+        }
+
+        with patch("mes_dashboard.routes.ai_routes._AI_QUERY_ENABLED", True):
+            response = self.client.post(
+                "/api/ai/query",
+                json={"question": "WB 不良", "conversation_id": "conv-clarify"},
+            )
+
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["data"]["needs_clarification"])
+        self.assertEqual(payload["data"]["missing_slots"], ["intent"])
 
 
 # ---------------------------------------------------------------------------

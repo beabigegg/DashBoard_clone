@@ -10,6 +10,7 @@ export function useAiChat() {
   const isLoading = ref(false);
   const isRateLimited = ref(false);
   const loadingStepText = ref('');
+  const conversationId = ref(createConversationId());
 
   let rateLimitTimer = null;
   let loadingStepTimer = null;
@@ -46,6 +47,7 @@ export function useAiChat() {
 
   function clearHistory() {
     messages.value = [];
+    conversationId.value = createConversationId();
   }
 
   async function submitQuestion(question) {
@@ -66,7 +68,10 @@ export function useAiChat() {
       const response = await fetch('/api/ai/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: trimmed }),
+        body: JSON.stringify({
+          question: trimmed,
+          conversation_id: conversationId.value,
+        }),
         signal: abortController.signal,
       });
 
@@ -99,6 +104,8 @@ export function useAiChat() {
         suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
         sqlUsed: data.sql_used ?? null,
         toolTrace: Array.isArray(data.tool_trace) ? data.tool_trace : [],
+        missingSlots: Array.isArray(data.missing_slots) ? data.missing_slots : [],
+        queryState: data.query_state ?? null,
       };
 
       messages.value = [...messages.value, aiMessage];
@@ -144,4 +151,8 @@ export function useAiChat() {
     submitQuestion,
     submitSuggestion,
   };
+}
+
+function createConversationId() {
+  return `ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }

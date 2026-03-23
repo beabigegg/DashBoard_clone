@@ -87,11 +87,13 @@ TABLE_DOMAINS: dict[str, dict] = {
     },
     "yield": {
         "tables": [
+            "DWH.ERP_WIP_MOVETXN",
+            "DWH.ERP_WIP_MOVETXN_DETAIL",
             "DWH.DW_MES_LOTREJECTHISTORY",
             "DWH.DW_MES_LOTWIPHISTORY",
         ],
         "keywords": ["良率", "yield", "OU%", "通過率", "pass rate"],
-        "description": "良率分析（需關聯不良與歷程計算）",
+        "description": "良率分析（ERP 投入量為分母，reject 為分子）",
     },
     "wip_data": {
         "tables": [
@@ -183,6 +185,8 @@ ORIGINALCONTAINERID CHAR(16)    -- 原始容器 ID
 MOVEINQTY         NUMBER        -- 進站數量""",
 
     "DWH.DW_MES_LOTWIPHISTORY": """-- 批次加工站進出歷史（每次 TrackIn/TrackOut 一筆）
+-- 最穩定查詢鍵：CONTAINERID；若使用者提供 LOTID 通常需先 resolve
+-- 若題目明確指定生產工單，可直接用 PJ_WORKORDER
 CONTAINERID       CHAR(16)      -- 批次容器 ID
 WORKCENTERNAME    VARCHAR2(40)  -- 加工站名稱（如 焊接_DB, 成型）
 EQUIPMENTID       CHAR(16)      -- 設備 ID
@@ -194,7 +198,7 @@ TRACKOUTQTY       NUMBER        -- TrackOut 數量（pcs）
 SPECNAME          VARCHAR2(40)  -- 製程規格
 PJ_WORKORDER      VARCHAR2(40)  -- 生產工單號
 WORKFLOWNAME      VARCHAR2(40)  -- 製程流程名稱
-FINISHEDRUNCARD   VARCHAR2(40)  -- Runcard 編號""",
+FINISHEDRUNCARD   VARCHAR2(40)  -- Runcard 編號（流程欄位，非通用主鍵）""",
 
     # ── 不良/Hold ────────────────────────────────────────────────────────
     "DWH.DW_MES_LOTREJECTHISTORY": """-- 批次不良/Reject 歷史（約 16,100,000 筆）
@@ -324,6 +328,7 @@ COMMENTS          VARCHAR2(255) -- 維修備註""",
 
     # ── 材料/物料 ────────────────────────────────────────────────────────
     "DWH.DW_MES_LOTMATERIALSHISTORY": """-- 批次材料耗用歷史（每次耗料一筆）
+-- 最穩定查詢鍵：CONTAINERID；若輸入為 LOTID 通常需先反查
 CONTAINERID       CHAR(16)      -- 批次容器 ID
 TXNDATE           DATE          -- 耗用時間
 MATERIALPARTNAME  VARCHAR2      -- 材料料號（如 WAF002861_CP, LEF000074）
@@ -359,7 +364,7 @@ HISTORYMAINLINEID CHAR(16)      -- 歷史主線 ID""",
 CONTAINERID       CHAR(16)      -- 成品批次容器 ID
 CONTAINERNAME     VARCHAR2(40)  -- 成品批次編號（流水批號）
 LOTID             CHAR(16)      -- 來源批次 ID（被合併的批次）
-FINISHEDNAME      VARCHAR2(40)  -- 完成品名稱
+FINISHEDNAME      VARCHAR2(40)  -- 完成品名稱 / 成品流水號關聯欄位
 PJ_WORKORDER      VARCHAR2(40)  -- 生產工單號
 PJ_GOODDIEQTY     NUMBER        -- 良品 Die 數量
 PJ_ORIGINALGOODDIEQTY NUMBER    -- 合併前的原始良品數量
@@ -502,6 +507,31 @@ SQL_EXAMPLES: dict[str, list[dict[str, str]]] = {
                 "FETCH FIRST 20 ROWS ONLY"
             ),
         },
+        {
+            "question": "目前線上有多少品質異常 HOLD？",
+            "sql": (
+                "SELECT COUNT(*) AS QUALITY_HOLD_LOTS, SUM(QTY) AS QUALITY_HOLD_QTY "
+                "FROM DWH.DW_MES_LOT_V "
+                "WHERE CURRENTHOLDCOUNT > 0 "
+                "AND (HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN ("
+                "'IQC檢驗(久存品驗證)(QC)', '大中/安波幅50pcs樣品留樣(PD)', '工程驗證(PE)', '工程驗證(RD)', "
+                "'指定機台生產', '特殊需求(X-Ray全檢)', '特殊需求管控', '第一次量產QC品質確認(QC)', "
+                "'需綁尾數(PD)', '樣品需求留存打樣(樣品)', '盤點(收線)需求'"
+                ")) "
+                "FETCH FIRST 1 ROWS ONLY"
+            ),
+        },
+        {
+            "question": "2N7002K現在在哪些站點生產？",
+            "sql": (
+                "SELECT DISTINCT WORKCENTER_GROUP "
+                "FROM DWH.DW_MES_LOT_V "
+                "WHERE PJ_TYPE = :pj_type "
+                "AND EQUIPMENTCOUNT > 0 "
+                "ORDER BY WORKCENTER_GROUP "
+                "FETCH FIRST 100 ROWS ONLY"
+            ),
+        },
     ],
     "lot_history": [
         {
@@ -527,6 +557,27 @@ SQL_EXAMPLES: dict[str, list[dict[str, str]]] = {
                 "GROUP BY h.WORKCENTERNAME, h.EQUIPMENTNAME "
                 "ORDER BY LOT_CNT DESC "
                 "FETCH FIRST 30 ROWS ONLY"
+            ),
+        },
+        {
+            "question": "GA26020001在哪些機台生產過？",
+            "sql": (
+                "SELECT DISTINCT h.EQUIPMENTNAME "
+                "FROM DWH.DW_MES_LOTWIPHISTORY h "
+                "WHERE h.PJ_WORKORDER = :workorder_name "
+                "ORDER BY h.EQUIPMENTNAME "
+                "FETCH FIRST 100 ROWS ONLY"
+            ),
+        },
+        {
+            "question": "GA23100020-A00-011 生產過哪些站點？",
+            "sql": (
+                "SELECT DISTINCT h.WORKCENTERNAME "
+                "FROM DWH.DW_MES_CONTAINER c "
+                "JOIN DWH.DW_MES_LOTWIPHISTORY h ON h.CONTAINERID = c.CONTAINERID "
+                "WHERE c.CONTAINERNAME = :lot_id "
+                "ORDER BY h.WORKCENTERNAME "
+                "FETCH FIRST 100 ROWS ONLY"
             ),
         },
     ],

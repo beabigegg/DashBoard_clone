@@ -48,11 +48,15 @@ def ai_query():
 
     body = request.get_json(silent=True) or {}
     question = (body.get("question") or "").strip()
+    conversation_id = (body.get("conversation_id") or "").strip() or None
     if not question:
         return validation_error("question 不可為空")
 
     try:
-        result = ai_query_service.process_query(question=question)
+        result = ai_query_service.process_query(
+            question=question,
+            conversation_id=conversation_id,
+        )
         return success_response(result)
 
     except TimeoutError as exc:

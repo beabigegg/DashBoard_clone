@@ -79,6 +79,19 @@ BUSINESS_TERMINOLOGY = """
 - 產線自檢異常(PD) → 產線品質問題
 - 這些都是 Hold 原因，不是工站名稱
 
+## 「品質異常 Hold / 品質 Hold」的業務定義
+
+在 WIP 即時視圖中，「品質異常 Hold」不是只看 HOLDREASONNAME LIKE '%品質異常%'。
+正確定義是：
+- 先判斷批次目前為 HOLD：EQUIPMENTCOUNT = 0 且 CURRENTHOLDCOUNT > 0
+- 再排除「非品質 Hold 原因」
+- 也就是說：只要 HOLDREASONNAME 不屬於非品質 Hold 清單，就算品質 Hold
+- 因此 S1 / S2 / S3 這類代碼也屬於品質 Hold
+
+使用者若問「目前線上有多少品質異常 HOLD」：
+- 應回傳品質 Hold 的 lots 與 qty
+- 不可只用 HOLDREASONNAME LIKE '%品質異常%'，否則會漏掉 S1/S2/S3 等品質異常批次
+
 ## 設備狀態代碼
 
 EQUIPMENTASSETSSTATUS 欄位的值：
@@ -107,6 +120,21 @@ OU% = SUM(PRD 狀態小時數) / SUM(所有狀態小時數) × 100
 - 生產工單（MFGORDERNAME / JOBORDER / PJ_WORKORDER）：GA/GC 開頭，管理批次生產
 - 維修工單（JOBID / JOBORDERNAME）：設備故障報修，關聯 DW_MES_JOB 表
 - EQUIPMENTSTATUS_WIP_V 中同時有兩者：JOBORDER=生產工單，JOBID=維修工單
+- 若使用者輸入 GA/GC 開頭（如 GA26020001），優先視為生產工單，不是 LOT ID
+- 在 LOTWIPHISTORY 中查工單歷程時，應優先使用 PJ_WORKORDER 過濾，不可誤用 CONTAINERID
+
+## 產品欄位語義（非常重要）
+
+在 DW_MES_LOT_V / 即時 WIP 查詢中，與產品相關的欄位容易混淆：
+- PRODUCT：完整產品料號 / 完整品名
+- PJ_TYPE：產品類型，常是使用者口中的型號關鍵字（例如 2N7002K）
+- PRODUCTLINENAME：封裝型號（例如 SOT-23、SOD-323HE）
+- PACKAGE_LEF：封裝 + LeadFrame 組合
+
+如果使用者問：
+- 「2N7002K 現在在哪些站點生產」→ 優先視為 PJ_TYPE 查詢，不是 PRODUCT 精確比對
+- 「SOT-23 現在在哪些站點生產」→ 視為 PRODUCTLINENAME / PACKAGE 類查詢
+- 「完整料號 SS1060VHEWS_R2_00001」→ 才可能對應 PRODUCT
 """.strip()
 
 # ---------------------------------------------------------------------------
@@ -162,9 +190,70 @@ SCRAP_EXCLUSION_RULES = """
 """.strip()
 
 
+QUALITY_HOLD_RULES = """
+## 品質 Hold 判斷規則（即時 WIP 口徑）
+
+以下原因屬於「非品質 Hold」，應從品質 Hold 中排除：
+- IQC檢驗(久存品驗證)(QC)
+- 大中/安波幅50pcs樣品留樣(PD)
+- 工程驗證(PE)
+- 工程驗證(RD)
+- 指定機台生產
+- 特殊需求(X-Ray全檢)
+- 特殊需求管控
+- 第一次量產QC品質確認(QC)
+- 需綁尾數(PD)
+- 樣品需求留存打樣(樣品)
+- 盤點(收線)需求
+
+除了上述非品質 Hold 原因外，其餘目前 HOLD 中的批次都屬於品質 Hold。
+若 HOLDREASONNAME 為 NULL，也視為品質 Hold。
+""".strip()
+
+
+ID_RELATIONSHIP_RULES = """
+## ID 關係與查詢鍵規則
+
+### 1. 即時 WIP（DW_MES_LOT_V）
+- LOT ID：使用 LOTID
+- 生產工單：使用 WORKORDER
+- Wafer Lot：使用 FIRSTNAME
+- 產品型號關鍵字（如 2N7002K）：優先用 PJ_TYPE
+- 封裝型號（如 SOT-23）：優先用 PRODUCTLINENAME 或 PACKAGE_LEF
+
+### 2. 歷史批次資料表的主鍵習慣
+以下歷史表查詢時，最穩定的鍵通常是 CONTAINERID：
+- DW_MES_LOTWIPHISTORY
+- DW_MES_LOTMATERIALSHISTORY
+- DW_MES_LOTREJECTHISTORY
+- DW_MES_HOLDRELEASEHISTORY
+- DW_MES_LOTWIPDATAHISTORY
+
+也就是說：
+- 若使用者給的是 LOT ID / CONTAINERNAME，常需要先從 DW_MES_CONTAINER 反查成 CONTAINERID
+- 若使用者給的是 Wafer Lot（FIRSTNAME），通常也要先找到對應 LOT / CONTAINERID 再查歷史表
+
+### 3. 生產工單（GA/GC）與歷史表
+- 使用者輸入 GA/GC 開頭（如 GA26020001）時，優先視為生產工單
+- 在 DW_MES_LOTWIPHISTORY / DW_MES_LOTREJECTHISTORY / DW_MES_HOLDRELEASEHISTORY / DW_MES_LOTMATERIALSHISTORY 中，生產工單欄位通常是 PJ_WORKORDER
+- 在 DW_MES_LOT_V 中，生產工單欄位是 WORKORDER
+- 在 DW_MES_CONTAINER 中，生產工單欄位是 MFGORDERNAME
+
+### 4. FINISHEDRUNCARD / FINISHEDNAME / LOT 的關係
+- FINISHEDRUNCARD 出現在歷史表中，通常是完工卡號/流程欄位，不是通用主鍵
+- FINISHEDNAME 出現在 DW_MES_PJ_COMBINEDASSYLOTS，中意義較接近成品流水號/完成品名稱
+- 若是做 genealogy / split-merge / serial trace，應優先考慮 lineage 表與 COMBINEDASSYLOTS，而不是直接把 FINISHEDRUNCARD 當歷史表主鍵
+
+### 5. 何時需要先反查（resolve）
+- 問「某 LOT 經過哪些站、哪些機台、用了哪些材料」→ 若輸入是 LOTID/CONTAINERNAME，通常先 resolve 到 CONTAINERID 再查歷史表
+- 問「某工單有哪些 LOT / 哪些機台生產過」→ 可直接用工單欄位（如 PJ_WORKORDER / MFGORDERNAME），不一定需要日期限制
+- 問「某 Wafer Lot 對應哪些批次」→ 通常先用 FIRSTNAME 找 LOT / CONTAINERID，再進一步查歷史
+""".strip()
+
+
 def get_stage1_business_context() -> str:
     """Return business context to inject into Stage 1 prompt."""
-    return f"{SYSTEM_OVERVIEW}\n\n{BUSINESS_TERMINOLOGY}"
+    return f"{SYSTEM_OVERVIEW}\n\n{BUSINESS_TERMINOLOGY}\n\n{QUALITY_HOLD_RULES}\n\n{ID_RELATIONSHIP_RULES}"
 
 
 def get_stage1_domain_hints() -> str:

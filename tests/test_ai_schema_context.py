@@ -127,6 +127,31 @@ class TestSqlExamples(unittest.TestCase):
             self.assertIn(domain, SQL_EXAMPLES, f"No SQL examples for domain '{domain}'")
             self.assertTrue(len(SQL_EXAMPLES[domain]) >= 2, f"Domain '{domain}' has fewer than 2 examples")
 
+    def test_wip_realtime_contains_quality_hold_example(self) -> None:
+        examples = SQL_EXAMPLES.get("wip_realtime", [])
+        joined = "\n".join(ex.get("question", "") + "\n" + ex.get("sql", "") for ex in examples)
+        self.assertIn("品質異常 HOLD", joined)
+        self.assertIn("QUALITY_HOLD_LOTS", joined)
+        self.assertIn("QUALITY_HOLD_QTY", joined)
+
+    def test_wip_realtime_contains_product_type_example(self) -> None:
+        examples = SQL_EXAMPLES.get("wip_realtime", [])
+        joined = "\n".join(ex.get("question", "") + "\n" + ex.get("sql", "") for ex in examples)
+        self.assertIn("2N7002K現在在哪些站點生產", joined)
+        self.assertIn("PJ_TYPE = :pj_type", joined)
+
+    def test_lot_history_contains_workorder_machine_example(self) -> None:
+        examples = SQL_EXAMPLES.get("lot_history", [])
+        joined = "\n".join(ex.get("question", "") + "\n" + ex.get("sql", "") for ex in examples)
+        self.assertIn("GA26020001在哪些機台生產過", joined)
+        self.assertIn("PJ_WORKORDER = :workorder_name", joined)
+
+    def test_lot_history_contains_lotid_resolve_example(self) -> None:
+        examples = SQL_EXAMPLES.get("lot_history", [])
+        joined = "\n".join(ex.get("question", "") + "\n" + ex.get("sql", "") for ex in examples)
+        self.assertIn("GA23100020-A00-011 生產過哪些站點", joined)
+        self.assertIn("JOIN DWH.DW_MES_LOTWIPHISTORY h ON h.CONTAINERID = c.CONTAINERID", joined)
+
     def test_examples_are_select_statements(self) -> None:
         for domain, examples in SQL_EXAMPLES.items():
             for ex in examples:

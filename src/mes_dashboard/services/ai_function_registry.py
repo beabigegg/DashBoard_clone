@@ -133,6 +133,7 @@ def build_stage2_prompt(domains: list[str]) -> str:
     from mes_dashboard.services.ai_business_context import (
         get_dynamic_metadata_block,
     )
+    from mes_dashboard.sql.filters import CommonFilters
 
     schema_block = get_schemas_for_domains(domains)
     examples_block = get_examples_for_domains(domains)
@@ -142,6 +143,7 @@ def build_stage2_prompt(domains: list[str]) -> str:
 
     today = date.today()
     seven_days_ago = today - timedelta(days=7)
+    non_quality_list = CommonFilters.get_non_quality_reasons_sql()
 
     lines = [
         "你是 Oracle SQL 生成器。根據使用者問題生成可執行的 Oracle SELECT 語句。",
@@ -158,14 +160,21 @@ def build_stage2_prompt(domains: list[str]) -> str:
         "## SQL 生成規則",
         "1. 只能使用上方列出的表，禁止其他表",
         "2. 只用 SELECT，禁止 INSERT/UPDATE/DELETE/DDL",
-        "3. 歷史表（名稱含 HISTORY / MOVETXN / RESOURCESTATUS_SHIFT）必須加日期或 ID 條件；未指定日期時 params 填寫近 7 天",
+        "3. 歷史表（名稱含 HISTORY / MOVETXN / RESOURCESTATUS_SHIFT）必須加日期或 ID 條件",
+        "   - 若問題已指定 lot / workorder / container_id / equipment_id 這類明確識別碼，可不加日期限制",
+        "   - 只有在未指定明確識別碼、且問題是在做統計/趨勢/排行時，才預設近 7 天",
         "4. 即時 View（DW_MES_LOT_V、DW_MES_EQUIPMENTSTATUS_WIP_V）是當下快照，禁止加 SYS_DATE 日期過濾——問「目前/現在」直接查，不加日期條件",
         "5. 必須加 FETCH FIRST N ROWS ONLY（N 通常為 20-100）",
         "6. 日期條件用 :start_date 和 :end_date bind variable，params 值必須是 YYYY-MM-DD 格式的實際日期（禁止用 SYSDATE）",
         "7. 工站名稱比對：使用者說「DB」「WB」等縮寫時，params 必須轉成系統全名（如 DB→'焊接_DB%', WB→'焊接_WB%', 成型→'成型%'），參考業務術語的工站對照表",
         "8. Hold 原因名稱用 LIKE '%S1%' 模糊比對（使用者說 S1 但實際值可能是 'S1品質異常單(PE)'）",
-        '9. 混合大小寫欄位必須用雙引號：e."Package", e."Function"（其餘欄位全大寫，不加引號）',
-        "10. 若無法生成合理 SQL，回傳 sql: null",
+        "9. 若使用者問『品質異常 Hold / 品質 Hold』，不可用 HOLDREASONNAME LIKE '%品質異常%'；應使用品質 Hold 定義：目前 HOLD 且 (HOLDREASONNAME IS NULL OR HOLDREASONNAME NOT IN (非品質 Hold 清單))",
+        f"   非品質 Hold 清單：{non_quality_list}",
+        "10. 若使用者提供的是產品型號關鍵字（例如 2N7002K），在即時 WIP 查詢時優先使用 PJ_TYPE，而不是 PRODUCT 精確比對",
+        "11. 若使用者提供的是封裝型號（例如 SOT-23），優先使用 PRODUCTLINENAME 或 PACKAGE 類欄位",
+        "12. 若使用者輸入 GA/GC 開頭（如 GA26020001），通常是生產工單，查 LOTWIPHISTORY 時優先用 PJ_WORKORDER，而不是 CONTAINERID",
+        '13. 混合大小寫欄位必須用雙引號：e."Package", e."Function"（其餘欄位全大寫，不加引號）',
+        "14. 若無法生成合理 SQL，回傳 sql: null",
         "",
     ]
 
@@ -220,16 +229,28 @@ def build_reviewer_prompt(domains: list[str]) -> str:
         "- 常見錯誤：問「現在 HOLD 多少」卻查 HOLDRELEASEHISTORY",
         "- 即時 View（LOT_V / EQUIPMENTSTATUS_WIP_V）是當下快照，禁止加 SYS_DATE 日期過濾",
         "- 常見錯誤：查 LOT_V 時加了 SYS_DATE BETWEEN 導致查不到資料",
+        "- 歷史表若已提供明確識別碼（例如工單、lot、container_id、equipment_id），可以不加日期限制",
+        "- 常見錯誤：已指定工單或 lot，卻仍強制加近 7 天條件，導致查不到歷史資料",
         "",
         "### 2. Hold 原因比對方式",
         "- 使用者說 S1/S2 等縮寫，系統中實際值是完整名稱（如 S2品質異常單(PE)）",
         "- 必須用 LIKE '%S1%' 模糊比對，不能用 = 'S1' 精確比對",
+        "- 使用者問『品質異常 Hold / 品質 Hold』時，不可用 HOLDREASONNAME LIKE '%品質異常%'",
+        "- 正確做法：以目前 HOLD 批次為母集合，排除非品質 Hold 原因後的剩餘批次才是品質 Hold",
+        "- 非品質 Hold 原因包含：IQC檢驗(久存品驗證)(QC)、工程驗證(PE)、工程驗證(RD)、指定機台生產、特殊需求(X-Ray全檢)、特殊需求管控、第一次量產QC品質確認(QC)、需綁尾數(PD)、樣品需求留存打樣(樣品)、盤點(收線)需求等",
         "",
         "### 3. 欄位語義正確性",
         "- 不良率分母：用 MOVEINQTY（進站數量），不是 TRACKINQTY 或 QTYTOPROCESS",
         "- WIP 狀態：用 EQUIPMENTCOUNT>0 判斷 RUN，CURRENTHOLDCOUNT>0 判斷 HOLD",
         "- JOBID 是維修工單 ID，JOBORDER/MFGORDERNAME 才是生產工單號",
         "- LOT_V 的工單欄位叫 WORKORDER（非 MFGORDERNAME）",
+        "- LOT_V 中 PRODUCT 是完整產品料號；PJ_TYPE 才常對應使用者口中的產品型號（例如 2N7002K）",
+        "- 使用者若問『2N7002K 現在在哪些站點生產』，不可寫 PRODUCT = '2N7002K'；應優先考慮 PJ_TYPE = '2N7002K'",
+        "- 使用者若問封裝型號（例如 SOT-23），應優先考慮 PRODUCTLINENAME / PACKAGE 類欄位",
+        "- 使用者若輸入 GA/GC 開頭（例如 GA26020001），通常是生產工單，不是 CONTAINERID",
+        "- 查 LOTWIPHISTORY 時，工單應使用 PJ_WORKORDER；只有 lot 才用 CONTAINERID / LOTID 類欄位",
+        "- 查 LOTWIPHISTORY / LOTMATERIALSHISTORY / LOTREJECTHISTORY / HOLDRELEASEHISTORY 這類歷史表時，若使用者給的是 LOTID/CONTAINERNAME，通常要先 resolve 成 CONTAINERID",
+        "- FINISHEDRUNCARD 不是通用主鍵；若題目在問 genealogy / 成品流水號關係，應優先考慮 COMBINEDASSYLOTS / lineage 表",
         "",
         "### 4. 混合大小寫欄位",
         '- Package 和 Function 必須用雙引號："Package"、"Function"',

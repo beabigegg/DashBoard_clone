@@ -30,6 +30,7 @@ from mes_dashboard.services.ai_function_registry import (
     get_suggestions,
     validate_intent,
 )
+from mes_dashboard.services.ai_query_understanding import advance_query_state
 
 import pandas as pd
 
@@ -1190,21 +1191,48 @@ def process_query_function(question: str) -> dict[str, Any]:
 # Dispatcher — feature flag selects pipeline
 # ---------------------------------------------------------------------------
 
-def process_query(question: str) -> dict[str, Any]:
-    """Route to text2sql, function-call, or agent pipeline based on AI_MODE env var.
+def process_query(question: str, conversation_id: str | None = None) -> dict[str, Any]:
+    """Route to clarification/text2sql/function/agent pipeline based on AI_MODE.
 
     AI_MODE=text2sql (default) → process_query_text2sql()
     AI_MODE=function            → process_query_function()
     AI_MODE=agent               → process_agent_turn()
     """
+    state = advance_query_state(
+        conversation_id=conversation_id,
+        user_input=question,
+        llm_caller=_call_llm,
+    )
+
+    if not state.get("ready_to_search"):
+        return {
+            "answer": state.get("answer") or "請補充查詢條件。",
+            "chart_data": None,
+            "query_used": None,
+            "params_used": None,
+            "suggestions": state.get("suggestions") or [],
+            "needs_clarification": True,
+            "missing_slots": state.get("missing_slots") or [],
+            "query_state": state.get("query_state") or {},
+        }
+
+    search_question = state.get("search_question") or question
     mode = os.getenv("AI_MODE", "text2sql").strip().lower()
     if mode == "agent":
         from mes_dashboard.services.ai_agent_loop import process_agent_turn
-        return process_agent_turn(question)
-    if mode == "function":
-        result = process_query_function(question)
+        result = process_agent_turn(search_question)
         result.setdefault("needs_clarification", False)
+        result.setdefault("missing_slots", [])
+        result.setdefault("query_state", state.get("query_state") or {})
         return result
-    result = process_query_text2sql(question)
+    if mode == "function":
+        result = process_query_function(search_question)
+        result.setdefault("needs_clarification", False)
+        result.setdefault("missing_slots", [])
+        result.setdefault("query_state", state.get("query_state") or {})
+        return result
+    result = process_query_text2sql(search_question)
     result.setdefault("needs_clarification", False)
+    result.setdefault("missing_slots", [])
+    result.setdefault("query_state", state.get("query_state") or {})
     return result
