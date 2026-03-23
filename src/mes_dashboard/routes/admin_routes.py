@@ -511,9 +511,7 @@ def _query_mysql_metrics(minutes: int = 30, bucket_seconds: int = 30) -> list:
 
         sql = text(f"""
             SELECT
-                FROM_UNIXTIME(
-                    FLOOR(UNIX_TIMESTAMP(ts) / {bucket_seconds}) * {bucket_seconds}
-                ) AS ts,
+                MIN(ts) AS ts,
                 MAX(pool_saturation)    AS pool_saturation,
                 MAX(pool_checked_out)   AS pool_checked_out,
                 MAX(pool_checked_in)    AS pool_checked_in,
