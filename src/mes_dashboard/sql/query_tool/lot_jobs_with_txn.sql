@@ -31,9 +31,10 @@ SELECT
 FROM DWH.DW_MES_JOB j
 JOIN DWH.DW_MES_JOBTXNHISTORY h ON j.JOBID = h.JOBID
 WHERE j.RESOURCEID = :equipment_id
+  AND j.CREATEDATE <= :time_end
   AND (
-    (j.CREATEDATE BETWEEN :time_start AND :time_end)
-    OR (j.COMPLETEDATE BETWEEN :time_start AND :time_end)
-    OR (j.CREATEDATE <= :time_start AND (j.COMPLETEDATE IS NULL OR j.COMPLETEDATE >= :time_end))
+    (j.COMPLETEDATE IS NOT NULL AND j.COMPLETEDATE >= :time_start)
+    OR
+    (j.COMPLETEDATE IS NULL AND j.CREATEDATE >= :time_start)
   )
 ORDER BY j.JOBID, h.TXNDATE
