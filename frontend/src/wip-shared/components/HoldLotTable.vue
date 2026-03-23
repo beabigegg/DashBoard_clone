@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 
 import Pagination from '../../shared-ui/components/PaginationControl.vue';
 
@@ -39,6 +40,22 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['clear-filters', 'prev-page', 'next-page']);
+const lotsRef = computed(() => props.lots);
+const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(lotsRef);
+
+function currentSortLabel(key) {
+  if (sortKey.value !== key) {
+    return '⇕';
+  }
+  return sortDirection.value === 'asc' ? '▲' : '▼';
+}
+
+function ariaSortFor(key) {
+  if (sortKey.value !== key) {
+    return 'none';
+  }
+  return sortDirection.value === 'asc' ? 'ascending' : 'descending';
+}
 
 function formatNumber(value) {
   if (value === null || value === undefined || value === '-') {
@@ -90,19 +107,19 @@ const pageInfo = computed(() => {
       <table class="lot-table">
         <thead>
           <tr>
-            <th>LOTID</th>
-            <th>WORKORDER</th>
-            <th>QTY</th>
-            <th>Product</th>
-            <th>Package</th>
-            <th>Workcenter</th>
-            <th>Hold Reason</th>
-            <th>Spec</th>
-            <th>Age</th>
-            <th>Hold By</th>
-            <th>Dept</th>
-            <th>Hold Comment</th>
-            <th>Future Hold Comment</th>
+            <th class="cursor-pointer" @click="toggleSort('lotId')" :aria-sort="ariaSortFor('lotId')">LOTID <span>{{ currentSortLabel('lotId') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('workorder')" :aria-sort="ariaSortFor('workorder')">WORKORDER <span>{{ currentSortLabel('workorder') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('qty')" :aria-sort="ariaSortFor('qty')">QTY <span>{{ currentSortLabel('qty') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('product')" :aria-sort="ariaSortFor('product')">Product <span>{{ currentSortLabel('product') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('package')" :aria-sort="ariaSortFor('package')">Package <span>{{ currentSortLabel('package') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('workcenter')" :aria-sort="ariaSortFor('workcenter')">Workcenter <span>{{ currentSortLabel('workcenter') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('holdReason')" :aria-sort="ariaSortFor('holdReason')">Hold Reason <span>{{ currentSortLabel('holdReason') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('spec')" :aria-sort="ariaSortFor('spec')">Spec <span>{{ currentSortLabel('spec') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('age')" :aria-sort="ariaSortFor('age')">Age <span>{{ currentSortLabel('age') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('holdBy')" :aria-sort="ariaSortFor('holdBy')">Hold By <span>{{ currentSortLabel('holdBy') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('dept')" :aria-sort="ariaSortFor('dept')">Dept <span>{{ currentSortLabel('dept') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('holdComment')" :aria-sort="ariaSortFor('holdComment')">Hold Comment <span>{{ currentSortLabel('holdComment') }}</span></th>
+            <th class="cursor-pointer" @click="toggleSort('futureHoldComment')" :aria-sort="ariaSortFor('futureHoldComment')">Future Hold Comment <span>{{ currentSortLabel('futureHoldComment') }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -112,10 +129,10 @@ const pageInfo = computed(() => {
           <tr v-else-if="errorMessage">
             <td colspan="13" class="placeholder">{{ errorMessage }}</td>
           </tr>
-          <tr v-else-if="lots.length === 0">
+          <tr v-else-if="sortedData.length === 0">
             <td colspan="13" class="placeholder">No data</td>
           </tr>
-          <tr v-for="lot in lots" v-else :key="lot.lotId">
+          <tr v-for="lot in sortedData" v-else :key="lot.lotId">
             <td>{{ lot.lotId || '-' }}</td>
             <td>{{ lot.workorder || '-' }}</td>
             <td>{{ formatNumber(lot.qty) }}</td>
