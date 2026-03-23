@@ -72,6 +72,7 @@ class SyncWorker:
             logger.info("SyncWorker stopped")
 
     def _run(self) -> None:
+        self._ensure_mysql_tables()
         while not self._stop_event.wait(self.interval):
             try:
                 self._sync_logs()
@@ -89,6 +90,99 @@ class SyncWorker:
                 self._cleanup_synced()
             except Exception as exc:
                 logger.warning("SyncWorker: cleanup error: %s", exc)
+
+    # ----------------------------------------------------------
+    # Auto-create MySQL tables
+    # ----------------------------------------------------------
+
+    def _ensure_mysql_tables(self) -> None:
+        """Create MySQL tables if they don't exist yet."""
+        from sqlalchemy import text
+
+        if not MYSQL_OPS_ENABLED:
+            return
+
+        ddl_statements = [
+            """
+            CREATE TABLE IF NOT EXISTS dashboard_logs (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                sync_id VARCHAR(255) UNIQUE,
+                timestamp DATETIME(3),
+                level VARCHAR(20),
+                logger_name VARCHAR(255),
+                message TEXT,
+                request_id VARCHAR(100),
+                user VARCHAR(100),
+                ip VARCHAR(45),
+                extra TEXT,
+                INDEX idx_timestamp (timestamp),
+                INDEX idx_level (level)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS dashboard_metrics_snapshots (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                sync_id VARCHAR(255) UNIQUE,
+                ts DATETIME(3),
+                worker_pid INT,
+                pool_saturation DOUBLE,
+                pool_checked_out INT,
+                pool_checked_in INT,
+                pool_overflow INT,
+                pool_max_capacity INT,
+                redis_used_memory BIGINT,
+                redis_hit_rate DOUBLE,
+                rc_l1_hit_rate DOUBLE,
+                rc_l2_hit_rate DOUBLE,
+                rc_miss_rate DOUBLE,
+                latency_p50_ms DOUBLE,
+                latency_p95_ms DOUBLE,
+                latency_p99_ms DOUBLE,
+                latency_count INT,
+                slow_query_active INT,
+                slow_query_waiting INT,
+                worker_rss_bytes BIGINT,
+                system_mem_available_mb DOUBLE,
+                system_mem_used_pct DOUBLE,
+                rq_workers_total INT,
+                rq_workers_busy INT,
+                rq_queue_depth INT,
+                heavy_query_slots_active INT,
+                INDEX idx_ts (ts)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS dashboard_login_sessions (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                sync_id VARCHAR(255) UNIQUE,
+                session_id VARCHAR(100),
+                emp_id VARCHAR(50),
+                username VARCHAR(100),
+                display_name VARCHAR(200),
+                real_name VARCHAR(100),
+                department VARCHAR(200),
+                email VARCHAR(200),
+                phone VARCHAR(50),
+                domain VARCHAR(50),
+                ip VARCHAR(45),
+                login_time DATETIME(3),
+                last_active DATETIME(3),
+                logout_time DATETIME(3),
+                duration_sec INT,
+                is_admin TINYINT DEFAULT 0,
+                INDEX idx_login_time (login_time),
+                INDEX idx_emp_id (emp_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """,
+        ]
+
+        try:
+            with get_mysql_connection() as conn:
+                for ddl in ddl_statements:
+                    conn.execute(text(ddl))
+            logger.info("SyncWorker: MySQL tables verified/created")
+        except Exception as exc:
+            logger.warning("SyncWorker: cannot ensure MySQL tables, will retry on next sync: %s", exc)
 
     # ----------------------------------------------------------
     # Log sync
