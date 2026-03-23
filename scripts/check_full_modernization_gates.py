@@ -86,12 +86,10 @@ def _route_css_targets() -> dict[str, list[Path]]:
         "/qc-gate": [ROOT / "frontend/src/qc-gate/style.css"],
         "/job-query": [ROOT / "frontend/src/job-query/style.css"],
         "/admin/pages": [ROOT / "src/mes_dashboard/templates/admin/pages.html"],
-        "/admin/performance": [ROOT / "frontend/src/admin-performance/style.css"],
         "/tables": [ROOT / "frontend/src/tables/style.css"],
         "/excel-query": [ROOT / "frontend/src/excel-query/style.css"],
         "/query-tool": [ROOT / "frontend/src/query-tool/style.css"],
         "/mid-section-defect": [ROOT / "frontend/src/mid-section-defect/style.css"],
-        "/admin/user-usage-kpi": [ROOT / "frontend/src/admin-user-usage-kpi/style.css"],
         "/admin/dashboard": [ROOT / "frontend/src/admin-dashboard/style.css"],
     }
 
@@ -132,8 +130,8 @@ def _check_scope_matrix(scope_matrix: dict[str, Any], report: CheckReport) -> tu
     }
     if not in_scope:
         report.fail("scope matrix has no in-scope routes")
-    if "/admin/pages" not in in_scope or "/admin/performance" not in in_scope:
-        report.fail("scope matrix must include /admin/pages and /admin/performance")
+    if "/admin/pages" not in in_scope or "/admin/dashboard" not in in_scope:
+        report.fail("scope matrix must include /admin/pages and /admin/dashboard")
     required_deferred: set[str] = set()
     if deferred != required_deferred:
         report.fail("scope matrix deferred routes mismatch expected policy (all routes promoted to in-scope)")

@@ -32,9 +32,7 @@ const adminUser = ref(null);
 const navigationNotice = ref('');
 const adminLinks = ref({
   logout: null,
-  pages: '/admin/pages',
   dashboard: '/admin/dashboard',
-  performance: '/admin/performance',
 });
 const sidebarCollapsed = ref(false);
 const sidebarMobileOpen = ref(false);
@@ -187,9 +185,7 @@ async function loadNavigation() {
     adminUser.value = null;
     adminLinks.value = {
       logout: null,
-      pages: '/admin/pages',
       dashboard: '/admin/dashboard',
-      performance: '/admin/performance',
     };
     syncNavigationRoutes([]);
   } finally {
@@ -280,9 +276,6 @@ watch(isLoginPage, (isLogin, wasLogin) => {
         <AnomalyIndicator />
         <HealthStatus />
         <div class="admin-entry">
-          <template v-if="isAdmin">
-            <a v-if="adminLinks?.pages" class="admin-link" :href="adminLinks.pages">管理後台</a>
-          </template>
           <span v-if="adminDisplayName" class="admin-name">{{ adminDisplayName }}</span>
           <button type="button" class="admin-link" @click="handleLogout">登出</button>
         </div>

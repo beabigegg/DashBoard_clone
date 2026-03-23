@@ -41,23 +41,11 @@ LEGACY_NAV_ASSIGNMENTS = {
         "status": "dev",
         "name": "頁面管理",
     },
-    "/admin/performance": {
+    "/admin/dashboard": {
         "drawer_id": "dev-tools",
         "order": 2,
         "status": "dev",
-        "name": "效能監控",
-    },
-    "/admin/dashboard": {
-        "drawer_id": "dev-tools",
-        "order": 3,
-        "status": "dev",
         "name": "管理儀表板",
-    },
-    "/admin/user-usage-kpi": {
-        "drawer_id": "dev-tools",
-        "order": 4,
-        "status": "dev",
-        "name": "使用者 KPI",
     },
 }
 

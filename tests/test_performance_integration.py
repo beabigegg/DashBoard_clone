@@ -376,18 +376,11 @@ class TestPerformancePage:
         # Should redirect to login
         assert response.status_code == 302
 
-    def test_performance_page_loads(self, admin_client):
-        """Performance page loads for admin users."""
+    def test_performance_page_redirects_to_dashboard(self, admin_client):
+        """Performance page redirects to unified dashboard."""
         response = admin_client.get('/admin/performance')
-
-        # Should be 200 for authenticated admin
-        assert response.status_code == 200
-        # Check for performance-related content
-        html = response.data.decode('utf-8', errors='ignore')
-        data_str = html.lower()
-        assert 'performance' in data_str or '效能' in data_str
-        assert '/static/dist/admin-performance.js' in html
-        assert 'cdn.jsdelivr.net' not in html
+        assert response.status_code == 302
+        assert '/admin/dashboard' in response.headers.get('Location', '')
 
     def test_dashboard_page_requires_auth(self, client):
         response = client.get('/admin/dashboard')
@@ -406,9 +399,8 @@ class TestPerformancePage:
         response = client.get('/admin/user-usage-kpi')
         assert response.status_code == 302
 
-    def test_user_usage_kpi_page_loads(self, admin_client):
+    def test_user_usage_kpi_page_redirects_to_dashboard(self, admin_client):
+        """User usage KPI page redirects to unified dashboard."""
         response = admin_client.get('/admin/user-usage-kpi')
-        assert response.status_code == 200
-        html = response.data.decode('utf-8', errors='ignore')
-        assert '/static/dist/admin-user-usage-kpi.js' in html
-        assert 'cdn.jsdelivr.net' not in html
+        assert response.status_code == 302
+        assert '/admin/dashboard' in response.headers.get('Location', '')

@@ -10,13 +10,11 @@
     "/resource-history": ["resource-history.js"],
     "/qc-gate": ["qc-gate.js"],
     "/job-query": ["job-query.js"],
-    "/admin/performance": ["admin-performance.js"],
     "/tables": ["tables.js"],
     "/excel-query": ["excel-query.js"],
     "/query-tool": ["query-tool.js"],
     "/mid-section-defect": ["mid-section-defect.js"],
     "/yield-alert-center": ["yield-alert-center.js"],
-    "/admin/user-usage-kpi": ["admin-user-usage-kpi.js"],
     "/admin/dashboard": ["admin-dashboard.js"]
   },
   "deferred_routes": []

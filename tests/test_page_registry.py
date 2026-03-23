@@ -67,7 +67,7 @@ class TestSchemaMigration:
         # Admin tools should be backfilled from legacy hardcoded sidebar mapping.
         assert page_by_route["/admin/pages"]["drawer_id"] == "dev-tools"
         assert page_by_route["/admin/dashboard"]["drawer_id"] == "dev-tools"
-        assert page_by_route["/admin/performance"]["drawer_id"] == "dev-tools"
+        assert page_by_route["/admin/dashboard"]["drawer_id"] == "dev-tools"
 
     def test_subsequent_load_does_not_reset_drawers(self, mock_registry):
         page_registry.get_all_drawers()

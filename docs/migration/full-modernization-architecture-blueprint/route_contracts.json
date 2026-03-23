@@ -133,30 +133,6 @@
       "compatibility_policy": "external_target_redirect"
     },
     {
-      "route": "/admin/performance",
-      "route_id": "admin-performance",
-      "title": "Admin Performance",
-      "scope": "in-scope",
-      "render_mode": "native",
-      "owner": "frontend-platform-admin",
-      "visibility_policy": "admin_only",
-      "canonical_shell_path": "/portal-shell/admin/performance",
-      "rollback_strategy": "fallback_to_legacy_route",
-      "compatibility_policy": "redirect_to_shell_when_spa_enabled"
-    },
-    {
-      "route": "/admin/user-usage-kpi",
-      "route_id": "admin-user-usage-kpi",
-      "title": "User Usage KPI",
-      "scope": "in-scope",
-      "render_mode": "native",
-      "owner": "frontend-platform-admin",
-      "visibility_policy": "admin_only",
-      "canonical_shell_path": "/portal-shell/admin/user-usage-kpi",
-      "rollback_strategy": "fallback_to_legacy_route",
-      "compatibility_policy": "redirect_to_shell_when_spa_enabled"
-    },
-    {
       "route": "/admin/dashboard",
       "route_id": "admin-dashboard",
       "title": "Admin Dashboard",

@@ -132,7 +132,7 @@ def test_portal_navigation_admin_includes_admin_drawer_routes():
     }
     assert "/admin/pages" in all_routes
     assert "/admin/dashboard" in all_routes
-    assert "/admin/performance" in all_routes
+    assert "/admin/dashboard" in all_routes
     assert "/excel-query" in all_routes
 
 

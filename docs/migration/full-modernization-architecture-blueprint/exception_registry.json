@@ -78,13 +78,6 @@
       "reason": "Legacy styles pending full token and scope migration"
     },
     {
-      "id": "style-legacy-admin-performance",
-      "scope": "/admin/performance",
-      "owner": "frontend-platform-admin",
-      "milestone": "full-modernization-phase2",
-      "reason": "Legacy styles pending full token and scope migration"
-    },
-    {
       "id": "style-legacy-tables",
       "scope": "/tables",
       "owner": "frontend-mes-reporting",

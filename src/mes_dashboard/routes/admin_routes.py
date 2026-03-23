@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, current_app, g, make_response, render_template, request, send_from_directory
+from flask import Blueprint, current_app, g, make_response, redirect, render_template, request, send_from_directory, url_for
 
 from mes_dashboard.core.csrf import get_csrf_token
 from mes_dashboard.core.permissions import admin_required
@@ -77,14 +77,8 @@ _last_restart_request: float = 0.0
 @admin_bp.route("/performance")
 @admin_required
 def performance():
-    """Performance monitoring dashboard (Vue SPA)."""
-    dist_dir = os.path.join(current_app.static_folder or "", "dist")
-    html_path = os.path.join(dist_dir, "admin-performance.html")
-    with open(html_path, "r", encoding="utf-8") as f:
-        html = f.read()
-    csrf_meta = f'<meta name="csrf-token" content="{get_csrf_token()}">'
-    html = html.replace("<meta charset", f"{csrf_meta}\n    <meta charset", 1)
-    return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
+    """Deprecated — redirect to unified dashboard."""
+    return redirect(url_for("admin.dashboard"))
 
 
 @admin_bp.route("/dashboard")
@@ -276,10 +270,10 @@ def api_logs():
         )
         mysql_rows = _query_mysql_logs(level=level, q=q, since=since, limit=limit)
 
-        # Merge sort by timestamp DESC
+        # Merge sort by timestamp DESC — normalise to str for cross-source comparison
         all_rows = sorted(
             sqlite_rows + mysql_rows,
-            key=lambda r: r.get("timestamp") or "",
+            key=lambda r: str(r.get("timestamp") or ""),
             reverse=True,
         )
         merged = all_rows[offset: offset + limit]
@@ -548,7 +542,7 @@ def _query_mysql_metrics(minutes: int = 30, bucket_seconds: int = 30) -> list:
             FROM dashboard_metrics_snapshots
             WHERE ts >= DATE_SUB(NOW(), INTERVAL :minutes MINUTE)
             GROUP BY FLOOR(UNIX_TIMESTAMP(ts) / {bucket_seconds})
-            ORDER BY ts ASC
+            ORDER BY MIN(ts) ASC
         """)
 
         with get_mysql_connection() as conn:
@@ -1088,29 +1082,8 @@ def api_worker_status():
 @admin_bp.route("/user-usage-kpi")
 @admin_required
 def user_usage_kpi():
-    """User usage KPI dashboard (Vue SPA)."""
-    dist_dir = os.path.join(current_app.static_folder or "", "dist")
-    html_path = os.path.join(dist_dir, "admin-user-usage-kpi.html")
-    csrf_meta = f'<meta name="csrf-token" content="{get_csrf_token()}">'
-
-    if os.path.exists(html_path):
-        with open(html_path, "r", encoding="utf-8") as f:
-            html = f.read()
-        html = html.replace("<meta charset", f"{csrf_meta}\n    <meta charset", 1)
-        return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
-
-    # Test/local fallback when frontend artifacts are not copied yet.
-    html = (
-        "<!doctype html><html lang=\"zh-Hant\"><head>"
-        f"{csrf_meta}"
-        "<meta charset=\"UTF-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-        "<title>使用者 KPI</title>"
-        "<link rel=\"stylesheet\" href=\"/static/dist/admin-user-usage-kpi.css\">"
-        "<script type=\"module\" src=\"/static/dist/admin-user-usage-kpi.js\"></script>"
-        "</head><body><div id='app'></div></body></html>"
-    )
-    return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
+    """Deprecated — redirect to unified dashboard."""
+    return redirect(url_for("admin.dashboard"))
 
 
 @admin_bp.route("/api/user-usage-kpi", methods=["GET"])

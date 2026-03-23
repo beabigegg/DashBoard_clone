@@ -16,8 +16,6 @@
     "/mid-section-defect": { "known_issues": [] },
     "/yield-alert-center": { "known_issues": [] },
     "/admin/pages": { "known_issues": [] },
-    "/admin/performance": { "known_issues": [] },
-    "/admin/user-usage-kpi": { "known_issues": [] },
     "/admin/dashboard": { "known_issues": [] }
   }
 }
