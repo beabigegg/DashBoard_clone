@@ -21,6 +21,10 @@ from typing import Any, Dict, List, Optional
 from flask import Blueprint, Response, request
 
 from mes_dashboard.core.cache import cache_get, cache_set
+from mes_dashboard.core.heavy_query_telemetry import (
+    record_async_fallback,
+    record_guard_reject,
+)
 from mes_dashboard.core.interactive_memory_guard import process_rss_mb
 from mes_dashboard.core.query_quality_contract import (
     QUALITY_SCOPE_DOMAIN,
@@ -791,6 +795,7 @@ def events():
                     "job_id=%s profile=%s cid_count=%s rss_mb=%.1f limit_mb=%.0f",
                     job_id, profile, cid_count, rss_now, TRACE_SYNC_RSS_REJECT_MB,
                 )
+                record_async_fallback("trace.events", reason="rss_guard")
                 return _async_events_response(job_id)
             logger.warning(
                 "trace events RSS guard async enqueue failed cid_count=%s rss_mb=%.1f: %s",
@@ -802,6 +807,7 @@ def events():
             "trace events sync rejected due to RSS guard rss_mb=%.1f limit_mb=%.0f cid_count=%s",
             rss_now, TRACE_SYNC_RSS_REJECT_MB, cid_count,
         )
+        record_guard_reject("trace.events", reason="rss_guard")
         return error_response(
             "SERVICE_UNAVAILABLE",
             "伺服器記憶體負載過高，請稍後再試",
@@ -903,6 +909,7 @@ def events():
                     "trace events aggregation rejected due to RSS guard rss_mb=%.1f limit_mb=%.0f",
                     rss_before_agg, TRACE_SYNC_RSS_REJECT_MB,
                 )
+                record_guard_reject("trace.events_aggregation", reason="rss_guard")
                 return error_response(
                     "SERVICE_UNAVAILABLE",
                     "伺服器記憶體負載過高，無法完成聚合計算，請稍後再試",

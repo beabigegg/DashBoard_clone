@@ -465,3 +465,43 @@ class TestCollectorObservability:
                 call.args and call.args[0].startswith("RQ dead worker alert:")
                 for call in mock_warning.call_args_list
             )
+
+
+class TestHeavyQueryGuardColumns:
+    def test_schema_contains_heavy_query_guard_columns(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_heavy_guard_cols.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+
+            conn = sqlite3.connect(db_path)
+            rows = conn.execute("PRAGMA table_info(metrics_snapshots)").fetchall()
+            conn.close()
+            col_names = {row[1] for row in rows}
+
+            assert "heavy_query_guard_reject_total" in col_names
+            assert "heavy_query_memory_error_total" in col_names
+            assert "heavy_query_async_fallback_total" in col_names
+
+    def test_collector_persists_heavy_query_guard_counters(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_heavy_guard_values.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+            collector = MetricsHistoryCollector(app=None, store=store)
+
+            with patch(
+                "mes_dashboard.core.heavy_query_telemetry.get_heavy_query_telemetry",
+                return_value={
+                    "guard_reject_total": 5,
+                    "memory_error_total": 2,
+                    "async_fallback_total": 9,
+                },
+            ):
+                collector._collect_snapshot()
+
+            rows = store.query_snapshots(minutes=5)
+            latest = rows[-1]
+            assert latest["heavy_query_guard_reject_total"] == 5
+            assert latest["heavy_query_memory_error_total"] == 2
+            assert latest["heavy_query_async_fallback_total"] == 9

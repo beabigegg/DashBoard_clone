@@ -152,6 +152,9 @@ class SyncWorker:
                 rq_workers_busy INT,
                 rq_queue_depth INT,
                 heavy_query_slots_active INT,
+                heavy_query_guard_reject_total INT,
+                heavy_query_memory_error_total INT,
+                heavy_query_async_fallback_total INT,
                 INDEX idx_ts (ts)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """,
@@ -179,11 +182,27 @@ class SyncWorker:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """,
         ]
+        metric_migration_columns = [
+            "heavy_query_guard_reject_total INT",
+            "heavy_query_memory_error_total INT",
+            "heavy_query_async_fallback_total INT",
+        ]
 
         try:
             with get_mysql_connection() as conn:
                 for ddl in ddl_statements:
                     conn.execute(text(ddl))
+                for column_spec in metric_migration_columns:
+                    try:
+                        conn.execute(
+                            text(
+                                f"ALTER TABLE dashboard_metrics_snapshots "
+                                f"ADD COLUMN {column_spec}"
+                            )
+                        )
+                    except Exception:
+                        # Tolerate duplicate-column errors for existing deployments.
+                        pass
             logger.info("SyncWorker: MySQL tables verified/created")
         except Exception as exc:
             logger.warning("SyncWorker: cannot ensure MySQL tables, will retry on next sync: %s", exc)
@@ -263,7 +282,10 @@ class SyncWorker:
                                  slow_query_active, slow_query_waiting, worker_rss_bytes,
                                  system_mem_available_mb, system_mem_used_pct,
                                  rq_workers_total, rq_workers_busy, rq_queue_depth,
-                                 heavy_query_slots_active)
+                                 heavy_query_slots_active,
+                                 heavy_query_guard_reject_total,
+                                 heavy_query_memory_error_total,
+                                 heavy_query_async_fallback_total)
                             VALUES
                                 (:sync_id, :ts, :worker_pid,
                                  :pool_saturation, :pool_checked_out, :pool_checked_in,
@@ -274,7 +296,10 @@ class SyncWorker:
                                  :slow_query_active, :slow_query_waiting, :worker_rss_bytes,
                                  :system_mem_available_mb, :system_mem_used_pct,
                                  :rq_workers_total, :rq_workers_busy, :rq_queue_depth,
-                                 :heavy_query_slots_active)
+                                 :heavy_query_slots_active,
+                                 :heavy_query_guard_reject_total,
+                                 :heavy_query_memory_error_total,
+                                 :heavy_query_async_fallback_total)
                         """),
                         {
                             "sync_id": row.get("sync_id"),
@@ -303,6 +328,9 @@ class SyncWorker:
                             "rq_workers_busy": row.get("rq_workers_busy"),
                             "rq_queue_depth": row.get("rq_queue_depth"),
                             "heavy_query_slots_active": row.get("heavy_query_slots_active"),
+                            "heavy_query_guard_reject_total": row.get("heavy_query_guard_reject_total"),
+                            "heavy_query_memory_error_total": row.get("heavy_query_memory_error_total"),
+                            "heavy_query_async_fallback_total": row.get("heavy_query_async_fallback_total"),
                         }
                     )
             self._metrics_store.mark_synced([r["id"] for r in rows])

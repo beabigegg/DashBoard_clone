@@ -237,6 +237,39 @@
       </div>
     </section>
 
+    <!-- Heavy Query Guard Telemetry -->
+    <section
+      class="panel"
+      v-if="perfDetail?.heavy_query_telemetry && !perfDetail.heavy_query_telemetry.error"
+    >
+      <h2 class="panel-title">Heavy Query 守門</h2>
+      <div class="pool-stats-grid">
+        <StatCard :value="perfDetail.heavy_query_telemetry.guard_reject_total" label="守門拒絕次數" />
+        <StatCard :value="perfDetail.heavy_query_telemetry.memory_error_total" label="記憶體拒絕次數" />
+        <StatCard :value="perfDetail.heavy_query_telemetry.async_fallback_total" label="Async Fallback 次數" />
+      </div>
+      <h3 class="sub-title" v-if="heavyRouteRejects.length">路由拒絕分布</h3>
+      <table class="mini-table" v-if="heavyRouteRejects.length">
+        <thead><tr><th>路由</th><th>次數</th></tr></thead>
+        <tbody>
+          <tr v-for="row in heavyRouteRejects" :key="row.route">
+            <td>{{ row.route }}</td>
+            <td>{{ row.count }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <h3 class="sub-title" v-if="heavyRejectReasons.length">拒絕原因分布</h3>
+      <table class="mini-table" v-if="heavyRejectReasons.length">
+        <thead><tr><th>原因</th><th>次數</th></tr></thead>
+        <tbody>
+          <tr v-for="row in heavyRejectReasons" :key="row.reason">
+            <td>{{ row.reason }}</td>
+            <td>{{ row.count }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <!-- Async Workers -->
     <section
       class="panel"
@@ -357,6 +390,13 @@
       title="佇列深度 & 槽位趨勢"
       :snapshots="historyData"
       :series="asyncQueueTrendSeries"
+    />
+
+    <TrendChart
+      v-if="historyData.length > 1"
+      title="Heavy Query 守門趨勢"
+      :snapshots="historyData"
+      :series="heavyQueryGuardTrendSeries"
     />
 
     <!-- Storage Management -->
@@ -688,6 +728,16 @@ const paretoFallbackReasons = computed(() => {
     .map(([reason, count]) => ({ reason, count }));
 });
 
+const heavyRouteRejects = computed(() => {
+  const rows = perfDetail.value?.heavy_query_telemetry?.route_rejects;
+  return Array.isArray(rows) ? rows : [];
+});
+
+const heavyRejectReasons = computed(() => {
+  const rows = perfDetail.value?.heavy_query_telemetry?.reject_reasons;
+  return Array.isArray(rows) ? rows : [];
+});
+
 // --- Async Workers ---
 const asyncWorkers = computed(() => perfDetail.value?.async_workers || {});
 const rqWorkers = computed(() => asyncWorkers.value.workers?.workers || []);
@@ -862,6 +912,12 @@ const asyncWorkerTrendSeries = [
 const asyncQueueTrendSeries = [
   { name: '佇列深度', key: 'rq_queue_depth', color: 'rgb(99, 102, 241)' },
   { name: '並行槽位', key: 'heavy_query_slots_active', color: 'rgb(239, 68, 68)' },
+];
+
+const heavyQueryGuardTrendSeries = [
+  { name: '守門拒絕', key: 'heavy_query_guard_reject_total', color: 'rgb(239, 68, 68)' },
+  { name: '記憶體拒絕', key: 'heavy_query_memory_error_total', color: 'rgb(245, 158, 11)' },
+  { name: 'Async Fallback', key: 'heavy_query_async_fallback_total', color: 'rgb(59, 130, 246)' },
 ];
 
 async function refreshAll() {

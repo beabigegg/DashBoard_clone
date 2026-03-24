@@ -68,6 +68,9 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     rq_workers_busy INTEGER,
     rq_queue_depth INTEGER,
     heavy_query_slots_active INTEGER,
+    heavy_query_guard_reject_total INTEGER,
+    heavy_query_memory_error_total INTEGER,
+    heavy_query_async_fallback_total INTEGER,
     cache_hit_count INTEGER,
     cache_miss_count INTEGER,
     sync_id TEXT,
@@ -86,6 +89,9 @@ _MIGRATION_COLUMNS = [
     ("rq_workers_busy", "INTEGER"),
     ("rq_queue_depth", "INTEGER"),
     ("heavy_query_slots_active", "INTEGER"),
+    ("heavy_query_guard_reject_total", "INTEGER"),
+    ("heavy_query_memory_error_total", "INTEGER"),
+    ("heavy_query_async_fallback_total", "INTEGER"),
     ("cache_hit_count", "INTEGER"),
     ("cache_miss_count", "INTEGER"),
     ("sync_id", "TEXT"),
@@ -112,6 +118,9 @@ COLUMNS = [
     "system_mem_available_mb", "system_mem_used_pct",
     "rq_workers_total", "rq_workers_busy", "rq_queue_depth",
     "heavy_query_slots_active",
+    "heavy_query_guard_reject_total",
+    "heavy_query_memory_error_total",
+    "heavy_query_async_fallback_total",
     "cache_hit_count", "cache_miss_count",
 ]
 
@@ -237,9 +246,12 @@ class MetricsHistoryStore:
                              system_mem_available_mb, system_mem_used_pct,
                              rq_workers_total, rq_workers_busy,
                              rq_queue_depth, heavy_query_slots_active,
+                             heavy_query_guard_reject_total,
+                             heavy_query_memory_error_total,
+                             heavy_query_async_fallback_total,
                              cache_hit_count, cache_miss_count,
                              synced)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                         """,
                         (
                             ts, pid,
@@ -266,6 +278,9 @@ class MetricsHistoryStore:
                             data.get("rq_workers_busy"),
                             data.get("rq_queue_depth"),
                             data.get("heavy_query_slots_active"),
+                            data.get("heavy_query_guard_reject_total"),
+                            data.get("heavy_query_memory_error_total"),
+                            data.get("heavy_query_async_fallback_total"),
                             data.get("cache_hit_count"),
                             data.get("cache_miss_count"),
                         ),
@@ -340,6 +355,9 @@ class MetricsHistoryStore:
                 MAX(rq_workers_busy)    AS rq_workers_busy,
                 MAX(rq_queue_depth)     AS rq_queue_depth,
                 MAX(heavy_query_slots_active) AS heavy_query_slots_active,
+                MAX(heavy_query_guard_reject_total) AS heavy_query_guard_reject_total,
+                MAX(heavy_query_memory_error_total) AS heavy_query_memory_error_total,
+                MAX(heavy_query_async_fallback_total) AS heavy_query_async_fallback_total,
                 SUM(cache_hit_count)    AS cache_hit_count,
                 SUM(cache_miss_count)   AS cache_miss_count,
                 COUNT(DISTINCT worker_pid) AS worker_count,
@@ -679,6 +697,26 @@ class MetricsHistoryCollector:
                     )
             except Exception:
                 pass  # columns stay None → SQLite stores NULL
+
+            # Heavy query guard telemetry counters
+            try:
+                from mes_dashboard.core.heavy_query_telemetry import (
+                    get_heavy_query_telemetry,
+                )
+                guard = get_heavy_query_telemetry()
+                data["heavy_query_guard_reject_total"] = int(
+                    guard.get("guard_reject_total", 0)
+                )
+                data["heavy_query_memory_error_total"] = int(
+                    guard.get("memory_error_total", 0)
+                )
+                data["heavy_query_async_fallback_total"] = int(
+                    guard.get("async_fallback_total", 0)
+                )
+            except Exception:
+                data["heavy_query_guard_reject_total"] = 0
+                data["heavy_query_memory_error_total"] = 0
+                data["heavy_query_async_fallback_total"] = 0
 
             self._store.write_snapshot(data)
         except Exception as exc:

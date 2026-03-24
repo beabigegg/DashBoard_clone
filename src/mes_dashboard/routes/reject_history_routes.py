@@ -22,6 +22,10 @@ from mes_dashboard.core.response import (
     VALIDATION_ERROR,
     SERVICE_UNAVAILABLE,
 )
+from mes_dashboard.core.heavy_query_telemetry import (
+    record_guard_reject,
+    record_memory_error,
+)
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.core.utils import parse_bool_query
@@ -446,6 +450,7 @@ def api_reject_history_reason_pareto():
         return validation_error(str(exc))
     except MemoryError as exc:
         logger.warning("Reject history reason-pareto memory guard: %s", exc)
+        record_memory_error("reject_history.dimension_pareto", reason="rss_guard")
         return _overload_error(str(exc))
     except Exception:
         return internal_error("查詢柏拉圖資料失敗")
@@ -487,6 +492,7 @@ def api_reject_history_batch_pareto():
         return success_response(result, meta=pareto_meta)
     except MemoryError as exc:
         logger.warning("Reject history batch-pareto memory guard: %s", exc)
+        record_memory_error("reject_history.batch_pareto", reason="rss_guard")
         return _overload_error(str(exc))
     except ValueError as exc:
         return validation_error(str(exc))
@@ -675,6 +681,10 @@ def api_reject_history_query():
                 _guard_telemetry = get_memory_guard_telemetry()
                 if _guard_telemetry.get("system_memory_pressure"):
                     retry_after = _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS
+                    record_guard_reject(
+                        "reject_history.query",
+                        reason="system_memory_pressure",
+                    )
                     return error_response(
                         SERVICE_UNAVAILABLE,
                         "系統記憶體不足，請稍後再試",
@@ -690,6 +700,10 @@ def api_reject_history_query():
                 _active = get_slow_query_active_count()
                 if _active >= HEAVY_QUERY_REJECT_THRESHOLD:
                     retry_after = _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS
+                    record_guard_reject(
+                        "reject_history.query",
+                        reason="slow_query_active_threshold",
+                    )
                     return error_response(
                         SERVICE_UNAVAILABLE,
                         "系統忙碌中，請稍後再試",
@@ -761,12 +775,16 @@ def api_reject_history_query():
     except ValueError as exc:
         return validation_error(str(exc))
     except RejectPrimaryQueryOverloadError as exc:
+        record_guard_reject("reject_history.query", reason=exc.code)
         return error_response(
             exc.code,
             str(exc),
             status_code=503,
             headers={"Retry-After": str(exc.retry_after)},
         )
+    except MemoryError as exc:
+        record_memory_error("reject_history.query", reason="rss_guard")
+        return _overload_error(str(exc))
     except Exception:
         import traceback
         traceback.print_exc()
@@ -858,6 +876,7 @@ def api_reject_history_view():
 
     except MemoryError as exc:
         logger.warning("Reject history view memory guard: %s", exc)
+        record_memory_error("reject_history.view", reason="rss_guard")
         return _overload_error(str(exc))
     except ValueError as exc:
         return validation_error(str(exc))
@@ -927,6 +946,7 @@ def api_reject_history_export_cached():
 
     except MemoryError as exc:
         logger.warning("Reject history export-cached memory guard: %s", exc)
+        record_memory_error("reject_history.export_cached", reason="rss_guard")
         return _overload_error(str(exc))
     except ValueError as exc:
         return validation_error(str(exc))

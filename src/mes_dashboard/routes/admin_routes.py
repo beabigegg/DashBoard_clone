@@ -447,6 +447,15 @@ def api_performance_detail():
         logger.warning("Failed to collect worker memory guard telemetry: %s", exc)
         worker_memory_guard = {"error": str(exc)}
 
+    # ---- Heavy query guard telemetry ----
+    heavy_query_telemetry = None
+    try:
+        from mes_dashboard.core.heavy_query_telemetry import get_heavy_query_telemetry
+        heavy_query_telemetry = get_heavy_query_telemetry()
+    except Exception as exc:
+        logger.warning("Failed to collect heavy query guard telemetry: %s", exc)
+        heavy_query_telemetry = {"error": str(exc)}
+
     # ---- Async workers (RQ) ----
     async_workers = None
     try:
@@ -464,6 +473,7 @@ def api_performance_detail():
         "direct_connections": direct_connections,
         "pareto_materialization": pareto_materialization,
         "worker_memory_guard": worker_memory_guard,
+        "heavy_query_telemetry": heavy_query_telemetry,
         "async_workers": async_workers,
     })
 
@@ -535,6 +545,9 @@ def _query_mysql_metrics(minutes: int = 30, bucket_seconds: int = 30) -> list:
                 MAX(rq_workers_busy)    AS rq_workers_busy,
                 MAX(rq_queue_depth)     AS rq_queue_depth,
                 MAX(heavy_query_slots_active) AS heavy_query_slots_active,
+                MAX(heavy_query_guard_reject_total) AS heavy_query_guard_reject_total,
+                MAX(heavy_query_memory_error_total) AS heavy_query_memory_error_total,
+                MAX(heavy_query_async_fallback_total) AS heavy_query_async_fallback_total,
                 COUNT(DISTINCT worker_pid) AS worker_count,
                 ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
             FROM dashboard_metrics_snapshots

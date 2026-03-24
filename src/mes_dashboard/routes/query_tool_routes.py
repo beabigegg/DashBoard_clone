@@ -19,6 +19,7 @@ from mes_dashboard.core.cache import cache_get, cache_set
 from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
+from mes_dashboard.core.heavy_query_telemetry import record_memory_error
 from mes_dashboard.core.response import (
     success_response,
     validation_error,
@@ -62,6 +63,11 @@ def _resolve_export_cids(params: dict) -> list[str]:
         return [c for c in cids if c]
     single = params.get('container_id')
     return [single] if single else []
+
+
+def _memory_error_response(route_name: str, exc: MemoryError):
+    record_memory_error(route_name, reason="rss_guard")
+    return service_unavailable_error(str(exc))
 
 # Create Blueprint
 query_tool_bp = Blueprint('query_tool', __name__)
@@ -383,7 +389,7 @@ def query_lot_history():
                 per_page=per_page,
             )
         except MemoryError as exc:
-            return service_unavailable_error(str(exc))
+            return _memory_error_response("query_tool.lot_history", exc)
     elif container_id:
         try:
             result = get_lot_history(
@@ -393,7 +399,7 @@ def query_lot_history():
                 per_page=per_page,
             )
         except MemoryError as exc:
-            return service_unavailable_error(str(exc))
+            return _memory_error_response("query_tool.lot_history", exc)
     else:
         return validation_error('請指定 CONTAINERID')
 
@@ -487,7 +493,7 @@ def query_lot_associations():
                 per_page=per_page,
             )
         except MemoryError as exc:
-            return service_unavailable_error(str(exc))
+            return _memory_error_response(f"query_tool.lot_associations.{assoc_type}", exc)
     else:
         if not container_id:
             return validation_error('請指定 CONTAINERID')
@@ -595,7 +601,7 @@ def query_equipment_period():
                 return validation_error('請選擇至少一台設備')
             result = get_equipment_jobs(equipment_ids, start_date, end_date)
     except MemoryError as exc:
-        return service_unavailable_error(str(exc))
+        return _memory_error_response(f"query_tool.equipment_period.{query_type}", exc)
 
     if 'error' in result:
         return validation_error(result.get('error', '查詢失敗'))
@@ -876,5 +882,7 @@ def export_csv():
             }
         )
 
+    except MemoryError as exc:
+        return _memory_error_response("query_tool.export_csv", exc)
     except Exception as exc:
         return internal_error(f'匯出失敗: {str(exc)}')

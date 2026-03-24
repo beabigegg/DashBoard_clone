@@ -9,6 +9,7 @@ import os
 
 from flask import Blueprint, request, Response
 
+from mes_dashboard.core.heavy_query_telemetry import record_guard_reject
 from mes_dashboard.core.response import (
     success_response,
     validation_error,
@@ -169,6 +170,10 @@ def api_analysis():
     # Phase 0: concurrency fast-rejection (sync fallback path only)
     try:
         if get_slow_query_active_count() >= _HEAVY_QUERY_REJECT_THRESHOLD:
+            record_guard_reject(
+                "mid_section_defect.analysis",
+                reason="slow_query_active_threshold",
+            )
             return error_response(
                 SERVICE_UNAVAILABLE,
                 "系統忙碌中，請稍後再試",

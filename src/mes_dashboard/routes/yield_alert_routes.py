@@ -9,6 +9,10 @@ from datetime import date, timedelta
 
 from flask import Blueprint, request
 
+from mes_dashboard.core.heavy_query_telemetry import (
+    record_guard_reject,
+    record_memory_error,
+)
 from mes_dashboard.core.response import (
     VALIDATION_ERROR,
     SERVICE_UNAVAILABLE,
@@ -162,6 +166,10 @@ def api_yield_alert_query():
     # Phase 0: concurrency fast-rejection
     try:
         if get_slow_query_active_count() >= _HEAVY_QUERY_REJECT_THRESHOLD:
+            record_guard_reject(
+                "yield_alert.query",
+                reason="slow_query_active_threshold",
+            )
             return error_response(
                 SERVICE_UNAVAILABLE,
                 "系統忙碌中，請稍後再試",
@@ -176,6 +184,7 @@ def api_yield_alert_query():
         result = execute_primary_query(start_date=start_date, end_date=end_date)
         return success_response(result)
     except MemoryError as exc:
+        record_memory_error("yield_alert.query", reason="rss_guard")
         return error_response(
             SERVICE_UNAVAILABLE,
             str(exc),
@@ -298,6 +307,7 @@ def api_yield_alert_view():
 
         return success_response(data, meta=meta)
     except MemoryError as exc:
+        record_memory_error("yield_alert.view", reason="rss_guard")
         return error_response(
             SERVICE_UNAVAILABLE,
             str(exc),

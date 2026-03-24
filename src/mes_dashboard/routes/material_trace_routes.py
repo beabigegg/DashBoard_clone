@@ -7,6 +7,7 @@ import logging
 
 from flask import Blueprint, Response, stream_with_context
 
+from mes_dashboard.core.heavy_query_telemetry import record_memory_error
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.core.response import (
@@ -137,6 +138,7 @@ def api_material_trace_query():
 
     except MemoryError as exc:
         logger.warning("Material trace query memory guard: %s", exc)
+        record_memory_error("material_trace.query", reason="rss_guard")
         return error_response(
             SERVICE_UNAVAILABLE,
             str(exc),
@@ -196,6 +198,7 @@ def api_material_trace_export():
 
     except MemoryError as exc:
         logger.warning("Material trace export memory guard: %s", exc)
+        record_memory_error("material_trace.export", reason="rss_guard")
         return error_response(
             SERVICE_UNAVAILABLE,
             str(exc),
