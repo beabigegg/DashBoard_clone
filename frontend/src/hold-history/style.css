@@ -1,12 +1,5 @@
 @import '../resource-shared/styles.css';
 
-.hold-history-header {
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
-}
-
-.hold-history-page .header h1 {
-  font-size: 24px;
-}
 
 .hold-type-badge {
   display: inline-flex;

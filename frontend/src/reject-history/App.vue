@@ -1307,11 +1307,7 @@ onUnmounted(() => {
   <div class="dashboard reject-history-page theme-reject-history">
     <PageHeader
       title="報廢歷史查詢"
-      :last-update="lastQueryAt || '--'"
-      :refreshing="loading.querying"
-      :refresh-success="refreshSuccess"
-      :refresh-error="refreshError"
-      @refresh="applyFilters"
+      :show-refresh="false"
     />
 
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>

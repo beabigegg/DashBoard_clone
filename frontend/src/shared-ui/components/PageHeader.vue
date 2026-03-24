@@ -30,6 +30,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  showRefresh: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 defineEmits(['refresh']);
@@ -54,7 +58,7 @@ const cacheDotClass = computed(() => {
       <slot name="header-left-after" />
     </div>
     <h1 v-else>{{ title }}</h1>
-    <div class="page-header-meta">
+    <div v-if="showRefresh" class="page-header-meta">
       <div v-if="showCache" class="cache-status">
         <span class="cache-dot" :class="cacheDotClass"></span>
         <span>{{ cacheText }}</span>

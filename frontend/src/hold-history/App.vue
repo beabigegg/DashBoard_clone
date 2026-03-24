@@ -652,10 +652,7 @@ onMounted(() => {
   <div class="dashboard hold-history-page theme-hold-history">
     <PageHeader
       title="Hold 歷史績效"
-      :refreshing="loading.global"
-      :refresh-success="refreshSuccess"
-      :refresh-error="refreshError"
-      @refresh="manualRefresh"
+      :show-refresh="false"
     >
       <template #header-left />
       <template #header-left-after>
