@@ -28,6 +28,7 @@ from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.core.feature_flags import resolve_bool_flag
 from mes_dashboard.core.query_spool_store import (
     clear_spooled_df,
+    get_spool_file_path,
     load_spooled_df,
     store_spooled_df,
 )
@@ -342,11 +343,15 @@ def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
 
 
 def _has_cached_df(query_id: str) -> bool:
-    """Check if query_id has cached data (L1 marker or Redis/spool exists)."""
+    """Check if query_id has cached data (L1 marker, Redis, or spool exists)."""
     if _dataset_cache.get(query_id) is not None:
         return True
     df = _redis_load_df(query_id)
-    return df is not None
+    if df is not None:
+        return True
+    # L3: check spool metadata (O(1) Redis + path.exists, no parquet load)
+    spool_path = get_spool_file_path(_REDIS_NAMESPACE, query_id)
+    return spool_path is not None
 
 
 def _store_df(query_id: str, df: pd.DataFrame) -> None:

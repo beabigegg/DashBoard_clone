@@ -1416,3 +1416,40 @@ def test_optimize_groupby_dtypes_preserves_aggregation_parity():
         LOSSREASONNAME=optimized["LOSSREASONNAME"].astype(str),
     )
     pd.testing.assert_frame_equal(baseline_cmp, optimized_cmp, check_dtype=False)
+
+
+# ---------------------------------------------------------------------------
+# _has_cached_df spool awareness (Task 2 of reject-cache-warmup-memory-fix)
+# ---------------------------------------------------------------------------
+
+def test_has_cached_df_returns_true_when_spool_exists(monkeypatch):
+    """L1 miss + Redis miss + spool present → True (no parquet load)."""
+    monkeypatch.setattr(cache_svc, "_dataset_cache", MagicMock(**{"get.return_value": None}))
+    monkeypatch.setattr(cache_svc, "_redis_load_df", lambda _qid: None)
+    monkeypatch.setattr(cache_svc, "get_spool_file_path", lambda _ns, _qid: "/spool/reject_dataset/abc.parquet")
+
+    assert cache_svc._has_cached_df("abc") is True
+
+
+def test_has_cached_df_returns_false_when_spool_absent(monkeypatch):
+    """L1 miss + Redis miss + no spool → False."""
+    monkeypatch.setattr(cache_svc, "_dataset_cache", MagicMock(**{"get.return_value": None}))
+    monkeypatch.setattr(cache_svc, "_redis_load_df", lambda _qid: None)
+    monkeypatch.setattr(cache_svc, "get_spool_file_path", lambda _ns, _qid: None)
+
+    assert cache_svc._has_cached_df("abc") is False
+
+
+def test_ensure_dataset_loaded_short_circuits_on_spool_hit(monkeypatch):
+    """ensure_dataset_loaded returns cache_hit=True without calling execute_primary_query when spool exists."""
+    monkeypatch.setattr(cache_svc, "_WARMUP_DAYS", 30)
+    monkeypatch.setattr(cache_svc, "_dataset_cache", MagicMock(**{"get.return_value": None}))
+    monkeypatch.setattr(cache_svc, "_redis_load_df", lambda _qid: None)
+    monkeypatch.setattr(cache_svc, "get_spool_file_path", lambda _ns, _qid: "/spool/reject_dataset/abc.parquet")
+    execute_mock = MagicMock()
+    monkeypatch.setattr(cache_svc, "execute_primary_query", execute_mock)
+
+    result = cache_svc.ensure_dataset_loaded()
+
+    assert result["cache_hit"] is True
+    execute_mock.assert_not_called()
