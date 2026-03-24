@@ -1,3 +1,5 @@
+@import '../resource-shared/styles.css';
+
 .reject-history-header {
   background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
 }

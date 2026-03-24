@@ -15,6 +15,7 @@ import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrat
 import { useRejectHistoryDuckDB } from './useRejectHistoryDuckDB.js';
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import DetailTable from './components/DetailTable.vue';
@@ -141,6 +142,8 @@ const paginationLoading = ref(false);
 const errorMessage = ref('');
 const partialFailureWarning = ref('');
 const lastQueryAt = ref('');
+const refreshSuccess = ref(false);
+const refreshError = ref(false);
 
 // ---- DuckDB-WASM state ----
 const duckdb = useRejectHistoryDuckDB();
@@ -408,7 +411,9 @@ async function _applyQueryResult(result) {
 
   await fetchBatchPareto();
 
-  lastQueryAt.value = new Date().toLocaleString('zh-TW');
+  const _now = new Date();
+  const _pad = (n) => String(n).padStart(2, '0');
+  lastQueryAt.value = `${_now.getFullYear()}-${_pad(_now.getMonth() + 1)}-${_pad(_now.getDate())} ${_pad(_now.getHours())}:${_pad(_now.getMinutes())}:${_pad(_now.getSeconds())}`;
   updateUrlState();
 }
 
@@ -419,6 +424,7 @@ async function executePrimaryQuery() {
   paginationLoading.value = false;
   errorMessage.value = '';
   partialFailureWarning.value = '';
+  refreshError.value = false;
   cancelAsyncJob();
 
   try {
@@ -505,9 +511,13 @@ async function executePrimaryQuery() {
       // refreshView() increments activeRequestId, making the outer finally stale.
       // Explicitly clear loading state and fetch pareto here.
       loading.querying = false;
-      lastQueryAt.value = new Date().toLocaleString('zh-TW');
+      const _now = new Date();
+  const _pad = (n) => String(n).padStart(2, '0');
+  lastQueryAt.value = `${_now.getFullYear()}-${_pad(_now.getMonth() + 1)}-${_pad(_now.getDate())} ${_pad(_now.getHours())}:${_pad(_now.getMinutes())}:${_pad(_now.getSeconds())}`;
       updateUrlState();
       await fetchBatchPareto();
+      refreshSuccess.value = true;
+      setTimeout(() => { refreshSuccess.value = false; }, 1500);
       return;
     }
 
@@ -517,8 +527,11 @@ async function executePrimaryQuery() {
     await _loadViewAfterQuery(resultData.query_id);
     await _applyQueryResult(resultData);
 
+    refreshSuccess.value = true;
+    setTimeout(() => { refreshSuccess.value = false; }, 1500);
   } catch (error) {
     if (isStaleRequest(requestId)) return;
+    refreshError.value = true;
     if (error?.name === 'AbortError') {
       errorMessage.value = '查詢已取消';
     } else if (error?.errorCode === 'JOB_FAILED') {
@@ -1292,24 +1305,14 @@ onUnmounted(() => {
 
 <template>
   <div class="dashboard reject-history-page theme-reject-history">
-    <header class="header reject-history-header">
-      <div class="header-left">
-        <div class="header-title-row">
-          <h1>報廢歷史查詢</h1>
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="last-update" v-if="lastQueryAt">更新時間：{{ lastQueryAt }}</div>
-        <button
-          type="button"
-          class="ui-btn ui-btn--ghost ui-btn--sm"
-          :disabled="loading.querying"
-          @click="applyFilters"
-        >
-          重新整理
-        </button>
-      </div>
-    </header>
+    <PageHeader
+      title="報廢歷史查詢"
+      :last-update="lastQueryAt || '--'"
+      :refreshing="loading.querying"
+      :refresh-success="refreshSuccess"
+      :refresh-error="refreshError"
+      @refresh="applyFilters"
+    />
 
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
     <div v-if="partialFailureWarning" class="warning-banner">
