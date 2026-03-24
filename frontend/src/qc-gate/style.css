@@ -1,3 +1,5 @@
+@import '../resource-shared/styles.css';
+
 .qc-gate-page,
 .qc-gate-page * {
   box-sizing: border-box;
