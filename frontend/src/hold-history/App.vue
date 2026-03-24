@@ -8,6 +8,7 @@ import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrat
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 import { useHoldHistoryDuckDB } from './useHoldHistoryDuckDB.js';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 
 import DailyTrend from './components/DailyTrend.vue';
@@ -43,6 +44,8 @@ const detailData = ref({
 const page = ref(1);
 const initialLoading = ref(true);
 const paginationLoading = ref(false);
+const refreshSuccess = ref(false);
+const refreshError = ref(false);
 const loading = reactive({
   global: false,
   primaryQuery: false,
@@ -218,6 +221,7 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
   loading.primaryQuery = true;
   loading.list = true;
   errorMessage.value = '';
+  refreshError.value = false;
 
   // Discard any previous local-compute state before evaluating new response (Task 4.4)
   duckdb.deactivate();
@@ -251,6 +255,9 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
         // Activation failed — remain in server-view mode (Task 4.3)
       }
     }
+
+    refreshSuccess.value = true;
+    setTimeout(() => { refreshSuccess.value = false; }, 1500);
   } catch (error) {
     if (isStaleRequest(requestId)) return;
     if (error?.name === 'AbortError') {
@@ -258,6 +265,7 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
     } else {
       errorMessage.value = error?.message || '主查詢執行失敗';
     }
+    refreshError.value = true;
   } finally {
     if (isStaleRequest(requestId)) return;
     loading.global = false;
@@ -642,15 +650,18 @@ onMounted(() => {
 
 <template>
   <div class="dashboard hold-history-page theme-hold-history">
-    <header class="header hold-history-header">
-      <div class="header-left">
-        <h1>Hold 歷史績效</h1>
+    <PageHeader
+      title="Hold 歷史績效"
+      :refreshing="loading.global"
+      :refresh-success="refreshSuccess"
+      :refresh-error="refreshError"
+      @refresh="manualRefresh"
+    >
+      <template #header-left />
+      <template #header-left-after>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
-      </div>
-      <div class="header-right">
-        <button type="button" class="ui-btn ui-btn--primary" @click="manualRefresh">重新整理</button>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
 
