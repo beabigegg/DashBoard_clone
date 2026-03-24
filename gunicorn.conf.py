@@ -4,7 +4,7 @@ import os
 _gunicorn_logger = logging.getLogger("gunicorn.startup")
 
 bind = os.getenv("GUNICORN_BIND", "0.0.0.0:8080")
-workers = int(os.getenv("GUNICORN_WORKERS", "3"))  # 3 workers for redundancy
+workers = int(os.getenv("GUNICORN_WORKERS", "2"))  # DEV: 2, PRD: 4
 threads = int(os.getenv("GUNICORN_THREADS", "4"))
 worker_class = "gthread"
 
@@ -16,8 +16,8 @@ keepalive = 5         # Keep-alive connections timeout
 
 # Worker lifecycle management - prevent state accumulation.
 # Make these configurable so high-load test environments can raise the ceiling.
-max_requests = int(os.getenv("GUNICORN_MAX_REQUESTS", "1200"))
-max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "300"))
+max_requests = int(os.getenv("GUNICORN_MAX_REQUESTS", "5000"))
+max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "1000"))
 
 
 # ============================================================
@@ -30,7 +30,7 @@ def on_starting(server):
         import psutil
         vm = psutil.virtual_memory()
         available_mb = vm.available / (1024 * 1024)
-        rq_workers = int(os.getenv("RQ_WORKER_COUNT_ESTIMATE", "2"))  # trace + reject
+        rq_workers = int(os.getenv("RQ_WORKER_COUNT_ESTIMATE", "3"))  # trace + reject + msd
         required_mb = workers * 400 + rq_workers * 200
         if available_mb >= required_mb:
             server.log.info(
