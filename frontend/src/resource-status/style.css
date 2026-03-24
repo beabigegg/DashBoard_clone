@@ -1,37 +1,3 @@
-.status-header-meta {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 13px;
-  flex-wrap: wrap;
-}
-
-.cache-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.cache-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: theme('colors.token.h22c55e');
-}
-
-.cache-dot.loading {
-  background: theme('colors.token.hf59e0b');
-}
-
-.cache-dot.error {
-  background: theme('colors.token.hef4444');
-}
-
-.last-update {
-  opacity: 0.9;
-}
-
 .filters-panel {
   padding: theme('spacing.token.p12') theme('spacing.token.p16');
   display: flex;
@@ -321,7 +287,7 @@
 }
 
 @media (max-width: 880px) {
-  .status-header-meta {
+  .page-header-meta {
     width: 100%;
     justify-content: flex-start;
   }

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import QcGateChart from './components/QcGateChart.vue';
 import LotTable from './components/LotTable.vue';
 import { useQcGateData } from './composables/useQcGateData.js';
@@ -10,6 +11,8 @@ const {
   cacheTime,
   loading,
   refreshing,
+  refreshSuccess,
+  refreshError,
   errorMessage,
   allLots,
   refreshNow,
@@ -48,19 +51,13 @@ const formattedCacheTime = computed(() => {
     return '--';
   }
 
-  const date = new Date(cacheTime.value);
-  if (Number.isNaN(date.getTime())) {
+  const d = new Date(cacheTime.value);
+  if (Number.isNaN(d.getTime())) {
     return String(cacheTime.value);
   }
 
-  return date.toLocaleString('zh-TW', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 });
 
 const activeFilterLabel = computed(() => {
@@ -100,30 +97,14 @@ function handleManualRefresh() {
 
 <template>
   <div class="qc-gate-page theme-qc-gate">
-    <header class="qc-gate-header">
-      <div>
-        <h1>QC-GATE 狀態</h1>
-        <p class="header-subtitle">即時監控各 QC-GATE 站點的在製 LOT 與等待時間</p>
-      </div>
-      <div class="header-meta">
-        <div class="meta-row">
-          <span class="meta-label">快照時間</span>
-          <span class="meta-value">{{ formattedCacheTime }}</span>
-        </div>
-        <div class="meta-row">
-          <span class="meta-label">總 LOT</span>
-          <span class="meta-value">{{ totalLots.toLocaleString('zh-TW') }}</span>
-        </div>
-        <button
-          type="button"
-          class="refresh-button"
-          :disabled="loading || refreshing"
-          @click="handleManualRefresh"
-        >
-          {{ refreshing ? '更新中...' : '重新整理' }}
-        </button>
-      </div>
-    </header>
+    <PageHeader
+      title="QC-GATE 狀態"
+      :last-update="formattedCacheTime"
+      :refreshing="loading || refreshing"
+      :refresh-success="refreshSuccess"
+      :refresh-error="refreshError"
+      @refresh="handleManualRefresh"
+    />
 
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 

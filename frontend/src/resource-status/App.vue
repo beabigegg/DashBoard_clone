@@ -12,7 +12,7 @@ import EquipmentGrid from './components/EquipmentGrid.vue';
 import FilterBar from './components/FilterBar.vue';
 import FloatingTooltip from './components/FloatingTooltip.vue';
 import MatrixSection from './components/MatrixSection.vue';
-import StatusHeader from './components/StatusHeader.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SummaryCards from './components/SummaryCards.vue';
 
 ensureMesApiAvailable();
@@ -69,6 +69,9 @@ const loading = reactive({
   refreshing: false,
   options: false,
 });
+
+const refreshSuccess = ref(false);
+const refreshError = ref(false);
 
 const cacheLevel = ref('loading');
 const cacheText = ref('檢查中...');
@@ -231,7 +234,9 @@ async function checkCacheStatus() {
     }
 
     if (equipmentCache.updated_at) {
-      lastUpdate.value = new Date(equipmentCache.updated_at).toLocaleString('zh-TW');
+      const d = new Date(equipmentCache.updated_at);
+      const pad = (n) => String(n).padStart(2, '0');
+      lastUpdate.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     } else {
       lastUpdate.value = '--';
     }
@@ -369,11 +374,14 @@ async function loadData(showOverlay = false) {
   }
 
   loading.refreshing = true;
+  refreshError.value = false;
   summaryError.value = '';
   equipmentError.value = '';
 
   const [summaryResult, equipmentResult] = await Promise.allSettled([loadSummary(), loadEquipment()]);
   await checkCacheStatus();
+
+  const hasFailed = summaryResult.status === 'rejected' || equipmentResult.status === 'rejected';
 
   if (summaryResult.status === 'rejected') {
     summaryError.value = summaryResult.reason?.message || '摘要資料載入失敗';
@@ -382,6 +390,13 @@ async function loadData(showOverlay = false) {
   if (equipmentResult.status === 'rejected') {
     equipmentError.value = equipmentResult.reason?.message || '設備資料載入失敗';
     allEquipment.value = [];
+  }
+
+  if (hasFailed) {
+    refreshError.value = true;
+  } else {
+    refreshSuccess.value = true;
+    setTimeout(() => { refreshSuccess.value = false; }, 1500);
   }
 
   loading.refreshing = false;
@@ -441,11 +456,12 @@ onMounted(() => {
 <template>
   <div class="resource-page theme-resource">
     <div class="dashboard">
-      <StatusHeader
-        :cache-level="cacheLevel"
-        :cache-text="cacheText"
+      <PageHeader
+        title="設備即時概況"
         :last-update="lastUpdate"
         :refreshing="loading.refreshing"
+        :refresh-success="refreshSuccess"
+        :refresh-error="refreshError"
         @refresh="handleManualRefresh"
       />
       <FilterBar

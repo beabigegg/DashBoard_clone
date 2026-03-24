@@ -8,6 +8,7 @@ import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import HoldLotTable from '../wip-shared/components/HoldLotTable.vue';
 
@@ -31,6 +32,8 @@ const pagination = ref({
 const page = ref(1);
 const initialLoading = ref(true);
 const refreshing = ref(false);
+const refreshSuccess = ref(false);
+const refreshError = ref(false);
 const lotsLoading = ref(false);
 const paginationLoading = ref(false);
 const lotsError = ref('');
@@ -60,7 +63,7 @@ const orchestrator = useFilterOrchestrator({
 });
 
 const lastUpdate = computed(() => {
-  return summary.value?.dataUpdateDate ? `Last Update: ${summary.value.dataUpdateDate}` : '';
+  return summary.value?.dataUpdateDate ?? '--';
 });
 
 function unwrapApiResult(result, fallbackMessage) {
@@ -263,6 +266,7 @@ async function loadAllData(showOverlay = true) {
   loadError.value = '';
   lotsError.value = '';
   refreshing.value = true;
+  refreshError.value = false;
 
   try {
     const [summaryData, distributionData, lotsData] = await Promise.all([
@@ -284,11 +288,14 @@ async function loadAllData(showOverlay = true) {
       totalPages: Number(lotsData?.pagination?.totalPages || 1),
     };
 
+    refreshSuccess.value = true;
+    setTimeout(() => { refreshSuccess.value = false; }, 1500);
   } catch (error) {
     if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
     loadError.value = error?.message || '載入資料失敗';
+    refreshError.value = true;
   } finally {
     if (isStaleRequest(requestId)) {
       return;
@@ -372,20 +379,22 @@ onMounted(() => {
 
 <template>
   <div class="dashboard hold-detail-page theme-hold-detail">
-    <header class="header" :style="headerStyle">
-      <div class="header-left">
+    <PageHeader
+      :title="`Hold Detail: ${reason}`"
+      :last-update="lastUpdate"
+      :refreshing="refreshing"
+      :refresh-success="refreshSuccess"
+      :refresh-error="refreshError"
+      :style="headerStyle"
+      @refresh="manualRefresh"
+    >
+      <template #header-left>
         <a :href="backToOverviewHref" class="ui-btn ui-btn--ghost btn-back">&larr; Hold Overview</a>
-        <h1>Hold Detail: {{ reason }}</h1>
+      </template>
+      <template #header-left-after>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
-      </div>
-      <div class="header-right">
-        <span class="last-update">
-          <span class="refresh-indicator" :class="{ active: refreshing }"></span>
-          <span>{{ lastUpdate }}</span>
-        </span>
-        <button type="button" class="ui-btn ui-btn--ghost" @click="manualRefresh">重新整理</button>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <p v-if="loadError" class="error-banner">{{ loadError }}</p>
 

@@ -8,6 +8,7 @@ import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import LotDetailPanel from './components/LotDetailPanel.vue';
 import LotTable from './components/LotTable.vue';
@@ -303,7 +304,7 @@ const pageTitle = computed(() => {
 });
 
 const lastUpdate = computed(() => {
-  return detailData.value?.sys_date ? `Last Update: ${detailData.value.sys_date}` : '';
+  return detailData.value?.sys_date ?? '--';
 });
 
 const summary = computed(() => detailData.value?.summary || null);
@@ -506,21 +507,18 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dashboard wip-detail-page theme-wip-detail">
-    <header class="header">
-      <div class="header-left">
+    <PageHeader
+      :title="pageTitle"
+      :last-update="lastUpdate"
+      :refreshing="refreshing"
+      :refresh-success="refreshSuccess"
+      :refresh-error="refreshError"
+      @refresh="manualRefresh"
+    >
+      <template #header-left>
         <a :href="backUrl" class="ui-btn ui-btn--ghost ui-btn--sm">&larr; Overview</a>
-        <h1>{{ pageTitle }}</h1>
-      </div>
-      <div class="header-right">
-        <span class="last-update">
-          <span class="refresh-indicator" :class="{ active: refreshing }"></span>
-          <span class="refresh-success" :class="{ active: refreshSuccess }">&#10003;</span>
-          <span class="refresh-error" :class="{ active: refreshError }"></span>
-          <span>{{ lastUpdate }}</span>
-        </span>
-        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="manualRefresh">Refresh</button>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
 

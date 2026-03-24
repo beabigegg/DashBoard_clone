@@ -8,6 +8,7 @@ import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SkeletonLoader from '../shared-ui/components/SkeletonLoader.vue';
 import HoldLotTable from '../wip-shared/components/HoldLotTable.vue';
 import ParetoSection from '../wip-shared/components/ParetoSection.vue';
@@ -119,8 +120,7 @@ const lotFilterText = computed(() => {
 const hasLotFilterText = computed(() => Boolean(lotFilterText.value));
 
 const lastUpdate = computed(() => {
-  const value = summary.value?.dataUpdateDate;
-  return value ? `Last Update: ${value}` : '';
+  return summary.value?.dataUpdateDate ?? '--';
 });
 
 const reasonOptions = computed(() => {
@@ -719,23 +719,19 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dashboard hold-overview-page theme-hold-overview">
-    <header class="header">
-      <div class="header-left">
-        <div class="header-title-row">
-          <h1>Hold 即時概況</h1>
-          <span class="hold-type-badge">{{ holdTypeLabel }}</span>
-        </div>
-      </div>
-      <div class="header-right">
-        <span class="last-update">
-          <span class="refresh-indicator" :class="{ active: refreshing }"></span>
-          <span class="refresh-success" :class="{ active: refreshSuccess }">&#10003;</span>
-          <span class="refresh-error" :class="{ active: refreshError }"></span>
-          <span>{{ lastUpdate }}</span>
-        </span>
-        <button type="button" class="ui-btn ui-btn--ghost" @click="manualRefresh">重新整理</button>
-      </div>
-    </header>
+    <PageHeader
+      title="Hold 即時概況"
+      :last-update="lastUpdate"
+      :refreshing="refreshing"
+      :refresh-success="refreshSuccess"
+      :refresh-error="refreshError"
+      @refresh="manualRefresh"
+    >
+      <template #header-left />
+      <template #header-left-after>
+        <span class="hold-type-badge">{{ holdTypeLabel }}</span>
+      </template>
+    </PageHeader>
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
 

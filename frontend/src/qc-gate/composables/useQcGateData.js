@@ -53,6 +53,8 @@ export function useQcGateData() {
   const cacheTime = ref(null);
   const loading = ref(true);
   const refreshing = ref(false);
+  const refreshSuccess = ref(false);
+  const refreshError = ref(false);
   const errorMessage = ref('');
   const lastFetchedAt = ref(null);
 
@@ -84,6 +86,7 @@ export function useQcGateData() {
     }
 
     errorMessage.value = '';
+    refreshError.value = false;
 
     try {
       const response = await apiGet('/api/qc-gate/summary', {
@@ -97,12 +100,15 @@ export function useQcGateData() {
       stations.value = normalized.stations;
       cacheTime.value = normalized.cache_time;
       lastFetchedAt.value = new Date();
+      refreshSuccess.value = true;
+      setTimeout(() => { refreshSuccess.value = false; }, 1500);
       return true;
     } catch (error) {
       if (error?.name === 'AbortError') {
         return false;
       }
       errorMessage.value = error?.message || '載入 QC-GATE 資料失敗';
+      refreshError.value = true;
       return false;
     } finally {
       loading.value = false;
@@ -168,6 +174,8 @@ export function useQcGateData() {
     cacheTime,
     loading,
     refreshing,
+    refreshSuccess,
+    refreshError,
     errorMessage,
     lastFetchedAt,
     allLots,

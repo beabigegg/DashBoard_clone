@@ -10,6 +10,7 @@ import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrat
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import MatrixTable from './components/MatrixTable.vue';
 import StatusCards from './components/StatusCards.vue';
@@ -180,7 +181,7 @@ function onFilterDraftChange(nextDraftFilters) {
 }
 
 const lastUpdate = computed(() => {
-  return summary.value?.dataUpdateDate ? `Last Update: ${summary.value.dataUpdateDate}` : '';
+  return summary.value?.dataUpdateDate ?? '--';
 });
 
 const matrixTitle = computed(() => {
@@ -431,18 +432,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dashboard wip-overview-page theme-wip-overview">
-    <header class="header">
-      <h1>WIP 即時概況</h1>
-      <div class="header-right">
-        <span class="last-update">
-          <span class="refresh-indicator" :class="{ active: refreshing }"></span>
-          <span class="refresh-success" :class="{ active: refreshSuccess }">&#10003;</span>
-          <span class="refresh-error" :class="{ active: refreshError }"></span>
-          <span>{{ lastUpdate }}</span>
-        </span>
-        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="manualRefresh">重新整理</button>
-      </div>
-    </header>
+    <PageHeader
+      title="WIP 即時概況"
+      :last-update="lastUpdate"
+      :refreshing="refreshing"
+      :refresh-success="refreshSuccess"
+      :refresh-error="refreshError"
+      @refresh="manualRefresh"
+    />
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
 
