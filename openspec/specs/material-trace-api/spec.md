@@ -149,3 +149,15 @@ Material Trace query and export responses SHALL explicitly mark complete vs trun
 - **WHEN** query completes without truncation
 - **THEN** response SHALL include `quality_meta.status = "complete"`
 
+### Requirement: Material Trace memory-pressure rejection SHALL use service-unavailable semantics
+Memory guard failures on Material Trace endpoints SHALL be reported as retryable service overload, not request validation failure.
+
+#### Scenario: Query memory guard rejection
+- **WHEN** `POST /api/material-trace/query` hits memory guard
+- **THEN** endpoint SHALL return HTTP `503 SERVICE_UNAVAILABLE`
+- **THEN** response SHALL include a retryable overload message and `Retry-After` header
+
+#### Scenario: Export memory guard rejection
+- **WHEN** `POST /api/material-trace/export` hits memory guard
+- **THEN** endpoint SHALL return HTTP `503 SERVICE_UNAVAILABLE`
+- **THEN** response contract SHALL remain distinguishable from parameter-validation errors (`400`)

@@ -16,6 +16,7 @@ Architecture:
 """
 
 import csv
+import hashlib
 import io
 import logging
 import os
@@ -53,9 +54,31 @@ MAX_EQUIPMENTS = 20
 MAX_DATE_RANGE_DAYS = 730  # 2 years
 DEFAULT_TIME_WINDOW_HOURS = 168  # 1 week for better PJ_TYPE detection
 ADJACENT_LOTS_COUNT = 3
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = str(os.getenv(name, "true" if default else "false")).strip().lower()
+    return raw in {"1", "true", "yes", "y", "on"}
+
+
 QUERY_TOOL_RSS_REJECT_MB = float(os.getenv('QUERY_TOOL_RSS_REJECT_MB', '1100'))
 QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE = int(os.getenv('QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE', '200'))
 QUERY_TOOL_DETAIL_MAX_PER_PAGE = int(os.getenv('QUERY_TOOL_DETAIL_MAX_PER_PAGE', '500'))
+QUERY_TOOL_SPOOL_TTL_SECONDS = int(os.getenv('QUERY_TOOL_SPOOL_TTL_SECONDS', '300'))
+QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP = _env_bool(
+    "QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP",
+    False,
+)
+QUERY_TOOL_REJECT_EXCLUDE_MATERIAL_SCRAP = _env_bool(
+    "QUERY_TOOL_REJECT_EXCLUDE_MATERIAL_SCRAP",
+    True,
+)
+QUERY_TOOL_REJECT_EXCLUDE_PB_DIODE = _env_bool(
+    "QUERY_TOOL_REJECT_EXCLUDE_PB_DIODE",
+    True,
+)
+QUERY_TOOL_SPOOL_NS_HISTORY_BATCH = "query_tool_history_batch"
+QUERY_TOOL_SPOOL_NS_ASSOC_BATCH_PREFIX = "query_tool_assoc_batch"
 
 
 def _fetch_domain_records(container_ids: List[str], domain: str) -> tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Any]]:
@@ -131,6 +154,97 @@ def _max_batch_container_ids() -> int:
         return max(int(os.getenv("QUERY_TOOL_MAX_CONTAINER_IDS", "200")), 1)
     except (TypeError, ValueError):
         return 200
+
+
+def _build_query_tool_batch_query_id(domain: str, container_ids: List[str]) -> str:
+    payload = {
+        "fn": "query_tool_batch",
+        "domain": str(domain or "").strip().lower(),
+        "container_ids": sorted(_normalize_search_tokens(container_ids)),
+    }
+    try:
+        from mes_dashboard.services.batch_query_engine import compute_query_hash
+        return compute_query_hash(payload)
+    except Exception:
+        raw = repr(payload).encode("utf-8", errors="ignore")
+        return hashlib.md5(raw).hexdigest()[:16]
+
+
+def _query_tool_batch_namespace(domain: str) -> str:
+    d = str(domain or "").strip().lower()
+    if d == "history":
+        return QUERY_TOOL_SPOOL_NS_HISTORY_BATCH
+    return f"{QUERY_TOOL_SPOOL_NS_ASSOC_BATCH_PREFIX}_{d or 'unknown'}"
+
+
+def _query_tool_reject_policy() -> Dict[str, bool]:
+    return {
+        "include_excluded_scrap": QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP,
+        "exclude_material_scrap": QUERY_TOOL_REJECT_EXCLUDE_MATERIAL_SCRAP,
+        "exclude_pb_diode": QUERY_TOOL_REJECT_EXCLUDE_PB_DIODE,
+    }
+
+
+def _store_query_tool_batch_spool(
+    *,
+    namespace: str,
+    query_id: str,
+    rows: List[Dict[str, Any]],
+) -> bool:
+    if not rows:
+        return False
+    try:
+        from mes_dashboard.core.query_spool_store import store_spooled_df
+        df = pd.DataFrame(rows)
+        if df.empty:
+            return False
+        return bool(
+            store_spooled_df(
+                namespace,
+                query_id,
+                df,
+                ttl_seconds=max(QUERY_TOOL_SPOOL_TTL_SECONDS, 60),
+            )
+        )
+    except Exception as exc:
+        logger.debug(
+            "query_tool spool store skipped namespace=%s query_id=%s: %s",
+            namespace,
+            query_id,
+            exc,
+        )
+        return False
+
+
+def _try_query_tool_spool_page(
+    *,
+    namespace: str,
+    query_id: str,
+    page: int,
+    per_page: int,
+    workcenter_names: Optional[List[str]] = None,
+    reject_policy: Optional[Dict[str, bool]] = None,
+) -> tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    try:
+        from mes_dashboard.services.query_tool_sql_runtime import (
+            try_compute_page_from_spool,
+        )
+        return try_compute_page_from_spool(
+            namespace=namespace,
+            query_id=query_id,
+            page=page,
+            per_page=per_page,
+            workcenter_names=workcenter_names,
+            reject_policy=reject_policy,
+        )
+    except Exception as exc:
+        logger.debug(
+            "query_tool spool runtime unavailable namespace=%s query_id=%s: %s",
+            namespace,
+            query_id,
+            exc,
+        )
+        return None, {"view_sql_fallback_reason": "query_tool_sql_runtime_unavailable"}
 
 
 # ============================================================
@@ -836,17 +950,89 @@ def _get_workcenters_for_groups(groups: List[str]) -> List[str]:
 def _enrich_workcenter_group(rows: list) -> list:
     """Add WORKCENTER_GROUP field to each history row based on WORKCENTERNAME.
 
-    Uses filter_cache workcenter mapping to resolve the group name.
+    Uses filter_cache mapping first, then fallback pattern mapping.
     """
-    from mes_dashboard.services.filter_cache import get_workcenter_mapping
+    from mes_dashboard.config.workcenter_groups import get_workcenter_group
+    from mes_dashboard.services.filter_cache import (
+        get_spec_workcenter_mapping,
+        get_workcenter_mapping,
+    )
+
     mapping = get_workcenter_mapping() or {}
+    spec_mapping = get_spec_workcenter_mapping() or {}
     for row in rows:
-        wc_name = row.get('WORKCENTERNAME')
+        current_group = str(row.get('WORKCENTER_GROUP') or '').strip()
+        if current_group:
+            row['WORKCENTER_GROUP'] = current_group
+            continue
+
+        wc_name = str(row.get('WORKCENTERNAME') or '').strip()
+        group_name = ""
         if wc_name and wc_name in mapping:
-            row['WORKCENTER_GROUP'] = mapping[wc_name].get('group', wc_name)
-        else:
-            row['WORKCENTER_GROUP'] = wc_name or ''
+            group_name = str(mapping[wc_name].get('group') or '').strip()
+
+        if not group_name and wc_name:
+            group_name, _ = get_workcenter_group(wc_name)
+            group_name = str(group_name or '').strip()
+
+        if not group_name:
+            spec_name = str(row.get('SPECNAME') or row.get('SPEC') or '').strip().upper()
+            if spec_name and spec_name in spec_mapping:
+                group_name = str(spec_mapping[spec_name].get('group') or '').strip()
+
+        row['WORKCENTER_GROUP'] = group_name or wc_name or ''
     return rows
+
+
+def _apply_query_tool_reject_policy(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Apply reject-history default policy filters to query-tool reject rows."""
+    if not rows:
+        return []
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return []
+
+    mask = pd.Series(True, index=df.index)
+    policy = _query_tool_reject_policy()
+
+    if policy["exclude_material_scrap"] and "SCRAP_OBJECTTYPE" in df.columns:
+        obj_type = df["SCRAP_OBJECTTYPE"].fillna("").astype(str).str.strip().str.upper()
+        mask &= obj_type != "MATERIAL"
+
+    if policy["exclude_pb_diode"] and "PRODUCTLINENAME" in df.columns:
+        product = df["PRODUCTLINENAME"].fillna("").astype(str).str.strip().str.upper()
+        mask &= ~product.str.match(r"^PB_")
+
+    if not policy["include_excluded_scrap"]:
+        excluded = set()
+        try:
+            from mes_dashboard.services.scrap_reason_exclusion_cache import (
+                get_excluded_reasons,
+            )
+
+            excluded = {
+                str(v or "").strip().upper()
+                for v in (get_excluded_reasons() or set())
+                if str(v or "").strip()
+            }
+        except Exception:
+            excluded = set()
+
+        if excluded and "LOSSREASON_CODE" in df.columns:
+            code_upper = df["LOSSREASON_CODE"].fillna("").astype(str).str.strip().str.upper()
+            mask &= ~code_upper.isin(excluded)
+        if excluded and "LOSSREASONNAME" in df.columns:
+            name_upper = df["LOSSREASONNAME"].fillna("").astype(str).str.strip().str.upper()
+            mask &= ~name_upper.isin(excluded)
+
+        if "LOSSREASONNAME" in df.columns:
+            reason = df["LOSSREASONNAME"].fillna("").astype(str).str.strip().str.upper()
+            mask &= reason.str.match(r"^[0-9]{3}_")
+            mask &= ~reason.str.match(r"^(XXX|ZZZ)_")
+
+    filtered = df[mask]
+    return _df_to_records(filtered)
 
 
 def get_lot_history(
@@ -994,14 +1180,55 @@ def get_lot_history_batch(
     max_ids = _max_batch_container_ids()
     if len(container_ids) > max_ids:
         return {'error': f'container_ids 數量不可超過 {max_ids} 筆'}
+    normalized_page = _sanitize_page(page)
+    normalized_per_page = _sanitize_per_page(per_page)
+    spool_query_id = _build_query_tool_batch_query_id("history", container_ids)
+    spool_namespace = _query_tool_batch_namespace("history")
 
     try:
+        spool_workcenters = None
+        if workcenter_groups:
+            spool_workcenters = _get_workcenters_for_groups(workcenter_groups) or None
+        spool_result, spool_meta = _try_query_tool_spool_page(
+            namespace=spool_namespace,
+            query_id=spool_query_id,
+            page=normalized_page,
+            per_page=normalized_per_page,
+            workcenter_names=spool_workcenters,
+        )
+        if spool_result is not None:
+            paged_rows = list(spool_result.get("data", []))
+            _enrich_workcenter_group(paged_rows)
+            return {
+                'data': paged_rows,
+                'total': int(spool_result.get("total", len(paged_rows)) or 0),
+                'container_ids': container_ids,
+                'filtered_by_groups': workcenter_groups or [],
+                'pagination': spool_result.get("pagination", {
+                    "page": 1,
+                    "per_page": len(paged_rows),
+                    "total": len(paged_rows),
+                    "total_pages": 1,
+                }),
+                'quality_meta': {
+                    'status': 'complete',
+                    'runtime': 'duckdb',
+                    'runtime_path': 'spool',
+                    **spool_meta,
+                },
+            }
+
         _check_rss_guard("LOT 批次生產履歷查詢")
         events_by_cid, quality_meta = _fetch_domain_records(container_ids, "history")
 
         rows = []
         for cid in container_ids:
             rows.extend(events_by_cid.get(cid, []))
+        _store_query_tool_batch_spool(
+            namespace=spool_namespace,
+            query_id=spool_query_id,
+            rows=rows,
+        )
 
         if workcenter_groups:
             workcenters = _get_workcenters_for_groups(workcenter_groups)
@@ -1014,8 +1241,8 @@ def get_lot_history_batch(
 
         paged_rows, pagination = _paginate_rows(
             rows,
-            _sanitize_page(page),
-            _sanitize_per_page(per_page),
+            normalized_page,
+            normalized_per_page,
         )
 
         _enrich_workcenter_group(paged_rows)
@@ -1067,22 +1294,63 @@ def get_lot_associations_batch(
     valid_batch_types = {'materials', 'rejects', 'holds'}
     if assoc_type not in valid_batch_types:
         return {'error': f'批次查詢不支援類型: {assoc_type}'}
+    normalized_page = _sanitize_page(page)
+    normalized_per_page = _sanitize_per_page(per_page)
+    spool_query_id = _build_query_tool_batch_query_id(assoc_type, container_ids)
+    spool_namespace = _query_tool_batch_namespace(assoc_type)
+    reject_policy = _query_tool_reject_policy() if assoc_type == "rejects" else None
 
     try:
+        spool_result, spool_meta = _try_query_tool_spool_page(
+            namespace=spool_namespace,
+            query_id=spool_query_id,
+            page=normalized_page,
+            per_page=normalized_per_page,
+            reject_policy=reject_policy,
+        )
+        if spool_result is not None:
+            paged_rows = list(spool_result.get("data", []))
+            _enrich_workcenter_group(paged_rows)
+            return {
+                'data': paged_rows,
+                'total': int(spool_result.get("total", len(paged_rows)) or 0),
+                'container_ids': container_ids,
+                'pagination': spool_result.get("pagination", {
+                    "page": 1,
+                    "per_page": len(paged_rows),
+                    "total": len(paged_rows),
+                    "total_pages": 1,
+                }),
+                'quality_meta': {
+                    'status': 'complete',
+                    'runtime': 'duckdb',
+                    'runtime_path': 'spool',
+                    **spool_meta,
+                },
+            }
+
         _check_rss_guard(f"LOT 批次{assoc_type}查詢")
         events_by_cid, quality_meta = _fetch_domain_records(container_ids, assoc_type)
 
         rows = []
         for cid in container_ids:
             rows.extend(events_by_cid.get(cid, []))
+        _store_query_tool_batch_spool(
+            namespace=spool_namespace,
+            query_id=spool_query_id,
+            rows=rows,
+        )
+
+        if assoc_type == "rejects":
+            rows = _apply_query_tool_reject_policy(rows)
 
         # Keep timeline grouping consistent with history rows.
         # Especially for materials, workcenter names like "焊_DB_料" need to map
         # to the same WORKCENTER_GROUP used by LOT history tracks.
         paged_rows, pagination = _paginate_rows(
             rows,
-            _sanitize_page(page),
-            _sanitize_per_page(per_page),
+            normalized_page,
+            normalized_per_page,
         )
         _enrich_workcenter_group(paged_rows)
         data = _df_to_records(pd.DataFrame(paged_rows))
@@ -1168,11 +1436,13 @@ def get_lot_rejects(container_id: str, *, page: int = 1, per_page: int = 0) -> D
     try:
         events_by_cid, quality_meta = _fetch_domain_records([container_id], "rejects")
         rows = list(events_by_cid.get(container_id, []))
+        rows = _apply_query_tool_reject_policy(rows)
         paged_rows, pagination = _paginate_rows(
             rows,
             _sanitize_page(page),
             _sanitize_per_page(per_page),
         )
+        _enrich_workcenter_group(paged_rows)
         data = _df_to_records(pd.DataFrame(paged_rows))
 
         logger.debug(f"LOT rejects: {len(data)} records for {container_id}")

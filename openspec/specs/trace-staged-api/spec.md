@@ -35,3 +35,16 @@ Completeness metadata shape SHALL be normalized identically for fresh execution 
 #### Scenario: Cached response normalization
 - **WHEN** events endpoint returns a cached events payload
 - **THEN** response normalization SHALL ensure `quality_meta` and `domain_quality_meta` are present and schema-consistent with fresh execution responses
+
+### Requirement: Trace events sync path SHALL prefer async fallback under memory pressure
+When sync execution is blocked by memory-pressure guard, the endpoint SHALL prefer async job delegation when async execution is available for the request.
+
+#### Scenario: Memory-pressure guard with async available
+- **WHEN** sync `POST /api/trace/events` request hits RSS guard and async queue is available
+- **THEN** endpoint SHALL return `202` with job handles instead of immediate `503`
+- **THEN** response SHALL include status/stream endpoints for polling
+
+#### Scenario: Memory-pressure guard with async unavailable
+- **WHEN** sync request hits RSS guard and async queue is unavailable
+- **THEN** endpoint SHALL return HTTP `503 SERVICE_UNAVAILABLE`
+- **THEN** response SHALL include `Retry-After` header and retryable overload code

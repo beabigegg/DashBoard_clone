@@ -68,6 +68,19 @@ The API SHALL support cache-aware execution for repeated equivalent queries, wit
 - **THEN** `apply_view` SHALL compute results via DuckDB without loading the full DataFrame into process memory
 - **THEN** peak RSS during view computation SHALL be bounded by DuckDB's memory-mapped execution model
 
+### Requirement: Yield Alert overload signaling SHALL align with heavy-query contract
+Yield Alert memory-pressure and overload responses SHALL follow the same retryable contract used by other heavy-query endpoints.
+
+#### Scenario: Primary query overload response contract
+- **WHEN** `POST /api/yield-alert/query` returns overload due to memory guard or heavy-query rejection
+- **THEN** response SHALL use HTTP `503 SERVICE_UNAVAILABLE`
+- **THEN** response SHALL include `Retry-After` and machine-readable overload code/meta
+
+#### Scenario: View query overload response contract
+- **WHEN** `GET /api/yield-alert/view` returns overload due to memory guard
+- **THEN** response SHALL preserve retryable overload semantics consistent with query endpoint
+- **THEN** client SHALL be able to apply unified retry policy across heavy-query pages
+
 ### Requirement: Yield Alert Center API SHALL expose a reason-detail endpoint
 The API SHALL provide `GET /api/yield-alert/reason-detail` as a direct-query endpoint that does not depend on an existing `query_id` or dataset cache.
 

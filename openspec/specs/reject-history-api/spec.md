@@ -60,3 +60,16 @@ The API SHALL surface stable metadata so operators and clients can identify whet
 #### Scenario: Fallback metadata
 - **WHEN** response uses legacy fallback due to snapshot miss/stale/build failure
 - **THEN** response metadata SHALL include a stable fallback reason code
+
+### Requirement: Reject History API overload responses SHALL be retryable and contract-consistent
+Memory-pressure or heavy-query front-door rejection on reject-history endpoints SHALL use a consistent service-unavailable contract.
+
+#### Scenario: Primary query front-door rejection
+- **WHEN** heavy-query guard rejects `POST /api/reject-history/query` before execution
+- **THEN** endpoint SHALL return HTTP `503 SERVICE_UNAVAILABLE`
+- **THEN** response SHALL include `Retry-After` header and a machine-readable overload code
+
+#### Scenario: Cached/view path memory rejection
+- **WHEN** memory guard rejects `GET /api/reject-history/view` or `GET /api/reject-history/export-cached`
+- **THEN** endpoint SHALL return retryable overload semantics instead of validation semantics
+- **THEN** clients SHALL be able to distinguish overload from parameter-validation failures

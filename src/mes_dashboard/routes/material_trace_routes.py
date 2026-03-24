@@ -10,6 +10,8 @@ from flask import Blueprint, Response, stream_with_context
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.core.response import (
+    SERVICE_UNAVAILABLE,
+    error_response,
     internal_error,
     service_unavailable_error,
     success_response,
@@ -135,7 +137,12 @@ def api_material_trace_query():
 
     except MemoryError as exc:
         logger.warning("Material trace query memory guard: %s", exc)
-        return validation_error(str(exc))
+        return error_response(
+            SERVICE_UNAVAILABLE,
+            str(exc),
+            status_code=503,
+            headers={"Retry-After": "30"},
+        )
     except Exception:
         logger.exception("Material trace query failed: mode=%s", mode)
         return internal_error()
@@ -189,7 +196,12 @@ def api_material_trace_export():
 
     except MemoryError as exc:
         logger.warning("Material trace export memory guard: %s", exc)
-        return validation_error(str(exc))
+        return error_response(
+            SERVICE_UNAVAILABLE,
+            str(exc),
+            status_code=503,
+            headers={"Retry-After": "30"},
+        )
     except Exception:
         logger.exception("Material trace export failed: mode=%s", mode)
         return internal_error()

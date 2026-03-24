@@ -378,16 +378,59 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertFalse(payload['success'])
         self.assertEqual(payload['error']['code'], 'CACHE_MISS')
 
+    @patch('mes_dashboard.routes.reject_history_routes.query_dimension_pareto')
+    def test_reason_pareto_memory_guard_returns_503(self, mock_pareto):
+        mock_pareto.side_effect = MemoryError('目前服務記憶體負載較高')
+
+        response = self.client.get(
+            '/api/reject-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(payload['success'])
+        self.assertEqual(payload['error']['code'], 'SERVICE_UNAVAILABLE')
+        self.assertIn('記憶體負載較高', payload['error']['message'])
+        self.assertEqual(response.headers.get('Retry-After'), '30')
+
     @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
-    def test_batch_pareto_memory_guard_returns_400(self, mock_batch_pareto):
+    def test_batch_pareto_memory_guard_returns_503(self, mock_batch_pareto):
         mock_batch_pareto.side_effect = MemoryError('目前服務記憶體負載較高')
 
         response = self.client.get('/api/reject-history/batch-pareto?query_id=qid-oom')
         payload = json.loads(response.data)
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 503)
         self.assertFalse(payload['success'])
+        self.assertEqual(payload['error']['code'], 'SERVICE_UNAVAILABLE')
         self.assertIn('記憶體負載較高', payload['error']['message'])
+        self.assertEqual(response.headers.get('Retry-After'), '30')
+
+    @patch('mes_dashboard.routes.reject_history_routes.apply_view')
+    def test_view_memory_guard_returns_503(self, mock_apply_view):
+        mock_apply_view.side_effect = MemoryError('目前服務記憶體負載較高')
+
+        response = self.client.get('/api/reject-history/view?query_id=qid-oom')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(payload['success'])
+        self.assertEqual(payload['error']['code'], 'SERVICE_UNAVAILABLE')
+        self.assertIn('記憶體負載較高', payload['error']['message'])
+        self.assertEqual(response.headers.get('Retry-After'), '30')
+
+    @patch('mes_dashboard.routes.reject_history_routes.export_csv_from_cache')
+    def test_export_cached_memory_guard_returns_503(self, mock_export_cached):
+        mock_export_cached.side_effect = MemoryError('目前服務記憶體負載較高')
+
+        response = self.client.get('/api/reject-history/export-cached?query_id=qid-oom')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(payload['success'])
+        self.assertEqual(payload['error']['code'], 'SERVICE_UNAVAILABLE')
+        self.assertIn('記憶體負載較高', payload['error']['message'])
+        self.assertEqual(response.headers.get('Retry-After'), '30')
 
     @patch('mes_dashboard.routes.reject_history_routes.apply_view')
     def test_view_passes_pareto_multi_select_filters(self, mock_apply_view):

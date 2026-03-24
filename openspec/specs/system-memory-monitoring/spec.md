@@ -57,3 +57,16 @@ The application startup (gunicorn `on_starting` hook or `start_server.sh`) SHALL
 - **WHEN** available system memory is below the estimated requirement
 - **THEN** startup SHALL log a WARNING with the shortfall amount and a suggestion to reduce worker count
 - **THEN** startup SHALL NOT be blocked (warning only)
+
+### Requirement: Heavy-query memory guard telemetry SHALL be standardized across routes
+All heavy-query endpoints SHALL emit standardized guard/fallback telemetry fields for overload diagnostics and cross-route comparison.
+
+#### Scenario: Guard rejection telemetry
+- **WHEN** a heavy-query request is rejected by memory guard
+- **THEN** logs/metrics SHALL include route identifier, guard type, current RSS, configured threshold, and query scope identifiers
+- **THEN** telemetry naming SHALL be consistent across query-tool, trace, reject-history, material-trace, and yield-alert routes
+
+#### Scenario: Degraded fallback telemetry
+- **WHEN** a heavy-query request is served via degraded fallback path (cache/spool/duckdb)
+- **THEN** logs/metrics SHALL include fallback path type and success status
+- **THEN** operators SHALL be able to compare `guard_reject` and `fallback_success` rates per route

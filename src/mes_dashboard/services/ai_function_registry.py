@@ -132,6 +132,7 @@ def build_stage2_prompt(domains: list[str]) -> str:
     )
     from mes_dashboard.services.ai_business_context import (
         get_dynamic_metadata_block,
+        SCRAP_EXCLUSION_RULES,
     )
     from mes_dashboard.sql.filters import CommonFilters
 
@@ -174,12 +175,22 @@ def build_stage2_prompt(domains: list[str]) -> str:
         "11. 若使用者提供的是封裝型號（例如 SOT-23），優先使用 PRODUCTLINENAME 或 PACKAGE 類欄位",
         "12. 若使用者輸入 GA/GC 開頭（如 GA26020001），通常是生產工單，查 LOTWIPHISTORY 時優先用 PJ_WORKORDER，而不是 CONTAINERID",
         '13. 混合大小寫欄位必須用雙引號：e."Package", e."Function"（其餘欄位全大寫，不加引號）',
-        "14. 若無法生成合理 SQL，回傳 sql: null",
+        "14. 若問題是『站點/站別』層級排行或彙總，優先以 WORKCENTER_GROUP（或 WORK_CENTER_GROUP）輸出，不可只用 WORKCENTERNAME 分組",
+        "15. 若來源表只有 WORKCENTERNAME，需透過 DWH.DW_MES_SPEC_WORKCENTER_V（以 SPEC 對照）映射成 WORKCENTER_GROUP 後再彙總",
+        "16. 若在 reject/yield 分析中使用 LOTREJECTHISTORY，必須套用報表一致的 Reject 排除規則（見下方），避免口徑偏差",
+        "17. 若無法生成合理 SQL，回傳 sql: null",
         "",
     ]
 
     if metadata_block:
         lines += [metadata_block]
+
+    if any(d in ("yield", "reject") for d in domains):
+        lines += [
+            "## Reject 排除口徑（與報表一致）",
+            SCRAP_EXCLUSION_RULES,
+            "",
+        ]
 
     if examples_block:
         lines += [
@@ -262,6 +273,14 @@ def build_reviewer_prompt(domains: list[str]) -> str:
         "- workcenter_pattern 的值必須用系統全名（如 '焊接_DB%'），不能用縮寫（如 'DB%'）",
         "- 對照：DB→焊接_DB%, WB→焊接_WB%, DW→焊接_DW%, 成型→成型%, TMTT→TMTT%, 品檢→品檢%, FQC→FQC%",
         "",
+        "### 7. 站點彙總與 Reject 口徑一致性",
+        "- 若問題在問『站點/站別』排行（例如『昨天哪些站點良率較低』），分組欄位應是 WORKCENTER_GROUP（或 WORK_CENTER_GROUP），不可僅以 WORKCENTERNAME 分組",
+        "- 若來源只有 WORKCENTERNAME，應透過 DW_MES_SPEC_WORKCENTER_V 以 SPEC 對照映射 WORKCENTER_GROUP",
+        "- 若使用 LOTREJECTHISTORY 做良率/不良率分析，需套用 Reject 排除口徑：",
+        "  1) 排除 MATERIAL 報廢（透過 container/object type）",
+        "  2) 排除 ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE（ENABLE_FLAG='Y'）列出的原因",
+        "  3) 排除不符合 ^[0-9]{3}_ 或符合 ^(XXX|ZZZ)_ 的原因",
+        "",
         "## 回覆格式（嚴格 JSON）",
         "",
         "審查通過：",
@@ -271,7 +290,7 @@ def build_reviewer_prompt(domains: list[str]) -> str:
         '{"approved": false, "issues": ["具體問題描述1", "具體問題描述2"]}',
         "",
         "規則：",
-        "- 只列出上述 6 類已知問題（含即時 View 禁加日期），不要做其他審查",
+        "- 只列出上述 7 類已知問題（含即時 View 禁加日期），不要做其他審查",
         "- issues 要具體說明哪裡錯、應該怎麼做（讓 SQL 生成器能根據 issues 修正）",
         "- 不要自己重寫 SQL",
     ])

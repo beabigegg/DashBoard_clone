@@ -215,3 +215,26 @@ LOT detail warnings SHALL be driven by `quality_meta` regardless of whether data
 - **WHEN** subsequent refresh for the same sub-tab returns `quality_meta.status = "complete"`
 - **THEN** non-complete warning SHALL be cleared for that sub-tab
 
+### Requirement: Query-tool heavy detail queries SHALL prioritize degraded runtime over immediate rejection under memory pressure
+For high-volume LOT detail requests, the backend SHALL prefer cache/spool/DuckDB degraded execution paths before returning overload rejection.
+
+#### Scenario: Memory pressure with degraded runtime available
+- **WHEN** a heavy detail request is received while worker RSS exceeds configured guard threshold and spool/degraded runtime is available
+- **THEN** the endpoint SHALL attempt degraded execution first
+- **THEN** response SHALL remain successful with metadata indicating degraded runtime path
+
+#### Scenario: Memory pressure with no degraded runtime available
+- **WHEN** a heavy detail request is received while worker RSS exceeds configured guard threshold and no degraded runtime is available
+- **THEN** the endpoint SHALL return HTTP 503 with a retryable overload signal
+- **THEN** response SHALL include `Retry-After` header
+
+### Requirement: Query-tool low-yield reject outputs SHALL align with workcenter-group and reject policy semantics
+Query-tool outputs used for low-yield/reject interpretation SHALL consistently apply workcenter-group mapping and reject business-policy filtering.
+
+#### Scenario: Workcenter-group aligned aggregation
+- **WHEN** a low-yield/reject interpretation query is executed through query-tool detail flows
+- **THEN** grouping keys SHALL use `WORKCENTER_GROUP` semantics (not raw station aliases only)
+
+#### Scenario: Reject policy filter parity
+- **WHEN** reject-related detail rows are used for low-yield interpretation
+- **THEN** filtering semantics SHALL align with reject-history policy toggles (e.g., excluded reasons, material scrap, PB diode policy)

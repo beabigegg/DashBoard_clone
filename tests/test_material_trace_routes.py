@@ -272,6 +272,21 @@ class TestExportEndpoint:
         )
         assert response.status_code == 400
 
+    @patch("mes_dashboard.routes.material_trace_routes.export_csv")
+    def test_export_memory_guard_returns_503(self, mock_export, client):
+        mock_export.side_effect = MemoryError("記憶體負載較高")
+
+        response = client.post(
+            "/api/material-trace/export",
+            data=json.dumps({"mode": "workorder", "values": ["WO-001"]}),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 503
+        assert response.headers.get("Retry-After") == "30"
+        payload = response.get_json()
+        assert payload["success"] is False
+
 
 # ============================================================
 # Filter options endpoint
@@ -300,3 +315,20 @@ class TestFilterOptions:
         response = client.get("/api/material-trace/filter-options")
 
         assert response.status_code == 503
+
+
+class TestMemoryGuardContract:
+    @patch("mes_dashboard.routes.material_trace_routes.forward_query")
+    def test_query_memory_guard_returns_503(self, mock_forward, client):
+        mock_forward.side_effect = MemoryError("記憶體負載較高")
+
+        response = client.post(
+            "/api/material-trace/query",
+            data=json.dumps({"mode": "workorder", "values": ["WO-001"]}),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 503
+        assert response.headers.get("Retry-After") == "30"
+        payload = response.get_json()
+        assert payload["success"] is False

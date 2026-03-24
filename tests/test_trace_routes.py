@@ -813,6 +813,66 @@ def test_events_falls_back_to_sync_when_async_unavailable(
     mock_fetch_events.assert_called()
 
 
+@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+@patch('mes_dashboard.routes.trace_routes.process_rss_mb', return_value=4096.0)
+@patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
+def test_events_rss_guard_routes_to_async_when_available(
+    _mock_async_avail,
+    mock_enqueue,
+    _mock_rss,
+    mock_fetch_events,
+    monkeypatch,
+):
+    """RSS guard hit should route sync requests to async when queue is available."""
+    monkeypatch.setattr(
+        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 99999,
+    )
+    mock_enqueue.return_value = ('trace-evt-rss-001', None)
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': ['CID-1', 'CID-2'],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload['data']['async'] is True
+    assert payload['data']['job_id'] == 'trace-evt-rss-001'
+    assert '/api/trace/job/trace-evt-rss-001' in payload['data']['status_url']
+    mock_fetch_events.assert_not_called()
+
+
+@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
+@patch('mes_dashboard.routes.trace_routes.process_rss_mb', return_value=4096.0)
+def test_events_rss_guard_returns_503_when_async_unavailable(
+    _mock_rss,
+    _mock_async_avail,
+    mock_fetch_events,
+):
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'query_tool',
+            'container_ids': ['CID-1', 'CID-2'],
+            'domains': ['history'],
+        },
+    )
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload['error']['code'] == 'SERVICE_UNAVAILABLE'
+    assert response.headers.get('Retry-After') == '30'
+    mock_fetch_events.assert_not_called()
+
+
 @patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
 def test_events_falls_back_to_413_when_enqueue_fails(

@@ -653,6 +653,12 @@ def _review_sql(
     Returns:
         issue_summary — empty string if approved, otherwise a description of problems.
     """
+    deterministic_issues = _deterministic_review_issues(question, sql, domains)
+    if deterministic_issues:
+        issue_summary = "; ".join(deterministic_issues)
+        logger.info("Reviewer deterministically rejected SQL: %s", issue_summary)
+        return issue_summary
+
     from mes_dashboard.services.ai_function_registry import build_reviewer_prompt
 
     review_messages = [
@@ -679,6 +685,51 @@ def _review_sql(
     issue_summary = "; ".join(issues) if issues else "審查未通過"
     logger.info("Reviewer rejected SQL: %s", issue_summary)
     return issue_summary
+
+
+def _deterministic_review_issues(question: str, sql: str, domains: list[str]) -> list[str]:
+    """Run deterministic SQL checks for known business-critical rules.
+
+    These checks catch high-frequency logical misses before asking LLM reviewer.
+    """
+    issues: list[str] = []
+    q = (question or "").strip()
+    sql_upper = (sql or "").upper()
+    domain_set = {d.strip().lower() for d in (domains or [])}
+
+    is_rate_query = any(token in q for token in ("良率", "不良率", "報廢率", "yield", "reject rate"))
+    mentions_station = any(token in q for token in ("站點", "站別", "工站"))
+    rate_domain = bool(domain_set.intersection({"yield", "reject"}))
+
+    if is_rate_query and mentions_station and rate_domain:
+        has_station_group = "WORKCENTER_GROUP" in sql_upper or "WORK_CENTER_GROUP" in sql_upper
+        grouped_by_station_name = bool(re.search(r"GROUP\s+BY[\s\S]*WORKCENTERNAME", sql_upper))
+        if grouped_by_station_name and not has_station_group:
+            issues.append(
+                "問題在問站點層級統計時應以 WORKCENTER_GROUP 彙總，不可僅以 WORKCENTERNAME 分組。"
+                "請改用 WORKCENTER_GROUP（或透過 SPEC 對照映射後再分組）。"
+            )
+
+    uses_reject_history = "DW_MES_LOTREJECTHISTORY" in sql_upper
+    if is_rate_query and rate_domain and uses_reject_history:
+        has_exclusion_table = "ERP_PJ_WIP_SCRAP_REASONS_EXCLUDE" in sql_upper
+        has_reason_not_in = (
+            ("LOSSREASON_CODE" in sql_upper and "NOT IN" in sql_upper)
+            or ("LOSSREASONNAME" in sql_upper and "NOT IN" in sql_upper)
+            or has_exclusion_table
+        )
+        has_prefix_policy = "REGEXP_LIKE" in sql_upper and ("^[0-9]{3}_" in sql_upper or "^(XXX|ZZZ)_" in sql_upper)
+        has_material_filter = (
+            ("SCRAP_OBJECTTYPE" in sql_upper and "MATERIAL" in sql_upper)
+            or ("OBJECTTYPE" in sql_upper and "MATERIAL" in sql_upper)
+        )
+        if not (has_reason_not_in and has_prefix_policy and has_material_filter):
+            issues.append(
+                "使用 LOTREJECTHISTORY 計算良率/不良率時，需套用報表口徑的 Reject 排除規則"
+                "（MATERIAL 報廢、排除清單原因、以及原因碼前綴規則）。目前 SQL 未完整套用。"
+            )
+
+    return issues
 
 
 # ---------------------------------------------------------------------------

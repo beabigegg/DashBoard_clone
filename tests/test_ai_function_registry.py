@@ -304,10 +304,25 @@ class TestStage2Prompt(unittest.TestCase):
         self.assertIn("可不加日期限制", prompt)
         self.assertIn("GA26020001", prompt)
 
+    def test_stage2_prompt_contains_workcenter_group_rule(self):
+        prompt = build_stage2_prompt(["yield"])
+        self.assertIn("WORKCENTER_GROUP", prompt)
+        self.assertIn("站點/站別", prompt)
+
+    def test_stage2_prompt_contains_reject_exclusion_policy(self):
+        prompt = build_stage2_prompt(["reject"])
+        self.assertIn("Reject 排除口徑", prompt)
+        self.assertIn("SCRAP_OBJECTTYPE = 'MATERIAL'", prompt)
+
     def test_reviewer_prompt_contains_id_resolution_rules(self):
         prompt = build_reviewer_prompt(["lot_history", "genealogy"])
         self.assertIn("resolve 成 CONTAINERID", prompt)
         self.assertIn("FINISHEDRUNCARD 不是通用主鍵", prompt)
+
+    def test_reviewer_prompt_contains_workcenter_group_and_reject_policy(self):
+        prompt = build_reviewer_prompt(["reject", "yield"])
+        self.assertIn("WORKCENTER_GROUP", prompt)
+        self.assertIn("Reject 排除口徑", prompt)
 
     def test_contains_json_format_instruction(self):
         prompt = build_stage2_prompt(["reject"])

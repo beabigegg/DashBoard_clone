@@ -180,6 +180,19 @@ def _error(code: str, message: str, status_code: int = 400):
     return error_response(code, message, status_code=status_code)
 
 
+def _async_events_response(job_id: str):
+    return success_response(
+        {
+            "stage": "events",
+            "async": True,
+            "job_id": job_id,
+            "status_url": f"/api/trace/job/{job_id}",
+            "stream_url": f"/api/trace/job/{job_id}/stream",
+        },
+        status_code=202,
+    )
+
+
 def _is_timeout_exception(exc: Exception) -> bool:
     text = str(exc).lower()
     timeout_fragments = (
@@ -737,13 +750,7 @@ def events():
                 "trace events routed to async job_id=%s profile=%s cid_count=%s",
                 job_id, profile, cid_count,
             )
-            return success_response({
-                "stage": "events",
-                "async": True,
-                "job_id": job_id,
-                "status_url": f"/api/trace/job/{job_id}",
-                "stream_url": f"/api/trace/job/{job_id}/stream",
-            }, status_code=202)
+            return _async_events_response(job_id)
         logger.warning("trace async enqueue failed cid_count=%s: %s", cid_count, err)
 
     if not is_msd and cid_count > TRACE_EVENTS_CID_LIMIT:
@@ -776,6 +783,21 @@ def events():
     # --- MD2: RSS guard before sync execution ---
     rss_now = process_rss_mb()
     if rss_now is not None and rss_now > TRACE_SYNC_RSS_REJECT_MB:
+        if is_async_available():
+            job_id, err = enqueue_trace_events_job(profile, container_ids, domains, payload)
+            if job_id is not None:
+                logger.info(
+                    "trace events RSS guard fallback routed to async "
+                    "job_id=%s profile=%s cid_count=%s rss_mb=%.1f limit_mb=%.0f",
+                    job_id, profile, cid_count, rss_now, TRACE_SYNC_RSS_REJECT_MB,
+                )
+                return _async_events_response(job_id)
+            logger.warning(
+                "trace events RSS guard async enqueue failed cid_count=%s rss_mb=%.1f: %s",
+                cid_count,
+                rss_now,
+                err,
+            )
         logger.warning(
             "trace events sync rejected due to RSS guard rss_mb=%.1f limit_mb=%.0f cid_count=%s",
             rss_now, TRACE_SYNC_RSS_REJECT_MB, cid_count,

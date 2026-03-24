@@ -58,6 +58,10 @@ _REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS = max(
     1, int(os.getenv("REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS", "190"))
 )
 HEAVY_QUERY_REJECT_THRESHOLD = max(1, int(os.getenv("HEAVY_QUERY_REJECT_THRESHOLD", "4")))
+_REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS = max(
+    1,
+    int(os.getenv("REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS", "30")),
+)
 
 _REJECT_HISTORY_LIST_RATE_LIMIT = configured_rate_limit(
     bucket="reject-history-list",
@@ -142,6 +146,17 @@ def _parse_multi_param(name: str) -> list[str]:
         seen.add(value)
         deduped.append(value)
     return deduped
+
+
+def _overload_error(message: str):
+    retry_after = _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS
+    return error_response(
+        SERVICE_UNAVAILABLE,
+        message,
+        status_code=503,
+        meta={"retry_after_seconds": retry_after},
+        headers={"Retry-After": str(retry_after)},
+    )
 
 
 def _normalized_list_for_cache(values: Optional[list[str]]) -> Optional[list[str]]:
@@ -431,7 +446,7 @@ def api_reject_history_reason_pareto():
         return validation_error(str(exc))
     except MemoryError as exc:
         logger.warning("Reject history reason-pareto memory guard: %s", exc)
-        return validation_error(str(exc))
+        return _overload_error(str(exc))
     except Exception:
         return internal_error("查詢柏拉圖資料失敗")
 
@@ -472,7 +487,7 @@ def api_reject_history_batch_pareto():
         return success_response(result, meta=pareto_meta)
     except MemoryError as exc:
         logger.warning("Reject history batch-pareto memory guard: %s", exc)
-        return validation_error(str(exc))
+        return _overload_error(str(exc))
     except ValueError as exc:
         return validation_error(str(exc))
     except Exception:
@@ -659,12 +674,13 @@ def api_reject_history_query():
                 from mes_dashboard.core.worker_memory_guard import get_memory_guard_telemetry
                 _guard_telemetry = get_memory_guard_telemetry()
                 if _guard_telemetry.get("system_memory_pressure"):
+                    retry_after = _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS
                     return error_response(
                         SERVICE_UNAVAILABLE,
                         "系統記憶體不足，請稍後再試",
                         status_code=503,
-                        meta={"retry_after_seconds": 30},
-                        headers={"Retry-After": "30"},
+                        meta={"retry_after_seconds": retry_after},
+                        headers={"Retry-After": str(retry_after)},
                     )
             except Exception:
                 pass
@@ -673,12 +689,13 @@ def api_reject_history_query():
             try:
                 _active = get_slow_query_active_count()
                 if _active >= HEAVY_QUERY_REJECT_THRESHOLD:
+                    retry_after = _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS
                     return error_response(
                         SERVICE_UNAVAILABLE,
                         "系統忙碌中，請稍後再試",
                         status_code=503,
-                        meta={"retry_after_seconds": 30, "query_id": _pre_query_id},
-                        headers={"Retry-After": "30"},
+                        meta={"retry_after_seconds": retry_after, "query_id": _pre_query_id},
+                        headers={"Retry-After": str(retry_after)},
                     )
             except Exception:
                 pass
@@ -841,7 +858,7 @@ def api_reject_history_view():
 
     except MemoryError as exc:
         logger.warning("Reject history view memory guard: %s", exc)
-        return validation_error(str(exc))
+        return _overload_error(str(exc))
     except ValueError as exc:
         return validation_error(str(exc))
     except Exception:
@@ -910,7 +927,7 @@ def api_reject_history_export_cached():
 
     except MemoryError as exc:
         logger.warning("Reject history export-cached memory guard: %s", exc)
-        return validation_error(str(exc))
+        return _overload_error(str(exc))
     except ValueError as exc:
         return validation_error(str(exc))
     except Exception:

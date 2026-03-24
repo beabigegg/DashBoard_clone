@@ -342,7 +342,7 @@ def get_dynamic_metadata_block(domains: list[str]) -> str:
                 lines.append(f"  - {r}")
             lines.append("")
 
-    if any(d in ("wip_realtime",) for d in domains):
+    if any(d in ("wip_realtime", "yield", "reject", "equipment", "hold", "lot_history", "material", "job") for d in domains):
         wcs = get_workcenter_groups()
         if wcs:
             lines.append("## 目前系統中的工站群組（WORKCENTER_GROUP 實際值）")

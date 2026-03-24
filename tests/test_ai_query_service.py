@@ -575,3 +575,33 @@ class TestCoerceDateParams(unittest.TestCase):
         result = svc._coerce_date_params({"pattern": "%S1%", "count": 5})
         self.assertEqual(result["pattern"], "%S1%")
         self.assertEqual(result["count"], 5)
+
+
+class TestDeterministicSqlReviewer(unittest.TestCase):
+    """Deterministic reviewer catches business-critical SQL misses."""
+
+    def test_rejects_station_rate_sql_without_group_aggregation(self):
+        question = "昨天有哪些站點良率較低？"
+        sql = (
+            "SELECT r.WORKCENTERNAME, SUM(r.REJECTQTY) AS TOTAL_REJECT, "
+            "SUM(r.MOVEINQTY) AS TOTAL_IN "
+            "FROM DWH.DW_MES_LOTREJECTHISTORY r "
+            "WHERE r.TXNDATE >= :start_date AND r.TXNDATE < :end_date "
+            "GROUP BY r.WORKCENTERNAME "
+            "ORDER BY TOTAL_REJECT DESC FETCH FIRST 20 ROWS ONLY"
+        )
+        issues = svc._deterministic_review_issues(question, sql, ["yield"])
+        self.assertTrue(any("WORKCENTER_GROUP" in msg for msg in issues))
+
+    def test_rejects_rate_sql_without_reject_exclusion_policy(self):
+        question = "近 7 天不良率最高的站別？"
+        sql = (
+            "SELECT r.WORKCENTER_GROUP, SUM(r.REJECTQTY) AS TOTAL_REJECT, "
+            "SUM(r.MOVEINQTY) AS TOTAL_IN "
+            "FROM DWH.DW_MES_LOTREJECTHISTORY r "
+            "WHERE r.TXNDATE >= :start_date AND r.TXNDATE < :end_date "
+            "GROUP BY r.WORKCENTER_GROUP "
+            "ORDER BY TOTAL_REJECT DESC FETCH FIRST 20 ROWS ONLY"
+        )
+        issues = svc._deterministic_review_issues(question, sql, ["reject"])
+        self.assertTrue(any("Reject 排除規則" in msg for msg in issues))
