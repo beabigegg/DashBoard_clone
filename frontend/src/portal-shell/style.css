@@ -229,7 +229,8 @@
   max-width: none;
 }
 
-.shell-content .resource-page {
+.shell-content .resource-page,
+.shell-content .qc-gate-page {
   padding: 0;
 }
 
