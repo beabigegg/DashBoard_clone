@@ -332,6 +332,8 @@ def api_meta_filter_options():
     pj_type = request.args.get('type', '').strip() or None
     firstname = request.args.get('firstname', '').strip() or None
     waferdesc = request.args.get('waferdesc', '').strip() or None
+    status = request.args.get('status', '').strip() or None
+    hold_type = request.args.get('hold_type', '').strip() or None
 
     result = get_wip_filter_options(
         include_dummy=include_dummy,
@@ -341,6 +343,8 @@ def api_meta_filter_options():
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
+        status=status,
+        hold_type=hold_type,
     )
     if result is not None:
         return success_response(result)

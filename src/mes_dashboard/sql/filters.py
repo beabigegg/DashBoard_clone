@@ -16,7 +16,8 @@ from .builder import QueryBuilder
 # All other hold reasons are considered quality holds
 NON_QUALITY_HOLD_REASONS = {
     "IQC檢驗(久存品驗證)(QC)",
-    "大中/安波幅50pcs樣品留樣(PD)",
+    "大中/安波福50pcs樣品留樣(PD)",
+    "大中50pcs樣品留樣(PD)",
     "工程驗證(PE)",
     "工程驗證(RD)",
     "指定機台生產",

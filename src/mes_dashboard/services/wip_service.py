@@ -2054,6 +2054,8 @@ def _get_filter_options_cache_payload(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    status: Optional[str] = None,
+    hold_type: Optional[str] = None,
 ) -> Optional[Dict[str, List[str]]]:
     by_field = {
         "workorder": ("workorders", "WORKORDER"),
@@ -2074,6 +2076,8 @@ def _get_filter_options_cache_payload(
             pj_type=None if field == "pj_type" else pj_type,
             firstname=None if field == "firstname" else firstname,
             waferdesc=None if field == "waferdesc" else waferdesc,
+            status=status,
+            hold_type=hold_type,
         )
         if df is None:
             return None
@@ -2090,6 +2094,8 @@ def get_wip_filter_options(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    status: Optional[str] = None,
+    hold_type: Optional[str] = None,
 ) -> Optional[Dict[str, List[str]]]:
     """Get interdependent filter option lists for WIP overview dropdowns."""
     has_filter = any(
@@ -2097,8 +2103,10 @@ def get_wip_filter_options(
         for value in (workorder, lotid, package, pj_type, firstname, waferdesc)
     )
 
+    has_status_filter = bool(status or hold_type)
+
     indexed = _get_wip_search_index(include_dummy=include_dummy)
-    if indexed is not None and not has_filter:
+    if indexed is not None and not has_filter and not has_status_filter:
         return {
             "workorders": list(indexed.get("workorders", [])),
             "lotids": list(indexed.get("lotids", [])),
@@ -2119,6 +2127,8 @@ def get_wip_filter_options(
                 pj_type=pj_type,
                 firstname=firstname,
                 waferdesc=waferdesc,
+                status=status,
+                hold_type=hold_type,
             )
             if payload is not None:
                 return payload
