@@ -5,7 +5,7 @@
   --text: theme('colors.text.primary');
   --muted: theme('colors.text.secondary');
   --border: theme('colors.stroke.input');
-  --primary: theme('colors.token.h4f46e5');
+  --primary: theme('colors.brand.700');
   --primary-strong: theme('colors.brand.800');
   --danger: theme('colors.token.hdc2626');
   --warning: theme('colors.token.hb45309');
@@ -26,7 +26,7 @@
 }
 
 .header {
-  background: linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
   color: theme('colors.white');
   padding: theme('spacing.panel') theme('spacing.token.p28');
   display: flex;

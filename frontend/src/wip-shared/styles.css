@@ -13,9 +13,9 @@
   --muted: theme('colors.token.h666666');
   --border: theme('colors.token.he2e6ef');
   --primary: theme('colors.brand.500');
-  --primary-dark: theme('colors.token.h5568d3');
+  --primary-dark: theme('colors.brand.700');
   --shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+  --shadow-strong: 0 4px 15px rgba(0, 128, 200, 0.2);
   --success: theme('colors.state.success');
   --danger: theme('colors.state.danger');
   --warning: theme('colors.state.warning');
@@ -39,7 +39,7 @@
   flex-wrap: wrap;
   gap: theme('spacing.3');
   padding: theme('spacing.token.p18') theme('spacing.token.p22');
-  background: var(--header-gradient, linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%));
+  background: var(--header-gradient, linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%));
   border-radius: theme('borderRadius.shell');
   margin-bottom: theme('spacing.4');
   box-shadow: var(--shadow-strong);
@@ -164,6 +164,24 @@
   color: var(--danger);
 }
 
+:is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center) .matrix-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+:is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center) .matrix-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: theme('colors.brand.50');
+  border-bottom: 2px solid theme('colors.stroke.panel');
+}
+
+:is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center) .matrix-table td {
+  border-bottom: 1px solid theme('colors.stroke.soft');
+}
+
 :is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center) .placeholder {
   text-align: center;
   padding: theme('spacing[10]') theme('spacing.5');
@@ -229,7 +247,7 @@
   }
   50% {
     transform: scale(1.05);
-    background: rgba(102, 126, 234, 0.1);
+    background: rgba(0, 128, 200, 0.1);
   }
   100% {
     transform: scale(1);

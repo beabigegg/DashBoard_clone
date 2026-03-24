@@ -9,13 +9,13 @@
   --text: theme('colors.token.h1f2937');
   --muted: theme('colors.token.h64748b');
   --border: theme('colors.token.hdbe3ef');
-  --header-from: var(--portal-brand-start, theme('colors.token.h667eea'));
-  --header-to: var(--portal-brand-end, theme('colors.token.h764ba2'));
+  --header-from: theme('colors.brand.800');
+  --header-to: theme('colors.brand.500');
   --success: theme('colors.token.h22c55e');
   --warning: theme('colors.token.hfacc15');
   --danger: theme('colors.token.hef4444');
   --shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
-  --shadow-strong: 0 6px 24px rgba(102, 126, 234, 0.24);
+  --shadow-strong: 0 6px 24px rgba(0, 128, 200, 0.24);
   margin: 0 auto;
   font-family: 'Microsoft JhengHei', Arial, sans-serif;
   background: var(--bg);
@@ -122,8 +122,8 @@
 }
 
 .panel.is-refreshing {
-  border-color: theme('colors.token.hc7d2fe');
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+  border-color: theme('colors.brand.100');
+  box-shadow: 0 0 0 2px rgba(0, 128, 200, 0.12);
 }
 
 .theme-qc-gate .panel-header {

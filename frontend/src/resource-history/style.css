@@ -1,5 +1,5 @@
 .history-header {
-  background: linear-gradient(135deg, theme('colors.token.h667eea') 0%, theme('colors.token.h764ba2') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
 }
 
 .theme-resource-history .filter-row {
@@ -78,7 +78,7 @@
   margin: 0;
   width: 14px;
   height: 14px;
-  accent-color: theme('colors.token.h2563eb');
+  accent-color: theme('colors.brand.600');
 }
 
 .chart-grid {

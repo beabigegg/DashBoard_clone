@@ -31,7 +31,7 @@ const backwardCards = computed(() => [
     label: 'LOT 數量',
     value: formatNumber(props.kpi.lot_count),
     unit: 'lots',
-    color: 'var(--color-token-h6366f1)',
+    color: 'var(--color-brand-500)',
   },
   {
     label: '不良總數',
@@ -49,7 +49,7 @@ const backwardCards = computed(() => [
     label: '首要不良原因',
     value: props.kpi.top_loss_reason || '-',
     unit: '',
-    color: 'var(--color-token-h8b5cf6)',
+    color: 'var(--color-accent-500)',
     isText: true,
   },
   {
@@ -77,13 +77,13 @@ const forwardCards = computed(() => [
     label: '追蹤批次數',
     value: formatNumber(props.kpi.tracked_lot_count),
     unit: 'lots',
-    color: 'var(--color-token-h6366f1)',
+    color: 'var(--color-brand-500)',
   },
   {
     label: '下游到達站數',
     value: formatNumber(props.kpi.downstream_stations_reached),
     unit: '站',
-    color: 'var(--color-token-h8b5cf6)',
+    color: 'var(--color-accent-500)',
   },
   {
     label: '下游不良總數',

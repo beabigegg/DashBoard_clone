@@ -4,10 +4,10 @@
   --text: theme('colors.token.h222222');
   --muted: theme('colors.token.h666666');
   --border: theme('colors.token.he2e6ef');
-  --primary: theme('colors.token.h667eea');
-  --primary-dark: theme('colors.token.h5568d3');
+  --primary: theme('colors.brand.500');
+  --primary-dark: theme('colors.brand.600');
   --shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  --shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+  --shadow-strong: 0 4px 15px rgba(0, 128, 200, 0.2);
   --success: theme('colors.token.h22c55e');
   --danger: theme('colors.token.hef4444');
   --warning: theme('colors.token.hf59e0b');
@@ -39,7 +39,7 @@
   flex-wrap: wrap;
   gap: 12px;
   padding: theme('spacing.token.p18') theme('spacing.token.p22');
-  background: var(--header-gradient, linear-gradient(135deg, theme('colors.token.h667eea') 0%, theme('colors.token.h764ba2') 100%));
+  background: var(--header-gradient, linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%));
   border-radius: 10px;
   margin-bottom: theme('spacing.token.p16');
   box-shadow: var(--shadow-strong);
@@ -58,70 +58,13 @@
 }
 
 .theme-query-tool .query-tool-header {
-  background: linear-gradient(135deg, theme('colors.token.h667eea') 0%, theme('colors.token.h764ba2') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
 }
 
 .theme-query-tool .query-tool-subtitle {
   margin-top: theme('spacing.token.p4');
   font-size: 13px;
   color: rgba(255, 255, 255, 0.75);
-}
-
-/* ---- 按鈕 (wip-shared) ---- */
-.theme-query-tool .btn {
-  padding: theme('spacing.token.p9') theme('spacing.token.p20');
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.theme-query-tool .btn-primary {
-  padding: theme('spacing.token.p9') theme('spacing.token.p20');
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  background: var(--primary);
-  color: theme('colors.token.hffffff');
-  transition: all 0.2s ease;
-}
-
-.theme-query-tool .btn-primary:hover {
-  background: var(--primary-dark);
-}
-
-.theme-query-tool .btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.theme-query-tool .btn.btn-export {
-  background: theme('colors.token.h0f766e');
-  color: theme('colors.token.hffffff');
-}
-
-.theme-query-tool .btn.btn-export:hover {
-  background: theme('colors.token.h0b5e59');
-  color: theme('colors.token.hffffff');
-}
-
-.theme-query-tool .btn.btn-export:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.theme-query-tool .btn-ghost {
-  background: theme('colors.token.hf1f5f9');
-  color: theme('colors.token.h334155');
-  border: 1px solid var(--border);
-}
-
-.theme-query-tool .btn-ghost:hover {
-  background: theme('colors.token.he2e8f0');
 }
 
 /* ---- 佔位 / 空狀態 (wip-shared) ---- */
@@ -193,8 +136,8 @@
 
 .theme-query-tool .query-tool-tab.active {
   border-color: var(--primary);
-  background: theme('colors.token.heef2ff');
-  color: theme('colors.token.h4c51bf');
+  background: theme('colors.brand.50');
+  color: theme('colors.brand.700');
   box-shadow: var(--shadow);
 }
 
@@ -256,8 +199,8 @@
 
 .theme-query-tool .query-tool-sub-tab.active {
   border-color: var(--primary);
-  background: theme('colors.token.heef2ff');
-  color: theme('colors.token.h4c51bf');
+  background: theme('colors.brand.50');
+  color: theme('colors.brand.700');
 }
 
 /* ---- 表單控制元素 ---- */
@@ -275,7 +218,7 @@
 
 .theme-query-tool .query-tool-select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+  box-shadow: 0 0 0 2px rgba(0, 128, 200, 0.15);
 }
 
 .theme-query-tool .query-tool-select:disabled {
@@ -299,7 +242,7 @@
 
 .theme-query-tool .query-tool-textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+  box-shadow: 0 0 0 2px rgba(0, 128, 200, 0.15);
 }
 
 .theme-query-tool .query-tool-textarea:disabled {
@@ -321,7 +264,7 @@
 
 .theme-query-tool .query-tool-date-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+  box-shadow: 0 0 0 2px rgba(0, 128, 200, 0.15);
 }
 
 .theme-query-tool .query-tool-input-help {
@@ -549,7 +492,7 @@
   margin: 0;
   width: 14px;
   height: 14px;
-  accent-color: theme('colors.token.h2563eb');
+  accent-color: theme('colors.brand.600');
 }
 
 .theme-query-tool .multi-select-empty {
@@ -565,21 +508,6 @@
   padding: theme('spacing.token.p8') theme('spacing.token.p10');
   border-top: 1px solid var(--border);
   background: theme('colors.token.hf8fafc');
-}
-
-.theme-query-tool .btn-sm {
-  padding: theme('spacing.token.p4') theme('spacing.token.p10');
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: theme('colors.token.hf8fafc');
-  color: var(--text);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.theme-query-tool .btn-sm:hover {
-  border-color: theme('colors.token.hc2d0e0');
-  background: theme('colors.token.heef4fb');
 }
 
 /* ---- 排序表頭 ---- */

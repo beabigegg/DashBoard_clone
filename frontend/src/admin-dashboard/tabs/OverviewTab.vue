@@ -92,19 +92,19 @@ const deadWorkerAlert = computed(() => {
 });
 
 const latencyMiniSeries = [
-  { name: 'P95', key: 'latency_p95_ms', color: '#f59e0b' },
+  { name: 'P95', key: 'latency_p95_ms', color: 'var(--color-token-hf59e0b)' },
 ];
 
 const poolMiniSeries = [
-  { name: '飽和度', key: 'pool_saturation', color: '#2563eb' },
+  { name: '飽和度', key: 'pool_saturation', color: 'var(--color-brand-600)' },
 ];
 
 const workerMiniSeries = [
-  { name: 'RSS', key: 'worker_rss_mb', color: '#8b5cf6' },
+  { name: 'RSS', key: 'worker_rss_mb', color: 'var(--color-accent-500)' },
 ];
 
 const cacheMiniSeries = [
-  { name: 'Hit Rate', key: 'redis_hit_rate', color: '#10b981' },
+  { name: 'Hit Rate', key: 'redis_hit_rate', color: 'var(--color-token-h10b981)' },
 ];
 
 const isInitialLoading = computed(

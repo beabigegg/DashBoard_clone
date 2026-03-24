@@ -10,6 +10,7 @@
   }
 
   :root {
+    color-scheme: light;
     --portal-shell-max-width: none;
     --portal-shell-gap: 12px;
     --portal-shell-bg: theme('colors.token.hf5f7fa');
@@ -18,8 +19,8 @@
     --portal-panel-bg: theme('colors.token.hffffff');
     --portal-text-primary: theme('colors.token.h1f2937');
     --portal-text-secondary: theme('colors.token.h64748b');
-    --portal-brand-start: theme('colors.token.h667eea');
-    --portal-brand-end: theme('colors.token.h764ba2');
+    --portal-brand-start: theme('colors.brand.500');
+    --portal-brand-end: theme('colors.accent.500');
     --portal-radius-shell: 10px;
     --portal-radius-card: 8px;
     --portal-shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
@@ -51,15 +52,16 @@
     --spacing-token-p48: theme('spacing.token.p48');
     --spacing-token-p50: theme('spacing.token.p50');
     --spacing-token-p80: theme('spacing.token.p80');
+    --color-brand-500: theme('colors.brand.500');
+    --color-brand-600: theme('colors.brand.600');
+    --color-accent-500: theme('colors.accent.500');
     --color-token-h0ea5e9: theme('colors.token.h0ea5e9');
     --color-token-h0f172a: theme('colors.token.h0f172a');
     --color-token-h10b981: theme('colors.token.h10b981');
     --color-token-h16a34a: theme('colors.token.h16a34a');
     --color-token-h22c55e: theme('colors.token.h22c55e');
-    --color-token-h2563eb: theme('colors.token.h2563eb');
     --color-token-h3b82f6: theme('colors.token.h3b82f6');
     --color-token-h475569: theme('colors.token.h475569');
-    --color-token-h6366f1: theme('colors.token.h6366f1');
     --color-token-h64748b: theme('colors.token.h64748b');
     --color-token-h666666: theme('colors.token.h666666');
     --color-token-h8b5cf6: theme('colors.token.h8b5cf6');
@@ -87,6 +89,7 @@
   }
 
   body {
+    margin: 0;
     background: theme('colors.surface.app');
     color: theme('colors.text.primary');
     font-family: theme('fontFamily.sans');
@@ -211,13 +214,33 @@
   }
 
   .ui-btn--primary {
-    background: linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%);
+    background: theme('colors.brand.500');
     color: theme('colors.token.hffffff');
   }
 
   .ui-btn--primary:hover:not(:disabled):not(.is-loading) {
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    background: theme('colors.brand.600');
+    box-shadow: 0 4px 12px rgba(0, 128, 200, 0.35);
     transform: var(--hover-lift);
+  }
+
+  .ui-btn--secondary {
+    background: theme('colors.brand.50');
+    color: theme('colors.brand.600');
+    border: 1px solid theme('colors.brand.500');
+  }
+
+  .ui-btn--secondary:hover:not(:disabled):not(.is-loading) {
+    background: theme('colors.brand.100');
+  }
+
+  .ui-btn--danger {
+    background: theme('colors.state.danger');
+    color: theme('colors.surface.card');
+  }
+
+  .ui-btn--danger:hover:not(:disabled):not(.is-loading) {
+    background: theme('colors.token.hdc2626');
   }
 
   .ui-btn--ghost {
@@ -254,7 +277,7 @@
     padding: theme('spacing.token.p16') theme('spacing.token.p20');
     border-radius: 12px;
     margin-bottom: theme('spacing.token.p16');
-    background: linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%);
+    background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
     box-shadow: theme('boxShadow.shell');
   }
 

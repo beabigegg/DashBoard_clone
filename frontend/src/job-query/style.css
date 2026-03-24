@@ -9,11 +9,7 @@
   padding: theme('spacing.token.p22') theme('spacing.token.p24');
   margin-bottom: theme('spacing.token.p16');
   color: theme('colors.token.hffffff');
-  background: linear-gradient(
-    135deg,
-    var(--portal-brand-start, theme('colors.token.h667eea')) 0%,
-    var(--portal-brand-end, theme('colors.token.h764ba2')) 100%
-  );
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
   box-shadow: var(--portal-shadow-panel, 0 8px 24px rgba(79, 70, 229, 0.18));
 }
 
@@ -71,7 +67,7 @@
 }
 
 .job-query-btn-primary {
-  background: theme('colors.token.h4f46e5');
+  background: theme('colors.brand.700');
   color: theme('colors.token.hffffff');
 }
 
@@ -104,8 +100,8 @@
 }
 
 .job-query-resource.selected {
-  border-color: theme('colors.token.h6366f1');
-  background: theme('colors.token.heef2ff');
+  border-color: theme('colors.brand.500');
+  background: theme('colors.brand.50');
 }
 
 .job-query-resource input {

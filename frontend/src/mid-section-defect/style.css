@@ -6,8 +6,8 @@
   --msd-border: theme('colors.stroke.input');
   --msd-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   --msd-shadow-md: 0 8px 22px rgba(15, 23, 42, 0.1);
-  --msd-primary: theme('colors.token.h6366f1');
-  --msd-primary-dark: theme('colors.token.h4f46e5');
+  --msd-primary: theme('colors.brand.500');
+  --msd-primary-dark: theme('colors.brand.700');
 }
 
 .page-container {
@@ -25,7 +25,7 @@
   padding: theme('spacing.4') theme('spacing.5');
   border-radius: 12px;
   margin-bottom: theme('spacing.4');
-  background: linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
   box-shadow: var(--msd-shadow-md);
 }
 
@@ -368,7 +368,7 @@
   border-radius: 10px;
   box-shadow: var(--msd-shadow);
   padding: theme('spacing.4');
-  border-top: 3px solid theme('colors.token.h6366f1');
+  border-top: 3px solid theme('colors.brand.500');
 }
 
 .kpi-label {

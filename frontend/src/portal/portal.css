@@ -62,7 +62,7 @@
 }
 
 .route-status.loading {
-  border-color: theme('colors.token.hc7d2fe');
+  border-color: theme('colors.brand.100');
   background: theme('colors.surface.active');
   color: theme('colors.brand.800');
   font-weight: 600;

@@ -4,13 +4,13 @@
   --ya-border: theme('colors.token.he2e6ef');
   --ya-text: theme('colors.token.h222222');
   --ya-muted: theme('colors.token.h666666');
-  --ya-primary: theme('colors.token.h667eea');
-  --ya-primary-hover: theme('colors.token.h5568d3');
+  --ya-primary: theme('colors.brand.500');
+  --ya-primary-hover: theme('colors.brand.700');
   --ya-warn: theme('colors.token.hf59e0b');
   --ya-danger: theme('colors.token.hef4444');
   --ya-success: theme('colors.token.h22c55e');
   --ya-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  --ya-shadow-strong: 0 4px 15px rgba(102, 126, 234, 0.2);
+  --ya-shadow-strong: 0 4px 15px rgba(0, 128, 200, 0.2);
 }
 
 .yield-alert-page {
@@ -31,7 +31,7 @@
   flex-wrap: wrap;
   gap: 12px;
   padding: theme('spacing.token.p18') theme('spacing.token.p22');
-  background: linear-gradient(135deg, theme('colors.token.h667eea') 0%, theme('colors.token.h764ba2') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
   border-radius: 10px;
   margin-bottom: theme('spacing.token.p16');
   box-shadow: var(--ya-shadow-strong);
@@ -151,7 +151,7 @@
 .theme-yield-alert-center .text-area:focus {
   outline: none;
   border-color: var(--ya-primary);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 128, 200, 0.15);
 }
 
 .theme-yield-alert-center .text-area {

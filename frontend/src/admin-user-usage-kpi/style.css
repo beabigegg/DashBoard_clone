@@ -8,7 +8,7 @@
 
 /* Header */
 .kpi-header {
-  background: linear-gradient(135deg, theme('colors.token.h2563eb') 0%, theme('colors.token.h6366f1') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
   color: theme('colors.white');
   padding: theme('spacing.shell') theme('spacing.panel');
   border-radius: 0 0 12px 12px;
@@ -60,30 +60,6 @@
   background: theme('colors.white');
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: theme('spacing.token.p5') theme('spacing.token.p10');
-  border: none;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.2);
-  color: theme('colors.white');
-  transition: background 0.15s;
-}
-
-.btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* Panel */
 .panel {
   background: theme('colors.surface.card');
@@ -123,7 +99,7 @@
 .kpi-card-value {
   font-size: 1.8rem;
   font-weight: 700;
-  color: theme('colors.token.h2563eb');
+  color: theme('colors.brand.600');
   line-height: 1.2;
 }
 
@@ -222,6 +198,10 @@
   text-align: center;
   padding: theme('spacing.panel');
   color: theme('colors.text.muted');
+}
+
+.kpi-error {
+  color: theme('colors.state.danger');
 }
 
 .empty-text {

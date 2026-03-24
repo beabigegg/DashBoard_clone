@@ -1,18 +1,3 @@
-:root {
-  color-scheme: light;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif;
-  background: theme('colors.token.hf5f7fa');
-  color: theme('colors.token.h1f2937');
-}
-
 .shell {
   min-height: 100vh;
   display: flex;
@@ -24,7 +9,7 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  background: linear-gradient(135deg, theme('colors.token.h667eea') 0%, theme('colors.token.h764ba2') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
   color: theme('colors.token.hffffff');
   padding: theme('spacing.token.p12') theme('spacing.token.p20');
   min-height: var(--shell-header-height, 56px);
@@ -214,8 +199,8 @@ body {
 }
 
 .drawer-link.active {
-  background: theme('colors.token.heef2ff');
-  color: theme('colors.token.h4338ca');
+  background: theme('colors.brand.50');
+  color: theme('colors.brand.800');
   font-weight: 600;
 }
 
@@ -263,9 +248,9 @@ body {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: theme('colors.token.heef2ff');
-  color: theme('colors.token.h4338ca');
-  border: 1px solid theme('colors.token.hc7d2fe');
+  background: theme('colors.brand.50');
+  color: theme('colors.brand.800');
+  border: 1px solid theme('colors.brand.100');
   border-radius: 999px;
   padding: theme('spacing.token.p2') theme('spacing.token.p8');
 }
@@ -302,17 +287,8 @@ body {
   margin-top: theme('spacing.token.p12');
 }
 
-.btn-primary {
-  border: none;
-  border-radius: 8px;
-  background: theme('colors.token.h4f46e5');
-  color: theme('colors.token.hffffff');
-  padding: theme('spacing.token.p8') theme('spacing.token.p12');
-  cursor: pointer;
-}
-
 .btn-link {
-  color: theme('colors.token.h4f46e5');
+  color: theme('colors.brand.700');
 }
 
 /* ── Anomaly Indicator ──────────────────────────────────────────────────── */
@@ -451,7 +427,7 @@ body {
 .health-popup h4 {
   margin: 0 0 theme('spacing.token.p10');
   font-size: 14px;
-  color: theme('colors.token.h4338ca');
+  color: theme('colors.brand.800');
 }
 
 .health-item {

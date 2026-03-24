@@ -121,7 +121,7 @@ const firstError = computed(() => {
 }
 
 .trace-progress-step.is-active {
-  color: theme('colors.token.h2563eb');
+  color: theme('colors.brand.600');
 }
 
 .trace-progress-step.is-active .trace-progress-dot {

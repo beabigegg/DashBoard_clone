@@ -12,7 +12,7 @@
   --resource-border: theme('colors.token.hdbe4ef');
   --resource-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   --resource-shadow-md: 0 8px 22px rgba(15, 23, 42, 0.1);
-  --resource-primary: theme('colors.token.h2563eb');
+  --resource-primary: theme('colors.brand.600');
   --resource-primary-dark: theme('colors.token.h1d4ed8');
 
   --status-prd: theme('colors.token.h22c55e');
@@ -48,7 +48,7 @@
   padding: theme('spacing.token.p16') theme('spacing.token.p20');
   border-radius: 12px;
   margin-bottom: theme('spacing.token.p16');
-  background: linear-gradient(135deg, theme('colors.token.h667eea') 0%, theme('colors.token.h764ba2') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
   box-shadow: var(--resource-shadow-md);
 }
 
@@ -215,33 +215,51 @@
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table th,
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table td {
-  border: 1px solid var(--resource-border);
   padding: theme('spacing.token.p8') theme('spacing.token.p6');
   text-align: center;
   vertical-align: middle;
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table th {
-  background: theme('colors.token.hf8fafc');
+  background: theme('colors.brand.50');
   color: theme('colors.token.h334155');
   font-weight: 700;
   white-space: nowrap;
+  border-bottom: 2px solid theme('colors.stroke.panel');
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table td {
+  border-bottom: 1px solid theme('colors.stroke.soft');
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table th:first-child,
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table td:first-child {
   text-align: left;
   min-width: 280px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  border-right: 1px solid theme('colors.stroke.soft');
+  background: theme('colors.surface.card');
+}
+
+:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table th:first-child {
+  z-index: 3;
+  background: theme('colors.brand.50');
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table tbody tr:hover {
-  background: theme('colors.token.hf8fbff');
+  background: theme('colors.surface.hover');
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .matrix-table .col-total {
@@ -345,7 +363,7 @@
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .expand-btn.expanded {
   transform: rotate(90deg);
-  color: theme('colors.token.h2563eb');
+  color: theme('colors.brand.600');
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .expand-placeholder {
@@ -559,7 +577,7 @@
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .multi-select-option input[type='checkbox'] {
   margin: 0;
-  accent-color: theme('colors.token.h2563eb');
+  accent-color: theme('colors.brand.600');
 }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-yield-alert-center) .multi-select-empty {

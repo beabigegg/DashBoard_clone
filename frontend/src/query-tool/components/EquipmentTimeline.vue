@@ -61,7 +61,7 @@ const colorMap = Object.freeze({
   SBY: 'var(--color-token-hf59e0b)',
   UDT: 'var(--color-token-hef4444)',
   SDT: 'var(--color-token-h64748b)',
-  LOT: 'var(--color-token-h2563eb)',
+  LOT: 'var(--color-brand-600)',
   JOB: 'var(--color-token-h9333ea)',
 });
 

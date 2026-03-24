@@ -7,7 +7,7 @@
 }
 
 .theme-admin-dashboard .dashboard-header {
-  background: linear-gradient(135deg, theme('colors.token.h2563eb') 0%, theme('colors.token.h6366f1') 45%, theme('colors.token.h8b5cf6') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
   color: theme('colors.white');
   padding: theme('spacing.shell') theme('spacing.panel');
   border-radius: 0 0 12px 12px;
@@ -75,44 +75,6 @@
 
 .theme-admin-dashboard .auto-refresh-toggle input[type='checkbox'] {
   accent-color: theme('colors.white');
-}
-
-.theme-admin-dashboard .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: theme('spacing.token.p8') theme('spacing.token.p16');
-  border: none;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  background: theme('colors.stroke.soft');
-  color: theme('colors.token.h334155');
-  transition: background 0.15s;
-}
-
-.theme-admin-dashboard .btn:hover:not(:disabled) {
-  background: theme('colors.token.hcbd5e1');
-}
-
-.theme-admin-dashboard .btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.theme-admin-dashboard .btn-sm {
-  padding: theme('spacing.token.p5') theme('spacing.token.p10');
-  font-size: 0.8rem;
-}
-
-.theme-admin-dashboard .btn-danger {
-  background: theme('colors.state.danger');
-  color: theme('colors.white');
-}
-
-.theme-admin-dashboard .btn-danger:hover:not(:disabled) {
-  background: theme('colors.token.hdc2626');
 }
 
 .theme-admin-dashboard .panel {
@@ -545,7 +507,7 @@
   justify-content: flex-end;
 }
 
-.theme-admin-dashboard .modal-actions .btn {
+.theme-admin-dashboard .modal-actions .ui-btn--ghost {
   background: theme('colors.stroke.soft');
   color: theme('colors.token.h334155');
 }
@@ -641,7 +603,7 @@
 .theme-admin-dashboard .kpi-card-value {
   font-size: 1.8rem;
   font-weight: 700;
-  color: theme('colors.token.h2563eb');
+  color: theme('colors.brand.600');
   line-height: 1.2;
 }
 
