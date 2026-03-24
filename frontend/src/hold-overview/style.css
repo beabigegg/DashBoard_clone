@@ -92,7 +92,8 @@
 }
 
 .hold-overview-filter-bar {
-  justify-content: space-between;
+  justify-content: flex-start;
+  overflow: visible;
 }
 
 .filter-group {
