@@ -66,7 +66,7 @@ onMounted(() => {
             {{ item }}
           </option>
         </select>
-        <button class="btn btn-sm" @click="refresh" :disabled="loading">
+        <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="refresh" :disabled="loading">
           {{ loading ? '載入中...' : '查詢' }}
         </button>
       </div>

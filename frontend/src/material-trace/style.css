@@ -1,5 +1,5 @@
 .material-trace-header {
-  background: linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
 }
 
 .mode-tab-row {
@@ -286,21 +286,6 @@
   background: theme('colors.surface.hover');
 }
 
-.btn.btn-export {
-  background: theme('colors.brand.500');
-  color: theme('colors.white');
-}
-
-.btn.btn-export:hover {
-  background: theme('colors.token.h5568d3');
-  color: theme('colors.white');
-}
-
-.btn.btn-export:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
 .empty-message {
   text-align: center;
   padding: theme('spacing.token.p40') theme('spacing.shell');
@@ -420,21 +405,6 @@
   padding: theme('spacing.token.p8') theme('spacing.token.p10');
   border-top: 1px solid var(--border);
   background: theme('colors.surface.muted');
-}
-
-.btn-sm {
-  padding: theme('spacing.token.p4') theme('spacing.token.p10');
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: theme('colors.surface.muted');
-  color: var(--text);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.btn-sm:hover {
-  border-color: theme('colors.token.hc2d0e0');
-  background: theme('colors.token.heef4fb');
 }
 
 @media (max-width: 768px) {

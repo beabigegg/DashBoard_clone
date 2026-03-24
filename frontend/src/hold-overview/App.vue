@@ -8,7 +8,7 @@ import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
-import EmptyState from '../shared-ui/components/EmptyState.vue';
+import SkeletonLoader from '../shared-ui/components/SkeletonLoader.vue';
 import HoldLotTable from '../wip-shared/components/HoldLotTable.vue';
 import ParetoSection from '../wip-shared/components/ParetoSection.vue';
 
@@ -756,9 +756,16 @@ onBeforeUnmount(() => {
       @change="handleFilterChange"
     />
 
-    <SummaryCards :summary="summary" />
+    <template v-if="initialLoading">
+      <div class="space-y-4">
+        <SkeletonLoader type="card" :rows="4" />
+        <SkeletonLoader type="table" :rows="6" />
+      </div>
+    </template>
+    <template v-else>
+      <SummaryCards :summary="summary" />
 
-    <section class="content-grid">
+      <section class="content-grid">
       <section class="card ui-card">
         <div class="card-header ui-card-header">
           <div class="card-title ui-card-title">Workcenter x Package Matrix (QTY)</div>
@@ -806,8 +813,9 @@ onBeforeUnmount(() => {
           @next-page="nextPage"
         />
       </div>
-    </section>
+      </section>
+    </template>
   </div>
 
-  <LoadingOverlay v-if="initialLoading || refreshing" tier="page" />
+  <LoadingOverlay v-if="refreshing && !initialLoading" tier="page" />
 </template>

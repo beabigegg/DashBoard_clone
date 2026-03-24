@@ -315,7 +315,7 @@ const detailCountLabel = computed(() => {
         <div class="query-tool-pagination-actions">
           <button
             type="button"
-            class="btn btn-ghost"
+            class="ui-btn ui-btn--ghost"
             :disabled="activeLoading || activePagination.page <= 1"
             @click="emit('change-page', { tab: activeSubTab, page: activePagination.page - 1 })"
           >
@@ -323,7 +323,7 @@ const detailCountLabel = computed(() => {
           </button>
           <button
             type="button"
-            class="btn btn-ghost"
+            class="ui-btn ui-btn--ghost"
             :disabled="activeLoading || activePagination.page >= activePagination.total_pages"
             @click="emit('change-page', { tab: activeSubTab, page: activePagination.page + 1 })"
           >

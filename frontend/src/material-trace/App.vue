@@ -373,8 +373,8 @@ function onDocumentClick(e) {
                   </div>
                 </div>
                 <div class="multi-select-actions">
-                  <button class="btn-sm" @click="selectAllWorkcenterGroups">全選</button>
-                  <button class="btn-sm" @click="clearWorkcenterGroups">清除</button>
+                  <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="selectAllWorkcenterGroups">全選</button>
+                  <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="clearWorkcenterGroups">清除</button>
                 </div>
               </div>
             </div>
@@ -414,12 +414,12 @@ function onDocumentClick(e) {
           <!-- Buttons -->
           <div class="filter-toolbar">
             <div class="filter-actions">
-              <button class="btn btn-primary" :disabled="!canQuery" @click="executePrimaryQuery()">
+              <button class="ui-btn ui-btn--primary" :disabled="!canQuery" @click="executePrimaryQuery()">
                 <span v-if="loading" class="btn-spinner"></span>
                 查詢
               </button>
-              <button class="btn btn-secondary" @click="clearAll">清除</button>
-              <button class="btn btn-export" :disabled="!canExport" @click="exportCsv">
+              <button class="ui-btn ui-btn--secondary" @click="clearAll">清除</button>
+              <button class="ui-btn ui-btn--secondary" :disabled="!canExport" @click="exportCsv">
                 匯出 CSV
               </button>
             </div>

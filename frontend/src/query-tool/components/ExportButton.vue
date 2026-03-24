@@ -18,7 +18,7 @@ const props = defineProps({
 <template>
   <button
     type="button"
-    class="btn btn-export"
+    class="ui-btn ui-btn--secondary"
     :disabled="disabled || loading"
   >
     {{ loading ? '匯出中...' : label }}

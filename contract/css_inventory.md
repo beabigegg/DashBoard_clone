@@ -1,6 +1,6 @@
 # CSS Inventory (Governed Source List)
 
-Updated: 2026-03-12
+Updated: 2026-03-24
 
 This file is the governed inventory for authored CSS source files in `frontend/src/**/*.css`.
 
@@ -32,6 +32,7 @@ Governance status (2026-03-12): `css-governance-check` = 0 errors, 0 warnings.
 | :--- | :--- | :--- |
 | `frontend/src/shared-ui/components/LoadingSpinner.vue` | `<style scoped>` | Inline spinner; sizes sm/md/lg |
 | `frontend/src/shared-ui/components/LoadingOverlay.vue` | `<style scoped>` | Section/page tier overlay |
+| `frontend/src/shared-ui/components/SkeletonLoader.vue` | `<style scoped>` | Shared skeleton variants for text/card/table loading states with reduced-motion fallback |
 | `frontend/src/shared-ui/components/EmptyState.vue` | `<style scoped>` | Typed empty state messages |
 | `frontend/src/shared-ui/components/ErrorBanner.vue` | `<style scoped>` | Dismissible error banner; `message` prop + `action` slot + `dismiss` event |
 

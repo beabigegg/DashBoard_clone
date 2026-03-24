@@ -196,7 +196,7 @@ async function loadTxn(jobId) {
               <td>
                 <button
                   type="button"
-                  class="btn btn-ghost btn-mini"
+                  class="ui-btn ui-btn--ghost ui-btn--sm"
                   @click="loadTxn(row?.JOBID)"
                 >
                   查看交易歷程
@@ -264,10 +264,3 @@ async function loadTxn(jobId) {
     </div>
   </section>
 </template>
-
-<style scoped>
-.btn-mini {
-  padding: theme('spacing.token.p2') theme('spacing.token.p8');
-  font-size: 11px;
-}
-</style>

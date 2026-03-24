@@ -9,7 +9,7 @@
             <input type="checkbox" v-model="autoRefreshEnabled" @change="toggleAutoRefresh" />
             自動更新 (30s)
           </label>
-          <button class="btn btn-sm" @click="refreshAll" :disabled="loading">
+          <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="refreshAll" :disabled="loading">
             <template v-if="loading">更新中...</template>
             <template v-else>重新整理</template>
           </button>
@@ -375,7 +375,7 @@
               <td>
                 <button
                   v-if="f.path.includes('metrics_history')"
-                  class="btn btn-sm btn-danger"
+                  class="ui-btn ui-btn--danger ui-btn--sm"
                   :disabled="storagePurging"
                   @click="purgeMetricsHistory"
                 >清除快照</button>
@@ -412,15 +412,15 @@
       </div>
 
       <div class="storage-actions">
-        <button class="btn btn-sm" :disabled="storagePurging" @click="cleanupLogFiles(['logs'])">
+        <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="storagePurging" @click="cleanupLogFiles(['logs'])">
           {{ storagePurging ? '清理中...' : '清空 Log 檔案' }}
         </button>
         <button
-          class="btn btn-sm"
+          class="ui-btn ui-btn--ghost ui-btn--sm"
           :disabled="storagePurging || !storageInfo.archive_files?.length"
           @click="cleanupLogFiles(['archive'])"
         >清空 Archive</button>
-        <button class="btn btn-sm btn-danger" :disabled="storagePurging" @click="cleanupLogFiles(['logs', 'archive'])">
+        <button class="ui-btn ui-btn--danger ui-btn--sm" :disabled="storagePurging" @click="cleanupLogFiles(['logs', 'archive'])">
           全部清理
         </button>
       </div>
@@ -435,7 +435,7 @@
         <StatCard :value="cooldownDisplay" label="冷卻狀態" />
       </div>
       <button
-        class="btn btn-danger"
+        class="ui-btn ui-btn--danger"
         :disabled="workerCooldownActive"
         @click="showRestartModal = true"
       >
@@ -448,8 +448,8 @@
           <h3>確認重啟 Worker</h3>
           <p>重啟將導致目前的請求暫時中斷，確定要繼續嗎？</p>
           <div class="modal-actions">
-            <button class="btn" @click="showRestartModal = false">取消</button>
-            <button class="btn btn-danger" @click="doRestart" :disabled="restartLoading">
+            <button class="ui-btn ui-btn--ghost" @click="showRestartModal = false">取消</button>
+            <button class="ui-btn ui-btn--danger" @click="doRestart" :disabled="restartLoading">
               {{ restartLoading ? '重啟中...' : '確認重啟' }}
             </button>
           </div>
@@ -474,7 +474,7 @@
           placeholder="搜尋日誌..."
           @input="debouncedLoadLogs"
         />
-        <button class="btn btn-sm" @click="cleanupLogs" :disabled="cleanupLoading">
+        <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="cleanupLogs" :disabled="cleanupLoading">
           {{ cleanupLoading ? '清理中...' : '清理日誌' }}
         </button>
       </div>
@@ -498,9 +498,9 @@
         <p v-else class="muted">無日誌</p>
       </div>
       <div class="log-pagination" v-if="logsData?.total > logLimit">
-        <button class="btn btn-sm" :disabled="logOffset === 0" @click="logOffset -= logLimit; loadLogs()">上一頁</button>
+        <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="logOffset === 0" @click="logOffset -= logLimit; loadLogs()">上一頁</button>
         <span>{{ logOffset / logLimit + 1 }} / {{ Math.ceil(logsData.total / logLimit) }}</span>
-        <button class="btn btn-sm" :disabled="logOffset + logLimit >= logsData.total" @click="logOffset += logLimit; loadLogs()">下一頁</button>
+        <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="logOffset + logLimit >= logsData.total" @click="logOffset += logLimit; loadLogs()">下一頁</button>
       </div>
     </section>
   </div>

@@ -8,22 +8,22 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          500: '#667eea',
-          600: '#5a67d8',
-          700: '#4c51bf',
-          800: '#4338ca'
+          50: '#e6f4fb',
+          100: '#b3dbf2',
+          500: '#0080C8',
+          600: '#006BA8',
+          700: '#005A8F',
+          800: '#004A76'
         },
         accent: {
-          500: '#764ba2'
+          500: '#00A3E0'
         },
         surface: {
           app: '#f5f7fa',
           card: '#ffffff',
           muted: '#f8fafc',
           hover: '#f1f5f9',
-          active: '#eef2ff'
+          active: '#e6f4fb'
         },
         stroke: {
           soft: '#e2e8f0',
@@ -79,9 +79,7 @@ export default {
           h6366f1: '#6366f1',
           h64748b: '#64748b',
           h666666: '#666666',
-          h667eea: '#667eea',
           h6c757d: '#6c757d',
-          h764ba2: '#764ba2',
           h7a271a: '#7a271a',
           h854d0e: '#854d0e',
           h8b5cf6: '#8b5cf6',
@@ -181,7 +179,13 @@ export default {
         sans: ['"Noto Sans TC"', '"Microsoft JhengHei"', 'system-ui', 'sans-serif']
       },
       fontSize: {
-        '2xs': ['11px', { lineHeight: '1rem' }]
+        '2xs': ['11px', { lineHeight: '1rem' }],
+        xs: ['12px', { lineHeight: '1.125rem' }],
+        sm: ['13px', { lineHeight: '1.25rem' }],
+        base: ['14px', { lineHeight: '1.375rem' }],
+        lg: ['16px', { lineHeight: '1.5rem' }],
+        xl: ['20px', { lineHeight: '1.75rem' }],
+        '2xl': ['24px', { lineHeight: '2rem' }]
       },
       spacing: {
         shell: '20px',
@@ -222,7 +226,7 @@ export default {
         card: '8px'
       },
       boxShadow: {
-        shell: '0 4px 12px rgba(102, 126, 234, 0.3)',
+        shell: '0 4px 12px rgba(0, 128, 200, 0.25)',
         panel: '0 2px 10px rgba(0, 0, 0, 0.08)',
         soft: '0 1px 4px rgba(0, 0, 0, 0.06)'
       },

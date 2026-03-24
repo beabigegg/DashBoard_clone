@@ -41,7 +41,13 @@ const chartOption = computed(() => {
 
 <template>
   <div class="chart-container">
-    <VChart v-if="data.length > 0" :option="chartOption" :autoresize="{ throttle: 100 }" style="height: 260px" />
+    <VChart v-if="data.length > 0" class="chart-host" :option="chartOption" :autoresize="{ throttle: 100 }" />
     <div v-else class="empty-text">尚無時長資料</div>
   </div>
 </template>
+
+<style scoped>
+.chart-host {
+  height: 260px;
+}
+</style>

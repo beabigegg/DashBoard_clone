@@ -25,13 +25,13 @@ use([
  * All hex values for chart rendering are defined here (governance exception).
  */
 const CHART_PALETTE = {
-  bar: '#5a67d8',
-  barSecondary: '#667eea',
-  line: '#4c51bf',
-  lineSecondary: '#8b83f8',
+  bar: '#0080C8',
+  barSecondary: '#00A3E0',
+  line: '#006BA8',
+  lineSecondary: '#00A3E0',
   cumLine: '#ef4444',
-  heatmapMin: '#eef2ff',
-  heatmapMax: '#4c51bf',
+  heatmapMin: '#e6f4fb',
+  heatmapMax: '#004A76',
   axisLabel: '#64748b',
   axisTick: '#e2e8f0',
   tooltipBg: '#1f2937',

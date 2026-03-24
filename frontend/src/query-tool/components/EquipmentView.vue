@@ -131,7 +131,7 @@ const subTabs = Object.keys(tabMeta);
           <template #actions>
             <button
               type="button"
-              class="btn btn-ghost"
+              class="ui-btn ui-btn--ghost"
               @click="emit('reset-date-range')"
             >
               近 30 天
@@ -139,7 +139,7 @@ const subTabs = Object.keys(tabMeta);
 
             <button
               type="button"
-              class="btn btn-primary"
+              class="ui-btn ui-btn--primary"
               :disabled="loading[activeSubTab] || loading.timeline"
               @click="emit('query-active-sub-tab')"
             >
@@ -189,7 +189,7 @@ const subTabs = Object.keys(tabMeta);
         <div class="query-tool-pagination-actions">
           <button
             type="button"
-            class="btn btn-ghost"
+            class="ui-btn ui-btn--ghost"
             :disabled="loading.lots || lotsPagination.page <= 1"
             @click="emit('change-lots-page', lotsPagination.page - 1)"
           >
@@ -197,7 +197,7 @@ const subTabs = Object.keys(tabMeta);
           </button>
           <button
             type="button"
-            class="btn btn-ghost"
+            class="ui-btn ui-btn--ghost"
             :disabled="loading.lots || lotsPagination.page >= lotsPagination.total_pages"
             @click="emit('change-lots-page', lotsPagination.page + 1)"
           >

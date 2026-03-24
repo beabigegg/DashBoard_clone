@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
             />
             自動更新 (30s)
           </label>
-          <button class="btn btn-sm" :disabled="refreshing" @click="refreshNow">
+          <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="refreshing" @click="refreshNow">
             {{ refreshing ? '更新中...' : '重新整理' }}
           </button>
         </div>

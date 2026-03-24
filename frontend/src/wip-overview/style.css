@@ -206,7 +206,8 @@
 
 .matrix-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 12px;
 }
 
@@ -214,17 +215,20 @@
 .matrix-table td {
   padding: theme('spacing.token.p8') theme('spacing.token.p10');
   text-align: right;
-  border: 1px solid theme('colors.token.he5e7eb');
   white-space: nowrap;
 }
 
 .matrix-table th {
-  background: theme('colors.token.hf3f4f6');
+  background: theme('colors.brand.50');
   font-weight: 600;
   position: sticky;
   top: 0;
   z-index: 1;
-  border-bottom: 2px solid theme('colors.token.hcbd5e1');
+  border-bottom: 2px solid theme('colors.stroke.panel');
+}
+
+.matrix-table td {
+  border-bottom: 1px solid theme('colors.stroke.soft');
 }
 
 .matrix-table th:first-child {
@@ -233,8 +237,8 @@
   left: 0;
   top: 0;
   z-index: 3;
-  background: theme('colors.token.he5e7eb');
-  border-right: 2px solid theme('colors.token.hcbd5e1');
+  background: theme('colors.brand.50');
+  border-right: 1px solid theme('colors.stroke.soft');
 }
 
 .matrix-table td:first-child {
@@ -242,17 +246,17 @@
   font-weight: 600;
   position: sticky;
   left: 0;
-  background: theme('colors.token.hf9fafb');
+  background: theme('colors.surface.card');
   z-index: 1;
-  border-right: 2px solid theme('colors.token.hcbd5e1');
+  border-right: 1px solid theme('colors.stroke.soft');
 }
 
 .matrix-table tbody tr:hover td {
-  background: theme('colors.token.hf0f4ff');
+  background: theme('colors.surface.hover');
 }
 
 .matrix-table tbody tr:hover td:first-child {
-  background: theme('colors.token.he8ecff');
+  background: theme('colors.brand.50');
 }
 
 .matrix-table .total-row td,

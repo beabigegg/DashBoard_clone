@@ -147,7 +147,7 @@
 
 .hold-type-btn.active {
   background: theme('colors.token.hdbeafe');
-  color: theme('colors.token.h1e3a8a');
+  color: theme('colors.brand.800');
   box-shadow: inset 0 0 0 1px theme('colors.token.h93c5fd');
 }
 
@@ -173,7 +173,7 @@
 .reason-select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 0 0 2px rgba(0, 128, 200, 0.2);
 }
 
 .matrix-container {
@@ -184,7 +184,8 @@
 
 .hold-matrix-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 12px;
 }
 
@@ -192,18 +193,21 @@
 .hold-matrix-table td {
   padding: theme('spacing.token.p8') theme('spacing.token.p10');
   text-align: right;
-  border: 1px solid theme('colors.token.he5e7eb');
   white-space: nowrap;
   color: theme('colors.token.h222222');
 }
 
 .hold-matrix-table th {
-  background: theme('colors.token.hf3f4f6');
+  background: theme('colors.brand.50');
   font-weight: 600;
   position: sticky;
   top: 0;
   z-index: 1;
-  border-bottom: 2px solid theme('colors.token.hcbd5e1');
+  border-bottom: 2px solid theme('colors.stroke.panel');
+}
+
+.hold-matrix-table td {
+  border-bottom: 1px solid theme('colors.stroke.soft');
 }
 
 .hold-matrix-table th:first-child {
@@ -211,8 +215,8 @@
   position: sticky;
   left: 0;
   z-index: 3;
-  background: theme('colors.token.he5e7eb');
-  border-right: 2px solid theme('colors.token.hcbd5e1');
+  background: theme('colors.brand.50');
+  border-right: 1px solid theme('colors.stroke.soft');
 }
 
 .hold-matrix-table td:first-child {
@@ -221,8 +225,8 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  background: theme('colors.token.hf9fafb');
-  border-right: 2px solid theme('colors.token.hcbd5e1');
+  background: theme('colors.surface.card');
+  border-right: 1px solid theme('colors.stroke.soft');
 }
 
 .hold-matrix-table .clickable {
@@ -243,11 +247,11 @@
 }
 
 .hold-matrix-table tbody tr:hover td {
-  background: theme('colors.token.hf0f4ff');
+  background: theme('colors.surface.hover');
 }
 
 .hold-matrix-table tbody tr:hover td:first-child {
-  background: theme('colors.token.he8ecff');
+  background: theme('colors.brand.50');
 }
 
 .hold-matrix-table .total-row td,
@@ -261,13 +265,13 @@
 }
 
 .hold-matrix-table tr.active td:first-child {
-  background: theme('colors.token.hc7d2fe');
+  background: theme('colors.brand.100');
 }
 
 .hold-matrix-table td.active,
 .hold-matrix-table th.active {
-  background: theme('colors.token.hc7d2fe');
-  color: theme('colors.token.h1e3a8a');
+  background: theme('colors.brand.100');
+  color: theme('colors.brand.800');
   font-weight: 700;
 }
 

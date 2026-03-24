@@ -81,7 +81,7 @@ onMounted(() => {
             <option value="">全部部門</option>
             <option v-for="d in kpiData?.departments_available || []" :key="d" :value="d">{{ d }}</option>
           </select>
-          <button class="btn" @click="fetchData" :disabled="loading">
+          <button class="ui-btn ui-btn--ghost" @click="fetchData" :disabled="loading">
             {{ loading ? '載入中...' : '查詢' }}
           </button>
         </div>
@@ -90,7 +90,7 @@ onMounted(() => {
 
     <!-- Loading / Error -->
     <div v-if="loading && !kpiData" class="loading-text">載入中...</div>
-    <div v-else-if="error" class="panel" style="color: red">{{ error }}</div>
+    <div v-else-if="error" class="panel kpi-error">{{ error }}</div>
 
     <template v-if="kpiData">
       <!-- Overview Cards -->

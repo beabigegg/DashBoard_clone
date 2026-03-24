@@ -274,7 +274,7 @@
 }
 
 .lot-id-link.active {
-  background: rgba(102, 126, 234, 0.15);
+  background: rgba(0, 128, 200, 0.15);
   padding: theme('spacing.token.p2') theme('spacing.token.p6');
   border-radius: 4px;
 }
@@ -297,7 +297,7 @@
   align-items: center;
   padding: theme('spacing.nav') theme('spacing.shell');
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(135deg, theme('colors.brand.500') 0%, theme('colors.accent.500') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
 }
 
 .lot-detail-title {

@@ -1058,12 +1058,12 @@ function exportRelationCsv() {
 }
 
 .lineage-selected-summary {
-  border-color: theme('colors.token.hc7d2fe');
+  border-color: theme('colors.brand.100');
   background: rgba(238, 242, 255, 0.6);
   color: inherit;
 }
 
 .lineage-selected-count {
-  color: theme('colors.token.h4338ca');
+  color: theme('colors.brand.800');
 }
 </style>

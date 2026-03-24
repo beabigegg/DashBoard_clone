@@ -75,7 +75,7 @@ function handleResolve() {
         <template #actions>
           <button
             type="button"
-            class="btn btn-primary"
+            class="ui-btn ui-btn--primary"
             :disabled="resolving"
             @click="handleResolve"
           >

@@ -102,7 +102,7 @@ onBeforeUnmount(() => {
           placeholder="搜尋日誌..."
           @input="onSearchInput"
         />
-        <button class="btn btn-sm" @click="cleanupLogs" :disabled="cleanupLoading">
+        <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="cleanupLogs" :disabled="cleanupLoading">
           {{ cleanupLoading ? '清理中...' : '清理日誌' }}
         </button>
       </div>
@@ -132,10 +132,10 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="log-pagination" v-if="(logsData?.total || 0) > logLimit">
-        <button class="btn btn-sm" :disabled="logOffset === 0" @click="previousPage">上一頁</button>
+        <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="logOffset === 0" @click="previousPage">上一頁</button>
         <span>{{ currentPage }} / {{ totalPages }}</span>
         <button
-          class="btn btn-sm"
+          class="ui-btn ui-btn--ghost ui-btn--sm"
           :disabled="logOffset + logLimit >= (logsData?.total || 0)"
           @click="nextPage"
         >

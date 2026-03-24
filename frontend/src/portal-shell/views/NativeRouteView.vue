@@ -171,8 +171,15 @@ onUnmounted(() => {
     <p v-else>Native route-view integration 已啟用契約，但此頁仍暫時以既有頁面承載內容。</p>
     <p v-if="owner" class="muted">Owner: {{ owner }}</p>
     <div class="actions">
-      <button v-if="moduleError" type="button" class="btn-primary" @click="loadNativeModule(targetRoute)">重試載入</button>
-      <button type="button" class="btn-primary" @click="openLegacyPage">開啟既有頁面</button>
+      <button
+        v-if="moduleError"
+        type="button"
+        class="ui-btn ui-btn--primary ui-btn--sm"
+        @click="loadNativeModule(targetRoute)"
+      >
+        重試載入
+      </button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--sm" @click="openLegacyPage">開啟既有頁面</button>
       <a class="btn-link" :href="launchHref">直接前往 {{ launchHref }}</a>
     </div>
   </div>

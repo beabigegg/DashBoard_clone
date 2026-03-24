@@ -1,5 +1,5 @@
 .hold-history-header {
-  background: linear-gradient(135deg, theme('colors.token.h667eea') 0%, theme('colors.token.h764ba2') 100%);
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
 }
 
 .hold-history-page .header h1 {
