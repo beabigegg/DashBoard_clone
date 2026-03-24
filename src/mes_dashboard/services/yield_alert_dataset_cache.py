@@ -24,10 +24,15 @@ import numpy as np
 import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
-from mes_dashboard.core.database import read_sql_df_slow
+from mes_dashboard.core.database import read_sql_df_slow, read_sql_df_slow_iter
 from mes_dashboard.core.interactive_memory_guard import enforce_dataset_memory_guard, maybe_gc_collect
-from mes_dashboard.core.query_spool_store import get_spool_file_path, store_spooled_df
-from mes_dashboard.core.redis_client import REDIS_ENABLED, get_redis_client
+from mes_dashboard.core.query_spool_store import (
+    QUERY_SPOOL_DIR,
+    get_spool_file_path,
+    register_spool_file,
+    store_spooled_df,
+)
+from mes_dashboard.core.redis_client import release_lock, try_acquire_lock
 from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
 from mes_dashboard.services.yield_alert_service import (
     DEFAULT_PAGE_SIZE,
@@ -58,6 +63,7 @@ _REDIS_NAMESPACE = "yield_alert_dataset"
 _CACHE_SCHEMA_VERSION = 4
 _SPOOL_NAMESPACE = "yield_alert_dataset"
 _WARMUP_DAYS = max(1, int(os.getenv("YIELD_ALERT_DATASET_WARMUP_DAYS", "30")))
+_STREAMING_SPOOL_ENABLED = os.getenv("YIELD_ALERT_STREAMING_SPOOL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 _VIEW_MAX_INPUT_MB = float(os.getenv("YIELD_ALERT_VIEW_MAX_INPUT_MB", "96"))
 _VIEW_MAX_PROJECTED_RSS_MB = float(os.getenv("YIELD_ALERT_VIEW_MAX_PROJECTED_RSS_MB", "1100"))
@@ -98,6 +104,44 @@ _TX_DEDUP_COLUMNS = [
     "DEPARTMENT_NAME", "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
     "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
 ]
+
+
+class SpoolWriteError(Exception):
+    """Raised when the streaming spool write pipeline fails."""
+
+
+_PRIMARY_DETAIL_SQL = """
+    SELECT
+        TRUNC(d.TXN_DATE) AS DATE_BUCKET,
+        NVL(TRIM(d.WIP_ENTITY_NAME), '(NA)') AS WIP_ENTITY_NAME,
+        NVL(TRIM(d.REASON_CODE), NVL(TRIM(d.REASON_NAME), '(UNMAPPED)')) AS REASON_RAW,
+        NVL(TRIM(d.REASON_NAME), '(未填寫)') AS REASON_NAME,
+        NVL(TRIM(d.DEPARTMENT_NAME), '(NA)') AS DEPARTMENT_NAME,
+        NVL(TRIM(d.LINE), '(NA)') AS LINE_NAME,
+        NVL(TRIM(d.PACKAGE), '(NA)') AS PACKAGE_NAME,
+        NVL(TRIM(d.TYPE), '(NA)') AS TYPE_NAME,
+        NVL(TRIM(d.FUNCTION), '(NA)') AS FUNCTION_NAME,
+        NVL(d.OPERATION_SEQ_NUM, -1) AS OPERATION_SEQ_NUM,
+        SUM(NVL(d.TRANSACTION_QUANTITY, 0)) AS TRANSACTION_QTY,
+        SUM(NVL(d.SCRAP_QUANTITY, 0)) AS SCRAP_QTY
+    FROM DWH.ERP_WIP_MOVETXN_DETAIL d
+    WHERE d.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
+      AND d.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
+      AND UPPER(NVL(TRIM(d.WIP_ENTITY_NAME), '-')) LIKE 'GA%'
+      AND d.PACKAGE IS NOT NULL
+      AND TRIM(d.PACKAGE) NOT IN ('N/A', 'NA', '(NA)', '(N/A)', 'NULL')
+    GROUP BY
+        TRUNC(d.TXN_DATE),
+        NVL(TRIM(d.WIP_ENTITY_NAME), '(NA)'),
+        NVL(TRIM(d.REASON_CODE), NVL(TRIM(d.REASON_NAME), '(UNMAPPED)')),
+        NVL(TRIM(d.REASON_NAME), '(未填寫)'),
+        NVL(TRIM(d.DEPARTMENT_NAME), '(NA)'),
+        NVL(TRIM(d.LINE), '(NA)'),
+        NVL(TRIM(d.PACKAGE), '(NA)'),
+        NVL(TRIM(d.TYPE), '(NA)'),
+        NVL(TRIM(d.FUNCTION), '(NA)'),
+        NVL(d.OPERATION_SEQ_NUM, -1)
+"""
 
 
 def _dedup_tx_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -280,10 +324,6 @@ def _make_query_id(params: dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
-def _detail_cache_key(query_id: str) -> str:
-    return f"{_REDIS_NAMESPACE}:{query_id}:detail"
-
-
 def _linkage_cache_key(query_id: str) -> str:
     return f"{_REDIS_NAMESPACE}:{query_id}:linkage"
 
@@ -319,6 +359,112 @@ def _prepare_detail_df(df: Optional[pd.DataFrame]) -> pd.DataFrame:
     return prepared[_DETAIL_COLUMNS]
 
 
+def _prepare_detail_chunk(columns: list, rows: list) -> "Any":
+    """Build a mini PyArrow Table from a (columns, rows) batch from read_sql_df_slow_iter.
+
+    Applies the same normalizations as _prepare_detail_df but in-place (no .copy()).
+    Returns a pa.Table with only _DETAIL_COLUMNS columns.
+    """
+    import pyarrow as pa
+
+    df = pd.DataFrame(rows, columns=columns)
+
+    df["DATE_BUCKET"] = df["DATE_BUCKET"].map(_bucket_to_text)
+    df["WORKORDER"] = df["WIP_ENTITY_NAME"].fillna("(NA)").astype(str).str.strip()
+    df["REASON_RAW"] = df["REASON_RAW"].fillna("(UNMAPPED)").astype(str).str.strip()
+    df["REASON_NAME"] = df["REASON_NAME"].fillna("(未填寫)").astype(str).str.strip()
+    df["DEPARTMENT_NAME"] = df["DEPARTMENT_NAME"].fillna("(NA)").astype(str).str.strip()
+    df["DEPARTMENT_GROUP"] = df["DEPARTMENT_NAME"].map(_normalize_yield_department_group)
+    df["PROCESS_CATEGORY"] = df["DEPARTMENT_GROUP"].map(_normalize_process_category)
+    df["LINE_NAME"] = df["LINE_NAME"].fillna("(NA)").astype(str).str.strip()
+    df["PACKAGE_NAME"] = df["PACKAGE_NAME"].fillna("(NA)").astype(str).str.strip()
+    df["TYPE_NAME"] = df["TYPE_NAME"].fillna("(NA)").astype(str).str.strip()
+    df["FUNCTION_NAME"] = df["FUNCTION_NAME"].fillna("(NA)").astype(str).str.strip()
+
+    def _op_text_chunk(v: Any) -> str:
+        if v == -1:
+            return "-1"
+        try:
+            return str(int(float(v)))
+        except (TypeError, ValueError):
+            return "-1"
+
+    df["OPERATION_TEXT"] = df["OPERATION_SEQ_NUM"].fillna(-1).map(_op_text_chunk)
+    df["REASON_CODE"] = df["REASON_RAW"].map(normalize_reason_code)
+    df["REASON_RAW_UPPER"] = df["REASON_RAW"].str.upper()
+    df["REASON_NAME_UPPER"] = df["REASON_NAME"].str.upper()
+    df["TRANSACTION_QTY"] = pd.to_numeric(df["TRANSACTION_QTY"], errors="coerce").fillna(0.0)
+    df["SCRAP_QTY"] = pd.to_numeric(df["SCRAP_QTY"], errors="coerce").fillna(0.0)
+
+    return pa.Table.from_pandas(df[_DETAIL_COLUMNS], preserve_index=False)
+
+
+def _streaming_write_to_spool(
+    sql: str,
+    params: dict,
+    query_id: str,
+) -> "tuple[Any, int]":
+    """Stream SQL results batch-by-batch into a temporary Parquet spool file.
+
+    Returns (tmp_path, total_rows). If no rows were returned, returns (None, 0)
+    and cleans up the temp file.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    from pathlib import Path
+
+    tmp_path = (QUERY_SPOOL_DIR / _SPOOL_NAMESPACE / f"{query_id}_streaming.tmp.parquet").resolve()
+    tmp_path.parent.mkdir(parents=True, exist_ok=True)
+
+    writer = None
+    schema = None
+    total_rows = 0
+    try:
+        for columns, rows in read_sql_df_slow_iter(sql, params):
+            table = _prepare_detail_chunk(columns, rows)
+            if writer is None:
+                schema = table.schema
+                writer = pq.ParquetWriter(str(tmp_path), schema)
+            else:
+                if table.schema != schema:
+                    try:
+                        table = table.cast(schema, safe=False)
+                    except Exception:
+                        pass  # best-effort cast
+            writer.write_table(table)
+            total_rows += len(rows)
+            del table
+    except Exception:
+        if writer is not None:
+            try:
+                writer.close()
+            except Exception:
+                pass
+            writer = None
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+        raise
+    finally:
+        if writer is not None:
+            try:
+                writer.close()
+            except Exception:
+                pass
+
+    if total_rows == 0:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+        return None, 0
+
+    return tmp_path, total_rows
+
+
 def _prepare_linkage_df(linked: dict[str, float]) -> pd.DataFrame:
     if not linked:
         return pd.DataFrame(columns=_LINKAGE_COLUMNS)
@@ -326,88 +472,94 @@ def _prepare_linkage_df(linked: dict[str, float]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=_LINKAGE_COLUMNS)
 
 
-def _store_payload(query_id: str, *, detail_df: pd.DataFrame, linkage_df: pd.DataFrame) -> None:
-    """Store dataset to L1 (in-memory, lightweight) and L2 (Redis) caches.
+def _store_payload(
+    query_id: str,
+    *,
+    linkage_df: pd.DataFrame,
+    spool_ready: bool = True,
+    empty_result: bool = False,
+    start_date: str = "",
+    end_date: str = "",
+) -> None:
+    """Store dataset metadata to L1 (in-memory) cache.
 
-    L1 only keeps ``linkage_df`` (tiny) — **not** ``detail_df`` (hundreds of
-    MB).  ``detail_df`` lives in Redis (L2) and the parquet spool file on
-    disk.  The DuckDB view path reads from the spool file directly; the
-    pandas fallback path loads ``detail_df`` from Redis on demand.
+    L1 keeps linkage_df (tiny) + spool/empty flags + date metadata.
+    detail_df is NOT stored here — DuckDB reads from the spool file,
+    and the pandas fallback reads from the spool file on demand.
+    Linkage is also stored in Redis for cross-process / post-restart recovery.
     """
-    # L1: lightweight — only linkage_df + existence marker
     _dataset_cache.set(query_id, {
-        "detail_df": None,
         "linkage_df": linkage_df,
+        "spool_ready": spool_ready,
+        "empty_result": empty_result,
+        "start_date": start_date,
+        "end_date": end_date,
     })
-    # L2: full data in Redis
-    detail_ok = redis_store_df(_detail_cache_key(query_id), detail_df, ttl=_CACHE_TTL)
-    linkage_ok = redis_store_df(_linkage_cache_key(query_id), linkage_df, ttl=_CACHE_TTL)
-    if not detail_ok or not linkage_ok:
-        logger.warning(
-            "_store_payload: Redis store partial failure query_id=%s detail=%s linkage=%s",
-            query_id, detail_ok, linkage_ok,
-        )
+    if linkage_df is not None and not linkage_df.empty:
+        linkage_ok = redis_store_df(_linkage_cache_key(query_id), linkage_df, ttl=_CACHE_TTL)
+        if not linkage_ok:
+            logger.warning(
+                "_store_payload: Redis linkage store failed query_id=%s",
+                query_id,
+            )
 
 
-def _get_cached_payload(query_id: str) -> Optional[dict[str, pd.DataFrame]]:
-    """Return a lightweight payload dict if the query_id is known.
+def _get_cached_payload(query_id: str) -> Optional[dict]:
+    """Return a lightweight payload dict if the query_id is valid and data is ready.
 
-    The returned ``detail_df`` may be ``None`` (L1 hit — only marker stored).
-    Callers that need the full detail DataFrame should call
-    ``_load_detail_df_from_redis`` explicitly.
+    Returns None when neither L1 nor Redis+spool can confirm the dataset exists.
     """
     payload = _dataset_cache.get(query_id)
     if isinstance(payload, dict):
-        logger.debug("_get_cached_payload: L1 hit for query_id=%s", query_id)
-        return payload
+        # Backward compat: old L1 payloads (pre-refactor) have no 'spool_ready' key.
+        # Treat them as spool_ready=True so existing callers continue to work.
+        if "spool_ready" not in payload:
+            payload = dict(payload)
+            payload["spool_ready"] = True
+            payload.setdefault("empty_result", False)
 
-    # L1 miss — check Redis for existence (load only linkage, not detail)
-    logger.debug("_get_cached_payload: L1 miss for query_id=%s, trying Redis", query_id)
-    # Quick existence check: try loading linkage (tiny) first
+        empty = payload.get("empty_result", False)
+        spool_ready = payload.get("spool_ready", True)
+
+        if empty or (spool_ready and get_spool_file_path(_SPOOL_NAMESPACE, query_id) is not None):
+            logger.debug("_get_cached_payload: L1 hit for query_id=%s", query_id)
+            return payload
+
+        logger.debug(
+            "_get_cached_payload: L1 stale (spool missing) for query_id=%s", query_id
+        )
+        # Fall through to Redis check
+
+    # L1 miss — check Redis linkage and spool file
+    logger.debug("_get_cached_payload: L1 miss for query_id=%s, trying Redis+spool", query_id)
     linkage_df = redis_load_df(_linkage_cache_key(query_id))
-    # Also verify detail exists in Redis (peek only, don't load)
-    detail_exists = _redis_key_exists(_detail_cache_key(query_id))
-    if not detail_exists:
+    spool_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
+    spool_exists = spool_path is not None
+
+    if linkage_df is None and not spool_exists:
         logger.warning(
-            "_get_cached_payload: Redis miss for query_id=%s key=%s",
-            query_id, _detail_cache_key(query_id),
+            "_get_cached_payload: Redis+spool miss for query_id=%s",
+            query_id,
         )
         return None
+
     if linkage_df is None:
         linkage_df = pd.DataFrame(columns=_LINKAGE_COLUMNS)
 
-    # Promote to L1 — lightweight (no detail_df)
-    payload = {
-        "detail_df": None,
+    # Promote lightweight L1
+    promoted: dict = {
         "linkage_df": linkage_df,
+        "spool_ready": spool_exists,
+        "empty_result": not spool_exists,
+        "start_date": "",
+        "end_date": "",
     }
-    _dataset_cache.set(query_id, payload)
-    logger.debug("_get_cached_payload: Redis confirmed for query_id=%s, lightweight L1 promoted", query_id)
-    return payload
-
-
-def _redis_key_exists(key: str) -> bool:
-    """Check if a Redis key exists without loading its value."""
-    if not REDIS_ENABLED:
-        return False
-    client = get_redis_client()
-    if client is None:
-        return False
-    try:
-        from mes_dashboard.core.redis_df_store import get_key
-        return bool(client.exists(get_key(key)))
-    except Exception:
-        return False
-
-
-def _load_detail_df_from_redis(query_id: str) -> Optional[pd.DataFrame]:
-    """Load detail_df from Redis on demand (for pandas fallback path)."""
-    detail_df = redis_load_df(_detail_cache_key(query_id))
-    if detail_df is None:
-        logger.warning(
-            "_load_detail_df_from_redis: Redis miss for query_id=%s", query_id,
-        )
-    return detail_df
+    _dataset_cache.set(query_id, promoted)
+    logger.debug(
+        "_get_cached_payload: promoted lightweight L1 for query_id=%s spool=%s",
+        query_id, spool_exists,
+    )
+    return promoted
 
 
 def _load_primary_detail_df(start_date: str, end_date: str) -> pd.DataFrame:
@@ -465,6 +617,17 @@ def _build_linkage_df(start_date: str, end_date: str, detail_df: pd.DataFrame) -
     return _prepare_linkage_df(linked)
 
 
+def _load_detail_df_from_spool(query_id: str) -> Optional[pd.DataFrame]:
+    """Load the full detail DataFrame from the spool parquet file (pandas fallback path)."""
+    spool_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
+    if spool_path is None:
+        logger.warning(
+            "_load_detail_df_from_spool: spool not found for query_id=%s", query_id
+        )
+        return None
+    return pd.read_parquet(spool_path)
+
+
 def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
     validate_date_range(start_date, end_date)
     query_id = _make_query_id(
@@ -489,51 +652,161 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
         }
 
     logger.info("Yield alert dataset cache miss: query_id=%s", query_id)
-    started = time.perf_counter()
-    detail_df = _load_primary_detail_df(start_date, end_date)
-    elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
 
-    # NOTE: No memory guard here — follows reject module pattern.
-    # Primary query only loads → spool to parquet → store cache → release.
-    # DuckDB handles heavy aggregation out-of-core via parquet spool.
-    # Guard is applied in apply_view's pandas fallback path only.
+    if _STREAMING_SPOOL_ENABLED:
+        # ── Streaming spool path ─────────────────────────────────────────
+        lock_name = f"yield_alert_primary:{query_id}"
+        lock_acquired = try_acquire_lock(lock_name, ttl_seconds=300)
+        if not lock_acquired:
+            # Another worker is executing the same query — wait for it to finish
+            logger.info(
+                "execute_primary_query: single-flight wait for query_id=%s", query_id
+            )
+            for _ in range(15):  # up to 30s (15 × 2s)
+                time.sleep(2)
+                cached = _get_cached_payload(query_id)
+                if cached is not None:
+                    logger.info(
+                        "execute_primary_query: single-flight resolved from cache query_id=%s",
+                        query_id,
+                    )
+                    linkage_ready = (
+                        cached.get("linkage_df") is not None
+                        and not cached["linkage_df"].empty
+                    )
+                    return {
+                        "query_id": query_id,
+                        "meta": {
+                            "cache_hit": True,
+                            "max_query_days": MAX_QUERY_DAYS,
+                            "linkage_ready": linkage_ready,
+                        },
+                    }
+            raise SpoolWriteError(
+                "single_flight_timeout: 查詢已有另一個 worker 正在執行，請稍後重試"
+            )
 
-    logger.info(
-        "Yield alert detail loaded: query_id=%s detail_rows=%s scrap_rows=%s latency_ms=%.2f",
-        query_id,
-        len(detail_df),
-        int((detail_df["SCRAP_QTY"] > 0).sum()) if not detail_df.empty else 0,
-        elapsed_ms,
-    )
-    linkage_df = pd.DataFrame(columns=_LINKAGE_COLUMNS)
+        try:
+            started = time.perf_counter()
+            try:
+                tmp_path, total_rows = _streaming_write_to_spool(
+                    _PRIMARY_DETAIL_SQL,
+                    {"start_date": start_date, "end_date": end_date},
+                    query_id,
+                )
+            except Exception as exc:
+                raise SpoolWriteError(f"SPOOL_WRITE_FAILED: {exc}") from exc
 
-    # Spool write (parquet to disk) — synchronous so DuckDB view path
-    # can use it immediately on the subsequent /view request.
-    try:
-        store_spooled_df(_SPOOL_NAMESPACE, query_id, detail_df)
-    except Exception as exc:
-        logger.warning("Spool write failed (query_id=%s): %s", query_id, exc)
+            elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
 
-    # L1 (lightweight marker + linkage only) + L2 Redis (full detail).
-    # detail_df is NOT kept in L1 — DuckDB reads from spool file,
-    # pandas fallback loads from Redis on demand.
-    detail_row_count = len(detail_df)
-    _store_payload(query_id, detail_df=detail_df, linkage_df=linkage_df)
+            if total_rows == 0:
+                _store_payload(
+                    query_id,
+                    linkage_df=pd.DataFrame(columns=_LINKAGE_COLUMNS),
+                    spool_ready=False,
+                    empty_result=True,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                logger.info(
+                    "execute_primary_query: empty result query_id=%s latency_ms=%.2f",
+                    query_id, elapsed_ms,
+                )
+                return {
+                    "query_id": query_id,
+                    "meta": {
+                        "cache_hit": False,
+                        "query_latency_ms": elapsed_ms,
+                        "max_query_days": MAX_QUERY_DAYS,
+                        "detail_rows": 0,
+                        "linkage_ready": True,
+                    },
+                }
 
-    # Explicitly release the large DataFrame reference to help GC
-    del detail_df
-    maybe_gc_collect()
+            registered = register_spool_file(_SPOOL_NAMESPACE, query_id, tmp_path, total_rows)
+            if not registered:
+                raise SpoolWriteError(
+                    "spool_register_failed: Spool 註冊失敗，請稍後重試"
+                )
 
-    return {
-        "query_id": query_id,
-        "meta": {
-            "cache_hit": False,
-            "query_latency_ms": elapsed_ms,
-            "max_query_days": MAX_QUERY_DAYS,
-            "detail_rows": int(detail_row_count),
-            "linkage_ready": False,
-        },
-    }
+            _store_payload(
+                query_id,
+                linkage_df=pd.DataFrame(columns=_LINKAGE_COLUMNS),
+                spool_ready=True,
+                empty_result=False,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            maybe_gc_collect()
+            logger.info(
+                "execute_primary_query: streaming spool done query_id=%s rows=%s latency_ms=%.2f",
+                query_id, total_rows, elapsed_ms,
+            )
+            return {
+                "query_id": query_id,
+                "meta": {
+                    "cache_hit": False,
+                    "query_latency_ms": elapsed_ms,
+                    "max_query_days": MAX_QUERY_DAYS,
+                    "detail_rows": int(total_rows),
+                    "linkage_ready": False,
+                },
+            }
+        finally:
+            try:
+                release_lock(lock_name)
+            except Exception:
+                pass
+
+    else:
+        # ── Legacy path (YIELD_ALERT_STREAMING_SPOOL_ENABLED=false) ─────
+        started = time.perf_counter()
+        detail_df = _load_primary_detail_df(start_date, end_date)
+        elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+
+        # NOTE: No memory guard here — follows reject module pattern.
+        # Primary query only loads → spool to parquet → store cache → release.
+        # DuckDB handles heavy aggregation out-of-core via parquet spool.
+        # Guard is applied in apply_view's pandas fallback path only.
+
+        logger.info(
+            "Yield alert detail loaded (legacy): query_id=%s detail_rows=%s scrap_rows=%s latency_ms=%.2f",
+            query_id,
+            len(detail_df),
+            int((detail_df["SCRAP_QTY"] > 0).sum()) if not detail_df.empty else 0,
+            elapsed_ms,
+        )
+
+        spool_ok = False
+        try:
+            store_spooled_df(_SPOOL_NAMESPACE, query_id, detail_df)
+            spool_ok = True
+        except Exception as exc:
+            logger.warning("Spool write failed (legacy, query_id=%s): %s", query_id, exc)
+
+        detail_row_count = len(detail_df)
+        _store_payload(
+            query_id,
+            linkage_df=pd.DataFrame(columns=_LINKAGE_COLUMNS),
+            spool_ready=spool_ok,
+            empty_result=detail_df.empty,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        del detail_df
+        maybe_gc_collect()
+
+        return {
+            "query_id": query_id,
+            "meta": {
+                "cache_hit": False,
+                "query_latency_ms": elapsed_ms,
+                "max_query_days": MAX_QUERY_DAYS,
+                "detail_rows": int(detail_row_count),
+                "linkage_ready": False,
+            },
+        }
 
 
 def ensure_dataset_loaded() -> dict[str, Any]:
@@ -567,33 +840,105 @@ def ensure_dataset_loaded() -> dict[str, Any]:
     }
 
 
+def _extract_workorders_from_spool(query_id: str) -> list[str]:
+    """Query DISTINCT WORKORDER values from the spool parquet file via DuckDB."""
+    spool_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
+    if spool_path is None:
+        return []
+    try:
+        import duckdb
+        conn = duckdb.connect(":memory:")
+        try:
+            rows = conn.execute(
+                'SELECT DISTINCT "WORKORDER" FROM read_parquet(?)', [spool_path]
+            ).fetchall()
+        finally:
+            conn.close()
+        return [str(r[0]).strip().upper() for r in rows if r[0]]
+    except Exception as exc:
+        logger.warning(
+            "_extract_workorders_from_spool: failed for query_id=%s: %s", query_id, exc
+        )
+        return []
+
+
 def execute_linkage_query(*, query_id: str) -> Optional[dict[str, Any]]:
     """Compute reject linkage for a cached dataset and update the cache."""
     payload = _get_cached_payload(query_id)
     if payload is None:
         return None
 
-    # detail_df may be None in L1 (lightweight mode) — load from Redis
-    detail_df = payload.get("detail_df")
-    if detail_df is None:
-        detail_df = _load_detail_df_from_redis(query_id)
-    if detail_df is None or detail_df.empty:
+    start_date: str = payload.get("start_date") or ""
+    end_date: str = payload.get("end_date") or ""
+
+    if payload.get("empty_result"):
         return {
             "query_id": query_id,
             "meta": {"linkage_ready": True, "linkage_rows": 0},
         }
 
-    # Derive date range from the cached data
-    start_date = str(detail_df["DATE_BUCKET"].min())[:10]
-    end_date = str(detail_df["DATE_BUCKET"].max())[:10]
+    spool_ready = payload.get("spool_ready", True)
+    spool_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
+    if not spool_ready or spool_path is None:
+        return {
+            "query_id": query_id,
+            "meta": {
+                "linkage_ready": False,
+                "linkage_not_ready_reason": "spool_not_available",
+            },
+        }
+
+    workorders = _extract_workorders_from_spool(query_id)
+    if not workorders:
+        _store_payload(
+            query_id,
+            linkage_df=pd.DataFrame(columns=_LINKAGE_COLUMNS),
+            spool_ready=spool_ready,
+            empty_result=False,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return {
+            "query_id": query_id,
+            "meta": {"linkage_ready": True, "linkage_rows": 0},
+        }
+
+    # If date range is missing from payload, derive it from the spool via DuckDB
+    if not start_date or not end_date:
+        try:
+            import duckdb
+            conn = duckdb.connect(":memory:")
+            try:
+                row = conn.execute(
+                    'SELECT MIN("DATE_BUCKET"), MAX("DATE_BUCKET") FROM read_parquet(?)',
+                    [spool_path],
+                ).fetchone()
+            finally:
+                conn.close()
+            if row and row[0] and row[1]:
+                start_date = str(row[0])[:10]
+                end_date = str(row[1])[:10]
+        except Exception as exc:
+            logger.warning(
+                "execute_linkage_query: date range derivation failed query_id=%s: %s",
+                query_id, exc,
+            )
 
     started = time.perf_counter()
-    linkage_df = _build_linkage_df(start_date, end_date, detail_df)
+    linked = _compute_reject_linkage(
+        start_date=start_date, end_date=end_date, workorders=workorders
+    )
+    linkage_df = _prepare_linkage_df(linked)
     elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
 
-    # Update cache with computed linkage (detail_df written to Redis again, L1 stays lightweight)
-    _store_payload(query_id, detail_df=detail_df, linkage_df=linkage_df)
-    del detail_df
+    _store_payload(
+        query_id,
+        linkage_df=linkage_df,
+        spool_ready=spool_ready,
+        empty_result=False,
+        start_date=start_date,
+        end_date=end_date,
+    )
     maybe_gc_collect()
     logger.info(
         "Yield alert linkage computed: query_id=%s rows=%s latency_ms=%.2f",
@@ -1135,14 +1480,44 @@ def apply_view(
             query_id, sql_meta.get("view_sql_fallback_reason"),
         )
 
-    # detail_df may be None in L1 (lightweight mode) — load from Redis on demand
-    detail_df = payload.get("detail_df")
+    # Handle empty-result marker
+    if payload.get("empty_result"):
+        return {
+            "summary": {"transaction_qty": 0.0, "scrap_qty": 0.0, "yield_pct": 100.0},
+            "trend": {"items": [], "granularity": granularity},
+            "heatmap": {"items": [], "granularity": granularity},
+            "station_summary": {"items": []},
+            "package_summary": {"items": []},
+            "alerts": {
+                "items": [],
+                "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 1},
+                "quality": {
+                    "matched": 0, "partially_matched": 0, "unmatched": 0,
+                    "matched_scrap_qty": 0.0, "partially_matched_scrap_qty": 0.0,
+                    "unmatched_scrap_qty": 0.0, "total_scrap_qty": 0.0,
+                    "unmatched_ratio": 0.0, "warning": False, "warning_code": None,
+                },
+                "sort": {"sort_by": sort_by, "sort_dir": sort_dir},
+            },
+            "meta": {
+                "query_latency_ms": 0.0,
+                "max_query_days": MAX_QUERY_DAYS,
+                "max_per_page": MAX_PAGE_SIZE,
+                "reason_exclusion_applied": False,
+                "excluded_reason_count": 0,
+                "cache": {"query_id": query_id},
+                "linkage_ready": True,
+                "view_source": "empty",
+            },
+            "filter_options": {},
+        }
+
+    # Load detail_df from spool (pandas fallback path)
+    detail_df = _load_detail_df_from_spool(query_id)
     if detail_df is None:
-        detail_df = _load_detail_df_from_redis(query_id)
-    if detail_df is None:
-        logger.warning("apply_view pandas fallback: detail_df unavailable from Redis query_id=%s", query_id)
+        logger.warning("apply_view pandas fallback: detail_df unavailable from spool query_id=%s", query_id)
         return None
-    linkage_df = payload["linkage_df"]
+    linkage_df = payload.get("linkage_df")
 
     # Task 1.3: memory guard before pandas computation
     enforce_dataset_memory_guard(
@@ -1221,7 +1596,7 @@ def apply_view(
             "linkage_ready": _linkage_ready,
             "view_source": "pandas",
         },
-        "filter_options": _compute_filter_options(payload["detail_df"]),
+        "filter_options": _compute_filter_options(detail_df),
     }
     # Task 1.3: GC after heavy pandas computation
     maybe_gc_collect()

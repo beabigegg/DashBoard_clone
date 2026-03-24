@@ -355,13 +355,19 @@ class CacheUpdater:
         )
 
     def _warmup_yield_alert_dataset(self) -> None:
-        from mes_dashboard.services import yield_alert_dataset_cache
-        result = yield_alert_dataset_cache.ensure_dataset_loaded()
-        logger.info(
-            "Yield-alert dataset warmup complete query_id=%s cache_hit=%s",
-            result.get("query_id"),
-            result.get("cache_hit"),
-        )
+        if not try_acquire_lock("yield_alert_warmup", ttl_seconds=120):
+            logger.debug("Another worker is running yield-alert warmup, skipping")
+            return
+        try:
+            from mes_dashboard.services import yield_alert_dataset_cache
+            result = yield_alert_dataset_cache.ensure_dataset_loaded()
+            logger.info(
+                "Yield-alert dataset warmup complete query_id=%s cache_hit=%s",
+                result.get("query_id"),
+                result.get("cache_hit"),
+            )
+        finally:
+            release_lock("yield_alert_warmup")
 
     def _warmup_reject_options(self) -> None:
         from mes_dashboard.services.reject_history_service import get_filter_options

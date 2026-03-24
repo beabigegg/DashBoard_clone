@@ -310,3 +310,34 @@ class TestWarmupTasks:
         updater = cu.CacheUpdater(interval=1)
         updater._warmup_yield_alert_dataset()
         mock_ensure.assert_called_once()
+
+    @patch('mes_dashboard.services.yield_alert_dataset_cache.ensure_dataset_loaded')
+    @patch('mes_dashboard.core.cache_updater.try_acquire_lock', return_value=False)
+    def test_warmup_yield_alert_dataset_skips_when_lock_held(self, mock_lock, mock_ensure):
+        import mes_dashboard.core.cache_updater as cu
+
+        updater = cu.CacheUpdater(interval=1)
+        updater._warmup_yield_alert_dataset()
+        mock_lock.assert_called_once_with("yield_alert_warmup", ttl_seconds=120)
+        mock_ensure.assert_not_called()
+
+    @patch('mes_dashboard.services.yield_alert_dataset_cache.ensure_dataset_loaded', return_value={'query_id': 'qid-y', 'cache_hit': False})
+    @patch('mes_dashboard.core.cache_updater.release_lock')
+    @patch('mes_dashboard.core.cache_updater.try_acquire_lock', return_value=True)
+    def test_warmup_yield_alert_dataset_releases_lock_on_success(self, mock_acquire, mock_release, mock_ensure):
+        import mes_dashboard.core.cache_updater as cu
+
+        updater = cu.CacheUpdater(interval=1)
+        updater._warmup_yield_alert_dataset()
+        mock_release.assert_called_once_with("yield_alert_warmup")
+
+    @patch('mes_dashboard.services.yield_alert_dataset_cache.ensure_dataset_loaded', side_effect=RuntimeError('boom'))
+    @patch('mes_dashboard.core.cache_updater.release_lock')
+    @patch('mes_dashboard.core.cache_updater.try_acquire_lock', return_value=True)
+    def test_warmup_yield_alert_dataset_releases_lock_on_error(self, mock_acquire, mock_release, mock_ensure):
+        import mes_dashboard.core.cache_updater as cu
+
+        updater = cu.CacheUpdater(interval=1)
+        with pytest.raises(RuntimeError):
+            updater._warmup_yield_alert_dataset()
+        mock_release.assert_called_once_with("yield_alert_warmup")

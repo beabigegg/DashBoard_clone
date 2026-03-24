@@ -100,3 +100,30 @@ The API SHALL provide `GET /api/yield-alert/reason-detail` as a direct-query end
 ### Requirement: Yield Alert Center API drilldown-context endpoint is the primary drill path
 **Reason**: 「查看追溯」跳轉行為被 inline reason-detail 取代，drilldown-context 不再是使用者互動的主要入口。
 **Migration**: 前端改呼叫 `GET /api/yield-alert/reason-detail`；`/api/yield-alert/drilldown-context` endpoint 仍保留在後端（不刪除）供未來使用，但前端不再觸發。
+
+## Delta: 2026-03-24-yield-alert-streaming-spool
+
+### Primary query pipeline changes (`POST /api/yield-alert/query`)
+
+- `execute_primary_query` now uses streaming write pipeline when `YIELD_ALERT_STREAMING_SPOOL_ENABLED=true` (default).
+- Peak memory reduced from ~600MB to ~5MB by streaming Oracle rows via `read_sql_df_slow_iter` → `ParquetWriter` → `register_spool_file`.
+- query_id-level single-flight distributed lock prevents duplicate Oracle queries for the same conditions.
+- When spool write or register fails: returns `503 SERVICE_UNAVAILABLE` with `Retry-After: 30` and `error_code: SERVICE_UNAVAILABLE`. No query marker is published.
+- Empty-result queries (0 rows) store a lightweight cache marker (`empty_result=true, spool_ready=false`) to prevent repeated Oracle re-queries.
+- Query date metadata (`start_date`, `end_date`) is persisted in the L1 cache payload.
+
+### Redis L2 detail removed
+
+- `detail_df` is no longer stored in Redis. Only `linkage_df` (~20KB) remains in Redis.
+- Cache validity is now determined by: L1 payload marker exists AND (`empty_result=true` OR spool file exists on disk).
+
+### Linkage query changes (`POST /api/yield-alert/analyze`)
+
+- `execute_linkage_query` now uses DuckDB `SELECT DISTINCT "WORKORDER" FROM read_parquet(spool_path)` to extract workorders instead of loading full 662K-row detail DataFrame from Redis.
+- Memory for linkage query reduced from ~200MB to ~1MB.
+- If spool is not available: returns `linkage_ready: false` with `linkage_not_ready_reason: spool_not_available`.
+- Date range (`start_date`, `end_date`) for Oracle reject linkage query now sourced from payload metadata (not from detail_df min/max).
+
+### Rollout/rollback
+
+- Feature flag: `YIELD_ALERT_STREAMING_SPOOL_ENABLED` (env var, default `true`). Set to `false` to use legacy path.

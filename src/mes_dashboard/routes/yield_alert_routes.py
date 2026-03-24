@@ -29,6 +29,7 @@ from mes_dashboard.core.database import get_slow_query_active_count
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.services.yield_alert_dataset_cache import (
+    SpoolWriteError,
     apply_view as apply_cached_view,
     execute_linkage_query,
     execute_primary_query,
@@ -183,6 +184,15 @@ def api_yield_alert_query():
     try:
         result = execute_primary_query(start_date=start_date, end_date=end_date)
         return success_response(result)
+    except SpoolWriteError as exc:
+        logger.warning("Yield alert spool write failed: %s", exc)
+        return error_response(
+            SERVICE_UNAVAILABLE,
+            str(exc),
+            status_code=503,
+            meta={"retry_after_seconds": 30},
+            headers={"Retry-After": "30"},
+        )
     except MemoryError as exc:
         record_memory_error("yield_alert.query", reason="rss_guard")
         return error_response(

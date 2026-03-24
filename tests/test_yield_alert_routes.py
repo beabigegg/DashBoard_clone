@@ -192,6 +192,23 @@ def test_alerts_supports_workcenter_group_filters(mock_query, client):
     assert "焊接_DW" in kwargs["filters"]["departments"]
 
 
+@patch("mes_dashboard.routes.yield_alert_routes.execute_primary_query")
+def test_query_spool_write_error_returns_503(mock_primary, client):
+    from mes_dashboard.services.yield_alert_dataset_cache import SpoolWriteError
+
+    mock_primary.side_effect = SpoolWriteError("spool_register_failed: Spool 註冊失敗，請稍後重試")
+
+    response = client.post(
+        "/api/yield-alert/query",
+        json={"start_date": "2026-03-01", "end_date": "2026-03-06"},
+    )
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert payload["error"]["code"] == "SERVICE_UNAVAILABLE"
+    assert response.headers.get("Retry-After") == "30"
+
+
 @patch("mes_dashboard.routes.yield_alert_routes.get_yield_workcenter_group_options")
 def test_filter_options_returns_workcenter_groups(mock_groups, client):
     mock_groups.return_value = ["焊接_DB", "焊接_WB", "成型"]

@@ -47,3 +47,32 @@ The DuckDB SQL runtime SHALL apply the same reason exclusion logic as the pandas
 #### Scenario: Unmapped reasons excluded
 - **WHEN** a row has REASON_CODE equal to `UNMAPPED_REASON`
 - **THEN** the DuckDB SQL SHALL exclude it from scrap aggregation (consistent with pandas `_apply_reason_policy`)
+
+## Delta: 2026-03-24-yield-alert-streaming-spool
+
+### Spool failure contract
+
+- When streaming parquet write or `register_spool_file` fails: the primary query SHALL return `503 SERVICE_UNAVAILABLE` + `Retry-After` + `error_code: SERVICE_UNAVAILABLE`. No query marker is published.
+- Callers MUST treat 503 as retryable.
+
+### Empty-result cache semantics
+
+- Zero-row queries now produce a lightweight marker (`empty_result=true, spool_ready=false`) rather than triggering a cache miss.
+- DuckDB and pandas fallback paths both return empty success results (not cache miss) for empty-result markers.
+
+### Data source tiering
+
+- Large detail data (662K rows, 5.7MB parquet): spool parquet on disk only. No longer stored in Redis.
+- Small linkage data (~20KB): Redis + L1 process cache (unchanged).
+- Pandas fallback data source: `pd.read_parquet(spool_path)` (previously: `redis_load_df`).
+
+### Single-flight behavior
+
+- Concurrent requests for the same `query_id` are handled by a distributed lock:
+  - Lock owner: runs the query and writes spool.
+  - Waiters: poll for up to 30s. If cache becomes available, return it. If timeout, return `503 SERVICE_UNAVAILABLE` with `error_code: SERVICE_UNAVAILABLE`.
+
+### Removed assumptions
+
+- Redis detail fallback (`redis_load_df(detail_cache_key)`) no longer exists. All specs that referenced this fallback are superseded by the spool-only source.
+- `_redis_key_exists` check removed from cache validity logic.
