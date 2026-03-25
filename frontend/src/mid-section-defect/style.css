@@ -1,3 +1,5 @@
+@import '../resource-shared/styles.css';
+
 .theme-mid-section-defect {
   --msd-bg: theme('colors.surface.app');
   --msd-card-bg: theme('colors.surface.card');
@@ -10,37 +12,6 @@
   --msd-primary-dark: theme('colors.brand.700');
 }
 
-.page-container {
-  min-height: 100vh;
-  padding: theme('spacing.4');
-  max-width: 1800px;
-  margin: 0 auto;
-}
-
-/* ====== Header ====== */
-.page-header {
-  display: flex;
-  flex-direction: column;
-  gap: theme('spacing.1');
-  padding: theme('spacing.4') theme('spacing.5');
-  border-radius: 12px;
-  margin-bottom: theme('spacing.4');
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
-  box-shadow: var(--msd-shadow-md);
-}
-
-.page-header h1 {
-  margin: 0;
-  color: theme('colors.surface.card');
-  font-size: 24px;
-  letter-spacing: 0.2px;
-}
-
-.header-desc {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 13px;
-}
 
 /* ====== Section Card ====== */
 .section-card {

@@ -1,6 +1,4 @@
-.material-trace-header {
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
-}
+@import '../resource-shared/styles.css';
 
 .mode-tab-row {
   display: flex;

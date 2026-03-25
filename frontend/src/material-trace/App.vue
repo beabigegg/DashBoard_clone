@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
 import { parseMultiLineInput } from '../core/reject-history-filters.js';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 
 const API_TIMEOUT = 60000;
 const DEFAULT_PER_PAGE = 20;
@@ -285,12 +286,10 @@ function onDocumentClick(e) {
 
 <template>
   <div class="dashboard theme-material-trace" @click="onDocumentClick">
-    <!-- Header -->
-    <div class="header material-trace-header">
-      <div class="header-left">
-        <h1>原物料追溯查詢</h1>
-      </div>
-    </div>
+    <PageHeader
+      title="原物料追溯查詢"
+      :show-refresh="false"
+    />
 
     <!-- Error / Warning Banners -->
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>

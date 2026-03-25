@@ -37,6 +37,10 @@
   margin-bottom: theme('spacing.token.p14');
 }
 
+.theme-query-tool .ui-card {
+  overflow: visible;
+}
+
 .theme-query-tool .card-header {
   padding: theme('spacing.token.p14') theme('spacing.token.p18');
   border-bottom: 1px solid var(--border);

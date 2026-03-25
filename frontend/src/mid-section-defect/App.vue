@@ -8,6 +8,7 @@ import TraceProgressBar from '../shared-composables/TraceProgressBar.vue';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 
 import AnalysisSummary from './components/AnalysisSummary.vue';
 import DetailTable from './components/DetailTable.vue';
@@ -571,11 +572,11 @@ void initPage();
 </script>
 
 <template>
-  <div class="page-container theme-mid-section-defect">
-    <header class="page-header">
-      <h1>製程不良追溯分析</h1>
-      <p class="header-desc">{{ headerSubtitle }}</p>
-    </header>
+  <div class="dashboard theme-mid-section-defect">
+    <PageHeader
+      title="製程不良追溯分析"
+      :show-refresh="false"
+    />
 
     <FilterBar
       :filters="filters"

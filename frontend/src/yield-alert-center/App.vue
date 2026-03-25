@@ -12,6 +12,7 @@ import { toQueryParams } from './utils.js';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import YieldHeatmap from './YieldHeatmap.vue';
 import YieldStationChart from './YieldStationChart.vue';
 import YieldPackageChart from './YieldPackageChart.vue';
@@ -591,15 +592,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="yield-alert-page theme-yield-alert-center">
-    <div class="ya-header">
-      <div class="ya-header-left">
-        <div class="ya-header-title-row">
-          <h1>{{ pageTitle }}</h1>
-        </div>
-        <p>以 ERP WIP 移轉/報廢資料快速定位良率風險，並回鑽報廢歷史</p>
-      </div>
-    </div>
+  <div class="dashboard theme-yield-alert-center">
+    <PageHeader
+      :title="pageTitle"
+      :show-refresh="false"
+    />
 
     <section class="filter-panel primary-query-panel">
       <header class="panel-header">
