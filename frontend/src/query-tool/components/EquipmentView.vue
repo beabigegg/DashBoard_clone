@@ -5,14 +5,10 @@ import FilterToolbar from '../../shared-ui/components/FilterToolbar.vue';
 import EquipmentJobsPanel from './EquipmentJobsPanel.vue';
 import EquipmentLotsTable from './EquipmentLotsTable.vue';
 import EquipmentRejectsTable from './EquipmentRejectsTable.vue';
-import EquipmentTimeline from './EquipmentTimeline.vue';
+import LotTimeline from './LotTimeline.vue';
 
 const props = defineProps({
   equipmentOptions: {
-    type: Array,
-    default: () => [],
-  },
-  equipmentRawOptions: {
     type: Array,
     default: () => [],
   },
@@ -56,10 +52,6 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  statusRows: {
-    type: Array,
-    default: () => [],
-  },
   exporting: {
     type: Object,
     required: true,
@@ -85,7 +77,6 @@ const tabMeta = Object.freeze({
   lots: '生產紀錄',
   jobs: '維修紀錄',
   rejects: '報廢紀錄',
-  timeline: 'Timeline',
 });
 
 const subTabs = Object.keys(tabMeta);
@@ -205,9 +196,13 @@ const subTabs = Object.keys(tabMeta);
           </button>
         </div>
       </div>
+      <LotTimeline
+        v-if="activeSubTab === 'lots' && lotsRows.length > 0"
+        :history-rows="lotsRows"
+      />
 
       <EquipmentJobsPanel
-        v-else-if="activeSubTab === 'jobs'"
+        v-if="activeSubTab === 'jobs'"
         :rows="jobsRows"
         :loading="loading.jobs"
         :error="errors.jobs"
@@ -217,29 +212,13 @@ const subTabs = Object.keys(tabMeta);
       />
 
       <EquipmentRejectsTable
-        v-else-if="activeSubTab === 'rejects'"
+        v-if="activeSubTab === 'rejects'"
         :rows="rejectsRows"
         :loading="loading.rejects"
         :error="errors.rejects"
         :export-disabled="!canExportSubTab('rejects')"
         :exporting="exporting.rejects"
         @export="emit('export-sub-tab', 'rejects')"
-      />
-
-      <EquipmentTimeline
-        v-else
-        :status-rows="statusRows"
-        :lots-rows="lotsRows"
-        :jobs-rows="jobsRows"
-        :equipment-options="equipmentRawOptions"
-        :selected-equipment-ids="selectedEquipmentIds"
-        :start-date="startDate"
-        :end-date="endDate"
-        :loading="loading.timeline"
-        :error="errors.timeline"
-        :export-disabled="!canExportSubTab('timeline')"
-        :exporting="exporting.timeline"
-        @export="emit('export-sub-tab', 'timeline')"
       />
       </div>
     </section>

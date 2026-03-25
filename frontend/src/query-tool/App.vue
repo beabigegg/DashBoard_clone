@@ -5,9 +5,11 @@ import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import EquipmentView from './components/EquipmentView.vue';
+import LotEquipmentView from './components/LotEquipmentView.vue';
 import LotTraceView from './components/LotTraceView.vue';
 import SerialReverseTraceView from './components/SerialReverseTraceView.vue';
 import { useEquipmentQuery } from './composables/useEquipmentQuery.js';
+import { useLotEquipmentQuery } from './composables/useLotEquipmentQuery.js';
 import { useLotDetail } from './composables/useLotDetail.js';
 import { useLotLineage } from './composables/useLotLineage.js';
 import { useLotResolve } from './composables/useLotResolve.js';
@@ -17,13 +19,15 @@ import { normalizeText, parseArrayParam, parseInputValues, uniqueValues } from '
 const TAB_LOT = 'lot';
 const TAB_REVERSE = 'reverse';
 const TAB_EQUIPMENT = 'equipment';
+const TAB_LOT_EQUIPMENT = 'lot_equipment';
 
-const VALID_TABS = new Set([TAB_LOT, TAB_REVERSE, TAB_EQUIPMENT]);
+const VALID_TABS = new Set([TAB_LOT, TAB_REVERSE, TAB_EQUIPMENT, TAB_LOT_EQUIPMENT]);
 
 const tabItems = Object.freeze([
   { key: TAB_LOT, label: '批次追蹤(正向)', subtitle: '由 Wafer LOT / GA-GC 工單展開下游血緣與明細' },
   { key: TAB_REVERSE, label: '流水批反查(反向)', subtitle: '由成品流水號 / GD 工單 / GD LOT 回溯上游批次' },
   { key: TAB_EQUIPMENT, label: '設備生產批次追蹤', subtitle: '設備紀錄與時序視圖' },
+  { key: TAB_LOT_EQUIPMENT, label: '批次追蹤生產設備', subtitle: '由批次名稱 + 站點群組查詢處理設備' },
 ]);
 
 function normalizeTopTab(value) {
@@ -61,6 +65,11 @@ function readStateFromUrl() {
     startDate: normalizeText(params.get('start_date')),
     endDate: normalizeText(params.get('end_date')),
     equipmentSubTab: normalizeText(params.get('equipment_sub_tab')) || 'lots',
+
+    leInputType: normalizeText(params.get('le_input_type')) || 'lot_id',
+    leInputText: normalizeText(params.get('le_input_text')),
+    leWorkcenterGroups: parseArrayParam(params, 'le_workcenter_groups'),
+    leSubTab: normalizeText(params.get('le_sub_tab')) || 'lots',
   };
 }
 
@@ -106,6 +115,13 @@ const equipmentQuery = useEquipmentQuery({
   activeSubTab: initialState.equipmentSubTab,
 });
 
+const lotEquipmentQuery = useLotEquipmentQuery({
+  inputType: initialState.leInputType,
+  inputText: initialState.leInputText,
+  workcenterGroups: initialState.leWorkcenterGroups,
+  activeSubTab: initialState.leSubTab,
+});
+
 const activeTabMeta = computed(() => tabItems.find((item) => item.key === activeTab.value) || tabItems[0]);
 
 const selectedContainerName = computed(() => {
@@ -135,7 +151,7 @@ const equipmentColumns = computed(() => {
   if (equipmentQuery.activeSubTab.value === 'rejects') {
     return Object.keys(equipmentQuery.rejectsRows.value[0] || {});
   }
-  return Object.keys(equipmentQuery.statusRows.value[0] || {});
+  return Object.keys(equipmentQuery.lotsRows.value[0] || {});
 });
 
 const suppressUrlSync = ref(false);
@@ -193,6 +209,22 @@ function buildUrlState() {
 
   if (equipmentQuery.activeSubTab.value) {
     params.set('equipment_sub_tab', equipmentQuery.activeSubTab.value);
+  }
+
+  if (lotEquipmentQuery.inputType.value) {
+    params.set('le_input_type', lotEquipmentQuery.inputType.value);
+  }
+
+  if (lotEquipmentQuery.inputText.value) {
+    params.set('le_input_text', lotEquipmentQuery.inputText.value);
+  }
+
+  uniqueValues(lotEquipmentQuery.selectedWorkcenterGroups.value).forEach((group) => {
+    params.append('le_workcenter_groups', group);
+  });
+
+  if (lotEquipmentQuery.activeSubTab.value) {
+    params.set('le_sub_tab', lotEquipmentQuery.activeSubTab.value);
   }
 
   // Backward-compatible URL keys for deep links and existing tests.
@@ -258,6 +290,11 @@ async function applyStateFromUrl() {
   equipmentQuery.startDate.value = state.startDate || equipmentQuery.startDate.value;
   equipmentQuery.endDate.value = state.endDate || equipmentQuery.endDate.value;
   equipmentQuery.activeSubTab.value = state.equipmentSubTab;
+
+  lotEquipmentQuery.inputType.value = state.leInputType || 'lot_id';
+  lotEquipmentQuery.inputText.value = state.leInputText || '';
+  lotEquipmentQuery.selectedWorkcenterGroups.value = state.leWorkcenterGroups || [];
+  lotEquipmentQuery.activeSubTab.value = state.leSubTab || 'lots';
 
   suppressUrlSync.value = false;
 
@@ -370,12 +407,25 @@ async function handleExportEquipmentSubTab(tab) {
   await equipmentQuery.exportSubTab(tab);
 }
 
+async function handleLotEquipmentLookup() {
+  await lotEquipmentQuery.lookupEquipment();
+}
+
+async function handleChangeLotEquipmentSubTab(tab) {
+  await lotEquipmentQuery.setActiveSubTab(tab);
+}
+
+async function handleExportLotEquipmentSubTab(tab) {
+  await lotEquipmentQuery.exportSubTab(tab);
+}
+
 onMounted(async () => {
   window.addEventListener('popstate', handlePopState);
   await Promise.all([
     lotDetail.loadWorkcenterGroups(),
     reverseDetail.loadWorkcenterGroups(),
     equipmentQuery.bootstrap(),
+    lotEquipmentQuery.bootstrap(),
   ]);
 
   if (initialState.lotSelectedContainerId) {
@@ -415,6 +465,11 @@ watch(
     equipmentQuery.startDate,
     equipmentQuery.endDate,
     equipmentQuery.activeSubTab,
+
+    lotEquipmentQuery.inputType,
+    lotEquipmentQuery.inputText,
+    lotEquipmentQuery.selectedWorkcenterGroups,
+    lotEquipmentQuery.activeSubTab,
   ],
   () => {
     syncUrlState();
@@ -559,10 +614,41 @@ watch(
           @change-page="handleReverseDetailPageChange"
         />
 
+        <LotEquipmentView
+          v-show="activeTab === TAB_LOT_EQUIPMENT"
+          :input-type="lotEquipmentQuery.inputType.value"
+          :input-type-options="lotEquipmentQuery.inputTypeOptions"
+          :input-text="lotEquipmentQuery.inputText.value"
+          :parsed-input-count="lotEquipmentQuery.parsedInputCount.value"
+          :workcenter-group-options="lotEquipmentQuery.workcenterGroupOptions.value"
+          :selected-workcenter-groups="lotEquipmentQuery.selectedWorkcenterGroups.value"
+          :resolved-equipment-ids="lotEquipmentQuery.resolvedEquipmentIds.value"
+          :resolved-equipment-names="lotEquipmentQuery.resolvedEquipmentNames.value"
+          :lookup-message="lotEquipmentQuery.lookupMessage.value"
+          :trace-entries="lotEquipmentQuery.traceEntries.value"
+          :start-date="lotEquipmentQuery.startDate.value"
+          :end-date="lotEquipmentQuery.endDate.value"
+          :active-sub-tab="lotEquipmentQuery.activeSubTab.value"
+          :loading="lotEquipmentQuery.loading"
+          :errors="lotEquipmentQuery.errors"
+          :lots-rows="lotEquipmentQuery.lotsRows.value"
+          :lots-pagination="lotEquipmentQuery.lotsPagination.value"
+          :jobs-rows="lotEquipmentQuery.jobsRows.value"
+          :rejects-rows="lotEquipmentQuery.rejectsRows.value"
+          :exporting="lotEquipmentQuery.exporting"
+          :can-export-sub-tab="lotEquipmentQuery.canExportSubTab"
+          @update:input-type="lotEquipmentQuery.inputType.value = $event"
+          @update:input-text="lotEquipmentQuery.inputText.value = $event"
+          @update:selected-workcenter-groups="lotEquipmentQuery.selectedWorkcenterGroups.value = $event"
+          @lookup="handleLotEquipmentLookup"
+          @change-sub-tab="handleChangeLotEquipmentSubTab"
+          @change-lots-page="lotEquipmentQuery.queryLots({ page: $event })"
+          @export-sub-tab="handleExportLotEquipmentSubTab"
+        />
+
         <EquipmentView
           v-show="activeTab === TAB_EQUIPMENT"
           :equipment-options="equipmentQuery.equipmentOptionItems.value"
-          :equipment-raw-options="equipmentQuery.equipmentOptions.value"
           :selected-equipment-ids="equipmentQuery.selectedEquipmentIds.value"
           :start-date="equipmentQuery.startDate.value"
           :end-date="equipmentQuery.endDate.value"
@@ -573,7 +659,6 @@ watch(
           :lots-pagination="equipmentQuery.lotsPagination.value"
           :jobs-rows="equipmentQuery.jobsRows.value"
           :rejects-rows="equipmentQuery.rejectsRows.value"
-          :status-rows="equipmentQuery.statusRows.value"
           :exporting="equipmentQuery.exporting"
           :can-export-sub-tab="equipmentQuery.canExportSubTab"
           @update:selected-equipment-ids="equipmentQuery.setSelectedEquipmentIds($event)"

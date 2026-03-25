@@ -1893,6 +1893,351 @@ def get_lot_jobs_with_history(
 
 
 # ============================================================
+# Lot → Equipment Lookup
+# ============================================================
+
+MAX_LOT_EQUIPMENT_INPUT = 100
+MAX_PARENT_TRACE_DEPTH = 10
+
+
+def _resolve_container_ids_by_names(container_names: List[str]) -> Dict[str, str]:
+    """Resolve CONTAINERNAME → CONTAINERID using lot_resolve_id SQL.
+
+    Returns:
+        Dict mapping CONTAINERNAME (upper) → CONTAINERID.
+    """
+    builder = QueryBuilder()
+    _add_exact_or_pattern_condition(builder, "CONTAINERNAME", container_names)
+    sql = SQLLoader.load_with_params(
+        "query_tool/lot_resolve_id",
+        CONTAINER_FILTER=builder.get_conditions_sql(),
+    )
+    df = read_sql_df_slow(sql, builder.params, caller="lot_equip:resolve_ids")
+    if df is None or df.empty:
+        return {}
+    records = _df_to_records(df)
+    result = {}
+    for row in records:
+        name = (row.get('CONTAINERNAME') or '').strip().upper()
+        cid = (row.get('CONTAINERID') or '').strip()
+        if name and cid:
+            result[name] = cid
+    return result
+
+
+def _build_two_filters(
+    col_a: str, values_a: List[str],
+    col_b: str, values_b: List[str],
+) -> Tuple[str, str, Dict[str, Any]]:
+    """Build two IN-clause filters on a single QueryBuilder to avoid param name collision.
+
+    Returns:
+        (filter_a_sql, filter_b_sql, merged_params)
+    """
+    builder = QueryBuilder()
+    builder.add_in_condition(col_a, values_a)
+    filter_a = builder.conditions[0] if builder.conditions else "1=1"
+    builder.add_in_condition(col_b, values_b)
+    filter_b = builder.conditions[1] if len(builder.conditions) > 1 else "1=1"
+    return filter_a, filter_b, builder.params
+
+
+def _check_names_with_equipment(
+    container_names: List[str],
+    workcenters: List[str],
+) -> set:
+    """Check which container names have equipment at given workcenters.
+
+    Returns:
+        Set of CONTAINERNAME values that have equipment records.
+    """
+    if not container_names or not workcenters:
+        return set()
+
+    container_filter, workcenter_filter, params = _build_two_filters(
+        "c.CONTAINERNAME", container_names,
+        "h.WORKCENTERNAME", workcenters,
+    )
+
+    sql = SQLLoader.load_with_params(
+        "query_tool/lot_equipment_check",
+        CONTAINER_FILTER=container_filter,
+        WORKCENTER_FILTER=workcenter_filter,
+    )
+
+    df = read_sql_df_slow(sql, params, caller="lot_equip:check_names")
+    if df is None or df.empty:
+        return set()
+    records = _df_to_records(df)
+    return {(r.get('CONTAINERNAME') or '').strip() for r in records} - {''}
+
+
+def _lookup_equipment_by_names(
+    container_names: List[str],
+    workcenters: List[str],
+) -> List[Dict[str, Any]]:
+    """Query lot_equipment_lookup for given container names + workcenters.
+
+    Returns:
+        List of result records (EQUIPMENTID, EQUIPMENTNAME, MIN_TRACKIN, MAX_TRACKOUT).
+        Empty list if nothing found.
+    """
+    if not container_names or not workcenters:
+        return []
+
+    container_filter, workcenter_filter, params = _build_two_filters(
+        "c.CONTAINERNAME", container_names,
+        "h.WORKCENTERNAME", workcenters,
+    )
+
+    sql = SQLLoader.load_with_params(
+        "query_tool/lot_equipment_lookup",
+        CONTAINER_FILTER=container_filter,
+        WORKCENTER_FILTER=workcenter_filter,
+    )
+
+    df = read_sql_df_slow(sql, params, caller="lot_equip:lookup_names")
+    if df is None or df.empty:
+        return []
+    return _df_to_records(df)
+
+
+def _trace_parents_for_equipment(
+    not_found_names: List[str],
+    workcenters: List[str],
+) -> Tuple[Dict[str, str], List[str]]:
+    """For lots without equipment at workcenter, trace up split chain.
+
+    Args:
+        not_found_names: LOT names (CONTAINERNAME) with no equipment.
+        workcenters: WORKCENTERNAME list for the selected groups.
+
+    Returns:
+        (trace_map, found_parent_names)
+        trace_map: {original_lot_name: parent_lot_name_that_was_found}
+        found_parent_names: parent names that DO have equipment at workcenter.
+    """
+    from mes_dashboard.services.lineage_engine import LineageEngine
+
+    trace_map: Dict[str, str] = {}
+    found_parent_names: List[str] = []
+
+    # Resolve not-found names to CIDs
+    name_to_cid = _resolve_container_ids_by_names(not_found_names)
+    if not name_to_cid:
+        return trace_map, found_parent_names
+
+    cid_to_name: Dict[str, str] = {v: k for k, v in name_to_cid.items()}
+
+    # pending: original_input_name → current_cid being traced
+    pending: Dict[str, str] = {}
+    for name in not_found_names:
+        cid = name_to_cid.get(name.strip().upper())
+        if cid:
+            pending[name] = cid
+
+    for _depth in range(MAX_PARENT_TRACE_DEPTH):
+        if not pending:
+            break
+
+        current_cids = list(set(pending.values()))
+        split_result = LineageEngine.resolve_split_ancestors(current_cids)
+        child_to_parent = split_result.get("child_to_parent", {})
+        discovered_names = split_result.get("cid_to_name", {})
+        cid_to_name.update(discovered_names)
+
+        if not child_to_parent:
+            break
+
+        # Advance each pending entry to its parent
+        next_pending: Dict[str, str] = {}
+        parent_cids_this_round: set = set()
+        for original_name, current_cid in list(pending.items()):
+            parent_cid = child_to_parent.get(current_cid)
+            if not parent_cid or parent_cid == current_cid:
+                # No parent — stop tracing this one
+                continue
+            parent_cids_this_round.add(parent_cid)
+            next_pending[original_name] = parent_cid
+
+        if not parent_cids_this_round:
+            break
+
+        # Get parent names (cid_to_name was updated by split_ancestors)
+        parent_names_set = {
+            cid_to_name[p] for p in parent_cids_this_round if p in cid_to_name
+        }
+
+        if not parent_names_set:
+            break
+
+        # Check which parent names have equipment at the workcenter
+        parents_with_equipment = _check_names_with_equipment(
+            list(parent_names_set), workcenters,
+        )
+
+        # Partition: found parents vs keep tracing
+        still_pending: Dict[str, str] = {}
+        for original_name, parent_cid in next_pending.items():
+            parent_name = cid_to_name.get(parent_cid, '')
+            if parent_name in parents_with_equipment:
+                trace_map[original_name] = parent_name
+                found_parent_names.append(parent_name)
+            elif parent_name:
+                # Parent not found either — record and keep tracing
+                trace_map[original_name] = parent_name
+                still_pending[original_name] = parent_cid
+
+        pending = still_pending
+
+    # Clean trace_map: only keep entries whose final value was found
+    found_set = set(found_parent_names)
+    trace_map = {k: v for k, v in trace_map.items() if v in found_set}
+
+    return trace_map, list(set(found_parent_names))
+
+
+def resolve_lot_equipment(
+    input_type: str,
+    values: List[str],
+    workcenter_groups: List[str],
+) -> Dict[str, Any]:
+    """Look up which equipment processed given lots at workcenter groups.
+
+    For lot_id input: if a lot has no equipment at the workcenter groups,
+    traces up the split chain to find a parent lot that does.
+
+    For work_order input: resolves work order to lot IDs first.
+
+    Args:
+        input_type: 'lot_id' or 'work_order'
+        values: List of LOT IDs or work order numbers.
+        workcenter_groups: List of WORKCENTER_GROUP names.
+
+    Returns:
+        Dict with equipment_ids, equipment_names, date_range, trace_map.
+    """
+    if not values:
+        return {'error': '請輸入至少一筆查詢條件'}
+
+    if len(values) > MAX_LOT_EQUIPMENT_INPUT:
+        return {'error': f'輸入數量不得超過 {MAX_LOT_EQUIPMENT_INPUT} 筆'}
+
+    if input_type not in ('lot_id', 'work_order'):
+        return {'error': f'不支援的輸入類型: {input_type}'}
+
+    if not workcenter_groups:
+        return {'error': '請選擇站點群組'}
+
+    workcenters = _get_workcenters_for_groups(workcenter_groups)
+    if not workcenters:
+        group_names = '、'.join(workcenter_groups)
+        return {'error': f'找不到站點群組「{group_names}」對應的站點'}
+
+    try:
+        _check_rss_guard("批次追蹤生產設備 lookup")
+
+        # Step 1: Resolve input to container names
+        if input_type == 'work_order':
+            resolve_result = resolve_lots('work_order', values)
+            if 'error' in resolve_result:
+                return {'error': resolve_result['error']}
+            resolved_data = resolve_result.get('data', [])
+            if not resolved_data:
+                return {
+                    'equipment_ids': [],
+                    'equipment_names': [],
+                    'date_range': None,
+                    'trace_map': {},
+                    'not_found_hint': '找不到此工單對應的批次',
+                }
+            all_names = list({
+                row.get('lot_id', '').strip()
+                for row in resolved_data
+                if row.get('lot_id')
+            })
+        else:
+            # lot_id: use as-is
+            all_names = [v.strip() for v in values if v.strip()]
+
+        if not all_names:
+            return {
+                'equipment_ids': [],
+                'equipment_names': [],
+                'date_range': None,
+                'trace_map': {},
+                'not_found_hint': '找不到任何符合的批次',
+            }
+
+        # Step 2: Check which input names have equipment at the workcenter
+        found_names = _check_names_with_equipment(all_names, workcenters)
+        logger.info(
+            "Lot equipment check: %s input, %s found at workcenter groups %s",
+            len(all_names), len(found_names), workcenter_groups,
+        )
+
+        trace_map = {}
+        final_names = list(found_names)
+
+        # Step 3: For lot_id, trace not-found names up the split chain
+        if input_type == 'lot_id':
+            not_found_names = [n for n in all_names if n not in found_names]
+            if not_found_names:
+                logger.info(
+                    "Lot equipment: %s lots not found, tracing parents: %s",
+                    len(not_found_names), not_found_names,
+                )
+                trace_map, found_parent_names = _trace_parents_for_equipment(
+                    not_found_names, workcenters,
+                )
+                final_names.extend(found_parent_names)
+
+        # Step 4: Get equipment details for all matched names
+        records = _lookup_equipment_by_names(final_names, workcenters)
+
+        if not records:
+            return {
+                'equipment_ids': [],
+                'equipment_names': [],
+                'date_range': None,
+                'trace_map': trace_map,
+                'not_found_hint': '在指定站點群組中找不到這些批次的設備紀錄',
+            }
+
+        equipment_ids = list({r['EQUIPMENTID'] for r in records if r.get('EQUIPMENTID')})
+        equipment_names = list({r['EQUIPMENTNAME'] for r in records if r.get('EQUIPMENTNAME')})
+
+        min_trackin = records[0].get('MIN_TRACKIN') if records else None
+        max_trackout = records[0].get('MAX_TRACKOUT') if records else None
+
+        date_range = None
+        if min_trackin and max_trackout:
+            start_dt = str(min_trackin)[:10]
+            end_dt = str(max_trackout)[:10]
+            date_range = {'start': start_dt, 'end': end_dt}
+
+        logger.info(
+            "Lot equipment lookup: input_type=%s, input=%s, equipment=%s, "
+            "traced=%s, groups=%s",
+            input_type, len(values), len(equipment_ids),
+            len(trace_map), workcenter_groups,
+        )
+
+        return {
+            'equipment_ids': equipment_ids,
+            'equipment_names': equipment_names,
+            'date_range': date_range,
+            'trace_map': trace_map,
+        }
+
+    except MemoryError:
+        raise
+    except Exception as exc:
+        logger.error(f"Lot equipment lookup failed: {exc}")
+        return {'error': f'查詢失敗: {str(exc)}'}
+
+
+# ============================================================
 # Equipment Period Query Functions
 # ============================================================
 

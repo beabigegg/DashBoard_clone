@@ -37,7 +37,9 @@
   margin-bottom: theme('spacing.token.p14');
 }
 
-.theme-query-tool .ui-card {
+.theme-query-tool .ui-card,
+.theme-query-tool .ui-card-body,
+.theme-query-tool .card-body {
   overflow: visible;
 }
 

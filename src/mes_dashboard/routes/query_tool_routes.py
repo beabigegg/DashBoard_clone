@@ -48,6 +48,7 @@ from mes_dashboard.services.query_tool_service import (
     get_equipment_materials,
     get_equipment_rejects,
     get_equipment_jobs,
+    resolve_lot_equipment,
     export_to_csv,
     generate_csv_stream,
     validate_date_range,
@@ -106,7 +107,14 @@ _QUERY_TOOL_EQUIPMENT_RATE_LIMIT = configured_rate_limit(
     bucket="query-tool-equipment",
     max_attempts_env="QT_EQUIP_RATE_MAX_REQUESTS",
     window_seconds_env="QT_EQUIP_RATE_WINDOW_SECONDS",
-    default_max_attempts=5,
+    default_max_attempts=10,
+    default_window_seconds=60,
+)
+_QUERY_TOOL_LOT_EQUIP_RATE_LIMIT = configured_rate_limit(
+    bucket="query-tool-lot-equipment",
+    max_attempts_env="QT_LOT_EQUIP_RATE_MAX_REQUESTS",
+    window_seconds_env="QT_LOT_EQUIP_RATE_WINDOW_SECONDS",
+    default_max_attempts=10,
     default_window_seconds=60,
 )
 _QUERY_TOOL_EXPORT_RATE_LIMIT = configured_rate_limit(
@@ -677,6 +685,53 @@ def get_workcenter_groups_list():
 
     except Exception as exc:
         return internal_error(f'載入站點群組失敗: {str(exc)}')
+
+
+# ============================================================
+# Lot → Equipment Lookup API
+# ============================================================
+
+@query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
+@_QUERY_TOOL_LOT_EQUIP_RATE_LIMIT
+def lookup_lot_equipment():
+    """Look up which equipment processed given lots at a workcenter group.
+
+    Expects JSON body:
+    {
+        "input_type": "lot_id" | "work_order",
+        "values": ["LOT001", "LOT002"],
+        "workcenter_groups": ["焊接_DB", "焊接_WB"]
+    }
+
+    Returns equipment IDs/names, observed date range, and trace_map
+    for lots that were traced to parent lots.
+    """
+    data, payload_error = parse_json_payload(require_non_empty_object=True)
+    if payload_error is not None:
+        return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
+
+    input_type = data.get('input_type', 'lot_id')
+    values = data.get('values', [])
+    workcenter_groups = data.get('workcenter_groups', [])
+
+    if not values:
+        return validation_error('請輸入至少一筆查詢條件')
+
+    if input_type not in ('lot_id', 'work_order'):
+        return validation_error(f'不支援的輸入類型: {input_type}')
+
+    if not workcenter_groups:
+        return validation_error('請選擇站點群組')
+
+    try:
+        result = resolve_lot_equipment(input_type, values, workcenter_groups)
+    except MemoryError as exc:
+        return _memory_error_response("query_tool.lot_equipment_lookup", exc)
+
+    if 'error' in result:
+        return validation_error(result['error'])
+
+    return success_response(result)
 
 
 # ============================================================

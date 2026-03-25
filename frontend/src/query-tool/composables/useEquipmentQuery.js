@@ -4,7 +4,7 @@ import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api.js';
 import { exportCsv } from '../utils/csv.js';
 import { normalizeText, toDateInputValue, uniqueValues } from '../utils/values.js';
 
-const EQUIPMENT_SUB_TABS = Object.freeze(['lots', 'jobs', 'rejects', 'timeline']);
+const EQUIPMENT_SUB_TABS = Object.freeze(['lots', 'jobs', 'rejects']);
 const DEFAULT_LOTS_PER_PAGE = 200;
 
 function normalizeSubTab(value) {
@@ -27,8 +27,6 @@ function emptyTabFlags() {
     lots: false,
     jobs: false,
     rejects: false,
-    timeline: false,
-    status_hours: false,
   };
 }
 
@@ -48,15 +46,12 @@ export function useEquipmentQuery(initial = {}) {
   const lotsPagination = ref({ page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 });
   const jobsRows = ref([]);
   const rejectsRows = ref([]);
-  const statusRows = ref([]);
 
   const loading = reactive({
     bootstrapping: false,
     lots: false,
     jobs: false,
     rejects: false,
-    timeline: false,
-    status_hours: false,
   });
 
   const errors = reactive({
@@ -65,8 +60,6 @@ export function useEquipmentQuery(initial = {}) {
     lots: '',
     jobs: '',
     rejects: '',
-    timeline: '',
-    status_hours: '',
   });
 
   const queried = reactive(emptyTabFlags());
@@ -227,52 +220,6 @@ export function useEquipmentQuery(initial = {}) {
     }
   }
 
-  async function queryTimeline() {
-    loading.timeline = true;
-    loading.status_hours = true;
-    errors.filters = '';
-    errors.timeline = '';
-    errors.status_hours = '';
-
-    try {
-      const [statusData, lotsData, jobsData] = await Promise.all([
-        fetchEquipmentPeriod('status_hours'),
-        fetchEquipmentPeriod('lots', { page: 1, perPage: DEFAULT_LOTS_PER_PAGE }),
-        fetchEquipmentPeriod('jobs'),
-      ]);
-
-      statusRows.value = Array.isArray(statusData?.data) ? statusData.data : [];
-      lotsRows.value = Array.isArray(lotsData?.data) ? lotsData.data : [];
-      jobsRows.value = Array.isArray(jobsData?.data) ? jobsData.data : [];
-      lotsPagination.value = lotsData?.pagination || {
-        page: 1,
-        per_page: DEFAULT_LOTS_PER_PAGE,
-        total: lotsRows.value.length,
-        total_pages: 1,
-      };
-
-      queried.timeline = true;
-      queried.status_hours = true;
-      queried.lots = true;
-      queried.jobs = true;
-
-      return true;
-    } catch (error) {
-      const message = error?.message || '查詢設備 Timeline 失敗';
-      errors.timeline = message;
-      errors.status_hours = message;
-      if (!errors.filters) {
-        errors.filters = message;
-      }
-      statusRows.value = [];
-      lotsPagination.value = { page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 };
-      return false;
-    } finally {
-      loading.timeline = false;
-      loading.status_hours = false;
-    }
-  }
-
   async function queryActiveSubTab() {
     const tab = activeSubTab.value;
     if (tab === 'lots') {
@@ -281,10 +228,7 @@ export function useEquipmentQuery(initial = {}) {
     if (tab === 'jobs') {
       return queryJobs();
     }
-    if (tab === 'rejects') {
-      return queryRejects();
-    }
-    return queryTimeline();
+    return queryRejects();
   }
 
   async function setActiveSubTab(tab, { autoQuery = true } = {}) {
@@ -310,7 +254,7 @@ export function useEquipmentQuery(initial = {}) {
     if (normalized === 'rejects') {
       return rejectsRows.value.length > 0;
     }
-    return statusRows.value.length > 0;
+    return lotsRows.value.length > 0;
   }
 
   async function exportSubTab(tab) {
@@ -335,8 +279,6 @@ export function useEquipmentQuery(initial = {}) {
         exportType = 'equipment_jobs';
       } else if (normalized === 'rejects') {
         exportType = 'equipment_rejects';
-      } else if (normalized === 'timeline') {
-        exportType = 'equipment_status_hours';
       }
 
       await exportCsv({
@@ -374,7 +316,6 @@ export function useEquipmentQuery(initial = {}) {
     lotsPagination,
     jobsRows,
     rejectsRows,
-    statusRows,
     loading,
     errors,
     queried,
@@ -386,7 +327,6 @@ export function useEquipmentQuery(initial = {}) {
     queryLots,
     queryJobs,
     queryRejects,
-    queryTimeline,
     queryActiveSubTab,
     canExportSubTab,
     exportSubTab,
