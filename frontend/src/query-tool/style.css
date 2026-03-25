@@ -1,3 +1,5 @@
+@import '../resource-shared/styles.css';
+
 .theme-query-tool {
   --bg: theme('colors.token.hf5f7fa');
   --card-bg: theme('colors.token.hffffff');
@@ -18,54 +20,6 @@
    包含 wip-shared 基礎變數與元件 + 頁面專屬樣式
    ================================================================ */
 
-/* ---- 頁面容器 ---- */
-.theme-query-tool .dashboard {
-  max-width: 1900px;
-  margin: 0 auto;
-  padding: theme('spacing.token.p20');
-}
-
-.theme-query-tool .query-tool-page {
-  max-width: 1900px;
-  margin: 0 auto;
-  padding: theme('spacing.token.p20');
-}
-
-/* ---- Header (wip-shared) ---- */
-.theme-query-tool .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: theme('spacing.token.p18') theme('spacing.token.p22');
-  background: var(--header-gradient, linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%));
-  border-radius: 10px;
-  margin-bottom: theme('spacing.token.p16');
-  box-shadow: var(--shadow-strong);
-}
-
-.theme-query-tool .header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.theme-query-tool .header h1 {
-  color: theme('colors.token.hffffff');
-  font-size: 24px;
-}
-
-.theme-query-tool .query-tool-header {
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
-}
-
-.theme-query-tool .query-tool-subtitle {
-  margin-top: theme('spacing.token.p4');
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
-}
 
 /* ---- 佔位 / 空狀態 (wip-shared) ---- */
 .theme-query-tool .placeholder {

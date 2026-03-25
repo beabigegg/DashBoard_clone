@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import EquipmentView from './components/EquipmentView.vue';
 import LotTraceView from './components/LotTraceView.vue';
 import SerialReverseTraceView from './components/SerialReverseTraceView.vue';
@@ -442,12 +443,10 @@ watch(
 
 <template>
   <div class="dashboard query-tool-page theme-query-tool">
-    <header class="header query-tool-header">
-      <div class="header-left">
-        <h1>批次追蹤工具</h1>
-        <p class="query-tool-subtitle">正向/反向批次追溯與設備生產批次查詢整合入口</p>
-      </div>
-    </header>
+    <PageHeader
+      title="批次追蹤工具"
+      :show-refresh="false"
+    />
 
     <section class="card ui-card">
       <div class="card-header ui-card-header">
