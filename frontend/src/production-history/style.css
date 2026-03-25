@@ -1,0 +1,248 @@
+/* Production History page styles
+ * Scoped under .theme-production-history
+ * All feature-specific styles must live here.
+ */
+
+/* ── Filter panel ────────────────────────────────────────────────────────── */
+
+.theme-production-history .ph-app__filter-panel {
+  @apply p-4 flex flex-col gap-3 overflow-visible;
+}
+
+.theme-production-history .ui-card {
+  overflow: visible;
+}
+
+.theme-production-history .ph-app__filter-row {
+  @apply flex flex-wrap gap-3 items-end;
+}
+
+.theme-production-history .ph-app__filter-row--optional {
+  @apply pt-1 border-t border-gray-100;
+}
+
+.theme-production-history .ph-app__filter-field {
+  @apply flex flex-col gap-1 min-w-32;
+}
+
+.theme-production-history .ph-app__filter-field--required {
+  @apply min-w-48;
+}
+
+.theme-production-history .ph-app__label {
+  @apply text-xs font-medium text-gray-600;
+}
+
+.theme-production-history .ph-app__required {
+  @apply text-red-500;
+}
+
+.theme-production-history .ph-app__input {
+  width: 100%;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+  border: 1px solid var(--resource-border, theme('colors.token.hdbe4ef'));
+  border-radius: 8px;
+  font-size: 13px;
+  background: theme('colors.token.hffffff');
+}
+
+.theme-production-history .ph-app__input:focus {
+  outline: none;
+  border-color: theme('colors.token.h0ea5e9');
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);
+}
+
+.theme-production-history .ph-app__textarea {
+  @apply border border-gray-300 rounded px-2 py-1 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300;
+}
+
+/* ── Supplementary filters (post-query MultiSelect grid) ─────────────────── */
+
+.theme-production-history .ph-supplementary-filters {
+  @apply grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-1 border-t border-gray-100;
+}
+
+.theme-production-history .ph-app__filter-actions {
+  @apply flex items-center gap-3 pt-3 justify-end;
+}
+
+.theme-production-history .ph-app__filter-field--type {
+  min-width: 240px;
+}
+
+.theme-production-history .ph-app__form-error {
+  @apply text-sm text-red-600;
+}
+
+/* ── Error banners ───────────────────────────────────────────────────────── */
+
+.theme-production-history .ph-app__error-banner {
+  @apply bg-red-50 border border-red-300 text-red-700 rounded px-4 py-2 text-sm flex items-center gap-3;
+}
+
+.theme-production-history .ph-app__error-banner--overload {
+  @apply bg-yellow-50 border-yellow-300 text-yellow-800;
+}
+
+.theme-production-history .ph-app__error-banner--expired {
+  @apply bg-orange-50 border-orange-300 text-orange-800;
+}
+
+.theme-production-history .ph-app__empty-state {
+  @apply text-center text-gray-400 py-16 text-sm;
+}
+
+/* ── Detail table (shared pattern) ───────────────────────────────────────── */
+
+.theme-production-history .detail-table-wrap {
+  position: relative;
+  overflow-x: auto;
+}
+
+.theme-production-history .detail-table-wrap.is-loading table {
+  opacity: 0.4;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--motion-ease);
+}
+
+.theme-production-history .detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.theme-production-history .detail-table th,
+.theme-production-history .detail-table td {
+  border-bottom: 1px solid var(--border);
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.theme-production-history .detail-table thead th {
+  position: sticky;
+  top: 0;
+  background: theme('colors.token.hf8fafc');
+  z-index: 1;
+}
+
+.theme-production-history .detail-table tbody tr:hover {
+  background: theme('colors.token.hf8fbff');
+}
+
+.theme-production-history .placeholder {
+  text-align: center;
+  padding: theme('spacing[10]') theme('spacing.5');
+  color: var(--muted);
+}
+
+.theme-production-history .ph-detail-count {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ── Matrix-specific overrides ───────────────────────────────────────────── */
+
+.theme-production-history .ph-matrix-table {
+  border-collapse: collapse;
+}
+
+.theme-production-history .ph-matrix-label-col {
+  text-align: left;
+  min-width: 200px;
+  position: sticky;
+  left: 0;
+  background: theme('colors.token.hf8fafc');
+  z-index: 2;
+}
+
+.theme-production-history .ph-matrix-count-col {
+  min-width: 56px;
+  text-align: right;
+}
+
+.theme-production-history .ph-matrix-month-col {
+  min-width: 64px;
+  text-align: right;
+}
+
+.theme-production-history .ph-matrix-label-cell {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: inherit;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.theme-production-history .ph-matrix-num-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.theme-production-history .ph-matrix-indent {
+  padding-left: 28px;
+}
+
+.theme-production-history .ph-matrix-indent-2 {
+  padding-left: 52px;
+}
+
+.theme-production-history .ph-matrix-row--eqp {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.theme-production-history .ph-matrix-row {
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+
+.theme-production-history .ph-matrix-row:hover {
+  background: theme('colors.token.hf8fbff');
+}
+
+.theme-production-history .ph-matrix-row--active {
+  background: theme('colors.surface.active');
+  border-left: 3px solid var(--primary);
+}
+
+.theme-production-history .ph-matrix-row--wc {
+  font-weight: 600;
+}
+
+.theme-production-history .ph-matrix-row--spec {
+  color: var(--muted);
+}
+
+.theme-production-history .ph-matrix-expand {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 10px;
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.theme-production-history .ph-matrix-expand:hover {
+  color: var(--text);
+}
+
+.theme-production-history .ph-matrix-chip {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.3');
+  margin-top: theme('spacing.3');
+  font-size: 12px;
+  color: var(--primary);
+  background: theme('colors.surface.active');
+  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+  border-radius: 6px;
+}

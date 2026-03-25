@@ -60,6 +60,7 @@ Governance status (2026-03-12): `css-governance-check` = 0 errors, 0 warnings.
 | `frontend/src/wip-detail/style.css` | `theme-wip-detail` | wip-detail |
 | `frontend/src/wip-overview/style.css` | `theme-wip-overview` | wip-overview |
 | `frontend/src/yield-alert-center/style.css` | `theme-yield-alert-center` | yield-alert-center |
+| `frontend/src/production-history/style.css` | `theme-production-history` | production-history |
 
 ## Synchronization Rule
 

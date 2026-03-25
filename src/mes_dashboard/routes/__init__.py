@@ -24,6 +24,7 @@ from .yield_alert_routes import yield_alert_bp
 from .spool_routes import spool_bp
 from .analytics_routes import analytics_bp
 from .ai_routes import ai_bp
+from .production_history_routes import production_history_bp
 
 
 def register_routes(app) -> None:
@@ -47,6 +48,7 @@ def register_routes(app) -> None:
     app.register_blueprint(spool_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(ai_bp)
+    app.register_blueprint(production_history_bp)
 
 __all__ = [
     'wip_bp',
@@ -69,5 +71,6 @@ __all__ = [
     'spool_bp',
     'analytics_bp',
     'ai_bp',
+    'production_history_bp',
     'register_routes',
 ]

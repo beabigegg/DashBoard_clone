@@ -23,6 +23,7 @@ This file is the governed inventory for API contract classification and exceptio
 | `resource_routes.py` | All JSON API endpoints |
 | `resource_history_routes.py` | All JSON API endpoints |
 | `yield_alert_routes.py` | All JSON API endpoints |
+| `production_history_routes.py` | All JSON API endpoints — `POST /api/production-history/query` (primary Oracle query → spool, returns `{dataset_id, detail, matrix, filter_options}`; 400 validation, 503+Retry-After on `heavy_query_overloaded`/`memory_guard_rejected`), `POST /api/production-history/page` (DuckDB paged detail, filter: `{workcenter_group, spec, equipment_id}`; 410 `dataset_expired`), `POST /api/production-history/matrix` (DuckDB matrix with same filter; 410 `dataset_expired`), `POST /api/production-history/options` (DuckDB distinct filter option values; body: `{dataset_id}`; response data: `{work_orders, lot_ids, packages, bop_codes, workcenter_groups, equipment_ids}` each a sorted string array; 410 `dataset_expired`, 503 on memory pressure); gated by `PROD_HISTORY_ENABLED` feature flag |
 | `admin_routes.py` | All JSON API endpoints — includes `POST /api/admin/analytics/recalculate` (manual anomaly detection trigger, admin auth required), `GET /admin/api/user-usage-kpi` (user usage KPI dashboard data, admin auth required; query params: `start_date`, `end_date`, `department`) |
 
 ### Admin Page Routes (non-API)
@@ -61,6 +62,7 @@ This file is the governed inventory for API contract classification and exceptio
 | `resource_history_routes.py` | CSV export endpoints |
 | `trace_routes.py` | NDJSON stream endpoint (`/api/trace/job/<job_id>/stream`) |
 | `spool_routes.py` | `GET /api/spool/{namespace}/{query_id}.parquet` — Parquet binary download; JSON errors use envelope |
+| `production_history_routes.py` | `GET /api/production-history/export` — full CSV stream download; JSON errors use envelope |
 
 ### legacy-transition (temporary bridge endpoints; retirement pending)
 

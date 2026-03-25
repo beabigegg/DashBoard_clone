@@ -16,6 +16,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/material-trace',
   '/yield-alert-center',
   '/anomaly-overview',
+  '/production-history',
 ]);
 
 const IN_SCOPE_ADMIN_ROUTES = Object.freeze([
@@ -261,6 +262,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
     title: '異常總覽',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/production-history': buildContract({
+    route: '/production-history',
+    routeId: 'production-history',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: '生產歷程查詢',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',
