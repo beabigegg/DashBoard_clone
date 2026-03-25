@@ -348,7 +348,8 @@ function buildNode(cid, visited, parentCid = '') {
     }
 
     // Expanded branch: prepend a [−] toggle to allow collapsing
-    if (children.length > 0 && childIds.length > 0) {
+    // Skip root nodes — use "全部收合" for root-level collapse
+    if (children.length > 0 && childIds.length > 0 && !rootsSet.value.has(id)) {
       children.unshift({
         name: '−',
         value: { type: 'collapse-toggle', parentCid: id },
@@ -373,6 +374,7 @@ function buildNode(cid, visited, parentCid = '') {
   const parentName = normalizeText(props.nameMap?.get?.(normalizeText(parentCid)) || parentCid);
   const shortTag = relationTag(incomingEdgeType, incomingEdgeReversed);
   const displayLabel = shortTag ? `${shortTag} ${name}` : name;
+  const isSelected = selectedSet.value.has(id);
 
   return {
     name,
@@ -387,16 +389,16 @@ function buildNode(cid, visited, parentCid = '') {
     children,
     itemStyle: {
       color,
-      borderColor: color,
-      borderWidth: 1,
+      borderColor: isSelected ? 'rgb(15, 23, 42)' : color,
+      borderWidth: isSelected ? 2.5 : 1,
     },
     label: {
       ...LABEL_BASE_STYLE,
       position: children.length > 0 ? 'top' : 'right',
       distance: children.length > 0 ? 8 : 6,
-      fontWeight: 'normal',
+      fontWeight: isSelected ? 'bold' : 'normal',
       fontSize: isSerialLike ? 10 : 11,
-      color: isSerialLike ? 'rgb(100, 116, 139)' : 'rgb(51, 65, 85)',
+      color: isSelected ? 'rgb(15, 23, 42)' : (isSerialLike ? 'rgb(100, 116, 139)' : 'rgb(51, 65, 85)'),
       formatter: () => displayLabel,
     },
     symbol: isSerialLike ? 'diamond' : (nodeType === 'root' ? 'roundRect' : 'circle'),
@@ -408,8 +410,9 @@ function buildNode(cid, visited, parentCid = '') {
 // Build each root into its own independent tree data.
 // Depends on collapsedCids so tree rebuilds when expand/collapse changes.
 const treesData = computed(() => {
-  // Access collapsedCids to establish reactive dependency
+  // Access reactive deps so tree rebuilds on change
   collapsedCids.value;
+  selectedSet.value;
   if (props.treeRoots.length === 0) {
     return [];
   }
@@ -785,6 +788,12 @@ function collapseAll() {
   triggerRef(collapsedCids);
 }
 
+function removeSelection(cid) {
+  const current = new Set(selectedSet.value);
+  current.delete(normalizeText(cid));
+  emit('select-nodes', [...current]);
+}
+
 function resetView() {
   const instance = getChartInstance();
   if (!instance) return;
@@ -994,9 +1003,15 @@ function exportRelationCsv() {
         <span
           v-for="cid in selectedContainerIds.slice(0, 8)"
           :key="cid"
-          class="inline-flex items-center rounded-full border border-brand-300 bg-white px-2 py-0.5 font-mono text-xs text-brand-800 shadow-sm"
+          class="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-white pl-2 pr-1 py-0.5 font-mono text-xs text-brand-800 shadow-sm"
         >
           {{ nameMap?.get?.(cid) || cid }}
+          <button
+            type="button"
+            class="lineage-chip-remove"
+            title="取消篩選"
+            @click="removeSelection(cid)"
+          >×</button>
         </span>
         <span v-if="selectedContainerIds.length > 8" class="text-xs text-brand-600">+{{ selectedContainerIds.length - 8 }} 更多</span>
       </div>
@@ -1065,5 +1080,27 @@ function exportRelationCsv() {
 
 .lineage-selected-count {
   color: theme('colors.brand.800');
+}
+
+.lineage-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: theme('colors.brand.500');
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.lineage-chip-remove:hover {
+  background: theme('colors.brand.100');
+  color: theme('colors.brand.700');
 }
 </style>
