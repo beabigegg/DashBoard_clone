@@ -278,8 +278,8 @@ def _scheduler_loop() -> None:
                 break
 
             logger.info("Anomaly detection: daily scheduled run (hour=%02d)...", now.hour)
-            if _run_computation():
-                last_run_date = today_str
+            _run_computation()
+            last_run_date = today_str
 
     logger.info("Anomaly detection scheduler stopped")
 
