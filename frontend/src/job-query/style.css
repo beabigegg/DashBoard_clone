@@ -1,27 +1,8 @@
+@import '../resource-shared/styles.css';
+
 .job-query-page {
-  max-width: 1680px;
+  max-width: 1800px;
   margin: 0 auto;
-  padding: theme('spacing.token.p20');
-}
-
-.job-query-header {
-  border-radius: 12px;
-  padding: theme('spacing.token.p22') theme('spacing.token.p24');
-  margin-bottom: theme('spacing.token.p16');
-  color: theme('colors.token.hffffff');
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
-  box-shadow: var(--portal-shadow-panel, 0 8px 24px rgba(79, 70, 229, 0.18));
-}
-
-.job-query-header h1 {
-  margin: 0;
-  font-size: 24px;
-}
-
-.job-query-header p {
-  margin: theme('spacing.token.p8') 0 0;
-  font-size: 13px;
-  opacity: 0.9;
 }
 
 .job-query-title-row {

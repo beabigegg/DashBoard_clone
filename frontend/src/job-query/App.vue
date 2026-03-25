@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue';
 
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import StatusBadge from '../shared-ui/components/StatusBadge.vue';
 import { useJobQueryData } from './composables/useJobQueryData.js';
@@ -58,10 +59,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="job-query-page u-content-shell theme-job-query">
-    <header class="job-query-header">
-      <h1>設備維修查詢</h1>
-    </header>
+  <div class="job-query-page dashboard theme-job-query">
+    <PageHeader
+      title="設備維修查詢"
+      :show-refresh="false"
+    />
 
     <div class="u-panel-stack">
       <SectionCard>
