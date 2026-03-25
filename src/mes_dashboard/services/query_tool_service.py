@@ -581,7 +581,7 @@ def _resolve_by_lot_id(lot_ids: List[str]) -> Dict[str, Any]:
         CONTAINER_FILTER=builder.get_conditions_sql(),
     )
 
-    df = read_sql_df_slow(sql, builder.params)
+    df = read_sql_df_slow(sql, builder.params, caller="query_tool:lot_resolve_id")
     data = _df_to_records(df)
     matched, not_found, expansion_info = _match_rows_by_tokens(
         lot_ids,
@@ -678,7 +678,7 @@ def _resolve_by_gd_lot_id(gd_lot_ids: List[str]) -> Dict[str, Any]:
         CONTAINER_FILTER=builder.get_conditions_sql(),
     )
 
-    df = read_sql_df_slow(sql, builder.params)
+    df = read_sql_df_slow(sql, builder.params, caller="query_tool:lot_resolve_id")
     data = _df_to_records(df)
     matched, not_found, expansion_info = _match_rows_by_tokens(
         gd_lot_ids,
@@ -770,7 +770,7 @@ def _resolve_by_serial_number(serial_numbers: List[str]) -> Dict[str, Any]:
             config['sql_name'],
             **{config['filter_key']: builder.get_conditions_sql()},
         )
-        df = read_sql_df_slow(sql, builder.params)
+        df = read_sql_df_slow(sql, builder.params, caller=f"query_tool:{config['sql_name']}")
         data = _df_to_records(df)
         matched, _, _ = _match_rows_by_tokens(
             tokens,
@@ -856,7 +856,7 @@ def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
         WORK_ORDER_FILTER=builder.get_conditions_sql(),
     )
 
-    df = read_sql_df_slow(sql, builder.params)
+    df = read_sql_df_slow(sql, builder.params, caller="query_tool:lot_resolve_work_order")
     data = _df_to_records(df)
     matched, not_found, expansion_info = _match_rows_by_tokens(
         work_orders,
@@ -899,7 +899,7 @@ def _resolve_by_gd_work_order(work_orders: List[str]) -> Dict[str, Any]:
         WORK_ORDER_FILTER=builder.get_conditions_sql(),
     )
 
-    df = read_sql_df_slow(sql, builder.params)
+    df = read_sql_df_slow(sql, builder.params, caller="query_tool:lot_resolve_work_order")
     data = _df_to_records(df)
     matched, not_found, expansion_info = _match_rows_by_tokens(
         work_orders,

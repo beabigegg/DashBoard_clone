@@ -147,7 +147,7 @@ class LineageEngine:
                 "lineage/container_snapshot",
                 CID_FILTER=builder.get_conditions_sql(),
             )
-            df = read_sql_df(sql, builder.params)
+            df = read_sql_df(sql, builder.params, caller="lineage_engine:container_snapshot")
             if df is None or df.empty:
                 continue
             for _, row in df.iterrows():
@@ -180,7 +180,7 @@ class LineageEngine:
                 "lineage/lot_ids_by_name",
                 NAME_FILTER=builder.get_conditions_sql(),
             )
-            df = read_sql_df(sql, builder.params)
+            df = read_sql_df(sql, builder.params, caller="lineage_engine:lot_ids_by_name")
             if df is None or df.empty:
                 continue
             for _, row in df.iterrows():
@@ -332,7 +332,7 @@ class LineageEngine:
                 CID_FILTER=builder.get_conditions_sql(),
             )
 
-            df = read_sql_df(sql, builder.params)
+            df = read_sql_df(sql, builder.params, caller="lineage_engine:split_ancestors")
             if df is None or df.empty:
                 continue
 
@@ -383,7 +383,7 @@ class LineageEngine:
                 TARGET_CID_FILTER=builder.get_conditions_sql(),
             )
 
-            df = read_sql_df(sql, builder.params)
+            df = read_sql_df(sql, builder.params, caller="lineage_engine:merge_sources")
             if df is None or df.empty:
                 continue
 
@@ -431,7 +431,7 @@ class LineageEngine:
                 ROOT_FILTER=builder.get_conditions_sql(),
             )
 
-            df = read_sql_df(sql, builder.params)
+            df = read_sql_df(sql, builder.params, caller="lineage_engine:split_descendants")
             if df is None or df.empty:
                 continue
 
@@ -487,7 +487,7 @@ class LineageEngine:
                 CID_FILTER=builder.get_conditions_sql(),
             )
 
-            df = read_sql_df(sql, builder.params)
+            df = read_sql_df(sql, builder.params, caller="lineage_engine:leaf_serial_numbers")
             if df is None or df.empty:
                 continue
 

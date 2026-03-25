@@ -394,7 +394,7 @@ def get_filter_options(
         exclude_pb_diode=exclude_pb_diode,
     )
     sql = _prepare_sql("filter_options", where_clause=where_clause)
-    df = read_sql_df(sql, _common_params(start_date, end_date, params))
+    df = read_sql_df(sql, _common_params(start_date, end_date, params), caller="reject_history:get_filter_options")
     if df is None:
         df = pd.DataFrame()
 

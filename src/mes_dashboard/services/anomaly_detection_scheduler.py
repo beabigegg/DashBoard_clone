@@ -271,14 +271,23 @@ def _scheduler_loop() -> None:
 
         # Run once per day at or after the scheduled hour
         if now.hour >= _SCHEDULE_HOUR and last_run_date != today_str:
-            logger.info("Anomaly detection: daily run — refreshing all anomaly spools...")
-            _refresh_all_spool()
+            from mes_dashboard.core.redis_client import release_lock, try_acquire_lock
 
-            if _STOP_EVENT.is_set():
-                break
+            if try_acquire_lock("anomaly_daily_refresh", ttl_seconds=300):
+                try:
+                    logger.info("Anomaly detection: daily run — refreshing all anomaly spools...")
+                    _refresh_all_spool()
 
-            logger.info("Anomaly detection: daily scheduled run (hour=%02d)...", now.hour)
-            _run_computation()
+                    if _STOP_EVENT.is_set():
+                        break
+
+                    logger.info("Anomaly detection: daily scheduled run (hour=%02d)...", now.hour)
+                    _run_computation()
+                finally:
+                    release_lock("anomaly_daily_refresh")
+            else:
+                logger.debug("Anomaly detection: another worker is handling daily run, skipping")
+
             last_run_date = today_str
 
     logger.info("Anomaly detection scheduler stopped")

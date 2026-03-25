@@ -199,7 +199,7 @@ def test_split_ancestors_matches_legacy_bfs_for_five_known_lots(mock_read_sql_df
                 depth += 1
         return pd.DataFrame(rows)
 
-    def _mock_read_sql(_sql, params):
+    def _mock_read_sql(_sql, params, **kwargs):
         requested = [value for value in params.values()]
         return _connect_by_rows(requested)
 

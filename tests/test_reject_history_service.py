@@ -117,7 +117,7 @@ def test_get_filter_options_includes_packages(monkeypatch):
     monkeypatch.setattr(svc, "get_excluded_reasons", lambda force_refresh=False: set())
     captured: dict = {}
 
-    def _fake_read_sql_df(_sql, params=None):
+    def _fake_read_sql_df(_sql, params=None, **kwargs):
         captured["params"] = dict(params or {})
         return pd.DataFrame(
             [
@@ -163,7 +163,7 @@ def test_get_filter_options_includes_packages(monkeypatch):
 
 def test_get_filter_options_appends_material_reason_option(monkeypatch):
     monkeypatch.setattr(svc, "get_excluded_reasons", lambda force_refresh=False: set())
-    def _fake_read_sql_df(_sql, _params=None):
+    def _fake_read_sql_df(_sql, _params=None, **kwargs):
         return pd.DataFrame(
             [
                 {
