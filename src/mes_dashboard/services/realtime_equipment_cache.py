@@ -151,7 +151,7 @@ def _load_equipment_status_from_oracle() -> list[dict[str, Any]] | None:
         List of equipment status records, or None if query fails.
     """
     try:
-        df = read_sql_df(EQUIPMENT_STATUS_SELECT_SQL)
+        df = read_sql_df(EQUIPMENT_STATUS_SELECT_SQL, caller="realtime_equipment_cache")
         if df is None or df.empty:
             logger.warning("No data returned from DW_MES_EQUIPMENTSTATUS_WIP_V")
             return []
