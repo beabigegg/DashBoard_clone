@@ -1,0 +1,95 @@
+## Purpose
+Define stable requirements for msd-analysis-transparency.
+## Requirements
+### Requirement: Analysis page SHALL display a collapsible analysis summary panel
+The page SHALL show a summary panel above KPI cards explaining the query context, data scope, and attribution methodology.
+
+#### Scenario: Summary panel rendering
+- **WHEN** backward analysis data is loaded
+- **THEN** a collapsible panel SHALL appear above the KPI cards
+- **THEN** the panel SHALL be expanded by default on first render
+- **THEN** the panel SHALL include a toggle control to collapse/expand
+
+#### Scenario: Query context section
+- **WHEN** the summary panel is rendered
+- **THEN** it SHALL display the committed query parameters: detection station name, date range (or container mode info), and selected loss reasons (or「全部」if none selected)
+
+#### Scenario: Data scope section
+- **WHEN** the summary panel is rendered
+- **THEN** it SHALL display:
+  - 偵測站 LOT 總數 (total detection lots count)
+  - 總投入 (total input qty in pcs)
+  - 報廢 LOT 數 (lots with defects matching selected loss reasons)
+  - 報廢總數 (total reject qty in pcs)
+  - 血緣追溯涵蓋上游 LOT 數 (total unique ancestor count)
+
+#### Scenario: Ancestor count from lineage response
+- **WHEN** lineage stage returns response
+- **THEN** the response SHALL include `total_ancestor_count` (number of unique ancestor CIDs across all seeds, excluding seeds themselves)
+- **THEN** the summary panel SHALL use this value for「血緣追溯涵蓋上游 LOT」
+
+#### Scenario: Attribution methodology section
+- **WHEN** the summary panel is rendered
+- **THEN** it SHALL display a static text block explaining the attribution logic:
+  - All LOTs passing through the detection station (including those with no defects) are included in analysis
+  - Each LOT's upstream lineage (split/merge chain) is traced to identify associated upstream factors
+  - Attribution rate = sum of associated LOTs' reject qty / sum of associated LOTs' input qty × 100%
+  - The same defect can be attributed to multiple upstream factors (non-exclusive)
+  - Pareto bar height = attributed defect count (with overlap), orange line = attributed defect rate
+
+#### Scenario: Summary panel in container mode
+- **WHEN** query mode is container mode
+- **THEN** the query context section SHALL show the input type, resolved count, and not-found count instead of date range
+- **THEN** the data scope section SHALL still show LOT count and input/reject totals
+
+#### Scenario: Summary panel collapsed state persistence
+- **WHEN** user collapses the summary panel
+- **THEN** the collapsed state SHALL persist within the current session (sessionStorage)
+- **WHEN** user triggers a new query
+- **THEN** the panel SHALL remain in its current collapsed/expanded state
+
+### Requirement: MSD aggregation pipeline SHALL be metadata-safe under partial/truncated event payloads
+MSD aggregation and normalization logic SHALL process event records without assuming metadata and record rows share the same container map structure.
+
+#### Scenario: Truncated upstream/downstream events do not break aggregation
+- **WHEN** upstream or downstream event fetch returns non-complete quality metadata
+- **THEN** MSD aggregation pipeline SHALL continue with available records
+- **THEN** pipeline SHALL not raise type/iteration errors due to metadata entries
+
+#### Scenario: Metadata-agnostic normalizers
+- **WHEN** event payload includes metadata side-channel fields
+- **THEN** MSD record normalizers SHALL only iterate over validated record collections
+- **THEN** non-record metadata fields SHALL be ignored by row normalizers
+
+### Requirement: MSD API response SHALL surface data completeness state
+MSD-related API responses built from staged events SHALL expose query quality metadata to callers.
+
+#### Scenario: Partial MSD aggregation response
+- **WHEN** one or more staged event domains are partial or truncated
+- **THEN** MSD response SHALL include `quality_meta.status` with non-complete value
+- **THEN** response SHALL include affected domain details for operator diagnostics
+
+#### Scenario: Complete MSD aggregation response
+- **WHEN** all contributing staged domains are complete
+- **THEN** MSD response SHALL include `quality_meta.status = "complete"`
+
+### Requirement: MSD analysis UI SHALL surface staged completeness warnings independently of genealogy status
+MSD analysis UI SHALL display a dedicated warning for non-complete staged trace results and SHALL not rely only on genealogy error status.
+
+#### Scenario: Staged partial/truncated warning
+- **WHEN** staged events aggregation contains `quality_meta.status = "partial"` or `"truncated"`
+- **THEN** MSD page SHALL render a visible warning banner indicating data may be incomplete
+- **THEN** the warning SHALL coexist with genealogy warning when both conditions are true
+
+#### Scenario: Staged failed-domain warning
+- **WHEN** staged events response includes failed-domain completeness metadata (`failed_domains` or equivalent failed status)
+- **THEN** MSD page SHALL render diagnostics-aware warning text indicating affected scope
+
+### Requirement: MSD compatibility route usage SHALL not hide staged completeness semantics
+While compatibility endpoints remain available, active MSD UI behavior SHALL remain aligned with staged trace completeness semantics.
+
+#### Scenario: Active UI path prioritizes staged completeness
+- **WHEN** MSD UI renders summary/charts from staged events aggregation
+- **THEN** completeness warning behavior SHALL be derived from staged `quality_meta`
+- **THEN** absence of legacy-route warning fields SHALL NOT suppress staged non-complete warning
+

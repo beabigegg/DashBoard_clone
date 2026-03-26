@@ -63,8 +63,6 @@ Check.md
 docs/API_USAGE_CAPABILITY_REPORT.md
 docs/oom_*.md
 
-# OpenSpec workflow artifacts
-openspec/
 
 # Database investigation & reference docs
 docs/MES_Database_Reference.md

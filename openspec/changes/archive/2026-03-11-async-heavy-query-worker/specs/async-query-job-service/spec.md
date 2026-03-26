@@ -1,0 +1,115 @@
+## ADDED Requirements
+
+### Requirement: Shared async job service SHALL provide job enqueue capability
+The `async_query_job_service` module SHALL provide a generic `enqueue_job()` function that enqueues a callable to a named RQ queue with configurable timeout and TTL.
+
+#### Scenario: Successful enqueue
+- **WHEN** `enqueue_job(queue_name="reject-query", worker_fn=fn, job_id="reject-abc123", kwargs={...}, job_timeout=1800, result_ttl=3600)` is called
+- **THEN** the function SHALL enqueue `fn` to the `reject-query` RQ queue
+- **THEN** the function SHALL write initial job metadata to Redis HSET at key `{prefix}:job:{job_id}:meta`
+- **THEN** the metadata SHALL include `status=queued`, `created_at`, `queue_name`
+- **THEN** the function SHALL return `(job_id, None)` on success
+
+#### Scenario: RQ unavailable
+- **WHEN** `enqueue_job()` is called but RQ is not installed or Redis is unreachable
+- **THEN** the function SHALL return `(None, "async queue unavailable")`
+- **THEN** no exception SHALL be raised
+
+#### Scenario: Enqueue failure
+- **WHEN** `enqueue_job()` is called but the RQ enqueue operation fails
+- **THEN** the function SHALL return `(None, "<error message>")`
+- **THEN** the job metadata SHALL be updated with `status=failed` and `error` field
+
+### Requirement: Shared async job service SHALL provide job status query
+The module SHALL provide `get_job_status(prefix, job_id)` that reads job metadata from Redis.
+
+#### Scenario: Job exists and is running
+- **WHEN** `get_job_status("reject", "abc123")` is called and the job is in progress
+- **THEN** the function SHALL return a dict with `job_id`, `status=running`, `progress`, `created_at`, `elapsed_seconds`
+
+#### Scenario: Job completed
+- **WHEN** `get_job_status("reject", "abc123")` is called and the job has finished
+- **THEN** the returned dict SHALL include `status=completed`, `query_id`, `completed_at`, `elapsed_seconds`
+
+#### Scenario: Job not found
+- **WHEN** `get_job_status("reject", "nonexistent")` is called
+- **THEN** the function SHALL return `None`
+
+### Requirement: Shared async job service SHALL provide progress update
+The module SHALL provide `update_job_progress(prefix, job_id, **fields)` that updates Redis HSET fields for a running job.
+
+#### Scenario: Progress update during execution
+- **WHEN** `update_job_progress("reject", "abc123", status="running", progress="3/10", pct=30)` is called
+- **THEN** the Redis HSET at `{prefix}:job:{job_id}:meta` SHALL be updated with the provided fields
+
+### Requirement: Shared async job service SHALL provide job completion marking
+The module SHALL provide `complete_job(prefix, job_id, query_id=None, error=None)` that marks a job as completed or failed.
+
+#### Scenario: Successful completion
+- **WHEN** `complete_job("reject", "abc123", query_id="deadbeef12345678")` is called
+- **THEN** the job metadata SHALL be updated with `status=completed`, `query_id=deadbeef12345678`, `completed_at`
+
+#### Scenario: Failed completion
+- **WHEN** `complete_job("reject", "abc123", error="Oracle timeout")` is called
+- **THEN** the job metadata SHALL be updated with `status=failed`, `error="Oracle timeout"`, `completed_at`
+
+### Requirement: Shared async job service SHALL provide RQ health check
+The module SHALL provide `is_async_available()` that checks RQ installation, Redis connectivity, and worker existence with a 60-second TTL cache.
+
+#### Scenario: All checks pass
+- **WHEN** RQ is installed, Redis is reachable, and at least one RQ worker is registered
+- **THEN** `is_async_available()` SHALL return `True`
+
+#### Scenario: No workers registered
+- **WHEN** RQ is installed and Redis is reachable but no RQ workers are registered
+- **THEN** `is_async_available()` SHALL return `False`
+
+#### Scenario: Cached result within TTL
+- **WHEN** `is_async_available()` was called 30 seconds ago and returned `True`
+- **THEN** the second call SHALL return `True` without performing any checks
+
+### Requirement: Reject query job worker SHALL execute queries in RQ process
+The `reject_query_job_service` module SHALL provide `execute_reject_query_job(job_id, mode, params)` as the RQ worker entry point.
+
+#### Scenario: Successful date_range query execution
+- **WHEN** `execute_reject_query_job("reject-abc123", "date_range", {"start_date": "2025-01-01", "end_date": "2025-03-31", ...})` runs in the RQ worker
+- **THEN** it SHALL execute the same query logic as `execute_primary_query()` (batch engine path)
+- **THEN** it SHALL update job progress after each chunk completion via `update_job_progress()`
+- **THEN** it SHALL store the result in the spool via `register_spool_file()`
+- **THEN** it SHALL call `complete_job()` with the resulting `query_id`
+
+#### Scenario: Query execution failure
+- **WHEN** the query execution raises an exception in the RQ worker
+- **THEN** the worker SHALL call `complete_job()` with the error message
+- **THEN** the job metadata SHALL show `status=failed`
+
+### Requirement: Reject query job service SHALL provide async decision function
+The module SHALL provide `should_use_async(mode, start_date, end_date)` that determines whether a query should use the async path.
+
+#### Scenario: Long date range with async available
+- **WHEN** `mode="date_range"` and `end_date - start_date > REJECT_ASYNC_DAY_THRESHOLD` (default 10) and `is_async_available()` returns `True`
+- **THEN** `should_use_async()` SHALL return `True`
+
+#### Scenario: Short date range
+- **WHEN** `mode="date_range"` and `end_date - start_date <= 10`
+- **THEN** `should_use_async()` SHALL return `False`
+
+#### Scenario: Container mode
+- **WHEN** `mode="container"`
+- **THEN** `should_use_async()` SHALL return `False`
+
+#### Scenario: Async unavailable
+- **WHEN** date range is long but `is_async_available()` returns `False`
+- **THEN** `should_use_async()` SHALL return `False` (graceful fallback to sync)
+
+### Requirement: RQ worker process SHALL be configured for reject-query queue
+The deployment scripts SHALL start a dedicated RQ worker process for the `reject-query` queue, independent of the trace-events worker.
+
+#### Scenario: Worker startup
+- **WHEN** `RQ_REJECT_WORKER_ENABLED=true` (default)
+- **THEN** `start_server.sh` SHALL start a dedicated RQ worker process listening on the `reject-query` queue
+
+#### Scenario: Worker disabled
+- **WHEN** `RQ_REJECT_WORKER_ENABLED=false`
+- **THEN** no reject-query RQ worker SHALL be started
+- **THEN** `should_use_async()` SHALL return `False` due to `is_async_available()` finding no workers
