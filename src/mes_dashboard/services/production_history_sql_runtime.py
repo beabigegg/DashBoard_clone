@@ -154,6 +154,7 @@ def compute_detail_page(
                 PJ_BOP          AS bop,
                 WORK_ORDER      AS work_order,
                 WAFER_LOT       AS wafer_lot,
+                PACKAGE_NAME    AS package_name,
                 WORKCENTERNAME  AS workcenter,
                 SPECNAME        AS spec,
                 EQUIPMENTID     AS equipment_id,
@@ -206,6 +207,7 @@ def _pandas_detail_page(
     rows = page_df.rename(columns={
         "CONTAINERNAME": "lot_id", "PJ_TYPE": "pj_type", "PJ_BOP": "bop",
         "WORK_ORDER": "work_order", "WAFER_LOT": "wafer_lot",
+        "PACKAGE_NAME": "package_name",
         "WORKCENTERNAME": "workcenter", "SPECNAME": "spec",
         "EQUIPMENTID": "equipment_id", "EQUIPMENTNAME": "equipment_name",
         "TRACKIN_TS": "trackin_time", "TRACKOUT_TS": "trackout_time",
@@ -424,27 +426,34 @@ def compute_filter_options(spool_path: str) -> Dict[str, List[str]]:
         All values are sorted strings.  Empty lists are returned on any
         non-MemoryError failure so the caller always gets a safe dict.
     """
-    _COLUMNS = [
-        ("work_orders",       "WORK_ORDER"),
-        ("lot_ids",           "CONTAINERNAME"),
-        ("packages",          "PJ_TYPE"),
-        ("bop_codes",         "PJ_BOP"),
-        ("workcenter_groups", "WORKCENTERNAME"),
-        ("equipment_ids",     "EQUIPMENTID"),
+    # Simple 1:1 column mappings (key → Parquet column)
+    _SIMPLE_COLUMNS = [
+        ("work_orders",  "WORK_ORDER"),
+        ("lot_ids",      "CONTAINERNAME"),
+        ("packages",     "PACKAGE_NAME"),
+        ("bop_codes",    "PJ_BOP"),
     ]
 
-    empty: Dict[str, List[str]] = {key: [] for key, _ in _COLUMNS}
+    empty: Dict[str, List[str]] = {
+        k: [] for k, _ in _SIMPLE_COLUMNS
+    }
+    empty["workcenter_groups"] = []
+    empty["equipment_ids"] = []
 
     if not _SQL_VIEW_ENABLED:
         logger.debug("compute_filter_options: SQL view disabled, returning empty options")
         return empty
 
     try:
+        from mes_dashboard.config.workcenter_groups import get_workcenter_group
+
         conn = _get_duckdb_conn()
         _attach_spool_view(conn, spool_path)
 
         result: Dict[str, List[str]] = {}
-        for key, col in _COLUMNS:
+
+        # Simple columns — straight DISTINCT
+        for key, col in _SIMPLE_COLUMNS:
             sql = (
                 f"SELECT DISTINCT {_qid(col)} AS val "
                 f"FROM ph_src "
@@ -453,6 +462,32 @@ def compute_filter_options(spool_path: str) -> Dict[str, List[str]]:
             )
             rows = _fetch_dict_rows(conn, sql)
             result[key] = [str(r["val"]) for r in rows]
+
+        # workcenter_groups — map raw names → canonical group names, sorted by order
+        wc_sql = (
+            "SELECT DISTINCT \"WORKCENTERNAME\" AS val "
+            "FROM ph_src "
+            "WHERE \"WORKCENTERNAME\" IS NOT NULL AND \"WORKCENTERNAME\" != '' "
+        )
+        wc_rows = _fetch_dict_rows(conn, wc_sql)
+        group_set: Dict[str, int] = {}  # group_name → order
+        for r in wc_rows:
+            gname, order = get_workcenter_group(str(r["val"]))
+            label = gname if gname else str(r["val"])
+            group_set.setdefault(label, order)
+        result["workcenter_groups"] = [
+            name for name, _ in sorted(group_set.items(), key=lambda x: (x[1], x[0]))
+        ]
+
+        # equipment_ids — use EQUIPMENTNAME for display
+        eqp_sql = (
+            "SELECT DISTINCT \"EQUIPMENTNAME\" AS val "
+            "FROM ph_src "
+            "WHERE \"EQUIPMENTNAME\" IS NOT NULL AND \"EQUIPMENTNAME\" != '' "
+            "ORDER BY val"
+        )
+        eqp_rows = _fetch_dict_rows(conn, eqp_sql)
+        result["equipment_ids"] = [str(r["val"]) for r in eqp_rows]
 
         conn.close()
         return result
@@ -477,6 +512,7 @@ def stream_export(
     EXPORT_COLUMNS = [
         ("CONTAINERNAME", "LotID"),
         ("PJ_TYPE", "Type"),
+        ("PACKAGE_NAME", "Package"),
         ("PJ_BOP", "BOP"),
         ("WORK_ORDER", "WorkOrder"),
         ("WAFER_LOT", "WaferLot"),

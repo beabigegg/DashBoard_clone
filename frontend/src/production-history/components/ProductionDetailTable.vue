@@ -54,6 +54,7 @@ function formatTs(value) {
     >
       <DataTableColumn columnKey="lot_id" label="LotID" :sortable="true" />
       <DataTableColumn columnKey="pj_type" label="Type" :sortable="true" />
+      <DataTableColumn columnKey="package_name" label="Package" :sortable="true" />
       <DataTableColumn columnKey="bop" label="BOP" :sortable="true" />
       <DataTableColumn columnKey="work_order" label="WorkOrder" :sortable="true" />
       <DataTableColumn columnKey="wafer_lot" label="WaferLot" :sortable="true" />

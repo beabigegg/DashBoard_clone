@@ -159,7 +159,7 @@ def _build_extra_filters(params: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
 
     packages = params.get("packages") or []
     if packages:
-        qb.add_in_condition("c.PJ_TYPE", packages)  # PJ_TYPE used as package proxy
+        qb.add_in_condition("c.PRODUCTLINENAME", packages)
 
     bop_codes = params.get("bop_codes") or []
     if bop_codes:
@@ -185,7 +185,7 @@ def _build_extra_filters(params: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
 
     equipment_ids = params.get("equipment_ids") or []
     if equipment_ids:
-        qb.add_in_condition("h.EQUIPMENTID", equipment_ids)
+        qb.add_in_condition("h.EQUIPMENTNAME", equipment_ids)
 
     conditions_sql = qb.get_conditions_sql()
     extra_sql = f"AND {conditions_sql}" if conditions_sql else ""
@@ -332,15 +332,21 @@ def _resolve_container_ids_by_names(names: List[str]) -> Dict[str, str]:
 
 # ── Type options (from DWH history) ───────────────────────────────────────────
 
+_TYPE_OPTIONS_CACHE_KEY = "production_history:type_options"
+_TYPE_OPTIONS_TTL = 86400  # 24 hours
+
+
 def get_type_options() -> List[str]:
     """Return DISTINCT PJ_TYPE values from DWH.DW_MES_CONTAINER.
 
-    This queries historical data so retired types still appear.
-    Results are cached at module level for the lifetime of the worker.
+    Results are cached in the LayeredCache (memory + Redis) with a 24-hour
+    TTL, so Oracle is only queried once per day across all workers.
     """
-    global _TYPE_OPTIONS_CACHE
-    if _TYPE_OPTIONS_CACHE is not None:
-        return _TYPE_OPTIONS_CACHE
+    from mes_dashboard.core.cache import cache_get, cache_set
+
+    cached = cache_get(_TYPE_OPTIONS_CACHE_KEY)
+    if cached is not None:
+        return cached
 
     from mes_dashboard.core.database import read_sql_df
 
@@ -352,14 +358,11 @@ def get_type_options() -> List[str]:
         df = read_sql_df(sql, caller="production_history:type_options")
         if df is not None and not df.empty:
             result = [str(v).strip() for v in df["PJ_TYPE"] if str(v).strip()]
-            _TYPE_OPTIONS_CACHE = result
+            cache_set(_TYPE_OPTIONS_CACHE_KEY, result, ttl=_TYPE_OPTIONS_TTL)
             return result
     except Exception as exc:
         logger.warning("get_type_options failed: %s", exc)
     return []
-
-
-_TYPE_OPTIONS_CACHE: Optional[List[str]] = None
 
 
 # ── Primary query entry point ─────────────────────────────────────────────────

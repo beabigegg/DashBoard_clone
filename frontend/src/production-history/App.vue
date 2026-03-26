@@ -200,7 +200,7 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
           />
         </div>
         <div class="ui-filter-group">
-          <label class="ui-filter-label">Equipment ID</label>
+          <label class="ui-filter-label">Equipment</label>
           <MultiSelect
             :model-value="supplementaryFilter.equipment_ids"
             :options="supplementaryOptions.equipment_ids"

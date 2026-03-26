@@ -10,8 +10,10 @@
 --                          Replaced with empty string when no optional filters given.
 --
 -- GROUP BY rationale:
---   Same LOT+WC+SPEC+EQP may have multiple partial track-out records.
---   We take MIN(TrackIn), MAX(TrackOut) to get the effective window.
+--   Same LOT+WC+SPEC+EQP may have multiple partial track-out records
+--   (shared TRACKINTIMESTAMP, separate TRACKOUTTIMESTAMP).
+--   InQTY on the first record = original lot size; subsequent InQTY = remaining.
+--   We use MAX(InQTY) for the original entering qty, SUM(OutQTY) for total output.
 --
 -- Note: EQUIPMENTID IS NOT NULL excludes checkpoint-only stations.
 
@@ -21,14 +23,15 @@ SELECT
     c.PJ_BOP,
     c.MFGORDERNAME           AS WORK_ORDER,
     c.FIRSTNAME              AS WAFER_LOT,
+    c.PRODUCTLINENAME        AS PACKAGE_NAME,
     h.WORKCENTERNAME,
     h.SPECNAME,
     h.EQUIPMENTID,
     h.EQUIPMENTNAME,
     MIN(h.TRACKINTIMESTAMP)  AS TRACKIN_TS,
     MAX(h.TRACKOUTTIMESTAMP) AS TRACKOUT_TS,
-    MIN(h.TRACKINQTY)        AS TRACKIN_QTY,
-    MAX(h.TRACKOUTQTY)       AS TRACKOUT_QTY
+    MAX(h.TRACKINQTY)        AS TRACKIN_QTY,
+    SUM(h.TRACKOUTQTY)       AS TRACKOUT_QTY
 FROM DWH.DW_MES_CONTAINER c
 JOIN DWH.DW_MES_LOTWIPHISTORY h ON c.CONTAINERID = h.CONTAINERID
 WHERE h.TRACKINTIMESTAMP >= TO_TIMESTAMP(:chunk_start,    'YYYY-MM-DD')
@@ -42,6 +45,7 @@ GROUP BY
     c.PJ_BOP,
     c.MFGORDERNAME,
     c.FIRSTNAME,
+    c.PRODUCTLINENAME,
     h.WORKCENTERNAME,
     h.SPECNAME,
     h.EQUIPMENTID,

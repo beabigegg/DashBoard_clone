@@ -96,6 +96,13 @@
   margin-left: auto;
 }
 
+/* ── Matrix first-column override (narrower than resource default 280px) ── */
+
+.theme-production-history .matrix-table th:first-child,
+.theme-production-history .matrix-table td:first-child {
+  min-width: 180px;
+}
+
 /* ── Matrix clickable month cells ──────────────────────────────────────── */
 
 .theme-production-history .clickable-cell {
