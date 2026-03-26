@@ -42,6 +42,8 @@ logs/
 .claude/
 .codex/
 CLAUDE.md
+AGENTS.md
+GEMINI.md
 
 # Test artifacts
 .pytest_cache/
@@ -60,3 +62,23 @@ reports/
 Check.md
 docs/API_USAGE_CAPABILITY_REPORT.md
 docs/oom_*.md
+
+# OpenSpec workflow artifacts
+openspec/
+
+# Database investigation & reference docs
+docs/MES_Database_Reference.md
+docs/Oracle_Authorized_Objects.md
+
+# Migration planning artifacts
+docs/migration/
+
+# Operational runbooks
+docs/runbooks/
+
+# DB schema query & doc generation tools
+tools/
+
+# Migration-phase CI workflows & feature flags
+.github/
+data/modernization_feature_flags.json
