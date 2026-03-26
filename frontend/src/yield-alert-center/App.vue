@@ -90,7 +90,7 @@ const filters = reactive({
   min_scrap_qty: '1',
 });
 
-const pageTitle = 'Yield Alert Center';
+const pageTitle = '良率查詢';
 
 // ── DuckDB-WASM mode (Task 7.2) ───────────────────────────────────────────
 const DUCKDB_THRESHOLD = 5000;

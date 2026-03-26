@@ -252,7 +252,7 @@ const ROUTE_CONTRACTS = Object.freeze({
     routeId: 'yield-alert-center',
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
-    title: 'Yield Alert Center',
+    title: '良率查詢',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',

@@ -1068,7 +1068,7 @@ def create_app(config_name: str | None = None) -> Flask:
         return missing_in_scope_asset_response('/yield-alert-center', (
             "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-            "<title>Yield Alert Center</title>"
+            "<title>良率查詢</title>"
             "<script type=\"module\" src=\"/static/dist/yield-alert-center.js\"></script>"
             "</head><body><div id='app'></div></body></html>",
             200,

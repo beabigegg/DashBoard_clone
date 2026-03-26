@@ -108,9 +108,9 @@
     },
     {
       "route": "/yield-alert-center",
-      "name": "Yield Alert Center",
+      "name": "良率查詢",
       "status": "released",
-      "drawer_id": "drawer-3",
+      "drawer_id": "drawer",
       "order": 4
     },
     {
