@@ -20,6 +20,7 @@ export function useProductionHistory() {
     workcenter_group: '',
     spec: '',
     equipment_id: '',
+    month: '',
   });
 
   // ── Supplementary filter options & selections ─────────────────────────────
@@ -134,9 +135,11 @@ export function useProductionHistory() {
       workcenter_group: filter.workcenter_group || '',
       spec: filter.spec || '',
       equipment_id: filter.equipment_id || '',
+      month: filter.month || '',
     });
+    // Only re-fetch detail table; the matrix itself stays unchanged to
+    // preserve the full picture and just highlights the selected node/cell.
     await fetchPage(1);
-    await _fetchMatrix();
   }
 
   async function _fetchMatrix() {
@@ -162,6 +165,7 @@ export function useProductionHistory() {
     matrixFilter.workcenter_group = '';
     matrixFilter.spec = '';
     matrixFilter.equipment_id = '';
+    matrixFilter.month = '';
   }
 
   function _clearSupplementaryFilter() {
@@ -210,6 +214,7 @@ export function useProductionHistory() {
     if (matrixFilter.workcenter_group) params.set('workcenter_group', matrixFilter.workcenter_group);
     if (matrixFilter.spec) params.set('spec', matrixFilter.spec);
     if (matrixFilter.equipment_id) params.set('equipment_id', matrixFilter.equipment_id);
+    if (matrixFilter.month) params.set('month', matrixFilter.month);
     for (const [key, arr] of Object.entries(supplementaryFilter)) {
       if (arr.length) params.set(key, arr.join(','));
     }

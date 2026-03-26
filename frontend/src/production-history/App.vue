@@ -91,7 +91,7 @@ async function handleMatrixSelect({ filter }) {
 }
 
 async function handleClearFilter() {
-  await applyMatrixFilter({ workcenter_group: '', spec: '', equipment_id: '' });
+  await applyMatrixFilter({ workcenter_group: '', spec: '', equipment_id: '', month: '' });
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────
@@ -106,8 +106,7 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
 </script>
 
 <template>
-  <div class="theme-production-history resource-page">
-    <div class="dashboard">
+  <div class="dashboard theme-production-history">
     <PageHeader
       title="生產歷程查詢"
       :show-refresh="false"
@@ -274,6 +273,5 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
       請選擇 Type 與日期區間後按「查詢」
     </div>
 
-    </div><!-- /dashboard -->
   </div>
 </template>

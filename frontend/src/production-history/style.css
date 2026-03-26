@@ -87,98 +87,32 @@
   color: var(--muted);
 }
 
-/* ── Matrix-specific overrides ───────────────────────────────────────────── */
+/* ── Detail toolbar (matches resource-history) ─────────────────────────── */
 
-.theme-production-history .ph-matrix-table {
-  border-collapse: collapse;
-}
-
-.theme-production-history .ph-matrix-label-col {
-  text-align: left;
-  min-width: 200px;
-  position: sticky;
-  left: 0;
-  background: theme('colors.token.hf8fafc');
-  z-index: 2;
-}
-
-.theme-production-history .ph-matrix-count-col {
-  min-width: 56px;
-  text-align: right;
-}
-
-.theme-production-history .ph-matrix-month-col {
-  min-width: 64px;
-  text-align: right;
-}
-
-.theme-production-history .ph-matrix-label-cell {
-  text-align: left;
-  position: sticky;
-  left: 0;
-  background: inherit;
-  z-index: 1;
+.theme-production-history .detail-toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  margin-left: auto;
 }
 
-.theme-production-history .ph-matrix-num-cell {
-  text-align: right;
-  white-space: nowrap;
-}
+/* ── Matrix clickable month cells ──────────────────────────────────────── */
 
-.theme-production-history .ph-matrix-indent {
-  padding-left: 28px;
-}
-
-.theme-production-history .ph-matrix-indent-2 {
-  padding-left: 52px;
-}
-
-.theme-production-history .ph-matrix-row--eqp {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.theme-production-history .ph-matrix-row {
+.theme-production-history .clickable-cell {
   cursor: pointer;
-  transition: background var(--motion-fast) var(--motion-ease);
+  transition: background 0.15s;
 }
 
-.theme-production-history .ph-matrix-row:hover {
-  background: theme('colors.token.hf8fbff');
-}
-
-.theme-production-history .ph-matrix-row--active {
+.theme-production-history .clickable-cell:hover {
   background: theme('colors.surface.active');
-  border-left: 3px solid var(--primary);
 }
 
-.theme-production-history .ph-matrix-row--wc {
+.theme-production-history .cell-active {
+  background: theme('colors.brand.100');
   font-weight: 600;
 }
 
-.theme-production-history .ph-matrix-row--spec {
-  color: var(--muted);
-}
-
-.theme-production-history .ph-matrix-expand {
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: 10px;
-  width: 16px;
-  flex-shrink: 0;
-  text-align: center;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.theme-production-history .ph-matrix-expand:hover {
-  color: var(--text);
-}
+/* ── Matrix filter chip ─────────────────────────────────────────────────── */
 
 .theme-production-history .ph-matrix-chip {
   display: flex;

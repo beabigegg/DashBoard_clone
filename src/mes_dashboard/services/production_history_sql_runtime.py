@@ -63,30 +63,48 @@ def _fetch_dict_rows(conn: Any, sql: str, params: Optional[List[Any]] = None) ->
 def _build_filter_where(filter_params: Dict[str, Any]) -> tuple[str, List[Any]]:
     """Build DuckDB WHERE clause for matrix/page/export filter.
 
-    Accepted filter fields: workcenter_group, spec, equipment_id
+    Accepted filter fields: workcenter_group, spec, equipment_id, month
     Returns (where_clause, positional_params)
 
-    Note: ``workcenter_group`` maps directly to the ``WORKCENTERNAME`` column
-    (not to a resolved group).  Oracle-side group expansion is done in
-    ``_build_extra_filters``; the DuckDB layer operates on already-expanded
-    workcenter names stored in the Parquet spool.
+    ``workcenter_group`` is a canonical group name (e.g. '焊接_DB').  This
+    function expands it to the underlying ILIKE patterns defined in
+    ``workcenter_groups.py`` so the filter matches the raw WORKCENTERNAME
+    values stored in the Parquet spool.
     """
+    from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS
+
     conditions: List[str] = []
     params: List[Any] = []
 
     wc_group = str(filter_params.get("workcenter_group") or "").strip()
     spec = str(filter_params.get("spec") or "").strip()
     equipment_id = str(filter_params.get("equipment_id") or "").strip()
+    month = str(filter_params.get("month") or "").strip()
 
     if wc_group:
-        conditions.append("WORKCENTERNAME = ?")
-        params.append(wc_group)
+        if wc_group in WORKCENTER_GROUPS:
+            cfg = WORKCENTER_GROUPS[wc_group]
+            # Include patterns (OR)
+            like_parts = [f"WORKCENTERNAME ILIKE ?" for _ in cfg["patterns"]]
+            conditions.append("(" + " OR ".join(like_parts) + ")")
+            params.extend(f"%{p}%" for p in cfg["patterns"])
+            # Exclude patterns (AND NOT each)
+            for excl in cfg.get("exclude", []):
+                conditions.append("WORKCENTERNAME NOT ILIKE ?")
+                params.append(f"%{excl}%")
+        else:
+            # Unmatched group — label equals the raw workcenter name
+            conditions.append("WORKCENTERNAME = ?")
+            params.append(wc_group)
     if spec:
         conditions.append("SPECNAME = ?")
         params.append(spec)
     if equipment_id:
         conditions.append("EQUIPMENTID = ?")
         params.append(equipment_id)
+    if month:
+        conditions.append("strftime(TRACKIN_TS::TIMESTAMP, '%Y-%m') = ?")
+        params.append(month)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     return where, params
@@ -251,7 +269,14 @@ def compute_matrix_view(
 
 
 def _build_matrix_tree(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Build hierarchical tree from flat aggregation rows."""
+    """Build hierarchical tree from flat aggregation rows.
+
+    Applies workcenter group mapping so that raw workcenter names are grouped
+    under their canonical group name (e.g. '焊_DB_料' → '焊接_DB') and sorted
+    by the configured group order.
+    """
+    from mes_dashboard.config.workcenter_groups import get_workcenter_group
+
     # Collect all months
     all_months: set[str] = set()
     for r in rows:
@@ -260,20 +285,28 @@ def _build_matrix_tree(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
             all_months.add(m)
     month_columns = sorted(all_months)
 
-    # Build tree: wc → spec → eqp
+    # Build tree: workcenter_group → spec → eqp
+    # Map raw workcenter names to canonical group names
     wc_map: Dict[str, Any] = {}
+    wc_order: Dict[str, int] = {}
+
     for r in rows:
-        wc = str(r.get("wc") or "")
+        raw_wc = str(r.get("wc") or "")
         spec = str(r.get("spec") or "")
         eqp_id = str(r.get("eqp_id") or "")
         eqp_name = str(r.get("eqp_name") or "")
         month = str(r.get("month_bucket") or "")
         count = int(r.get("lot_count") or 0)
 
-        if wc not in wc_map:
-            wc_map[wc] = {"label": wc, "level": "workcenter", "count": 0,
-                          "month_counts": {}, "children": {}}
-        wc_node = wc_map[wc]
+        # Resolve workcenter to its group
+        group_name, order = get_workcenter_group(raw_wc)
+        wc_label = group_name if group_name else raw_wc
+        wc_order.setdefault(wc_label, order)
+
+        if wc_label not in wc_map:
+            wc_map[wc_label] = {"label": wc_label, "level": "workcenter", "count": 0,
+                                "month_counts": {}, "children": {}}
+        wc_node = wc_map[wc_label]
 
         spec_key = spec
         if spec_key not in wc_node["children"]:
@@ -310,19 +343,44 @@ def _build_matrix_tree(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         return result
 
     tree = _flatten(wc_map)
+    # Sort workcenter groups by configured order, then alphabetically
+    tree.sort(key=lambda n: (wc_order.get(n["label"], 999), n["label"]))
+    # Sort spec children alphabetically, equipment children alphabetically
+    for wc_node in tree:
+        wc_node["children"].sort(key=lambda n: n["label"])
+        for spec_node in wc_node["children"]:
+            spec_node["children"].sort(key=lambda n: n.get("equipment_name") or n["label"])
+
     return {"tree": tree, "month_columns": month_columns}
 
 
 def _apply_pandas_filter(df: "pd.DataFrame", filter_params: Dict[str, Any]) -> "pd.DataFrame":
+    import pandas as pd
+    from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS
+
     wc_group = str(filter_params.get("workcenter_group") or "").strip()
     spec = str(filter_params.get("spec") or "").strip()
     equipment_id = str(filter_params.get("equipment_id") or "").strip()
+    month = str(filter_params.get("month") or "").strip()
+
     if wc_group:
-        df = df[df["WORKCENTERNAME"] == wc_group]
+        if wc_group in WORKCENTER_GROUPS:
+            cfg = WORKCENTER_GROUPS[wc_group]
+            wc_upper = df["WORKCENTERNAME"].str.upper()
+            mask = pd.Series(False, index=df.index)
+            for p in cfg["patterns"]:
+                mask |= wc_upper.str.contains(p.upper(), na=False)
+            for excl in cfg.get("exclude", []):
+                mask &= ~wc_upper.str.contains(excl.upper(), na=False)
+            df = df[mask]
+        else:
+            df = df[df["WORKCENTERNAME"] == wc_group]
     if spec:
         df = df[df["SPECNAME"] == spec]
     if equipment_id:
         df = df[df["EQUIPMENTID"] == equipment_id]
+    if month:
+        df = df[pd.to_datetime(df["TRACKIN_TS"], errors="coerce").dt.strftime("%Y-%m") == month]
     return df
 
 

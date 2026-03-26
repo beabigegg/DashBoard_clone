@@ -70,11 +70,12 @@ def _require_dataset(dataset_id: str):
 
 
 def _parse_filter_params(source: dict) -> dict:
-    """Extract shared filter params {workcenter_group, spec, equipment_id}."""
+    """Extract shared filter params {workcenter_group, spec, equipment_id, month}."""
     return {
         "workcenter_group": str(source.get("workcenter_group") or "").strip(),
         "spec": str(source.get("spec") or "").strip(),
         "equipment_id": str(source.get("equipment_id") or "").strip(),
+        "month": str(source.get("month") or "").strip(),
     }
 
 
@@ -267,6 +268,7 @@ def api_production_history_export():
         "workcenter_group": str(request.args.get("workcenter_group") or "").strip(),
         "spec": str(request.args.get("spec") or "").strip(),
         "equipment_id": str(request.args.get("equipment_id") or "").strip(),
+        "month": str(request.args.get("month") or "").strip(),
     }
 
     def _generate():
