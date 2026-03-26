@@ -17,14 +17,16 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/yield-alert-center',
   '/anomaly-overview',
   '/production-history',
+  '/login',
 ]);
 
 const IN_SCOPE_ADMIN_ROUTES = Object.freeze([
   '/admin/pages',
   '/admin/dashboard',
+  '/admin/performance',
 ]);
 
-const DEFERRED_ROUTES = Object.freeze(['/login']);
+const DEFERRED_ROUTES = Object.freeze([]);
 
 const ALL_KNOWN_ROUTES = Object.freeze([
   ...IN_SCOPE_REPORT_ROUTES,
@@ -275,6 +277,28 @@ const ROUTE_CONTRACTS = Object.freeze({
     title: '生產歷程查詢',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/login': buildContract({
+    route: '/login',
+    routeId: 'login',
+    renderMode: 'native',
+    owner: 'frontend-platform-admin',
+    title: 'Login',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/admin/performance': buildContract({
+    route: '/admin/performance',
+    routeId: 'admin-performance',
+    renderMode: 'native',
+    owner: 'frontend-platform-admin',
+    title: '效能監控',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'admin_only',
     scope: 'in-scope',
     compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),

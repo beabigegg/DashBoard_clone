@@ -239,6 +239,30 @@
       "canonical_shell_path": "/portal-shell/production-history",
       "rollback_strategy": "fallback_to_legacy_route",
       "compatibility_policy": "redirect_to_shell_when_spa_enabled"
+    },
+    {
+      "route": "/login",
+      "route_id": "login",
+      "title": "Login",
+      "scope": "in-scope",
+      "render_mode": "native",
+      "owner": "frontend-platform-admin",
+      "visibility_policy": "released_or_admin",
+      "canonical_shell_path": "/portal-shell/login",
+      "rollback_strategy": "fallback_to_legacy_route",
+      "compatibility_policy": "redirect_to_shell_when_spa_enabled"
+    },
+    {
+      "route": "/admin/performance",
+      "route_id": "admin-performance",
+      "title": "效能監控",
+      "scope": "in-scope",
+      "render_mode": "native",
+      "owner": "frontend-platform-admin",
+      "visibility_policy": "admin_only",
+      "canonical_shell_path": "/portal-shell/admin/performance",
+      "rollback_strategy": "fallback_to_legacy_route",
+      "compatibility_policy": "redirect_to_shell_when_spa_enabled"
     }
   ]
 }
