@@ -62,7 +62,7 @@ const TOGGLE_EXPAND_STYLE = Object.freeze({
     show: true, position: 'inside', fontSize: 11, fontWeight: 'bold',
     color: 'rgb(67, 56, 202)', backgroundColor: 'transparent', padding: 0,
   },
-  lineStyle: { color: 'rgb(199, 210, 254)', type: 'dotted', width: 1 },
+  lineStyle: { width: 0 },
   emphasis: { itemStyle: { borderColor: 'rgb(79, 70, 229)', borderWidth: 2 } },
 });
 
@@ -74,7 +74,7 @@ const TOGGLE_COLLAPSE_STYLE = Object.freeze({
     show: true, position: 'inside', fontSize: 11, fontWeight: 'bold',
     color: 'rgb(146, 64, 14)', backgroundColor: 'transparent', padding: 0,
   },
-  lineStyle: { color: 'rgb(253, 230, 138)', type: 'dotted', width: 1 },
+  lineStyle: { width: 0 },
   emphasis: { itemStyle: { borderColor: 'rgb(217, 119, 6)', borderWidth: 2 } },
 });
 
@@ -134,6 +134,10 @@ const props = defineProps({
   showSerialLegend: {
     type: Boolean,
     default: true,
+  },
+  isReverse: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -325,7 +329,20 @@ function buildNode(cid, visited, parentCid = '') {
       children: [],
     }];
   } else {
-    children = childIds
+    // In reverse mode, process split_from children first so the lineage chain
+    // (A00-001-01C → A00-001 → A01) is traversed before wafer_origin nodes.
+    // This ensures wafer_lot is "claimed" by the deepest ancestor (A01) via
+    // the global visited set, and won't duplicate at shallower levels.
+    const orderedChildIds = props.isReverse
+      ? [...childIds].sort((a, b) => {
+          const ea = normalizeText(lookupEdgeMeta(id, a).edgeType);
+          const eb = normalizeText(lookupEdgeMeta(id, b).edgeType);
+          const priority = { split_from: 0, merge_source: 1, gd_rework_source: 2, wafer_origin: 3 };
+          return (priority[ea] ?? 1) - (priority[eb] ?? 1);
+        })
+      : childIds;
+
+    children = orderedChildIds
       .map((childId) => buildNode(childId, visited, id))
       .filter(Boolean);
 
@@ -377,7 +394,7 @@ function buildNode(cid, visited, parentCid = '') {
   const displayLabel = shortTag ? `${shortTag} ${name}` : name;
   const isSelected = selectedSet.value.has(id);
 
-  return {
+  const node = {
     name,
     value: {
       cid: id,
@@ -406,6 +423,8 @@ function buildNode(cid, visited, parentCid = '') {
     symbolSize: isSerialLike ? 6 : (nodeType === 'root' ? 14 : 10),
     lineStyle: incomingEdgeStyle,
   };
+
+  return node;
 }
 
 // Build each root into its own independent tree data.

@@ -282,7 +282,7 @@ def api_production_history_export():
 
     return Response(
         stream_with_context(_generate()),
-        mimetype="text/csv",
+        mimetype="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f'attachment; filename="production-history-{dataset_id}.csv"',
         },

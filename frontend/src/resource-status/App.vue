@@ -45,7 +45,7 @@ const {
   updateField,
 } = useFilterOrchestrator({
   fields: {
-    group:        { trigger: 'immediate', initial: '' },
+    groups:       { trigger: 'immediate', initial: [] },
     isProduction: { trigger: 'immediate', initial: false },
     isKey:        { trigger: 'immediate', initial: false },
     isMonitor:    { trigger: 'immediate', initial: false },
@@ -53,7 +53,7 @@ const {
     machines:     { trigger: 'immediate', initial: [] },
   },
   dependencies: [
-    { when: 'group',        then: ['families', 'machines'], action: 'clear' },
+    { when: 'groups',       then: ['families', 'machines'], action: 'clear' },
     { when: 'isProduction', then: ['families', 'machines'], action: 'clear' },
     { when: 'isKey',        then: ['families', 'machines'], action: 'clear' },
     { when: 'isMonitor',    then: ['families', 'machines'], action: 'clear' },
@@ -130,8 +130,8 @@ function unwrapApiResult(result, fallbackMessage) {
 function buildFilterParams() {
   const params = {};
 
-  if (filterState.group) {
-    params.workcenter_groups = filterState.group;
+  if (filterState.groups.length > 0) {
+    params.workcenter_groups = filterState.groups.join(',');
   }
   if (filterState.isProduction) {
     params.is_production = 1;
@@ -154,8 +154,9 @@ function buildFilterParams() {
 
 // --- Cascade: derive available family/machine options from upstream filters ---
 const filteredByUpstream = computed(() => {
+  const groupSet = filterState.groups.length > 0 ? new Set(filterState.groups) : null;
   return allResources.value.filter((r) => {
-    if (filterState.group && r.workcenterGroup !== filterState.group) return false;
+    if (groupSet && !groupSet.has(r.workcenterGroup)) return false;
     if (filterState.isProduction && !r.isProduction) return false;
     if (filterState.isKey && !r.isKey) return false;
     if (filterState.isMonitor && !r.isMonitor) return false;
@@ -439,8 +440,8 @@ async function applyFiltersAndReload() {
   resetAutoRefresh();
 }
 
-function updateGroup(group) {
-  updateField('group', group || '');
+function updateGroups(groups) {
+  updateField('groups', groups || []);
 }
 
 function updateFlags(nextFlags) {
@@ -496,14 +497,14 @@ onMounted(() => {
       />
       <FilterBar
         :workcenter-groups="workcenterGroups"
-        :selected-group="filterState.group"
+        :selected-groups="filterState.groups"
         :flags="filterState"
         :family-options="familyOptions"
         :machine-options="machineOptions"
         :selected-families="filterState.families"
         :selected-machines="filterState.machines"
         :loading="loading.options || loading.refreshing"
-        @change-group="updateGroup"
+        @change-groups="updateGroups"
         @change-flags="updateFlags"
         @change-families="updateFamilies"
         @change-machines="updateMachines"

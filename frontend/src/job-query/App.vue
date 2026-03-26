@@ -1,16 +1,20 @@
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import DataTable from '../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import StatusBadge from '../shared-ui/components/StatusBadge.vue';
 import { useJobQueryData } from './composables/useJobQueryData.js';
+
+const ROWS_PER_PAGE = 25;
 
 const {
   resources,
@@ -36,6 +40,42 @@ const {
   getStatusTone,
 } = useJobQueryData();
 
+// ── Renderless component to trigger loadTxn when expand slot mounts ──
+const ExpandTxnLoader = {
+  props: { jobId: String, loadFn: Function },
+  mounted() { if (this.jobId && this.loadFn) this.loadFn(this.jobId); },
+  render() { return null; },
+};
+
+// ── Client-side pagination ──
+const currentPage = ref(1);
+
+const pagedJobs = computed(() => {
+  const start = (currentPage.value - 1) * ROWS_PER_PAGE;
+  return jobs.value.slice(start, start + ROWS_PER_PAGE);
+});
+
+const jobsPagination = computed(() => {
+  const total = jobs.value.length;
+  const totalPages = Math.max(1, Math.ceil(total / ROWS_PER_PAGE));
+  return {
+    page: currentPage.value,
+    totalPages,
+    infoText: `共 ${total} 筆`,
+  };
+});
+
+function handleJobsPageChange(page) {
+  currentPage.value = page;
+}
+
+// Reset to page 1 when query completes
+const originalQueryJobs = queryJobs;
+async function wrappedQueryJobs() {
+  currentPage.value = 1;
+  return originalQueryJobs();
+}
+
 const resourceOptions = computed(() =>
   resources.value.map((item) => ({
     value: item.RESOURCEID,
@@ -57,7 +97,7 @@ onMounted(async () => {
   }
   await loadResources();
   if (filters.resourceIds.length > 0) {
-    await queryJobs();
+    await wrappedQueryJobs();
   }
 });
 </script>
@@ -100,7 +140,7 @@ onMounted(async () => {
           </label>
 
           <template #actions>
-            <button type="button" class="job-query-btn job-query-btn-primary" :disabled="loadingJobs" @click="queryJobs">
+            <button type="button" class="job-query-btn job-query-btn-primary" :disabled="loadingJobs" @click="wrappedQueryJobs">
               {{ loadingJobs ? '查詢中...' : '查詢' }}
             </button>
             <button type="button" class="job-query-btn job-query-btn-success" :disabled="exporting" @click="exportCsv">
@@ -121,8 +161,12 @@ onMounted(async () => {
           </div>
         </template>
 
-        <DataTable :data="jobs" :loading="loadingJobs">
-          <DataTableColumn column-key="_action" label="操作" />
+        <DataTable
+          :data="pagedJobs"
+          :loading="loadingJobs"
+          :pagination="jobsPagination"
+          @page-change="handleJobsPageChange"
+        >
           <DataTableColumn v-for="column in jobsColumns" :key="column" :column-key="column" :label="column" />
 
           <template #empty>
@@ -130,38 +174,43 @@ onMounted(async () => {
           </template>
 
           <template #cell="{ row, columnKey, value }">
-            <template v-if="columnKey === '_action'">
-              <button type="button" class="job-query-btn job-query-btn-ghost" @click="loadTxn(row.JOBID)">
-                查看交易歷程
-              </button>
-            </template>
-            <template v-else-if="columnKey === 'JOBSTATUS'">
+            <template v-if="columnKey === 'JOBSTATUS'">
               <StatusBadge :tone="getStatusTone(value)" :text="formatCellValue(value)" />
             </template>
             <template v-else>{{ formatCellValue(value) }}</template>
           </template>
-        </DataTable>
-      </SectionCard>
 
-      <SectionCard v-if="selectedJobId">
-        <template #header>
-          <div class="job-query-title-row">
-            <strong>交易歷程：{{ selectedJobId }}</strong>
-            <span class="job-query-muted">{{ txnRows.length }} 筆</span>
-          </div>
-        </template>
-
-        <DataTable :data="txnRows" :loading="loadingTxn">
-          <DataTableColumn v-for="column in txnColumns" :key="column" :column-key="column" :label="column" />
-
-          <template #cell="{ columnKey, value }">
-            <template v-if="columnKey === 'JOBSTATUS' || columnKey === 'FROMJOBSTATUS'">
-              <StatusBadge :tone="getStatusTone(value)" :text="formatCellValue(value)" />
-            </template>
-            <template v-else>{{ formatCellValue(value) }}</template>
+          <template #expand="{ row }">
+            <ExpandTxnLoader :job-id="row.JOBID" :load-fn="loadTxn" />
+            <div class="job-query-txn-expand">
+              <div class="job-query-txn-header">
+                <strong>交易歷程：{{ row.JOBID }}</strong>
+                <LoadingSpinner v-if="loadingTxn && selectedJobId === row.JOBID" size="sm" />
+              </div>
+              <table v-if="selectedJobId === row.JOBID && txnRows.length > 0" class="job-query-txn-table">
+                <thead>
+                  <tr>
+                    <th v-for="col in txnColumns" :key="col">{{ col }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(txn, ti) in txnRows" :key="ti">
+                    <td v-for="col in txnColumns" :key="col">
+                      <template v-if="col === 'JOBSTATUS' || col === 'FROMJOBSTATUS'">
+                        <StatusBadge :tone="getStatusTone(txn[col])" :text="formatCellValue(txn[col])" />
+                      </template>
+                      <template v-else>{{ formatCellValue(txn[col]) }}</template>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else-if="selectedJobId === row.JOBID && !loadingTxn" class="job-query-muted">無交易歷程</p>
+            </div>
           </template>
         </DataTable>
       </SectionCard>
     </div>
+
+    <LoadingOverlay v-if="loadingJobs" tier="page" />
   </div>
 </template>

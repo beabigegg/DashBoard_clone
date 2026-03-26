@@ -21,8 +21,8 @@ export function useSortableTable(data) {
       return 'date';
     }
     if (typeof value === 'string') {
-      // ISO date-like strings
-      if (/^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2})?/.test(value)) {
+      // Date-like strings: YYYY-MM-DD, YYYY/M/D, with optional time
+      if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}([ T]\d{1,2}:\d{2})?/.test(value)) {
         return 'date';
       }
       // Numeric strings
@@ -33,6 +33,19 @@ export function useSortableTable(data) {
     return 'string';
   }
 
+  /**
+   * Normalize a date string to ensure reliable parsing.
+   * Handles YYYY/M/D, YYYY-M-D, with optional time components.
+   */
+  function normalizeDateStr(value) {
+    const str = String(value).trim();
+    // Replace slashes with dashes for consistent parsing
+    // "2026/2/27 22:39:37" → "2026-2-27 22:39:37"
+    const normalized = str.replace(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/, '$1-$2-$3');
+    const d = new Date(normalized);
+    return Number.isNaN(d.getTime()) ? new Date(str) : d;
+  }
+
   function compareValues(a, b, type) {
     if (a === null || a === undefined || a === '') return 1;
     if (b === null || b === undefined || b === '') return -1;
@@ -41,7 +54,7 @@ export function useSortableTable(data) {
       return Number(a) - Number(b);
     }
     if (type === 'date') {
-      return new Date(a) - new Date(b);
+      return normalizeDateStr(a) - normalizeDateStr(b);
     }
     // string — locale-aware
     return String(a).localeCompare(String(b), 'zh-Hant', { numeric: true, sensitivity: 'base' });

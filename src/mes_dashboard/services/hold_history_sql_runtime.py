@@ -271,16 +271,20 @@ def _query_reason_pareto(
     record_type: str = "new",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    duration_range: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Compute reason Pareto: GROUP BY HOLDREASONNAME, DESC by count."""
     type_clause = _build_hold_type_clause(hold_type)
     record_clause = _build_record_type_clause(record_type, start_date, end_date)
+    duration_clause = _build_duration_clause(duration_range)
 
     where_parts = []
     if type_clause:
         where_parts.append(type_clause)
     if record_clause:
         where_parts.append(record_clause)
+    if duration_clause:
+        where_parts.append(duration_clause)
     where_sql = "WHERE " + " AND ".join(where_parts) if where_parts else ""
 
     sql = f"""
@@ -323,6 +327,7 @@ def _query_duration(
     record_type: str = "new",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    reason: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Compute hold duration distribution via CASE buckets in DuckDB."""
     type_clause = _build_hold_type_clause(hold_type)
@@ -333,6 +338,8 @@ def _query_duration(
         where_parts.append(type_clause)
     if record_clause:
         where_parts.append(record_clause)
+    if reason:
+        where_parts.append(f'TRIM("HOLDREASONNAME") = {_sql_str_literal(reason.strip())}')
     where_sql = "WHERE " + " AND ".join(where_parts)
 
     sql = f"""
@@ -595,6 +602,7 @@ def try_compute_view_from_spool(
             record_type=record_type,
             start_date=resolved_start,
             end_date=resolved_end,
+            duration_range=duration_range,
         )
         duration = _query_duration(
             conn,
@@ -602,6 +610,7 @@ def try_compute_view_from_spool(
             record_type=record_type,
             start_date=resolved_start,
             end_date=resolved_end,
+            reason=reason,
         )
         list_result = _query_list(
             conn,

@@ -93,12 +93,20 @@ export function useLotEquipmentQuery(initial = {}) {
     return Object.entries(map).map(([from, to]) => ({ from, to }));
   });
 
-  /** Set of lot names relevant to the query (input lots + traced parent lots). */
+  /** Set of lot names relevant to the query (input lots + traced parent lots).
+   *  For work_order input, the input values are work order names (not lot names),
+   *  so we rely on traceMap keys (resolved lot names) instead. */
   const relevantLotNames = computed(() => {
-    const names = new Set(parseInputValues(inputText.value).map((v) => v.toUpperCase()));
+    const names = new Set();
+    // For lot input, include input values directly; for work_order, skip (work order != lot name)
+    if (inputType.value !== 'work_order') {
+      parseInputValues(inputText.value).forEach((v) => names.add(v.toUpperCase()));
+    }
     const map = traceMap.value;
     if (map && typeof map === 'object') {
-      Object.values(map).forEach((parentName) => {
+      // Include both resolved lot names (keys) and their parent lot names (values)
+      Object.entries(map).forEach(([lotName, parentName]) => {
+        if (lotName) names.add(String(lotName).toUpperCase());
         if (parentName) names.add(String(parentName).toUpperCase());
       });
     }
@@ -246,10 +254,13 @@ export function useLotEquipmentQuery(initial = {}) {
       const payload = await fetchEquipmentPeriod('lots', { page: 1, perPage: 9999 });
       const allRows = Array.isArray(payload?.data) ? payload.data : [];
       const relevant = relevantLotNames.value;
-      lotsRows.value = allRows.filter((row) => {
-        const name = String(row.CONTAINERNAME || '').toUpperCase();
-        return relevant.has(name);
-      });
+      // When relevant set is empty (e.g., work_order with no trace map), show all lots
+      lotsRows.value = relevant.size > 0
+        ? allRows.filter((row) => {
+            const name = String(row.CONTAINERNAME || '').toUpperCase();
+            return relevant.has(name);
+          })
+        : allRows;
       lotsPagination.value = {
         page: 1,
         per_page: lotsRows.value.length,

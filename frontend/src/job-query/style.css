@@ -5,6 +5,15 @@
   margin: 0 auto;
 }
 
+/* Allow MultiSelect dropdown to overflow SectionCard boundaries */
+.job-query-page .shared-section-card:first-child {
+  overflow: visible;
+}
+
+.job-query-page .shared-section-card:first-child > .shared-section-card-body {
+  overflow: visible;
+}
+
 .job-query-title-row {
   display: flex;
   justify-content: space-between;
@@ -105,6 +114,38 @@
   color: theme('colors.token.h64748b');
 }
 
+
+.job-query-txn-expand {
+  padding: theme('spacing.token.p8') theme('spacing.token.p12');
+}
+
+.job-query-txn-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: theme('spacing.token.p8');
+  font-size: 13px;
+}
+
+.job-query-txn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.job-query-txn-table th,
+.job-query-txn-table td {
+  padding: theme('spacing.token.p6') theme('spacing.token.p8');
+  text-align: left;
+  border-bottom: 1px solid theme('colors.token.he2e8f0');
+  white-space: nowrap;
+}
+
+.job-query-txn-table th {
+  font-weight: 600;
+  color: theme('colors.token.h64748b');
+  background: theme('colors.token.hf8fafc');
+}
 
 .job-query-success {
   margin: 0;

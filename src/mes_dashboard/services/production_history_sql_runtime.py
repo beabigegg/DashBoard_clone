@@ -159,8 +159,8 @@ def compute_detail_page(
                 SPECNAME        AS spec,
                 EQUIPMENTID     AS equipment_id,
                 EQUIPMENTNAME   AS equipment_name,
-                TRACKIN_TS      AS trackin_time,
-                TRACKOUT_TS     AS trackout_time,
+                strftime(TRACKIN_TS::TIMESTAMP, '%Y-%m-%d %H:%M:%S')   AS trackin_time,
+                strftime(TRACKOUT_TS::TIMESTAMP, '%Y-%m-%d %H:%M:%S') AS trackout_time,
                 TRACKIN_QTY     AS trackin_qty,
                 TRACKOUT_QTY    AS trackout_qty
             FROM ph_src
@@ -534,7 +534,8 @@ def stream_export(
     buf = io.StringIO()
     writer = csv.writer(buf)
 
-    # Header
+    # BOM + Header for Excel UTF-8 compatibility
+    buf.write('\ufeff')
     writer.writerow([dst for _, dst in EXPORT_COLUMNS])
     yield buf.getvalue()
     buf.truncate(0)

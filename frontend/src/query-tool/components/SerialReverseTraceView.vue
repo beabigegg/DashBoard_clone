@@ -171,6 +171,7 @@ const emit = defineEmits([
       :leaf-serials="leafSerials"
       :selected-container-ids="selectedContainerIds"
       :loading="lineageLoading"
+      :is-reverse="true"
       title="流水批反查樹"
       description="由成品流水號往上追溯來源批次與祖先節點（點擊節點可多選）"
       empty-message="目前尚無可反查節點，請先輸入成品流水號。"

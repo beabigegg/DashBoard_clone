@@ -410,7 +410,13 @@ async function _applyQueryResult(result) {
     }
   }
 
-  await fetchBatchPareto();
+  // When DuckDB mode is active, refreshView() computes both view data and pareto;
+  // otherwise, fetch pareto from server separately.
+  if (duckdbMode.value && duckdb.isActive.value) {
+    await refreshView();
+  } else {
+    await fetchBatchPareto();
+  }
 
   const _now = new Date();
   const _pad = (n) => String(n).padStart(2, '0');

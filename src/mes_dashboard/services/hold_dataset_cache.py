@@ -378,10 +378,20 @@ def _derive_all_views(
         ht_value = "non-quality" if hold_type == "non-quality" else "quality"
         filtered = filtered[filtered["HOLD_TYPE"] == ht_value]
 
-    reason_pareto = _derive_reason_pareto(filtered)
-    duration = _derive_duration(filtered)
+    # Cross-filtering: duration_range filters reason_pareto; reason filters duration
+    pareto_df = filtered
+    duration_df = filtered
+    if duration_range:
+        pareto_df = _apply_duration_range_filter(pareto_df, duration_range)
+    if reason:
+        duration_df = duration_df[
+            duration_df["HOLDREASONNAME"].str.strip() == reason.strip()
+        ]
 
-    # List: additional reason + duration_range filters
+    reason_pareto = _derive_reason_pareto(pareto_df)
+    duration = _derive_duration(duration_df)
+
+    # List: both reason + duration_range filters
     list_df = filtered
     if reason:
         list_df = list_df[

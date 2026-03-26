@@ -6,9 +6,9 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  selectedGroup: {
-    type: String,
-    default: '',
+  selectedGroups: {
+    type: Array,
+    default: () => [],
   },
   flags: {
     type: Object,
@@ -40,7 +40,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['change-group', 'change-flags', 'change-families', 'change-machines']);
+const emit = defineEmits(['change-groups', 'change-flags', 'change-families', 'change-machines']);
 
 function updateFlag(key, checked) {
   emit('change-flags', {
@@ -54,19 +54,14 @@ function updateFlag(key, checked) {
   <section class="section-card">
     <div class="filters-panel">
       <div class="filter-block">
-        <label for="status-group-filter">工站群組</label>
-        <select
-          id="status-group-filter"
-          class="filter-select"
-          :value="selectedGroup"
+        <label>工站群組</label>
+        <MultiSelect
+          :model-value="selectedGroups"
+          :options="workcenterGroups"
           :disabled="loading"
-          @change="$emit('change-group', $event.target.value)"
-        >
-          <option value="">全部群組</option>
-          <option v-for="group in workcenterGroups" :key="group" :value="group">
-            {{ group }}
-          </option>
-        </select>
+          placeholder="全部群組"
+          @update:model-value="$emit('change-groups', $event)"
+        />
       </div>
 
       <div class="filter-block">

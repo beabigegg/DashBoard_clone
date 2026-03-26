@@ -5,6 +5,7 @@ import { useProductionHistory } from './composables/useProductionHistory.js';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import ProductionMatrix from './components/ProductionMatrix.vue';
 import ProductionDetailTable from './components/ProductionDetailTable.vue';
 
@@ -273,5 +274,6 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
       請選擇 Type 與日期區間後按「查詢」
     </div>
 
+    <LoadingOverlay v-if="loading" tier="page" />
   </div>
 </template>
