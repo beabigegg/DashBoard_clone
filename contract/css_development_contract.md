@@ -118,6 +118,22 @@
 
 ---
 
+#### **8. 共用 UI 元件樣式約束 (Shared-UI Component Styling Constraints)**
+
+**原則：共用 UI 元件擁有自己的 scoped 樣式，功能區塊不得從外部覆寫。**
+
+*   **契約 8.1 (DataTable)**: `DataTable.vue` 使用 `data-table-*` 前綴的 scoped 類別。功能區塊的 CSS 檔案**禁止**定義以 `data-table-` 開頭的選擇器來覆寫 DataTable 內部樣式。如需客製化，應透過 DataTable 提供的 props 與 slots。
+
+*   **契約 8.2 (SummaryCard / SummaryCardGroup)**: 摘要卡片的視覺差異應透過 `SummaryCard` 的 `accent` prop 設定。功能區塊**禁止**撰寫自訂的 `.summary-card` 樣式來取代 prop 系統。已遷移至 `SummaryCard` 的頁面不得保留舊的 `.summary-card` / `.summary-grid` CSS 定義。
+
+*   **契約 8.3 (Chip)**: 標籤/徽章的語意色彩應透過 `Chip` 的 `tone` prop 設定。功能區塊**禁止**撰寫自訂的 pill/tag CSS 來取代 Chip 的 tone 系統。
+
+*   **契約 8.4 (SectionCard)**: 區塊卡片應統一使用 `SectionCard` 元件。功能區塊**禁止**在 feature CSS 中新增 `.section-card` 定義來取代 SectionCard 元件。已遷移的頁面應移除舊的 `.section-card` CSS。
+
+*   **契約 8.5 (ErrorBanner)**: 錯誤訊息應統一使用 `shared-ui/ErrorBanner.vue`。功能區塊**禁止**在 feature CSS 中新增 `.error-banner` 類別定義。
+
+---
+
 ### **快速參考備忘錄**
 
 | 當您需要... | 您應該... | 操作的檔案 |
@@ -129,3 +145,4 @@
 | 在 ECharts 設定中需要顏色 | 優先走集中 palette/token 映射；必要時可保留 HEX 並列入例外治理 | `*.vue` / `*.js` 圖表設定 |
 | 修改全站的**預設背景色**或**字體** | 修改 `@layer base` 中的 `body` 規則 | `styles/tailwind.css` |
 | 新增/刪除/改名一個 CSS 檔案 | 同步更新 CSS 清單並一併提交 | `contract/css_inventory.md` |
+| 為**共用 UI 元件**新增樣式差異 | 使用元件 props（如 `accent`, `tone`, `variant`），不從外部 CSS 覆寫 | `*.vue` 模板 |

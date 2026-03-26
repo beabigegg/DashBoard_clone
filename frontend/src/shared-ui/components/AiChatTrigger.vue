@@ -38,7 +38,7 @@ defineEmits(['click']);
   background: theme('colors.brand.600');
   color: theme('colors.token.hffffff');
   border: none;
-  box-shadow: theme('boxShadow.panel');
+  box-shadow: theme('boxShadow.md');
   cursor: pointer;
   display: flex;
   align-items: center;

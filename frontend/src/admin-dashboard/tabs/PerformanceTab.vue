@@ -8,6 +8,10 @@ import { CanvasRenderer } from 'echarts/renderers';
 import GaugeBar from '../../admin-shared/components/GaugeBar.vue';
 import StatCard from '../../admin-shared/components/StatCard.vue';
 import TrendChart from '../../admin-shared/components/TrendChart.vue';
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+import SectionCard from '../../shared-ui/components/SectionCard.vue';
+import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
 import {
   useMetrics,
   usePerfDetail,
@@ -131,24 +135,22 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="performance-tab">
-    <section v-if="errorMessage" class="panel panel-disabled">
-      <div class="muted">{{ errorMessage }}</div>
-    </section>
+    <ErrorBanner :message="errorMessage" :dismissible="false" />
 
-    <section class="panel">
-      <h2 class="panel-title">查詢效能</h2>
+    <SectionCard>
+      <template #header><h2 class="panel-title">查詢效能</h2></template>
       <div class="query-perf-grid">
-        <div class="query-perf-stats">
-          <StatCard :value="metricsData?.p50_ms" label="P50 (ms)" />
-          <StatCard :value="metricsData?.p95_ms" label="P95 (ms)" />
-          <StatCard :value="metricsData?.p99_ms" label="P99 (ms)" />
-          <StatCard :value="metricsData?.count" label="查詢數" />
-          <StatCard :value="metricsData?.slow_count" label="慢查詢" />
-          <StatCard :value="slowRateDisplay" label="慢查詢率" />
-        </div>
+        <SummaryCardGroup :columns="3">
+          <SummaryCard label="P50 (ms)" :value="metricsData?.p50_ms" />
+          <SummaryCard label="P95 (ms)" :value="metricsData?.p95_ms" accent="warning" />
+          <SummaryCard label="P99 (ms)" :value="metricsData?.p99_ms" accent="danger" />
+          <SummaryCard label="查詢數" :value="metricsData?.count" accent="info" />
+          <SummaryCard label="慢查詢" :value="metricsData?.slow_count" accent="danger" />
+          <SummaryCard label="慢查詢率" :value="slowRateDisplay" accent="warning" />
+        </SummaryCardGroup>
         <div ref="latencyChartRef" class="query-perf-chart"></div>
       </div>
-    </section>
+    </SectionCard>
 
     <TrendChart
       v-if="historyData.length > 1"
@@ -158,27 +160,27 @@ onBeforeUnmount(() => {
       yAxisLabel="ms"
     />
 
-    <section v-if="perfDetail?.db_pool?.status" class="panel">
-      <h2 class="panel-title">連線池</h2>
+    <SectionCard v-if="perfDetail?.db_pool?.status">
+      <template #header><h2 class="panel-title">連線池</h2></template>
       <GaugeBar
         label="飽和度"
         :value="perfDetail.db_pool.status.saturation"
         :max="1"
       />
-      <div class="pool-stats-grid">
-        <StatCard :value="perfDetail.db_pool.status.checked_out" label="使用中" />
-        <StatCard :value="perfDetail.db_pool.status.checked_in" label="閒置" />
-        <StatCard :value="poolTotalConnections" label="總連線數" />
-        <StatCard :value="perfDetail.db_pool.status.max_capacity" label="最大容量" />
-        <StatCard :value="poolOverflowDisplay" label="溢出連線" />
-        <StatCard :value="perfDetail.db_pool.status.slow_query_active" label="慢查詢執行中" />
-        <StatCard :value="perfDetail.db_pool.status.slow_query_waiting" label="慢查詢排隊中" />
-        <StatCard :value="perfDetail.db_pool.config?.pool_size" label="池大小" />
-        <StatCard :value="perfDetail.db_pool.config?.pool_recycle" label="回收週期 (s)" />
-        <StatCard :value="perfDetail.db_pool.config?.pool_timeout" label="逾時 (s)" />
-        <StatCard :value="perfDetail.direct_connections?.total_since_start" label="直連次數" />
-      </div>
-    </section>
+      <SummaryCardGroup :columns="4">
+        <SummaryCard label="使用中" :value="perfDetail.db_pool.status.checked_out" accent="warning" />
+        <SummaryCard label="閒置" :value="perfDetail.db_pool.status.checked_in" accent="success" />
+        <SummaryCard label="總連線數" :value="poolTotalConnections" accent="info" />
+        <SummaryCard label="最大容量" :value="perfDetail.db_pool.status.max_capacity" />
+        <SummaryCard label="溢出連線" :value="poolOverflowDisplay" accent="danger" />
+        <SummaryCard label="慢查詢執行中" :value="perfDetail.db_pool.status.slow_query_active" accent="danger" />
+        <SummaryCard label="慢查詢排隊中" :value="perfDetail.db_pool.status.slow_query_waiting" accent="warning" />
+        <SummaryCard label="池大小" :value="perfDetail.db_pool.config?.pool_size" />
+        <SummaryCard label="回收週期 (s)" :value="perfDetail.db_pool.config?.pool_recycle" accent="neutral" />
+        <SummaryCard label="逾時 (s)" :value="perfDetail.db_pool.config?.pool_timeout" accent="neutral" />
+        <SummaryCard label="直連次數" :value="perfDetail.direct_connections?.total_since_start" accent="info" />
+      </SummaryCardGroup>
+    </SectionCard>
 
     <TrendChart
       v-if="historyData.length > 1"

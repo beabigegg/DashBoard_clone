@@ -3,6 +3,9 @@ import { computed, onMounted, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
 import { parseMultiLineInput } from '../core/reject-history-filters.js';
+import DataTable from '../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 
 const API_TIMEOUT = 60000;
@@ -292,7 +295,7 @@ function onDocumentClick(e) {
     />
 
     <!-- Error / Warning Banners -->
-    <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
+    <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" />
     <div v-if="unresolvedWarning" class="warning-banner">{{ unresolvedWarning }}</div>
     <div v-if="warningMessage" class="warning-banner">{{ warningMessage }}</div>
 
@@ -438,48 +441,14 @@ function onDocumentClick(e) {
         </span>
       </div>
       <div class="card-body ui-card-body">
-        <!-- Loading overlay -->
-        <div class="detail-table-wrap" :class="{ 'is-loading': loading, 'is-paginating': paginationLoading }">
-          <div v-if="loading" class="table-loading-overlay">
-            <span class="table-spinner"></span>
-          </div>
-          <table class="detail-table">
-            <thead>
-              <tr>
-                <th v-for="col in TABLE_COLUMNS" :key="col.key">{{ col.label }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, idx) in rows" :key="idx">
-                <td v-for="col in TABLE_COLUMNS" :key="col.key">{{ row[col.key] ?? '' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Empty message -->
-        <div v-if="!loading && !paginationLoading && rows.length === 0 && pagination.total === 0" class="empty-message">
-          查無資料
-        </div>
-
-        <!-- Pagination -->
-        <div v-if="pagination.total_pages > 1" class="pagination-bar">
-          <div class="pagination-info">
-            第 {{ pagination.page }} / {{ pagination.total_pages }} 頁，共
-            {{ pagination.total.toLocaleString() }} 筆
-          </div>
-          <div class="pagination-actions">
-            <button :disabled="loading || paginationLoading || pagination.page <= 1" @click="goToPage(pagination.page - 1)">
-              上一頁
-            </button>
-            <button
-              :disabled="loading || paginationLoading || pagination.page >= pagination.total_pages"
-              @click="goToPage(pagination.page + 1)"
-            >
-              下一頁
-            </button>
-          </div>
-        </div>
+        <DataTable
+          :data="rows"
+          :loading="loading || paginationLoading"
+          :pagination="pagination.total_pages > 1 ? { page: pagination.page, totalPages: pagination.total_pages, infoText: `第 ${pagination.page} / ${pagination.total_pages} 頁，共 ${pagination.total.toLocaleString()} 筆` } : null"
+          @page-change="goToPage"
+        >
+          <DataTableColumn v-for="col in TABLE_COLUMNS" :key="col.key" :column-key="col.key" :label="col.label" :sortable="true" />
+        </DataTable>
       </div>
     </div>
   </div>

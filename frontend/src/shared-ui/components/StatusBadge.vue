@@ -5,6 +5,7 @@ const props = defineProps({
   tone: {
     type: String,
     default: 'neutral',
+    validator: (v) => ['neutral', 'success', 'warning', 'danger', 'info'].includes(v),
   },
   text: {
     type: String,
@@ -49,5 +50,10 @@ const badgeClass = computed(() => `shared-status-badge tone-${props.tone}`);
 .tone-danger {
   background: theme('colors.red.100');
   color: theme('colors.red.700');
+}
+
+.tone-info {
+  background: theme('colors.blue.100');
+  color: theme('colors.blue.700');
 }
 </style>

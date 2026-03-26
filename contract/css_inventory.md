@@ -1,6 +1,6 @@
 # CSS Inventory (Governed Source List)
 
-Updated: 2026-03-24
+Updated: 2026-03-26
 
 This file is the governed inventory for authored CSS source files in `frontend/src/**/*.css`.
 
@@ -22,9 +22,9 @@ Governance status (2026-03-12): `css-governance-check` = 0 errors, 0 warnings.
 
 | File | Scope | Notes |
 | :--- | :--- | :--- |
-| `frontend/src/wip-shared/styles.css` | `theme-wip-*`, hold/reject/query/material/yield shared blocks | Shared WIP domain primitives. **Cleaned**: removed `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-light`, `.btn-back` definitions (replaced by global `ui-btn` system). |
+| `frontend/src/wip-shared/styles.css` | `theme-wip-*`, hold/reject/query/material/yield shared blocks | Shared WIP domain primitives. **Cleaned**: removed `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-light`, `.btn-back` definitions (replaced by global `ui-btn` system). Summary/section classes retained pending component migration. |
 | `frontend/src/wip-shared/pareto-styles.css` | Pareto chart/table shared blocks | Shared pareto presentation |
-| `frontend/src/resource-shared/styles.css` | `theme-resource*` and related shared blocks | Shared resource domain primitives. **Cleaned**: removed `.btn`, `.btn-sm`, `.btn-primary` definitions (replaced by global `ui-btn` system). |
+| `frontend/src/resource-shared/styles.css` | `theme-resource*` and related shared blocks | Shared resource domain primitives. **Cleaned**: removed `.btn`, `.btn-sm`, `.btn-primary` (replaced by `ui-btn`); removed `.error-banner` (replaced by shared-ui `ErrorBanner.vue`). Summary-grid/card/section-card classes retained pending component migration. |
 
 ## Shared UI Component Styles (scoped — new in frontend-unified-ux)
 
@@ -35,6 +35,11 @@ Governance status (2026-03-12): `css-governance-check` = 0 errors, 0 warnings.
 | `frontend/src/shared-ui/components/SkeletonLoader.vue` | `<style scoped>` | Shared skeleton variants for text/card/table loading states with reduced-motion fallback |
 | `frontend/src/shared-ui/components/EmptyState.vue` | `<style scoped>` | Typed empty state messages |
 | `frontend/src/shared-ui/components/ErrorBanner.vue` | `<style scoped>` | Dismissible error banner; `message` prop + `action` slot + `dismiss` event |
+| `frontend/src/shared-ui/components/SummaryCard.vue` | `<style scoped>` | Summary card with accent bar, label, value, sub slot; `accent` prop for color theming |
+| `frontend/src/shared-ui/components/SummaryCardGroup.vue` | `<style scoped>` | Responsive grid container for SummaryCard; `columns` prop |
+| `frontend/src/shared-ui/components/SectionCard.vue` | `<style scoped>` | Section wrapper with optional header, collapsible body, footer; `variant` prop for visual style |
+| `frontend/src/shared-ui/components/DataTable.vue` | `<style scoped>` | Shared data table with sorting, pagination, slot columns; `data-table-*` scoped classes |
+| `frontend/src/shared-ui/components/Chip.vue` | `<style scoped>` | Inline label chip/tag; `tone` prop for semantic coloring |
 
 ## Route-Local Feature Layers
 

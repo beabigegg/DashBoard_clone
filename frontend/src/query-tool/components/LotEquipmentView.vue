@@ -1,4 +1,5 @@
 <script setup>
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
 import EquipmentJobsPanel from './EquipmentJobsPanel.vue';
@@ -189,9 +190,7 @@ function inputPlaceholder() {
           </div>
         </div>
 
-        <p v-if="errors.lookup" class="error-banner le-error-mt">
-          {{ errors.lookup }}
-        </p>
+        <ErrorBanner :message="errors.lookup" />
 
         <!-- Lookup result message -->
         <p
@@ -336,10 +335,6 @@ function inputPlaceholder() {
   font-size: 11px;
   text-align: right;
   margin-top: 2px;
-}
-
-.le-error-mt {
-  margin-top: theme('spacing.token.p8');
 }
 
 .le-lookup-message {

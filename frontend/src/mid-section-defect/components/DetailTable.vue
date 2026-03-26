@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue';
-import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 
-import Pagination from '../../shared-ui/components/PaginationControl.vue';
+import DataTable from '../../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 
 const props = defineProps({
   data: {
@@ -28,9 +28,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['export-csv', 'prev-page', 'next-page']);
-
-const dataRef = computed(() => props.data);
-const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(dataRef);
 
 const COLUMNS_BACKWARD = [
   { key: 'CONTAINERNAME', label: 'LOT ID', width: '140px' },
@@ -73,9 +70,19 @@ const tableInfo = computed(() => {
   return `顯示 ${start} - ${end} 筆，共 ${total.toLocaleString()} 筆`;
 });
 
-function sortIcon(field) {
-  if (sortKey.value !== field) return ' ⇕';
-  return sortDirection.value === 'asc' ? ' ▲' : ' ▼';
+const tablePagination = computed(() => ({
+  page: Number(props.pagination.page || 1),
+  totalPages: Number(props.pagination.total_pages || 1),
+  infoText: tableInfo.value,
+}));
+
+function handlePageChange(page) {
+  const current = Number(props.pagination.page || 1);
+  if (page > current) {
+    emit('next-page');
+  } else if (page < current) {
+    emit('prev-page');
+  }
 }
 
 function formatCell(value, col) {
@@ -120,49 +127,33 @@ function getSuspectHits(row) {
         </div>
       </div>
 
-      <div class="table-wrapper">
-        <table class="detail-table">
-          <thead>
-            <tr>
-              <th
-                v-for="col in activeColumns"
-                :key="col.key"
-                :style="{ width: col.width, cursor: 'pointer' }"
-                :aria-sort="sortKey === col.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'"
-                class="sortable"
-                @click="toggleSort(col.key)"
-              >
-                {{ col.label }}{{ sortIcon(col.key) }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, idx) in sortedData" :key="idx">
-              <td v-for="col in activeColumns" :key="col.key" :class="{ numeric: col.numeric }">
-                <template v-if="col.key === 'SUSPECT_HITS'">
-                  <span v-if="getSuspectHits(row)" :class="{ 'hit-full': getSuspectHits(row).fullMatch }" class="suspect-cell">
-                    {{ getSuspectHits(row).hitNames.join(', ') }}
-                    <span class="hit-ratio">({{ getSuspectHits(row).hitCount }}/{{ getSuspectHits(row).totalCount }})</span>
-                  </span>
-                  <span v-else class="no-hit">-</span>
-                </template>
-                <template v-else>{{ formatCell(row[col.key], col) }}</template>
-              </td>
-            </tr>
-            <tr v-if="!sortedData.length">
-              <td :colspan="activeColumns.length" class="empty-row">暫無資料</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        :data="data"
+        :loading="loading"
+        :pagination="tablePagination"
+        @page-change="handlePageChange"
+      >
+        <DataTableColumn
+          v-for="col in activeColumns"
+          :key="col.key"
+          :column-key="col.key"
+          :label="col.label"
+          :width="col.width"
+          :align="col.numeric ? 'right' : 'left'"
+          sortable
+        />
 
-      <Pagination
-        :visible="Number(pagination.total_pages || 1) > 1"
-        :page="Number(pagination.page || 1)"
-        :total-pages="Number(pagination.total_pages || 1)"
-        @prev="emit('prev-page')"
-        @next="emit('next-page')"
-      />
+        <template #cell="{ row, columnKey, value }">
+          <template v-if="columnKey === 'SUSPECT_HITS'">
+            <span v-if="getSuspectHits(row)" :class="{ 'hit-full': getSuspectHits(row).fullMatch }" class="suspect-cell">
+              {{ getSuspectHits(row).hitNames.join(', ') }}
+              <span class="hit-ratio">({{ getSuspectHits(row).hitCount }}/{{ getSuspectHits(row).totalCount }})</span>
+            </span>
+            <span v-else class="no-hit">-</span>
+          </template>
+          <template v-else>{{ formatCell(value, activeColumns.find(c => c.key === columnKey) || {}) }}</template>
+        </template>
+      </DataTable>
     </div>
   </section>
 </template>

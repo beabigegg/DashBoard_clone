@@ -302,17 +302,7 @@
   border-radius: 0 0 8px 8px;
 }
 
-/* ====== Error / Warning Banners ====== */
-.error-banner {
-  padding: theme('spacing.3') theme('spacing.4');
-  background: theme('colors.token.hfef2f2');
-  border: 1px solid theme('colors.token.hfecaca');
-  border-radius: 8px;
-  color: theme('colors.token.hdc2626');
-  font-size: 14px;
-  margin-bottom: theme('spacing.4');
-}
-
+/* ====== Warning Banner ====== */
 .warning-banner {
   padding: theme('spacing.3') theme('spacing.4');
   background: theme('colors.token.hfffbeb');

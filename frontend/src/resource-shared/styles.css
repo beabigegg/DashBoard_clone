@@ -169,92 +169,6 @@
   gap: 8px;
 }
 
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card {
-  position: relative;
-  border: 1px solid var(--resource-border);
-  border-radius: 10px;
-  padding: theme('spacing.token.p12') theme('spacing.token.p10');
-  background: var(--resource-card-bg);
-  text-align: center;
-  box-shadow: var(--resource-shadow);
-  overflow: hidden;
-  transition: transform var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--resource-primary);
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.clickable {
-  cursor: pointer;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.clickable:hover {
-  transform: var(--hover-lift);
-  box-shadow: 0 7px 16px rgba(37, 99, 235, 0.12);
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.active {
-  border-color: theme('colors.token.h93c5fd');
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-label {
-  font-size: 12px;
-  color: var(--resource-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: theme('spacing.token.p3');
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-value {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-sub {
-  margin-top: theme('spacing.token.p4');
-  font-size: 12px;
-  color: var(--resource-muted);
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.prd::before { background: var(--status-prd); }
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.prd .summary-value { color: var(--status-prd); }
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.sby::before { background: var(--status-sby); }
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.sby .summary-value { color: var(--status-sby); }
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.udt::before { background: var(--status-udt); }
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.udt .summary-value { color: var(--status-udt); }
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.sdt::before { background: var(--status-sdt); }
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.sdt .summary-value { color: var(--status-sdt); }
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.egt::before { background: var(--status-egt); }
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.egt .summary-value { color: var(--status-egt); }
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.nst::before { background: var(--status-nst); }
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.nst .summary-value { color: var(--status-nst); }
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.other::before { background: var(--status-other); }
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.other .summary-value { color: var(--status-other); }
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.ou::before { background: var(--resource-primary); }
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.availability::before { background: theme('colors.token.h22c55e'); }
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card.total::before { background: var(--resource-muted); }
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .filter-indicator {
   display: none;
@@ -485,11 +399,6 @@
   background: theme('colors.token.hfee2e2');
 }
 
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .summary-card .ou-badge {
-  font-size: 24px;
-  min-width: auto;
-  padding: theme('spacing.token.p4') theme('spacing.token.p16');
-}
 
 :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .eq-status {
   display: inline-flex;
@@ -544,25 +453,13 @@
 }
 
 /* Loading overlay/spinner styles moved to shared-ui LoadingOverlay.vue (scoped) */
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history) .error-banner {
-  padding: theme('spacing.token.p10') theme('spacing.token.p12');
-  border: 1px solid theme('colors.token.hfecaca');
-  border-radius: 8px;
-  background: theme('colors.token.hfef2f2');
-  color: theme('colors.token.hb91c1c');
-  font-size: 13px;
-  margin-bottom: theme('spacing.token.p12');
-}
+/* Error banner styles moved to shared-ui ErrorBanner.vue (scoped) */
 
 @media (prefers-reduced-motion: reduce) {
   :is(.theme-resource, .theme-resource-history) .loading-spinner {
     animation: none;
   }
 
-  :is(.theme-resource, .theme-resource-history) .summary-card.clickable:hover {
-    transform: none;
-  }
 
   :is(.theme-resource, .theme-resource-history) .expand-btn {
     transition: none;

@@ -15,6 +15,7 @@ import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useResourceHistoryDuckDB } from './useResourceHistoryDuckDB.js';
 
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 
 import ComparisonChart from './components/ComparisonChart.vue';
@@ -631,7 +632,7 @@ onMounted(() => {
         @clear="clearFilters"
       />
 
-      <p v-if="queryError" class="error-banner query-error">{{ queryError }}</p>
+      <ErrorBanner :message="queryError" :dismissible="false" />
       <p v-if="autoPruneHint" class="filter-indicator">{{ autoPruneHint }}</p>
       <p v-if="detailWarning" class="filter-indicator active">{{ detailWarning }}</p>
       <p v-if="exportMessage" class="filter-indicator active">{{ exportMessage }}</p>

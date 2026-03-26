@@ -74,68 +74,13 @@
   @apply text-sm text-red-600;
 }
 
-/* ── Error banners ───────────────────────────────────────────────────────── */
-
-.theme-production-history .ph-app__error-banner {
-  @apply bg-red-50 border border-red-300 text-red-700 rounded px-4 py-2 text-sm flex items-center gap-3;
-}
-
-.theme-production-history .ph-app__error-banner--overload {
-  @apply bg-yellow-50 border-yellow-300 text-yellow-800;
-}
-
-.theme-production-history .ph-app__error-banner--expired {
-  @apply bg-orange-50 border-orange-300 text-orange-800;
-}
+/* Error banners removed — replaced by shared-ui ErrorBanner */
 
 .theme-production-history .ph-app__empty-state {
   @apply text-center text-gray-400 py-16 text-sm;
 }
 
-/* ── Detail table (shared pattern) ───────────────────────────────────────── */
-
-.theme-production-history .detail-table-wrap {
-  position: relative;
-  overflow-x: auto;
-}
-
-.theme-production-history .detail-table-wrap.is-loading table {
-  opacity: 0.4;
-  pointer-events: none;
-  transition: opacity var(--motion-fast) var(--motion-ease);
-}
-
-.theme-production-history .detail-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.theme-production-history .detail-table th,
-.theme-production-history .detail-table td {
-  border-bottom: 1px solid var(--border);
-  padding: theme('spacing.token.p8') theme('spacing.token.p10');
-  text-align: left;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.theme-production-history .detail-table thead th {
-  position: sticky;
-  top: 0;
-  background: theme('colors.token.hf8fafc');
-  z-index: 1;
-}
-
-.theme-production-history .detail-table tbody tr:hover {
-  background: theme('colors.token.hf8fbff');
-}
-
-.theme-production-history .placeholder {
-  text-align: center;
-  padding: theme('spacing[10]') theme('spacing.5');
-  color: var(--muted);
-}
+/* Detail table classes removed — replaced by shared-ui DataTable */
 
 .theme-production-history .ph-detail-count {
   font-size: 13px;

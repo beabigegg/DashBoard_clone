@@ -7,6 +7,7 @@ import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 import { useHoldHistoryDuckDB } from './useHoldHistoryDuckDB.js';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
@@ -660,7 +661,7 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
+    <ErrorBanner :message="errorMessage" :dismissible="false" />
 
     <FilterBar
       :start-date="orchestrator.committed.startDate"

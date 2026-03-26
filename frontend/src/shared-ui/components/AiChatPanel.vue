@@ -205,7 +205,7 @@ function showDividerBefore(idx) {
   z-index: 50;
   background: theme('colors.surface.card');
   border-left: 1px solid theme('colors.stroke.soft');
-  box-shadow: theme('boxShadow.panel');
+  box-shadow: theme('boxShadow.md');
   display: flex;
   flex-direction: column;
   animation: ai-panel-slide-in var(--motion-normal, 200ms) var(--motion-ease, ease) both;

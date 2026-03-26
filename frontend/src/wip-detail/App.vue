@@ -9,6 +9,7 @@ import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrat
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import LotDetailPanel from './components/LotDetailPanel.vue';
 import LotTable from './components/LotTable.vue';
@@ -520,7 +521,7 @@ onBeforeUnmount(() => {
       </template>
     </PageHeader>
 
-    <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
+    <ErrorBanner :message="errorMessage" :dismissible="false" />
 
     <FilterPanel
       :filters="filters"

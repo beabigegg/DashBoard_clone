@@ -10,9 +10,12 @@ import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrat
 import { toQueryParams } from './utils.js';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
+import SummaryCard from '../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import YieldHeatmap from './YieldHeatmap.vue';
 import YieldStationChart from './YieldStationChart.vue';
 import YieldPackageChart from './YieldPackageChart.vue';
@@ -155,22 +158,30 @@ const summaryCards = computed(() => [
   {
     key: 'transaction',
     label: '移轉量',
-    value: Number(summary.value.transaction_qty || 0).toLocaleString(),
-    tone: 'base',
+    value: Number(summary.value.transaction_qty || 0),
+    accent: 'brand',
+    format: 'number',
   },
   {
     key: 'scrap',
     label: '報廢量',
-    value: Number(summary.value.scrap_qty || 0).toLocaleString(),
-    tone: 'warn',
+    value: Number(summary.value.scrap_qty || 0),
+    accent: 'warning',
+    format: 'number',
   },
   {
     key: 'yield',
     label: '良率',
-    value: `${Number(summary.value.yield_pct || 0).toFixed(2)}%`,
-    tone: Number(summary.value.yield_pct || 0) < Number(filters.risk_threshold || 98) ? 'danger' : 'good',
+    value: Number(summary.value.yield_pct || 0),
+    accent: Number(summary.value.yield_pct || 0) < Number(filters.risk_threshold || 98) ? 'danger' : 'success',
+    format: 'percent',
   },
 ]);
+
+function alertRowKey(row) {
+  return `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}`;
+}
+
 
 
 function setDefaultDateRange() {
@@ -714,15 +725,21 @@ onUnmounted(() => {
     </section>
 
     <section class="status-stack">
-      <div v-if="errorMessage" class="status error">{{ errorMessage }}</div>
+      <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" />
       <div v-if="warningMessage" class="status warn">{{ warningMessage }}</div>
     </section>
 
-    <section class="summary-grid">
-      <article v-for="card in summaryCards" :key="card.key" class="summary-card" :class="`tone-${card.tone}`">
-        <h3>{{ card.label }}</h3>
-        <p>{{ card.value }}</p>
-      </article>
+    <section class="summary-section">
+      <SummaryCardGroup :columns="3">
+        <SummaryCard
+          v-for="card in summaryCards"
+          :key="card.key"
+          :label="card.label"
+          :value="card.value"
+          :accent="card.accent"
+          :format="card.format"
+        />
+      </SummaryCardGroup>
     </section>
 
     <div v-if="hasQueried" class="chart-grid">
@@ -796,11 +813,11 @@ onUnmounted(() => {
                     class="ui-btn ui-btn--ghost ui-btn--sm"
                     @click="toggleReasonDetail(row)"
                   >
-                    {{ reasonDetailLoading && expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}` ? '載入中...' : expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}` ? '收合' : '查看原因' }}
+                    {{ reasonDetailLoading && expandedRowKey === alertRowKey(row) ? '載入中...' : expandedRowKey === alertRowKey(row) ? '收合' : '查看原因' }}
                   </button>
                 </td>
               </tr>
-              <tr v-if="expandedRowKey === `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}`" class="reason-detail-row">
+              <tr v-if="expandedRowKey === alertRowKey(row)" class="reason-detail-row">
                 <td colspan="10">
                   <EmptyState v-if="reasonDetailLoading" type="loading" />
                   <EmptyState v-else-if="reasonDetailRows.length === 0" type="filter-empty" />

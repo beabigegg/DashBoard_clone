@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../../core/api.js';
 import { useSortableTable } from '../../shared-composables/useSortableTable.js';
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import StatusBadge from '../../shared-ui/components/StatusBadge.vue';
 import { formatCellValue, formatDateTime, parseDateTime } from '../utils/values.js';
 
@@ -222,9 +223,7 @@ async function loadTxn(jobId) {
         <span class="query-tool-muted">{{ txnRows.length }} 筆</span>
       </div>
 
-      <p v-if="txnError" class="error-banner">
-        {{ txnError }}
-      </p>
+      <ErrorBanner :message="txnError" />
 
       <div v-if="loadingTxn" class="placeholder">
         載入交易歷程中...

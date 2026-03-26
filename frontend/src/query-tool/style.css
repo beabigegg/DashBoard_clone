@@ -60,16 +60,6 @@
   padding: theme('spacing.token.p14') theme('spacing.token.p16');
 }
 
-/* ---- Error 訊息 ---- */
-.theme-query-tool .error-banner {
-  margin-bottom: theme('spacing.token.p14');
-  padding: theme('spacing.token.p10') theme('spacing.token.p12');
-  border-radius: 6px;
-  background: theme('colors.token.hfef2f2');
-  color: theme('colors.token.h991b1b');
-  font-size: 13px;
-}
-
 /* ---- Tab 導航 (頂層) ---- */
 .theme-query-tool .query-tool-tab-bar {
   display: flex;

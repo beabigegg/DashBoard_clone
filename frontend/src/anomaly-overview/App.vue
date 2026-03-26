@@ -3,6 +3,12 @@ import { onMounted, ref, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { buildLaunchHref } from '../portal-shell/routeQuery.js';
 import VChart from 'vue-echarts';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
+import SummaryCard from '../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
+import SectionCard from '../shared-ui/components/SectionCard.vue';
+import DataTable from '../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart, BarChart } from 'echarts/charts';
@@ -402,21 +408,18 @@ onMounted(async () => {
       <div v-if="summaryLoading" class="ao-loading-row">
         <span class="ao-spinner"></span> 載入摘要中...
       </div>
-      <div v-else-if="summaryError" class="ao-error-row">摘要載入失敗：{{ summaryError }}</div>
-      <template v-else-if="summaryData">
-        <button
+      <ErrorBanner :message="summaryError ? `摘要載入失敗：${summaryError}` : ''" :dismissible="false" />
+      <SummaryCardGroup v-if="summaryData && !summaryError" :columns="4">
+        <SummaryCard
           v-for="section in sections"
           :key="section.key"
-          class="ao-card"
-          :class="severityClass(summaryData.breakdown[section.key]?.severity ?? 'ok')"
-          type="button"
+          :label="section.label"
+          :value="summaryData.breakdown[section.key]?.count ?? '—'"
+          :accent="(summaryData.breakdown[section.key]?.severity ?? 'ok') === 'critical' ? 'danger' : (summaryData.breakdown[section.key]?.severity ?? 'ok') === 'warning' ? 'warning' : 'success'"
+          :clickable="true"
           @click="scrollToSection(section.key)"
-        >
-          <span class="ao-card-label">{{ section.label }}</span>
-          <span class="ao-card-count">{{ summaryData.breakdown[section.key]?.count ?? '—' }}</span>
-          <span class="ao-card-sev-dot"></span>
-        </button>
-      </template>
+        />
+      </SummaryCardGroup>
     </section>
 
     <!-- 4 個展開區塊 -->
@@ -454,7 +457,7 @@ onMounted(async () => {
         <div v-if="section.loading" class="ao-loading-row">
           <span class="ao-spinner"></span> 載入中...
         </div>
-        <div v-else-if="section.error" class="ao-error-row">{{ section.error }}</div>
+        <ErrorBanner v-else-if="section.error" :message="section.error" :dismissible="false" />
         <div v-else-if="section.items.length === 0" class="ao-empty-row">無異常記錄</div>
         <div v-else class="ao-table-wrap">
           <table class="ao-table">

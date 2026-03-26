@@ -7,6 +7,7 @@ import { useTraceProgress } from '../shared-composables/useTraceProgress.js';
 import TraceProgressBar from '../shared-composables/TraceProgressBar.vue';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 
@@ -601,7 +602,7 @@ void initPage();
       :stage_errors="trace.stage_errors"
     />
 
-    <div v-if="queryError" class="error-banner">{{ queryError }}</div>
+    <ErrorBanner :message="queryError" :dismissible="false" />
 
     <template v-if="hasQueried">
       <div v-if="analysisData.genealogy_status === 'error'" class="warning-banner">

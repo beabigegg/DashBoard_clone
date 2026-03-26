@@ -4,6 +4,12 @@ import { computed, onMounted } from 'vue';
 import GaugeBar from '../../admin-shared/components/GaugeBar.vue';
 import StatCard from '../../admin-shared/components/StatCard.vue';
 import TrendChart from '../../admin-shared/components/TrendChart.vue';
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+import SectionCard from '../../shared-ui/components/SectionCard.vue';
+import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
+import DataTable from '../../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 import {
   usePerfDetail,
   usePerfHistory,
@@ -108,12 +114,10 @@ onMounted(() => {
 
 <template>
   <div class="cache-tab">
-    <section v-if="errorMessage" class="panel panel-disabled">
-      <div class="muted">{{ errorMessage }}</div>
-    </section>
+    <ErrorBanner :message="errorMessage" :dismissible="false" />
 
-    <section class="panel" v-if="perfDetail?.redis">
-      <h2 class="panel-title">Redis 快取</h2>
+    <SectionCard v-if="perfDetail?.redis">
+      <template #header><h2 class="panel-title">Redis 快取</h2></template>
       <div class="redis-grid">
         <div class="redis-stats">
           <GaugeBar
@@ -122,30 +126,25 @@ onMounted(() => {
             :max="1"
             :displayText="redisMemoryLabel"
           />
-          <div class="redis-mini-stats">
-            <StatCard :value="perfDetail.redis.used_memory_human" label="已使用" />
-            <StatCard :value="perfDetail.redis.peak_memory_human" label="峰值" />
-            <StatCard :value="perfDetail.redis.connected_clients" label="連線數" />
-            <StatCard :value="hitRateDisplay" label="命中率" />
-          </div>
+          <SummaryCardGroup :columns="2">
+            <SummaryCard label="已使用" :value="perfDetail.redis.used_memory_human" accent="info" />
+            <SummaryCard label="峰值" :value="perfDetail.redis.peak_memory_human" accent="warning" />
+            <SummaryCard label="連線數" :value="perfDetail.redis.connected_clients" accent="brand" />
+            <SummaryCard label="命中率" :value="hitRateDisplay" accent="success" />
+          </SummaryCardGroup>
         </div>
         <div class="redis-namespaces">
-          <table class="mini-table">
-            <thead><tr><th>Namespace</th><th>Key 數量</th></tr></thead>
-            <tbody>
-              <tr v-for="namespace in perfDetail.redis.namespaces" :key="namespace.name">
-                <td>{{ namespace.name }}</td>
-                <td>{{ namespace.key_count }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <DataTable :data="perfDetail.redis.namespaces || []">
+            <DataTableColumn columnKey="name" label="Namespace" />
+            <DataTableColumn columnKey="key_count" label="Key 數量" align="right" />
+          </DataTable>
         </div>
       </div>
-    </section>
-    <section class="panel panel-disabled" v-else-if="perfDetail && !perfDetail.redis">
-      <h2 class="panel-title">Redis 快取</h2>
+    </SectionCard>
+    <SectionCard v-else-if="perfDetail && !perfDetail.redis">
+      <template #header><h2 class="panel-title">Redis 快取</h2></template>
       <p class="muted">Redis 未啟用</p>
-    </section>
+    </SectionCard>
 
     <TrendChart
       v-if="historyData.length > 1"
@@ -154,8 +153,8 @@ onMounted(() => {
       :series="redisTrendSeries"
     />
 
-    <section class="panel" v-if="perfDetail">
-      <h2 class="panel-title">記憶體快取</h2>
+    <SectionCard v-if="perfDetail">
+      <template #header><h2 class="panel-title">記憶體快取</h2></template>
       <div class="cache-cards-grid">
         <div class="cache-card" v-for="(info, name) in perfDetail.process_caches" :key="name">
           <div class="cache-card-name">{{ name }}</div>
@@ -170,47 +169,41 @@ onMounted(() => {
       </div>
       <div class="route-cache-section" v-if="perfDetail.route_cache">
         <h3 class="sub-title">Route Cache</h3>
-        <div class="route-cache-stats">
-          <StatCard :value="perfDetail.route_cache.mode" label="模式" />
-          <StatCard :value="perfDetail.route_cache.l1_size" label="L1 大小" />
-          <StatCard :value="routeCacheL1HitRate" label="L1 命中率" />
-          <StatCard :value="routeCacheL2HitRate" label="L2 命中率" />
-          <StatCard :value="routeCacheMissRate" label="未命中率" />
-          <StatCard :value="perfDetail.route_cache.reads_total" label="總讀取" />
-        </div>
+        <SummaryCardGroup :columns="6">
+          <SummaryCard label="模式" :value="perfDetail.route_cache.mode" accent="neutral" />
+          <SummaryCard label="L1 大小" :value="perfDetail.route_cache.l1_size" accent="info" />
+          <SummaryCard label="L1 命中率" :value="routeCacheL1HitRate" accent="success" />
+          <SummaryCard label="L2 命中率" :value="routeCacheL2HitRate" accent="brand" />
+          <SummaryCard label="未命中率" :value="routeCacheMissRate" accent="warning" />
+          <SummaryCard label="總讀取" :value="perfDetail.route_cache.reads_total" accent="info" />
+        </SummaryCardGroup>
       </div>
-    </section>
+    </SectionCard>
 
-    <section
-      class="panel"
+    <SectionCard
       v-if="perfDetail?.pareto_materialization && !perfDetail.pareto_materialization.error"
     >
-      <h2 class="panel-title">Pareto 物化層</h2>
-      <div class="pareto-stats-grid">
-        <StatCard :value="paretoHitRateDisplay" label="命中率" />
-        <StatCard :value="perfDetail.pareto_materialization.hit" label="命中次數" />
-        <StatCard :value="perfDetail.pareto_materialization.miss" label="未命中次數" />
-        <StatCard :value="perfDetail.pareto_materialization.build" label="建構次數" />
-        <StatCard :value="perfDetail.pareto_materialization.build_ok" label="建構成功" />
-        <StatCard :value="perfDetail.pareto_materialization.build_fail" label="建構失敗" />
-        <StatCard :value="perfDetail.pareto_materialization.fallback" label="Fallback 次數" />
-        <StatCard :value="perfDetail.pareto_materialization.rejected_oversize" label="超大拒絕" />
-        <StatCard :value="paretoBuildLatencyDisplay" label="最近建構耗時" />
-        <StatCard :value="paretoPayloadDisplay" label="Snapshot 大小" />
-      </div>
+      <template #header><h2 class="panel-title">Pareto 物化層</h2></template>
+      <SummaryCardGroup :columns="5">
+        <SummaryCard label="命中率" :value="paretoHitRateDisplay" accent="success" />
+        <SummaryCard label="命中次數" :value="perfDetail.pareto_materialization.hit" accent="success" />
+        <SummaryCard label="未命中次數" :value="perfDetail.pareto_materialization.miss" accent="warning" />
+        <SummaryCard label="建構次數" :value="perfDetail.pareto_materialization.build" accent="info" />
+        <SummaryCard label="建構成功" :value="perfDetail.pareto_materialization.build_ok" accent="success" />
+        <SummaryCard label="建構失敗" :value="perfDetail.pareto_materialization.build_fail" accent="danger" />
+        <SummaryCard label="Fallback 次數" :value="perfDetail.pareto_materialization.fallback" accent="warning" />
+        <SummaryCard label="超大拒絕" :value="perfDetail.pareto_materialization.rejected_oversize" accent="danger" />
+        <SummaryCard label="最近建構耗時" :value="paretoBuildLatencyDisplay" accent="neutral" />
+        <SummaryCard label="Snapshot 大小" :value="paretoPayloadDisplay" accent="neutral" />
+      </SummaryCardGroup>
       <div class="pareto-fallback-reasons" v-if="paretoFallbackReasons.length">
         <h3 class="sub-title">Fallback 原因分布</h3>
-        <table class="mini-table">
-          <thead><tr><th>原因</th><th>次數</th></tr></thead>
-          <tbody>
-            <tr v-for="reason in paretoFallbackReasons" :key="reason.reason">
-              <td>{{ reason.reason }}</td>
-              <td>{{ reason.count }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <DataTable :data="paretoFallbackReasons">
+          <DataTableColumn columnKey="reason" label="原因" />
+          <DataTableColumn columnKey="count" label="次數" align="right" />
+        </DataTable>
       </div>
-    </section>
+    </SectionCard>
 
     <TrendChart
       v-if="historyData.length > 1"

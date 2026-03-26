@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive } from 'vue';
-import { useSortableTable } from '../../shared-composables/useSortableTable.js';
-import Pagination from '../../shared-ui/components/PaginationControl.vue';
+import DataTable from '../../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 
 const props = defineProps({
   items: {
@@ -28,9 +28,6 @@ const props = defineProps({
 
 const emit = defineEmits(['prev-page', 'next-page']);
 
-const itemsRef = computed(() => props.items);
-const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(itemsRef);
-
 const pageSummary = computed(() => {
   const page = Number(props.pagination?.page || 1);
   const perPage = Number(props.pagination?.perPage || 20);
@@ -49,6 +46,16 @@ const pageInfo = computed(() => {
   const page = Number(props.pagination?.page || 1);
   const totalPages = Number(props.pagination?.totalPages || 1);
   return `Page ${page} / ${totalPages}`;
+});
+
+const tablePagination = computed(() => {
+  const totalPages = Number(props.pagination?.totalPages || 1);
+  if (totalPages <= 1) return null;
+  return {
+    page: Number(props.pagination?.page || 1),
+    totalPages,
+    infoText: pageInfo.value,
+  };
 });
 
 function formatNumber(value) {
@@ -82,6 +89,15 @@ function showTip(event) {
 function hideTip() {
   tip.visible = false;
 }
+
+function handlePageChange(newPage) {
+  const currentPage = Number(props.pagination?.page || 1);
+  if (newPage < currentPage) {
+    emit('prev-page');
+  } else if (newPage > currentPage) {
+    emit('next-page');
+  }
+}
 </script>
 
 <template>
@@ -91,66 +107,54 @@ function hideTip() {
       <div class="table-info">{{ pageSummary }}</div>
     </div>
 
-    <div class="card-body ui-card-body detail-table-wrap" :class="{ paginating: paginating }">
-      <table class="detail-table">
-        <thead>
-          <tr>
-            <th class="cursor-pointer" @click="toggleSort('lotId')" :aria-sort="sortKey === 'lotId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Lot ID <span>{{ sortKey === 'lotId' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('workorder')" :aria-sort="sortKey === 'workorder' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WorkOrder <span>{{ sortKey === 'workorder' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('product')" :aria-sort="sortKey === 'product' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Product <span>{{ sortKey === 'product' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('workcenter')" :aria-sort="sortKey === 'workcenter' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">站別 <span>{{ sortKey === 'workcenter' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('holdReason')" :aria-sort="sortKey === 'holdReason' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold Reason <span>{{ sortKey === 'holdReason' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('qty')" :aria-sort="sortKey === 'qty' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">數量 <span>{{ sortKey === 'qty' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('holdDate')" :aria-sort="sortKey === 'holdDate' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold 時間 <span>{{ sortKey === 'holdDate' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('holdEmp')" :aria-sort="sortKey === 'holdEmp' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold 人員 <span>{{ sortKey === 'holdEmp' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('holdComment')" :aria-sort="sortKey === 'holdComment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Hold Comment <span>{{ sortKey === 'holdComment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('releaseDate')" :aria-sort="sortKey === 'releaseDate' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Release 時間 <span>{{ sortKey === 'releaseDate' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('releaseEmp')" :aria-sort="sortKey === 'releaseEmp' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Release 人員 <span>{{ sortKey === 'releaseEmp' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('releaseComment')" :aria-sort="sortKey === 'releaseComment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Release Comment <span>{{ sortKey === 'releaseComment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('holdHours')" :aria-sort="sortKey === 'holdHours' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">時長(hr) <span>{{ sortKey === 'holdHours' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('ncr')" :aria-sort="sortKey === 'ncr' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">NCR <span>{{ sortKey === 'ncr' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('futureHoldComment')" :aria-sort="sortKey === 'futureHoldComment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Future Hold Comment <span>{{ sortKey === 'futureHoldComment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td colspan="15" class="placeholder">Loading...</td>
-          </tr>
-          <tr v-else-if="errorMessage">
-            <td colspan="15" class="placeholder">{{ errorMessage }}</td>
-          </tr>
-          <tr v-else-if="sortedData.length === 0">
-            <td colspan="15" class="placeholder">No data</td>
-          </tr>
-          <tr v-for="item in sortedData" v-else :key="`${item.lotId}-${item.holdDate}-${item.releaseDate}`">
-            <td>{{ item.lotId || '-' }}</td>
-            <td>{{ item.workorder || '-' }}</td>
-            <td>{{ item.product || '-' }}</td>
-            <td>{{ item.workcenter || '-' }}</td>
-            <td>{{ item.holdReason || '-' }}</td>
-            <td>{{ formatNumber(item.qty) }}</td>
-            <td>{{ item.holdDate || '-' }}</td>
-            <td>{{ item.holdEmp || '-' }}</td>
-            <td class="cell-comment" :data-tip="item.holdComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ item.holdComment || '-' }}</td>
-            <td>{{ item.releaseDate || '仍在 Hold' }}</td>
-            <td>{{ item.releaseEmp || '-' }}</td>
-            <td class="cell-comment" :data-tip="item.releaseComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ item.releaseComment || '-' }}</td>
-            <td>{{ formatHours(item.holdHours) }}</td>
-            <td>{{ item.ncr || '-' }}</td>
-            <td class="cell-comment" :data-tip="item.futureHoldComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ item.futureHoldComment || '-' }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <div class="card-body ui-card-body">
+      <DataTable
+        :data="items"
+        :loading="loading || paginating"
+        :pagination="tablePagination"
+        @page-change="handlePageChange"
+      >
+        <DataTableColumn columnKey="lotId" label="Lot ID" :sortable="true" />
+        <DataTableColumn columnKey="workorder" label="WorkOrder" :sortable="true" />
+        <DataTableColumn columnKey="product" label="Product" :sortable="true" />
+        <DataTableColumn columnKey="workcenter" label="站別" :sortable="true" />
+        <DataTableColumn columnKey="holdReason" label="Hold Reason" :sortable="true" />
+        <DataTableColumn columnKey="qty" label="數量" :sortable="true" align="right" />
+        <DataTableColumn columnKey="holdDate" label="Hold 時間" :sortable="true" />
+        <DataTableColumn columnKey="holdEmp" label="Hold 人員" :sortable="true" />
+        <DataTableColumn columnKey="holdComment" label="Hold Comment" :sortable="true" />
+        <DataTableColumn columnKey="releaseDate" label="Release 時間" :sortable="true" />
+        <DataTableColumn columnKey="releaseEmp" label="Release 人員" :sortable="true" />
+        <DataTableColumn columnKey="releaseComment" label="Release Comment" :sortable="true" />
+        <DataTableColumn columnKey="holdHours" label="時長(hr)" :sortable="true" align="right" />
+        <DataTableColumn columnKey="ncr" label="NCR" :sortable="true" />
+        <DataTableColumn columnKey="futureHoldComment" label="Future Hold Comment" :sortable="true" />
 
-    <Pagination
-      :visible="Number(pagination.totalPages || 1) > 1"
-      :page="Number(pagination.page || 1)"
-      :total-pages="Number(pagination.totalPages || 1)"
-      :info-text="pageInfo"
-      @prev="emit('prev-page')"
-      @next="emit('next-page')"
-    />
+        <template #cell="{ row, columnKey, value }">
+          <template v-if="columnKey === 'lotId'">{{ row.lotId || '-' }}</template>
+          <template v-else-if="columnKey === 'workorder'">{{ row.workorder || '-' }}</template>
+          <template v-else-if="columnKey === 'product'">{{ row.product || '-' }}</template>
+          <template v-else-if="columnKey === 'workcenter'">{{ row.workcenter || '-' }}</template>
+          <template v-else-if="columnKey === 'holdReason'">{{ row.holdReason || '-' }}</template>
+          <template v-else-if="columnKey === 'qty'">{{ formatNumber(row.qty) }}</template>
+          <template v-else-if="columnKey === 'holdDate'">{{ row.holdDate || '-' }}</template>
+          <template v-else-if="columnKey === 'holdEmp'">{{ row.holdEmp || '-' }}</template>
+          <template v-else-if="columnKey === 'holdComment'">
+            <span class="cell-comment" :data-tip="row.holdComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ row.holdComment || '-' }}</span>
+          </template>
+          <template v-else-if="columnKey === 'releaseDate'">{{ row.releaseDate || '仍在 Hold' }}</template>
+          <template v-else-if="columnKey === 'releaseEmp'">{{ row.releaseEmp || '-' }}</template>
+          <template v-else-if="columnKey === 'releaseComment'">
+            <span class="cell-comment" :data-tip="row.releaseComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ row.releaseComment || '-' }}</span>
+          </template>
+          <template v-else-if="columnKey === 'holdHours'">{{ formatHours(row.holdHours) }}</template>
+          <template v-else-if="columnKey === 'ncr'">{{ row.ncr || '-' }}</template>
+          <template v-else-if="columnKey === 'futureHoldComment'">
+            <span class="cell-comment" :data-tip="row.futureHoldComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ row.futureHoldComment || '-' }}</span>
+          </template>
+        </template>
+      </DataTable>
+    </div>
   </section>
 
   <Teleport to="body">

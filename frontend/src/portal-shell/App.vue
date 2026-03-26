@@ -1,6 +1,7 @@
 <script setup>
 import './ai-chat.css';
 
+import { ChevronRight } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -310,7 +311,7 @@ watch(isLoginPage, (isLogin, wasLogin) => {
         <div v-if="navigationNotice" class="notice-banner">{{ navigationNotice }}</div>
         <div class="breadcrumb">
           <span v-if="breadcrumb.drawerName">{{ breadcrumb.drawerName }}</span>
-          <span v-if="breadcrumb.drawerName">/</span>
+          <ChevronRight v-if="breadcrumb.drawerName" :size="14" class="breadcrumb-separator" />
           <span>{{ breadcrumb.title }}</span>
         </div>
         <RouterView />

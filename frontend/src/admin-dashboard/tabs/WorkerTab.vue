@@ -6,6 +6,12 @@ import GaugeBar from '../../admin-shared/components/GaugeBar.vue';
 import StatCard from '../../admin-shared/components/StatCard.vue';
 import StatusDot from '../../admin-shared/components/StatusDot.vue';
 import TrendChart from '../../admin-shared/components/TrendChart.vue';
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+import SectionCard from '../../shared-ui/components/SectionCard.vue';
+import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
+import DataTable from '../../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 import {
   usePerfDetail,
   usePerfHistory,
@@ -187,9 +193,7 @@ onMounted(() => {
 
 <template>
   <div class="worker-tab">
-    <section v-if="errorMessage" class="panel panel-disabled">
-      <div class="muted">{{ errorMessage }}</div>
-    </section>
+    <ErrorBanner :message="errorMessage" :dismissible="false" />
 
     <TrendChart
       v-if="historyData.length > 1"
@@ -199,8 +203,8 @@ onMounted(() => {
       yAxisLabel="MB"
     />
 
-    <section class="panel" v-if="perfDetail?.worker_memory_guard?.enabled">
-      <h2 class="panel-title">Worker 記憶體守衛</h2>
+    <SectionCard v-if="perfDetail?.worker_memory_guard?.enabled">
+      <template #header><h2 class="panel-title">Worker 記憶體守衛</h2></template>
       <GaugeBar
         label="RSS 使用率"
         :value="perfDetail.worker_memory_guard.rss_pct"
@@ -210,21 +214,20 @@ onMounted(() => {
         :warningThreshold="0.7"
         :dangerThreshold="0.85"
       />
-      <div class="memory-guard-stats">
-        <StatCard :value="perfDetail.worker_memory_guard.last_rss_mb?.toFixed(1)" label="當前 RSS (MB)" />
-        <StatCard :value="perfDetail.worker_memory_guard.limit_mb" label="上限 (MB)" />
-        <StatCard :value="memoryGuardLevelDisplay" label="壓力等級" />
-        <StatCard :value="perfDetail.worker_memory_guard.warn_count" label="警告次數" />
-        <StatCard :value="perfDetail.worker_memory_guard.evict_count" label="驅逐次數" />
-        <StatCard :value="perfDetail.worker_memory_guard.restart_count" label="重啟次數" />
-      </div>
-    </section>
+      <SummaryCardGroup :columns="6">
+        <SummaryCard label="當前 RSS (MB)" :value="perfDetail.worker_memory_guard.last_rss_mb?.toFixed(1)" accent="info" />
+        <SummaryCard label="上限 (MB)" :value="perfDetail.worker_memory_guard.limit_mb" accent="neutral" />
+        <SummaryCard label="壓力等級" :value="memoryGuardLevelDisplay" accent="warning" />
+        <SummaryCard label="警告次數" :value="perfDetail.worker_memory_guard.warn_count" accent="warning" />
+        <SummaryCard label="驅逐次數" :value="perfDetail.worker_memory_guard.evict_count" accent="danger" />
+        <SummaryCard label="重啟次數" :value="perfDetail.worker_memory_guard.restart_count" accent="danger" />
+      </SummaryCardGroup>
+    </SectionCard>
 
-    <section
-      class="panel"
+    <SectionCard
       v-if="perfDetail?.async_workers && !perfDetail.async_workers.error"
     >
-      <h2 class="panel-title">非同步查詢 Worker</h2>
+      <template #header><h2 class="panel-title">非同步查詢 Worker</h2></template>
 
       <div class="status-cards-grid">
         <div class="status-card">
@@ -262,64 +265,62 @@ onMounted(() => {
       />
 
       <h3 class="sub-title">Worker 狀態</h3>
-      <table class="mini-table" v-if="rqWorkers.length">
-        <thead>
-          <tr>
-            <th>名稱</th>
-            <th>狀態</th>
-            <th>目前任務</th>
-            <th>佇列</th>
-            <th>成功</th>
-            <th>失敗</th>
-            <th>已運行</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="worker in rqWorkers" :key="worker.name">
-            <td>{{ worker.name }}</td>
-            <td>
-              <span class="rq-worker-state-dot" :class="`rq-worker-state-dot--${workerStateColor(worker.state)}`"></span>
-              {{ worker.state }}
-            </td>
-            <td class="rq-job-id">{{ worker.current_job || '-' }}</td>
-            <td>{{ worker.queues?.join(', ') || '-' }}</td>
-            <td>{{ worker.successful_job_count ?? 0 }}</td>
-            <td>{{ worker.failed_job_count ?? 0 }}</td>
-            <td>{{ formatUptime(worker.birth_date) }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <DataTable v-if="rqWorkers.length" :data="rqWorkers">
+        <DataTableColumn columnKey="name" label="名稱" />
+        <DataTableColumn columnKey="state" label="狀態" />
+        <DataTableColumn columnKey="current_job" label="目前任務" />
+        <DataTableColumn columnKey="queues" label="佇列" />
+        <DataTableColumn columnKey="successful_job_count" label="成功" align="right" />
+        <DataTableColumn columnKey="failed_job_count" label="失敗" align="right" />
+        <DataTableColumn columnKey="birth_date" label="已運行" />
+        <template #cell="{ row, columnKey, value }">
+          <template v-if="columnKey === 'state'">
+            <span class="rq-worker-state-dot" :class="`rq-worker-state-dot--${workerStateColor(row.state)}`"></span>
+            {{ row.state }}
+          </template>
+          <template v-else-if="columnKey === 'current_job'">
+            <span class="rq-job-id">{{ row.current_job || '-' }}</span>
+          </template>
+          <template v-else-if="columnKey === 'queues'">
+            {{ row.queues?.join(', ') || '-' }}
+          </template>
+          <template v-else-if="columnKey === 'successful_job_count'">
+            {{ row.successful_job_count ?? 0 }}
+          </template>
+          <template v-else-if="columnKey === 'failed_job_count'">
+            {{ row.failed_job_count ?? 0 }}
+          </template>
+          <template v-else-if="columnKey === 'birth_date'">
+            {{ formatUptime(row.birth_date) }}
+          </template>
+          <template v-else>{{ value }}</template>
+        </template>
+      </DataTable>
       <p class="muted" v-else>無活躍 Worker</p>
 
       <h3 class="sub-title">佇列狀態</h3>
-      <table class="mini-table" v-if="rqQueues.length">
-        <thead>
-          <tr>
-            <th>佇列名稱</th>
-            <th>排隊深度</th>
-            <th>執行中</th>
-            <th>失敗</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="queue in rqQueues" :key="queue.name">
-            <td>{{ queue.name }}</td>
-            <td>{{ queue.depth ?? 0 }}</td>
-            <td>{{ queue.started ?? 0 }}</td>
-            <td>{{ queue.failed ?? 0 }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <DataTable v-if="rqQueues.length" :data="rqQueues">
+        <DataTableColumn columnKey="name" label="佇列名稱" />
+        <DataTableColumn columnKey="depth" label="排隊深度" align="right" />
+        <DataTableColumn columnKey="started" label="執行中" align="right" />
+        <DataTableColumn columnKey="failed" label="失敗" align="right" />
+        <template #cell="{ row, columnKey, value }">
+          <template v-if="columnKey === 'depth'">{{ row.depth ?? 0 }}</template>
+          <template v-else-if="columnKey === 'started'">{{ row.started ?? 0 }}</template>
+          <template v-else-if="columnKey === 'failed'">{{ row.failed ?? 0 }}</template>
+          <template v-else>{{ value }}</template>
+        </template>
+      </DataTable>
       <p class="muted" v-else>無佇列資料</p>
-    </section>
-    <section class="panel panel-disabled" v-else-if="perfDetail && perfDetail.async_workers?.error">
-      <h2 class="panel-title">非同步查詢 Worker</h2>
+    </SectionCard>
+    <SectionCard v-else-if="perfDetail && perfDetail.async_workers?.error">
+      <template #header><h2 class="panel-title">非同步查詢 Worker</h2></template>
       <p class="muted">RQ Worker 監控不可用：{{ perfDetail.async_workers.error }}</p>
-    </section>
-    <section class="panel panel-disabled" v-else-if="perfDetail && !perfDetail.async_workers">
-      <h2 class="panel-title">非同步查詢 Worker</h2>
+    </SectionCard>
+    <SectionCard v-else-if="perfDetail && !perfDetail.async_workers">
+      <template #header><h2 class="panel-title">非同步查詢 Worker</h2></template>
       <p class="muted">RQ Worker 監控不可用</p>
-    </section>
+    </SectionCard>
 
     <TrendChart
       v-if="historyData.length > 1"
@@ -335,57 +336,55 @@ onMounted(() => {
       :series="asyncQueueTrendSeries"
     />
 
-    <section class="panel" v-if="storageInfo">
-      <h2 class="panel-title">儲存空間管理</h2>
+    <SectionCard v-if="storageInfo">
+      <template #header><h2 class="panel-title">儲存空間管理</h2></template>
       <p class="storage-total">總使用量：{{ formatBytes(storageInfo.total_bytes) }}</p>
 
       <div class="storage-section">
         <h4>SQLite 資料庫</h4>
-        <table class="mini-table">
-          <thead><tr><th>檔案</th><th>大小</th><th>操作</th></tr></thead>
-          <tbody>
-            <tr v-for="file in storageInfo.sqlite_files" :key="file.path">
-              <td>{{ file.path }}</td>
-              <td>{{ formatBytes(file.size_bytes) }}</td>
-              <td>
-                <button
-                  v-if="file.path.includes('metrics_history')"
-                  class="ui-btn ui-btn--danger ui-btn--sm"
-                  :disabled="storagePurging"
-                  @click="purgeMetricsHistory"
-                >
-                  清除快照
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <DataTable :data="storageInfo.sqlite_files || []">
+          <DataTableColumn columnKey="path" label="檔案" />
+          <DataTableColumn columnKey="size_bytes" label="大小" align="right" />
+          <DataTableColumn columnKey="actions" label="操作" />
+          <template #cell="{ row, columnKey }">
+            <template v-if="columnKey === 'size_bytes'">{{ formatBytes(row.size_bytes) }}</template>
+            <template v-else-if="columnKey === 'actions'">
+              <button
+                v-if="row.path.includes('metrics_history')"
+                class="ui-btn ui-btn--danger ui-btn--sm"
+                :disabled="storagePurging"
+                @click="purgeMetricsHistory"
+              >
+                清除快照
+              </button>
+            </template>
+            <template v-else>{{ row[columnKey] }}</template>
+          </template>
+        </DataTable>
       </div>
 
       <div class="storage-section">
         <h4>Log 檔案</h4>
-        <table class="mini-table">
-          <thead><tr><th>檔案</th><th>大小</th></tr></thead>
-          <tbody>
-            <tr v-for="file in storageInfo.log_files" :key="file.path">
-              <td>{{ file.path }}</td>
-              <td>{{ formatBytes(file.size_bytes) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <DataTable :data="storageInfo.log_files || []">
+          <DataTableColumn columnKey="path" label="檔案" />
+          <DataTableColumn columnKey="size_bytes" label="大小" align="right" />
+          <template #cell="{ row, columnKey }">
+            <template v-if="columnKey === 'size_bytes'">{{ formatBytes(row.size_bytes) }}</template>
+            <template v-else>{{ row[columnKey] }}</template>
+          </template>
+        </DataTable>
       </div>
 
       <div class="storage-section" v-if="storageInfo.archive_files?.length">
         <h4>Archive ({{ storageInfo.archive_files.length }} 檔, {{ formatBytes(storageInfo.archive_total_bytes) }})</h4>
-        <table class="mini-table">
-          <thead><tr><th>檔案</th><th>大小</th></tr></thead>
-          <tbody>
-            <tr v-for="file in storageInfo.archive_files" :key="file.path">
-              <td>{{ file.path }}</td>
-              <td>{{ formatBytes(file.size_bytes) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <DataTable :data="storageInfo.archive_files || []">
+          <DataTableColumn columnKey="path" label="檔案" />
+          <DataTableColumn columnKey="size_bytes" label="大小" align="right" />
+          <template #cell="{ row, columnKey }">
+            <template v-if="columnKey === 'size_bytes'">{{ formatBytes(row.size_bytes) }}</template>
+            <template v-else>{{ row[columnKey] }}</template>
+          </template>
+        </DataTable>
       </div>
 
       <div class="storage-actions">
@@ -403,15 +402,15 @@ onMounted(() => {
           全部清理
         </button>
       </div>
-    </section>
+    </SectionCard>
 
-    <section class="panel">
-      <h2 class="panel-title">Worker 控制</h2>
-      <div class="worker-info">
-        <StatCard :value="workerData?.worker_pid" label="PID" />
-        <StatCard :value="workerStartTimeDisplay" label="啟動時間" />
-        <StatCard :value="cooldownDisplay" label="冷卻狀態" />
-      </div>
+    <SectionCard>
+      <template #header><h2 class="panel-title">Worker 控制</h2></template>
+      <SummaryCardGroup :columns="3">
+        <SummaryCard label="PID" :value="workerData?.worker_pid" accent="info" />
+        <SummaryCard label="啟動時間" :value="workerStartTimeDisplay" accent="neutral" />
+        <SummaryCard label="冷卻狀態" :value="cooldownDisplay" accent="brand" />
+      </SummaryCardGroup>
       <button
         class="ui-btn ui-btn--danger"
         :disabled="workerCooldownActive"
@@ -432,6 +431,6 @@ onMounted(() => {
           </div>
         </div>
       </div>
-    </section>
+    </SectionCard>
   </div>
 </template>

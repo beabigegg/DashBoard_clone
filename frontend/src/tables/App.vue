@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import TableCatalog from './components/TableCatalog.vue';
 import DataViewer from './components/DataViewer.vue';
 import { useTableData } from './composables/useTableData.js';
@@ -79,9 +80,7 @@ onMounted(() => {
       </header>
 
       <main class="content">
-        <div v-if="pageError" class="error-banner">
-          {{ pageError }}
-        </div>
+        <ErrorBanner :message="pageError" :dismissible="false" />
 
         <div v-if="isInitialLoading" class="loading-panel">
           正在載入表格設定...

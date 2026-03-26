@@ -1,4 +1,8 @@
 <script setup>
+import DataTable from '../../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
+import SectionCard from '../../shared-ui/components/SectionCard.vue';
+
 const props = defineProps({
   rows: { type: Array, default: () => [] },
   pagination: {
@@ -11,21 +15,6 @@ const props = defineProps({
 
 const emit = defineEmits(['page-change']);
 
-const COLUMNS = [
-  { key: 'lot_id',        label: 'LotID' },
-  { key: 'pj_type',       label: 'Type' },
-  { key: 'bop',           label: 'BOP' },
-  { key: 'work_order',    label: 'WorkOrder' },
-  { key: 'wafer_lot',     label: 'WaferLot' },
-  { key: 'workcenter',    label: 'WorkCenter' },
-  { key: 'spec',          label: 'Spec' },
-  { key: 'equipment_name',label: 'EquipName' },
-  { key: 'trackin_time',  label: 'TrackIn' },
-  { key: 'trackout_time', label: 'TrackOut' },
-  { key: 'trackin_qty',   label: 'InQTY' },
-  { key: 'trackout_qty',  label: 'OutQTY' },
-];
-
 function formatTs(value) {
   if (!value) return '';
   try {
@@ -36,78 +25,52 @@ function formatTs(value) {
     return String(value);
   }
 }
-
-function cellValue(row, key) {
-  const v = row[key];
-  if (key === 'trackin_time' || key === 'trackout_time') return formatTs(v);
-  return v ?? '';
-}
 </script>
 
 <template>
-  <div class="ui-card">
-    <div class="ui-card-header" style="display:flex;align-items:center;justify-content:space-between;">
-      <span class="ui-card-title">明細資料</span>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span class="ph-detail-count">
-          共 {{ pagination.total_rows.toLocaleString() }} 筆
-        </span>
-        <a
-          v-if="exportUrl"
-          :href="exportUrl"
-          class="ui-btn ui-btn--ghost"
-          download
-        >
-          匯出 CSV
-        </a>
+  <SectionCard>
+    <template #header>
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+        <span class="ui-card-title">明細資料</span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="ph-detail-count">
+            共 {{ pagination.total_rows.toLocaleString() }} 筆
+          </span>
+          <a
+            v-if="exportUrl"
+            :href="exportUrl"
+            class="ui-btn ui-btn--ghost"
+            download
+          >
+            匯出 CSV
+          </a>
+        </div>
       </div>
-    </div>
+    </template>
 
-    <div
-      class="detail-table-wrap ui-table-wrap"
-      :class="{ 'is-loading': loading }"
+    <DataTable
+      :data="rows"
+      :loading="loading"
+      :pagination="pagination.total_pages > 1 ? { page: pagination.page, totalPages: pagination.total_pages, infoText: `${pagination.page} / ${pagination.total_pages}` } : null"
+      @page-change="(p) => emit('page-change', p)"
     >
-      <table class="detail-table">
-        <thead>
-          <tr>
-            <th v-for="col in COLUMNS" :key="col.key">
-              {{ col.label }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td :colspan="COLUMNS.length" class="placeholder">載入中…</td>
-          </tr>
-          <tr v-else-if="!rows.length">
-            <td :colspan="COLUMNS.length" class="placeholder">無資料</td>
-          </tr>
-          <tr v-for="(row, idx) in rows" v-else :key="idx">
-            <td v-for="col in COLUMNS" :key="col.key">
-              {{ cellValue(row, col.key) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Pagination -->
-    <div v-if="pagination.total_pages > 1" class="pagination">
-      <button
-        :disabled="pagination.page <= 1 || loading"
-        @click="emit('page-change', pagination.page - 1)"
-      >
-        上一頁
-      </button>
-      <span class="page-info">
-        {{ pagination.page }} / {{ pagination.total_pages }}
-      </span>
-      <button
-        :disabled="pagination.page >= pagination.total_pages || loading"
-        @click="emit('page-change', pagination.page + 1)"
-      >
-        下一頁
-      </button>
-    </div>
-  </div>
+      <DataTableColumn columnKey="lot_id" label="LotID" />
+      <DataTableColumn columnKey="pj_type" label="Type" />
+      <DataTableColumn columnKey="bop" label="BOP" />
+      <DataTableColumn columnKey="work_order" label="WorkOrder" />
+      <DataTableColumn columnKey="wafer_lot" label="WaferLot" />
+      <DataTableColumn columnKey="workcenter" label="WorkCenter" />
+      <DataTableColumn columnKey="spec" label="Spec" />
+      <DataTableColumn columnKey="equipment_name" label="EquipName" />
+      <DataTableColumn columnKey="trackin_time" label="TrackIn" />
+      <DataTableColumn columnKey="trackout_time" label="TrackOut" />
+      <DataTableColumn columnKey="trackin_qty" label="InQTY" align="right" />
+      <DataTableColumn columnKey="trackout_qty" label="OutQTY" align="right" />
+      <template #cell="{ row, columnKey, value }">
+        <template v-if="columnKey === 'trackin_time'">{{ formatTs(value) }}</template>
+        <template v-else-if="columnKey === 'trackout_time'">{{ formatTs(value) }}</template>
+        <template v-else>{{ value ?? '' }}</template>
+      </template>
+    </DataTable>
+  </SectionCard>
 </template>

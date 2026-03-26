@@ -1,4 +1,7 @@
 <script setup>
+import SummaryCard from '../../shared-ui/components/SummaryCard.vue'
+import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue'
+
 const props = defineProps({
   summary: {
     type: Object,
@@ -12,54 +15,19 @@ const props = defineProps({
       avgHoldHours: 0,
     }),
   },
-});
-
-function formatNumber(value) {
-  return Number(value || 0).toLocaleString('zh-TW');
-}
-
-function formatHours(value) {
-  return `${Number(value || 0).toFixed(1)} hr`;
-}
+})
 </script>
 
 <template>
-  <section class="summary-row hold-history-summary-row">
-    <article class="summary-card stat-negative-red">
-      <div class="summary-label">On Hold 數量</div>
-      <div class="summary-value">{{ formatNumber(summary.stillOnHoldCount) }}</div>
-    </article>
-
-    <article class="summary-card stat-negative-orange">
-      <div class="summary-label">最末日新增 Hold</div>
-      <div class="summary-value">{{ formatNumber(summary.newHoldSnapshotCount) }}</div>
-    </article>
-
-    <article class="summary-card stat-negative-red">
-      <div class="summary-label">累計新增 Hold</div>
-      <div class="summary-value">{{ formatNumber(summary.newHoldQty) }}</div>
-    </article>
-
-    <article class="summary-card stat-positive">
-      <div class="summary-label">累計 Release</div>
-      <div class="summary-value">{{ formatNumber(summary.releaseQty) }}</div>
-    </article>
-
-    <article class="summary-card stat-negative-orange">
-      <div class="summary-label">累計 Future Hold</div>
-      <div class="summary-value">{{ formatNumber(summary.futureHoldQty) }}</div>
-    </article>
-
-    <article class="summary-card">
-      <div class="summary-label">累計淨變動 (Release - New - Future)</div>
-      <div class="summary-value" :class="{ positive: summary.netChange >= 0, negative: summary.netChange < 0 }">
-        {{ formatNumber(summary.netChange) }}
-      </div>
-    </article>
-
-    <article class="summary-card">
-      <div class="summary-label">平均 Hold 時長</div>
-      <div class="summary-value">{{ formatHours(summary.avgHoldHours) }}</div>
-    </article>
-  </section>
+  <SummaryCardGroup :columns="7">
+    <SummaryCard label="On Hold 數量"     :value="summary.stillOnHoldCount"    format="number"   accent="danger" />
+    <SummaryCard label="最末日新增 Hold"  :value="summary.newHoldSnapshotCount" format="number"   accent="warning" />
+    <SummaryCard label="累計新增 Hold"    :value="summary.newHoldQty"           format="number"   accent="danger" />
+    <SummaryCard label="累計 Release"     :value="summary.releaseQty"           format="number"   accent="success" />
+    <SummaryCard label="累計 Future Hold" :value="summary.futureHoldQty"        format="number"   accent="warning" />
+    <SummaryCard label="累計淨變動"       :value="summary.netChange"            format="number"   :accent="summary.netChange >= 0 ? 'success' : 'danger'" />
+    <SummaryCard label="平均 Hold 時長"   :value="summary.avgHoldHours"         format="duration" accent="neutral">
+      <template #sub>hr</template>
+    </SummaryCard>
+  </SummaryCardGroup>
 </template>

@@ -1,6 +1,7 @@
 <script setup>
-import { computed, ref } from 'vue';
-import { useSortableTable } from '../../shared-composables/useSortableTable.js';
+import { computed } from 'vue';
+import DataTable from '../../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 
 const props = defineProps({
   items: { type: Array, default: () => [] },
@@ -14,15 +15,20 @@ const props = defineProps({
   selectedParetoSummary: { type: String, default: '' },
 });
 
-defineEmits(['go-to-page', 'clear-pareto-selection']);
+const emit = defineEmits(['go-to-page', 'clear-pareto-selection']);
 
-const itemsRef = computed(() => props.items);
-const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(itemsRef);
-
-const showRejectBreakdown = ref(false);
+const tablePagination = computed(() => ({
+  page: props.pagination.page,
+  totalPages: props.pagination.totalPages,
+  infoText: `共 ${Number(props.pagination.total || 0).toLocaleString('zh-TW')} 筆`,
+}));
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('zh-TW');
+}
+
+function onPageChange(newPage) {
+  emit('go-to-page', newPage);
 }
 </script>
 
@@ -33,74 +39,112 @@ function formatNumber(value) {
         明細列表
         <span v-if="selectedParetoCount > 0" class="detail-reason-badge">
           Pareto 篩選: {{ selectedParetoSummary || `${selectedParetoCount} 項` }}
-          <button type="button" class="badge-clear" @click="$emit('clear-pareto-selection')">×</button>
+          <button type="button" class="badge-clear" @click="emit('clear-pareto-selection')">×</button>
         </span>
       </div>
     </div>
-    <div class="card-body ui-card-body detail-table-wrap" :class="{ 'is-loading': loading, 'is-paginating': paginating }">
-      <div v-if="loading" class="table-loading-overlay"><span class="table-spinner"></span></div>
-      <table class="detail-table">
-        <thead>
-          <tr>
-            <th class="cursor-pointer" @click="toggleSort('CONTAINERNAME')" :aria-sort="sortKey === 'CONTAINERNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOT <span>{{ sortKey === 'CONTAINERNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('WORKCENTERNAME')" :aria-sort="sortKey === 'WORKCENTERNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WORKCENTER <span>{{ sortKey === 'WORKCENTERNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('PRODUCTLINENAME')" :aria-sort="sortKey === 'PRODUCTLINENAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'PRODUCTLINENAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('PJ_FUNCTION')" :aria-sort="sortKey === 'PJ_FUNCTION' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">FUNCTION <span>{{ sortKey === 'PJ_FUNCTION' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="col-left cursor-pointer" @click="toggleSort('PJ_TYPE')" :aria-sort="sortKey === 'PJ_TYPE' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">TYPE <span>{{ sortKey === 'PJ_TYPE' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('WORKFLOWNAME')" :aria-sort="sortKey === 'WORKFLOWNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WORKFLOW <span>{{ sortKey === 'WORKFLOWNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('PRODUCTNAME')" :aria-sort="sortKey === 'PRODUCTNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">PRODUCT <span>{{ sortKey === 'PRODUCTNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('LOSSREASONNAME')" :aria-sort="sortKey === 'LOSSREASONNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">原因 <span>{{ sortKey === 'LOSSREASONNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('EQUIPMENTNAME')" :aria-sort="sortKey === 'EQUIPMENTNAME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">EQUIPMENT <span>{{ sortKey === 'EQUIPMENTNAME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('REJECTCOMMENT')" :aria-sort="sortKey === 'REJECTCOMMENT' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">COMMENT <span>{{ sortKey === 'REJECTCOMMENT' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="th-expandable" @click="showRejectBreakdown = !showRejectBreakdown">
-              扣帳報廢量 <span class="expand-icon">{{ showRejectBreakdown ? '▾' : '▸' }}</span>
-            </th>
-            <template v-if="showRejectBreakdown">
-              <th class="th-sub">REJECT</th>
-              <th class="th-sub">STANDBY</th>
-              <th class="th-sub">QTYTOPROCESS</th>
-              <th class="th-sub">INPROCESS</th>
-              <th class="th-sub">PROCESSED</th>
-            </template>
-            <th class="cursor-pointer" @click="toggleSort('DEFECT_QTY')" :aria-sort="sortKey === 'DEFECT_QTY' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">不扣帳報廢量 <span>{{ sortKey === 'DEFECT_QTY' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('TXN_TIME')" :aria-sort="sortKey === 'TXN_TIME' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">報廢時間 <span>{{ sortKey === 'TXN_TIME' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(row, idx) in sortedData" :key="`${row.TXN_DAY}-${row.CONTAINERNAME}-${row.LOSSREASONNAME}-${idx}`">
-            <td>{{ row.CONTAINERNAME || '' }}</td>
-            <td>{{ row.WORKCENTERNAME }}</td>
-            <td>{{ row.PRODUCTLINENAME }}</td>
-            <td>{{ row.PJ_FUNCTION || '' }}</td>
-            <td class="col-left">{{ row.PJ_TYPE }}</td>
-            <td>{{ row.WORKFLOWNAME || '' }}</td>
-            <td>{{ row.PRODUCTNAME || '' }}</td>
-            <td>{{ row.LOSSREASONNAME }}</td>
-            <td>{{ row.EQUIPMENTNAME || '' }}</td>
-            <td>{{ row.REJECTCOMMENT || '' }}</td>
-            <td>{{ formatNumber(row.REJECT_TOTAL_QTY) }}</td>
-            <template v-if="showRejectBreakdown">
-              <td class="td-sub">{{ formatNumber(row.REJECT_QTY) }}</td>
-              <td class="td-sub">{{ formatNumber(row.STANDBY_QTY) }}</td>
-              <td class="td-sub">{{ formatNumber(row.QTYTOPROCESS_QTY) }}</td>
-              <td class="td-sub">{{ formatNumber(row.INPROCESS_QTY) }}</td>
-              <td class="td-sub">{{ formatNumber(row.PROCESSED_QTY) }}</td>
-            </template>
-            <td>{{ formatNumber(row.DEFECT_QTY) }}</td>
-            <td class="cell-nowrap">{{ row.TXN_TIME || row.TXN_DAY }}</td>
-          </tr>
-          <tr v-if="!sortedData || sortedData.length === 0">
-            <td :colspan="showRejectBreakdown ? 18 : 13" class="placeholder">No data</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="pagination">
-      <button :disabled="pagination.page <= 1 || loading || paginating" @click="$emit('go-to-page', pagination.page - 1)">上一頁</button>
-      <span class="page-info">
-        第 {{ pagination.page }} / {{ pagination.totalPages }} 頁 · 共 {{ formatNumber(pagination.total) }} 筆
-      </span>
-      <button :disabled="pagination.page >= pagination.totalPages || loading || paginating" @click="$emit('go-to-page', pagination.page + 1)">下一頁</button>
+    <div class="card-body ui-card-body">
+      <DataTable
+        :data="items"
+        :loading="loading || paginating"
+        :pagination="tablePagination"
+        @page-change="onPageChange"
+      >
+        <DataTableColumn column-key="CONTAINERNAME" label="LOT" :sortable="true" />
+        <DataTableColumn column-key="WORKCENTERNAME" label="WORKCENTER" :sortable="true" />
+        <DataTableColumn column-key="PRODUCTLINENAME" label="Package" :sortable="true" />
+        <DataTableColumn column-key="PJ_FUNCTION" label="FUNCTION" :sortable="true" />
+        <DataTableColumn column-key="PJ_TYPE" label="TYPE" :sortable="true" />
+        <DataTableColumn column-key="WORKFLOWNAME" label="WORKFLOW" :sortable="true" />
+        <DataTableColumn column-key="PRODUCTNAME" label="PRODUCT" :sortable="true" />
+        <DataTableColumn column-key="LOSSREASONNAME" label="原因" :sortable="true" />
+        <DataTableColumn column-key="EQUIPMENTNAME" label="EQUIPMENT" :sortable="true" />
+        <DataTableColumn column-key="REJECTCOMMENT" label="COMMENT" :sortable="true" />
+        <DataTableColumn column-key="REJECT_TOTAL_QTY" label="扣帳報廢量" :sortable="true" align="right" />
+        <DataTableColumn column-key="DEFECT_QTY" label="不扣帳報廢量" :sortable="true" align="right" />
+        <DataTableColumn column-key="TXN_TIME" label="報廢時間" :sortable="true" />
+
+        <template #cell="{ row, columnKey, value }">
+          <template v-if="columnKey === 'CONTAINERNAME'">{{ row.CONTAINERNAME || '' }}</template>
+          <template v-else-if="columnKey === 'PJ_FUNCTION'">{{ row.PJ_FUNCTION || '' }}</template>
+          <template v-else-if="columnKey === 'WORKFLOWNAME'">{{ row.WORKFLOWNAME || '' }}</template>
+          <template v-else-if="columnKey === 'PRODUCTNAME'">{{ row.PRODUCTNAME || '' }}</template>
+          <template v-else-if="columnKey === 'EQUIPMENTNAME'">{{ row.EQUIPMENTNAME || '' }}</template>
+          <template v-else-if="columnKey === 'REJECTCOMMENT'">{{ row.REJECTCOMMENT || '' }}</template>
+          <template v-else-if="columnKey === 'REJECT_TOTAL_QTY'">{{ formatNumber(row.REJECT_TOTAL_QTY) }}</template>
+          <template v-else-if="columnKey === 'DEFECT_QTY'">{{ formatNumber(row.DEFECT_QTY) }}</template>
+          <template v-else-if="columnKey === 'TXN_TIME'">
+            <span class="cell-nowrap">{{ row.TXN_TIME || row.TXN_DAY }}</span>
+          </template>
+          <template v-else>{{ value }}</template>
+        </template>
+
+        <template #expand="{ row }">
+          <div class="expand-breakdown">
+            <span class="expand-breakdown__title">扣帳報廢明細</span>
+            <div class="expand-breakdown__grid">
+              <div class="expand-breakdown__item">
+                <span class="expand-breakdown__label">REJECT</span>
+                <span class="expand-breakdown__value">{{ formatNumber(row.REJECT_QTY) }}</span>
+              </div>
+              <div class="expand-breakdown__item">
+                <span class="expand-breakdown__label">STANDBY</span>
+                <span class="expand-breakdown__value">{{ formatNumber(row.STANDBY_QTY) }}</span>
+              </div>
+              <div class="expand-breakdown__item">
+                <span class="expand-breakdown__label">QTYTOPROCESS</span>
+                <span class="expand-breakdown__value">{{ formatNumber(row.QTYTOPROCESS_QTY) }}</span>
+              </div>
+              <div class="expand-breakdown__item">
+                <span class="expand-breakdown__label">INPROCESS</span>
+                <span class="expand-breakdown__value">{{ formatNumber(row.INPROCESS_QTY) }}</span>
+              </div>
+              <div class="expand-breakdown__item">
+                <span class="expand-breakdown__label">PROCESSED</span>
+                <span class="expand-breakdown__value">{{ formatNumber(row.PROCESSED_QTY) }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </section>
 </template>
+
+<style scoped>
+.expand-breakdown {
+  padding: 4px 0;
+}
+
+.expand-breakdown__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: theme('colors.text.subtle');
+  margin-bottom: 8px;
+  display: block;
+}
+
+.expand-breakdown__grid {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.expand-breakdown__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.expand-breakdown__label {
+  font-size: 11px;
+  color: theme('colors.text.muted');
+  font-weight: 600;
+}
+
+.expand-breakdown__value {
+  font-size: 13px;
+  font-weight: 600;
+  color: theme('colors.text.primary');
+}
+</style>

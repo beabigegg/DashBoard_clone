@@ -1,6 +1,9 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 
+import DataTable from '../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import { useExcelQueryData } from './composables/useExcelQueryData.js';
@@ -74,20 +77,10 @@ onMounted(async () => {
           </template>
         </FilterToolbar>
         <p class="excel-meta">檔名：{{ uploadState.fileName || '-' }}</p>
-        <div v-if="excelPreview.length > 0" class="excel-table-wrap">
-          <table class="excel-table">
-            <thead>
-              <tr>
-                <th v-for="column in excelColumns" :key="column">{{ column }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, index) in excelPreview" :key="index">
-                <td v-for="column in excelColumns" :key="column">{{ formatCell(row[column]) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable v-if="excelPreview.length > 0" :data="excelPreview">
+          <DataTableColumn v-for="column in excelColumns" :key="column" :column-key="column" :label="column" />
+          <template #cell="{ value }">{{ formatCell(value) }}</template>
+        </DataTable>
       </SectionCard>
 
       <SectionCard>
@@ -183,29 +176,17 @@ onMounted(async () => {
         </div>
       </SectionCard>
 
-      <p v-if="errorMessage" class="excel-error">{{ errorMessage }}</p>
+      <ErrorBanner :message="errorMessage" :dismissible="false" />
       <p v-if="successMessage" class="excel-success">{{ successMessage }}</p>
 
       <SectionCard>
         <template #header>
           <strong>查詢結果（{{ queryResult.total }}）</strong>
         </template>
-        <div v-if="loading.querying" class="excel-empty">查詢中...</div>
-        <div v-else-if="queryResult.rows.length === 0" class="excel-empty">目前無資料</div>
-        <div v-else class="excel-table-wrap">
-          <table class="excel-table">
-            <thead>
-              <tr>
-                <th v-for="column in queryResult.columns" :key="column">{{ column }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, index) in queryResult.rows" :key="index">
-                <td v-for="column in queryResult.columns" :key="column">{{ formatCell(row[column]) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable :data="queryResult.rows" :loading="loading.querying">
+          <DataTableColumn v-for="column in queryResult.columns" :key="column" :column-key="column" :label="column" />
+          <template #cell="{ value }">{{ formatCell(value) }}</template>
+        </DataTable>
       </SectionCard>
     </div>
   </div>

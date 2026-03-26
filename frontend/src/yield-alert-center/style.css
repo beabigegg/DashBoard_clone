@@ -130,10 +130,8 @@
   border: 1px solid;
 }
 
-.theme-yield-alert-center .status.error {
-  border-color: theme('colors.token.hfca5a5');
-  background: theme('colors.token.hfff3f2');
-  color: theme('colors.token.h7a271a');
+.theme-yield-alert-center .summary-section {
+  margin-bottom: theme('spacing.token.p12');
 }
 
 .theme-yield-alert-center .status.warn {
@@ -142,45 +140,6 @@
   color: theme('colors.token.h8b5e02');
 }
 
-/* ── Summary cards ── */
-.theme-yield-alert-center .summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: theme('spacing.token.p12');
-}
-
-.theme-yield-alert-center .summary-card {
-  background: var(--ya-panel);
-  border: 1px solid var(--ya-border);
-  border-radius: 10px;
-  padding: theme('spacing.token.p12');
-  box-shadow: var(--ya-shadow);
-}
-
-.theme-yield-alert-center .summary-card h3 {
-  margin: 0;
-  color: var(--ya-muted);
-  font-size: 13px;
-}
-
-.theme-yield-alert-center .summary-card p {
-  margin: theme('spacing.token.p8') 0 0;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.theme-yield-alert-center .summary-card.tone-warn p {
-  color: var(--ya-warn);
-}
-
-.theme-yield-alert-center .summary-card.tone-danger p {
-  color: var(--ya-danger);
-}
-
-.theme-yield-alert-center .summary-card.tone-good p {
-  color: var(--ya-success);
-}
 
 /* ── Chart 2×2 grid ── */
 .theme-yield-alert-center .chart-grid {

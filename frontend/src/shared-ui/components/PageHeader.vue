@@ -40,7 +40,6 @@ defineEmits(['refresh']);
 
 const slots = useSlots();
 const hasLeftSlot = computed(() => !!slots['header-left']);
-
 const showCache = computed(() => !!props.cacheText);
 
 const cacheDotClass = computed(() => {
@@ -52,12 +51,17 @@ const cacheDotClass = computed(() => {
 
 <template>
   <header class="header-gradient">
-    <div v-if="hasLeftSlot" class="header-left">
-      <slot name="header-left" />
-      <h1>{{ title }}</h1>
-      <slot name="header-left-after" />
+    <div class="header-title-block">
+      <div v-if="hasLeftSlot" class="header-left">
+        <slot name="header-left" />
+        <h1>{{ title }}</h1>
+        <slot name="header-left-after" />
+      </div>
+      <h1 v-else>{{ title }}</h1>
+      <div v-if="$slots.subtitle" class="header-subtitle">
+        <slot name="subtitle" />
+      </div>
     </div>
-    <h1 v-else>{{ title }}</h1>
     <div v-if="showRefresh" class="page-header-meta">
       <div v-if="showCache" class="cache-status">
         <span class="cache-dot" :class="cacheDotClass"></span>
@@ -75,3 +79,22 @@ const cacheDotClass = computed(() => {
     </div>
   </header>
 </template>
+
+<style scoped>
+.header-gradient {
+  background: linear-gradient(135deg, theme('colors.brand.700') 0%, theme('colors.brand.500') 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.header-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 4px;
+}
+
+.header-title-block {
+  display: flex;
+  flex-direction: column;
+}
+</style>

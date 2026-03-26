@@ -17,8 +17,14 @@ const messages = {
 
 <template>
   <div class="empty-state">
+    <div v-if="$slots.illustration" class="empty-state__illustration">
+      <slot name="illustration" />
+    </div>
     <slot name="icon" />
     <p class="empty-state__message">{{ messages[type] }}</p>
+    <div v-if="$slots.action" class="empty-state__action">
+      <slot name="action" />
+    </div>
   </div>
 </template>
 
@@ -32,9 +38,17 @@ const messages = {
   text-align: center;
 }
 
+.empty-state__illustration {
+  margin-bottom: 8px;
+}
+
 .empty-state__message {
   margin: 8px 0 0;
   font-size: 13px;
   color: var(--portal-text-secondary);
+}
+
+.empty-state__action {
+  margin-top: 16px;
 }
 </style>

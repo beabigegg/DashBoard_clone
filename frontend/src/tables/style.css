@@ -71,15 +71,6 @@
   padding: theme('spacing.token.p26');
 }
 
-.error-banner {
-  margin-bottom: theme('spacing.token.p16');
-  background: theme('colors.token.hfef2f2');
-  border: 1px solid theme('colors.token.hfecaca');
-  color: theme('colors.token.h991b1b');
-  border-radius: 8px;
-  padding: theme('spacing.block') theme('spacing.nav');
-  font-size: 14px;
-}
 
 .loading-panel,
 .empty-state {
@@ -293,30 +284,6 @@
   background: theme('colors.token.hfafbff');
 }
 
-.filter-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: theme('colors.brand.100');
-  color: var(--primary);
-  border-radius: 999px;
-  padding: theme('spacing.token.p4') theme('spacing.token.p10');
-  font-size: 12px;
-}
-
-.filter-tag .remove {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  padding: 0;
-}
-
-.filter-tag .remove:hover {
-  color: var(--danger);
-}
 
 .table-container {
   border: 1px solid var(--border);
@@ -386,11 +353,6 @@
 
 .loading {
   color: var(--primary);
-}
-
-.error {
-  color: theme('colors.token.h991b1b');
-  background: theme('colors.token.hfef2f2');
 }
 
 .empty-hint {

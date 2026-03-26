@@ -2,21 +2,27 @@
 Define stable requirements for tailwind-design-system.
 ## Requirements
 ### Requirement: Frontend styles SHALL be governed by Tailwind design tokens
-The frontend SHALL enforce `frontend/tailwind.config.js` as the single source of truth for design tokens. Shared visual semantics SHALL be expressed through token-backed Tailwind/shared layers, and token consumption in CSS SHALL use `theme()` rather than route-local token variables.
+The frontend SHALL enforce `frontend/tailwind.config.js` as the single source of truth for design tokens. All shared visual semantics SHALL be expressed through token-backed Tailwind utility classes or `@apply` component classes.
 
 #### Scenario: Shared token usage across in-scope modules
-- **WHEN** two modules render equivalent UI semantics (for example card, filter chip, primary action, status indicator)
+- **WHEN** two modules render equivalent UI semantics (card, filter chip, primary action, status indicator)
 - **THEN** they SHALL use the same token-backed semantics from `tailwind.config.js`
 - **THEN** visual output SHALL remain consistent across those modules
 
-#### Scenario: Token introduction and consumption governance
+#### Scenario: Token introduction governance
 - **WHEN** a new design token is introduced
 - **THEN** it SHALL be added under `theme.extend` in `frontend/tailwind.config.js`
 - **THEN** CSS token consumption SHALL use `theme('...')` paths instead of introducing route-local `:root` token variables
 
-#### Scenario: text.muted meets WCAG AA contrast
-- **WHEN** `text.muted` is used on white/light backgrounds
-- **THEN** the token value SHALL be `#64748b` or darker to achieve minimum 4.5:1 contrast ratio
+#### Scenario: text.muted accessibility compliance
+- **WHEN** `text.muted` token color is used on white/light (`surface.card`, `surface.base`) backgrounds
+- **THEN** the token value SHALL be `#64748b` or darker to meet WCAG AA 4.5:1 minimum contrast ratio
+
+#### Scenario: Shadow tokens use semantic naming
+- **WHEN** shadow tokens are consumed in CSS or Tailwind classes
+- **THEN** they SHALL use the semantic scale (`shadow-xs` through `shadow-xl`) or legacy aliases (`shadow-soft`, `shadow-panel`)
+- **THEN** `shadow-shell` SHALL remain available for brand-chrome interactive elements only; new code SHALL NOT use it for content elevation
+- **THEN** new code SHALL prefer semantic scale names over legacy aliases for neutral elevation
 
 ### Requirement: Tailwind migration SHALL support coexistence with legacy CSS
 Tailwind migration SHALL allow controlled legacy coexistence only as a time-bounded transition state. New or modified route styles SHALL NOT introduce additional token-like `:root` definitions or route-global selectors for local presentation behavior.

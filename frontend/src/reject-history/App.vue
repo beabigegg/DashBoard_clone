@@ -16,6 +16,7 @@ import { useRejectHistoryDuckDB } from './useRejectHistoryDuckDB.js';
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import DetailTable from './components/DetailTable.vue';
@@ -1310,7 +1311,7 @@ onUnmounted(() => {
       :show-refresh="false"
     />
 
-    <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
+    <ErrorBanner :message="errorMessage" :dismissible="false" />
     <div v-if="partialFailureWarning" class="warning-banner">
       {{ partialFailureWarning }}
     </div>

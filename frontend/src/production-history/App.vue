@@ -4,6 +4,7 @@ import { apiGet } from '../core/api.js';
 import { useProductionHistory } from './composables/useProductionHistory.js';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import ProductionMatrix from './components/ProductionMatrix.vue';
 import ProductionDetailTable from './components/ProductionDetailTable.vue';
 
@@ -226,19 +227,25 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
     </div><!-- /ui-card -->
 
     <!-- Error banners -->
-    <div v-if="error" class="ph-app__error-banner">
-      {{ error }}
-    </div>
+    <ErrorBanner :message="error" :dismissible="false" />
 
-    <div v-if="overloadError" class="ph-app__error-banner ph-app__error-banner--overload">
-      系統忙碌中（{{ overloadError.code }}），請 {{ overloadError.retryAfterSeconds }} 秒後重試。
-      <button class="ui-btn ui-btn--sm" @click="handleQuery">重試</button>
-    </div>
+    <ErrorBanner
+      :message="overloadError ? `系統忙碌中（${overloadError.code}），請 ${overloadError.retryAfterSeconds} 秒後重試。` : ''"
+      :dismissible="false"
+    >
+      <template v-if="overloadError" #action>
+        <button class="ui-btn ui-btn--sm" @click="handleQuery">重試</button>
+      </template>
+    </ErrorBanner>
 
-    <div v-if="expiredDataset" class="ph-app__error-banner ph-app__error-banner--expired">
-      查詢資料已過期（dataset expired），請重新查詢。
-      <button class="ui-btn ui-btn--sm" @click="handleQuery">重新查詢</button>
-    </div>
+    <ErrorBanner
+      :message="expiredDataset ? '查詢資料已過期（dataset expired），請重新查詢。' : ''"
+      :dismissible="false"
+    >
+      <template v-if="expiredDataset" #action>
+        <button class="ui-btn ui-btn--sm" @click="handleQuery">重新查詢</button>
+      </template>
+    </ErrorBanner>
 
     <!-- Results -->
     <template v-if="datasetId">

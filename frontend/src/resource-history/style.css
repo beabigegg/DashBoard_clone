@@ -130,10 +130,6 @@
   font-size: 12px;
 }
 
-.query-error {
-  margin-top: theme('spacing.token.p4');
-}
-
 @media (max-width: 1180px) {
   .chart-grid {
     grid-template-columns: 1fr;

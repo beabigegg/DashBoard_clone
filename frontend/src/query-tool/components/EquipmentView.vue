@@ -1,4 +1,5 @@
 <script setup>
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../../shared-ui/components/FilterToolbar.vue';
 
@@ -139,9 +140,7 @@ const subTabs = Object.keys(tabMeta);
           </template>
         </FilterToolbar>
 
-        <p v-if="errors.filters" class="error-banner error-banner--mt8">
-          {{ errors.filters }}
-        </p>
+        <ErrorBanner :message="errors.filters" />
       </div>
     </section>
 
@@ -228,9 +227,5 @@ const subTabs = Object.keys(tabMeta);
 <style scoped>
 .filter-group--equipment {
   min-width: 320px;
-}
-
-.error-banner--mt8 {
-  margin-top: theme('spacing.token.p8');
 }
 </style>

@@ -5,7 +5,7 @@
   background: theme('colors.surface.card');
   border-radius: theme('borderRadius.shell');
   border: 1px solid theme('colors.stroke.panel');
-  box-shadow: theme('boxShadow.soft');
+  box-shadow: theme('boxShadow.sm');
   overflow-y: auto;
   align-self: flex-start;
   position: sticky;

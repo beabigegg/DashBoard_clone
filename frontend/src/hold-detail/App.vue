@@ -9,7 +9,10 @@ import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrat
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
+import DataTable from '../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
 import HoldLotTable from '../wip-shared/components/HoldLotTable.vue';
 
 import AgeDistribution from './components/AgeDistribution.vue';
@@ -396,7 +399,7 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <p v-if="loadError" class="error-banner">{{ loadError }}</p>
+    <ErrorBanner :message="loadError" :dismissible="false" />
 
     <SummaryCards :summary="summary" />
 

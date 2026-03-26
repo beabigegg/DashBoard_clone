@@ -8,13 +8,15 @@ import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
+import SummaryCard from '../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import MatrixTable from './components/MatrixTable.vue';
 import StatusCards from './components/StatusCards.vue';
-import SummaryCards from './components/SummaryCards.vue';
 
 const API_TIMEOUT = 60000;
 const FILTER_OPTION_DEBOUNCE_MS = 120;
@@ -441,7 +443,7 @@ onBeforeUnmount(() => {
       @refresh="manualRefresh"
     />
 
-    <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
+    <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" />
 
     <FilterPanel
       :filters="filters"
@@ -452,7 +454,20 @@ onBeforeUnmount(() => {
       @draft-change="onFilterDraftChange"
     />
 
-    <SummaryCards :summary="summary" />
+    <SummaryCardGroup :columns="2">
+      <SummaryCard
+        label="Total Lots"
+        :value="summary?.totalLots"
+        format="number"
+        accent="brand"
+      />
+      <SummaryCard
+        label="Total QTY"
+        :value="summary?.totalQtyPcs"
+        format="number"
+        accent="info"
+      />
+    </SummaryCardGroup>
 
     <StatusCards
       :summary="summary?.byWipStatus || {}"

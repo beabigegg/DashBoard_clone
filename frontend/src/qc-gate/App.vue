@@ -1,7 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue';
 
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
+import SectionCard from '../shared-ui/components/SectionCard.vue';
 import QcGateChart from './components/QcGateChart.vue';
 import LotTable from './components/LotTable.vue';
 import { useQcGateData } from './composables/useQcGateData.js';
@@ -106,14 +108,14 @@ function handleManualRefresh() {
       @refresh="handleManualRefresh"
     />
 
-    <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
+    <ErrorBanner :message="errorMessage" :dismissible="false" />
 
     <main class="qc-gate-content">
-      <section class="panel chart-panel" :class="{ 'is-refreshing': refreshing }">
-        <div class="panel-header">
-          <h2>站點等待時間分布</h2>
+      <SectionCard variant="elevated" :class="{ 'is-refreshing': refreshing }">
+        <template #header>
+          <h2 class="panel-title">站點等待時間分布</h2>
           <span class="panel-hint">點擊圖表區段可篩選下方 LOT 清單</span>
-        </div>
+        </template>
 
         <div v-if="loading" class="loading-state">資料載入中...</div>
 
@@ -125,11 +127,11 @@ function handleManualRefresh() {
           />
           <div v-if="!hasStations" class="empty-state">目前無 QC-GATE LOT</div>
         </template>
-      </section>
+      </SectionCard>
 
-      <section class="panel table-panel" :class="{ 'is-refreshing': refreshing }">
-        <div class="panel-header">
-          <h2>LOT 明細</h2>
+      <SectionCard variant="elevated" :class="{ 'is-refreshing': refreshing }">
+        <template #header>
+          <h2 class="panel-title">LOT 明細</h2>
           <button
             v-if="activeFilter"
             type="button"
@@ -138,14 +140,14 @@ function handleManualRefresh() {
           >
             篩選中：{{ activeFilterLabel }}（點擊清除）
           </button>
-        </div>
+        </template>
 
         <LotTable
           :lots="filteredLots"
           :active-filter="activeFilter"
           @clear-filter="clearFilter"
         />
-      </section>
+      </SectionCard>
     </main>
   </div>
 </template>

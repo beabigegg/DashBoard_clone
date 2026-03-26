@@ -3,6 +3,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { apiPost } from '../../core/api.js';
 import { useLogs } from '../../admin-shared/composables/useAdminData.js';
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+import SectionCard from '../../shared-ui/components/SectionCard.vue';
+import DataTable from '../../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 
 const logLevel = ref('');
 const logSearch = ref('');
@@ -82,12 +86,10 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="logs-tab">
-    <section v-if="errorMessage" class="panel panel-disabled">
-      <p class="muted">{{ errorMessage }}</p>
-    </section>
+    <ErrorBanner :message="errorMessage" :dismissible="false" />
 
-    <section class="panel">
-      <h2 class="panel-title">系統日誌</h2>
+    <SectionCard>
+      <template #header><h2 class="panel-title">系統日誌</h2></template>
       <div class="log-controls">
         <select v-model="logLevel" @change="onLevelChange">
           <option value="">全部等級</option>
@@ -108,40 +110,28 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="log-table-wrapper">
-        <table class="log-table" v-if="logsData?.logs?.length">
-          <thead>
-            <tr>
-              <th>時間</th>
-              <th>等級</th>
-              <th>訊息</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(log, index) in logsData.logs"
-              :key="index"
-              :class="'log-' + (log.level || '').toLowerCase()"
-            >
-              <td class="log-time">{{ log.timestamp }}</td>
-              <td class="log-level">{{ log.level }}</td>
-              <td class="log-msg">{{ log.message }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-else class="muted">無日誌</p>
-      </div>
-
-      <div class="log-pagination" v-if="(logsData?.total || 0) > logLimit">
-        <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="logOffset === 0" @click="previousPage">上一頁</button>
-        <span>{{ currentPage }} / {{ totalPages }}</span>
-        <button
-          class="ui-btn ui-btn--ghost ui-btn--sm"
-          :disabled="logOffset + logLimit >= (logsData?.total || 0)"
-          @click="nextPage"
+        <DataTable
+          :data="logsData?.logs || []"
+          :pagination="(logsData?.total || 0) > logLimit ? { page: currentPage, totalPages: totalPages, infoText: `共 ${logsData?.total || 0} 筆` } : null"
+          @page-change="(p) => { logOffset = (p - 1) * logLimit; loadLogs(); }"
         >
-          下一頁
-        </button>
+          <DataTableColumn columnKey="timestamp" label="時間" />
+          <DataTableColumn columnKey="level" label="等級" />
+          <DataTableColumn columnKey="message" label="訊息" />
+          <template #cell="{ row, columnKey, value }">
+            <template v-if="columnKey === 'timestamp'">
+              <span class="log-time">{{ value }}</span>
+            </template>
+            <template v-else-if="columnKey === 'level'">
+              <span class="log-level" :class="'log-level--' + (value || '').toLowerCase()">{{ value }}</span>
+            </template>
+            <template v-else-if="columnKey === 'message'">
+              <span class="log-msg">{{ value }}</span>
+            </template>
+            <template v-else>{{ value }}</template>
+          </template>
+        </DataTable>
       </div>
-    </section>
+    </SectionCard>
   </div>
 </template>

@@ -15,15 +15,6 @@
   color: theme('colors.token.hffffff');
 }
 
-.error-banner {
-  margin-bottom: theme('spacing.token.p14');
-  padding: theme('spacing.token.p10') theme('spacing.token.p12');
-  border-radius: 6px;
-  background: theme('colors.token.hfef2f2');
-  color: theme('colors.token.h991b1b');
-  font-size: 13px;
-}
-
 .hold-summary-row {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }

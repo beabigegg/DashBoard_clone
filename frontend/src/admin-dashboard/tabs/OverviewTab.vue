@@ -3,6 +3,10 @@ import { computed, onMounted } from 'vue';
 
 import StatusDot from '../../admin-shared/components/StatusDot.vue';
 import TrendChart from '../../admin-shared/components/TrendChart.vue';
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+import SectionCard from '../../shared-ui/components/SectionCard.vue';
+import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
 import { useHealthSummary, usePerfHistory } from '../../admin-shared/composables/useAdminData.js';
 
 const healthHook = useHealthSummary();
@@ -130,12 +134,10 @@ onMounted(() => {
       <div class="loading-text">載入總覽資料中...</div>
     </section>
 
-    <section v-if="errorMessage" class="panel panel-disabled">
-      <div class="muted">{{ errorMessage }}</div>
-    </section>
+    <ErrorBanner :message="errorMessage" :dismissible="false" />
 
-    <section class="panel">
-      <h2 class="panel-title">系統健康總覽</h2>
+    <SectionCard>
+      <template #header><h2 class="panel-title">系統健康總覽</h2></template>
       <div class="status-cards-grid">
         <div class="status-card">
           <div class="status-card-title">Database</div>
@@ -158,14 +160,14 @@ onMounted(() => {
           <div class="status-card-meta">{{ memoryInfo?.pressure || 'normal' }}</div>
         </div>
       </div>
-    </section>
+    </SectionCard>
 
     <section v-if="deadWorkerAlert" class="overview-warning-banner">
-      ⚠️ 偵測到 RQ worker 可能離線（queue_depth={{ queueDepth }} / workers={{ workersTotal }}）
+      偵測到 RQ worker 可能離線（queue_depth={{ queueDepth }} / workers={{ workersTotal }}）
     </section>
 
-    <section class="panel">
-      <h2 class="panel-title">30 分鐘趨勢</h2>
+    <SectionCard>
+      <template #header><h2 class="panel-title">30 分鐘趨勢</h2></template>
       <div class="overview-mini-grid">
         <TrendChart
           :snapshots="historyData"
@@ -198,16 +200,16 @@ onMounted(() => {
           height="180px"
         />
       </div>
-    </section>
+    </SectionCard>
 
-    <section class="panel">
-      <h2 class="panel-title">Active Alerts</h2>
+    <SectionCard>
+      <template #header><h2 class="panel-title">Active Alerts</h2></template>
       <ul v-if="warnings.length" class="overview-alert-list">
         <li v-for="(entry, index) in warnings" :key="`${entry}-${index}`">
           {{ entry }}
         </li>
       </ul>
       <p v-else class="muted">目前無警示訊息</p>
-    </section>
+    </SectionCard>
   </div>
 </template>

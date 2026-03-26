@@ -26,65 +26,7 @@
   margin-bottom: theme('spacing.token.p20');
 }
 
-.theme-anomaly-overview .ao-card {
-  flex: 1;
-  min-width: 140px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: theme('spacing.token.p6');
-  padding: theme('spacing.token.p14');
-  border-radius: theme('borderRadius.card');
-  border: 1px solid theme('colors.stroke.soft');
-  background: theme('colors.surface.card');
-  cursor: pointer;
-  transition: box-shadow var(--motion-fast, 150ms) var(--motion-ease, ease);
-}
-
-.theme-anomaly-overview .ao-card:hover {
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.1);
-}
-
-.theme-anomaly-overview .ao-card-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: theme('colors.text.secondary');
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.theme-anomaly-overview .ao-card-count {
-  font-size: 28px;
-  font-weight: 700;
-  color: theme('colors.text.primary');
-  line-height: 1;
-}
-
-.theme-anomaly-overview .ao-card-sev-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: theme('colors.token.h9ca3af');
-}
-
-.theme-anomaly-overview .ao-card.sev-ok .ao-card-sev-dot {
-  background: theme('colors.token.h22c55e');
-}
-
-.theme-anomaly-overview .ao-card.sev-warning .ao-card-sev-dot {
-  background: theme('colors.state.warning');
-}
-
-.theme-anomaly-overview .ao-card.sev-critical .ao-card-sev-dot {
-  background: theme('colors.state.danger');
-  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
-  animation: pulse var(--motion-pulse, 1.5s) infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
+/* ao-card classes removed — replaced by shared-ui SummaryCard + SummaryCardGroup */
 
 /* ── Sections ──────────────────────────────────────────────────────────── */
 .theme-anomaly-overview .ao-section {
@@ -241,9 +183,7 @@
   gap: 8px;
 }
 
-.theme-anomaly-overview .ao-error-row {
-  color: theme('colors.token.hdc2626');
-}
+/* ao-error-row removed — replaced by shared-ui ErrorBanner */
 
 .theme-anomaly-overview .ao-empty-row {
   color: theme('colors.text.secondary');

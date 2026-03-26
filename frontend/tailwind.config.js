@@ -10,10 +10,12 @@ export default {
         brand: {
           50: '#e6f4fb',
           100: '#b3dbf2',
+          400: '#2998d8',
           500: '#0080C8',
           600: '#006BA8',
           700: '#005A8F',
-          800: '#004A76'
+          800: '#004A76',
+          900: '#003460'
         },
         accent: {
           500: '#00A3E0'
@@ -176,7 +178,7 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['"Noto Sans TC"', '"Microsoft JhengHei"', 'system-ui', 'sans-serif']
+        sans: ['Inter', '"Noto Sans TC"', '"Microsoft JhengHei"', 'system-ui', 'sans-serif']
       },
       fontSize: {
         '2xs': ['11px', { lineHeight: '1rem' }],
@@ -223,12 +225,17 @@ export default {
       },
       borderRadius: {
         shell: '10px',
-        card: '8px'
+        card: '8px',
+        pill: '999px',
+        button: '6px'
       },
       boxShadow: {
+        xs:    '0 1px 2px rgba(0, 0, 0, 0.04)',
+        sm:    '0 1px 4px rgba(0, 0, 0, 0.06)',
+        md:    '0 4px 12px rgba(0, 0, 0, 0.08)',
+        lg:    '0 8px 24px rgba(0, 0, 0, 0.12)',
+        xl:    '0 16px 48px rgba(0, 0, 0, 0.16)',
         shell: '0 4px 12px rgba(0, 128, 200, 0.25)',
-        panel: '0 2px 10px rgba(0, 0, 0, 0.08)',
-        soft: '0 1px 4px rgba(0, 0, 0, 0.06)'
       },
       zIndex: {
         popup: '1000'

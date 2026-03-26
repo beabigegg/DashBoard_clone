@@ -1,6 +1,9 @@
 <script setup>
 import { computed } from 'vue';
 
+import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
+
 const props = defineProps({
   kpi: {
     type: Object,
@@ -25,38 +28,37 @@ const backwardCards = computed(() => [
     label: `${props.stationLabel} 投入數`,
     value: formatNumber(props.kpi.total_input),
     unit: 'pcs',
-    color: 'var(--color-token-h3b82f6)',
+    accent: 'info',
   },
   {
     label: 'LOT 數量',
     value: formatNumber(props.kpi.lot_count),
     unit: 'lots',
-    color: 'var(--color-brand-500)',
+    accent: 'brand',
   },
   {
     label: '不良總數',
     value: formatNumber(props.kpi.total_defect_qty),
     unit: 'pcs',
-    color: 'var(--color-token-hef4444)',
+    accent: 'danger',
   },
   {
     label: '不良率',
     value: formatRate(props.kpi.total_defect_rate),
     unit: '%',
-    color: 'var(--color-token-hf59e0b)',
+    accent: 'warning',
   },
   {
     label: '首要不良原因',
     value: props.kpi.top_loss_reason || '-',
     unit: '',
-    color: 'var(--color-accent-500)',
-    isText: true,
+    accent: 'neutral',
   },
   {
     label: '上游關聯機台',
     value: formatNumber(props.kpi.affected_machine_count),
     unit: '台',
-    color: 'var(--color-token-h10b981)',
+    accent: 'success',
   },
 ]);
 
@@ -65,37 +67,37 @@ const forwardCards = computed(() => [
     label: '偵測批次數',
     value: formatNumber(props.kpi.detection_lot_count),
     unit: 'lots',
-    color: 'var(--color-token-h3b82f6)',
+    accent: 'info',
   },
   {
     label: '偵測不良數',
     value: formatNumber(props.kpi.detection_defect_qty),
     unit: 'pcs',
-    color: 'var(--color-token-hef4444)',
+    accent: 'danger',
   },
   {
     label: '追蹤批次數',
     value: formatNumber(props.kpi.tracked_lot_count),
     unit: 'lots',
-    color: 'var(--color-brand-500)',
+    accent: 'brand',
   },
   {
     label: '下游到達站數',
     value: formatNumber(props.kpi.downstream_stations_reached),
     unit: '站',
-    color: 'var(--color-accent-500)',
+    accent: 'neutral',
   },
   {
     label: '下游不良總數',
     value: formatNumber(props.kpi.downstream_total_reject),
     unit: 'pcs',
-    color: 'var(--color-token-hf59e0b)',
+    accent: 'warning',
   },
   {
     label: '下游不良率',
     value: formatRate(props.kpi.downstream_reject_rate),
     unit: '%',
-    color: 'var(--color-token-h10b981)',
+    accent: 'success',
   },
 ]);
 
@@ -116,19 +118,16 @@ function formatRate(v) {
 
 <template>
   <section class="kpi-section">
-    <div class="kpi-grid">
-      <div
+    <SummaryCardGroup :columns="cards.length">
+      <SummaryCard
         v-for="(card, idx) in cards"
         :key="idx"
-        class="kpi-card"
-        :style="{ borderTopColor: card.color }"
+        :label="card.label"
+        :value="card.value"
+        :accent="card.accent"
       >
-        <div class="kpi-label">{{ card.label }}</div>
-        <div class="kpi-value" :class="{ 'kpi-text': card.isText }">
-          <span>{{ card.value }}</span>
-          <span v-if="card.unit && !card.isText" class="kpi-unit">{{ card.unit }}</span>
-        </div>
-      </div>
-    </div>
+        <template v-if="card.unit" #sub>{{ card.unit }}</template>
+      </SummaryCard>
+    </SummaryCardGroup>
   </section>
 </template>

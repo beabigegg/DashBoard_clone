@@ -9,10 +9,13 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
+  background: rgba(0, 74, 118, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   color: theme('colors.token.hffffff');
   padding: theme('spacing.token.p12') theme('spacing.token.p20');
-  min-height: var(--shell-header-height, 56px);
+  min-height: var(--shell-header-height, 60px);
   flex-shrink: 0;
 }
 
@@ -136,13 +139,14 @@
 .sidebar--mobile-open,
 .sidebar--mobile-closed {
   position: fixed;
-  top: var(--shell-header-height, 56px);
+  top: var(--shell-header-height, 60px);
   left: 0;
   bottom: 0;
   width: min(280px, calc(100vw - 40px));
   min-width: min(280px, calc(100vw - 40px));
   z-index: 40;
   box-shadow: 8px 0 24px rgba(15, 23, 42, 0.22);
+  transition: transform var(--motion-slow) var(--motion-ease);
 }
 
 .sidebar--mobile-open {
@@ -158,6 +162,8 @@
   inset: 0;
   z-index: 35;
   background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .overlay-fade-enter-active,
@@ -184,6 +190,7 @@
 }
 
 .drawer-link {
+  position: relative;
   display: flex;
   align-items: center;
   text-decoration: none;
@@ -191,17 +198,36 @@
   border-radius: 8px;
   color: theme('colors.token.h334155');
   font-size: 14px;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+  overflow: hidden;
+}
+
+.drawer-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3px;
+  background: theme('colors.brand.500');
+  border-radius: 0 2px 2px 0;
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--motion-ease);
 }
 
 .drawer-link:hover {
-  background: theme('colors.token.hf1f5f9');
+  background: theme('colors.surface.active');
+  color: theme('colors.brand.600');
 }
 
 .drawer-link.active {
-  background: theme('colors.brand.50');
+  background: theme('colors.surface.active');
   color: theme('colors.brand.800');
   font-weight: 600;
+}
+
+.drawer-link.active::before {
+  opacity: 1;
 }
 
 .shell-content {
@@ -241,6 +267,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.breadcrumb-separator {
+  color: theme('colors.token.h9ca3af');
+  flex-shrink: 0;
 }
 
 .mode-badge {

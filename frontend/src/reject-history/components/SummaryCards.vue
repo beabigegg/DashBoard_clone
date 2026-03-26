@@ -1,27 +1,27 @@
 <script setup>
+import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
+
 defineProps({
   cards: { type: Array, default: () => [] },
 });
 
-function formatNumber(value) {
-  return Number(value || 0).toLocaleString('zh-TW');
-}
-
-function formatPct(value) {
-  return `${Number(value || 0).toFixed(2)}%`;
-}
+const LANE_ACCENT_MAP = {
+  reject: 'danger',
+  defect: 'info',
+  neutral: 'neutral',
+};
 </script>
 
 <template>
-  <section class="summary-row reject-summary-row">
-    <article
+  <SummaryCardGroup :columns="6">
+    <SummaryCard
       v-for="card in cards"
       :key="card.key"
-      class="summary-card"
-      :class="`lane-${card.lane}`"
-    >
-      <div class="summary-label">{{ card.label }}</div>
-      <div class="summary-value small">{{ card.isPct ? formatPct(card.value) : formatNumber(card.value) }}</div>
-    </article>
-  </section>
+      :label="card.label"
+      :value="card.value"
+      :format="card.isPct ? 'percent' : 'number'"
+      :accent="LANE_ACCENT_MAP[card.lane] || 'neutral'"
+    />
+  </SummaryCardGroup>
 </template>

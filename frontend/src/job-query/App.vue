@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 
+import DataTable from '../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
@@ -106,7 +109,7 @@ onMounted(async () => {
         </FilterToolbar>
       </SectionCard>
 
-      <p v-if="errorMessage" class="job-query-error">{{ errorMessage }}</p>
+      <ErrorBanner :message="errorMessage" :dismissible="false" />
       <p v-if="exportMessage" class="job-query-success">{{ exportMessage }}</p>
 
       <SectionCard>
@@ -117,35 +120,22 @@ onMounted(async () => {
           </div>
         </template>
 
-        <div v-if="loadingJobs" class="job-query-empty">查詢中...</div>
-        <div v-else-if="jobs.length === 0" class="job-query-empty">目前無資料</div>
-        <div v-else class="job-query-table-wrap">
-          <table class="job-query-table">
-            <thead>
-              <tr>
-                <th>操作</th>
-                <th v-for="column in jobsColumns" :key="column">{{ column }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in jobs" :key="row.JOBID || `${row.RESOURCENAME}-${row.CREATEDATE}`">
-                <td>
-                  <button type="button" class="job-query-btn job-query-btn-ghost" @click="loadTxn(row.JOBID)">
-                    查看交易歷程
-                  </button>
-                </td>
-                <td v-for="column in jobsColumns" :key="column">
-                  <StatusBadge
-                    v-if="column === 'JOBSTATUS'"
-                    :tone="getStatusTone(row[column])"
-                    :text="formatCellValue(row[column])"
-                  />
-                  <span v-else>{{ formatCellValue(row[column]) }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable :data="jobs" :loading="loadingJobs">
+          <DataTableColumn column-key="_action" label="操作" />
+          <DataTableColumn v-for="column in jobsColumns" :key="column" :column-key="column" :label="column" />
+
+          <template #cell="{ row, columnKey, value }">
+            <template v-if="columnKey === '_action'">
+              <button type="button" class="job-query-btn job-query-btn-ghost" @click="loadTxn(row.JOBID)">
+                查看交易歷程
+              </button>
+            </template>
+            <template v-else-if="columnKey === 'JOBSTATUS'">
+              <StatusBadge :tone="getStatusTone(value)" :text="formatCellValue(value)" />
+            </template>
+            <template v-else>{{ formatCellValue(value) }}</template>
+          </template>
+        </DataTable>
       </SectionCard>
 
       <SectionCard v-if="selectedJobId">
@@ -156,29 +146,16 @@ onMounted(async () => {
           </div>
         </template>
 
-        <div v-if="loadingTxn" class="job-query-empty">載入交易歷程中...</div>
-        <div v-else-if="txnRows.length === 0" class="job-query-empty">無交易歷程資料</div>
-        <div v-else class="job-query-table-wrap">
-          <table class="job-query-table">
-            <thead>
-              <tr>
-                <th v-for="column in txnColumns" :key="column">{{ column }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in txnRows" :key="row.JOBTXNHISTORYID || row.TXNDATE">
-                <td v-for="column in txnColumns" :key="column">
-                  <StatusBadge
-                    v-if="column === 'JOBSTATUS' || column === 'FROMJOBSTATUS'"
-                    :tone="getStatusTone(row[column])"
-                    :text="formatCellValue(row[column])"
-                  />
-                  <span v-else>{{ formatCellValue(row[column]) }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable :data="txnRows" :loading="loadingTxn">
+          <DataTableColumn v-for="column in txnColumns" :key="column" :column-key="column" :label="column" />
+
+          <template #cell="{ columnKey, value }">
+            <template v-if="columnKey === 'JOBSTATUS' || columnKey === 'FROMJOBSTATUS'">
+              <StatusBadge :tone="getStatusTone(value)" :text="formatCellValue(value)" />
+            </template>
+            <template v-else>{{ formatCellValue(value) }}</template>
+          </template>
+        </DataTable>
       </SectionCard>
     </div>
   </div>

@@ -4,16 +4,18 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
-import { MATRIX_STATUS_COLUMNS, STATUS_DISPLAY_MAP, normalizeStatus } from '../resource-shared/constants.js';
+import { MATRIX_STATUS_COLUMNS, OU_BADGE_THRESHOLDS, STATUS_DISPLAY_MAP, normalizeStatus } from '../resource-shared/constants.js';
 
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import SummaryCard from '../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 
 import EquipmentGrid from './components/EquipmentGrid.vue';
 import FilterBar from './components/FilterBar.vue';
 import FloatingTooltip from './components/FloatingTooltip.vue';
 import MatrixSection from './components/MatrixSection.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
-import SummaryCards from './components/SummaryCards.vue';
 
 ensureMesApiAvailable();
 
@@ -79,6 +81,34 @@ const lastUpdate = ref('--');
 
 const summaryError = ref('');
 const equipmentError = ref('');
+
+const STATUS_ACCENT_MAP = {
+  PRD: 'prd',
+  SBY: 'sby',
+  UDT: 'udt',
+  SDT: 'sdt',
+  EGT: 'egt',
+  NST: 'nst',
+  OTHER: 'neutral',
+};
+
+function resolveOuAccent(value) {
+  const pct = Number(value || 0);
+  if (pct >= OU_BADGE_THRESHOLDS.high) return 'success';
+  if (pct >= OU_BADGE_THRESHOLDS.medium) return 'warning';
+  return 'danger';
+}
+
+const statusTotalForPct = computed(() => {
+  return MATRIX_STATUS_COLUMNS.reduce((total, status) => total + Number(summary.value.byStatus?.[status] || 0), 0);
+});
+
+function statusPctSub(status) {
+  const count = Number(summary.value.byStatus?.[status] || 0);
+  const total = statusTotalForPct.value;
+  const pctStr = total > 0 ? `${((count / total) * 100).toFixed(1)}%` : '--';
+  return `${STATUS_DISPLAY_MAP[status] || status} (${pctStr})`;
+}
 
 const tooltipState = reactive({
   visible: false,
@@ -479,10 +509,49 @@ onMounted(() => {
         @change-machines="updateMachines"
       />
 
-      <p v-if="summaryError" class="error-banner">{{ summaryError }}</p>
-      <SummaryCards :summary="summary" :active-status="summaryStatusFilter" @toggle-status="toggleSummaryStatus" />
+      <ErrorBanner :message="summaryError" @dismiss="summaryError = ''" />
 
-      <p v-if="equipmentError" class="error-banner">{{ equipmentError }}</p>
+      <SummaryCardGroup columns="auto">
+        <SummaryCard
+          label="OU%"
+          :value="summary.ouPct"
+          format="percent"
+          :accent="resolveOuAccent(summary.ouPct)"
+        >
+          <template #sub>稼動率</template>
+        </SummaryCard>
+        <SummaryCard
+          label="AVAIL%"
+          :value="summary.availabilityPct"
+          format="percent"
+          :accent="resolveOuAccent(summary.availabilityPct)"
+        >
+          <template #sub>可用率</template>
+        </SummaryCard>
+        <SummaryCard
+          v-for="status in MATRIX_STATUS_COLUMNS"
+          :key="status"
+          :label="status"
+          :value="Number(summary.byStatus?.[status] || 0)"
+          format="number"
+          :accent="STATUS_ACCENT_MAP[status] || 'neutral'"
+          clickable
+          :active="summaryStatusFilter === status"
+          @click="toggleSummaryStatus(status)"
+        >
+          <template #sub>{{ statusPctSub(status) }}</template>
+        </SummaryCard>
+        <SummaryCard
+          label="Total"
+          :value="summary.totalCount"
+          format="number"
+          accent="brand"
+        >
+          <template #sub>設備總數</template>
+        </SummaryCard>
+      </SummaryCardGroup>
+
+      <ErrorBanner :message="equipmentError" @dismiss="equipmentError = ''" />
       <MatrixSection
         :equipment="allEquipment"
         :expanded-state="hierarchyState"

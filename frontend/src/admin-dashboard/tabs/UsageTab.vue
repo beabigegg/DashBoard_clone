@@ -8,6 +8,10 @@ import HourlyLoginChart from '../../admin-user-usage-kpi/components/HourlyLoginC
 import KpiCard from '../../admin-user-usage-kpi/components/KpiCard.vue';
 import RecentSessionsTable from '../../admin-user-usage-kpi/components/RecentSessionsTable.vue';
 import TopUsersTable from '../../admin-user-usage-kpi/components/TopUsersTable.vue';
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+import SectionCard from '../../shared-ui/components/SectionCard.vue';
+import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
 import { useUsageKpi } from '../../admin-shared/composables/useAdminData.js';
 
 const startDate = ref('');
@@ -72,56 +76,54 @@ onMounted(() => {
       </div>
     </section>
 
-    <section v-if="error" class="panel panel-disabled">
-      <p class="muted">{{ error }}</p>
-    </section>
+    <ErrorBanner :message="error" :dismissible="false" />
 
     <section v-if="loading && !kpiData" class="panel">
       <div class="loading-text">載入中...</div>
     </section>
 
     <template v-if="kpiData">
-      <section class="panel">
-        <h2 class="panel-title">總覽</h2>
-        <div class="kpi-cards-grid">
-          <KpiCard :value="kpiData.overview?.unique_users" label="不重複使用者" />
-          <KpiCard :value="kpiData.overview?.total_sessions" label="總登入次數" />
-          <KpiCard :value="formatDuration(kpiData.overview?.avg_duration_sec)" label="平均使用時長" />
-          <KpiCard :value="kpiData.overview?.active_sessions" label="目前在線" />
-        </div>
-      </section>
+      <SectionCard>
+        <template #header><h2 class="panel-title">總覽</h2></template>
+        <SummaryCardGroup :columns="4">
+          <SummaryCard label="不重複使用者" :value="kpiData.overview?.unique_users" accent="brand" />
+          <SummaryCard label="總登入次數" :value="kpiData.overview?.total_sessions" accent="info" />
+          <SummaryCard label="平均使用時長" :value="formatDuration(kpiData.overview?.avg_duration_sec)" accent="success" />
+          <SummaryCard label="目前在線" :value="kpiData.overview?.active_sessions" accent="warning" />
+        </SummaryCardGroup>
+      </SectionCard>
 
-      <section class="panel">
-        <h2 class="panel-title">每日活躍使用者（DAU）</h2>
+      <SectionCard>
+        <template #header><h2 class="panel-title">每日活躍使用者（DAU）</h2></template>
         <DauTrendChart :data="kpiData.dau_trend || []" />
-      </section>
+      </SectionCard>
 
       <div class="charts-grid">
-        <section class="panel">
-          <h2 class="panel-title">登入時段分佈</h2>
+        <SectionCard>
+          <template #header><h2 class="panel-title">登入時段分佈</h2></template>
           <HourlyLoginChart :data="kpiData.hourly_logins || []" />
-        </section>
-        <section class="panel">
-          <h2 class="panel-title">使用時長分佈</h2>
+        </SectionCard>
+        <SectionCard>
+          <template #header><h2 class="panel-title">使用時長分佈</h2></template>
           <DurationDistChart :data="kpiData.duration_distribution || []" />
-        </section>
+        </SectionCard>
       </div>
 
       <div class="tables-grid">
-        <section class="panel">
-          <h2 class="panel-title">Top 使用者</h2>
+        <SectionCard>
+          <template #header><h2 class="panel-title">Top 使用者</h2></template>
           <TopUsersTable :users="kpiData.top_users || []" />
-        </section>
-        <section class="panel">
-          <h2 class="panel-title">部門統計</h2>
+        </SectionCard>
+        <SectionCard>
+          <template #header><h2 class="panel-title">部門統計</h2></template>
           <DeptBreakdownTable :departments="kpiData.dept_breakdown || []" />
-        </section>
+        </SectionCard>
       </div>
 
-      <section class="panel">
-        <h2 class="panel-title">近期登入記錄</h2>
+      <SectionCard>
+        <template #header><h2 class="panel-title">近期登入記錄</h2></template>
         <RecentSessionsTable :sessions="kpiData.recent_sessions || []" />
-      </section>
+      </SectionCard>
     </template>
   </div>
 </template>

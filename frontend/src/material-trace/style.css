@@ -96,15 +96,6 @@
   padding: theme('spacing.nav') theme('spacing.token.p16');
 }
 
-.error-banner {
-  margin-bottom: theme('spacing.nav');
-  padding: theme('spacing.token.p10') theme('spacing.block');
-  border-radius: 6px;
-  background: theme('colors.token.hfef2f2');
-  color: theme('colors.token.h991b1b');
-  font-size: 13px;
-}
-
 .warning-banner {
   margin-bottom: theme('spacing.nav');
   padding: theme('spacing.token.p10') theme('spacing.block');

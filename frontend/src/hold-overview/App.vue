@@ -7,14 +7,17 @@ import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
+import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SkeletonLoader from '../shared-ui/components/SkeletonLoader.vue';
-import HoldLotTable from '../wip-shared/components/HoldLotTable.vue';
+import SummaryCard from '../shared-ui/components/SummaryCard.vue';
+import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
+import DataTable from '../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
 import ParetoSection from '../wip-shared/components/ParetoSection.vue';
 
 import FilterPanel from '../wip-overview/components/FilterPanel.vue';
-import SummaryCards from '../hold-detail/components/SummaryCards.vue';
 import FilterBar from './components/FilterBar.vue';
 import FilterIndicator from './components/FilterIndicator.vue';
 import HoldMatrix from './components/HoldMatrix.vue';
@@ -118,6 +121,36 @@ const lotFilterText = computed(() => {
 
 
 const hasLotFilterText = computed(() => Boolean(lotFilterText.value));
+
+const tablePagination = computed(() => {
+  const pg = pagination.value;
+  const p = Number(pg?.page || 1);
+  const perPage = Number(pg?.perPage || DEFAULT_PER_PAGE);
+  const total = Number(pg?.total || 0);
+  const totalPages = Number(pg?.totalPages || 1);
+  const start = total > 0 ? (p - 1) * perPage + 1 : 0;
+  const end = Math.min(p * perPage, total);
+  const infoText = total > 0 ? `${start} - ${end} / ${total.toLocaleString('zh-TW')}` : 'No data';
+  return { page: p, totalPages, infoText };
+});
+
+function formatNumber(value) {
+  if (value === null || value === undefined || value === '-') return '-';
+  return Number(value).toLocaleString('zh-TW');
+}
+
+function formatAge(value) {
+  if (value === null || value === undefined || value === '-') return '-';
+  return `${value}天`;
+}
+
+function handleLotPageChange(nextPage) {
+  if (paginationLoading.value) return;
+  if (nextPage < 1 || nextPage > Number(pagination.value?.totalPages || 1)) return;
+  page.value = nextPage;
+  updateUrlState();
+  void loadLotsPage();
+}
 
 const lastUpdate = computed(() => {
   return summary.value?.dataUpdateDate ?? '--';
@@ -733,7 +766,7 @@ onBeforeUnmount(() => {
       </template>
     </PageHeader>
 
-    <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
+    <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" />
 
     <FilterPanel
       :filters="filters"
@@ -759,7 +792,42 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <template v-else>
-      <SummaryCards :summary="summary" />
+      <SummaryCardGroup :columns="5">
+        <SummaryCard
+          label="Total Lots"
+          :value="summary?.totalLots"
+          format="number"
+          accent="brand"
+        />
+        <SummaryCard
+          label="Total QTY"
+          :value="summary?.totalQty"
+          format="number"
+          accent="info"
+        />
+        <SummaryCard
+          label="平均當站滯留"
+          :value="summary?.avgAge"
+          format="duration"
+          accent="warning"
+        >
+          <template #sub>天</template>
+        </SummaryCard>
+        <SummaryCard
+          label="最久當站滯留"
+          :value="summary?.maxAge"
+          format="duration"
+          accent="danger"
+        >
+          <template #sub>天</template>
+        </SummaryCard>
+        <SummaryCard
+          label="影響站群"
+          :value="summary?.workcenterCount"
+          format="number"
+          accent="neutral"
+        />
+      </SummaryCardGroup>
 
       <section class="content-grid">
       <section class="card ui-card">
@@ -795,20 +863,43 @@ onBeforeUnmount(() => {
         @clear-all="clearMatrixFilter"
       />
 
-      <div class="ui-table-wrap" :class="{ 'is-loading': lotsLoading }">
-        <HoldLotTable
-          :lots="lots"
-          :pagination="pagination"
-          :loading="lotsLoading"
-          :paginating="paginationLoading"
-          :error-message="lotsError"
-          :has-active-filters="hasLotFilterText"
-          :filter-text="lotFilterText"
-          @clear-filters="clearMatrixFilter"
-          @prev-page="prevPage"
-          @next-page="nextPage"
-        />
-      </div>
+      <section class="card ui-card">
+        <div class="card-header ui-card-header">
+          <div class="card-title ui-card-title">Hold Lot Details</div>
+          <div v-if="hasLotFilterText" class="flex items-center gap-2 text-xs text-text-muted">
+            <span>篩選: {{ lotFilterText }}</span>
+            <button type="button" class="text-brand-500 hover:underline" @click="clearMatrixFilter">清除</button>
+          </div>
+        </div>
+        <div class="card-body ui-card-body">
+          <ErrorBanner :message="lotsError" @dismiss="lotsError = ''" />
+          <DataTable
+            :data="lots"
+            :loading="lotsLoading"
+            :pagination="tablePagination"
+            @page-change="handleLotPageChange"
+          >
+            <DataTableColumn column-key="lotId" label="LOTID" sortable />
+            <DataTableColumn column-key="workorder" label="WORKORDER" sortable />
+            <DataTableColumn column-key="qty" label="QTY" sortable align="right" />
+            <DataTableColumn column-key="product" label="Product" sortable />
+            <DataTableColumn column-key="package" label="Package" sortable />
+            <DataTableColumn column-key="workcenter" label="Workcenter" sortable />
+            <DataTableColumn column-key="holdReason" label="Hold Reason" sortable />
+            <DataTableColumn column-key="spec" label="Spec" sortable />
+            <DataTableColumn column-key="age" label="Age" sortable align="right" />
+            <DataTableColumn column-key="holdBy" label="Hold By" sortable />
+            <DataTableColumn column-key="dept" label="Dept" sortable />
+            <DataTableColumn column-key="holdComment" label="Hold Comment" sortable />
+            <DataTableColumn column-key="futureHoldComment" label="Future Hold Comment" sortable />
+            <template #cell="{ columnKey, row, value }">
+              <template v-if="columnKey === 'qty'">{{ formatNumber(value) }}</template>
+              <template v-else-if="columnKey === 'age'">{{ formatAge(value) }}</template>
+              <template v-else>{{ value || '-' }}</template>
+            </template>
+          </DataTable>
+        </div>
+      </section>
       </section>
     </template>
   </div>

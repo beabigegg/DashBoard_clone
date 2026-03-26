@@ -1,6 +1,9 @@
 <script setup>
 import { computed } from 'vue';
 
+import Chip from '../../shared-ui/components/Chip.vue';
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+
 const props = defineProps({
   selectedTable: {
     type: Object,
@@ -119,25 +122,19 @@ function isNil(value) {
     </div>
 
     <div v-if="activeFilters.length > 0" class="active-filters">
-      <span
+      <Chip
         v-for="[column, value] in activeFilters"
         :key="column"
-        class="filter-tag"
-      >
-        {{ column }}: {{ value }}
-        <button
-          type="button"
-          class="remove"
-          @click="$emit('remove-filter', column)"
-        >
-          ×
-        </button>
-      </span>
+        :label="`${column}: ${value}`"
+        tone="brand"
+        removable
+        @remove="$emit('remove-filter', column)"
+      />
     </div>
 
     <div class="table-container">
       <div v-if="loadingColumns" class="loading">正在載入欄位資訊...</div>
-      <div v-else-if="errorMessage" class="error">{{ errorMessage }}</div>
+      <ErrorBanner v-else-if="errorMessage" :message="errorMessage" :dismissible="false" />
       <div v-else-if="columns.length === 0" class="empty-hint">尚未載入欄位資訊</div>
       <table v-else>
         <thead>

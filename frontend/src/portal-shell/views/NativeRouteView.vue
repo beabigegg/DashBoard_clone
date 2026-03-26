@@ -159,10 +159,12 @@ onUnmounted(() => {
     <p>載入 native route-view 模組中...{{ loadingElapsed >= 3 ? ` (${loadingElapsed}s)` : '' }}</p>
   </div>
 
-  <component
-    :is="resolvedComponent"
-    v-else-if="resolvedComponent"
-  />
+  <Transition v-else-if="resolvedComponent" name="page-fade" mode="out-in">
+    <component
+      :is="resolvedComponent"
+      :key="targetRoute"
+    />
+  </Transition>
 
   <div v-else class="panel">
     <h2>{{ pageName }}</h2>
@@ -184,3 +186,26 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style>
+.page-fade-enter-active {
+  transition: opacity var(--motion-normal) var(--motion-ease), transform var(--motion-normal) var(--motion-ease);
+}
+.page-fade-leave-active {
+  transition: opacity var(--motion-fast) var(--motion-ease);
+}
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-fade-enter-active,
+  .page-fade-leave-active {
+    transition-duration: 0ms;
+  }
+}
+</style>

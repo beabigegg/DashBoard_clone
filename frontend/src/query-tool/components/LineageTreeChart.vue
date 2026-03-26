@@ -7,6 +7,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import { TreeChart } from 'echarts/charts';
 import { TooltipComponent, ToolboxComponent } from 'echarts/components';
 
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import ExportButton from './ExportButton.vue';
 import LoadingOverlay from '../../shared-ui/components/LoadingOverlay.vue';
 import PaginationControl from '../../shared-ui/components/PaginationControl.vue';
@@ -925,9 +926,7 @@ function exportRelationCsv() {
         </div>
       </div>
     </div>
-    <p v-if="exportErrorMessage" class="error-banner">
-      {{ exportErrorMessage }}
-    </p>
+    <ErrorBanner :message="exportErrorMessage" />
 
     <!-- Loading overlay -->
     <div v-if="loading" class="placeholder lineage-loading-placeholder">

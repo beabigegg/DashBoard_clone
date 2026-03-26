@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 
+import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import ExportButton from './ExportButton.vue';
 import LotAssociationTable from './LotAssociationTable.vue';
 import LotHistoryTable from './LotHistoryTable.vue';
@@ -257,9 +258,7 @@ const detailCountLabel = computed(() => {
           </button>
         </div>
 
-        <p v-if="activeError" class="error-banner">
-          {{ activeError }}
-        </p>
+        <ErrorBanner :message="activeError" />
         <p v-if="shouldShowQualityWarning" class="query-tool-warning">
           {{ qualityWarningText }}
         </p>
