@@ -91,9 +91,14 @@ class SyncWorker:
             except Exception as exc:
                 logger.warning("SyncWorker: login session sync error: %s", exc)
             try:
+                self._cleanup_orphan_sessions()
+            except Exception as exc:
+                logger.warning("SyncWorker: orphan session cleanup error: %s", exc)
+            try:
                 self._cleanup_synced()
             except Exception as exc:
                 logger.warning("SyncWorker: cleanup error: %s", exc)
+            record_sync_completed()
 
     # ----------------------------------------------------------
     # Auto-create MySQL tables
@@ -203,9 +208,62 @@ class SyncWorker:
                     except Exception:
                         # Tolerate duplicate-column errors for existing deployments.
                         pass
+                # Add online_count column to metrics snapshots if not present
+                try:
+                    conn.execute(
+                        text("ALTER TABLE dashboard_metrics_snapshots ADD COLUMN online_count INT")
+                    )
+                except Exception:
+                    pass
+                # One-time migration v2: truncate stale login sessions table
+                self._run_login_session_migration(conn)
             logger.info("SyncWorker: MySQL tables verified/created")
         except Exception as exc:
             logger.warning("SyncWorker: cannot ensure MySQL tables, will retry on next sync: %s", exc)
+
+    # ----------------------------------------------------------
+    # One-time migrations
+    # ----------------------------------------------------------
+
+    _MIGRATION_VERSION_KEY = "sync_worker_migration_version"
+    _MIGRATION_VERSION_TARGET = 2
+
+    def _run_login_session_migration(self, conn) -> None:
+        """One-time migration: truncate dashboard_login_sessions to clear stale data."""
+        try:
+            result = conn.execute(
+                text(
+                    "SELECT value FROM dashboard_migration_meta "
+                    f"WHERE key = '{self._MIGRATION_VERSION_KEY}' LIMIT 1"
+                )
+            ).fetchone()
+            current_version = int(result[0]) if result else 0
+        except Exception:
+            # Meta table doesn't exist yet — create it
+            try:
+                conn.execute(text(
+                    "CREATE TABLE IF NOT EXISTS dashboard_migration_meta ("
+                    "  key VARCHAR(100) PRIMARY KEY,"
+                    "  value VARCHAR(255)"
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+                ))
+            except Exception:
+                pass
+            current_version = 0
+
+        if current_version >= self._MIGRATION_VERSION_TARGET:
+            return
+
+        try:
+            conn.execute(text("TRUNCATE TABLE dashboard_login_sessions"))
+            conn.execute(text(
+                "REPLACE INTO dashboard_migration_meta (key, value) VALUES "
+                f"('{self._MIGRATION_VERSION_KEY}', '{self._MIGRATION_VERSION_TARGET}')"
+            ))
+            logger.info("SyncWorker: migration v%d applied (truncated dashboard_login_sessions)",
+                        self._MIGRATION_VERSION_TARGET)
+        except Exception as exc:
+            logger.warning("SyncWorker: migration v%d failed: %s", self._MIGRATION_VERSION_TARGET, exc)
 
     # ----------------------------------------------------------
     # Log sync
@@ -285,7 +343,8 @@ class SyncWorker:
                                  heavy_query_slots_active,
                                  heavy_query_guard_reject_total,
                                  heavy_query_memory_error_total,
-                                 heavy_query_async_fallback_total)
+                                 heavy_query_async_fallback_total,
+                                 online_count)
                             VALUES
                                 (:sync_id, :ts, :worker_pid,
                                  :pool_saturation, :pool_checked_out, :pool_checked_in,
@@ -299,7 +358,8 @@ class SyncWorker:
                                  :heavy_query_slots_active,
                                  :heavy_query_guard_reject_total,
                                  :heavy_query_memory_error_total,
-                                 :heavy_query_async_fallback_total)
+                                 :heavy_query_async_fallback_total,
+                                 :online_count)
                         """),
                         {
                             "sync_id": row.get("sync_id"),
@@ -331,6 +391,7 @@ class SyncWorker:
                             "heavy_query_guard_reject_total": row.get("heavy_query_guard_reject_total"),
                             "heavy_query_memory_error_total": row.get("heavy_query_memory_error_total"),
                             "heavy_query_async_fallback_total": row.get("heavy_query_async_fallback_total"),
+                            "online_count": row.get("online_count"),
                         }
                     )
             self._metrics_store.mark_synced([r["id"] for r in rows])
@@ -391,6 +452,16 @@ class SyncWorker:
             logger.warning("SyncWorker: MySQL unavailable for login sessions, will retry: %s", exc)
 
     # ----------------------------------------------------------
+    # Orphan session cleanup
+    # ----------------------------------------------------------
+
+    def _cleanup_orphan_sessions(self) -> None:
+        """Close sessions older than 8 hours that never had a proper logout."""
+        closed = self._login_store.cleanup_orphan_sessions(older_than_hours=8)
+        if closed > 0:
+            logger.info("SyncWorker: closed %d orphan sessions (>8h)", closed)
+
+    # ----------------------------------------------------------
     # Cleanup
     # ----------------------------------------------------------
 
@@ -420,6 +491,8 @@ def _parse_ts(ts_str) -> Optional[datetime]:
 
 _SYNC_WORKER: Optional[SyncWorker] = None
 
+_last_sync_at: Optional[datetime] = None
+
 
 def start_sync_worker() -> None:
     global _SYNC_WORKER
@@ -433,3 +506,23 @@ def stop_sync_worker() -> None:
     if _SYNC_WORKER is not None:
         _SYNC_WORKER.stop()
         _SYNC_WORKER = None
+
+
+def record_sync_completed() -> None:
+    """Record that a sync cycle has completed (called internally after each sync)."""
+    global _last_sync_at
+    _last_sync_at = datetime.now()
+
+
+def get_sync_worker_status() -> dict:
+    """Return SyncWorker status for health endpoint."""
+    running = (
+        MYSQL_SYNC_ENABLED
+        and _SYNC_WORKER is not None
+        and _SYNC_WORKER._thread is not None
+        and _SYNC_WORKER._thread.is_alive()
+    )
+    return {
+        "running": running,
+        "last_sync_at": _last_sync_at.isoformat() if _last_sync_at else None,
+    }

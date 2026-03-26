@@ -10,7 +10,7 @@ import AiChatPanel from '../shared-ui/components/AiChatPanel.vue';
 import AiChatTrigger from '../shared-ui/components/AiChatTrigger.vue';
 import AnomalyIndicator from './components/AnomalyIndicator.vue';
 import HealthStatus from './components/HealthStatus.vue';
-import { useAuth } from './composables/useAuth.js';
+import { onlineCount, useAuth } from './composables/useAuth.js';
 import { consumeNavigationNotice, setAuthState, syncNavigationRoutes } from './router.js';
 import { normalizeRoutePath } from './routeContracts.js';
 import {
@@ -201,6 +201,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown);
   if (!isLoginPage.value) {
     void loadNavigation();
+    auth.startHeartbeat();
   }
 
   // Global 401 interceptor: redirect to /login if session expires.
@@ -275,6 +276,10 @@ watch(isLoginPage, (isLogin, wasLogin) => {
       </div>
       <div class="shell-header-right">
         <AnomalyIndicator />
+        <div v-if="onlineCount !== null" class="online-count" aria-label="在線人數">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+          <span>{{ onlineCount }}</span>
+        </div>
         <HealthStatus />
         <div class="admin-entry">
           <span v-if="adminDisplayName" class="admin-name">{{ adminDisplayName }}</span>

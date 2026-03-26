@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Pytest configuration and fixtures for MES Dashboard tests."""
 
+import logging
 import pytest
 import sys
 import os
@@ -69,6 +70,17 @@ def _reset_modernization_policy_cache():
     clear_modernization_policy_cache()
     yield
     clear_modernization_policy_cache()
+
+
+@pytest.fixture(autouse=True)
+def _restore_logger_propagation():
+    """Restore mes_dashboard logger propagation after tests that call create_app().
+
+    create_app() sets logger.propagate = False, which is correct for production
+    but breaks caplog in subsequent tests (caplog relies on propagation to root).
+    """
+    yield
+    logging.getLogger('mes_dashboard').propagate = True
 
 
 @pytest.fixture

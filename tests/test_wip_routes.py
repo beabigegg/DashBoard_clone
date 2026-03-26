@@ -508,6 +508,8 @@ class TestMetaFilterOptionsRoute(TestWipRoutesBase):
             pj_type=None,
             firstname=None,
             waferdesc=None,
+            status=None,
+            hold_type=None,
         )
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_filter_options')
@@ -534,6 +536,8 @@ class TestMetaFilterOptionsRoute(TestWipRoutesBase):
             pj_type='PJA',
             firstname='WF001',
             waferdesc='SiC',
+            status=None,
+            hold_type=None,
         )
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_filter_options')

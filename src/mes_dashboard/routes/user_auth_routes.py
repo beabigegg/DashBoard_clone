@@ -217,10 +217,14 @@ def heartbeat():
     """Update last_active timestamp for the current session."""
     user = session.get("user", {})
     session_id = user.get("session_id")
+    online_count = None
     if session_id:
         try:
             from mes_dashboard.core.login_session_store import get_login_session_store
-            get_login_session_store().update_last_active(session_id)
+            store = get_login_session_store()
+            store.update_last_active(session_id)
+            online_count = store.get_active_count()
         except Exception as e:
             logger.warning("Failed to update heartbeat: %s", e)
-    return success_response(None)
+    data = {"online_count": online_count} if online_count is not None else None
+    return success_response(data)

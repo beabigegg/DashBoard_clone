@@ -14,17 +14,24 @@ import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 import SectionCard from '../../shared-ui/components/SectionCard.vue';
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
-import { useUsageKpi } from '../../admin-shared/composables/useAdminData.js';
+import TrendChart from '../../admin-shared/components/TrendChart.vue';
+import { usePerfHistory, useUsageKpi } from '../../admin-shared/composables/useAdminData.js';
 
 const startDate = ref('');
 const endDate = ref('');
 const department = ref('');
 
 const usageHook = useUsageKpi(startDate, endDate, department);
+const historyHook = usePerfHistory(60, 30);
 
 const kpiData = computed(() => usageHook.data.value || null);
 const loading = computed(() => usageHook.loading.value);
 const error = computed(() => usageHook.error.value);
+const onlineTrendData = computed(() => historyHook.data.value || []);
+
+const onlineTrendSeries = [
+  { name: '在線人數', key: 'online_count', color: 'var(--color-accent-500)' },
+];
 
 function initDates() {
   const now = new Date();
@@ -42,7 +49,7 @@ function formatDuration(seconds) {
 }
 
 async function refresh() {
-  await usageHook.refresh();
+  await Promise.all([usageHook.refresh(), historyHook.refresh()]);
 }
 
 defineExpose({ refresh });
@@ -104,6 +111,17 @@ onMounted(() => {
       <SectionCard>
         <template #header><h2 class="panel-title">每日活躍使用者（DAU）</h2></template>
         <DauTrendChart :data="kpiData.dau_trend || []" />
+      </SectionCard>
+
+      <SectionCard>
+        <template #header><h2 class="panel-title">在線人數趨勢（近 60 分鐘）</h2></template>
+        <TrendChart
+          :snapshots="onlineTrendData"
+          :series="onlineTrendSeries"
+          title="在線人數"
+          yAxisLabel="人"
+          height="200px"
+        />
       </SectionCard>
 
       <div class="charts-grid">

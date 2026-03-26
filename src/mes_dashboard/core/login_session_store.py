@@ -229,6 +229,10 @@ class LoginSessionStore:
 
         Only resets synced=0 if the row is currently synced=1, avoiding
         unnecessary re-sync of rows the SyncWorker hasn't picked up yet.
+
+        If the session was closed (e.g. by graceful shutdown) but the user is
+        still active (Flask session cookie survived restart), reopen it by
+        clearing logout_time and duration_sec.
         """
         if not self._initialized:
             return
@@ -236,6 +240,14 @@ class LoginSessionStore:
         try:
             with self._write_lock:
                 with self._get_connection() as conn:
+                    # Reopen sessions closed by server restart while user stayed active.
+                    conn.execute(
+                        "UPDATE login_sessions "
+                        "SET logout_time = NULL, duration_sec = NULL, "
+                        "    last_active = ?, synced = 0 "
+                        "WHERE session_id = ? AND logout_time IS NOT NULL",
+                        (now, session_id),
+                    )
                     conn.execute(
                         "UPDATE login_sessions SET last_active = ?, synced = 0 "
                         "WHERE session_id = ? AND (synced = 1 OR last_active IS NULL)",
@@ -252,7 +264,7 @@ class LoginSessionStore:
             logger.error("Failed to update_last_active: %s", e)
 
     def close_session(self, session_id: str) -> None:
-        """Record logout: set logout_time and compute duration_sec."""
+        """Record logout: set logout_time and compute duration_sec using last_active."""
         if not self._initialized:
             return
         now = datetime.now()
@@ -262,7 +274,7 @@ class LoginSessionStore:
                 with self._get_connection() as conn:
                     cursor = conn.cursor()
                     cursor.execute(
-                        "SELECT login_time FROM login_sessions WHERE session_id = ?",
+                        "SELECT login_time, last_active FROM login_sessions WHERE session_id = ?",
                         (session_id,),
                     )
                     row = cursor.fetchone()
@@ -270,7 +282,12 @@ class LoginSessionStore:
                     if row:
                         try:
                             login_dt = datetime.fromisoformat(row[0])
-                            duration_sec = int((now - login_dt).total_seconds())
+                            last_active = row[1]
+                            if last_active:
+                                ref_dt = datetime.fromisoformat(last_active)
+                            else:
+                                ref_dt = now
+                            duration_sec = int((ref_dt - login_dt).total_seconds())
                         except (ValueError, TypeError):
                             pass
                     conn.execute(
@@ -284,6 +301,58 @@ class LoginSessionStore:
                     conn.commit()
         except Exception as e:
             logger.error("Failed to close_session: %s", e)
+
+    def get_active_count(self) -> int:
+        """Return count of sessions active within the last 30 minutes."""
+        if not self._initialized:
+            self.initialize()
+        cutoff = (datetime.now() - timedelta(minutes=30)).isoformat()
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) FROM login_sessions "
+                    "WHERE logout_time IS NULL AND last_active >= ?",
+                    (cutoff,),
+                )
+                row = cursor.fetchone()
+                return row[0] if row else 0
+        except Exception as e:
+            logger.error("Failed to get_active_count: %s", e)
+            return 0
+
+    def close_all_active_sessions(self) -> int:
+        """Close all sessions with logout_time IS NULL using last_active as logout time.
+
+        Returns count of sessions closed.
+        """
+        if not self._initialized:
+            return 0
+        try:
+            with self._write_lock:
+                with self._get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        """
+                        UPDATE login_sessions
+                        SET logout_time = COALESCE(last_active, login_time),
+                            duration_sec = CAST(
+                                (julianday(COALESCE(last_active, login_time))
+                                 - julianday(login_time)) * 86400
+                                AS INTEGER
+                            ),
+                            synced = 0
+                        WHERE logout_time IS NULL
+                        """
+                    )
+                    count = cursor.rowcount
+                    conn.commit()
+            if count > 0:
+                logger.info("close_all_active_sessions: closed %d sessions", count)
+            return count
+        except Exception as e:
+            logger.error("Failed to close_all_active_sessions: %s", e)
+            return 0
 
     def get_unsynced(self, batch_size: int = 500) -> List[Dict[str, Any]]:
         """Return up to batch_size unsynced login session rows."""
@@ -316,6 +385,39 @@ class LoginSessionStore:
                     conn.commit()
         except Exception as e:
             logger.error("Failed to mark_synced login sessions: %s", e)
+
+    def cleanup_orphan_sessions(self, older_than_hours: int = 8) -> int:
+        """Close orphan sessions older than older_than_hours using last_active as logout time.
+
+        Returns count of sessions closed.
+        """
+        if not self._initialized:
+            return 0
+        cutoff = (datetime.now() - timedelta(hours=older_than_hours)).isoformat()
+        try:
+            with self._write_lock:
+                with self._get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        """
+                        UPDATE login_sessions
+                        SET logout_time = COALESCE(last_active, login_time),
+                            duration_sec = CAST(
+                                (julianday(COALESCE(last_active, login_time))
+                                 - julianday(login_time)) * 86400
+                                AS INTEGER
+                            ),
+                            synced = 0
+                        WHERE logout_time IS NULL AND login_time < ?
+                        """,
+                        (cutoff,),
+                    )
+                    count = cursor.rowcount
+                    conn.commit()
+            return count
+        except Exception as e:
+            logger.error("Failed to cleanup_orphan_sessions: %s", e)
+            return 0
 
     def cleanup_synced(self, older_than_hours: int = 24) -> int:
         """Delete synced=1 records older than older_than_hours. Returns deleted count."""

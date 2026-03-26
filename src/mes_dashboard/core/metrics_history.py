@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     heavy_query_async_fallback_total INTEGER,
     cache_hit_count INTEGER,
     cache_miss_count INTEGER,
+    online_count INTEGER,
     sync_id TEXT,
     synced INTEGER DEFAULT 0
 );
@@ -94,6 +95,7 @@ _MIGRATION_COLUMNS = [
     ("heavy_query_async_fallback_total", "INTEGER"),
     ("cache_hit_count", "INTEGER"),
     ("cache_miss_count", "INTEGER"),
+    ("online_count", "INTEGER"),
     ("sync_id", "TEXT"),
     ("synced", "INTEGER DEFAULT 0"),
 ]
@@ -122,6 +124,7 @@ COLUMNS = [
     "heavy_query_memory_error_total",
     "heavy_query_async_fallback_total",
     "cache_hit_count", "cache_miss_count",
+    "online_count",
 ]
 
 
@@ -250,8 +253,9 @@ class MetricsHistoryStore:
                              heavy_query_memory_error_total,
                              heavy_query_async_fallback_total,
                              cache_hit_count, cache_miss_count,
+                             online_count,
                              synced)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                         """,
                         (
                             ts, pid,
@@ -283,6 +287,7 @@ class MetricsHistoryStore:
                             data.get("heavy_query_async_fallback_total"),
                             data.get("cache_hit_count"),
                             data.get("cache_miss_count"),
+                            data.get("online_count"),
                         ),
                     )
                     rowid = cursor.lastrowid
@@ -360,6 +365,7 @@ class MetricsHistoryStore:
                 MAX(heavy_query_async_fallback_total) AS heavy_query_async_fallback_total,
                 SUM(cache_hit_count)    AS cache_hit_count,
                 SUM(cache_miss_count)   AS cache_miss_count,
+                MAX(online_count)       AS online_count,
                 COUNT(DISTINCT worker_pid) AS worker_count,
                 ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
             FROM metrics_snapshots
@@ -717,6 +723,13 @@ class MetricsHistoryCollector:
                 data["heavy_query_guard_reject_total"] = 0
                 data["heavy_query_memory_error_total"] = 0
                 data["heavy_query_async_fallback_total"] = 0
+
+            # Online count
+            try:
+                from mes_dashboard.core.login_session_store import get_login_session_store
+                data["online_count"] = get_login_session_store().get_active_count()
+            except Exception:
+                data["online_count"] = None
 
             self._store.write_snapshot(data)
         except Exception as exc:

@@ -416,6 +416,12 @@ def _shutdown_runtime_resources() -> None:
         logger.warning("Error stopping metrics history: %s", exc)
 
     try:
+        from mes_dashboard.core.login_session_store import get_login_session_store
+        get_login_session_store().close_all_active_sessions()
+    except Exception as exc:
+        logger.warning("Error closing active login sessions on shutdown: %s", exc)
+
+    try:
         from mes_dashboard.core.sync_worker import stop_sync_worker
         stop_sync_worker()
     except Exception as exc:

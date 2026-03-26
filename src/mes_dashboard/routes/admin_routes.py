@@ -548,6 +548,7 @@ def _query_mysql_metrics(minutes: int = 30, bucket_seconds: int = 30) -> list:
                 MAX(heavy_query_guard_reject_total) AS heavy_query_guard_reject_total,
                 MAX(heavy_query_memory_error_total) AS heavy_query_memory_error_total,
                 MAX(heavy_query_async_fallback_total) AS heavy_query_async_fallback_total,
+                MAX(online_count)       AS online_count,
                 COUNT(DISTINCT worker_pid) AS worker_count,
                 ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
             FROM dashboard_metrics_snapshots

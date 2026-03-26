@@ -14,6 +14,27 @@ from sqlalchemy import text
 
 logger = logging.getLogger("mes_dashboard.user_usage_kpi_service")
 
+
+def _get_sqlite_active_session_ids() -> set:
+    """Return session_ids of currently active sessions from SQLite (authoritative source)."""
+    try:
+        from mes_dashboard.core.login_session_store import get_login_session_store
+        store = get_login_session_store()
+        if not store._initialized:
+            store.initialize()
+        cutoff = (datetime.now() - timedelta(minutes=30)).isoformat()
+        with store._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT session_id FROM login_sessions "
+                "WHERE logout_time IS NULL AND last_active >= ?",
+                (cutoff,),
+            )
+            return {row[0] for row in cursor.fetchall()}
+    except Exception:
+        return set()
+
+
 # Duration bucket boundaries in seconds
 _DURATION_BUCKETS = [
     ("<5min", 0, 300),
@@ -91,14 +112,9 @@ def _query_mysql(
             "avg_duration_sec": _safe_int(row["avg_duration_sec"]) if row else 0,
         }
 
-        # Active sessions (last_active within 30 min, no logout)
-        active_row = conn.execute(text("""
-            SELECT COUNT(*) AS cnt
-            FROM dashboard_login_sessions
-            WHERE logout_time IS NULL
-              AND last_active >= DATE_SUB(NOW(), INTERVAL 30 MINUTE)
-        """)).mappings().first()
-        overview["active_sessions"] = active_row["cnt"] if active_row else 0
+        # Active sessions — always use SQLite (authoritative real-time source)
+        from mes_dashboard.core.login_session_store import get_login_session_store
+        overview["active_sessions"] = get_login_session_store().get_active_count()
 
         # DAU trend
         dau_rows = conn.execute(text(f"""
@@ -180,9 +196,10 @@ def _query_mysql(
             for r in dept_rows
         ]
 
-        # Recent sessions
+        # Recent sessions (status from MySQL may lag behind SQLite;
+        # cross-reference with authoritative SQLite active sessions by session_id)
         recent_rows = conn.execute(text("""
-            SELECT emp_id AS username, display_name, department,
+            SELECT session_id, emp_id AS username, display_name, department,
                    login_time, duration_sec,
                    CASE WHEN logout_time IS NULL AND last_active >= DATE_SUB(NOW(), INTERVAL 30 MINUTE)
                         THEN 'active' ELSE 'ended' END AS status
@@ -190,6 +207,7 @@ def _query_mysql(
             ORDER BY login_time DESC
             LIMIT 20
         """)).mappings().all()
+        active_sids = _get_sqlite_active_session_ids()
         recent_sessions = [
             {
                 "username": r["username"],
@@ -197,7 +215,7 @@ def _query_mysql(
                 "department": r["department"],
                 "login_time": str(r["login_time"]) if r["login_time"] else None,
                 "duration_sec": r["duration_sec"],
-                "status": r["status"],
+                "status": "active" if r["session_id"] in active_sids else r["status"],
             }
             for r in recent_rows
         ]
@@ -259,14 +277,9 @@ def _query_sqlite(
             "avg_duration_sec": _safe_int(row[2]) if row else 0,
         }
 
-        # Active sessions
-        cursor.execute("""
-            SELECT COUNT(*) FROM login_sessions
-            WHERE logout_time IS NULL
-              AND last_active >= datetime('now', '-30 minutes')
-        """)
-        active_row = cursor.fetchone()
-        overview["active_sessions"] = active_row[0] if active_row else 0
+        # Active sessions — use LoginSessionStore (consistent with MySQL path)
+        from mes_dashboard.core.login_session_store import get_login_session_store
+        overview["active_sessions"] = get_login_session_store().get_active_count()
 
         # DAU trend
         cursor.execute(f"""

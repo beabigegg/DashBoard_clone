@@ -307,7 +307,43 @@
   flex-wrap: wrap;
 }
 
-/* mini-table classes removed — replaced by shared-ui DataTable */
+/* Mini table — admin-dashboard scoped */
+.theme-admin-dashboard .mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.theme-admin-dashboard .mini-table th {
+  text-align: left;
+  padding: theme('spacing.token.p8') theme('spacing.token.p12');
+  border-bottom: 2px solid theme('colors.stroke.panel');
+  color: theme('colors.text.secondary');
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  background: theme('colors.surface.muted');
+}
+
+.theme-admin-dashboard .mini-table td {
+  padding: theme('spacing.token.p10') theme('spacing.token.p12');
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  color: theme('colors.text.primary');
+}
+
+.theme-admin-dashboard .mini-table tbody tr:hover {
+  background: theme('colors.surface.hover');
+}
+
+.theme-admin-dashboard .mini-table tr:last-child td {
+  border-bottom: none;
+}
+
+.theme-admin-dashboard .mini-table .text-right {
+  text-align: right;
+}
 
 .theme-admin-dashboard .log-controls {
   display: flex;
@@ -525,10 +561,11 @@
 
 .theme-admin-dashboard .status-badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 10px;
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .theme-admin-dashboard .status-active {
@@ -537,8 +574,8 @@
 }
 
 .theme-admin-dashboard .status-ended {
-  background: theme('colors.surface.muted');
-  color: theme('colors.text.secondary');
+  background: theme('colors.stroke.soft');
+  color: theme('colors.text.muted');
 }
 
 .theme-admin-dashboard .rq-worker-state-dot {

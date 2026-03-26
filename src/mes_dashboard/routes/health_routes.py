@@ -554,6 +554,27 @@ def health_check():
     except Exception:
         pass
 
+    sync_worker_status: dict = {}
+    try:
+        from mes_dashboard.core.sync_worker import get_sync_worker_status
+        sync_worker_status = get_sync_worker_status()
+    except Exception:
+        pass
+
+    anomaly_scheduler_status: dict = {}
+    try:
+        from mes_dashboard.services.anomaly_detection_scheduler import get_anomaly_scheduler_status
+        anomaly_scheduler_status = get_anomaly_scheduler_status()
+    except Exception:
+        pass
+
+    online_count: int = 0
+    try:
+        from mes_dashboard.core.login_session_store import get_login_session_store
+        online_count = get_login_session_store().get_active_count()
+    except Exception:
+        pass
+
     response = {
         'status': status,
         'services': services,
@@ -584,6 +605,9 @@ def health_check():
         'workcenter_mapping': workcenter_mapping,
         'system_memory': system_memory,
         'async_workers': async_workers,
+        'sync_worker': sync_worker_status,
+        'anomaly_scheduler': anomaly_scheduler_status,
+        'online_count': online_count,
     }
 
     if errors:

@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 
 const user = ref(null);
+export const onlineCount = ref(null);
 let _heartbeatTimer = null;
 
 export const isAuthenticated = computed(() => user.value !== null);
@@ -46,18 +47,29 @@ export function useAuth() {
     stopHeartbeat();
   }
 
+  async function _sendHeartbeat() {
+    try {
+      const res = await fetch('/api/auth/heartbeat', { method: 'PATCH' });
+      if (res.status === 401) {
+        stopHeartbeat();
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        const count = data?.data?.online_count;
+        if (typeof count === 'number') {
+          onlineCount.value = count;
+        }
+      }
+    } catch {
+      // network error — keep timer, retry next interval
+    }
+  }
+
   function startHeartbeat() {
     if (_heartbeatTimer) return;
-    _heartbeatTimer = setInterval(async () => {
-      try {
-        const res = await fetch('/api/auth/heartbeat', { method: 'PATCH' });
-        if (res.status === 401) {
-          stopHeartbeat();
-        }
-      } catch {
-        // network error — keep timer, retry next interval
-      }
-    }, 5 * 60 * 1000);
+    _sendHeartbeat();
+    _heartbeatTimer = setInterval(_sendHeartbeat, 5 * 60 * 1000);
   }
 
   function stopHeartbeat() {
@@ -71,6 +83,7 @@ export function useAuth() {
     user,
     isAuthenticated,
     isAdmin,
+    onlineCount,
     checkAuth,
     login,
     logout,

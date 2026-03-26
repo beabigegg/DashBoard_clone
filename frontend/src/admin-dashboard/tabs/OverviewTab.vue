@@ -96,6 +96,40 @@ const deadWorkerAlert = computed(() => {
   return warnings.value.some((entry) => String(entry || '').includes('RQ Worker 離線'));
 });
 
+const syncWorker = computed(() => healthData.value?.sync_worker || {});
+const anomalyScheduler = computed(() => healthData.value?.anomaly_scheduler || {});
+
+const syncWorkerStatus = computed(() => {
+  if (syncWorker.value.running === true) return 'healthy';
+  if (syncWorker.value.running === false) return 'disabled';
+  return 'disabled';
+});
+const syncWorkerLabel = computed(() => {
+  if (syncWorker.value.running === true) return `running`;
+  if (syncWorker.value.running === false) return '未啟用';
+  return '-';
+});
+const syncWorkerMeta = computed(() => {
+  if (!syncWorker.value.last_sync_at) return '--';
+  try {
+    const d = new Date(syncWorker.value.last_sync_at);
+    return d.toLocaleString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return syncWorker.value.last_sync_at;
+  }
+});
+
+const anomalyStatus = computed(() => {
+  if (anomalyScheduler.value.running === true) return 'healthy';
+  if (anomalyScheduler.value.running === false) return 'disabled';
+  return 'disabled';
+});
+const anomalyLabel = computed(() => {
+  if (anomalyScheduler.value.running === true) return 'running';
+  if (anomalyScheduler.value.running === false) return '未啟用';
+  return '-';
+});
+
 const latencyMiniSeries = [
   { name: 'P95', key: 'latency_p95_ms', color: 'var(--color-token-hf59e0b)' },
 ];
@@ -159,6 +193,16 @@ onMounted(() => {
           <div class="status-card-title">System Memory</div>
           <StatusDot :status="memoryStatus" :label="memoryLabel" />
           <div class="status-card-meta">{{ memoryInfo?.pressure || 'normal' }}</div>
+        </div>
+        <div class="status-card">
+          <div class="status-card-title">MySQL Sync</div>
+          <StatusDot :status="syncWorkerStatus" :label="syncWorkerLabel" />
+          <div class="status-card-meta">last: {{ syncWorkerMeta }}</div>
+        </div>
+        <div class="status-card">
+          <div class="status-card-title">Anomaly Scheduler</div>
+          <StatusDot :status="anomalyStatus" :label="anomalyLabel" />
+          <div class="status-card-meta">{{ anomalyScheduler.anomaly_count ?? '--' }} anomalies</div>
         </div>
       </div>
     </SectionCard>

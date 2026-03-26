@@ -25,6 +25,9 @@ logger = logging.getLogger("mes_dashboard.anomaly_detection_scheduler")
 _WORKER_THREAD: threading.Thread | None = None
 _STOP_EVENT = threading.Event()
 
+_last_run_date: str | None = None
+_last_anomaly_count: int = 0
+
 # Configurable schedule hour (0-23), default 08:00 local time
 _SCHEDULE_HOUR = int(os.getenv("ANOMALY_DETECTION_SCHEDULE_HOUR", "8"))
 # Check interval for the scheduler loop (seconds)
@@ -218,6 +221,8 @@ def _refresh_all_spool() -> int:
 
 def _run_computation() -> bool:
     """Execute anomaly detection with distributed lock."""
+    global _last_run_date, _last_anomaly_count
+
     from mes_dashboard.core.redis_client import release_lock, try_acquire_lock
     from mes_dashboard.services.anomaly_detection_sql_runtime import compute_and_cache_all
 
@@ -228,6 +233,8 @@ def _run_computation() -> bool:
     try:
         result = compute_and_cache_all()
         total = result.get("data", {}).get("total_count", 0)
+        _last_run_date = datetime.now().strftime("%Y-%m-%d")
+        _last_anomaly_count = total
         logger.info("Anomaly detection scheduled run complete: %d anomalies", total)
         return True
     except Exception as exc:
@@ -324,6 +331,16 @@ def stop_anomaly_detection_scheduler() -> None:
         _STOP_EVENT.set()
         _WORKER_THREAD.join(timeout=5)
         _WORKER_THREAD = None
+
+
+def get_anomaly_scheduler_status() -> dict:
+    """Return anomaly scheduler status for health endpoint."""
+    running = _WORKER_THREAD is not None and _WORKER_THREAD.is_alive()
+    return {
+        "running": running,
+        "last_run": _last_run_date,
+        "anomaly_count": _last_anomaly_count,
+    }
 
 
 def trigger_recalculation() -> dict:
