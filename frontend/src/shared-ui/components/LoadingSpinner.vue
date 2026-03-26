@@ -40,4 +40,12 @@ const sizeMap = {
 @keyframes spinner-spin {
   to { transform: rotate(360deg); }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: none;
+    border-top-color: currentColor;
+    opacity: 0.5;
+  }
+}
 </style>

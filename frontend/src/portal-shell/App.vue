@@ -278,6 +278,8 @@ watch(isLoginPage, (isLogin, wasLogin) => {
         <HealthStatus />
         <div class="admin-entry">
           <span v-if="adminDisplayName" class="admin-name">{{ adminDisplayName }}</span>
+          <a v-if="adminLinks?.pages?.dashboard" :href="adminLinks.pages.dashboard" class="admin-link">管理後台</a>
+          <a v-if="adminLinks?.pages?.login" :href="adminLinks.pages.login" class="admin-link">管理員登入</a>
           <button type="button" class="admin-link" @click="handleLogout">登出</button>
         </div>
       </div>
@@ -287,7 +289,7 @@ watch(isLoginPage, (isLogin, wasLogin) => {
       <div v-if="isMobile && sidebarMobileOpen" class="sidebar-overlay" @click="closeMobileSidebar" />
     </Transition>
 
-    <main class="shell-main">
+    <main id="main-content" class="shell-main">
       <aside class="sidebar" :class="sidebarUiState.sidebarClass" role="navigation" aria-label="主選單">
         <div v-if="loading" class="muted">載入導覽中...</div>
         <div v-else-if="errorMessage" class="error">{{ errorMessage }}</div>
@@ -307,7 +309,7 @@ watch(isLoginPage, (isLogin, wasLogin) => {
         </template>
       </aside>
 
-      <main id="main-content" class="shell-content">
+      <section class="shell-content">
         <div v-if="navigationNotice" class="notice-banner">{{ navigationNotice }}</div>
         <div class="breadcrumb">
           <span v-if="breadcrumb.drawerName">{{ breadcrumb.drawerName }}</span>
@@ -315,7 +317,7 @@ watch(isLoginPage, (isLogin, wasLogin) => {
           <span>{{ breadcrumb.title }}</span>
         </div>
         <RouterView />
-      </main>
+      </section>
     </main>
 
     <AiChatTrigger v-if="!aiChat.isOpen.value" @click="aiChat.togglePanel" />

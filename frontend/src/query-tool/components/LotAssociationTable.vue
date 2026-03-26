@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 import { formatCellValue } from '../utils/values.js';
+import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 
 const props = defineProps({
   rows: {
@@ -80,9 +81,7 @@ function resolveColumnLabel(column) {
 
 <template>
   <div>
-    <div v-if="loading" class="placeholder">
-      讀取中...
-    </div>
+    <BlockLoadingState v-if="loading" />
 
     <div v-else-if="rows.length === 0" class="placeholder">
       {{ emptyText }}

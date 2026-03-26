@@ -16,7 +16,7 @@ const INPUT_LIMITS = Object.freeze({
   wafer_lot: 100,
   lot_id: 100,
   serial_number: 100,
-  work_order: 30,
+  work_order: 50,
   gd_work_order: 100,
   gd_lot_id: 100,
 });

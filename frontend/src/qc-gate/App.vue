@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import QcGateChart from './components/QcGateChart.vue';
@@ -117,9 +118,7 @@ function handleManualRefresh() {
           <span class="panel-hint">點擊圖表區段可篩選下方 LOT 清單</span>
         </template>
 
-        <div v-if="loading" class="loading-state">資料載入中...</div>
-
-        <template v-else>
+        <template v-if="!loading">
           <QcGateChart
             :stations="stations"
             :active-filter="activeFilter"
@@ -149,5 +148,7 @@ function handleManualRefresh() {
         />
       </SectionCard>
     </main>
+
+    <LoadingOverlay v-if="loading" tier="page" />
   </div>
 </template>

@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
+import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 import { formatCellValue } from '../utils/values.js';
 
 const props = defineProps({
@@ -81,9 +82,7 @@ const workcenterOptions = computed(() => {
       </label>
     </div>
 
-    <div v-if="loading" class="placeholder">
-      歷程資料讀取中...
-    </div>
+    <BlockLoadingState v-if="loading" text="歷程資料讀取中..." />
 
     <div v-else-if="rows.length === 0" class="placeholder">
       無歷程資料

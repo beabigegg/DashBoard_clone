@@ -702,7 +702,7 @@ onMounted(() => {
       @clear-duration="clearDurationFilter"
     />
 
-    <div class="ui-table-wrap" :class="{ 'is-loading': loading.list }">
+    <div class="ui-table-wrap">
       <DetailTable
         :items="detailData.items || []"
         :pagination="detailData.pagination"

@@ -119,7 +119,6 @@
   color: var(--muted);
 }
 
-.loading-state,
 .empty-state {
   display: flex;
   align-items: center;

@@ -5,6 +5,7 @@ import { apiGet, ensureMesApiAvailable } from '../../core/api.js';
 import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import StatusBadge from '../../shared-ui/components/StatusBadge.vue';
+import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 import { formatCellValue, formatDateTime, parseDateTime } from '../utils/values.js';
 
 const props = defineProps({
@@ -166,9 +167,7 @@ async function loadTxn(jobId) {
 <template>
   <section class="space-y-3">
     <div>
-      <div v-if="loading" class="placeholder">
-        讀取中...
-      </div>
+      <BlockLoadingState v-if="loading" />
 
       <div v-else-if="displayRows.length === 0" class="placeholder">
         {{ emptyText }}
@@ -225,9 +224,7 @@ async function loadTxn(jobId) {
 
       <ErrorBanner :message="txnError" />
 
-      <div v-if="loadingTxn" class="placeholder">
-        載入交易歷程中...
-      </div>
+      <BlockLoadingState v-if="loadingTxn" text="載入交易歷程中..." />
 
       <div v-else-if="txnRows.length === 0" class="placeholder">
         無交易歷程資料

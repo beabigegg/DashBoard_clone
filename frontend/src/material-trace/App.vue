@@ -6,6 +6,7 @@ import { parseMultiLineInput } from '../core/reject-history-filters.js';
 import DataTable from '../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
+import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 
 const API_TIMEOUT = 60000;
@@ -416,9 +417,14 @@ function onDocumentClick(e) {
           <!-- Buttons -->
           <div class="filter-toolbar">
             <div class="filter-actions">
-              <button class="ui-btn ui-btn--primary" :disabled="!canQuery" @click="executePrimaryQuery()">
-                <span v-if="loading" class="btn-spinner"></span>
-                查詢
+              <button
+                class="ui-btn ui-btn--primary"
+                :class="{ 'is-loading': loading }"
+                :disabled="!canQuery || loading"
+                @click="executePrimaryQuery()"
+              >
+                <LoadingSpinner v-if="loading" size="sm" />
+                {{ loading ? '查詢中...' : '查詢' }}
               </button>
               <button class="ui-btn ui-btn--secondary" @click="clearAll">清除</button>
               <button class="ui-btn ui-btn--secondary" :disabled="!canExport" @click="exportCsv">

@@ -221,8 +221,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(.theme-wip-overview, .theme-wip-detail) .refresh-indicator,
-  :is(.theme-wip-overview, .theme-wip-detail) .loading-spinner {
+  :is(.theme-wip-overview, .theme-wip-detail) .refresh-indicator {
     animation: none;
   }
 

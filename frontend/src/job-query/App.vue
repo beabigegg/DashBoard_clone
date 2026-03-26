@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue';
 
 import DataTable from '../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
+import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
@@ -123,6 +124,10 @@ onMounted(async () => {
         <DataTable :data="jobs" :loading="loadingJobs">
           <DataTableColumn column-key="_action" label="操作" />
           <DataTableColumn v-for="column in jobsColumns" :key="column" :column-key="column" :label="column" />
+
+          <template #empty>
+            <EmptyState text="目前無資料" />
+          </template>
 
           <template #cell="{ row, columnKey, value }">
             <template v-if="columnKey === '_action'">

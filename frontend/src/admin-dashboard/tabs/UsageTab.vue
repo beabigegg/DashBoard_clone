@@ -8,7 +8,9 @@ import HourlyLoginChart from '../../admin-user-usage-kpi/components/HourlyLoginC
 import KpiCard from '../../admin-user-usage-kpi/components/KpiCard.vue';
 import RecentSessionsTable from '../../admin-user-usage-kpi/components/RecentSessionsTable.vue';
 import TopUsersTable from '../../admin-user-usage-kpi/components/TopUsersTable.vue';
+import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 import SectionCard from '../../shared-ui/components/SectionCard.vue';
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
@@ -70,8 +72,14 @@ onMounted(() => {
             {{ item }}
           </option>
         </select>
-        <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="refresh" :disabled="loading">
-          {{ loading ? '載入中...' : '查詢' }}
+        <button
+          class="ui-btn ui-btn--ghost ui-btn--sm"
+          :class="{ 'is-loading': loading }"
+          :disabled="loading"
+          @click="refresh"
+        >
+          <LoadingSpinner v-if="loading" size="sm" />
+          {{ loading ? '查詢中...' : '查詢' }}
         </button>
       </div>
     </section>
@@ -79,7 +87,7 @@ onMounted(() => {
     <ErrorBanner :message="error" :dismissible="false" />
 
     <section v-if="loading && !kpiData" class="panel">
-      <div class="loading-text">載入中...</div>
+      <BlockLoadingState />
     </section>
 
     <template v-if="kpiData">

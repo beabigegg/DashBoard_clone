@@ -30,7 +30,8 @@ Governance status (2026-03-12): `css-governance-check` = 0 errors, 0 warnings.
 
 | File | Scope | Notes |
 | :--- | :--- | :--- |
-| `frontend/src/shared-ui/components/LoadingSpinner.vue` | `<style scoped>` | Inline spinner; sizes sm/md/lg |
+| `frontend/src/shared-ui/components/BlockLoadingState.vue` | `<style scoped>` | Block-level loading placeholder; `text` + `minHeight` props; replaces ad-hoc `loading-text` divs |
+| `frontend/src/shared-ui/components/LoadingSpinner.vue` | `<style scoped>` | Inline spinner; sizes sm/md/lg; reduced-motion fallback added |
 | `frontend/src/shared-ui/components/LoadingOverlay.vue` | `<style scoped>` | Section/page tier overlay |
 | `frontend/src/shared-ui/components/SkeletonLoader.vue` | `<style scoped>` | Shared skeleton variants for text/card/table loading states with reduced-motion fallback |
 | `frontend/src/shared-ui/components/EmptyState.vue` | `<style scoped>` | Typed empty state messages |

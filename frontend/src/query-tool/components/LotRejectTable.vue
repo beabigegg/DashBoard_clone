@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 
 import { useSortableTable } from '../../shared-composables/useSortableTable.js';
 import { formatDateTime, parseDateTime } from '../utils/values.js';
+import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 
 const props = defineProps({
   rows: {
@@ -110,9 +111,7 @@ function ariaSortFor(key) {
 
 <template>
   <div>
-    <div v-if="loading" class="placeholder">
-      讀取中...
-    </div>
+    <BlockLoadingState v-if="loading" />
 
     <div v-else-if="displayRows.length === 0" class="placeholder">
       {{ emptyText }}

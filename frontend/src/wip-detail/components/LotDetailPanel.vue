@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 
 import { apiGet } from '../../core/api.js';
+import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 
 const props = defineProps({
   lotId: {
@@ -122,7 +123,7 @@ const otherFields = ['owner', 'startDate', 'tmttRemaining', 'dataUpdateDate'];
 
     <div class="lot-detail-content">
       <div v-if="loading" class="lot-detail-loading">
-        <span class="loading-spinner"></span>
+        <LoadingSpinner size="sm" />
         Loading...
       </div>
 

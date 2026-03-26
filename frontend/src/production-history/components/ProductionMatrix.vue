@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue';
+import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 
 const props = defineProps({
   tree: { type: Array, default: () => [] },
@@ -69,7 +70,7 @@ function collapseAll() {
         </div>
       </div>
 
-      <div v-if="loading" class="empty-state">載入中…</div>
+      <BlockLoadingState v-if="loading" />
       <div v-else-if="!tree.length" class="empty-state">無資料</div>
 
       <div v-else class="hierarchy-table-wrap">

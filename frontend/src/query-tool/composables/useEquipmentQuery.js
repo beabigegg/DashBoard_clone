@@ -27,6 +27,7 @@ function emptyTabFlags() {
     lots: false,
     jobs: false,
     rejects: false,
+    timeline: false,
   };
 }
 
@@ -46,6 +47,7 @@ export function useEquipmentQuery(initial = {}) {
   const lotsPagination = ref({ page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 });
   const jobsRows = ref([]);
   const rejectsRows = ref([]);
+  const statusRows = ref([]);
 
   const loading = reactive({
     bootstrapping: false,
@@ -220,6 +222,39 @@ export function useEquipmentQuery(initial = {}) {
     }
   }
 
+  async function queryTimeline() {
+    const validation = validateFilters();
+    if (validation) {
+      errors.filters = validation;
+      return false;
+    }
+
+    errors.filters = '';
+
+    try {
+      const [statusPayload, lotsPayload, jobsPayload] = await Promise.all([
+        fetchEquipmentPeriod('status_hours'),
+        fetchEquipmentPeriod('lots', { page: 1, perPage: DEFAULT_LOTS_PER_PAGE }),
+        fetchEquipmentPeriod('jobs'),
+      ]);
+
+      statusRows.value = Array.isArray(statusPayload?.data) ? statusPayload.data : [];
+      lotsRows.value = Array.isArray(lotsPayload?.data) ? lotsPayload.data : [];
+      lotsPagination.value = lotsPayload?.pagination || {
+        page: 1,
+        per_page: DEFAULT_LOTS_PER_PAGE,
+        total: lotsRows.value.length,
+        total_pages: 1,
+      };
+      jobsRows.value = Array.isArray(jobsPayload?.data) ? jobsPayload.data : [];
+      queried.timeline = true;
+      return true;
+    } catch (error) {
+      errors.filters = error?.message || '查詢時間軸資料失敗';
+      return false;
+    }
+  }
+
   async function queryActiveSubTab() {
     const tab = activeSubTab.value;
     if (tab === 'lots') {
@@ -316,6 +351,7 @@ export function useEquipmentQuery(initial = {}) {
     lotsPagination,
     jobsRows,
     rejectsRows,
+    statusRows,
     loading,
     errors,
     queried,
@@ -327,6 +363,7 @@ export function useEquipmentQuery(initial = {}) {
     queryLots,
     queryJobs,
     queryRejects,
+    queryTimeline,
     queryActiveSubTab,
     canExportSubTab,
     exportSubTab,

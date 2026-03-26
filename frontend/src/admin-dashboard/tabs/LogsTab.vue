@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { apiPost } from '../../core/api.js';
 import { useLogs } from '../../admin-shared/composables/useAdminData.js';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 import SectionCard from '../../shared-ui/components/SectionCard.vue';
 import DataTable from '../../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
@@ -16,6 +17,7 @@ const cleanupLoading = ref(false);
 
 const logsHook = useLogs(logLevel, logSearch, logLimit, logOffset);
 const logsData = computed(() => logsHook.data.value || null);
+const logsLoading = computed(() => logsHook.loading.value);
 const errorMessage = computed(() => logsHook.error.value || '');
 
 let debounceTimer = null;
@@ -104,7 +106,13 @@ onBeforeUnmount(() => {
           placeholder="搜尋日誌..."
           @input="onSearchInput"
         />
-        <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="cleanupLogs" :disabled="cleanupLoading">
+        <button
+          class="ui-btn ui-btn--ghost ui-btn--sm"
+          :class="{ 'is-loading': cleanupLoading }"
+          :disabled="cleanupLoading"
+          @click="cleanupLogs"
+        >
+          <LoadingSpinner v-if="cleanupLoading" size="sm" />
           {{ cleanupLoading ? '清理中...' : '清理日誌' }}
         </button>
       </div>
@@ -112,6 +120,7 @@ onBeforeUnmount(() => {
       <div class="log-table-wrapper">
         <DataTable
           :data="logsData?.logs || []"
+          :loading="logsLoading"
           :pagination="(logsData?.total || 0) > logLimit ? { page: currentPage, totalPages: totalPages, infoText: `共 ${logsData?.total || 0} 筆` } : null"
           @page-change="(p) => { logOffset = (p - 1) * logLimit; loadLogs(); }"
         >

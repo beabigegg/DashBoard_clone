@@ -132,6 +132,12 @@
 
 *   **契約 8.5 (ErrorBanner)**: 錯誤訊息應統一使用 `shared-ui/ErrorBanner.vue`。功能區塊**禁止**在 feature CSS 中新增 `.error-banner` 類別定義。
 
+*   **契約 8.6 (Loading 三層治理)**: Loading 狀態必須依場景分層使用，並遵守以下規則：
+    *   **Page-level**：阻斷頁面主要操作的初始化等待，**必須**使用 `LoadingOverlay tier="page"`。功能區塊**禁止**自訂 full-page spinner（如自行定義 `@keyframes` + fixed/absolute 全屏遮罩）。
+    *   **Component-level**：按鈕 busy 狀態**必須**搭配 `is-loading` class + `LoadingSpinner size="sm"` + `disabled` 屬性 + loading 文案（如「查詢中...」）。**禁止**保留自定義 `.btn-spinner` CSS 類別。
+    *   **Block-level**：表格/卡片區塊等待：若使用 `DataTable`，**必須**透過 `:loading` prop；若為非 DataTable 區塊，**必須**使用 `BlockLoadingState`（或 `EmptyState type="loading"`）。**禁止**在同一區塊同時使用多種等待呈現（如 `.ui-table-wrap.is-loading` 與 `DataTable :loading` 並存）。
+    *   所有 loading 動畫**必須**尊重 `prefers-reduced-motion`。
+
 ---
 
 ### **快速參考備忘錄**
@@ -146,3 +152,7 @@
 | 修改全站的**預設背景色**或**字體** | 修改 `@layer base` 中的 `body` 規則 | `styles/tailwind.css` |
 | 新增/刪除/改名一個 CSS 檔案 | 同步更新 CSS 清單並一併提交 | `contract/css_inventory.md` |
 | 為**共用 UI 元件**新增樣式差異 | 使用元件 props（如 `accent`, `tone`, `variant`），不從外部 CSS 覆寫 | `*.vue` 模板 |
+| 頁面**初始化全局等待** | 使用 `<LoadingOverlay tier="page" />` | `App.vue` |
+| **按鈕 busy 狀態** | `is-loading` + `<LoadingSpinner size="sm" />` + `disabled` + loading 文案 | `*.vue` 模板 |
+| **區塊等待**（非 DataTable） | 使用 `<BlockLoadingState />` | `*.vue` 模板 |
+| **DataTable 區塊等待** | 使用 `DataTable :loading` prop，不加 `ui-table-wrap.is-loading` | `*.vue` 模板 |

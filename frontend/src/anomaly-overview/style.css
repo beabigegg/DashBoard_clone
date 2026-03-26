@@ -189,19 +189,6 @@
   color: theme('colors.text.secondary');
 }
 
-.theme-anomaly-overview .ao-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid theme('colors.stroke.soft');
-  border-top-color: theme('colors.brand.700');
-  animation: ao-spin 0.7s linear infinite;
-}
-
-@keyframes ao-spin {
-  to { transform: rotate(360deg); }
-}
 
 /* ── Drilldown Panel ──────────────────────────────────────────────────────── */
 .theme-anomaly-overview .ao-row-active td {

@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 
 import DataTable from '../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
+import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
@@ -186,6 +187,10 @@ onMounted(async () => {
         <DataTable :data="queryResult.rows" :loading="loading.querying">
           <DataTableColumn v-for="column in queryResult.columns" :key="column" :column-key="column" :label="column" />
           <template #cell="{ value }">{{ formatCell(value) }}</template>
+
+          <template #empty>
+            <EmptyState v-if="queryResult.rows.length === 0 && !loading.querying" text="查無資料" />
+          </template>
         </DataTable>
       </SectionCard>
     </div>

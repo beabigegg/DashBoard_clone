@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 
+import BlockLoadingState from '../shared-ui/components/BlockLoadingState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import TableCatalog from './components/TableCatalog.vue';
 import DataViewer from './components/DataViewer.vue';
@@ -83,7 +84,7 @@ onMounted(() => {
         <ErrorBanner :message="pageError" :dismissible="false" />
 
         <div v-if="isInitialLoading" class="loading-panel">
-          正在載入表格設定...
+          <BlockLoadingState text="正在載入表格設定..." />
         </div>
 
         <div v-else-if="isCatalogEmpty" class="empty-state">

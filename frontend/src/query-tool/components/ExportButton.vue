@@ -1,4 +1,6 @@
 <script setup>
+import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
+
 const props = defineProps({
   disabled: {
     type: Boolean,
@@ -19,8 +21,10 @@ const props = defineProps({
   <button
     type="button"
     class="ui-btn ui-btn--secondary"
+    :class="{ 'is-loading': loading }"
     :disabled="disabled || loading"
   >
+    <LoadingSpinner v-if="loading" size="sm" />
     {{ loading ? '匯出中...' : label }}
   </button>
 </template>

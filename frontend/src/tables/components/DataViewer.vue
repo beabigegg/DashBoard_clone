@@ -3,6 +3,8 @@ import { computed } from 'vue';
 
 import Chip from '../../shared-ui/components/Chip.vue';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
+import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
+import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 
 const props = defineProps({
   selectedTable: {
@@ -133,7 +135,7 @@ function isNil(value) {
     </div>
 
     <div class="table-container">
-      <div v-if="loadingColumns" class="loading">正在載入欄位資訊...</div>
+      <BlockLoadingState v-if="loadingColumns" text="正在載入欄位資訊..." />
       <ErrorBanner v-else-if="errorMessage" :message="errorMessage" :dismissible="false" />
       <div v-else-if="columns.length === 0" class="empty-hint">尚未載入欄位資訊</div>
       <table v-else>
@@ -155,7 +157,9 @@ function isNil(value) {
         </thead>
         <tbody>
           <tr v-if="loadingQuery">
-            <td :colspan="columns.length" class="loading">正在查詢資料...</td>
+            <td :colspan="columns.length" class="loading">
+              <LoadingSpinner size="sm" /> 正在查詢資料...
+            </td>
           </tr>
           <tr v-else-if="!hasQueried">
             <td :colspan="columns.length" class="empty-hint">

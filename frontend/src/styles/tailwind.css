@@ -215,6 +215,10 @@
     transition: all var(--motion-normal) var(--motion-ease);
   }
 
+  /* Loading pattern: <button class="ui-btn is-loading" disabled>
+       <LoadingSpinner size="sm" /> 查詢中...
+     </button>
+     Always pair is-loading with disabled attribute and loading copy. */
   .ui-btn:disabled,
   .ui-btn.is-loading {
     opacity: 0.6;

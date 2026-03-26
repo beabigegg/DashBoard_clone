@@ -2,6 +2,8 @@
 import { onMounted, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
+import BlockLoadingState from '../shared-ui/components/BlockLoadingState.vue';
+import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import DauTrendChart from './components/DauTrendChart.vue';
 import DeptBreakdownTable from './components/DeptBreakdownTable.vue';
 import DurationDistChart from './components/DurationDistChart.vue';
@@ -81,15 +83,21 @@ onMounted(() => {
             <option value="">全部部門</option>
             <option v-for="d in kpiData?.departments_available || []" :key="d" :value="d">{{ d }}</option>
           </select>
-          <button class="ui-btn ui-btn--ghost" @click="fetchData" :disabled="loading">
-            {{ loading ? '載入中...' : '查詢' }}
+          <button
+            class="ui-btn ui-btn--ghost"
+            :class="{ 'is-loading': loading }"
+            :disabled="loading"
+            @click="fetchData"
+          >
+            <LoadingSpinner v-if="loading" size="sm" />
+            {{ loading ? '查詢中...' : '查詢' }}
           </button>
         </div>
       </div>
     </header>
 
     <!-- Loading / Error -->
-    <div v-if="loading && !kpiData" class="loading-text">載入中...</div>
+    <BlockLoadingState v-if="loading && !kpiData" />
     <div v-else-if="error" class="panel kpi-error">{{ error }}</div>
 
     <template v-if="kpiData">

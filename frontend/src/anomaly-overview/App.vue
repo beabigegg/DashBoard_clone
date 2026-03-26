@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router';
 import { buildLaunchHref } from '../portal-shell/routeQuery.js';
 import VChart from 'vue-echarts';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
+import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
@@ -20,8 +22,11 @@ use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, MarkL
 
 const router = useRouter();
 
+// ── 頁面初始化等待 ──────────────────────────────────────────────────────────
+const pageLoading = ref(true);
+
 // ── 摘要卡片資料 ────────────────────────────────────────────────────────────
-const summaryLoading = ref(true);
+const summaryLoading = ref(false);
 const summaryError = ref('');
 const summaryData = ref(null);
 
@@ -52,7 +57,7 @@ const sections = ref([
       { key: 'scrap_qty', label: '報廢量' },
     ],
     items: [],
-    loading: true,
+    loading: false,
     error: '',
     count: 0,
     expanded: false,
@@ -71,7 +76,7 @@ const sections = ref([
       { key: 'z_score', label: 'Z-score' },
     ],
     items: [],
-    loading: true,
+    loading: false,
     error: '',
     count: 0,
     expanded: false,
@@ -91,7 +96,7 @@ const sections = ref([
       { key: 'percentile_threshold', label: '門檻' },
     ],
     items: [],
-    loading: true,
+    loading: false,
     error: '',
     count: 0,
     expanded: false,
@@ -112,7 +117,7 @@ const sections = ref([
       { key: 'deviation', label: '偏差' },
     ],
     items: [],
-    loading: true,
+    loading: false,
     error: '',
     count: 0,
     expanded: false,
@@ -393,6 +398,7 @@ onMounted(async () => {
   await loadSummary();
   await Promise.all(sections.value.map((s) => loadSectionDetail(s)));
   applyDefaultExpand();
+  pageLoading.value = false;
 });
 </script>
 
@@ -406,7 +412,7 @@ onMounted(async () => {
     <!-- 摘要卡片 -->
     <section class="ao-summary-cards">
       <div v-if="summaryLoading" class="ao-loading-row">
-        <span class="ao-spinner"></span> 載入摘要中...
+        <LoadingSpinner size="sm" /> 載入摘要中...
       </div>
       <ErrorBanner :message="summaryError ? `摘要載入失敗：${summaryError}` : ''" :dismissible="false" />
       <SummaryCardGroup v-if="summaryData && !summaryError" :columns="4">
@@ -455,7 +461,7 @@ onMounted(async () => {
 
         <!-- 資料表格 -->
         <div v-if="section.loading" class="ao-loading-row">
-          <span class="ao-spinner"></span> 載入中...
+          <LoadingSpinner size="sm" /> 載入中...
         </div>
         <ErrorBanner v-else-if="section.error" :message="section.error" :dismissible="false" />
         <div v-else-if="section.items.length === 0" class="ao-empty-row">無異常記錄</div>
@@ -494,7 +500,7 @@ onMounted(async () => {
                         </button>
                       </div>
                       <div v-if="drilldown.loading" class="ao-loading-row">
-                        <span class="ao-spinner"></span> 載入趨勢...
+                        <LoadingSpinner size="sm" /> 載入趨勢...
                       </div>
                       <div v-else-if="drilldown.error" class="ao-error-row">{{ drilldown.error }}</div>
                       <div v-else-if="drilldown.items.length === 0" class="ao-empty-row">無趨勢資料</div>
@@ -510,5 +516,6 @@ onMounted(async () => {
         </div>
       </div>
     </section>
+    <LoadingOverlay v-if="pageLoading" tier="page" />
   </div>
 </template>

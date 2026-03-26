@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 
 import { apiGet } from '../../core/api.js';
+import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 
 const props = defineProps({
   machine: {
@@ -79,7 +80,7 @@ function formatNumber(v) {
 
     <div class="panel-section">
       <h5 class="section-label">近期維修紀錄</h5>
-      <div v-if="jobsLoading" class="jobs-loading">載入中...</div>
+      <BlockLoadingState v-if="jobsLoading" min-height="60px" />
       <div v-else-if="jobsError" class="jobs-error">{{ jobsError }}</div>
       <div v-else-if="jobs.length === 0" class="jobs-empty">近 30 天無維修紀錄</div>
       <table v-else class="jobs-table">

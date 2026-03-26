@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue';
 
 import StatusDot from '../../admin-shared/components/StatusDot.vue';
 import TrendChart from '../../admin-shared/components/TrendChart.vue';
+import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import SectionCard from '../../shared-ui/components/SectionCard.vue';
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
@@ -131,7 +132,7 @@ onMounted(() => {
 <template>
   <div class="overview-tab">
     <section v-if="isInitialLoading" class="panel">
-      <div class="loading-text">載入總覽資料中...</div>
+      <BlockLoadingState text="載入總覽資料中..." />
     </section>
 
     <ErrorBanner :message="errorMessage" :dismissible="false" />

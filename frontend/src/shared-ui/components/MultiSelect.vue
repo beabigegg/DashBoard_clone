@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import LoadingSpinner from './LoadingSpinner.vue';
 
 const props = defineProps({
   modelValue: {
@@ -133,11 +134,9 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
       @click="toggleDropdown"
     >
       <span class="multi-select-text">{{ selectedText }}</span>
-      <!-- Loading spinner (Task 5.2) -->
+      <!-- Loading spinner using shared component -->
       <span v-if="loading" class="multi-select-spinner" aria-hidden="true">
-        <svg class="ms-spinner-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="14" />
-        </svg>
+        <LoadingSpinner size="sm" />
       </span>
       <!-- SVG chevron (Task 5.3) -->
       <span v-else class="multi-select-arrow" :class="{ 'is-open': isOpen }" aria-hidden="true">
@@ -191,17 +190,6 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
   flex-shrink: 0;
 }
 
-.ms-spinner-icon {
-  width: 14px;
-  height: 14px;
-  animation: ms-spin var(--motion-slow, 300ms) linear infinite;
-  color: currentColor;
-}
-
-@keyframes ms-spin {
-  to { transform: rotate(360deg); }
-}
-
 .multi-select-arrow {
   display: inline-flex;
   align-items: center;
@@ -250,9 +238,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ms-spinner-icon,
   .multi-select-arrow {
-    animation: none;
     transition: none;
   }
 }
