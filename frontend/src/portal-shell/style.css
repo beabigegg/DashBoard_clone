@@ -351,17 +351,17 @@
   font-weight: 700;
 }
 
-.anomaly-dot-ok {
-  background: theme('colors.token.h22c55e');
-  box-shadow: 0 0 5px rgba(34, 197, 94, 0.55);
+.dot.anomaly-dot-ok {
+  background: theme('colors.token.hef4444');
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.55);
 }
 
-.anomaly-dot-warning {
+.dot.anomaly-dot-warning {
   background: theme('colors.token.hf59e0b');
   box-shadow: 0 0 5px rgba(245, 158, 11, 0.55);
 }
 
-.anomaly-dot-critical {
+.dot.anomaly-dot-critical {
   background: theme('colors.token.hef4444');
   box-shadow: 0 0 5px rgba(239, 68, 68, 0.55);
 }
