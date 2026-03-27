@@ -12,7 +12,6 @@ from typing import Optional, Dict, List, Any
 logger = logging.getLogger('mes_dashboard.resource_service')
 
 from mes_dashboard.core.database import (
-    get_db_connection,
     read_sql_df,
     DatabasePoolExhaustedError,
     DatabaseCircuitOpenError,
@@ -308,10 +307,8 @@ def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
         locations = get_locations()
         assets_statuses = get_distinct_values('PJ_ASSETSSTATUS')
 
-        # Query only dynamic status data from Oracle using SQLLoader
-        sql_statuses = SQLLoader.load("resource/distinct_statuses")
-        status_df = read_sql_df(sql_statuses, {'days_back': days_back})
-        statuses = status_df['NEWSTATUSNAME'].tolist() if status_df is not None else []
+        # Use STATUS_CATEGORIES constant — status values are fixed, no Oracle query needed
+        statuses = list(STATUS_CATEGORIES)
 
         return {
             'workcenters': workcenters,
@@ -326,6 +323,35 @@ def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
     except Exception as exc:
         logger.error(f"Resource filter options query failed: {exc}", exc_info=True)
         return None
+
+
+def get_resource_status_values(days_back: int = 30) -> List[Dict[str, Any]]:
+    """Get distinct status values with counts from DWH.DW_MES_RESOURCESTATUS.
+
+    Uses main pool (read_sql_df) instead of a direct connection.
+
+    Returns:
+        List of {'status': str, 'count': int} dicts ordered by count desc.
+    """
+    sql = """
+        SELECT DISTINCT NEWSTATUSNAME, COUNT(*) as CNT
+        FROM DWH.DW_MES_RESOURCESTATUS
+        WHERE NEWSTATUSNAME IS NOT NULL
+          AND LASTSTATUSCHANGEDATE >= SYSDATE - :days_back
+        GROUP BY NEWSTATUSNAME
+        ORDER BY CNT DESC
+    """
+    try:
+        df = read_sql_df(sql, {'days_back': days_back}, caller="resource_service:status_values")
+        if df is None or df.empty:
+            return []
+        return [
+            {'status': str(row['NEWSTATUSNAME']), 'count': int(row['CNT'])}
+            for _, row in df.iterrows()
+        ]
+    except Exception as exc:
+        logger.error("get_resource_status_values failed: %s", exc, exc_info=True)
+        raise
 
 
 # ============================================================

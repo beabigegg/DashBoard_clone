@@ -394,3 +394,41 @@ class TestGetWorkcenterStatusMatrix:
 
                 assert len(result) == 1
                 assert result[0]['OTHER'] == 1
+
+
+class TestQueryResourceFilterOptions:
+    """Tests for query_resource_filter_options using STATUS_CATEGORIES constant."""
+
+    # resource_cache functions are imported locally inside query_resource_filter_options
+    _RC = 'mes_dashboard.services.resource_cache'
+
+    def test_statuses_come_from_constant(self):
+        """statuses in filter options are from STATUS_CATEGORIES constant, no Oracle query."""
+        from mes_dashboard.services.resource_service import query_resource_filter_options
+        from mes_dashboard.config.constants import STATUS_CATEGORIES
+
+        with patch(f'{self._RC}.get_workcenters', return_value=['WC-01']):
+            with patch(f'{self._RC}.get_resource_families', return_value=['F1']):
+                with patch(f'{self._RC}.get_departments', return_value=['D1']):
+                    with patch(f'{self._RC}.get_locations', return_value=['L1']):
+                        with patch(f'{self._RC}.get_distinct_values', return_value=['Active']):
+                            result = query_resource_filter_options()
+
+        assert result is not None
+        assert result['statuses'] == list(STATUS_CATEGORIES)
+        assert 'workcenters' in result
+
+    def test_no_read_sql_df_call_for_statuses(self):
+        """query_resource_filter_options does not call read_sql_df for statuses."""
+        from mes_dashboard.services.resource_service import query_resource_filter_options
+
+        with patch(f'{self._RC}.get_workcenters', return_value=[]):
+            with patch(f'{self._RC}.get_resource_families', return_value=[]):
+                with patch(f'{self._RC}.get_departments', return_value=[]):
+                    with patch(f'{self._RC}.get_locations', return_value=[]):
+                        with patch(f'{self._RC}.get_distinct_values', return_value=[]):
+                            with patch('mes_dashboard.services.resource_service.read_sql_df') as mock_sql:
+                                result = query_resource_filter_options()
+
+        mock_sql.assert_not_called()
+        assert result is not None

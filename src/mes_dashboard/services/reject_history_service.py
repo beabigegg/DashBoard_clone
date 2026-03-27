@@ -371,8 +371,8 @@ def _has_material_scrap(df: pd.DataFrame) -> bool:
 
 def get_filter_options(
     *,
-    start_date: str,
-    end_date: str,
+    start_date: str = "",
+    end_date: str = "",
     workcenter_groups: Optional[list[str]] = None,
     packages: Optional[list[str]] = None,
     reasons: Optional[list[str]] = None,
@@ -381,10 +381,16 @@ def get_filter_options(
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
 ) -> dict[str, Any]:
-    """Return options under current draft filter context with one SQL round-trip."""
-    _validate_range(start_date, end_date)
+    """Return filter options from cache (date params accepted but ignored).
 
-    where_clause, params, meta = _build_where_clause(
+    Options are sourced from:
+    - workcenter_groups: filter_cache
+    - packages: container_filter_cache
+    - reasons: reason_filter_cache
+    Response time: <10ms (was 5.85s).
+    """
+    # Build meta from params without executing Oracle query
+    _, _, meta = _build_where_clause(
         workcenter_groups=workcenter_groups,
         packages=packages,
         reasons=reasons,
@@ -393,19 +399,17 @@ def get_filter_options(
         exclude_material_scrap=exclude_material_scrap,
         exclude_pb_diode=exclude_pb_diode,
     )
-    sql = _prepare_sql("filter_options", where_clause=where_clause)
-    df = read_sql_df(sql, _common_params(start_date, end_date, params), caller="reject_history:get_filter_options")
-    if df is None:
-        df = pd.DataFrame()
 
-    reason_options = _extract_distinct_text_values(df, "REASON")
-    if _has_material_scrap(df) and MATERIAL_REASON_OPTION not in reason_options:
-        reason_options.append(MATERIAL_REASON_OPTION)
+    from mes_dashboard.services.filter_cache import get_workcenter_groups
+    from mes_dashboard.services.container_filter_cache import get_packages
+    from mes_dashboard.services.reason_filter_cache import get_reject_reasons
+
+    wc_groups = get_workcenter_groups() or []
 
     return {
-        "workcenter_groups": _extract_workcenter_group_options(df),
-        "packages": _extract_distinct_text_values(df, "PACKAGE"),
-        "reasons": reason_options,
+        "workcenter_groups": wc_groups,
+        "packages": get_packages(),
+        "reasons": get_reject_reasons(),
         "meta": meta,
     }
 

@@ -73,6 +73,15 @@ def _reset_modernization_policy_cache():
 
 
 @pytest.fixture(autouse=True)
+def _reset_circuit_breaker():
+    """Reset circuit breaker singleton between tests to prevent order-dependency."""
+    import mes_dashboard.core.circuit_breaker as cb_mod
+    cb_mod._DATABASE_CIRCUIT_BREAKER = None
+    yield
+    cb_mod._DATABASE_CIRCUIT_BREAKER = None
+
+
+@pytest.fixture(autouse=True)
 def _restore_logger_propagation():
     """Restore mes_dashboard logger propagation after tests that call create_app().
 

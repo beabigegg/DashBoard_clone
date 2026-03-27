@@ -70,7 +70,7 @@ CACHE_TTL_MATERIAL_TRACE = 300          # Material trace lineage: 5 min
 CACHE_TTL_JOB_QUERY = 600              # Job query results: 10 min
 CACHE_TTL_DETECTION = 300               # MSD detection data: 5 min
 CACHE_TTL_LOSS_REASONS = 86400          # MSD loss reason list: 24 hours
-CACHE_TTL_FILTER_GENERAL = 3600         # General filter options: 1 hour
+CACHE_TTL_FILTER_GENERAL = 86400        # General filter options: 24 hours
 CACHE_TTL_PROCESS_L1 = 30              # Process-level L1 cache: 30 sec
 
 

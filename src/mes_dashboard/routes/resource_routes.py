@@ -9,7 +9,6 @@ import logging
 from flask import Blueprint, request, current_app
 
 from mes_dashboard.core.database import (
-    get_db_connection,
     DatabasePoolExhaustedError,
     DatabaseCircuitOpenError,
 )
@@ -117,6 +116,7 @@ from mes_dashboard.services.resource_service import (
     get_merged_resource_status,
     get_resource_status_summary,
     get_workcenter_status_matrix,
+    get_resource_status_values,
 )
 from mes_dashboard.services.filter_cache import get_workcenter_groups
 from mes_dashboard.services.resource_cache import (
@@ -276,30 +276,12 @@ def api_resource_filter_options():
 @resource_bp.route('/status_values')
 def api_resource_status_values():
     """API: Get all distinct status values with counts (for verification)."""
-    connection = get_db_connection()
-    if not connection:
-        return internal_error('數據庫連接失敗')
-
     try:
-        sql = """
-            SELECT DISTINCT NEWSTATUSNAME, COUNT(*) as CNT
-            FROM DWH.DW_MES_RESOURCESTATUS
-            WHERE NEWSTATUSNAME IS NOT NULL
-              AND LASTSTATUSCHANGEDATE >= SYSDATE - 30
-            GROUP BY NEWSTATUSNAME
-            ORDER BY CNT DESC
-        """
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        rows = cursor.fetchall()
-        cursor.close()
-        connection.close()
-
-        data = [{'status': row[0], 'count': row[1]} for row in rows]
+        data = get_resource_status_values(days_back=30)
         return success_response(data)
+    except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
+        raise
     except Exception as exc:
-        if connection:
-            connection.close()
         logger.exception("Failed to load resource status values: %s", exc)
         return error_response(
             INTERNAL_ERROR,

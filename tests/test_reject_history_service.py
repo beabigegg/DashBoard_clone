@@ -113,73 +113,56 @@ def test_build_where_clause_include_override_skips_reason_prefix_policy(monkeypa
     assert "358" not in params.values()
 
 
-def test_get_filter_options_includes_packages(monkeypatch):
+def test_get_filter_options_reads_from_caches(monkeypatch):
+    """get_filter_options returns workcenter_groups/packages/reasons from cache modules."""
     monkeypatch.setattr(svc, "get_excluded_reasons", lambda force_refresh=False: set())
-    captured: dict = {}
 
-    def _fake_read_sql_df(_sql, params=None, **kwargs):
-        captured["params"] = dict(params or {})
-        return pd.DataFrame(
-            [
-                {
-                    "WORKCENTER_GROUP": "WB",
-                    "WORKCENTERSEQUENCE_GROUP": 1,
-                    "REASON": "R1",
-                    "PACKAGE": "PKG-A",
-                    "SCRAP_OBJECTTYPE": "LOT",
-                },
-                {
-                    "WORKCENTER_GROUP": "FA",
-                    "WORKCENTERSEQUENCE_GROUP": 5,
-                    "REASON": "R2",
-                    "PACKAGE": "PKG-B",
-                    "SCRAP_OBJECTTYPE": "LOT",
-                },
-            ]
-        )
+    mock_wc_groups = [{"name": "WB", "sequence": 1}, {"name": "FA", "sequence": 5}]
+    mock_packages = ["PKG-A", "PKG-B"]
+    mock_reasons = ["001_CRACK", "002_BREAK"]
 
-    monkeypatch.setattr(svc, "read_sql_df", _fake_read_sql_df)
+    import mes_dashboard.services.filter_cache as fc
+    import mes_dashboard.services.container_filter_cache as cfc
+    import mes_dashboard.services.reason_filter_cache as rfc
+
+    monkeypatch.setattr(fc, "get_workcenter_groups", lambda force_refresh=False: mock_wc_groups)
+    monkeypatch.setattr(cfc, "_CACHE", {"packages": mock_packages, "pj_types": [], "loaded": True, "updated_at": None})
+    monkeypatch.setattr(rfc, "_CACHE", {"reject_reasons": mock_reasons, "loaded": True, "updated_at": None})
 
     result = svc.get_filter_options(
         start_date="2026-02-01",
         end_date="2026-02-07",
         workcenter_groups=["WB"],
         packages=["PKG-A"],
-        reasons=["R1"],
+        reasons=["001_CRACK"],
         include_excluded_scrap=False,
     )
 
-    assert result["reasons"] == ["R1", "R2"]
-    assert result["packages"] == ["PKG-A", "PKG-B"]
+    assert result["packages"] == mock_packages
+    assert result["reasons"] == mock_reasons
     assert result["workcenter_groups"][0]["name"] == "WB"
     assert result["workcenter_groups"][1]["name"] == "FA"
-
-    assert captured["params"]["start_date"] == "2026-02-01"
-    assert captured["params"]["end_date"] == "2026-02-07"
-    assert "WB" in captured["params"].values()
-    assert "PKG-A" in captured["params"].values()
-    assert "R1" in captured["params"].values()
+    # Date params are accepted and ignored — no Oracle call needed
+    assert "meta" in result
 
 
-def test_get_filter_options_appends_material_reason_option(monkeypatch):
+def test_get_filter_options_date_params_backward_compat(monkeypatch):
+    """get_filter_options accepts date params without error (backward compat)."""
     monkeypatch.setattr(svc, "get_excluded_reasons", lambda force_refresh=False: set())
-    def _fake_read_sql_df(_sql, _params=None, **kwargs):
-        return pd.DataFrame(
-            [
-                {
-                    "WORKCENTER_GROUP": "WB",
-                    "WORKCENTERSEQUENCE_GROUP": 1,
-                    "REASON": "001_TEST",
-                    "PACKAGE": "PKG-A",
-                    "SCRAP_OBJECTTYPE": "MATERIAL",
-                }
-            ]
-        )
 
-    monkeypatch.setattr(svc, "read_sql_df", _fake_read_sql_df)
+    import mes_dashboard.services.filter_cache as fc
+    import mes_dashboard.services.container_filter_cache as cfc
+    import mes_dashboard.services.reason_filter_cache as rfc
 
+    monkeypatch.setattr(fc, "get_workcenter_groups", lambda force_refresh=False: [])
+    monkeypatch.setattr(cfc, "_CACHE", {"packages": [], "pj_types": [], "loaded": True, "updated_at": None})
+    monkeypatch.setattr(rfc, "_CACHE", {"reject_reasons": [], "loaded": True, "updated_at": None})
+
+    # Should not raise, date params are ignored
     result = svc.get_filter_options(start_date="2026-02-01", end_date="2026-02-07")
-    assert svc.MATERIAL_REASON_OPTION in result["reasons"]
+    assert "packages" in result
+    assert "reasons" in result
+    assert "workcenter_groups" in result
 
 
 def test_build_where_clause_with_material_reason_adds_objecttype_condition(monkeypatch):

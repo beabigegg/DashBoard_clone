@@ -100,40 +100,27 @@ def test_query_analysis_detail_returns_none_on_service_failure(mock_query_analys
     assert result is None
 
 
-@patch('mes_dashboard.services.mid_section_defect_service.cache_get')
-@patch('mes_dashboard.services.mid_section_defect_service.read_sql_df')
-def test_query_all_loss_reasons_cache_hit_skips_query(mock_read_sql_df, mock_cache_get):
-    mock_cache_get.return_value = {'loss_reasons': ['Cached_A', 'Cached_B']}
+@patch('mes_dashboard.services.reason_filter_cache.get_reject_reasons')
+def test_query_all_loss_reasons_cache_hit_skips_query(mock_get_reasons):
+    """query_all_loss_reasons delegates to reason_filter_cache.get_reject_reasons()."""
+    mock_get_reasons.return_value = ['Cached_A', 'Cached_B']
 
     result = query_all_loss_reasons()
 
     assert result == {'loss_reasons': ['Cached_A', 'Cached_B']}
-    mock_read_sql_df.assert_not_called()
+    mock_get_reasons.assert_called_once()
 
 
-@patch('mes_dashboard.services.mid_section_defect_service.cache_get', return_value=None)
-@patch('mes_dashboard.services.mid_section_defect_service.cache_set')
-@patch('mes_dashboard.services.mid_section_defect_service.read_sql_df')
-@patch('mes_dashboard.services.mid_section_defect_service.SQLLoader.load')
+@patch('mes_dashboard.services.reason_filter_cache.get_reject_reasons')
 def test_query_all_loss_reasons_cache_miss_queries_and_caches_sorted_values(
-    mock_sql_load,
-    mock_read_sql_df,
-    mock_cache_set,
-    _mock_cache_get,
+    mock_get_reasons,
 ):
-    mock_sql_load.return_value = 'SELECT ...'
-    mock_read_sql_df.return_value = pd.DataFrame(
-        {'LOSSREASONNAME': ['B_REASON', None, 'A_REASON', 'B_REASON']}
-    )
+    """query_all_loss_reasons returns values from reason_filter_cache."""
+    mock_get_reasons.return_value = ['A_REASON', 'B_REASON']
 
     result = query_all_loss_reasons()
 
     assert result == {'loss_reasons': ['A_REASON', 'B_REASON']}
-    mock_cache_set.assert_called_once_with(
-        'mid_section_loss_reasons:None:',
-        {'loss_reasons': ['A_REASON', 'B_REASON']},
-        ttl=86400,
-    )
 
 
 @patch('mes_dashboard.services.mid_section_defect_service.cache_set')

@@ -679,33 +679,20 @@ def query_analysis_detail(
 
 
 def query_all_loss_reasons() -> Optional[Dict[str, Any]]:
-    """Get all loss reasons (cached daily in Redis).
+    """Get all loss reasons from reason_filter_cache (no slow pool usage).
 
-    Lightweight query: DISTINCT LOSSREASONNAME from last 365 days.
-    Cached with 24h TTL — suitable for dropdown population on page load.
+    Reads from reason_filter_cache which is loaded at startup and refreshed
+    every 24 hours. Does not occupy a slow pool connection.
 
     Returns:
         Dict with 'loss_reasons' list, or None on failure.
     """
-    cache_key = make_cache_key("mid_section_loss_reasons")
-    cached = cache_get(cache_key)
-    if cached is not None:
-        return cached
-
     try:
-        sql = SQLLoader.load("mid_section_defect/all_loss_reasons")
-        df = read_sql_df(sql, {})
-        if df is None:
-            logger.error("Loss reasons query returned None")
-            return None
-
-        reasons = sorted(df['LOSSREASONNAME'].dropna().unique().tolist())
-        result = {'loss_reasons': reasons}
-        logger.info(f"Loss reasons: {len(reasons)} distinct values cached (24h TTL)")
-        cache_set(cache_key, result, ttl=CACHE_TTL_LOSS_REASONS)
-        return result
+        from mes_dashboard.services.reason_filter_cache import get_reject_reasons
+        reasons = get_reject_reasons()
+        return {'loss_reasons': reasons}
     except Exception as exc:
-        logger.error(f"Loss reasons query failed: {exc}", exc_info=True)
+        logger.error(f"Loss reasons from cache failed: {exc}", exc_info=True)
         return None
 
 

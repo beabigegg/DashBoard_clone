@@ -1003,14 +1003,6 @@ def create_app(config_name: str | None = None) -> Flask:
             200,
         ))
 
-    @app.route('/excel-query')
-    def excel_query_page():
-        """Excel batch query tool page."""
-        canonical_redirect = maybe_redirect_to_canonical_shell('/excel-query')
-        if canonical_redirect is not None:
-            return canonical_redirect
-        return render_template('excel_query.html')
-
     @app.route('/resource-history')
     def resource_history_page():
         """Resource history analysis page served as pure Vite HTML output."""

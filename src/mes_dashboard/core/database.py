@@ -460,6 +460,16 @@ def _keepalive_worker():
         except Exception as exc:
             logger.warning(f"Keep-alive ping failed: {exc}")
 
+        # Ping slow engine independently so a slow-pool failure doesn't affect main
+        try:
+            slow_engine = get_slow_engine()
+            if slow_engine is not None:
+                with slow_engine.connect() as conn:
+                    conn.execute(text("SELECT 1 FROM DUAL"))
+                logger.debug("Slow-pool keep-alive ping successful")
+        except Exception as exc:
+            logger.warning(f"Slow-pool keep-alive ping failed: {exc}")
+
 
 def start_keepalive():
     """Start background keep-alive thread for connection pool."""
@@ -759,6 +769,20 @@ def read_sql_df_slow(
     """
     global _SLOW_QUERY_ACTIVE, _SLOW_QUERY_WAITING
     from mes_dashboard.core.metrics import record_query_latency
+    from mes_dashboard.core.circuit_breaker import (
+        get_database_circuit_breaker,
+        CIRCUIT_BREAKER_ENABLED,
+    )
+
+    # Check circuit breaker before acquiring semaphore
+    circuit_breaker = get_database_circuit_breaker()
+    if not circuit_breaker.allow_request():
+        logger.warning("Circuit breaker OPEN - rejecting slow database query")
+        retry_after = max(int(getattr(circuit_breaker, "recovery_timeout", 30)), 1)
+        raise DatabaseCircuitOpenError(
+            "Database service is temporarily unavailable (circuit breaker open)",
+            retry_after_seconds=retry_after,
+        )
 
     runtime = get_db_runtime_config()
     if timeout_seconds is None:
@@ -803,6 +827,8 @@ def read_sql_df_slow(
         df = pd.DataFrame(rows, columns=columns)
 
         elapsed = time.time() - start_time
+        if CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker.record_success()
         if elapsed > 1.0:
             sql_preview = sql.strip().replace('\n', ' ')[:100]
             logger.warning("Slow query (%s, %.2fs): %s...", caller, elapsed, sql_preview)
@@ -813,6 +839,8 @@ def read_sql_df_slow(
 
     except Exception as exc:
         elapsed = time.time() - start_time
+        if CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker.record_failure()
         ora_code = _extract_ora_code(exc)
         sql_preview = sql.strip().replace('\n', ' ')[:100]
         logger.error(
@@ -939,20 +967,12 @@ def read_sql_df_slow_iter(
 
 def get_table_columns(table_name: str) -> list:
     """Get column names for a table."""
-    connection = get_db_connection()
-    if not connection:
-        return []
-
     try:
-        cursor = connection.cursor()
-        cursor.execute(f"SELECT * FROM {table_name} WHERE ROWNUM <= 1")
-        columns = [desc[0] for desc in cursor.description]
-        cursor.close()
-        connection.close()
-        return columns
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(text(f"SELECT * FROM {table_name} WHERE ROWNUM <= 1"))
+            return list(result.keys())
     except Exception:
-        if connection:
-            connection.close()
         return []
 
 
@@ -973,13 +993,7 @@ def get_table_data(
     if not table_name or not _TABLE_NAME_PATTERN.match(table_name):
         return {'error': '不允許查詢此表'}
 
-    connection = get_db_connection()
-    if not connection:
-        return {'error': 'Database connection failed'}
-
     try:
-        cursor = connection.cursor()
-
         where_conditions = []
         bind_params = {}
 
@@ -1023,9 +1037,12 @@ def get_table_data(
                 """
 
         bind_params['row_limit'] = limit
-        cursor.execute(sql, bind_params)
-        columns = [desc[0] for desc in cursor.description]
-        rows = cursor.fetchall()
+
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(text(sql), bind_params)
+            columns = list(result.keys())
+            rows = result.fetchall()
 
         data = []
         for row in rows:
@@ -1038,9 +1055,6 @@ def get_table_data(
                     row_dict[col] = value
             data.append(row_dict)
 
-        cursor.close()
-        connection.close()
-
         return {
             'columns': columns,
             'data': data,
@@ -1049,8 +1063,6 @@ def get_table_data(
     except Exception as exc:
         ora_code = _extract_ora_code(exc)
         logger.error(f"get_table_data failed - ORA-{ora_code}: {exc}")
-        if connection:
-            connection.close()
         return {'error': '查詢服務暫時無法使用'}
 
 
@@ -1070,13 +1082,7 @@ def get_table_column_metadata(table_name: str) -> Dict[str, Any]:
         - is_date: True if column is DATE or TIMESTAMP type
         - is_number: True if column is NUMBER type
     """
-    connection = get_db_connection()
-    if not connection:
-        return {'error': 'Database connection failed', 'columns': []}
-
     try:
-        cursor = connection.cursor()
-
         # Parse schema and table name
         parts = table_name.split('.')
         if len(parts) == 2:
@@ -1094,7 +1100,7 @@ def get_table_column_metadata(table_name: str) -> Dict[str, Any]:
                 WHERE OWNER = :owner AND TABLE_NAME = :table_name
                 ORDER BY COLUMN_ID
             """
-            cursor.execute(sql, {'owner': owner, 'table_name': tbl_name})
+            params = {'owner': owner, 'table_name': tbl_name}
         else:
             sql = """
                 SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH,
@@ -1103,11 +1109,12 @@ def get_table_column_metadata(table_name: str) -> Dict[str, Any]:
                 WHERE TABLE_NAME = :table_name
                 ORDER BY COLUMN_ID
             """
-            cursor.execute(sql, {'table_name': tbl_name})
+            params = {'table_name': tbl_name}
 
-        rows = cursor.fetchall()
-        cursor.close()
-        connection.close()
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(text(sql), params)
+            rows = result.fetchall()
 
         if not rows:
             # Fallback to basic column detection if no metadata found
@@ -1158,8 +1165,6 @@ def get_table_column_metadata(table_name: str) -> Dict[str, Any]:
             f"get_table_column_metadata failed - ORA-{ora_code}: {exc}, "
             f"falling back to basic detection"
         )
-        if connection:
-            connection.close()
 
         # Fallback to basic column detection
         basic_columns = get_table_columns(table_name)

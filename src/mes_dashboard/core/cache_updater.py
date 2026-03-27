@@ -33,8 +33,11 @@ CACHE_CHECK_INTERVAL = int(os.getenv('CACHE_CHECK_INTERVAL', '600'))  # 10 minut
 WIP_VIEW = "DWH.DW_MES_LOT_V"
 WIP_CACHE_TTL_SECONDS = int(os.getenv('WIP_CACHE_TTL_SECONDS', '0'))
 
-# Resource cache sync interval (default: 4 hours)
-RESOURCE_SYNC_INTERVAL = int(os.getenv('RESOURCE_SYNC_INTERVAL', '14400'))
+# Resource cache sync interval (default: 24 hours)
+RESOURCE_SYNC_INTERVAL = int(os.getenv('RESOURCE_SYNC_INTERVAL', '86400'))
+
+# Filter caches sync interval (default: 24 hours)
+FILTER_CACHE_SYNC_INTERVAL = int(os.getenv('FILTER_CACHE_SYNC_INTERVAL', '86400'))
 
 # ============================================================
 # Cache Updater Class
@@ -52,10 +55,12 @@ class CacheUpdater:
         """
         self.interval = interval
         self.resource_sync_interval = RESOURCE_SYNC_INTERVAL
+        self.filter_cache_sync_interval = FILTER_CACHE_SYNC_INTERVAL
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._is_running = False
         self._last_resource_sync: Optional[float] = None
+        self._last_filter_cache_sync: Optional[float] = None
 
     def start(self) -> None:
         """Start the background update thread."""
@@ -107,6 +112,10 @@ class CacheUpdater:
 
         # Initial resource cache load
         self._check_resource_update(force=True)
+
+        # Initial filter caches load (container + reason)
+        self._check_filter_caches_update(force=True)
+
         self._run_dataset_warmups()
 
         # Periodic updates
@@ -114,6 +123,7 @@ class CacheUpdater:
             try:
                 self._check_and_update()
                 self._check_resource_update()
+                self._check_filter_caches_update()
                 self._run_dataset_warmups()
             except Exception as e:
                 logger.error(f"Cache update failed: {e}", exc_info=True)
@@ -344,6 +354,64 @@ class CacheUpdater:
             return False
         finally:
             release_lock("resource_cache_update")
+
+    def _check_filter_caches_update(self, force: bool = False) -> None:
+        """Initialize or refresh container_filter_cache and reason_filter_cache.
+
+        Uses Redis distributed locks per cache to prevent multi-worker duplication.
+        Failures are isolated — one failing cache does not block others.
+
+        Args:
+            force: If True, refresh regardless of elapsed interval.
+        """
+        now = time.time()
+        if not force and self._last_filter_cache_sync is not None:
+            elapsed = now - self._last_filter_cache_sync
+            if elapsed < self.filter_cache_sync_interval:
+                logger.debug(
+                    "Filter cache sync not due yet (%.0fs < %ds)",
+                    elapsed, self.filter_cache_sync_interval,
+                )
+                return
+
+        for cache_name, lock_name, refresh_fn in (
+            (
+                "container_filter_cache",
+                "container_filter_cache_refresh",
+                self._refresh_container_filter_cache,
+            ),
+            (
+                "reason_filter_cache",
+                "reason_filter_cache_refresh",
+                self._refresh_reason_filter_cache,
+            ),
+        ):
+            try:
+                if not try_acquire_lock(lock_name, ttl_seconds=120):
+                    logger.debug("Another worker holds %s lock, skipping", lock_name)
+                    continue
+                try:
+                    refresh_fn(force=force)
+                finally:
+                    release_lock(lock_name)
+            except Exception as exc:
+                logger.warning("Filter cache refresh failed (%s): %s", cache_name, exc)
+
+        self._last_filter_cache_sync = now
+
+    def _refresh_container_filter_cache(self, force: bool = False) -> None:
+        from mes_dashboard.services.container_filter_cache import init, refresh
+        if force:
+            refresh()
+        else:
+            init()
+
+    def _refresh_reason_filter_cache(self, force: bool = False) -> None:
+        from mes_dashboard.services.reason_filter_cache import init, refresh
+        if force:
+            refresh()
+        else:
+            init()
 
     def _warmup_reject_dataset(self) -> None:
         from mes_dashboard.services import reject_dataset_cache

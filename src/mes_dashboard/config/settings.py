@@ -117,6 +117,9 @@ class DevelopmentConfig(Config):
     DB_CALL_TIMEOUT_MS = _int_env("DB_CALL_TIMEOUT_MS", 55000)
     DB_SLOW_MAX_CONCURRENT = _int_env("DB_SLOW_MAX_CONCURRENT", 3)
     DB_SLOW_POOL_ENABLED = _bool_env("DB_SLOW_POOL_ENABLED", True)
+    # pool_size + max_overflow = semaphore (2+1=3)
+    DB_SLOW_POOL_SIZE = _int_env("DB_SLOW_POOL_SIZE", 2)
+    DB_SLOW_POOL_MAX_OVERFLOW = _int_env("DB_SLOW_POOL_MAX_OVERFLOW", 1)
 
 
 class ProductionConfig(Config):
@@ -133,8 +136,11 @@ class ProductionConfig(Config):
     DB_CONNECT_RETRY_COUNT = _int_env("DB_CONNECT_RETRY_COUNT", 1)
     DB_CONNECT_RETRY_DELAY = _float_env("DB_CONNECT_RETRY_DELAY", 1.0)
     DB_CALL_TIMEOUT_MS = _int_env("DB_CALL_TIMEOUT_MS", 55000)
-    DB_SLOW_MAX_CONCURRENT = _int_env("DB_SLOW_MAX_CONCURRENT", 5)
+    # pool_size + max_overflow = semaphore (5+3=8)
+    DB_SLOW_MAX_CONCURRENT = _int_env("DB_SLOW_MAX_CONCURRENT", 8)
     DB_SLOW_POOL_ENABLED = _bool_env("DB_SLOW_POOL_ENABLED", True)
+    DB_SLOW_POOL_SIZE = _int_env("DB_SLOW_POOL_SIZE", 5)
+    DB_SLOW_POOL_MAX_OVERFLOW = _int_env("DB_SLOW_POOL_MAX_OVERFLOW", 3)
 
 
 class TestingConfig(Config):

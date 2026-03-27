@@ -337,32 +337,13 @@ _TYPE_OPTIONS_TTL = 86400  # 24 hours
 
 
 def get_type_options() -> List[str]:
-    """Return DISTINCT PJ_TYPE values from DWH.DW_MES_CONTAINER.
+    """Return DISTINCT PJ_TYPE values from container_filter_cache.
 
-    Results are cached in the LayeredCache (memory + Redis) with a 24-hour
-    TTL, so Oracle is only queried once per day across all workers.
+    Delegates to container_filter_cache.get_pj_types() which is loaded at
+    startup and refreshed every 24 hours. No Oracle query is executed here.
     """
-    from mes_dashboard.core.cache import cache_get, cache_set
-
-    cached = cache_get(_TYPE_OPTIONS_CACHE_KEY)
-    if cached is not None:
-        return cached
-
-    from mes_dashboard.core.database import read_sql_df
-
-    sql = (
-        "SELECT DISTINCT PJ_TYPE FROM DWH.DW_MES_CONTAINER "
-        "WHERE PJ_TYPE IS NOT NULL ORDER BY PJ_TYPE"
-    )
-    try:
-        df = read_sql_df(sql, caller="production_history:type_options")
-        if df is not None and not df.empty:
-            result = [str(v).strip() for v in df["PJ_TYPE"] if str(v).strip()]
-            cache_set(_TYPE_OPTIONS_CACHE_KEY, result, ttl=_TYPE_OPTIONS_TTL)
-            return result
-    except Exception as exc:
-        logger.warning("get_type_options failed: %s", exc)
-    return []
+    from mes_dashboard.services.container_filter_cache import get_pj_types
+    return get_pj_types()
 
 
 # ── Primary query entry point ─────────────────────────────────────────────────
