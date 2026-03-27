@@ -1474,6 +1474,8 @@ def _derive_analytics_raw(df: pd.DataFrame) -> list:
         "DEFECT_QTY": ("DEFECT_QTY", "sum"),
     }
     # Add optional columns if present
+    if "AFFECTED_LOT_COUNT" in df.columns:
+        agg_cols["AFFECTED_LOT_COUNT"] = ("AFFECTED_LOT_COUNT", "sum")
     if "AFFECTED_WORKORDER_COUNT" in df.columns:
         agg_cols["AFFECTED_WORKORDER_COUNT"] = ("AFFECTED_WORKORDER_COUNT", "sum")
 
@@ -1483,18 +1485,7 @@ def _derive_analytics_raw(df: pd.DataFrame) -> list:
         .reset_index()
     )
 
-    # Count distinct CONTAINERIDs per group for AFFECTED_LOT_COUNT
-    if "CONTAINERID" in df.columns:
-        lot_counts = (
-            df.groupby(["TXN_DAY", "LOSSREASONNAME"], observed=True)["CONTAINERID"]
-            .nunique()
-            .reset_index()
-            .rename(columns={"CONTAINERID": "AFFECTED_LOT_COUNT"})
-        )
-        grouped = grouped.merge(
-            lot_counts, on=["TXN_DAY", "LOSSREASONNAME"], how="left"
-        )
-    else:
+    if "AFFECTED_LOT_COUNT" not in grouped.columns:
         grouped["AFFECTED_LOT_COUNT"] = 0
 
     items = []
@@ -1690,7 +1681,7 @@ _PARETO_DIMENSIONS = tuple(_DIM_TO_DF_COLUMN.keys())
 _PARETO_TOP20_DIMENSIONS = {"type"}
 _PARETO_GUARD_REQUIRED_COLUMNS = (
     tuple(_DIM_TO_DF_COLUMN.values())
-    + ("MOVEIN_QTY", "REJECT_TOTAL_QTY", "DEFECT_QTY", "CONTAINERID", "TXN_DAY")
+    + ("MOVEIN_QTY", "REJECT_TOTAL_QTY", "DEFECT_QTY", "AFFECTED_LOT_COUNT", "TXN_DAY")
 )
 
 
@@ -1768,7 +1759,7 @@ def _build_dimension_pareto_items(
         return []
 
     agg_dict = {}
-    for col in ["MOVEIN_QTY", "REJECT_TOTAL_QTY", "DEFECT_QTY"]:
+    for col in ["MOVEIN_QTY", "REJECT_TOTAL_QTY", "DEFECT_QTY", "AFFECTED_LOT_COUNT"]:
         if col in df.columns:
             agg_dict[col] = (col, "sum")
 
@@ -1776,15 +1767,7 @@ def _build_dimension_pareto_items(
     if grouped.empty:
         return []
 
-    if "CONTAINERID" in df.columns:
-        lot_counts = (
-            df.groupby(dim_col, observed=True)["CONTAINERID"]
-            .nunique()
-            .reset_index()
-            .rename(columns={"CONTAINERID": "AFFECTED_LOT_COUNT"})
-        )
-        grouped = grouped.merge(lot_counts, on=dim_col, how="left")
-    else:
+    if "AFFECTED_LOT_COUNT" not in grouped.columns:
         grouped["AFFECTED_LOT_COUNT"] = 0
 
     grouped["METRIC_VALUE"] = grouped[metric_col].fillna(0)
