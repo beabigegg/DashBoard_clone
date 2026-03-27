@@ -367,35 +367,47 @@ def test_query_yield_summary_preserves_department_filter_when_exclusion_enabled(
 
 
 def test_query_alert_candidates_preserves_department_filter_with_exclusion_params(monkeypatch):
-    captured: dict = {}
+    calls: list = []
     monkeypatch.setattr(
         yield_alert_service,
         "get_excluded_reasons",
         lambda force_refresh=False: {"358"},
     )
 
+    _tx_row = {
+        "DATE_BUCKET": "2026-02-21",
+        "WIP_ENTITY_NAME": "WO-1",
+        "DEPARTMENT_NAME": "焊接_WB",
+        "LINE_NAME": "L1",
+        "PACKAGE_NAME": "PKG-A",
+        "TYPE_NAME": "TYPE-A",
+        "FUNCTION_NAME": "FUNC-A",
+        "OPERATION_SEQ_NUM": 10,
+        "TRANSACTION_QTY": 100,
+    }
+
+    _alert_row = {
+        "DATE_BUCKET": "2026-02-21",
+        "WIP_ENTITY_NAME": "WO-1",
+        "REASON_RAW": "031_腳架氧化",
+        "REASON_NAME": "031_腳架氧化",
+        "DEPARTMENT_NAME": "焊接_WB",
+        "LINE_NAME": "L1",
+        "PACKAGE_NAME": "PKG-A",
+        "TYPE_NAME": "TYPE-A",
+        "FUNCTION_NAME": "FUNC-A",
+        "OPERATION_SEQ_NUM": 10,
+        "TRANSACTION_QTY": 0,
+        "SCRAP_QTY": 10,
+        "YIELD_PCT": 90,
+        "SCRAP_RATE_PCT": 10,
+    }
+
     def _fake_read_sql_df_slow(_sql: str, params: dict):
-        captured["params"] = dict(params or {})
-        return pd.DataFrame(
-            [
-                {
-                    "DATE_BUCKET": "2026-02-21",
-                    "WIP_ENTITY_NAME": "WO-1",
-                    "REASON_RAW": "031_腳架氧化",
-                    "REASON_NAME": "031_腳架氧化",
-                    "DEPARTMENT_NAME": "焊接_WB",
-                    "LINE_NAME": "L1",
-                    "PACKAGE_NAME": "PKG-A",
-                    "TYPE_NAME": "TYPE-A",
-                    "FUNCTION_NAME": "FUNC-A",
-                    "OPERATION_SEQ_NUM": 10,
-                    "TRANSACTION_QTY": 100,
-                    "SCRAP_QTY": 10,
-                    "YIELD_PCT": 90,
-                    "SCRAP_RATE_PCT": 10,
-                }
-            ]
-        )
+        calls.append({"sql": _sql, "params": dict(params or {})})
+        if "alerts_tx_lookup" in _sql or "TRANSACTION_QTY" in _sql and "SCRAP" not in _sql:
+            return pd.DataFrame([_tx_row])
+        return pd.DataFrame([_alert_row])
 
     monkeypatch.setattr(yield_alert_service, "read_sql_df_slow", _fake_read_sql_df_slow)
     monkeypatch.setattr(yield_alert_service, "_compute_reject_linkage", lambda **_: {})
@@ -409,6 +421,12 @@ def test_query_alert_candidates_preserves_department_filter_with_exclusion_param
     )
 
     assert result["pagination"]["total"] == 1
-    assert "焊接_WB" in captured["params"].values()
-    assert "焊接_DW" in captured["params"].values()
-    assert "358" in captured["params"].values()
+    # Alerts SQL call should have exclusion + department params
+    alerts_call = calls[0]
+    assert "焊接_WB" in alerts_call["params"].values()
+    assert "焊接_DW" in alerts_call["params"].values()
+    assert "358" in alerts_call["params"].values()
+    # tx_lookup SQL call should have department params (no exclusion)
+    tx_call = calls[1]
+    assert "焊接_WB" in tx_call["params"].values()
+    assert "焊接_DW" in tx_call["params"].values()

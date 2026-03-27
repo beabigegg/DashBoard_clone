@@ -327,15 +327,36 @@ async function queryAlerts(client, { fullWhere, reasonWhere, riskThreshold, minS
     ? `WHERE ${fullWhere} AND ${reasonWhere} AND ${qid('SCRAP_QTY')} <> 0`
     : `WHERE ${reasonWhere} AND ${qid('SCRAP_QTY')} <> 0`;
 
+  // tx_lookup WHERE: dimension filters only (no reason exclusion, no SCRAP_QTY filter)
+  const txWhere = fullWhere ? `WHERE ${fullWhere}` : '';
+
   const groupByCols = [
     'DATE_BUCKET', 'WORKORDER', 'REASON_CODE', 'REASON_NAME',
     'DEPARTMENT_GROUP', 'PROCESS_CATEGORY', 'LINE_NAME', 'PACKAGE_NAME',
     'TYPE_NAME', 'FUNCTION_NAME', 'OPERATION_TEXT',
   ].map(c => qid(c)).join(', ');
 
+  const txJoinCols = [
+    'DATE_BUCKET', 'WORKORDER',
+    'DEPARTMENT_GROUP', 'PROCESS_CATEGORY',
+    'LINE_NAME', 'PACKAGE_NAME', 'TYPE_NAME', 'FUNCTION_NAME', 'OPERATION_TEXT',
+  ];
+  const txGroupBy = txJoinCols.map(c => qid(c)).join(', ');
+  const txJoinOn = txJoinCols.map(c => `ag.${qid(c)} IS NOT DISTINCT FROM tx.${qid(c)}`).join(' AND ');
+
   // Get all alert groups with computed risk score
+  // tx_lookup computes TRANSACTION_QTY from ALL rows (including move-only),
+  // then joins to scrap-only alert_groups for accurate yield calculation.
   const allSql = `
-    WITH alert_groups AS (
+    WITH tx_lookup AS (
+      SELECT
+        ${txGroupBy},
+        SUM(${qid('TRANSACTION_QTY')}) AS transaction_qty
+      FROM ${qid(TABLE_NAME)}
+      ${txWhere}
+      GROUP BY ${txGroupBy}
+    ),
+    alert_groups AS (
       SELECT
         ${qid('DATE_BUCKET')},
         ${qid('WORKORDER')},
@@ -348,11 +369,15 @@ async function queryAlerts(client, { fullWhere, reasonWhere, riskThreshold, minS
         ${qid('TYPE_NAME')},
         ${qid('FUNCTION_NAME')},
         ${qid('OPERATION_TEXT')},
-        SUM(${qid('TRANSACTION_QTY')}) AS transaction_qty,
         SUM(${qid('SCRAP_QTY')}) AS scrap_qty
       FROM ${qid(TABLE_NAME)}
       ${combinedWhere}
       GROUP BY ${groupByCols}
+    ),
+    alert_with_tx AS (
+      SELECT ag.*, COALESCE(tx.transaction_qty, 0) AS transaction_qty
+      FROM alert_groups ag
+      LEFT JOIN tx_lookup tx ON ${txJoinOn}
     )
     SELECT *,
       CASE WHEN transaction_qty <= 0 THEN 100.0
@@ -361,7 +386,7 @@ async function queryAlerts(client, { fullWhere, reasonWhere, riskThreshold, minS
       CASE WHEN transaction_qty <= 0 THEN 100.0
            ELSE ROUND((1 - scrap_qty / transaction_qty) * 100, 4)
       END AS yield_pct_raw
-    FROM alert_groups
+    FROM alert_with_tx
     WHERE NOT (
       CASE WHEN transaction_qty <= 0 THEN 100.0
            ELSE ROUND((1 - scrap_qty / transaction_qty) * 100, 4)

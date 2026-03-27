@@ -686,8 +686,31 @@ def query_alert_candidates(
     query_params.update(params)
     query_params.update(exclusion_params)
 
+    # Query TRANSACTION_QTY from ALL rows (including move-only) at non-reason level
+    tx_sql = _load_sql("alerts_tx_lookup")
+    tx_where_sql, tx_params = _build_optional_where(filters or {}, column_map=_DETAIL_FILTER_COLUMNS)
+    tx_sql = tx_sql.replace("{{ WHERE_CLAUSE }}", f" AND {tx_where_sql}" if tx_where_sql else "")
+    tx_query_params = {"start_date": start_date, "end_date": end_date}
+    tx_query_params.update(tx_params)
+
     started = time.perf_counter()
     df = read_sql_df_slow(sql, query_params)
+    tx_df = read_sql_df_slow(tx_sql, tx_query_params)
+
+    # Build tx_lookup: (date, workorder, department_group, line, package, type, function, operation) -> tx_qty
+    tx_lookup: dict[tuple, float] = {}
+    for _, trow in tx_df.iterrows():
+        tx_key = (
+            _bucket_to_text(trow.get("DATE_BUCKET")),
+            str(trow.get("WIP_ENTITY_NAME") or "").strip(),
+            _normalize_yield_department_group(trow.get("DEPARTMENT_NAME")),
+            str(trow.get("LINE_NAME") or "").strip(),
+            str(trow.get("PACKAGE_NAME") or "").strip(),
+            str(trow.get("TYPE_NAME") or "").strip(),
+            str(trow.get("FUNCTION_NAME") or "").strip(),
+            str(trow.get("OPERATION_SEQ_NUM") or "").strip(),
+        )
+        tx_lookup[tx_key] = tx_lookup.get(tx_key, 0.0) + _safe_float(trow.get("TRANSACTION_QTY"))
 
     aggregated_rows: dict[tuple, dict] = {}
     for _, row in df.iterrows():
@@ -735,15 +758,24 @@ def query_alert_candidates(
                 "type": type_name,
                 "function": function_name,
                 "operation": operation_name,
-                "transaction_qty": 0.0,
                 "scrap_qty": 0.0,
             }
-        aggregated_rows[row_key]["transaction_qty"] += _safe_float(row.get("TRANSACTION_QTY"))
         aggregated_rows[row_key]["scrap_qty"] += scrap_qty
 
     rows: list[dict] = []
     for aggregated in aggregated_rows.values():
-        transaction_qty = _safe_float(aggregated.get("transaction_qty"))
+        # Look up TRANSACTION_QTY from the non-reason-level tx_lookup
+        tx_key = (
+            aggregated["date_bucket"],
+            aggregated["workorder"],
+            aggregated["department"],
+            aggregated["line"],
+            aggregated["package"],
+            aggregated["type"],
+            aggregated["function"],
+            aggregated["operation"],
+        )
+        transaction_qty = _safe_float(tx_lookup.get(tx_key, 0.0))
         scrap_qty = _safe_float(aggregated.get("scrap_qty"))
         yield_pct = 100.0
         if transaction_qty > 0:

@@ -1056,9 +1056,17 @@ _ALERTS_SORT_COLUMN: dict[str, str] = {
 }
 
 
+_ALERT_TX_JOIN_COLUMNS = [
+    "DATE_BUCKET", "WORKORDER",
+    "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
+    "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
+]
+
+
 def _build_alerts_view(
     *,
     detail_df: pd.DataFrame,
+    tx_df: pd.DataFrame,
     linkage_df: pd.DataFrame,
     linkage_ready: bool,
     filters: dict[str, list[str]],
@@ -1100,6 +1108,19 @@ def _build_alerts_view(
             as_index=False,
         )[["TRANSACTION_QTY", "SCRAP_QTY"]].sum()
     )
+
+    # Merge deduplicated TRANSACTION_QTY from tx_df (which includes move-only rows)
+    # The per-reason TRANSACTION_QTY from the detail table is 0 for scrap records,
+    # so we must look up the proper value at the non-reason level.
+    if tx_df is not None and not tx_df.empty:
+        tx_for_alerts = tx_df.groupby(
+            _ALERT_TX_JOIN_COLUMNS, dropna=False, as_index=False,
+        )["TRANSACTION_QTY"].sum()
+        grouped = grouped.drop(columns=["TRANSACTION_QTY"])
+        grouped = grouped.merge(tx_for_alerts, on=_ALERT_TX_JOIN_COLUMNS, how="left")
+        grouped["TRANSACTION_QTY"] = pd.to_numeric(
+            grouped["TRANSACTION_QTY"], errors="coerce"
+        ).fillna(0.0)
 
     # Vectorized derivations — avoids per-row Python loop on large DataFrames
     tx_arr = grouped["TRANSACTION_QTY"].to_numpy(dtype=float)
@@ -1555,6 +1576,7 @@ def apply_view(
     _linkage_ready = linkage_df is not None and not linkage_df.empty
     alerts = _build_alerts_view(
         detail_df=detail_df,
+        tx_df=tx_df_base,
         linkage_df=linkage_df,
         linkage_ready=_linkage_ready,
         filters=normalized_filters,

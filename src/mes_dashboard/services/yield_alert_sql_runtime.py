@@ -519,9 +519,35 @@ def _query_alerts(
     safe_threshold = float(risk_threshold)
     safe_min_scrap = float(min_scrap_qty)
 
+    # Build tx_lookup WHERE: same dimension filters but without reason exclusion or SCRAP_QTY filter
+    tx_where = f"WHERE {full_where}" if full_where else ""
+
+    tx_join_cols = ", ".join(_qid(c) for c in [
+        "DATE_BUCKET", "WORKORDER",
+        "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
+        "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
+    ])
+
+    tx_join_on = " AND ".join(
+        f"ag.{_qid(c)} IS NOT DISTINCT FROM tx.{_qid(c)}"
+        for c in [
+            "DATE_BUCKET", "WORKORDER",
+            "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
+            "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
+        ]
+    )
+
     # DuckDB allows HAVING to reference aliases defined in SELECT
     base_sql = f"""
-        WITH alert_groups AS (
+        WITH tx_lookup AS (
+            SELECT
+                {tx_join_cols},
+                SUM("TRANSACTION_QTY") AS transaction_qty
+            FROM yield_alert_src
+            {tx_where}
+            GROUP BY {tx_join_cols}
+        ),
+        alert_groups AS (
             SELECT
                 "DATE_BUCKET",
                 "WORKORDER",
@@ -534,11 +560,15 @@ def _query_alerts(
                 "TYPE_NAME",
                 "FUNCTION_NAME",
                 "OPERATION_TEXT",
-                SUM("TRANSACTION_QTY") AS transaction_qty,
                 SUM("SCRAP_QTY") AS scrap_qty
             FROM yield_alert_src
             {combined_where}
             GROUP BY {group_by_cols}
+        ),
+        alert_with_tx AS (
+            SELECT ag.*, COALESCE(tx.transaction_qty, 0) AS transaction_qty
+            FROM alert_groups ag
+            LEFT JOIN tx_lookup tx ON {tx_join_on}
         ),
         alerts_computed AS (
             SELECT *,
@@ -557,7 +587,7 @@ def _query_alerts(
                     + LEAST(GREATEST(scrap_qty, 0), 200) / 20.0,
                     4
                 ) AS risk_score
-            FROM alert_groups
+            FROM alert_with_tx
         ),
         alerts_filtered AS (
             SELECT *,
@@ -572,10 +602,14 @@ def _query_alerts(
     """
     threshold_params = [safe_threshold, safe_threshold, safe_threshold, safe_threshold, safe_min_scrap]
 
+    # tx_lookup uses full_params (dimension filters only);
+    # alert_groups uses combined_params (dimension + reason exclusion + scrap filter)
+    all_cte_params = full_params + combined_params
+
     # Count total
     count_sql = base_sql + "SELECT COUNT(*) AS total FROM alerts_filtered"
     count_rows = _fetch_dict_rows(
-        conn, count_sql, combined_params + threshold_params
+        conn, count_sql, all_cte_params + threshold_params
     )
     total = int(count_rows[0].get("total") or 0) if count_rows else 0
 
@@ -622,7 +656,7 @@ def _query_alerts(
     )
     page_rows = _fetch_dict_rows(
         conn, page_sql,
-        combined_params + threshold_params + [per_page, offset]
+        all_cte_params + threshold_params + [per_page, offset]
     )
 
     items: List[Dict[str, Any]] = []
