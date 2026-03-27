@@ -18,6 +18,22 @@ WITH spec_map AS (
     WHERE SPEC IS NOT NULL
     GROUP BY SPEC
 ),
+workflow_map AS (
+    SELECT CONTAINERID, WORKFLOWNAME
+    FROM (
+        SELECT
+            w.CONTAINERID,
+            w.WORKFLOWNAME,
+            ROW_NUMBER() OVER (
+                PARTITION BY w.CONTAINERID
+                ORDER BY w.WORKFLOWNAME
+            ) AS wf_rn
+        FROM DWH.DW_MES_WIP w
+        WHERE w.CONTAINERID IS NOT NULL
+          AND w.WORKFLOWNAME IS NOT NULL
+    )
+    WHERE wf_rn = 1
+),
 reject_raw AS (
     SELECT
         TRUNC(r.TXNDATE) AS TXN_DAY,
@@ -32,6 +48,7 @@ reject_raw AS (
         NVL(sm.WORKCENTERSEQUENCE_GROUP, 999) AS WORKCENTERSEQUENCE_GROUP,
         NVL(TRIM(r.SPECNAME), '(NA)') AS SPECNAME,
         NVL(TRIM(r.EQUIPMENTNAME), '(NA)') AS EQUIPMENTNAME,
+        NVL(TRIM(wm.WORKFLOWNAME), '(NA)') AS WORKFLOWNAME,
         NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') AS LOSSREASONNAME,
         -- Optimized: SUBSTR/INSTR instead of REGEXP_SUBSTR
         NVL(
@@ -78,6 +95,8 @@ reject_raw AS (
       ON c.CONTAINERID = r.CONTAINERID
     LEFT JOIN spec_map sm
       ON sm.SPEC = TRIM(r.SPECNAME)
+    LEFT JOIN workflow_map wm
+      ON wm.CONTAINERID = r.CONTAINERID
     WHERE {{ BASE_WHERE }}
 ),
 daily_agg AS (
@@ -89,6 +108,7 @@ daily_agg AS (
         WORKCENTERNAME,
         SPECNAME,
         EQUIPMENTNAME,
+        WORKFLOWNAME,
         PRODUCTLINENAME,
         SCRAP_OBJECTTYPE,
         PJ_TYPE,
@@ -113,6 +133,7 @@ daily_agg AS (
         WORKCENTERNAME,
         SPECNAME,
         EQUIPMENTNAME,
+        WORKFLOWNAME,
         PRODUCTLINENAME,
         SCRAP_OBJECTTYPE,
         PJ_TYPE,
@@ -127,6 +148,7 @@ SELECT
     WORKCENTERNAME,
     SPECNAME,
     EQUIPMENTNAME,
+    WORKFLOWNAME,
     PRODUCTLINENAME,
     SCRAP_OBJECTTYPE,
     PJ_TYPE,

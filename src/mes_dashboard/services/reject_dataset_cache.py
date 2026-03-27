@@ -1668,6 +1668,7 @@ def _paginate_detail(
                 "WORKCENTERNAME": _normalize_text(row.get("WORKCENTERNAME")),
                 "SPECNAME": _normalize_text(row.get("SPECNAME")),
                 "EQUIPMENTNAME": _normalize_text(row.get("EQUIPMENTNAME")),
+                "WORKFLOWNAME": _normalize_text(row.get("WORKFLOWNAME")),
                 "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
                 "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
                 "CONTAINERNAME": _normalize_text(row.get("CONTAINERNAME")),
