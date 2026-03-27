@@ -70,13 +70,19 @@ def _require_dataset(dataset_id: str):
 
 
 def _parse_filter_params(source: dict) -> dict:
-    """Extract shared filter params {workcenter_group, spec, equipment_id, month}."""
-    return {
+    """Extract shared filter params (matrix singular + supplementary arrays)."""
+    result = {
         "workcenter_group": str(source.get("workcenter_group") or "").strip(),
         "spec": str(source.get("spec") or "").strip(),
         "equipment_id": str(source.get("equipment_id") or "").strip(),
         "month": str(source.get("month") or "").strip(),
     }
+    # Supplementary multi-select filters (arrays of strings)
+    for key in ("work_orders", "lot_ids", "packages", "bop_codes", "workcenter_groups", "equipment_ids"):
+        raw = source.get(key)
+        if isinstance(raw, list) and raw:
+            result[key] = [str(v).strip() for v in raw if str(v).strip()]
+    return result
 
 
 # ── GET /api/production-history/type-options ──────────────────────────────────
@@ -270,6 +276,11 @@ def api_production_history_export():
         "equipment_id": str(request.args.get("equipment_id") or "").strip(),
         "month": str(request.args.get("month") or "").strip(),
     }
+    # Supplementary multi-select filters (comma-separated in query string)
+    for key in ("work_orders", "lot_ids", "packages", "bop_codes", "workcenter_groups", "equipment_ids"):
+        raw = str(request.args.get(key) or "").strip()
+        if raw:
+            filter_params[key] = [v.strip() for v in raw.split(",") if v.strip()]
 
     def _generate():
         try:

@@ -230,6 +230,8 @@ class SyncWorker:
 
     def _run_login_session_migration(self, conn) -> None:
         """One-time migration: truncate dashboard_login_sessions to clear stale data."""
+        from sqlalchemy import text
+
         try:
             result = conn.execute(
                 text(

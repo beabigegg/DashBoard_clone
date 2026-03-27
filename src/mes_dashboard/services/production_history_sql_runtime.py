@@ -60,42 +60,51 @@ def _fetch_dict_rows(conn: Any, sql: str, params: Optional[List[Any]] = None) ->
 
 # ── Filter WHERE clause builder ───────────────────────────────────────────────
 
+def _build_wc_group_condition(
+    group_name: str, workcenter_groups: Dict[str, Any],
+) -> tuple[str, List[Any]]:
+    """Build a single workcenter-group WHERE fragment (ILIKE patterns or exact match)."""
+    if group_name in workcenter_groups:
+        cfg = workcenter_groups[group_name]
+        like_parts = [f"WORKCENTERNAME ILIKE ?" for _ in cfg["patterns"]]
+        clause = "(" + " OR ".join(like_parts) + ")"
+        p = [f"%{pat}%" for pat in cfg["patterns"]]
+        for excl in cfg.get("exclude", []):
+            clause += " AND WORKCENTERNAME NOT ILIKE ?"
+            p.append(f"%{excl}%")
+        return clause, p
+    else:
+        return "WORKCENTERNAME = ?", [group_name]
+
+
 def _build_filter_where(filter_params: Dict[str, Any]) -> tuple[str, List[Any]]:
     """Build DuckDB WHERE clause for matrix/page/export filter.
 
-    Accepted filter fields: workcenter_group, spec, equipment_id, month
-    Returns (where_clause, positional_params)
+    Accepted filter fields:
+      - Matrix (singular): workcenter_group, spec, equipment_id, month
+      - Supplementary (arrays): work_orders, lot_ids, packages, bop_codes,
+        workcenter_groups, equipment_ids
 
-    ``workcenter_group`` is a canonical group name (e.g. '焊接_DB').  This
-    function expands it to the underlying ILIKE patterns defined in
-    ``workcenter_groups.py`` so the filter matches the raw WORKCENTERNAME
-    values stored in the Parquet spool.
+    ``workcenter_group`` / ``workcenter_groups`` are canonical group names
+    (e.g. '焊接_DB').  This function expands them to the underlying ILIKE
+    patterns defined in ``workcenter_groups.py`` so the filter matches the
+    raw WORKCENTERNAME values stored in the Parquet spool.
     """
     from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS
 
     conditions: List[str] = []
     params: List[Any] = []
 
+    # ── Matrix singular filters ──────────────────────────────────────────────
     wc_group = str(filter_params.get("workcenter_group") or "").strip()
     spec = str(filter_params.get("spec") or "").strip()
     equipment_id = str(filter_params.get("equipment_id") or "").strip()
     month = str(filter_params.get("month") or "").strip()
 
     if wc_group:
-        if wc_group in WORKCENTER_GROUPS:
-            cfg = WORKCENTER_GROUPS[wc_group]
-            # Include patterns (OR)
-            like_parts = [f"WORKCENTERNAME ILIKE ?" for _ in cfg["patterns"]]
-            conditions.append("(" + " OR ".join(like_parts) + ")")
-            params.extend(f"%{p}%" for p in cfg["patterns"])
-            # Exclude patterns (AND NOT each)
-            for excl in cfg.get("exclude", []):
-                conditions.append("WORKCENTERNAME NOT ILIKE ?")
-                params.append(f"%{excl}%")
-        else:
-            # Unmatched group — label equals the raw workcenter name
-            conditions.append("WORKCENTERNAME = ?")
-            params.append(wc_group)
+        clause, p = _build_wc_group_condition(wc_group, WORKCENTER_GROUPS)
+        conditions.append(clause)
+        params.extend(p)
     if spec:
         conditions.append("SPECNAME = ?")
         params.append(spec)
@@ -105,6 +114,32 @@ def _build_filter_where(filter_params: Dict[str, Any]) -> tuple[str, List[Any]]:
     if month:
         conditions.append("strftime(TRACKIN_TS::TIMESTAMP, '%Y-%m') = ?")
         params.append(month)
+
+    # ── Supplementary multi-select filters (arrays) ──────────────────────────
+    # Simple column-based IN filters
+    _SUPP_COLUMNS = [
+        ("work_orders", "WORK_ORDER"),
+        ("lot_ids", "CONTAINERNAME"),
+        ("packages", "PACKAGE_NAME"),
+        ("bop_codes", "PJ_BOP"),
+        ("equipment_ids", "EQUIPMENTNAME"),
+    ]
+    for key, col in _SUPP_COLUMNS:
+        values = filter_params.get(key)
+        if isinstance(values, list) and values:
+            placeholders = ", ".join("?" for _ in values)
+            conditions.append(f'"{col}" IN ({placeholders})')
+            params.extend(values)
+
+    # workcenter_groups (plural) — expand each group name to ILIKE patterns
+    wc_groups = filter_params.get("workcenter_groups")
+    if isinstance(wc_groups, list) and wc_groups:
+        group_clauses: List[str] = []
+        for gname in wc_groups:
+            clause, p = _build_wc_group_condition(gname, WORKCENTER_GROUPS)
+            group_clauses.append(f"({clause})")
+            params.extend(p)
+        conditions.append("(" + " OR ".join(group_clauses) + ")")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     return where, params
@@ -356,33 +391,64 @@ def _build_matrix_tree(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {"tree": tree, "month_columns": month_columns}
 
 
+def _apply_pandas_wc_group_filter(df: "pd.DataFrame", group_name: str, workcenter_groups: Dict) -> "pd.DataFrame":
+    """Filter DataFrame by a single workcenter group name."""
+    import pandas as pd
+
+    if group_name in workcenter_groups:
+        cfg = workcenter_groups[group_name]
+        wc_upper = df["WORKCENTERNAME"].str.upper()
+        mask = pd.Series(False, index=df.index)
+        for p in cfg["patterns"]:
+            mask |= wc_upper.str.contains(p.upper(), na=False)
+        for excl in cfg.get("exclude", []):
+            mask &= ~wc_upper.str.contains(excl.upper(), na=False)
+        return df[mask]
+    else:
+        return df[df["WORKCENTERNAME"] == group_name]
+
+
 def _apply_pandas_filter(df: "pd.DataFrame", filter_params: Dict[str, Any]) -> "pd.DataFrame":
     import pandas as pd
     from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS
 
+    # ── Matrix singular filters ──────────────────────────────────────────────
     wc_group = str(filter_params.get("workcenter_group") or "").strip()
     spec = str(filter_params.get("spec") or "").strip()
     equipment_id = str(filter_params.get("equipment_id") or "").strip()
     month = str(filter_params.get("month") or "").strip()
 
     if wc_group:
-        if wc_group in WORKCENTER_GROUPS:
-            cfg = WORKCENTER_GROUPS[wc_group]
-            wc_upper = df["WORKCENTERNAME"].str.upper()
-            mask = pd.Series(False, index=df.index)
-            for p in cfg["patterns"]:
-                mask |= wc_upper.str.contains(p.upper(), na=False)
-            for excl in cfg.get("exclude", []):
-                mask &= ~wc_upper.str.contains(excl.upper(), na=False)
-            df = df[mask]
-        else:
-            df = df[df["WORKCENTERNAME"] == wc_group]
+        df = _apply_pandas_wc_group_filter(df, wc_group, WORKCENTER_GROUPS)
     if spec:
         df = df[df["SPECNAME"] == spec]
     if equipment_id:
         df = df[df["EQUIPMENTID"] == equipment_id]
     if month:
         df = df[pd.to_datetime(df["TRACKIN_TS"], errors="coerce").dt.strftime("%Y-%m") == month]
+
+    # ── Supplementary multi-select filters (arrays) ──────────────────────────
+    _SUPP_COLUMNS = [
+        ("work_orders", "WORK_ORDER"),
+        ("lot_ids", "CONTAINERNAME"),
+        ("packages", "PACKAGE_NAME"),
+        ("bop_codes", "PJ_BOP"),
+        ("equipment_ids", "EQUIPMENTNAME"),
+    ]
+    for key, col in _SUPP_COLUMNS:
+        values = filter_params.get(key)
+        if isinstance(values, list) and values:
+            df = df[df[col].isin(values)]
+
+    # workcenter_groups (plural) — OR across multiple groups
+    wc_groups = filter_params.get("workcenter_groups")
+    if isinstance(wc_groups, list) and wc_groups:
+        combined_mask = pd.Series(False, index=df.index)
+        for gname in wc_groups:
+            sub = _apply_pandas_wc_group_filter(df, gname, WORKCENTER_GROUPS)
+            combined_mask |= df.index.isin(sub.index)
+        df = df[combined_mask]
+
     return df
 
 
