@@ -232,7 +232,35 @@ export function useTraceProgress({ profile } = {}) {
         },
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },
       );
-      const lineagePayload = unwrapEnvelope(lineageRaw);
+      const lineageEnvelope = unwrapEnvelope(lineageRaw);
+
+      // Async lineage path: server returned 202 with job_id
+      let lineagePayload;
+      if (lineageEnvelope?.async === true && lineageEnvelope?.status_url) {
+        job_progress.active = true;
+        job_progress.job_id = lineageEnvelope.job_id;
+        job_progress.status = 'queued';
+
+        await pollJobUntilComplete(lineageEnvelope.status_url, {
+          signal: controller.signal,
+          onProgress: (statusResp) => {
+            job_progress.status = statusResp.status;
+            job_progress.elapsed_seconds = statusResp.elapsed_seconds || 0;
+            job_progress.progress = statusResp.progress || '';
+          },
+        });
+
+        const lineageResultUrl = `${lineageEnvelope.status_url}/result`;
+        const lineageResultRaw = await apiGet(lineageResultUrl, {
+          timeout: DEFAULT_STAGE_TIMEOUT_MS,
+          signal: controller.signal,
+        });
+        lineagePayload = unwrapEnvelope(lineageResultRaw);
+        job_progress.active = false;
+      } else {
+        lineagePayload = lineageEnvelope;
+      }
+
       stage_results.lineage = lineagePayload;
       completed_stages.value = [...completed_stages.value, 'lineage'];
 

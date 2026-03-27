@@ -46,6 +46,11 @@ from mes_dashboard.services.mid_section_defect_service import (
     resolve_trace_seed_lots,
 )
 from mes_dashboard.services.query_tool_service import resolve_lots
+from mes_dashboard.services.msd_lineage_job_service import (
+    enqueue_msd_lineage,
+    get_msd_lineage_job_result,
+    get_msd_lineage_job_status,
+)
 from mes_dashboard.services.trace_job_service import (
     TRACE_ASYNC_CID_THRESHOLD,
     enqueue_trace_events_job,
@@ -63,6 +68,8 @@ TRACE_SLOW_THRESHOLD_SECONDS = float(os.getenv('TRACE_SLOW_THRESHOLD_SECONDS', '
 TRACE_EVENTS_MAX_WORKERS = int(os.getenv('TRACE_EVENTS_MAX_WORKERS', '2'))
 TRACE_EVENTS_CID_LIMIT = int(os.getenv('TRACE_EVENTS_CID_LIMIT', '50000'))
 TRACE_CACHE_TTL_SECONDS = 300
+
+LINEAGE_SEED_ASYNC_THRESHOLD = int(os.getenv('LINEAGE_SEED_ASYNC_THRESHOLD', '5000'))
 
 # RSS guard: reject sync event processing when RSS exceeds this MB threshold
 TRACE_SYNC_RSS_REJECT_MB = float(os.getenv("TRACE_SYNC_RSS_REJECT_MB", "1100"))
@@ -672,6 +679,31 @@ def lineage():
         params = payload.get("params") or {}
         direction = str(params.get("direction") or "backward").strip()
 
+    # MSD large lineage: offload to async job when seed count exceeds threshold
+    if profile == PROFILE_MID_SECTION_DEFECT and len(container_ids) > LINEAGE_SEED_ASYNC_THRESHOLD:
+        if is_async_available():
+            job_id, err = enqueue_msd_lineage(container_ids=container_ids, direction=direction)
+            if job_id is not None:
+                logger.info(
+                    "trace lineage MSD async job_id=%s seeds=%s direction=%s",
+                    job_id, len(container_ids), direction,
+                )
+                return success_response(
+                    {
+                        "stage": "lineage",
+                        "async": True,
+                        "job_id": job_id,
+                        "status_url": f"/api/trace/lineage/job/{job_id}",
+                    },
+                    status_code=202,
+                )
+            logger.warning("trace lineage MSD async enqueue failed seeds=%s: %s", len(container_ids), err)
+        else:
+            logger.warning(
+                "trace lineage MSD seed count exceeds threshold seeds=%s threshold=%s; async unavailable",
+                len(container_ids), LINEAGE_SEED_ASYNC_THRESHOLD,
+            )
+
     started = time.monotonic()
     try:
         if direction == "backward":
@@ -714,6 +746,40 @@ def lineage():
     return success_response(response)
 
 
+@trace_bp.route("/lineage/job/<job_id>", methods=["GET"])
+@_TRACE_JOB_RATE_LIMIT
+def lineage_job_status(job_id: str):
+    """Return the current status of an async MSD lineage job."""
+    status = get_msd_lineage_job_status(job_id)
+    if status is None:
+        return _error("JOB_NOT_FOUND", "job not found or expired", 404)
+    return success_response(status)
+
+
+@trace_bp.route("/lineage/job/<job_id>/result", methods=["GET"])
+@_TRACE_JOB_RATE_LIMIT
+def lineage_job_result(job_id: str):
+    """Return the lineage result of a completed async MSD lineage job."""
+    status = get_msd_lineage_job_status(job_id)
+    if status is None:
+        return _error("JOB_NOT_FOUND", "job not found or expired", 404)
+
+    job_status = status.get("status", "")
+    if job_status not in ("completed",):
+        return error_response(
+            "JOB_NOT_COMPLETE",
+            "job has not completed yet",
+            status_code=409,
+            meta={"job_status": job_status},
+        )
+
+    result = get_msd_lineage_job_result(job_id)
+    if result is None:
+        return _error("JOB_RESULT_EXPIRED", "job result has expired", 404)
+
+    return success_response(result)
+
+
 @trace_bp.route("/events", methods=["POST"])
 @_TRACE_EVENTS_RATE_LIMIT
 def events():
@@ -740,8 +806,7 @@ def events():
             400,
         )
 
-    # Admission control: non-MSD profiles have a hard CID limit to prevent OOM.
-    # MSD (reject tracing) needs all CIDs for accurate aggregation statistics.
+    # Admission control: all profiles have a hard CID limit to prevent OOM.
     is_msd = (profile == PROFILE_MID_SECTION_DEFECT)
     cid_count = len(container_ids)
 
@@ -757,21 +822,25 @@ def events():
             return _async_events_response(job_id)
         logger.warning("trace async enqueue failed cid_count=%s: %s", cid_count, err)
 
-    if not is_msd and cid_count > TRACE_EVENTS_CID_LIMIT:
+    if cid_count > TRACE_EVENTS_CID_LIMIT:
         logger.warning(
             "trace events CID limit exceeded profile=%s cid_count=%s limit=%s",
             profile, cid_count, TRACE_EVENTS_CID_LIMIT,
         )
+        if is_async_available():
+            job_id, err = enqueue_trace_events_job(profile, container_ids, domains, payload)
+            if job_id is not None:
+                logger.info(
+                    "trace events CID limit fallback async job_id=%s profile=%s cid_count=%s",
+                    job_id, profile, cid_count,
+                )
+                record_async_fallback("trace.events", reason="cid_limit")
+                return _async_events_response(job_id)
+            logger.warning("trace events CID limit async fallback failed: %s", err)
         return _error(
             "CID_LIMIT_EXCEEDED",
             f"container_ids count ({cid_count}) exceeds limit ({TRACE_EVENTS_CID_LIMIT})",
             413,
-        )
-
-    if is_msd and cid_count > TRACE_EVENTS_CID_LIMIT:
-        logger.warning(
-            "trace events MSD large query proceeding cid_count=%s limit=%s",
-            cid_count, TRACE_EVENTS_CID_LIMIT,
         )
 
     # For MSD profile, skip the events-level cache so that aggregation is

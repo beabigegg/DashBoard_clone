@@ -659,8 +659,9 @@ def test_cached_events_replay_domain_partial_overrides_stale_complete_top_level(
 # ---- Admission control tests ----
 
 
-def test_events_non_msd_cid_limit_returns_413(monkeypatch):
-    """Non-MSD profile exceeding CID limit should return 413."""
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
+def test_events_non_msd_cid_limit_returns_413(mock_async_available, monkeypatch):
+    """Non-MSD profile exceeding CID limit should return 413 when async is unavailable."""
     monkeypatch.setattr(
         'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
     )
@@ -680,29 +681,15 @@ def test_events_non_msd_cid_limit_returns_413(monkeypatch):
     assert payload['error']['code'] == 'CID_LIMIT_EXCEEDED'
 
 
-@patch('mes_dashboard.routes.trace_routes.build_trace_aggregation_from_events')
-@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
-def test_events_msd_bypasses_cid_limit(
-    mock_fetch_events,
-    mock_build_aggregation,
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
+def test_events_msd_exceeding_cid_limit_returns_413_without_async(
+    mock_async_available,
     monkeypatch,
 ):
-    """MSD profile should bypass CID limit and proceed normally."""
+    """MSD profile exceeding CID limit should return 413 when async is unavailable."""
     monkeypatch.setattr(
         'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
     )
-    mock_fetch_events.return_value = {
-        f'CID-{i}': [{'CONTAINERID': f'CID-{i}', 'WORKCENTER_GROUP': '測試'}]
-        for i in range(10)
-    }
-    mock_build_aggregation.return_value = {
-        'kpi': {'total_input': 10},
-        'charts': {},
-        'daily_trend': [],
-        'available_loss_reasons': [],
-        'genealogy_status': 'ready',
-        'detail_total_count': 0,
-    }
 
     client = _client()
     response = client.post(
@@ -715,15 +702,48 @@ def test_events_msd_bypasses_cid_limit(
                 'start_date': '2025-01-01',
                 'end_date': '2025-01-31',
             },
-            'lineage': {'ancestors': {}},
-            'seed_container_ids': [f'CID-{i}' for i in range(10)],
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 413
     payload = response.get_json()
-    assert payload['data']['stage'] == 'events'
-    mock_fetch_events.assert_called()
+    assert payload['error']['code'] == 'CID_LIMIT_EXCEEDED'
+
+
+@patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
+def test_events_msd_exceeding_cid_limit_returns_202_with_async(
+    mock_async_available,
+    mock_enqueue,
+    monkeypatch,
+):
+    """MSD profile exceeding CID limit should return 202 (async) when async is available."""
+    monkeypatch.setattr(
+        'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
+    )
+    monkeypatch.setattr(
+        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 100,
+    )
+    mock_enqueue.return_value = ('msd-job-abc', None)
+
+    client = _client()
+    response = client.post(
+        '/api/trace/events',
+        json={
+            'profile': 'mid_section_defect',
+            'container_ids': [f'CID-{i}' for i in range(10)],
+            'domains': ['upstream_history'],
+            'params': {
+                'start_date': '2025-01-01',
+                'end_date': '2025-01-31',
+            },
+        },
+    )
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload['data']['async'] is True
+    assert payload['data']['job_id'] == 'msd-job-abc'
 
 
 @patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
@@ -1054,3 +1074,98 @@ def test_events_async_response_includes_stream_url(mock_enqueue, mock_async):
     data = response.get_json()
     assert data["data"]["stream_url"] == "/api/trace/job/trace-evt-xyz/stream"
     assert data["data"]["status_url"] == "/api/trace/job/trace-evt-xyz"
+
+
+# ---- MSD async lineage endpoint tests ----
+
+
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
+@patch('mes_dashboard.routes.trace_routes.enqueue_msd_lineage')
+def test_lineage_msd_async_returns_202_when_seeds_exceed_threshold(
+    mock_enqueue,
+    mock_async,
+    monkeypatch,
+):
+    """MSD lineage with seeds > LINEAGE_SEED_ASYNC_THRESHOLD should return 202."""
+    monkeypatch.setattr('mes_dashboard.routes.trace_routes.LINEAGE_SEED_ASYNC_THRESHOLD', 5)
+    mock_enqueue.return_value = ('msd-lineage-abc', None)
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.post('/api/trace/lineage', json={
+        'profile': 'mid_section_defect',
+        'container_ids': [f'CID-{i}' for i in range(10)],
+        'params': {'direction': 'backward'},
+    })
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload['data']['async'] is True
+    assert payload['data']['job_id'] == 'msd-lineage-abc'
+    assert '/api/trace/lineage/job/msd-lineage-abc' in payload['data']['status_url']
+
+
+@patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_status')
+def test_lineage_job_status_endpoint_found(mock_status):
+    """GET /api/trace/lineage/job/<id> should return job status."""
+    mock_status.return_value = {
+        'job_id': 'msd-lineage-abc',
+        'status': 'running',
+        'progress': '5/56 split batches',
+        'elapsed_seconds': 12.5,
+    }
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.get('/api/trace/lineage/job/msd-lineage-abc')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['data']['status'] == 'running'
+    assert payload['data']['job_id'] == 'msd-lineage-abc'
+
+
+@patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_status', return_value=None)
+def test_lineage_job_status_endpoint_not_found(mock_status):
+    """GET /api/trace/lineage/job/<id> should return 404 for unknown job."""
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.get('/api/trace/lineage/job/nonexistent')
+
+    assert response.status_code == 404
+
+
+@patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_result')
+@patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_status')
+def test_lineage_job_result_endpoint_success(mock_status, mock_result):
+    """GET /api/trace/lineage/job/<id>/result should return reconstructed lineage."""
+    mock_status.return_value = {'status': 'completed', 'job_id': 'msd-lineage-abc'}
+    mock_result.return_value = {
+        'stage': 'lineage',
+        'ancestors': {'SEED1': ['ANC1', 'ANC2']},
+        'names': {'ANC1': 'LOT-ANC1'},
+        'seed_roots': {'SEED1': 'ROOT-1'},
+        'total_nodes': 3,
+        'total_ancestor_count': 2,
+    }
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.get('/api/trace/lineage/job/msd-lineage-abc/result')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['data']['stage'] == 'lineage'
+    assert 'SEED1' in payload['data']['ancestors']
+
+
+@patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_status')
+def test_lineage_job_result_endpoint_job_still_running(mock_status):
+    """GET /api/trace/lineage/job/<id>/result should return 409 when job not yet complete."""
+    mock_status.return_value = {'status': 'running', 'job_id': 'msd-lineage-abc'}
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.get('/api/trace/lineage/job/msd-lineage-abc/result')
+
+    assert response.status_code == 409

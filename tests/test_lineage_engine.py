@@ -6,6 +6,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pandas as pd
+import pytest
 
 from mes_dashboard.services.lineage_engine import LineageEngine
 
@@ -317,3 +318,67 @@ def test_lineage_engine_uses_slow_connection():
     from mes_dashboard.core.database import read_sql_df_slow
 
     assert le.read_sql_df is read_sql_df_slow
+
+
+# ---- Admission control tests ----
+
+
+def test_resolve_full_genealogy_raises_value_error_when_seed_count_exceeds_limit(monkeypatch):
+    """resolve_full_genealogy should raise ValueError when seed count exceeds LINEAGE_MAX_SEED_COUNT."""
+    import mes_dashboard.services.lineage_engine as le
+    monkeypatch.setattr(le, "LINEAGE_MAX_SEED_COUNT", 5)
+
+    cids = [f"C{i:04d}" for i in range(6)]
+    with pytest.raises(ValueError, match="seed count"):
+        LineageEngine.resolve_full_genealogy(cids)
+
+
+def test_resolve_forward_tree_raises_value_error_when_seed_count_exceeds_limit(monkeypatch):
+    """resolve_forward_tree should raise ValueError when seed count exceeds LINEAGE_MAX_SEED_COUNT."""
+    import mes_dashboard.services.lineage_engine as le
+    monkeypatch.setattr(le, "LINEAGE_MAX_SEED_COUNT", 3)
+
+    cids = [f"C{i:04d}" for i in range(4)]
+    with pytest.raises(ValueError, match="seed count"):
+        LineageEngine.resolve_forward_tree(cids)
+
+
+@patch("mes_dashboard.services.lineage_engine.process_rss_mb")
+def test_resolve_full_genealogy_raises_memory_error_when_rss_exceeds_limit(mock_rss, monkeypatch):
+    """resolve_full_genealogy should raise MemoryError when RSS exceeds LINEAGE_RSS_REJECT_MB."""
+    import mes_dashboard.services.lineage_engine as le
+    monkeypatch.setattr(le, "LINEAGE_RSS_REJECT_MB", 500.0)
+    mock_rss.return_value = 600.0
+
+    with pytest.raises(MemoryError, match="RSS"):
+        LineageEngine.resolve_full_genealogy(["C0001"])
+
+
+@patch("mes_dashboard.services.lineage_engine.process_rss_mb")
+def test_resolve_forward_tree_raises_memory_error_when_rss_exceeds_limit(mock_rss, monkeypatch):
+    """resolve_forward_tree should raise MemoryError when RSS exceeds LINEAGE_RSS_REJECT_MB."""
+    import mes_dashboard.services.lineage_engine as le
+    monkeypatch.setattr(le, "LINEAGE_RSS_REJECT_MB", 500.0)
+    mock_rss.return_value = 750.0
+
+    with pytest.raises(MemoryError, match="RSS"):
+        LineageEngine.resolve_forward_tree(["C0001"])
+
+
+@patch("mes_dashboard.services.lineage_engine.process_rss_mb")
+@patch("mes_dashboard.services.lineage_engine.LineageEngine.resolve_merge_sources")
+@patch("mes_dashboard.services.lineage_engine.LineageEngine.resolve_split_ancestors")
+def test_resolve_full_genealogy_proceeds_normally_for_small_input(
+    mock_split, mock_merge, mock_rss
+):
+    """resolve_full_genealogy should proceed normally when seed count and RSS are within limits."""
+    mock_rss.return_value = 300.0
+    mock_split.return_value = {
+        "child_to_parent": {"A": "B"},
+        "cid_to_name": {"A": "LOT-A", "B": "LOT-B"},
+    }
+    mock_merge.return_value = {}
+
+    result = LineageEngine.resolve_full_genealogy(["A"])
+    assert "ancestors" in result
+    assert "A" in result["ancestors"]

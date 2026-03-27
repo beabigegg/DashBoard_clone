@@ -32,7 +32,7 @@ This file is the governed inventory for API contract classification and exceptio
 | `admin_routes.py` | `/admin/performance`, `/admin/user-usage-kpi`, `/admin/dashboard` | Admin-authenticated SPA HTML routes; CSRF token is injected into the served HTML |
 | `job_query_routes.py` | All JSON API endpoints |
 | `qc_gate_routes.py` | All JSON API endpoints |
-| `trace_routes.py` | All JSON API endpoints |
+| `trace_routes.py` | All JSON API endpoints — includes `GET /api/trace/lineage/job/<job_id>` (MSD async lineage job status polling; 404 if not found), `GET /api/trace/lineage/job/<job_id>/result` (MSD async lineage job result retrieval; 409 if not completed, 404 if expired); `POST /api/trace/lineage` may return HTTP 202 with `{"async": true, "job_id": ..., "status_url": ...}` when MSD seed count exceeds `LINEAGE_SEED_ASYNC_THRESHOLD` |
 | `mid_section_defect_routes.py` | All JSON API endpoints — includes `GET /api/mid-section-defect/analysis/job/<job_id>` and `GET /api/mid-section-defect/analysis/job/<job_id>/result`; `GET /api/mid-section-defect/analysis` may return HTTP 202 with `{"async": true, "job_id": ..., "status_url": ...}` when routed to background worker |
 | `query_tool_routes.py` | All JSON API endpoints |
 | `material_trace_routes.py` | JSON endpoints except CSV export (`/api/material-trace/export`) |
