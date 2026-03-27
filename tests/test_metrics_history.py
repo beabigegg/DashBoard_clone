@@ -34,20 +34,20 @@ def _insert_snapshot(store, ts_str, pid, rss_bytes, **kwargs):
         'redis_hit_rate': 0, 'rc_l1_hit_rate': 0, 'rc_l2_hit_rate': 0,
         'rc_miss_rate': 0, 'latency_p50_ms': 0, 'latency_p95_ms': 0,
         'latency_p99_ms': 0, 'latency_count': 0, 'slow_query_active': 0,
-        'slow_query_waiting': 0,
+        'slow_query_waiting': 0, 'service_rss_bytes': 0,
     }
     defaults.update(kwargs)
     with store._write_lock:
         with store._get_connection() as conn:
             conn.execute(
                 """INSERT INTO metrics_snapshots
-                   (ts, worker_pid, worker_rss_bytes, pool_saturation, pool_checked_out,
+                   (ts, worker_pid, worker_rss_bytes, service_rss_bytes, pool_saturation, pool_checked_out,
                     pool_checked_in, pool_overflow, pool_max_capacity, redis_used_memory,
                     redis_hit_rate, rc_l1_hit_rate, rc_l2_hit_rate, rc_miss_rate,
                     latency_p50_ms, latency_p95_ms, latency_p99_ms, latency_count,
                     slow_query_active, slow_query_waiting)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (ts_str, pid, rss_bytes, defaults['pool_saturation'], defaults['pool_checked_out'],
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (ts_str, pid, rss_bytes, defaults['service_rss_bytes'], defaults['pool_saturation'], defaults['pool_checked_out'],
                  defaults['pool_checked_in'], defaults['pool_overflow'], defaults['pool_max_capacity'],
                  defaults['redis_used_memory'], defaults['redis_hit_rate'], defaults['rc_l1_hit_rate'],
                  defaults['rc_l2_hit_rate'], defaults['rc_miss_rate'], defaults['latency_p50_ms'],
@@ -136,15 +136,17 @@ class TestMultiWorkerAggregation:
 
             rss_a = 1770 * 1024 * 1024
             rss_b = 563 * 1024 * 1024
+            service_rss = 2400 * 1024 * 1024
 
-            _insert_snapshot(store, ts, pid=1001, rss_bytes=rss_a, pool_saturation=0.8)
-            _insert_snapshot(store, ts, pid=1002, rss_bytes=rss_b, pool_saturation=0.3)
+            _insert_snapshot(store, ts, pid=1001, rss_bytes=rss_a, service_rss_bytes=service_rss, pool_saturation=0.8)
+            _insert_snapshot(store, ts, pid=1002, rss_bytes=rss_b, service_rss_bytes=service_rss, pool_saturation=0.3)
 
             rows = store.query_snapshots_aggregated(minutes=5)
             assert len(rows) == 1, f"Expected 1 aggregated row, got {len(rows)}"
 
             row = rows[0]
             assert row["worker_rss_bytes"] == rss_a  # MAX
+            assert row["service_rss_bytes"] == service_rss  # shared service total should not double count
             assert row["worker_count"] == 2
 
 
@@ -402,6 +404,7 @@ class TestCacheHitMissColumns:
 
             assert "cache_hit_count" in col_names
             assert "cache_miss_count" in col_names
+            assert "service_rss_bytes" in col_names
 
     def test_write_snapshot_persists_cache_hit_miss_counts(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -465,6 +468,22 @@ class TestCollectorObservability:
                 call.args and call.args[0].startswith("RQ dead worker alert:")
                 for call in mock_warning.call_args_list
             )
+
+    def test_collector_records_service_rss_bytes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_collector_service_rss.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+            collector = MetricsHistoryCollector(app=None, store=store)
+
+            with patch(
+                "mes_dashboard.core.worker_memory_guard.get_service_memory_snapshot",
+                return_value={"total_rss_bytes": 3221225472},
+            ):
+                collector._collect_snapshot()
+
+            rows = store.query_snapshots(minutes=5)
+            assert rows[-1]["service_rss_bytes"] == 3221225472
 
 
 class TestHeavyQueryGuardColumns:

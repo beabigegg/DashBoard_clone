@@ -539,6 +539,7 @@ def _query_mysql_metrics(minutes: int = 30, bucket_seconds: int = 30) -> list:
                 MAX(slow_query_active)  AS slow_query_active,
                 MAX(slow_query_waiting) AS slow_query_waiting,
                 MAX(worker_rss_bytes)   AS worker_rss_bytes,
+                MAX(service_rss_bytes)  AS service_rss_bytes,
                 MIN(system_mem_available_mb) AS system_mem_available_mb,
                 MAX(system_mem_used_pct) AS system_mem_used_pct,
                 MAX(rq_workers_total)   AS rq_workers_total,

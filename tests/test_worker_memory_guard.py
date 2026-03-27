@@ -265,14 +265,72 @@ class TestTelemetry:
         assert d["restart_count"] == 0
         assert "check_interval" in d
         assert "enabled" in d
+        assert d["process_memory"]["rss_mb"] == 1024.5
+        assert d["process_memory"]["limit_mb"] == 2048
+        assert d["process_memory"]["level"] == "normal"
+
+    def test_telemetry_dict_includes_nested_system_memory_breakdown(self):
+        from mes_dashboard.core.worker_memory_guard import _telemetry
+
+        _telemetry.system_memory_pressure = True
+        _telemetry.system_mem_used_pct = 96.2
+        _telemetry.system_mem_available_mb = 256.0
+        _telemetry.system_mem_total_mb = 32768.0
+
+        d = _telemetry.to_dict()
+
+        assert d["system_mem_total_mb"] == 32768.0
+        assert d["system_memory"]["pressure"] is True
+        assert d["system_memory"]["pressure_state"] == "critical"
+        assert d["system_memory"]["used_pct"] == pytest.approx(96.2, abs=0.1)
+        assert d["system_memory"]["available_mb"] == pytest.approx(256.0, abs=1.0)
+        assert d["system_memory"]["total_mb"] == pytest.approx(32768.0, abs=1.0)
+        assert d["system_memory"]["used_mb"] == pytest.approx(32512.0, abs=1.0)
+
+    def test_telemetry_dict_includes_service_memory_breakdown(self):
+        from mes_dashboard.core.worker_memory_guard import _telemetry
+
+        _telemetry.service_rss_bytes = 3145728000
+        _telemetry.service_rss_mb = 3000.0
+        _telemetry.service_process_count = 5
+        _telemetry.service_gunicorn_rss_mb = 2500.0
+        _telemetry.service_gunicorn_process_count = 3
+        _telemetry.service_rq_rss_mb = 500.0
+        _telemetry.service_rq_process_count = 2
+
+        d = _telemetry.to_dict()
+
+        assert d["service_rss_bytes"] == 3145728000
+        assert d["service_rss_mb"] == pytest.approx(3000.0, abs=0.1)
+        assert d["service_memory"]["rss_mb"] == pytest.approx(3000.0, abs=0.1)
+        assert d["service_memory"]["process_count"] == 5
+        assert d["service_memory"]["gunicorn_rss_mb"] == pytest.approx(2500.0, abs=0.1)
+        assert d["service_memory"]["gunicorn_process_count"] == 3
+        assert d["service_memory"]["rq_rss_mb"] == pytest.approx(500.0, abs=0.1)
+        assert d["service_memory"]["rq_process_count"] == 2
 
     def test_get_memory_guard_telemetry_returns_dict(self):
         from mes_dashboard.core.worker_memory_guard import get_memory_guard_telemetry
 
-        t = get_memory_guard_telemetry()
+        with patch(
+            "mes_dashboard.core.worker_memory_guard.get_service_memory_snapshot",
+            return_value={
+                "total_rss_bytes": 2097152000,
+                "total_rss_mb": 2000.0,
+                "total_process_count": 4,
+                "gunicorn_rss_mb": 1500.0,
+                "gunicorn_process_count": 3,
+                "rq_rss_mb": 500.0,
+                "rq_process_count": 1,
+            },
+        ):
+            t = get_memory_guard_telemetry()
+
         assert isinstance(t, dict)
         assert "enabled" in t
         assert "level" in t
+        assert t["service_memory"]["rss_mb"] == pytest.approx(2000.0, abs=0.1)
+        assert t["service_memory"]["process_count"] == 4
 
 
 # ============================================================

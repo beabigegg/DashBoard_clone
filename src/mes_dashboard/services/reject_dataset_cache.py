@@ -780,6 +780,7 @@ def execute_primary_query(
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
+    build_response: bool = True,
 ) -> Dict[str, Any]:
     """Execute Oracle query → cache DataFrame → return structured result."""
 
@@ -856,6 +857,42 @@ def execute_primary_query(
             exclude_pb_diode=exclude_pb_diode,
         )
         return _build_primary_response(query_id, filtered_df, response_meta, resolution_info)
+
+    def _build_response_from_spool() -> Dict[str, Any]:
+        cached_partial_meta = _load_partial_failure_flag(query_id)
+        response_meta = dict(meta)
+        if cached_partial_meta:
+            response_meta.update(cached_partial_meta)
+
+        result = apply_view(
+            query_id=query_id,
+            page=1,
+            per_page=50,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
+        )
+        if result is None:
+            raise RuntimeError(
+                f"Stored reject spool unavailable while building response (query_id={query_id})"
+            )
+
+        analytics_raw = result.get("analytics_raw") or []
+        response: Dict[str, Any] = {
+            "query_id": query_id,
+            "analytics_raw": analytics_raw,
+            "summary": result.get("summary") or {},
+            "trend": {
+                "items": _derive_trend_from_analytics(analytics_raw),
+                "granularity": "day",
+            },
+            "detail": result.get("detail") or _paginate_detail(pd.DataFrame(), page=1, per_page=50),
+            "available_filters": result.get("available_filters") or {},
+            "meta": response_meta,
+        }
+        if resolution_info is not None:
+            response["resolution_info"] = resolution_info
+        return response
 
     # ---- Check cache first ----
     cached_df = _get_cached_df(query_id)
@@ -938,6 +975,9 @@ def execute_primary_query(
                 "Engine activated for container IDs: %d batches (query_id=%s)",
                 len(engine_chunks), query_id,
             )
+
+        stored_via_spool = False
+        spool_ready_for_response = False
 
         if use_engine and engine_chunks:
             # --- Engine path ---
@@ -1034,8 +1074,10 @@ def execute_primary_query(
                     ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
                 )
                 if spool_registered:
-                    _cached = _get_cached_df(query_id)
-                    df = _cached if _cached is not None else pd.DataFrame()
+                    _dataset_cache.set(query_id, True)
+                    stored_via_spool = True
+                    spool_ready_for_response = True
+                    df = pd.DataFrame()
                 else:
                     # Fallback: spool_tmp_path still exists if register_spool_file did not move it
                     from pathlib import Path as _Path
@@ -1073,21 +1115,31 @@ def execute_primary_query(
         if partial_failure_meta:
             meta.update(partial_failure_meta)
 
-        stored_via_spool = False
-        if not df.empty:
+        if not stored_via_spool and not df.empty:
             stored_via_spool = _store_query_result(query_id, df)
-            if partial_failure_meta.get("has_partial_failure"):
-                flag_ttl = (
-                    _REJECT_ENGINE_SPOOL_TTL_SECONDS if stored_via_spool else _CACHE_TTL
-                )
-                _store_partial_failure_flag(
-                    query_id,
-                    partial_failure_meta.get("failed_chunk_count", 0),
-                    partial_failure_meta.get("failed_ranges"),
-                    flag_ttl,
-                )
-            else:
-                _clear_partial_failure_flag(query_id)
+            spool_ready_for_response = bool(stored_via_spool)
+
+        if partial_failure_meta.get("has_partial_failure"):
+            flag_ttl = (
+                _REJECT_ENGINE_SPOOL_TTL_SECONDS if stored_via_spool else _CACHE_TTL
+            )
+            _store_partial_failure_flag(
+                query_id,
+                partial_failure_meta.get("failed_chunk_count", 0),
+                partial_failure_meta.get("failed_ranges"),
+                flag_ttl,
+            )
+        else:
+            _clear_partial_failure_flag(query_id)
+
+        if not build_response:
+            response: Dict[str, Any] = {"query_id": query_id, "meta": dict(meta)}
+            if resolution_info is not None:
+                response["resolution_info"] = resolution_info
+            return response
+
+        if stored_via_spool and spool_ready_for_response:
+            return _build_response_from_spool()
 
         filtered = _apply_policy_filters(
             df,

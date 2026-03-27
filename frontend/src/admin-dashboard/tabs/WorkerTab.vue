@@ -41,15 +41,45 @@ const errorMessage = computed(
 );
 
 const memoryGuardRssDisplay = computed(() => {
-  const guard = perfDetail.value?.worker_memory_guard;
-  if (!guard) return '';
-  return `${guard.last_rss_mb?.toFixed(1) ?? '-'} MB / ${guard.limit_mb} MB (${guard.rss_pct?.toFixed(1) ?? '-'}%)`;
+  const processMemory = perfDetail.value?.worker_memory_guard?.process_memory
+    || perfDetail.value?.worker_memory_guard;
+  if (!processMemory) return '';
+  return `${processMemory.rss_mb?.toFixed?.(1) ?? processMemory.last_rss_mb?.toFixed?.(1) ?? '-'} MB / ${processMemory.limit_mb} MB (${processMemory.rss_pct?.toFixed(1) ?? '-'}%)`;
 });
 
 const memoryGuardLevelDisplay = computed(() => {
-  const level = perfDetail.value?.worker_memory_guard?.level;
+  const level = perfDetail.value?.worker_memory_guard?.process_memory?.level
+    || perfDetail.value?.worker_memory_guard?.level;
   const map = { normal: '正常', warn: '警告', evict: '驅逐中', restart: '重啟中' };
   return map[level] || level || '-';
+});
+
+const systemMemory = computed(
+  () => perfDetail.value?.worker_memory_guard?.system_memory || {},
+);
+
+const serviceMemory = computed(
+  () => perfDetail.value?.worker_memory_guard?.service_memory || {},
+);
+
+const serviceMemoryDisplay = computed(() => {
+  const info = serviceMemory.value || {};
+  if (typeof info.rss_mb !== 'number') return '';
+  return `${info.rss_mb.toFixed(1)} MB (${info.process_count ?? 0} processes)`;
+});
+
+const systemMemoryDisplay = computed(() => {
+  const info = systemMemory.value || {};
+  if (typeof info.used_pct !== 'number') return '';
+  const used = typeof info.used_mb === 'number' ? info.used_mb : '-';
+  const total = typeof info.total_mb === 'number' ? info.total_mb : '-';
+  return `${info.used_pct.toFixed(1)}% (${used} MB / ${total} MB)`;
+});
+
+const systemMemoryLevelDisplay = computed(() => {
+  const state = systemMemory.value?.pressure_state;
+  const map = { normal: '正常', warning: '警告', critical: '危急' };
+  return map[state] || state || '-';
 });
 
 const asyncWorkers = computed(() => perfDetail.value?.async_workers || {});
@@ -77,7 +107,12 @@ const cooldownDisplay = computed(() => {
 });
 
 const memoryTrendSeries = [
-  { name: 'RSS (MB)', key: 'worker_rss_mb', color: 'rgb(139, 92, 246)' },
+  { name: 'Process RSS (MB)', key: 'worker_rss_mb', color: 'rgb(139, 92, 246)' },
+  { name: 'Server RSS (MB)', key: 'service_rss_mb', color: 'rgb(59, 130, 246)' },
+];
+
+const systemMemoryTrendSeries = [
+  { name: 'System Used %', key: 'system_mem_used_pct', color: 'rgb(239, 68, 68)' },
 ];
 
 const asyncWorkerTrendSeries = [
@@ -197,17 +232,28 @@ onMounted(() => {
 
     <TrendChart
       v-if="historyData.length > 1"
-      title="Worker 記憶體趨勢"
+      title="Process / Server RSS 趨勢"
       :snapshots="historyData"
       :series="memoryTrendSeries"
       yAxisLabel="MB"
     />
 
+    <TrendChart
+      v-if="historyData.length > 1"
+      title="System 全機記憶體趨勢"
+      :snapshots="historyData"
+      :series="systemMemoryTrendSeries"
+      yAxisLabel="%"
+      :yMax="100"
+    />
+
     <SectionCard v-if="perfDetail?.worker_memory_guard?.enabled">
-      <template #header><h2 class="panel-title">Worker 記憶體守衛</h2></template>
+      <template #header><h2 class="panel-title">記憶體守衛</h2></template>
+      <p class="muted">Process 看單一 worker；Server 看整個 mes-dashboard 服務總 RSS；System 看主機總記憶體使用率。</p>
+      <h3 class="sub-title">Process 單一進程</h3>
       <GaugeBar
         label="RSS 使用率"
-        :value="perfDetail.worker_memory_guard.rss_pct"
+        :value="perfDetail.worker_memory_guard.process_memory?.rss_pct ?? perfDetail.worker_memory_guard.rss_pct"
         :max="100"
         unit="%"
         :displayText="memoryGuardRssDisplay"
@@ -215,12 +261,40 @@ onMounted(() => {
         :dangerThreshold="0.85"
       />
       <SummaryCardGroup :columns="6">
-        <SummaryCard label="當前 RSS (MB)" :value="perfDetail.worker_memory_guard.last_rss_mb?.toFixed(1)" accent="info" />
-        <SummaryCard label="上限 (MB)" :value="perfDetail.worker_memory_guard.limit_mb" accent="neutral" />
+        <SummaryCard label="當前 RSS (MB)" :value="perfDetail.worker_memory_guard.process_memory?.rss_mb?.toFixed(1) ?? perfDetail.worker_memory_guard.last_rss_mb?.toFixed(1)" accent="info" />
+        <SummaryCard label="上限 (MB)" :value="perfDetail.worker_memory_guard.process_memory?.limit_mb ?? perfDetail.worker_memory_guard.limit_mb" accent="neutral" />
         <SummaryCard label="壓力等級" :value="memoryGuardLevelDisplay" accent="warning" />
-        <SummaryCard label="警告次數" :value="perfDetail.worker_memory_guard.warn_count" accent="warning" />
-        <SummaryCard label="驅逐次數" :value="perfDetail.worker_memory_guard.evict_count" accent="danger" />
-        <SummaryCard label="重啟次數" :value="perfDetail.worker_memory_guard.restart_count" accent="danger" />
+        <SummaryCard label="警告次數" :value="perfDetail.worker_memory_guard.process_memory?.warn_count ?? perfDetail.worker_memory_guard.warn_count" accent="warning" />
+        <SummaryCard label="驅逐次數" :value="perfDetail.worker_memory_guard.process_memory?.evict_count ?? perfDetail.worker_memory_guard.evict_count" accent="danger" />
+        <SummaryCard label="重啟次數" :value="perfDetail.worker_memory_guard.process_memory?.restart_count ?? perfDetail.worker_memory_guard.restart_count" accent="danger" />
+      </SummaryCardGroup>
+
+      <h3 class="sub-title">Server 整個服務</h3>
+      <SummaryCardGroup :columns="5">
+        <SummaryCard label="總 RSS (MB)" :value="serviceMemory.rss_mb?.toFixed(1)" accent="info" />
+        <SummaryCard label="監控進程數" :value="serviceMemory.process_count" accent="neutral" />
+        <SummaryCard label="Gunicorn RSS (MB)" :value="serviceMemory.gunicorn_rss_mb?.toFixed(1)" accent="info" />
+        <SummaryCard label="RQ RSS (MB)" :value="serviceMemory.rq_rss_mb?.toFixed(1)" accent="warning" />
+        <SummaryCard label="Server 摘要" :value="serviceMemoryDisplay" accent="neutral" />
+      </SummaryCardGroup>
+
+      <h3 class="sub-title">System 全機</h3>
+      <GaugeBar
+        label="總記憶體使用率"
+        :value="systemMemory.used_pct || 0"
+        :max="100"
+        unit="%"
+        :displayText="systemMemoryDisplay"
+        :warningThreshold="0.85"
+        :dangerThreshold="0.92"
+      />
+      <SummaryCardGroup :columns="6">
+        <SummaryCard label="壓力狀態" :value="systemMemoryLevelDisplay" accent="warning" />
+        <SummaryCard label="已使用 (MB)" :value="systemMemory.used_mb" accent="danger" />
+        <SummaryCard label="可用 (MB)" :value="systemMemory.available_mb" accent="info" />
+        <SummaryCard label="總量 (MB)" :value="systemMemory.total_mb" accent="neutral" />
+        <SummaryCard label="警告門檻 (%)" :value="systemMemory.warn_threshold_pct" accent="warning" />
+        <SummaryCard label="拒絕門檻 (%)" :value="systemMemory.reject_threshold_pct" accent="danger" />
       </SummaryCardGroup>
     </SectionCard>
 

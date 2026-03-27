@@ -129,7 +129,7 @@ def execute_reject_query_job(
 
     from mes_dashboard.services.reject_dataset_cache import (
         _CACHE_SCHEMA_VERSION,
-        _get_cached_df,
+        _has_cached_df,
         _make_query_id,
         execute_primary_query,
     )
@@ -155,8 +155,7 @@ def execute_reject_query_job(
         query_id = _make_query_id(query_id_input)
 
         # Check cache — if a concurrent sync request already filled it, reuse
-        cached_df = _get_cached_df(query_id)
-        if cached_df is not None:
+        if _has_cached_df(query_id):
             logger.info("reject query job: cache hit, skipping Oracle query job_id=%s query_id=%s", job_id, query_id)
             complete_job(_JOB_PREFIX, job_id, query_id=query_id)
             return
@@ -172,6 +171,7 @@ def execute_reject_query_job(
             include_excluded_scrap=bool(params.get("include_excluded_scrap", False)),
             exclude_material_scrap=bool(params.get("exclude_material_scrap", True)),
             exclude_pb_diode=bool(params.get("exclude_pb_diode", True)),
+            build_response=False,
         )
 
         complete_job(_JOB_PREFIX, job_id, query_id=query_id)

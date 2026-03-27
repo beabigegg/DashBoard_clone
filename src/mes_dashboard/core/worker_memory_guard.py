@@ -98,6 +98,57 @@ def _current_rss_mb() -> Optional[float]:
     return process_rss_mb()
 
 
+def _classify_service_process(info: Dict[str, Any]) -> Optional[str]:
+    """Return service role for mes-dashboard processes we own."""
+    name = str(info.get("name") or "").lower()
+    cmdline = " ".join(info.get("cmdline") or [])
+
+    if name == "gunicorn" and "mes_dashboard" in cmdline:
+        return "gunicorn"
+    if name == "rq" and "mes_dashboard.rq_worker_preload" in cmdline:
+        return "rq"
+    return None
+
+
+def get_service_memory_snapshot() -> Dict[str, Any]:
+    """Return aggregated RSS for the full mes-dashboard service."""
+    summary = {
+        "total_rss_bytes": 0,
+        "total_rss_mb": 0.0,
+        "total_process_count": 0,
+        "gunicorn_rss_bytes": 0,
+        "gunicorn_rss_mb": 0.0,
+        "gunicorn_process_count": 0,
+        "rq_rss_bytes": 0,
+        "rq_rss_mb": 0.0,
+        "rq_process_count": 0,
+    }
+    try:
+        import psutil
+
+        for proc in psutil.process_iter(["pid", "name", "cmdline", "memory_info"]):
+            try:
+                info = proc.info
+                role = _classify_service_process(info)
+                if role is None:
+                    continue
+                rss_bytes = int(getattr(info.get("memory_info"), "rss", 0) or 0)
+                summary["total_rss_bytes"] += rss_bytes
+                summary["total_process_count"] += 1
+                summary[f"{role}_rss_bytes"] += rss_bytes
+                summary[f"{role}_process_count"] += 1
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+    except Exception as exc:
+        logger.debug("Service memory snapshot error: %s", exc)
+        return summary
+
+    summary["total_rss_mb"] = round(summary["total_rss_bytes"] / (1024 * 1024), 1)
+    summary["gunicorn_rss_mb"] = round(summary["gunicorn_rss_bytes"] / (1024 * 1024), 1)
+    summary["rq_rss_mb"] = round(summary["rq_rss_bytes"] / (1024 * 1024), 1)
+    return summary
+
+
 # ============================================================
 # Telemetry
 # ============================================================
@@ -108,7 +159,10 @@ class _Telemetry:
         "last_rss_mb", "last_check_at", "last_level",
         "limit_mb", "rss_pct",
         "system_memory_pressure",
-        "system_mem_used_pct", "system_mem_available_mb",
+        "system_mem_used_pct", "system_mem_available_mb", "system_mem_total_mb",
+        "service_rss_bytes", "service_rss_mb", "service_process_count",
+        "service_gunicorn_rss_mb", "service_gunicorn_process_count",
+        "service_rq_rss_mb", "service_rq_process_count",
     )
 
     def __init__(self) -> None:
@@ -123,8 +177,27 @@ class _Telemetry:
         self.system_memory_pressure: bool = False
         self.system_mem_used_pct: float = 0.0
         self.system_mem_available_mb: float = 0.0
+        self.system_mem_total_mb: float = 0.0
+        self.service_rss_bytes: int = 0
+        self.service_rss_mb: float = 0.0
+        self.service_process_count: int = 0
+        self.service_gunicorn_rss_mb: float = 0.0
+        self.service_gunicorn_process_count: int = 0
+        self.service_rq_rss_mb: float = 0.0
+        self.service_rq_process_count: int = 0
+
+    def _system_pressure_state(self) -> str:
+        if self.system_mem_used_pct > _SYSTEM_MEM_REJECT_PCT:
+            return "critical"
+        if self.system_mem_used_pct > _SYSTEM_MEM_WARN_PCT:
+            return "warning"
+        return "normal"
 
     def to_dict(self) -> Dict[str, Any]:
+        system_total_mb = round(self.system_mem_total_mb, 0)
+        system_available_mb = round(self.system_mem_available_mb, 0)
+        system_used_mb = max(system_total_mb - system_available_mb, 0)
+        system_pressure_state = self._system_pressure_state()
         return {
             "enabled": _GUARD_ENABLED,
             "limit_mb": self.limit_mb,
@@ -138,6 +211,37 @@ class _Telemetry:
             "system_memory_pressure": self.system_memory_pressure,
             "system_mem_used_pct": round(self.system_mem_used_pct, 1),
             "system_mem_available_mb": round(self.system_mem_available_mb, 0),
+            "system_mem_total_mb": system_total_mb,
+            "service_rss_bytes": self.service_rss_bytes,
+            "service_rss_mb": round(self.service_rss_mb, 1),
+            "process_memory": {
+                "rss_mb": round(self.last_rss_mb, 1),
+                "limit_mb": self.limit_mb,
+                "rss_pct": round(self.rss_pct, 1),
+                "level": self.last_level,
+                "warn_count": self.warn_count,
+                "evict_count": self.evict_count,
+                "restart_count": self.restart_count,
+            },
+            "service_memory": {
+                "rss_bytes": self.service_rss_bytes,
+                "rss_mb": round(self.service_rss_mb, 1),
+                "process_count": self.service_process_count,
+                "gunicorn_rss_mb": round(self.service_gunicorn_rss_mb, 1),
+                "gunicorn_process_count": self.service_gunicorn_process_count,
+                "rq_rss_mb": round(self.service_rq_rss_mb, 1),
+                "rq_process_count": self.service_rq_process_count,
+            },
+            "system_memory": {
+                "pressure": self.system_memory_pressure,
+                "pressure_state": system_pressure_state,
+                "used_pct": round(self.system_mem_used_pct, 1),
+                "available_mb": system_available_mb,
+                "total_mb": system_total_mb,
+                "used_mb": system_used_mb,
+                "warn_threshold_pct": _SYSTEM_MEM_WARN_PCT,
+                "reject_threshold_pct": _SYSTEM_MEM_REJECT_PCT,
+            },
         }
 
 
@@ -214,9 +318,11 @@ class _WorkerMemoryGuard:
             vm = psutil.virtual_memory()
             used_pct = vm.percent
             available_mb = vm.available / (1024 * 1024)
+            total_mb = vm.total / (1024 * 1024)
 
             _telemetry.system_mem_used_pct = used_pct
             _telemetry.system_mem_available_mb = available_mb
+            _telemetry.system_mem_total_mb = total_mb
 
             if used_pct > _SYSTEM_MEM_REJECT_PCT:
                 if not _telemetry.system_memory_pressure:
@@ -270,6 +376,16 @@ class _WorkerMemoryGuard:
         except Exception as exc:
             logger.debug("System memory check error: %s", exc)
 
+    def _update_service_memory(self) -> None:
+        snapshot = get_service_memory_snapshot()
+        _telemetry.service_rss_bytes = int(snapshot.get("total_rss_bytes", 0) or 0)
+        _telemetry.service_rss_mb = float(snapshot.get("total_rss_mb", 0.0) or 0.0)
+        _telemetry.service_process_count = int(snapshot.get("total_process_count", 0) or 0)
+        _telemetry.service_gunicorn_rss_mb = float(snapshot.get("gunicorn_rss_mb", 0.0) or 0.0)
+        _telemetry.service_gunicorn_process_count = int(snapshot.get("gunicorn_process_count", 0) or 0)
+        _telemetry.service_rq_rss_mb = float(snapshot.get("rq_rss_mb", 0.0) or 0.0)
+        _telemetry.service_rq_process_count = int(snapshot.get("rq_process_count", 0) or 0)
+
     def _check_rss(self) -> None:
         rss_mb = _current_rss_mb()
         if rss_mb is None:
@@ -283,6 +399,7 @@ class _WorkerMemoryGuard:
         _telemetry.rss_pct = pct
 
         # Check system memory in the same cycle
+        self._update_service_memory()
         self._check_system_memory()
 
         # --- Level 1: Normal ---
@@ -384,4 +501,12 @@ def stop_worker_memory_guard() -> None:
 
 def get_memory_guard_telemetry() -> Dict[str, Any]:
     """Return current guard state for admin telemetry and health checks."""
+    snapshot = get_service_memory_snapshot()
+    _telemetry.service_rss_bytes = int(snapshot.get("total_rss_bytes", 0) or 0)
+    _telemetry.service_rss_mb = float(snapshot.get("total_rss_mb", 0.0) or 0.0)
+    _telemetry.service_process_count = int(snapshot.get("total_process_count", 0) or 0)
+    _telemetry.service_gunicorn_rss_mb = float(snapshot.get("gunicorn_rss_mb", 0.0) or 0.0)
+    _telemetry.service_gunicorn_process_count = int(snapshot.get("gunicorn_process_count", 0) or 0)
+    _telemetry.service_rq_rss_mb = float(snapshot.get("rq_rss_mb", 0.0) or 0.0)
+    _telemetry.service_rq_process_count = int(snapshot.get("rq_process_count", 0) or 0)
     return _telemetry.to_dict()

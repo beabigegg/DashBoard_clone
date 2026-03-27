@@ -32,7 +32,7 @@ from mes_dashboard.services.reject_dataset_cache import (
     compute_dimension_pareto,
     execute_primary_query,
     export_csv_from_cache,
-    _get_cached_df,
+    _has_cached_df,
     _make_query_id,
     _CACHE_SCHEMA_VERSION,
 )
@@ -672,7 +672,7 @@ def api_reject_history_query():
     }
     _pre_query_id = _make_query_id(_query_id_input)
 
-    if _get_cached_df(_pre_query_id) is not None:
+    if _has_cached_df(_pre_query_id):
         try:
             result = execute_primary_query(
                 mode=mode,

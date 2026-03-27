@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     slow_query_active INTEGER,
     slow_query_waiting INTEGER,
     worker_rss_bytes INTEGER,
+    service_rss_bytes INTEGER,
     system_mem_available_mb REAL,
     system_mem_used_pct REAL,
     rq_workers_total INTEGER,
@@ -84,6 +85,7 @@ _MIGRATION_COLUMNS = [
     ("slow_query_active", "INTEGER"),
     ("slow_query_waiting", "INTEGER"),
     ("worker_rss_bytes", "INTEGER"),
+    ("service_rss_bytes", "INTEGER"),
     ("system_mem_available_mb", "REAL"),
     ("system_mem_used_pct", "REAL"),
     ("rq_workers_total", "INTEGER"),
@@ -117,6 +119,7 @@ COLUMNS = [
     "rc_l1_hit_rate", "rc_l2_hit_rate", "rc_miss_rate",
     "latency_p50_ms", "latency_p95_ms", "latency_p99_ms", "latency_count",
     "slow_query_active", "slow_query_waiting", "worker_rss_bytes",
+    "service_rss_bytes",
     "system_mem_available_mb", "system_mem_used_pct",
     "rq_workers_total", "rq_workers_busy", "rq_queue_depth",
     "heavy_query_slots_active",
@@ -246,6 +249,7 @@ class MetricsHistoryStore:
                              rc_l1_hit_rate, rc_l2_hit_rate, rc_miss_rate,
                              latency_p50_ms, latency_p95_ms, latency_p99_ms, latency_count,
                              slow_query_active, slow_query_waiting, worker_rss_bytes,
+                             service_rss_bytes,
                              system_mem_available_mb, system_mem_used_pct,
                              rq_workers_total, rq_workers_busy,
                              rq_queue_depth, heavy_query_slots_active,
@@ -255,7 +259,7 @@ class MetricsHistoryStore:
                              cache_hit_count, cache_miss_count,
                              online_count,
                              synced)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                         """,
                         (
                             ts, pid,
@@ -276,6 +280,7 @@ class MetricsHistoryStore:
                             data.get("slow_query_active"),
                             data.get("slow_query_waiting"),
                             data.get("worker_rss_bytes"),
+                            data.get("service_rss_bytes"),
                             data.get("system_mem_available_mb"),
                             data.get("system_mem_used_pct"),
                             data.get("rq_workers_total"),
@@ -354,6 +359,7 @@ class MetricsHistoryStore:
                 MAX(slow_query_active)  AS slow_query_active,
                 MAX(slow_query_waiting) AS slow_query_waiting,
                 MAX(worker_rss_bytes)   AS worker_rss_bytes,
+                MAX(service_rss_bytes)  AS service_rss_bytes,
                 MIN(system_mem_available_mb) AS system_mem_available_mb,
                 MAX(system_mem_used_pct) AS system_mem_used_pct,
                 MAX(rq_workers_total)   AS rq_workers_total,
@@ -607,6 +613,13 @@ class MetricsHistoryCollector:
                 data["worker_rss_bytes"] = int(rss_mb * 1024 * 1024) if rss_mb is not None else 0
             except Exception:
                 data["worker_rss_bytes"] = 0
+
+            try:
+                from mes_dashboard.core.worker_memory_guard import get_service_memory_snapshot
+                service_memory = get_service_memory_snapshot()
+                data["service_rss_bytes"] = int(service_memory.get("total_rss_bytes", 0) or 0)
+            except Exception:
+                data["service_rss_bytes"] = 0
 
             # System memory (total machine memory)
             try:

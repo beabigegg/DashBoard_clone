@@ -1050,6 +1050,129 @@ def test_large_result_spills_to_parquet_and_view_export_use_spool_fallback(monke
     assert len(export_rows) == len(df)
 
 
+def test_execute_primary_query_registered_spool_builds_response_without_reloading_dataframe(
+    monkeypatch, tmp_path
+):
+    import mes_dashboard.services.batch_query_engine as engine_mod
+    import mes_dashboard.core.query_spool_store as spool_store
+
+    cached_reads = {"count": 0}
+
+    def fake_get_cached_df(_query_id):
+        cached_reads["count"] += 1
+        if cached_reads["count"] <= 2:
+            return None
+        raise AssertionError("registered spool path should not reload cached DataFrame")
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", fake_get_cached_df)
+    monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
+    monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+    monkeypatch.setattr(cache_svc, "_prepare_sql", lambda *a, **kw: "SELECT 1 FROM dual")
+    monkeypatch.setattr(cache_svc, "redis_clear_batch", lambda *_a, **_kw: None)
+    monkeypatch.setattr(
+        cache_svc,
+        "_store_query_result",
+        lambda *_a, **_kw: (_ for _ in ()).throw(
+            AssertionError("registered spool path should not store query result twice")
+        ),
+    )
+    monkeypatch.setattr(
+        cache_svc,
+        "_build_primary_response",
+        lambda *_a, **_kw: (_ for _ in ()).throw(
+            AssertionError("registered spool path should build response from spool view")
+        ),
+    )
+    monkeypatch.setattr(
+        cache_svc,
+        "apply_view",
+        lambda **kw: {
+            "analytics_raw": [
+                {
+                    "bucket_date": "2025-01-01",
+                    "reason": "001_A",
+                    "MOVEIN_QTY": 100,
+                    "REJECT_TOTAL_QTY": 10,
+                    "DEFECT_QTY": 0,
+                    "AFFECTED_LOT_COUNT": 1,
+                    "AFFECTED_WORKORDER_COUNT": 1,
+                }
+            ],
+            "summary": {"MOVEIN_QTY": 100, "REJECT_TOTAL_QTY": 10},
+            "detail": {
+                "items": [{"CONTAINERNAME": "LOT-001"}],
+                "pagination": {"page": 1, "perPage": 50, "total": 1, "totalPages": 1},
+            },
+            "available_filters": {"workcenter_groups": ["WB"], "packages": [], "reasons": ["001_A"]},
+        },
+    )
+
+    monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *_a, **_kw: True)
+    monkeypatch.setattr(
+        engine_mod,
+        "decompose_by_time_range",
+        lambda *_a, **_kw: [{"chunk_start": "2025-01-01", "chunk_end": "2025-01-10"}],
+    )
+    monkeypatch.setattr(engine_mod, "execute_plan", lambda *a, **kw: kw.get("query_hash"))
+    monkeypatch.setattr(
+        engine_mod,
+        "merge_chunks_to_spool",
+        lambda *a, **kw: (tmp_path / "spooled.parquet", 1),
+    )
+    monkeypatch.setattr(spool_store, "register_spool_file", lambda *a, **kw: True)
+
+    result = cache_svc.execute_primary_query(
+        mode="date_range",
+        start_date="2025-01-01",
+        end_date="2025-03-01",
+    )
+
+    assert result["query_id"]
+    assert result["detail"]["pagination"]["total"] == 1
+    assert result["trend"]["items"][0]["REJECT_TOTAL_QTY"] == 10
+    assert cached_reads["count"] == 2
+
+
+def test_execute_primary_query_build_response_false_skips_response_derivation(monkeypatch):
+    import mes_dashboard.services.batch_query_engine as engine_mod
+
+    monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: None)
+    monkeypatch.setattr(cache_svc, "_validate_range", lambda *_a, **_kw: None)
+    monkeypatch.setattr(cache_svc, "_build_where_clause", lambda **kw: ("", {}, {}))
+    monkeypatch.setattr(cache_svc, "_prepare_sql", lambda *a, **kw: "SELECT 1 FROM dual")
+    monkeypatch.setattr(
+        cache_svc,
+        "read_sql_df",
+        lambda _sql, _params: pd.DataFrame({"CONTAINERID": ["C1"], "REJECT_TOTAL_QTY": [1]}),
+    )
+    monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *_a, **_kw: False)
+    monkeypatch.setattr(cache_svc, "_store_query_result", lambda *_a, **_kw: False)
+    monkeypatch.setattr(
+        cache_svc,
+        "_apply_policy_filters",
+        lambda *_a, **_kw: (_ for _ in ()).throw(
+            AssertionError("build_response=False should skip policy filtering")
+        ),
+    )
+    monkeypatch.setattr(
+        cache_svc,
+        "_build_primary_response",
+        lambda *_a, **_kw: (_ for _ in ()).throw(
+            AssertionError("build_response=False should skip response construction")
+        ),
+    )
+
+    result = cache_svc.execute_primary_query(
+        mode="date_range",
+        start_date="2025-01-01",
+        end_date="2025-01-05",
+        build_response=False,
+    )
+
+    assert result["query_id"]
+    assert result["meta"] == {}
+
+
 def test_resolve_containers_deduplicates_container_ids(monkeypatch):
     monkeypatch.setattr(
         cache_svc,

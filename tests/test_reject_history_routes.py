@@ -175,7 +175,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         mock_execute.assert_not_called()
 
     @patch('mes_dashboard.services.reject_query_job_service.enqueue_reject_query', return_value=('reject-job-001', None))
-    @patch('mes_dashboard.routes.reject_history_routes._get_cached_df', return_value=None)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=False)
     def test_query_accepts_date_range_within_half_year(self, _mock_cache, _mock_enqueue):
 
         response = self.client.post(
@@ -196,7 +196,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(payload['data']['job_id'], 'reject-job-001')
 
     @patch('mes_dashboard.services.reject_query_job_service.enqueue_reject_query', return_value=(None, 'redis unavailable'))
-    @patch('mes_dashboard.routes.reject_history_routes._get_cached_df', return_value=None)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=False)
     def test_query_returns_503_when_async_enqueue_fails(self, _mock_cache, _mock_enqueue):
 
         response = self.client.post(

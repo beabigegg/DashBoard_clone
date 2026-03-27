@@ -151,6 +151,7 @@ class SyncWorker:
                 slow_query_active INT,
                 slow_query_waiting INT,
                 worker_rss_bytes BIGINT,
+                service_rss_bytes BIGINT,
                 system_mem_available_mb DOUBLE,
                 system_mem_used_pct DOUBLE,
                 rq_workers_total INT,
@@ -191,6 +192,7 @@ class SyncWorker:
             "heavy_query_guard_reject_total INT",
             "heavy_query_memory_error_total INT",
             "heavy_query_async_fallback_total INT",
+            "service_rss_bytes BIGINT",
         ]
 
         try:
@@ -340,6 +342,7 @@ class SyncWorker:
                                  rc_l1_hit_rate, rc_l2_hit_rate, rc_miss_rate,
                                  latency_p50_ms, latency_p95_ms, latency_p99_ms, latency_count,
                                  slow_query_active, slow_query_waiting, worker_rss_bytes,
+                                 service_rss_bytes,
                                  system_mem_available_mb, system_mem_used_pct,
                                  rq_workers_total, rq_workers_busy, rq_queue_depth,
                                  heavy_query_slots_active,
@@ -355,6 +358,7 @@ class SyncWorker:
                                  :rc_l1_hit_rate, :rc_l2_hit_rate, :rc_miss_rate,
                                  :latency_p50_ms, :latency_p95_ms, :latency_p99_ms, :latency_count,
                                  :slow_query_active, :slow_query_waiting, :worker_rss_bytes,
+                                 :service_rss_bytes,
                                  :system_mem_available_mb, :system_mem_used_pct,
                                  :rq_workers_total, :rq_workers_busy, :rq_queue_depth,
                                  :heavy_query_slots_active,
@@ -384,6 +388,7 @@ class SyncWorker:
                             "slow_query_active": row.get("slow_query_active"),
                             "slow_query_waiting": row.get("slow_query_waiting"),
                             "worker_rss_bytes": row.get("worker_rss_bytes"),
+                            "service_rss_bytes": row.get("service_rss_bytes"),
                             "system_mem_available_mb": row.get("system_mem_available_mb"),
                             "system_mem_used_pct": row.get("system_mem_used_pct"),
                             "rq_workers_total": row.get("rq_workers_total"),

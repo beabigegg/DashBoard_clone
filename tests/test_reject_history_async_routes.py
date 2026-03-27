@@ -89,7 +89,7 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
         "mes_dashboard.services.reject_query_job_service.enqueue_reject_query"
     )
     _EXECUTE = "mes_dashboard.routes.reject_history_routes.execute_primary_query"
-    _GET_CACHED_DF = "mes_dashboard.routes.reject_history_routes._get_cached_df"
+    _GET_CACHED_DF = "mes_dashboard.routes.reject_history_routes._has_cached_df"
     _SLOW_QUERY_COUNT = (
         "mes_dashboard.routes.reject_history_routes.get_slow_query_active_count"
     )
@@ -101,7 +101,7 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
     # 1. Short query — async 202 on spool miss
     # ------------------------------------------------------------------
 
-    @patch("mes_dashboard.routes.reject_history_routes._get_cached_df", return_value=None)
+    @patch("mes_dashboard.routes.reject_history_routes._has_cached_df", return_value=False)
     def test_short_query_returns_async_202_on_spool_miss(self, _mock_cache):
         """5-day date_range spool miss should enqueue async work."""
         fake_job_id = "reject-short-0001"
@@ -123,7 +123,7 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
     # 2. Long query — async 202
     # ------------------------------------------------------------------
 
-    @patch("mes_dashboard.routes.reject_history_routes._get_cached_df", return_value=None)
+    @patch("mes_dashboard.routes.reject_history_routes._has_cached_df", return_value=False)
     def test_long_query_returns_async_202(
         self, _mock_cache
     ):
@@ -167,8 +167,8 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
         mock_execute.return_value = _SYNC_RESULT
 
         with patch(
-            "mes_dashboard.routes.reject_history_routes._get_cached_df",
-            return_value=cached_df,
+            "mes_dashboard.routes.reject_history_routes._has_cached_df",
+            return_value=True,
         ):
             response = self.client.post(
                 "/api/reject-history/query", json=_VALID_QUERY_BODY_SHORT
@@ -184,7 +184,7 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
     # 4. Async enqueue failure → 503
     # ------------------------------------------------------------------
 
-    @patch("mes_dashboard.routes.reject_history_routes._get_cached_df", return_value=None)
+    @patch("mes_dashboard.routes.reject_history_routes._has_cached_df", return_value=False)
     def test_async_enqueue_failure_returns_503(
         self, _mock_cache
     ):
@@ -209,7 +209,7 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
     # 5. Container mode — async 202 on spool miss
     # ------------------------------------------------------------------
 
-    @patch("mes_dashboard.routes.reject_history_routes._get_cached_df", return_value=None)
+    @patch("mes_dashboard.routes.reject_history_routes._has_cached_df", return_value=False)
     def test_container_mode_returns_async_202(self, _mock_cache):
         """container mode now also routes through the background spool pipeline."""
         fake_job_id = "reject-container-0001"

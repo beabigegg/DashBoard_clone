@@ -84,6 +84,9 @@ export function usePerfHistory(minutes = 30, bucket = 30) {
       worker_rss_mb: snapshot.worker_rss_bytes
         ? Math.round((snapshot.worker_rss_bytes / 1048576) * 10) / 10
         : 0,
+      service_rss_mb: snapshot.service_rss_bytes
+        ? Math.round((snapshot.service_rss_bytes / 1048576) * 10) / 10
+        : 0,
       redis_used_memory_mb:
         snapshot.redis_used_memory_mb
         ?? (snapshot.redis_used_memory
