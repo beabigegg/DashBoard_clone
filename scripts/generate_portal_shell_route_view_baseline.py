@@ -114,15 +114,6 @@ TARGET_ROUTE_CONTRACTS: list[dict[str, Any]] = [
         "rollback_strategy": "fallback_to_legacy_route",
     },
     {
-        "route": "/excel-query",
-        "page_name": "Excel 查詢工具",
-        "render_mode": "native",
-        "required_query_keys": [],
-        "source_dir": "frontend/src/excel-query",
-        "owner": "frontend-mes-reporting",
-        "rollback_strategy": "fallback_to_legacy_route",
-    },
-    {
         "route": "/query-tool",
         "page_name": "Query Tool",
         "render_mode": "native",
@@ -184,7 +175,6 @@ ROUTE_NOTES = {
     "/resource-history": "date/granularity/group/family/resource/flags contract",
     "/qc-gate": "chart-table linked filtering parity",
     "/job-query": "resource/date query + txn detail + export",
-    "/excel-query": "upload/detect/query/export workflow",
     "/query-tool": "resolve/history/associations/equipment-period workflows",
 }
 

@@ -15,7 +15,6 @@ This file is the governed inventory for API contract classification and exceptio
 | :--- | :--- |
 | `wip_routes.py` | All JSON API endpoints |
 | `dashboard_routes.py` | All JSON API endpoints |
-| `excel_query_routes.py` | JSON endpoints except CSV export (`/export-csv`) |
 | `hold_routes.py` | All JSON API endpoints |
 | `hold_overview_routes.py` | All JSON API endpoints |
 | `hold_history_routes.py` | All JSON API endpoints |
@@ -53,7 +52,6 @@ This file is the governed inventory for API contract classification and exceptio
 
 | File | Scope |
 | :--- | :--- |
-| `excel_query_routes.py` | CSV export endpoints |
 | `job_query_routes.py` | CSV export/stream endpoints |
 | `material_trace_routes.py` | CSV trace export endpoints |
 | `mid_section_defect_routes.py` | CSV export endpoints |

@@ -136,7 +136,6 @@ def main() -> int:
         "/portal-shell",
         "/api/portal/navigation",
         "/job-query",
-        "/excel-query",
         "/query-tool",
     ]
 

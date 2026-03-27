@@ -14,13 +14,6 @@ test('buildLaunchHref appends scalar query values', () => {
   );
 });
 
-test('buildLaunchHref supports repeated query keys from array values', () => {
-  assert.equal(
-    buildLaunchHref('/excel-query', { lotid: ['L1', 'L2'], mode: 'upload' }),
-    '/excel-query?lotid=L1&lotid=L2&mode=upload',
-  );
-});
-
 test('buildLaunchHref replaces existing query keys with latest runtime values', () => {
   assert.equal(
     buildLaunchHref('/query-tool?mode=legacy&page=1', { mode: 'runtime', page: '3' }),

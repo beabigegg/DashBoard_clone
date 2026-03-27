@@ -94,12 +94,6 @@
       {"api_key": "value", "ui_label": "值", "export_header": "值", "semantic_type": "text"}
     ]
   },
-  "excel_query": {
-    "result_table": [
-      {"api_key": "search_column", "ui_label": "查詢欄位", "export_header": "查詢欄位", "semantic_type": "text"},
-      {"api_key": "result_column", "ui_label": "回傳欄位", "export_header": "回傳欄位", "semantic_type": "text"}
-    ]
-  },
   "resource_status": {
     "matrix_summary": [
       {"api_key": "workcenter_group", "ui_label": "站點群組", "export_header": "站點群組", "semantic_type": "category"},

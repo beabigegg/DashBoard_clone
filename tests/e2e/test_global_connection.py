@@ -138,12 +138,6 @@ class TestRoutePagesSmoke:
             text = header.inner_text()
             assert "MES 數據表查詢工具" in text or "頁面開發中" in text
 
-    def test_excel_query_page_loads(self, page: Page, app_server: str):
-        response = page.goto(f"{app_server}/excel-query")
-        assert response is not None
-        assert response.status in {200, 403}
-        expect(page.locator("body")).to_be_visible()
-
 
 @pytest.mark.e2e
 class TestConsoleAndErrorSignals:

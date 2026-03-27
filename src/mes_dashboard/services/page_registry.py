@@ -32,9 +32,8 @@ LEGACY_NAV_ASSIGNMENTS = {
     "/resource": {"drawer_id": "reports", "order": 2},
     "/resource-history": {"drawer_id": "reports", "order": 3},
     "/tables": {"drawer_id": "queries", "order": 1},
-    "/excel-query": {"drawer_id": "queries", "order": 2},
-    "/job-query": {"drawer_id": "queries", "order": 3},
-    "/query-tool": {"drawer_id": "queries", "order": 4},
+    "/job-query": {"drawer_id": "queries", "order": 2},
+    "/query-tool": {"drawer_id": "queries", "order": 3},
     "/admin/pages": {
         "drawer_id": "dev-tools",
         "order": 1,

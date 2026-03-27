@@ -17,16 +17,6 @@ const WAVE_B_NATIVE_CASES = Object.freeze([
     expectedParams: ['start_date=2026-02-01', 'end_date=2026-02-11', 'resource_ids=EQ-01', 'resource_ids=EQ-02'],
   },
   {
-    route: '/excel-query',
-    page: 'Excel 查詢工具',
-    query: {
-      mode: 'upload',
-      table_name: 'DWH.DW_MES_WIP',
-      search_column: 'LOT_ID',
-    },
-    expectedParams: ['mode=upload', 'table_name=DWH.DW_MES_WIP', 'search_column=LOT_ID'],
-  },
-  {
     route: '/query-tool',
     page: 'Query Tool',
     query: {

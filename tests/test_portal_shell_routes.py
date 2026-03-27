@@ -110,7 +110,7 @@ def test_portal_navigation_non_admin_visibility_matches_release_only():
     assert "/resource-history" in all_routes
     assert "/job-query" in all_routes
     assert "/admin/pages" not in all_routes
-    assert "/excel-query" not in all_routes
+
 
 
 def test_portal_navigation_admin_includes_admin_drawer_routes():
@@ -133,7 +133,7 @@ def test_portal_navigation_admin_includes_admin_drawer_routes():
     assert "/admin/pages" in all_routes
     assert "/admin/dashboard" in all_routes
     assert "/admin/dashboard" in all_routes
-    assert "/excel-query" in all_routes
+
 
 
 def test_wrapper_telemetry_endpoint_removed_after_wrapper_decommission():
@@ -367,7 +367,7 @@ def test_wave_b_native_routes_are_reachable(monkeypatch):
     client = app.test_client()
     _login_as_admin(client)
 
-    for route in ["/job-query", "/excel-query", "/query-tool", "/yield-alert-center"]:
+    for route in ["/job-query", "/query-tool", "/yield-alert-center"]:
         response = client.get(route)
         assert response.status_code == 200, f"{route} should be reachable"
 
@@ -460,7 +460,6 @@ def test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled(m
 
     cases = {
         "/tables?category=wip": "/portal-shell/tables?category=wip",
-        "/excel-query": "/portal-shell/excel-query",
         "/query-tool": "/portal-shell/query-tool",
         "/mid-section-defect": "/portal-shell/mid-section-defect",
         "/yield-alert-center?start_date=2026-03-01": "/portal-shell/yield-alert-center?start_date=2026-03-01",

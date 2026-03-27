@@ -86,5 +86,4 @@ def test_template_backed_promoted_routes_do_not_require_html_assets():
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     required = payload.get("in_scope_required_assets", {})
 
-    assert required.get("/excel-query") == ["excel-query.js"]
     assert required.get("/query-tool") == ["query-tool.js"]

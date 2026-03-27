@@ -27,7 +27,6 @@
 | 材料追溯查詢 | `/material-trace` | ✅ 已完成 |
 | 數據表查詢工具 | `/tables` | ✅ 已完成 |
 | 設備維修查詢 | `/job-query` | ✅ 已完成 |
-| Excel 查詢工具 | `/excel-query` | ✅ 已完成 |
 | 批次追蹤工具 | `/query-tool` | ✅ 已完成 |
 
 ### 管理與基礎設施
@@ -130,7 +129,7 @@ DashBoard_vite/
 │   │   ├── material_trace_routes.py  # 材料追溯 API
 │   │   ├── mid_section_defect_routes.py  # 中段不良 API
 │   │   ├── qc_gate_routes.py       # QC-GATE API
-│   │   ├── query_tool_routes.py / job_query_routes.py / excel_query_routes.py
+│   │   ├── query_tool_routes.py / job_query_routes.py
 │   │   ├── spool_routes.py         # 查詢結果 spool API
 │   │   ├── trace_routes.py         # 追溯非同步任務 API
 │   │   ├── admin_routes.py / auth_routes.py / health_routes.py
@@ -199,7 +198,6 @@ DashBoard_vite/
 │   │   ├── tables/                 # 數據表查詢（Vue 3 SFC）
 │   │   ├── admin-performance/      # 效能監控（Vue 3 SFC）
 │   │   ├── job-query/              # 設備維修查詢
-│   │   ├── excel-query/            # Excel 查詢工具
 │   │   ├── query-tool/             # 批次追蹤工具
 │   │   ├── workers/                # Web Worker（DuckDB 等）
 │   │   └── portal/                 # Portal 入口

@@ -27,7 +27,6 @@ ROUTES_DIR = Path(__file__).parent.parent / "src" / "mes_dashboard" / "routes"
 _JSONIFY_BASELINE = {
     "admin_routes.py": 36,
     "dashboard_routes.py": 11,
-    "excel_query_routes.py": 39,
     "hold_history_routes.py": 12,
     "hold_overview_routes.py": 14,
     "hold_routes.py": 11,

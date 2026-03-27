@@ -58,10 +58,6 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../job-query/App.vue'),
     [() => import('../resource-shared/styles.css'), () => import('../job-query/style.css')],
   ),
-  '/excel-query': createNativeLoader(
-    () => import('../excel-query/App.vue'),
-    [() => import('../excel-query/style.css')],
-  ),
   '/query-tool': createNativeLoader(
     () => import('../query-tool/App.vue'),
     [() => import('../wip-shared/styles.css'), () => import('../styles/tailwind.css'), () => import('../query-tool/style.css')],

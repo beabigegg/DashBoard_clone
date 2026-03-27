@@ -7,7 +7,6 @@ Contains Flask Blueprints for different API endpoints.
 from .wip_routes import wip_bp
 from .resource_routes import resource_bp
 from .dashboard_routes import dashboard_bp
-from .excel_query_routes import excel_query_bp
 from .hold_routes import hold_bp
 from .hold_overview_routes import hold_overview_bp
 from .hold_history_routes import hold_history_bp
@@ -32,7 +31,6 @@ def register_routes(app) -> None:
     app.register_blueprint(wip_bp)
     app.register_blueprint(resource_bp)
     app.register_blueprint(dashboard_bp)
-    app.register_blueprint(excel_query_bp)
     app.register_blueprint(hold_bp)
     app.register_blueprint(hold_overview_bp)
     app.register_blueprint(hold_history_bp)
@@ -54,7 +52,6 @@ __all__ = [
     'wip_bp',
     'resource_bp',
     'dashboard_bp',
-    'excel_query_bp',
     'hold_bp',
     'hold_overview_bp',
     'hold_history_bp',

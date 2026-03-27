@@ -55,7 +55,7 @@ def test_scope_matrix_has_all_routes_promoted_to_in_scope():
     deferred = {item["route"] for item in matrix["deferred"]}
     assert deferred == set(), "all deferred routes should be promoted to in-scope"
     in_scope_routes = {item["route"] for item in matrix["in_scope"]}
-    for route in ("/tables", "/excel-query", "/query-tool", "/mid-section-defect"):
+    for route in ("/tables", "/query-tool", "/mid-section-defect"):
         assert route in in_scope_routes, f"{route} should be in-scope"
 
 

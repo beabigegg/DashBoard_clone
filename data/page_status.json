@@ -72,13 +72,6 @@
       "order": 4
     },
     {
-      "route": "/excel-query",
-      "name": "Excel 批次查詢",
-      "status": "dev",
-      "drawer_id": "dev-tools",
-      "order": 2
-    },
-    {
       "route": "/job-query",
       "name": "設備維修查詢",
       "status": "released",

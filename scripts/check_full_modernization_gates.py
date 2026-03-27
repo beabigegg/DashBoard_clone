@@ -87,7 +87,6 @@ def _route_css_targets() -> dict[str, list[Path]]:
         "/job-query": [ROOT / "frontend/src/job-query/style.css"],
         "/admin/pages": [ROOT / "src/mes_dashboard/templates/admin/pages.html"],
         "/tables": [ROOT / "frontend/src/tables/style.css"],
-        "/excel-query": [ROOT / "frontend/src/excel-query/style.css"],
         "/query-tool": [ROOT / "frontend/src/query-tool/style.css"],
         "/mid-section-defect": [ROOT / "frontend/src/mid-section-defect/style.css"],
         "/admin/dashboard": [ROOT / "frontend/src/admin-dashboard/style.css"],

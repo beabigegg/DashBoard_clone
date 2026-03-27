@@ -98,15 +98,6 @@ class TestTemplateIntegration(unittest.TestCase):
         self.assertIn('type="module"', html)
         self.assertNotIn('mes-toast-container', html)
 
-    def test_excel_query_page_includes_base_scripts(self):
-        response = self.client.get('/excel-query')
-        self.assertEqual(response.status_code, 200)
-        html = response.data.decode('utf-8')
-
-        self.assertIn('toast.js', html)
-        self.assertIn('mes-api.js', html)
-        self.assertIn('mes-toast-container', html)
-
     def test_query_tool_page_includes_base_scripts(self):
         response = self.client.get('/query-tool')
         self.assertEqual(response.status_code, 200)
@@ -354,7 +345,6 @@ class TestViteModuleIntegration(unittest.TestCase):
             ('/resource-history', 'resource-history.js'),
             ('/reject-history', 'reject-history.js'),
             ('/job-query', 'job-query.js'),
-            ('/excel-query', 'excel-query.js'),
             ('/query-tool', 'query-tool.js'),
         ]
         canonical_routes = {
@@ -366,7 +356,6 @@ class TestViteModuleIntegration(unittest.TestCase):
             '/resource-history': '/portal-shell/resource-history',
             '/job-query': '/portal-shell/job-query',
             '/tables': '/portal-shell/tables',
-            '/excel-query': '/portal-shell/excel-query',
             '/query-tool': '/portal-shell/query-tool',
             '/reject-history': '/portal-shell/reject-history',
         }

@@ -17,10 +17,6 @@ test('table parity: Wave B native pages keep deterministic column and empty-stat
   assert.match(jobSource, /txnColumns/);
   assert.match(jobSource, /目前無資料/);
 
-  const excelSource = readSource('src/excel-query/App.vue');
-  assert.match(excelSource, /queryResult\.columns/);
-  assert.match(excelSource, /queryResult\.rows\.length === 0/);
-
   const queryToolSource = readSource('src/query-tool/App.vue');
   assert.match(queryToolSource, /resolvedColumns/);
   assert.match(queryToolSource, /historyColumns/);

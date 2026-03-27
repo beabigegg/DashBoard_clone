@@ -41,7 +41,7 @@ test('admin shell targets are governed with correct render modes', () => {
 test('formerly deferred routes are now promoted to in-scope', () => {
   const inScope = new Set(getInScopeRoutes());
   const deferred = getDeferredRoutes();
-  const promotedRoutes = ['/tables', '/excel-query', '/query-tool', '/mid-section-defect'];
+  const promotedRoutes = ['/tables', '/query-tool', '/mid-section-defect'];
 
   assert.equal(deferred.length, 0, 'all deferred routes should be promoted');
 

@@ -19,7 +19,6 @@ const WAVE_A_ROUTES = Object.freeze([
 
 const WAVE_B_NATIVE_ROUTES = Object.freeze([
   '/job-query',
-  '/excel-query',
   '/query-tool',
 ]);
 
