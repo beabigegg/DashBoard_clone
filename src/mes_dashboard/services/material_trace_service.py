@@ -40,10 +40,6 @@ from mes_dashboard.sql import QueryBuilder, SQLLoader
 
 logger = logging.getLogger("mes_dashboard.material_trace")
 
-_REVERSE_MAX_ROWS = 10_000
-_FORWARD_MAX_ROWS = 50_000
-_EXPORT_MAX_ROWS = 50_000
-
 # Safeguard: max DataFrame memory (MB) before aborting — same pattern as batch_query_engine
 _MAX_RESULT_MB = int(os.getenv("MATERIAL_TRACE_MAX_RESULT_MB", "256"))
 
@@ -515,18 +511,6 @@ def forward_query(
             "quality_meta": quality_meta,
         }
 
-    # Forward truncation — SQL fetches 50001 rows to detect overflow
-    if len(df) > _FORWARD_MAX_ROWS:
-        observed_rows = len(df)
-        df = df.iloc[:_FORWARD_MAX_ROWS]
-        meta["truncated"] = True
-        meta["max_rows"] = _FORWARD_MAX_ROWS
-        quality_meta = _build_query_quality_meta(
-            truncated=True,
-            observed_rows=observed_rows,
-            max_rows=_FORWARD_MAX_ROWS,
-        )
-
     df = _enrich_workcenter_group(df)
 
     # Store enriched result in Redis for subsequent pagination / export
@@ -584,18 +568,6 @@ def reverse_query(
             "meta": meta,
             "quality_meta": quality_meta,
         }
-
-    # Check truncation (SQL fetches 10001 rows to detect overflow)
-    if len(df) > _REVERSE_MAX_ROWS:
-        observed_rows = len(df)
-        df = df.iloc[:_REVERSE_MAX_ROWS]
-        meta["truncated"] = True
-        meta["max_rows"] = _REVERSE_MAX_ROWS
-        quality_meta = _build_query_quality_meta(
-            truncated=True,
-            observed_rows=observed_rows,
-            max_rows=_REVERSE_MAX_ROWS,
-        )
 
     df = _enrich_workcenter_group(df)
 
@@ -660,19 +632,6 @@ def export_csv(
 
         df = _enrich_workcenter_group(df)
 
-        if len(df) > _FORWARD_MAX_ROWS and mode in {"lot", "workorder"}:
-            base_query_quality = _build_query_quality_meta(
-                truncated=True,
-                observed_rows=len(df),
-                max_rows=_FORWARD_MAX_ROWS,
-            )
-        elif len(df) > _REVERSE_MAX_ROWS and mode == "material_lot":
-            base_query_quality = _build_query_quality_meta(
-                truncated=True,
-                observed_rows=len(df),
-                max_rows=_REVERSE_MAX_ROWS,
-            )
-
         # Store in cache for potential subsequent requests
         _try_store_cached_df(cache_key, df)
         _try_store_cached_meta(cache_key, meta=meta, quality_meta=base_query_quality)
@@ -681,20 +640,10 @@ def export_csv(
         export_quality_meta = _to_export_quality_meta(base_query_quality, observed_rows=0)
         return _empty_csv(), {"meta": meta, "quality_meta": export_quality_meta}
 
-    # Truncate if over export limit
     observed_rows = len(df)
-    export_truncated = False
-    if len(df) > _EXPORT_MAX_ROWS:
-        df = df.iloc[:_EXPORT_MAX_ROWS]
-        meta["truncated"] = True
-        meta["export_max_rows"] = _EXPORT_MAX_ROWS
-        export_truncated = True
-
     export_quality_meta = _to_export_quality_meta(
         base_query_quality,
         observed_rows=observed_rows,
-        max_rows=_EXPORT_MAX_ROWS if export_truncated else None,
-        reasons=["export_max_rows_exceeded"] if export_truncated else [],
     )
 
     return _iter_csv_bytes(df), {"meta": meta, "quality_meta": export_quality_meta}
@@ -703,3 +652,192 @@ def export_csv(
 def _empty_csv() -> Generator[bytes, None, None]:
     """Return an empty CSV stream with headers only."""
     return _iter_csv_bytes(pd.DataFrame())
+
+
+# ---------------------------------------------------------------------------
+# Canonical query hash (task 2.5)
+# ---------------------------------------------------------------------------
+# material-trace on-demand spool identity: hash of the primary query params.
+# When spool-backed execution is complete (task 8.1-8.4) the route will use
+# this id to check for an existing spool before enqueuing an RQ job.
+_MATERIAL_TRACE_QUERY_SCHEMA_VERSION = 1
+
+
+def make_canonical_query_hash(
+    direction: str,
+    root_lot_ids: Optional[List[str]] = None,
+    root_cids: Optional[List[str]] = None,
+    depth: Optional[int] = None,
+    **extra_params,
+) -> str:
+    """Return the canonical spool query id for a material trace query."""
+    key: Dict[str, Any] = {
+        "_v": _MATERIAL_TRACE_QUERY_SCHEMA_VERSION,
+        "direction": direction,
+        "root_lot_ids": sorted(root_lot_ids or []),
+        "root_cids": sorted(root_cids or []),
+    }
+    if depth is not None:
+        key["depth"] = depth
+    if extra_params:
+        key["extra"] = {k: v for k, v in sorted(extra_params.items())}
+    return f"mtrace-{compute_query_hash(key)}"
+
+
+# ---------------------------------------------------------------------------
+# Spool-backed execution (task 8.1)
+# ---------------------------------------------------------------------------
+
+_SPOOL_NAMESPACE = "material_trace"
+_SPOOL_SCHEMA_VERSION = 1
+
+
+def make_route_query_hash(
+    mode: str,
+    values: List[str],
+    workcenter_groups: Optional[List[str]] = None,
+) -> str:
+    """Compute the canonical spool query hash for a material trace route request.
+
+    This is the spool key used by the route (mode/values/workcenter_groups).
+    Distinct from make_canonical_query_hash which serves the lineage pipeline.
+    """
+    key = {
+        "_v": _SPOOL_SCHEMA_VERSION,
+        "mode": mode,
+        "values": sorted(values or []),
+        "workcenter_groups": sorted(workcenter_groups or []),
+    }
+    return f"mtrace-{compute_query_hash(key)}"
+
+
+def execute_to_spool(
+    mode: str,
+    values: List[str],
+    workcenter_groups: Optional[List[str]] = None,
+) -> tuple:
+    """Execute Oracle query and write result to Parquet spool.
+
+    This is the RQ-safe execution path — runs Oracle query and writes the
+    enriched DataFrame to spool. Returns (query_hash, total_rows).
+
+    Idempotent: if the spool already exists, returns immediately.
+    """
+    import tempfile
+    from pathlib import Path as _Path
+
+    from mes_dashboard.core.query_spool_store import (
+        QUERY_SPOOL_DIR,
+        get_spool_file_path,
+        register_spool_file,
+    )
+
+    query_hash = make_route_query_hash(mode, values, workcenter_groups)
+
+    # Idempotency: return immediately if spool already exists
+    existing = get_spool_file_path(_SPOOL_NAMESPACE, query_hash)
+    if existing and _Path(existing).exists():
+        logger.info(
+            "execute_to_spool: spool hit (query_hash=%s mode=%s)", query_hash, mode
+        )
+        # Return row count from existing spool
+        try:
+            import duckdb
+            conn = duckdb.connect(":memory:")
+            path_lit = "'" + existing.replace("'", "''") + "'"
+            row = conn.execute(f"SELECT COUNT(*) FROM read_parquet({path_lit})").fetchone()
+            conn.close()
+            return query_hash, int(row[0]) if row else 0
+        except Exception:
+            return query_hash, 0
+
+    wc_names = _resolve_workcenter_names(workcenter_groups)
+    meta: Dict[str, Any] = {}
+
+    if mode == "lot":
+        container_ids, _name_map, unresolved = _resolve_container_ids(values)
+        if unresolved:
+            meta["unresolved"] = unresolved
+        if not container_ids:
+            # Nothing to spool; return empty indicator
+            return query_hash, 0
+        df = _execute_batched_query(
+            "material_trace/forward_by_lot", "m.CONTAINERID", container_ids, wc_names,
+            allow_patterns=False
+        )
+    elif mode == "workorder":
+        df = _execute_batched_query(
+            "material_trace/forward_by_workorder", "m.PJ_WORKORDER", values, wc_names
+        )
+    else:  # material_lot (reverse)
+        df = _execute_batched_query(
+            "material_trace/reverse_by_material_lot", "m.MATERIALLOTNAME", values, wc_names
+        )
+
+    maybe_gc_collect()
+
+    if df.empty:
+        return query_hash, 0
+
+    df = _enrich_workcenter_group(df)
+
+    # Write to temporary parquet then register spool
+    spool_dir = QUERY_SPOOL_DIR / _SPOOL_NAMESPACE
+    spool_dir.mkdir(parents=True, exist_ok=True)
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".parquet", dir=spool_dir)
+    os.close(tmp_fd)
+    try:
+        df.to_parquet(tmp_path, engine="pyarrow", index=False)
+        row_count = len(df)
+        registered = register_spool_file(
+            _SPOOL_NAMESPACE,
+            query_hash,
+            tmp_path,
+            row_count,
+        )
+        if not registered:
+            logger.warning(
+                "execute_to_spool: register_spool_file failed (query_hash=%s)", query_hash
+            )
+    except Exception as exc:
+        logger.error("execute_to_spool: parquet write failed: %s", exc)
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+    logger.info(
+        "execute_to_spool: wrote spool (query_hash=%s mode=%s rows=%d)",
+        query_hash, mode, row_count,
+    )
+    return query_hash, row_count
+
+
+def rq_material_trace_job(job_id: str, mode: str, values: List[str], workcenter_groups: Optional[List[str]]) -> None:
+    """RQ worker function: execute material trace query and write to spool.
+
+    Called by the RQ worker when the route enqueues an async job.
+    Updates job progress via async_query_job_service.
+    """
+    _PREFIX = "material_trace"
+    try:
+        from mes_dashboard.services.async_query_job_service import (
+            update_job_progress,
+            complete_job,
+        )
+        update_job_progress(_PREFIX, job_id, "running", pct=10, message="查詢中...")
+        query_hash, total_rows = execute_to_spool(mode, values, workcenter_groups)
+        update_job_progress(_PREFIX, job_id, "running", pct=90, message=f"寫入 spool ({total_rows} 筆)")
+        complete_job(_PREFIX, job_id, query_id=query_hash)
+        logger.info(
+            "rq_material_trace_job: complete (job_id=%s query_hash=%s rows=%d)",
+            job_id, query_hash, total_rows,
+        )
+    except Exception as exc:
+        logger.error("rq_material_trace_job failed (job_id=%s): %s", job_id, exc)
+        try:
+            from mes_dashboard.services.async_query_job_service import complete_job
+            complete_job("material_trace", job_id, error=str(exc))
+        except Exception:
+            pass

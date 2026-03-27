@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from 'vue';
 
-import { apiPost, ensureMesApiAvailable } from '../../core/api.js';
+import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api.js';
+import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling.js';
 import { normalizeText, uniqueValues } from '../utils/values.js';
 
 const MAX_CONCURRENCY = 3;
@@ -207,7 +208,16 @@ export function useLotLineage(initial = {}) {
           },
           { timeout: 360000, silent: true },
         );
-        return envelope?.data || {};
+        const payload = envelope?.data || {};
+        if (payload?.async === true && payload?.status_url) {
+          await pollJobUntilComplete(payload.status_url);
+          const resultEnvelope = await apiGet(`${payload.status_url}/result`, {
+            timeout: 360000,
+            silent: true,
+          });
+          return resultEnvelope?.data || {};
+        }
+        return payload;
       } catch (error) {
         const status = Number(error?.status || 0);
         if (status !== 429 || attempt >= MAX_429_RETRY) {

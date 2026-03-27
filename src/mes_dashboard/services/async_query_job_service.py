@@ -154,7 +154,10 @@ def enqueue_job(
         "completed_at": "",
         "progress": "",
         "pct": "",
+        "stage": "",
+        "completed_stages": "",
         "query_id": "",
+        "dataset_id": "",
         "error": "",
     }
     key = _meta_key(prefix, job_id)
@@ -221,10 +224,25 @@ def get_job_status(prefix: str, job_id: str) -> Optional[Dict[str, Any]]:
         except (TypeError, ValueError):
             pass
 
-    # Include query_id if present (completed jobs)
+    # Stage-aware progress fields (task 4.1)
+    stage = meta.get("stage")
+    if stage:
+        result["stage"] = stage
+
+    completed_stages_raw = meta.get("completed_stages")
+    if completed_stages_raw:
+        stages = [s.strip() for s in completed_stages_raw.split(",") if s.strip()]
+        if stages:
+            result["completed_stages"] = stages
+
+    # Include query_id / dataset_id if present (completed jobs)
     query_id = meta.get("query_id")
     if query_id:
         result["query_id"] = query_id
+
+    dataset_id = meta.get("dataset_id")
+    if dataset_id:
+        result["dataset_id"] = dataset_id
 
     completed_at_raw = meta.get("completed_at")
     if completed_at_raw:
@@ -252,9 +270,15 @@ def complete_job(
     prefix: str,
     job_id: str,
     query_id: Optional[str] = None,
+    dataset_id: Optional[str] = None,
     error: Optional[str] = None,
 ) -> None:
-    """Mark a job as completed or failed."""
+    """Mark a job as completed or failed.
+
+    ``query_id`` is the canonical spool key for the completed result.
+    ``dataset_id`` is an optional alternative identifier (e.g. for multi-stage
+    pipelines where query_id and dataset_id differ).
+    """
     global _FAILED_JOB_COUNT
     conn = get_redis_client()
     if conn is None:
@@ -281,6 +305,8 @@ def complete_job(
             "query_id": str(query_id or ""),
             "completed_at": str(time.time()),
         }
+        if dataset_id:
+            fields["dataset_id"] = str(dataset_id)
 
     try:
         conn.hset(key, mapping=fields)

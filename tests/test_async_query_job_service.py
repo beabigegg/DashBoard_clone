@@ -525,3 +525,122 @@ class TestCompleteJob:
             call.args and call.args[0] == "Job failed: prefix=%s job_id=%s error=%s"
             for call in mock_logger.warning.call_args_list
         )
+
+
+# ---------------------------------------------------------------------------
+# Task 4.3 — multi-stage progress and compatibility fields
+# ---------------------------------------------------------------------------
+
+class TestMultiStageProgress:
+    """Verify stage-aware progress fields in enqueue_job / get_job_status."""
+
+    def test_enqueue_job_includes_stage_fields_in_initial_meta(self):
+        """Initial job metadata must include stage and completed_stages keys."""
+        mock_conn = MagicMock()
+        mock_conn.ping.return_value = True
+        mock_queue = MagicMock()
+
+        with patch.object(svc, "get_redis_client", return_value=mock_conn), \
+             patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch("mes_dashboard.services.async_query_job_service.Queue", return_value=mock_queue):
+            svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None, prefix="test")
+
+        hset_call = mock_conn.hset.call_args
+        mapping = hset_call.kwargs.get("mapping") or hset_call[1].get("mapping")
+        assert "stage" in mapping
+        assert "completed_stages" in mapping
+        assert "dataset_id" in mapping
+
+    def test_update_job_progress_with_stage_stores_correctly(self):
+        """update_job_progress with stage should store it in Redis HSET."""
+        mock_conn = MagicMock()
+        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+            svc.update_job_progress(
+                "test",
+                "job-stage-001",
+                status="running",
+                stage="lineage",
+                pct="60",
+                completed_stages="seed_detection",
+            )
+
+        hset_call = mock_conn.hset.call_args
+        mapping = hset_call.kwargs.get("mapping") or hset_call[1].get("mapping")
+        assert mapping["stage"] == "lineage"
+        assert mapping["completed_stages"] == "seed_detection"
+        assert mapping["pct"] == "60"
+
+    def test_get_job_status_returns_stage_and_completed_stages(self):
+        """get_job_status must return stage and completed_stages when present."""
+        mock_conn = MagicMock()
+        mock_conn.hgetall.return_value = {
+            "status": "running",
+            "stage": "events",
+            "completed_stages": "seed_detection,lineage",
+            "progress": "aggregating events",
+            "pct": "75",
+            "created_at": str(time.time() - 30),
+            "completed_at": "",
+            "query_id": "",
+            "error": "",
+        }
+        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+            result = svc.get_job_status("test", "job-stage-001")
+
+        assert result is not None
+        assert result["stage"] == "events"
+        assert result["completed_stages"] == ["seed_detection", "lineage"]
+        assert result["pct"] == 75
+
+    def test_get_job_status_returns_dataset_id_when_present(self):
+        """get_job_status must return dataset_id for completed jobs."""
+        mock_conn = MagicMock()
+        mock_conn.hgetall.return_value = {
+            "status": "completed",
+            "stage": "",
+            "completed_stages": "",
+            "progress": "",
+            "pct": "",
+            "created_at": str(time.time() - 5),
+            "completed_at": str(time.time()),
+            "query_id": "msd-abc12345",
+            "dataset_id": "ds-abc12345",
+            "error": "",
+        }
+        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+            result = svc.get_job_status("test", "job-complete-001")
+
+        assert result is not None
+        assert result["query_id"] == "msd-abc12345"
+        assert result["dataset_id"] == "ds-abc12345"
+
+    def test_complete_job_stores_dataset_id(self):
+        """complete_job should persist dataset_id when provided."""
+        mock_conn = MagicMock()
+        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+            svc.complete_job("test", "job-ds-001", query_id="msd-abc", dataset_id="ds-abc")
+
+        hset_call = mock_conn.hset.call_args
+        mapping = hset_call.kwargs.get("mapping") or hset_call[1].get("mapping")
+        assert mapping["dataset_id"] == "ds-abc"
+        assert mapping["query_id"] == "msd-abc"
+        assert mapping["status"] == "completed"
+
+    def test_completed_stages_empty_not_in_result(self):
+        """get_job_status should omit completed_stages when field is empty."""
+        mock_conn = MagicMock()
+        mock_conn.hgetall.return_value = {
+            "status": "queued",
+            "stage": "",
+            "completed_stages": "",
+            "created_at": str(time.time()),
+            "completed_at": "",
+            "query_id": "",
+            "error": "",
+        }
+        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+            result = svc.get_job_status("test", "job-queued-001")
+
+        assert result is not None
+        assert "stage" not in result
+        assert "completed_stages" not in result

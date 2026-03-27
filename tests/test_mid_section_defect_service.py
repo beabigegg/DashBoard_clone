@@ -125,17 +125,11 @@ def test_query_all_loss_reasons_cache_miss_queries_and_caches_sorted_values(
 
 @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
 @patch('mes_dashboard.services.mid_section_defect_service.cache_get', return_value=None)
-@patch('mes_dashboard.services.mid_section_defect_service.release_lock')
-@patch('mes_dashboard.services.mid_section_defect_service.try_acquire_lock', return_value=True)
-@patch('mes_dashboard.services.mid_section_defect_service._fetch_upstream_history')
-@patch('mes_dashboard.services.mid_section_defect_service._resolve_full_genealogy')
+@patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool')
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
-def test_trace_aggregation_matches_query_analysis_summary(
+def test_query_analysis_prefers_spool_runtime(
     mock_fetch_detection_data,
-    mock_resolve_genealogy,
-    mock_fetch_upstream_history,
-    _mock_lock,
-    _mock_release_lock,
+    mock_load_from_spool,
     _mock_cache_get,
     _mock_cache_set,
 ):
@@ -206,10 +200,6 @@ def test_trace_aggregation_matches_query_analysis_summary(
     }
 
     mock_fetch_detection_data.return_value = detection_df
-    mock_resolve_genealogy.return_value = ancestors
-    mock_fetch_upstream_history.return_value = upstream_normalized
-
-    summary = query_analysis('2025-01-01', '2025-01-31')
     staged_summary = build_trace_aggregation_from_events(
         '2025-01-01',
         '2025-01-31',
@@ -220,20 +210,59 @@ def test_trace_aggregation_matches_query_analysis_summary(
         },
         upstream_events_by_cid=upstream_events,
     )
+    mock_load_from_spool.return_value = {
+        'kpi': staged_summary['kpi'],
+        'charts': staged_summary['charts'],
+        'daily_trend': staged_summary['daily_trend'],
+        'available_loss_reasons': staged_summary['available_loss_reasons'],
+        'genealogy_status': staged_summary['genealogy_status'],
+        'detail': [{'CONTAINERNAME': 'LOT-001'}] * staged_summary['detail_total_count'],
+        'attribution': staged_summary['attribution'],
+        'trace_query_id': 'msd-runtime-001',
+    }
 
-    assert staged_summary['available_loss_reasons'] == summary['available_loss_reasons']
-    assert staged_summary['genealogy_status'] == summary['genealogy_status']
-    assert staged_summary['detail_total_count'] == len(summary['detail'])
+    summary = query_analysis('2025-01-01', '2025-01-31')
 
-    assert staged_summary['kpi']['total_input'] == summary['kpi']['total_input']
-    assert staged_summary['kpi']['lot_count'] == summary['kpi']['lot_count']
-    assert staged_summary['kpi']['total_defect_qty'] == summary['kpi']['total_defect_qty']
-    assert abs(
-        staged_summary['kpi']['total_defect_rate'] - summary['kpi']['total_defect_rate']
-    ) <= 0.01
+    assert summary['available_loss_reasons'] == staged_summary['available_loss_reasons']
+    assert summary['genealogy_status'] == staged_summary['genealogy_status']
+    assert len(summary['detail']) == staged_summary['detail_total_count']
+    assert summary['kpi'] == staged_summary['kpi']
+    assert summary['daily_trend'] == staged_summary['daily_trend']
+    assert summary['charts'].keys() == staged_summary['charts'].keys()
+    assert summary['trace_query_id'] == 'msd-runtime-001'
 
-    assert staged_summary['daily_trend'] == summary['daily_trend']
-    assert staged_summary['charts'].keys() == summary['charts'].keys()
+
+@patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value='msd-compat-job')
+@patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_query_analysis_returns_pending_on_spool_miss(
+    mock_fetch_detection_data,
+    _mock_load,
+    mock_ensure_job,
+):
+    mock_fetch_detection_data.return_value = pd.DataFrame([
+        {
+            'CONTAINERID': 'CID-001',
+            'CONTAINERNAME': 'LOT-001',
+            'TRACKINQTY': 100,
+            'REJECTQTY': 5,
+            'LOSSREASONNAME': 'R1',
+            'WORKFLOW': 'WF-A',
+            'PRODUCTLINENAME': 'PKG-A',
+            'PJ_TYPE': 'TYPE-A',
+            'DETECTION_EQUIPMENTNAME': 'EQ-01',
+            'TRACKINTIMESTAMP': '2025-01-10 10:00:00',
+            'FINISHEDRUNCARD': 'FR-001',
+        },
+    ])
+
+    result = query_analysis('2025-01-01', '2025-01-31')
+
+    assert result['genealogy_status'] == 'pending'
+    assert result['detail'] == []
+    assert result['available_loss_reasons'] == ['R1']
+    assert result['trace_query_id'].startswith('msd-')
+    mock_ensure_job.assert_called_once()
 
 
 def test_query_station_options_returns_ordered_list():

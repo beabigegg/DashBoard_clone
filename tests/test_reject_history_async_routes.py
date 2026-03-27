@@ -2,8 +2,8 @@
 """Route integration tests for the reject-history async query feature.
 
 Covers:
-- POST /api/reject-history/query  — sync (200) and async (202) paths,
-  cache-hit bypass, concurrency 503, enqueue failure, container mode
+- POST /api/reject-history/query  — cache-hit sync (200) and spool-miss async (202) paths,
+  enqueue failure, container mode
 - GET  /api/reject-history/job/<job_id> — found (200), not-found (404),
   completed status (200 with status/query_id fields)
 
@@ -84,10 +84,6 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
     # ------------------------------------------------------------------
     # Patch targets
     # ------------------------------------------------------------------
-    _SHOULD_USE_ASYNC = (
-        "mes_dashboard.routes.reject_history_routes."
-        "mes_dashboard.services.reject_query_job_service.should_use_async"
-    )
     _ENQUEUE = (
         "mes_dashboard.routes.reject_history_routes."
         "mes_dashboard.services.reject_query_job_service.enqueue_reject_query"
@@ -102,54 +98,36 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
     )
 
     # ------------------------------------------------------------------
-    # 1. Short query — sync 200
+    # 1. Short query — async 202 on spool miss
     # ------------------------------------------------------------------
 
-    @patch(
-        "mes_dashboard.services.reject_query_job_service.should_use_async",
-        return_value=False,
-    )
-    @patch("mes_dashboard.routes.reject_history_routes.execute_primary_query")
     @patch("mes_dashboard.routes.reject_history_routes._get_cached_df", return_value=None)
-    @patch(
-        "mes_dashboard.routes.reject_history_routes.get_slow_query_active_count",
-        return_value=0,
-    )
-    def test_short_query_returns_sync_200(
-        self, _mock_count, _mock_cache, mock_execute, _mock_async
-    ):
-        """5-day date_range with should_use_async=False → 200 with standard envelope."""
-        mock_execute.return_value = _SYNC_RESULT
-
-        response = self.client.post(
-            "/api/reject-history/query", json=_VALID_QUERY_BODY_SHORT
-        )
+    def test_short_query_returns_async_202_on_spool_miss(self, _mock_cache):
+        """5-day date_range spool miss should enqueue async work."""
+        fake_job_id = "reject-short-0001"
+        with patch(
+            "mes_dashboard.services.reject_query_job_service.enqueue_reject_query",
+            return_value=(fake_job_id, None),
+        ):
+            response = self.client.post(
+                "/api/reject-history/query", json=_VALID_QUERY_BODY_SHORT
+            )
         payload = _parse(response)
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
         self.assertTrue(payload["success"])
-        self.assertIn("data", payload)
-        self.assertIn("meta", payload)
-        self.assertIn("timestamp", payload["meta"])
-        mock_execute.assert_called_once()
+        self.assertEqual(payload["data"]["job_id"], fake_job_id)
+        self.assertIn("query_id", payload["data"])
 
     # ------------------------------------------------------------------
     # 2. Long query — async 202
     # ------------------------------------------------------------------
 
-    @patch(
-        "mes_dashboard.services.reject_query_job_service.should_use_async",
-        return_value=True,
-    )
     @patch("mes_dashboard.routes.reject_history_routes._get_cached_df", return_value=None)
-    @patch(
-        "mes_dashboard.routes.reject_history_routes.get_slow_query_active_count",
-        return_value=0,
-    )
     def test_long_query_returns_async_202(
-        self, _mock_count, _mock_cache, _mock_async
+        self, _mock_cache
     ):
-        """31-day date_range with should_use_async=True and enqueue success → 202."""
+        """31-day date_range spool miss should enqueue async work."""
         fake_job_id = "reject-deadbeef-0001"
         with patch(
             "mes_dashboard.services.reject_query_job_service.enqueue_reject_query",
@@ -175,17 +153,14 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
         self.assertIn("query_id", data)
 
     # ------------------------------------------------------------------
-    # 3. Cache hit bypasses concurrency check
+    # 3. Cache hit bypasses enqueue path
     # ------------------------------------------------------------------
 
     @patch("mes_dashboard.routes.reject_history_routes.execute_primary_query")
-    @patch(
-        "mes_dashboard.routes.reject_history_routes.get_slow_query_active_count",
-    )
-    def test_cache_hit_bypasses_concurrency_check(
-        self, mock_count, mock_execute
+    def test_cache_hit_serves_sync_result(
+        self, mock_execute
     ):
-        """When _get_cached_df returns a DataFrame, concurrency check is never called."""
+        """When _get_cached_df returns a DataFrame, route should reuse sync result."""
         import pandas as pd
 
         cached_df = pd.DataFrame({"col": [1, 2, 3]})
@@ -195,30 +170,32 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
             "mes_dashboard.routes.reject_history_routes._get_cached_df",
             return_value=cached_df,
         ):
-            # Use short range so date validation passes easily
             response = self.client.post(
                 "/api/reject-history/query", json=_VALID_QUERY_BODY_SHORT
             )
 
-        # Concurrency check should NOT have been called
-        mock_count.assert_not_called()
-        # Response should still succeed (sync path executed)
-        self.assertIn(response.status_code, (200, 202))
+        payload = _parse(response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload["success"])
+        mock_execute.assert_called_once()
 
     # ------------------------------------------------------------------
-    # 4. Concurrency threshold → 503
+    # 4. Async enqueue failure → 503
     # ------------------------------------------------------------------
 
     @patch("mes_dashboard.routes.reject_history_routes._get_cached_df", return_value=None)
-    @patch(
-        "mes_dashboard.routes.reject_history_routes.get_slow_query_active_count",
-        return_value=4,  # equals HEAVY_QUERY_REJECT_THRESHOLD default of 4
-    )
-    def test_concurrency_503(self, _mock_count, _mock_cache):
-        """When active slow-query count >= threshold → 503 SERVICE_UNAVAILABLE."""
-        response = self.client.post(
-            "/api/reject-history/query", json=_VALID_QUERY_BODY_SHORT
-        )
+    def test_async_enqueue_failure_returns_503(
+        self, _mock_cache
+    ):
+        """enqueue failure should fail closed with 503 instead of falling back to sync."""
+        with patch(
+            "mes_dashboard.services.reject_query_job_service.enqueue_reject_query",
+            return_value=(None, "Redis unavailable"),
+        ):
+            response = self.client.post(
+                "/api/reject-history/query", json=_VALID_QUERY_BODY_LONG
+            )
         payload = _parse(response)
 
         self.assertEqual(response.status_code, 503)
@@ -229,55 +206,17 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
         self.assertIn("Retry-After", response.headers)
 
     # ------------------------------------------------------------------
-    # 5. Async enqueue failure → 503
+    # 5. Container mode — async 202 on spool miss
     # ------------------------------------------------------------------
 
-    @patch(
-        "mes_dashboard.services.reject_query_job_service.should_use_async",
-        return_value=True,
-    )
     @patch("mes_dashboard.routes.reject_history_routes._get_cached_df", return_value=None)
-    @patch(
-        "mes_dashboard.routes.reject_history_routes.get_slow_query_active_count",
-        return_value=0,
-    )
-    @patch("mes_dashboard.routes.reject_history_routes.execute_primary_query")
-    def test_async_enqueue_failure_returns_503(
-        self, mock_execute, _mock_count, _mock_cache, _mock_async
-    ):
-        """should_use_async=True but enqueue returns (None, error) → falls back to sync.
-
-        The route logs a warning and falls through to the synchronous path.
-        We verify this by checking execute_primary_query is called as fallback.
-        """
-        mock_execute.return_value = _SYNC_RESULT
-
+    def test_container_mode_returns_async_202(self, _mock_cache):
+        """container mode now also routes through the background spool pipeline."""
+        fake_job_id = "reject-container-0001"
         with patch(
             "mes_dashboard.services.reject_query_job_service.enqueue_reject_query",
-            return_value=(None, "Redis unavailable"),
+            return_value=(fake_job_id, None),
         ):
-            response = self.client.post(
-                "/api/reject-history/query", json=_VALID_QUERY_BODY_LONG
-            )
-
-        # Route falls back to synchronous execution rather than returning 503
-        payload = _parse(response)
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(payload["success"])
-        mock_execute.assert_called_once()
-
-    # ------------------------------------------------------------------
-    # 6. Container mode — always sync regardless of date range
-    # ------------------------------------------------------------------
-
-    @patch("mes_dashboard.routes.reject_history_routes.execute_primary_query")
-    def test_container_mode_always_sync(self, mock_execute):
-        """container mode never calls should_use_async — always goes sync."""
-        mock_execute.return_value = _SYNC_RESULT
-
-        with patch(
-            "mes_dashboard.services.reject_query_job_service.should_use_async",
-        ) as mock_async_check:
             response = self.client.post(
                 "/api/reject-history/query",
                 json={
@@ -289,14 +228,11 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
                     "exclude_pb_diode": True,
                 },
             )
-
         payload = _parse(response)
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
         self.assertTrue(payload["success"])
-        # should_use_async must NOT be called for container mode
-        mock_async_check.assert_not_called()
-        mock_execute.assert_called_once()
+        self.assertEqual(payload["data"]["job_id"], fake_job_id)
 
 
 # ---------------------------------------------------------------------------

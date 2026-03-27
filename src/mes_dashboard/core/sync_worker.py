@@ -235,8 +235,8 @@ class SyncWorker:
         try:
             result = conn.execute(
                 text(
-                    "SELECT value FROM dashboard_migration_meta "
-                    f"WHERE key = '{self._MIGRATION_VERSION_KEY}' LIMIT 1"
+                    "SELECT `value` FROM dashboard_migration_meta "
+                    f"WHERE `key` = '{self._MIGRATION_VERSION_KEY}' LIMIT 1"
                 )
             ).fetchone()
             current_version = int(result[0]) if result else 0
@@ -245,8 +245,8 @@ class SyncWorker:
             try:
                 conn.execute(text(
                     "CREATE TABLE IF NOT EXISTS dashboard_migration_meta ("
-                    "  key VARCHAR(100) PRIMARY KEY,"
-                    "  value VARCHAR(255)"
+                    "  `key` VARCHAR(100) PRIMARY KEY,"
+                    "  `value` VARCHAR(255)"
                     ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
                 ))
             except Exception:
@@ -259,7 +259,7 @@ class SyncWorker:
         try:
             conn.execute(text("TRUNCATE TABLE dashboard_login_sessions"))
             conn.execute(text(
-                "REPLACE INTO dashboard_migration_meta (key, value) VALUES "
+                "REPLACE INTO dashboard_migration_meta (`key`, `value`) VALUES "
                 f"('{self._MIGRATION_VERSION_KEY}', '{self._MIGRATION_VERSION_TARGET}')"
             ))
             logger.info("SyncWorker: migration v%d applied (truncated dashboard_login_sessions)",

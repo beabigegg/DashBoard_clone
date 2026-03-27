@@ -15,16 +15,11 @@ import logging
 import os
 import uuid
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 try:
     from rq import Retry
 except Exception:  # pragma: no cover - optional dependency path
     Retry = None  # type: ignore[assignment]
-
-from mes_dashboard.core.global_concurrency import (
-    acquire_heavy_query_slot,
-    release_heavy_query_slot,
-)
 from mes_dashboard.services.async_query_job_service import (
     complete_job,
     enqueue_job,
@@ -134,13 +129,10 @@ def execute_reject_query_job(
 
     from mes_dashboard.services.reject_dataset_cache import (
         _CACHE_SCHEMA_VERSION,
-        _execute_and_spool,
         _get_cached_df,
         _make_query_id,
-        _build_primary_response,
-        RejectPrimaryQueryOverloadError,
+        execute_primary_query,
     )
-    from mes_dashboard.sql import QueryBuilder
 
     logger.info("reject query job started job_id=%s mode=%s", job_id, mode)
     update_job_progress(_JOB_PREFIX, job_id, status="started", progress="initializing")
@@ -148,6 +140,8 @@ def execute_reject_query_job(
     try:
         start_date = params.get("start_date")
         end_date = params.get("end_date")
+        container_input_type = params.get("container_input_type")
+        container_values = params.get("container_values") or []
 
         # Compute deterministic query_id (same formula as execute_primary_query)
         query_id_input = {
@@ -155,8 +149,8 @@ def execute_reject_query_job(
             "mode": mode,
             "start_date": start_date,
             "end_date": end_date,
-            "container_input_type": None,
-            "container_values": [],
+            "container_input_type": container_input_type,
+            "container_values": sorted(container_values),
         }
         query_id = _make_query_id(query_id_input)
 
@@ -167,57 +161,18 @@ def execute_reject_query_job(
             complete_job(_JOB_PREFIX, job_id, query_id=query_id)
             return
 
-        # Build WHERE clause for date_range mode
-        if mode != "date_range":
-            raise ValueError(f"execute_reject_query_job: unsupported mode={mode!r}")
-
-        if not start_date or not end_date:
-            raise ValueError("date_range mode requires start_date and end_date")
-
-        base_where = (
-            "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
-            " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
-        )
-        base_params: Dict[str, Any] = {"start_date": start_date, "end_date": end_date}
-
-        # Progress callback — updates Redis HSET after each chunk
-        def _progress(status: str, progress_str: str, pct: int) -> None:
-            update_job_progress(
-                _JOB_PREFIX,
-                job_id,
-                status=status,
-                progress=progress_str,
-                pct=str(pct),
-            )
-
         update_job_progress(_JOB_PREFIX, job_id, status="running", progress="querying Oracle")
 
-        # Acquire global concurrency slot (fail-open: proceeds if Redis unavailable)
-        slot_owner = f"rq:{job_id}"
-        acquired = acquire_heavy_query_slot(slot_owner)
-        try:
-            partial_failure_meta = _execute_and_spool(
-                query_id=query_id,
-                mode=mode,
-                base_where=base_where,
-                base_params=base_params,
-                container_ids=None,
-                progress_callback=_progress,
-            )
-        finally:
-            if acquired:
-                release_heavy_query_slot(slot_owner)
-
-        if partial_failure_meta.get("has_partial_failure"):
-            logger.warning(
-                "reject query job completed with partial failure job_id=%s query_id=%s",
-                job_id, query_id,
-            )
-        else:
-            logger.info(
-                "reject query job completed job_id=%s query_id=%s",
-                job_id, query_id,
-            )
+        execute_primary_query(
+            mode=mode,
+            start_date=start_date,
+            end_date=end_date,
+            container_input_type=container_input_type,
+            container_values=container_values,
+            include_excluded_scrap=bool(params.get("include_excluded_scrap", False)),
+            exclude_material_scrap=bool(params.get("exclude_material_scrap", True)),
+            exclude_pb_diode=bool(params.get("exclude_pb_diode", True)),
+        )
 
         complete_job(_JOB_PREFIX, job_id, query_id=query_id)
 

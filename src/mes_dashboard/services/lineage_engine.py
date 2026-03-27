@@ -9,16 +9,12 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
-from mes_dashboard.core.interactive_memory_guard import process_rss_mb
 from mes_dashboard.sql import QueryBuilder, SQLLoader
 
 logger = logging.getLogger("mes_dashboard.lineage_engine")
 
 ORACLE_IN_BATCH_SIZE = 1000
 MAX_SPLIT_DEPTH = 20
-
-LINEAGE_MAX_SEED_COUNT = int(os.getenv("LINEAGE_MAX_SEED_COUNT", "80000"))
-LINEAGE_RSS_REJECT_MB = float(os.getenv("LINEAGE_RSS_REJECT_MB", "900"))
 
 NODE_TYPE_WAFER = "WAFER"
 NODE_TYPE_GC = "GC"
@@ -542,15 +538,6 @@ class LineageEngine:
             }
         """
         seed_cids = _normalize_list(container_ids)
-        if len(seed_cids) > LINEAGE_MAX_SEED_COUNT:
-            raise ValueError(
-                f"resolve_forward_tree: seed count {len(seed_cids)} exceeds limit {LINEAGE_MAX_SEED_COUNT}"
-            )
-        rss = process_rss_mb()
-        if rss is not None and rss > LINEAGE_RSS_REJECT_MB:
-            raise MemoryError(
-                f"resolve_forward_tree: RSS {rss:.1f} MB exceeds limit {LINEAGE_RSS_REJECT_MB:.0f} MB"
-            )
         empty = {
             "roots": [],
             "children_map": {},
@@ -703,15 +690,6 @@ class LineageEngine:
             }
         """
         seed_cids = _normalize_list(container_ids)
-        if len(seed_cids) > LINEAGE_MAX_SEED_COUNT:
-            raise ValueError(
-                f"resolve_full_genealogy: seed count {len(seed_cids)} exceeds limit {LINEAGE_MAX_SEED_COUNT}"
-            )
-        rss = process_rss_mb()
-        if rss is not None and rss > LINEAGE_RSS_REJECT_MB:
-            raise MemoryError(
-                f"resolve_full_genealogy: RSS {rss:.1f} MB exceeds limit {LINEAGE_RSS_REJECT_MB:.0f} MB"
-            )
         if not seed_cids:
             return {
                 "ancestors": {},

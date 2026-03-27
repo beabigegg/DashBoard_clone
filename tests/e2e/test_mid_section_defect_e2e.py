@@ -10,8 +10,40 @@ Endpoints:
 Run with: pytest tests/e2e/test_mid_section_defect_e2e.py -v -s
 """
 
+import time
+
 import pytest
 import requests
+
+
+def _poll_msd_detail_until_ready(app_server, params, timeout=180):
+    """Poll MSD detail until the staged trace spool is ready."""
+    deadline = time.time() + timeout
+    last_response = None
+    while time.time() < deadline:
+        last_response = requests.get(
+            f"{app_server}/api/mid-section-defect/analysis/detail",
+            params=params,
+            timeout=120,
+        )
+        if last_response.status_code == 200:
+            return last_response
+        if last_response.status_code == 429:
+            retry_after = last_response.headers.get("Retry-After")
+            try:
+                wait_seconds = float(retry_after) if retry_after else 3.0
+            except ValueError:
+                wait_seconds = 3.0
+            time.sleep(max(wait_seconds, 1.0))
+            continue
+        if last_response.status_code == 503:
+            pytest.skip("Service busy")
+        assert last_response.status_code == 409, (
+            f"Expected 200/409 while polling MSD detail, got {last_response.status_code}: "
+            f"{last_response.text[:200]}"
+        )
+        time.sleep(4)
+    return last_response
 
 
 @pytest.mark.e2e
@@ -59,18 +91,38 @@ class TestMidSectionDefectE2E:
 
     def test_analysis_detail_returns_paginated_data(self, app_server):
         """GET /analysis/detail with valid dates returns paginated records."""
-        resp = requests.get(
-            f"{app_server}/api/mid-section-defect/analysis/detail",
+        summary_resp = requests.get(
+            f"{app_server}/api/mid-section-defect/analysis",
             params={
+                "start_date": "2026-03-01",
+                "end_date": "2026-03-07",
+            },
+            timeout=120,
+        )
+        if summary_resp.status_code == 503:
+            pytest.skip("Service busy")
+        assert summary_resp.status_code == 200
+        summary_payload = summary_resp.json()
+        assert summary_payload["success"] is True
+        trace_query_id = summary_payload.get("data", {}).get("trace_query_id")
+        assert trace_query_id, f"MSD summary missing trace_query_id: {summary_payload}"
+
+        resp = _poll_msd_detail_until_ready(
+            app_server,
+            {
                 "start_date": "2026-03-01",
                 "end_date": "2026-03-07",
                 "page": 1,
                 "page_size": 10,
+                "trace_query_id": trace_query_id,
             },
-            timeout=120,
         )
-        if resp.status_code == 503:
-            pytest.skip("Service busy")
+        assert resp is not None, "MSD detail polling timed out"
+        if resp.status_code == 409:
+            payload = resp.json()
+            assert payload["error"]["code"] == "QUERY_NOT_READY"
+            assert payload.get("meta", {}).get("trace_query_id") == trace_query_id
+            return
         assert resp.status_code == 200
         payload = resp.json()
         assert payload["success"] is True

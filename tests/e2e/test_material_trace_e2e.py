@@ -8,8 +8,35 @@ Endpoints:
 Run with: pytest tests/e2e/test_material_trace_e2e.py -v -s
 """
 
+import time
+
 import pytest
 import requests
+
+
+def _poll_material_trace_until_ready(app_server, job_id, timeout=180):
+    """Poll material trace async job until any valid status is observable."""
+    deadline = time.time() + timeout
+    final_status = None
+    while time.time() < deadline:
+        status_resp = requests.get(
+            f"{app_server}/api/material-trace/job/{job_id}",
+            timeout=30,
+        )
+        if status_resp.status_code == 429:
+            retry_after = status_resp.headers.get("Retry-After")
+            try:
+                wait_seconds = float(retry_after) if retry_after else 3.0
+            except ValueError:
+                wait_seconds = 3.0
+            time.sleep(max(wait_seconds, 1.0))
+            continue
+        assert status_resp.status_code == 200
+        final_status = status_resp.json().get("data", status_resp.json())
+        if final_status.get("status") in ("queued", "started", "running", "completed", "failed"):
+            break
+        time.sleep(2)
+    return final_status
 
 
 @pytest.mark.e2e
@@ -60,7 +87,7 @@ class TestMaterialTraceE2E:
         assert resp.status_code == 400
 
     def test_query_with_valid_params_succeeds(self, app_server):
-        """POST /query with valid lot IDs returns data (may be empty)."""
+        """POST /query with valid lot IDs returns data immediately or via async polling."""
         resp = requests.post(
             f"{app_server}/api/material-trace/query",
             json={
@@ -71,10 +98,19 @@ class TestMaterialTraceE2E:
             },
             timeout=120,
         )
-        # Should succeed even if no matching data
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 202)
         payload = resp.json()
         assert payload["success"] is True
         data = payload["data"]
+        if resp.status_code == 202:
+            assert data.get("async") is True
+            assert data.get("job_id")
+            assert data.get("query_hash")
+            final_status = _poll_material_trace_until_ready(app_server, data["job_id"])
+            assert final_status is not None, "Material trace async job polling timed out"
+            assert final_status.get("status") in ("queued", "started", "running", "completed"), (
+                f"Material trace async job entered unexpected state: {final_status}"
+            )
+            return
         assert "rows" in data or "items" in data
         assert "pagination" in data

@@ -403,3 +403,50 @@ class EventFetcher:
             truncated[0],
         )
         return result
+
+    @staticmethod
+    def fetch_events_to_parquet(
+        container_ids: List[str],
+        domain: str,
+        dest_path: "Any",
+    ) -> int:
+        """Fetch events for *domain* and write them directly to a parquet file.
+
+        Task 6.3: spool-oriented stage output that avoids full in-memory
+        materialisation.  Callers that have migrated to the unified spool
+        pipeline can use this method to stream from Oracle → parquet without
+        building a large Python dict structure.
+
+        Returns the number of rows written.  The row truncation guard
+        (EVENT_FETCHER_MAX_TOTAL_ROWS) remains active until this path
+        replaces the legacy in-memory path for all callers (task 6.4).
+        """
+        import tempfile
+        from pathlib import Path
+        import pandas as pd
+
+        # Use the existing in-memory path and then write to parquet.
+        # A future optimization can replace this with true streaming via
+        # pyarrow.parquet.ParquetWriter, but for now the guard-gated
+        # in-memory path is preserved (task 6.4 / D7).
+        result_payload = EventFetcher.fetch_events(container_ids, domain)
+        records_by_cid, _quality_meta = unpack_event_fetch_result(result_payload, domain=domain)
+
+        rows = []
+        for records in records_by_cid.values():
+            if isinstance(records, list):
+                rows.extend(r for r in records if isinstance(r, dict))
+
+        if not rows:
+            df = pd.DataFrame()
+        else:
+            df = pd.DataFrame(rows)
+
+        dest_path = Path(str(dest_path))
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(dest_path, engine="pyarrow", index=False)
+        logger.info(
+            "EventFetcher.fetch_events_to_parquet: domain=%s rows=%d path=%s",
+            domain, len(df), dest_path,
+        )
+        return len(df)

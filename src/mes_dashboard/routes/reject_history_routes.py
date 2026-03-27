@@ -22,16 +22,11 @@ from mes_dashboard.core.response import (
     VALIDATION_ERROR,
     SERVICE_UNAVAILABLE,
 )
-from mes_dashboard.core.heavy_query_telemetry import (
-    record_guard_reject,
-    record_memory_error,
-)
+from mes_dashboard.core.heavy_query_telemetry import record_memory_error
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.core.utils import parse_bool_query
-from mes_dashboard.core.database import get_slow_query_active_count
 from mes_dashboard.services.reject_dataset_cache import (
-    RejectPrimaryQueryOverloadError,
     apply_view,
     compute_batch_pareto,
     compute_dimension_pareto,
@@ -61,7 +56,6 @@ _REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS = int(
 _REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS = max(
     1, int(os.getenv("REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS", "190"))
 )
-HEAVY_QUERY_REJECT_THRESHOLD = max(1, int(os.getenv("HEAVY_QUERY_REJECT_THRESHOLD", "4")))
 _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS = max(
     1,
     int(os.getenv("REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS", "30")),
@@ -631,8 +625,8 @@ def api_reject_history_query():
     """Primary query: execute Oracle → cache DataFrame → return results.
 
     Supports two response codes:
-      200 - synchronous result (short query, container mode, or async unavailable)
-      202 - async job enqueued (long date_range query with RQ worker available)
+      200 - existing cached/spooled result served immediately
+      202 - spool miss enqueued to RQ for background execution
     """
     body, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
@@ -659,132 +653,86 @@ def api_reject_history_query():
         if date_range_error:
             return validation_error(date_range_error)
 
-    # ---- Phase 0: cache check → concurrency check → 503 fast rejection ----
-    if mode == "date_range" and start_date and end_date:
-        # Compute query_id to check cache before concurrency check
-        _query_id_input = {
-            "cache_schema_version": _CACHE_SCHEMA_VERSION,
-            "mode": mode,
-            "start_date": start_date,
-            "end_date": end_date,
-            "container_input_type": None,
-            "container_values": [],
-        }
-        _pre_query_id = _make_query_id(_query_id_input)
+    container_input_type: Optional[str] = None
+    container_values: list[str] = []
+    if mode == "container":
+        container_input_type = str(body.get("container_input_type", "lot")).strip()
+        raw_container_values = body.get("container_values", [])
+        if not isinstance(raw_container_values, list) or not raw_container_values:
+            return validation_error("container mode 需要 container_values 陣列")
+        container_values = [str(v).strip() for v in raw_container_values if str(v).strip()]
 
-        # D4: cache check before concurrency check (retries can reuse completed results)
-        _cached_df = _get_cached_df(_pre_query_id)
-        if _cached_df is None:
-            # Check system memory pressure flag
-            try:
-                from mes_dashboard.core.worker_memory_guard import get_memory_guard_telemetry
-                _guard_telemetry = get_memory_guard_telemetry()
-                if _guard_telemetry.get("system_memory_pressure"):
-                    retry_after = _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS
-                    record_guard_reject(
-                        "reject_history.query",
-                        reason="system_memory_pressure",
-                    )
-                    return error_response(
-                        SERVICE_UNAVAILABLE,
-                        "系統記憶體不足，請稍後再試",
-                        status_code=503,
-                        meta={"retry_after_seconds": retry_after},
-                        headers={"Retry-After": str(retry_after)},
-                    )
-            except Exception:
-                pass
+    _query_id_input = {
+        "cache_schema_version": _CACHE_SCHEMA_VERSION,
+        "mode": mode,
+        "start_date": start_date,
+        "end_date": end_date,
+        "container_input_type": container_input_type,
+        "container_values": sorted(container_values),
+    }
+    _pre_query_id = _make_query_id(_query_id_input)
 
-            # Concurrency check (fail-safe: proceed if check throws)
-            try:
-                _active = get_slow_query_active_count()
-                if _active >= HEAVY_QUERY_REJECT_THRESHOLD:
-                    retry_after = _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS
-                    record_guard_reject(
-                        "reject_history.query",
-                        reason="slow_query_active_threshold",
-                    )
-                    return error_response(
-                        SERVICE_UNAVAILABLE,
-                        "系統忙碌中，請稍後再試",
-                        status_code=503,
-                        meta={"retry_after_seconds": retry_after, "query_id": _pre_query_id},
-                        headers={"Retry-After": str(retry_after)},
-                    )
-            except Exception:
-                pass
+    if _get_cached_df(_pre_query_id) is not None:
+        try:
+            result = execute_primary_query(
+                mode=mode,
+                start_date=start_date,
+                end_date=end_date,
+                container_input_type=container_input_type,
+                container_values=container_values or None,
+                include_excluded_scrap=include_excluded_scrap,
+                exclude_material_scrap=exclude_material_scrap,
+                exclude_pb_diode=exclude_pb_diode,
+            )
+            return success_response(result)
+        except ValueError as exc:
+            return validation_error(str(exc))
+        except MemoryError as exc:
+            record_memory_error("reject_history.query", reason="rss_guard")
+            return _overload_error(str(exc))
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            return internal_error("主查詢執行失敗")
 
     try:
-        kwargs = {
-            "mode": mode,
+        from mes_dashboard.services.reject_query_job_service import enqueue_reject_query
+
+        job_params = {
             "include_excluded_scrap": include_excluded_scrap,
             "exclude_material_scrap": exclude_material_scrap,
             "exclude_pb_diode": exclude_pb_diode,
+            "start_date": start_date,
+            "end_date": end_date,
         }
 
-        if mode == "date_range":
-            kwargs["start_date"] = start_date
-            kwargs["end_date"] = end_date
+        if mode == "container":
+            job_params["container_input_type"] = container_input_type
+            job_params["container_values"] = container_values
 
-            # ---- Async path for long queries ----
-            from mes_dashboard.services.reject_query_job_service import (
-                should_use_async,
-                enqueue_reject_query,
+        job_id, err = enqueue_reject_query(mode, job_params)
+        if job_id is None:
+            logger.warning("reject async enqueue failed (%s)", err)
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "背景查詢服務不可用，請稍後再試",
+                status_code=503,
+                meta={"retry_after_seconds": _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS},
+                headers={"Retry-After": str(_REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS)},
             )
-            if should_use_async(mode, start_date, end_date):
-                job_params = {
-                    "start_date": start_date,
-                    "end_date": end_date,
-                    "include_excluded_scrap": include_excluded_scrap,
-                    "exclude_material_scrap": exclude_material_scrap,
-                    "exclude_pb_diode": exclude_pb_diode,
-                }
-                job_id, err = enqueue_reject_query(mode, job_params)
-                if job_id is not None:
-                    _async_query_id_input = {
-                        "cache_schema_version": _CACHE_SCHEMA_VERSION,
-                        "mode": mode,
-                        "start_date": start_date,
-                        "end_date": end_date,
-                        "container_input_type": None,
-                        "container_values": [],
-                    }
-                    _async_query_id = _make_query_id(_async_query_id_input)
-                    return success_response(
-                        {
-                            "async": True,
-                            "job_id": job_id,
-                            "status_url": f"/api/reject-history/job/{job_id}",
-                            "query_id": _async_query_id,
-                        },
-                        status_code=202,
-                    )
-                # Enqueue failed — fall through to synchronous path
-                logger.warning("reject async enqueue failed (%s), falling back to sync", err)
-        else:
-            container_input_type = str(body.get("container_input_type", "lot")).strip()
-            container_values = body.get("container_values", [])
-            if not isinstance(container_values, list) or not container_values:
-                return validation_error("container mode 需要 container_values 陣列")
-            kwargs["container_input_type"] = container_input_type
-            kwargs["container_values"] = [str(v).strip() for v in container_values if str(v).strip()]
 
-        result = execute_primary_query(**kwargs)
-        return success_response(result)
+        return success_response(
+            {
+                "async": True,
+                "job_id": job_id,
+                "status_url": f"/api/reject-history/job/{job_id}",
+                "query_id": _pre_query_id,
+            },
+            status_code=202,
+        )
 
     except ValueError as exc:
         return validation_error(str(exc))
-    except RejectPrimaryQueryOverloadError as exc:
-        record_guard_reject("reject_history.query", reason=exc.code)
-        return error_response(
-            exc.code,
-            str(exc),
-            status_code=503,
-            headers={"Retry-After": str(exc.retry_after)},
-        )
-    except MemoryError as exc:
-        record_memory_error("reject_history.query", reason="rss_guard")
-        return _overload_error(str(exc))
     except Exception:
         import traceback
         traceback.print_exc()

@@ -223,15 +223,10 @@ def test_seed_resolve_rate_limited_returns_429(_mock_rate_limit):
     assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
 
 
-@patch('mes_dashboard.routes.trace_routes.LineageEngine.resolve_forward_tree')
-def test_lineage_success_returns_forward_tree(mock_resolve_tree):
-    mock_resolve_tree.return_value = {
-        'roots': ['CID-ROOT'],
-        'children_map': {'CID-ROOT': ['CID-A'], 'CID-A': ['CID-001']},
-        'leaf_serials': {'CID-001': ['SN-001']},
-        'cid_to_name': {'CID-ROOT': 'WAFER-001', 'CID-A': 'LOT-A', 'CID-001': 'LOT-001'},
-        'total_nodes': 3,
-    }
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
+@patch('mes_dashboard.routes.trace_routes.enqueue_trace_lineage')
+def test_lineage_query_tool_routes_to_async(mock_enqueue, _mock_async):
+    mock_enqueue.return_value = ('trace-lineage-abc', None, 'trace-lineage-query-tool-123')
 
     client = _client()
     response = client.post(
@@ -242,23 +237,22 @@ def test_lineage_success_returns_forward_tree(mock_resolve_tree):
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     payload = response.get_json()
     assert payload['data']['stage'] == 'lineage'
-    assert payload['data']['roots'] == ['CID-ROOT']
-    assert payload['data']['children_map']['CID-ROOT'] == ['CID-A']
-    assert payload['data']['children_map']['CID-A'] == ['CID-001']
-    assert payload['data']['leaf_serials']['CID-001'] == ['SN-001']
-    assert payload['data']['total_nodes'] == 3
-    assert payload['data']['names']['CID-ROOT'] == 'WAFER-001'
-    assert payload['data']['names']['CID-A'] == 'LOT-A'
+    assert payload['data']['async'] is True
+    assert payload['data']['job_id'] == 'trace-lineage-abc'
+    assert payload['data']['query_id'] == 'trace-lineage-query-tool-123'
+    assert payload['data']['status_url'] == '/api/trace/lineage/job/trace-lineage-abc'
 
 
-@patch('mes_dashboard.routes.trace_routes.LineageEngine.resolve_full_genealogy')
-def test_lineage_reverse_profile_returns_ancestors(mock_resolve_genealogy):
-    mock_resolve_genealogy.return_value = {
-        'ancestors': {'CID-SN': {'CID-A', 'CID-B'}},
-        'cid_to_name': {
+@patch('mes_dashboard.routes.trace_routes.load_trace_lineage_result')
+def test_lineage_reverse_profile_returns_cached_ancestors(mock_load_result):
+    mock_load_result.return_value = {
+        'stage': 'lineage',
+        'roots': ['CID-SN'],
+        'ancestors': {'CID-SN': ['CID-A', 'CID-B']},
+        'names': {
             'CID-SN': 'LOT-SN',
             'CID-A': 'LOT-A',
             'CID-B': 'LOT-B',
@@ -295,11 +289,8 @@ def test_lineage_reverse_profile_returns_ancestors(mock_resolve_genealogy):
     assert payload['data']['edges'][0]['edge_type'] == 'gd_rework_source'
 
 
-@patch(
-    'mes_dashboard.routes.trace_routes.LineageEngine.resolve_forward_tree',
-    side_effect=TimeoutError('lineage timed out'),
-)
-def test_lineage_timeout_returns_504(_mock_resolve_tree):
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
+def test_lineage_returns_503_when_async_unavailable(_mock_async):
     client = _client()
     response = client.post(
         '/api/trace/lineage',
@@ -309,9 +300,9 @@ def test_lineage_timeout_returns_504(_mock_resolve_tree):
         },
     )
 
-    assert response.status_code == 504
+    assert response.status_code == 503
     payload = response.get_json()
-    assert payload['error']['code'] == 'LINEAGE_TIMEOUT'
+    assert payload['error']['code'] == 'SERVICE_UNAVAILABLE'
 
 
 @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 6))
@@ -331,25 +322,9 @@ def test_lineage_rate_limited_returns_429(_mock_rate_limit):
     assert payload['error']['code'] == 'TOO_MANY_REQUESTS'
 
 
-@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
-def test_events_partial_failure_returns_200_with_code(mock_fetch_events):
-    def _side_effect(_container_ids, domain):
-        if domain == 'history':
-            return {
-                'records_by_cid': {
-                    'CID-001': [{'CONTAINERID': 'CID-001', 'EVENTTYPE': 'TRACK_IN'}],
-                },
-                'quality_meta': {
-                    'status': 'complete',
-                    'scope': 'domain',
-                    'domain': 'history',
-                    'reasons': [],
-                },
-            }
-        raise RuntimeError('domain failed')
-
-    mock_fetch_events.side_effect = _side_effect
-
+@patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job', return_value=('trace-evt-legacy-001', None))
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
+def test_events_partial_failure_path_now_routes_to_async(_mock_async, _mock_enqueue):
     client = _client()
     response = client.post(
         '/api/trace/events',
@@ -360,42 +335,17 @@ def test_events_partial_failure_returns_200_with_code(mock_fetch_events):
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     payload = response.get_json()
-    assert payload['data']['stage'] == 'events'
-    assert payload['data']['code'] == 'EVENTS_PARTIAL_FAILURE'
-    assert 'materials' in payload['data']['failed_domains']
-    assert payload['data']['results']['history']['count'] == 1
-    assert payload['data']['results']['history']['quality_meta']['status'] == 'complete'
-    assert payload['data']['results']['materials']['quality_meta']['status'] == 'failed'
-    assert payload['data']['quality_meta']['status'] == 'partial'
+    assert payload['data']['async'] is True
+    assert payload['data']['job_id'] == 'trace-evt-legacy-001'
 
 
-@patch('mes_dashboard.routes.trace_routes.build_trace_aggregation_from_events')
-@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
-def test_events_mid_section_defect_with_aggregation(
-    mock_fetch_events,
-    mock_build_aggregation,
-):
-    mock_fetch_events.return_value = {
-        'records_by_cid': {
-            'CID-001': [
-                {
-                    'CONTAINERID': 'CID-001',
-                    'WORKCENTER_GROUP': '測試',
-                    'EQUIPMENTID': 'EQ-01',
-                    'EQUIPMENTNAME': 'EQ-01',
-                }
-            ]
-        },
-        'quality_meta': {
-            'status': 'complete',
-            'scope': 'domain',
-            'domain': 'upstream_history',
-            'reasons': [],
-        },
-    }
-    mock_build_aggregation.return_value = {
+@patch('mes_dashboard.services.msd_duckdb_runtime.MsdDuckdbRuntime')
+def test_events_mid_section_defect_with_aggregation(mock_runtime_cls):
+    mock_runtime = mock_runtime_cls.return_value
+    mock_runtime.is_available.return_value = True
+    mock_runtime.get_summary.return_value = {
         'kpi': {'total_input': 100},
         'charts': {'by_station': []},
         'daily_trend': [],
@@ -422,11 +372,9 @@ def test_events_mid_section_defect_with_aggregation(
 
     assert response.status_code == 200
     payload = response.get_json()
+    assert payload['data']['spool_hit'] is True
     assert payload['data']['aggregation']['kpi']['total_input'] == 100
     assert payload['data']['aggregation']['genealogy_status'] == 'ready'
-    assert payload['data']['results']['upstream_history']['quality_meta']['status'] == 'complete'
-    assert payload['data']['quality_meta']['status'] == 'complete'
-    mock_build_aggregation.assert_called_once()
 
 
 @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 5))
@@ -475,24 +423,17 @@ def test_non_msd_seed_cache_key_includes_all_params():
     assert key_a != key_b
 
 
-@patch('mes_dashboard.routes.trace_routes.build_trace_aggregation_from_events')
-@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
+@patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
 def test_msd_events_recomputes_aggregation_on_each_call(
-    mock_fetch_events,
-    mock_build_aggregation,
+    _mock_async,
+    mock_enqueue,
 ):
-    """MSD events should NOT use events-level cache, so aggregation is always fresh."""
-    mock_fetch_events.return_value = {
-        'CID-001': [{'CONTAINERID': 'CID-001', 'WORKCENTER_GROUP': '測試'}]
-    }
-    mock_build_aggregation.return_value = {
-        'kpi': {'total_input': 100},
-        'charts': {},
-        'daily_trend': [],
-        'available_loss_reasons': [],
-        'genealogy_status': 'ready',
-        'detail_total_count': 0,
-    }
+    """MSD events should NOT use events-level cache; each spool miss re-enqueues."""
+    mock_enqueue.side_effect = [
+        ('trace-msd-001', None),
+        ('trace-msd-002', None),
+    ]
 
     client = _client()
     body = {
@@ -510,14 +451,14 @@ def test_msd_events_recomputes_aggregation_on_each_call(
 
     # First call
     resp1 = client.post('/api/trace/events', json=body)
-    assert resp1.status_code == 200
+    assert resp1.status_code == 202
 
-    # Second call with different loss_reasons — aggregation must be re-invoked
+    # Second call with different loss_reasons — route should enqueue again
     body['params']['loss_reasons'] = ['Reason-B']
     resp2 = client.post('/api/trace/events', json=body)
-    assert resp2.status_code == 200
+    assert resp2.status_code == 202
 
-    assert mock_build_aggregation.call_count == 2
+    assert mock_enqueue.call_count == 2
 
 
 @patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
@@ -656,16 +597,12 @@ def test_cached_events_replay_domain_partial_overrides_stale_complete_top_level(
     mock_fetch_events.assert_not_called()
 
 
-# ---- Admission control tests ----
+# ---- Async-only events routing tests ----
 
 
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
-def test_events_non_msd_cid_limit_returns_413(mock_async_available, monkeypatch):
-    """Non-MSD profile exceeding CID limit should return 413 when async is unavailable."""
-    monkeypatch.setattr(
-        'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
-    )
-
+def test_events_non_msd_returns_503_when_async_unavailable(mock_async_available):
+    """Spool miss should return 503 when the async worker path is unavailable."""
     client = _client()
     response = client.post(
         '/api/trace/events',
@@ -676,21 +613,14 @@ def test_events_non_msd_cid_limit_returns_413(mock_async_available, monkeypatch)
         },
     )
 
-    assert response.status_code == 413
+    assert response.status_code == 503
     payload = response.get_json()
-    assert payload['error']['code'] == 'CID_LIMIT_EXCEEDED'
+    assert payload['error']['code'] == 'SERVICE_UNAVAILABLE'
 
 
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
-def test_events_msd_exceeding_cid_limit_returns_413_without_async(
-    mock_async_available,
-    monkeypatch,
-):
-    """MSD profile exceeding CID limit should return 413 when async is unavailable."""
-    monkeypatch.setattr(
-        'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
-    )
-
+def test_events_msd_returns_503_without_async(mock_async_available):
+    """MSD spool miss should return 503 when the async worker path is unavailable."""
     client = _client()
     response = client.post(
         '/api/trace/events',
@@ -705,25 +635,18 @@ def test_events_msd_exceeding_cid_limit_returns_413_without_async(
         },
     )
 
-    assert response.status_code == 413
+    assert response.status_code == 503
     payload = response.get_json()
-    assert payload['error']['code'] == 'CID_LIMIT_EXCEEDED'
+    assert payload['error']['code'] == 'SERVICE_UNAVAILABLE'
 
 
 @patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
-def test_events_msd_exceeding_cid_limit_returns_202_with_async(
+def test_events_msd_spool_miss_returns_202_with_async(
     mock_async_available,
     mock_enqueue,
-    monkeypatch,
 ):
-    """MSD profile exceeding CID limit should return 202 (async) when async is available."""
-    monkeypatch.setattr(
-        'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
-    )
-    monkeypatch.setattr(
-        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 100,
-    )
+    """MSD spool miss should enqueue async work when async is available."""
     mock_enqueue.return_value = ('msd-job-abc', None)
 
     client = _client()
@@ -746,13 +669,11 @@ def test_events_msd_exceeding_cid_limit_returns_202_with_async(
     assert payload['data']['job_id'] == 'msd-job-abc'
 
 
-@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
-def test_events_non_msd_within_limit_proceeds(mock_fetch_events):
-    """Non-MSD profile within CID limit should proceed normally."""
-    mock_fetch_events.return_value = {
-        'CID-001': [{'CONTAINERID': 'CID-001', 'EVENTTYPE': 'TRACK_IN'}]
-    }
-
+@patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
+@patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
+def test_events_non_msd_spool_miss_enqueues_async(_mock_async, mock_enqueue):
+    """Non-MSD spool miss should enqueue async work instead of running sync fetches."""
+    mock_enqueue.return_value = ('trace-evt-short-001', None)
     client = _client()
     response = client.post(
         '/api/trace/events',
@@ -763,9 +684,9 @@ def test_events_non_msd_within_limit_proceeds(mock_fetch_events):
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     payload = response.get_json()
-    assert payload['data']['stage'] == 'events'
+    assert payload['data']['job_id'] == 'trace-evt-short-001'
 
 
 # ---- Async job queue tests ----
@@ -776,12 +697,8 @@ def test_events_non_msd_within_limit_proceeds(mock_fetch_events):
 def test_events_routes_to_async_above_threshold(
     mock_async_avail,
     mock_enqueue,
-    monkeypatch,
 ):
-    """CID count > async threshold should return 202 with job_id."""
-    monkeypatch.setattr(
-        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 5,
-    )
+    """Spool miss should return 202 with job metadata."""
     mock_enqueue.return_value = ('trace-evt-abc123', None)
 
     client = _client()
@@ -801,22 +718,11 @@ def test_events_routes_to_async_above_threshold(
     assert '/api/trace/job/trace-evt-abc123' in payload['data']['status_url']
 
 
-@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
-def test_events_falls_back_to_sync_when_async_unavailable(
+def test_events_returns_503_when_async_unavailable(
     mock_async_avail,
-    mock_fetch_events,
-    monkeypatch,
 ):
-    """When async is unavailable, should fall through to sync processing."""
-    monkeypatch.setattr(
-        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 2,
-    )
-    mock_fetch_events.return_value = {
-        f'CID-{i}': [{'CONTAINERID': f'CID-{i}'}]
-        for i in range(3)
-    }
-
+    """When async is unavailable, spool miss should return 503."""
     client = _client()
     response = client.post(
         '/api/trace/events',
@@ -827,27 +733,18 @@ def test_events_falls_back_to_sync_when_async_unavailable(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 503
     payload = response.get_json()
-    assert payload['data']['stage'] == 'events'
-    mock_fetch_events.assert_called()
+    assert payload['error']['code'] == 'SERVICE_UNAVAILABLE'
 
 
-@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
-@patch('mes_dashboard.routes.trace_routes.process_rss_mb', return_value=4096.0)
 @patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
-def test_events_rss_guard_routes_to_async_when_available(
+def test_events_spool_miss_routes_to_async_when_available(
     _mock_async_avail,
     mock_enqueue,
-    _mock_rss,
-    mock_fetch_events,
-    monkeypatch,
 ):
-    """RSS guard hit should route sync requests to async when queue is available."""
-    monkeypatch.setattr(
-        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 99999,
-    )
+    """General spool miss should route to async when queue is available."""
     mock_enqueue.return_value = ('trace-evt-rss-001', None)
 
     client = _client()
@@ -865,16 +762,11 @@ def test_events_rss_guard_routes_to_async_when_available(
     assert payload['data']['async'] is True
     assert payload['data']['job_id'] == 'trace-evt-rss-001'
     assert '/api/trace/job/trace-evt-rss-001' in payload['data']['status_url']
-    mock_fetch_events.assert_not_called()
 
 
-@patch('mes_dashboard.routes.trace_routes.EventFetcher.fetch_events')
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
-@patch('mes_dashboard.routes.trace_routes.process_rss_mb', return_value=4096.0)
 def test_events_rss_guard_returns_503_when_async_unavailable(
-    _mock_rss,
     _mock_async_avail,
-    mock_fetch_events,
 ):
     client = _client()
     response = client.post(
@@ -890,23 +782,15 @@ def test_events_rss_guard_returns_503_when_async_unavailable(
     payload = response.get_json()
     assert payload['error']['code'] == 'SERVICE_UNAVAILABLE'
     assert response.headers.get('Retry-After') == '30'
-    mock_fetch_events.assert_not_called()
 
 
 @patch('mes_dashboard.routes.trace_routes.enqueue_trace_events_job')
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
-def test_events_falls_back_to_413_when_enqueue_fails(
+def test_events_returns_503_when_enqueue_fails(
     mock_async_avail,
     mock_enqueue,
-    monkeypatch,
 ):
-    """When enqueue fails for non-MSD, should fall back to 413."""
-    monkeypatch.setattr(
-        'mes_dashboard.routes.trace_routes.TRACE_ASYNC_CID_THRESHOLD', 3,
-    )
-    monkeypatch.setattr(
-        'mes_dashboard.routes.trace_routes.TRACE_EVENTS_CID_LIMIT', 5,
-    )
+    """When enqueue fails, the route should fail closed with 503."""
     mock_enqueue.return_value = (None, 'Redis down')
 
     client = _client()
@@ -919,9 +803,9 @@ def test_events_falls_back_to_413_when_enqueue_fails(
         },
     )
 
-    assert response.status_code == 413
+    assert response.status_code == 503
     payload = response.get_json()
-    assert payload['error']['code'] == 'CID_LIMIT_EXCEEDED'
+    assert payload['error']['code'] == 'SERVICE_UNAVAILABLE'
 
 
 # ---- Job status/result endpoint tests ----
@@ -1076,19 +960,13 @@ def test_events_async_response_includes_stream_url(mock_enqueue, mock_async):
     assert data["data"]["status_url"] == "/api/trace/job/trace-evt-xyz"
 
 
-# ---- MSD async lineage endpoint tests ----
-
-
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=True)
-@patch('mes_dashboard.routes.trace_routes.enqueue_msd_lineage')
-def test_lineage_msd_async_returns_202_when_seeds_exceed_threshold(
+@patch('mes_dashboard.routes.trace_routes.enqueue_trace_lineage')
+def test_lineage_msd_async_returns_202(
     mock_enqueue,
-    mock_async,
-    monkeypatch,
+    _mock_async,
 ):
-    """MSD lineage with seeds > LINEAGE_SEED_ASYNC_THRESHOLD should return 202."""
-    monkeypatch.setattr('mes_dashboard.routes.trace_routes.LINEAGE_SEED_ASYNC_THRESHOLD', 5)
-    mock_enqueue.return_value = ('msd-lineage-abc', None)
+    mock_enqueue.return_value = ('trace-lineage-msd', None, 'trace-lineage-mid-section-defect-123')
 
     reset_rate_limits_for_tests()
     client = _client()
@@ -1101,32 +979,34 @@ def test_lineage_msd_async_returns_202_when_seeds_exceed_threshold(
     assert response.status_code == 202
     payload = response.get_json()
     assert payload['data']['async'] is True
-    assert payload['data']['job_id'] == 'msd-lineage-abc'
-    assert '/api/trace/lineage/job/msd-lineage-abc' in payload['data']['status_url']
+    assert payload['data']['job_id'] == 'trace-lineage-msd'
+    assert payload['data']['query_id'] == 'trace-lineage-mid-section-defect-123'
+    assert payload['data']['status_url'] == '/api/trace/lineage/job/trace-lineage-msd'
 
 
-@patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_status')
+@patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_status')
 def test_lineage_job_status_endpoint_found(mock_status):
     """GET /api/trace/lineage/job/<id> should return job status."""
     mock_status.return_value = {
-        'job_id': 'msd-lineage-abc',
+        'job_id': 'trace-lineage-abc',
         'status': 'running',
-        'progress': '5/56 split batches',
+        'progress': 'resolving lineage',
         'elapsed_seconds': 12.5,
     }
 
     reset_rate_limits_for_tests()
     client = _client()
-    response = client.get('/api/trace/lineage/job/msd-lineage-abc')
+    response = client.get('/api/trace/lineage/job/trace-lineage-abc')
 
     assert response.status_code == 200
     payload = response.get_json()
     assert payload['data']['status'] == 'running'
-    assert payload['data']['job_id'] == 'msd-lineage-abc'
+    assert payload['data']['job_id'] == 'trace-lineage-abc'
 
 
+@patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_status', return_value=None)
 @patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_status', return_value=None)
-def test_lineage_job_status_endpoint_not_found(mock_status):
+def test_lineage_job_status_endpoint_not_found(_mock_msd_status, _mock_status):
     """GET /api/trace/lineage/job/<id> should return 404 for unknown job."""
     reset_rate_limits_for_tests()
     client = _client()
@@ -1135,11 +1015,11 @@ def test_lineage_job_status_endpoint_not_found(mock_status):
     assert response.status_code == 404
 
 
-@patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_result')
-@patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_status')
+@patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_result')
+@patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_status')
 def test_lineage_job_result_endpoint_success(mock_status, mock_result):
     """GET /api/trace/lineage/job/<id>/result should return reconstructed lineage."""
-    mock_status.return_value = {'status': 'completed', 'job_id': 'msd-lineage-abc'}
+    mock_status.return_value = {'status': 'completed', 'job_id': 'trace-lineage-abc'}
     mock_result.return_value = {
         'stage': 'lineage',
         'ancestors': {'SEED1': ['ANC1', 'ANC2']},
@@ -1151,7 +1031,7 @@ def test_lineage_job_result_endpoint_success(mock_status, mock_result):
 
     reset_rate_limits_for_tests()
     client = _client()
-    response = client.get('/api/trace/lineage/job/msd-lineage-abc/result')
+    response = client.get('/api/trace/lineage/job/trace-lineage-abc/result')
 
     assert response.status_code == 200
     payload = response.get_json()
@@ -1159,13 +1039,13 @@ def test_lineage_job_result_endpoint_success(mock_status, mock_result):
     assert 'SEED1' in payload['data']['ancestors']
 
 
-@patch('mes_dashboard.routes.trace_routes.get_msd_lineage_job_status')
+@patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_status')
 def test_lineage_job_result_endpoint_job_still_running(mock_status):
     """GET /api/trace/lineage/job/<id>/result should return 409 when job not yet complete."""
-    mock_status.return_value = {'status': 'running', 'job_id': 'msd-lineage-abc'}
+    mock_status.return_value = {'status': 'running', 'job_id': 'trace-lineage-abc'}
 
     reset_rate_limits_for_tests()
     client = _client()
-    response = client.get('/api/trace/lineage/job/msd-lineage-abc/result')
+    response = client.get('/api/trace/lineage/job/trace-lineage-abc/result')
 
     assert response.status_code == 409

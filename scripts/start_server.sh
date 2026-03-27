@@ -785,9 +785,9 @@ start_rq_worker() {
     log_info "Starting RQ trace worker (queue: ${TRACE_WORKER_QUEUE})..."
     local redis_url="${REDIS_URL:-redis://localhost:6379/0}"
     if command -v setsid >/dev/null 2>&1; then
-        setsid rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
+        setsid env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
     else
-        nohup rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
+        env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 nohup rq worker "${TRACE_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "$RQ_WORKER_LOG" 2>&1 < /dev/null &
     fi
     local pid=$!
     echo "$pid" > "$RQ_WORKER_PID_FILE"
@@ -897,9 +897,9 @@ start_rq_reject_worker() {
     log_info "Starting RQ reject worker (queue: ${RQ_REJECT_WORKER_QUEUE})..."
 
     if command -v setsid &>/dev/null; then
-        setsid rq worker "${RQ_REJECT_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_REJECT_WORKER_LOG}" 2>&1 < /dev/null &
+        setsid env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 rq worker "${RQ_REJECT_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_REJECT_WORKER_LOG}" 2>&1 < /dev/null &
     else
-        nohup rq worker "${RQ_REJECT_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_REJECT_WORKER_LOG}" 2>&1 < /dev/null &
+        env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 nohup rq worker "${RQ_REJECT_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_REJECT_WORKER_LOG}" 2>&1 < /dev/null &
     fi
     local worker_pid=$!
     echo "$worker_pid" > "${RQ_REJECT_WORKER_PID_FILE}"
@@ -1003,9 +1003,9 @@ start_rq_msd_worker() {
     log_info "Starting RQ msd worker (queue: ${RQ_MSD_WORKER_QUEUE})..."
 
     if command -v setsid &>/dev/null; then
-        setsid rq worker "${RQ_MSD_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_MSD_WORKER_LOG}" 2>&1 < /dev/null &
+        setsid env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 rq worker "${RQ_MSD_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_MSD_WORKER_LOG}" 2>&1 < /dev/null &
     else
-        nohup rq worker "${RQ_MSD_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_MSD_WORKER_LOG}" 2>&1 < /dev/null &
+        env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 nohup rq worker "${RQ_MSD_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_MSD_WORKER_LOG}" 2>&1 < /dev/null &
     fi
     local worker_pid=$!
     echo "$worker_pid" > "${RQ_MSD_WORKER_PID_FILE}"

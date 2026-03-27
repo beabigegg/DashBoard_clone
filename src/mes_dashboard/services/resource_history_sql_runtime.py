@@ -463,3 +463,125 @@ def try_compute_view_from_spool(
                 conn.close()
             except Exception:
                 pass
+
+
+# ── Task 7.2: Canonical base spool query with view-time filter predicates ─────
+
+def try_compute_query_from_canonical_spool(
+    *,
+    start_date: str,
+    end_date: str,
+    granularity: str = "day",
+    workcenter_groups=None,
+    families=None,
+    resource_ids=None,
+    is_production: bool = False,
+    is_key: bool = False,
+    is_monitor: bool = False,
+) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """Check canonical base spool and compute query result with filter predicates in DuckDB.
+
+    The canonical base spool (no filter, date-range only) is checked first.
+    If found, filter dimensions (workcenter_groups / families / resource_ids / flags)
+    are applied via an INNER JOIN against resource_dim so that kpi / trend /
+    heatmap / comparison / detail all see only the filtered subset.
+
+    Route contract remains unchanged — same params and response shape as
+    ``execute_primary_query``.  Returns ``(result_dict, meta)`` with
+    ``result["query_id"]`` set to the canonical query_id, or ``(None, meta)``
+    when the canonical spool is not yet available (cache miss → fall through to
+    Oracle path).
+    """
+    if not _SQL_VIEW_ENABLED:
+        return None, {"canonical_fallback_reason": SQL_FALLBACK_DISABLED}
+
+    try:
+        import duckdb  # type: ignore
+    except Exception:
+        return None, {"canonical_fallback_reason": SQL_FALLBACK_DEP_MISSING}
+
+    from mes_dashboard.services.resource_dataset_cache import make_canonical_base_query_id
+    canonical_query_id = make_canonical_base_query_id(start_date, end_date, granularity)
+    parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, canonical_query_id)
+    if not parquet_path:
+        return None, {"canonical_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    try:
+        from mes_dashboard.services.resource_history_service import (
+            _get_filtered_resources,
+            _build_resource_lookup,
+        )
+        from mes_dashboard.services.resource_dataset_cache import _get_workcenter_mapping
+        resources = _get_filtered_resources(
+            workcenter_groups=workcenter_groups,
+            families=families,
+            resource_ids=resource_ids,
+            is_production=is_production,
+            is_key=is_key,
+            is_monitor=is_monitor,
+        )
+        resource_lookup = _build_resource_lookup(resources)
+        wc_mapping = _get_workcenter_mapping()
+    except Exception as exc:
+        logger.warning(
+            "try_compute_query_from_canonical_spool: dimension load failed: %s", exc
+        )
+        return None, {"canonical_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
+
+    started_at = time.time()
+    conn = None
+    try:
+        conn = duckdb.connect(database=":memory:")
+        # Load all spool rows into resource_all, then build filter-specific
+        # resource_dim, then create resource_src as the filtered join view so
+        # all existing query functions (_query_kpi, _query_trend, etc.) see
+        # only the filtered subset without any code changes.
+        conn.execute(
+            "CREATE TEMP VIEW resource_all AS "
+            f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
+        )
+        _build_resource_lookup_table(conn, resource_lookup, wc_mapping)
+        conn.execute(
+            "CREATE TEMP VIEW resource_src AS "
+            "SELECT s.* FROM resource_all s "
+            "INNER JOIN resource_dim d "
+            "ON CAST(s.\"HISTORYID\" AS VARCHAR) = d.HISTORYID"
+        )
+
+        kpi = _query_kpi(conn)
+        trend_items = _query_trend(conn, granularity=granularity)
+        heatmap_items = _query_heatmap(conn, granularity=granularity)
+        comparison_items = _query_workcenter_comparison(conn)
+        detail = _query_detail(conn)
+
+        latency_s = round(time.time() - started_at, 3)
+        logger.info(
+            "try_compute_query_from_canonical_spool: hit "
+            "(canonical_query_id=%s latency_s=%.3f)",
+            canonical_query_id, latency_s,
+        )
+        result = {
+            "query_id": canonical_query_id,
+            "summary": {
+                "kpi": kpi,
+                "trend": trend_items,
+                "heatmap": heatmap_items,
+                "workcenter_comparison": comparison_items,
+            },
+            "detail": detail,
+        }
+        return result, {"canonical_spool_latency_s": latency_s}
+
+    except Exception as exc:
+        logger.warning(
+            "try_compute_query_from_canonical_spool failed "
+            "(canonical_query_id=%s): %s",
+            canonical_query_id, exc,
+        )
+        return None, {"canonical_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass

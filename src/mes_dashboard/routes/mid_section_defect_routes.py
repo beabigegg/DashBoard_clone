@@ -5,34 +5,23 @@ Bidirectional traceability from any detection station to upstream/downstream.
 """
 
 import logging
-import os
 
 from flask import Blueprint, request, Response
 
-from mes_dashboard.core.heavy_query_telemetry import record_guard_reject
 from mes_dashboard.core.response import (
     success_response,
     validation_error,
     internal_error,
     error_response,
-    not_found_error,
-    SERVICE_UNAVAILABLE,
 )
 from mes_dashboard.core.cache import cache_get, make_cache_key
-from mes_dashboard.core.database import get_slow_query_active_count
 from mes_dashboard.core.rate_limit import configured_rate_limit
-from mes_dashboard.services.async_query_job_service import is_async_available
 from mes_dashboard.services.mid_section_defect_service import (
+    ensure_analysis_background_job,
+    resolve_analysis_trace_context,
     query_analysis,
-    query_analysis_detail,
     query_all_loss_reasons,
     query_station_options,
-    export_csv,
-)
-from mes_dashboard.services.msd_query_job_service import (
-    enqueue_msd_analysis,
-    get_msd_job_result,
-    get_msd_job_status,
 )
 
 logger = logging.getLogger('mes_dashboard.mid_section_defect_routes')
@@ -42,9 +31,6 @@ mid_section_defect_bp = Blueprint(
     __name__,
     url_prefix='/api/mid-section-defect'
 )
-
-_HEAVY_QUERY_REJECT_THRESHOLD = max(1, int(os.getenv("HEAVY_QUERY_REJECT_THRESHOLD", "4")))
-
 _ANALYSIS_RATE_LIMIT = configured_rate_limit(
     bucket="mid-section-defect-analysis",
     max_attempts_env="MID_SECTION_DEFECT_ANALYSIS_RATE_LIMIT_MAX_REQUESTS",
@@ -109,6 +95,7 @@ def _build_summary_payload(result: dict) -> dict:
         'genealogy_status': result.get('genealogy_status'),
         'detail_total_count': len(result.get('detail', [])),
         'attribution': result.get('attribution', []),
+        'trace_query_id': result.get('trace_query_id'),
     }
 
 
@@ -121,7 +108,11 @@ def api_station_options():
 @mid_section_defect_bp.route('/analysis', methods=['GET'])
 @_ANALYSIS_RATE_LIMIT
 def api_analysis():
-    """API: Get defect traceability analysis (summary).
+    """API: Compatibility adapter for defect traceability analysis (summary).
+
+    This endpoint is retained as a compatibility adapter while MSD migrates to
+    the staged trace + spool + DuckDB pipeline (task 5.5).  Do NOT remove until
+    all consumers (frontend, AI registry, tests, api_inventory.md) are migrated.
 
     Query Parameters:
         start_date: Start date (YYYY-MM-DD), required
@@ -146,44 +137,6 @@ def api_analysis():
     if cached is not None:
         return success_response(_build_summary_payload(cached))
 
-    if is_async_available():
-        job_id, err = enqueue_msd_analysis(
-            start_date=start_date,
-            end_date=end_date,
-            station=station,
-            direction=direction,
-            loss_reasons=loss_reasons,
-        )
-        if job_id is not None:
-            return success_response(
-                {
-                    "async": True,
-                    "job_id": job_id,
-                    "status_url": f"/api/mid-section-defect/analysis/job/{job_id}",
-                },
-                status_code=202,
-            )
-        # Enqueue failure falls back to sync execution.
-        if err:
-            logger.warning("msd async enqueue failed, fallback to sync: %s", err)
-
-    # Phase 0: concurrency fast-rejection (sync fallback path only)
-    try:
-        if get_slow_query_active_count() >= _HEAVY_QUERY_REJECT_THRESHOLD:
-            record_guard_reject(
-                "mid_section_defect.analysis",
-                reason="slow_query_active_threshold",
-            )
-            return error_response(
-                SERVICE_UNAVAILABLE,
-                "系統忙碌中，請稍後再試",
-                status_code=503,
-                meta={"retry_after_seconds": 30},
-                headers={"Retry-After": "30"},
-            )
-    except Exception:
-        pass
-
     result = query_analysis(start_date, end_date, loss_reasons, station, direction)
 
     if result is None:
@@ -195,65 +148,96 @@ def api_analysis():
     return success_response(_build_summary_payload(result))
 
 
-@mid_section_defect_bp.route('/analysis/job/<job_id>', methods=['GET'])
-def api_analysis_job_status(job_id: str):
-    status = get_msd_job_status(job_id)
-    if status is None:
-        return not_found_error("job not found or expired")
-    return success_response(status)
-
-
-@mid_section_defect_bp.route('/analysis/job/<job_id>/result', methods=['GET'])
-def api_analysis_job_result(job_id: str):
-    status = get_msd_job_status(job_id)
-    if status is None:
-        return not_found_error("job not found or expired")
-
-    if status.get("status") != "completed":
-        return error_response(
-            "JOB_NOT_COMPLETE",
-            "job has not completed yet",
-            status_code=409,
-            meta={"job_status": status.get("status")},
-        )
-
-    result = get_msd_job_result(job_id)
-    if result is None:
-        return not_found_error("job result expired")
-
-    return success_response(_build_summary_payload(result))
-
-
 @mid_section_defect_bp.route('/analysis/detail', methods=['GET'])
 @_DETAIL_RATE_LIMIT
 def api_analysis_detail():
     """API: Get paginated detail table for defect traceability analysis.
 
     Query Parameters:
+        trace_query_id: Canonical spool id from a previous MSD query (preferred)
         start_date, end_date, loss_reasons, station, direction (same as /analysis)
         page: Page number (default 1)
         page_size: Records per page (default 200, max 500)
+        sort_by: Column to sort by (default defect_rate)
+        order: asc or desc (default desc)
     """
+    # Task 5.3 / 6.5: resolve canonical trace_query_id first, then serve from spool.
+    trace_query_id = request.args.get("trace_query_id", "").strip() or None
     start_date, end_date, loss_reasons, station, direction = _parse_common_params()
+    if not trace_query_id:
+        if not start_date or not end_date:
+            return validation_error('必須提供 start_date 和 end_date 參數')
+        context = resolve_analysis_trace_context(
+            start_date=start_date,
+            end_date=end_date,
+            station=station,
+            direction=direction,
+        )
+        if context is None:
+            return internal_error('查詢失敗，請稍後再試')
+        if 'error' in context:
+            return validation_error(context['error'])
+        trace_query_id = context.get("trace_query_id")
+        if not context.get("seed_container_ids"):
+            return success_response({
+                "detail": [],
+                "pagination": {
+                    "page": max(request.args.get("page", 1, type=int), 1),
+                    "page_size": max(1, min(request.args.get("page_size", 200, type=int), 500)),
+                    "total_count": 0,
+                    "total_pages": 1,
+                },
+                "trace_query_id": trace_query_id,
+            })
 
-    if not start_date or not end_date:
-        return validation_error('必須提供 start_date 和 end_date 參數')
+    if trace_query_id:
+        try:
+            from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+            page = max(request.args.get("page", 1, type=int), 1)
+            per_page = max(1, min(request.args.get("page_size", 200, type=int), 500))
+            sort_by = request.args.get("sort_by", "defect_rate")
+            order = request.args.get("order", "desc")
+            rt = MsdDuckdbRuntime(trace_query_id)
+            if rt.is_available():
+                detail = rt.get_detail(page=page, per_page=per_page, sort_by=sort_by, order=order)
+                if detail is not None:
+                    pagination = detail.get("pagination") or {}
+                    return success_response({
+                        "detail": detail.get("items") or [],
+                        "pagination": {
+                            "page": pagination.get("page", page),
+                            "page_size": pagination.get("per_page", per_page),
+                            "total_count": pagination.get("total", 0),
+                            "total_pages": pagination.get("total_pages", 1),
+                        },
+                        "trace_query_id": detail.get("trace_query_id") or trace_query_id,
+                    })
+        except Exception as exc:
+            logger.warning("detail spool path failed (trace_query_id=%s): %s", trace_query_id, exc)
+        context = resolve_analysis_trace_context(
+            start_date=start_date,
+            end_date=end_date,
+            station=station,
+            direction=direction,
+        )
+        if context and 'error' not in context:
+            ensure_analysis_background_job(
+                start_date=start_date,
+                end_date=end_date,
+                station=station,
+                direction=direction,
+                trace_query_id=trace_query_id,
+                seed_container_ids=context.get("seed_container_ids"),
+                seed_container_names=context.get("seed_container_names"),
+            )
+        return error_response(
+            "QUERY_NOT_READY",
+            "查詢結果尚未就緒，請先完成 staged trace 查詢",
+            status_code=409,
+            meta={"trace_query_id": trace_query_id},
+        )
 
-    page = max(request.args.get('page', 1, type=int), 1)
-    page_size = max(1, min(request.args.get('page_size', 200, type=int), 500))
-
-    result = query_analysis_detail(
-        start_date, end_date, loss_reasons, station, direction,
-        page=page, page_size=page_size,
-    )
-
-    if result is None:
-        return internal_error('查詢失敗，請稍後再試')
-
-    if 'error' in result:
-        return validation_error(result['error'])
-
-    return success_response(result)
+    return internal_error('查詢失敗，請稍後再試')
 
 
 @mid_section_defect_bp.route('/loss-reasons', methods=['GET'])
@@ -273,20 +257,64 @@ def api_export():
     """API: Export defect traceability detail data as CSV.
 
     Query Parameters:
+        trace_query_id: Canonical spool id from a previous MSD query (preferred)
         start_date, end_date, loss_reasons, station, direction (same as /analysis)
     """
+    # Task 5.4 / 6.5: resolve canonical trace_query_id first, then stream from spool.
+    trace_query_id = request.args.get("trace_query_id", "").strip() or None
     start_date, end_date, loss_reasons, station, direction = _parse_common_params()
+    if not trace_query_id:
+        if not start_date or not end_date:
+            return validation_error('必須提供 start_date 和 end_date 參數')
+        context = resolve_analysis_trace_context(
+            start_date=start_date,
+            end_date=end_date,
+            station=station,
+            direction=direction,
+        )
+        if context is None:
+            return internal_error('查詢失敗，請稍後再試')
+        if 'error' in context:
+            return validation_error(context['error'])
+        trace_query_id = context.get("trace_query_id")
 
-    if not start_date or not end_date:
-        return validation_error('必須提供 start_date 和 end_date 參數')
+    if trace_query_id:
+        try:
+            from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+            rt = MsdDuckdbRuntime(trace_query_id)
+            if rt.is_available():
+                filename = f"defect_trace_{trace_query_id}.csv"
+                return Response(
+                    rt.export_csv(),
+                    mimetype="text/csv",
+                    headers={
+                        "Content-Disposition": f"attachment; filename={filename}",
+                        "Content-Type": "text/csv; charset=utf-8-sig",
+                    },
+                )
+        except Exception as exc:
+            logger.warning("export spool path failed (trace_query_id=%s): %s", trace_query_id, exc)
+        context = resolve_analysis_trace_context(
+            start_date=start_date,
+            end_date=end_date,
+            station=station,
+            direction=direction,
+        )
+        if context and 'error' not in context:
+            ensure_analysis_background_job(
+                start_date=start_date,
+                end_date=end_date,
+                station=station,
+                direction=direction,
+                trace_query_id=trace_query_id,
+                seed_container_ids=context.get("seed_container_ids"),
+                seed_container_names=context.get("seed_container_names"),
+            )
+        return error_response(
+            "QUERY_NOT_READY",
+            "查詢結果尚未就緒，請先完成 staged trace 查詢",
+            status_code=409,
+            meta={"trace_query_id": trace_query_id},
+        )
 
-    filename = f"defect_trace_{station}_{direction}_{start_date}_to_{end_date}.csv"
-
-    return Response(
-        export_csv(start_date, end_date, loss_reasons, station, direction),
-        mimetype='text/csv',
-        headers={
-            'Content-Disposition': f'attachment; filename={filename}',
-            'Content-Type': 'text/csv; charset=utf-8-sig'
-        }
-    )
+    return internal_error('查詢失敗，請稍後再試')

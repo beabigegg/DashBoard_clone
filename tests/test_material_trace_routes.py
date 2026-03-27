@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Integration tests for Material Trace API routes.
-
-Tests input validation, pagination structure, and CSV export.
-"""
+"""Integration tests for Material Trace API routes."""
 
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -135,9 +132,11 @@ class TestQueryValidation:
 
 
 class TestQueryPagination:
-    @patch("mes_dashboard.routes.material_trace_routes.forward_query")
-    def test_query_returns_pagination_structure(self, mock_fwd, client):
-        mock_fwd.return_value = {
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_query_returns_pagination_structure_on_spool_hit(self, mock_runtime_cls, client):
+        mock_runtime = MagicMock()
+        mock_runtime.is_available.return_value = True
+        mock_runtime.get_page.return_value = {
             "rows": [{"CONTAINERNAME": "LOT-1", "PJ_WORKORDER": "WO-1"}],
             "pagination": {
                 "page": 1,
@@ -145,9 +144,9 @@ class TestQueryPagination:
                 "total": 100,
                 "total_pages": 2,
             },
-            "meta": {},
-            "quality_meta": {"status": "complete", "reasons": []},
+            "query_hash": "mtrace-hit-001",
         }
+        mock_runtime_cls.return_value = mock_runtime
 
         response = client.post(
             "/api/material-trace/query",
@@ -165,16 +164,18 @@ class TestQueryPagination:
         assert pag["total"] == 100
         assert pag["total_pages"] == 2
         assert len(payload["data"]["rows"]) == 1
-        assert payload["data"]["quality_meta"]["status"] == "complete"
+        assert payload["data"]["query_hash"] == "mtrace-hit-001"
 
-    @patch("mes_dashboard.routes.material_trace_routes.forward_query")
-    def test_query_passes_page_param(self, mock_fwd, client):
-        mock_fwd.return_value = {
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_query_passes_page_param(self, mock_runtime_cls, client):
+        mock_runtime = MagicMock()
+        mock_runtime.is_available.return_value = True
+        mock_runtime.get_page.return_value = {
             "rows": [],
             "pagination": {"page": 3, "per_page": 50, "total": 200, "total_pages": 4},
-            "meta": {},
-            "quality_meta": {"status": "complete", "reasons": []},
+            "query_hash": "mtrace-hit-002",
         }
+        mock_runtime_cls.return_value = mock_runtime
 
         response = client.post(
             "/api/material-trace/query",
@@ -183,30 +184,52 @@ class TestQueryPagination:
         )
 
         assert response.status_code == 200
-        mock_fwd.assert_called_once()
-        call_kwargs = mock_fwd.call_args
-        # page should be 3
-        assert call_kwargs[0][3] == 3 or call_kwargs.kwargs.get("page") == 3
+        mock_runtime.get_page.assert_called_once_with(3, 50)
 
-    @patch("mes_dashboard.routes.material_trace_routes.reverse_query")
-    def test_reverse_mode_dispatches_correctly(self, mock_rev, client):
-        mock_rev.return_value = {
-            "rows": [],
-            "pagination": {"page": 1, "per_page": 50, "total": 0, "total_pages": 0},
-            "meta": {},
-            "quality_meta": {"status": "truncated", "max_rows": 10000, "reasons": ["row_guard_truncated"]},
-        }
-
+    @patch("mes_dashboard.routes.material_trace_routes.enqueue_job")
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_spool_miss_enqueues_async_job(self, mock_runtime_cls, mock_enqueue_job, client):
+        mock_runtime = MagicMock()
+        mock_runtime.is_available.return_value = False
+        mock_runtime_cls.return_value = mock_runtime
+        mock_enqueue_job.return_value = ("mtrace-job-001", None)
         response = client.post(
             "/api/material-trace/query",
             data=json.dumps({"mode": "material_lot", "values": ["MLOT-A"]}),
             content_type="application/json",
         )
 
+        assert response.status_code == 202
+        payload = response.get_json()
+        assert payload["success"] is True
+        assert payload["data"]["async"] is True
+        assert payload["data"]["job_id"] == "mtrace-job-001"
+        assert "/api/material-trace/job/mtrace-job-001" in payload["data"]["status_url"]
+
+    @patch("mes_dashboard.routes.material_trace_routes.enqueue_job", return_value=(None, "redis unavailable"))
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_spool_miss_returns_503_when_enqueue_fails(self, mock_runtime_cls, _mock_enqueue_job, client):
+        mock_runtime = MagicMock()
+        mock_runtime.is_available.return_value = False
+        mock_runtime_cls.return_value = mock_runtime
+
+        response = client.post(
+            "/api/material-trace/query",
+            data=json.dumps({"mode": "workorder", "values": ["WO-001"]}),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 503
+        assert response.headers.get("Retry-After") == "30"
+        payload = response.get_json()
+        assert payload["success"] is False
+
+    @patch("mes_dashboard.routes.material_trace_routes.get_job_status", return_value={"job_id": "mtrace-job-001", "status": "running"})
+    def test_job_status_endpoint_returns_status(self, _mock_status, client):
+        response = client.get("/api/material-trace/job/mtrace-job-001")
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload["data"]["quality_meta"]["status"] == "truncated"
-        mock_rev.assert_called_once()
+        assert payload["data"]["status"] == "running"
 
 
 # ============================================================
@@ -215,17 +238,16 @@ class TestQueryPagination:
 
 
 class TestExportEndpoint:
-    @patch("mes_dashboard.routes.material_trace_routes.export_csv")
-    def test_export_returns_csv_content_type(self, mock_export, client):
-        csv_content = b"\xef\xbb\xbfLOT ID,\xe5\xb7\xa5\xe5\x96\xae\n"
-        mock_export.return_value = (
-            iter([csv_content]),
-            {"meta": {}, "quality_meta": {"status": "complete", "reasons": []}},
-        )
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_export_returns_csv_content_type(self, mock_runtime_cls, client):
+        mock_runtime = MagicMock()
+        mock_runtime.is_available.return_value = True
+        mock_runtime.export_csv.return_value = iter([b"\xef\xbb\xbfLOT ID,\xe5\xb7\xa5\xe5\x96\xae\n"])
+        mock_runtime_cls.return_value = mock_runtime
 
         response = client.post(
             "/api/material-trace/export",
-            data=json.dumps({"mode": "workorder", "values": ["WO-001"]}),
+            data=json.dumps({"mode": "workorder", "values": ["WO-001"], "query_hash": "mtrace-hit-001"}),
             content_type="application/json",
         )
 
@@ -235,50 +257,49 @@ class TestExportEndpoint:
         assert response.data[:3] == b"\xef\xbb\xbf"
         assert response.headers.get("X-Query-Quality-Status") == "complete"
 
-    @patch("mes_dashboard.routes.material_trace_routes.export_csv")
-    def test_export_truncated_sets_header(self, mock_export, client):
-        csv_content = b"\xef\xbb\xbfheader\nrow\n"
-        mock_export.return_value = (
-            iter([csv_content]),
-            {
-                "meta": {"truncated": True, "export_max_rows": 50000},
-                "quality_meta": {
-                    "status": "truncated",
-                    "reasons": ["export_max_rows_exceeded"],
-                    "max_rows": 50000,
-                    "observed_rows": 88888,
-                },
-            },
-        )
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_export_returns_409_when_query_not_ready(self, mock_runtime_cls, client):
+        mock_runtime = MagicMock()
+        mock_runtime.is_available.return_value = False
+        mock_runtime_cls.return_value = mock_runtime
 
         response = client.post(
             "/api/material-trace/export",
-            data=json.dumps({"mode": "workorder", "values": ["WO-001"]}),
+            data=json.dumps({"mode": "workorder", "values": ["WO-001"], "query_hash": "mtrace-miss-001"}),
             content_type="application/json",
         )
 
-        assert response.status_code == 200
-        assert response.headers.get("X-Truncated") == "true"
-        assert response.headers.get("X-Max-Rows") == "50000"
-        assert response.headers.get("X-Query-Quality-Status") == "truncated"
-        assert response.headers.get("X-Query-Quality-Max-Rows") == "50000"
+        assert response.status_code == 409
+        payload = response.get_json()
+        assert payload["error"]["code"] == "QUERY_NOT_READY"
 
     def test_export_validation_same_as_query(self, client):
         """Export should reject invalid mode same as query."""
         response = client.post(
             "/api/material-trace/export",
-            data=json.dumps({"mode": "invalid", "values": ["X"]}),
+            data=json.dumps({"mode": "invalid", "values": ["X"], "query_hash": "mtrace-hit-001"}),
             content_type="application/json",
         )
         assert response.status_code == 400
 
-    @patch("mes_dashboard.routes.material_trace_routes.export_csv")
-    def test_export_memory_guard_returns_503(self, mock_export, client):
-        mock_export.side_effect = MemoryError("記憶體負載較高")
-
+    def test_export_requires_query_hash(self, client):
         response = client.post(
             "/api/material-trace/export",
             data=json.dumps({"mode": "workorder", "values": ["WO-001"]}),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert "query_hash" in payload["error"]["message"]
+
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_export_memory_guard_returns_503(self, mock_runtime_cls, client):
+        mock_runtime_cls.side_effect = MemoryError("記憶體負載較高")
+
+        response = client.post(
+            "/api/material-trace/export",
+            data=json.dumps({"mode": "workorder", "values": ["WO-001"], "query_hash": "mtrace-hit-001"}),
             content_type="application/json",
         )
 
@@ -318,9 +339,9 @@ class TestFilterOptions:
 
 
 class TestMemoryGuardContract:
-    @patch("mes_dashboard.routes.material_trace_routes.forward_query")
-    def test_query_memory_guard_returns_503(self, mock_forward, client):
-        mock_forward.side_effect = MemoryError("記憶體負載較高")
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_query_memory_guard_returns_503(self, mock_runtime_cls, client):
+        mock_runtime_cls.side_effect = MemoryError("記憶體負載較高")
 
         response = client.post(
             "/api/material-trace/query",

@@ -2,7 +2,7 @@
 """Unit tests for material_trace_service.
 
 Tests cover forward/reverse query logic, CONTAINERID resolution,
-workcenter group enrichment/filtering, truncation, CSV export,
+workcenter group enrichment/filtering, CSV export,
 safeguards (memory guard, batched queries), and wildcard support.
 """
 
@@ -16,7 +16,6 @@ from mes_dashboard.services.material_trace_service import (
     _check_memory_guard,
     _compute_cache_key,
     _enrich_workcenter_group,
-    _FORWARD_MAX_ROWS,
     _IN_BATCH_SIZE,
     _is_pattern_token,
     _resolve_container_ids,
@@ -143,7 +142,7 @@ class TestForwardWorkorderQuery:
 
 
 # ============================================================
-# 7.3 Reverse query — truncation logic
+# 7.3 Reverse query
 # ============================================================
 
 
@@ -153,16 +152,15 @@ class TestReverseQuery:
     @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_reverse_truncation_at_10000(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
+    def test_reverse_large_result_keeps_full_total(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql_slow.return_value = _make_material_df(10001)
 
         result = reverse_query(["MLOT-A"], page=1, per_page=50)
 
-        assert result["meta"]["truncated"] is True
-        assert result["meta"]["max_rows"] == 10000
-        assert result["quality_meta"]["status"] == "truncated"
-        assert result["pagination"]["total"] == 10000
+        assert "truncated" not in result["meta"]
+        assert result["quality_meta"]["status"] == "complete"
+        assert result["pagination"]["total"] == 10001
 
     @patch(_PATCH_GC)
     @patch(_PATCH_REDIS_STORE)
@@ -527,26 +525,25 @@ class TestRedisCache:
 
 
 # ============================================================
-# Forward truncation tests (MT4)
+# Forward large-result behavior (MT4)
 # ============================================================
 
 
-class TestForwardTruncation:
+class TestForwardLargeResult:
     @patch(_PATCH_GC)
     @patch(_PATCH_REDIS_STORE)
     @patch(_PATCH_REDIS_LOAD, return_value=None)
     @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow")
     @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
-    def test_forward_truncation_at_50000(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
+    def test_forward_large_result_keeps_full_total(self, mock_mapping, mock_sql_slow, _rl, _rs, _gc):
         mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
         mock_sql_slow.return_value = _make_material_df(50001)
 
         result = forward_query("workorder", ["WO-001"], page=1, per_page=50)
 
-        assert result["meta"]["truncated"] is True
-        assert result["meta"]["max_rows"] == _FORWARD_MAX_ROWS
-        assert result["quality_meta"]["status"] == "truncated"
-        assert result["pagination"]["total"] == _FORWARD_MAX_ROWS
+        assert "truncated" not in result["meta"]
+        assert result["quality_meta"]["status"] == "complete"
+        assert result["pagination"]["total"] == 50001
 
     @patch(_PATCH_GC)
     @patch(_PATCH_REDIS_STORE)

@@ -128,7 +128,6 @@ _REJECT_DERIVE_FORCE_GC = os.getenv("REJECT_DERIVE_FORCE_GC", "true").strip().lo
     "yes",
     "on",
 }
-REJECT_QUERY_RSS_REJECT_MB = float(os.getenv("REJECT_QUERY_RSS_REJECT_MB", "900"))
 _REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
     "REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED",
     default=True,
@@ -429,11 +428,6 @@ def _store_query_result(query_id: str, df: pd.DataFrame) -> bool:
 def _df_memory_mb(df: pd.DataFrame) -> float:
     from mes_dashboard.core.interactive_memory_guard import df_memory_mb
     return df_memory_mb(df)
-
-
-def _process_rss_mb() -> Optional[float]:
-    from mes_dashboard.core.interactive_memory_guard import process_rss_mb
-    return process_rss_mb()
 
 
 def _enforce_interactive_memory_guard(df: pd.DataFrame, *, operation: str, query_id: str) -> None:
@@ -868,20 +862,6 @@ def execute_primary_query(
     if cached_df is not None:
         logger.info("Dataset cache hit for query_id=%s", query_id)
         return _build_response_from_cache(cached_df)
-
-    # ---- RSS front-door guard (before acquiring query lock) ----
-    current_rss = _process_rss_mb()
-    if current_rss is not None and current_rss >= REJECT_QUERY_RSS_REJECT_MB:
-        logger.warning(
-            "Reject primary query rejected: RSS %.1f MB >= threshold %.1f MB",
-            current_rss,
-            REJECT_QUERY_RSS_REJECT_MB,
-        )
-        raise RejectPrimaryQueryOverloadError(
-            "系統記憶體使用率過高，請稍後重試",
-            code="SERVICE_UNAVAILABLE",
-            retry_after=30,
-        )
 
     lock_owner = f"{os.getpid()}:{uuid.uuid4().hex}"
     has_query_lock = False

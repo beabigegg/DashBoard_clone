@@ -486,3 +486,26 @@ def _run_oracle_to_spool(params: Dict[str, Any], dataset_id: str) -> None:
             row_count=total_rows,
             ttl_seconds=QUERY_SPOOL_TTL_SECONDS,
         )
+
+
+# ---------------------------------------------------------------------------
+# Canonical spool identity (task 2.3)
+# ---------------------------------------------------------------------------
+# production-history is on-demand only; it is NOT enrolled in the warmup
+# scheduler.  The canonical spool identity includes pj_types + date range +
+# all user-supplied filters so that any repeat query with the same params can
+# reuse the spool without re-querying Oracle.
+#
+# Do NOT add production-history to spool_warmup_scheduler._WARMUP_JOBS.
+
+
+def make_canonical_spool_id(params: Dict[str, Any]) -> str:
+    """Return the canonical on-demand spool id for a production-history query.
+
+    Delegates to the internal ``_make_dataset_id`` which already includes
+    pj_types, date range, and all user-supplied filter params.
+
+    This function is the stable public entry point for external callers
+    (routes, tests) that need to look up or reuse an existing spool.
+    """
+    return _make_dataset_id(params)

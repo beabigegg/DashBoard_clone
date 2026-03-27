@@ -731,7 +731,7 @@ resource_status_history:
 # ── Mid-Section Defect ──────────────────────────────────────────────────────
 
 mid_section_defect_analysis:
-  description: 中段缺陷追溯分析，從測試站不良追溯上游加工站的關聯性
+  description: 中段缺陷追溯分析，從測試站不良追溯上游加工站的關聯性（compatibility path，底層已改走 spool + DuckDB）
   service: mes_dashboard.services.mid_section_defect_service.query_analysis
   chart_type: table
   params:

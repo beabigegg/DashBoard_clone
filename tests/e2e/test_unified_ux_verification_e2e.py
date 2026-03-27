@@ -10,6 +10,8 @@ Covers tasks 19.2–19.5:
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+import json
 import re
 import time
 from urllib.parse import parse_qs, quote, urlparse
@@ -26,6 +28,44 @@ from playwright.sync_api import Page, expect
 def _api_get(url: str, timeout: float = 10.0):
     """Best-effort GET."""
     return requests.get(url, timeout=timeout, allow_redirects=False)
+
+
+def _ensure_shell_auth(page: Page):
+    """Mock shell auth endpoints so portal-shell pages can load consistently."""
+    if getattr(page, "_shell_auth_mocked", False):
+        return
+
+    def handle_auth_me(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps(
+                {
+                    "success": True,
+                    "data": {
+                        "username": "92367",
+                        "displayName": "E2E Admin",
+                        "mail": "ymirliu@panjit.com.tw",
+                        "department": "E2E",
+                        "telephoneNumber": "1234",
+                        "domain": "PANJIT",
+                        "is_admin": True,
+                    },
+                },
+                ensure_ascii=False,
+            ),
+        )
+
+    def handle_heartbeat(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({"success": True, "data": {"online_count": 1}}),
+        )
+
+    page.route("**/api/auth/me", handle_auth_me)
+    page.route("**/api/auth/heartbeat", handle_heartbeat)
+    page._shell_auth_mocked = True
 
 
 def _pick_first(app_server: str, api_path: str, key: str = "data") -> list:
@@ -87,9 +127,10 @@ class _ResponseCollector:
 
 def _goto(page: Page, app_server: str, path: str, **params):
     """Navigate to a page with optional query params."""
+    _ensure_shell_auth(page)
     qs = "&".join(f"{k}={quote(str(v))}" for k, v in params.items() if v)
-    url = f"{app_server}/{path}" + (f"?{qs}" if qs else "")
-    page.goto(url, wait_until="commit", timeout=60000)
+    url = f"{app_server}/portal-shell/{path}" + (f"?{qs}" if qs else "")
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(3000)  # let initial API calls settle
     return url
 
@@ -97,6 +138,12 @@ def _goto(page: Page, app_server: str, path: str, **params):
 def _wait_network_idle(page: Page, seconds: float = 5.0):
     """Wait for network activity to settle."""
     page.wait_for_timeout(int(seconds * 1000))
+
+
+def _wait_until_enabled(locator, timeout: int = 120000):
+    """Wait until the first locator target becomes enabled."""
+    expect(locator.first).to_be_visible(timeout=timeout)
+    expect(locator.first).to_be_enabled(timeout=timeout)
 
 
 # ---------------------------------------------------------------------------
@@ -159,15 +206,23 @@ class TestFilterCrossImpactMatrix:
         """Date Apply → POST /query (primary), supplementary filters → GET /view."""
         _goto(page, app_server, "hold-history")
 
-        collector = _ResponseCollector(page).start(url_contains="/api/hold-history/")
-
         # Find and click the apply/query button
         apply_btn = page.locator("button.ui-btn--primary, button:has-text('套用'), button:has-text('查詢')")
         if apply_btn.count() > 0:
+            _wait_until_enabled(apply_btn)
+            start_input = page.locator("#hold-history-start-date")
+            if start_input.count() == 0:
+                pytest.skip("No hold-history start date input found")
+            current_start = start_input.first.input_value()
+            next_start = (datetime.strptime(current_start, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+            start_input.first.fill(next_start)
+            collector = _ResponseCollector(page).start(url_contains="/api/hold-history/")
             apply_btn.first.click()
             _wait_network_idle(page, 8)
+            responses = collector.stop()
+        else:
+            responses = []
 
-        responses = collector.stop()
         paths = [r["path"] for r in responses]
 
         if apply_btn.count() > 0:
@@ -181,6 +236,7 @@ class TestFilterCrossImpactMatrix:
         # First do primary query
         apply_btn = page.locator("button.ui-btn--primary, button:has-text('套用'), button:has-text('查詢')")
         if apply_btn.count() > 0:
+            _wait_until_enabled(apply_btn)
             apply_btn.first.click()
             _wait_network_idle(page, 8)
 

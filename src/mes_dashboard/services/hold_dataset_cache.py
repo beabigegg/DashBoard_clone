@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -690,4 +691,38 @@ def _derive_list(
             "total": total,
             "totalPages": total_pages,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Canonical warmup identity (task 2.1)
+# ---------------------------------------------------------------------------
+# hold-overview canonical spool key is determined by (start_date, end_date).
+# Warmup uses the rolling last-90-days window so the key is date-stable.
+_WARMUP_DAYS = 90
+
+
+def make_canonical_warmup_query_id(start_date: str, end_date: str) -> str:
+    """Return the canonical spool key for the given date range."""
+    return _make_query_id({"start_date": start_date, "end_date": end_date})
+
+
+def ensure_dataset_loaded() -> Dict[str, Any]:
+    """Ensure the default hold dataset exists in cache (used by warmup scheduler)."""
+    end_dt = date.today()
+    start_dt = end_dt - timedelta(days=_WARMUP_DAYS - 1)
+    start_date = start_dt.strftime("%Y-%m-%d")
+    end_date = end_dt.strftime("%Y-%m-%d")
+
+    query_id = make_canonical_warmup_query_id(start_date, end_date)
+    cached = _get_cached_df(query_id)
+    if cached is not None:
+        return {"query_id": query_id, "cache_hit": True, "start_date": start_date, "end_date": end_date}
+
+    result = execute_primary_query(start_date=start_date, end_date=end_date)
+    return {
+        "query_id": result.get("query_id", query_id),
+        "cache_hit": False,
+        "start_date": start_date,
+        "end_date": end_date,
     }

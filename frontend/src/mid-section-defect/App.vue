@@ -104,6 +104,10 @@ const resolutionInfo = ref(null);
 const availableLossReasons = ref([]);
 const trace = useTraceProgress({ profile: 'mid_section_defect' });
 
+// Canonical trace_query_id from spool-hit or async job result.
+// Passed to detail/export so the backend can serve from spool instead of Oracle.
+const currentTraceQueryId = ref(null);
+
 const analysisData = ref({
   kpi: {},
   charts: {},
@@ -327,6 +331,10 @@ function buildDetailParams() {
   if (snapshot.lossReasons.length) {
     params.loss_reasons = snapshot.lossReasons.join(',');
   }
+  // Pass canonical trace_query_id when available so backend serves from spool.
+  if (currentTraceQueryId.value) {
+    params.trace_query_id = currentTraceQueryId.value;
+  }
   return params;
 }
 
@@ -401,6 +409,7 @@ async function loadAnalysis() {
   queryError.value = '';
   restoredFromCache.value = false;
   resolutionInfo.value = null;
+  currentTraceQueryId.value = null;
   updateUpstreamField('station', []);
   updateUpstreamField('spec', []);
   trace.abort();
@@ -429,6 +438,12 @@ async function loadAnalysis() {
         ...eventsAggregation.value,
         total_ancestor_count: trace.stage_results.lineage?.total_ancestor_count || 0,
       };
+    }
+
+    // Capture canonical trace_query_id for spool-backed detail/export calls.
+    const eventsResult = trace.stage_results.events;
+    if (eventsResult?.trace_query_id) {
+      currentTraceQueryId.value = eventsResult.trace_query_id;
     }
 
     const stageError = firstStageErrorMessage();
@@ -483,6 +498,10 @@ function exportCsv() {
   });
   if (snapshot.lossReasons.length) {
     params.set('loss_reasons', snapshot.lossReasons.join(','));
+  }
+  // Pass canonical trace_query_id when available so backend streams from spool.
+  if (currentTraceQueryId.value) {
+    params.set('trace_query_id', currentTraceQueryId.value);
   }
 
   const link = document.createElement('a');

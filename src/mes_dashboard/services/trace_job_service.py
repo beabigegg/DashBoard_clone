@@ -9,6 +9,7 @@ process — independent of gunicorn — with its own memory space.
 from __future__ import annotations
 
 import gc
+import hashlib
 import json
 import logging
 import os
@@ -168,7 +169,7 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     created_at = float(meta.get("created_at", 0))
     elapsed = time.time() - created_at if created_at > 0 else 0
 
-    return {
+    result: Dict[str, Any] = {
         "job_id": job_id,
         "status": meta.get("status", "unknown"),
         "profile": meta.get("profile"),
@@ -179,6 +180,24 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
         "elapsed_seconds": round(elapsed, 1),
         "error": meta.get("error") or None,
     }
+
+    # Stage-aware progress fields (task 4.2)
+    stage = meta.get("stage")
+    if stage:
+        result["stage"] = stage
+    completed_stages_raw = meta.get("completed_stages")
+    if completed_stages_raw:
+        stages = [s.strip() for s in completed_stages_raw.split(",") if s.strip()]
+        if stages:
+            result["completed_stages"] = stages
+
+    # Canonical query_id / trace_query_id for spool-backed results
+    query_id = meta.get("query_id")
+    if query_id:
+        result["query_id"] = query_id
+        result["trace_query_id"] = query_id  # alias for MSD consumers
+
+    return result
 
 
 def get_job_result(
@@ -606,7 +625,32 @@ def execute_trace_events_job(
         _update_meta(job_id, progress="building response")
 
         aggregation = None
+        trace_query_id: Optional[str] = None
         if is_msd:
+            # Task 6.1: compute canonical trace_query_id for spool registration
+            params = payload.get("params") or {}
+            trace_query_id = make_trace_query_id(
+                profile=profile,
+                container_ids=container_ids,
+                start_date=params.get("start_date"),
+                end_date=params.get("end_date"),
+                station=params.get("station"),
+                direction=params.get("direction"),
+            )
+
+            # Write events stage spool for DuckDB runtime (task 6.1)
+            try:
+                _write_msd_events_spool(
+                    job_id=job_id,
+                    trace_query_id=trace_query_id,
+                    raw_domain_results=raw_domain_results,
+                )
+            except Exception as _spool_exc:
+                logger.warning(
+                    "trace job events spool write failed job_id=%s: %s",
+                    job_id, _spool_exc,
+                )
+
             aggregation, agg_error = _build_job_msd_aggregation(
                 payload,
                 raw_domain_results,
@@ -637,12 +681,10 @@ def execute_trace_events_job(
                 domain_quality_meta=domain_quality_meta,
             )
 
-        _update_meta(
-            job_id,
-            status="finished",
-            progress="complete",
-            completed_at=time.time(),
-        )
+        _finish_meta = {"status": "finished", "progress": "complete", "completed_at": time.time()}
+        if trace_query_id:
+            _finish_meta["query_id"] = trace_query_id
+        _update_meta(job_id, **_finish_meta)
 
         logger.info(
             "trace job completed job_id=%s profile=%s domains=%s",
@@ -679,6 +721,58 @@ def _flatten_domain_records(
             if isinstance(row, dict):
                 rows.append(row)
     return rows
+
+
+def _write_msd_events_spool(
+    job_id: str,
+    trace_query_id: str,
+    raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]],
+) -> None:
+    """Write flattened MSD events to parquet spool for DuckDB runtime.
+
+    Task 6.1: records stage spool metadata so that /analysis/detail and /export
+    can read from DuckDB instead of re-running Oracle.
+    """
+    import pandas as pd
+    import tempfile
+    from pathlib import Path
+    from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE, _STAGE_EVENTS
+    from mes_dashboard.core.query_spool_store import register_stage_spool_file
+
+    rows: List[Dict[str, Any]] = []
+    for events_by_cid in raw_domain_results.values():
+        for records in events_by_cid.values():
+            if isinstance(records, list):
+                rows.extend(r for r in records if isinstance(r, dict))
+
+    if not rows:
+        logger.debug("_write_msd_events_spool: no events to spool for trace_query_id=%s", trace_query_id)
+        return
+
+    df = pd.DataFrame(rows)
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    df.to_parquet(tmp_path, engine="pyarrow", index=False)
+
+    ok = register_stage_spool_file(
+        SPOOL_NAMESPACE,
+        trace_query_id,
+        _STAGE_EVENTS,
+        tmp_path,
+        row_count=len(df),
+    )
+    if ok:
+        logger.info(
+            "_write_msd_events_spool: registered events spool trace_query_id=%s rows=%d",
+            trace_query_id, len(df),
+        )
+    else:
+        logger.warning(
+            "_write_msd_events_spool: spool registration failed trace_query_id=%s",
+            trace_query_id,
+        )
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
 
 
 def _build_job_msd_aggregation(
@@ -754,3 +848,54 @@ def _build_job_msd_aggregation(
     if "error" in aggregation:
         return None, str(aggregation["error"])
     return aggregation, None
+
+
+# ---------------------------------------------------------------------------
+# Canonical trace_query_id / dataset_id (task 2.4)
+# ---------------------------------------------------------------------------
+# MSD staged trace must expose a stable ``trace_query_id`` so that:
+#   - /analysis/detail and /export can resolve the matching spool
+#   - spool can be reused without re-running Oracle
+#
+# The trace_query_id is derived from the primary query parameters (not a
+# random UUID) so that the same query always maps to the same spool key.
+_TRACE_QUERY_ID_SCHEMA_VERSION = 1
+
+
+def make_trace_query_id(
+    profile: str,
+    container_ids: List[str],
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    station: Optional[str] = None,
+    direction: Optional[str] = None,
+    **extra_params,
+) -> str:
+    """Return the canonical trace_query_id for an MSD staged trace query.
+
+    The id is derived from the primary query parameters so that any repeat
+    invocation with the same inputs returns the same id and can reuse an
+    existing spool.
+
+    ``extra_params`` are included in the hash when non-empty to support
+    future MSD variants without breaking the existing identity contract.
+    """
+    key: Dict[str, Any] = {
+        "_v": _TRACE_QUERY_ID_SCHEMA_VERSION,
+        "profile": profile,
+        "container_ids": sorted(container_ids or []),
+    }
+    if start_date:
+        key["start_date"] = start_date
+    if end_date:
+        key["end_date"] = end_date
+    if station:
+        key["station"] = station
+    if direction:
+        key["direction"] = direction
+    if extra_params:
+        key["extra"] = {k: v for k, v in sorted(extra_params.items())}
+
+    canonical = json.dumps(key, sort_keys=True, ensure_ascii=False, default=str)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+    return f"msd-{digest}"

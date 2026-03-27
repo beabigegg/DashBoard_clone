@@ -174,16 +174,9 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertIn('190', payload['error']['message'])
         mock_execute.assert_not_called()
 
-    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
-    def test_query_accepts_date_range_within_half_year(self, mock_execute):
-        mock_execute.return_value = {
-            'query_id': 'qid-001',
-            'summary': {},
-            'trend': [],
-            'detail': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 1}},
-            'available_filters': {'workcenter_groups': [], 'packages': [], 'reasons': []},
-            'meta': {},
-        }
+    @patch('mes_dashboard.services.reject_query_job_service.enqueue_reject_query', return_value=('reject-job-001', None))
+    @patch('mes_dashboard.routes.reject_history_routes._get_cached_df', return_value=None)
+    def test_query_accepts_date_range_within_half_year(self, _mock_cache, _mock_enqueue):
 
         response = self.client.post(
             '/api/reject-history/query',
@@ -198,19 +191,13 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         )
         payload = json.loads(response.data)
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
         self.assertTrue(payload['success'])
-        mock_execute.assert_called_once()
+        self.assertEqual(payload['data']['job_id'], 'reject-job-001')
 
-    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
-    def test_query_returns_503_when_primary_overload(self, mock_execute):
-        from mes_dashboard.services.reject_dataset_cache import RejectPrimaryQueryOverloadError
-
-        mock_execute.side_effect = RejectPrimaryQueryOverloadError(
-            "同條件查詢正在執行中，請稍後重試",
-            code="SERVICE_UNAVAILABLE",
-            retry_after=5,
-        )
+    @patch('mes_dashboard.services.reject_query_job_service.enqueue_reject_query', return_value=(None, 'redis unavailable'))
+    @patch('mes_dashboard.routes.reject_history_routes._get_cached_df', return_value=None)
+    def test_query_returns_503_when_async_enqueue_fails(self, _mock_cache, _mock_enqueue):
 
         response = self.client.post(
             '/api/reject-history/query',
@@ -228,7 +215,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(response.status_code, 503)
         self.assertFalse(payload['success'])
         self.assertEqual(payload['error']['code'], 'SERVICE_UNAVAILABLE')
-        self.assertEqual(response.headers.get('Retry-After'), '5')
+        self.assertEqual(response.headers.get('Retry-After'), '30')
 
     @patch('mes_dashboard.routes.reject_history_routes.query_trend')
     def test_trend_invalid_granularity_returns_400(self, mock_trend):

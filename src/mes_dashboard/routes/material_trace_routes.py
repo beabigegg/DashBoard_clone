@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 from flask import Blueprint, Response, stream_with_context
 
@@ -14,6 +15,7 @@ from mes_dashboard.core.response import (
     SERVICE_UNAVAILABLE,
     error_response,
     internal_error,
+    not_found_error,
     service_unavailable_error,
     success_response,
     validation_error,
@@ -22,10 +24,11 @@ from mes_dashboard.services.container_resolution_policy import (
     validate_resolution_request,
 )
 from mes_dashboard.services.filter_cache import get_workcenter_groups
+from mes_dashboard.services.async_query_job_service import enqueue_job, get_job_status
+from mes_dashboard.services.material_trace_duckdb_runtime import MaterialTraceDuckdbRuntime
 from mes_dashboard.services.material_trace_service import (
-    export_csv,
-    forward_query,
-    reverse_query,
+    make_route_query_hash,
+    rq_material_trace_job,
 )
 
 logger = logging.getLogger("mes_dashboard.material_trace")
@@ -119,7 +122,11 @@ def _validate_query_params(body: dict) -> tuple[str | None, str, list[str], list
 @material_trace_bp.route("/api/material-trace/query", methods=["POST"])
 @_QUERY_RATE_LIMIT
 def api_material_trace_query():
-    """Execute material trace query (forward or reverse)."""
+    """Execute material trace query (forward or reverse).
+
+    Task 8.3/8.4: Checks spool first (DuckDB hit), enqueues async RQ job on
+    miss, and fails closed if the background worker path is unavailable.
+    """
     body, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
         return validation_error(payload_error.message)
@@ -129,12 +136,51 @@ def api_material_trace_query():
         return validation_error(error)
 
     try:
-        if mode in _FORWARD_MODES:
-            result = forward_query(mode, values, workcenter_groups, page, per_page)
-        else:
-            result = reverse_query(values, workcenter_groups, page, per_page)
+        # ── Task 8.3: Try spool hit first (DuckDB, no Oracle) ──────────────
+        query_hash = make_route_query_hash(mode, values, workcenter_groups)
+        try:
+            rt = MaterialTraceDuckdbRuntime(query_hash)
+            if rt.is_available():
+                duckdb_result = rt.get_page(page, per_page)
+                if duckdb_result is not None:
+                    return success_response(duckdb_result)
+        except Exception as _spool_exc:
+            logger.debug("material_trace spool hit check failed: %s", _spool_exc)
 
-        return success_response(result)
+        # ── Spool miss — enqueue async RQ job ───────────────────────────────
+        try:
+            generated_job_id = f"mtrace-{uuid.uuid4().hex[:12]}"
+            job_id, err = enqueue_job(
+                queue_name="default",
+                worker_fn=rq_material_trace_job,
+                prefix="material_trace",
+                job_id=generated_job_id,
+                kwargs={
+                    "job_id": generated_job_id,
+                    "mode": mode,
+                    "values": values,
+                    "workcenter_groups": workcenter_groups,
+                },
+            )
+            if job_id is not None:
+                return success_response(
+                    {
+                        "async": True,
+                        "job_id": job_id,
+                        "status_url": f"/api/material-trace/job/{job_id}",
+                        "query_hash": query_hash,
+                    },
+                    status_code=202,
+                )
+            logger.warning("material_trace async enqueue failed (%s)", err)
+        except Exception as _enqueue_exc:
+            logger.warning("material_trace enqueue error: %s", _enqueue_exc)
+        return error_response(
+            SERVICE_UNAVAILABLE,
+            "背景查詢服務不可用，請稍後再試",
+            status_code=503,
+            headers={"Retry-After": "30"},
+        )
 
     except MemoryError as exc:
         logger.warning("Material trace query memory guard: %s", exc)
@@ -150,51 +196,53 @@ def api_material_trace_query():
         return internal_error()
 
 
+@material_trace_bp.route("/api/material-trace/job/<job_id>", methods=["GET"])
+@_QUERY_RATE_LIMIT
+def api_material_trace_job_status(job_id: str):
+    """Get async material trace job status (task 8.3)."""
+    status = get_job_status("material_trace", job_id)
+    if status is None:
+        return not_found_error("Job not found")
+    return success_response(status)
+
+
 @material_trace_bp.route("/api/material-trace/export", methods=["POST"])
 @_EXPORT_RATE_LIMIT
 def api_material_trace_export():
-    """Export material trace query results as CSV."""
+    """Export material trace query results as CSV.
+
+    Task 8.3/8.4: Requires ``query_hash`` from a completed query and streams
+    directly from DuckDB parquet. No legacy Oracle export fallback remains.
+    """
     body, payload_error = parse_json_payload(require_non_empty_object=True)
     if payload_error is not None:
         return validation_error(payload_error.message)
+
+    query_hash = str(body.get("query_hash") or "").strip()
+    if not query_hash:
+        return validation_error("匯出需提供 query_hash，請先完成查詢")
 
     error, mode, values, workcenter_groups, _page, _per_page = _validate_query_params(body)
     if error:
         return validation_error(error)
 
     try:
-        csv_stream, export_meta = export_csv(mode, values, workcenter_groups)
-        meta = export_meta.get("meta") if isinstance(export_meta, dict) else {}
-        quality_meta = export_meta.get("quality_meta") if isinstance(export_meta, dict) else {}
-        status = str((quality_meta or {}).get("status", "complete")).strip().lower() or "complete"
-        reasons = quality_meta.get("reasons") if isinstance(quality_meta, dict) else []
-        reason_header = ",".join([str(r).strip() for r in (reasons or []) if str(r).strip()])
+        rt = MaterialTraceDuckdbRuntime(query_hash)
+        if not rt.is_available():
+            return error_response(
+                "QUERY_NOT_READY",
+                "查詢結果尚未就緒，請先完成查詢",
+                status_code=409,
+            )
 
-        response = Response(
-            stream_with_context(csv_stream),
+        return Response(
+            stream_with_context(rt.export_csv()),
             mimetype="text/csv; charset=utf-8",
             headers={
                 "Content-Disposition": "attachment; filename=material_trace.csv",
-                "X-Query-Quality-Status": status,
-                "X-Query-Quality-Reasons": reason_header,
+                "X-Query-Quality-Status": "complete",
             },
         )
-        if isinstance(quality_meta, dict):
-            observed_rows = quality_meta.get("observed_rows")
-            max_rows = quality_meta.get("max_rows")
-            if observed_rows is not None:
-                response.headers["X-Query-Quality-Observed-Rows"] = str(observed_rows)
-            if max_rows is not None:
-                response.headers["X-Query-Quality-Max-Rows"] = str(max_rows)
-
-        if status == "truncated" or (isinstance(meta, dict) and meta.get("truncated")):
-            response.headers["X-Truncated"] = "true"
-            response.headers["X-Max-Rows"] = str(
-                (meta or {}).get("export_max_rows")
-                or (quality_meta or {}).get("max_rows")
-                or ""
-            )
-        return response
 
     except MemoryError as exc:
         logger.warning("Material trace export memory guard: %s", exc)

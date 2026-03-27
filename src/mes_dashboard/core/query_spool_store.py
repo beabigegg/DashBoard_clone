@@ -59,16 +59,32 @@ def _float_env(name: str, default: float) -> float:
         return default
 
 
-QUERY_SPOOL_ENABLED = _bool_env("REJECT_ENGINE_SPILL_ENABLED", True)
+# Canonical env var names.  Legacy REJECT_ENGINE_* names are accepted as
+# fallbacks so existing deployments continue to work without reconfiguration.
+QUERY_SPOOL_ENABLED = _bool_env("QUERY_SPOOL_ENABLED", _bool_env("REJECT_ENGINE_SPILL_ENABLED", True))
 QUERY_SPOOL_DIR = Path(os.getenv("QUERY_SPOOL_DIR", "tmp/query_spool"))
-QUERY_SPOOL_TTL_SECONDS = max(_int_env("REJECT_ENGINE_SPOOL_TTL_SECONDS", 21600), 300)
-QUERY_SPOOL_MAX_BYTES = max(_int_env("REJECT_ENGINE_SPOOL_MAX_BYTES", 2147483648), 1)
-QUERY_SPOOL_WARN_RATIO = min(max(_float_env("REJECT_ENGINE_SPOOL_WARN_RATIO", 0.85), 0.1), 1.0)
+QUERY_SPOOL_TTL_SECONDS = max(
+    _int_env("SPOOL_TTL_SECONDS", _int_env("REJECT_ENGINE_SPOOL_TTL_SECONDS", 10800)), 300
+)
+QUERY_SPOOL_MAX_BYTES = max(
+    _int_env("QUERY_SPOOL_MAX_BYTES", _int_env("REJECT_ENGINE_SPOOL_MAX_BYTES", 10_737_418_240)), 1
+)
+QUERY_SPOOL_WARN_RATIO = min(
+    max(_float_env("QUERY_SPOOL_WARN_RATIO", _float_env("REJECT_ENGINE_SPOOL_WARN_RATIO", 0.85)), 0.1), 1.0
+)
 QUERY_SPOOL_CLEANUP_INTERVAL_SECONDS = max(
-    _int_env("REJECT_ENGINE_SPOOL_CLEANUP_INTERVAL_SECONDS", 300), 30
+    _int_env(
+        "QUERY_SPOOL_CLEANUP_INTERVAL_SECONDS",
+        _int_env("REJECT_ENGINE_SPOOL_CLEANUP_INTERVAL_SECONDS", 300),
+    ),
+    30,
 )
 QUERY_SPOOL_ORPHAN_GRACE_SECONDS = max(
-    _int_env("REJECT_ENGINE_SPOOL_ORPHAN_GRACE_SECONDS", 600), 60
+    _int_env(
+        "QUERY_SPOOL_ORPHAN_GRACE_SECONDS",
+        _int_env("REJECT_ENGINE_SPOOL_ORPHAN_GRACE_SECONDS", 600),
+    ),
+    60,
 )
 _SPOOL_SCHEMA_VERSION = 1
 _VALID_ID_RE = re.compile(r"^[A-Za-z0-9._-]{4,128}$")
@@ -106,6 +122,30 @@ def _target_path(namespace: str, query_id: str) -> Path:
     root_str = str(root)
     if not str(path).startswith(f"{root_str}{os.sep}"):
         raise ValueError("Invalid spool target path")
+    return path
+
+
+def _safe_stage(stage: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]", "_", str(stage or "").strip()) or "default"
+
+
+def _stage_meta_key(namespace: str, query_id: str, stage: str) -> str:
+    ns = _normalize_namespace(namespace)
+    return f"{ns}:spool_stage:{query_id}:{_safe_stage(stage)}"
+
+
+def _stage_index_key(namespace: str, query_id: str) -> str:
+    ns = _normalize_namespace(namespace)
+    return f"{ns}:spool_stages:{query_id}"
+
+
+def _stage_target_path(namespace: str, query_id: str, stage: str) -> Path:
+    root = _spool_root()
+    ns = _normalize_namespace(namespace)
+    path = (root / ns / f"{query_id}_{_safe_stage(stage)}.parquet").resolve()
+    root_str = str(root)
+    if not str(path).startswith(f"{root_str}{os.sep}"):
+        raise ValueError("Invalid spool stage target path")
     return path
 
 
@@ -423,6 +463,146 @@ def register_spool_file(
     except Exception as exc:
         logger.warning("Failed to register spool file (query_id=%s): %s", safe_query_id, exc)
         return False
+
+
+def register_stage_spool_file(
+    namespace: str,
+    query_id: str,
+    stage: str,
+    src_path: "Path",
+    row_count: int,
+    *,
+    ttl_seconds: Optional[int] = None,
+) -> bool:
+    """Register a stage-level parquet file for a multi-stage pipeline job.
+
+    Stores the file at ``{namespace}/{query_id}_{stage}.parquet`` and records
+    both per-stage metadata (``{ns}:spool_stage:{query_id}:{stage}``) and a
+    Redis SET index of completed stages (``{ns}:spool_stages:{query_id}``).
+    """
+    if not QUERY_SPOOL_ENABLED:
+        return False
+
+    safe_query_id = _safe_query_id(query_id)
+    if not safe_query_id:
+        logger.warning("Invalid query_id for register_stage_spool_file: %s", query_id)
+        return False
+
+    safe_st = _safe_stage(stage)
+    client = get_redis_client()
+    if client is None:
+        logger.warning("Redis unavailable, skip register_stage_spool_file query_id=%s stage=%s", safe_query_id, safe_st)
+        return False
+
+    ttl = max(int(ttl_seconds or QUERY_SPOOL_TTL_SECONDS), 60)
+
+    try:
+        import pyarrow.parquet as _pq
+        schema = _pq.read_schema(str(src_path))
+        columns = [str(f.name) for f in schema]
+    except Exception:
+        columns = []
+
+    try:
+        dest = _stage_target_path(namespace, safe_query_id, safe_st)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        Path(src_path).replace(dest)
+
+        now_ts = int(time.time())
+        metadata = {
+            "schema_version": _SPOOL_SCHEMA_VERSION,
+            "namespace": _normalize_namespace(namespace),
+            "query_id": safe_query_id,
+            "stage": safe_st,
+            "relative_path": str(dest.relative_to(_spool_root())),
+            "row_count": int(row_count),
+            "column_count": int(len(columns)),
+            "columns_hash": _columns_hash(columns),
+            "created_at": now_ts,
+            "expires_at": now_ts + ttl,
+            "file_size_bytes": int(dest.stat().st_size),
+        }
+        stage_key = get_key(_stage_meta_key(namespace, safe_query_id, safe_st))
+        client.setex(stage_key, ttl, json.dumps(metadata, ensure_ascii=False, sort_keys=True))
+
+        # Track stage name in the namespace index SET
+        index_key = get_key(_stage_index_key(namespace, safe_query_id))
+        client.sadd(index_key, safe_st)
+        client.expire(index_key, ttl)
+
+        return True
+    except Exception as exc:
+        logger.warning(
+            "Failed to register stage spool file (query_id=%s stage=%s): %s",
+            safe_query_id, safe_st, exc,
+        )
+        return False
+
+
+def get_stage_spool_metadata(namespace: str, query_id: str, stage: str) -> Optional[dict]:
+    """Return metadata for a specific stage of a multi-stage spool."""
+    safe_query_id = _safe_query_id(query_id)
+    if not safe_query_id:
+        return None
+    client = get_redis_client()
+    if client is None:
+        return None
+    key = get_key(_stage_meta_key(namespace, safe_query_id, _safe_stage(stage)))
+    try:
+        raw = client.get(key)
+        if not raw:
+            return None
+        payload = json.loads(raw)
+        return payload if isinstance(payload, dict) else None
+    except Exception as exc:
+        logger.warning("Failed to read stage spool metadata for %s/%s: %s", safe_query_id, stage, exc)
+        return None
+
+
+def get_stage_spool_path(namespace: str, query_id: str, stage: str) -> Optional[str]:
+    """Resolve the parquet file path for a specific stage without loading it."""
+    if not QUERY_SPOOL_ENABLED:
+        return None
+    safe_query_id = _safe_query_id(query_id)
+    if not safe_query_id:
+        return None
+    metadata = get_stage_spool_metadata(namespace, safe_query_id, stage)
+    if metadata is None:
+        return None
+    expires_at = int(metadata.get("expires_at") or 0)
+    if expires_at and expires_at <= int(time.time()):
+        return None
+    path = _path_from_relative(str(metadata.get("relative_path") or ""))
+    if path is None or not path.exists():
+        return None
+    return str(path)
+
+
+def list_namespace_stages(namespace: str, query_id: str) -> list:
+    """Return the list of completed stage names for a multi-stage spool."""
+    safe_query_id = _safe_query_id(query_id)
+    if not safe_query_id:
+        return []
+    client = get_redis_client()
+    if client is None:
+        return []
+    key = get_key(_stage_index_key(namespace, safe_query_id))
+    try:
+        members = client.smembers(key)
+        return sorted(m.decode() if isinstance(m, bytes) else str(m) for m in members)
+    except Exception:
+        return []
+
+
+def list_namespace_spool_paths(namespace: str, query_id: str) -> list:
+    """Return resolved parquet file paths for all completed stages."""
+    stages = list_namespace_stages(namespace, query_id)
+    paths = []
+    for stage in stages:
+        path = get_stage_spool_path(namespace, query_id, stage)
+        if path:
+            paths.append(path)
+    return paths
 
 
 def clear_spooled_df(namespace: str, query_id: str, *, remove_file: bool = True) -> None:

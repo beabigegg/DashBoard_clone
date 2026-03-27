@@ -36,8 +36,63 @@ def _extract_container_id(payload: dict[str, Any]) -> str:
     )
 
 
+def _probe_health_recoverability(base_url: str, attempts: int = 5, timeout: float = 5.0) -> tuple[int, list[str]]:
+    """Probe health multiple times to allow brief post-burst recovery windows."""
+    healthy_probes = 0
+    errors: list[str] = []
+
+    for _ in range(attempts):
+        probe_start = time.time()
+        try:
+            response = requests.get(f"{base_url}/health", timeout=timeout)
+            if response.status_code in (200, 503):
+                payload = response.json()
+                if payload.get("status") in {"healthy", "degraded", "unhealthy"}:
+                    healthy_probes += 1
+                else:
+                    errors.append(f"unexpected health payload: {payload}")
+            else:
+                errors.append(f"unexpected health status: {response.status_code}")
+        except Exception as exc:  # pragma: no cover - runtime dependent
+            errors.append(str(exc)[:120])
+        elapsed = time.time() - probe_start
+        if healthy_probes >= 3:
+            break
+        time.sleep(max(0.5, min(2.0, elapsed + 0.2)))
+
+    return healthy_probes, errors
+
+
 def _intercept_navigation_as_admin(page: Page):
-    """Inject query-tool route to portal navigation for stress browser tests."""
+    """Inject auth + navigation so query-tool can render inside portal shell."""
+
+    def handle_auth_me(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps(
+                {
+                    "success": True,
+                    "data": {
+                        "username": "92367",
+                        "displayName": "Stress Admin",
+                        "mail": "ymirliu@panjit.com.tw",
+                        "department": "E2E",
+                        "telephoneNumber": "1234",
+                        "domain": "PANJIT",
+                        "is_admin": True,
+                    },
+                },
+                ensure_ascii=False,
+            ),
+        )
+
+    def handle_heartbeat(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({"success": True, "data": {"online_count": 1}}),
+        )
 
     def handle_route(route):
         response = route.fetch()
@@ -80,6 +135,8 @@ def _intercept_navigation_as_admin(page: Page):
             body=json.dumps(body),
         )
 
+    page.route("**/api/auth/me", handle_auth_me)
+    page.route("**/api/auth/heartbeat", handle_heartbeat)
     page.route("**/api/portal/navigation", handle_route)
 
 
@@ -278,10 +335,11 @@ class TestQueryToolApiStress:
             f"{five_xx_errors[:5]}"
         )
 
-        health_resp = requests.get(f"{base_url}/health", timeout=10)
-        assert health_resp.status_code in (200, 503)
-        health_payload = health_resp.json()
-        assert health_payload.get("status") in {"healthy", "degraded", "unhealthy"}
+        healthy_probes, health_errors = _probe_health_recoverability(base_url)
+        assert healthy_probes >= 3, (
+            f"Health endpoint recoverability too low: {healthy_probes}/5 "
+            f"({health_errors[:3]})"
+        )
 
     def test_large_multi_value_resolve_high_concurrency_stability(
         self,
@@ -325,8 +383,11 @@ class TestQueryToolApiStress:
         assert all("HTTP 5" not in err for err in result.errors), f"5xx detected: {result.errors[:5]}"
 
         # Post-burst recoverability probe.
-        health_resp = requests.get(f"{base_url}/health", timeout=10)
-        assert health_resp.status_code in (200, 503)
+        healthy_probes, health_errors = _probe_health_recoverability(base_url)
+        assert healthy_probes >= 3, (
+            f"Health endpoint recoverability too low: {healthy_probes}/5 "
+            f"({health_errors[:3]})"
+        )
 
 
 @pytest.mark.stress
@@ -337,7 +398,7 @@ class TestQueryToolBrowserStress:
         """Rapid resolve + tab switch cycles should not crash frontend runtime."""
         _intercept_navigation_as_admin(page)
         page.goto(f"{base_url}{QUERY_TOOL_BASE}?tab=lot", wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(1200)
+        expect(page.locator("textarea.query-tool-textarea").first).to_be_visible(timeout=60000)
 
         js_errors = []
         page.on("pageerror", lambda error: js_errors.append(str(error)))

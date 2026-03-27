@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
 import { parseMultiLineInput } from '../core/reject-history-filters.js';
@@ -33,6 +33,14 @@ const paginationLoading = ref(false);
 const errorMessage = ref('');
 const warningMessage = ref('');
 const unresolvedWarning = ref('');
+
+// ---- Async job state (task 8.3) ----
+const currentQueryHash = ref(null);
+const pollingJobId = ref(null);
+const _POLL_INTERVAL_MS = 2000;
+const _POLL_MAX_ATTEMPTS = 150; // ~5 minutes
+let _pollingAttempts = 0;
+let _pollingTimer = null;
 
 // ---- Computed ----
 const parsedValues = computed(() => parseMultiLineInput(inputText.value));
@@ -106,6 +114,53 @@ function clearResults() {
   errorMessage.value = '';
   warningMessage.value = '';
   unresolvedWarning.value = '';
+  currentQueryHash.value = null;
+  pollingJobId.value = null;
+  _stopPolling();
+}
+
+// ---- Async polling helpers (task 8.3) ----
+function _stopPolling() {
+  if (_pollingTimer !== null) {
+    clearTimeout(_pollingTimer);
+    _pollingTimer = null;
+  }
+}
+
+function _startPolling(jobId, queryPage) {
+  _pollingAttempts = 0;
+  function poll() {
+    if (pollingJobId.value !== jobId) return; // stale poll, discard
+    _pollingAttempts++;
+    if (_pollingAttempts > _POLL_MAX_ATTEMPTS) {
+      loading.value = false;
+      pollingJobId.value = null;
+      errorMessage.value = '查詢逾時，請重試';
+      return;
+    }
+    apiGet(`/api/material-trace/job/${jobId}`, { timeout: 10000 })
+      .then((res) => {
+        if (pollingJobId.value !== jobId) return;
+        const status = String(res?.data?.status || '').toLowerCase();
+        if (status === 'completed') {
+          pollingJobId.value = null;
+          _stopPolling();
+          void executePrimaryQuery(queryPage, { _fromPoll: true });
+        } else if (status === 'failed') {
+          loading.value = false;
+          pollingJobId.value = null;
+          errorMessage.value = res?.data?.error || '查詢失敗，請稍後再試';
+        } else {
+          _pollingTimer = setTimeout(poll, _POLL_INTERVAL_MS);
+        }
+      })
+      .catch(() => {
+        if (pollingJobId.value === jobId) {
+          _pollingTimer = setTimeout(poll, _POLL_INTERVAL_MS);
+        }
+      });
+  }
+  _pollingTimer = setTimeout(poll, _POLL_INTERVAL_MS);
 }
 
 // ---- Workcenter multi-select ----
@@ -138,20 +193,24 @@ async function loadFilterOptions() {
   }
 }
 
-async function executePrimaryQuery(page = 1, { paginationOnly = false } = {}) {
-  if (paginationOnly) {
+async function executePrimaryQuery(page = 1, { paginationOnly = false, _fromPoll = false } = {}) {
+  if (_fromPoll) {
+    // loading is already true from the original call — proceed directly
+  } else if (paginationOnly) {
     if (loading.value || paginationLoading.value) return;
-  } else if (!canQuery.value) {
-    return;
-  }
-
-  if (!paginationOnly) {
+  } else {
+    if (!canQuery.value) return;
+    _stopPolling();
+    pollingJobId.value = null;
+    currentQueryHash.value = null;
     errorMessage.value = '';
     warningMessage.value = '';
     unresolvedWarning.value = '';
     loading.value = true;
     paginationLoading.value = false;
-  } else {
+  }
+
+  if (paginationOnly) {
     paginationLoading.value = true;
   }
 
@@ -170,7 +229,7 @@ async function executePrimaryQuery(page = 1, { paginationOnly = false } = {}) {
 
     if (!result.success) {
       errorMessage.value = result.error?.message || '查詢失敗';
-      if (!paginationOnly) {
+      if (!paginationOnly && !_fromPoll) {
         rows.value = [];
         pagination.value = { page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 0 };
       }
@@ -178,6 +237,18 @@ async function executePrimaryQuery(page = 1, { paginationOnly = false } = {}) {
     }
 
     const payload = result.data || {};
+
+    // ── Task 8.3: Handle async 202 response ────────────────────────────────
+    if (payload.async) {
+      pollingJobId.value = payload.job_id;
+      currentQueryHash.value = payload.query_hash || null;
+      _startPolling(payload.job_id, page);
+      return; // loading stays true during polling
+    }
+
+    // Spool hit or sync result — capture query_hash if present
+    currentQueryHash.value = payload.query_hash || null;
+
     rows.value = payload.rows || [];
     pagination.value = payload.pagination || {
       page: 1,
@@ -193,13 +264,14 @@ async function executePrimaryQuery(page = 1, { paginationOnly = false } = {}) {
     warningMessage.value = buildQualityWarning(payload.quality_meta, payload.meta);
   } catch (err) {
     errorMessage.value = err.message || '查詢失敗，請稍後再試';
-    if (!paginationOnly) {
+    if (!paginationOnly && !_fromPoll) {
       rows.value = [];
     }
   } finally {
     if (paginationOnly) {
       paginationLoading.value = false;
-    } else {
+    } else if (!pollingJobId.value) {
+      // Only clear loading if we're not waiting for a poll result
       loading.value = false;
     }
   }
@@ -235,6 +307,10 @@ async function exportCsv() {
   };
   if (selectedWorkcenterGroups.value.length > 0) {
     body.workcenter_groups = selectedWorkcenterGroups.value;
+  }
+  // Task 8.3: pass query_hash so backend can stream from DuckDB spool
+  if (currentQueryHash.value) {
+    body.query_hash = currentQueryHash.value;
   }
 
   try {
@@ -278,6 +354,10 @@ async function exportCsv() {
 // ---- Lifecycle ----
 onMounted(() => {
   loadFilterOptions();
+});
+
+onUnmounted(() => {
+  _stopPolling();
 });
 
 // Close dropdown on click outside

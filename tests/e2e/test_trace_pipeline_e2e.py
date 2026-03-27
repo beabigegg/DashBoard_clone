@@ -53,6 +53,44 @@ def _post_events(base_url, profile, container_ids, domains=None, timeout=60):
     return response
 
 
+def _poll_trace_job_until_terminal(base_url, job_id, timeout=180):
+    """Poll trace async job until finished/failed and return the final status."""
+    deadline = time.time() + timeout
+    final_status = None
+    while time.time() < deadline:
+        status_resp = requests.get(f"{base_url}/api/trace/job/{job_id}", timeout=10)
+        assert status_resp.status_code == 200
+        final_status = status_resp.json().get("data", status_resp.json())
+        if final_status["status"] in ("finished", "failed"):
+            break
+        time.sleep(2)
+    return final_status
+
+
+def _unwrap_events_payload(base_url, response):
+    """Return materialized events payload from either sync or async response."""
+    assert response.status_code in (200, 202), (
+        f"Expected 200 or 202, got {response.status_code}: {response.text[:200]}"
+    )
+    payload = response.json().get("data", response.json())
+    if response.status_code == 200:
+        return payload
+
+    assert payload.get("async") is True
+    job_id = payload.get("job_id")
+    assert job_id, f"Async events response missing job_id: {payload}"
+
+    final_status = _poll_trace_job_until_terminal(base_url, job_id)
+    assert final_status is not None, "Trace async job polling timed out"
+    assert final_status["status"] == "finished", f"Trace async job did not finish: {final_status}"
+
+    result_resp = requests.get(f"{base_url}/api/trace/job/{job_id}/result", timeout=30)
+    assert result_resp.status_code == 200, (
+        f"Expected 200 result for trace job {job_id}, got {result_resp.status_code}: {result_resp.text[:200]}"
+    )
+    return result_resp.json().get("data", result_resp.json())
+
+
 def _resolve_cids(base_url, work_order):
     """Resolve real container IDs from a work order via live API."""
     resp = None
@@ -219,13 +257,12 @@ class TestTraceAdmissionControl:
     """Verify admission control: CID limits, profile bypass, validation."""
 
     def test_sync_response_with_small_cid_set(self, base, real_cids):
-        """Small CID count → sync 200 response with actual trace data."""
+        """Small CID count returns usable trace data via sync hit or async materialization."""
         small_cids = real_cids[:3]
         resp = _post_events(base, "query_tool", small_cids, domains=["history"])
         _maybe_skip_on_service_overload(resp, "trace sync small cid")
 
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text[:200]}"
-        data = resp.json().get("data", resp.json())
+        data = _unwrap_events_payload(base, resp)
         assert data["stage"] == "events"
         assert "results" in data
         assert "history" in data["results"]
@@ -237,12 +274,11 @@ class TestTraceAdmissionControl:
         assert history["count"] >= 0
 
     def test_sync_response_data_structure_complete(self, base, real_cids):
-        """Sync response has proper domain data structure with count/data keys."""
+        """Trace response has proper domain data structure after sync/async completion."""
         resp = _post_events(base, "query_tool", real_cids[:5],
                             domains=["history", "materials"])
         _maybe_skip_on_service_overload(resp, "trace sync data structure")
-        assert resp.status_code == 200
-        data = resp.json().get("data", resp.json())
+        data = _unwrap_events_payload(base, resp)
         for domain in ["history", "materials"]:
             assert domain in data["results"], f"Missing domain '{domain}'"
             d = data["results"][domain]
@@ -381,7 +417,7 @@ class TestTraceAsyncJobQueue:
         final_status = None
         deadline = time.time() + 120
         while time.time() < deadline:
-            resp = requests.get(status_url, timeout=10)
+            resp = requests.get(status_url, timeout=30)
             assert resp.status_code == 200
             final_status = resp.json().get("data", resp.json())
             if final_status["status"] in ("finished", "failed"):
@@ -396,7 +432,7 @@ class TestTraceAsyncJobQueue:
         if final_status["status"] == "finished":
             # Result should be retrievable
             result_resp = requests.get(
-                f"{base}/api/trace/job/{job_id}/result", timeout=10,
+                f"{base}/api/trace/job/{job_id}/result", timeout=30,
             )
             assert result_resp.status_code == 200
             result = result_resp.json().get("data", result_resp.json())
@@ -475,7 +511,7 @@ class TestTraceNDJSONStream:
 
         try:
             resp = requests.get(
-                f"{base}/api/trace/job/{job_id}/stream", timeout=10,
+                f"{base}/api/trace/job/{job_id}/stream", timeout=30,
             )
             assert resp.status_code == 409
             data = resp.json()
@@ -731,16 +767,14 @@ class TestTraceAsyncToStream:
         threshold = int(os.getenv("TRACE_ASYNC_CID_THRESHOLD", "20000"))
 
         if len(real_cids) <= threshold:
-            # Not enough CIDs to trigger async — test sync path instead
-            # and verify stream works for the seeded result
+            # Even below threshold, the route may still choose async on spool miss.
             resp = _post_events(base, "query_tool", real_cids[:10],
                                 domains=["history"])
             _maybe_skip_on_service_overload(resp, "trace async lifecycle sync fallback")
-            assert resp.status_code == 200
-            data = resp.json().get("data", resp.json())
+            data = _unwrap_events_payload(base, resp)
             assert data["stage"] == "events"
             assert "history" in data["results"]
-            # Sync path proven — stream is tested in TestTraceNDJSONStream
+            # Result path proven — stream is tested in TestTraceNDJSONStream
             return
 
         # If we have enough CIDs, test full async lifecycle

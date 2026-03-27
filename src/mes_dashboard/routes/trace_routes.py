@@ -9,23 +9,16 @@ Provides three stage endpoints for progressive trace execution:
 
 from __future__ import annotations
 
-import gc
 import hashlib
 import json
 import logging
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
 from flask import Blueprint, Response, request
 
 from mes_dashboard.core.cache import cache_get, cache_set
-from mes_dashboard.core.heavy_query_telemetry import (
-    record_async_fallback,
-    record_guard_reject,
-)
-from mes_dashboard.core.interactive_memory_guard import process_rss_mb
 from mes_dashboard.core.query_quality_contract import (
     QUALITY_SCOPE_DOMAIN,
     QUALITY_SCOPE_QUERY,
@@ -36,27 +29,31 @@ from mes_dashboard.core.query_quality_contract import (
     unpack_event_fetch_result,
 )
 from mes_dashboard.core.rate_limit import configured_rate_limit
-from mes_dashboard.core.redis_client import try_acquire_lock, release_lock
 from mes_dashboard.core.response import error_response, success_response
 from mes_dashboard.services.event_fetcher import EventFetcher
-from mes_dashboard.services.lineage_engine import LineageEngine
 from mes_dashboard.services.mid_section_defect_service import (
     build_trace_aggregation_from_events,
     parse_loss_reasons_param,
     resolve_trace_seed_lots,
 )
-from mes_dashboard.services.query_tool_service import resolve_lots
 from mes_dashboard.services.msd_lineage_job_service import (
-    enqueue_msd_lineage,
     get_msd_lineage_job_result,
     get_msd_lineage_job_status,
 )
+from mes_dashboard.services.query_tool_service import resolve_lots
+from mes_dashboard.services.trace_lineage_job_service import (
+    enqueue_trace_lineage,
+    get_trace_lineage_job_result,
+    get_trace_lineage_job_status,
+    load_trace_lineage_result,
+    make_trace_lineage_query_id,
+)
 from mes_dashboard.services.trace_job_service import (
-    TRACE_ASYNC_CID_THRESHOLD,
     enqueue_trace_events_job,
     get_job_result,
     get_job_status,
     is_async_available,
+    make_trace_query_id,
     stream_job_result_ndjson,
 )
 
@@ -65,20 +62,7 @@ logger = logging.getLogger("mes_dashboard.trace_routes")
 trace_bp = Blueprint("trace", __name__, url_prefix="/api/trace")
 
 TRACE_SLOW_THRESHOLD_SECONDS = float(os.getenv('TRACE_SLOW_THRESHOLD_SECONDS', '15'))
-TRACE_EVENTS_MAX_WORKERS = int(os.getenv('TRACE_EVENTS_MAX_WORKERS', '2'))
-TRACE_EVENTS_CID_LIMIT = int(os.getenv('TRACE_EVENTS_CID_LIMIT', '50000'))
 TRACE_CACHE_TTL_SECONDS = 300
-
-LINEAGE_SEED_ASYNC_THRESHOLD = int(os.getenv('LINEAGE_SEED_ASYNC_THRESHOLD', '5000'))
-
-# RSS guard: reject sync event processing when RSS exceeds this MB threshold
-TRACE_SYNC_RSS_REJECT_MB = float(os.getenv("TRACE_SYNC_RSS_REJECT_MB", "1100"))
-
-# Stampede lock for events endpoint sync path
-EVENTS_LOCK_TTL_SECONDS = 240
-EVENTS_LOCK_WAIT_TIMEOUT_SECONDS = 180
-EVENTS_LOCK_POLL_INTERVAL_SECONDS = 0.5
-
 PROFILE_QUERY_TOOL = "query_tool"
 PROFILE_QUERY_TOOL_REVERSE = "query_tool_reverse"
 PROFILE_MID_SECTION_DEFECT = "mid_section_defect"
@@ -544,6 +528,31 @@ def _build_msd_aggregation(
     if not isinstance(params, dict):
         return None, ("INVALID_PARAMS", "params is required for mid_section_defect profile", 400)
 
+    # Task 5.2: try spool-backed DuckDB runtime first when a valid spool exists.
+    # This avoids large in-memory pandas aggregation in the gunicorn worker.
+    try:
+        _container_ids = payload.get("container_ids") or []
+        _tqid = make_trace_query_id(
+            profile=PROFILE_MID_SECTION_DEFECT,
+            container_ids=_container_ids,
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            station=params.get("station"),
+            direction=params.get("direction"),
+        )
+        from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+        _rt = MsdDuckdbRuntime(_tqid)
+        if _rt.is_available():
+            _summary = _rt.get_summary()
+            if _summary is not None:
+                logger.debug(
+                    "_build_msd_aggregation: using DuckDB spool path trace_query_id=%s", _tqid
+                )
+                _summary["trace_query_id"] = _tqid
+                return _summary, None
+    except Exception as _exc:
+        logger.debug("_build_msd_aggregation: DuckDB spool path failed, falling through: %s", _exc)
+
     mode = str(params.get("mode") or "date_range").strip()
 
     start_date: Optional[str] = None
@@ -658,10 +667,20 @@ def lineage():
     if not container_ids:
         return _error("INVALID_PARAMS", "container_ids must contain at least one id", 400)
 
+    params = payload.get("params")
+    if params is not None and not isinstance(params, dict):
+        return _error("INVALID_PARAMS", "params must be an object when provided", 400)
+
     lineage_cache_key = _lineage_cache_key(profile, container_ids)
     cached = cache_get(lineage_cache_key)
     if cached is not None:
         return success_response(cached)
+
+    query_id = make_trace_lineage_query_id(profile, container_ids, params=params)
+    stored_result = load_trace_lineage_result(query_id)
+    if stored_result is not None:
+        cache_set(lineage_cache_key, stored_result, ttl=TRACE_CACHE_TTL_SECONDS)
+        return success_response(stored_result)
 
     logger.info(
         "trace lineage profile=%s count=%s correlation_cache_key=%s",
@@ -670,87 +689,61 @@ def lineage():
         payload.get("cache_key"),
     )
 
-    # Determine lineage direction: backward profiles use reverse genealogy,
-    # forward profiles (and mid_section_defect with direction=backward) use genealogy
-    direction = "forward"
-    if profile == PROFILE_QUERY_TOOL_REVERSE:
-        direction = "backward"
-    elif profile == PROFILE_MID_SECTION_DEFECT:
-        params = payload.get("params") or {}
-        direction = str(params.get("direction") or "backward").strip()
+    if not is_async_available():
+        logger.warning(
+            "trace lineage spool miss but async unavailable profile=%s cid_count=%s",
+            profile,
+            len(container_ids),
+        )
+        return error_response(
+            "SERVICE_UNAVAILABLE",
+            "背景查詢服務不可用，請稍後再試",
+            status_code=503,
+            headers={"Retry-After": "30"},
+        )
 
-    # MSD large lineage: offload to async job when seed count exceeds threshold
-    if profile == PROFILE_MID_SECTION_DEFECT and len(container_ids) > LINEAGE_SEED_ASYNC_THRESHOLD:
-        if is_async_available():
-            job_id, err = enqueue_msd_lineage(container_ids=container_ids, direction=direction)
-            if job_id is not None:
-                logger.info(
-                    "trace lineage MSD async job_id=%s seeds=%s direction=%s",
-                    job_id, len(container_ids), direction,
-                )
-                return success_response(
-                    {
-                        "stage": "lineage",
-                        "async": True,
-                        "job_id": job_id,
-                        "status_url": f"/api/trace/lineage/job/{job_id}",
-                    },
-                    status_code=202,
-                )
-            logger.warning("trace lineage MSD async enqueue failed seeds=%s: %s", len(container_ids), err)
-        else:
-            logger.warning(
-                "trace lineage MSD seed count exceeds threshold seeds=%s threshold=%s; async unavailable",
-                len(container_ids), LINEAGE_SEED_ASYNC_THRESHOLD,
-            )
+    job_id, err, enqueued_query_id = enqueue_trace_lineage(
+        profile=profile,
+        container_ids=container_ids,
+        params=params,
+    )
+    if job_id is None:
+        logger.warning(
+            "trace lineage enqueue failed profile=%s cid_count=%s: %s",
+            profile,
+            len(container_ids),
+            err,
+        )
+        return error_response(
+            "SERVICE_UNAVAILABLE",
+            "背景查詢服務不可用，請稍後再試",
+            status_code=503,
+            headers={"Retry-After": "30"},
+        )
 
-    started = time.monotonic()
-    try:
-        if direction == "backward":
-            reverse_graph = LineageEngine.resolve_full_genealogy(container_ids)
-            response = _build_lineage_response(
-                container_ids,
-                reverse_graph.get("ancestors", {}),
-                cid_to_name=reverse_graph.get("cid_to_name"),
-                parent_map=reverse_graph.get("parent_map"),
-                merge_edges=reverse_graph.get("merge_edges"),
-                typed_nodes=reverse_graph.get("nodes"),
-                typed_edges=reverse_graph.get("edges"),
-                seed_roots=reverse_graph.get("seed_roots"),
-            )
-            response["roots"] = list(container_ids)
-        else:
-            forward_tree = LineageEngine.resolve_forward_tree(container_ids)
-            cid_to_name = forward_tree.get("cid_to_name") or {}
-            response = {
-                "stage": "lineage",
-                "roots": forward_tree.get("roots", []),
-                "children_map": forward_tree.get("children_map", {}),
-                "leaf_serials": forward_tree.get("leaf_serials", {}),
-                "names": {cid: name for cid, name in cid_to_name.items() if name},
-                "total_nodes": forward_tree.get("total_nodes", 0),
-                "nodes": forward_tree.get("nodes", {}),
-                "edges": forward_tree.get("edges", []),
-            }
-    except Exception as exc:
-        if _is_timeout_exception(exc):
-            return _error("LINEAGE_TIMEOUT", "lineage query timed out", 504)
-        logger.error("lineage stage failed: %s", exc, exc_info=True)
-        return _error("LINEAGE_FAILED", "lineage stage failed", 500)
-
-    elapsed = time.monotonic() - started
-    if elapsed > TRACE_SLOW_THRESHOLD_SECONDS:
-        logger.warning("trace lineage slow elapsed=%.2fs", elapsed)
-
-    cache_set(lineage_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
-    return success_response(response)
+    logger.info(
+        "trace lineage routed to async job_id=%s profile=%s cid_count=%s",
+        job_id,
+        profile,
+        len(container_ids),
+    )
+    return success_response(
+        {
+            "stage": "lineage",
+            "async": True,
+            "job_id": job_id,
+            "query_id": enqueued_query_id or query_id,
+            "status_url": f"/api/trace/lineage/job/{job_id}",
+        },
+        status_code=202,
+    )
 
 
 @trace_bp.route("/lineage/job/<job_id>", methods=["GET"])
 @_TRACE_JOB_RATE_LIMIT
 def lineage_job_status(job_id: str):
     """Return the current status of an async MSD lineage job."""
-    status = get_msd_lineage_job_status(job_id)
+    status = get_trace_lineage_job_status(job_id) or get_msd_lineage_job_status(job_id)
     if status is None:
         return _error("JOB_NOT_FOUND", "job not found or expired", 404)
     return success_response(status)
@@ -760,7 +753,7 @@ def lineage_job_status(job_id: str):
 @_TRACE_JOB_RATE_LIMIT
 def lineage_job_result(job_id: str):
     """Return the lineage result of a completed async MSD lineage job."""
-    status = get_msd_lineage_job_status(job_id)
+    status = get_trace_lineage_job_status(job_id) or get_msd_lineage_job_status(job_id)
     if status is None:
         return _error("JOB_NOT_FOUND", "job not found or expired", 404)
 
@@ -773,7 +766,7 @@ def lineage_job_result(job_id: str):
             meta={"job_status": job_status},
         )
 
-    result = get_msd_lineage_job_result(job_id)
+    result = get_trace_lineage_job_result(job_id) or get_msd_lineage_job_result(job_id)
     if result is None:
         return _error("JOB_RESULT_EXPIRED", "job result has expired", 404)
 
@@ -806,226 +799,85 @@ def events():
             400,
         )
 
-    # Admission control: all profiles have a hard CID limit to prevent OOM.
     is_msd = (profile == PROFILE_MID_SECTION_DEFECT)
     cid_count = len(container_ids)
 
-    # Route large queries to async job queue when available.
-    # Falls through to sync path if RQ is not installed or Redis is down.
-    if cid_count > TRACE_ASYNC_CID_THRESHOLD and is_async_available():
-        job_id, err = enqueue_trace_events_job(profile, container_ids, domains, payload)
-        if job_id is not None:
-            logger.info(
-                "trace events routed to async job_id=%s profile=%s cid_count=%s",
-                job_id, profile, cid_count,
+    # Task 6.2: check for existing spool hit (MSD profile only).
+    # If a valid spool exists for the canonical trace_query_id, serve directly.
+    if is_msd:
+        try:
+            params_block = payload.get("params") or {}
+            _tqid = make_trace_query_id(
+                profile=profile,
+                container_ids=container_ids,
+                start_date=params_block.get("start_date"),
+                end_date=params_block.get("end_date"),
+                station=params_block.get("station"),
+                direction=params_block.get("direction"),
             )
-            return _async_events_response(job_id)
-        logger.warning("trace async enqueue failed cid_count=%s: %s", cid_count, err)
+            from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+            _rt = MsdDuckdbRuntime(_tqid)
+            if _rt.is_available():
+                _summary = _rt.get_summary()
+                if _summary is not None:
+                    logger.debug(
+                        "trace events: spool hit for trace_query_id=%s cid_count=%d",
+                        _tqid, cid_count,
+                    )
+                    return success_response({
+                        "stage": "events",
+                        "spool_hit": True,
+                        "trace_query_id": _tqid,
+                        "aggregation": _summary,
+                        "results": {},
+                    })
+        except Exception as _spool_exc:
+            logger.debug("trace events spool check failed: %s", _spool_exc)
 
-    if cid_count > TRACE_EVENTS_CID_LIMIT:
-        logger.warning(
-            "trace events CID limit exceeded profile=%s cid_count=%s limit=%s",
-            profile, cid_count, TRACE_EVENTS_CID_LIMIT,
-        )
-        if is_async_available():
-            job_id, err = enqueue_trace_events_job(profile, container_ids, domains, payload)
-            if job_id is not None:
-                logger.info(
-                    "trace events CID limit fallback async job_id=%s profile=%s cid_count=%s",
-                    job_id, profile, cid_count,
-                )
-                record_async_fallback("trace.events", reason="cid_limit")
-                return _async_events_response(job_id)
-            logger.warning("trace events CID limit async fallback failed: %s", err)
-        return _error(
-            "CID_LIMIT_EXCEEDED",
-            f"container_ids count ({cid_count}) exceeds limit ({TRACE_EVENTS_CID_LIMIT})",
-            413,
-        )
-
-    # For MSD profile, skip the events-level cache so that aggregation is
-    # always recomputed with the current loss_reasons.  EventFetcher still
-    # provides per-domain Redis caching, so raw Oracle queries are avoided.
-
+    # Non-MSD cached responses can still be served directly for small, already
+    # materialized results. Spool misses now always route through the async job
+    # pipeline so the web worker never performs heavy events fetch/aggregation.
     events_cache_key = _events_cache_key(profile, domains, container_ids)
     if not is_msd:
         cached = cache_get(events_cache_key)
         if cached is not None:
             return success_response(_ensure_events_quality_meta(cached))
 
-    # --- MD2: RSS guard before sync execution ---
-    rss_now = process_rss_mb()
-    if rss_now is not None and rss_now > TRACE_SYNC_RSS_REJECT_MB:
-        if is_async_available():
-            job_id, err = enqueue_trace_events_job(profile, container_ids, domains, payload)
-            if job_id is not None:
-                logger.info(
-                    "trace events RSS guard fallback routed to async "
-                    "job_id=%s profile=%s cid_count=%s rss_mb=%.1f limit_mb=%.0f",
-                    job_id, profile, cid_count, rss_now, TRACE_SYNC_RSS_REJECT_MB,
-                )
-                record_async_fallback("trace.events", reason="rss_guard")
-                return _async_events_response(job_id)
-            logger.warning(
-                "trace events RSS guard async enqueue failed cid_count=%s rss_mb=%.1f: %s",
-                cid_count,
-                rss_now,
-                err,
-            )
+    if not is_async_available():
         logger.warning(
-            "trace events sync rejected due to RSS guard rss_mb=%.1f limit_mb=%.0f cid_count=%s",
-            rss_now, TRACE_SYNC_RSS_REJECT_MB, cid_count,
+            "trace events spool miss but async unavailable profile=%s cid_count=%s",
+            profile,
+            cid_count,
         )
-        record_guard_reject("trace.events", reason="rss_guard")
         return error_response(
             "SERVICE_UNAVAILABLE",
-            "伺服器記憶體負載過高，請稍後再試",
+            "背景查詢服務不可用，請稍後再試",
+            status_code=503,
+            headers={"Retry-After": "30"},
+        )
+
+    job_id, err = enqueue_trace_events_job(profile, container_ids, domains, payload)
+    if job_id is None:
+        logger.warning(
+            "trace events enqueue failed profile=%s cid_count=%s: %s",
+            profile,
+            cid_count,
+            err,
+        )
+        return error_response(
+            "SERVICE_UNAVAILABLE",
+            "背景查詢服務不可用，請稍後再試",
             status_code=503,
             headers={"Retry-After": "30"},
         )
 
     logger.info(
-        "trace events profile=%s domains=%s cid_count=%s correlation_cache_key=%s",
+        "trace events routed to async job_id=%s profile=%s cid_count=%s",
+        job_id,
         profile,
-        ",".join(domains),
-        len(container_ids),
-        payload.get("cache_key"),
+        cid_count,
     )
-
-    # --- MD4: Stampede lock for sync path ---
-    cid_hash = hashlib.md5("|".join(sorted(container_ids)).encode("utf-8")).hexdigest()
-    lock_key = f"trace:events:{cid_hash}"
-    lock_acquired = try_acquire_lock(lock_key, ttl_seconds=EVENTS_LOCK_TTL_SECONDS)
-
-    if not lock_acquired:
-        # Another worker is processing the same CID set — poll cache for result
-        wait_start = time.monotonic()
-        while (time.monotonic() - wait_start) < EVENTS_LOCK_WAIT_TIMEOUT_SECONDS:
-            cached = cache_get(events_cache_key)
-            if cached is not None:
-                return success_response(_ensure_events_quality_meta(cached))
-            time.sleep(EVENTS_LOCK_POLL_INTERVAL_SECONDS)
-
-        logger.warning(
-            "trace events stampede lock wait timeout; proceeding with fail-open execution "
-            "cid_hash=%s cid_count=%s",
-            cid_hash[:12], cid_count,
-        )
-
-    try:
-        # Double-check cache after acquiring lock
-        if lock_acquired:
-            cached = cache_get(events_cache_key)
-            if cached is not None:
-                return success_response(_ensure_events_quality_meta(cached))
-
-        started = time.monotonic()
-        results: Dict[str, Dict[str, Any]] = {}
-        raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
-        failed_domains: List[str] = []
-        domain_quality_meta: Dict[str, Dict[str, Any]] = {}
-
-        with ThreadPoolExecutor(max_workers=min(len(domains), TRACE_EVENTS_MAX_WORKERS)) as executor:
-            futures = {
-                executor.submit(EventFetcher.fetch_events, container_ids, domain): domain
-                for domain in domains
-            }
-            for future in as_completed(futures):
-                domain = futures[future]
-                try:
-                    events_payload = future.result()
-                    events_by_cid, quality_meta = unpack_event_fetch_result(
-                        events_payload,
-                        domain=domain,
-                    )
-                    rows = _flatten_domain_records(events_by_cid)
-                    results[domain] = {
-                        "data": rows,
-                        "count": len(rows),
-                        "quality_meta": quality_meta,
-                    }
-                    domain_quality_meta[domain] = quality_meta
-                    if is_msd:
-                        raw_domain_results[domain] = events_by_cid
-                    # Non-MSD: events_by_cid goes out of scope here, no double retention
-                except Exception as exc:
-                    logger.error("events stage domain failed domain=%s: %s", domain, exc, exc_info=True)
-                    failed_domains.append(domain)
-                    failed_meta = build_quality_meta(
-                        status=QUALITY_STATUS_FAILED,
-                        scope=QUALITY_SCOPE_DOMAIN,
-                        domain=domain,
-                        reasons=["domain_fetch_failed"],
-                    )
-                    results[domain] = {
-                        "data": [],
-                        "count": 0,
-                        "quality_meta": failed_meta,
-                    }
-                    domain_quality_meta[domain] = failed_meta
-
-        elapsed = time.monotonic() - started
-        if elapsed > TRACE_SLOW_THRESHOLD_SECONDS:
-            logger.warning("trace events slow elapsed=%.2fs domains=%s", elapsed, ",".join(domains))
-
-        # --- MD2: RSS guard before aggregation computation ---
-        aggregation = None
-        if profile == PROFILE_MID_SECTION_DEFECT:
-            rss_before_agg = process_rss_mb()
-            if rss_before_agg is not None and rss_before_agg > TRACE_SYNC_RSS_REJECT_MB:
-                del raw_domain_results
-                logger.warning(
-                    "trace events aggregation rejected due to RSS guard rss_mb=%.1f limit_mb=%.0f",
-                    rss_before_agg, TRACE_SYNC_RSS_REJECT_MB,
-                )
-                record_guard_reject("trace.events_aggregation", reason="rss_guard")
-                return error_response(
-                    "SERVICE_UNAVAILABLE",
-                    "伺服器記憶體負載過高，無法完成聚合計算，請稍後再試",
-                    status_code=503,
-                    headers={"Retry-After": "30"},
-                )
-
-            aggregation, agg_error = _build_msd_aggregation(
-                payload,
-                raw_domain_results,
-                domain_quality_meta=domain_quality_meta,
-            )
-            del raw_domain_results
-            if agg_error is not None:
-                code, message, status = agg_error
-                return _error(code, message, status)
-        else:
-            del raw_domain_results
-
-        query_quality_meta = merge_quality_metas(
-            domain_quality_meta.values(),
-            scope=QUALITY_SCOPE_QUERY,
-        )
-
-        response: Dict[str, Any] = {
-            "stage": "events",
-            "results": results,
-            "aggregation": aggregation,
-            "quality_meta": query_quality_meta,
-            "domain_quality_meta": domain_quality_meta,
-        }
-
-        if failed_domains:
-            response["error"] = "one or more domains failed"
-            response["code"] = "EVENTS_PARTIAL_FAILURE"
-            response["failed_domains"] = sorted(failed_domains)
-
-        if not is_msd and len(container_ids) <= 10000:
-            cache_set(events_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
-
-        if len(container_ids) > 10000:
-            gc.collect()
-
-        return success_response(response)
-    finally:
-        if lock_acquired:
-            release_lock(lock_key)
+    return _async_events_response(job_id)
 
 
 @trace_bp.route("/job/<job_id>", methods=["GET"])

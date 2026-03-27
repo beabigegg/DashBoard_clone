@@ -129,9 +129,10 @@ class CacheUpdater:
                 logger.error(f"Cache update failed: {e}", exc_info=True)
 
     def _run_dataset_warmups(self) -> None:
+        # reject_dataset and yield_alert_dataset warmups have been migrated to
+        # spool_warmup_scheduler (task 3.2).  cache_updater only runs warmup
+        # tasks that are NOT owned by the spool scheduler.
         for warmup_name, warmup_fn in (
-            ("reject_dataset", self._warmup_reject_dataset),
-            ("yield_alert_dataset", self._warmup_yield_alert_dataset),
             ("reject_options", self._warmup_reject_options),
         ):
             try:

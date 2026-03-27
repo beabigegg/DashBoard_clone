@@ -33,7 +33,6 @@ Attribution Method (Forward):
 """
 
 import csv
-import hashlib
 import io
 import logging
 import math
@@ -56,8 +55,14 @@ from mes_dashboard.core.query_quality_contract import (
     normalize_quality_meta,
     unpack_event_fetch_result,
 )
-from mes_dashboard.core.redis_client import try_acquire_lock, release_lock
 from mes_dashboard.sql import SQLLoader
+from mes_dashboard.services.async_query_job_service import (
+    complete_job,
+    enqueue_job,
+    get_job_status as get_async_job_status,
+    is_async_available,
+    update_job_progress,
+)
 from mes_dashboard.services.event_fetcher import EventFetcher
 from mes_dashboard.services.lineage_engine import LineageEngine
 from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS, get_group_order
@@ -72,11 +77,10 @@ from mes_dashboard.config.constants import (
 )
 
 FORWARD_PIPELINE_MAX_WORKERS = int(os.getenv('FORWARD_PIPELINE_MAX_WORKERS', '2'))
-
-# Distributed lock settings for query_analysis cold-cache path
-ANALYSIS_LOCK_TTL_SECONDS = 240
-ANALYSIS_LOCK_WAIT_TIMEOUT_SECONDS = 180
-ANALYSIS_LOCK_POLL_INTERVAL_SECONDS = 0.5
+MSD_COMPAT_QUEUE = os.getenv("MSD_WORKER_QUEUE", "msd-analysis")
+MSD_COMPAT_JOB_TIMEOUT_SECONDS = int(os.getenv("MSD_JOB_TIMEOUT_SECONDS", "1800"))
+MSD_COMPAT_JOB_TTL_SECONDS = int(os.getenv("MSD_JOB_TTL_SECONDS", "3600"))
+_MSD_COMPAT_JOB_PREFIX = "msd-compat"
 
 # Top N for chart display (rest grouped as "其他")
 TOP_N = 10
@@ -134,6 +138,140 @@ CSV_COLUMNS_FORWARD = [
 VALID_DIRECTIONS = ('backward', 'forward')
 
 
+def resolve_analysis_trace_context(
+    start_date: str,
+    end_date: str,
+    station: str = '測試',
+    direction: str = 'backward',
+) -> Optional[Dict[str, Any]]:
+    """Resolve canonical MSD trace context from compatibility query params."""
+    error = _validate_params(start_date, end_date, station, direction)
+    if error:
+        return {'error': error}
+
+    detection_df = _fetch_station_detection_data(start_date, end_date, station)
+    if detection_df is None:
+        return None
+
+    available_loss_reasons = sorted(
+        detection_df.loc[detection_df['REJECTQTY'] > 0, 'LOSSREASONNAME']
+        .dropna().unique().tolist()
+    ) if not detection_df.empty else []
+
+    unique_rows = detection_df.drop_duplicates(subset=['CONTAINERID']) if not detection_df.empty else detection_df
+    seed_container_ids: List[str] = []
+    seed_container_names: Dict[str, str] = {}
+    for _, row in unique_rows.iterrows():
+        cid = _safe_str(row.get('CONTAINERID'))
+        if not cid:
+            continue
+        seed_container_ids.append(cid)
+        seed_container_names[cid] = _safe_str(row.get('CONTAINERNAME')) or cid
+
+    from mes_dashboard.services.trace_job_service import make_trace_query_id
+
+    trace_query_id = make_trace_query_id(
+        profile="mid_section_defect",
+        container_ids=seed_container_ids,
+        start_date=start_date,
+        end_date=end_date,
+        station=station,
+        direction=direction,
+    )
+
+    return {
+        "trace_query_id": trace_query_id,
+        "seed_container_ids": seed_container_ids,
+        "seed_container_names": seed_container_names,
+        "available_loss_reasons": available_loss_reasons,
+        "detection_df": detection_df,
+    }
+
+
+def _load_analysis_from_spool(
+    trace_query_id: str,
+    available_loss_reasons: Optional[List[str]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Build compatibility summary payload from MSD spool-backed runtime."""
+    from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+
+    rt = MsdDuckdbRuntime(trace_query_id)
+    if not rt.is_available():
+        return None
+
+    summary = rt.get_summary()
+    detail = rt.get_all_detail()
+    if summary is None or detail is None:
+        return None
+
+    return {
+        'kpi': summary.get('kpi') or {},
+        'charts': summary.get('charts') or {},
+        'daily_trend': summary.get('daily_trend') or [],
+        'available_loss_reasons': list(available_loss_reasons or []),
+        'genealogy_status': 'ready',
+        'detail': detail,
+        'attribution': summary.get('attribution') or [],
+        'trace_query_id': trace_query_id,
+    }
+
+
+def _empty_pending_result(
+    direction: str,
+    trace_query_id: str,
+    available_loss_reasons: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    result = _empty_result(direction)
+    result['available_loss_reasons'] = list(available_loss_reasons or [])
+    result['genealogy_status'] = 'pending'
+    result['trace_query_id'] = trace_query_id
+    return result
+
+
+def _compat_job_id(trace_query_id: str) -> str:
+    return f"msd-compat-{trace_query_id}"
+
+
+def ensure_analysis_background_job(
+    *,
+    start_date: str,
+    end_date: str,
+    station: str,
+    direction: str,
+    trace_query_id: str,
+    seed_container_ids: Optional[List[str]] = None,
+    seed_container_names: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
+    """Ensure a background MSD compatibility refresh job exists for this trace id."""
+    if not trace_query_id or not is_async_available():
+        return None
+
+    job_id = _compat_job_id(trace_query_id)
+    existing = get_async_job_status(_MSD_COMPAT_JOB_PREFIX, job_id)
+    if existing and str(existing.get("status") or "").lower() in {"queued", "started", "running", "finished", "completed"}:
+        return job_id
+
+    queued_job_id, _err = enqueue_job(
+        queue_name=MSD_COMPAT_QUEUE,
+        worker_fn=_execute_msd_compat_job,
+        job_id=job_id,
+        prefix=_MSD_COMPAT_JOB_PREFIX,
+        job_timeout=MSD_COMPAT_JOB_TIMEOUT_SECONDS,
+        result_ttl=MSD_COMPAT_JOB_TTL_SECONDS,
+        kwargs={
+            "job_id": job_id,
+            "start_date": start_date,
+            "end_date": end_date,
+            "station": station,
+            "direction": direction,
+            "trace_query_id": trace_query_id,
+            "seed_container_ids": list(seed_container_ids or []),
+            "seed_container_names": dict(seed_container_names or {}),
+        },
+    )
+    return queued_job_id
+
+
 # ============================================================
 # Public API
 # ============================================================
@@ -157,9 +295,16 @@ def query_analysis(
     Returns:
         Dict with kpi, charts, detail, available_loss_reasons, genealogy_status.
     """
-    error = _validate_params(start_date, end_date, station, direction)
-    if error:
-        return {'error': error}
+    context = resolve_analysis_trace_context(
+        start_date=start_date,
+        end_date=end_date,
+        station=station,
+        direction=direction,
+    )
+    if context is None:
+        return None
+    if 'error' in context:
+        return {'error': context['error']}
 
     # Check full analysis cache
     cache_key = make_cache_key(
@@ -175,56 +320,40 @@ def query_analysis(
     cached = cache_get(cache_key)
     if cached is not None:
         return cached
+    detection_df = context["detection_df"]
+    available_loss_reasons = context["available_loss_reasons"]
+    trace_query_id = context["trace_query_id"]
+    seed_container_ids = context["seed_container_ids"]
+    seed_container_names = context["seed_container_names"]
 
-    lock_name = (
-        f"mid_section_defect:analysis:{hashlib.md5(cache_key.encode('utf-8')).hexdigest()}"
+    if detection_df.empty:
+        empty_result = _empty_result(direction)
+        empty_result["available_loss_reasons"] = available_loss_reasons
+        empty_result["trace_query_id"] = trace_query_id
+        return empty_result
+
+    staged = _load_analysis_from_spool(
+        trace_query_id=trace_query_id,
+        available_loss_reasons=available_loss_reasons,
     )
-    lock_acquired = False
+    if staged is not None:
+        cache_set(cache_key, staged, ttl=CACHE_TTL_DETECTION)
+        return staged
 
-    # Prevent duplicate cold-cache pipeline execution across workers.
-    lock_acquired = try_acquire_lock(lock_name, ttl_seconds=ANALYSIS_LOCK_TTL_SECONDS)
-    if not lock_acquired:
-        wait_start = time.monotonic()
-        while (
-            time.monotonic() - wait_start
-            < ANALYSIS_LOCK_WAIT_TIMEOUT_SECONDS
-        ):
-            cached = cache_get(cache_key)
-            if cached is not None:
-                return cached
-            time.sleep(ANALYSIS_LOCK_POLL_INTERVAL_SECONDS)
-
-        logger.warning(
-            "Timed out waiting for in-flight mid_section_defect analysis cache; "
-            "continuing with fail-open pipeline execution"
-        )
-    else:
-        # Double-check cache after lock acquisition.
-        cached = cache_get(cache_key)
-        if cached is not None:
-            return cached
-
-    try:
-        if direction == 'forward':
-            result = _run_forward_pipeline(
-                start_date, end_date, station, loss_reasons,
-            )
-        else:
-            result = _run_backward_pipeline(
-                start_date, end_date, station, loss_reasons,
-            )
-
-        if result is None:
-            return None
-
-        # Only cache successful results
-        genealogy_status = result.get('genealogy_status', 'ready')
-        if genealogy_status == 'ready':
-            cache_set(cache_key, result, ttl=CACHE_TTL_DETECTION)
-        return result
-    finally:
-        if lock_acquired:
-            release_lock(lock_name)
+    ensure_analysis_background_job(
+        start_date=start_date,
+        end_date=end_date,
+        station=station,
+        direction=direction,
+        trace_query_id=trace_query_id,
+        seed_container_ids=seed_container_ids,
+        seed_container_names=seed_container_names,
+    )
+    return _empty_pending_result(
+        direction=direction,
+        trace_query_id=trace_query_id,
+        available_loss_reasons=available_loss_reasons,
+    )
 
 
 def parse_loss_reasons_param(loss_reasons: Any) -> Optional[List[str]]:
@@ -758,6 +887,189 @@ def query_station_options() -> List[Dict[str, Any]]:
         primary_pattern = cfg['patterns'][0] if cfg.get('patterns') else name
         options.append({'name': name, 'label': primary_pattern, 'order': cfg['order']})
     return sorted(options, key=lambda x: x['order'])
+
+
+def _collect_forward_tracked_cids(
+    seed_container_ids: List[str],
+    children_map: Dict[str, Any],
+) -> List[str]:
+    seen = set(seed_container_ids)
+    queue = list(seed_container_ids)
+    ordered = list(seed_container_ids)
+    while queue:
+        current = queue.pop(0)
+        children = children_map.get(current)
+        if not isinstance(children, (list, set, tuple)):
+            continue
+        for child in children:
+            cid = _safe_str(child)
+            if not cid or cid in seen:
+                continue
+            seen.add(cid)
+            ordered.append(cid)
+            queue.append(cid)
+    return ordered
+
+
+def _write_msd_lineage_stage_spool(
+    trace_query_id: str,
+    ancestors: Dict[str, Any],
+    cid_to_name: Optional[Dict[str, str]] = None,
+) -> None:
+    """Persist simplified MSD lineage stage for DuckDB attribution joins."""
+    import tempfile
+    from pathlib import Path
+
+    from mes_dashboard.core.query_spool_store import register_stage_spool_file
+    from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE, _STAGE_LINEAGE
+
+    rows: List[Dict[str, Any]] = []
+    for descendant_id, values in (ancestors or {}).items():
+        if not isinstance(values, (list, set, tuple)):
+            continue
+        for ancestor_id in values:
+            safe_ancestor = _safe_str(ancestor_id)
+            safe_descendant = _safe_str(descendant_id)
+            if not safe_ancestor or not safe_descendant:
+                continue
+            rows.append({
+                "DESCENDANT_ID": safe_descendant,
+                "ANCESTOR_ID": safe_ancestor,
+                "ANCESTOR_NAME": _safe_str((cid_to_name or {}).get(safe_ancestor)) or safe_ancestor,
+            })
+
+    if not rows:
+        return
+
+    df = pd.DataFrame(rows)
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    df.to_parquet(tmp_path, engine="pyarrow", index=False)
+
+    ok = register_stage_spool_file(
+        SPOOL_NAMESPACE,
+        trace_query_id,
+        _STAGE_LINEAGE,
+        tmp_path,
+        row_count=len(df),
+    )
+    if not ok and tmp_path.exists():
+        tmp_path.unlink(missing_ok=True)
+
+
+def _execute_msd_compat_job(
+    *,
+    job_id: str,
+    start_date: str,
+    end_date: str,
+    station: str,
+    direction: str,
+    trace_query_id: str,
+    seed_container_ids: Optional[List[str]] = None,
+    seed_container_names: Optional[Dict[str, str]] = None,
+) -> None:
+    """Build MSD staged spool in RQ worker for compatibility requests."""
+    from mes_dashboard.rq_worker_preload import ensure_rq_logging
+    from mes_dashboard.services.trace_job_service import _write_msd_events_spool
+
+    ensure_rq_logging()
+    update_job_progress(
+        _MSD_COMPAT_JOB_PREFIX,
+        job_id,
+        status="running",
+        stage="seed-resolve",
+        progress="resolving seeds",
+        pct=10,
+    )
+
+    context = resolve_analysis_trace_context(
+        start_date=start_date,
+        end_date=end_date,
+        station=station,
+        direction=direction,
+    )
+    if context is None:
+        complete_job(_MSD_COMPAT_JOB_PREFIX, job_id, error="failed to resolve analysis context")
+        return
+    if 'error' in context:
+        complete_job(_MSD_COMPAT_JOB_PREFIX, job_id, error=str(context['error']))
+        return
+
+    detection_df = context["detection_df"]
+    if detection_df.empty:
+        complete_job(_MSD_COMPAT_JOB_PREFIX, job_id, query_id=trace_query_id)
+        return
+
+    seed_ids = list(seed_container_ids or context["seed_container_ids"])
+    seed_names = dict(seed_container_names or context["seed_container_names"])
+    domains = ['upstream_history', 'downstream_rejects'] if direction == 'forward' else ['upstream_history', 'materials']
+
+    try:
+        update_job_progress(
+            _MSD_COMPAT_JOB_PREFIX,
+            job_id,
+            status="running",
+            stage="lineage",
+            progress="resolving lineage",
+            completed_stages="seed-resolve",
+            pct=35,
+        )
+
+        if direction == 'forward':
+            lineage_result = LineageEngine.resolve_forward_tree(seed_ids, seed_names)
+            children_map = lineage_result.get("children_map", {}) if isinstance(lineage_result, dict) else {}
+            target_cids = _collect_forward_tracked_cids(seed_ids, children_map)
+            backward_ancestors: Dict[str, Any] = {}
+        else:
+            lineage_result = LineageEngine.resolve_full_genealogy(seed_ids, seed_names)
+            backward_ancestors = lineage_result.get("ancestors", {}) if isinstance(lineage_result, dict) else {}
+            cid_to_name = lineage_result.get("cid_to_name", {}) if isinstance(lineage_result, dict) else {}
+            target_set = set(seed_ids)
+            for values in backward_ancestors.values():
+                if isinstance(values, (list, set, tuple)):
+                    target_set.update(_safe_str(value) for value in values if _safe_str(value))
+            target_cids = sorted(target_set)
+            _write_msd_lineage_stage_spool(trace_query_id, backward_ancestors, cid_to_name)
+
+        update_job_progress(
+            _MSD_COMPAT_JOB_PREFIX,
+            job_id,
+            status="running",
+            stage="events",
+            progress="fetching staged events",
+            completed_stages="seed-resolve,lineage",
+            pct=70,
+        )
+
+        raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+        for domain in domains:
+            events_payload = EventFetcher.fetch_events(target_cids, domain)
+            events_by_cid, _quality_meta = unpack_event_fetch_result(events_payload, domain=domain)
+            raw_domain_results[domain] = events_by_cid
+
+        _write_msd_events_spool(
+            job_id=job_id,
+            trace_query_id=trace_query_id,
+            raw_domain_results=raw_domain_results,
+        )
+        update_job_progress(
+            _MSD_COMPAT_JOB_PREFIX,
+            job_id,
+            status="running",
+            stage="events",
+            progress="staged spool ready",
+            completed_stages="seed-resolve,lineage,events",
+            pct=95,
+        )
+        complete_job(
+            _MSD_COMPAT_JOB_PREFIX,
+            job_id,
+            query_id=trace_query_id,
+        )
+    except Exception as exc:
+        logger.error("MSD compatibility worker failed (job_id=%s): %s", job_id, exc, exc_info=True)
+        complete_job(_MSD_COMPAT_JOB_PREFIX, job_id, error=str(exc))
+        raise
 
 
 # ============================================================

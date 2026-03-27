@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -757,4 +758,56 @@ def _derive_detail(
         "total": len(data),
         "truncated": False,
         "max_records": None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Canonical base dataset identity (task 2.2)
+# ---------------------------------------------------------------------------
+# resource-history canonical base dataset: date-range only, no filter params.
+# Filters (workcenter / family / resource / flags) are applied at DuckDB /
+# view-time, not baked into the spool key.  The route contract remains
+# unchanged — POST /api/resource/history/query still accepts the same params.
+#
+# This function is the stable key used for warmup and spool reuse.
+# Full spool pipeline migration is completed in task 7.2.
+_CANONICAL_BASE_SCHEMA_VERSION = 1
+
+
+def make_canonical_base_query_id(start_date: str, end_date: str, granularity: str = "day") -> str:
+    """Return the canonical spool key for the resource base dataset.
+
+    Uses only the date range and granularity — filter dimensions are resolved
+    at view time by the DuckDB / SQL runtime, not baked into the spool key.
+    """
+    return _make_query_id({
+        "canonical_schema_version": _CANONICAL_BASE_SCHEMA_VERSION,
+        "start_date": start_date,
+        "end_date": end_date,
+        "granularity": granularity,
+    })
+
+
+def ensure_dataset_loaded() -> Dict[str, Any]:
+    """Ensure the canonical resource base dataset exists in cache.
+
+    Called by the warmup scheduler (task 3.3) after canonical base dataset
+    design is complete.  Uses the last 90 days as the default warmup window.
+    """
+    end_dt = date.today()
+    start_dt = end_dt - timedelta(days=89)
+    start_date = start_dt.strftime("%Y-%m-%d")
+    end_date = end_dt.strftime("%Y-%m-%d")
+
+    base_query_id = make_canonical_base_query_id(start_date, end_date)
+    if _has_cached_df(base_query_id):
+        return {"query_id": base_query_id, "cache_hit": True, "start_date": start_date, "end_date": end_date}
+
+    # Full base dataset: no filter restrictions, all resources
+    result = execute_primary_query(start_date=start_date, end_date=end_date)
+    return {
+        "query_id": result.get("query_id", base_query_id),
+        "cache_hit": False,
+        "start_date": start_date,
+        "end_date": end_date,
     }
