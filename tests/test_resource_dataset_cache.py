@@ -203,3 +203,20 @@ class TestPhase2ResourceStoreDF:
         assert len(spool_calls) == 1
         assert len(redis_calls) == 1
         assert result is expected_df
+
+
+class TestResourceApplyView:
+    """Phase 3: apply_view uses DuckDB SQL runtime as the sole compute path."""
+
+    def test_apply_view_sql_result_none_returns_none(self, monkeypatch):
+        """apply_view returns None when DuckDB runtime returns no result (spool miss)."""
+        from mes_dashboard.services import resource_history_sql_runtime
+
+        monkeypatch.setattr(
+            resource_history_sql_runtime,
+            "try_compute_view_from_spool",
+            lambda **_kwargs: (None, {"view_sql_fallback_reason": "spool_miss"}),
+        )
+
+        result = cache_svc.apply_view(query_id="res-none-qid")
+        assert result is None

@@ -96,3 +96,12 @@ Memory-pressure or heavy-query front-door rejection on reject-history endpoints 
 - **WHEN** memory guard rejects `GET /api/reject-history/view` or `GET /api/reject-history/export-cached`
 - **THEN** endpoint SHALL return retryable overload semantics instead of validation semantics
 - **THEN** clients SHALL be able to distinguish overload from parameter-validation failures
+
+## Delta: phase3-spool-first-primary-query
+
+### DuckDB as sole view engine for `apply_view`
+
+- The `_REJECT_CACHE_SQL_VIEW_FALLBACK_LEGACY_ENABLED` runtime flag has been removed. The pandas legacy view path is permanently retired.
+- `apply_view` SHALL use DuckDB SQL runtime (`reject_cache_sql_runtime.try_compute_view_from_spool`) as the sole compute path.
+- **Spool miss**: if DuckDB returns `None`, `apply_view` returns `None` → `GET /api/reject-history/view` returns HTTP 410 `cache_expired`.
+- The `batch-pareto` and `export-cached` paths retain their own `_allow_legacy_fallback()` guard and are unaffected by this change.

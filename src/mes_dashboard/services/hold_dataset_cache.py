@@ -302,9 +302,10 @@ def apply_view(
     _start_date: Optional[str] = None,
     _end_date: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
-    """Read cache -> apply filters -> return derived data. Returns None if expired.
+    """Read cache -> apply filters -> return derived data. Returns None if expired (→ route returns 410).
 
-    Tries DuckDB SQL runtime first (feature-flagged); falls back to Pandas.
+    DuckDB SQL runtime is the sole compute path. Spool miss or runtime error
+    returns None (cache_expired).
     ``_start_date``/``_end_date`` are passed through to the SQL runtime for
     record_type='new' boundary computation.
     """
@@ -344,21 +345,7 @@ def apply_view(
         )
     except Exception as exc:
         logger.warning("hold apply_view: SQL runtime error: %s", exc)
-
-    # ── Pandas fallback path ───────────────────────────────────────────────
-    df = _get_cached_df(query_id)
-    if df is None:
-        return None
-
-    return _derive_all_views(
-        df,
-        hold_type=hold_type,
-        reason=reason,
-        record_type=record_type,
-        duration_range=duration_range,
-        page=page,
-        per_page=per_page,
-    )
+    return None
 
 
 # ============================================================

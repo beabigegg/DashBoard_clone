@@ -25,7 +25,7 @@ import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow, read_sql_df_slow_iter
-from mes_dashboard.core.interactive_memory_guard import enforce_dataset_memory_guard, maybe_gc_collect
+from mes_dashboard.core.interactive_memory_guard import maybe_gc_collect
 from mes_dashboard.core.query_spool_store import (
     QUERY_SPOOL_DIR,
     get_spool_file_path,
@@ -65,9 +65,6 @@ _SPOOL_NAMESPACE = "yield_alert_dataset"
 _WARMUP_DAYS = max(1, int(os.getenv("YIELD_ALERT_DATASET_WARMUP_DAYS", "30")))
 _STREAMING_SPOOL_ENABLED = os.getenv("YIELD_ALERT_STREAMING_SPOOL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 
-_VIEW_MAX_INPUT_MB = float(os.getenv("YIELD_ALERT_VIEW_MAX_INPUT_MB", "96"))
-_VIEW_MAX_PROJECTED_RSS_MB = float(os.getenv("YIELD_ALERT_VIEW_MAX_PROJECTED_RSS_MB", "1100"))
-_VIEW_WORKING_SET_FACTOR = float(os.getenv("YIELD_ALERT_VIEW_WORKING_SET_FACTOR", "2.5"))
 
 _DETAIL_COLUMNS = [
     "DATE_BUCKET",
@@ -617,17 +614,6 @@ def _build_linkage_df(start_date: str, end_date: str, detail_df: pd.DataFrame) -
     return _prepare_linkage_df(linked)
 
 
-def _load_detail_df_from_spool(query_id: str) -> Optional[pd.DataFrame]:
-    """Load the full detail DataFrame from the spool parquet file (pandas fallback path)."""
-    spool_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
-    if spool_path is None:
-        logger.warning(
-            "_load_detail_df_from_spool: spool not found for query_id=%s", query_id
-        )
-        return None
-    return pd.read_parquet(spool_path)
-
-
 def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
     validate_date_range(start_date, end_date)
     query_id = _make_query_id(
@@ -767,7 +753,6 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
         # NOTE: No memory guard here — follows reject module pattern.
         # Primary query only loads → spool to parquet → store cache → release.
         # DuckDB handles heavy aggregation out-of-core via parquet spool.
-        # Guard is applied in apply_view's pandas fallback path only.
 
         logger.info(
             "Yield alert detail loaded (legacy): query_id=%s detail_rows=%s scrap_rows=%s latency_ms=%.2f",
@@ -1494,132 +1479,4 @@ def apply_view(
             "filter_options": sql_result["filter_options"],
         }
 
-    # ── Task 5.3: Pandas fallback path ───────────────────────────────────────
-    if sql_meta.get("view_sql_fallback_reason"):
-        logger.info(
-            "Yield alert DuckDB fallback to pandas: query_id=%s reason=%s",
-            query_id, sql_meta.get("view_sql_fallback_reason"),
-        )
-
-    # Handle empty-result marker
-    if payload.get("empty_result"):
-        return {
-            "summary": {"transaction_qty": 0.0, "scrap_qty": 0.0, "yield_pct": 100.0},
-            "trend": {"items": [], "granularity": granularity},
-            "heatmap": {"items": [], "granularity": granularity},
-            "station_summary": {"items": []},
-            "package_summary": {"items": []},
-            "alerts": {
-                "items": [],
-                "pagination": {"page": 1, "per_page": per_page, "total": 0, "total_pages": 1},
-                "quality": {
-                    "matched": 0, "partially_matched": 0, "unmatched": 0,
-                    "matched_scrap_qty": 0.0, "partially_matched_scrap_qty": 0.0,
-                    "unmatched_scrap_qty": 0.0, "total_scrap_qty": 0.0,
-                    "unmatched_ratio": 0.0, "warning": False, "warning_code": None,
-                },
-                "sort": {"sort_by": sort_by, "sort_dir": sort_dir},
-            },
-            "meta": {
-                "query_latency_ms": 0.0,
-                "max_query_days": MAX_QUERY_DAYS,
-                "max_per_page": MAX_PAGE_SIZE,
-                "reason_exclusion_applied": False,
-                "excluded_reason_count": 0,
-                "cache": {"query_id": query_id},
-                "linkage_ready": True,
-                "view_source": "empty",
-            },
-            "filter_options": {},
-        }
-
-    # Load detail_df from spool (pandas fallback path)
-    detail_df = _load_detail_df_from_spool(query_id)
-    if detail_df is None:
-        logger.warning("apply_view pandas fallback: detail_df unavailable from spool query_id=%s", query_id)
-        return None
-    linkage_df = payload.get("linkage_df")
-
-    # Task 1.3: memory guard before pandas computation
-    enforce_dataset_memory_guard(
-        detail_df,
-        operation="視圖查詢",
-        query_id=query_id,
-        max_input_mb=_VIEW_MAX_INPUT_MB,
-        max_projected_rss_mb=_VIEW_MAX_PROJECTED_RSS_MB,
-        working_set_factor=_VIEW_WORKING_SET_FACTOR,
-    )
-
-    # Apply ALL dimension filters to summary/trend/heatmap/station/package (not just dept/process)
-    detail_filt = _apply_dimension_filters(detail_df, normalized_filters)
-    tx_df_base = _dedup_tx_df(detail_filt)
-    scrap_df_base = _apply_reason_policy(detail_filt, excluded_reason_tokens=excluded_reason_tokens)
-
-    summary, trend_items = _build_summary_and_trend(
-        tx_df=tx_df_base,
-        scrap_df=scrap_df_base,
-        granularity=normalized_granularity,
-    )
-    heatmap_items = _build_heatmap_data(
-        tx_df=tx_df_base,
-        scrap_df=scrap_df_base,
-        granularity=normalized_granularity,
-    )
-    station_summary_items = _build_station_summary(
-        tx_df=tx_df_base,
-        scrap_df=scrap_df_base,
-    )
-    package_summary_items = _build_package_summary(
-        tx_df=tx_df_base,
-        scrap_df=scrap_df_base,
-    )
-    _linkage_ready = linkage_df is not None and not linkage_df.empty
-    alerts = _build_alerts_view(
-        detail_df=detail_df,
-        tx_df=tx_df_base,
-        linkage_df=linkage_df,
-        linkage_ready=_linkage_ready,
-        filters=normalized_filters,
-        page=normalized_page,
-        per_page=normalized_per_page,
-        sort_by=normalized_sort_by,
-        sort_dir=normalized_sort_dir,
-        risk_threshold=normalized_risk,
-        min_scrap_qty=normalized_min_scrap,
-        excluded_reason_tokens=excluded_reason_tokens,
-    )
-    elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
-    logger.info("Yield alert cached view computed: query_id=%s latency_ms=%.2f", query_id, elapsed_ms)
-
-    result = {
-        "summary": summary,
-        "trend": {
-            "items": trend_items,
-            "granularity": normalized_granularity,
-        },
-        "heatmap": {
-            "items": heatmap_items,
-            "granularity": normalized_granularity,
-        },
-        "station_summary": {
-            "items": station_summary_items,
-        },
-        "package_summary": {
-            "items": package_summary_items,
-        },
-        "alerts": alerts,
-        "meta": {
-            "query_latency_ms": elapsed_ms,
-            "max_query_days": MAX_QUERY_DAYS,
-            "max_per_page": MAX_PAGE_SIZE,
-            "reason_exclusion_applied": True,
-            "excluded_reason_count": len(excluded_reason_tokens),
-            "cache": {"query_id": query_id},
-            "linkage_ready": _linkage_ready,
-            "view_source": "pandas",
-        },
-        "filter_options": _compute_filter_options(detail_df),
-    }
-    # Task 1.3: GC after heavy pandas computation
-    maybe_gc_collect()
-    return result
+    return None

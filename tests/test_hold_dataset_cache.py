@@ -129,12 +129,6 @@ class TestHoldViewSqlDateResolution:
             "_get_query_dates",
             lambda _qid: {"start": "2026-03-01", "end": "2026-03-31"},
         )
-        monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: pd.DataFrame({"x": [1]}))
-        monkeypatch.setattr(
-            cache_svc,
-            "_derive_all_views",
-            lambda df, **kw: {"trend": {"days": []}, "list": {"items": [], "pagination": {}}},
-        )
 
         cache_svc.apply_view(query_id="qid-uses-cached-dates")
 
@@ -157,12 +151,6 @@ class TestHoldViewSqlDateResolution:
             "_get_query_dates",
             lambda _qid: {"start": "2026-03-01", "end": "2026-03-31"},
         )
-        monkeypatch.setattr(cache_svc, "_get_cached_df", lambda _qid: pd.DataFrame({"x": [1]}))
-        monkeypatch.setattr(
-            cache_svc,
-            "_derive_all_views",
-            lambda df, **kw: {"trend": {"days": []}, "list": {"items": [], "pagination": {}}},
-        )
 
         cache_svc.apply_view(
             query_id="qid-explicit-dates",
@@ -172,6 +160,21 @@ class TestHoldViewSqlDateResolution:
 
         assert captured.get("start_date") == "2026-04-10"
         assert captured.get("end_date") == "2026-04-12"
+
+    def test_apply_view_sql_result_none_returns_none(self, monkeypatch):
+        """apply_view returns None when DuckDB runtime returns no result (spool miss)."""
+        monkeypatch.setattr(
+            "mes_dashboard.services.hold_history_sql_runtime.try_compute_view_from_spool",
+            lambda **_kwargs: (None, {"view_sql_fallback_reason": "spool_miss"}),
+        )
+        monkeypatch.setattr(
+            cache_svc,
+            "_get_query_dates",
+            lambda _qid: {},
+        )
+
+        result = cache_svc.apply_view(query_id="hold-none-qid")
+        assert result is None
 
 
 # ============================================================

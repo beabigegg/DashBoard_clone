@@ -136,10 +136,6 @@ _REJECT_CACHE_SQL_BATCH_PARETO_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
     "REJECT_CACHE_SQL_BATCH_PARETO_FALLBACK_LEGACY_ENABLED",
     default=True,
 )
-_REJECT_CACHE_SQL_VIEW_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
-    "REJECT_CACHE_SQL_VIEW_FALLBACK_LEGACY_ENABLED",
-    default=True,
-)
 _REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
     "REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED",
     default=True,
@@ -1341,79 +1337,7 @@ def apply_view(
             sql_meta.get("view_sql_latency_s"),
         )
         return sql_result
-
-    view_sql_fallback_reason = _normalize_text(
-        (sql_meta or {}).get("view_sql_fallback_reason")
-    ) or "unknown"
-    if not _allow_legacy_fallback(_REJECT_CACHE_SQL_VIEW_FALLBACK_LEGACY_ENABLED):
-        raise RuntimeError(
-            f"cache-sql view unavailable (reason={view_sql_fallback_reason})"
-        )
-    logger.info(
-        "Reject view fallback to legacy path (query_id=%s, reason=%s)",
-        query_id,
-        view_sql_fallback_reason,
-    )
-
-    df = _get_cached_df(query_id)
-    if df is None:
-        return None
-
-    _enforce_interactive_memory_guard(df, operation="視圖查詢", query_id=query_id)
-    try:
-        # Apply policy filters first (cache stores unfiltered data)
-        df = _apply_policy_filters(
-            df,
-            include_excluded_scrap=include_excluded_scrap,
-            exclude_material_scrap=exclude_material_scrap,
-            exclude_pb_diode=exclude_pb_diode,
-        )
-
-        # Extract available filters from policy-filtered (pre-supplementary) data
-        available = _extract_available_filters(df)
-
-        filtered = _apply_supplementary_filters(
-            df,
-            packages=packages,
-            workcenter_groups=workcenter_groups,
-            reasons=reasons,
-            metric_filter=metric_filter,
-        )
-
-        # Analytics always uses full date range (supplementary-filtered only).
-        # The frontend derives trend from analytics_raw and filters Pareto by
-        # selectedTrendDates client-side.
-        analytics_raw = _derive_analytics_raw(filtered)
-        summary = _derive_summary_from_analytics(analytics_raw)
-
-        # Detail list: additionally filter by detail_reason and trend_dates
-        detail_df = filtered
-        if trend_dates:
-            date_set = set(trend_dates)
-            detail_df = detail_df[
-                detail_df["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
-            ]
-        if detail_reason:
-            detail_df = detail_df[
-                detail_df["LOSSREASONNAME"].str.strip() == detail_reason.strip()
-            ]
-        detail_df = _apply_pareto_selection_filter(
-            detail_df,
-            pareto_dimension=pareto_dimension,
-            pareto_values=pareto_values,
-            pareto_selections=pareto_selections,
-        )
-
-        detail_page = _paginate_detail(detail_df, page=page, per_page=per_page)
-
-        return {
-            "analytics_raw": analytics_raw,
-            "summary": summary,
-            "detail": detail_page,
-            "available_filters": available,
-        }
-    finally:
-        _maybe_collect_after_interactive_compute()
+    return None
 
 
 def _apply_supplementary_filters(

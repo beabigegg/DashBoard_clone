@@ -23,57 +23,16 @@ The resource_dataset_cache module SHALL query Oracle via chunked batch queries a
 - **THEN** the Redis spool metadata namespace SHALL be `resource_dataset`
 - **THEN** the Redis key `resource_dataset:{query_id}` (Parquet+base64 payload) SHALL NOT be written when `PHASE2_METADATA_ONLY=1`
 
-### Requirement: Resource dataset cache SHALL derive KPI summary from cached DataFrame
-The module SHALL compute aggregated KPI metrics from the cached fact set via DuckDB SQL runtime.
-
-#### Scenario: KPI derivation via DuckDB
-- **WHEN** summary view is derived from the spool Parquet file
-- **THEN** DuckDB SHALL compute total hours for PRD, SBY, UDT, SDT, EGT, NST via SQL aggregation
-- **THEN** OU% and AVAIL% SHALL be computed from the hour totals
-- **THEN** machine count SHALL be the COUNT DISTINCT of HISTORYID
-- **THEN** no Pandas DataFrame SHALL be created during this derivation
-
-### Requirement: Resource dataset cache SHALL derive trend data from cached DataFrame
-The module SHALL compute time-series aggregations from the cached fact set via DuckDB SQL runtime.
-
-#### Scenario: Trend derivation via DuckDB
-- **WHEN** summary view is derived with a given granularity (day/week/month/year)
-- **THEN** DuckDB SHALL group by the granularity period using SQL date functions
-- **THEN** each period SHALL include PRD, SBY, UDT, SDT, EGT, NST hours and computed OU%, AVAIL%
-- **THEN** no Pandas DataFrame SHALL be created during this derivation
-
-### Requirement: Resource dataset cache SHALL derive heatmap from cached DataFrame
-The module SHALL compute workcenter x date OU% matrix from the cached fact set via DuckDB SQL runtime.
-
-#### Scenario: Heatmap derivation via DuckDB
-- **WHEN** summary view is derived
-- **THEN** DuckDB SHALL group by (workcenter, date) using SQL aggregation
-- **THEN** each cell SHALL contain the OU% for that workcenter on that date
-- **THEN** workcenters SHALL be sorted by workcenter_seq
-
-### Requirement: Resource dataset cache SHALL derive workcenter comparison from cached DataFrame
-The module SHALL compute per-workcenter aggregated metrics from the cached fact set via DuckDB SQL runtime.
-
-#### Scenario: Comparison derivation via DuckDB
-- **WHEN** summary view is derived
-- **THEN** DuckDB SHALL group by workcenter using SQL aggregation
-- **THEN** each workcenter SHALL include total hours and computed OU%
-- **THEN** results SHALL be sorted by OU% descending, limited to top 15
-
-### Requirement: Resource dataset cache SHALL derive paginated detail from cached DataFrame
-The module SHALL provide hierarchical detail records from the cached fact set via DuckDB SQL runtime.
-
-#### Scenario: Detail derivation and pagination via DuckDB
-- **WHEN** detail view is requested with page and per_page parameters
-- **THEN** DuckDB SHALL compute per-resource metrics from the spool Parquet file
-- **THEN** resource dimension data (WORKCENTERNAME, RESOURCEFAMILYNAME) SHALL be merged from resource_cache
-- **THEN** results SHALL be structured as a hierarchical tree (workcenter -> family -> resource)
-- **THEN** pagination SHALL be applied via SQL LIMIT/OFFSET
-
 ### Requirement: Resource dataset cache SHALL handle cache expiry gracefully
-The module SHALL return appropriate signals when cache has expired.
+The module SHALL return appropriate signals when cache has expired or the view engine cannot compute a result.
 
 #### Scenario: Cache expired during view request
 - **WHEN** a view is requested with a query_id whose spool file has expired
 - **THEN** the response SHALL return `{ success: false, error: "cache_expired" }`
 - **THEN** the HTTP status SHALL be 410 (Gone)
+
+#### Scenario: DuckDB runtime failure during view request
+- **WHEN** `apply_view()` is called and the DuckDB SQL runtime returns no result (spool miss, runtime error, or feature flag disabled)
+- **THEN** the response SHALL return `{ success: false, error: "cache_expired" }`
+- **THEN** the HTTP status SHALL be 410 (Gone)
+- **THEN** the system SHALL NOT call `_get_cached_df()` or any `_derive_*()` pandas function

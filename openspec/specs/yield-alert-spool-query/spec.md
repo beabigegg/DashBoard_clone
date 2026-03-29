@@ -26,15 +26,11 @@ The system SHALL provide a DuckDB-based SQL runtime (`yield_alert_sql_runtime.py
 - **THEN** filtering, grouping, sorting, and pagination SHALL be performed within DuckDB SQL (not Python-side materialization)
 - **THEN** only the requested page of alert rows SHALL be returned to Python
 
-#### Scenario: DuckDB fallback to pandas on spool miss
+#### Scenario: Spool miss returns None (cache expired)
 - **WHEN** `apply_view` is called but no parquet spool file exists for the query_id
-- **THEN** the system SHALL fall back to the pandas computation path with memory guard protection
-- **THEN** the system SHALL log the fallback reason
-
-#### Scenario: DuckDB disabled via feature flag
-- **WHEN** environment variable `YIELD_ALERT_SQL_VIEW_ENABLED` is set to `false`
-- **THEN** the system SHALL skip the DuckDB path entirely and use the pandas computation path
-- **THEN** the pandas path SHALL still be protected by `enforce_dataset_memory_guard`
+- **THEN** `apply_view` SHALL return `None` (route returns HTTP 410 cache_expired)
+- **THEN** the system SHALL log the fallback reason at DEBUG level
+- **THEN** the pandas fallback path SHALL NOT be invoked
 
 ### Requirement: Yield Alert DuckDB runtime SHALL apply reason exclusion policy equivalently
 The DuckDB SQL runtime SHALL apply the same reason exclusion logic as the pandas `_apply_reason_policy` function.
@@ -58,7 +54,7 @@ The DuckDB SQL runtime SHALL apply the same reason exclusion logic as the pandas
 ### Empty-result cache semantics
 
 - Zero-row queries now produce a lightweight marker (`empty_result=true, spool_ready=false`) rather than triggering a cache miss.
-- DuckDB and pandas fallback paths both return empty success results (not cache miss) for empty-result markers.
+- Empty-result markers (`empty_result=true, spool_ready=false`) have no spool file. DuckDB returns spool_miss → `apply_view` returns `None` → route returns HTTP 410 (cache_expired).
 
 ### Data source tiering
 

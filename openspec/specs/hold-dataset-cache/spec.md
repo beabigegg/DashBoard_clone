@@ -23,46 +23,8 @@ The hold_dataset_cache module SHALL query Oracle via chunked batch queries and c
 - **THEN** the Redis spool metadata namespace SHALL be `hold_dataset`
 - **THEN** the Redis key `hold_dataset:{query_id}` (Parquet+base64 payload) SHALL NOT be written when `PHASE2_METADATA_ONLY=1`
 
-### Requirement: Hold dataset cache SHALL derive trend data from cached DataFrame
-The module SHALL compute daily trend aggregations from the cached fact set via DuckDB SQL runtime.
-
-#### Scenario: Trend derivation via DuckDB
-- **WHEN** `apply_view()` is called with a valid query_id
-- **THEN** DuckDB SHALL derive trend data by grouping the spool Parquet by date using SQL aggregation
-- **THEN** the 07:30 shift boundary rule SHALL be applied
-- **THEN** all three hold_type variants (quality, non_quality, all) SHALL be computed from SQL WHERE clauses
-- **THEN** hold_type filtering SHALL be applied via SQL, not in-memory Pandas
-
-### Requirement: Hold dataset cache SHALL derive reason Pareto from cached DataFrame
-The module SHALL compute reason distribution from the cached fact set via DuckDB SQL runtime.
-
-#### Scenario: Reason Pareto derivation via DuckDB
-- **WHEN** `apply_view()` is called with hold_type filter
-- **THEN** DuckDB SHALL derive reason Pareto by grouping the filtered data by HOLDREASONNAME
-- **THEN** items SHALL include count, qty, pct, and cumPct
-- **THEN** items SHALL be sorted by count descending
-
-### Requirement: Hold dataset cache SHALL derive duration distribution from cached DataFrame
-The module SHALL compute hold duration buckets from the cached fact set via DuckDB SQL runtime.
-
-#### Scenario: Duration derivation via DuckDB
-- **WHEN** `apply_view()` is called with hold_type filter
-- **THEN** DuckDB SHALL derive duration distribution from records where RELEASETXNDATE IS NOT NULL
-- **THEN** 4 buckets SHALL be computed via SQL CASE expressions: <4h, 4-24h, 1-3d, >3d
-- **THEN** each bucket SHALL include count and pct
-
-### Requirement: Hold dataset cache SHALL derive paginated list from cached DataFrame
-The module SHALL provide paginated detail records from the cached fact set via DuckDB SQL runtime.
-
-#### Scenario: List pagination via DuckDB
-- **WHEN** `apply_view()` is called with page and per_page parameters
-- **THEN** DuckDB SHALL filter the spool Parquet by hold_type and optional reason filter
-- **THEN** records SHALL be sorted by HOLDTXNDATE descending via SQL ORDER BY
-- **THEN** pagination SHALL be applied via SQL LIMIT/OFFSET
-- **THEN** response SHALL include items and pagination metadata (page, perPage, total, totalPages)
-
 ### Requirement: Hold dataset cache SHALL handle cache expiry gracefully
-The module SHALL return appropriate signals when cache has expired.
+The module SHALL return appropriate signals when cache has expired or the view engine cannot compute a result.
 
 #### Scenario: Cache expired during view request
 - **WHEN** `apply_view()` is called with a query_id whose spool file has expired
@@ -73,3 +35,9 @@ The module SHALL return appropriate signals when cache has expired.
 - **WHEN** `apply_view()` is called with a query_id that has no spool metadata pointer and no Redis DataFrame key
 - **THEN** the response SHALL return `{ success: false, error: "cache_expired" }` (treated as expired/miss)
 - **THEN** the client SHALL re-trigger `execute_primary_query()`
+
+#### Scenario: DuckDB runtime failure during view request
+- **WHEN** `apply_view()` is called and the DuckDB SQL runtime returns no result (spool miss, runtime error, or feature flag disabled)
+- **THEN** the response SHALL return `{ success: false, error: "cache_expired" }`
+- **THEN** the HTTP status SHALL be 410 (Gone)
+- **THEN** the system SHALL NOT call `_get_cached_df()` or `_derive_all_views()` pandas function

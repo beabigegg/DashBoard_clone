@@ -23,19 +23,21 @@ Each dataset that has a Parquet spool SHALL have a corresponding SQL runtime mod
 - **THEN** DuckDB SHALL execute SQL queries against the Parquet file using `read_parquet(path)`
 - **THEN** the view result SHALL be returned as a Python dict without constructing a Pandas DataFrame
 
-#### Scenario: DuckDB SQL runtime unavailable fallback
-- **WHEN** the SQL runtime cannot execute (feature flag disabled, DuckDB import failed, or spool file missing)
-- **THEN** the system SHALL fall back to the existing Pandas-based view derivation
-- **THEN** the response metadata SHALL include `fallback_reason` indicating why SQL runtime was not used
+#### Scenario: DuckDB runtime failure or spool miss returns cache_expired
+- **WHEN** the SQL runtime cannot execute (DuckDB import failed, spool file missing, or runtime error)
+- **THEN** the system SHALL return `{ success: false, error: "cache_expired" }` with HTTP 410
+- **THEN** the system SHALL NOT fall back to the Pandas-based view derivation
+- **THEN** the client SHALL re-trigger `execute_primary_query()` to rebuild the spool
 
 ### Requirement: DuckDB SQL runtime modules SHALL be gated by feature flags
 Each SQL runtime module SHALL be controlled by a boolean feature flag that defaults to enabled.
 
 #### Scenario: Feature flag controls view path selection
 - **WHEN** the feature flag (e.g., `RESOURCE_HISTORY_SQL_VIEW_ENABLED`) is set to `false`
-- **THEN** the view query SHALL use the existing Pandas-based derivation path
+- **THEN** the view query SHALL return `{ success: false, error: "cache_expired" }` with HTTP 410
+- **THEN** the system SHALL NOT use the Pandas-based derivation path as a fallback
 - **WHEN** the feature flag is set to `true` (default)
-- **THEN** the view query SHALL attempt the DuckDB SQL runtime path first
+- **THEN** the view query SHALL attempt the DuckDB SQL runtime path
 
 ### Requirement: Query-level memory guard SHALL NOT reject queries when chunked processing is used
 When a dataset cache module uses `batch_query_engine` for chunked queries and `merge_chunks_to_spool()` for streaming output, the query-level `enforce_dataset_memory_guard` SHALL NOT be applied to reject queries.

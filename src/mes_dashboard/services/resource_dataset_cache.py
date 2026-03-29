@@ -332,11 +332,11 @@ def apply_view(
     query_id: str,
     granularity: str = "day",
 ) -> Optional[Dict[str, Any]]:
-    """Read cache -> derive views. Returns None if expired.
+    """Read cache -> derive views. Returns None if expired (→ route returns 410).
 
-    Tries DuckDB SQL runtime first (feature-flagged); falls back to Pandas.
+    DuckDB SQL runtime is the sole compute path. Spool miss or runtime error
+    returns None (cache_expired).
     """
-    # ── Task 3.7: Try DuckDB SQL runtime path ─────────────────────────────
     try:
         from mes_dashboard.services.resource_history_sql_runtime import (
             try_compute_view_from_spool,
@@ -349,27 +349,12 @@ def apply_view(
             return {**sql_result, "_meta": sql_meta}
         fallback_reason = sql_meta.get("view_sql_fallback_reason", "unknown")
         logger.debug(
-            "resource apply_view: SQL runtime fallback (reason=%s query_id=%s)",
+            "resource apply_view: SQL runtime no result (reason=%s query_id=%s)",
             fallback_reason, query_id,
         )
     except Exception as exc:
         logger.warning("resource apply_view: SQL runtime error: %s", exc)
-
-    # ── Pandas fallback path ───────────────────────────────────────────────
-    df = _get_cached_df(query_id)
-    if df is None:
-        return None
-
-    resource_lookup = _get_resource_lookup()
-    wc_mapping = _get_workcenter_mapping()
-
-    summary = _derive_summary(df, resource_lookup, wc_mapping, granularity)
-    detail = _derive_detail(df, resource_lookup, wc_mapping)
-
-    return {
-        "summary": summary,
-        "detail": detail,
-    }
+    return None
 
 
 # ============================================================

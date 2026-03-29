@@ -55,115 +55,24 @@ def test_apply_view_returns_none_on_cache_miss(monkeypatch):
     assert result is None
 
 
-def test_apply_view_uses_cached_data_for_secondary_filters(monkeypatch):
-    move_df = pd.DataFrame(
-        [
-            {"DATE_BUCKET": "2026-02-21", "DEPARTMENT_NAME": "焊接_WB", "TRANSACTION_QTY": 14039.147},
-            {"DATE_BUCKET": "2026-02-21", "DEPARTMENT_NAME": "成型", "TRANSACTION_QTY": 100.0},
-        ]
-    )
-    detail_df = pd.DataFrame(
-        [
-            {
-                "DATE_BUCKET": "2026-02-21",
-                "WORKORDER": "WO-1",
-                "REASON_RAW": "031_腳架氧化",
-                "REASON_NAME": "031_腳架氧化",
-                "DEPARTMENT_NAME": "焊接_WB",
-                "DEPARTMENT_GROUP": "焊接_WB",
-                "PROCESS_CATEGORY": "WB",
-                "LINE_NAME": "L1",
-                "PACKAGE_NAME": "PKG-A",
-                "TYPE_NAME": "TYPE-A",
-                "FUNCTION_NAME": "FUNC-A",
-                "OPERATION_TEXT": "10",
-                "REASON_CODE": "031",
-                "REASON_RAW_UPPER": "031_腳架氧化",
-                "REASON_NAME_UPPER": "031_腳架氧化",
-                "TRANSACTION_QTY": 14039.147,
-                "SCRAP_QTY": 17.155,
-            },
-            {
-                "DATE_BUCKET": "2026-02-21",
-                "WORKORDER": "WO-2",
-                "REASON_RAW": "(UNMAPPED)",
-                "REASON_NAME": "(UNMAPPED)",
-                "DEPARTMENT_NAME": "焊接_WB",
-                "DEPARTMENT_GROUP": "焊接_WB",
-                "PROCESS_CATEGORY": "WB",
-                "LINE_NAME": "L1",
-                "PACKAGE_NAME": "PKG-A",
-                "TYPE_NAME": "TYPE-A",
-                "FUNCTION_NAME": "FUNC-A",
-                "OPERATION_TEXT": "10",
-                "REASON_CODE": "UNMAPPED_REASON",
-                "REASON_RAW_UPPER": "(UNMAPPED)",
-                "REASON_NAME_UPPER": "(UNMAPPED)",
-                "TRANSACTION_QTY": 200.0,
-                "SCRAP_QTY": 2.0,
-            },
-            {
-                "DATE_BUCKET": "2026-02-21",
-                "WORKORDER": "WO-3",
-                "REASON_RAW": "031_腳架氧化",
-                "REASON_NAME": "031_腳架氧化",
-                "DEPARTMENT_NAME": "成型",
-                "DEPARTMENT_GROUP": "成型",
-                "PROCESS_CATEGORY": "OTHER",
-                "LINE_NAME": "L9",
-                "PACKAGE_NAME": "PKG-Z",
-                "TYPE_NAME": "TYPE-Z",
-                "FUNCTION_NAME": "FUNC-Z",
-                "OPERATION_TEXT": "30",
-                "REASON_CODE": "031",
-                "REASON_RAW_UPPER": "031_腳架氧化",
-                "REASON_NAME_UPPER": "031_腳架氧化",
-                "TRANSACTION_QTY": 100.0,
-                "SCRAP_QTY": 5.0,
-            },
-        ]
-    )
-    linkage_df = pd.DataFrame([{"CANONICAL_KEY": "2026-02-21|WO-1|031", "REJECT_TOTAL_QTY": 17.155}])
+def test_apply_view_duckdb_failure_returns_none(monkeypatch):
+    """apply_view returns None when DuckDB runtime returns no result (spool miss or error)."""
+    from mes_dashboard.services import yield_alert_sql_runtime
+
     monkeypatch.setattr(
         dataset_cache,
         "_get_cached_payload",
-        lambda _query_id: {"linkage_df": linkage_df, "spool_ready": True, "empty_result": False},
+        lambda _qid: {"linkage_df": pd.DataFrame(), "spool_ready": True, "empty_result": False},
     )
-    monkeypatch.setattr(dataset_cache, "_load_detail_df_from_spool", lambda _qid: detail_df)
-    monkeypatch.setattr(dataset_cache, "_load_excluded_reason_tokens", lambda: {"358"})
-
-    result = dataset_cache.apply_view(
-        query_id="ya-001",
-        filters={"departments": ["焊接_WB", "焊接_DW"]},
-        risk_threshold=99,
-        min_scrap_qty=0,
+    monkeypatch.setattr(dataset_cache, "_load_excluded_reason_tokens", lambda: set())
+    monkeypatch.setattr(
+        yield_alert_sql_runtime,
+        "try_compute_view_from_spool",
+        lambda **_kwargs: (None, {"view_sql_fallback_reason": "test_spool_miss"}),
     )
 
-    assert result is not None
-    assert round(result["summary"]["transaction_qty"], 3) == 14239.147
-    assert round(result["summary"]["scrap_qty"], 3) == 17.155
-    assert result["alerts"]["pagination"]["total"] == 1
-    assert result["alerts"]["items"][0]["department"] == "焊接_WB"
-
-    # All supplementary filters now apply to ALL views (summary, trend, heatmap, etc.)
-    # L9 belongs to dept "成型" — filtering by dept "焊接_WB" + line "L9" yields no match
-    with_line_filter = dataset_cache.apply_view(
-        query_id="ya-001",
-        filters={"departments": ["焊接_WB", "焊接_DW"], "lines": ["L9"]},
-        risk_threshold=99,
-        min_scrap_qty=0,
-    )
-    assert with_line_filter["alerts"]["pagination"]["total"] == 0
-    assert with_line_filter["summary"]["transaction_qty"] == 0.0
-
-    # L1 belongs to dept "焊接_WB" — this combination narrows results correctly
-    with_l1_filter = dataset_cache.apply_view(
-        query_id="ya-001",
-        filters={"departments": ["焊接_WB", "焊接_DW"], "lines": ["L1"]},
-        risk_threshold=99,
-        min_scrap_qty=0,
-    )
-    assert with_l1_filter["summary"]["transaction_qty"] > 0
+    result = dataset_cache.apply_view(query_id="ya-fail-001")
+    assert result is None
 
 
 def test_ensure_dataset_loaded_returns_cache_hit(monkeypatch):
@@ -285,7 +194,9 @@ def test_execute_primary_query_empty_result_does_not_raise(monkeypatch):
 
 
 def test_apply_view_returns_empty_success_for_empty_result_marker(monkeypatch):
-    """apply_view returns empty structured result (not None) when empty_result marker is set."""
+    """apply_view returns None when empty_result marker is set (no spool → DuckDB spool_miss → 410)."""
+    from mes_dashboard.services import yield_alert_sql_runtime
+
     monkeypatch.setattr(
         dataset_cache,
         "_get_cached_payload",
@@ -298,12 +209,14 @@ def test_apply_view_returns_empty_success_for_empty_result_marker(monkeypatch):
         },
     )
     monkeypatch.setattr(dataset_cache, "_load_excluded_reason_tokens", lambda: set())
+    monkeypatch.setattr(
+        yield_alert_sql_runtime,
+        "try_compute_view_from_spool",
+        lambda **_kwargs: (None, {"view_sql_fallback_reason": "spool_miss"}),
+    )
 
     result = dataset_cache.apply_view(query_id="empty-qid")
-    assert result is not None
-    assert result["summary"]["transaction_qty"] == 0.0
-    assert result["summary"]["scrap_qty"] == 0.0
-    assert result["alerts"]["pagination"]["total"] == 0
+    assert result is None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -481,75 +394,38 @@ def test_execute_linkage_query_derives_dates_from_spool_when_missing(monkeypatch
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_primary_query_to_spool_to_view_full_pipeline(monkeypatch, tmp_path):
-    """Integration: streaming write → register spool → apply_view via pandas fallback produces correct response."""
-    import pyarrow as pa
-    import pyarrow.parquet as pq
+    """Integration: apply_view via DuckDB SQL runtime produces correct response."""
+    from mes_dashboard.services import yield_alert_sql_runtime
 
-    # --- Phase 1: Simulate streaming write producing a real parquet spool ---
-    detail_rows = [
-        {
-            "DATE_BUCKET": "2026-02-21",
-            "WORKORDER": "WO-001",
-            "REASON_RAW": "031_腳架氧化",
-            "REASON_NAME": "031_腳架氧化",
-            "DEPARTMENT_NAME": "焊接_WB",
-            "DEPARTMENT_GROUP": "焊接_WB",
-            "PROCESS_CATEGORY": "WB",
-            "LINE_NAME": "L1",
-            "PACKAGE_NAME": "PKG-A",
-            "TYPE_NAME": "TYPE-A",
-            "FUNCTION_NAME": "FUNC-A",
-            "OPERATION_TEXT": "10",
-            "REASON_CODE": "031",
-            "REASON_RAW_UPPER": "031_腳架氧化",
-            "REASON_NAME_UPPER": "031_腳架氧化",
-            "TRANSACTION_QTY": 100.0,
-            "SCRAP_QTY": 5.0,
-        },
-        {
-            "DATE_BUCKET": "2026-02-21",
-            "WORKORDER": "WO-002",
-            "REASON_RAW": "032_打線斷裂",
-            "REASON_NAME": "032_打線斷裂",
-            "DEPARTMENT_NAME": "焊接_WB",
-            "DEPARTMENT_GROUP": "焊接_WB",
-            "PROCESS_CATEGORY": "WB",
-            "LINE_NAME": "L2",
-            "PACKAGE_NAME": "PKG-B",
-            "TYPE_NAME": "TYPE-B",
-            "FUNCTION_NAME": "FUNC-B",
-            "OPERATION_TEXT": "20",
-            "REASON_CODE": "032",
-            "REASON_RAW_UPPER": "032_打線斷裂",
-            "REASON_NAME_UPPER": "032_打線斷裂",
-            "TRANSACTION_QTY": 200.0,
-            "SCRAP_QTY": 10.0,
-        },
-    ]
-    detail_df = pd.DataFrame(detail_rows)
-    spool_file = tmp_path / "integration_spool.parquet"
-    pq.write_table(pa.Table.from_pandas(detail_df, preserve_index=False), str(spool_file))
+    duckdb_result = {
+        "summary": {"transaction_qty": 300.0, "scrap_qty": 15.0},
+        "alerts": {"pagination": {"total": 2}, "items": []},
+        "trend": {"items": []},
+        "heatmap": {},
+        "station_summary": {},
+        "package_summary": {},
+        "filter_options": {},
+        "meta": {"view_source": "duckdb"},
+    }
 
-    linkage_df = pd.DataFrame(
-        [{"CANONICAL_KEY": "2026-02-21|WO-001|031", "REJECT_TOTAL_QTY": 5.0}]
-    )
-
-    # --- Phase 2: Wire up apply_view to use the spool file ---
     monkeypatch.setattr(
         dataset_cache,
         "_get_cached_payload",
         lambda _qid: {
-            "linkage_df": linkage_df,
+            "linkage_df": pd.DataFrame(columns=dataset_cache._LINKAGE_COLUMNS),
             "spool_ready": True,
             "empty_result": False,
             "start_date": "2026-02-21",
             "end_date": "2026-02-21",
         },
     )
-    monkeypatch.setattr(dataset_cache, "_load_detail_df_from_spool", lambda _qid: detail_df)
     monkeypatch.setattr(dataset_cache, "_load_excluded_reason_tokens", lambda: set())
+    monkeypatch.setattr(
+        yield_alert_sql_runtime,
+        "try_compute_view_from_spool",
+        lambda **_kwargs: (duckdb_result, {"view_source": "duckdb"}),
+    )
 
-    # --- Phase 3: Call apply_view and verify the full response ---
     result = dataset_cache.apply_view(query_id="integration-qid")
     assert result is not None
 
@@ -557,13 +433,13 @@ def test_primary_query_to_spool_to_view_full_pipeline(monkeypatch, tmp_path):
     assert result["summary"]["transaction_qty"] == 300.0
     assert result["summary"]["scrap_qty"] == 15.0
 
-    # Alerts should have 2 items (each workorder+reason is a distinct alert)
+    # Alerts should have 2 items
     assert result["alerts"]["pagination"]["total"] == 2
 
-    # Meta should indicate pandas fallback
-    assert result["meta"]["view_source"] == "pandas"
+    # Meta should indicate DuckDB path
+    assert result["meta"]["view_source"] == "duckdb"
 
-    # Filter options should be populated
+    # Filter options should be present
     assert "filter_options" in result
 
     # Trend items should exist
