@@ -8,7 +8,7 @@
 >
 > **Phase 進度：**
 > - [x] Phase 0 — 基線量測 → 完成，詳見 `docs/phase0_baseline_assessment.md`
-> - [~] Phase 1 — hot cache 整理 → 提案封存 (2026-03-29)，待實作，詳見 `openspec/changes/archive/2026-03-29-phase1-hot-cache-normalization/`
+> - [x] Phase 1 — hot cache 整理 → 實作完成 (2026-03-29)，commit `77e6819`，提案封存於 `openspec/changes/archive/2026-03-29-phase1-hot-cache-normalization/`
 > - [ ] Phase 2 — heavy dataset metadata-only Redis
 > - [ ] Phase 3 — 重查詢 primary query 全部先落 spool
 > - [ ] Phase 4 — 對外語意分兩類
@@ -360,9 +360,17 @@ Browser / Flask / Frontend DuckDB-WASM
 
 ## Phase 1: 先整理 hot cache，不碰重查詢 contract
 
-> **狀態：提案封存 (2026-03-29)**
+> **狀態：✅ 實作完成 (2026-03-29)，commit `77e6819`**
 > openspec 封存於 `openspec/changes/archive/2026-03-29-phase1-hot-cache-normalization/`
 > 實作任務追蹤：`openspec/changes/archive/2026-03-29-phase1-hot-cache-normalization/tasks.md`
+>
+> **實作結果（6 工作群組全數完成）：**
+> - Group 1：WIP cache Parquet-only — `cache_updater.py` 移除 JSON 路徑，`cache.py` 移除 JSON fallback
+> - Group 2：Dataset L1 max_size→1 — `hold/reject/resource_dataset_cache.py`（3→1），`yield_alert_dataset_cache.py`（2→1）
+> - Group 3：Redis TTL EX 300 — `resource_cache.py` pipeline、`realtime_equipment_cache.py` pipeline
+> - Group 4：Spool 磁碟用量 telemetry — `admin_routes.py` 新增 `spool_disk_usage`
+> - Group 5：Redis namespace 記憶體 telemetry — `admin_routes.py` 新增 `redis_namespace_memory`（6 namespace）
+> - Group 6：Validation — pytest 49 passed，2 pre-existing failures（`TestWarmupTasks`，與 Phase 1 無關）
 
 目標：
 
