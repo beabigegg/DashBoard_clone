@@ -10,7 +10,7 @@
 > - [x] Phase 0 — 基線量測 → 完成，詳見 `docs/phase0_baseline_assessment.md`
 > - [x] Phase 1 — hot cache 整理 → 實作完成 (2026-03-29)，commit `77e6819`，提案封存於 `openspec/changes/archive/2026-03-29-phase1-hot-cache-normalization/`
 > - [x] Phase 2 — heavy dataset metadata-only Redis → 實作完成 (2026-03-29)，commit `c77f1d4`，提案封存於 `openspec/changes/archive/2026-03-29-phase2-heavy-dataset-metadata-redis/`
-> - [ ] Phase 3 — 重查詢 primary query 全部先落 spool
+> - [x] Phase 3 — 重查詢 primary query 全部先落 spool → 實作完成 (2026-03-29)，commit `84d186d`，提案封存於 `openspec/changes/archive/2026-03-29-phase3-spool-first-primary-query/`
 > - [ ] Phase 4 — 對外語意分兩類
 > - [ ] Phase 5 — 退休 pandas heavy fallback
 
@@ -468,6 +468,18 @@ Browser / Flask / Frontend DuckDB-WASM
 - 預估 Redis peak 從 200–400 MB 降至 50–100 MB
 
 ## Phase 3: 讓重查詢 primary query 全部先落 spool
+
+> **狀態：✅ 實作完成 (2026-03-29)，commit `84d186d`**
+> openspec 封存於 `openspec/changes/archive/2026-03-29-phase3-spool-first-primary-query/`
+> 實作任務追蹤：`openspec/changes/archive/2026-03-29-phase3-spool-first-primary-query/tasks.md`
+>
+> **實作結果：**
+> - `apply_view()` pandas fallback 從 resource / hold / yield-alert / reject 全部移除
+> - spool miss または DuckDB runtime 失敗 → `None`（route 返回 410 `cache_expired`）
+> - `_derive_*()` 函數保留：仍由 `execute_primary_query()` Oracle cold-start 路徑使用（SCOPE NARROWED）
+> - `_allow_legacy_fallback()` 保留：reject batch pareto / export 路徑仍在使用
+> - `_REJECT_CACHE_SQL_VIEW_FALLBACK_LEGACY_ENABLED` 刪除（僅 view path 使用，已移除）
+> - Governed specs 更新：parquet-spool-view-engine、resource-dataset-cache、hold-dataset-cache、yield-alert-spool-query、reject-history-api
 
 目標：
 
