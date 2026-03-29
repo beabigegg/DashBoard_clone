@@ -150,7 +150,9 @@ def execute_primary_query(
     }
     query_id = _make_query_id(query_id_input)
 
-    if _has_cached_df(query_id):
+    _spool_available = _has_cached_df(query_id)
+
+    if _spool_available:
         logger.info("Resource dataset cache hit for query_id=%s", query_id)
     else:
         logger.info(
@@ -225,6 +227,7 @@ def execute_primary_query(
                     ttl_seconds=_CACHE_TTL,
                 )
                 _dataset_cache.set(query_id, True)  # L1 marker
+                _spool_available = True
         else:
             # --- Direct path (short query) ---
             params = {"start_date": start_date, "end_date": end_date}
@@ -237,9 +240,14 @@ def execute_primary_query(
                 df = pd.DataFrame()
             if not df.empty:
                 _store_df(query_id, df)
+                _spool_available = True
 
     result = apply_view(query_id=query_id, granularity=granularity)
     if result is None:
+        if _spool_available:
+            raise RuntimeError(
+                f"bootstrap render failure: apply_view returned None for query_id={query_id}"
+            )
         return {
             "query_id": query_id,
             "summary": _empty_summary(),

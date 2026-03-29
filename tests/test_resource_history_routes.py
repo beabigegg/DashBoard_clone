@@ -159,6 +159,24 @@ class TestResourceHistoryQueryAPI(unittest.TestCase):
         self.assertTrue(call_kwargs['is_production'])
         self.assertTrue(call_kwargs['is_key'])
 
+    @patch(
+        'mes_dashboard.services.resource_history_sql_runtime.try_compute_query_from_canonical_spool',
+        return_value=(None, None),
+    )
+    @patch('mes_dashboard.routes.resource_history_routes.execute_primary_query')
+    def test_query_bootstrap_render_failure_returns_500(self, mock_query, _mock_canonical):
+        """Bootstrap render failure from service should surface as route failure."""
+        mock_query.side_effect = RuntimeError('bootstrap render failure: apply_view returned None')
+
+        response = self.client.post(
+            '/api/resource/history/query',
+            json={'start_date': '2024-01-01', 'end_date': '2024-01-07'},
+        )
+
+        self.assertEqual(response.status_code, 500)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+
 
 class TestResourceHistoryViewAPI(unittest.TestCase):
     """Integration tests for GET /api/resource/history/view endpoint."""

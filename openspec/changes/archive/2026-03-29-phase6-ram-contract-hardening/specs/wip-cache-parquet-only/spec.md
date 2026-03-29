@@ -1,9 +1,4 @@
-# wip-cache-parquet-only Specification
-
-## Purpose
-Normalize the WIP cache to use only the Parquet Redis representation, removing the legacy JSON key to reduce Redis memory consumption and simplify the read path.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: WIP cache updater SHALL write Parquet-only to Redis
 The `cache_updater.py` WIP update cycle SHALL write only the Parquet representation (`mes_wip:data:parquet`) to Redis. The JSON representation (`mes_wip:data`) SHALL NOT be written.
@@ -30,17 +25,7 @@ The `get_cached_wip_data()` function in `core/cache.py` SHALL read only from the
 - **THEN** the function SHALL return `None`
 - **THEN** no attempt SHALL be made to read `mes_wip:data` as fallback
 
-### Requirement: Stale JSON key SHALL be cleaned up on first update
-On the first WIP update cycle after deployment, the updater SHALL delete the `mes_wip:data` key if it exists, to reclaim Redis memory.
-
-#### Scenario: Legacy JSON key exists at first update
-- **WHEN** the updater runs and `mes_wip:data` key exists in Redis
-- **THEN** the updater SHALL delete `mes_wip:data` within the same pipeline
-- **THEN** a log at INFO level SHALL record the cleanup
-
-#### Scenario: Legacy JSON key does not exist
-- **WHEN** the updater runs and `mes_wip:data` does not exist in Redis
-- **THEN** no error or warning SHALL be emitted
+## ADDED Requirements
 
 ### Requirement: WIP cache availability probes SHALL inspect the canonical Parquet key
 All WIP cache availability and health checks SHALL inspect the same canonical Redis key used by the runtime read/write path.

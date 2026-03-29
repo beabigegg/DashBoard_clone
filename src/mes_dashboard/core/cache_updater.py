@@ -285,7 +285,7 @@ class CacheUpdater:
 
             # Store as Parquet (primary representation)
             from mes_dashboard.core.redis_df_store import redis_store_df
-            redis_store_df(get_key("data:parquet"), df_copy, ttl=ttl_seconds)
+            redis_store_df("data:parquet", df_copy, ttl=ttl_seconds)
             logger.debug("WIP Parquet cache updated")
 
             return True

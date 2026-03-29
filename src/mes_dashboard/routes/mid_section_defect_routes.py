@@ -13,11 +13,11 @@ from mes_dashboard.core.response import (
     validation_error,
     internal_error,
     error_response,
+    cache_expired_error,
 )
 from mes_dashboard.core.cache import cache_get, make_cache_key
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.services.mid_section_defect_service import (
-    ensure_analysis_background_job,
     resolve_analysis_trace_context,
     query_analysis,
     query_all_loss_reasons,
@@ -214,28 +214,7 @@ def api_analysis_detail():
                     })
         except Exception as exc:
             logger.warning("detail spool path failed (trace_query_id=%s): %s", trace_query_id, exc)
-        context = resolve_analysis_trace_context(
-            start_date=start_date,
-            end_date=end_date,
-            station=station,
-            direction=direction,
-        )
-        if context and 'error' not in context:
-            ensure_analysis_background_job(
-                start_date=start_date,
-                end_date=end_date,
-                station=station,
-                direction=direction,
-                trace_query_id=trace_query_id,
-                seed_container_ids=context.get("seed_container_ids"),
-                seed_container_names=context.get("seed_container_names"),
-            )
-        return error_response(
-            "QUERY_NOT_READY",
-            "查詢結果尚未就緒，請先完成 staged trace 查詢",
-            status_code=409,
-            meta={"trace_query_id": trace_query_id},
-        )
+        return cache_expired_error()
 
     return internal_error('查詢失敗，請稍後再試')
 
@@ -294,27 +273,6 @@ def api_export():
                 )
         except Exception as exc:
             logger.warning("export spool path failed (trace_query_id=%s): %s", trace_query_id, exc)
-        context = resolve_analysis_trace_context(
-            start_date=start_date,
-            end_date=end_date,
-            station=station,
-            direction=direction,
-        )
-        if context and 'error' not in context:
-            ensure_analysis_background_job(
-                start_date=start_date,
-                end_date=end_date,
-                station=station,
-                direction=direction,
-                trace_query_id=trace_query_id,
-                seed_container_ids=context.get("seed_container_ids"),
-                seed_container_names=context.get("seed_container_names"),
-            )
-        return error_response(
-            "QUERY_NOT_READY",
-            "查詢結果尚未就緒，請先完成 staged trace 查詢",
-            status_code=409,
-            meta={"trace_query_id": trace_query_id},
-        )
+        return cache_expired_error()
 
     return internal_error('查詢失敗，請稍後再試')

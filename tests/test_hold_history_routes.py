@@ -141,6 +141,20 @@ class TestHoldHistoryQueryRoute(TestHoldHistoryRoutesBase):
         self.assertEqual(response.headers.get('Retry-After'), '8')
         mock_exec.assert_not_called()
 
+    @patch('mes_dashboard.routes.hold_history_routes.execute_primary_query')
+    def test_query_bootstrap_render_failure_returns_500(self, mock_exec):
+        """Bootstrap render failure from service should surface as route failure."""
+        mock_exec.side_effect = RuntimeError('bootstrap render failure: apply_view returned None')
+
+        response = self.client.post(
+            '/api/hold-history/query',
+            json={'start_date': '2026-02-01', 'end_date': '2026-02-07'},
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertFalse(payload['success'])
+
 
 class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
     """Test GET /api/hold-history/view endpoint."""

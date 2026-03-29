@@ -404,3 +404,23 @@ class TestPerformancePage:
         response = admin_client.get('/admin/user-usage-kpi')
         assert response.status_code == 302
         assert '/admin/dashboard' in response.headers.get('Location', '')
+
+
+class TestRedisNamespaceMemoryTelemetry:
+    """Test admin Redis namespace memory sampling helpers."""
+
+    def test_collect_redis_namespace_memory_uses_canonical_wip_parquet_key(self):
+        from mes_dashboard.routes.admin_routes import _collect_redis_namespace_memory
+
+        client = MagicMock()
+        client.exists.side_effect = lambda key: 1 if key == 'mes_wip:data:parquet' else 0
+        client.scan.return_value = (0, [])
+        client.execute_command.return_value = 4096
+
+        with patch('mes_dashboard.core.redis_client.REDIS_KEY_PREFIX', 'mes_wip'):
+            result = _collect_redis_namespace_memory(client)
+
+        wip_entry = next(item for item in result if item['namespace'] == 'mes_wip')
+        assert wip_entry['sample_key'] == 'mes_wip:data:parquet'
+        assert wip_entry['estimated_bytes'] == 4096
+        client.exists.assert_any_call('mes_wip:data:parquet')

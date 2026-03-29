@@ -173,3 +173,66 @@ class TestHoldStoreDf:
 
         assert len(spool_calls) == 1
         assert spool_calls[0] == (cache_svc._REDIS_NAMESPACE, "qid-hold-spool")
+
+
+class TestHoldBootstrapFailureSemantics:
+    """Task 2.3: execute_primary_query must fail loudly when spool exists but apply_view returns None."""
+
+    def _make_hold_env(self, monkeypatch, *, spool_created: bool, apply_view_result):
+        """Patch execute_primary_query environment for short direct path."""
+        import mes_dashboard.services.batch_query_engine as engine_mod
+        # Force direct path regardless of BATCH_QUERY_TIME_THRESHOLD_DAYS env setting
+        monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *a: False)
+        monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _: False)
+        monkeypatch.setattr(cache_svc, "_load_sql", lambda name: "SELECT 1 FROM dual")
+        monkeypatch.setattr(cache_svc, "_store_query_dates", lambda *a, **kw: None)
+        if spool_created:
+            monkeypatch.setattr(
+                cache_svc,
+                "read_sql_df",
+                lambda sql, params, caller=None: pd.DataFrame({"CONTAINERID": ["C1"]}),
+            )
+            monkeypatch.setattr(cache_svc, "_store_df", lambda *a, **kw: None)
+        else:
+            monkeypatch.setattr(
+                cache_svc,
+                "read_sql_df",
+                lambda sql, params, caller=None: pd.DataFrame(),
+            )
+        monkeypatch.setattr(
+            cache_svc,
+            "apply_view",
+            lambda **kw: apply_view_result,
+        )
+
+    def test_spool_created_apply_view_none_raises(self, monkeypatch):
+        """When Oracle produces data (spool created) but apply_view fails → RuntimeError."""
+        self._make_hold_env(monkeypatch, spool_created=True, apply_view_result=None)
+        import pytest
+        with pytest.raises(RuntimeError, match="bootstrap render failure"):
+            cache_svc.execute_primary_query(
+                start_date="2025-06-01",
+                end_date="2025-06-30",
+            )
+
+    def test_no_spool_apply_view_none_returns_empty(self, monkeypatch):
+        """When Oracle returns empty data (no spool) and apply_view fails → empty result, no raise."""
+        self._make_hold_env(monkeypatch, spool_created=False, apply_view_result=None)
+        result = cache_svc.execute_primary_query(
+            start_date="2025-06-01",
+            end_date="2025-06-30",
+        )
+        assert result["query_id"] is not None
+        assert result["trend"] == {"days": []}
+        assert result["list"]["pagination"]["total"] == 0
+
+    def test_cache_hit_apply_view_none_raises(self, monkeypatch):
+        """When spool exists (cache hit) but apply_view fails → RuntimeError."""
+        monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _: True)
+        monkeypatch.setattr(cache_svc, "apply_view", lambda **kw: None)
+        import pytest
+        with pytest.raises(RuntimeError, match="bootstrap render failure"):
+            cache_svc.execute_primary_query(
+                start_date="2025-06-01",
+                end_date="2025-06-30",
+            )

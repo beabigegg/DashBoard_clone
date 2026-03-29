@@ -228,3 +228,95 @@ def test_station_options_success(mock_query_station_options):
     assert payload['success'] is True
     assert len(payload['data']) == 2
     assert payload['data'][0]['name'] == '切割'
+
+
+# ── Task 1.3: MSD detail/export spool miss → 410, no auto-dispatch ──────────
+
+@patch('mes_dashboard.services.msd_duckdb_runtime.MsdDuckdbRuntime')
+@patch('mes_dashboard.routes.mid_section_defect_routes.resolve_analysis_trace_context')
+def test_detail_spool_miss_returns_410(mock_resolve_context, mock_runtime_cls):
+    """When MsdDuckdbRuntime spool is unavailable, detail endpoint returns 410."""
+    mock_resolve_context.return_value = {
+        'trace_query_id': 'msd-trace-abc',
+        'seed_container_ids': ['CID-001'],
+    }
+    mock_runtime = MagicMock()
+    mock_runtime.is_available.return_value = False
+    mock_runtime_cls.return_value = mock_runtime
+
+    client = _client()
+    response = client.get(
+        '/api/mid-section-defect/analysis/detail?start_date=2025-01-01&end_date=2025-01-31'
+    )
+
+    assert response.status_code == 410
+    payload = response.get_json()
+    assert payload['success'] is False
+    assert payload['error']['code'] == 'CACHE_EXPIRED'
+
+
+@patch('mes_dashboard.services.msd_duckdb_runtime.MsdDuckdbRuntime')
+@patch('mes_dashboard.routes.mid_section_defect_routes.resolve_analysis_trace_context')
+def test_detail_spool_miss_does_not_dispatch_job(mock_resolve_context, mock_runtime_cls):
+    """On spool miss, detail route must NOT call ensure_analysis_background_job."""
+    mock_resolve_context.return_value = {
+        'trace_query_id': 'msd-trace-abc',
+        'seed_container_ids': ['CID-001'],
+    }
+    mock_runtime = MagicMock()
+    mock_runtime.is_available.return_value = False
+    mock_runtime_cls.return_value = mock_runtime
+
+    with patch(
+        'mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job'
+    ) as mock_dispatch:
+        client = _client()
+        client.get(
+            '/api/mid-section-defect/analysis/detail?start_date=2025-01-01&end_date=2025-01-31'
+        )
+        mock_dispatch.assert_not_called()
+
+
+@patch('mes_dashboard.services.msd_duckdb_runtime.MsdDuckdbRuntime')
+@patch('mes_dashboard.routes.mid_section_defect_routes.resolve_analysis_trace_context')
+def test_export_spool_miss_returns_410(mock_resolve_context, mock_runtime_cls):
+    """When MsdDuckdbRuntime spool is unavailable, export endpoint returns 410."""
+    mock_resolve_context.return_value = {
+        'trace_query_id': 'msd-trace-abc',
+        'seed_container_ids': ['CID-001'],
+    }
+    mock_runtime = MagicMock()
+    mock_runtime.is_available.return_value = False
+    mock_runtime_cls.return_value = mock_runtime
+
+    client = _client()
+    response = client.get(
+        '/api/mid-section-defect/export?start_date=2025-01-01&end_date=2025-01-31'
+    )
+
+    assert response.status_code == 410
+    payload = response.get_json()
+    assert payload['success'] is False
+    assert payload['error']['code'] == 'CACHE_EXPIRED'
+
+
+@patch('mes_dashboard.services.msd_duckdb_runtime.MsdDuckdbRuntime')
+@patch('mes_dashboard.routes.mid_section_defect_routes.resolve_analysis_trace_context')
+def test_export_spool_miss_does_not_dispatch_job(mock_resolve_context, mock_runtime_cls):
+    """On spool miss, export route must NOT call ensure_analysis_background_job."""
+    mock_resolve_context.return_value = {
+        'trace_query_id': 'msd-trace-abc',
+        'seed_container_ids': ['CID-001'],
+    }
+    mock_runtime = MagicMock()
+    mock_runtime.is_available.return_value = False
+    mock_runtime_cls.return_value = mock_runtime
+
+    with patch(
+        'mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job'
+    ) as mock_dispatch:
+        client = _client()
+        client.get(
+            '/api/mid-section-defect/export?start_date=2025-01-01&end_date=2025-01-31'
+        )
+        mock_dispatch.assert_not_called()

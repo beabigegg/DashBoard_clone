@@ -471,7 +471,7 @@ def get_cached_wip_data() -> Optional[pd.DataFrame]:
             # Load from Parquet (primary representation)
             try:
                 from mes_dashboard.core.redis_df_store import redis_load_df
-                parsed_df = redis_load_df(get_key("data:parquet"))
+                parsed_df = redis_load_df("data:parquet")
                 if parsed_df is not None:
                     source = "parquet"
             except Exception:
@@ -545,7 +545,7 @@ def is_cache_available() -> bool:
         return False
 
     try:
-        return client.exists(get_key("data")) > 0
+        return client.exists(get_key("data:parquet")) > 0
     except Exception as e:
         logger.warning(f"Failed to check cache availability: {e}")
         return False

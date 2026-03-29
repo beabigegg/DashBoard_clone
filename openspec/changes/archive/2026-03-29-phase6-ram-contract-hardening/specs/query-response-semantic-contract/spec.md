@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Historical query domains SHALL be classified into Type A or Type B semantic response contract
 All historical query domains SHALL declare and implement one of two query response semantic patterns based on their primary query execution model.

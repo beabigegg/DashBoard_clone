@@ -278,7 +278,7 @@ class TestCacheUpdateFlow:
 class TestWarmupTasks:
     """Test dataset warmup hooks in CacheUpdater."""
 
-    def test_run_dataset_warmups_calls_all_tasks(self):
+    def test_run_dataset_warmups_calls_owned_tasks_only(self):
         import mes_dashboard.core.cache_updater as cu
 
         updater = cu.CacheUpdater(interval=1)
@@ -287,21 +287,16 @@ class TestWarmupTasks:
              patch.object(updater, '_warmup_reject_options') as mock_options:
             updater._run_dataset_warmups()
 
-        mock_reject.assert_called_once()
-        mock_yield.assert_called_once()
+        mock_reject.assert_not_called()
+        mock_yield.assert_not_called()
         mock_options.assert_called_once()
 
-    def test_warmup_failure_does_not_block_other_tasks(self):
+    def test_warmup_failure_is_swallowed(self):
         import mes_dashboard.core.cache_updater as cu
 
         updater = cu.CacheUpdater(interval=1)
-        with patch.object(updater, '_warmup_reject_dataset', side_effect=RuntimeError('reject failed')), \
-             patch.object(updater, '_warmup_yield_alert_dataset') as mock_yield, \
-             patch.object(updater, '_warmup_reject_options') as mock_options:
+        with patch.object(updater, '_warmup_reject_options', side_effect=RuntimeError('options failed')):
             updater._run_dataset_warmups()
-
-        mock_yield.assert_called_once()
-        mock_options.assert_called_once()
 
     @patch('mes_dashboard.services.reject_dataset_cache.ensure_dataset_loaded', return_value={'query_id': 'qid-r', 'cache_hit': True})
     def test_warmup_reject_dataset_delegates(self, mock_ensure):
@@ -349,3 +344,35 @@ class TestWarmupTasks:
         with pytest.raises(RuntimeError):
             updater._warmup_yield_alert_dataset()
         mock_release.assert_called_once_with("yield_alert_warmup")
+
+
+# ── Task 3.3: WIP canonical key alignment (writer) ──────────────────────────
+
+class TestWipCacheWriterCanonicalKey:
+    """Verify cache_updater passes raw suffix 'data:parquet' to redis_store_df (no double prefix)."""
+
+    def test_update_redis_cache_passes_raw_suffix_to_store_df(self):
+        """redis_store_df must receive 'data:parquet' as the key, not a pre-prefixed string."""
+        import mes_dashboard.core.cache_updater as cu
+
+        mock_client = MagicMock()
+        mock_pipeline = MagicMock()
+        mock_client.pipeline.return_value = mock_pipeline
+
+        test_df = pd.DataFrame({'LOTID': ['LOT001'], 'QTY': [100]})
+        captured_key = {}
+
+        def capture_store(key, df, **kwargs):
+            captured_key["key"] = key
+            return True
+
+        with patch.object(cu, 'get_redis_client', return_value=mock_client):
+            with patch.object(cu, 'get_key', side_effect=lambda k: f'mes_wip:{k}'):
+                with patch('mes_dashboard.core.redis_df_store.redis_store_df', side_effect=capture_store):
+                    updater = cu.CacheUpdater()
+                    updater._update_redis_cache(test_df, '2024-01-15 10:30:00')
+
+        assert captured_key.get("key") == "data:parquet", (
+            f"Expected raw suffix 'data:parquet', got '{captured_key.get('key')}'. "
+            "Double-prefix bug: did not remove get_key() pre-call from cache_updater."
+        )

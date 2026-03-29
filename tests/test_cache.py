@@ -426,3 +426,51 @@ class TestProcessLevelCache:
         assert resource_dataset_cache._dataset_cache.max_size == 1
         assert reject_dataset_cache._dataset_cache.max_size == 1
         assert yield_alert_dataset_cache._dataset_cache.max_size == 1
+
+
+# ── Task 3.3: WIP canonical key alignment ───────────────────────────────────
+
+class TestWipCacheCanonicalKey:
+    """Verify reader and availability probe use the canonical 'data:parquet' raw suffix."""
+
+    def test_get_cached_wip_data_reads_raw_suffix(self):
+        """get_cached_wip_data must call redis_load_df('data:parquet'), not get_key('data:parquet')."""
+        import mes_dashboard.core.cache as cache
+
+        captured = {}
+
+        def fake_load_df(key):
+            captured["key"] = key
+            return None  # simulate miss
+
+        test_df = pd.DataFrame({"LOTID": ["L1"]})
+
+        with patch.object(cache, 'REDIS_ENABLED', True):
+            with patch.object(cache, 'get_redis_client', return_value=MagicMock()):
+                with patch('mes_dashboard.core.redis_df_store.redis_load_df', side_effect=fake_load_df):
+                    cache._wip_df_cache._cache.clear()
+                    cache.get_cached_wip_data()
+
+        assert captured.get("key") == "data:parquet", (
+            f"Expected raw suffix 'data:parquet', got '{captured.get('key')}'"
+        )
+
+    def test_is_cache_available_checks_parquet_key(self):
+        """is_cache_available() must check the 'data:parquet' canonical key, not legacy 'data'."""
+        import mes_dashboard.core.cache as cache
+
+        checked_keys = []
+        mock_client = MagicMock()
+        mock_client.exists.side_effect = lambda k: checked_keys.append(k) or 1
+
+        with patch.object(cache, 'REDIS_ENABLED', True):
+            with patch.object(cache, 'get_redis_client', return_value=mock_client):
+                with patch.object(cache, 'get_key', side_effect=lambda k: f"mes_wip:{k}"):
+                    cache.is_cache_available()
+
+        assert any("data:parquet" in k for k in checked_keys), (
+            f"Expected check for 'data:parquet', checked: {checked_keys}"
+        )
+        assert not any(k.endswith(":data") for k in checked_keys), (
+            f"Legacy 'mes_wip:data' key must not be checked, found: {checked_keys}"
+        )
