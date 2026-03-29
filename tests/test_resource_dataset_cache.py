@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from unittest.mock import MagicMock
 
 from mes_dashboard.services import resource_dataset_cache as cache_svc
 
@@ -140,3 +141,65 @@ class TestResourceEngineDecomposition:
         )
 
         assert engine_calls["execute"] == 0  # Engine NOT used
+
+
+# ============================================================
+# Phase 2: metadata-only Redis (PHASE2_METADATA_ONLY)
+# ============================================================
+
+
+class TestPhase2ResourceStoreDF:
+    """5.3 — _store_df uses store_spooled_df when PHASE2_METADATA_ONLY=1."""
+
+    def test_phase2_store_df_calls_store_spooled_df_not_redis(self, monkeypatch):
+        """PHASE2_METADATA_ONLY=1: store_spooled_df called, _redis_store_df not called."""
+        monkeypatch.setattr(cache_svc, "_PHASE2_METADATA_ONLY", True)
+
+        spool_calls = []
+        redis_calls = []
+
+        monkeypatch.setattr(cache_svc, "store_spooled_df", lambda ns, qid, df, **kw: spool_calls.append((ns, qid)))
+        monkeypatch.setattr(cache_svc, "_redis_store_df", lambda qid, df: redis_calls.append(qid))
+        monkeypatch.setattr(cache_svc, "_dataset_cache", MagicMock())
+
+        df = pd.DataFrame({"HISTORYID": [1]})
+        cache_svc._store_df("qid-resource-phase2", df)
+
+        assert len(spool_calls) == 1
+        assert spool_calls[0] == (cache_svc._REDIS_NAMESPACE, "qid-resource-phase2")
+        assert len(redis_calls) == 0
+
+    def test_phase2_disabled_store_df_calls_redis(self, monkeypatch):
+        """PHASE2_METADATA_ONLY=0: _redis_store_df called, store_spooled_df not called."""
+        monkeypatch.setattr(cache_svc, "_PHASE2_METADATA_ONLY", False)
+
+        spool_calls = []
+        redis_calls = []
+
+        monkeypatch.setattr(cache_svc, "store_spooled_df", lambda ns, qid, df, **kw: spool_calls.append((ns, qid)))
+        monkeypatch.setattr(cache_svc, "_redis_store_df", lambda qid, df: redis_calls.append(qid))
+        monkeypatch.setattr(cache_svc, "_dataset_cache", MagicMock())
+
+        df = pd.DataFrame({"HISTORYID": [1]})
+        cache_svc._store_df("qid-resource-phase1", df)
+
+        assert len(redis_calls) == 1
+        assert redis_calls[0] == "qid-resource-phase1"
+        assert len(spool_calls) == 0
+
+    def test_phase2_get_cached_df_spool_miss_falls_back_to_redis(self, monkeypatch):
+        """Spool miss → redis_load_df attempted as fallback (Phase 2 enabled)."""
+        monkeypatch.setattr(cache_svc, "_PHASE2_METADATA_ONLY", True)
+
+        expected_df = pd.DataFrame({"HISTORYID": [99]})
+        spool_calls = []
+        redis_calls = []
+
+        monkeypatch.setattr(cache_svc, "load_spooled_df", lambda ns, qid: (spool_calls.append(qid) or None))
+        monkeypatch.setattr(cache_svc, "_redis_load_df", lambda qid: (redis_calls.append(qid) or expected_df))
+
+        result = cache_svc._get_cached_df("qid-resource-spool-miss")
+
+        assert len(spool_calls) == 1
+        assert len(redis_calls) == 1
+        assert result is expected_df

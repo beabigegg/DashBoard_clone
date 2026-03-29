@@ -6,7 +6,7 @@ Supplementary view (GET /view) → read cache → pandas filter/derive.
 
 Cache layers:
   L1: ProcessLevelCache (in-process, per-worker)
-  L2: Redis (cross-worker, parquet bytes encoded as base64 string)
+  L2: spool file + Redis metadata pointer (< 1 KB) [Phase 2]; Redis parquet bytes [Phase 1 fallback]
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -27,6 +28,7 @@ from mes_dashboard.core.query_spool_store import (
     QUERY_SPOOL_DIR,
     load_spooled_df,
     register_spool_file,
+    store_spooled_df,
 )
 from mes_dashboard.core.redis_client import get_key, get_redis_client
 from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
@@ -46,6 +48,7 @@ _CACHE_TTL = CACHE_TTL_DATASET
 _CACHE_MAX_SIZE = 1
 _REDIS_NAMESPACE = "hold_dataset"
 _DEFAULT_DETAIL_PER_PAGE = 20
+_PHASE2_METADATA_ONLY: bool = os.getenv("PHASE2_METADATA_ONLY", "1") == "1"
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("hold_dataset", _dataset_cache, "Hold Dataset (L1, 15min)")
@@ -129,12 +132,22 @@ def _get_query_dates(query_id: str) -> Optional[Dict[str, str]]:
 
 
 def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
-    """Load DataFrame from Redis or spool on demand — NOT promoted to L1."""
-    df = _redis_load_df(query_id)
-    if df is not None:
-        return df
-    # Spool fallback (engine path writes spool instead of full Redis DataFrame)
-    df = load_spooled_df(_REDIS_NAMESPACE, query_id)
+    """Load DataFrame from spool or Redis on demand — NOT promoted to L1.
+
+    Phase 2 (default): spool primary, Redis fallback for in-flight keys from old deployment.
+    Phase 1 (flag=0): Redis primary, spool fallback.
+    """
+    if _PHASE2_METADATA_ONLY:
+        df = load_spooled_df(_REDIS_NAMESPACE, query_id)
+        if df is None:
+            # Transition fallback: in-flight Redis key from pre-Phase-2 deployment
+            logger.debug("Spool miss for query_id=%s, attempting Redis fallback", query_id)
+            df = _redis_load_df(query_id)
+    else:
+        df = _redis_load_df(query_id)
+        if df is None:
+            df = load_spooled_df(_REDIS_NAMESPACE, query_id)
+
     if df is not None:
         # Restore _QUERY_START/_QUERY_END for Pandas record_type='new' filter
         if "_QUERY_START" not in df.columns:
@@ -147,13 +160,12 @@ def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
 
 
 def _store_df(query_id: str, df: pd.DataFrame) -> None:
-    """Write to Redis L2 only; L1 gets lightweight marker.
-
-    Direct-path queries (≤10 days) are small — Redis is sufficient.
-    DuckDB view path uses spool files from the engine path (long queries).
-    """
+    """Write to spool (Phase 2) or Redis L2 (Phase 1 fallback); L1 gets lightweight marker."""
     _dataset_cache.set(query_id, True)  # lightweight marker
-    _redis_store_df(query_id, df)
+    if _PHASE2_METADATA_ONLY:
+        store_spooled_df(_REDIS_NAMESPACE, query_id, df, ttl_seconds=_CACHE_TTL)
+    else:
+        _redis_store_df(query_id, df)
 
 
 # ============================================================

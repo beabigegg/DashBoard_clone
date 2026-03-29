@@ -1576,3 +1576,101 @@ def test_ensure_dataset_loaded_short_circuits_on_spool_hit(monkeypatch):
 
     assert result["cache_hit"] is True
     execute_mock.assert_not_called()
+
+
+# ============================================================
+# Phase 2: metadata-only Redis (PHASE2_METADATA_ONLY)
+# ============================================================
+
+
+class TestPhase2RejectStoreDF:
+    """5.1 — _store_df uses store_spooled_df when PHASE2_METADATA_ONLY=1."""
+
+    def test_phase2_store_df_calls_store_spooled_df_not_redis(self, monkeypatch):
+        """PHASE2_METADATA_ONLY=1: store_spooled_df called, _redis_store_df not called."""
+        monkeypatch.setattr(cache_svc, "_PHASE2_METADATA_ONLY", True)
+
+        spool_calls = []
+        redis_calls = []
+
+        monkeypatch.setattr(cache_svc, "store_spooled_df", lambda ns, qid, df, **kw: spool_calls.append((ns, qid)))
+        monkeypatch.setattr(cache_svc, "_redis_store_df", lambda qid, df: redis_calls.append(qid))
+        monkeypatch.setattr(cache_svc, "clear_spooled_df", lambda ns, qid: None)
+        monkeypatch.setattr(cache_svc, "_dataset_cache", MagicMock())
+
+        df = pd.DataFrame({"CONTAINERID": ["C1"]})
+        cache_svc._store_df("qid-phase2", df)
+
+        assert len(spool_calls) == 1
+        assert spool_calls[0] == (cache_svc._REDIS_NAMESPACE, "qid-phase2")
+        assert len(redis_calls) == 0
+
+    def test_phase2_disabled_store_df_calls_redis_not_spool(self, monkeypatch):
+        """PHASE2_METADATA_ONLY=0: _redis_store_df called, store_spooled_df not called."""
+        monkeypatch.setattr(cache_svc, "_PHASE2_METADATA_ONLY", False)
+
+        spool_calls = []
+        redis_calls = []
+
+        monkeypatch.setattr(cache_svc, "store_spooled_df", lambda ns, qid, df, **kw: spool_calls.append((ns, qid)))
+        monkeypatch.setattr(cache_svc, "_redis_store_df", lambda qid, df: redis_calls.append(qid))
+        monkeypatch.setattr(cache_svc, "clear_spooled_df", lambda ns, qid: None)
+        monkeypatch.setattr(cache_svc, "_dataset_cache", MagicMock())
+
+        df = pd.DataFrame({"CONTAINERID": ["C1"]})
+        cache_svc._store_df("qid-phase1", df)
+
+        assert len(redis_calls) == 1
+        assert redis_calls[0] == "qid-phase1"
+        assert len(spool_calls) == 0
+
+
+class TestPhase2RejectGetCachedDF:
+    """5.4 — spool miss falls back to redis_load_df; 5.5 — flag=0 uses Redis first."""
+
+    def test_phase2_spool_miss_falls_back_to_redis(self, monkeypatch):
+        """5.4 — when spool misses, redis_load_df is attempted as fallback."""
+        monkeypatch.setattr(cache_svc, "_PHASE2_METADATA_ONLY", True)
+
+        expected_df = pd.DataFrame({"CONTAINERID": ["C-fallback"]})
+        spool_calls = []
+        redis_calls = []
+
+        monkeypatch.setattr(cache_svc, "load_spooled_df", lambda ns, qid: (spool_calls.append(qid) or None))
+        monkeypatch.setattr(cache_svc, "_redis_load_df", lambda qid: (redis_calls.append(qid) or expected_df))
+
+        result = cache_svc._get_cached_df("qid-spool-miss")
+
+        assert len(spool_calls) == 1
+        assert len(redis_calls) == 1
+        assert result is expected_df
+
+    def test_phase2_spool_hit_skips_redis(self, monkeypatch):
+        """PHASE2_METADATA_ONLY=1: when spool hits, redis_load_df is not called."""
+        monkeypatch.setattr(cache_svc, "_PHASE2_METADATA_ONLY", True)
+
+        spool_df = pd.DataFrame({"CONTAINERID": ["C-spool"]})
+        redis_calls = []
+
+        monkeypatch.setattr(cache_svc, "load_spooled_df", lambda ns, qid: spool_df)
+        monkeypatch.setattr(cache_svc, "_redis_load_df", lambda qid: (redis_calls.append(qid) or None))
+
+        result = cache_svc._get_cached_df("qid-spool-hit")
+
+        assert len(redis_calls) == 0
+        assert result is spool_df
+
+    def test_phase1_get_cached_df_uses_redis_first(self, monkeypatch):
+        """5.5 — PHASE2_METADATA_ONLY=0: Redis consulted first (legacy path)."""
+        monkeypatch.setattr(cache_svc, "_PHASE2_METADATA_ONLY", False)
+
+        redis_df = pd.DataFrame({"CONTAINERID": ["C-redis"]})
+        spool_calls = []
+
+        monkeypatch.setattr(cache_svc, "_redis_load_df", lambda qid: redis_df)
+        monkeypatch.setattr(cache_svc, "load_spooled_df", lambda ns, qid: (spool_calls.append(qid) or None))
+
+        result = cache_svc._get_cached_df("qid-legacy")
+
+        assert result is redis_df
+        assert len(spool_calls) == 0
