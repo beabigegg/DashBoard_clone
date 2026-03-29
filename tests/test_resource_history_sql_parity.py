@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
-"""Parity tests: resource-history DuckDB SQL runtime vs Pandas derivation.
+"""DuckDB SQL runtime correctness tests for resource-history.
 
-Covers tasks 3.8 and 9.1 — verifies that the DuckDB out-of-core view
-computation produces identical results to the Pandas-based derivation for
-all sub-views (kpi / trend / heatmap / workcenter_comparison / detail).
+Originally a pandas parity test (tasks 3.8 and 9.1). The Pandas derivation
+path was retired in Phase 3; this file now verifies DuckDB SQL runtime
+produces structurally correct, sane output against known sample data.
 """
 from __future__ import annotations
 
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
-from unittest import mock
 
 import pandas as pd
 import pytest
+
 
 # ── Sample data ──────────────────────────────────────────────────────────────
 
@@ -112,157 +112,91 @@ def _run_duckdb_view(parquet_path: str, granularity: str = "day") -> Dict[str, A
         conn.close()
 
 
-def _run_pandas_view(df: pd.DataFrame, granularity: str = "day") -> Dict[str, Any]:
-    """Run the Pandas-based derivation."""
-    from mes_dashboard.services.resource_dataset_cache import (
-        _derive_summary,
-        _derive_detail,
-    )
-
-    summary = _derive_summary(df, _RESOURCE_LOOKUP, _WC_MAPPING, granularity)
-    detail = _derive_detail(df, _RESOURCE_LOOKUP, _WC_MAPPING)
-    return {"summary": summary, "detail": detail}
-
-
-# ── Parity assertions ───────────────────────────────────────────────────────
-
-def _assert_float_close(a: float, b: float, label: str, tol: float = 0.15):
-    """Assert two floats are within tolerance."""
-    assert abs(float(a) - float(b)) <= tol, (
-        f"{label}: DuckDB={a} vs Pandas={b} (diff={abs(float(a)-float(b)):.4f}, tol={tol})"
-    )
-
-
-# ── Test class ───────────────────────────────────────────────────────────────
+# ── DuckDB correctness tests ─────────────────────────────────────────────────
 
 class TestResourceHistorySqlParity:
-    """DuckDB SQL runtime must produce same results as Pandas derivation."""
+    """DuckDB SQL runtime produces structurally correct, sane output."""
 
     @pytest.fixture(autouse=True)
     def setup(self, tmp_path):
         self.df = _build_sample_df(7)
         self.parquet_path = _write_parquet(self.df, str(tmp_path))
 
-    def test_kpi_parity(self):
-        duck = _run_duckdb_view(self.parquet_path)
-        pandas_result = _run_pandas_view(self.df)
+    def test_kpi_structure_and_sanity(self):
+        result = _run_duckdb_view(self.parquet_path)
+        kpi = result["summary"]["kpi"]
+        expected_keys = [
+            "ou_pct", "availability_pct", "prd_hours", "sby_hours",
+            "udt_hours", "sdt_hours", "egt_hours", "nst_hours",
+            "prd_pct", "sby_pct", "udt_pct", "sdt_pct", "egt_pct", "nst_pct",
+            "machine_count",
+        ]
+        for key in expected_keys:
+            assert key in kpi, f"kpi missing key: {key}"
+        assert kpi["machine_count"] == len(_RESOURCES)
+        assert 0.0 <= kpi["ou_pct"] <= 100.0
+        assert 0.0 <= kpi["availability_pct"] <= 100.0
+        assert kpi["prd_hours"] > 0
 
-        dk = duck["summary"]["kpi"]
-        pk = pandas_result["summary"]["kpi"]
+    def test_trend_day_structure(self):
+        result = _run_duckdb_view(self.parquet_path, granularity="day")
+        trend = result["summary"]["trend"]
+        assert len(trend) == 7  # 7 sample days
+        for item in trend:
+            assert "date" in item
+            assert "ou_pct" in item
+            assert "prd_hours" in item
+            assert 0.0 <= item["ou_pct"] <= 100.0
 
-        for key in ["ou_pct", "availability_pct", "prd_hours", "sby_hours",
-                     "udt_hours", "sdt_hours", "egt_hours", "nst_hours",
-                     "prd_pct", "sby_pct", "udt_pct", "sdt_pct", "egt_pct", "nst_pct"]:
-            _assert_float_close(dk[key], pk[key], f"kpi.{key}")
+    def test_trend_week_structure(self):
+        result = _run_duckdb_view(self.parquet_path, granularity="week")
+        trend = result["summary"]["trend"]
+        assert len(trend) >= 1
+        for item in trend:
+            assert "date" in item
+            assert "ou_pct" in item
 
-        assert dk["machine_count"] == pk["machine_count"], (
-            f"machine_count: DuckDB={dk['machine_count']} vs Pandas={pk['machine_count']}"
-        )
+    def test_heatmap_structure(self):
+        result = _run_duckdb_view(self.parquet_path)
+        heatmap = result["summary"]["heatmap"]
+        assert len(heatmap) > 0
+        for item in heatmap:
+            assert "workcenter" in item
+            assert "date" in item
+            assert "ou_pct" in item
+            assert 0.0 <= item["ou_pct"] <= 100.0
 
-    def test_trend_parity_day(self):
-        duck = _run_duckdb_view(self.parquet_path, granularity="day")
-        pandas_result = _run_pandas_view(self.df, granularity="day")
+    def test_workcenter_comparison_structure(self):
+        result = _run_duckdb_view(self.parquet_path)
+        comparison = result["summary"]["workcenter_comparison"]
+        assert len(comparison) == len(_WORKCENTERS)
+        wc_names = {c["workcenter"] for c in comparison}
+        assert wc_names == set(_WORKCENTERS)
+        for c in comparison:
+            assert "ou_pct" in c
+            assert "prd_hours" in c
+            assert "machine_count" in c
+            assert c["machine_count"] > 0
 
-        dt = duck["summary"]["trend"]
-        pt = pandas_result["summary"]["trend"]
-
-        assert len(dt) == len(pt), f"trend length: DuckDB={len(dt)} vs Pandas={len(pt)}"
-
-        # Sort both by date for comparison
-        dt_sorted = sorted(dt, key=lambda x: x["date"])
-        pt_sorted = sorted(pt, key=lambda x: x["date"])
-
-        for i, (d, p) in enumerate(zip(dt_sorted, pt_sorted)):
-            assert d["date"] == p["date"], f"trend[{i}].date: {d['date']} vs {p['date']}"
-            _assert_float_close(d["ou_pct"], p["ou_pct"], f"trend[{i}].ou_pct")
-            _assert_float_close(d["prd_hours"], p["prd_hours"], f"trend[{i}].prd_hours")
-
-    def test_trend_parity_week(self):
-        duck = _run_duckdb_view(self.parquet_path, granularity="week")
-        pandas_result = _run_pandas_view(self.df, granularity="week")
-
-        dt = duck["summary"]["trend"]
-        pt = pandas_result["summary"]["trend"]
-
-        assert len(dt) == len(pt), f"trend(week) length: DuckDB={len(dt)} vs Pandas={len(pt)}"
-
-    def test_heatmap_parity(self):
-        duck = _run_duckdb_view(self.parquet_path)
-        pandas_result = _run_pandas_view(self.df)
-
-        dh = duck["summary"]["heatmap"]
-        ph = pandas_result["summary"]["heatmap"]
-
-        assert len(dh) == len(ph), f"heatmap length: DuckDB={len(dh)} vs Pandas={len(ph)}"
-
-        # Build lookup: (workcenter, date) -> ou_pct
-        d_map = {(h["workcenter"], h["date"]): h["ou_pct"] for h in dh}
-        p_map = {(h["workcenter"], h["date"]): h["ou_pct"] for h in ph}
-
-        assert set(d_map.keys()) == set(p_map.keys()), "heatmap keys differ"
-
-        for key in d_map:
-            _assert_float_close(d_map[key], p_map[key], f"heatmap[{key}].ou_pct")
-
-    def test_workcenter_comparison_parity(self):
-        duck = _run_duckdb_view(self.parquet_path)
-        pandas_result = _run_pandas_view(self.df)
-
-        dc = duck["summary"]["workcenter_comparison"]
-        pc = pandas_result["summary"]["workcenter_comparison"]
-
-        assert len(dc) == len(pc), (
-            f"comparison length: DuckDB={len(dc)} vs Pandas={len(pc)}"
-        )
-
-        d_map = {c["workcenter"]: c for c in dc}
-        p_map = {c["workcenter"]: c for c in pc}
-
-        assert set(d_map.keys()) == set(p_map.keys()), "comparison workcenters differ"
-
-        for wc in d_map:
-            _assert_float_close(d_map[wc]["ou_pct"], p_map[wc]["ou_pct"], f"comparison[{wc}].ou_pct")
-            _assert_float_close(d_map[wc]["prd_hours"], p_map[wc]["prd_hours"], f"comparison[{wc}].prd_hours")
-            assert d_map[wc]["machine_count"] == p_map[wc]["machine_count"], (
-                f"comparison[{wc}].machine_count: {d_map[wc]['machine_count']} vs {p_map[wc]['machine_count']}"
-            )
-
-    def test_detail_parity(self):
-        duck = _run_duckdb_view(self.parquet_path)
-        pandas_result = _run_pandas_view(self.df)
-
-        dd = duck["detail"]
-        pd_detail = pandas_result["detail"]
-
-        assert dd["total"] == pd_detail["total"], (
-            f"detail total: DuckDB={dd['total']} vs Pandas={pd_detail['total']}"
-        )
-
-        # Build lookup by resource name
-        d_map = {r["resource"]: r for r in dd["data"]}
-        p_map = {r["resource"]: r for r in pd_detail["data"]}
-
-        assert set(d_map.keys()) == set(p_map.keys()), "detail resources differ"
-
-        for res in d_map:
+    def test_detail_structure(self):
+        result = _run_duckdb_view(self.parquet_path)
+        detail = result["detail"]
+        assert detail["total"] == len(_RESOURCES)
+        assert len(detail["data"]) == len(_RESOURCES)
+        for row in detail["data"]:
             for key in ["ou_pct", "availability_pct", "prd_hours", "sby_hours",
-                         "udt_hours", "sdt_hours", "egt_hours", "nst_hours"]:
-                _assert_float_close(
-                    d_map[res][key], p_map[res][key], f"detail[{res}].{key}"
-                )
+                        "udt_hours", "sdt_hours", "egt_hours", "nst_hours"]:
+                assert key in row, f"detail row missing key: {key}"
+                assert row[key] >= 0
 
-    def test_empty_df_parity(self):
-        """Both paths should handle empty DataFrames gracefully."""
+    def test_empty_df(self):
+        """Empty DataFrame returns zero-valued structure."""
         empty_df = pd.DataFrame(columns=[
             "HISTORYID", "DATA_DATE", "PRD_HOURS", "SBY_HOURS",
             "UDT_HOURS", "SDT_HOURS", "EGT_HOURS", "NST_HOURS", "TOTAL_HOURS",
         ])
         with tempfile.TemporaryDirectory() as tmp:
             path = _write_parquet(empty_df, tmp)
-            duck = _run_duckdb_view(path)
-            pandas_result = _run_pandas_view(empty_df)
-
-            assert duck["summary"]["kpi"]["machine_count"] == 0
-            assert pandas_result["summary"]["kpi"]["machine_count"] == 0
-            assert duck["detail"]["total"] == 0
-            assert pandas_result["detail"]["total"] == 0
+            result = _run_duckdb_view(path)
+            assert result["summary"]["kpi"]["machine_count"] == 0
+            assert result["detail"]["total"] == 0

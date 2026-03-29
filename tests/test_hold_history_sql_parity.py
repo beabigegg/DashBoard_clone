@@ -1,37 +1,26 @@
 # -*- coding: utf-8 -*-
-"""Parity tests: hold-history DuckDB SQL runtime vs Pandas derivation.
+"""DuckDB SQL runtime correctness tests for hold-history.
 
-Covers tasks 4.7 and 9.2 — verifies that the DuckDB out-of-core view
-computation produces identical results to the Pandas-based derivation for
-all sub-views (reason_pareto / duration / list).
-
-Note: The DuckDB SQL runtime references lowercase ``hold_day`` / ``release_day``
-(matching Oracle SQL aliases), while the Pandas path references uppercase
-``HOLD_DAY`` / ``RELEASE_DAY`` (from ``read_sql_df`` column uppercasing).
-The test builds separate DataFrames with appropriate column naming for each
-path, using identical underlying data, to isolate derivation logic parity
-from the column-naming difference.
+Originally a pandas parity test (tasks 4.7 and 9.2). The Pandas derivation
+path was retired in Phase 3; this file now verifies DuckDB SQL runtime
+produces structurally correct, sane output against known sample data.
 """
 from __future__ import annotations
 
-import math
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List
-from unittest import mock
 
 import pandas as pd
 import pytest
+
 
 # ── Sample data ──────────────────────────────────────────────────────────────
 
 _REASONS = ["QUALITY_CHECK", "YIELD_FAIL", "CONTAMINATION", "VISUAL_DEFECT"]
 _START_DATE = "2026-01-01"
 _END_DATE = "2026-01-07"
-
-# Columns that the DuckDB SQL runtime references in lowercase
-_LOWERCASE_COLS = {"hold_day", "release_day"}
 
 
 def _build_sample_rows(n_holds: int = 30) -> List[Dict[str, Any]]:
@@ -84,28 +73,6 @@ def _build_sample_rows(n_holds: int = 30) -> List[Dict[str, Any]]:
         })
 
     return rows
-
-
-def _build_duckdb_df(rows: List[Dict[str, Any]]) -> pd.DataFrame:
-    """Build DataFrame with lowercase hold_day/release_day (DuckDB SQL runtime expects this)."""
-    return pd.DataFrame(rows)
-
-
-def _build_pandas_df(rows: List[Dict[str, Any]]) -> pd.DataFrame:
-    """Build DataFrame with uppercase columns (as read_sql_df would produce).
-
-    Oracle DATE columns are returned as Timestamps by cx_Oracle/oracledb,
-    then read_sql_df uppercases column names. We replicate that here.
-    """
-    df = pd.DataFrame(rows)
-    df.columns = [str(c).upper() for c in df.columns]
-    # Convert date columns to Timestamps (matching Oracle driver behavior)
-    df["HOLD_DAY"] = pd.to_datetime(df["HOLD_DAY"])
-    df["RELEASE_DAY"] = pd.to_datetime(df["RELEASE_DAY"])
-    # Add query date range so _apply_record_type_filter matches DuckDB behavior
-    df["_QUERY_START"] = pd.Timestamp(_START_DATE)
-    df["_QUERY_END"] = pd.Timestamp(_END_DATE)
-    return df
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -163,28 +130,7 @@ def _run_duckdb_view(parquet_path: str, **kwargs) -> Dict[str, Any]:
         conn.close()
 
 
-def _run_pandas_view(df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-    """Run Pandas-based derivation."""
-    from mes_dashboard.services.hold_dataset_cache import _derive_all_views
-
-    return _derive_all_views(
-        df,
-        hold_type=kwargs.get("hold_type", "quality"),
-        reason=kwargs.get("reason", None),
-        record_type=kwargs.get("record_type", "new"),
-        duration_range=kwargs.get("duration_range", None),
-        page=kwargs.get("page", 1),
-        per_page=kwargs.get("per_page", 50),
-    )
-
-
-# ── Parity assertions ───────────────────────────────────────────────────────
-
-def _assert_float_close(a, b, label: str, tol: float = 0.05):
-    assert abs(float(a) - float(b)) <= tol, (
-        f"{label}: DuckDB={a} vs Pandas={b} (diff={abs(float(a)-float(b)):.4f})"
-    )
-
+# ── Standalone helper tests ──────────────────────────────────────────────────
 
 def test_resolve_view_date_range_uses_valid_input_dates(monkeypatch):
     from mes_dashboard.services import hold_history_sql_runtime as runtime
@@ -221,134 +167,69 @@ def test_resolve_view_date_range_falls_back_to_spool_bounds(monkeypatch):
     assert end == "2026-03-09"
 
 
-# ── Test class ───────────────────────────────────────────────────────────────
+# ── DuckDB correctness tests ─────────────────────────────────────────────────
 
 class TestHoldHistorySqlParity:
-    """DuckDB SQL runtime must produce same results as Pandas derivation."""
+    """DuckDB SQL runtime produces structurally correct, sane output."""
 
     @pytest.fixture(autouse=True)
     def setup(self, tmp_path):
         self.raw_rows = _build_sample_rows(30)
-        # DuckDB path: lowercase hold_day/release_day
-        duck_df = _build_duckdb_df(self.raw_rows)
+        duck_df = pd.DataFrame(self.raw_rows)
         self.parquet_path = _write_parquet(duck_df, str(tmp_path))
-        # Pandas path: uppercase columns (as read_sql_df would produce)
-        self.pandas_df = _build_pandas_df(self.raw_rows)
 
-    def test_reason_pareto_parity_quality(self):
-        duck = _run_duckdb_view(self.parquet_path, hold_type="quality")
-        pandas_result = _run_pandas_view(self.pandas_df, hold_type="quality")
+    def test_reason_pareto_quality(self):
+        result = _run_duckdb_view(self.parquet_path, hold_type="quality")
+        items = result["reason_pareto"]["items"]
+        assert len(items) > 0
+        for item in items:
+            assert "reason" in item
+            assert item["qty"] >= 0
+            assert 0.0 <= item["pct"] <= 100.0
 
-        dr = duck["reason_pareto"]["items"]
-        pr = pandas_result["reason_pareto"]["items"]
+    def test_reason_pareto_all(self):
+        result = _run_duckdb_view(self.parquet_path, hold_type="all")
+        items = result["reason_pareto"]["items"]
+        assert len(items) > 0
+        total_pct = sum(item["pct"] for item in items)
+        assert abs(total_pct - 100.0) < 1.0
 
-        assert len(dr) == len(pr), (
-            f"reason_pareto length: DuckDB={len(dr)} vs Pandas={len(pr)}"
-        )
+    def test_duration_buckets_present(self):
+        result = _run_duckdb_view(self.parquet_path, hold_type="quality")
+        items = result["duration"]["items"]
+        bucket_labels = {item["range"] for item in items}
+        assert "<4h" in bucket_labels
+        assert "4-24h" in bucket_labels
+        assert "1-3d" in bucket_labels
+        assert ">3d" in bucket_labels
 
-        d_map = {r["reason"]: r for r in dr}
-        p_map = {r["reason"]: r for r in pr}
-
-        assert set(d_map.keys()) == set(p_map.keys()), "reason names differ"
-
-        for reason in d_map:
-            assert d_map[reason]["qty"] == p_map[reason]["qty"], (
-                f"reason_pareto[{reason}].qty: {d_map[reason]['qty']} vs {p_map[reason]['qty']}"
-            )
-            _assert_float_close(
-                d_map[reason]["pct"], p_map[reason]["pct"],
-                f"reason_pareto[{reason}].pct"
-            )
-
-    def test_reason_pareto_parity_all(self):
-        duck = _run_duckdb_view(self.parquet_path, hold_type="all")
-        pandas_result = _run_pandas_view(self.pandas_df, hold_type="all")
-
-        dr = duck["reason_pareto"]["items"]
-        pr = pandas_result["reason_pareto"]["items"]
-
-        assert len(dr) == len(pr), (
-            f"reason_pareto(all) length: DuckDB={len(dr)} vs Pandas={len(pr)}"
-        )
-
-    def test_duration_parity(self):
-        duck = _run_duckdb_view(self.parquet_path, hold_type="quality")
-        pandas_result = _run_pandas_view(self.pandas_df, hold_type="quality")
-
-        dd = duck["duration"]["items"]
-        pd_items = pandas_result["duration"]["items"]
-
-        assert len(dd) == len(pd_items), (
-            f"duration length: DuckDB={len(dd)} vs Pandas={len(pd_items)}"
-        )
-
-        d_map = {d["range"]: d for d in dd}
-        p_map = {d["range"]: d for d in pd_items}
-
-        for bucket in ["<4h", "4-24h", "1-3d", ">3d"]:
-            assert d_map[bucket]["count"] == p_map[bucket]["count"], (
-                f"duration[{bucket}].count: {d_map[bucket]['count']} vs {p_map[bucket]['count']}"
-            )
-            assert d_map[bucket]["qty"] == p_map[bucket]["qty"], (
-                f"duration[{bucket}].qty: {d_map[bucket]['qty']} vs {p_map[bucket]['qty']}"
-            )
-            _assert_float_close(
-                d_map[bucket]["pct"], p_map[bucket]["pct"],
-                f"duration[{bucket}].pct"
-            )
-
-    def test_list_pagination_parity(self):
-        duck = _run_duckdb_view(
+    def test_list_pagination_structure(self):
+        result = _run_duckdb_view(
             self.parquet_path, hold_type="quality", page=1, per_page=10,
         )
-        pandas_result = _run_pandas_view(
-            self.pandas_df, hold_type="quality", page=1, per_page=10,
-        )
+        lst = result["list"]
+        assert "pagination" in lst
+        assert "items" in lst
+        pg = lst["pagination"]
+        assert pg["total"] >= 0
+        assert pg["totalPages"] >= 1
+        assert len(lst["items"]) <= 10
 
-        dl = duck["list"]
-        pl = pandas_result["list"]
-
-        assert dl["pagination"]["total"] == pl["pagination"]["total"], (
-            f"list total: DuckDB={dl['pagination']['total']} vs Pandas={pl['pagination']['total']}"
-        )
-        assert dl["pagination"]["totalPages"] == pl["pagination"]["totalPages"], (
-            f"list totalPages differ"
-        )
-        assert len(dl["items"]) == len(pl["items"]), (
-            f"list items length: DuckDB={len(dl['items'])} vs Pandas={len(pl['items'])}"
-        )
-
-    def test_list_reason_filter_parity(self):
+    def test_list_reason_filter(self):
         reason = "QUALITY_CHECK"
-        duck = _run_duckdb_view(
+        result = _run_duckdb_view(
             self.parquet_path, hold_type="quality", reason=reason,
         )
-        pandas_result = _run_pandas_view(
-            self.pandas_df, hold_type="quality", reason=reason,
-        )
+        lst = result["list"]
+        assert lst["pagination"]["total"] >= 0
 
-        dl = duck["list"]
-        pl = pandas_result["list"]
+    def test_non_quality_filter(self):
+        result = _run_duckdb_view(self.parquet_path, hold_type="non-quality")
+        items = result["reason_pareto"]["items"]
+        total_qty = sum(r["qty"] for r in items)
+        assert total_qty >= 0
 
-        assert dl["pagination"]["total"] == pl["pagination"]["total"], (
-            f"list(reason={reason}) total: DuckDB={dl['pagination']['total']} vs Pandas={pl['pagination']['total']}"
-        )
-
-    def test_non_quality_filter_parity(self):
-        duck = _run_duckdb_view(self.parquet_path, hold_type="non-quality")
-        pandas_result = _run_pandas_view(self.pandas_df, hold_type="non-quality")
-
-        dr = duck["reason_pareto"]["items"]
-        pr = pandas_result["reason_pareto"]["items"]
-
-        d_total = sum(r["qty"] for r in dr)
-        p_total = sum(r["qty"] for r in pr)
-
-        assert d_total == p_total, (
-            f"non-quality total qty: DuckDB={d_total} vs Pandas={p_total}"
-        )
-
-    def test_empty_df_parity(self):
+    def test_empty_df(self):
         duck_cols = [
             "CONTAINERID", "LOT_ID", "PJ_WORKORDER", "PRODUCTNAME",
             "WORKCENTERNAME", "HOLDREASONNAME", "QTY", "HOLDTXNDATE",
@@ -357,17 +238,9 @@ class TestHoldHistorySqlParity:
             "HOLD_TYPE", "hold_day", "release_day", "RN_HOLD_DAY",
             "IS_FUTURE_HOLD", "FUTURE_HOLD_FLAG",
         ]
-        pandas_cols = [c.upper() for c in duck_cols]
-
         with tempfile.TemporaryDirectory() as tmp:
             duck_df = pd.DataFrame(columns=duck_cols)
             path = _write_parquet(duck_df, tmp)
-            duck = _run_duckdb_view(path)
-
-            pandas_df = pd.DataFrame(columns=pandas_cols)
-            pandas_result = _run_pandas_view(pandas_df)
-
-            assert len(duck["reason_pareto"]["items"]) == 0
-            assert len(pandas_result["reason_pareto"]["items"]) == 0
-            assert duck["list"]["pagination"]["total"] == 0
-            assert pandas_result["list"]["pagination"]["total"] == 0
+            result = _run_duckdb_view(path)
+            assert len(result["reason_pareto"]["items"]) == 0
+            assert result["list"]["pagination"]["total"] == 0

@@ -12,7 +12,7 @@
 > - [x] Phase 2 — heavy dataset metadata-only Redis → 實作完成 (2026-03-29)，commit `c77f1d4`，提案封存於 `openspec/changes/archive/2026-03-29-phase2-heavy-dataset-metadata-redis/`
 > - [x] Phase 3 — 重查詢 primary query 全部先落 spool → 實作完成 (2026-03-29)，commit `84d186d`，提案封存於 `openspec/changes/archive/2026-03-29-phase3-spool-first-primary-query/`
 > - [x] Phase 4 — 對外語意分兩類 → spec governance 完成 (2026-03-29)，新增 `query-response-semantic-contract` spec，5 個既有 spec 更新，`api_inventory.md` 補充 Type A/B 標記
-> - [ ] Phase 5 — 退休 pandas heavy fallback
+> - [x] Phase 5 — 退休 pandas heavy fallback ✅ 完成 (2026-03-29)
 
 ---
 
@@ -565,26 +565,26 @@ Browser / Flask / Frontend DuckDB-WASM
 - **更新** `openspec/specs/async-query-job-service/spec.md`：補充 Type B miss re-dispatch 入口角色定義
 - **更新** `contract/api_inventory.md`：reject / resource-history / hold-history / yield-alert 路由加入 Type A/B 語意分類標記
 
-## Phase 5: 退休 pandas heavy fallback 與舊大 payload 路徑
+## Phase 5: 退休 pandas heavy fallback 與舊大 payload 路徑 ✅ 完成 (2026-03-29)
 
 目標：
 
 - 真正把 RAM 成本從設計上移除
 
-工作：
+實作結果：
 
-- 對已穩定的域移除：
-  - Redis 大型 DataFrame 寫入
-  - `load_spooled_df()` 後再做大範圍 pandas 衍生
-  - 已無人使用的 legacy fallback
-- 保留：
-  - DuckDB runtime
-  - frontend DuckDB-WASM 適用頁面
-  - Redis job/spool/filter metadata
+- **resource-history** (`resource_dataset_cache.py`): 移除 `_derive_summary()` / `_derive_detail()` / `_get_cached_df()`，`execute_primary_query()` 統一為 spool → DuckDB `apply_view()`
+- **hold-history** (`hold_dataset_cache.py`): 移除 `_derive_all_views()` / `_get_cached_df()`，同上
+- **yield-alert** (`yield_alert_dataset_cache.py`): 移除 `_build_summary_and_trend()` 等 pandas 衍生 helpers，同上
+- **reject-history** (`reject_dataset_cache.py`): 移除 `_build_primary_response()` / `_derive_analytics_raw()` / `_derive_summary_from_analytics()` / `_derive_trend_from_analytics()`；移除 `_allow_legacy_fallback()` gate 及相關 flag 常數；移除 `_PHASE2_METADATA_ONLY` 條件分支（`_store_df` 統一走 spool）；移除 `_redis_load_df` / `_redis_store_df` Redis large df helper
+- **parity tests**: `test_hold_history_sql_parity.py` / `test_resource_history_sql_parity.py` 改為 DuckDB 正確性測試（pandas 比對路徑退役）
+- **測試回歸**: `pytest tests/ -v` → 1881 passed, 14 pre-existing failures, 277 skipped（Phase 5 零新增失敗）
 
-完成條件：
+完成條件達成：
 
-- 歷史報表域的 server-side pandas 只剩 compatibility emergency fallback
+- 歷史報表域的 server-side pandas 已完全移除（無 emergency fallback 殘留）
+- `execute_primary_query()` 四個域統一為 Oracle → spool → DuckDB `apply_view()` 單一路徑
+- Redis 大型 DataFrame 寫入路徑全面清除
 
 ---
 

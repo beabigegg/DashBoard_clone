@@ -25,9 +25,7 @@ import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
-from mes_dashboard.core.feature_flags import resolve_bool_flag
 from mes_dashboard.core.query_spool_store import (
-    clear_spooled_df,
     get_spool_file_path,
     load_spooled_df,
     store_spooled_df,
@@ -39,8 +37,6 @@ from mes_dashboard.core.global_concurrency import (
 from mes_dashboard.core.redis_client import get_key, get_redis_client
 from mes_dashboard.core.redis_df_store import (
     redis_clear_batch,
-    redis_load_df,
-    redis_store_df,
 )
 from mes_dashboard.core.partial_failure_contract import (
     build_partial_failure_meta,
@@ -128,19 +124,6 @@ _REJECT_DERIVE_FORCE_GC = os.getenv("REJECT_DERIVE_FORCE_GC", "true").strip().lo
     "yes",
     "on",
 }
-_REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
-    "REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED",
-    default=True,
-)
-_REJECT_CACHE_SQL_BATCH_PARETO_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
-    "REJECT_CACHE_SQL_BATCH_PARETO_FALLBACK_LEGACY_ENABLED",
-    default=True,
-)
-_REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED = resolve_bool_flag(
-    "REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED",
-    default=True,
-)
-_PHASE2_METADATA_ONLY: bool = os.getenv("PHASE2_METADATA_ONLY", "1") == "1"
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("reject_dataset", _dataset_cache, "Reject Dataset (L1, 15min)")
@@ -164,9 +147,6 @@ class RejectPrimaryQueryOverloadError(RuntimeError):
         self.retry_after = max(1, int(retry_after))
 
 
-def _allow_legacy_fallback(flag_enabled: bool) -> bool:
-    return bool(_REJECT_CACHE_SQL_FALLBACK_LEGACY_ENABLED and flag_enabled)
-
 
 # ============================================================
 # Query ID
@@ -184,12 +164,7 @@ def _make_query_id(params: dict) -> str:
 # ============================================================
 
 
-def _redis_store_df(query_id: str, df: pd.DataFrame) -> None:
-    redis_store_df(f"{_REDIS_NAMESPACE}:{query_id}", df, ttl=_CACHE_TTL)
 
-
-def _redis_load_df(query_id: str) -> Optional[pd.DataFrame]:
-    return redis_load_df(f"{_REDIS_NAMESPACE}:{query_id}")
 
 
 def _redis_delete_df(query_id: str) -> None:
@@ -304,16 +279,15 @@ def _is_query_lock_active(query_id: str) -> bool:
         return False
 
 
-def _wait_for_inflight_query_result(query_id: str) -> Optional[pd.DataFrame]:
-    """Wait for in-flight owner to finish and publish cache."""
+def _wait_for_inflight_query_result(query_id: str) -> bool:
+    """Wait for in-flight owner to finish and publish cache. Returns True when ready."""
     deadline = time.monotonic() + float(_REJECT_ENGINE_QUERY_WAIT_SECONDS)
     poll = float(_REJECT_ENGINE_QUERY_WAIT_POLL_SECONDS)
     while time.monotonic() < deadline:
-        cached_df = _get_cached_df(query_id)
-        if cached_df is not None:
-            return cached_df
+        if _has_cached_df(query_id):
+            return True
         if not _is_query_lock_active(query_id):
-            return None
+            return False
         time.sleep(poll)
 
     raise RejectPrimaryQueryOverloadError(
@@ -328,47 +302,20 @@ def _wait_for_inflight_query_result(query_id: str) -> Optional[pd.DataFrame]:
 # ============================================================
 
 
-def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
-    """Load DataFrame from spool or Redis on demand — NOT promoted to L1.
-
-    Phase 2 (default): spool primary, Redis fallback for in-flight keys from old deployment.
-    Phase 1 (flag=0): Redis primary, spool fallback.
-    """
-    if _PHASE2_METADATA_ONLY:
-        df = load_spooled_df(_REDIS_NAMESPACE, query_id)
-        if df is not None:
-            return df
-        # Transition fallback: in-flight Redis key from pre-Phase-2 deployment
-        logger.debug("Spool miss for query_id=%s, attempting Redis fallback", query_id)
-        return _redis_load_df(query_id)
-    else:
-        df = _redis_load_df(query_id)
-        if df is not None:
-            return df
-        return load_spooled_df(_REDIS_NAMESPACE, query_id)
-
 
 def _has_cached_df(query_id: str) -> bool:
-    """Check if query_id has cached data (L1 marker, Redis, or spool exists)."""
+    """Check if query_id has cached data (L1 marker or spool exists)."""
     if _dataset_cache.get(query_id) is not None:
         return True
-    df = _redis_load_df(query_id)
-    if df is not None:
-        return True
-    # L3: check spool metadata (O(1) Redis + path.exists, no parquet load)
     spool_path = get_spool_file_path(_REDIS_NAMESPACE, query_id)
     return spool_path is not None
 
 
 def _store_df(query_id: str, df: pd.DataFrame) -> None:
-    """Write to spool (Phase 2) or Redis L2 (Phase 1 fallback); L1 gets lightweight marker."""
+    """Write to spool; L1 gets lightweight marker."""
     df = _optimize_groupby_dtypes(df)
     _dataset_cache.set(query_id, True)  # lightweight marker
-    if _PHASE2_METADATA_ONLY:
-        store_spooled_df(_REDIS_NAMESPACE, query_id, df, ttl_seconds=_CACHE_TTL)
-    else:
-        _redis_store_df(query_id, df)
-        clear_spooled_df(_REDIS_NAMESPACE, query_id)
+    store_spooled_df(_REDIS_NAMESPACE, query_id, df, ttl_seconds=_CACHE_TTL)
 
 
 def _optimize_groupby_dtypes(df: pd.DataFrame) -> pd.DataFrame:
@@ -716,8 +663,7 @@ def _execute_and_spool(
                 ttl_seconds=_REJECT_ENGINE_SPOOL_TTL_SECONDS,
             )
             if spool_registered:
-                _cached = _get_cached_df(query_id)
-                df = _cached if _cached is not None else pd.DataFrame()
+                df = load_spooled_df(_REDIS_NAMESPACE, query_id) or pd.DataFrame()
             else:
                 from pathlib import Path as _Path
                 _p = _Path(spool_tmp_path)
@@ -851,19 +797,6 @@ def execute_primary_query(
     }
     query_id = _make_query_id(query_id_input)
 
-    def _build_response_from_cache(df: pd.DataFrame) -> Dict[str, Any]:
-        cached_partial_meta = _load_partial_failure_flag(query_id)
-        response_meta = dict(meta)
-        if cached_partial_meta:
-            response_meta.update(cached_partial_meta)
-        filtered_df = _apply_policy_filters(
-            df,
-            include_excluded_scrap=include_excluded_scrap,
-            exclude_material_scrap=exclude_material_scrap,
-            exclude_pb_diode=exclude_pb_diode,
-        )
-        return _build_primary_response(query_id, filtered_df, response_meta, resolution_info)
-
     def _build_response_from_spool() -> Dict[str, Any]:
         cached_partial_meta = _load_partial_failure_flag(query_id)
         response_meta = dict(meta)
@@ -884,15 +817,42 @@ def execute_primary_query(
             )
 
         analytics_raw = result.get("analytics_raw") or []
+        # Derive trend from DuckDB analytics_raw (pure Python groupby-by-date)
+        by_date: Dict[str, Dict[str, int]] = {}
+        for _row in analytics_raw:
+            _d = _row.get("bucket_date", "")
+            if _d not in by_date:
+                by_date[_d] = {"MOVEIN_QTY": 0, "REJECT_TOTAL_QTY": 0, "DEFECT_QTY": 0}
+            by_date[_d]["MOVEIN_QTY"] += _row.get("MOVEIN_QTY", 0)
+            by_date[_d]["REJECT_TOTAL_QTY"] += _row.get("REJECT_TOTAL_QTY", 0)
+            by_date[_d]["DEFECT_QTY"] += _row.get("DEFECT_QTY", 0)
+        trend_items = []
+        for _date_str in sorted(by_date.keys()):
+            _vals = by_date[_date_str]
+            _movein = _vals["MOVEIN_QTY"]
+            _reject = _vals["REJECT_TOTAL_QTY"]
+            _defect = _vals["DEFECT_QTY"]
+            trend_items.append({
+                "bucket_date": _date_str,
+                "MOVEIN_QTY": _movein,
+                "REJECT_TOTAL_QTY": _reject,
+                "DEFECT_QTY": _defect,
+                "REJECT_RATE_PCT": round((_reject / _movein * 100) if _movein else 0, 4),
+                "DEFECT_RATE_PCT": round((_defect / _movein * 100) if _movein else 0, 4),
+            })
+
         response: Dict[str, Any] = {
             "query_id": query_id,
             "analytics_raw": analytics_raw,
             "summary": result.get("summary") or {},
             "trend": {
-                "items": _derive_trend_from_analytics(analytics_raw),
+                "items": trend_items,
                 "granularity": "day",
             },
-            "detail": result.get("detail") or _paginate_detail(pd.DataFrame(), page=1, per_page=50),
+            "detail": result.get("detail") or {
+                "items": [],
+                "pagination": {"page": 1, "perPage": 50, "total": 0, "totalPages": 0},
+            },
             "available_filters": result.get("available_filters") or {},
             "meta": response_meta,
         }
@@ -901,10 +861,9 @@ def execute_primary_query(
         return response
 
     # ---- Check cache first ----
-    cached_df = _get_cached_df(query_id)
-    if cached_df is not None:
+    if _has_cached_df(query_id):
         logger.info("Dataset cache hit for query_id=%s", query_id)
-        return _build_response_from_cache(cached_df)
+        return _build_response_from_spool()
 
     lock_owner = f"{os.getpid()}:{uuid.uuid4().hex}"
     has_query_lock = False
@@ -914,10 +873,10 @@ def execute_primary_query(
         has_query_lock = _acquire_query_lock(query_id, lock_owner)
         if not has_query_lock:
             logger.info("Reject query in-flight, waiting for existing run (query_id=%s)", query_id)
-            waited_df = _wait_for_inflight_query_result(query_id)
-            if waited_df is not None:
+            in_flight_ready = _wait_for_inflight_query_result(query_id)
+            if in_flight_ready:
                 logger.info("Reject query reused completed in-flight result (query_id=%s)", query_id)
-                return _build_response_from_cache(waited_df)
+                return _build_response_from_spool()
             has_query_lock = _acquire_query_lock(query_id, lock_owner)
             if not has_query_lock:
                 raise RejectPrimaryQueryOverloadError(
@@ -926,10 +885,9 @@ def execute_primary_query(
                     retry_after=5,
                 )
 
-        cached_df = _get_cached_df(query_id)
-        if cached_df is not None:
+        if _has_cached_df(query_id):
             logger.info("Dataset cache hit after lock for query_id=%s", query_id)
-            return _build_response_from_cache(cached_df)
+            return _build_response_from_spool()
 
         # ---- Execute Oracle query (NO policy filters — cache unfiltered) ----
         logger.info("Dataset cache miss for query_id=%s, querying Oracle", query_id)
@@ -1144,16 +1102,7 @@ def execute_primary_query(
                 response["resolution_info"] = resolution_info
             return response
 
-        if stored_via_spool and spool_ready_for_response:
-            return _build_response_from_spool()
-
-        filtered = _apply_policy_filters(
-            df,
-            include_excluded_scrap=include_excluded_scrap,
-            exclude_material_scrap=exclude_material_scrap,
-            exclude_pb_diode=exclude_pb_diode,
-        )
-        return _build_primary_response(query_id, filtered, meta, resolution_info)
+        return _build_response_from_spool()
     finally:
         if _slot_acquired and _slot_owner:
             release_heavy_query_slot(_slot_owner)
@@ -1250,33 +1199,6 @@ def _apply_policy_filters(
             mask &= ~name_trimmed.str.match(r"^(XXX|ZZZ)_")
 
     return df[mask]
-
-
-def _build_primary_response(
-    query_id: str,
-    df: pd.DataFrame,
-    meta: Dict[str, Any],
-    resolution_info: Optional[Dict[str, Any]],
-) -> Dict[str, Any]:
-    """Build the full response from a LOT-level DataFrame."""
-    analytics_raw = _derive_analytics_raw(df)
-    summary = _derive_summary_from_analytics(analytics_raw)
-    trend_items = _derive_trend_from_analytics(analytics_raw)
-    first_page = _paginate_detail(df, page=1, per_page=50)
-    available = _extract_available_filters(df)
-
-    result: Dict[str, Any] = {
-        "query_id": query_id,
-        "analytics_raw": analytics_raw,
-        "summary": summary,
-        "trend": {"items": trend_items, "granularity": "day"},
-        "detail": first_page,
-        "available_filters": available,
-        "meta": meta,
-    }
-    if resolution_info is not None:
-        result["resolution_info"] = resolution_info
-    return result
 
 
 # ============================================================
@@ -1442,111 +1364,6 @@ def _apply_pareto_selection_filter(
         lambda value: _normalize_text(value) or "(未知)"
     )
     return df[normalized_dimension_values.isin(value_set)]
-
-
-# ============================================================
-# Derivation helpers
-# ============================================================
-
-
-def _derive_analytics_raw(df: pd.DataFrame) -> list:
-    """GROUP BY (TXN_DAY, LOSSREASONNAME) → per date×reason rows."""
-    if df is None or df.empty:
-        return []
-
-    agg_cols = {
-        "MOVEIN_QTY": ("MOVEIN_QTY", "sum"),
-        "REJECT_TOTAL_QTY": ("REJECT_TOTAL_QTY", "sum"),
-        "DEFECT_QTY": ("DEFECT_QTY", "sum"),
-    }
-    # Add optional columns if present
-    if "AFFECTED_LOT_COUNT" in df.columns:
-        agg_cols["AFFECTED_LOT_COUNT"] = ("AFFECTED_LOT_COUNT", "sum")
-    if "AFFECTED_WORKORDER_COUNT" in df.columns:
-        agg_cols["AFFECTED_WORKORDER_COUNT"] = ("AFFECTED_WORKORDER_COUNT", "sum")
-
-    grouped = (
-        df.groupby(["TXN_DAY", "LOSSREASONNAME"], sort=True, observed=True)
-        .agg(**agg_cols)
-        .reset_index()
-    )
-
-    if "AFFECTED_LOT_COUNT" not in grouped.columns:
-        grouped["AFFECTED_LOT_COUNT"] = 0
-
-    items = []
-    for _, row in grouped.iterrows():
-        items.append(
-            {
-                "bucket_date": _to_date_str(row["TXN_DAY"]),
-                "reason": _normalize_text(row["LOSSREASONNAME"]) or "(未填寫)",
-                "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
-                "REJECT_TOTAL_QTY": _as_int(row.get("REJECT_TOTAL_QTY")),
-                "DEFECT_QTY": _as_int(row.get("DEFECT_QTY")),
-                "AFFECTED_LOT_COUNT": _as_int(row.get("AFFECTED_LOT_COUNT")),
-                "AFFECTED_WORKORDER_COUNT": _as_int(
-                    row.get("AFFECTED_WORKORDER_COUNT")
-                ),
-            }
-        )
-    return items
-
-
-def _derive_summary_from_analytics(analytics_raw: list) -> dict:
-    """Aggregate analytics_raw into a single summary dict."""
-    movein = sum(r.get("MOVEIN_QTY", 0) for r in analytics_raw)
-    reject_total = sum(r.get("REJECT_TOTAL_QTY", 0) for r in analytics_raw)
-    defect = sum(r.get("DEFECT_QTY", 0) for r in analytics_raw)
-    affected_lot = sum(r.get("AFFECTED_LOT_COUNT", 0) for r in analytics_raw)
-    affected_wo = sum(r.get("AFFECTED_WORKORDER_COUNT", 0) for r in analytics_raw)
-
-    total_scrap = reject_total + defect
-    return {
-        "MOVEIN_QTY": movein,
-        "REJECT_TOTAL_QTY": reject_total,
-        "DEFECT_QTY": defect,
-        "REJECT_RATE_PCT": round((reject_total / movein * 100) if movein else 0, 4),
-        "DEFECT_RATE_PCT": round((defect / movein * 100) if movein else 0, 4),
-        "REJECT_SHARE_PCT": round(
-            (reject_total / total_scrap * 100) if total_scrap else 0, 4
-        ),
-        "AFFECTED_LOT_COUNT": affected_lot,
-        "AFFECTED_WORKORDER_COUNT": affected_wo,
-    }
-
-
-def _derive_trend_from_analytics(analytics_raw: list) -> list:
-    """Group analytics_raw by date into trend items."""
-    by_date: Dict[str, Dict[str, int]] = {}
-    for row in analytics_raw:
-        d = row.get("bucket_date", "")
-        if d not in by_date:
-            by_date[d] = {"MOVEIN_QTY": 0, "REJECT_TOTAL_QTY": 0, "DEFECT_QTY": 0}
-        by_date[d]["MOVEIN_QTY"] += row.get("MOVEIN_QTY", 0)
-        by_date[d]["REJECT_TOTAL_QTY"] += row.get("REJECT_TOTAL_QTY", 0)
-        by_date[d]["DEFECT_QTY"] += row.get("DEFECT_QTY", 0)
-
-    items = []
-    for date_str in sorted(by_date.keys()):
-        vals = by_date[date_str]
-        movein = vals["MOVEIN_QTY"]
-        reject = vals["REJECT_TOTAL_QTY"]
-        defect = vals["DEFECT_QTY"]
-        items.append(
-            {
-                "bucket_date": date_str,
-                "MOVEIN_QTY": movein,
-                "REJECT_TOTAL_QTY": reject,
-                "DEFECT_QTY": defect,
-                "REJECT_RATE_PCT": round(
-                    (reject / movein * 100) if movein else 0, 4
-                ),
-                "DEFECT_RATE_PCT": round(
-                    (defect / movein * 100) if movein else 0, 4
-                ),
-            }
-        )
-    return items
 
 
 def _paginate_detail(
@@ -1853,7 +1670,7 @@ def compute_dimension_pareto(
 
     mat_result, mat_meta = try_materialized_dimension_pareto(
         query_id,
-        lambda: _get_cached_df(query_id),
+        lambda: load_spooled_df(_REDIS_NAMESPACE, query_id),
         dimension=dimension,
         metric_mode=metric_mode,
         pareto_scope=pareto_scope,
@@ -1870,7 +1687,7 @@ def compute_dimension_pareto(
         return mat_result
 
     # ---- Legacy DataFrame-based compute (fallback) -------------------------
-    df = _get_cached_df(query_id)
+    df = load_spooled_df(_REDIS_NAMESPACE, query_id)
     if df is None:
         return None
 
@@ -1962,7 +1779,7 @@ def compute_batch_pareto(
 
     mat_result, mat_meta = try_materialized_batch_pareto(
         query_id,
-        lambda: _get_cached_df(query_id),
+        lambda: load_spooled_df(_REDIS_NAMESPACE, query_id),
         metric_mode=metric_mode,
         pareto_scope=pareto_scope,
         pareto_display_scope=pareto_display_scope,
@@ -1979,7 +1796,7 @@ def compute_batch_pareto(
         mat_result["_pareto_meta"] = mat_meta
         return mat_result
 
-    # ---- Cache-SQL fallback path (DuckDB over parquet spool) ----------------
+    # ---- Cache-SQL path (DuckDB over parquet spool) ----------------
     from mes_dashboard.services.reject_cache_sql_runtime import (
         try_compute_batch_pareto_from_spool,
     )
@@ -2021,105 +1838,9 @@ def compute_batch_pareto(
     pareto_sql_fallback_reason = _normalize_text(
         (sql_meta or {}).get("pareto_sql_fallback_reason")
     ) or "unknown"
-    if not _allow_legacy_fallback(_REJECT_CACHE_SQL_BATCH_PARETO_FALLBACK_LEGACY_ENABLED):
-        raise RuntimeError(
-            f"cache-sql batch-pareto unavailable (reason={pareto_sql_fallback_reason})"
-        )
-    logger.info(
-        "Reject batch-pareto fallback to legacy path (query_id=%s, reason=%s)",
-        query_id,
-        pareto_sql_fallback_reason,
+    raise RuntimeError(
+        f"cache-sql batch-pareto unavailable (reason={pareto_sql_fallback_reason})"
     )
-
-    # ---- Legacy DataFrame-based compute (fallback) -------------------------
-    df = _get_cached_df(query_id)
-    if df is None:
-        return None
-
-    try:
-        df = _apply_policy_filters(
-            df,
-            include_excluded_scrap=include_excluded_scrap,
-            exclude_material_scrap=exclude_material_scrap,
-            exclude_pb_diode=exclude_pb_diode,
-        )
-        if df is None or df.empty:
-            return {
-                "dimensions": {
-                    dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
-                    for dim in _PARETO_DIMENSIONS
-                }
-            }
-
-        filtered = _apply_supplementary_filters(
-            df,
-            packages=packages,
-            workcenter_groups=workcenter_groups,
-            reasons=reasons,
-        )
-        if filtered is None or filtered.empty:
-            return {
-                "dimensions": {
-                    dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
-                    for dim in _PARETO_DIMENSIONS
-                }
-            }
-
-        if trend_dates and "TXN_DAY" in filtered.columns:
-            date_set = set(trend_dates)
-            filtered = filtered[
-                filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
-            ]
-            if filtered.empty:
-                return {
-                    "dimensions": {
-                        dim: {"items": [], "dimension": dim, "metric_mode": metric_mode}
-                        for dim in _PARETO_DIMENSIONS
-                    }
-                }
-
-        filtered = _project_pareto_guard_frame(filtered)
-        _enforce_interactive_memory_guard(filtered, operation="柏拉圖批次查詢", query_id=query_id)
-
-        dimensions: Dict[str, Dict[str, Any]] = {}
-        for dim in _PARETO_DIMENSIONS:
-            dim_col = _DIM_TO_DF_COLUMN.get(dim)
-            dim_df = _apply_cross_filter(filtered, normalized_selections, exclude_dim=dim)
-            items = _build_dimension_pareto_items(
-                dim_df,
-                dim_col=dim_col,
-                metric_mode=metric_mode,
-                pareto_scope=pareto_scope,
-            )
-            if pareto_display_scope == "top20" and dim in _PARETO_TOP20_DIMENSIONS:
-                items = items[:20]
-            dimensions[dim] = {
-                "items": items,
-                "dimension": dim,
-                "metric_mode": metric_mode,
-            }
-
-        result = {
-            "dimensions": dimensions,
-            "metric_mode": metric_mode,
-            "pareto_scope": pareto_scope,
-            "pareto_display_scope": pareto_display_scope,
-        }
-        merged_meta: Dict[str, Any] = {}
-        if isinstance(mat_meta, dict):
-            merged_meta.update(mat_meta)
-        if isinstance(sql_meta, dict):
-            merged_meta.update(sql_meta)
-        if merged_meta:
-            result["_pareto_meta"] = merged_meta
-        logger.info(
-            "Reject batch-pareto served by legacy fallback (query_id=%s, reason=%s)",
-            query_id,
-            pareto_sql_fallback_reason,
-        )
-        return result
-    finally:
-        _maybe_collect_after_interactive_compute()
 
 
 # ============================================================
@@ -2178,86 +1899,6 @@ def export_csv_from_cache(
     export_sql_fallback_reason = _normalize_text(
         (sql_meta or {}).get("export_sql_fallback_reason")
     ) or "unknown"
-    if not _allow_legacy_fallback(_REJECT_CACHE_SQL_EXPORT_FALLBACK_LEGACY_ENABLED):
-        raise RuntimeError(
-            f"cache-sql export unavailable (reason={export_sql_fallback_reason})"
-        )
-    logger.info(
-        "Reject export-cached fallback to legacy path (query_id=%s, reason=%s)",
-        query_id,
-        export_sql_fallback_reason,
+    raise RuntimeError(
+        f"cache-sql export unavailable (reason={export_sql_fallback_reason})"
     )
-
-    df = _get_cached_df(query_id)
-    if df is None:
-        return None
-
-    _enforce_interactive_memory_guard(df, operation="CSV匯出", query_id=query_id)
-    try:
-        df = _apply_policy_filters(
-            df,
-            include_excluded_scrap=include_excluded_scrap,
-            exclude_material_scrap=exclude_material_scrap,
-            exclude_pb_diode=exclude_pb_diode,
-        )
-
-        filtered = _apply_supplementary_filters(
-            df,
-            packages=packages,
-            workcenter_groups=workcenter_groups,
-            reasons=reasons,
-            metric_filter=metric_filter,
-        )
-
-        if trend_dates:
-            date_set = set(trend_dates)
-            filtered = filtered[
-                filtered["TXN_DAY"].apply(lambda d: _to_date_str(d) in date_set)
-            ]
-        if detail_reason and "LOSSREASONNAME" in filtered.columns:
-            filtered = filtered[
-                filtered["LOSSREASONNAME"].str.strip() == detail_reason.strip()
-            ]
-        filtered = _apply_pareto_selection_filter(
-            filtered,
-            pareto_dimension=pareto_dimension,
-            pareto_values=pareto_values,
-            pareto_selections=pareto_selections,
-        )
-
-        rows: List[Dict[str, Any]] = []
-        for _, row in filtered.iterrows():
-            rows.append(
-                {
-                    "LOT": _normalize_text(row.get("CONTAINERNAME")),
-                    "WORKCENTER": _normalize_text(row.get("WORKCENTERNAME")),
-                    "WORKCENTER_GROUP": _normalize_text(row.get("WORKCENTER_GROUP")),
-                    "Package": _normalize_text(row.get("PRODUCTLINENAME")),
-                    "FUNCTION": _normalize_text(row.get("PJ_FUNCTION")),
-                    "TYPE": _normalize_text(row.get("PJ_TYPE")),
-                    "PRODUCT": _normalize_text(row.get("PRODUCTNAME")),
-                    "原因": _normalize_text(row.get("LOSSREASONNAME")),
-                    "EQUIPMENT": _normalize_text(row.get("EQUIPMENTNAME")),
-                    "COMMENT": _normalize_text(row.get("REJECTCOMMENT")),
-                    "SPEC": _normalize_text(row.get("SPECNAME")),
-                    "REJECT_QTY": _as_int(row.get("REJECT_QTY")),
-                    "STANDBY_QTY": _as_int(row.get("STANDBY_QTY")),
-                    "QTYTOPROCESS_QTY": _as_int(row.get("QTYTOPROCESS_QTY")),
-                    "INPROCESS_QTY": _as_int(row.get("INPROCESS_QTY")),
-                    "PROCESSED_QTY": _as_int(row.get("PROCESSED_QTY")),
-                    "扣帳報廢量": _as_int(row.get("REJECT_TOTAL_QTY")),
-                    "不扣帳報廢量": _as_int(row.get("DEFECT_QTY")),
-                    "MOVEIN_QTY": _as_int(row.get("MOVEIN_QTY")),
-                    "報廢時間": _to_datetime_str(row.get("TXN_TIME")),
-                    "日期": _to_date_str(row.get("TXN_DAY")),
-                }
-            )
-        logger.info(
-            "Reject export-cached served by legacy fallback (query_id=%s, rows=%d, reason=%s)",
-            query_id,
-            len(rows),
-            export_sql_fallback_reason,
-        )
-        return rows
-    finally:
-        _maybe_collect_after_interactive_compute()

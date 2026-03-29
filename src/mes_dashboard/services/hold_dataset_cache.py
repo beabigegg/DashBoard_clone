@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Two-phase hold-history dataset cache.
+"""Hold-history dataset cache.
 
-Primary query (POST /query) → Oracle → cache full hold/release DataFrame.
-Supplementary view (GET /view) → read cache → pandas filter/derive.
+Primary query (POST /query) → Oracle → spool to Parquet → call DuckDB apply_view() → return result.
+Supplementary view (GET /view) → read spool → DuckDB apply_view() → return result.
 
 Cache layers:
   L1: ProcessLevelCache (in-process, per-worker)
-  L2: spool file + Redis metadata pointer (< 1 KB) [Phase 2]; Redis parquet bytes [Phase 1 fallback]
+  L2: spool file + Redis metadata pointer (< 1 KB)
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -26,19 +25,11 @@ from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.core.query_spool_store import (
     QUERY_SPOOL_DIR,
-    load_spooled_df,
+    get_spool_file_path,
     register_spool_file,
     store_spooled_df,
 )
 from mes_dashboard.core.redis_client import get_key, get_redis_client
-from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
-from mes_dashboard.services.filter_cache import get_workcenter_group as _get_wc_group
-from mes_dashboard.services.hold_history_service import (
-    _clean_text,
-    _format_datetime,
-    _safe_float,
-    _safe_int,
-)
 from mes_dashboard.sql.filters import CommonFilters
 
 logger = logging.getLogger("mes_dashboard.hold_dataset_cache")
@@ -48,7 +39,6 @@ _CACHE_TTL = CACHE_TTL_DATASET
 _CACHE_MAX_SIZE = 1
 _REDIS_NAMESPACE = "hold_dataset"
 _DEFAULT_DETAIL_PER_PAGE = 20
-_PHASE2_METADATA_ONLY: bool = os.getenv("PHASE2_METADATA_ONLY", "1") == "1"
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
 register_process_cache("hold_dataset", _dataset_cache, "Hold Dataset (L1, 15min)")
@@ -85,21 +75,15 @@ def _make_query_id(params: dict) -> str:
 
 
 # ============================================================
-# Redis L2 helpers (delegated to shared redis_df_store)
+# Cache existence check and write
 # ============================================================
 
 
-def _redis_store_df(query_id: str, df: pd.DataFrame) -> None:
-    redis_store_df(f"{_REDIS_NAMESPACE}:{query_id}", df, ttl=_CACHE_TTL)
-
-
-def _redis_load_df(query_id: str) -> Optional[pd.DataFrame]:
-    return redis_load_df(f"{_REDIS_NAMESPACE}:{query_id}")
-
-
-# ============================================================
-# Cache read (L1 -> L2 -> None)
-# ============================================================
+def _has_cached_df(query_id: str) -> bool:
+    """Check if query_id has cached data (L1 marker or spool exists)."""
+    if _dataset_cache.get(query_id) is not None:
+        return True
+    return get_spool_file_path(_REDIS_NAMESPACE, query_id) is not None
 
 
 def _store_query_dates(query_id: str, start_date: str, end_date: str) -> None:
@@ -131,41 +115,10 @@ def _get_query_dates(query_id: str) -> Optional[Dict[str, str]]:
     return None
 
 
-def _get_cached_df(query_id: str) -> Optional[pd.DataFrame]:
-    """Load DataFrame from spool or Redis on demand — NOT promoted to L1.
-
-    Phase 2 (default): spool primary, Redis fallback for in-flight keys from old deployment.
-    Phase 1 (flag=0): Redis primary, spool fallback.
-    """
-    if _PHASE2_METADATA_ONLY:
-        df = load_spooled_df(_REDIS_NAMESPACE, query_id)
-        if df is None:
-            # Transition fallback: in-flight Redis key from pre-Phase-2 deployment
-            logger.debug("Spool miss for query_id=%s, attempting Redis fallback", query_id)
-            df = _redis_load_df(query_id)
-    else:
-        df = _redis_load_df(query_id)
-        if df is None:
-            df = load_spooled_df(_REDIS_NAMESPACE, query_id)
-
-    if df is not None:
-        # Restore _QUERY_START/_QUERY_END for Pandas record_type='new' filter
-        if "_QUERY_START" not in df.columns:
-            dates = _get_query_dates(query_id)
-            if dates:
-                df = df.copy()
-                df["_QUERY_START"] = pd.Timestamp(dates["start"])
-                df["_QUERY_END"] = pd.Timestamp(dates["end"])
-    return df
-
-
 def _store_df(query_id: str, df: pd.DataFrame) -> None:
-    """Write to spool (Phase 2) or Redis L2 (Phase 1 fallback); L1 gets lightweight marker."""
+    """Write to spool; L1 gets lightweight marker."""
     _dataset_cache.set(query_id, True)  # lightweight marker
-    if _PHASE2_METADATA_ONLY:
-        store_spooled_df(_REDIS_NAMESPACE, query_id, df, ttl_seconds=_CACHE_TTL)
-    else:
-        _redis_store_df(query_id, df)
+    store_spooled_df(_REDIS_NAMESPACE, query_id, df, ttl_seconds=_CACHE_TTL)
 
 
 # ============================================================
@@ -180,12 +133,11 @@ def execute_primary_query(
     hold_type: str = "quality",
     record_type: str = "new",
 ) -> Dict[str, Any]:
-    """Execute Oracle query -> cache DataFrame -> return structured result."""
+    """Execute Oracle query -> spool to Parquet -> return DuckDB-computed result."""
 
     query_id = _make_query_id({"start_date": start_date, "end_date": end_date})
 
-    cached_df = _get_cached_df(query_id)
-    if cached_df is not None:
+    if _has_cached_df(query_id):
         logger.info("Hold dataset cache hit for query_id=%s", query_id)
     else:
         logger.info(
@@ -245,14 +197,6 @@ def execute_primary_query(
                 )
                 _dataset_cache.set(query_id, True)  # L1 marker
                 _store_query_dates(query_id, start_date, end_date)
-                _loaded = load_spooled_df(_REDIS_NAMESPACE, query_id)
-                df = _loaded if _loaded is not None else pd.DataFrame()
-                if not df.empty and "_QUERY_START" not in df.columns:
-                    df["_QUERY_START"] = pd.Timestamp(start_date)
-                    df["_QUERY_END"] = pd.Timestamp(end_date)
-            else:
-                df = pd.DataFrame()
-            # Spool already registered; skip Redis DataFrame store.
         else:
             # --- Direct path (short query) ---
             sql = _load_sql("base_facts")
@@ -265,24 +209,21 @@ def execute_primary_query(
             if df is None:
                 df = pd.DataFrame()
             if not df.empty:
-                df["_QUERY_START"] = pd.Timestamp(start_date)
-                df["_QUERY_END"] = pd.Timestamp(end_date)
                 _store_df(query_id, df)
+                _store_query_dates(query_id, start_date, end_date)
 
-        cached_df = df
-
-    views = _derive_all_views(
-        cached_df,
+    result = apply_view(
+        query_id=query_id,
         hold_type=hold_type,
         record_type=record_type,
         page=1,
         per_page=_DEFAULT_DETAIL_PER_PAGE,
+        _start_date=start_date,
+        _end_date=end_date,
     )
-
-    # Release large DataFrame to free memory
-    del cached_df
-
-    return {"query_id": query_id, **views}
+    if result is None:
+        return {"query_id": query_id, **_empty_views()}
+    return {"query_id": query_id, **result}
 
 
 # ============================================================
@@ -348,68 +289,6 @@ def apply_view(
     return None
 
 
-# ============================================================
-# Master derivation
-# ============================================================
-
-
-def _derive_all_views(
-    df: pd.DataFrame,
-    *,
-    hold_type: str = "quality",
-    reason: Optional[str] = None,
-    record_type: str = "new",
-    duration_range: Optional[str] = None,
-    page: int = 1,
-    per_page: int = 50,
-) -> Dict[str, Any]:
-    """Derive trend, reason_pareto, duration, and list from cached DataFrame."""
-    if df is None or df.empty:
-        return _empty_views()
-
-    # Trend uses full DF (no record_type/reason/duration filter, all hold_types)
-    trend = _derive_trend(df)
-
-    # Apply record_type filter for pareto, duration, list
-    filtered = _apply_record_type_filter(df, record_type)
-
-    # Apply hold_type filter
-    if hold_type != "all":
-        ht_value = "non-quality" if hold_type == "non-quality" else "quality"
-        filtered = filtered[filtered["HOLD_TYPE"] == ht_value]
-
-    # Cross-filtering: duration_range filters reason_pareto; reason filters duration
-    pareto_df = filtered
-    duration_df = filtered
-    if duration_range:
-        pareto_df = _apply_duration_range_filter(pareto_df, duration_range)
-    if reason:
-        duration_df = duration_df[
-            duration_df["HOLDREASONNAME"].str.strip() == reason.strip()
-        ]
-
-    reason_pareto = _derive_reason_pareto(pareto_df)
-    duration = _derive_duration(duration_df)
-
-    # List: both reason + duration_range filters
-    list_df = filtered
-    if reason:
-        list_df = list_df[
-            list_df["HOLDREASONNAME"].str.strip() == reason.strip()
-        ]
-    if duration_range:
-        list_df = _apply_duration_range_filter(list_df, duration_range)
-
-    detail = _derive_list(list_df, page=page, per_page=per_page)
-
-    return {
-        "trend": trend,
-        "reason_pareto": reason_pareto,
-        "duration": duration,
-        "list": detail,
-    }
-
-
 def _empty_views() -> Dict[str, Any]:
     return {
         "trend": {"days": []},
@@ -427,270 +306,6 @@ def _empty_views() -> Dict[str, Any]:
     }
 
 
-# ============================================================
-# Record-type & duration-range filters
-# ============================================================
-
-
-def _apply_record_type_filter(
-    df: pd.DataFrame, record_type: str
-) -> pd.DataFrame:
-    if df is None or df.empty:
-        return df
-
-    types = {t.strip().lower() for t in str(record_type or "new").split(",")}
-    if types >= {"new", "on_hold", "released"}:
-        return df
-
-    mask = pd.Series(False, index=df.index)
-
-    if "new" in types:
-        if "_QUERY_START" in df.columns and "_QUERY_END" in df.columns:
-            qs = df["_QUERY_START"].iloc[0]
-            qe = df["_QUERY_END"].iloc[0]
-            mask |= (df["HOLD_DAY"] >= qs) & (df["HOLD_DAY"] <= qe)
-        else:
-            mask |= pd.Series(True, index=df.index)
-
-    if "on_hold" in types:
-        mask |= df["RELEASETXNDATE"].isna()
-
-    if "released" in types:
-        mask |= df["RELEASETXNDATE"].notna()
-
-    return df[mask]
-
-
-def _apply_duration_range_filter(
-    df: pd.DataFrame, duration_range: str
-) -> pd.DataFrame:
-    if df is None or df.empty or not duration_range:
-        return df
-
-    hours = df["HOLD_HOURS"]
-    if duration_range == "<4h":
-        return df[hours < 4]
-    if duration_range == "4-24h":
-        return df[(hours >= 4) & (hours < 24)]
-    if duration_range == "1-3d":
-        return df[(hours >= 24) & (hours < 72)]
-    if duration_range == ">3d":
-        return df[hours >= 72]
-    return df
-
-
-# ============================================================
-# Derivation: Trend
-# ============================================================
-
-
-def _derive_trend(df: pd.DataFrame) -> Dict[str, Any]:
-    """Derive daily trend with quality / non_quality / all variants."""
-    if df is None or df.empty:
-        return {"days": []}
-
-    if "_QUERY_START" in df.columns:
-        start = pd.Timestamp(df["_QUERY_START"].iloc[0])
-        end = pd.Timestamp(df["_QUERY_END"].iloc[0])
-    else:
-        start = df["HOLD_DAY"].min()
-        end = df["HOLD_DAY"].max()
-
-    dates = pd.date_range(start, end, freq="D")
-
-    type_map: List[tuple] = [
-        ("quality", "quality"),
-        ("non_quality", "non-quality"),
-        ("all", None),
-    ]
-
-    days: List[Dict[str, Any]] = []
-    for d in dates:
-        day_data: Dict[str, Any] = {"date": d.strftime("%Y-%m-%d")}
-
-        for key, type_filter in type_map:
-            tdf = df if type_filter is None else df[df["HOLD_TYPE"] == type_filter]
-
-            if tdf.empty:
-                day_data[key] = _empty_trend_metrics()
-                continue
-
-            # holdQty: total QTY on hold as of this day
-            on_hold = (tdf["HOLD_DAY"] <= d) & (
-                tdf["RELEASE_DAY"].isna() | (tdf["RELEASE_DAY"] > d)
-            )
-            hold_qty = _safe_int(tdf.loc[on_hold, "QTY"].sum())
-
-            # newHoldQty: QTY of new holds arriving this day (dedup)
-            new_mask = (tdf["HOLD_DAY"] == d) & (tdf["RN_HOLD_DAY"] == 1)
-            new_hold_qty = _safe_int(tdf.loc[new_mask, "QTY"].sum())
-
-            # releaseQty: QTY released on this day
-            release_mask = tdf["RELEASE_DAY"] == d
-            release_qty = _safe_int(tdf.loc[release_mask, "QTY"].sum())
-
-            # futureHoldQty: QTY of future holds on this day
-            future_mask = (
-                (tdf["HOLD_DAY"] == d)
-                & (tdf["IS_FUTURE_HOLD"] == 1)
-                & (tdf["FUTURE_HOLD_FLAG"] == 1)
-            )
-            future_hold_qty = _safe_int(tdf.loc[future_mask, "QTY"].sum())
-
-            day_data[key] = {
-                "holdQty": hold_qty,
-                "newHoldQty": new_hold_qty,
-                "releaseQty": release_qty,
-                "futureHoldQty": future_hold_qty,
-            }
-
-        days.append(day_data)
-
-    return {"days": days}
-
-
-def _empty_trend_metrics() -> Dict[str, int]:
-    return {"holdQty": 0, "newHoldQty": 0, "releaseQty": 0, "futureHoldQty": 0}
-
-
-# ============================================================
-# Derivation: Reason Pareto
-# ============================================================
-
-
-def _derive_reason_pareto(df: pd.DataFrame) -> Dict[str, Any]:
-    """Group by HOLDREASONNAME -> count, qty, pct, cumPct."""
-    if df is None or df.empty:
-        return {"items": []}
-
-    grouped = (
-        df.groupby("HOLDREASONNAME", sort=False)
-        .agg(count=("CONTAINERID", "count"), qty=("QTY", "sum"))
-        .reset_index()
-    )
-    grouped = grouped.sort_values("qty", ascending=False)
-    total_qty = grouped["qty"].sum()
-
-    items: List[Dict[str, Any]] = []
-    cumulative = 0.0
-    for _, row in grouped.iterrows():
-        count = _safe_int(row["count"])
-        qty = _safe_int(row["qty"])
-        pct = round((qty / total_qty * 100) if total_qty > 0 else 0, 2)
-        cumulative += pct
-        items.append(
-            {
-                "reason": _clean_text(row["HOLDREASONNAME"]) or "(未填寫)",
-                "count": count,
-                "qty": qty,
-                "pct": pct,
-                "cumPct": round(cumulative, 2),
-            }
-        )
-
-    return {"items": items}
-
-
-# ============================================================
-# Derivation: Duration
-# ============================================================
-
-
-def _derive_duration(df: pd.DataFrame) -> Dict[str, Any]:
-    """Bucket released holds into <4h / 4-24h / 1-3d / >3d."""
-    if df is None or df.empty:
-        return {"items": []}
-
-    released = df[df["RELEASETXNDATE"].notna()]
-    if released.empty:
-        return {"items": []}
-
-    hours = released["HOLD_HOURS"]
-    total_qty = _safe_int(released["QTY"].sum())
-
-    buckets = [
-        ("<4h", hours < 4),
-        ("4-24h", (hours >= 4) & (hours < 24)),
-        ("1-3d", (hours >= 24) & (hours < 72)),
-        (">3d", hours >= 72),
-    ]
-
-    items: List[Dict[str, Any]] = []
-    for label, mask in buckets:
-        count = int(mask.sum())
-        qty = _safe_int(released.loc[mask, "QTY"].sum())
-        pct = round((qty / total_qty * 100) if total_qty > 0 else 0, 2)
-        items.append({"range": label, "count": count, "qty": qty, "pct": pct})
-
-    return {"items": items}
-
-
-# ============================================================
-# Derivation: Paginated list
-# ============================================================
-
-
-def _derive_list(
-    df: pd.DataFrame,
-    *,
-    page: int = 1,
-    per_page: int = 50,
-) -> Dict[str, Any]:
-    """Sort by HOLDTXNDATE desc and paginate."""
-    if df is None or df.empty:
-        return {
-            "items": [],
-            "pagination": {
-                "page": 1,
-                "perPage": per_page,
-                "total": 0,
-                "totalPages": 1,
-            },
-        }
-
-    page = max(int(page), 1)
-    per_page = min(max(int(per_page), 1), 200)
-
-    sorted_df = df.sort_values("HOLDTXNDATE", ascending=False)
-    total = len(sorted_df)
-    total_pages = max((total + per_page - 1) // per_page, 1)
-    offset = (page - 1) * per_page
-    page_df = sorted_df.iloc[offset : offset + per_page]
-
-    items: List[Dict[str, Any]] = []
-    for _, row in page_df.iterrows():
-        wc_name = _clean_text(row.get("WORKCENTERNAME"))
-        wc_group = _get_wc_group(wc_name) if wc_name else None
-
-        items.append(
-            {
-                "lotId": _clean_text(row.get("LOT_ID")),
-                "workorder": _clean_text(row.get("PJ_WORKORDER")),
-                "product": _clean_text(row.get("PRODUCTNAME")),
-                "workcenter": wc_group or wc_name,
-                "holdReason": _clean_text(row.get("HOLDREASONNAME")),
-                "qty": _safe_int(row.get("QTY")),
-                "holdDate": _format_datetime(row.get("HOLDTXNDATE")),
-                "holdEmp": _clean_text(row.get("HOLDEMP")),
-                "holdComment": _clean_text(row.get("HOLDCOMMENTS")),
-                "releaseDate": _format_datetime(row.get("RELEASETXNDATE")),
-                "releaseEmp": _clean_text(row.get("RELEASEEMP")),
-                "releaseComment": _clean_text(row.get("RELEASECOMMENTS")),
-                "holdHours": round(_safe_float(row.get("HOLD_HOURS")), 2),
-                "ncr": _clean_text(row.get("NCRID")),
-                "futureHoldComment": _clean_text(row.get("FUTUREHOLDCOMMENTS")),
-            }
-        )
-
-    return {
-        "items": items,
-        "pagination": {
-            "page": page,
-            "perPage": per_page,
-            "total": total,
-            "totalPages": total_pages,
-        },
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -714,8 +329,7 @@ def ensure_dataset_loaded() -> Dict[str, Any]:
     end_date = end_dt.strftime("%Y-%m-%d")
 
     query_id = make_canonical_warmup_query_id(start_date, end_date)
-    cached = _get_cached_df(query_id)
-    if cached is not None:
+    if _has_cached_df(query_id):
         return {"query_id": query_id, "cache_hit": True, "start_date": start_date, "end_date": end_date}
 
     result = execute_primary_query(start_date=start_date, end_date=end_date)
