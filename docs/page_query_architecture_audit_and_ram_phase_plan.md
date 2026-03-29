@@ -9,7 +9,7 @@
 > **Phase 進度：**
 > - [x] Phase 0 — 基線量測 → 完成，詳見 `docs/phase0_baseline_assessment.md`
 > - [x] Phase 1 — hot cache 整理 → 實作完成 (2026-03-29)，commit `77e6819`，提案封存於 `openspec/changes/archive/2026-03-29-phase1-hot-cache-normalization/`
-> - [ ] Phase 2 — heavy dataset metadata-only Redis
+> - [x] Phase 2 — heavy dataset metadata-only Redis → 實作完成 (2026-03-29)，commit `c77f1d4`，提案封存於 `openspec/changes/archive/2026-03-29-phase2-heavy-dataset-metadata-redis/`
 > - [ ] Phase 3 — 重查詢 primary query 全部先落 spool
 > - [ ] Phase 4 — 對外語意分兩類
 > - [ ] Phase 5 — 退休 pandas heavy fallback
@@ -417,6 +417,18 @@ Browser / Flask / Frontend DuckDB-WASM
 - Redis hot cache schema 明確化（WIP 單一表示、resource/equipment 有 TTL）
 
 ## Phase 2: 建立 heavy dataset 的 metadata-only Redis 模型
+
+> **狀態：✅ 實作完成 (2026-03-29)，commit `c77f1d4`**
+> openspec 封存於 `openspec/changes/archive/2026-03-29-phase2-heavy-dataset-metadata-redis/`
+> 實作任務追蹤：`openspec/changes/archive/2026-03-29-phase2-heavy-dataset-metadata-redis/tasks.md`
+>
+> **實作結果：**
+> - Feature flag `PHASE2_METADATA_ONLY`（預設=1）加入 reject/hold/resource_dataset_cache.py
+> - `_store_df()`：flag=1 → `store_spooled_df()`；flag=0 → `redis_store_df()` rollback 路徑
+> - `_load_df_on_demand()` / `_get_cached_df()`：spool-first + Redis transition fallback
+> - Engine path（`_store_query_result()`）不受影響
+> - 新增 Phase 2 測試（reject/hold/resource 各 3 cases：store mock、store not called、flag=0 regression）
+> - openspec governed specs 更新：reject-history-api、hold-dataset-cache、resource-dataset-cache、dataset-cache-metadata-only-redis（新）
 
 目標：
 
