@@ -1,6 +1,6 @@
 # API Inventory (Governed Source List)
 
-Updated: 2026-03-27
+Updated: 2026-03-29
 
 This file is the governed inventory for API contract classification and exception boundaries.
 
@@ -17,11 +17,11 @@ This file is the governed inventory for API contract classification and exceptio
 | `dashboard_routes.py` | All JSON API endpoints |
 | `hold_routes.py` | All JSON API endpoints |
 | `hold_overview_routes.py` | All JSON API endpoints |
-| `hold_history_routes.py` | All JSON API endpoints |
-| `reject_history_routes.py` | All JSON API endpoints — includes `GET /api/reject-history/job/<job_id>` (async job status); `POST /api/reject-history/query` may return HTTP 202 with `{"async": true, "job_id": ..., "status_url": ...}` when query is enqueued as background job |
+| `hold_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410): view miss returns 410 `cache_expired`; client re-triggers `execute_primary_query()` synchronously |
+| `reject_history_routes.py` | All JSON API endpoints — **Type B** (async 202 polling on 410): includes `GET /api/reject-history/job/<job_id>` (async job status); `POST /api/reject-history/query` may return HTTP 202 with `{"async": true, "job_id": ..., "status_url": ...}` when query is enqueued as background job; view miss (410) → client dispatches new async job → polling |
 | `resource_routes.py` | All JSON API endpoints |
-| `resource_history_routes.py` | All JSON API endpoints — `POST /api/resource/history/query` checks canonical base spool first (DuckDB filter at view time, task 7.2); falls through to Oracle path on spool miss; response shape unchanged: `{query_id, summary, detail}` |
-| `yield_alert_routes.py` | All JSON API endpoints |
+| `resource_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410): `POST /api/resource/history/query` checks canonical base spool first (DuckDB filter at view time, task 7.2); falls through to Oracle path on spool miss; response shape unchanged: `{query_id, summary, detail}`; view miss returns 410 `cache_expired`; client re-triggers `execute_primary_query()` synchronously |
+| `yield_alert_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410): view miss returns 410 `cache_expired`; client re-triggers `execute_primary_query()` synchronously |
 | `production_history_routes.py` | All JSON API endpoints — `POST /api/production-history/query` (primary Oracle query → spool, returns `{dataset_id, detail, matrix, filter_options}`; 400 validation, 503+Retry-After on `heavy_query_overloaded`/`memory_guard_rejected`), `POST /api/production-history/page` (DuckDB paged detail, filter: `{workcenter_group, spec, equipment_id}`; 410 `dataset_expired`), `POST /api/production-history/matrix` (DuckDB matrix with same filter; 410 `dataset_expired`), `POST /api/production-history/options` (DuckDB distinct filter option values; body: `{dataset_id}`; response data: `{work_orders, lot_ids, packages, bop_codes, workcenter_groups, equipment_ids}` each a sorted string array; 410 `dataset_expired`, 503 on memory pressure); gated by `PROD_HISTORY_ENABLED` feature flag |
 | `admin_routes.py` | All JSON API endpoints — includes `POST /api/admin/analytics/recalculate` (manual anomaly detection trigger, admin auth required), `GET /admin/api/user-usage-kpi` (user usage KPI dashboard data, admin auth required; query params: `start_date`, `end_date`, `department`) |
 

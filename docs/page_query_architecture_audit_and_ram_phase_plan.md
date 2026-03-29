@@ -11,7 +11,7 @@
 > - [x] Phase 1 — hot cache 整理 → 實作完成 (2026-03-29)，commit `77e6819`，提案封存於 `openspec/changes/archive/2026-03-29-phase1-hot-cache-normalization/`
 > - [x] Phase 2 — heavy dataset metadata-only Redis → 實作完成 (2026-03-29)，commit `c77f1d4`，提案封存於 `openspec/changes/archive/2026-03-29-phase2-heavy-dataset-metadata-redis/`
 > - [x] Phase 3 — 重查詢 primary query 全部先落 spool → 實作完成 (2026-03-29)，commit `84d186d`，提案封存於 `openspec/changes/archive/2026-03-29-phase3-spool-first-primary-query/`
-> - [ ] Phase 4 — 對外語意分兩類
+> - [x] Phase 4 — 對外語意分兩類 → spec governance 完成 (2026-03-29)，新增 `query-response-semantic-contract` spec，5 個既有 spec 更新，`api_inventory.md` 補充 Type A/B 標記
 > - [ ] Phase 5 — 退休 pandas heavy fallback
 
 ---
@@ -547,6 +547,23 @@ Browser / Flask / Frontend DuckDB-WASM
 
 - 重查詢域內部都已經是 spool-first
 - 但前端 contract 不必同一天全部切掉
+
+### Phase 4 實作結果（2026-03-29）
+
+**純 spec / contract governance — 無代碼變更。**
+
+已確認行為（audit）：
+- **Type A 域**（resource / hold / yield-alert）：view miss → `cache_expired_error()` (410)，無自動 dispatch；前端在 410 後呼叫 `executePrimaryQuery()` 同步重查 ✅
+- **Type B 域**（reject）：view miss → 410；前端在 410 後發起 `executePrimaryQuery()` → 202 async job → polling ✅；view endpoint 本身不呼叫 `enqueue_job()` ✅
+
+已新增 / 更新 governed specs：
+- **新增** `openspec/specs/query-response-semantic-contract/spec.md`：正式定義 Type A / Type B 雙語意查詢契約、view endpoint 不 dispatch 的架構要求
+- **更新** `openspec/specs/reject-history-api/spec.md`：補充 Type B 端到端契約 delta（view miss → 410 → async re-dispatch → polling）
+- **更新** `openspec/specs/resource-dataset-cache/spec.md`：加入 Type A 分類標籤 + sync re-query on 410 scenario
+- **更新** `openspec/specs/hold-dataset-cache/spec.md`：加入 Type A 分類標籤 + sync re-query on 410 scenario
+- **更新** `openspec/specs/yield-alert-spool-query/spec.md`：加入 Type A 分類標籤 + sync re-query on 410 scenario
+- **更新** `openspec/specs/async-query-job-service/spec.md`：補充 Type B miss re-dispatch 入口角色定義
+- **更新** `contract/api_inventory.md`：reject / resource-history / hold-history / yield-alert 路由加入 Type A/B 語意分類標記
 
 ## Phase 5: 退休 pandas heavy fallback 與舊大 payload 路徑
 
