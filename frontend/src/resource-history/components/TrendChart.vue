@@ -27,7 +27,7 @@ const chartOption = computed(() => {
       axisPointer: { type: 'line' },
     },
     legend: {
-      data: ['OU%', 'AVAIL%'],
+      data: ['OU%', 'OEE%', 'AVAIL%'],
       bottom: 0,
     },
     grid: {
@@ -63,6 +63,16 @@ const chartOption = computed(() => {
         data: trend.map((item) => Number(item.ou_pct || 0)),
       },
       {
+        name: 'OEE%',
+        type: 'line',
+        smooth: true,
+        symbolSize: 6,
+        areaStyle: { opacity: 0.1 },
+        lineStyle: { width: 2 },
+        itemStyle: { color: 'rgb(245, 158, 11)' },
+        data: trend.map((item) => Number(item.oee_pct || 0)),
+      },
+      {
         name: 'AVAIL%',
         type: 'line',
         smooth: true,
@@ -79,7 +89,7 @@ const chartOption = computed(() => {
 
 <template>
   <article class="chart-card">
-    <h3 class="chart-title">OU% / AVAIL% 趨勢</h3>
+    <h3 class="chart-title">OU% / OEE% / AVAIL% 趨勢</h3>
     <div v-if="hasData" class="chart-body" role="img" aria-label="設備稼動率趨勢圖">
       <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>

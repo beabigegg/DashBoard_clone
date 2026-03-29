@@ -375,6 +375,50 @@ def load_spooled_df(namespace: str, query_id: str) -> Optional[pd.DataFrame]:
     return df
 
 
+def read_spool_records(namespace: str, query_id: str) -> Optional[list[dict[str, Any]]]:
+    """Read spool parquet via DuckDB and return list-of-dict records.
+
+    Handles datetime formatting (YYYY-MM-DD HH:MM:SS) and null→None
+    conversion, matching the behaviour of the former pandas iterrows path.
+    Returns None when spool is missing or expired.
+    """
+    spool_path = get_spool_file_path(namespace, query_id)
+    if spool_path is None:
+        return None
+
+    try:
+        import duckdb  # type: ignore
+
+        conn = duckdb.connect(database=":memory:")
+        rel = conn.read_parquet(spool_path)
+        columns = rel.columns
+        types = rel.types
+        rows = rel.fetchall()
+        conn.close()
+
+        # Identify timestamp columns for formatting
+        ts_indices = {
+            i for i, t in enumerate(types) if "TIMESTAMP" in str(t).upper()
+        }
+
+        records: list[dict[str, Any]] = []
+        for row in rows:
+            record: dict[str, Any] = {}
+            for i, col in enumerate(columns):
+                val = row[i]
+                if val is None:
+                    record[col] = None
+                elif i in ts_indices:
+                    record[col] = val.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    record[col] = val
+            records.append(record)
+        return records
+    except Exception as exc:
+        logger.warning("read_spool_records failed (ns=%s, id=%s): %s", namespace, query_id, exc)
+        return None
+
+
 def get_spool_file_path(namespace: str, query_id: str) -> Optional[str]:
     """Resolve spool parquet path for query_id without loading DataFrame."""
     if not QUERY_SPOOL_ENABLED:

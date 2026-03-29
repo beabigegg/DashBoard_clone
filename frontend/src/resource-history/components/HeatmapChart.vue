@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { HeatmapChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, VisualMapComponent } from 'echarts/components';
@@ -16,10 +16,23 @@ const props = defineProps({
   },
 });
 
+const metricOptions = [
+  { value: 'ou_pct', label: 'OU%' },
+  { value: 'oee_pct', label: 'OEE%' },
+  { value: 'availability_pct', label: 'AVAIL%' },
+];
+const selectedMetric = ref('ou_pct');
+
+const metricLabel = computed(() => {
+  const opt = metricOptions.find((o) => o.value === selectedMetric.value);
+  return opt ? opt.label : 'OU%';
+});
+
 const hasData = computed(() => props.heatmap.length > 0);
 
 const parsedHeatmap = computed(() => {
   const rows = props.heatmap || [];
+  const metric = selectedMetric.value;
 
   const seqByWorkcenter = {};
   rows.forEach((row) => {
@@ -34,7 +47,7 @@ const parsedHeatmap = computed(() => {
   const matrixData = rows.map((row) => [
     dates.indexOf(row.date),
     workcenters.indexOf(row.workcenter),
-    Number(row.ou_pct || 0),
+    Number(row[metric] || 0),
   ]);
 
   return {
@@ -55,7 +68,7 @@ const chartOption = computed(() => {
         const yIndex = Number(params.value?.[1] || 0);
         const value = Number(params.value?.[2] || 0);
 
-        return `${payload.workcenters[yIndex] || '--'}<br/>${payload.dates[xIndex] || '--'}<br/>OU%: <b>${value.toFixed(
+        return `${payload.workcenters[yIndex] || '--'}<br/>${payload.dates[xIndex] || '--'}<br/>${metricLabel.value}: <b>${value.toFixed(
           1
         )}%</b>`;
       },
@@ -111,10 +124,32 @@ const chartOption = computed(() => {
 
 <template>
   <article class="chart-card">
-    <h3 class="chart-title">Workcenter x Date OU% 熱圖</h3>
+    <div class="chart-header">
+      <h3 class="chart-title">Workcenter x Date {{ metricLabel }} 熱圖</h3>
+      <select v-model="selectedMetric" class="heatmap-metric-select">
+        <option v-for="opt in metricOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+      </select>
+    </div>
     <div v-if="hasData" class="chart-body" role="img" aria-label="設備稼動率熱力圖">
       <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>
     <div v-else class="chart-no-data">No data</div>
   </article>
 </template>
+
+<style scoped>
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.heatmap-metric-select {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #1f2937);
+}
+</style>

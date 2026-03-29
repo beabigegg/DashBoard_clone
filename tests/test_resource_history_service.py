@@ -423,12 +423,19 @@ class TestExportCsv(unittest.TestCase):
         }]
         mock_wc_mapping.return_value = {'WC01': {'group': 'WC01', 'sequence': 1}}
 
-        mock_read_sql.return_value = pd.DataFrame([{
+        base_df = pd.DataFrame([{
             'HISTORYID': 'RES01',
             'PRD_HOURS': 80, 'SBY_HOURS': 10, 'UDT_HOURS': 5,
             'SDT_HOURS': 3, 'EGT_HOURS': 2, 'NST_HOURS': 10,
             'TOTAL_HOURS': 110
         }])
+        oee_df = pd.DataFrame([{
+            'EQUIPMENTID': 'RES01',
+            'SHIFT_DATE': '2024-01-01',
+            'TRACKOUT_QTY': 100,
+            'NG_QTY': 5,
+        }])
+        mock_read_sql.side_effect = [base_df, oee_df]
 
         result = list(export_csv(
             start_date='2024-01-01',
@@ -440,6 +447,7 @@ class TestExportCsv(unittest.TestCase):
         # Header should contain column names
         self.assertIn('站點', result[0])
         self.assertIn('OU%', result[0])
+        self.assertIn('OEE%', result[0])
 
 
 if __name__ == '__main__':

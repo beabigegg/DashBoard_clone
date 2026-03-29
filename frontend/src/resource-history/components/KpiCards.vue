@@ -43,6 +43,15 @@ const kpi = computed(() => ({
     </SummaryCard>
 
     <SummaryCard
+      label="OEE%"
+      :value="kpi.oee_pct"
+      format="percent"
+      :accent="resolveOuAccent(kpi.oee_pct)"
+    >
+      <template #sub>綜合設備效率</template>
+    </SummaryCard>
+
+    <SummaryCard
       label="AVAIL%"
       :value="kpi.availability_pct"
       format="percent"

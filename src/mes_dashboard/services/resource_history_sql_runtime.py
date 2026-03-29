@@ -28,6 +28,7 @@ SQL_FALLBACK_SPOOL_MISS = "resource_history_sql_spool_miss"
 SQL_FALLBACK_RUNTIME_ERROR = "resource_history_sql_runtime_error"
 
 _SPOOL_NAMESPACE = "resource_dataset"
+_OEE_SPOOL_NAMESPACE = "resource_oee"
 
 
 # ── SQL helpers ───────────────────────────────────────────────────────────────
@@ -45,6 +46,21 @@ def _attach_spool_view(conn: Any, parquet_path: str) -> None:
     conn.execute(
         "CREATE OR REPLACE TEMP VIEW resource_src AS "
         f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
+    )
+
+
+def _attach_oee_spool_view(conn: Any, parquet_path: str) -> None:
+    conn.execute(
+        "CREATE OR REPLACE TEMP VIEW oee_src AS "
+        f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
+    )
+
+
+def _attach_empty_oee_view(conn: Any) -> None:
+    conn.execute(
+        "CREATE OR REPLACE TEMP VIEW oee_src AS "
+        "SELECT '' AS EQUIPMENTID, CAST(NULL AS DATE) AS SHIFT_DATE, "
+        "0 AS TRACKOUT_QTY, 0 AS NG_QTY LIMIT 0"
     )
 
 
@@ -74,6 +90,15 @@ def _calc_avail_pct(prd: float, sby: float, udt: float, sdt: float, egt: float, 
 
 def _status_pct(val: float, total: float) -> float:
     return round(val / total * 100, 1) if total > 0 else 0.0
+
+
+def _calc_yield_pct(trackout: float, ng: float) -> float:
+    denom = trackout + ng
+    return round(trackout / denom * 100, 1) if denom > 0 else 0.0
+
+
+def _calc_oee_pct(availability_pct: float, yield_pct: float) -> float:
+    return round(availability_pct * yield_pct / 100, 1)
 
 
 # ── Date bucket expression ────────────────────────────────────────────────────
@@ -146,15 +171,21 @@ def _query_kpi(conn: Any) -> Dict[str, Any]:
     """Compute overall KPI metrics via DuckDB aggregation."""
     sql = """
         SELECT
-            COALESCE(SUM("PRD_HOURS"), 0) AS prd,
-            COALESCE(SUM("SBY_HOURS"), 0) AS sby,
-            COALESCE(SUM("UDT_HOURS"), 0) AS udt,
-            COALESCE(SUM("SDT_HOURS"), 0) AS sdt,
-            COALESCE(SUM("EGT_HOURS"), 0) AS egt,
-            COALESCE(SUM("NST_HOURS"), 0) AS nst,
-            COALESCE(SUM("TOTAL_HOURS"), 0) AS total,
-            COUNT(DISTINCT CAST("HISTORYID" AS VARCHAR)) AS machine_count
-        FROM resource_src
+            COALESCE(SUM(s."PRD_HOURS"), 0) AS prd,
+            COALESCE(SUM(s."SBY_HOURS"), 0) AS sby,
+            COALESCE(SUM(s."UDT_HOURS"), 0) AS udt,
+            COALESCE(SUM(s."SDT_HOURS"), 0) AS sdt,
+            COALESCE(SUM(s."EGT_HOURS"), 0) AS egt,
+            COALESCE(SUM(s."NST_HOURS"), 0) AS nst,
+            COALESCE(SUM(s."TOTAL_HOURS"), 0) AS total,
+            COUNT(DISTINCT CAST(s."HISTORYID" AS VARCHAR)) AS machine_count
+        FROM resource_src s
+    """
+    oee_sql = """
+        SELECT
+            COALESCE(SUM("TRACKOUT_QTY"), 0) AS trackout_qty,
+            COALESCE(SUM("NG_QTY"), 0) AS ng_qty
+        FROM oee_src
     """
     rows = _fetch_dict_rows(conn, sql)
     if not rows:
@@ -170,9 +201,21 @@ def _query_kpi(conn: Any) -> Dict[str, Any]:
     total = _sf(r.get("total"))
     machine_count = int(r.get("machine_count") or 0)
 
+    oee_rows = _fetch_dict_rows(conn, oee_sql)
+    trackout_qty = _sf(oee_rows[0].get("trackout_qty")) if oee_rows else 0.0
+    ng_qty = _sf(oee_rows[0].get("ng_qty")) if oee_rows else 0.0
+
+    availability_pct = _calc_avail_pct(prd, sby, udt, sdt, egt, nst)
+    yield_pct = _calc_yield_pct(trackout_qty, ng_qty)
+    oee_pct = _calc_oee_pct(availability_pct, yield_pct)
+
     return {
         "ou_pct": _calc_ou_pct(prd, sby, udt, sdt, egt),
-        "availability_pct": _calc_avail_pct(prd, sby, udt, sdt, egt, nst),
+        "availability_pct": availability_pct,
+        "oee_pct": oee_pct,
+        "yield_pct": yield_pct,
+        "trackout_qty": int(trackout_qty),
+        "ng_qty": int(ng_qty),
         "prd_hours": round(prd, 1),
         "prd_pct": _status_pct(prd, total),
         "sby_hours": round(sby, 1),
@@ -194,18 +237,34 @@ def _query_kpi(conn: Any) -> Dict[str, Any]:
 def _query_trend(conn: Any, *, granularity: str) -> List[Dict[str, Any]]:
     """Compute date-bucketed trend via DuckDB GROUP BY."""
     bucket_expr = _granularity_bucket_expr(granularity)
+    oee_bucket_expr = _granularity_bucket_expr(granularity, col="SHIFT_DATE")
     sql = f"""
         SELECT
-            {bucket_expr} AS period,
-            COALESCE(SUM("PRD_HOURS"), 0) AS prd,
-            COALESCE(SUM("SBY_HOURS"), 0) AS sby,
-            COALESCE(SUM("UDT_HOURS"), 0) AS udt,
-            COALESCE(SUM("SDT_HOURS"), 0) AS sdt,
-            COALESCE(SUM("EGT_HOURS"), 0) AS egt,
-            COALESCE(SUM("NST_HOURS"), 0) AS nst
-        FROM resource_src
-        GROUP BY 1
-        ORDER BY 1
+            s.period,
+            s.prd, s.sby, s.udt, s.sdt, s.egt, s.nst,
+            COALESCE(o.trackout_qty, 0) AS trackout_qty,
+            COALESCE(o.ng_qty, 0) AS ng_qty
+        FROM (
+            SELECT
+                {bucket_expr} AS period,
+                COALESCE(SUM("PRD_HOURS"), 0) AS prd,
+                COALESCE(SUM("SBY_HOURS"), 0) AS sby,
+                COALESCE(SUM("UDT_HOURS"), 0) AS udt,
+                COALESCE(SUM("SDT_HOURS"), 0) AS sdt,
+                COALESCE(SUM("EGT_HOURS"), 0) AS egt,
+                COALESCE(SUM("NST_HOURS"), 0) AS nst
+            FROM resource_src
+            GROUP BY 1
+        ) s
+        LEFT JOIN (
+            SELECT
+                {oee_bucket_expr} AS period,
+                COALESCE(SUM("TRACKOUT_QTY"), 0) AS trackout_qty,
+                COALESCE(SUM("NG_QTY"), 0) AS ng_qty
+            FROM oee_src
+            GROUP BY 1
+        ) o ON o.period = s.period
+        ORDER BY s.period
     """
     rows = _fetch_dict_rows(conn, sql)
     items: List[Dict[str, Any]] = []
@@ -216,10 +275,17 @@ def _query_trend(conn: Any, *, granularity: str) -> List[Dict[str, Any]]:
         sdt = _sf(r.get("sdt"))
         egt = _sf(r.get("egt"))
         nst = _sf(r.get("nst"))
+        trackout_qty = _sf(r.get("trackout_qty"))
+        ng_qty = _sf(r.get("ng_qty"))
+        availability_pct = _calc_avail_pct(prd, sby, udt, sdt, egt, nst)
+        yield_pct = _calc_yield_pct(trackout_qty, ng_qty)
+        oee_pct = _calc_oee_pct(availability_pct, yield_pct)
         items.append({
             "date": str(r.get("period") or ""),
             "ou_pct": _calc_ou_pct(prd, sby, udt, sdt, egt),
-            "availability_pct": _calc_avail_pct(prd, sby, udt, sdt, egt, nst),
+            "availability_pct": availability_pct,
+            "oee_pct": oee_pct,
+            "yield_pct": yield_pct,
             "prd_hours": round(prd, 1),
             "sby_hours": round(sby, 1),
             "udt_hours": round(udt, 1),
@@ -233,23 +299,43 @@ def _query_trend(conn: Any, *, granularity: str) -> List[Dict[str, Any]]:
 # ── Task 3.4: Heatmap SQL ─────────────────────────────────────────────────────
 
 def _query_heatmap(conn: Any, *, granularity: str) -> List[Dict[str, Any]]:
-    """Compute workcenter × date OU% matrix via DuckDB JOIN + GROUP BY."""
+    """Compute workcenter × date OU%/OEE%/AVAIL% matrix via DuckDB JOIN + GROUP BY."""
     bucket_expr = _granularity_bucket_expr(granularity)
+    oee_bucket_expr = _granularity_bucket_expr(granularity, col="SHIFT_DATE")
     sql = f"""
         SELECT
-            d.WC_GROUP AS workcenter,
-            MIN(d.WC_SEQ) AS workcenter_seq,
-            {bucket_expr.replace('"DATA_DATE"', 's."DATA_DATE"')} AS date,
-            COALESCE(SUM(s."PRD_HOURS"), 0) AS prd,
-            COALESCE(SUM(s."SBY_HOURS"), 0) AS sby,
-            COALESCE(SUM(s."UDT_HOURS"), 0) AS udt,
-            COALESCE(SUM(s."SDT_HOURS"), 0) AS sdt,
-            COALESCE(SUM(s."EGT_HOURS"), 0) AS egt
-        FROM resource_src s
-        JOIN resource_dim d ON CAST(s."HISTORYID" AS VARCHAR) = d.HISTORYID
-        WHERE d.WC_GROUP <> ''
-        GROUP BY d.WC_GROUP, {bucket_expr.replace('"DATA_DATE"', 's."DATA_DATE"')}
-        ORDER BY MIN(d.WC_SEQ), date
+            h.workcenter, h.workcenter_seq, h.date,
+            h.prd, h.sby, h.udt, h.sdt, h.egt, h.nst,
+            COALESCE(o.trackout_qty, 0) AS trackout_qty,
+            COALESCE(o.ng_qty, 0) AS ng_qty
+        FROM (
+            SELECT
+                d.WC_GROUP AS workcenter,
+                MIN(d.WC_SEQ) AS workcenter_seq,
+                {bucket_expr.replace('"DATA_DATE"', 's."DATA_DATE"')} AS date,
+                COALESCE(SUM(s."PRD_HOURS"), 0) AS prd,
+                COALESCE(SUM(s."SBY_HOURS"), 0) AS sby,
+                COALESCE(SUM(s."UDT_HOURS"), 0) AS udt,
+                COALESCE(SUM(s."SDT_HOURS"), 0) AS sdt,
+                COALESCE(SUM(s."EGT_HOURS"), 0) AS egt,
+                COALESCE(SUM(s."NST_HOURS"), 0) AS nst
+            FROM resource_src s
+            JOIN resource_dim d ON CAST(s."HISTORYID" AS VARCHAR) = d.HISTORYID
+            WHERE d.WC_GROUP <> ''
+            GROUP BY d.WC_GROUP, {bucket_expr.replace('"DATA_DATE"', 's."DATA_DATE"')}
+        ) h
+        LEFT JOIN (
+            SELECT
+                d.WC_GROUP AS workcenter,
+                {oee_bucket_expr.replace('"SHIFT_DATE"', 'o."SHIFT_DATE"')} AS date,
+                COALESCE(SUM(o."TRACKOUT_QTY"), 0) AS trackout_qty,
+                COALESCE(SUM(o."NG_QTY"), 0) AS ng_qty
+            FROM oee_src o
+            JOIN resource_dim d ON CAST(o."EQUIPMENTID" AS VARCHAR) = d.HISTORYID
+            WHERE d.WC_GROUP <> ''
+            GROUP BY d.WC_GROUP, {oee_bucket_expr.replace('"SHIFT_DATE"', 'o."SHIFT_DATE"')}
+        ) o ON o.workcenter = h.workcenter AND o.date = h.date
+        ORDER BY h.workcenter_seq, h.date
     """
     rows = _fetch_dict_rows(conn, sql)
     items: List[Dict[str, Any]] = []
@@ -259,11 +345,18 @@ def _query_heatmap(conn: Any, *, granularity: str) -> List[Dict[str, Any]]:
         udt = _sf(r.get("udt"))
         sdt = _sf(r.get("sdt"))
         egt = _sf(r.get("egt"))
+        nst = _sf(r.get("nst"))
+        trackout_qty = _sf(r.get("trackout_qty"))
+        ng_qty = _sf(r.get("ng_qty"))
+        availability_pct = _calc_avail_pct(prd, sby, udt, sdt, egt, nst)
+        yield_pct = _calc_yield_pct(trackout_qty, ng_qty)
         items.append({
             "workcenter": str(r.get("workcenter") or ""),
             "workcenter_seq": int(r.get("workcenter_seq") or 999),
             "date": str(r.get("date") or ""),
             "ou_pct": _calc_ou_pct(prd, sby, udt, sdt, egt),
+            "oee_pct": _calc_oee_pct(availability_pct, yield_pct),
+            "availability_pct": availability_pct,
         })
     return items
 
@@ -311,22 +404,37 @@ def _query_detail(conn: Any) -> Dict[str, Any]:
     """Compute per-resource metrics via DuckDB JOIN, sorted by workcenter/family/resource."""
     sql = """
         SELECT
-            CAST(s."HISTORYID" AS VARCHAR) AS historyid,
-            d.WC_GROUP AS workcenter,
-            d.WC_SEQ AS workcenter_seq,
-            d.FAMILY AS family,
-            d.RESOURCE AS resource,
-            COALESCE(SUM(s."PRD_HOURS"), 0) AS prd,
-            COALESCE(SUM(s."SBY_HOURS"), 0) AS sby,
-            COALESCE(SUM(s."UDT_HOURS"), 0) AS udt,
-            COALESCE(SUM(s."SDT_HOURS"), 0) AS sdt,
-            COALESCE(SUM(s."EGT_HOURS"), 0) AS egt,
-            COALESCE(SUM(s."NST_HOURS"), 0) AS nst,
-            COALESCE(SUM(s."TOTAL_HOURS"), 0) AS total
-        FROM resource_src s
-        JOIN resource_dim d ON CAST(s."HISTORYID" AS VARCHAR) = d.HISTORYID
-        GROUP BY CAST(s."HISTORYID" AS VARCHAR), d.WC_GROUP, d.WC_SEQ, d.FAMILY, d.RESOURCE
-        ORDER BY d.WC_SEQ, d.FAMILY, d.RESOURCE
+            s.historyid, s.workcenter, s.workcenter_seq, s.family, s.resource,
+            s.prd, s.sby, s.udt, s.sdt, s.egt, s.nst, s.total,
+            COALESCE(o.trackout_qty, 0) AS trackout_qty,
+            COALESCE(o.ng_qty, 0) AS ng_qty
+        FROM (
+            SELECT
+                CAST(s."HISTORYID" AS VARCHAR) AS historyid,
+                d.WC_GROUP AS workcenter,
+                d.WC_SEQ AS workcenter_seq,
+                d.FAMILY AS family,
+                d.RESOURCE AS resource,
+                COALESCE(SUM(s."PRD_HOURS"), 0) AS prd,
+                COALESCE(SUM(s."SBY_HOURS"), 0) AS sby,
+                COALESCE(SUM(s."UDT_HOURS"), 0) AS udt,
+                COALESCE(SUM(s."SDT_HOURS"), 0) AS sdt,
+                COALESCE(SUM(s."EGT_HOURS"), 0) AS egt,
+                COALESCE(SUM(s."NST_HOURS"), 0) AS nst,
+                COALESCE(SUM(s."TOTAL_HOURS"), 0) AS total
+            FROM resource_src s
+            JOIN resource_dim d ON CAST(s."HISTORYID" AS VARCHAR) = d.HISTORYID
+            GROUP BY CAST(s."HISTORYID" AS VARCHAR), d.WC_GROUP, d.WC_SEQ, d.FAMILY, d.RESOURCE
+        ) s
+        LEFT JOIN (
+            SELECT
+                CAST("EQUIPMENTID" AS VARCHAR) AS equipmentid,
+                COALESCE(SUM("TRACKOUT_QTY"), 0) AS trackout_qty,
+                COALESCE(SUM("NG_QTY"), 0) AS ng_qty
+            FROM oee_src
+            GROUP BY CAST("EQUIPMENTID" AS VARCHAR)
+        ) o ON o.equipmentid = s.historyid
+        ORDER BY s.workcenter_seq, s.family, s.resource
     """
     rows = _fetch_dict_rows(conn, sql)
     data: List[Dict[str, Any]] = []
@@ -338,13 +446,22 @@ def _query_detail(conn: Any) -> Dict[str, Any]:
         egt = _sf(r.get("egt"))
         nst = _sf(r.get("nst"))
         total = _sf(r.get("total"))
+        trackout_qty = _sf(r.get("trackout_qty"))
+        ng_qty = _sf(r.get("ng_qty"))
+        availability_pct = _calc_avail_pct(prd, sby, udt, sdt, egt, nst)
+        yield_pct = _calc_yield_pct(trackout_qty, ng_qty)
+        oee_pct = _calc_oee_pct(availability_pct, yield_pct)
         data.append({
             "workcenter": str(r.get("workcenter") or ""),
             "workcenter_seq": int(r.get("workcenter_seq") or 999),
             "family": str(r.get("family") or ""),
             "resource": str(r.get("resource") or ""),
             "ou_pct": _calc_ou_pct(prd, sby, udt, sdt, egt),
-            "availability_pct": _calc_avail_pct(prd, sby, udt, sdt, egt, nst),
+            "oee_pct": oee_pct,
+            "availability_pct": availability_pct,
+            "yield_pct": yield_pct,
+            "trackout_qty": int(trackout_qty),
+            "ng_qty": int(ng_qty),
             "prd_hours": round(prd, 1),
             "prd_pct": _status_pct(prd, total),
             "sby_hours": round(sby, 1),
@@ -372,6 +489,8 @@ def _query_detail(conn: Any) -> Dict[str, Any]:
 def _empty_kpi() -> Dict[str, Any]:
     return {
         "ou_pct": 0, "availability_pct": 0,
+        "oee_pct": 0, "yield_pct": 0,
+        "trackout_qty": 0, "ng_qty": 0,
         "prd_hours": 0, "prd_pct": 0,
         "sby_hours": 0, "sby_pct": 0,
         "udt_hours": 0, "udt_pct": 0,
@@ -392,7 +511,7 @@ def try_compute_view_from_spool(
     """Try to compute the full view result via DuckDB over the Parquet spool.
 
     Returns ``(result_dict, meta)`` on success, or ``(None, meta)`` on failure.
-    On failure the caller should fall back to Pandas-based derivation.
+    On failure returns ``(None, meta)`` — caller returns 410 cache_expired.
     ``meta["view_sql_fallback_reason"]`` is set when returning None.
     """
     if not _SQL_VIEW_ENABLED:
@@ -406,6 +525,8 @@ def try_compute_view_from_spool(
     parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
     if not parquet_path:
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    oee_parquet_path = get_spool_file_path(_OEE_SPOOL_NAMESPACE, query_id)
 
     # Load resource dimension data (needed for heatmap / comparison / detail)
     try:
@@ -424,6 +545,10 @@ def try_compute_view_from_spool(
     try:
         conn = duckdb.connect(database=":memory:")
         _attach_spool_view(conn, parquet_path)
+        if oee_parquet_path:
+            _attach_oee_spool_view(conn, oee_parquet_path)
+        else:
+            _attach_empty_oee_view(conn)
         _build_resource_lookup_table(conn, resource_lookup, wc_mapping)
 
         kpi = _query_kpi(conn)
@@ -500,11 +625,17 @@ def try_compute_query_from_canonical_spool(
     except Exception:
         return None, {"canonical_fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
-    from mes_dashboard.services.resource_dataset_cache import make_canonical_base_query_id
+    from mes_dashboard.services.resource_dataset_cache import (
+        make_canonical_base_query_id,
+        make_canonical_oee_query_id,
+    )
     canonical_query_id = make_canonical_base_query_id(start_date, end_date, granularity)
     parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, canonical_query_id)
     if not parquet_path:
         return None, {"canonical_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    canonical_oee_query_id = make_canonical_oee_query_id(start_date, end_date, granularity)
+    oee_parquet_path = get_spool_file_path(_OEE_SPOOL_NAMESPACE, canonical_oee_query_id)
 
     try:
         from mes_dashboard.services.resource_history_service import (
@@ -547,6 +678,20 @@ def try_compute_query_from_canonical_spool(
             "INNER JOIN resource_dim d "
             "ON CAST(s.\"HISTORYID\" AS VARCHAR) = d.HISTORYID"
         )
+        # OEE spool — filtered via INNER JOIN on resource_dim
+        if oee_parquet_path:
+            conn.execute(
+                "CREATE TEMP VIEW oee_all AS "
+                f"SELECT * FROM read_parquet({_sql_str_literal(oee_parquet_path)})"
+            )
+            conn.execute(
+                "CREATE TEMP VIEW oee_src AS "
+                "SELECT o.* FROM oee_all o "
+                "INNER JOIN resource_dim d "
+                "ON CAST(o.\"EQUIPMENTID\" AS VARCHAR) = d.HISTORYID"
+            )
+        else:
+            _attach_empty_oee_view(conn)
 
         kpi = _query_kpi(conn)
         trend_items = _query_trend(conn, granularity=granularity)

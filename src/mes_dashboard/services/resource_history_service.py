@@ -495,6 +495,31 @@ def export_csv(
 
         df = read_sql_df(sql, params)
 
+        # Query OEE data for CSV export
+        from datetime import timedelta as _td
+        from datetime import date as _date
+        oee_sql = SQLLoader.load("resource_history/oee_facts")
+        _reject_start = (_date.fromisoformat(start_date) - _td(days=30)).isoformat()
+        _reject_end = (_date.fromisoformat(end_date) + _td(days=30)).isoformat()
+        oee_params = {
+            'start_date': start_date,
+            'end_date': end_date,
+            'reject_start': _reject_start,
+            'reject_end': _reject_end,
+        }
+        oee_df = read_sql_df(oee_sql, oee_params)
+        oee_by_equipment = {}
+        if oee_df is not None and not oee_df.empty:
+            oee_grouped = oee_df.groupby('EQUIPMENTID', as_index=False).agg(
+                TRACKOUT_QTY=('TRACKOUT_QTY', 'sum'),
+                NG_QTY=('NG_QTY', 'sum'),
+            )
+            for _, orow in oee_grouped.iterrows():
+                oee_by_equipment[orow['EQUIPMENTID']] = {
+                    'trackout_qty': int(orow['TRACKOUT_QTY']),
+                    'ng_qty': int(orow['NG_QTY']),
+                }
+
         export_keys = get_export_api_keys('resource_history')
         headers = get_export_headers('resource_history')
         if not export_keys or not headers or len(export_keys) != len(headers):
@@ -503,7 +528,11 @@ def export_csv(
                 'family',
                 'resource',
                 'ou_pct',
+                'oee_pct',
                 'availability_pct',
+                'yield_pct',
+                'trackout_qty',
+                'ng_qty',
                 'prd_hours',
                 'prd_pct',
                 'sby_hours',
@@ -518,7 +547,8 @@ def export_csv(
                 'nst_pct',
             ]
             headers = [
-                '站點', '型號', '機台', 'OU%', 'Availability%',
+                '站點', '型號', '機台', 'OU%', 'OEE%', 'Availability%',
+                'Yield%', 'TRACKOUT_QTY', 'NG_QTY',
                 'PRD(h)', 'PRD(%)', 'SBY(h)', 'SBY(%)',
                 'UDT(h)', 'UDT(%)', 'SDT(h)', 'SDT(%)',
                 'EGT(h)', 'EGT(%)', 'NST(h)', 'NST(%)'
@@ -568,12 +598,24 @@ def export_csv(
                 egt_pct = round(egt / total * 100, 1) if total > 0 else 0
                 nst_pct = round(nst / total * 100, 1) if total > 0 else 0
 
+                # OEE fields from parallel query
+                oee_info = oee_by_equipment.get(historyid, {})
+                trackout_qty = oee_info.get('trackout_qty', 0)
+                ng_qty = oee_info.get('ng_qty', 0)
+                oee_denom = trackout_qty + ng_qty
+                yield_pct = round(trackout_qty / oee_denom * 100, 1) if oee_denom > 0 else 0
+                oee_pct = round(availability_pct * yield_pct / 100, 1)
+
                 value_map = {
                     'workcenter': wc_group,
                     'family': family,
                     'resource': resource_name,
                     'ou_pct': f"{ou_pct}%",
+                    'oee_pct': f"{oee_pct}%",
                     'availability_pct': f"{availability_pct}%",
+                    'yield_pct': f"{yield_pct}%",
+                    'trackout_qty': trackout_qty,
+                    'ng_qty': ng_qty,
                     'prd_hours': round(prd, 1),
                     'prd_pct': f"{prd_pct}%",
                     'sby_hours': round(sby, 1),

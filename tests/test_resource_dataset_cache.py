@@ -30,7 +30,9 @@ class TestResourceEngineDecomposition:
         monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
         monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", fake_merge_chunks_to_spool)
         monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _: False)
+        monkeypatch.setattr(cache_svc, "_has_cached_oee_df", lambda _: False)
         monkeypatch.setattr(cache_svc, "_store_df", lambda *a, **kw: None)
+        monkeypatch.setattr(cache_svc, "_store_oee_df", lambda *a, **kw: None)
         monkeypatch.setattr(cache_svc, "_load_sql", lambda name: "SELECT 1 FROM dual")
         monkeypatch.setattr(
             cache_svc,
@@ -62,8 +64,8 @@ class TestResourceEngineDecomposition:
             workcenter_groups=["WB"],
         )
 
-        assert engine_calls["execute"] == 1
-        assert engine_calls["merge"] == 1
+        assert engine_calls["execute"] == 2  # base + oee
+        assert engine_calls["merge"] == 2  # base + oee
         assert result["query_id"] is not None
 
     def test_short_range_skips_engine(self, monkeypatch):
@@ -71,6 +73,7 @@ class TestResourceEngineDecomposition:
         engine_calls = {"execute": 0}
 
         monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _: False)
+        monkeypatch.setattr(cache_svc, "_has_cached_oee_df", lambda _: False)
         monkeypatch.setattr(cache_svc, "_load_sql", lambda name: "SELECT 1 FROM dual")
         monkeypatch.setattr(
             cache_svc,
@@ -78,6 +81,7 @@ class TestResourceEngineDecomposition:
             lambda sql, params, caller=None: pd.DataFrame({"HISTORYID": [1]}),
         )
         monkeypatch.setattr(cache_svc, "_store_df", lambda *a, **kw: None)
+        monkeypatch.setattr(cache_svc, "_store_oee_df", lambda *a, **kw: None)
         monkeypatch.setattr(
             cache_svc,
             "_get_filtered_resources_and_lookup",
@@ -153,6 +157,7 @@ class TestResourceBootstrapFailureSemantics:
         # Force direct path regardless of BATCH_QUERY_TIME_THRESHOLD_DAYS env setting
         monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *a: False)
         monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _: False)
+        monkeypatch.setattr(cache_svc, "_has_cached_oee_df", lambda _: False)
         monkeypatch.setattr(cache_svc, "_load_sql", lambda name: "SELECT 1 FROM dual")
         monkeypatch.setattr(
             cache_svc,
@@ -170,6 +175,7 @@ class TestResourceBootstrapFailureSemantics:
                 lambda sql, params, caller=None: pd.DataFrame({"HISTORYID": [1]}),
             )
             monkeypatch.setattr(cache_svc, "_store_df", lambda *a, **kw: None)
+            monkeypatch.setattr(cache_svc, "_store_oee_df", lambda *a, **kw: None)
         else:
             monkeypatch.setattr(
                 cache_svc,
@@ -206,6 +212,7 @@ class TestResourceBootstrapFailureSemantics:
     def test_cache_hit_apply_view_none_raises(self, monkeypatch):
         """When spool exists (cache hit) but apply_view fails → RuntimeError."""
         monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _: True)
+        monkeypatch.setattr(cache_svc, "_has_cached_oee_df", lambda _: True)
         monkeypatch.setattr(cache_svc, "apply_view", lambda **kw: None)
         import pytest
         with pytest.raises(RuntimeError, match="bootstrap render failure"):

@@ -71,6 +71,10 @@ function buildKpiFromRow(row) {
   return {
     ou_pct: calcOuPct(prd, sby, udt, sdt, egt),
     availability_pct: calcAvailPct(prd, sby, udt, sdt, egt, nst),
+    oee_pct: null,
+    yield_pct: null,
+    trackout_qty: 0,
+    ng_qty: 0,
     prd_hours: Math.round(prd * 10) / 10,
     prd_pct: statusPct(prd, total),
     sby_hours: Math.round(sby * 10) / 10,
@@ -90,6 +94,8 @@ function buildKpiFromRow(row) {
 function emptyKpi() {
   return {
     ou_pct: 0, availability_pct: 0,
+    oee_pct: 0, yield_pct: 0,
+    trackout_qty: 0, ng_qty: 0,
     prd_hours: 0, prd_pct: 0,
     sby_hours: 0, sby_pct: 0,
     udt_hours: 0, udt_pct: 0,
@@ -146,6 +152,8 @@ async function queryTrend(client, granularity) {
       date: String(row.period || ''),
       ou_pct: calcOuPct(prd, sby, udt, sdt, egt),
       availability_pct: calcAvailPct(prd, sby, udt, sdt, egt, nst),
+      oee_pct: null,
+      yield_pct: null,
       prd_hours: Math.round(prd * 10) / 10,
       sby_hours: Math.round(sby * 10) / 10,
       udt_hours: Math.round(udt * 10) / 10,
@@ -209,7 +217,7 @@ function deriveHeatmap(heatmapRows, resourceMetadata) {
 
     const period = String(row.period || '');
     const key = `${wc}||${period}`;
-    if (!agg[key]) agg[key] = { wc, period, prd: 0, sby: 0, udt: 0, sdt: 0, egt: 0 };
+    if (!agg[key]) agg[key] = { wc, period, prd: 0, sby: 0, udt: 0, sdt: 0, egt: 0, nst: 0 };
     agg[key].prd += sf(row.prd_hours);
     agg[key].sby += sf(row.sby_hours);
     agg[key].udt += sf(row.udt_hours);
@@ -222,6 +230,8 @@ function deriveHeatmap(heatmapRows, resourceMetadata) {
     workcenter_seq: wcSeqMap[a.wc] ?? 999,
     date: a.period,
     ou_pct: calcOuPct(a.prd, a.sby, a.udt, a.sdt, a.egt),
+    oee_pct: null,
+    availability_pct: calcAvailPct(a.prd, a.sby, a.udt, a.sdt, a.egt, a.nst),
   }));
 
   items.sort((a, b) =>
@@ -272,7 +282,11 @@ function deriveDetail(byHistoryRows, resourceMetadata) {
       family: meta.family || '',
       resource: meta.resource || '',
       ou_pct: calcOuPct(prd, sby, udt, sdt, egt),
+      oee_pct: null,
       availability_pct: calcAvailPct(prd, sby, udt, sdt, egt, nst),
+      yield_pct: null,
+      trackout_qty: 0,
+      ng_qty: 0,
       prd_hours: Math.round(prd * 10) / 10,
       prd_pct: statusPct(prd, total),
       sby_hours: Math.round(sby * 10) / 10,

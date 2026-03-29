@@ -176,28 +176,34 @@ def get_jobs_by_resources(
         from mes_dashboard.services.batch_query_engine import (
             decompose_by_time_range,
             execute_plan,
-            merge_chunks,
+            merge_chunks_to_spool,
             compute_query_hash,
             should_decompose_by_time,
         )
-        from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
+        from mes_dashboard.core.query_spool_store import (
+            QUERY_SPOOL_DIR,
+            get_spool_file_path,
+            read_spool_records,
+            register_spool_file,
+        )
 
-        # Check Redis cache first
+        _SPOOL_NS = "job_query"
+
         cache_hash = compute_query_hash({
             "resource_ids": sorted(resource_ids),
             "start_date": start_date,
             "end_date": end_date,
         })
-        cache_key = f"job_query:{cache_hash}"
-        cached_df = redis_load_df(cache_key)
-        if cached_df is not None:
-            logger.info("Job query cache hit (hash=%s)", cache_hash)
-            df = cached_df
+
+        # Check spool cache first
+        cached_records = read_spool_records(_SPOOL_NS, cache_hash)
+        if cached_records is not None:
+            logger.info("Job query spool hit (hash=%s)", cache_hash)
+            data = cached_records
         elif should_decompose_by_time(start_date, end_date):
-            # --- Engine path for long date ranges ---
+            # --- Engine path for long date ranges → stream to spool ---
             engine_chunks = decompose_by_time_range(start_date, end_date)
 
-            # Build resource filter once (reused across all chunks)
             resource_filter, resource_params = _build_resource_filter_sql(
                 resource_ids, return_params=True
             )
@@ -223,10 +229,15 @@ def get_jobs_by_resources(
                 cache_prefix="job",
                 chunk_ttl=_JOB_CACHE_TTL,
             )
-            df = merge_chunks("job", cache_hash)
-            # Store merged result for fast re-access
-            if not df.empty:
-                redis_store_df(cache_key, df, ttl=_JOB_CACHE_TTL)
+            spool_tmp_path, spool_row_count = merge_chunks_to_spool(
+                "job", cache_hash, spool_dir=QUERY_SPOOL_DIR,
+            )
+            if spool_tmp_path is not None:
+                register_spool_file(
+                    _SPOOL_NS, cache_hash, spool_tmp_path,
+                    spool_row_count, ttl_seconds=_JOB_CACHE_TTL,
+                )
+            data = read_spool_records(_SPOOL_NS, cache_hash) or []
         else:
             # --- Direct path (short query) ---
             resource_filter, resource_params = _build_resource_filter_sql(
@@ -242,23 +253,23 @@ def get_jobs_by_resources(
             df = read_sql_df(sql, params)
             if df is None:
                 df = pd.DataFrame()
-            # Cache the result
+            # Store to spool for cache
             if not df.empty:
-                redis_store_df(cache_key, df, ttl=_JOB_CACHE_TTL)
-
-        # Convert to records
-        data = []
-        for _, row in df.iterrows():
-            record = {}
-            for col in df.columns:
-                value = row[col]
-                if pd.isna(value):
-                    record[col] = None
-                elif isinstance(value, datetime):
-                    record[col] = value.strftime('%Y-%m-%d %H:%M:%S')
-                else:
-                    record[col] = value
-            data.append(record)
+                from mes_dashboard.core.query_spool_store import store_spooled_df
+                store_spooled_df(_SPOOL_NS, cache_hash, df, ttl_seconds=_JOB_CACHE_TTL)
+            # Convert to records
+            data = []
+            for _, row in df.iterrows():
+                record = {}
+                for col in df.columns:
+                    value = row[col]
+                    if pd.isna(value):
+                        record[col] = None
+                    elif isinstance(value, datetime):
+                        record[col] = value.strftime('%Y-%m-%d %H:%M:%S')
+                    else:
+                        record[col] = value
+                data.append(record)
 
         logger.info(f"Job query returned {len(data)} records for {len(resource_ids)} resources")
 

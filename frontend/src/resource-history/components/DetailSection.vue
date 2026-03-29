@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 
-import { buildResourceKpiFromHours } from '../../core/compute.js';
+import { buildResourceKpiFromHours, calcYieldPct, calcOeePct } from '../../core/compute.js';
 import HierarchyTable from '../../resource-shared/components/HierarchyTable.vue';
 
 const props = defineProps({
@@ -33,6 +33,8 @@ function createHourBucket() {
     sdt_hours: 0,
     egt_hours: 0,
     nst_hours: 0,
+    trackout_qty: 0,
+    ng_qty: 0,
     machine_count: 0,
   };
 }
@@ -44,6 +46,8 @@ function mergeHours(target, source) {
   target.sdt_hours += Number(source.sdt_hours || 0);
   target.egt_hours += Number(source.egt_hours || 0);
   target.nst_hours += Number(source.nst_hours || 0);
+  target.trackout_qty += Number(source.trackout_qty || 0);
+  target.ng_qty += Number(source.ng_qty || 0);
   target.machine_count += Number(source.machine_count || 1);
 }
 
@@ -102,6 +106,8 @@ function buildHierarchy(data) {
       sdt_hours: Number(item.sdt_hours || 0),
       egt_hours: Number(item.egt_hours || 0),
       nst_hours: Number(item.nst_hours || 0),
+      trackout_qty: Number(item.trackout_qty || 0),
+      ng_qty: Number(item.ng_qty || 0),
       machine_count: Number(item.machine_count || 1),
     });
 
@@ -156,6 +162,17 @@ const columns = computed(() => {
       key: 'ou',
       label: 'OU%',
       value: (node) => `${Number(node.metrics?.ou_pct || 0).toFixed(1)}%`,
+      className: 'col-total',
+    },
+    {
+      key: 'oee',
+      label: 'OEE%',
+      value: (node) => {
+        const t = Number(node.metrics?.trackout_qty || 0);
+        const n = Number(node.metrics?.ng_qty || 0);
+        if (t + n === 0) return '—';
+        return `${Number(node.metrics?.oee_pct || 0).toFixed(1)}%`;
+      },
       className: 'col-total',
     },
     {

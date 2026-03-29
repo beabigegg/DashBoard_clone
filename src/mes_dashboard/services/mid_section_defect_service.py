@@ -1261,41 +1261,64 @@ def _fetch_station_detection_data(
         from mes_dashboard.services.batch_query_engine import (
             decompose_by_time_range,
             execute_plan,
-            merge_chunks,
+            merge_chunks_to_spool,
             compute_query_hash,
             should_decompose_by_time,
         )
+        from mes_dashboard.core.query_spool_store import (
+            QUERY_SPOOL_DIR,
+            load_spooled_df,
+            register_spool_file,
+        )
+
+        _SPOOL_NS = "msd_detect"
 
         if should_decompose_by_time(start_date, end_date):
-            # --- Engine path for long date ranges ---
-            engine_chunks = decompose_by_time_range(start_date, end_date)
+            # --- Engine path for long date ranges → stream to spool ---
             engine_hash = compute_query_hash({
                 "station": station,
                 "start_date": start_date,
                 "end_date": end_date,
             })
 
-            def _run_detection_chunk(chunk, max_rows_per_chunk=None):
-                chunk_params = {
-                    'start_date': chunk['chunk_start'],
-                    'end_date': chunk['chunk_end'],
-                    **wip_params,
-                    **rej_params,
-                }
-                result = read_sql_df(sql, chunk_params)
-                return result if result is not None else pd.DataFrame()
+            # Check spool cache before re-executing
+            df = load_spooled_df(_SPOOL_NS, engine_hash)
+            if df is not None:
+                logger.info("Detection spool hit (hash=%s)", engine_hash)
+            else:
+                engine_chunks = decompose_by_time_range(start_date, end_date)
 
-            logger.info(
-                "Engine activated for detection (%s): %d chunks",
-                station, len(engine_chunks),
-            )
-            execute_plan(
-                engine_chunks, _run_detection_chunk,
-                query_hash=engine_hash,
-                cache_prefix="msd_detect",
-                chunk_ttl=CACHE_TTL_DETECTION,
-            )
-            df = merge_chunks("msd_detect", engine_hash)
+                def _run_detection_chunk(chunk, max_rows_per_chunk=None):
+                    chunk_params = {
+                        'start_date': chunk['chunk_start'],
+                        'end_date': chunk['chunk_end'],
+                        **wip_params,
+                        **rej_params,
+                    }
+                    result = read_sql_df(sql, chunk_params)
+                    return result if result is not None else pd.DataFrame()
+
+                logger.info(
+                    "Engine activated for detection (%s): %d chunks",
+                    station, len(engine_chunks),
+                )
+                execute_plan(
+                    engine_chunks, _run_detection_chunk,
+                    query_hash=engine_hash,
+                    cache_prefix="msd_detect",
+                    chunk_ttl=CACHE_TTL_DETECTION,
+                )
+                spool_tmp_path, spool_row_count = merge_chunks_to_spool(
+                    "msd_detect", engine_hash, spool_dir=QUERY_SPOOL_DIR,
+                )
+                if spool_tmp_path is not None:
+                    register_spool_file(
+                        _SPOOL_NS, engine_hash, spool_tmp_path,
+                        spool_row_count, ttl_seconds=CACHE_TTL_DETECTION,
+                    )
+                df = load_spooled_df(_SPOOL_NS, engine_hash)
+                if df is None:
+                    df = pd.DataFrame()
         else:
             # --- Direct path (short query) ---
             bind_params = {
@@ -1315,7 +1338,9 @@ def _fetch_station_detection_data(
             len(df),
             df['CONTAINERID'].nunique() if not df.empty else 0,
         )
-        cache_set(cache_key, df.to_dict('records'), ttl=CACHE_TTL_DETECTION)
+        # Only cache records in Redis for direct path; engine path uses spool
+        if not should_decompose_by_time(start_date, end_date):
+            cache_set(cache_key, df.to_dict('records'), ttl=CACHE_TTL_DETECTION)
         return df
     except Exception as exc:
         logger.error("Station detection query failed (station=%s): %s", station, exc, exc_info=True)

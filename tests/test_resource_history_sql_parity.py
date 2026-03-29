@@ -86,6 +86,7 @@ def _run_duckdb_view(parquet_path: str, granularity: str = "day") -> Dict[str, A
     import duckdb
     from mes_dashboard.services.resource_history_sql_runtime import (
         _attach_spool_view,
+        _attach_empty_oee_view,
         _build_resource_lookup_table,
         _query_kpi,
         _query_trend,
@@ -97,6 +98,7 @@ def _run_duckdb_view(parquet_path: str, granularity: str = "day") -> Dict[str, A
     conn = duckdb.connect(database=":memory:")
     try:
         _attach_spool_view(conn, parquet_path)
+        _attach_empty_oee_view(conn)
         _build_resource_lookup_table(conn, _RESOURCE_LOOKUP, _WC_MAPPING)
 
         return {
