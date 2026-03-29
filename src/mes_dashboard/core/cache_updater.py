@@ -61,6 +61,7 @@ class CacheUpdater:
         self._is_running = False
         self._last_resource_sync: Optional[float] = None
         self._last_filter_cache_sync: Optional[float] = None
+        self._legacy_json_cleaned: bool = False
 
     def start(self) -> None:
         """Start the background update thread."""
@@ -259,45 +260,37 @@ class CacheUpdater:
         if client is None:
             return False
 
-        staging_key: str | None = None
         try:
             ttl_seconds = self._resolve_cache_ttl_seconds()
-            # Convert DataFrame to JSON
-            # Handle datetime columns
+            # Handle datetime columns before serialization
             df_copy = df.copy()
             for col in df_copy.select_dtypes(include=['datetime64']).columns:
                 df_copy[col] = df_copy[col].astype(str)
 
-            data_json = df_copy.to_json(orient='records', force_ascii=False)
+            # One-time cleanup of legacy JSON key left from previous deployments
+            if not self._legacy_json_cleaned:
+                legacy_key = get_key("data")
+                if client.exists(legacy_key):
+                    client.delete(legacy_key)
+                    logger.info("Deleted legacy WIP JSON key '%s'", legacy_key)
+                self._legacy_json_cleaned = True
 
-            # Stage payload first, then atomically publish live key + metadata.
             now = datetime.now().isoformat()
-            unique_suffix = f"{int(time.time() * 1000)}:{threading.get_ident()}"
-            staging_key = get_key(f"data:staging:{unique_suffix}")
 
+            # Write metadata keys
             pipe = client.pipeline()
-            pipe.set(staging_key, data_json, ex=ttl_seconds)
-            pipe.rename(staging_key, get_key("data"))
             pipe.set(get_key("meta:sys_date"), sys_date, ex=ttl_seconds)
             pipe.set(get_key("meta:updated_at"), now, ex=ttl_seconds)
             pipe.execute()
 
-            # Dual-key: also store as Parquet for faster deserialization
-            try:
-                from mes_dashboard.core.redis_df_store import redis_store_df
-                redis_store_df(get_key("data:parquet"), df_copy, ttl=ttl_seconds)
-                logger.debug("WIP Parquet cache updated alongside JSON")
-            except Exception as parquet_exc:
-                logger.warning("WIP Parquet cache write failed (JSON still valid): %s", parquet_exc)
+            # Store as Parquet (primary representation)
+            from mes_dashboard.core.redis_df_store import redis_store_df
+            redis_store_df(get_key("data:parquet"), df_copy, ttl=ttl_seconds)
+            logger.debug("WIP Parquet cache updated")
 
             return True
         except Exception as e:
             logger.error(f"Failed to update Redis cache: {e}")
-            if staging_key:
-                try:
-                    client.delete(staging_key)
-                except Exception:
-                    pass
             return False
 
     def _resolve_cache_ttl_seconds(self) -> int:

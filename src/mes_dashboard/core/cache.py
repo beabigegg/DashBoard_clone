@@ -432,10 +432,10 @@ def get_cached_wip_data() -> Optional[pd.DataFrame]:
     """Get cached WIP data from Redis with process-level caching.
 
     Uses a two-tier cache strategy:
-    1. Process-level cache: Parsed DataFrame (30s TTL) - fast, no parsing
-    2. Redis cache: Raw JSON data - shared across workers
+    1. Process-level cache: Parsed DataFrame (30s TTL) - fast, no deserialization
+    2. Redis cache: Parquet data - shared across workers
 
-    This prevents redundant JSON parsing of 14+ MB data across
+    This prevents redundant Parquet deserialization of 14+ MB data across
     concurrent requests, significantly improving response times.
 
     Returns:
@@ -466,9 +466,9 @@ def get_cached_wip_data() -> Optional[pd.DataFrame]:
         try:
             start_time = time.time()
             parsed_df = None
-            source = "json"
+            source = "parquet"
 
-            # Try Parquet first (faster deserialization)
+            # Load from Parquet (primary representation)
             try:
                 from mes_dashboard.core.redis_df_store import redis_load_df
                 parsed_df = redis_load_df(get_key("data:parquet"))
@@ -477,13 +477,9 @@ def get_cached_wip_data() -> Optional[pd.DataFrame]:
             except Exception:
                 pass
 
-            # Fallback to JSON
             if parsed_df is None:
-                data_json = client.get(get_key("data"))
-                if data_json is None:
-                    logger.debug("Cache miss: no data in Redis")
-                    return None
-                parsed_df = pd.read_json(io.StringIO(data_json), orient='records')
+                logger.debug("Cache miss: no data in Redis")
+                return None
 
             _wip_df_cache.set(cache_key, parsed_df)
             parse_time = time.time() - start_time

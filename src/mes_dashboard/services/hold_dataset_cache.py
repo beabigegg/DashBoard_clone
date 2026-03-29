@@ -43,7 +43,7 @@ logger = logging.getLogger("mes_dashboard.hold_dataset_cache")
 
 from mes_dashboard.config.constants import CACHE_TTL_DATASET
 _CACHE_TTL = CACHE_TTL_DATASET
-_CACHE_MAX_SIZE = 3
+_CACHE_MAX_SIZE = 1
 _REDIS_NAMESPACE = "hold_dataset"
 _DEFAULT_DETAIL_PER_PAGE = 20
 

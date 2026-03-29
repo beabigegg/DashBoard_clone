@@ -153,7 +153,7 @@ class TestUpdateRedisCache:
     """Test Redis cache update logic."""
 
     def test_update_redis_cache_success(self):
-        """Test _update_redis_cache updates cache correctly."""
+        """Test _update_redis_cache updates cache correctly (Parquet-only path)."""
         import mes_dashboard.core.cache_updater as cu
 
         mock_client = MagicMock()
@@ -167,15 +167,20 @@ class TestUpdateRedisCache:
 
         with patch.object(cu, 'get_redis_client', return_value=mock_client):
             with patch.object(cu, 'get_key', side_effect=lambda k: f'mes_wip:{k}'):
-                updater = cu.CacheUpdater()
-                result = updater._update_redis_cache(test_df, '2024-01-15 10:30:00')
+                with patch('mes_dashboard.core.redis_df_store.redis_store_df') as mock_store:
+                    updater = cu.CacheUpdater()
+                    result = updater._update_redis_cache(test_df, '2024-01-15 10:30:00')
 
-                assert result is True
-                mock_pipeline.rename.assert_called_once()
-                mock_pipeline.execute.assert_called_once()
-                assert mock_pipeline.set.call_count == 3
-                for call in mock_pipeline.set.call_args_list:
-                    assert call.kwargs.get("ex") == updater.interval * 3
+                    assert result is True
+                    mock_pipeline.execute.assert_called_once()
+                    # Two metadata keys written via pipeline: meta:sys_date, meta:updated_at
+                    assert mock_pipeline.set.call_count == 2
+                    for call in mock_pipeline.set.call_args_list:
+                        assert call.kwargs.get("ex") == updater.interval * 3
+                    # Parquet write called with correct TTL
+                    mock_store.assert_called_once()
+                    _, store_kwargs = mock_store.call_args
+                    assert store_kwargs.get("ttl") == updater.interval * 3
 
     def test_update_redis_cache_no_client(self):
         """Test _update_redis_cache handles no client."""
@@ -188,8 +193,8 @@ class TestUpdateRedisCache:
             result = updater._update_redis_cache(test_df, '2024-01-15')
             assert result is False
 
-    def test_update_redis_cache_cleans_staging_key_on_failure(self):
-        """Failed publish should clean staged key and keep function safe."""
+    def test_update_redis_cache_returns_false_on_pipeline_failure(self):
+        """Failed pipeline execute should return False gracefully."""
         import mes_dashboard.core.cache_updater as cu
 
         mock_client = MagicMock()
@@ -205,12 +210,9 @@ class TestUpdateRedisCache:
                 result = updater._update_redis_cache(test_df, '2024-01-15 10:30:00')
 
         assert result is False
-        mock_client.delete.assert_called_once()
-        staged_key = mock_client.delete.call_args.args[0]
-        assert "staging" in staged_key
 
     def test_update_redis_cache_ttl_override(self):
-        """Configured TTL override should apply to all Redis keys."""
+        """Configured TTL override should apply to metadata keys and Parquet write."""
         import mes_dashboard.core.cache_updater as cu
 
         mock_client = MagicMock()
@@ -221,13 +223,19 @@ class TestUpdateRedisCache:
         with patch.object(cu, 'WIP_CACHE_TTL_SECONDS', 42):
             with patch.object(cu, 'get_redis_client', return_value=mock_client):
                 with patch.object(cu, 'get_key', side_effect=lambda k: f'mes_wip:{k}'):
-                    updater = cu.CacheUpdater(interval=600)
-                    result = updater._update_redis_cache(test_df, '2024-01-15 10:30:00')
+                    with patch('mes_dashboard.core.redis_df_store.redis_store_df') as mock_store:
+                        updater = cu.CacheUpdater(interval=600)
+                        result = updater._update_redis_cache(test_df, '2024-01-15 10:30:00')
 
         assert result is True
-        assert mock_pipeline.set.call_count == 3
+        # Two metadata keys: meta:sys_date, meta:updated_at
+        assert mock_pipeline.set.call_count == 2
         for call in mock_pipeline.set.call_args_list:
             assert call.kwargs.get("ex") == 42
+        # Parquet write gets TTL=42
+        mock_store.assert_called_once()
+        _, store_kwargs = mock_store.call_args
+        assert store_kwargs.get("ttl") == 42
 
 
 class TestCacheUpdateFlow:

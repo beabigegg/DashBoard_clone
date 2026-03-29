@@ -34,7 +34,7 @@ logger = logging.getLogger("mes_dashboard.resource_dataset_cache")
 
 from mes_dashboard.config.constants import CACHE_TTL_DATASET
 _CACHE_TTL = CACHE_TTL_DATASET
-_CACHE_MAX_SIZE = 3
+_CACHE_MAX_SIZE = 1
 _REDIS_NAMESPACE = "resource_dataset"
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)

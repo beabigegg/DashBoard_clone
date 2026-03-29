@@ -58,7 +58,7 @@ from mes_dashboard.services.yield_alert_service import (
 logger = logging.getLogger("mes_dashboard.yield_alert_dataset_cache")
 
 _CACHE_TTL = max(30, int(os.getenv("YIELD_ALERT_CACHE_TTL_SECONDS", "300")))
-_CACHE_MAX_SIZE = max(1, int(os.getenv("YIELD_ALERT_DATASET_CACHE_MAX_SIZE", "2")))
+_CACHE_MAX_SIZE = max(1, int(os.getenv("YIELD_ALERT_DATASET_CACHE_MAX_SIZE", "1")))
 _REDIS_NAMESPACE = "yield_alert_dataset"
 _CACHE_SCHEMA_VERSION = 4
 _SPOOL_NAMESPACE = "yield_alert_dataset"

@@ -58,28 +58,27 @@ class TestGetCachedWipData:
                 assert result is None
 
     def test_returns_dataframe_from_cache(self, reset_redis):
-        """Test returns DataFrame when cache hit."""
+        """Test returns DataFrame when cache hit (Parquet path)."""
         import mes_dashboard.core.cache as cache
 
-        # Create test data as JSON string (what Redis returns with decode_responses=True)
         test_data = [
             {'LOTID': 'LOT001', 'QTY': 100, 'WORKORDER': 'WO001'},
             {'LOTID': 'LOT002', 'QTY': 200, 'WORKORDER': 'WO002'}
         ]
-        cached_json = json.dumps(test_data)
+        expected_df = pd.DataFrame(test_data)
 
         mock_client = MagicMock()
-        mock_client.get.return_value = cached_json  # String, not bytes
 
         with patch.object(cache, 'REDIS_ENABLED', True):
             with patch.object(cache, 'get_redis_client', return_value=mock_client):
-                with patch.object(cache, 'get_key', return_value='mes_wip:data'):
-                    result = cache.get_cached_wip_data()
+                with patch.object(cache, 'get_key', return_value='mes_wip:data:parquet'):
+                    with patch('mes_dashboard.core.redis_df_store.redis_load_df', return_value=expected_df):
+                        result = cache.get_cached_wip_data()
 
-                    assert result is not None
-                    assert isinstance(result, pd.DataFrame)
-                    assert len(result) == 2
-                    assert 'LOTID' in result.columns
+                        assert result is not None
+                        assert isinstance(result, pd.DataFrame)
+                        assert len(result) == 2
+                        assert 'LOTID' in result.columns
 
     def test_handles_invalid_json(self, reset_redis):
         """Test handles invalid JSON gracefully."""
@@ -95,25 +94,23 @@ class TestGetCachedWipData:
                     assert result is None
 
     def test_concurrent_requests_parse_redis_once(self, reset_redis):
-        """Concurrent misses should trigger Redis parse exactly once."""
+        """Concurrent misses should trigger Redis Parquet load exactly once."""
         import mes_dashboard.core.cache as cache
 
         test_data = [
             {'LOTID': 'LOT001', 'QTY': 100, 'WORKORDER': 'WO001'},
             {'LOTID': 'LOT002', 'QTY': 200, 'WORKORDER': 'WO002'}
         ]
-        cached_json = json.dumps(test_data)
 
         mock_client = MagicMock()
-        mock_client.get.return_value = cached_json
 
-        parse_count_lock = threading.Lock()
-        parse_count = 0
+        load_count_lock = threading.Lock()
+        load_count = 0
 
-        def slow_read_json(*args, **kwargs):
-            nonlocal parse_count
-            with parse_count_lock:
-                parse_count += 1
+        def slow_load_df(*args, **kwargs):
+            nonlocal load_count
+            with load_count_lock:
+                load_count += 1
             time.sleep(0.05)
             return pd.DataFrame(test_data)
 
@@ -125,15 +122,14 @@ class TestGetCachedWipData:
 
         with patch.object(cache, 'REDIS_ENABLED', True):
             with patch.object(cache, 'get_redis_client', return_value=mock_client):
-                with patch.object(cache, 'get_key', return_value='mes_wip:data'):
-                    with patch.object(cache.pd, 'read_json', side_effect=slow_read_json):
+                with patch.object(cache, 'get_key', return_value='mes_wip:data:parquet'):
+                    with patch('mes_dashboard.core.redis_df_store.redis_load_df', side_effect=slow_load_df):
                         with ThreadPoolExecutor(max_workers=6) as pool:
                             futures = [pool.submit(call_cache) for _ in range(6)]
                             start_event.set()
                             results = [future.result(timeout=3) for future in futures]
 
-        assert parse_count == 1
-        assert mock_client.get.call_count == 1
+        assert load_count == 1
         assert all(result is not None for result in results)
         assert all(len(result) == 2 for result in results)
 
@@ -426,7 +422,7 @@ class TestProcessLevelCache:
             yield_alert_dataset_cache,
         )
 
-        assert hold_dataset_cache._dataset_cache.max_size == 3
-        assert resource_dataset_cache._dataset_cache.max_size == 3
-        assert reject_dataset_cache._dataset_cache.max_size == 3
-        assert yield_alert_dataset_cache._dataset_cache.max_size == 2
+        assert hold_dataset_cache._dataset_cache.max_size == 1
+        assert resource_dataset_cache._dataset_cache.max_size == 1
+        assert reject_dataset_cache._dataset_cache.max_size == 1
+        assert yield_alert_dataset_cache._dataset_cache.max_size == 1

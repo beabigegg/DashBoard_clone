@@ -329,6 +329,87 @@ def _query_mysql_logs(
         return []
 
 
+def _collect_spool_disk_usage() -> list:
+    """Scan spool directory and return per-namespace disk usage stats."""
+    try:
+        from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR
+        spool_root = Path(QUERY_SPOOL_DIR).resolve()
+    except Exception as exc:
+        return [{"namespace": "__root__", "error": str(exc)}]
+
+    if not spool_root.exists():
+        return []
+
+    result = []
+    try:
+        entries = list(os.scandir(spool_root))
+    except OSError as exc:
+        return [{"namespace": "__root__", "error": str(exc)}]
+
+    for entry in entries:
+        if not entry.is_dir():
+            continue
+        ns = entry.name
+        try:
+            file_count = 0
+            total_bytes = 0
+            for item in os.scandir(entry.path):
+                if item.is_file(follow_symlinks=False):
+                    file_count += 1
+                    total_bytes += item.stat().st_size
+            result.append({"namespace": ns, "file_count": file_count, "total_bytes": total_bytes})
+        except OSError as exc:
+            result.append({"namespace": ns, "error": str(exc)})
+
+    return result
+
+
+def _collect_redis_namespace_memory(client) -> list:
+    """Sample Redis MEMORY USAGE for representative keys per namespace."""
+    key_prefix = None
+    try:
+        from mes_dashboard.core.redis_client import REDIS_KEY_PREFIX
+        key_prefix = REDIS_KEY_PREFIX
+    except Exception:
+        key_prefix = "mes"
+
+    namespaces = [
+        ("mes_wip", f"{key_prefix}:data:parquet"),
+        ("resource", f"{key_prefix}:resource:data"),
+        ("equipment", f"{key_prefix}:equipment_status:data"),
+        ("reject_dataset", f"{key_prefix}:reject_dataset:*"),
+        ("hold_dataset", f"{key_prefix}:hold_dataset:*"),
+        ("yield_alert", f"{key_prefix}:yield_alert_dataset:*"),
+    ]
+
+    result = []
+    for ns_name, pattern in namespaces:
+        try:
+            # Find a representative key
+            if pattern.endswith(":*"):
+                base = pattern[:-2]
+                cursor, keys = client.scan(cursor=0, match=pattern, count=5)
+                sample_key = keys[0] if keys else None
+            else:
+                sample_key = pattern if client.exists(pattern) else None
+
+            if sample_key is None:
+                result.append({"namespace": ns_name, "sample_key": None, "estimated_bytes": None})
+                continue
+
+            # MEMORY USAGE with timeout protection via socket timeout already on client
+            mem = client.execute_command("MEMORY", "USAGE", sample_key, "SAMPLES", "0")
+            result.append({
+                "namespace": ns_name,
+                "sample_key": sample_key,
+                "estimated_bytes": mem,
+            })
+        except Exception as exc:
+            result.append({"namespace": ns_name, "error": str(exc)})
+
+    return result
+
+
 @admin_bp.route("/api/performance-detail", methods=["GET"])
 @admin_required
 def api_performance_detail():
@@ -465,6 +546,20 @@ def api_performance_detail():
         logger.warning("Failed to collect RQ monitor telemetry: %s", exc)
         async_workers = {"error": str(exc)}
 
+    # ---- Spool disk usage ----
+    spool_disk_usage = _collect_spool_disk_usage()
+
+    # ---- Redis per-namespace memory estimate ----
+    redis_namespace_memory = None
+    if REDIS_ENABLED:
+        client_for_mem = get_redis_client()
+        if client_for_mem is not None:
+            try:
+                redis_namespace_memory = _collect_redis_namespace_memory(client_for_mem)
+            except Exception as exc:
+                logger.warning("Failed to collect Redis namespace memory: %s", exc)
+                redis_namespace_memory = [{"error": str(exc)}]
+
     return success_response({
         "redis": redis_detail,
         "process_caches": process_caches,
@@ -475,6 +570,8 @@ def api_performance_detail():
         "worker_memory_guard": worker_memory_guard,
         "heavy_query_telemetry": heavy_query_telemetry,
         "async_workers": async_workers,
+        "spool_disk_usage": spool_disk_usage,
+        "redis_namespace_memory": redis_namespace_memory,
     })
 
 

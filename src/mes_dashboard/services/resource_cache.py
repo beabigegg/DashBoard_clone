@@ -582,13 +582,13 @@ def _sync_to_redis(df: pd.DataFrame, version: str) -> bool:
 
         data_json = df_copy.to_json(orient='records', force_ascii=False)
 
-        # Atomic update using pipeline
+        # Atomic update using pipeline (EX 300: expire after 5 min if updater stops)
         now = datetime.now().isoformat()
         pipe = client.pipeline()
-        pipe.set(_get_key("data"), data_json)
-        pipe.set(_get_key("meta:version"), version)
-        pipe.set(_get_key("meta:updated"), now)
-        pipe.set(_get_key("meta:count"), str(len(df)))
+        pipe.set(_get_key("data"), data_json, ex=300)
+        pipe.set(_get_key("meta:version"), version, ex=300)
+        pipe.set(_get_key("meta:updated"), now, ex=300)
+        pipe.set(_get_key("meta:count"), str(len(df)), ex=300)
         pipe.execute()
 
         # Invalidate process-level cache so next request picks up new data
