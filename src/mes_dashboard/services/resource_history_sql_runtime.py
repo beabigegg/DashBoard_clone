@@ -286,6 +286,8 @@ def _query_trend(conn: Any, *, granularity: str) -> List[Dict[str, Any]]:
             "availability_pct": availability_pct,
             "oee_pct": oee_pct,
             "yield_pct": yield_pct,
+            "trackout_qty": trackout_qty,
+            "ng_qty": ng_qty,
             "prd_hours": round(prd, 1),
             "sby_hours": round(sby, 1),
             "udt_hours": round(udt, 1),
