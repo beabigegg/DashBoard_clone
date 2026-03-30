@@ -173,7 +173,7 @@ def test_read_sql_df_warning_includes_caller_tag():
          patch("mes_dashboard.core.metrics.record_query_latency"), \
          patch.object(db, "get_engine", return_value=engine), \
          patch.object(db.pd, "read_sql", return_value=pd.DataFrame({"A": [1]})), \
-         patch("mes_dashboard.core.database.time.time", side_effect=[100.0, 102.2]), \
+         patch("mes_dashboard.core.database.time.time", side_effect=[100.0, 103.5]), \
          patch("mes_dashboard.core.database.logger.warning") as mock_warning:
         db.read_sql_df("SELECT 1", {"p0": "x"}, caller="read_sql_df_test")
 

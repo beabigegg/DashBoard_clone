@@ -162,7 +162,10 @@ def _seed_spool(source_ns: str, anomaly_ns: str, lookback_days: int) -> bool:
                 logger.warning("Unknown source namespace: %s", source_ns)
                 return False
         except Exception as exc:
-            logger.error("Spool seed Oracle query failed for %s: %s", source_ns, exc)
+            if "single_flight_timeout" in str(exc):
+                logger.warning("Spool seed contention for %s (expected during startup): %s", source_ns, exc)
+            else:
+                logger.error("Spool seed Oracle query failed for %s: %s", source_ns, exc)
             return False
 
     # Step 2: Copy source spool to isolated anomaly namespace

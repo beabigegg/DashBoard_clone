@@ -1,3 +1,6 @@
+## Purpose
+Defines observability requirements for slow query detection, logging, and metrics in the MES Dashboard database layer.
+## Requirements
 ### Requirement: Slow query active count in metrics history snapshots
 The `MetricsHistoryCollector` SHALL include `slow_query_active` in each 30-second snapshot, recording the number of slow queries currently executing via dedicated connections.
 
@@ -60,3 +63,22 @@ The `read_sql_df()` and `read_sql_df_slow()` slow query warning logs SHALL inclu
 #### Scenario: Caller tag on slow path
 - **WHEN** `read_sql_df_slow(sql, params, caller="msd_detection")` completes
 - **THEN** the log SHALL include the caller tag in both the slow warning and the debug completion message
+
+### Requirement: Per-query slow warning threshold
+
+The fast-query path in `database.read_sql_df` SHALL log a WARNING when query elapsed time exceeds **3.0 seconds** (changed from 1.0s).
+
+This threshold applies only to the `read_sql_df` per-query debug log line. The `metrics.py` SLOW_QUERY_THRESHOLD (env-configurable, used for operational alerting) is unaffected.
+
+#### Scenario: Query under 3s does not trigger warning
+- **WHEN** a `read_sql_df` query completes in 2.5s
+- **THEN** no slow query WARNING is logged by `database.py`
+
+#### Scenario: Query over 3s triggers warning
+- **WHEN** a `read_sql_df` query completes in 4.0s
+- **THEN** a slow query WARNING is logged with caller name, elapsed time, and SQL preview
+
+#### Scenario: realtime_equipment_cache periodic refresh
+- **WHEN** `realtime_equipment_cache` refresh query completes in ~2.0s (typical)
+- **THEN** no slow query WARNING is logged (below 3.0s threshold)
+

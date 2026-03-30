@@ -91,7 +91,10 @@ class CacheUpdater:
         self._stop_event.set()
         self._thread.join(timeout=5)
         self._is_running = False
-        logger.info("Cache updater stopped")
+        if self._thread.is_alive():
+            logger.warning("Cache updater did not stop within 5s, proceeding with disposal")
+        else:
+            logger.info("Cache updater stopped")
 
     def is_running(self) -> bool:
         """Check if the updater is running."""

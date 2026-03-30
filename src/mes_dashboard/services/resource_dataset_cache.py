@@ -101,6 +101,30 @@ def _store_oee_df(query_id: str, df: pd.DataFrame) -> None:
 # ============================================================
 
 
+def _get_resource_lookup() -> Dict[str, Dict[str, Any]]:
+    """Thin wrapper: returns full resource lookup dict {historyid: info}.
+
+    Delegates to resource_history_service to keep the canonical logic in one place.
+    Imported by resource_history_sql_runtime and resource_history_routes.
+    """
+    from mes_dashboard.services.resource_history_service import (
+        _get_filtered_resources,
+        _build_resource_lookup,
+    )
+    resources = _get_filtered_resources()
+    return _build_resource_lookup(resources)
+
+
+def _get_workcenter_mapping() -> Optional[Dict[str, Dict[str, Any]]]:
+    """Thin wrapper: returns workcenter mapping {workcentername: {group, sequence}}.
+
+    Re-exports filter_cache.get_workcenter_mapping() so consumers can import
+    from a single module.
+    """
+    from mes_dashboard.services.filter_cache import get_workcenter_mapping
+    return get_workcenter_mapping()
+
+
 def _get_filtered_resources_and_lookup(
     *,
     workcenter_groups: Optional[List[str]] = None,

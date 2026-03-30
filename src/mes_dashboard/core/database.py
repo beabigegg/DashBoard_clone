@@ -501,6 +501,8 @@ def dispose_engine():
     """
     global _ENGINE, _HEALTH_ENGINE, _SLOW_ENGINE, _DB_RUNTIME_CONFIG, _SLOW_QUERY_SEMAPHORE
     stop_keepalive()
+    from mes_dashboard.core.cache_updater import stop_cache_updater
+    stop_cache_updater()
     if _HEALTH_ENGINE is not None:
         _HEALTH_ENGINE.dispose()
         logger.info("Health engine disposed")
@@ -693,8 +695,8 @@ def read_sql_df(
             if CIRCUIT_BREAKER_ENABLED:
                 circuit_breaker.record_success()
 
-            # Log slow queries (>1 second) as warnings
-            if elapsed > 1.0:
+            # Log slow queries (>3 seconds) as warnings
+            if elapsed > 3.0:
                 # Truncate SQL for logging (first 100 chars)
                 sql_preview = sql.strip().replace('\n', ' ')[:100]
                 logger.warning("Slow query (%s, %.2fs): %s...", caller, elapsed, sql_preview)

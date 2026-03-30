@@ -4,6 +4,7 @@
 Tests background cache update logic.
 """
 
+import logging
 import pytest
 from unittest.mock import patch, MagicMock
 import pandas as pd
@@ -375,4 +376,61 @@ class TestWipCacheWriterCanonicalKey:
         assert captured_key.get("key") == "data:parquet", (
             f"Expected raw suffix 'data:parquet', got '{captured_key.get('key')}'. "
             "Double-prefix bug: did not remove get_key() pre-call from cache_updater."
+        )
+
+
+class TestStopCacheUpdater:
+    """Test module-level stop_cache_updater() function."""
+
+    @pytest.fixture(autouse=True)
+    def reset_global(self):
+        """Reset _CACHE_UPDATER global before and after each test."""
+        import mes_dashboard.core.cache_updater as cu
+        original = cu._CACHE_UPDATER
+        cu._CACHE_UPDATER = None
+        yield
+        cu._CACHE_UPDATER = None
+
+    def test_stop_cache_updater_stops_running_thread(self):
+        """stop_cache_updater() stops a running thread within 5 seconds."""
+        import mes_dashboard.core.cache_updater as cu
+
+        with patch.object(cu, 'REDIS_ENABLED', True):
+            with patch.object(cu, 'redis_available', return_value=True):
+                with patch.object(cu, 'read_sql_df', return_value=None):
+                    cu.start_cache_updater()
+                    assert cu._CACHE_UPDATER is not None
+                    assert cu._CACHE_UPDATER.is_running()
+
+                    cu.stop_cache_updater()
+                    assert not cu._CACHE_UPDATER.is_running()
+
+    def test_stop_cache_updater_noop_when_not_started(self):
+        """stop_cache_updater() is a no-op when thread was never started."""
+        import mes_dashboard.core.cache_updater as cu
+
+        assert cu._CACHE_UPDATER is None
+        # Should not raise
+        cu.stop_cache_updater()
+
+    def test_stop_cache_updater_warns_when_thread_does_not_stop(self, caplog):
+        """stop_cache_updater() logs WARNING when thread is still alive after join timeout."""
+        import threading
+        import mes_dashboard.core.cache_updater as cu
+
+        updater = cu.CacheUpdater()
+        # Simulate a hung thread: is_alive() always True, join() is a no-op
+        hung_thread = patch.object(threading.Thread, 'join', return_value=None)
+        alive = patch.object(threading.Thread, 'is_alive', return_value=True)
+
+        with hung_thread, alive:
+            updater._thread = threading.Thread(target=lambda: None, daemon=True)
+            updater._thread.start()
+
+            with caplog.at_level(logging.WARNING, logger="mes_dashboard.core.cache_updater"):
+                updater.stop()
+
+        warning_msgs = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("did not stop" in r.message for r in warning_msgs), (
+            f"Expected WARNING about thread not stopping, got: {[r.message for r in caplog.records]}"
         )
