@@ -27,7 +27,7 @@ from mes_dashboard.core.query_quality_contract import (
     normalize_quality_meta,
     unpack_event_fetch_result,
 )
-from mes_dashboard.core.redis_client import get_key, get_redis_client
+from mes_dashboard.core.redis_client import get_control_redis_client, get_key, get_redis_client
 
 logger = logging.getLogger("mes_dashboard.trace_job_service")
 
@@ -40,6 +40,10 @@ TRACE_JOB_TIMEOUT_SECONDS = int(os.getenv("TRACE_JOB_TIMEOUT_SECONDS", "1800"))
 TRACE_WORKER_QUEUE = os.getenv("TRACE_WORKER_QUEUE", "trace-events")
 TRACE_EVENTS_MAX_WORKERS = int(os.getenv("TRACE_EVENTS_MAX_WORKERS", "2"))
 TRACE_STREAM_BATCH_SIZE = int(os.getenv("TRACE_STREAM_BATCH_SIZE", "5000"))
+
+# Spool-backed result storage (task 4.1)
+_TRACE_EVENTS_SPOOL_NS = "trace_events"
+_TRACE_EVENTS_SPOOL_TTL = TRACE_JOB_TTL_SECONDS
 
 # ---------------------------------------------------------------------------
 # RQ health check — delegates to shared async_query_job_service
@@ -117,7 +121,8 @@ def enqueue_trace_events_job(
 
     job_id = f"trace-evt-{uuid.uuid4().hex[:12]}"
 
-    conn = get_redis_client()
+    # Job meta written to control-plane Redis (not subject to cache eviction)
+    ctrl = get_control_redis_client()
     meta = {
         "profile": profile,
         "cid_count": str(len(container_ids)),
@@ -128,8 +133,8 @@ def enqueue_trace_events_job(
         "completed_at": "",
         "error": "",
     }
-    conn.hset(_meta_key(job_id), mapping=meta)
-    conn.expire(_meta_key(job_id), TRACE_JOB_TTL_SECONDS)
+    ctrl.hset(_meta_key(job_id), mapping=meta)
+    ctrl.expire(_meta_key(job_id), TRACE_JOB_TTL_SECONDS)
 
     try:
         queue.enqueue(
@@ -146,7 +151,7 @@ def enqueue_trace_events_job(
         )
     except Exception as exc:
         logger.error("Failed to enqueue trace job: %s", exc, exc_info=True)
-        conn.delete(_meta_key(job_id))
+        ctrl.delete(_meta_key(job_id))
         return None, f"enqueue failed: {exc}"
 
     logger.info(
@@ -158,7 +163,7 @@ def enqueue_trace_events_job(
 
 def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     """Get trace job status from Redis metadata. Returns None if not found."""
-    conn = get_redis_client()
+    conn = get_control_redis_client()
     if conn is None:
         return None
 
@@ -206,18 +211,21 @@ def get_job_result(
     offset: int = 0,
     limit: int = 0,
 ) -> Optional[Dict[str, Any]]:
-    """Get completed job result from Redis.
+    """Get completed job result.
 
-    Supports chunked storage (new) and legacy single-key storage.
-    Supports optional domain filtering and pagination via offset/limit.
+    Prefers spool-backed storage when query_id is present in result manifest.
+    Falls back to chunked Redis storage, then legacy single-key storage.
     """
     conn = get_redis_client()
     if conn is None:
         return None
 
-    # Try chunked storage first
+    # Try manifest (new chunked / spool-backed storage)
     raw_meta = conn.get(_result_meta_key(job_id))
     if raw_meta is not None:
+        meta = json.loads(raw_meta)
+        if meta.get("query_id"):
+            return _get_spool_result(conn, job_id, meta, domain, offset, limit)
         return _get_chunked_result(conn, job_id, raw_meta, domain, offset, limit)
 
     # Fall back to legacy single-key storage
@@ -239,6 +247,90 @@ def get_job_result(
         result["results"] = {
             domain: {"data": rows, "count": len(rows), "total": domain_data.get("count", 0)},
         }
+
+    return result
+
+
+def _get_spool_result(
+    conn,
+    job_id: str,
+    meta: Dict[str, Any],
+    domain: Optional[str] = None,
+    offset: int = 0,
+    limit: int = 0,
+) -> Dict[str, Any]:
+    """Reconstruct trace events result from per-domain spool stages."""
+    import pandas as pd
+    from mes_dashboard.core.query_spool_store import load_spooled_df
+
+    query_id = meta["query_id"]
+    domain_info = meta.get("domains", {})
+    domain_quality_meta_raw = meta.get("domain_quality_meta", {})
+
+    results: Dict[str, Any] = {}
+    result_domain_quality_meta: Dict[str, Dict[str, Any]] = {}
+    target_domains = [domain] if domain else list(domain_info.keys())
+
+    for d in target_domains:
+        info = domain_info.get(d)
+        if info is None:
+            continue
+        total = info.get("total", 0)
+
+        rows: List[Dict[str, Any]] = []
+        try:
+            spool_id = _trace_domain_spool_id(query_id, d)
+            df = load_spooled_df(_TRACE_EVENTS_SPOOL_NS, spool_id)
+            if df is not None and not df.empty:
+                if offset > 0:
+                    df = df.iloc[offset:]
+                if limit > 0:
+                    df = df.iloc[:limit]
+                rows = df.to_dict("records")
+        except Exception as exc:
+            logger.warning("spool read failed domain=%s query_id=%s: %s", d, query_id, exc)
+
+        raw_domain_meta = None
+        if isinstance(domain_quality_meta_raw, dict):
+            raw_domain_meta = domain_quality_meta_raw.get(d)
+        if raw_domain_meta is None and isinstance(info, dict):
+            raw_domain_meta = info.get("quality_meta")
+        domain_meta = normalize_quality_meta(raw_domain_meta, default_scope=QUALITY_SCOPE_DOMAIN)
+        if not domain_meta.get("domain"):
+            domain_meta["domain"] = d
+        result_domain_quality_meta[d] = domain_meta
+
+        results[d] = {
+            "data": rows,
+            "count": len(rows),
+            "total": total,
+            "quality_meta": domain_meta,
+        }
+
+    aggregation = None
+    raw_agg = conn.get(_result_aggregation_key(job_id))
+    if raw_agg is not None:
+        aggregation = json.loads(raw_agg)
+
+    quality_meta = normalize_quality_meta(
+        meta.get("quality_meta"), default_scope=QUALITY_SCOPE_QUERY,
+    )
+    if not meta.get("quality_meta"):
+        quality_meta = merge_quality_metas(
+            result_domain_quality_meta.values(), scope=QUALITY_SCOPE_QUERY,
+        )
+
+    result: Dict[str, Any] = {
+        "stage": "events",
+        "results": results,
+        "aggregation": aggregation,
+        "quality_meta": quality_meta,
+        "domain_quality_meta": result_domain_quality_meta,
+    }
+    if meta.get("failed_domains"):
+        result["error"] = "one or more domains failed"
+        result["code"] = "EVENTS_PARTIAL_FAILURE"
+        result["failed_domains"] = meta["failed_domains"]
 
     return result
 
@@ -363,6 +455,12 @@ def stream_job_result_ndjson(job_id: str):
         return
 
     meta = json.loads(raw_meta)
+
+    # Prefer spool-backed streaming when query_id is set
+    if meta.get("query_id"):
+        yield from _stream_spool_result_ndjson(conn, job_id, meta)
+        return
+
     domain_info = meta.get("domains", {})
     domain_quality_meta = meta.get("domain_quality_meta", {})
 
@@ -535,12 +633,171 @@ def _store_chunked_result(
     )
 
 
+def _store_result_manifest(
+    conn,
+    job_id: str,
+    profile: str,
+    query_id: str,
+    results: Dict[str, Dict[str, Any]],
+    aggregation: Optional[Dict[str, Any]],
+    failed_domains: List[str],
+    quality_meta: Optional[Dict[str, Any]] = None,
+    domain_quality_meta: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> None:
+    """Store lightweight result manifest in Redis (no row body data).
+
+    Row data is in Parquet spool; this manifest holds only quality metadata,
+    domain totals, and aggregation pointer for job status/progress display.
+    """
+    domain_info: Dict[str, Dict[str, Any]] = {}
+    normalized_domain_quality_meta: Dict[str, Dict[str, Any]] = {}
+
+    for domain_name, domain_data in results.items():
+        total = len(domain_data.get("data", []))
+        raw_domain_meta = None
+        if isinstance(domain_quality_meta, dict):
+            raw_domain_meta = domain_quality_meta.get(domain_name)
+        if raw_domain_meta is None:
+            raw_domain_meta = domain_data.get("quality_meta")
+        normalized_domain_meta = normalize_quality_meta(
+            raw_domain_meta, default_scope=QUALITY_SCOPE_DOMAIN,
+        )
+        if not normalized_domain_meta.get("domain"):
+            normalized_domain_meta["domain"] = domain_name
+        normalized_domain_quality_meta[domain_name] = normalized_domain_meta
+        domain_info[domain_name] = {
+            "total": total,
+            "quality_meta": normalized_domain_meta,
+        }
+
+    if aggregation is not None:
+        conn.setex(
+            _result_aggregation_key(job_id),
+            TRACE_JOB_TTL_SECONDS,
+            json.dumps(aggregation, default=str, ensure_ascii=False),
+        )
+
+    normalized_quality_meta = normalize_quality_meta(
+        quality_meta, default_scope=QUALITY_SCOPE_QUERY,
+    )
+    if quality_meta is None:
+        normalized_quality_meta = merge_quality_metas(
+            normalized_domain_quality_meta.values(), scope=QUALITY_SCOPE_QUERY,
+        )
+
+    result_meta = {
+        "profile": profile,
+        "query_id": query_id,
+        "domains": domain_info,
+        "failed_domains": sorted(failed_domains) if failed_domains else [],
+        "quality_meta": normalized_quality_meta,
+        "domain_quality_meta": normalized_domain_quality_meta,
+    }
+    conn.setex(
+        _result_meta_key(job_id),
+        TRACE_JOB_TTL_SECONDS,
+        json.dumps(result_meta, default=str, ensure_ascii=False),
+    )
+
+
+def _stream_spool_result_ndjson(conn, job_id: str, meta: Dict[str, Any]):
+    """Stream spool-backed trace events result as NDJSON lines."""
+    from mes_dashboard.core.query_spool_store import load_spooled_df
+
+    query_id = meta["query_id"]
+    domain_info = meta.get("domains", {})
+    domain_quality_meta_raw = meta.get("domain_quality_meta", {})
+
+    yield _ndjson_line({
+        "type": "meta",
+        "job_id": job_id,
+        "profile": meta.get("profile"),
+        "domains": list(domain_info.keys()),
+    })
+
+    total_records = 0
+    for domain_name, info in domain_info.items():
+        domain_total = info.get("total", 0)
+        raw_domain_meta = None
+        if isinstance(domain_quality_meta_raw, dict):
+            raw_domain_meta = domain_quality_meta_raw.get(domain_name)
+        if raw_domain_meta is None and isinstance(info, dict):
+            raw_domain_meta = info.get("quality_meta")
+        normalized_domain_meta = normalize_quality_meta(
+            raw_domain_meta, default_scope=QUALITY_SCOPE_DOMAIN,
+        )
+        if not normalized_domain_meta.get("domain"):
+            normalized_domain_meta["domain"] = domain_name
+
+        yield _ndjson_line({
+            "type": "domain_start",
+            "domain": domain_name,
+            "total": domain_total,
+            "quality_meta": normalized_domain_meta,
+        })
+
+        domain_count = 0
+        try:
+            spool_id = _trace_domain_spool_id(query_id, domain_name)
+            df = load_spooled_df(_TRACE_EVENTS_SPOOL_NS, spool_id)
+            if df is not None and not df.empty:
+                batch_idx = 0
+                for batch_start in range(0, len(df), TRACE_STREAM_BATCH_SIZE):
+                    batch_df = df.iloc[batch_start:batch_start + TRACE_STREAM_BATCH_SIZE]
+                    rows = batch_df.to_dict("records")
+                    domain_count += len(rows)
+                    yield _ndjson_line({
+                        "type": "records",
+                        "domain": domain_name,
+                        "batch": batch_idx,
+                        "count": len(rows),
+                        "data": rows,
+                    })
+                    batch_idx += 1
+        except Exception as exc:
+            logger.warning(
+                "spool stream read failed domain=%s query_id=%s: %s",
+                domain_name, query_id, exc,
+            )
+
+        yield _ndjson_line({
+            "type": "domain_end",
+            "domain": domain_name,
+            "count": domain_count,
+        })
+        total_records += domain_count
+
+    raw_agg = conn.get(_result_aggregation_key(job_id))
+    if raw_agg is not None:
+        yield _ndjson_line({"type": "aggregation", "data": json.loads(raw_agg)})
+
+    if meta.get("failed_domains"):
+        yield _ndjson_line({
+            "type": "warning",
+            "code": "EVENTS_PARTIAL_FAILURE",
+            "failed_domains": meta["failed_domains"],
+        })
+
+    quality_meta_raw = meta.get("quality_meta")
+    yield _ndjson_line({
+        "type": "quality_meta",
+        "quality_meta": normalize_quality_meta(
+            quality_meta_raw, default_scope=QUALITY_SCOPE_QUERY,
+        ),
+        "domain_quality_meta": (
+            domain_quality_meta_raw if isinstance(domain_quality_meta_raw, dict) else {}
+        ),
+    })
+
+    yield _ndjson_line({"type": "complete", "total_records": total_records})
+
+
 # ---------------------------------------------------------------------------
 # Worker entry point (runs in RQ worker process)
 # ---------------------------------------------------------------------------
 def _update_meta(job_id: str, **fields) -> None:
-    """Update job metadata fields in Redis."""
-    conn = get_redis_client()
+    """Update job metadata fields in control-plane Redis."""
+    conn = get_control_redis_client()
     if conn is None:
         return
     key = _meta_key(job_id)
@@ -625,9 +882,7 @@ def execute_trace_events_job(
         _update_meta(job_id, progress="building response")
 
         aggregation = None
-        trace_query_id: Optional[str] = None
         if is_msd:
-            # Task 6.1: compute canonical trace_query_id for spool registration
             params = payload.get("params") or {}
             trace_query_id = make_trace_query_id(
                 profile=profile,
@@ -638,7 +893,7 @@ def execute_trace_events_job(
                 direction=params.get("direction"),
             )
 
-            # Write events stage spool for DuckDB runtime (task 6.1)
+            # Write MSD analysis spool for DuckDB-backed analysis/export
             try:
                 _write_msd_events_spool(
                     job_id=job_id,
@@ -647,7 +902,7 @@ def execute_trace_events_job(
                 )
             except Exception as _spool_exc:
                 logger.warning(
-                    "trace job events spool write failed job_id=%s: %s",
+                    "trace job MSD events spool write failed job_id=%s: %s",
                     job_id, _spool_exc,
                 )
 
@@ -660,20 +915,35 @@ def execute_trace_events_job(
             if agg_error is not None:
                 raise RuntimeError(agg_error)
         else:
+            trace_query_id = make_general_trace_events_query_id(
+                profile=profile,
+                container_ids=container_ids,
+                domains=domains,
+            )
             del raw_domain_results
+
+        # Write per-domain result spool for get_job_result / streaming (all profiles)
+        try:
+            _write_trace_events_spool(trace_query_id, results)
+        except Exception as _spool_exc:
+            logger.warning(
+                "trace job result spool write failed job_id=%s: %s",
+                job_id, _spool_exc,
+            )
 
         quality_meta = merge_quality_metas(
             domain_quality_meta.values(),
             scope=QUALITY_SCOPE_QUERY,
         )
 
-        # Store result in Redis as chunked keys for streaming retrieval
+        # Store lightweight result manifest (no row body data — rows in spool)
         conn = get_redis_client()
         if conn is not None:
-            _store_chunked_result(
+            _store_result_manifest(
                 conn,
                 job_id,
                 profile,
+                trace_query_id,
                 results,
                 aggregation,
                 failed_domains,
@@ -681,10 +951,13 @@ def execute_trace_events_job(
                 domain_quality_meta=domain_quality_meta,
             )
 
-        _finish_meta = {"status": "finished", "progress": "complete", "completed_at": time.time()}
-        if trace_query_id:
-            _finish_meta["query_id"] = trace_query_id
-        _update_meta(job_id, **_finish_meta)
+        _update_meta(
+            job_id,
+            status="finished",
+            progress="complete",
+            completed_at=time.time(),
+            query_id=trace_query_id,
+        )
 
         logger.info(
             "trace job completed job_id=%s profile=%s domains=%s",
@@ -848,6 +1121,69 @@ def _build_job_msd_aggregation(
     if "error" in aggregation:
         return None, str(aggregation["error"])
     return aggregation, None
+
+
+# ---------------------------------------------------------------------------
+# Spool helpers for trace events result storage (task 4.1)
+# ---------------------------------------------------------------------------
+def _trace_domain_spool_id(query_id: str, domain: str) -> str:
+    """Return the spool query_id for a specific domain within a trace events job."""
+    domain_safe = domain.replace(":", ".").replace("/", "_")
+    return f"{query_id}.{domain_safe}"
+
+
+def _write_trace_events_spool(
+    query_id: str,
+    results: Dict[str, Dict[str, Any]],
+) -> None:
+    """Write per-domain event DataFrames to Parquet spool.
+
+    Called for ALL profiles so that get_job_result and streaming can read from
+    spool instead of Redis chunk keys.
+    """
+    import pandas as pd
+    from mes_dashboard.core.query_spool_store import store_spooled_df
+
+    for domain_name, domain_data in results.items():
+        rows = domain_data.get("data", [])
+        if not rows:
+            continue
+        try:
+            df = pd.DataFrame(rows)
+            spool_id = _trace_domain_spool_id(query_id, domain_name)
+            store_spooled_df(
+                _TRACE_EVENTS_SPOOL_NS, spool_id, df,
+                ttl_seconds=_TRACE_EVENTS_SPOOL_TTL,
+            )
+            logger.debug(
+                "_write_trace_events_spool: domain=%s rows=%d query_id=%s",
+                domain_name, len(df), query_id,
+            )
+        except Exception as exc:
+            logger.warning(
+                "_write_trace_events_spool: domain=%s failed: %s", domain_name, exc,
+            )
+
+
+def make_general_trace_events_query_id(
+    profile: str,
+    container_ids: List[str],
+    domains: List[str],
+) -> str:
+    """Return the canonical spool query_id for a non-MSD trace events job.
+
+    Deterministic: same profile + container_ids + domains → same id, enabling
+    result-spool reuse without re-running Oracle.
+    """
+    key: Dict[str, Any] = {
+        "_v": _TRACE_QUERY_ID_SCHEMA_VERSION,
+        "profile": profile,
+        "container_ids": sorted(container_ids or []),
+        "domains": sorted(domains or []),
+    }
+    canonical = json.dumps(key, sort_keys=True, ensure_ascii=False, default=str)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+    return f"trc-{digest}"
 
 
 # ---------------------------------------------------------------------------

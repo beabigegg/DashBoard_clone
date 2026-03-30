@@ -434,6 +434,17 @@ def _records_from_index(index: ResourceIndex, positions: list[RowPosition] | Non
         df = _get_cached_data()
         if df is None:
             return []
+        # _get_cached_data may have rebuilt the global index (e.g. after a
+        # new sync changed the version).  Re-fetch the current index so that
+        # row positions are consistent with the freshly loaded DataFrame.
+        current_index = _get_resource_index()
+        if current_index.get("version") != index.get("version"):
+            index = current_index
+            # Re-derive positions from the refreshed index when the caller
+            # requested all rows (positions was None) — the old all_positions
+            # may no longer match the new DataFrame.
+            if positions is None:
+                positions = None  # will fall through to all_positions below
     selected_positions = positions if positions is not None else index.get("all_positions", [])
     if not selected_positions:
         selected_positions = list(range(len(df)))
@@ -582,13 +593,18 @@ def _sync_to_redis(df: pd.DataFrame, version: str) -> bool:
 
         data_json = df_copy.to_json(orient='records', force_ascii=False)
 
-        # Atomic update using pipeline (EX 300: expire after 5 min if updater stops)
+        # Snapshot-plane TTL: Redis retention must exceed the sync interval
+        # so that a healthy background refresh never races against expiry.
+        # Use 2x the configured sync interval, floored at 600 seconds.
+        from mes_dashboard.core.cache_plane import snapshot_redis_ttl
+        redis_ttl = snapshot_redis_ttl(RESOURCE_SYNC_INTERVAL)
+
         now = datetime.now().isoformat()
         pipe = client.pipeline()
-        pipe.set(_get_key("data"), data_json, ex=300)
-        pipe.set(_get_key("meta:version"), version, ex=300)
-        pipe.set(_get_key("meta:updated"), now, ex=300)
-        pipe.set(_get_key("meta:count"), str(len(df)), ex=300)
+        pipe.set(_get_key("data"), data_json, ex=redis_ttl)
+        pipe.set(_get_key("meta:version"), version, ex=redis_ttl)
+        pipe.set(_get_key("meta:updated"), now, ex=redis_ttl)
+        pipe.set(_get_key("meta:count"), str(len(df)), ex=redis_ttl)
         pipe.execute()
 
         # Invalidate process-level cache so next request picks up new data

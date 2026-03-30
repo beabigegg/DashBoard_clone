@@ -22,7 +22,11 @@ logger = logging.getLogger('mes_dashboard.filter_cache')
 # ============================================================
 
 from mes_dashboard.config.constants import CACHE_TTL_FILTER_GENERAL
+from mes_dashboard.core.cache_plane import snapshot_redis_ttl
 CACHE_TTL_SECONDS = CACHE_TTL_FILTER_GENERAL
+# Redis retention uses snapshot-plane policy: > refresh interval so expiry
+# does not force Oracle fallback before the next healthy refresh cycle.
+_REDIS_TTL_SECONDS = snapshot_redis_ttl(CACHE_TTL_SECONDS)
 WIP_VIEW = os.getenv("FILTER_CACHE_WIP_VIEW", "DWH.DW_MES_LOT_V")
 SPEC_WORKCENTER_VIEW = os.getenv("FILTER_CACHE_SPEC_WORKCENTER_VIEW", "DWH.DW_MES_SPEC_WORKCENTER_V")
 
@@ -226,9 +230,9 @@ def _write_to_redis(data: dict) -> None:
         client.set(
             get_key(_REDIS_KEY),
             json.dumps(payload, default=str),
-            ex=CACHE_TTL_SECONDS,
+            ex=_REDIS_TTL_SECONDS,
         )
-        logger.debug("Filter cache written to Redis (TTL=%ds)", CACHE_TTL_SECONDS)
+        logger.debug("Filter cache written to Redis (TTL=%ds)", _REDIS_TTL_SECONDS)
     except Exception as exc:
         logger.warning("Failed to write filter cache to Redis: %s", exc)
 

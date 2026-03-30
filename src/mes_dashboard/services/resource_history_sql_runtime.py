@@ -520,13 +520,18 @@ def try_compute_view_from_spool(
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_DISABLED}
 
     try:
-        import duckdb  # type: ignore
+        from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
     except Exception:
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
     parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
     if not parquet_path:
+        from mes_dashboard.core.heavy_query_telemetry import record_spool_miss
+        record_spool_miss("resource_history", query_id)
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    from mes_dashboard.core.heavy_query_telemetry import record_spool_hit
+    record_spool_hit("resource_history", query_id)
 
     oee_parquet_path = get_spool_file_path(_OEE_SPOOL_NAMESPACE, query_id)
 
@@ -545,7 +550,7 @@ def try_compute_view_from_spool(
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = create_heavy_query_connection()
         _attach_spool_view(conn, parquet_path)
         if oee_parquet_path:
             _attach_oee_spool_view(conn, oee_parquet_path)
@@ -583,6 +588,8 @@ def try_compute_view_from_spool(
             "resource_history_sql_runtime: DuckDB view failed (query_id=%s): %s",
             query_id, exc,
         )
+        from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
+        record_lifecycle_failure("resource_history", reason="runtime_error")
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
     finally:
         if conn is not None:
@@ -623,7 +630,7 @@ def try_compute_query_from_canonical_spool(
         return None, {"canonical_fallback_reason": SQL_FALLBACK_DISABLED}
 
     try:
-        import duckdb  # type: ignore
+        from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
     except Exception:
         return None, {"canonical_fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
@@ -634,7 +641,12 @@ def try_compute_query_from_canonical_spool(
     canonical_query_id = make_canonical_base_query_id(start_date, end_date, granularity)
     parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, canonical_query_id)
     if not parquet_path:
+        from mes_dashboard.core.heavy_query_telemetry import record_spool_miss
+        record_spool_miss("resource_history", canonical_query_id)
         return None, {"canonical_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    from mes_dashboard.core.heavy_query_telemetry import record_spool_hit
+    record_spool_hit("resource_history", canonical_query_id)
 
     canonical_oee_query_id = make_canonical_oee_query_id(start_date, end_date, granularity)
     oee_parquet_path = get_spool_file_path(_OEE_SPOOL_NAMESPACE, canonical_oee_query_id)
@@ -664,7 +676,7 @@ def try_compute_query_from_canonical_spool(
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = create_heavy_query_connection()
         # Load all spool rows into resource_all, then build filter-specific
         # resource_dim, then create resource_src as the filtered join view so
         # all existing query functions (_query_kpi, _query_trend, etc.) see
@@ -725,6 +737,8 @@ def try_compute_query_from_canonical_spool(
             "(canonical_query_id=%s): %s",
             canonical_query_id, exc,
         )
+        from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
+        record_lifecycle_failure("resource_history", reason="canonical_runtime_error")
         return None, {"canonical_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
     finally:
         if conn is not None:

@@ -20,11 +20,19 @@ REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 REDIS_ENABLED = os.getenv('REDIS_ENABLED', 'true').lower() == 'true'
 REDIS_KEY_PREFIX = os.getenv('REDIS_KEY_PREFIX', 'mes_wip')
 
+# Control-plane Redis URL (defaults to REDIS_URL when not set).
+# Point this to a Redis instance / DB with maxmemory-policy=noeviction so that
+# locks, job status, and inflight state are never evicted under memory pressure.
+# Cache-plane data (spool metadata, snapshot payloads) uses REDIS_URL which may
+# have a volatile-lru or allkeys-lru eviction policy for memory management.
+REDIS_CONTROL_URL = os.getenv('REDIS_CONTROL_URL', REDIS_URL)
+
 # ============================================================
-# Redis Client Singleton
+# Redis Client Singletons
 # ============================================================
 
 _REDIS_CLIENT: Optional[redis.Redis] = None
+_REDIS_CONTROL_CLIENT: Optional[redis.Redis] = None
 
 
 def redact_connection_url(url: str) -> str:
@@ -85,6 +93,46 @@ def get_redis_client() -> Optional[redis.Redis]:
     return _REDIS_CLIENT
 
 
+def get_control_redis_client() -> Optional[redis.Redis]:
+    """Get the control-plane Redis client.
+
+    Used for keys that must not be evicted under memory pressure: distributed
+    locks, job status HSET, and inflight state.  Configured via REDIS_CONTROL_URL
+    (defaults to REDIS_URL when not set, so single-instance deployments work
+    without any extra configuration).
+    """
+    global _REDIS_CONTROL_CLIENT
+
+    if not REDIS_ENABLED:
+        return None
+
+    # Fast-path: reuse cache client when both URLs are identical
+    if REDIS_CONTROL_URL == REDIS_URL:
+        return get_redis_client()
+
+    if _REDIS_CONTROL_CLIENT is None:
+        try:
+            _REDIS_CONTROL_CLIENT = redis.Redis.from_url(
+                REDIS_CONTROL_URL,
+                decode_responses=True,
+                socket_timeout=5,
+                socket_connect_timeout=5,
+                retry_on_timeout=True,
+                health_check_interval=30,
+            )
+            _REDIS_CONTROL_CLIENT.ping()
+            logger.info(
+                "Control-plane Redis client connected to %s",
+                redact_connection_url(REDIS_CONTROL_URL),
+            )
+        except redis.RedisError as exc:
+            logger.warning("Failed to connect to control-plane Redis: %s", exc)
+            _REDIS_CONTROL_CLIENT = None
+            return None
+
+    return _REDIS_CONTROL_CLIENT
+
+
 def redis_available() -> bool:
     """Check if Redis connection is available.
 
@@ -128,11 +176,11 @@ def get_key_prefix() -> str:
 
 
 def close_redis() -> None:
-    """Close Redis connection.
+    """Close Redis connections.
 
     Call this during application shutdown.
     """
-    global _REDIS_CLIENT
+    global _REDIS_CLIENT, _REDIS_CONTROL_CLIENT
 
     if _REDIS_CLIENT is not None:
         try:
@@ -143,12 +191,22 @@ def close_redis() -> None:
         finally:
             _REDIS_CLIENT = None
 
+    # Only close control client if it's a separate connection
+    if _REDIS_CONTROL_CLIENT is not None:
+        try:
+            _REDIS_CONTROL_CLIENT.close()
+            logger.info("Control-plane Redis connection closed")
+        except Exception as e:
+            logger.warning(f"Error closing control-plane Redis connection: {e}")
+        finally:
+            _REDIS_CONTROL_CLIENT = None
+
 
 def try_acquire_lock(lock_name: str, ttl_seconds: int = 60) -> bool:
     """Try to acquire a distributed lock using Redis SET NX.
 
-    This is a non-blocking lock acquisition. If the lock is already held,
-    returns False immediately without waiting.
+    Uses the control-plane Redis client so locks are not subject to cache
+    eviction pressure.  Non-blocking: returns False immediately if held.
 
     Args:
         lock_name: Name of the lock (will be prefixed with key prefix).
@@ -157,7 +215,7 @@ def try_acquire_lock(lock_name: str, ttl_seconds: int = 60) -> bool:
     Returns:
         True if lock was acquired, False if already held by another process.
     """
-    client = get_redis_client()
+    client = get_control_redis_client()
     if client is None:
         # Redis unavailable - allow operation to proceed (fail-open)
         logger.warning(f"Redis unavailable, skipping lock for {lock_name}")
@@ -184,7 +242,7 @@ def release_lock(lock_name: str) -> None:
     Args:
         lock_name: Name of the lock to release.
     """
-    client = get_redis_client()
+    client = get_control_redis_client()
     if client is None:
         return
 

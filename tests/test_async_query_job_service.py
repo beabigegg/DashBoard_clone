@@ -140,6 +140,7 @@ class TestEnqueueJob:
             pass
 
         with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch("rq.Queue", return_value=mock_queue):
             job_id, err = svc.enqueue_job(
@@ -165,6 +166,7 @@ class TestEnqueueJob:
             pass
 
         with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch("rq.Queue", return_value=mock_queue):
             svc.enqueue_job(
@@ -191,9 +193,9 @@ class TestEnqueueJob:
         assert "RQ" in err or "unavailable" in err.lower()
 
     def test_returns_none_error_when_redis_unavailable(self):
-        """Should return (None, error) when Redis client is unavailable."""
+        """Should return (None, error) when control Redis client is unavailable."""
         with patch.object(svc, "_check_rq_installed", return_value=True), \
-             patch.object(svc, "get_redis_client", return_value=None):
+             patch.object(svc, "get_control_redis_client", return_value=None):
             job_id, err = svc.enqueue_job(
                 queue_name="test-queue",
                 worker_fn=lambda: None,
@@ -212,6 +214,7 @@ class TestEnqueueJob:
             pass
 
         with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch("rq.Queue", return_value=mock_queue):
             job_id, err = svc.enqueue_job(
@@ -235,6 +238,7 @@ class TestEnqueueJob:
             pass
 
         with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch("rq.Queue", return_value=mock_queue):
             job_id, err = svc.enqueue_job(
@@ -254,6 +258,7 @@ class TestEnqueueJob:
         default_retry = object()
 
         with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch.object(svc, "_build_default_retry", return_value=default_retry), \
              patch("rq.Queue", return_value=mock_queue):
@@ -268,6 +273,7 @@ class TestEnqueueJob:
         mock_queue = MagicMock()
 
         with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch("rq.Queue", return_value=mock_queue):
             svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None, retry=None)
@@ -283,6 +289,7 @@ class TestEnqueueJob:
         custom_retry = object()
 
         with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch("rq.Queue", return_value=mock_queue):
             svc.enqueue_job(
@@ -308,13 +315,13 @@ class TestGetJobStatus:
         """Should return None when Redis HGETALL returns empty dict."""
         mock_conn = MagicMock()
         mock_conn.hgetall.return_value = {}
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             result = svc.get_job_status("async", "no-such-job")
         assert result is None
 
     def test_returns_none_when_redis_unavailable(self):
-        """Should return None when get_redis_client() returns None."""
-        with patch.object(svc, "get_redis_client", return_value=None):
+        """Should return None when get_control_redis_client() returns None."""
+        with patch.object(svc, "get_control_redis_client", return_value=None):
             result = svc.get_job_status("async", "some-job-id")
         assert result is None
 
@@ -331,7 +338,7 @@ class TestGetJobStatus:
             "query_id": "",
             "error": "",
         }
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             result = svc.get_job_status("reject", "reject-abc123")
 
         assert result is not None
@@ -354,7 +361,7 @@ class TestGetJobStatus:
             "query_id": "",
             "error": "",
         }
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             result = svc.get_job_status("async", "job-elapsed-test")
 
         assert result is not None
@@ -373,7 +380,7 @@ class TestGetJobStatus:
             "query_id": "qry-deadbeef0123",
             "error": "",
         }
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             result = svc.get_job_status("reject", "job-done")
 
         assert result["status"] == "completed"
@@ -392,7 +399,7 @@ class TestGetJobStatus:
             "query_id": "",
             "error": "ORA-01555: snapshot too old",
         }
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             result = svc.get_job_status("reject", "job-fail")
 
         assert result["status"] == "failed"
@@ -410,7 +417,7 @@ class TestGetJobStatus:
             "query_id": "",
             "error": "",
         }
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             result = svc.get_job_status("async", "queued-job")
 
         assert "pct" not in result
@@ -424,7 +431,7 @@ class TestUpdateJobProgress:
     def test_writes_fields_to_redis_hset(self):
         """Should call hset on the correct meta key with stringified field values."""
         mock_conn = MagicMock()
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             svc.update_job_progress("reject", "job-prog-1", status="running", progress="50%", pct=50)
 
         mock_conn.hset.assert_called_once()
@@ -435,8 +442,8 @@ class TestUpdateJobProgress:
         assert mapping["pct"] == "50"
 
     def test_silently_returns_when_redis_unavailable(self):
-        """Should not raise when get_redis_client() returns None."""
-        with patch.object(svc, "get_redis_client", return_value=None):
+        """Should not raise when get_control_redis_client() returns None."""
+        with patch.object(svc, "get_control_redis_client", return_value=None):
             svc.update_job_progress("reject", "job-no-redis", status="running")
         # No exception = pass
 
@@ -444,7 +451,7 @@ class TestUpdateJobProgress:
         """Should not raise when Redis hset itself throws."""
         mock_conn = MagicMock()
         mock_conn.hset.side_effect = ConnectionError("pipe broken")
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             svc.update_job_progress("reject", "job-err", status="running")
         # No exception = pass
 
@@ -460,7 +467,7 @@ class TestCompleteJob:
     def test_sets_status_completed_with_query_id(self):
         """Should write status=completed and query_id when no error is given."""
         mock_conn = MagicMock()
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             svc.complete_job("reject", "job-ok", query_id="qry-abc123")
 
         mock_conn.hset.assert_called_once()
@@ -473,7 +480,7 @@ class TestCompleteJob:
     def test_sets_status_failed_with_error_message(self):
         """Should write status=failed and error message when error is provided."""
         mock_conn = MagicMock()
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             svc.complete_job("reject", "job-fail", error="ORA-00942: table not found")
 
         mock_conn.hset.assert_called_once()
@@ -487,7 +494,7 @@ class TestCompleteJob:
         """completed_at value written to Redis should be a recent Unix timestamp."""
         mock_conn = MagicMock()
         before = time.time()
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             svc.complete_job("reject", "job-ts", query_id="q1")
         after = time.time()
 
@@ -497,15 +504,15 @@ class TestCompleteJob:
         assert before <= completed_at <= after
 
     def test_silently_returns_when_redis_unavailable(self):
-        """Should not raise when get_redis_client() returns None."""
-        with patch.object(svc, "get_redis_client", return_value=None):
+        """Should not raise when get_control_redis_client() returns None."""
+        with patch.object(svc, "get_control_redis_client", return_value=None):
             svc.complete_job("reject", "job-no-redis", query_id="q1")
         # No exception = pass
 
     def test_handles_none_query_id(self):
         """Should store empty string for query_id when None is passed."""
         mock_conn = MagicMock()
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             svc.complete_job("reject", "job-noqid", query_id=None)
 
         call_kwargs = mock_conn.hset.call_args
@@ -516,7 +523,7 @@ class TestCompleteJob:
     def test_failure_increments_failed_job_counter_and_logs_warning(self):
         """Failed completion path should log warning and increment counter."""
         mock_conn = MagicMock()
-        with patch.object(svc, "get_redis_client", return_value=mock_conn), \
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
              patch.object(svc, "logger") as mock_logger:
             svc.complete_job("reject", "job-fail-counter", error="DB timeout")
 
@@ -540,9 +547,10 @@ class TestMultiStageProgress:
         mock_conn.ping.return_value = True
         mock_queue = MagicMock()
 
-        with patch.object(svc, "get_redis_client", return_value=mock_conn), \
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
+             patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch.object(svc, "_check_rq_installed", return_value=True), \
-             patch("mes_dashboard.services.async_query_job_service.Queue", return_value=mock_queue):
+             patch("rq.Queue", return_value=mock_queue):
             svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None, prefix="test")
 
         hset_call = mock_conn.hset.call_args
@@ -554,7 +562,7 @@ class TestMultiStageProgress:
     def test_update_job_progress_with_stage_stores_correctly(self):
         """update_job_progress with stage should store it in Redis HSET."""
         mock_conn = MagicMock()
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             svc.update_job_progress(
                 "test",
                 "job-stage-001",
@@ -584,7 +592,7 @@ class TestMultiStageProgress:
             "query_id": "",
             "error": "",
         }
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             result = svc.get_job_status("test", "job-stage-001")
 
         assert result is not None
@@ -607,7 +615,7 @@ class TestMultiStageProgress:
             "dataset_id": "ds-abc12345",
             "error": "",
         }
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             result = svc.get_job_status("test", "job-complete-001")
 
         assert result is not None
@@ -617,7 +625,7 @@ class TestMultiStageProgress:
     def test_complete_job_stores_dataset_id(self):
         """complete_job should persist dataset_id when provided."""
         mock_conn = MagicMock()
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             svc.complete_job("test", "job-ds-001", query_id="msd-abc", dataset_id="ds-abc")
 
         hset_call = mock_conn.hset.call_args
@@ -638,7 +646,7 @@ class TestMultiStageProgress:
             "query_id": "",
             "error": "",
         }
-        with patch.object(svc, "get_redis_client", return_value=mock_conn):
+        with patch.object(svc, "get_control_redis_client", return_value=mock_conn):
             result = svc.get_job_status("test", "job-queued-001")
 
         assert result is not None

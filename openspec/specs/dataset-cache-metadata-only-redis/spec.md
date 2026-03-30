@@ -5,24 +5,27 @@ This capability defines the spool-only L2 write path for dataset cache domains (
 ## Requirements
 
 ### Requirement: Dataset cache domains SHALL store query results as spool metadata pointers, not Redis DataFrame payloads
-The reject, hold, and resource dataset cache modules SHALL use `query_spool_store.store_spooled_df()` as the exclusive L2 write path, eliminating Parquet+base64 Redis payloads.
+Covered heavy-query domains SHALL use spool metadata pointers as the canonical Redis representation for reusable result bodies. Redis SHALL store metadata, lifecycle state, and lightweight indexes, while the reusable result body SHALL live in Parquet spool.
 
-#### Scenario: Direct-path query result stored as spool
-- **WHEN** `execute_primary_query()` completes and produces a result DataFrame via the direct (non-engine) path
-- **THEN** the system SHALL call `store_spooled_df(namespace, query_id, df, ttl_seconds=_CACHE_TTL)` to write the spool file and register the metadata pointer
-- **THEN** the system SHALL NOT call `redis_df_store.redis_store_df()` for the result DataFrame
-- **THEN** the Redis key `{namespace}:{query_id}` (Parquet+base64 payload) SHALL NOT be written
+#### Scenario: Direct-path heavy-query result stored as spool
+- **WHEN** a covered heavy-query module completes a direct or chunked primary query and produces a reusable result set
+- **THEN** the module SHALL write the result body to Parquet spool and register a Redis metadata pointer
+- **THEN** the module SHALL NOT store the full result body in Redis as JSON, pickled payload, or Redis DataFrame blob
 
-#### Scenario: Redis spool metadata pointer persisted
-- **WHEN** `store_spooled_df()` succeeds
-- **THEN** Redis SHALL contain a key `{namespace}:spool_meta:{query_id}` with fields: `namespace`, `relative_path`, `row_count`, `columns_hash`, `created_at`, `expires_at`, `file_size_bytes`
-- **THEN** the in-process L1 marker SHALL be set to `True` for the query_id
-- **THEN** the Redis key SHALL expire after 900 seconds
+#### Scenario: Redis metadata pointer persisted
+- **WHEN** a spool-backed result is published
+- **THEN** Redis SHALL store only lightweight state such as `query_id`, `relative_path`, `row_count`, `created_at`, `expires_at`, `status`, `file_size_bytes`, and optional stage/index metadata
+- **THEN** the Redis metadata SHALL be sufficient for view, export, and async job replay to locate the canonical spool
 
 #### Scenario: Cache hit reads from spool metadata
-- **WHEN** `_get_cached_df()` / `_load_df_on_demand()` is called with a query_id that has a spool metadata pointer
-- **THEN** the system SHALL call `query_spool_store.load_spooled_df()` to retrieve the DataFrame from the spool file
-- **THEN** the system SHALL NOT call `redis_df_store.redis_load_df()` as the primary path
+- **WHEN** a heavy-query result is reused
+- **THEN** the module SHALL resolve the result from Redis metadata and the canonical Parquet spool
+- **THEN** the module SHALL NOT treat Redis payload storage as the primary reusable result source
+
+#### Scenario: Trace and async domains follow the same rule
+- **WHEN** a trace, lineage, history, export, or other heavy async domain produces a replayable result
+- **THEN** the result body SHALL follow the same metadata-only Redis rule
+- **THEN** Redis SHALL be limited to metadata, state, locks, progress, and lightweight indexes for that result
 
 #### Scenario: Transition fallback during rolling deployment
 - **WHEN** `_get_cached_df()` finds no spool metadata pointer for a query_id but a Redis DataFrame key exists (in-flight from old deployment)
@@ -46,3 +49,16 @@ The `PHASE2_METADATA_ONLY` environment variable SHALL control whether the new sp
 - **WHEN** environment variable `PHASE2_METADATA_ONLY` is set to `0`
 - **THEN** all three domains SHALL fall back to `redis_store_df()` as the L2 write path
 - **THEN** behavior SHALL be identical to Phase 1 baseline
+
+### Requirement: Heavy-query metadata SHALL distinguish result body, sidecar data, and control state
+Covered modules SHALL separate canonical result bodies from sidecar data and control-plane state so that Redis usage remains bounded and intentional.
+
+#### Scenario: Sidecar data stored in Redis
+- **WHEN** a module stores small reusable sidecar data such as linkage maps, stage manifests, or pagination indexes
+- **THEN** that data SHALL be materially smaller than the canonical result body
+- **THEN** the canonical result body SHALL still remain in Parquet spool
+
+#### Scenario: Inflight and progress state
+- **WHEN** a module tracks query execution state
+- **THEN** inflight locks, progress records, and async job metadata SHALL be stored as control-plane metadata
+- **THEN** those records SHALL not be treated as cache payloads

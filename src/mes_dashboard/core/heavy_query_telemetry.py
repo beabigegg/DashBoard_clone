@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Process-local telemetry counters for heavy-query guard behavior."""
+"""Process-local telemetry counters for heavy-query guard behavior.
+
+Tracks guard rejects, memory errors, async fallbacks, and — for the
+cache-plane architecture — spool hit/miss rates and result-lifecycle
+failures across all heavy-query domains.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +19,9 @@ _COUNTERS = Counter(
         "guard_reject_total": 0,
         "memory_error_total": 0,
         "async_fallback_total": 0,
+        "spool_hit_total": 0,
+        "spool_miss_total": 0,
+        "lifecycle_failure_total": 0,
     }
 )
 _ROUTE_REJECTS = Counter()
@@ -22,6 +30,12 @@ _ROUTE_ASYNC_FALLBACKS = Counter()
 _REJECT_REASONS = Counter()
 _MEMORY_ERROR_REASONS = Counter()
 _ASYNC_FALLBACK_REASONS = Counter()
+
+# Spool hit/miss counters keyed by domain
+_DOMAIN_SPOOL_HITS = Counter()
+_DOMAIN_SPOOL_MISSES = Counter()
+_DOMAIN_LIFECYCLE_FAILURES = Counter()
+_LIFECYCLE_FAILURE_REASONS = Counter()
 
 
 def _normalize_token(value: str | None, *, default: str) -> str:
@@ -63,18 +77,51 @@ def record_async_fallback(route: str, reason: str = "rss_guard") -> None:
         _ASYNC_FALLBACK_REASONS[reason_name] += 1
 
 
+def record_spool_hit(domain: str, query_id: str = "") -> None:
+    """Record a spool cache hit for a heavy-query domain."""
+    domain_name = _normalize_token(domain, default="unknown_domain")
+    with _LOCK:
+        _COUNTERS["spool_hit_total"] += 1
+        _DOMAIN_SPOOL_HITS[domain_name] += 1
+
+
+def record_spool_miss(domain: str, query_id: str = "") -> None:
+    """Record a spool cache miss for a heavy-query domain."""
+    domain_name = _normalize_token(domain, default="unknown_domain")
+    with _LOCK:
+        _COUNTERS["spool_miss_total"] += 1
+        _DOMAIN_SPOOL_MISSES[domain_name] += 1
+
+
+def record_lifecycle_failure(domain: str, reason: str = "unknown") -> None:
+    """Record a result-lifecycle failure (expired, corrupt, runtime error)."""
+    domain_name = _normalize_token(domain, default="unknown_domain")
+    reason_name = _normalize_token(reason, default="unknown")
+    with _LOCK:
+        _COUNTERS["lifecycle_failure_total"] += 1
+        _DOMAIN_LIFECYCLE_FAILURES[domain_name] += 1
+        _LIFECYCLE_FAILURE_REASONS[reason_name] += 1
+
+
 def get_heavy_query_telemetry() -> Dict[str, Any]:
     with _LOCK:
         return {
             "guard_reject_total": int(_COUNTERS["guard_reject_total"]),
             "memory_error_total": int(_COUNTERS["memory_error_total"]),
             "async_fallback_total": int(_COUNTERS["async_fallback_total"]),
+            "spool_hit_total": int(_COUNTERS["spool_hit_total"]),
+            "spool_miss_total": int(_COUNTERS["spool_miss_total"]),
+            "lifecycle_failure_total": int(_COUNTERS["lifecycle_failure_total"]),
             "route_rejects": _counter_rows(_ROUTE_REJECTS, "route"),
             "route_memory_errors": _counter_rows(_ROUTE_MEMORY_ERRORS, "route"),
             "route_async_fallbacks": _counter_rows(_ROUTE_ASYNC_FALLBACKS, "route"),
             "reject_reasons": _counter_rows(_REJECT_REASONS, "reason"),
             "memory_error_reasons": _counter_rows(_MEMORY_ERROR_REASONS, "reason"),
             "async_fallback_reasons": _counter_rows(_ASYNC_FALLBACK_REASONS, "reason"),
+            "domain_spool_hits": _counter_rows(_DOMAIN_SPOOL_HITS, "domain"),
+            "domain_spool_misses": _counter_rows(_DOMAIN_SPOOL_MISSES, "domain"),
+            "domain_lifecycle_failures": _counter_rows(_DOMAIN_LIFECYCLE_FAILURES, "domain"),
+            "lifecycle_failure_reasons": _counter_rows(_LIFECYCLE_FAILURE_REASONS, "reason"),
         }
 
 
@@ -86,6 +133,9 @@ def reset_heavy_query_telemetry() -> None:
                 "guard_reject_total": 0,
                 "memory_error_total": 0,
                 "async_fallback_total": 0,
+                "spool_hit_total": 0,
+                "spool_miss_total": 0,
+                "lifecycle_failure_total": 0,
             }
         )
         _ROUTE_REJECTS.clear()
@@ -94,3 +144,7 @@ def reset_heavy_query_telemetry() -> None:
         _REJECT_REASONS.clear()
         _MEMORY_ERROR_REASONS.clear()
         _ASYNC_FALLBACK_REASONS.clear()
+        _DOMAIN_SPOOL_HITS.clear()
+        _DOMAIN_SPOOL_MISSES.clear()
+        _DOMAIN_LIFECYCLE_FAILURES.clear()
+        _LIFECYCLE_FAILURE_REASONS.clear()

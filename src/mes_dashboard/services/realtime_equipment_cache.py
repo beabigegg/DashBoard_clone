@@ -353,15 +353,19 @@ def _save_to_redis(aggregated: list[dict[str, Any]]) -> bool:
         updated_at = datetime.now().isoformat()
         count = len(aggregated)
 
-        # Atomic update using pipeline (EX 300: expire after 5 min if updater stops)
+        # Snapshot-plane TTL: Redis retention must exceed the sync interval
+        # so that a healthy background refresh never races against expiry.
+        from mes_dashboard.core.cache_plane import snapshot_redis_ttl
+        cache_ttl = snapshot_redis_ttl(_SYNC_INTERVAL)
+
         pipe = redis_client.pipeline()
-        pipe.set(data_key, data_json, ex=300)
+        pipe.set(data_key, data_json, ex=cache_ttl)
         pipe.delete(index_key)
         if index_mapping:
             pipe.hset(index_key, mapping=index_mapping)
-        pipe.expire(index_key, 300)
-        pipe.set(updated_key, updated_at, ex=300)
-        pipe.set(count_key, str(count), ex=300)
+        pipe.expire(index_key, cache_ttl)
+        pipe.set(updated_key, updated_at, ex=cache_ttl)
+        pipe.set(count_key, str(count), ex=cache_ttl)
         pipe.execute()
 
         # Invalidate process-level cache so next request picks up new data

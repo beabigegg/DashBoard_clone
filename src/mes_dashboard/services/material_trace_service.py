@@ -27,7 +27,7 @@ from mes_dashboard.core.query_quality_contract import (
     normalize_quality_meta,
 )
 from mes_dashboard.core.redis_client import get_key, get_redis_client
-from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
+from mes_dashboard.core.query_spool_store import load_spooled_df, store_spooled_df
 from mes_dashboard.services.batch_query_engine import compute_query_hash
 from mes_dashboard.services.container_resolution_policy import (
     validate_resolution_request,
@@ -432,21 +432,34 @@ def _compute_cache_key(
     return f"mt:result:{cache_hash}"
 
 
+_MT_SPOOL_NAMESPACE = "material_trace"
+
+
+def _mt_spool_id(cache_key: str) -> str:
+    """Derive a valid spool query_id from cache_key (replaces ':' with '.')."""
+    return cache_key.replace(":", ".")
+
+
 def _try_load_cached_df(cache_key: str) -> Optional[pd.DataFrame]:
-    """Attempt to load a cached DataFrame from Redis."""
+    """Attempt to load a cached DataFrame from Parquet spool."""
     try:
-        return redis_load_df(cache_key)
+        return load_spooled_df(_MT_SPOOL_NAMESPACE, _mt_spool_id(cache_key))
     except Exception as exc:
-        logger.debug("Redis cache load failed (%s): %s", cache_key, exc)
+        logger.debug("Spool cache load failed (%s): %s", cache_key, exc)
         return None
 
 
 def _try_store_cached_df(cache_key: str, df: pd.DataFrame) -> None:
-    """Attempt to store a DataFrame in Redis cache."""
+    """Persist a DataFrame to canonical Parquet spool (heavy-query plane)."""
     try:
-        redis_store_df(cache_key, df, ttl=_CACHE_TTL)
+        store_spooled_df(
+            _MT_SPOOL_NAMESPACE,
+            _mt_spool_id(cache_key),
+            df,
+            ttl_seconds=_CACHE_TTL,
+        )
     except Exception as exc:
-        logger.debug("Redis cache store failed (%s): %s", cache_key, exc)
+        logger.debug("Spool cache store failed (%s): %s", cache_key, exc)
 
 
 # ============================================================
@@ -742,8 +755,8 @@ def execute_to_spool(
         )
         # Return row count from existing spool
         try:
-            import duckdb
-            conn = duckdb.connect(":memory:")
+            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
+            conn = create_heavy_query_connection()
             path_lit = "'" + existing.replace("'", "''") + "'"
             row = conn.execute(f"SELECT COUNT(*) FROM read_parquet({path_lit})").fetchone()
             conn.close()

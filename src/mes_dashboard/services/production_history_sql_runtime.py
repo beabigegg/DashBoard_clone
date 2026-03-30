@@ -39,8 +39,8 @@ def _sql_str(value: str) -> str:
 
 
 def _get_duckdb_conn():
-    import duckdb
-    return duckdb.connect(database=":memory:")
+    from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
+    return create_heavy_query_connection()
 
 
 def _attach_spool_view(conn: Any, parquet_path: str) -> None:

@@ -458,7 +458,7 @@ def try_compute_batch_pareto_from_spool(
         }
 
     try:
-        import duckdb  # type: ignore
+        from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
     except Exception:
         return None, {
             "pareto_source": "legacy",
@@ -467,15 +467,20 @@ def try_compute_batch_pareto_from_spool(
 
     parquet_path = get_spool_file_path(namespace, query_id)
     if not parquet_path:
+        from mes_dashboard.core.heavy_query_telemetry import record_spool_miss
+        record_spool_miss("reject_cache", query_id)
         return None, {
             "pareto_source": "legacy",
             "pareto_sql_fallback_reason": SQL_FALLBACK_SPOOL_MISS,
         }
 
+    from mes_dashboard.core.heavy_query_telemetry import record_spool_hit
+    record_spool_hit("reject_cache", query_id)
+
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = create_heavy_query_connection()
         _attach_spool_source_view(conn, parquet_path)
         cols = _available_columns(conn)
         if not cols:
@@ -601,6 +606,8 @@ def try_compute_batch_pareto_from_spool(
         return result, meta
     except Exception as exc:
         logger.warning("cache-sql batch-pareto failed (query_id=%s): %s", query_id, exc)
+        from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
+        record_lifecycle_failure("reject_cache", reason="runtime_error")
         return None, {
             "pareto_source": "legacy",
             "pareto_sql_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR,
@@ -636,18 +643,23 @@ def try_compute_view_from_spool(
     if not _CACHE_SQL_ENABLED or not _CACHE_SQL_VIEW_ENABLED:
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_DISABLED}
     try:
-        import duckdb  # type: ignore
+        from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
     except Exception:
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
     parquet_path = get_spool_file_path(namespace, query_id)
     if not parquet_path:
+        from mes_dashboard.core.heavy_query_telemetry import record_spool_miss
+        record_spool_miss("reject_cache", query_id)
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    from mes_dashboard.core.heavy_query_telemetry import record_spool_hit
+    record_spool_hit("reject_cache", query_id)
 
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = create_heavy_query_connection()
         _attach_spool_source_view(conn, parquet_path)
         cols = _available_columns(conn)
         if not cols:
@@ -824,6 +836,8 @@ def try_compute_view_from_spool(
         }
     except Exception as exc:
         logger.warning("cache-sql view failed (query_id=%s): %s", query_id, exc)
+        from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
+        record_lifecycle_failure("reject_cache", reason="view_runtime_error")
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
     finally:
         if conn is not None:
@@ -855,18 +869,20 @@ def try_iter_export_rows_from_spool(
     if not _CACHE_SQL_ENABLED or not _CACHE_SQL_EXPORT_ENABLED:
         return None, {"export_sql_fallback_reason": SQL_FALLBACK_DISABLED}
     try:
-        import duckdb  # type: ignore
+        from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
     except Exception:
         return None, {"export_sql_fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
     parquet_path = get_spool_file_path(namespace, query_id)
     if not parquet_path:
+        from mes_dashboard.core.heavy_query_telemetry import record_spool_miss
+        record_spool_miss("reject_cache", query_id)
         return None, {"export_sql_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
 
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = create_heavy_query_connection()
         _attach_spool_source_view(conn, parquet_path)
         cols = _available_columns(conn)
         if not cols:
@@ -981,4 +997,6 @@ def try_iter_export_rows_from_spool(
             except Exception:
                 pass
         logger.warning("cache-sql export failed (query_id=%s): %s", query_id, exc)
+        from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
+        record_lifecycle_failure("reject_cache", reason="export_runtime_error")
         return None, {"export_sql_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}

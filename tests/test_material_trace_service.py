@@ -26,9 +26,9 @@ from mes_dashboard.services.material_trace_service import (
 )
 from mes_dashboard.sql import QueryBuilder
 
-# Common patch targets for Redis / cache / GC
-_PATCH_REDIS_LOAD = "mes_dashboard.services.material_trace_service.redis_load_df"
-_PATCH_REDIS_STORE = "mes_dashboard.services.material_trace_service.redis_store_df"
+# Common patch targets for spool cache / GC
+_PATCH_REDIS_LOAD = "mes_dashboard.services.material_trace_service.load_spooled_df"
+_PATCH_REDIS_STORE = "mes_dashboard.services.material_trace_service.store_spooled_df"
 _PATCH_GC = "mes_dashboard.services.material_trace_service.maybe_gc_collect"
 
 
@@ -520,8 +520,10 @@ class TestRedisCache:
 
         mock_redis_store.assert_called_once()
         call_args = mock_redis_store.call_args
-        assert call_args[0][0].startswith("mt:result:")
-        assert call_args[1]["ttl"] == 300
+        # store_spooled_df(namespace, spool_id, df, ttl_seconds=...)
+        assert call_args[0][0] == "material_trace"
+        assert call_args[0][1].startswith("mt.result.")
+        assert call_args[1]["ttl_seconds"] == 300
 
 
 # ============================================================

@@ -1,7 +1,21 @@
-## ADDED Requirements
+## Purpose
+
+Define the canonical Parquet spool write and DuckDB view-engine contracts for heavy-query modules. All covered modules SHALL write primary query results to Parquet spool and compute view results out-of-core via DuckDB.
+
+## Requirements
 
 ### Requirement: Dataset cache modules SHALL write primary query results to Parquet spool via streaming merge
-Dataset cache modules that use `batch_query_engine` for chunked Oracle queries SHALL output results to Parquet spool files using `merge_chunks_to_spool()` instead of assembling full in-memory DataFrames.
+All covered heavy-query modules that produce reusable result sets SHALL write those results to Parquet spool, using streaming merge for chunked execution paths and spool-safe direct persistence for smaller direct paths.
+
+#### Scenario: Chunked heavy query writes to spool
+- **WHEN** a covered heavy-query module executes a chunked Oracle query plan
+- **THEN** the module SHALL stream-merge chunk results into a canonical Parquet spool result
+- **THEN** peak merge memory SHALL remain proportional to chunk size, not full result size
+
+#### Scenario: Direct heavy query writes to spool
+- **WHEN** a covered heavy-query module executes a non-chunked direct query path
+- **THEN** the module SHALL still persist the reusable result body to canonical Parquet spool
+- **THEN** the direct path SHALL not switch to Redis body storage as an alternative L2 representation
 
 #### Scenario: Streaming merge to spool after chunked query
 - **WHEN** `execute_plan()` completes all chunks for a primary query
@@ -15,7 +29,17 @@ Dataset cache modules that use `batch_query_engine` for chunked Oracle queries S
 - **THEN** the spool metadata SHALL include row_count, file_size_bytes, and columns_hash
 
 ### Requirement: DuckDB SQL runtime modules SHALL compute view results from Parquet spool out-of-core
-Each dataset that has a Parquet spool SHALL have a corresponding SQL runtime module that computes view results using DuckDB `read_parquet()` without loading the full dataset into memory.
+Covered heavy-query modules SHALL use DuckDB-over-Parquet as the canonical runtime for page, view, export, and replayable result computation.
+
+#### Scenario: View and export from spool
+- **WHEN** a client requests pagination, filtered views, derived summaries, or export for a reusable heavy-query result
+- **THEN** the runtime SHALL resolve the canonical spool and execute through DuckDB or an equivalent spool-safe reader
+- **THEN** the runtime SHALL avoid full-result pandas materialization in the web worker as the primary path
+
+#### Scenario: Spool miss or runtime failure
+- **WHEN** the canonical spool cannot be resolved or the DuckDB runtime cannot execute
+- **THEN** the system SHALL return an explicit expired/unavailable result lifecycle response
+- **THEN** the module SHALL not silently fall back to a second canonical result-storage model
 
 #### Scenario: Out-of-core view computation
 - **WHEN** a view query is received with a valid query_id
@@ -28,6 +52,19 @@ Each dataset that has a Parquet spool SHALL have a corresponding SQL runtime mod
 - **THEN** the system SHALL return `{ success: false, error: "cache_expired" }` with HTTP 410
 - **THEN** the system SHALL NOT fall back to the Pandas-based view derivation
 - **THEN** the client SHALL re-trigger `execute_primary_query()` to rebuild the spool
+
+### Requirement: Heavy-query DuckDB runtimes SHALL use a shared bounded runtime policy
+All covered DuckDB heavy-query runtimes SHALL use a shared runtime policy for memory and concurrency governance.
+
+#### Scenario: Runtime connection creation
+- **WHEN** a heavy-query runtime opens a DuckDB connection
+- **THEN** it SHALL apply the shared memory-limit policy
+- **THEN** it SHALL apply the shared thread-limit policy
+- **THEN** equivalent heavy-query runtimes SHALL not diverge into unrelated per-module defaults
+
+#### Scenario: Runtime observability
+- **WHEN** a heavy-query runtime executes a page, view, or export operation
+- **THEN** logs and telemetry SHALL identify the canonical query/spool identity and whether the request was a spool hit or lifecycle miss
 
 ### Requirement: DuckDB SQL runtime modules SHALL be gated by feature flags
 Each SQL runtime module SHALL be controlled by a boolean feature flag that defaults to enabled.

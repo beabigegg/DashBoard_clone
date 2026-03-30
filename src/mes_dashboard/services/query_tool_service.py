@@ -2269,7 +2269,10 @@ def get_equipment_status_hours(
 
     try:
         from mes_dashboard.services.batch_query_engine import compute_query_hash
-        from mes_dashboard.core.redis_df_store import redis_load_df, redis_store_df
+        from mes_dashboard.core.query_spool_store import load_spooled_df, store_spooled_df
+
+        _QT_EQUIP_SPOOL_NS = "query_tool_equipment"
+        _QT_EQUIP_SPOOL_TTL = 300
 
         cache_hash = compute_query_hash({
             "fn": "equipment_status_hours",
@@ -2277,8 +2280,8 @@ def get_equipment_status_hours(
             "start_date": start_date,
             "end_date": end_date,
         })
-        cache_key = f"qt:equip_status:{cache_hash}"
-        cached_df = redis_load_df(cache_key)
+        spool_query_id = f"qt.equip.{cache_hash}"
+        cached_df = load_spooled_df(_QT_EQUIP_SPOOL_NS, spool_query_id)
 
         if cached_df is not None:
             df = cached_df
@@ -2293,7 +2296,7 @@ def get_equipment_status_hours(
             params.update(builder.params)
             df = read_sql_df_slow(sql, params)
             if df is not None and not df.empty:
-                redis_store_df(cache_key, df, ttl=300)
+                store_spooled_df(_QT_EQUIP_SPOOL_NS, spool_query_id, df, ttl_seconds=_QT_EQUIP_SPOOL_TTL)
 
         data = _df_to_records(df)
 

@@ -668,8 +668,8 @@ def _extract_workorders_from_spool(query_id: str) -> list[str]:
     if spool_path is None:
         return []
     try:
-        import duckdb
-        conn = duckdb.connect(":memory:")
+        from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
+        conn = create_heavy_query_connection()
         try:
             rows = conn.execute(
                 'SELECT DISTINCT "WORKORDER" FROM read_parquet(?)', [spool_path]
@@ -728,8 +728,8 @@ def execute_linkage_query(*, query_id: str) -> Optional[dict[str, Any]]:
     # If date range is missing from payload, derive it from the spool via DuckDB
     if not start_date or not end_date:
         try:
-            import duckdb
-            conn = duckdb.connect(":memory:")
+            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
+            conn = create_heavy_query_connection()
             try:
                 row = conn.execute(
                     'SELECT MIN("DATE_BUCKET"), MAX("DATE_BUCKET") FROM read_parquet(?)',

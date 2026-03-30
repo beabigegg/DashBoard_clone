@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from mes_dashboard.config.constants import CACHE_TTL_FILTER_GENERAL
+from mes_dashboard.core.cache_plane import snapshot_redis_ttl
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.redis_client import (
     get_key,
@@ -27,7 +28,9 @@ logger = logging.getLogger("mes_dashboard.container_filter_cache")
 
 _REDIS_KEY = get_key("container_filter_cache:data")
 _LOCK_NAME = "container_filter_cache_refresh"
-_TTL = CACHE_TTL_FILTER_GENERAL  # 24 hours (after 6.1 update)
+# Refresh check interval (24 hours); Redis TTL uses snapshot-plane policy (2x).
+_TTL = CACHE_TTL_FILTER_GENERAL
+_REDIS_TTL = snapshot_redis_ttl(_TTL)
 
 _CACHE_LOCK = threading.Lock()
 _CACHE: dict = {
@@ -177,7 +180,7 @@ def _write_to_redis(packages: List[str], pj_types: List[str], updated_at: str) -
             "pj_types": pj_types,
             "updated_at": updated_at,
         })
-        client.set(_REDIS_KEY, payload, ex=_TTL)
-        logger.debug("container_filter_cache written to Redis (TTL=%ds)", _TTL)
+        client.set(_REDIS_KEY, payload, ex=_REDIS_TTL)
+        logger.debug("container_filter_cache written to Redis (TTL=%ds)", _REDIS_TTL)
     except Exception as exc:
         logger.warning("container_filter_cache: Redis write failed: %s", exc)

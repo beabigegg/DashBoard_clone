@@ -783,18 +783,23 @@ def try_compute_view_from_spool(
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_DISABLED}
 
     try:
-        import duckdb  # type: ignore
+        from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
     except Exception:
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
     parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
     if not parquet_path:
+        from mes_dashboard.core.heavy_query_telemetry import record_spool_miss
+        record_spool_miss("yield_alert", query_id)
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    from mes_dashboard.core.heavy_query_telemetry import record_spool_hit
+    record_spool_hit("yield_alert", query_id)
 
     started_at = time.time()
     conn = None
     try:
-        conn = duckdb.connect(database=":memory:")
+        conn = create_heavy_query_connection()
         _attach_spool_view(conn, parquet_path)
 
         reason_excl_sql, reason_excl_params = _build_reason_exclusion_sql(excluded_reason_tokens)
@@ -882,6 +887,8 @@ def try_compute_view_from_spool(
             "yield_alert_sql_runtime: DuckDB view failed (query_id=%s): %s",
             query_id, exc,
         )
+        from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
+        record_lifecycle_failure("yield_alert", reason="runtime_error")
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_RUNTIME_ERROR}
     finally:
         if conn is not None:

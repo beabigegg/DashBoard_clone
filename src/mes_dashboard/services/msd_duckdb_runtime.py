@@ -63,7 +63,13 @@ class MsdDuckdbRuntime:
     def is_available(self) -> bool:
         """Return True if at least the events spool file is present."""
         self._resolve_paths()
-        return bool(self._events_path and Path(self._events_path).exists())
+        available = bool(self._events_path and Path(self._events_path).exists())
+        from mes_dashboard.core.heavy_query_telemetry import record_spool_hit, record_spool_miss
+        if available:
+            record_spool_hit("msd", self.trace_query_id)
+        else:
+            record_spool_miss("msd", self.trace_query_id)
+        return available
 
     # ------------------------------------------------------------------
     # Summary / KPI
@@ -76,9 +82,9 @@ class MsdDuckdbRuntime:
             return None
 
         try:
-            import duckdb
+            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
 
-            conn = duckdb.connect(database=":memory:", read_only=False)
+            conn = create_heavy_query_connection()
             conn.execute(f"CREATE VIEW events AS SELECT * FROM read_parquet('{self._events_path}')")
 
             kpi = self._compute_kpi(conn)
@@ -103,6 +109,8 @@ class MsdDuckdbRuntime:
             }
         except Exception as exc:
             logger.warning("MsdDuckdbRuntime.get_summary failed (trace_query_id=%s): %s", self.trace_query_id, exc)
+            from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
+            record_lifecycle_failure("msd", reason="runtime_error")
             return None
 
     def _compute_kpi(self, conn) -> Dict[str, Any]:
@@ -242,9 +250,9 @@ class MsdDuckdbRuntime:
         offset = max(0, (page - 1) * per_page)
 
         try:
-            import duckdb
+            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
 
-            conn = duckdb.connect(database=":memory:", read_only=False)
+            conn = create_heavy_query_connection()
             conn.execute(f"CREATE VIEW events AS SELECT * FROM read_parquet('{self._events_path}')")
 
             total_row = conn.execute("SELECT COUNT(*) FROM events").fetchone()
@@ -298,9 +306,9 @@ class MsdDuckdbRuntime:
             sort_lower = "defect_qty"
 
         try:
-            import duckdb
+            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
 
-            conn = duckdb.connect(database=":memory:", read_only=False)
+            conn = create_heavy_query_connection()
             conn.execute(f"CREATE VIEW events AS SELECT * FROM read_parquet('{self._events_path}')")
             rows = conn.execute(
                 f"""
@@ -332,11 +340,11 @@ class MsdDuckdbRuntime:
             return
 
         try:
-            import duckdb
+            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
             import io
             import csv
 
-            conn = duckdb.connect(database=":memory:", read_only=False)
+            conn = create_heavy_query_connection()
             conn.execute(f"CREATE VIEW events AS SELECT * FROM read_parquet('{self._events_path}')")
 
             # Get column names

@@ -23,6 +23,7 @@ from typing import Any, Optional
 import pandas as pd
 
 from mes_dashboard.core.redis_client import (
+    get_control_redis_client,
     get_key,
     get_redis_client,
     release_lock,
@@ -387,9 +388,9 @@ def read_spool_records(namespace: str, query_id: str) -> Optional[list[dict[str,
         return None
 
     try:
-        import duckdb  # type: ignore
+        from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
 
-        conn = duckdb.connect(database=":memory:")
+        conn = create_heavy_query_connection()
         rel = conn.read_parquet(spool_path)
         columns = rel.columns
         types = rel.types
@@ -795,3 +796,155 @@ def stop_query_spool_cleanup_worker(timeout: int = 5) -> None:
     _STOP_EVENT.set()
     _WORKER_THREAD.join(timeout=timeout)
     _WORKER_THREAD = None
+
+
+# ============================================================
+# Canonical Query Identity Contract
+# ============================================================
+
+_VALID_DOMAIN_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+
+
+def make_canonical_query_id(domain: str, params: dict[str, Any]) -> str:
+    """Derive a deterministic canonical query identity from domain + params.
+
+    The identity is a stable SHA-256-based hex string that uniquely
+    identifies a (domain, parameter-set) pair.  Callers should canonicalize
+    *params* before hashing (sort keys, normalize types).
+
+    Args:
+        domain: Short domain label (e.g. "reject", "material_trace").
+        params: Dict of query parameters that define the query identity.
+
+    Returns:
+        32-character hex string suitable for use as a spool query_id.
+    """
+    domain_safe = re.sub(r"[^A-Za-z0-9._-]", "_", str(domain or "unknown").strip()) or "unknown"
+    canonical = json.dumps(params, sort_keys=True, ensure_ascii=True, default=str)
+    payload = f"{domain_safe}:{canonical}"
+    return f"{domain_safe}." + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
+
+
+# ============================================================
+# Inflight State Contract
+# ============================================================
+
+_INFLIGHT_KEY_TTL_SECONDS = 300  # default inflight state TTL
+
+
+def _inflight_key(namespace: str, query_id: str) -> str:
+    ns = _normalize_namespace(namespace)
+    return f"{ns}:inflight:{query_id}"
+
+
+def set_inflight_state(
+    namespace: str,
+    query_id: str,
+    state: dict[str, Any],
+    *,
+    ttl_seconds: int = _INFLIGHT_KEY_TTL_SECONDS,
+) -> bool:
+    """Publish lightweight inflight state for a running heavy-query job.
+
+    Redis stores only control-plane metadata (job_id, status, worker, etc.),
+    never the result body.
+
+    Args:
+        namespace: Spool namespace (matches the spool namespace for this domain).
+        query_id: Canonical query identity.
+        state: Dict of inflight metadata (job_id, status, started_at, …).
+        ttl_seconds: State expiry; should exceed expected job duration.
+
+    Returns:
+        True if saved to Redis successfully.
+    """
+    safe_id = _safe_query_id(query_id)
+    if not safe_id:
+        return False
+    client = get_control_redis_client()
+    if client is None:
+        return False
+    key = get_key(_inflight_key(namespace, safe_id))
+    try:
+        payload = json.dumps(state, ensure_ascii=False, default=str)
+        client.setex(key, max(int(ttl_seconds), 10), payload)
+        return True
+    except Exception as exc:
+        logger.warning("Failed to set inflight state for %s: %s", safe_id, exc)
+        return False
+
+
+def get_inflight_state(namespace: str, query_id: str) -> Optional[dict[str, Any]]:
+    """Return current inflight state for a running heavy-query job, or None."""
+    safe_id = _safe_query_id(query_id)
+    if not safe_id:
+        return None
+    client = get_control_redis_client()
+    if client is None:
+        return None
+    key = get_key(_inflight_key(namespace, safe_id))
+    try:
+        raw = client.get(key)
+        if not raw:
+            return None
+        payload = json.loads(raw)
+        return payload if isinstance(payload, dict) else None
+    except Exception as exc:
+        logger.warning("Failed to get inflight state for %s: %s", safe_id, exc)
+        return None
+
+
+def clear_inflight_state(namespace: str, query_id: str) -> None:
+    """Remove inflight state when a job completes or fails."""
+    safe_id = _safe_query_id(query_id)
+    if not safe_id:
+        return
+    client = get_control_redis_client()
+    if client is None:
+        return
+    key = get_key(_inflight_key(namespace, safe_id))
+    try:
+        client.delete(key)
+    except Exception as exc:
+        logger.warning("Failed to clear inflight state for %s: %s", safe_id, exc)
+
+
+# ============================================================
+# Spool Metadata Status Helpers
+# ============================================================
+
+def update_spool_status(namespace: str, query_id: str, status: str) -> bool:
+    """Patch the status field on an existing spool metadata record.
+
+    Does not change TTL or any other metadata field.  Returns False if the
+    metadata key is missing or Redis is unavailable.
+
+    Args:
+        namespace: Spool namespace.
+        query_id: Canonical query identity.
+        status: New status string (use constants from cache_plane module).
+    """
+    safe_id = _safe_query_id(query_id)
+    if not safe_id:
+        return False
+    client = get_redis_client()
+    if client is None:
+        return False
+    key = get_key(_meta_key(namespace, safe_id))
+    try:
+        raw = client.get(key)
+        if not raw:
+            return False
+        metadata = json.loads(raw)
+        if not isinstance(metadata, dict):
+            return False
+        metadata["status"] = str(status)
+        # Preserve remaining TTL
+        remaining_ttl = client.ttl(key)
+        if remaining_ttl is None or remaining_ttl <= 0:
+            remaining_ttl = QUERY_SPOOL_TTL_SECONDS
+        client.setex(key, int(remaining_ttl), json.dumps(metadata, ensure_ascii=False, sort_keys=True))
+        return True
+    except Exception as exc:
+        logger.warning("Failed to update spool status for %s: %s", safe_id, exc)
+        return False

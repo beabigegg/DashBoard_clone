@@ -38,11 +38,11 @@ def test_is_async_available_false_no_redis():
 # enqueue_trace_events_job
 # ---------------------------------------------------------------------------
 @patch.object(tjs, "_get_rq_queue")
-@patch.object(tjs, "get_redis_client")
-def test_enqueue_success(mock_redis, mock_queue_fn):
-    """Enqueue should return a job_id and store metadata in Redis."""
-    conn = MagicMock()
-    mock_redis.return_value = conn
+@patch.object(tjs, "get_control_redis_client")
+def test_enqueue_success(mock_ctrl_redis, mock_queue_fn):
+    """Enqueue should return a job_id and store metadata in control-plane Redis."""
+    ctrl = MagicMock()
+    mock_ctrl_redis.return_value = ctrl
 
     queue = MagicMock()
     mock_queue_fn.return_value = queue
@@ -55,8 +55,8 @@ def test_enqueue_success(mock_redis, mock_queue_fn):
     assert job_id.startswith("trace-evt-")
     assert err is None
     queue.enqueue.assert_called_once()
-    conn.hset.assert_called_once()
-    conn.expire.assert_called_once()
+    ctrl.hset.assert_called_once()
+    ctrl.expire.assert_called_once()
 
 
 @patch.object(tjs, "_get_rq_queue", return_value=None)
@@ -71,11 +71,11 @@ def test_enqueue_no_queue(mock_queue_fn):
 
 
 @patch.object(tjs, "_get_rq_queue")
-@patch.object(tjs, "get_redis_client")
-def test_enqueue_queue_error(mock_redis, mock_queue_fn):
+@patch.object(tjs, "get_control_redis_client")
+def test_enqueue_queue_error(mock_ctrl_redis, mock_queue_fn):
     """Enqueue should return error when queue.enqueue raises."""
-    conn = MagicMock()
-    mock_redis.return_value = conn
+    ctrl = MagicMock()
+    mock_ctrl_redis.return_value = ctrl
 
     queue = MagicMock()
     queue.enqueue.side_effect = RuntimeError("connection refused")
@@ -87,16 +87,16 @@ def test_enqueue_queue_error(mock_redis, mock_queue_fn):
 
     assert job_id is None
     assert "connection refused" in err
-    # Meta key should be cleaned up
-    conn.delete.assert_called_once()
+    # Meta key should be cleaned up on control-plane Redis
+    ctrl.delete.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
 # get_job_status
 # ---------------------------------------------------------------------------
-@patch.object(tjs, "get_redis_client")
-def test_get_job_status_found(mock_redis):
-    """Should return status dict from Redis hash."""
+@patch.object(tjs, "get_control_redis_client")
+def test_get_job_status_found(mock_ctrl_redis):
+    """Should return status dict from control-plane Redis hash."""
     conn = MagicMock()
     conn.hgetall.return_value = {
         "profile": "query_tool",
@@ -108,7 +108,7 @@ def test_get_job_status_found(mock_redis):
         "completed_at": "",
         "error": "",
     }
-    mock_redis.return_value = conn
+    mock_ctrl_redis.return_value = conn
 
     status = tjs.get_job_status("trace-evt-abc123")
 
@@ -120,12 +120,12 @@ def test_get_job_status_found(mock_redis):
     assert status["error"] is None
 
 
-@patch.object(tjs, "get_redis_client")
-def test_get_job_status_not_found(mock_redis):
+@patch.object(tjs, "get_control_redis_client")
+def test_get_job_status_not_found(mock_ctrl_redis):
     """Should return None when job metadata does not exist."""
     conn = MagicMock()
     conn.hgetall.return_value = {}
-    mock_redis.return_value = conn
+    mock_ctrl_redis.return_value = conn
 
     assert tjs.get_job_status("trace-evt-nonexistent") is None
 
@@ -260,66 +260,73 @@ def test_get_job_result_with_domain_filter(mock_redis):
 # ---------------------------------------------------------------------------
 # execute_trace_events_job (worker entry point)
 # ---------------------------------------------------------------------------
+@patch.object(tjs, "_write_trace_events_spool")
 @patch.object(tjs, "get_redis_client")
+@patch.object(tjs, "get_control_redis_client")
 @patch("mes_dashboard.services.event_fetcher.EventFetcher.fetch_events")
-def test_execute_job_success(mock_fetch, mock_redis):
-    """Worker should fetch events, store result, and update meta to finished."""
+def test_execute_job_success(mock_fetch, mock_ctrl_redis, mock_redis, mock_spool):
+    """Worker should fetch events, store lightweight manifest, and update meta to finished."""
     mock_fetch.return_value = {"CID-1": [{"CONTAINERID": "CID-1"}]}
 
     conn = MagicMock()
+    ctrl = MagicMock()
     mock_redis.return_value = conn
+    mock_ctrl_redis.return_value = ctrl
+    mock_spool.return_value = None  # spool write is a no-op in tests
 
     tjs.execute_trace_events_job(
         "test-job-1", "query_tool", ["CID-1"], ["history"], {},
     )
 
     mock_fetch.assert_called_once_with(["CID-1"], "history")
+    mock_spool.assert_called_once()  # spool write was attempted
 
-    # Result should be stored as chunked keys (chunk + result meta)
+    # Result manifest stored on cache-plane Redis (1 setex: result:meta)
     setex_calls = [c for c in conn.method_calls if c[0] == "setex"]
-    assert len(setex_calls) == 2  # 1 chunk + 1 result meta
-
-    # Find the result meta setex call
     result_meta_call = [c for c in setex_calls if ":result:meta" in str(c)]
     assert len(result_meta_call) == 1
     stored_meta = json.loads(result_meta_call[0][1][2])
     assert "history" in stored_meta["domains"]
     assert stored_meta["domains"]["history"]["total"] == 1
+    assert "query_id" in stored_meta  # spool-backed manifest includes query_id
 
-    # Find the chunk setex call
-    chunk_call = [c for c in setex_calls if ":result:history:0" in str(c)]
-    assert len(chunk_call) == 1
-    stored_chunk = json.loads(chunk_call[0][1][2])
-    assert len(stored_chunk) == 1
-    assert stored_chunk[0]["CONTAINERID"] == "CID-1"
+    # No chunk keys (row data is in spool, not Redis)
+    chunk_calls = [c for c in setex_calls if ":result:history:" in str(c)]
+    assert len(chunk_calls) == 0
 
-    # Job meta should be updated to finished
-    hset_calls = [c for c in conn.method_calls if c[0] == "hset"]
+    # Job meta (hset) should be on control-plane Redis, status=finished
+    hset_calls = [c for c in ctrl.method_calls if c[0] == "hset"]
     last_meta = hset_calls[-1][2]["mapping"]
     assert last_meta["status"] == "finished"
 
 
+@patch.object(tjs, "_write_trace_events_spool")
 @patch.object(tjs, "get_redis_client")
+@patch.object(tjs, "get_control_redis_client")
 @patch("mes_dashboard.services.event_fetcher.EventFetcher.fetch_events")
-def test_execute_job_domain_failure_records_partial(mock_fetch, mock_redis):
+def test_execute_job_domain_failure_records_partial(mock_fetch, mock_ctrl_redis, mock_redis, mock_spool):
     """Domain fetch failure should result in partial failure, not job crash."""
     mock_fetch.side_effect = RuntimeError("db timeout")
 
     conn = MagicMock()
+    ctrl = MagicMock()
     mock_redis.return_value = conn
+    mock_ctrl_redis.return_value = ctrl
+    mock_spool.return_value = None
 
     tjs.execute_trace_events_job(
         "test-job-2", "query_tool", ["CID-1"], ["history"], {},
     )
 
-    # Result meta should still be stored (with failed_domains)
+    # Result manifest stored with failed_domains
     setex_calls = [c for c in conn.method_calls if c[0] == "setex"]
-    assert len(setex_calls) == 1  # only result meta (no chunks since domain failed)
-    stored_meta = json.loads(setex_calls[0][1][2])
+    result_meta_call = [c for c in setex_calls if ":result:meta" in str(c)]
+    assert len(result_meta_call) == 1
+    stored_meta = json.loads(result_meta_call[0][1][2])
     assert "history" in stored_meta["failed_domains"]
 
-    # Job meta should still be finished (partial failure is not a job crash)
-    hset_calls = [c for c in conn.method_calls if c[0] == "hset"]
+    # Job meta should still be finished on control-plane Redis
+    hset_calls = [c for c in ctrl.method_calls if c[0] == "hset"]
     last_meta = hset_calls[-1][2]["mapping"]
     assert last_meta["status"] == "finished"
 

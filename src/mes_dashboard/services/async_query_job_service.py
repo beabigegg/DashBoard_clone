@@ -17,7 +17,7 @@ import uuid
 import threading
 from typing import Any, Dict, Optional, Tuple
 
-from mes_dashboard.core.redis_client import get_key, get_redis_client
+from mes_dashboard.core.redis_client import get_control_redis_client, get_key, get_redis_client
 try:
     from rq import Retry
 except Exception:  # pragma: no cover - optional dependency path
@@ -139,14 +139,14 @@ def enqueue_job(
     if not _check_rq_installed():
         return None, "async queue unavailable (RQ not installed)"
 
-    conn = get_redis_client()
-    if conn is None:
+    ctrl = get_control_redis_client()
+    if ctrl is None:
         return None, "async queue unavailable (Redis unreachable)"
 
     if job_id is None:
         job_id = f"{queue_name}-{uuid.uuid4().hex[:12]}"
 
-    # Write initial metadata before enqueue so status is visible immediately
+    # Write initial metadata to control-plane Redis (not subject to cache eviction)
     meta = {
         "status": "queued",
         "queue_name": queue_name,
@@ -161,12 +161,14 @@ def enqueue_job(
         "error": "",
     }
     key = _meta_key(prefix, job_id)
-    conn.hset(key, mapping=meta)
-    conn.expire(key, result_ttl)
+    ctrl.hset(key, mapping=meta)
+    ctrl.expire(key, result_ttl)
 
     try:
         if retry is _DEFAULT_RETRY_SENTINEL:
             retry = _build_default_retry()
+        # RQ queue uses main Redis (workers also connect via REDIS_URL)
+        conn = get_redis_client()
         from rq import Queue
         queue = Queue(queue_name, connection=conn)
         queue.enqueue(
@@ -181,7 +183,7 @@ def enqueue_job(
     except Exception as exc:
         logger.error("async_query_job_service: enqueue failed job_id=%s: %s", job_id, exc, exc_info=True)
         try:
-            conn.hset(key, mapping={"status": "failed", "error": str(exc)})
+            ctrl.hset(key, mapping={"status": "failed", "error": str(exc)})
         except Exception:
             pass
         return None, f"enqueue failed: {exc}"
@@ -195,7 +197,7 @@ def enqueue_job(
 
 def get_job_status(prefix: str, job_id: str) -> Optional[Dict[str, Any]]:
     """Get job status from Redis metadata.  Returns None if not found."""
-    conn = get_redis_client()
+    conn = get_control_redis_client()
     if conn is None:
         return None
 
@@ -256,7 +258,7 @@ def get_job_status(prefix: str, job_id: str) -> Optional[Dict[str, Any]]:
 
 def update_job_progress(prefix: str, job_id: str, **fields) -> None:
     """Update Redis HSET fields for a running job."""
-    conn = get_redis_client()
+    conn = get_control_redis_client()
     if conn is None:
         return
     key = _meta_key(prefix, job_id)
@@ -280,7 +282,7 @@ def complete_job(
     pipelines where query_id and dataset_id differ).
     """
     global _FAILED_JOB_COUNT
-    conn = get_redis_client()
+    conn = get_control_redis_client()
     if conn is None:
         return
 

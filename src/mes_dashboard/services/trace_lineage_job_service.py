@@ -11,7 +11,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from mes_dashboard.core.redis_client import get_key, get_redis_client
+
 from mes_dashboard.services.async_query_job_service import (
     complete_job,
     enqueue_job,
@@ -42,6 +42,8 @@ TRACE_LINEAGE_JOB_TTL_SECONDS = int(
 _JOB_PREFIX = "trace-lineage"
 _PROFILE_QUERY_TOOL_REVERSE = "query_tool_reverse"
 _PROFILE_MID_SECTION_DEFECT = "mid_section_defect"
+
+_TRACE_LINEAGE_SPOOL_NS = "trace_lineage"
 
 
 def _normalize_container_ids(container_ids: List[str]) -> List[str]:
@@ -77,36 +79,37 @@ def make_trace_lineage_query_id(
     return f"trace-lineage-{safe_profile}-{digest}"[:128]
 
 
-def _result_key(query_id: str) -> str:
-    return get_key(f"trace:lineage:result:{query_id}")
-
-
 def load_trace_lineage_result(query_id: str) -> Optional[Dict[str, Any]]:
-    conn = get_redis_client()
-    if conn is None:
-        return None
+    """Load trace lineage result from spool-backed storage."""
+    from mes_dashboard.core.query_spool_store import load_spooled_df
     try:
-        raw = conn.get(_result_key(query_id))
-    except Exception:
+        df = load_spooled_df(_TRACE_LINEAGE_SPOOL_NS, query_id)
+        if df is None or df.empty:
+            return None
+        json_str = df["payload"].iloc[0]
+        payload = json.loads(json_str)
+        return payload if isinstance(payload, dict) else None
+    except Exception as exc:
+        logger.warning("trace lineage result load failed query_id=%s: %s", query_id, exc)
         return None
-    if not raw:
-        return None
-    try:
-        payload = json.loads(raw)
-    except Exception:
-        return None
-    return payload if isinstance(payload, dict) else None
 
 
 def _store_trace_lineage_result(query_id: str, payload: Dict[str, Any]) -> bool:
-    conn = get_redis_client()
-    if conn is None:
-        return False
+    """Store trace lineage result to spool-backed storage.
+
+    Serializes the lineage graph as a single-row Parquet spool so Redis
+    retains only job metadata and progress, not the full result body.
+    """
+    import pandas as pd
+    from mes_dashboard.core.query_spool_store import store_spooled_df
     try:
-        conn.setex(
-            _result_key(query_id),
-            max(TRACE_LINEAGE_JOB_TTL_SECONDS, 60),
-            json.dumps(payload, ensure_ascii=False, default=str),
+        json_str = json.dumps(payload, ensure_ascii=False, default=str)
+        df = pd.DataFrame({"payload": [json_str]})
+        store_spooled_df(
+            _TRACE_LINEAGE_SPOOL_NS,
+            query_id,
+            df,
+            ttl_seconds=max(TRACE_LINEAGE_JOB_TTL_SECONDS, 60),
         )
         return True
     except Exception as exc:

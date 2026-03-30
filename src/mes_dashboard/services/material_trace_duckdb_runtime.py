@@ -59,7 +59,13 @@ class MaterialTraceDuckdbRuntime:
     def is_available(self) -> bool:
         """Return True if the spool parquet file exists on disk."""
         self._resolve_path()
-        return bool(self._spool_path and Path(self._spool_path).exists())
+        available = bool(self._spool_path and Path(self._spool_path).exists())
+        from mes_dashboard.core.heavy_query_telemetry import record_spool_hit, record_spool_miss
+        if available:
+            record_spool_hit("material_trace", self.query_hash)
+        else:
+            record_spool_miss("material_trace", self.query_hash)
+        return available
 
     def get_page(
         self,
@@ -81,9 +87,9 @@ class MaterialTraceDuckdbRuntime:
         offset = (safe_page - 1) * safe_per_page
 
         try:
-            import duckdb
+            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
 
-            conn = duckdb.connect(database=":memory:")
+            conn = create_heavy_query_connection()
             path_lit = "'" + self._spool_path.replace("'", "''") + "'"
             conn.execute(f"CREATE TEMP VIEW src AS SELECT * FROM read_parquet({path_lit})")
 
@@ -114,6 +120,8 @@ class MaterialTraceDuckdbRuntime:
                 "MaterialTraceDuckdbRuntime.get_page failed (query_hash=%s): %s",
                 self.query_hash, exc,
             )
+            from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
+            record_lifecycle_failure("material_trace", reason="runtime_error")
             return None
 
     def export_csv(self, chunk_size: int = 5000) -> Generator[bytes, None, None]:
@@ -127,9 +135,9 @@ class MaterialTraceDuckdbRuntime:
             return
 
         try:
-            import duckdb
+            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
 
-            conn = duckdb.connect(database=":memory:")
+            conn = create_heavy_query_connection()
             path_lit = "'" + self._spool_path.replace("'", "''") + "'"
             conn.execute(f"CREATE TEMP VIEW src AS SELECT * FROM read_parquet({path_lit})")
 
@@ -163,3 +171,5 @@ class MaterialTraceDuckdbRuntime:
                 "MaterialTraceDuckdbRuntime.export_csv failed (query_hash=%s): %s",
                 self.query_hash, exc,
             )
+            from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
+            record_lifecycle_failure("material_trace", reason="export_runtime_error")

@@ -163,15 +163,21 @@ Memory guard failures on Material Trace endpoints SHALL be reported as retryable
 - **THEN** response contract SHALL remain distinguishable from parameter-validation errors (`400`)
 
 ### Requirement: Material trace SHALL migrate to spool-backed execution
-Material trace queries and export SHALL migrate to RQ + parquet spool + DuckDB runtime so that large result sets no longer depend on in-memory full-result processing.
+Material trace query and export SHALL use canonical heavy-query storage: the reusable result body SHALL live in Parquet spool and all pagination, replay, and export behavior SHALL read from the canonical spool-backed result.
 
 #### Scenario: Spool hit
-- **WHEN** a material trace request matches a valid spool
-- **THEN** the route SHALL return paginated/query results from DuckDB over the existing spool
+- **WHEN** a material trace request matches a valid canonical spool-backed result
+- **THEN** the route SHALL return paginated/query results from the spool-backed runtime without rerunning Oracle work
 
-#### Scenario: Spool miss on async-capable path
-- **WHEN** no spool exists and the async contract has been enabled for material trace
-- **THEN** the route SHALL enqueue the request and return HTTP 202
+#### Scenario: Spool miss
+- **WHEN** no canonical spool-backed result exists for the request
+- **THEN** the system SHALL create one through the heavy-query execution path before the result becomes reusable
+- **THEN** Redis SHALL not become the canonical body store for that result
+
+#### Scenario: Export from canonical result
+- **WHEN** a client exports material trace results
+- **THEN** the export SHALL read from the same canonical spool-backed result identity used by query pagination and replay
+- **THEN** export behavior SHALL not require a separate full-result Redis or in-memory body cache
 
 ### Requirement: Material trace row-limit retirement SHALL follow async/runtime migration
 The existing `_REVERSE_MAX_ROWS`, `_FORWARD_MAX_ROWS`, and `_EXPORT_MAX_ROWS` limits SHALL only be removed after spool-backed runtime and frontend async handling are in place.

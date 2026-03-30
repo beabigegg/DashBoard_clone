@@ -16,7 +16,7 @@ import os
 import re
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
@@ -128,47 +128,23 @@ def _copy_to_anomaly_namespace(source_ns: str, anomaly_ns: str) -> bool:
 
 
 def _seed_spool(source_ns: str, anomaly_ns: str, lookback_days: int) -> bool:
-    """Ensure source spool exists, then copy to isolated anomaly namespace.
+    """Copy source spool to isolated anomaly namespace if source data is available.
+
+    The anomaly scheduler is a consumer of source dataset spools — it does NOT
+    trigger Oracle queries. Source dataset lifecycle ownership belongs to the
+    respective dataset cache services (snapshot-plane refresh). If the source
+    spool is absent, the anomaly scheduler skips and waits for the next cycle.
 
     Returns True if the anomaly spool was successfully created.
     """
-    today = datetime.now()
-    start_date = (today - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-    end_date = today.strftime("%Y-%m-%d")
-
-    # Step 1: Ensure source spool has data (trigger Oracle query if needed)
     if not _has_spool(source_ns):
-        logger.info("Source spool missing: %s — querying Oracle (%dd)", source_ns, lookback_days)
-        try:
-            if source_ns == "yield_alert_dataset":
-                from mes_dashboard.services.yield_alert_dataset_cache import execute_primary_query
-                execute_primary_query(start_date=start_date, end_date=end_date)
+        logger.info(
+            "Source spool missing: %s — skipping anomaly seed "
+            "(source dataset refresh has not run yet)",
+            source_ns,
+        )
+        return False
 
-            elif source_ns == "reject_dataset":
-                from mes_dashboard.services.reject_dataset_cache import execute_primary_query
-                execute_primary_query(
-                    mode="date_range", start_date=start_date, end_date=end_date,
-                )
-
-            elif source_ns == "hold_dataset":
-                from mes_dashboard.services.hold_dataset_cache import execute_primary_query
-                execute_primary_query(start_date=start_date, end_date=end_date)
-
-            elif source_ns == "resource_dataset":
-                from mes_dashboard.services.resource_dataset_cache import execute_primary_query
-                execute_primary_query(start_date=start_date, end_date=end_date)
-
-            else:
-                logger.warning("Unknown source namespace: %s", source_ns)
-                return False
-        except Exception as exc:
-            if "single_flight_timeout" in str(exc):
-                logger.warning("Spool seed contention for %s (expected during startup): %s", source_ns, exc)
-            else:
-                logger.error("Spool seed Oracle query failed for %s: %s", source_ns, exc)
-            return False
-
-    # Step 2: Copy source spool to isolated anomaly namespace
     if _copy_to_anomaly_namespace(source_ns, anomaly_ns):
         logger.info("Spool seed complete: %s -> %s (%dd)", source_ns, anomaly_ns, lookback_days)
         return True

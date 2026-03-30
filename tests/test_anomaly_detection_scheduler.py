@@ -7,40 +7,37 @@ from unittest.mock import patch, MagicMock
 
 
 class TestSpoolSeedLogLevel:
-    """Verify _seed_spool logs single_flight_timeout at WARNING, other errors at ERROR."""
+    """Verify _seed_spool consumer-only behavior: no Oracle triggers, correct log levels."""
 
-    def _run_seed_with_exception(self, exc_message: str):
-        """Run _seed_spool with a patched execute_primary_query that raises the given exception."""
+    def test_source_spool_missing_logs_info_and_returns_false(self, caplog):
+        """When source spool is absent, _seed_spool should log at INFO and return False
+        without triggering any Oracle queries (consumer-only, task 5.1)."""
         import mes_dashboard.services.anomaly_detection_scheduler as sched
 
-        with patch.object(sched, '_has_spool', return_value=False):
-            with patch(
-                'mes_dashboard.services.yield_alert_dataset_cache.execute_primary_query',
-                side_effect=Exception(exc_message),
-            ):
-                return sched._seed_spool("yield_alert_dataset", "anomaly_yield_dataset", 14)
+        with caplog.at_level(logging.INFO, logger="mes_dashboard.anomaly_detection_scheduler"):
+            with patch.object(sched, '_has_spool', return_value=False):
+                result = sched._seed_spool("yield_alert_dataset", "anomaly_yield_dataset", 14)
 
-    def test_single_flight_timeout_logs_at_warning(self, caplog):
-        """single_flight_timeout exception should log at WARNING level."""
+        assert result is False
+        # Should not log at ERROR (no exceptions thrown)
+        error_msgs = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert not error_msgs, f"Expected no ERROR logs, got: {[r.message for r in error_msgs]}"
+        # Should log at INFO explaining the skip
+        info_msgs = [r for r in caplog.records if r.levelno == logging.INFO]
+        assert any("missing" in r.message.lower() or "skip" in r.message.lower()
+                   for r in info_msgs), (
+            f"Expected INFO about missing spool, got: {[r.message for r in caplog.records]}"
+        )
+
+    def test_copy_failure_logs_warning_and_returns_false(self, caplog):
+        """If copy fails (returns False), _seed_spool should log at WARNING level."""
+        import mes_dashboard.services.anomaly_detection_scheduler as sched
+
         with caplog.at_level(logging.WARNING, logger="mes_dashboard.anomaly_detection_scheduler"):
-            result = self._run_seed_with_exception(
-                "single_flight_timeout: 查詢已有另一個 worker 正在執行"
-            )
+            with patch.object(sched, '_has_spool', return_value=True), \
+                 patch.object(sched, '_copy_to_anomaly_namespace', return_value=False):
+                result = sched._seed_spool("yield_alert_dataset", "anomaly_yield_dataset", 14)
 
         assert result is False
         warning_msgs = [r for r in caplog.records if r.levelno == logging.WARNING]
-        assert any("single_flight_timeout" in r.message or "contention" in r.message.lower()
-                   for r in warning_msgs), (
-            f"Expected WARNING with 'single_flight_timeout', got: {[r.message for r in caplog.records]}"
-        )
-        error_msgs = [r for r in caplog.records if r.levelno == logging.ERROR]
-        assert not error_msgs, f"Expected no ERROR logs, got: {[r.message for r in error_msgs]}"
-
-    def test_other_exception_logs_at_error(self, caplog):
-        """Non-single_flight_timeout exceptions should log at ERROR level."""
-        with caplog.at_level(logging.ERROR, logger="mes_dashboard.anomaly_detection_scheduler"):
-            result = self._run_seed_with_exception("ORA-12345: connection timeout")
-
-        assert result is False
-        error_msgs = [r for r in caplog.records if r.levelno == logging.ERROR]
-        assert error_msgs, f"Expected ERROR log, got: {[r.message for r in caplog.records]}"
+        assert warning_msgs, f"Expected WARNING log on copy failure, got: {[r.message for r in caplog.records]}"

@@ -125,7 +125,7 @@ class TestAsyncStageAwareProgress:
         }
 
         with patch(
-            "mes_dashboard.services.trace_job_service.get_redis_client",
+            "mes_dashboard.services.trace_job_service.get_control_redis_client",
             return_value=mock_conn,
         ):
             from mes_dashboard.services.trace_job_service import get_job_status
@@ -153,7 +153,7 @@ class TestAsyncStageAwareProgress:
         }
 
         with patch(
-            "mes_dashboard.services.trace_job_service.get_redis_client",
+            "mes_dashboard.services.trace_job_service.get_control_redis_client",
             return_value=mock_conn,
         ):
             from mes_dashboard.services.trace_job_service import get_job_status

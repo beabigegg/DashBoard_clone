@@ -57,8 +57,8 @@ _DUCKDB_MEMORY_LIMIT = os.getenv("DUCKDB_MEMORY_LIMIT", "256MB")
 
 def _create_duckdb_conn():
     """Create a memory-limited DuckDB connection."""
-    import duckdb  # type: ignore
-    conn = duckdb.connect(database=":memory:")
+    from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
+    conn = create_heavy_query_connection()
     conn.execute(f"SET memory_limit = '{_DUCKDB_MEMORY_LIMIT}'")
     conn.execute("SET threads = 1")
     return conn
