@@ -138,6 +138,21 @@ CSV_COLUMNS_FORWARD = [
 VALID_DIRECTIONS = ('backward', 'forward')
 
 
+def _make_detection_spool_query_id(
+    start_date: str,
+    end_date: str,
+    station: str,
+) -> str:
+    """Return the canonical spool id for station detection parquet."""
+    from mes_dashboard.services.batch_query_engine import compute_query_hash
+
+    return compute_query_hash({
+        "station": station,
+        "start_date": start_date,
+        "end_date": end_date,
+    })
+
+
 def resolve_analysis_trace_context(
     start_date: str,
     end_date: str,
@@ -191,6 +206,8 @@ def resolve_analysis_trace_context(
 def _load_analysis_from_spool(
     trace_query_id: str,
     available_loss_reasons: Optional[List[str]] = None,
+    direction: str = 'backward',
+    loss_reasons: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Build compatibility summary payload from MSD spool-backed runtime."""
     from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
@@ -199,18 +216,18 @@ def _load_analysis_from_spool(
     if not rt.is_available():
         return None
 
-    summary = rt.get_summary()
-    detail = rt.get_all_detail()
-    if summary is None or detail is None:
+    summary = rt.get_summary(direction=direction, loss_reasons=loss_reasons)
+    if summary is None:
         return None
 
     return {
         'kpi': summary.get('kpi') or {},
         'charts': summary.get('charts') or {},
         'daily_trend': summary.get('daily_trend') or [],
-        'available_loss_reasons': list(available_loss_reasons or []),
-        'genealogy_status': 'ready',
-        'detail': detail,
+        'available_loss_reasons': summary.get('available_loss_reasons') or list(available_loss_reasons or []),
+        'genealogy_status': summary.get('genealogy_status') or 'ready',
+        'detail': [],
+        'detail_total_count': int(summary.get('detail_total_count') or 0),
         'attribution': summary.get('attribution') or [],
         'trace_query_id': trace_query_id,
     }
@@ -335,6 +352,8 @@ def query_analysis(
     staged = _load_analysis_from_spool(
         trace_query_id=trace_query_id,
         available_loss_reasons=available_loss_reasons,
+        direction=direction,
+        loss_reasons=loss_reasons,
     )
     if staged is not None:
         cache_set(cache_key, staged, ttl=CACHE_TTL_DETECTION)
@@ -957,6 +976,35 @@ def _write_msd_lineage_stage_spool(
         tmp_path.unlink(missing_ok=True)
 
 
+def _write_msd_detection_stage_spool(
+    trace_query_id: str,
+    detection_df: Optional[pd.DataFrame],
+) -> None:
+    """Persist detection rows for DuckDB-backed MSD detail queries."""
+    import tempfile
+    from pathlib import Path
+
+    from mes_dashboard.core.query_spool_store import register_stage_spool_file
+    from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE, _STAGE_DETECTION
+
+    if detection_df is None or detection_df.empty:
+        return
+
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    detection_df.to_parquet(tmp_path, engine="pyarrow", index=False)
+
+    ok = register_stage_spool_file(
+        SPOOL_NAMESPACE,
+        trace_query_id,
+        _STAGE_DETECTION,
+        tmp_path,
+        row_count=len(detection_df),
+    )
+    if not ok and tmp_path.exists():
+        tmp_path.unlink(missing_ok=True)
+
+
 def _execute_msd_compat_job(
     *,
     job_id: str,
@@ -970,7 +1018,7 @@ def _execute_msd_compat_job(
 ) -> None:
     """Build MSD staged spool in RQ worker for compatibility requests."""
     from mes_dashboard.rq_worker_preload import ensure_rq_logging
-    from mes_dashboard.services.trace_job_service import _write_msd_events_spool
+    from mes_dashboard.services.trace_job_service import _write_msd_events_spool_from_paths
 
     ensure_rq_logging()
     update_job_progress(
@@ -999,6 +1047,7 @@ def _execute_msd_compat_job(
     if detection_df.empty:
         complete_job(_MSD_COMPAT_JOB_PREFIX, job_id, query_id=trace_query_id)
         return
+    _write_msd_detection_stage_spool(trace_query_id, detection_df)
 
     seed_ids = list(seed_container_ids or context["seed_container_ids"])
     seed_names = dict(seed_container_names or context["seed_container_names"])
@@ -1041,17 +1090,26 @@ def _execute_msd_compat_job(
             pct=70,
         )
 
-        raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
-        for domain in domains:
-            events_payload = EventFetcher.fetch_events(target_cids, domain)
-            events_by_cid, _quality_meta = unpack_event_fetch_result(events_payload, domain=domain)
-            raw_domain_results[domain] = events_by_cid
+        import shutil
+        import tempfile
+        from pathlib import Path as _Path
 
-        _write_msd_events_spool(
-            job_id=job_id,
-            trace_query_id=trace_query_id,
-            raw_domain_results=raw_domain_results,
-        )
+        _tmp_dir = tempfile.mkdtemp()
+        _domain_paths: Dict[str, Any] = {}
+        try:
+            for domain in domains:
+                _dest = _Path(_tmp_dir) / f"{domain}.parquet"
+                _row_count, _quality_meta = EventFetcher.fetch_events_to_parquet(
+                    target_cids, domain, _dest
+                )
+                _domain_paths[domain] = _dest
+                logger.debug(
+                    "_execute_msd_compat_job: fetched domain=%s rows=%d", domain, _row_count
+                )
+
+            _write_msd_events_spool_from_paths(trace_query_id, _domain_paths)
+        finally:
+            shutil.rmtree(_tmp_dir, ignore_errors=True)
         update_job_progress(
             _MSD_COMPAT_JOB_PREFIX,
             job_id,
@@ -1242,10 +1300,28 @@ def _fetch_station_detection_data(
             'station': station,
         },
     )
+    detection_spool_query_id = _make_detection_spool_query_id(start_date, end_date, station)
     cached = cache_get(cache_key)
     if cached is not None:
         if isinstance(cached, list):
-            return pd.DataFrame(cached) if cached else pd.DataFrame()
+            cached_df = pd.DataFrame(cached) if cached else pd.DataFrame()
+            if not cached_df.empty:
+                try:
+                    from mes_dashboard.core.query_spool_store import store_spooled_df
+
+                    store_spooled_df(
+                        "msd_detect",
+                        detection_spool_query_id,
+                        cached_df,
+                        ttl_seconds=CACHE_TTL_DETECTION,
+                    )
+                except Exception as exc:
+                    logger.debug(
+                        "Detection cache-hit spool store skipped/failed (hash=%s): %s",
+                        detection_spool_query_id,
+                        exc,
+                    )
+            return cached_df
         return None
 
     try:
@@ -1262,25 +1338,20 @@ def _fetch_station_detection_data(
             decompose_by_time_range,
             execute_plan,
             merge_chunks_to_spool,
-            compute_query_hash,
             should_decompose_by_time,
         )
         from mes_dashboard.core.query_spool_store import (
             QUERY_SPOOL_DIR,
             load_spooled_df,
             register_spool_file,
+            store_spooled_df,
         )
 
         _SPOOL_NS = "msd_detect"
+        engine_hash = detection_spool_query_id
 
         if should_decompose_by_time(start_date, end_date):
             # --- Engine path for long date ranges → stream to spool ---
-            engine_hash = compute_query_hash({
-                "station": station,
-                "start_date": start_date,
-                "end_date": end_date,
-            })
-
             # Check spool cache before re-executing
             df = load_spooled_df(_SPOOL_NS, engine_hash)
             if df is not None:
@@ -1331,6 +1402,18 @@ def _fetch_station_detection_data(
             if df is None:
                 logger.error("Station detection query returned None (station=%s)", station)
                 return None
+            if not df.empty:
+                stored = store_spooled_df(
+                    _SPOOL_NS,
+                    engine_hash,
+                    df,
+                    ttl_seconds=CACHE_TTL_DETECTION,
+                )
+                if not stored:
+                    logger.debug(
+                        "Detection direct-path spool store skipped/failed (hash=%s)",
+                        engine_hash,
+                    )
 
         logger.info(
             "Station detection (%s): %d rows, %d unique lots",

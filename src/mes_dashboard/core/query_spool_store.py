@@ -725,6 +725,42 @@ def cleanup_expired_spool(namespace: str | None = None) -> dict[str, int]:
         except Exception as exc:
             logger.warning("Spool metadata cleanup failed: %s", exc)
 
+        # Also protect stage spool files from orphan deletion.
+        # Stage spools only have spool_stage keys (not spool_meta), so without
+        # this scan they would be treated as orphans and deleted prematurely.
+        if namespace:
+            stage_pattern = get_key(f"{_normalize_namespace(namespace)}:spool_stage:*")
+        else:
+            stage_pattern = get_key("*:spool_stage:*")
+        try:
+            for key in client.scan_iter(match=stage_pattern, count=200):
+                raw = client.get(key)
+                if not raw:
+                    continue
+                try:
+                    meta = json.loads(raw)
+                except Exception:
+                    client.delete(key)
+                    continue
+                rel = str(meta.get("relative_path") or "")
+                path = _path_from_relative(rel) if rel else None
+                expires_at = int(meta.get("expires_at") or 0)
+                expired = bool(expires_at and expires_at <= now_ts)
+                missing = path is None or not path.exists()
+                if expired or missing:
+                    if path is not None and path.exists():
+                        try:
+                            path.unlink()
+                            stats["expired_files_deleted"] += 1
+                        except OSError:
+                            pass
+                    client.delete(key)
+                    stats["meta_deleted"] += 1
+                elif path is not None:
+                    referenced_paths.add(str(path))
+        except Exception as exc:
+            logger.warning("Stage spool metadata cleanup failed: %s", exc)
+
     for file_path in root.rglob("*.parquet"):
         resolved = str(file_path.resolve())
         if resolved in referenced_paths:

@@ -313,3 +313,101 @@ def test_fetch_events_truncation_meta_contains_row_limit_context(
     assert result["quality_meta"]["status"] == QUALITY_STATUS_TRUNCATED
     assert result["quality_meta"]["observed_rows"] == 2
     assert result["quality_meta"]["max_rows"] == 2
+
+
+# ---------------------------------------------------------------------------
+# fetch_events_to_parquet streaming tests (task 1.3)
+# ---------------------------------------------------------------------------
+
+@patch("mes_dashboard.services.event_fetcher.read_sql_df_slow_iter")
+@patch("mes_dashboard.services.event_fetcher.SQLLoader.load")
+def test_fetch_events_to_parquet_returns_tuple(mock_sql_load, mock_iter, tmp_path, monkeypatch):
+    """fetch_events_to_parquet must return (int, dict) tuple."""
+    mock_sql_load.return_value = "SELECT * FROM t WHERE h.CONTAINERID = :container_id {{ WORKCENTER_FILTER }}"
+    mock_iter.side_effect = _iter_result(
+        ["CONTAINERID", "EVENTTYPE"],
+        [("CID-1", "A"), ("CID-2", "B")],
+    )
+
+    dest = tmp_path / "out.parquet"
+    result = EventFetcher.fetch_events_to_parquet(["CID-1", "CID-2"], "history", dest)
+
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    row_count, quality_meta = result
+    assert isinstance(row_count, int)
+    assert isinstance(quality_meta, dict)
+    assert row_count == 2
+    assert quality_meta["status"] == QUALITY_STATUS_COMPLETE
+    assert dest.exists()
+
+
+@patch("mes_dashboard.services.event_fetcher.read_sql_df_slow_iter")
+@patch("mes_dashboard.services.event_fetcher.SQLLoader.load")
+def test_fetch_events_to_parquet_no_row_guard(mock_sql_load, mock_iter, tmp_path, monkeypatch):
+    """Streaming path must NOT truncate even when rows exceed EVENT_FETCHER_MAX_TOTAL_ROWS."""
+    mock_sql_load.return_value = "SELECT * FROM t WHERE h.CONTAINERID = :container_id {{ WORKCENTER_FILTER }}"
+    monkeypatch.setattr("mes_dashboard.services.event_fetcher.EVENT_FETCHER_MAX_TOTAL_ROWS", 2)
+
+    # Return 10 rows — above the guard of 2
+    mock_iter.side_effect = _iter_result(
+        ["CONTAINERID", "EVENTTYPE"],
+        [(f"CID-{i}", "A") for i in range(10)],
+    )
+
+    dest = tmp_path / "out.parquet"
+    row_count, quality_meta = EventFetcher.fetch_events_to_parquet(
+        [f"CID-{i}" for i in range(10)], "history", dest
+    )
+
+    assert row_count == 10
+    assert quality_meta["status"] == QUALITY_STATUS_COMPLETE
+
+
+@patch("mes_dashboard.services.event_fetcher.read_sql_df_slow_iter")
+def test_fetch_events_to_parquet_jobs_domain_expands_containerids(mock_iter, tmp_path):
+    """Jobs domain CONTAINERIDS expansion must produce one row per (job, CID) pair."""
+    # jobs SQL returns rows with CONTAINERIDS containing multiple CIDs
+    # Each row has NULL as CONTAINERID; Python expands it per matching CID.
+    mock_iter.side_effect = _iter_result(
+        ["JOBID", "RESOURCEID", "RESOURCENAME", "JOBSTATUS", "JOBMODELNAME",
+         "JOBORDERNAME", "CREATEDATE", "COMPLETEDATE", "CAUSECODENAME",
+         "REPAIRCODENAME", "SYMPTOMCODENAME", "CONTAINERIDS", "CONTAINERNAMES", "CONTAINERID"],
+        [
+            ("JOB-1", "R1", "Res1", "COMPLETE", "M1", "O1", "2024-01-01", "2024-01-02",
+             None, None, None, "CID-A,CID-B", "LOT-A,LOT-B", None),
+        ],
+    )
+
+    dest = tmp_path / "jobs.parquet"
+    row_count, quality_meta = EventFetcher.fetch_events_to_parquet(
+        ["CID-A", "CID-B"], "jobs", dest
+    )
+
+    # JOB-1 matches both CID-A and CID-B → 2 expanded rows
+    assert row_count == 2
+    assert quality_meta["status"] == QUALITY_STATUS_COMPLETE
+
+
+@patch("mes_dashboard.services.event_fetcher.read_sql_df_slow_iter")
+@patch("mes_dashboard.services.event_fetcher.SQLLoader.load")
+def test_fetch_events_to_parquet_partial_failure_quality_meta(
+    mock_sql_load, mock_iter, tmp_path, monkeypatch
+):
+    """When a batch fails, quality_meta.status must be 'partial'."""
+    mock_sql_load.return_value = "SELECT * FROM t WHERE h.CONTAINERID = :container_id {{ WORKCENTER_FILTER }}"
+    monkeypatch.setattr("mes_dashboard.services.event_fetcher.EVENT_FETCHER_MAX_WORKERS", 2)
+
+    def _side_effect(sql, params, timeout_seconds=60):
+        if "CID-1000" in params.values():
+            raise RuntimeError("batch fail")
+        return iter([])
+
+    mock_iter.side_effect = _side_effect
+    cids = [f"CID-{i}" for i in range(1001)]  # force >1 batch
+
+    dest = tmp_path / "out.parquet"
+    row_count, quality_meta = EventFetcher.fetch_events_to_parquet(cids, "history", dest)
+
+    assert quality_meta["status"] == QUALITY_STATUS_PARTIAL
+    assert "chunk_failure" in quality_meta["reasons"]

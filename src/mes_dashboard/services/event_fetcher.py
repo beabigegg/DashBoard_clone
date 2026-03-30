@@ -8,9 +8,10 @@ import logging
 import math
 import os
 import re
+import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Tuple
 
 from mes_dashboard.core.cache import cache_get, cache_set
 from mes_dashboard.core.partial_failure_contract import build_partial_failure_meta
@@ -405,48 +406,192 @@ class EventFetcher:
         return result
 
     @staticmethod
+    def _stream_batches_to_writer(
+        normalized_ids: List[str],
+        domain: str,
+        row_callback: Callable[[List[str], List[tuple]], None],
+    ) -> Tuple[int, List]:
+        """Stream Oracle query results to *row_callback* without a row guard.
+
+        Extracts batch/threading/jobs-CONTAINERIDS expansion logic from
+        ``fetch_events()``.  The callback receives ``(columns, rows)`` where
+        *rows* is a list of raw tuples; for the ``jobs`` domain the CONTAINERID
+        column is pre-expanded so each tuple corresponds to one (job, cid) pair.
+
+        Returns ``(total_row_count, failures)`` where *failures* is a list of
+        ``(batch_ids, exc)`` pairs for batches that raised exceptions.
+        """
+        spec = _DOMAIN_SPECS[domain]
+        filter_column = spec["filter_column"]
+        match_mode = spec.get("match_mode", "in")
+        total_row_count = [0]
+
+        def _process_batch(batch_ids: List[str]) -> None:
+            builder = QueryBuilder()
+            if match_mode == "contains":
+                builder.add_or_like_conditions(filter_column, batch_ids, position="both")
+            else:
+                builder.add_in_condition(filter_column, batch_ids)
+            sql = EventFetcher._build_domain_sql(domain, builder.get_conditions_sql())
+
+            for columns, rows in read_sql_df_slow_iter(sql, builder.params, timeout_seconds=60):
+                if not rows:
+                    continue
+
+                if domain == "jobs":
+                    try:
+                        cids_idx = columns.index("CONTAINERIDS")
+                        cid_idx = columns.index("CONTAINERID")
+                    except ValueError:
+                        row_callback(columns, list(rows))
+                        total_row_count[0] += len(rows)
+                        continue
+
+                    expanded: List[tuple] = []
+                    for row in rows:
+                        containers_val = row[cids_idx]
+                        if not isinstance(containers_val, str) or not containers_val:
+                            continue
+                        for cid in batch_ids:
+                            if cid in containers_val:
+                                row_list = list(row)
+                                row_list[cid_idx] = cid
+                                expanded.append(tuple(row_list))
+
+                    if expanded:
+                        row_callback(columns, expanded)
+                        total_row_count[0] += len(expanded)
+                else:
+                    row_callback(columns, list(rows))
+                    total_row_count[0] += len(rows)
+
+        batches = [
+            normalized_ids[i:i + ORACLE_IN_BATCH_SIZE]
+            for i in range(0, len(normalized_ids), ORACLE_IN_BATCH_SIZE)
+        ]
+
+        if len(batches) <= 1:
+            for batch in batches:
+                _process_batch(batch)
+            failures: List = []
+        else:
+            failures = []
+            with ThreadPoolExecutor(max_workers=min(len(batches), EVENT_FETCHER_MAX_WORKERS)) as executor:
+                futures = {executor.submit(_process_batch, b): b for b in batches}
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as exc:
+                        failures.append((futures[future], exc))
+                        logger.error(
+                            "EventFetcher._stream_batches_to_writer batch failed domain=%s batch_size=%s",
+                            domain, len(futures[future]), exc_info=True,
+                        )
+
+        return total_row_count[0], failures
+
+    @staticmethod
     def fetch_events_to_parquet(
         container_ids: List[str],
         domain: str,
         dest_path: "Any",
-    ) -> int:
-        """Fetch events for *domain* and write them directly to a parquet file.
+    ) -> Tuple[int, Dict[str, Any]]:
+        """Fetch events for *domain* and stream them directly to a parquet file.
 
-        Task 6.3: spool-oriented stage output that avoids full in-memory
-        materialisation.  Callers that have migrated to the unified spool
-        pipeline can use this method to stream from Oracle → parquet without
-        building a large Python dict structure.
+        True streaming path: Oracle cursor → ``read_sql_df_slow_iter`` →
+        ``pyarrow.ParquetWriter``.  No row guard (EVENT_FETCHER_MAX_TOTAL_ROWS
+        is NOT applied here — spool-safe path).
 
-        Returns the number of rows written.  The row truncation guard
-        (EVENT_FETCHER_MAX_TOTAL_ROWS) remains active until this path
-        replaces the legacy in-memory path for all callers (task 6.4).
+        Returns ``(row_count, quality_meta)``.  When there are no rows an empty
+        parquet file is written so callers always have a valid file at *dest_path*.
         """
-        import tempfile
+        import pyarrow as pa
+        import pyarrow.parquet as pq
         from pathlib import Path
-        import pandas as pd
 
-        # Use the existing in-memory path and then write to parquet.
-        # A future optimization can replace this with true streaming via
-        # pyarrow.parquet.ParquetWriter, but for now the guard-gated
-        # in-memory path is preserved (task 6.4 / D7).
-        result_payload = EventFetcher.fetch_events(container_ids, domain)
-        records_by_cid, _quality_meta = unpack_event_fetch_result(result_payload, domain=domain)
+        if domain not in _DOMAIN_SPECS:
+            raise ValueError(f"Unsupported event domain: {domain}")
 
-        rows = []
-        for records in records_by_cid.values():
-            if isinstance(records, list):
-                rows.extend(r for r in records if isinstance(r, dict))
-
-        if not rows:
-            df = pd.DataFrame()
-        else:
-            df = pd.DataFrame(rows)
-
+        normalized_ids = _normalize_ids(container_ids)
         dest_path = Path(str(dest_path))
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(dest_path, engine="pyarrow", index=False)
+
+        if not normalized_ids:
+            pq.write_table(pa.table({}), dest_path)
+            return 0, build_quality_meta(
+                status=QUALITY_STATUS_COMPLETE,
+                scope=QUALITY_SCOPE_DOMAIN,
+                domain=domain,
+                observed_rows=0,
+            )
+
+        writer = None
+        schema = None
+        lock = threading.Lock()
+
+        def _write_callback(columns: List[str], rows: List[tuple]) -> None:
+            nonlocal writer, schema
+            if not rows:
+                return
+            col_arrays = {col: [row[i] for row in rows] for i, col in enumerate(columns)}
+            table = pa.table(col_arrays)
+            with lock:
+                if writer is None:
+                    schema = table.schema
+                    writer = pq.ParquetWriter(dest_path, schema)
+                else:
+                    try:
+                        table = table.cast(schema, safe=False)
+                    except Exception as cast_exc:
+                        logger.debug(
+                            "EventFetcher.fetch_events_to_parquet schema cast skipped domain=%s: %s",
+                            domain, cast_exc,
+                        )
+                writer.write_table(table)
+
+        try:
+            row_count, failures = EventFetcher._stream_batches_to_writer(
+                normalized_ids, domain, _write_callback
+            )
+        finally:
+            if writer is not None:
+                writer.close()
+
+        if writer is None:
+            # No rows written — create empty parquet so dest_path always exists
+            pq.write_table(pa.table({}), dest_path)
+
+        reasons: List[str] = []
+        status = QUALITY_STATUS_COMPLETE
+        failed_ranges: List[Dict[str, str]] = []
+        partial_meta: Dict[str, Any] = {}
+
+        if failures:
+            status = QUALITY_STATUS_PARTIAL
+            reasons.append("chunk_failure")
+            for batch, _ in failures:
+                if not batch:
+                    continue
+                failed_ranges.append({"start": str(batch[0]), "end": str(batch[-1])})
+            partial_meta = build_partial_failure_meta(
+                failed_count=len(failures),
+                failed_ranges=failed_ranges,
+            )
+
+        quality_meta = build_quality_meta(
+            status=status,
+            scope=QUALITY_SCOPE_DOMAIN,
+            domain=domain,
+            reasons=reasons,
+            observed_rows=row_count,
+            failed_ranges=failed_ranges,
+            extra={
+                "has_partial_failure": partial_meta.get("has_partial_failure", False),
+                "failed_chunk_count": partial_meta.get("failed_chunk_count", 0),
+            } if partial_meta else None,
+        )
         logger.info(
             "EventFetcher.fetch_events_to_parquet: domain=%s rows=%d path=%s",
-            domain, len(df), dest_path,
+            domain, row_count, dest_path,
         )
-        return len(df)
+        return row_count, quality_meta

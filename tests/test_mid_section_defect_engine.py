@@ -133,6 +133,10 @@ class TestDetectionEngineDecomposition:
 
     def test_short_range_skips_engine(self, monkeypatch):
         """30-day range → direct path, no engine."""
+        import mes_dashboard.core.query_spool_store as spool_mod
+
+        spool_calls = []
+
         monkeypatch.setattr(
             "mes_dashboard.services.mid_section_defect_service.cache_get",
             lambda key: None,
@@ -151,6 +155,11 @@ class TestDetectionEngineDecomposition:
             "mes_dashboard.services.mid_section_defect_service.read_sql_df",
             lambda sql, params: pd.DataFrame({"CONTAINERID": ["C1"]}),
         )
+        monkeypatch.setattr(
+            spool_mod,
+            "store_spooled_df",
+            lambda ns, qid, df, ttl_seconds=None: spool_calls.append((ns, qid, len(df))) or True,
+        )
 
         df = msd_svc._fetch_station_detection_data(
             start_date="2025-06-01",
@@ -160,6 +169,33 @@ class TestDetectionEngineDecomposition:
 
         assert df is not None
         assert len(df) == 1
+        assert spool_calls == [("msd_detect", msd_svc._make_detection_spool_query_id("2025-06-01", "2025-06-05", "測試"), 1)]
+
+    def test_short_range_cached_records_restores_dataframe_without_engine(self, monkeypatch):
+        """Redis cache hit on short range should still return the cached rows."""
+        import mes_dashboard.core.query_spool_store as spool_mod
+
+        spool_calls = []
+        monkeypatch.setattr(
+            "mes_dashboard.services.mid_section_defect_service.cache_get",
+            lambda key: [{"CONTAINERID": "C1", "CONTAINERNAME": "LOT-1"}],
+        )
+        monkeypatch.setattr(
+            spool_mod,
+            "store_spooled_df",
+            lambda ns, qid, df, ttl_seconds=None: spool_calls.append((ns, qid, len(df))) or True,
+        )
+
+        df = msd_svc._fetch_station_detection_data(
+            start_date="2025-06-01",
+            end_date="2025-06-05",
+            station="測試",
+        )
+
+        assert df is not None
+        assert len(df) == 1
+        assert df.iloc[0]["CONTAINERID"] == "C1"
+        assert spool_calls == [("msd_detect", msd_svc._make_detection_spool_query_id("2025-06-01", "2025-06-05", "測試"), 1)]
 
     def test_engine_path_returns_dataframe(self, monkeypatch, tmp_path):
         """Engine path returns DataFrame (same interface as before migration)."""

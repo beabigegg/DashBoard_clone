@@ -191,6 +191,35 @@ def test_seed_resolve_mid_section_defect_container_supports_reverse_input_types(
     assert payload['data']['seeds'][0]['container_id'] == 'CID-MSD'
 
 
+@patch('mes_dashboard.routes.trace_routes.resolve_trace_seed_lots')
+def test_seed_resolve_mid_section_defect_date_range_returns_compact_ids(mock_resolve):
+    mock_resolve.return_value = {
+        'seeds': [
+            {'container_id': 'CID-001', 'container_name': 'LOT-001'},
+            {'container_id': 'CID-002', 'container_name': 'LOT-002'},
+        ],
+        'seed_count': 2,
+    }
+
+    client = _client()
+    response = client.post(
+        '/api/trace/seed-resolve',
+        json={
+            'profile': 'mid_section_defect',
+            'params': {
+                'start_date': '2025-01-01',
+                'end_date': '2025-01-31',
+                'station': '測試',
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['data']['seed_container_ids'] == ['CID-001', 'CID-002']
+    assert 'seeds' not in payload['data']
+
+
 def test_seed_resolve_invalid_profile_returns_400():
     client = _client()
     response = client.post(
@@ -289,6 +318,34 @@ def test_lineage_reverse_profile_returns_cached_ancestors(mock_load_result):
     assert payload['data']['edges'][0]['edge_type'] == 'gd_rework_source'
 
 
+@patch('mes_dashboard.routes.trace_routes.load_trace_lineage_result')
+def test_lineage_mid_section_defect_returns_compact_payload(mock_load_result):
+    mock_load_result.return_value = {
+        'stage': 'lineage',
+        'ancestors': {'CID-001': ['CID-A', 'CID-B']},
+        'seed_roots': {'CID-001': 'ROOT-001'},
+        'total_nodes': 3,
+        'total_ancestor_count': 2,
+    }
+
+    client = _client()
+    response = client.post(
+        '/api/trace/lineage',
+        json={
+            'profile': 'mid_section_defect',
+            'container_ids': ['CID-001'],
+            'params': {'direction': 'backward'},
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['data']['query_id'].startswith('trace-lineage-mid-section-defect-')
+    assert payload['data']['total_ancestor_count'] == 2
+    assert payload['data']['seed_roots']['CID-001'] == 'ROOT-001'
+    assert 'ancestors' not in payload['data']
+
+
 @patch('mes_dashboard.routes.trace_routes.is_async_available', return_value=False)
 def test_lineage_returns_503_when_async_unavailable(_mock_async):
     client = _client()
@@ -364,6 +421,8 @@ def test_events_mid_section_defect_with_aggregation(mock_runtime_cls):
             'params': {
                 'start_date': '2025-01-01',
                 'end_date': '2025-01-31',
+                'direction': 'backward',
+                'loss_reasons': ['R1'],
             },
             'lineage': {'ancestors': {'CID-001': ['CID-A']}},
             'seed_container_ids': ['CID-001'],
@@ -375,6 +434,10 @@ def test_events_mid_section_defect_with_aggregation(mock_runtime_cls):
     assert payload['data']['spool_hit'] is True
     assert payload['data']['aggregation']['kpi']['total_input'] == 100
     assert payload['data']['aggregation']['genealogy_status'] == 'ready'
+    mock_runtime.get_summary.assert_called_once_with(
+        direction='backward',
+        loss_reasons=['R1'],
+    )
 
 
 @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 5))
@@ -1037,6 +1100,61 @@ def test_lineage_job_result_endpoint_success(mock_status, mock_result):
     payload = response.get_json()
     assert payload['data']['stage'] == 'lineage'
     assert 'SEED1' in payload['data']['ancestors']
+
+
+@patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_result')
+@patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_status')
+def test_lineage_job_result_endpoint_mid_section_defect_returns_compact_payload(mock_status, mock_result):
+    mock_status.return_value = {
+        'status': 'completed',
+        'job_id': 'trace-lineage-msd',
+        'profile': 'mid_section_defect',
+        'query_id': 'trace-lineage-mid-section-defect-123',
+    }
+    mock_result.return_value = {
+        'stage': 'lineage',
+        'ancestors': {'SEED1': ['ANC1', 'ANC2']},
+        'seed_roots': {'SEED1': 'ROOT-1'},
+        'total_nodes': 3,
+        'total_ancestor_count': 2,
+    }
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.get('/api/trace/lineage/job/trace-lineage-msd/result')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['data']['query_id'] == 'trace-lineage-mid-section-defect-123'
+    assert payload['data']['total_ancestor_count'] == 2
+    assert 'ancestors' not in payload['data']
+
+
+@patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_result')
+@patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_status')
+def test_lineage_job_result_endpoint_mid_section_defect_infers_compact_payload_from_query_id(mock_status, mock_result):
+    mock_status.return_value = {
+        'status': 'completed',
+        'job_id': 'trace-lineage-msd',
+        'query_id': 'trace-lineage-mid-section-defect-123',
+    }
+    mock_result.return_value = {
+        'stage': 'lineage',
+        'ancestors': {'SEED1': ['ANC1', 'ANC2']},
+        'seed_roots': {'SEED1': 'ROOT-1'},
+        'total_nodes': 3,
+        'total_ancestor_count': 2,
+    }
+
+    reset_rate_limits_for_tests()
+    client = _client()
+    response = client.get('/api/trace/lineage/job/trace-lineage-msd/result')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['data']['query_id'] == 'trace-lineage-mid-section-defect-123'
+    assert payload['data']['total_ancestor_count'] == 2
+    assert 'ancestors' not in payload['data']
 
 
 @patch('mes_dashboard.routes.trace_routes.get_trace_lineage_job_status')

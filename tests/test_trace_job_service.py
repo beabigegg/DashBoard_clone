@@ -536,6 +536,67 @@ def test_stream_ndjson_with_failed_domains(mock_redis):
     assert "history" in warning["failed_domains"]
 
 
+@patch("mes_dashboard.core.query_spool_store.load_spooled_df")
+@patch.object(tjs, "get_redis_client")
+def test_get_job_result_spool_manifest_exposes_trace_query_id(mock_redis, mock_load_spooled_df):
+    """Spool-backed job results should expose canonical trace_query_id for MSD consumers."""
+    result_meta = {
+        "profile": "mid_section_defect",
+        "query_id": "msd-abc123",
+        "domains": {"upstream_history": {"total": 1}},
+        "failed_domains": [],
+    }
+    conn = MagicMock()
+
+    def _get_side_effect(key):
+        if key.endswith(":result:meta"):
+            return json.dumps(result_meta)
+        if key.endswith(":result:aggregation"):
+            return json.dumps({"kpi": {"lot_count": 1}})
+        return None
+
+    conn.get.side_effect = _get_side_effect
+    mock_redis.return_value = conn
+    mock_load_spooled_df.return_value = None
+
+    result = tjs.get_job_result("job-1")
+
+    assert result is not None
+    assert result["query_id"] == "msd-abc123"
+    assert result["trace_query_id"] == "msd-abc123"
+
+
+@patch("mes_dashboard.core.query_spool_store.load_spooled_df")
+@patch.object(tjs, "get_redis_client")
+def test_stream_ndjson_spool_meta_includes_trace_query_id(mock_redis, mock_load_spooled_df):
+    """Spool-backed NDJSON stream should expose canonical trace_query_id in meta."""
+    result_meta = {
+        "profile": "mid_section_defect",
+        "query_id": "msd-abc123",
+        "domains": {"upstream_history": {"total": 1}},
+        "failed_domains": [],
+    }
+    conn = MagicMock()
+
+    def _get_side_effect(key):
+        if key.endswith(":result:meta"):
+            return json.dumps(result_meta)
+        if key.endswith(":result:aggregation"):
+            return None
+        return None
+
+    conn.get.side_effect = _get_side_effect
+    mock_redis.return_value = conn
+    mock_load_spooled_df.return_value = None
+
+    lines = list(tjs.stream_job_result_ndjson("job-1"))
+    parsed = [json.loads(line) for line in lines]
+
+    assert parsed[0]["type"] == "meta"
+    assert parsed[0]["query_id"] == "msd-abc123"
+    assert parsed[0]["trace_query_id"] == "msd-abc123"
+
+
 # ---------------------------------------------------------------------------
 # _flatten_domain_records
 # ---------------------------------------------------------------------------
@@ -546,3 +607,27 @@ def test_flatten_domain_records():
     }
     rows = tjs._flatten_domain_records(events_by_cid)
     assert len(rows) == 3
+
+
+@patch("mes_dashboard.services.trace_lineage_job_service.load_trace_lineage_result")
+def test_resolve_msd_lineage_payload_from_query_id(mock_load):
+    mock_load.return_value = {
+        "ancestors": {"CID-001": ["CID-A", "CID-B"]},
+        "seed_roots": {"CID-001": "ROOT-1"},
+    }
+    payload = {"lineage_query_id": "trace-lineage-mid-section-defect-123"}
+
+    result = tjs._resolve_msd_lineage_payload(payload)
+
+    assert result["ancestors"]["CID-001"] == ["CID-A", "CID-B"]
+    mock_load.assert_called_once_with("trace-lineage-mid-section-defect-123")
+
+
+def test_expand_msd_container_ids_backward():
+    result = tjs._expand_msd_container_ids(
+        ["CID-001"],
+        {"ancestors": {"CID-001": ["CID-A", "CID-B"]}},
+        "backward",
+    )
+
+    assert result == ["CID-001", "CID-A", "CID-B"]

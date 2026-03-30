@@ -11,6 +11,7 @@ from mes_dashboard.services.mid_section_defect_service import (
     _attribute_materials,
     _attribute_wafer_roots,
     _build_detail_table,
+    _execute_msd_compat_job,
     _normalize_upstream_event_records,
     build_trace_aggregation_from_events,
     export_csv,
@@ -216,7 +217,8 @@ def test_query_analysis_prefers_spool_runtime(
         'daily_trend': staged_summary['daily_trend'],
         'available_loss_reasons': staged_summary['available_loss_reasons'],
         'genealogy_status': staged_summary['genealogy_status'],
-        'detail': [{'CONTAINERNAME': 'LOT-001'}] * staged_summary['detail_total_count'],
+        'detail': [],
+        'detail_total_count': staged_summary['detail_total_count'],
         'attribution': staged_summary['attribution'],
         'trace_query_id': 'msd-runtime-001',
     }
@@ -225,7 +227,8 @@ def test_query_analysis_prefers_spool_runtime(
 
     assert summary['available_loss_reasons'] == staged_summary['available_loss_reasons']
     assert summary['genealogy_status'] == staged_summary['genealogy_status']
-    assert len(summary['detail']) == staged_summary['detail_total_count']
+    assert summary['detail_total_count'] == staged_summary['detail_total_count']
+    assert summary['detail'] == []
     assert summary['kpi'] == staged_summary['kpi']
     assert summary['daily_trend'] == staged_summary['daily_trend']
     assert summary['charts'].keys() == staged_summary['charts'].keys()
@@ -263,6 +266,65 @@ def test_query_analysis_returns_pending_on_spool_miss(
     assert result['available_loss_reasons'] == ['R1']
     assert result['trace_query_id'].startswith('msd-')
     mock_ensure_job.assert_called_once()
+
+
+@patch('mes_dashboard.services.trace_job_service._write_msd_events_spool_from_paths')
+@patch('mes_dashboard.services.mid_section_defect_service.EventFetcher.fetch_events_to_parquet')
+@patch('mes_dashboard.services.mid_section_defect_service._write_msd_lineage_stage_spool')
+@patch('mes_dashboard.services.mid_section_defect_service.LineageEngine.resolve_full_genealogy')
+@patch('mes_dashboard.services.mid_section_defect_service._write_msd_detection_stage_spool')
+@patch('mes_dashboard.services.mid_section_defect_service.resolve_analysis_trace_context')
+@patch('mes_dashboard.services.mid_section_defect_service.update_job_progress')
+@patch('mes_dashboard.services.mid_section_defect_service.complete_job')
+@patch('mes_dashboard.rq_worker_preload.ensure_rq_logging')
+def test_execute_msd_compat_job_registers_detection_stage_for_detail_queries(
+    _mock_ensure_rq_logging,
+    mock_complete_job,
+    _mock_update_job_progress,
+    mock_resolve_context,
+    mock_write_detection_stage,
+    mock_resolve_genealogy,
+    mock_write_lineage_stage,
+    mock_fetch_events_to_parquet,
+    mock_write_events_spool,
+):
+    detection_df = pd.DataFrame([
+        {
+            'CONTAINERID': 'CID-001',
+            'CONTAINERNAME': 'LOT-001',
+            'TRACKINQTY': 100,
+            'REJECTQTY': 5,
+            'LOSSREASONNAME': 'R1',
+            'DETECTION_EQUIPMENTNAME': 'EQ-01',
+        },
+    ])
+    mock_resolve_context.return_value = {
+        'detection_df': detection_df,
+        'seed_container_ids': ['CID-001'],
+        'seed_container_names': {'CID-001': 'LOT-001'},
+    }
+    mock_resolve_genealogy.return_value = {
+        'ancestors': {'CID-001': ['CID-101']},
+        'cid_to_name': {'CID-101': 'LOT-UP-001'},
+    }
+    mock_fetch_events_to_parquet.return_value = (1, {'status': 'complete'})
+
+    _execute_msd_compat_job(
+        job_id='msd-compat-1',
+        start_date='2025-01-01',
+        end_date='2025-01-31',
+        station='測試',
+        direction='backward',
+        trace_query_id='msd-trace-001',
+        seed_container_ids=['CID-001'],
+        seed_container_names={'CID-001': 'LOT-001'},
+    )
+
+    mock_write_detection_stage.assert_called_once_with('msd-trace-001', detection_df)
+    mock_write_lineage_stage.assert_called_once()
+    assert mock_fetch_events_to_parquet.call_count == 2
+    mock_write_events_spool.assert_called_once()
+    mock_complete_job.assert_called_with('msd-compat', 'msd-compat-1', query_id='msd-trace-001')
 
 
 def test_query_station_options_returns_ordered_list():

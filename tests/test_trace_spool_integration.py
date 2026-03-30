@@ -44,6 +44,104 @@ def lineage_parquet(tmp_path: pathlib.Path) -> str:
     return str(path)
 
 
+@pytest.fixture()
+def msd_detection_parquet(tmp_path: pathlib.Path) -> str:
+    df = pd.DataFrame(
+        [
+            {
+                "CONTAINERID": "CID-001",
+                "CONTAINERNAME": "LOT-001",
+                "PJ_TYPE": "TYPE-A",
+                "PRODUCTLINENAME": "PKG-A",
+                "WORKFLOW": "WF-A",
+                "FINISHEDRUNCARD": "FR-001",
+                "DETECTION_EQUIPMENTNAME": "DET-01",
+                "TRACKINQTY": 100,
+                "REJECTQTY": 5,
+                "LOSSREASONNAME": "R1",
+                "TRACKINTIMESTAMP": "2025-01-10 08:00:00",
+            },
+            {
+                "CONTAINERID": "CID-001",
+                "CONTAINERNAME": "LOT-001",
+                "PJ_TYPE": "TYPE-A",
+                "PRODUCTLINENAME": "PKG-A",
+                "WORKFLOW": "WF-A",
+                "FINISHEDRUNCARD": "FR-001",
+                "DETECTION_EQUIPMENTNAME": "DET-01",
+                "TRACKINQTY": 100,
+                "REJECTQTY": 2,
+                "LOSSREASONNAME": "R2",
+                "TRACKINTIMESTAMP": "2025-01-10 08:00:00",
+            },
+            {
+                "CONTAINERID": "CID-002",
+                "CONTAINERNAME": "LOT-002",
+                "PJ_TYPE": "TYPE-B",
+                "PRODUCTLINENAME": "PKG-B",
+                "WORKFLOW": "WF-B",
+                "FINISHEDRUNCARD": "FR-002",
+                "DETECTION_EQUIPMENTNAME": "DET-02",
+                "TRACKINQTY": 80,
+                "REJECTQTY": 0,
+                "LOSSREASONNAME": None,
+                "TRACKINTIMESTAMP": "2025-01-11 09:00:00",
+            },
+        ]
+    )
+    path = tmp_path / "detection.parquet"
+    df.to_parquet(path, index=False)
+    return str(path)
+
+
+@pytest.fixture()
+def msd_events_full_parquet(tmp_path: pathlib.Path) -> str:
+    df = pd.DataFrame(
+        [
+            {
+                "CONTAINERID": "CID-101",
+                "WORKCENTER_GROUP": "中段",
+                "EQUIPMENTID": "EQ-101",
+                "EQUIPMENTNAME": "WIRE-01",
+                "SPECNAME": "SPEC-A",
+                "TRACKINTIMESTAMP": "2025-01-09 07:00:00",
+            },
+            {
+                "CONTAINERID": "CID-001",
+                "WORKCENTER_GROUP": "測試",
+                "EQUIPMENTID": "DET-01",
+                "EQUIPMENTNAME": "TEST-01",
+                "SPECNAME": "SPEC-T",
+                "TRACKINTIMESTAMP": "2025-01-10 08:00:00",
+            },
+            {
+                "CONTAINERID": "CID-101",
+                "MATERIALPARTNAME": "PART-A",
+                "MATERIALLOTNAME": "MATLOT-1",
+            },
+        ]
+    )
+    path = tmp_path / "events-full.parquet"
+    df.to_parquet(path, index=False)
+    return str(path)
+
+
+@pytest.fixture()
+def msd_lineage_full_parquet(tmp_path: pathlib.Path) -> str:
+    df = pd.DataFrame(
+        [
+            {
+                "DESCENDANT_ID": "CID-001",
+                "ANCESTOR_ID": "CID-101",
+                "ANCESTOR_NAME": "WAFER-ROOT-001",
+            },
+        ]
+    )
+    path = tmp_path / "lineage-full.parquet"
+    df.to_parquet(path, index=False)
+    return str(path)
+
+
 # ---------------------------------------------------------------------------
 # 6.6a: Spool hit in trace events route (MSD profile)
 # ---------------------------------------------------------------------------
@@ -52,7 +150,7 @@ class TestTraceEventSpoolHit:
     """When an MSD events spool exists, the route should return it directly."""
 
     def test_spool_hit_returns_aggregation_and_trace_query_id(
-        self, events_parquet, lineage_parquet
+        self, events_parquet, lineage_parquet, msd_detection_parquet
     ):
         """Simulates the spool hit path: MsdDuckdbRuntime finds spool files
         and returns summary without touching Oracle."""
@@ -62,28 +160,30 @@ class TestTraceEventSpoolHit:
         rt = MsdDuckdbRuntime(tqid)
         rt._events_path = events_parquet
         rt._lineage_path = lineage_parquet
+        rt._detection_path = msd_detection_parquet
         rt._resolved = True
 
         assert rt.is_available() is True
         summary = rt.get_summary()
         assert summary is not None
         assert "kpi" in summary
-        assert summary["kpi"]["lot_count"] == 1
+        assert summary["kpi"]["lot_count"] == 2
 
-    def test_spool_hit_skips_oracle_query(self, events_parquet, lineage_parquet):
+    def test_spool_hit_skips_oracle_query(self, events_parquet, lineage_parquet, msd_detection_parquet):
         """When spool hit succeeds, EventFetcher should NOT be called."""
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
 
         rt = MsdDuckdbRuntime("test-skip-oracle")
         rt._events_path = events_parquet
         rt._lineage_path = lineage_parquet
+        rt._detection_path = msd_detection_parquet
         rt._resolved = True
 
         # Spool available → we get summary without touching Oracle
         assert rt.is_available() is True
         summary = rt.get_summary()
         assert summary is not None
-        assert summary["kpi"]["lot_count"] == 1
+        assert summary["kpi"]["lot_count"] == 2
 
     def test_spool_miss_falls_through(self):
         """When spool is unavailable, MsdDuckdbRuntime.is_available returns False."""
@@ -98,6 +198,49 @@ class TestTraceEventSpoolHit:
         ):
             rt = MsdDuckdbRuntime("test-miss")
             assert rt.is_available() is False
+
+    def test_backward_summary_and_detail_restore_compat_shape(
+        self,
+        msd_events_full_parquet,
+        msd_lineage_full_parquet,
+        msd_detection_parquet,
+    ):
+        from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+
+        rt = MsdDuckdbRuntime("msd-compat-shape-001")
+        rt._events_path = msd_events_full_parquet
+        rt._lineage_path = msd_lineage_full_parquet
+        rt._detection_path = msd_detection_parquet
+        rt._resolved = True
+
+        summary = rt.get_summary(direction="backward", loss_reasons=["R1"])
+        detail = rt.get_detail(
+            page=1,
+            per_page=20,
+            direction="backward",
+            loss_reasons=["R1"],
+        )
+
+        assert summary is not None
+        assert summary["kpi"]["total_input"] == 180
+        assert summary["kpi"]["total_defect_qty"] == 5
+        assert summary["kpi"]["defective_lot_count"] == 1
+        assert summary["charts"]["by_machine"]
+
+        assert detail is not None
+        assert detail["pagination"]["total"] == 2
+        row = detail["items"][0]
+        for key in (
+            "CONTAINERNAME",
+            "DETECTION_EQUIPMENTNAME",
+            "INPUT_QTY",
+            "LOSS_REASON",
+            "DEFECT_QTY",
+            "ANCESTOR_COUNT",
+            "UPSTREAM_MACHINE_COUNT",
+        ):
+            assert key in row
+        assert row["CONTAINERNAME"] == "LOT-001"
 
 
 # ---------------------------------------------------------------------------

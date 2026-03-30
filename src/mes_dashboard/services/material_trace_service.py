@@ -12,7 +12,7 @@ from typing import Any, Dict, Generator, List, Optional
 
 import pandas as pd
 
-from mes_dashboard.core.database import read_sql_df, read_sql_df_slow
+from mes_dashboard.core.database import read_sql_df, read_sql_df_slow, read_sql_df_slow_iter
 from mes_dashboard.core.interactive_memory_guard import (
     enforce_dataset_memory_guard,
     maybe_gc_collect,
@@ -238,6 +238,95 @@ def _execute_batched_query(
         result = result.drop_duplicates(subset=["CONTAINERID", "MATERIALLOTNAME", "WORKCENTERNAME", "TXNDATE"], ignore_index=True)
     _check_memory_guard(result)
     return result
+
+
+def _execute_batched_query_to_parquet(
+    sql_name: str,
+    column: str,
+    values: List[str],
+    dest_path: "Any",
+    wc_names: Optional[List[str]] = None,
+    *,
+    allow_patterns: bool = True,
+    mapping: Optional[Dict[str, Any]] = None,
+) -> int:
+    """Execute query in batches and stream results directly to a parquet file.
+
+    Uses ``read_sql_df_slow_iter`` + ``pyarrow.ParquetWriter`` so no large
+    DataFrame is accumulated in memory.  ``WORKCENTER_GROUP`` is mapped
+    inline per chunk.  ``_check_memory_guard()`` is NOT called (spool-safe
+    path).  Writes an empty parquet when there are no rows.
+
+    Returns the total row count written.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    from pathlib import Path as _Path
+
+    if mapping is None:
+        mapping = get_workcenter_mapping() or {}
+
+    base_sql = SQLLoader.load(sql_name)
+    dest_path = _Path(str(dest_path))
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if allow_patterns:
+        exact_tokens = [v for v in values if not _is_pattern_token(v)]
+        pattern_tokens = [v for v in values if _is_pattern_token(v)]
+    else:
+        exact_tokens = list(values)
+        pattern_tokens = []
+
+    writer = None
+    schema = None
+    total_rows = 0
+
+    try:
+        for i in range(0, max(len(exact_tokens), 1), _IN_BATCH_SIZE):
+            batch = exact_tokens[i:i + _IN_BATCH_SIZE]
+            combined = batch + (pattern_tokens if i == 0 else [])
+            if not combined:
+                continue
+
+            builder = QueryBuilder(base_sql=base_sql)
+            _add_exact_or_pattern_condition(builder, column, combined)
+            if wc_names:
+                builder.add_in_condition("m.WORKCENTERNAME", wc_names)
+
+            sql, params = builder.build()
+            for columns, rows in read_sql_df_slow_iter(sql, params):
+                if not rows:
+                    continue
+
+                col_arrays: Dict[str, list] = {col: [row[j] for row in rows] for j, col in enumerate(columns)}
+
+                # Inline WORKCENTER_GROUP enrichment
+                if mapping and "WORKCENTERNAME" in col_arrays:
+                    col_arrays["WORKCENTER_GROUP"] = [
+                        (mapping.get(wc) or {}).get("group", "") for wc in col_arrays["WORKCENTERNAME"]
+                    ]
+                else:
+                    col_arrays.setdefault("WORKCENTER_GROUP", [""] * len(rows))
+
+                table = pa.table(col_arrays)
+                if writer is None:
+                    schema = table.schema
+                    writer = pq.ParquetWriter(dest_path, schema)
+                else:
+                    try:
+                        table = table.cast(schema, safe=False)
+                    except Exception:
+                        pass
+                writer.write_table(table)
+                total_rows += len(rows)
+    finally:
+        if writer is not None:
+            writer.close()
+
+    if writer is None:
+        pq.write_table(pa.table({}), dest_path)
+
+    return total_rows
 
 
 def _paginate(df: pd.DataFrame, page: int, per_page: int) -> Dict[str, Any]:
@@ -729,10 +818,12 @@ def execute_to_spool(
     values: List[str],
     workcenter_groups: Optional[List[str]] = None,
 ) -> tuple:
-    """Execute Oracle query and write result to Parquet spool.
+    """Execute Oracle query and stream result to Parquet spool.
 
-    This is the RQ-safe execution path — runs Oracle query and writes the
-    enriched DataFrame to spool. Returns (query_hash, total_rows).
+    Streaming spool-safe path: uses ``_execute_batched_query_to_parquet``
+    (``read_sql_df_slow_iter`` + ``pyarrow.ParquetWriter``) so no large
+    DataFrame is assembled in memory and ``_check_memory_guard()`` is not
+    called.  Returns ``(query_hash, total_rows)``.
 
     Idempotent: if the spool already exists, returns immediately.
     """
@@ -753,7 +844,6 @@ def execute_to_spool(
         logger.info(
             "execute_to_spool: spool hit (query_hash=%s mode=%s)", query_hash, mode
         )
-        # Return row count from existing spool
         try:
             from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
             conn = create_heavy_query_connection()
@@ -765,43 +855,39 @@ def execute_to_spool(
             return query_hash, 0
 
     wc_names = _resolve_workcenter_names(workcenter_groups)
-    meta: Dict[str, Any] = {}
+    mapping = get_workcenter_mapping() or {}
 
-    if mode == "lot":
-        container_ids, _name_map, unresolved = _resolve_container_ids(values)
-        if unresolved:
-            meta["unresolved"] = unresolved
-        if not container_ids:
-            # Nothing to spool; return empty indicator
-            return query_hash, 0
-        df = _execute_batched_query(
-            "material_trace/forward_by_lot", "m.CONTAINERID", container_ids, wc_names,
-            allow_patterns=False
-        )
-    elif mode == "workorder":
-        df = _execute_batched_query(
-            "material_trace/forward_by_workorder", "m.PJ_WORKORDER", values, wc_names
-        )
-    else:  # material_lot (reverse)
-        df = _execute_batched_query(
-            "material_trace/reverse_by_material_lot", "m.MATERIALLOTNAME", values, wc_names
-        )
-
-    maybe_gc_collect()
-
-    if df.empty:
-        return query_hash, 0
-
-    df = _enrich_workcenter_group(df)
-
-    # Write to temporary parquet then register spool
     spool_dir = QUERY_SPOOL_DIR / _SPOOL_NAMESPACE
     spool_dir.mkdir(parents=True, exist_ok=True)
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".parquet", dir=spool_dir)
+    tmp_fd, tmp_path_str = tempfile.mkstemp(suffix=".parquet", dir=spool_dir)
     os.close(tmp_fd)
+    tmp_path = _Path(tmp_path_str)
+
     try:
-        df.to_parquet(tmp_path, engine="pyarrow", index=False)
-        row_count = len(df)
+        if mode == "lot":
+            container_ids, _name_map, unresolved = _resolve_container_ids(values)
+            if not container_ids:
+                tmp_path.unlink(missing_ok=True)
+                return query_hash, 0
+            row_count = _execute_batched_query_to_parquet(
+                "material_trace/forward_by_lot", "m.CONTAINERID", container_ids,
+                tmp_path, wc_names, allow_patterns=False, mapping=mapping,
+            )
+        elif mode == "workorder":
+            row_count = _execute_batched_query_to_parquet(
+                "material_trace/forward_by_workorder", "m.PJ_WORKORDER", values,
+                tmp_path, wc_names, mapping=mapping,
+            )
+        else:  # material_lot (reverse)
+            row_count = _execute_batched_query_to_parquet(
+                "material_trace/reverse_by_material_lot", "m.MATERIALLOTNAME", values,
+                tmp_path, wc_names, mapping=mapping,
+            )
+
+        if row_count == 0:
+            tmp_path.unlink(missing_ok=True)
+            return query_hash, 0
+
         registered = register_spool_file(
             _SPOOL_NAMESPACE,
             query_hash,
@@ -813,9 +899,9 @@ def execute_to_spool(
                 "execute_to_spool: register_spool_file failed (query_hash=%s)", query_hash
             )
     except Exception as exc:
-        logger.error("execute_to_spool: parquet write failed: %s", exc)
+        logger.error("execute_to_spool: streaming write failed: %s", exc)
         try:
-            os.unlink(tmp_path)
+            tmp_path.unlink(missing_ok=True)
         except OSError:
             pass
         raise

@@ -327,6 +327,8 @@ def _get_spool_result(
         "quality_meta": quality_meta,
         "domain_quality_meta": result_domain_quality_meta,
     }
+    result["query_id"] = query_id
+    result["trace_query_id"] = query_id
     if meta.get("failed_domains"):
         result["error"] = "one or more domains failed"
         result["code"] = "EVENTS_PARTIAL_FAILURE"
@@ -653,7 +655,7 @@ def _store_result_manifest(
     normalized_domain_quality_meta: Dict[str, Dict[str, Any]] = {}
 
     for domain_name, domain_data in results.items():
-        total = len(domain_data.get("data", []))
+        total = domain_data.get("count", len(domain_data.get("data", [])))
         raw_domain_meta = None
         if isinstance(domain_quality_meta, dict):
             raw_domain_meta = domain_quality_meta.get(domain_name)
@@ -713,6 +715,8 @@ def _stream_spool_result_ndjson(conn, job_id: str, meta: Dict[str, Any]):
         "job_id": job_id,
         "profile": meta.get("profile"),
         "domains": list(domain_info.keys()),
+        "query_id": query_id,
+        "trace_query_id": query_id,
     })
 
     total_records = 0
@@ -829,98 +833,184 @@ def execute_trace_events_job(
     _update_meta(job_id, status="started", progress="fetching events")
 
     try:
+        import shutil
+        import tempfile
+        from pathlib import Path as _Path
+
         results: Dict[str, Dict[str, Any]] = {}
-        raw_domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
         failed_domains: List[str] = []
         domain_quality_meta: Dict[str, Dict[str, Any]] = {}
 
         is_msd = (profile == "mid_section_defect")
-
-        with ThreadPoolExecutor(
-            max_workers=min(len(domains), TRACE_EVENTS_MAX_WORKERS),
-        ) as executor:
-            futures = {
-                executor.submit(EventFetcher.fetch_events, container_ids, domain): domain
-                for domain in domains
-            }
-            for future in as_completed(futures):
-                domain = futures[future]
-                try:
-                    events_payload = future.result()
-                    events_by_cid, quality_meta = unpack_event_fetch_result(
-                        events_payload,
-                        domain=domain,
-                    )
-                    rows = _flatten_domain_records(events_by_cid)
-                    results[domain] = {
-                        "data": rows,
-                        "count": len(rows),
-                        "quality_meta": quality_meta,
-                    }
-                    domain_quality_meta[domain] = quality_meta
-                    if is_msd:
-                        raw_domain_results[domain] = events_by_cid
-                except Exception as exc:
-                    logger.error(
-                        "trace job domain failed job_id=%s domain=%s: %s",
-                        job_id, domain, exc, exc_info=True,
-                    )
-                    failed_domains.append(domain)
-                    failed_meta = build_quality_meta(
-                        status=QUALITY_STATUS_FAILED,
-                        scope=QUALITY_SCOPE_DOMAIN,
-                        domain=domain,
-                        reasons=["domain_fetch_failed"],
-                    )
-                    domain_quality_meta[domain] = failed_meta
-                    results[domain] = {
-                        "data": [],
-                        "count": 0,
-                        "quality_meta": failed_meta,
-                    }
-
-        _update_meta(job_id, progress="building response")
-
         aggregation = None
+
         if is_msd:
-            params = payload.get("params") or {}
+            # Streaming MSD path: Oracle → per-domain parquet → merged events spool
+            _msd_params = payload.get("params") or {}
+            _seed_container_ids = [
+                cid.strip()
+                for cid in (payload.get("seed_container_ids") or container_ids)
+                if isinstance(cid, str) and cid.strip()
+            ]
+            _direction = str(_msd_params.get("direction") or "backward").strip() or "backward"
+            _lineage_payload = _resolve_msd_lineage_payload(payload)
+            _expanded_container_ids = _expand_msd_container_ids(
+                _seed_container_ids,
+                _lineage_payload,
+                _direction,
+            )
             trace_query_id = make_trace_query_id(
                 profile=profile,
-                container_ids=container_ids,
-                start_date=params.get("start_date"),
-                end_date=params.get("end_date"),
-                station=params.get("station"),
-                direction=params.get("direction"),
+                container_ids=_seed_container_ids,
+                start_date=_msd_params.get("start_date"),
+                end_date=_msd_params.get("end_date"),
+                station=_msd_params.get("station"),
+                direction=_direction,
             )
 
-            # Write MSD analysis spool for DuckDB-backed analysis/export
+            # Compute detection spool hash (same key used in _fetch_station_detection_data)
             try:
-                _write_msd_events_spool(
-                    job_id=job_id,
-                    trace_query_id=trace_query_id,
-                    raw_domain_results=raw_domain_results,
-                )
-            except Exception as _spool_exc:
-                logger.warning(
-                    "trace job MSD events spool write failed job_id=%s: %s",
-                    job_id, _spool_exc,
-                )
+                from mes_dashboard.services.batch_query_engine import compute_query_hash as _cqh
+                _msd_detection_hash: Optional[str] = _cqh({
+                    "station": _msd_params.get("station") or "",
+                    "start_date": _msd_params.get("start_date") or "",
+                    "end_date": _msd_params.get("end_date") or "",
+                })
+            except Exception as _hash_exc:
+                logger.warning("trace job MSD: could not compute detection_hash: %s", _hash_exc)
+                _msd_detection_hash = None
 
+            _tmp_dir = tempfile.mkdtemp()
+            _domain_paths: Dict[str, Any] = {}
+            aggregation = None
+            agg_error: Optional[str] = None
+            try:
+                for domain in domains:
+                    _dest = _Path(_tmp_dir) / f"{domain}.parquet"
+                    try:
+                        _row_count, _qm = EventFetcher.fetch_events_to_parquet(
+                            _expanded_container_ids, domain, _dest
+                        )
+                        results[domain] = {
+                            "data": [],
+                            "count": _row_count,
+                            "quality_meta": _qm,
+                        }
+                        domain_quality_meta[domain] = _qm
+                        _domain_paths[domain] = _dest
+                    except Exception as exc:
+                        logger.error(
+                            "trace job domain failed job_id=%s domain=%s: %s",
+                            job_id, domain, exc, exc_info=True,
+                        )
+                        failed_domains.append(domain)
+                        _fm = build_quality_meta(
+                            status=QUALITY_STATUS_FAILED,
+                            scope=QUALITY_SCOPE_DOMAIN,
+                            domain=domain,
+                            reasons=["domain_fetch_failed"],
+                        )
+                        domain_quality_meta[domain] = _fm
+                        results[domain] = {"data": [], "count": 0, "quality_meta": _fm}
+
+                try:
+                    _write_msd_events_spool_from_paths(trace_query_id, _domain_paths)
+                except Exception as _spool_exc:
+                    logger.warning(
+                        "trace job MSD events spool write failed job_id=%s: %s",
+                        job_id, _spool_exc,
+                    )
+
+                # Write lineage spool so DuckDB attribution JOIN can work
+                try:
+                    _lineage_ancestors = _lineage_payload.get("ancestors") if isinstance(_lineage_payload, dict) else None
+                    if isinstance(_lineage_ancestors, dict) and _lineage_ancestors:
+                        from mes_dashboard.services.mid_section_defect_service import _write_msd_lineage_stage_spool
+                        _write_msd_lineage_stage_spool(trace_query_id, _lineage_ancestors)
+                        logger.info(
+                            "trace job MSD lineage spool written job_id=%s ancestor_count=%s",
+                            job_id, len(_lineage_ancestors),
+                        )
+                except Exception as _lin_exc:
+                    logger.warning(
+                        "trace job MSD lineage spool write failed job_id=%s: %s",
+                        job_id, _lin_exc,
+                    )
+
+                _update_meta(job_id, progress="building response")
+            finally:
+                shutil.rmtree(_tmp_dir, ignore_errors=True)
+
+            # Build aggregation after tmp dir cleanup — uses spool files only
+            _payload_for_aggregation = dict(payload or {})
+            _payload_for_aggregation["seed_container_ids"] = _seed_container_ids
+            if _lineage_payload:
+                _payload_for_aggregation["lineage"] = {
+                    "ancestors": _lineage_payload.get("ancestors") or {},
+                    "children_map": _lineage_payload.get("children_map") or {},
+                    "seed_roots": _lineage_payload.get("seed_roots") or {},
+                }
             aggregation, agg_error = _build_job_msd_aggregation(
-                payload,
-                raw_domain_results,
+                _payload_for_aggregation,
+                {},
                 domain_quality_meta=domain_quality_meta,
+                trace_query_id=trace_query_id,
+                detection_hash=_msd_detection_hash,
             )
-            del raw_domain_results
+
             if agg_error is not None:
                 raise RuntimeError(agg_error)
+
         else:
+            # Non-MSD path: original in-memory fetch (unchanged)
+            with ThreadPoolExecutor(
+                max_workers=min(len(domains), TRACE_EVENTS_MAX_WORKERS),
+            ) as executor:
+                futures = {
+                    executor.submit(EventFetcher.fetch_events, container_ids, domain): domain
+                    for domain in domains
+                }
+                for future in as_completed(futures):
+                    domain = futures[future]
+                    try:
+                        events_payload = future.result()
+                        events_by_cid, quality_meta = unpack_event_fetch_result(
+                            events_payload,
+                            domain=domain,
+                        )
+                        rows = _flatten_domain_records(events_by_cid)
+                        results[domain] = {
+                            "data": rows,
+                            "count": len(rows),
+                            "quality_meta": quality_meta,
+                        }
+                        domain_quality_meta[domain] = quality_meta
+                    except Exception as exc:
+                        logger.error(
+                            "trace job domain failed job_id=%s domain=%s: %s",
+                            job_id, domain, exc, exc_info=True,
+                        )
+                        failed_domains.append(domain)
+                        failed_meta = build_quality_meta(
+                            status=QUALITY_STATUS_FAILED,
+                            scope=QUALITY_SCOPE_DOMAIN,
+                            domain=domain,
+                            reasons=["domain_fetch_failed"],
+                        )
+                        domain_quality_meta[domain] = failed_meta
+                        results[domain] = {
+                            "data": [],
+                            "count": 0,
+                            "quality_meta": failed_meta,
+                        }
+
+            _update_meta(job_id, progress="building response")
+
             trace_query_id = make_general_trace_events_query_id(
                 profile=profile,
                 container_ids=container_ids,
                 domains=domains,
             )
-            del raw_domain_results
 
         # Write per-domain result spool for get_job_result / streaming (all profiles)
         try:
@@ -996,6 +1086,75 @@ def _flatten_domain_records(
     return rows
 
 
+def _resolve_msd_lineage_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    lineage = payload.get("lineage") or {}
+    if isinstance(lineage, dict) and (
+        isinstance(lineage.get("ancestors"), dict) or isinstance(lineage.get("children_map"), dict)
+    ):
+        return lineage
+
+    lineage_query_id = str(payload.get("lineage_query_id") or "").strip()
+    if lineage_query_id:
+        try:
+            from mes_dashboard.services.trace_lineage_job_service import load_trace_lineage_result
+
+            stored = load_trace_lineage_result(lineage_query_id)
+            if isinstance(stored, dict):
+                return stored
+        except Exception as exc:
+            logger.warning(
+                "trace job MSD: failed to load lineage spool query_id=%s: %s",
+                lineage_query_id,
+                exc,
+            )
+    return {}
+
+
+def _expand_msd_container_ids(
+    seed_container_ids: List[str],
+    lineage_payload: Dict[str, Any],
+    direction: str,
+) -> List[str]:
+    seen = set()
+    merged: List[str] = []
+    for seed in seed_container_ids or []:
+        value = str(seed or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        merged.append(value)
+
+    if direction == "forward":
+        children_map = lineage_payload.get("children_map") if isinstance(lineage_payload, dict) else {}
+        queue = list(merged)
+        while queue:
+            current = queue.pop(0)
+            children = children_map.get(current) if isinstance(children_map, dict) else None
+            if not isinstance(children, list):
+                continue
+            for child in children:
+                child_id = str(child or "").strip()
+                if not child_id or child_id in seen:
+                    continue
+                seen.add(child_id)
+                merged.append(child_id)
+                queue.append(child_id)
+        return merged
+
+    ancestors = lineage_payload.get("ancestors") if isinstance(lineage_payload, dict) else {}
+    if isinstance(ancestors, dict):
+        for values in ancestors.values():
+            if not isinstance(values, list):
+                continue
+            for ancestor in values:
+                ancestor_id = str(ancestor or "").strip()
+                if not ancestor_id or ancestor_id in seen:
+                    continue
+                seen.add(ancestor_id)
+                merged.append(ancestor_id)
+    return merged
+
+
 def _write_msd_events_spool(
     job_id: str,
     trace_query_id: str,
@@ -1048,18 +1207,228 @@ def _write_msd_events_spool(
             tmp_path.unlink(missing_ok=True)
 
 
+def _write_msd_events_spool_from_paths(
+    trace_query_id: str,
+    domain_parquet_paths: Dict[str, Any],
+) -> None:
+    """Streaming merge of per-domain parquet files into a single MSD events spool.
+
+    Iterates each domain's parquet via ``pq.ParquetFile.iter_batches()`` and
+    writes all records to a single consolidated events spool file, then
+    registers it via ``register_stage_spool_file()``.  This is the streaming
+    replacement for ``_write_msd_events_spool()`` — no full DataFrame is
+    assembled in memory.
+    """
+    import tempfile
+    from pathlib import Path as _Path
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE, _STAGE_EVENTS
+    from mes_dashboard.core.query_spool_store import register_stage_spool_file
+
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as _tmp:
+        tmp_path = _Path(_tmp.name)
+
+    # First pass: collect schemas from all available domain parquets so we can
+    # build a unified schema before opening the ParquetWriter.  Different
+    # domains (e.g. upstream_history vs. materials) have completely different
+    # column sets; pandas used to union them automatically via DataFrame(rows),
+    # so we replicate that with pa.unify_schemas().
+    domain_paths: Dict[str, _Path] = {}
+    per_domain_schemas: List[pa.Schema] = []
+    for domain, src_path in domain_parquet_paths.items():
+        sp = _Path(src_path)
+        if not sp.exists():
+            logger.debug(
+                "_write_msd_events_spool_from_paths: skip missing parquet domain=%s path=%s",
+                domain, sp,
+            )
+            continue
+        try:
+            pf_schema = pq.read_schema(sp)
+            per_domain_schemas.append(pf_schema)
+            domain_paths[domain] = sp
+        except Exception as exc:
+            logger.warning(
+                "_write_msd_events_spool_from_paths: cannot read schema domain=%s: %s",
+                domain, exc,
+            )
+
+    if not per_domain_schemas:
+        return
+
+    unified_schema: pa.Schema = pa.unify_schemas(
+        per_domain_schemas, promote_options="permissive"
+    )
+
+    writer = None
+    total_rows = 0
+
+    try:
+        for domain, sp in domain_paths.items():
+            try:
+                pf = pq.ParquetFile(sp)
+                for batch in pf.iter_batches():
+                    if batch.num_rows == 0:
+                        continue
+                    table = pa.Table.from_batches([batch])
+                    # Align to unified schema: add null columns for any fields
+                    # this domain doesn't have, then reorder + cast.
+                    for field in unified_schema:
+                        if field.name not in table.schema.names:
+                            null_col = pa.array(
+                                [None] * len(table), type=field.type
+                            )
+                            table = table.append_column(field, null_col)
+                    table = table.select(unified_schema.names).cast(
+                        unified_schema, safe=False
+                    )
+                    if writer is None:
+                        writer = pq.ParquetWriter(tmp_path, unified_schema)
+                    writer.write_table(table)
+                    total_rows += batch.num_rows
+            except Exception as exc:
+                logger.warning(
+                    "_write_msd_events_spool_from_paths: failed to read domain parquet domain=%s: %s",
+                    domain, exc,
+                )
+    finally:
+        if writer is not None:
+            writer.close()
+
+    if total_rows == 0:
+        logger.debug(
+            "_write_msd_events_spool_from_paths: no events to spool trace_query_id=%s",
+            trace_query_id,
+        )
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return
+
+    ok = register_stage_spool_file(
+        SPOOL_NAMESPACE,
+        trace_query_id,
+        _STAGE_EVENTS,
+        tmp_path,
+        row_count=total_rows,
+    )
+    if ok:
+        logger.info(
+            "_write_msd_events_spool_from_paths: registered events spool trace_query_id=%s rows=%d",
+            trace_query_id, total_rows,
+        )
+    else:
+        logger.warning(
+            "_write_msd_events_spool_from_paths: spool registration failed trace_query_id=%s",
+            trace_query_id,
+        )
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def _build_job_msd_aggregation(
     payload: Dict[str, Any],
     domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]],
     domain_quality_meta: Optional[Dict[str, Dict[str, Any]]] = None,
+    trace_query_id: Optional[str] = None,
+    detection_hash: Optional[str] = None,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-    """Build MSD aggregation inside worker process (no Flask context)."""
+    """Build MSD aggregation inside worker process (no Flask context).
+
+    When *trace_query_id* and *detection_hash* are both provided and the
+    corresponding spool files are available, aggregation is computed via
+    DuckDB using the canonical detection spool path.  Falls back to the
+    in-memory ``build_trace_aggregation_from_events`` path otherwise.
+    """
+    params = payload.get("params")
+    normalized_loss_reasons = None
+    direction = "backward"
+    if isinstance(params, dict):
+        from mes_dashboard.services.mid_section_defect_service import parse_loss_reasons_param
+
+        normalized_loss_reasons = parse_loss_reasons_param(params.get("loss_reasons"))
+        direction = str(params.get("direction") or "backward").strip() or "backward"
+
+    if trace_query_id:
+        try:
+            from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+
+            runtime = MsdDuckdbRuntime(trace_query_id)
+            if runtime.is_available():
+                summary = runtime.get_summary(
+                    direction=direction,
+                    loss_reasons=normalized_loss_reasons,
+                )
+                if summary is not None:
+                    if domain_quality_meta:
+                        summary["domain_quality_meta"] = domain_quality_meta
+                    return summary, None
+        except Exception as _runtime_exc:
+            logger.warning(
+                "_build_job_msd_aggregation: existing stage runtime failed trace_query_id=%s: %s",
+                trace_query_id, _runtime_exc,
+            )
+
+    # DuckDB spool hit path (D4): prefer detection-spool-backed aggregation
+    if trace_query_id and detection_hash:
+        try:
+            from pathlib import Path as _AggPath
+            from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+            from mes_dashboard.core.query_spool_store import get_spool_file_path
+
+            runtime = MsdDuckdbRuntime(trace_query_id)
+            if runtime.is_available():
+                detection_path = get_spool_file_path("msd_detect", detection_hash)
+                if detection_path and _AggPath(detection_path).exists():
+                    summary = runtime.get_summary_with_detection(
+                        str(detection_path),
+                        loss_reasons=normalized_loss_reasons,
+                    )
+                    if summary is not None:
+                        if domain_quality_meta:
+                            summary["domain_quality_meta"] = domain_quality_meta
+                        # Copy detection spool as stage under msd-events namespace so
+                        # get_detail() can access it after the short msd_detect TTL expires.
+                        try:
+                            import shutil as _shutil
+                            import tempfile as _tmpmod
+                            from mes_dashboard.services.msd_duckdb_runtime import (
+                                SPOOL_NAMESPACE as _MSD_NS,
+                                _STAGE_DETECTION,
+                            )
+                            from mes_dashboard.core.query_spool_store import (
+                                register_stage_spool_file as _reg_stage,
+                                get_spool_metadata as _get_meta,
+                            )
+                            _det_meta = _get_meta("msd_detect", detection_hash) or {}
+                            _det_row_count = int(_det_meta.get("row_count", 0))
+                            with _tmpmod.NamedTemporaryFile(suffix=".parquet", delete=False) as _tf:
+                                _det_copy = _AggPath(_tf.name)
+                            _shutil.copy2(detection_path, _det_copy)
+                            _reg_stage(_MSD_NS, trace_query_id, _STAGE_DETECTION, _det_copy, _det_row_count)
+                            logger.info(
+                                "_build_job_msd_aggregation: detection stage registered trace_query_id=%s rows=%d",
+                                trace_query_id, _det_row_count,
+                            )
+                        except Exception as _copy_exc:
+                            logger.warning(
+                                "_build_job_msd_aggregation: detection stage copy failed: %s", _copy_exc
+                            )
+                        return summary, None
+        except Exception as _ddb_exc:
+            logger.warning(
+                "_build_job_msd_aggregation: DuckDB path failed trace_query_id=%s: %s",
+                trace_query_id, _ddb_exc,
+            )
+
     from mes_dashboard.services.mid_section_defect_service import (
         build_trace_aggregation_from_events,
-        parse_loss_reasons_param,
     )
 
-    params = payload.get("params")
     if not isinstance(params, dict):
         return None, "params is required for mid_section_defect profile"
 
@@ -1078,9 +1447,6 @@ def _build_job_msd_aggregation(
         if not start_date or not end_date:
             return None, "start_date/end_date is required in params"
 
-    raw_loss_reasons = params.get("loss_reasons")
-    loss_reasons = parse_loss_reasons_param(raw_loss_reasons)
-
     lineage = payload.get("lineage") or {}
     lineage_ancestors = lineage.get("ancestors") if isinstance(lineage, dict) else None
     lineage_roots = lineage.get("seed_roots") if isinstance(lineage, dict) else None
@@ -1097,12 +1463,11 @@ def _build_job_msd_aggregation(
     materials_events = domain_results.get("materials", {})
     downstream_events = domain_results.get("downstream_rejects", {})
     station = str(params.get("station") or "測試").strip()
-    direction = str(params.get("direction") or "backward").strip()
 
     aggregation = build_trace_aggregation_from_events(
         start_date,
         end_date,
-        loss_reasons=loss_reasons,
+        loss_reasons=normalized_loss_reasons,
         seed_container_ids=seed_container_ids,
         lineage_ancestors=lineage_ancestors,
         lineage_roots=lineage_roots,

@@ -26,6 +26,18 @@ function stageKey(stageName) {
 }
 
 function normalizeSeedContainerIds(seedPayload) {
+  const directIds = Array.isArray(seedPayload?.seed_container_ids) ? seedPayload.seed_container_ids : [];
+  if (directIds.length > 0) {
+    const seen = new Set();
+    const containerIds = [];
+    directIds.forEach((value) => {
+      const id = String(value || '').trim();
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      containerIds.push(id);
+    });
+    return containerIds;
+  }
   const rows = Array.isArray(seedPayload?.seeds) ? seedPayload.seeds : [];
   const seen = new Set();
   const containerIds = [];
@@ -264,23 +276,35 @@ export function useTraceProgress({ profile } = {}) {
       stage_results.lineage = lineagePayload;
       completed_stages.value = [...completed_stages.value, 'lineage'];
 
-      const allContainerIds = collectAllContainerIds(seedContainerIds, lineagePayload, direction);
+      const lineageQueryId = String(
+        lineagePayload?.query_id || lineageEnvelope?.query_id || '',
+      ).trim() || null;
+      const eventContainerIds = profile === 'mid_section_defect'
+        ? seedContainerIds
+        : collectAllContainerIds(seedContainerIds, lineagePayload, direction);
       current_stage.value = 'events';
+      const eventRequest = {
+        profile,
+        container_ids: eventContainerIds,
+        domains,
+        cache_key: seedPayload?.cache_key || null,
+        params,
+        seed_container_ids: seedContainerIds,
+      };
+      if (profile === 'mid_section_defect') {
+        if (lineageQueryId) {
+          eventRequest.lineage_query_id = lineageQueryId;
+        }
+      } else {
+        eventRequest.lineage = {
+          ancestors: lineagePayload?.ancestors || {},
+          children_map: lineagePayload?.children_map || {},
+          seed_roots: lineagePayload?.seed_roots || {},
+        };
+      }
       const eventsRaw = await apiPost(
         '/api/trace/events',
-        {
-          profile,
-          container_ids: allContainerIds,
-          domains,
-          cache_key: seedPayload?.cache_key || null,
-          params,
-          seed_container_ids: seedContainerIds,
-          lineage: {
-            ancestors: lineagePayload?.ancestors || {},
-            children_map: lineagePayload?.children_map || {},
-            seed_roots: lineagePayload?.seed_roots || {},
-          },
-        },
+        eventRequest,
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },
       );
       const eventsPayload = unwrapEnvelope(eventsRaw);
@@ -318,7 +342,14 @@ export function useTraceProgress({ profile } = {}) {
           await consumeNDJSONStream(streamUrl, {
             signal: controller.signal,
             onChunk: (chunk) => {
-              if (chunk.type === 'domain_start') {
+              if (chunk.type === 'meta') {
+                if (chunk.query_id) {
+                  streamedResult.query_id = chunk.query_id;
+                }
+                if (chunk.trace_query_id) {
+                  streamedResult.trace_query_id = chunk.trace_query_id;
+                }
+              } else if (chunk.type === 'domain_start') {
                 const domainQualityMeta = chunk.quality_meta || null;
                 streamedResult.results[chunk.domain] = {
                   data: [],

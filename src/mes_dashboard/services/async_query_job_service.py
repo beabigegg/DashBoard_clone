@@ -237,6 +237,10 @@ def get_job_status(prefix: str, job_id: str) -> Optional[Dict[str, Any]]:
         if stages:
             result["completed_stages"] = stages
 
+    profile = meta.get("profile")
+    if profile:
+        result["profile"] = profile
+
     # Include query_id / dataset_id if present (completed jobs)
     query_id = meta.get("query_id")
     if query_id:

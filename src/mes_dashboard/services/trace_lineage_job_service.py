@@ -154,6 +154,8 @@ def enqueue_trace_lineage(
         job_timeout=TRACE_LINEAGE_JOB_TIMEOUT_SECONDS,
         result_ttl=TRACE_LINEAGE_JOB_TTL_SECONDS,
     )
+    if enqueued_job_id:
+        update_job_progress(_JOB_PREFIX, enqueued_job_id, profile=profile)
     return enqueued_job_id, error, query_id
 
 

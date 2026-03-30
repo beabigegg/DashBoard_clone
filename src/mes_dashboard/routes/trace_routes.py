@@ -519,6 +519,23 @@ def _parse_lineage_roots(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
     return None
 
 
+def _compact_msd_lineage_response(
+    query_id: str,
+    response: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    payload = response if isinstance(response, dict) else {}
+    compact: Dict[str, Any] = {
+        "stage": "lineage",
+        "query_id": query_id,
+        "trace_lineage_query_id": query_id,
+        "total_nodes": int(payload.get("total_nodes") or 0),
+        "total_ancestor_count": int(payload.get("total_ancestor_count") or 0),
+    }
+    if isinstance(payload.get("seed_roots"), dict) and payload.get("seed_roots"):
+        compact["seed_roots"] = payload["seed_roots"]
+    return compact
+
+
 def _build_msd_aggregation(
     payload: Dict[str, Any],
     domain_results: Dict[str, Dict[str, List[Dict[str, Any]]]],
@@ -531,7 +548,7 @@ def _build_msd_aggregation(
     # Task 5.2: try spool-backed DuckDB runtime first when a valid spool exists.
     # This avoids large in-memory pandas aggregation in the gunicorn worker.
     try:
-        _container_ids = payload.get("container_ids") or []
+        _container_ids = _normalize_strings(payload.get("seed_container_ids", [])) or (payload.get("container_ids") or [])
         _tqid = make_trace_query_id(
             profile=PROFILE_MID_SECTION_DEFECT,
             container_ids=_container_ids,
@@ -543,7 +560,10 @@ def _build_msd_aggregation(
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
         _rt = MsdDuckdbRuntime(_tqid)
         if _rt.is_available():
-            _summary = _rt.get_summary()
+            _summary = _rt.get_summary(
+                direction=direction,
+                loss_reasons=loss_reasons,
+            )
             if _summary is not None:
                 logger.debug(
                     "_build_msd_aggregation: using DuckDB spool path trace_query_id=%s", _tqid
@@ -644,10 +664,23 @@ def seed_resolve():
 
     response = {
         "stage": "seed-resolve",
-        "seeds": resolved.get("seeds", []),
         "seed_count": int(resolved.get("seed_count", 0)),
         "cache_key": seed_cache_key,
     }
+    if profile == PROFILE_MID_SECTION_DEFECT:
+        response["seed_container_ids"] = _normalize_strings([
+            row.get("container_id")
+            for row in (resolved.get("seeds", []) if isinstance(resolved.get("seeds"), list) else [])
+            if isinstance(row, dict)
+        ])
+        not_found = resolved.get("not_found")
+        if isinstance(not_found, list) and not_found:
+            response["not_found"] = [str(v).strip() for v in not_found if str(v or "").strip()]
+        mode = str(params.get("mode") or "date_range").strip()
+        if mode == "container":
+            response["seeds"] = resolved.get("seeds", [])
+    else:
+        response["seeds"] = resolved.get("seeds", [])
     cache_set(seed_cache_key, response, ttl=TRACE_CACHE_TTL_SECONDS)
     return success_response(response)
 
@@ -679,8 +712,13 @@ def lineage():
     query_id = make_trace_lineage_query_id(profile, container_ids, params=params)
     stored_result = load_trace_lineage_result(query_id)
     if stored_result is not None:
-        cache_set(lineage_cache_key, stored_result, ttl=TRACE_CACHE_TTL_SECONDS)
-        return success_response(stored_result)
+        response_payload = (
+            _compact_msd_lineage_response(query_id, stored_result)
+            if profile == PROFILE_MID_SECTION_DEFECT
+            else stored_result
+        )
+        cache_set(lineage_cache_key, response_payload, ttl=TRACE_CACHE_TTL_SECONDS)
+        return success_response(response_payload)
 
     logger.info(
         "trace lineage profile=%s count=%s correlation_cache_key=%s",
@@ -769,7 +807,13 @@ def lineage_job_result(job_id: str):
     result = get_trace_lineage_job_result(job_id) or get_msd_lineage_job_result(job_id)
     if result is None:
         return _error("JOB_RESULT_EXPIRED", "job result has expired", 404)
-
+    query_id = str(status.get("query_id") or "").strip()
+    profile = str(status.get("profile") or "").strip()
+    if (
+        profile == PROFILE_MID_SECTION_DEFECT
+        or query_id.startswith("trace-lineage-mid-section-defect-")
+    ):
+        return success_response(_compact_msd_lineage_response(query_id, result))
     return success_response(result)
 
 
@@ -807,9 +851,10 @@ def events():
     if is_msd:
         try:
             params_block = payload.get("params") or {}
+            seed_ids = _normalize_strings(payload.get("seed_container_ids", [])) or container_ids
             _tqid = make_trace_query_id(
                 profile=profile,
-                container_ids=container_ids,
+                container_ids=seed_ids,
                 start_date=params_block.get("start_date"),
                 end_date=params_block.get("end_date"),
                 station=params_block.get("station"),
@@ -818,7 +863,10 @@ def events():
             from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
             _rt = MsdDuckdbRuntime(_tqid)
             if _rt.is_available():
-                _summary = _rt.get_summary()
+                _summary = _rt.get_summary(
+                    direction=str(params_block.get("direction") or "backward").strip(),
+                    loss_reasons=parse_loss_reasons_param(params_block.get("loss_reasons")),
+                )
                 if _summary is not None:
                     logger.debug(
                         "trace events: spool hit for trace_query_id=%s cid_count=%d",

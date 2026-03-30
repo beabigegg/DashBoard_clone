@@ -20,6 +20,7 @@ from mes_dashboard.services.material_trace_service import (
     _is_pattern_token,
     _resolve_container_ids,
     _resolve_workcenter_names,
+    execute_to_spool,
     export_csv,
     forward_query,
     reverse_query,
@@ -594,3 +595,72 @@ class TestGcCollect:
         reverse_query(["MLOT-A"], page=1, per_page=50)
 
         mock_gc.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# execute_to_spool streaming path tests (task 5.1)
+# ---------------------------------------------------------------------------
+
+class TestExecuteToSpoolStreaming:
+    """execute_to_spool() must use the streaming path and NOT call _check_memory_guard."""
+
+    @patch("mes_dashboard.services.material_trace_service._check_memory_guard")
+    @patch("mes_dashboard.core.query_spool_store.register_spool_file", return_value=True)
+    @patch("mes_dashboard.core.query_spool_store.get_spool_file_path", return_value=None)
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow_iter")
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df")
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_execute_to_spool_workorder_does_not_call_memory_guard(
+        self, mock_mapping, mock_sql, mock_iter, _gsfp, _rsf, mock_guard, tmp_path
+    ):
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        mock_sql.return_value = None  # not used for spool path
+
+        # Simulate iterator returning one batch of rows
+        def _iter_side(sql, params, **kwargs):
+            yield ["CONTAINERID", "CONTAINERNAME", "PJ_WORKORDER", "WORKCENTERNAME",
+                   "MATERIALPARTNAME", "MATERIALLOTNAME", "VENDORLOTNUMBER",
+                   "QTYREQUIRED", "QTYCONSUMED", "EQUIPMENTNAME", "TXNDATE",
+                   "PRIMARY_CATEGORY", "SECONDARY_CATEGORY"], [
+                (f"CID{i:016d}", f"LOT-{i}", "WO-1", "WC_DB_1", "MAT-1", f"MLOT-{i}",
+                 f"VL-{i}", 10.0, 9.5, "EQ-1", "2025-01-01", "CAT_A", "SUB_1")
+                for i in range(5)
+            ]
+
+        mock_iter.side_effect = _iter_side
+
+        with patch("mes_dashboard.core.query_spool_store.QUERY_SPOOL_DIR", tmp_path):
+            query_hash, row_count = execute_to_spool("workorder", ["WO-001"])
+
+        assert row_count == 5
+        mock_guard.assert_not_called()
+
+    @patch("mes_dashboard.services.material_trace_service._check_memory_guard")
+    @patch("mes_dashboard.core.query_spool_store.register_spool_file", return_value=True)
+    @patch("mes_dashboard.core.query_spool_store.get_spool_file_path", return_value=None)
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df_slow_iter")
+    @patch("mes_dashboard.services.material_trace_service.read_sql_df")
+    @patch("mes_dashboard.services.material_trace_service.get_workcenter_mapping")
+    def test_execute_to_spool_lot_does_not_call_memory_guard(
+        self, mock_mapping, mock_sql, mock_iter, _gsfp, _rsf, mock_guard, tmp_path
+    ):
+        mock_mapping.return_value = MOCK_WORKCENTER_MAPPING
+        # Resolve container IDs
+        mock_sql.return_value = _make_resolve_df(["LOT-A"])
+
+        def _iter_side(sql, params, **kwargs):
+            yield ["CONTAINERID", "CONTAINERNAME", "PJ_WORKORDER", "WORKCENTERNAME",
+                   "MATERIALPARTNAME", "MATERIALLOTNAME", "VENDORLOTNUMBER",
+                   "QTYREQUIRED", "QTYCONSUMED", "EQUIPMENTNAME", "TXNDATE",
+                   "PRIMARY_CATEGORY", "SECONDARY_CATEGORY"], [
+                ("CID_LOT-A", "LOT-A", "WO-1", "WC_DB_1", "MAT-1", "MLOT-1",
+                 "VL-1", 10.0, 9.5, "EQ-1", "2025-01-01", "CAT_A", "SUB_1"),
+            ]
+
+        mock_iter.side_effect = _iter_side
+
+        with patch("mes_dashboard.core.query_spool_store.QUERY_SPOOL_DIR", tmp_path):
+            query_hash, row_count = execute_to_spool("lot", ["LOT-A"])
+
+        assert row_count == 1
+        mock_guard.assert_not_called()

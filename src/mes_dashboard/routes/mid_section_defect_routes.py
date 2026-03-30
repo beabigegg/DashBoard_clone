@@ -93,7 +93,7 @@ def _build_summary_payload(result: dict) -> dict:
         'daily_trend': result.get('daily_trend'),
         'available_loss_reasons': result.get('available_loss_reasons'),
         'genealogy_status': result.get('genealogy_status'),
-        'detail_total_count': len(result.get('detail', [])),
+        'detail_total_count': int(result.get('detail_total_count', len(result.get('detail', [])))),
         'attribution': result.get('attribution', []),
         'trace_query_id': result.get('trace_query_id'),
     }
@@ -199,7 +199,14 @@ def api_analysis_detail():
             order = request.args.get("order", "desc")
             rt = MsdDuckdbRuntime(trace_query_id)
             if rt.is_available():
-                detail = rt.get_detail(page=page, per_page=per_page, sort_by=sort_by, order=order)
+                detail = rt.get_detail(
+                    page=page,
+                    per_page=per_page,
+                    sort_by=sort_by,
+                    order=order,
+                    direction=direction,
+                    loss_reasons=loss_reasons,
+                )
                 if detail is not None:
                     pagination = detail.get("pagination") or {}
                     return success_response({
@@ -264,7 +271,7 @@ def api_export():
             if rt.is_available():
                 filename = f"defect_trace_{trace_query_id}.csv"
                 return Response(
-                    rt.export_csv(),
+                    rt.export_csv(direction=direction, loss_reasons=loss_reasons),
                     mimetype="text/csv",
                     headers={
                         "Content-Disposition": f"attachment; filename={filename}",
