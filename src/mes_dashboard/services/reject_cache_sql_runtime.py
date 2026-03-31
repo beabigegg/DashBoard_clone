@@ -531,7 +531,11 @@ def try_compute_batch_pareto_from_spool(
         )
         defect_expr = "COALESCE(\"DEFECT_QTY\", 0)" if "DEFECT_QTY" in cols else "0"
         lot_expr = (
-            'SUM(COALESCE("AFFECTED_LOT_COUNT", 0))' if "AFFECTED_LOT_COUNT" in cols else "0"
+            'SUM(COALESCE("AFFECTED_LOT_COUNT", 0))'
+            if "AFFECTED_LOT_COUNT" in cols
+            else 'COUNT(DISTINCT "CONTAINERID")'
+            if "CONTAINERID" in cols
+            else "0"
         )
         metric_expr = f"COALESCE({_qid(metric_col)}, 0)"
 
@@ -698,7 +702,13 @@ def try_compute_view_from_spool(
         movein_expr = 'SUM(COALESCE("MOVEIN_QTY", 0))'
         reject_expr = 'SUM(COALESCE("REJECT_TOTAL_QTY", 0))'
         defect_expr = 'SUM(COALESCE("DEFECT_QTY", 0))'
-        lot_expr = 'SUM(COALESCE("AFFECTED_LOT_COUNT", 0))' if "AFFECTED_LOT_COUNT" in cols else "0"
+        lot_expr = (
+            'SUM(COALESCE("AFFECTED_LOT_COUNT", 0))'
+            if "AFFECTED_LOT_COUNT" in cols
+            else 'COUNT(DISTINCT "CONTAINERID")'
+            if "CONTAINERID" in cols
+            else "0"
+        )
         wo_expr = 'SUM(COALESCE("AFFECTED_WORKORDER_COUNT", 0))' if "AFFECTED_WORKORDER_COUNT" in cols else "0"
         reason_expr = _norm_value_expr("LOSSREASONNAME") if "LOSSREASONNAME" in cols else "'(未填寫)'"
         day_expr = (
