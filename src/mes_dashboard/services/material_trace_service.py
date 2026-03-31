@@ -28,6 +28,8 @@ from mes_dashboard.core.query_quality_contract import (
 )
 from mes_dashboard.core.redis_client import get_key, get_redis_client
 from mes_dashboard.core.query_spool_store import load_spooled_df, store_spooled_df
+
+MATERIAL_TRACE_QUEUE = os.getenv("TRACE_WORKER_QUEUE", "trace-events")
 from mes_dashboard.services.batch_query_engine import compute_query_hash
 from mes_dashboard.services.container_resolution_policy import (
     validate_resolution_request,
@@ -925,9 +927,9 @@ def rq_material_trace_job(job_id: str, mode: str, values: List[str], workcenter_
             update_job_progress,
             complete_job,
         )
-        update_job_progress(_PREFIX, job_id, "running", pct=10, message="查詢中...")
+        update_job_progress(_PREFIX, job_id, status="running", pct=10, message="查詢中...")
         query_hash, total_rows = execute_to_spool(mode, values, workcenter_groups)
-        update_job_progress(_PREFIX, job_id, "running", pct=90, message=f"寫入 spool ({total_rows} 筆)")
+        update_job_progress(_PREFIX, job_id, status="running", pct=90, message=f"寫入 spool ({total_rows} 筆)")
         complete_job(_PREFIX, job_id, query_id=query_hash)
         logger.info(
             "rq_material_trace_job: complete (job_id=%s query_hash=%s rows=%d)",

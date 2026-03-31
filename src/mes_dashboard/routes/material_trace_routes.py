@@ -27,6 +27,7 @@ from mes_dashboard.services.filter_cache import get_workcenter_groups
 from mes_dashboard.services.async_query_job_service import enqueue_job, get_job_status
 from mes_dashboard.services.material_trace_duckdb_runtime import MaterialTraceDuckdbRuntime
 from mes_dashboard.services.material_trace_service import (
+    MATERIAL_TRACE_QUEUE,
     make_route_query_hash,
     rq_material_trace_job,
 )
@@ -151,7 +152,7 @@ def api_material_trace_query():
         try:
             generated_job_id = f"mtrace-{uuid.uuid4().hex[:12]}"
             job_id, err = enqueue_job(
-                queue_name="default",
+                queue_name=MATERIAL_TRACE_QUEUE,
                 worker_fn=rq_material_trace_job,
                 prefix="material_trace",
                 job_id=generated_job_id,
