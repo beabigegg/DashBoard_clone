@@ -1580,7 +1580,15 @@ def _build_dimension_pareto_items(
         return []
 
     if "AFFECTED_LOT_COUNT" not in grouped.columns:
-        grouped["AFFECTED_LOT_COUNT"] = 0
+        if "CONTAINERNAME" in df.columns:
+            grouped["AFFECTED_LOT_COUNT"] = (
+                df.groupby(dim_col, sort=False, observed=True)["CONTAINERNAME"]
+                .nunique()
+                .reindex(grouped[dim_col])
+                .values
+            )
+        else:
+            grouped["AFFECTED_LOT_COUNT"] = 0
 
     grouped["METRIC_VALUE"] = grouped[metric_col].fillna(0)
     grouped = grouped[grouped["METRIC_VALUE"] > 0].sort_values(

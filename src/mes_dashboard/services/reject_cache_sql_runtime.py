@@ -533,8 +533,8 @@ def try_compute_batch_pareto_from_spool(
         lot_expr = (
             'SUM(COALESCE("AFFECTED_LOT_COUNT", 0))'
             if "AFFECTED_LOT_COUNT" in cols
-            else 'COUNT(DISTINCT "CONTAINERID")'
-            if "CONTAINERID" in cols
+            else 'COUNT(DISTINCT "CONTAINERNAME")'
+            if "CONTAINERNAME" in cols
             else "0"
         )
         metric_expr = f"COALESCE({_qid(metric_col)}, 0)"
@@ -705,8 +705,8 @@ def try_compute_view_from_spool(
         lot_expr = (
             'SUM(COALESCE("AFFECTED_LOT_COUNT", 0))'
             if "AFFECTED_LOT_COUNT" in cols
-            else 'COUNT(DISTINCT "CONTAINERID")'
-            if "CONTAINERID" in cols
+            else 'COUNT(DISTINCT "CONTAINERNAME")'
+            if "CONTAINERNAME" in cols
             else "0"
         )
         wo_expr = 'SUM(COALESCE("AFFECTED_WORKORDER_COUNT", 0))' if "AFFECTED_WORKORDER_COUNT" in cols else "0"
