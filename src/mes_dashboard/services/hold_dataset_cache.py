@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -38,6 +39,7 @@ from mes_dashboard.config.constants import CACHE_TTL_DATASET
 _CACHE_TTL = CACHE_TTL_DATASET
 _CACHE_MAX_SIZE = 1
 _REDIS_NAMESPACE = "hold_dataset"
+_HOLD_ENGINE_PARALLEL = max(1, int(os.getenv("HOLD_ENGINE_PARALLEL", "1")))
 _DEFAULT_DETAIL_PER_PAGE = 20
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
@@ -138,6 +140,7 @@ def execute_primary_query(
     query_id = _make_query_id({"start_date": start_date, "end_date": end_date})
 
     _spool_available = _has_cached_df(query_id)
+    _hold_partial_failure: Dict[str, Any] = {}
 
     if _spool_available:
         logger.info("Hold dataset cache hit for query_id=%s", query_id)
@@ -149,6 +152,7 @@ def execute_primary_query(
         from mes_dashboard.services.batch_query_engine import (
             decompose_by_time_range,
             execute_plan,
+            get_batch_progress,
             merge_chunks_to_spool,
             compute_query_hash,
             should_decompose_by_time,
@@ -180,10 +184,22 @@ def execute_primary_query(
             )
             execute_plan(
                 engine_chunks, _run_hold_chunk,
+                parallel=_HOLD_ENGINE_PARALLEL,
                 query_hash=engine_hash,
                 cache_prefix="hold",
                 chunk_ttl=_CACHE_TTL,
             )
+            _hold_progress = get_batch_progress("hold", engine_hash) or {}
+            if _hold_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
+                _hold_partial_failure = {
+                    "has_partial_failure": True,
+                    "failed_chunk_count": _hold_progress.get("failed_chunk_count"),
+                    "failed_ranges": _hold_progress.get("failed_ranges"),
+                }
+                logger.warning(
+                    "hold partial failure (query_id=%s): failed_ranges=%s",
+                    query_id, _hold_progress.get("failed_ranges"),
+                )
             spool_tmp_path, spool_row_count = merge_chunks_to_spool(
                 "hold",
                 engine_hash,
@@ -231,6 +247,8 @@ def execute_primary_query(
                 f"bootstrap render failure: apply_view returned None for query_id={query_id}"
             )
         return {"query_id": query_id, **_empty_views()}
+    if _hold_partial_failure:
+        result.setdefault("_meta", {})["partial_failure"] = _hold_partial_failure
     return {"query_id": query_id, **result}
 
 

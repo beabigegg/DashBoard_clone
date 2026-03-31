@@ -78,6 +78,7 @@ from mes_dashboard.config.constants import (
 
 FORWARD_PIPELINE_MAX_WORKERS = int(os.getenv('FORWARD_PIPELINE_MAX_WORKERS', '2'))
 MSD_COMPAT_QUEUE = os.getenv("MSD_WORKER_QUEUE", "msd-analysis")
+_MSD_ENGINE_PARALLEL = max(1, int(os.getenv("MSD_ENGINE_PARALLEL", "1")))
 MSD_COMPAT_JOB_TIMEOUT_SECONDS = int(os.getenv("MSD_JOB_TIMEOUT_SECONDS", "1800"))
 MSD_COMPAT_JOB_TTL_SECONDS = int(os.getenv("MSD_JOB_TTL_SECONDS", "3600"))
 _MSD_COMPAT_JOB_PREFIX = "msd-compat"
@@ -164,7 +165,7 @@ def resolve_analysis_trace_context(
     if error:
         return {'error': error}
 
-    detection_df = _fetch_station_detection_data(start_date, end_date, station)
+    detection_df, _msd_pf = _fetch_station_detection_data(start_date, end_date, station)
     if detection_df is None:
         return None
 
@@ -194,13 +195,16 @@ def resolve_analysis_trace_context(
         direction=direction,
     )
 
-    return {
+    result = {
         "trace_query_id": trace_query_id,
         "seed_container_ids": seed_container_ids,
         "seed_container_names": seed_container_names,
         "available_loss_reasons": available_loss_reasons,
         "detection_df": detection_df,
     }
+    if _msd_pf:
+        result["partial_failure_meta"] = _msd_pf
+    return result
 
 
 def _load_analysis_from_spool(
@@ -342,11 +346,14 @@ def query_analysis(
     trace_query_id = context["trace_query_id"]
     seed_container_ids = context["seed_container_ids"]
     seed_container_names = context["seed_container_names"]
+    _pf_meta = context.get("partial_failure_meta", {})
 
     if detection_df.empty:
         empty_result = _empty_result(direction)
         empty_result["available_loss_reasons"] = available_loss_reasons
         empty_result["trace_query_id"] = trace_query_id
+        if _pf_meta:
+            empty_result["_meta"] = {"partial_failure": _pf_meta}
         return empty_result
 
     staged = _load_analysis_from_spool(
@@ -368,11 +375,14 @@ def query_analysis(
         seed_container_ids=seed_container_ids,
         seed_container_names=seed_container_names,
     )
-    return _empty_pending_result(
+    _pending = _empty_pending_result(
         direction=direction,
         trace_query_id=trace_query_id,
         available_loss_reasons=available_loss_reasons,
     )
+    if _pf_meta:
+        _pending["_meta"] = {"partial_failure": _pf_meta}
+    return _pending
 
 
 def parse_loss_reasons_param(loss_reasons: Any) -> Optional[List[str]]:
@@ -421,11 +431,14 @@ def resolve_trace_seed_lots(
     if error:
         return {'error': error}
 
-    detection_df = _fetch_station_detection_data(start_date, end_date, station)
+    detection_df, _msd_pf = _fetch_station_detection_data(start_date, end_date, station)
     if detection_df is None:
         return None
     if detection_df.empty:
-        return {'seeds': [], 'seed_count': 0}
+        result: Dict[str, Any] = {'seeds': [], 'seed_count': 0}
+        if _msd_pf:
+            result['_meta'] = {'partial_failure': _msd_pf}
+        return result
 
     seeds = []
     unique_rows = detection_df.drop_duplicates(subset=['CONTAINERID'])
@@ -441,10 +454,13 @@ def resolve_trace_seed_lots(
         })
 
     seeds.sort(key=lambda item: (item.get('lot_id', ''), item.get('container_id', '')))
-    return {
+    result = {
         'seeds': seeds,
         'seed_count': len(seeds),
     }
+    if _msd_pf:
+        result['_meta'] = {'partial_failure': _msd_pf}
+    return result
 
 
 def build_trace_aggregation_from_events(
@@ -489,7 +505,7 @@ def build_trace_aggregation_from_events(
 
     normalized_loss_reasons = parse_loss_reasons_param(loss_reasons)
 
-    detection_df = _fetch_station_detection_data(start_date, end_date, station)
+    detection_df, _msd_pf = _fetch_station_detection_data(start_date, end_date, station)
     if detection_df is None:
         return None
     if detection_df.empty:
@@ -500,7 +516,7 @@ def build_trace_aggregation_from_events(
             materials_quality_meta=materials_quality_meta,
             downstream_quality_meta=downstream_quality_meta,
         )
-        return {
+        _r: Dict[str, Any] = {
             'kpi': empty_result['kpi'],
             'charts': empty_result['charts'],
             'daily_trend': empty_result['daily_trend'],
@@ -509,6 +525,9 @@ def build_trace_aggregation_from_events(
             'detail_total_count': 0,
             'quality_meta': quality_meta,
         }
+        if _msd_pf:
+            _r['_meta'] = {'partial_failure': _msd_pf}
+        return _r
 
     available_loss_reasons = sorted(
         detection_df.loc[detection_df['REJECTQTY'] > 0, 'LOSSREASONNAME']
@@ -557,7 +576,7 @@ def build_trace_aggregation_from_events(
             materials_quality_meta=materials_quality_meta,
             downstream_quality_meta=downstream_quality_meta,
         )
-        return {
+        _fwd: Dict[str, Any] = {
             'kpi': _build_forward_kpi(detection_data, forward_attr),
             'charts': _build_forward_charts(forward_attr, detection_data),
             'daily_trend': _build_daily_trend(filtered_df, normalized_loss_reasons),
@@ -567,6 +586,9 @@ def build_trace_aggregation_from_events(
             'attribution': [],
             'quality_meta': quality_meta,
         }
+        if _msd_pf:
+            _fwd['_meta'] = {'partial_failure': _msd_pf}
+        return _fwd
 
     # Backward direction
     normalized_ancestors = _normalize_lineage_ancestors(
@@ -601,7 +623,7 @@ def build_trace_aggregation_from_events(
         materials_quality_meta=materials_quality_meta,
         downstream_quality_meta=downstream_quality_meta,
     )
-    return {
+    _bwd: Dict[str, Any] = {
         'kpi': _build_kpi(filtered_df, attribution, normalized_loss_reasons),
         'charts': _build_all_charts(
             attribution, detection_data,
@@ -615,6 +637,9 @@ def build_trace_aggregation_from_events(
         'attribution': attribution,
         'quality_meta': quality_meta,
     }
+    if _msd_pf:
+        _bwd['_meta'] = {'partial_failure': _msd_pf}
+    return _bwd
 
 
 def _build_trace_aggregation_container_mode(
@@ -1285,7 +1310,7 @@ def _fetch_station_detection_data(
     start_date: str,
     end_date: str,
     station: str = '測試',
-) -> Optional[pd.DataFrame]:
+) -> Tuple[Optional[pd.DataFrame], Dict[str, Any]]:
     """Execute station_detection.sql and return raw DataFrame.
 
     For date ranges exceeding BATCH_QUERY_TIME_THRESHOLD_DAYS (default 10),
@@ -1321,9 +1346,10 @@ def _fetch_station_detection_data(
                         detection_spool_query_id,
                         exc,
                     )
-            return cached_df
-        return None
+            return cached_df, {}
+        return None, {}
 
+    _msd_partial_failure: Dict[str, Any] = {}
     try:
         wip_filter, wip_params = _build_station_filter(station, 'h')
         rej_filter, rej_params = _build_station_filter(station, 'r')
@@ -1337,6 +1363,7 @@ def _fetch_station_detection_data(
         from mes_dashboard.services.batch_query_engine import (
             decompose_by_time_range,
             execute_plan,
+            get_batch_progress,
             merge_chunks_to_spool,
             should_decompose_by_time,
         )
@@ -1375,10 +1402,22 @@ def _fetch_station_detection_data(
                 )
                 execute_plan(
                     engine_chunks, _run_detection_chunk,
+                    parallel=_MSD_ENGINE_PARALLEL,
                     query_hash=engine_hash,
                     cache_prefix="msd_detect",
                     chunk_ttl=CACHE_TTL_DETECTION,
                 )
+                _msd_progress = get_batch_progress("msd_detect", engine_hash) or {}
+                if _msd_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
+                    _msd_partial_failure = {
+                        "has_partial_failure": True,
+                        "failed_chunk_count": _msd_progress.get("failed_chunk_count"),
+                        "failed_ranges": _msd_progress.get("failed_ranges"),
+                    }
+                    logger.warning(
+                        "msd_detect partial failure (engine_hash=%s): failed_ranges=%s",
+                        engine_hash, _msd_progress.get("failed_ranges"),
+                    )
                 spool_tmp_path, spool_row_count = merge_chunks_to_spool(
                     "msd_detect", engine_hash, spool_dir=QUERY_SPOOL_DIR,
                 )
@@ -1424,10 +1463,10 @@ def _fetch_station_detection_data(
         # Only cache records in Redis for direct path; engine path uses spool
         if not should_decompose_by_time(start_date, end_date):
             cache_set(cache_key, df.to_dict('records'), ttl=CACHE_TTL_DETECTION)
-        return df
+        return df, _msd_partial_failure
     except Exception as exc:
         logger.error("Station detection query failed (station=%s): %s", station, exc, exc_info=True)
-        return None
+        return None, {}
 
 
 def _fetch_detection_by_container_ids(
@@ -1497,11 +1536,14 @@ def _run_backward_pipeline(
     loss_reasons: Optional[List[str]],
 ) -> Optional[Dict[str, Any]]:
     """Run the backward traceability pipeline (detection → upstream attribution)."""
-    detection_df = _fetch_station_detection_data(start_date, end_date, station)
+    detection_df, _msd_pf = _fetch_station_detection_data(start_date, end_date, station)
     if detection_df is None:
         return None
     if detection_df.empty:
-        return _empty_result('backward')
+        _er = _empty_result('backward')
+        if _msd_pf:
+            _er['_meta'] = {'partial_failure': _msd_pf}
+        return _er
 
     # Extract available loss reasons before filtering
     available_loss_reasons = sorted(
@@ -1554,7 +1596,7 @@ def _run_backward_pipeline(
         detection_data, ancestors, upstream_by_cid, loss_reasons,
     )
 
-    return {
+    _back: Dict[str, Any] = {
         'kpi': _build_kpi(filtered_df, attribution, loss_reasons),
         'available_loss_reasons': available_loss_reasons,
         'charts': _build_all_charts(attribution, detection_data),
@@ -1565,6 +1607,9 @@ def _run_backward_pipeline(
         'genealogy_status': genealogy_status,
         'attribution': attribution,
     }
+    if _msd_pf:
+        _back['_meta'] = {'partial_failure': _msd_pf}
+    return _back
 
 
 # ============================================================
@@ -1581,11 +1626,14 @@ def _run_forward_pipeline(
     station_order = get_group_order(station)
 
     # Stage 1: Detection data
-    detection_df = _fetch_station_detection_data(start_date, end_date, station)
+    detection_df, _msd_pf = _fetch_station_detection_data(start_date, end_date, station)
     if detection_df is None:
         return None
     if detection_df.empty:
-        return _empty_result('forward')
+        _er = _empty_result('forward')
+        if _msd_pf:
+            _er['_meta'] = {'partial_failure': _msd_pf}
+        return _er
 
     available_loss_reasons = sorted(
         detection_df.loc[detection_df['REJECTQTY'] > 0, 'LOSSREASONNAME']
@@ -1660,7 +1708,7 @@ def _run_forward_pipeline(
     )
 
     # Stage 8: Build result
-    return {
+    _fwd: Dict[str, Any] = {
         'kpi': _build_forward_kpi(detection_data, forward_attr),
         'available_loss_reasons': available_loss_reasons,
         'charts': _build_forward_charts(forward_attr, detection_data),
@@ -1670,6 +1718,9 @@ def _run_forward_pipeline(
         ),
         'genealogy_status': genealogy_status,
     }
+    if _msd_pf:
+        _fwd['_meta'] = {'partial_failure': _msd_pf}
+    return _fwd
 
 
 # ============================================================

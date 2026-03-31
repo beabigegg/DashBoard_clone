@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -35,6 +36,7 @@ logger = logging.getLogger("mes_dashboard.resource_dataset_cache")
 from mes_dashboard.config.constants import CACHE_TTL_DATASET
 _CACHE_TTL = CACHE_TTL_DATASET
 _CACHE_MAX_SIZE = 1
+_RESOURCE_ENGINE_PARALLEL = max(1, int(os.getenv("RESOURCE_ENGINE_PARALLEL", "1")))
 _REDIS_NAMESPACE = "resource_dataset"
 _OEE_REDIS_NAMESPACE = "resource_oee"
 
@@ -187,6 +189,7 @@ def execute_primary_query(
 
     _spool_available = _has_cached_df(query_id)
     _oee_spool_available = _has_cached_oee_df(query_id)
+    _partial_failure_meta: Dict[str, Any] = {}
 
     if _spool_available and _oee_spool_available:
         logger.info("Resource dataset cache hit for query_id=%s (base+oee)", query_id)
@@ -215,6 +218,7 @@ def execute_primary_query(
         from mes_dashboard.services.batch_query_engine import (
             decompose_by_time_range,
             execute_plan,
+            get_batch_progress,
             merge_chunks_to_spool,
             compute_query_hash,
             should_decompose_by_time,
@@ -298,10 +302,24 @@ def execute_primary_query(
             if not _spool_available:
                 execute_plan(
                     engine_chunks, _run_base_chunk,
+                    parallel=_RESOURCE_ENGINE_PARALLEL,
                     query_hash=engine_hash,
                     cache_prefix="resource",
                     chunk_ttl=_CACHE_TTL,
                 )
+                _base_progress = get_batch_progress("resource", engine_hash) or {}
+                if _base_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
+                    _base_failed = {
+                        "has_partial_failure": True,
+                        "failed_chunk_count": _base_progress.get("failed_chunk_count"),
+                        "failed_ranges": _base_progress.get("failed_ranges"),
+                        "source": "base",
+                    }
+                    _partial_failure_meta.update(_base_failed)
+                    logger.warning(
+                        "resource base partial failure (query_id=%s): failed_ranges=%s",
+                        query_id, _base_progress.get("failed_ranges"),
+                    )
                 spool_tmp_path, spool_row_count = merge_chunks_to_spool(
                     "resource", engine_hash, spool_dir=QUERY_SPOOL_DIR,
                 )
@@ -318,10 +336,24 @@ def execute_primary_query(
                 oee_engine_hash = compute_query_hash({**query_id_input, "_oee": True})
                 execute_plan(
                     engine_chunks, _run_oee_chunk,
+                    parallel=_RESOURCE_ENGINE_PARALLEL,
                     query_hash=oee_engine_hash,
                     cache_prefix="resource_oee",
                     chunk_ttl=_CACHE_TTL,
                 )
+                _oee_progress = get_batch_progress("resource_oee", oee_engine_hash) or {}
+                if _oee_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
+                    _oee_failed = {
+                        "has_partial_failure": True,
+                        "failed_chunk_count": _oee_progress.get("failed_chunk_count"),
+                        "failed_ranges": _oee_progress.get("failed_ranges"),
+                        "source": "oee",
+                    }
+                    _partial_failure_meta.update(_oee_failed)
+                    logger.warning(
+                        "resource OEE partial failure (query_id=%s): failed_ranges=%s",
+                        query_id, _oee_progress.get("failed_ranges"),
+                    )
                 oee_spool_tmp_path, oee_spool_row_count = merge_chunks_to_spool(
                     "resource_oee", oee_engine_hash, spool_dir=QUERY_SPOOL_DIR,
                 )
@@ -364,6 +396,8 @@ def execute_primary_query(
             "summary": _empty_summary(),
             "detail": _empty_detail(),
         }
+    if _partial_failure_meta:
+        result.setdefault("_meta", {})["partial_failure"] = _partial_failure_meta
     return {"query_id": query_id, **result}
 
 

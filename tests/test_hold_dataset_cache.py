@@ -236,3 +236,108 @@ class TestHoldBootstrapFailureSemantics:
                 start_date="2025-06-01",
                 end_date="2025-06-30",
             )
+
+
+# ============================================================
+# Task 9.2: Hold engine parallel env var tests
+# ============================================================
+
+class TestHoldEngineParallel:
+    """HOLD_ENGINE_PARALLEL env var controls execute_plan parallel for hold cache."""
+
+    def _make_engine_env(self, monkeypatch, *, engine_calls):
+        import mes_dashboard.services.batch_query_engine as engine_mod
+
+        def fake_execute_plan(chunks, query_fn, **kwargs):
+            engine_calls.append(kwargs.get("parallel"))
+            return kwargs.get("query_hash", "fake_hash")
+
+        monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: ("/tmp/f.parquet", 1))
+        monkeypatch.setattr(engine_mod, "get_batch_progress", lambda *a: {})
+        monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _: False)
+        monkeypatch.setattr(cache_svc, "_load_sql", lambda name: "SELECT 1 FROM dual")
+        monkeypatch.setattr(cache_svc, "register_spool_file", lambda *a, **kw: None)
+        monkeypatch.setattr(cache_svc, "_store_query_dates", lambda *a, **kw: None)
+        monkeypatch.setattr(
+            cache_svc,
+            "apply_view",
+            lambda **kw: {
+                "trend": {"days": []},
+                "reason_pareto": {"items": []},
+                "duration": {"items": []},
+                "list": {"items": [], "pagination": {"page": 1, "perPage": 20, "total": 0, "totalPages": 1}},
+                "_meta": {},
+            },
+        )
+
+    def test_default_parallel_is_1(self, monkeypatch):
+        """Without HOLD_ENGINE_PARALLEL → execute_plan gets parallel=1."""
+        engine_calls = []
+        monkeypatch.setattr(cache_svc, "_HOLD_ENGINE_PARALLEL", 1)
+        self._make_engine_env(monkeypatch, engine_calls=engine_calls)
+
+        cache_svc.execute_primary_query(start_date="2025-01-01", end_date="2025-03-31")
+
+        assert len(engine_calls) == 1
+        assert engine_calls[0] == 1
+
+    def test_parallel_2_passed_to_execute_plan(self, monkeypatch):
+        """HOLD_ENGINE_PARALLEL=2 → execute_plan gets parallel=2."""
+        engine_calls = []
+        monkeypatch.setattr(cache_svc, "_HOLD_ENGINE_PARALLEL", 2)
+        self._make_engine_env(monkeypatch, engine_calls=engine_calls)
+
+        cache_svc.execute_primary_query(start_date="2025-01-01", end_date="2025-03-31")
+
+        assert len(engine_calls) == 1
+        assert engine_calls[0] == 2
+
+
+# ============================================================
+# Task 10.6: Hold partial failure propagation tests
+# ============================================================
+
+class TestHoldPartialFailure:
+    """Hold partial failure propagates to result['_meta']['partial_failure']."""
+
+    def _make_engine_env(self, monkeypatch, *, progress=None):
+        import mes_dashboard.services.batch_query_engine as engine_mod
+
+        monkeypatch.setattr(engine_mod, "execute_plan", lambda *a, **kw: kw.get("query_hash", "fake"))
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: ("/tmp/f.parquet", 1))
+        monkeypatch.setattr(engine_mod, "get_batch_progress", lambda *a: progress or {})
+        monkeypatch.setattr(cache_svc, "_has_cached_df", lambda _: False)
+        monkeypatch.setattr(cache_svc, "_load_sql", lambda name: "SELECT 1 FROM dual")
+        monkeypatch.setattr(cache_svc, "register_spool_file", lambda *a, **kw: None)
+        monkeypatch.setattr(cache_svc, "_store_query_dates", lambda *a, **kw: None)
+        monkeypatch.setattr(
+            cache_svc,
+            "apply_view",
+            lambda **kw: {
+                "trend": {"days": []},
+                "reason_pareto": {"items": []},
+                "duration": {"items": []},
+                "list": {"items": [], "pagination": {"page": 1, "perPage": 20, "total": 0, "totalPages": 1}},
+                "_meta": {},
+            },
+        )
+
+    def test_partial_failure_in_meta(self, monkeypatch):
+        """Chunk partial failure → result._meta.partial_failure.has_partial_failure == True."""
+        self._make_engine_env(
+            monkeypatch,
+            progress={"has_partial_failure": "True", "failed_chunk_count": "1", "failed_ranges": "2025-01-01~2025-01-31"},
+        )
+
+        result = cache_svc.execute_primary_query(start_date="2025-01-01", end_date="2025-03-31")
+
+        assert result["_meta"]["partial_failure"]["has_partial_failure"] is True
+
+    def test_no_partial_failure_no_meta_key(self, monkeypatch):
+        """All chunks succeed → no partial_failure in _meta."""
+        self._make_engine_env(monkeypatch)
+
+        result = cache_svc.execute_primary_query(start_date="2025-01-01", end_date="2025-03-31")
+
+        assert "partial_failure" not in result.get("_meta", {})

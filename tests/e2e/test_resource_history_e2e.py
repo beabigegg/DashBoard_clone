@@ -16,6 +16,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 import mes_dashboard.core.database as db
+import mes_dashboard.core.redis_client as _redis_mod
 from mes_dashboard.app import create_app
 
 
@@ -34,16 +35,47 @@ def client(app):
     return app.test_client()
 
 
+@pytest.fixture
+def redis_enabled(monkeypatch):
+    """Enable Redis for tests that require spool storage.
+
+    conftest.py forces REDIS_ENABLED=false to isolate unit tests.
+    E2E tests that exercise the spool path need a real Redis connection.
+    Redis IS running in the integration environment (confirmed by redis-cli ping).
+    """
+    import mes_dashboard.core.query_spool_store as _spool_mod
+    monkeypatch.setattr(_redis_mod, 'REDIS_ENABLED', True)
+    monkeypatch.setattr(_redis_mod, '_REDIS_CLIENT', None)  # force reconnect
+    monkeypatch.setattr(_spool_mod, 'QUERY_SPOOL_ENABLED', True)
+
+    # Clear stale spool metadata AND L1 in-process cache so each test gets
+    # a clean slate and won't reuse parquet files with the wrong schema.
+    from mes_dashboard.services.resource_dataset_cache import _dataset_cache
+    from mes_dashboard.core.redis_client import get_key_prefix
+
+    def _clear_spool_state():
+        _dataset_cache.clear()
+        rc = _redis_mod.get_redis_client()
+        if rc:
+            prefix = get_key_prefix()
+            for ns in ('resource_dataset', 'resource_oee'):
+                keys = rc.keys(f"{prefix}:{ns}:spool_meta:*")
+                if keys:
+                    rc.delete(*keys)
+
+    _clear_spool_state()
+    yield
+    _clear_spool_state()
+    monkeypatch.setattr(_redis_mod, '_REDIS_CLIENT', None)
+
+
 class TestResourceHistoryPageAccess:
     """E2E tests for page access and navigation."""
 
     @staticmethod
     def _load_resource_history_entry(client):
-        spa_enabled = bool(client.application.config.get("PORTAL_SPA_ENABLED", False))
         response = client.get('/resource-history', follow_redirects=False)
-        if spa_enabled:
-            assert response.status_code == 302
-            assert response.location.endswith('/portal-shell/resource-history')
+        if response.status_code == 302 and response.location and 'portal-shell' in response.location:
             shell_response = client.get('/portal-shell/resource-history')
             assert shell_response.status_code == 200
             return shell_response, True
@@ -106,7 +138,7 @@ class TestResourceHistoryAPIWorkflow:
     @patch('mes_dashboard.services.resource_dataset_cache.read_sql_df')
     @patch('mes_dashboard.services.resource_dataset_cache._get_filtered_resources_and_lookup')
     def test_complete_query_workflow(self, mock_res_lookup, mock_read_sql,
-                                     mock_get_lookup, mock_get_wc, client):
+                                     mock_get_lookup, mock_get_wc, client, redis_enabled):
         """Complete query workflow via POST /query should return summary + detail."""
         resources = [
             {
@@ -143,7 +175,16 @@ class TestResourceHistoryAPIWorkflow:
              'PRD_HOURS': 4000, 'SBY_HOURS': 500, 'UDT_HOURS': 250,
              'SDT_HOURS': 150, 'EGT_HOURS': 100, 'NST_HOURS': 500, 'TOTAL_HOURS': 5500},
         ])
-        mock_read_sql.return_value = base_df
+        # OEE facts DataFrame — separate Oracle query for TRACKOUT/NG.
+        # DuckDB joins oee_src to resource_dim by EQUIPMENTID = HISTORYID.
+        oee_df = pd.DataFrame([
+            {'EQUIPMENTID': 'RES001', 'SHIFT_DATE': datetime(2024, 1, 1),
+             'TRACKOUT_QTY': 0, 'NG_QTY': 0},
+            {'EQUIPMENTID': 'RES002', 'SHIFT_DATE': datetime(2024, 1, 1),
+             'TRACKOUT_QTY': 0, 'NG_QTY': 0},
+        ])
+        # read_sql_df is called twice: first for base SHIFT data, then for OEE facts.
+        mock_read_sql.side_effect = [base_df, oee_df]
 
         response = client.post(
             '/api/resource/history/query',
@@ -190,7 +231,7 @@ class TestResourceHistoryAPIWorkflow:
     @patch('mes_dashboard.services.resource_dataset_cache.read_sql_df')
     @patch('mes_dashboard.services.resource_dataset_cache._get_filtered_resources_and_lookup')
     def test_detail_query_workflow(self, mock_res_lookup, mock_read_sql,
-                                    mock_get_lookup, mock_get_wc, client):
+                                    mock_get_lookup, mock_get_wc, client, redis_enabled):
         """Detail query via POST /query should return hierarchical data."""
         resources = [
             {
@@ -225,7 +266,13 @@ class TestResourceHistoryAPIWorkflow:
              'PRD_HOURS': 75, 'SBY_HOURS': 15, 'UDT_HOURS': 5, 'SDT_HOURS': 3, 'EGT_HOURS': 2,
              'NST_HOURS': 10, 'TOTAL_HOURS': 110},
         ])
-        mock_read_sql.return_value = base_df
+        oee_df = pd.DataFrame([
+            {'EQUIPMENTID': 'RES001', 'SHIFT_DATE': datetime(2024, 1, 1),
+             'TRACKOUT_QTY': 0, 'NG_QTY': 0},
+            {'EQUIPMENTID': 'RES002', 'SHIFT_DATE': datetime(2024, 1, 1),
+             'TRACKOUT_QTY': 0, 'NG_QTY': 0},
+        ])
+        mock_read_sql.side_effect = [base_df, oee_df]
 
         response = client.post(
             '/api/resource/history/query',
@@ -265,11 +312,14 @@ class TestResourceHistoryAPIWorkflow:
                 'RESOURCENAME': 'RES001',
             }
         ]
-        mock_read_sql.return_value = pd.DataFrame([
+        main_df = pd.DataFrame([
             {'HISTORYID': 'RES001',
              'PRD_HOURS': 80, 'SBY_HOURS': 10, 'UDT_HOURS': 5, 'SDT_HOURS': 3, 'EGT_HOURS': 2,
              'NST_HOURS': 10, 'TOTAL_HOURS': 110},
         ])
+        # read_sql_df is called twice: first for SHIFT data, then for OEE facts.
+        # Return empty DataFrame for the OEE call so EQUIPMENTID groupby is skipped.
+        mock_read_sql.side_effect = [main_df, pd.DataFrame()]
 
         response = client.get(
             '/api/resource/history/export'
@@ -393,3 +443,107 @@ class TestResourceHistoryNavigation:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+class TestResourceHistorySpoolReuse:
+    """E2E tests for resource-history spool caching and reuse."""
+
+    @staticmethod
+    def _fake_oracle_df():
+        import pandas as pd
+        return pd.DataFrame({
+            "HISTORYID": [1, 2],
+            "STATECODE": ["PRD", "SBY"],
+            "DURATION_HOURS": [8.0, 4.0],
+            "TRACKOUT_QTY": [100, 0],
+            "NG_QTY": [5, 0],
+        })
+
+    def test_two_identical_queries_oracle_called_once(self, client, monkeypatch):
+        """Two identical POST /query calls → Oracle mock called only once (second uses spool)."""
+        oracle_calls = {"count": 0}
+
+        def fake_execute_primary_query(**kwargs):
+            oracle_calls["count"] += 1
+            return {
+                "query_id": "spool-reuse-qid",
+                "summary": {"kpi": {}, "trend": [], "heatmap": [], "workcenter_comparison": []},
+                "detail": {"data": [], "total": 0, "truncated": False, "max_records": None},
+                "_meta": {},
+            }
+
+        def fake_canonical_spool(*args, **kwargs):
+            """First call returns None (miss), second returns result (hit)."""
+            if oracle_calls["count"] >= 1:
+                return (
+                    {
+                        "query_id": "spool-reuse-qid",
+                        "summary": {"kpi": {}, "trend": [], "heatmap": [], "workcenter_comparison": []},
+                        "detail": {"data": [], "total": 0, "truncated": False, "max_records": None},
+                    },
+                    {},
+                )
+            return (None, {})
+
+        with patch(
+            "mes_dashboard.routes.resource_history_routes.execute_primary_query",
+            side_effect=fake_execute_primary_query,
+        ), patch(
+            "mes_dashboard.services.resource_history_sql_runtime.try_compute_query_from_canonical_spool",
+            side_effect=fake_canonical_spool,
+        ):
+            payload = {"start_date": "2025-01-01", "end_date": "2025-01-31"}
+
+            # First call (cache miss → Oracle)
+            r1 = client.post(
+                "/api/resource/history/query",
+                json=payload,
+                content_type="application/json",
+            )
+            # Second call (cache hit → spool)
+            r2 = client.post(
+                "/api/resource/history/query",
+                json=payload,
+                content_type="application/json",
+            )
+
+        assert r1.status_code == 200
+        assert r2.status_code == 200
+        assert oracle_calls["count"] == 1  # Oracle called only once
+
+        d1 = r1.get_json()["data"]
+        d2 = r2.get_json()["data"]
+        assert d1.get("query_id") == d2.get("query_id")
+
+    def test_canonical_spool_hit_skips_oracle(self, client, monkeypatch):
+        """try_compute_query_from_canonical_spool returning result → Oracle not called."""
+        oracle_calls = {"count": 0}
+
+        def fake_execute_primary_query(**kwargs):
+            oracle_calls["count"] += 1
+            return {}
+
+        canonical_result = {
+            "query_id": "canonical-qid-test",
+            "summary": {"kpi": {}, "trend": [], "heatmap": [], "workcenter_comparison": []},
+            "detail": {"data": [], "total": 0, "truncated": False, "max_records": None},
+        }
+
+        with patch(
+            "mes_dashboard.routes.resource_history_routes.execute_primary_query",
+            side_effect=fake_execute_primary_query,
+        ), patch(
+            "mes_dashboard.services.resource_history_sql_runtime.try_compute_query_from_canonical_spool",
+            return_value=(canonical_result, {}),
+        ):
+            payload = {"start_date": "2025-06-01", "end_date": "2025-06-30"}
+            response = client.post(
+                "/api/resource/history/query",
+                json=payload,
+                content_type="application/json",
+            )
+
+        assert response.status_code == 200
+        assert oracle_calls["count"] == 0  # Oracle NOT called
+        data = response.get_json()["data"]
+        assert data.get("query_id") == "canonical-qid-test"

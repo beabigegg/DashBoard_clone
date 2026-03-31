@@ -40,6 +40,7 @@ from mes_dashboard.services.batch_query_engine import (
     compute_query_hash,
     decompose_by_time_range,
     execute_plan,
+    get_batch_progress,
     merge_chunks_to_spool,
 )
 from mes_dashboard.sql import QueryBuilder, SQLLoader
@@ -57,6 +58,7 @@ MAX_DATE_RANGE_DAYS = max(1, int(os.getenv("PROD_HISTORY_MAX_DATE_RANGE_DAYS", "
 ENGINE_GRAIN_DAYS = max(1, int(os.getenv("PROD_HISTORY_ENGINE_GRAIN_DAYS", "31")))
 MAX_ROWS_PER_CHUNK = max(1, int(os.getenv("PROD_HISTORY_MAX_ROWS_PER_CHUNK", "50000")))
 MAX_PARENT_TRACE_DEPTH = max(1, int(os.getenv("PROD_HISTORY_MAX_TRACE_DEPTH", "8")))
+_PRODUCTION_ENGINE_PARALLEL = max(1, int(os.getenv("PRODUCTION_ENGINE_PARALLEL", "1")))
 DEFAULT_PAGE_SIZE = 25
 _SPOOL_NAMESPACE = "production_history"
 _CACHE_PREFIX = "prod_hist"
@@ -390,7 +392,7 @@ def query_production_history(raw_params: Dict[str, Any]) -> Dict[str, Any]:
 
     t_start = time.monotonic()
     try:
-        _run_oracle_to_spool(params, dataset_id)
+        _spool_partial_failure = _run_oracle_to_spool(params, dataset_id)
     finally:
         release_heavy_query_slot(slot_owner)
 
@@ -413,6 +415,15 @@ def query_production_history(raw_params: Dict[str, Any]) -> Dict[str, Any]:
     detail = compute_detail_page(spool_path, filter_params={}, page=1, per_page=DEFAULT_PAGE_SIZE)
     matrix = compute_matrix_view(spool_path, filter_params={})
 
+    response_meta: Dict[str, Any] = {
+        "ttl_seconds": ttl_seconds,
+        "expires_at": int(meta.get("expires_at", 0)),
+        "row_count": int(meta.get("row_count", 0)),
+        "query_seconds": round(elapsed, 2),
+    }
+    if _spool_partial_failure:
+        response_meta["partial_failure"] = _spool_partial_failure
+
     return {
         "dataset_id": dataset_id,
         "detail": detail,
@@ -420,12 +431,7 @@ def query_production_history(raw_params: Dict[str, Any]) -> Dict[str, Any]:
         "filter_options": {
             "pj_types": params["pj_types"],
         },
-        "meta": {
-            "ttl_seconds": ttl_seconds,
-            "expires_at": int(meta.get("expires_at", 0)),
-            "row_count": int(meta.get("row_count", 0)),
-            "query_seconds": round(elapsed, 2),
-        },
+        "meta": response_meta,
     }
 
 
@@ -446,8 +452,12 @@ def _make_dataset_id(params: Dict[str, Any]) -> str:
     return f"ph-{compute_query_hash(hash_key)}"
 
 
-def _run_oracle_to_spool(params: Dict[str, Any], dataset_id: str) -> None:
-    """Execute Oracle chunked query and write results to Parquet spool."""
+def _run_oracle_to_spool(params: Dict[str, Any], dataset_id: str) -> Dict[str, Any]:
+    """Execute Oracle chunked query and write results to Parquet spool.
+
+    Returns:
+        partial_failure_meta dict (empty if all chunks succeeded).
+    """
     chunks = decompose_by_time_range(
         params["start_date"],
         params["end_date"],
@@ -463,11 +473,24 @@ def _run_oracle_to_spool(params: Dict[str, Any], dataset_id: str) -> None:
     execute_plan(
         chunks,
         query_fn,
-        parallel=1,
+        parallel=_PRODUCTION_ENGINE_PARALLEL,
         query_hash=query_hash,
         cache_prefix=_CACHE_PREFIX,
         max_rows_per_chunk=MAX_ROWS_PER_CHUNK,
     )
+
+    _prod_progress = get_batch_progress(_CACHE_PREFIX, query_hash) or {}
+    partial_failure_meta: Dict[str, Any] = {}
+    if _prod_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
+        partial_failure_meta = {
+            "has_partial_failure": True,
+            "failed_chunk_count": _prod_progress.get("failed_chunk_count"),
+            "failed_ranges": _prod_progress.get("failed_ranges"),
+        }
+        logger.warning(
+            "production_history partial failure (dataset_id=%s): failed_ranges=%s",
+            dataset_id, _prod_progress.get("failed_ranges"),
+        )
 
     spool_dir = QUERY_SPOOL_DIR / _SPOOL_NAMESPACE
     tmp_path, total_rows = merge_chunks_to_spool(
@@ -486,6 +509,8 @@ def _run_oracle_to_spool(params: Dict[str, Any], dataset_id: str) -> None:
             row_count=total_rows,
             ttl_seconds=QUERY_SPOOL_TTL_SECONDS,
         )
+
+    return partial_failure_meta
 
 
 # ---------------------------------------------------------------------------

@@ -63,7 +63,7 @@ CACHE_TTL_KPI = 60               # KPI data: 1 minute
 CACHE_TTL_TREND = 300            # Trend data: 5 minutes
 
 # ── Service-level dataset cache TTLs ──
-CACHE_TTL_DATASET = 900                 # Hold/Resource/Reject dataset: 15 min
+CACHE_TTL_DATASET = int(_os.getenv("CACHE_TTL_DATASET_SECONDS", "7200"))  # Hold/Resource/Reject dataset: 2 hours (env-overridable)
 CACHE_TTL_HOLD_TREND = int(             # Hold history trend: 12 hours
     _os.getenv('HOLD_TREND_CACHE_TTL_SECONDS', '43200'))
 CACHE_TTL_MATERIAL_TRACE = 300          # Material trace lineage: 5 min

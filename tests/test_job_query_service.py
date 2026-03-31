@@ -205,3 +205,92 @@ class TestErrorLeakageProtection:
 
         assert EXPORT_ERROR_MESSAGE in output
         assert "sensitive sql context" not in output
+
+
+# ============================================================
+# Task 9.3: Job engine parallel env var tests
+# ============================================================
+
+class TestJobEngineParallel:
+    """JOB_ENGINE_PARALLEL env var controls execute_plan parallel for job query."""
+
+    def _make_engine_env(self, monkeypatch, *, engine_calls):
+        import mes_dashboard.services.batch_query_engine as engine_mod
+        import mes_dashboard.services.job_query_service as job_svc
+
+        def fake_execute_plan(chunks, query_fn, **kwargs):
+            engine_calls.append(kwargs.get("parallel"))
+            return kwargs.get("query_hash", "fake_hash")
+
+        monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: ("/tmp/f.parquet", 1))
+        monkeypatch.setattr(engine_mod, "get_batch_progress", lambda *a: {})
+        # Patch spool read to return empty list
+        import mes_dashboard.core.query_spool_store as spool_mod
+        monkeypatch.setattr(spool_mod, "get_spool_file_path", lambda *a: None)
+        monkeypatch.setattr(spool_mod, "read_spool_records", lambda *a: None)
+        monkeypatch.setattr(spool_mod, "register_spool_file", lambda *a, **kw: None)
+
+    def test_default_parallel_is_1(self, monkeypatch):
+        """Without JOB_ENGINE_PARALLEL → execute_plan gets parallel=1."""
+        import mes_dashboard.services.job_query_service as job_svc
+        engine_calls = []
+        monkeypatch.setattr(job_svc, "_JOB_ENGINE_PARALLEL", 1)
+        self._make_engine_env(monkeypatch, engine_calls=engine_calls)
+
+        job_svc.get_jobs_by_resources(["R1"], "2025-01-01", "2025-03-31")
+
+        assert len(engine_calls) == 1
+        assert engine_calls[0] == 1
+
+    def test_parallel_2_passed_to_execute_plan(self, monkeypatch):
+        """JOB_ENGINE_PARALLEL=2 → execute_plan gets parallel=2."""
+        import mes_dashboard.services.job_query_service as job_svc
+        engine_calls = []
+        monkeypatch.setattr(job_svc, "_JOB_ENGINE_PARALLEL", 2)
+        self._make_engine_env(monkeypatch, engine_calls=engine_calls)
+
+        job_svc.get_jobs_by_resources(["R1"], "2025-01-01", "2025-03-31")
+
+        assert len(engine_calls) == 1
+        assert engine_calls[0] == 2
+
+
+# ============================================================
+# Task 10.7: Job partial failure propagation tests
+# ============================================================
+
+class TestJobPartialFailure:
+    """Job partial failure propagates to result['_meta']['partial_failure']."""
+
+    def _make_engine_env(self, monkeypatch, *, progress=None):
+        import mes_dashboard.services.batch_query_engine as engine_mod
+        import mes_dashboard.core.query_spool_store as spool_mod
+
+        monkeypatch.setattr(engine_mod, "execute_plan", lambda *a, **kw: kw.get("query_hash", "fake"))
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: ("/tmp/f.parquet", 1))
+        monkeypatch.setattr(engine_mod, "get_batch_progress", lambda *a: progress or {})
+        monkeypatch.setattr(spool_mod, "get_spool_file_path", lambda *a: None)
+        monkeypatch.setattr(spool_mod, "read_spool_records", lambda *a: None)
+        monkeypatch.setattr(spool_mod, "register_spool_file", lambda *a, **kw: None)
+
+    def test_partial_failure_in_meta(self, monkeypatch):
+        """Chunk partial failure → result._meta.partial_failure.has_partial_failure == True."""
+        import mes_dashboard.services.job_query_service as job_svc
+        self._make_engine_env(
+            monkeypatch,
+            progress={"has_partial_failure": "True", "failed_chunk_count": "1", "failed_ranges": "2025-01-01~2025-01-31"},
+        )
+
+        result = job_svc.get_jobs_by_resources(["R1"], "2025-01-01", "2025-03-31")
+
+        assert result["_meta"]["partial_failure"]["has_partial_failure"] is True
+
+    def test_no_partial_failure_no_meta_key(self, monkeypatch):
+        """All chunks succeed → no _meta in result."""
+        import mes_dashboard.services.job_query_service as job_svc
+        self._make_engine_env(monkeypatch)
+
+        result = job_svc.get_jobs_by_resources(["R1"], "2025-01-01", "2025-03-31")
+
+        assert "_meta" not in result

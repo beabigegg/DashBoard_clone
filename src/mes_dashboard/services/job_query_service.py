@@ -16,6 +16,7 @@ Architecture:
 import csv
 import io
 import logging
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Generator, Tuple
 
@@ -142,6 +143,7 @@ def _build_resource_filter_sql(
 
 from mes_dashboard.config.constants import CACHE_TTL_JOB_QUERY
 _JOB_CACHE_TTL = CACHE_TTL_JOB_QUERY
+_JOB_ENGINE_PARALLEL = max(1, int(os.getenv("JOB_ENGINE_PARALLEL", "1")))
 
 
 def get_jobs_by_resources(
@@ -173,9 +175,11 @@ def get_jobs_by_resources(
         return {'error': validation_error}
 
     try:
+        _job_partial_failure: Dict[str, Any] = {}
         from mes_dashboard.services.batch_query_engine import (
             decompose_by_time_range,
             execute_plan,
+            get_batch_progress,
             merge_chunks_to_spool,
             compute_query_hash,
             should_decompose_by_time,
@@ -225,10 +229,22 @@ def get_jobs_by_resources(
             )
             execute_plan(
                 engine_chunks, _run_job_chunk,
+                parallel=_JOB_ENGINE_PARALLEL,
                 query_hash=cache_hash,
                 cache_prefix="job",
                 chunk_ttl=_JOB_CACHE_TTL,
             )
+            _job_progress = get_batch_progress("job", cache_hash) or {}
+            if _job_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
+                _job_partial_failure = {
+                    "has_partial_failure": True,
+                    "failed_chunk_count": _job_progress.get("failed_chunk_count"),
+                    "failed_ranges": _job_progress.get("failed_ranges"),
+                }
+                logger.warning(
+                    "job partial failure (cache_hash=%s): failed_ranges=%s",
+                    cache_hash, _job_progress.get("failed_ranges"),
+                )
             spool_tmp_path, spool_row_count = merge_chunks_to_spool(
                 "job", cache_hash, spool_dir=QUERY_SPOOL_DIR,
             )
@@ -273,11 +289,14 @@ def get_jobs_by_resources(
 
         logger.info(f"Job query returned {len(data)} records for {len(resource_ids)} resources")
 
-        return {
+        result: Dict[str, Any] = {
             'data': data,
             'total': len(data),
-            'resource_count': len(resource_ids)
+            'resource_count': len(resource_ids),
         }
+        if _job_partial_failure:
+            result['_meta'] = {'partial_failure': _job_partial_failure}
+        return result
 
     except Exception as exc:
         logger.exception("Job query failed: %s", exc)

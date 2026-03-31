@@ -711,6 +711,10 @@ def _execute_and_spool(
                 partial_failure_meta.get("failed_ranges"),
                 flag_ttl,
             )
+            logger.warning(
+                "reject partial failure (query_id=%s): failed_ranges=%s",
+                query_id, partial_failure_meta.get("failed_ranges"),
+            )
         else:
             _clear_partial_failure_flag(query_id)
 
@@ -1092,6 +1096,10 @@ def execute_primary_query(
                 partial_failure_meta.get("failed_chunk_count", 0),
                 partial_failure_meta.get("failed_ranges"),
                 flag_ttl,
+            )
+            logger.warning(
+                "reject partial failure (query_id=%s): failed_ranges=%s",
+                query_id, partial_failure_meta.get("failed_ranges"),
             )
         else:
             _clear_partial_failure_flag(query_id)

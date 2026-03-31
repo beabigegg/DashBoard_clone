@@ -200,7 +200,7 @@ def test_query_analysis_prefers_spool_runtime(
         }],
     }
 
-    mock_fetch_detection_data.return_value = detection_df
+    mock_fetch_detection_data.return_value = (detection_df, {})
     staged_summary = build_trace_aggregation_from_events(
         '2025-01-01',
         '2025-01-31',
@@ -243,7 +243,7 @@ def test_query_analysis_returns_pending_on_spool_miss(
     _mock_load,
     mock_ensure_job,
 ):
-    mock_fetch_detection_data.return_value = pd.DataFrame([
+    mock_fetch_detection_data.return_value = (pd.DataFrame([
         {
             'CONTAINERID': 'CID-001',
             'CONTAINERNAME': 'LOT-001',
@@ -257,7 +257,7 @@ def test_query_analysis_returns_pending_on_spool_miss(
             'TRACKINTIMESTAMP': '2025-01-10 10:00:00',
             'FINISHEDRUNCARD': 'FR-001',
         },
-    ])
+    ]), {})
 
     result = query_analysis('2025-01-01', '2025-01-31')
 
@@ -363,7 +363,7 @@ def test_normalize_upstream_event_records_ignores_metadata_side_channel_fields()
 
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
 def test_build_trace_aggregation_surfaces_non_complete_quality_meta(mock_fetch_detection):
-    mock_fetch_detection.return_value = pd.DataFrame([
+    mock_fetch_detection.return_value = (pd.DataFrame([
         {
             'CONTAINERID': 'CID-001',
             'CONTAINERNAME': 'LOT-001',
@@ -377,7 +377,7 @@ def test_build_trace_aggregation_surfaces_non_complete_quality_meta(mock_fetch_d
             'TRACKINTIMESTAMP': '2025-01-10 10:00:00',
             'FINISHEDRUNCARD': 'FR-001',
         },
-    ])
+    ]), {})
 
     result = build_trace_aggregation_from_events(
         '2025-01-01',
@@ -695,3 +695,145 @@ def test_export_csv_flattens_structured_fields(mock_query_analysis):
     data_line = lines[2]
     assert '中段/WIRE-01, 後段/DIE-02' in data_line
     assert 'PART-A/ML-1' in data_line
+
+
+# ============================================================
+# Task 9.5: MSD engine parallel env var tests
+# ============================================================
+
+class TestMsdEngineParallel:
+    """MSD_ENGINE_PARALLEL env var controls execute_plan parallel for MSD detection."""
+
+    def _make_detection_env(self, monkeypatch, *, engine_calls, progress=None):
+        import mes_dashboard.services.batch_query_engine as engine_mod
+        import mes_dashboard.services.mid_section_defect_service as msd_svc
+        import mes_dashboard.core.query_spool_store as spool_mod
+        import mes_dashboard.sql as sql_mod
+
+        def fake_execute_plan(chunks, query_fn, **kwargs):
+            engine_calls.append(kwargs.get("parallel"))
+            return kwargs.get("query_hash", "fake_hash")
+
+        # Patch engine_mod (these are imported fresh inside the function)
+        monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: ("/tmp/f.parquet", 1))
+        monkeypatch.setattr(engine_mod, "get_batch_progress", lambda *a: progress or {})
+        monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *a: True)
+        monkeypatch.setattr(engine_mod, "decompose_by_time_range", lambda *a, **kw: [
+            {"chunk_start": "2025-01-01", "chunk_end": "2025-01-31"},
+        ])
+        monkeypatch.setattr(spool_mod, "register_spool_file", lambda *a, **kw: None)
+        monkeypatch.setattr(spool_mod, "load_spooled_df", lambda *a: None)
+        monkeypatch.setattr(sql_mod.SQLLoader, "load_with_params", lambda *a, **kw: "SELECT 1")
+        monkeypatch.setattr(msd_svc, "read_sql_df", lambda *a, **kw: __import__('pandas').DataFrame())
+        # Bypass cache_get so it goes to Oracle path
+        monkeypatch.setattr(msd_svc, "cache_get", lambda *a: None)
+        # Mock _build_station_filter to return simple values
+        monkeypatch.setattr(msd_svc, "_build_station_filter", lambda station, alias: ("1=1", {}))
+
+    def test_default_parallel_is_1(self, monkeypatch):
+        """Without MSD_ENGINE_PARALLEL → execute_plan gets parallel=1."""
+        import mes_dashboard.services.mid_section_defect_service as msd_svc
+
+        engine_calls = []
+        monkeypatch.setattr(msd_svc, "_MSD_ENGINE_PARALLEL", 1)
+        self._make_detection_env(monkeypatch, engine_calls=engine_calls)
+
+        msd_svc._fetch_station_detection_data("2025-01-01", "2025-12-31", "TestStation")
+
+        assert len(engine_calls) == 1
+        assert engine_calls[0] == 1
+
+    def test_parallel_2_passed_to_execute_plan(self, monkeypatch):
+        """MSD_ENGINE_PARALLEL=2 → execute_plan gets parallel=2."""
+        import mes_dashboard.services.mid_section_defect_service as msd_svc
+
+        engine_calls = []
+        monkeypatch.setattr(msd_svc, "_MSD_ENGINE_PARALLEL", 2)
+        self._make_detection_env(monkeypatch, engine_calls=engine_calls)
+
+        msd_svc._fetch_station_detection_data("2025-01-01", "2025-12-31", "TestStation")
+
+        assert len(engine_calls) == 1
+        assert engine_calls[0] == 2
+
+
+# ============================================================
+# Task 10.9: MSD partial failure warning test
+# ============================================================
+
+class TestMsdPartialFailure:
+    """MSD detection partial failure logs a warning and propagates to _meta."""
+
+    def _setup_partial_failure_mocks(self, monkeypatch):
+        """Common mock setup for partial failure tests."""
+        import mes_dashboard.services.mid_section_defect_service as msd_svc
+        import mes_dashboard.services.batch_query_engine as engine_mod
+        import mes_dashboard.core.query_spool_store as spool_mod
+        import mes_dashboard.sql as sql_mod
+        import pandas as pd
+
+        monkeypatch.setattr(engine_mod, "execute_plan", lambda *a, **kw: kw.get("query_hash", "fake"))
+        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: ("/tmp/f.parquet", 1))
+        monkeypatch.setattr(
+            engine_mod,
+            "get_batch_progress",
+            lambda *a: {"has_partial_failure": "True", "failed_ranges": "2025-01-01~2025-01-31"},
+        )
+        monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *a: True)
+        monkeypatch.setattr(engine_mod, "decompose_by_time_range", lambda *a, **kw: [
+            {"chunk_start": "2025-01-01", "chunk_end": "2025-01-31"},
+        ])
+        monkeypatch.setattr(spool_mod, "register_spool_file", lambda *a, **kw: None)
+        monkeypatch.setattr(spool_mod, "load_spooled_df", lambda *a: None)
+        monkeypatch.setattr(sql_mod.SQLLoader, "load_with_params", lambda *a, **kw: "SELECT 1")
+        monkeypatch.setattr(msd_svc, "read_sql_df", lambda *a, **kw: pd.DataFrame())
+        monkeypatch.setattr(msd_svc, "cache_get", lambda *a: None)
+        monkeypatch.setattr(msd_svc, "_build_station_filter", lambda station, alias: ("1=1", {}))
+        return msd_svc
+
+    def test_partial_failure_warning_logged(self, monkeypatch, caplog):
+        """Chunk partial failure → logger.warning is emitted."""
+        import logging
+        msd_svc = self._setup_partial_failure_mocks(monkeypatch)
+
+        with caplog.at_level(logging.WARNING, logger="mes_dashboard.mid_section_defect"):
+            msd_svc._fetch_station_detection_data("2025-01-01", "2025-12-31", "TestStation")
+
+        assert any("partial failure" in r.message.lower() for r in caplog.records)
+
+    def test_partial_failure_returned_in_meta(self, monkeypatch):
+        """Chunk partial failure → returned tuple[1] contains partial failure info."""
+        msd_svc = self._setup_partial_failure_mocks(monkeypatch)
+
+        df, pf_meta = msd_svc._fetch_station_detection_data("2025-01-01", "2025-12-31", "TestStation")
+
+        assert pf_meta.get("has_partial_failure") is True
+        assert pf_meta.get("failed_ranges") == "2025-01-01~2025-01-31"
+
+    def test_partial_failure_propagated_to_query_analysis(self, monkeypatch):
+        """partial_failure_meta from detection propagates to query_analysis() result _meta."""
+        import mes_dashboard.services.mid_section_defect_service as msd_svc
+
+        pf = {"has_partial_failure": True, "failed_ranges": "2025-01-01~2025-01-31"}
+
+        # Simulate resolve_analysis_trace_context returning partial_failure_meta
+        monkeypatch.setattr(
+            msd_svc,
+            "resolve_analysis_trace_context",
+            lambda **kw: {
+                "trace_query_id": "abc123",
+                "seed_container_ids": [],
+                "seed_container_names": {},
+                "available_loss_reasons": [],
+                "detection_df": __import__("pandas").DataFrame(),
+                "partial_failure_meta": pf,
+            },
+        )
+        monkeypatch.setattr(msd_svc, "cache_get", lambda *a: None)
+
+        result = msd_svc.query_analysis("2025-01-01", "2025-12-31")
+
+        assert result is not None
+        assert "_meta" in result
+        assert result["_meta"]["partial_failure"]["has_partial_failure"] is True
