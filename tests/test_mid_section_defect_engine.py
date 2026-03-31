@@ -120,7 +120,7 @@ class TestDetectionEngineDecomposition:
             fail_sql,
         )
 
-        df = msd_svc._fetch_station_detection_data(
+        df, _pf = msd_svc._fetch_station_detection_data(
             start_date="2025-01-01",
             end_date="2025-03-31",
             station="測試",
@@ -161,7 +161,7 @@ class TestDetectionEngineDecomposition:
             lambda ns, qid, df, ttl_seconds=None: spool_calls.append((ns, qid, len(df))) or True,
         )
 
-        df = msd_svc._fetch_station_detection_data(
+        df, _pf = msd_svc._fetch_station_detection_data(
             start_date="2025-06-01",
             end_date="2025-06-05",
             station="測試",
@@ -186,7 +186,7 @@ class TestDetectionEngineDecomposition:
             lambda ns, qid, df, ttl_seconds=None: spool_calls.append((ns, qid, len(df))) or True,
         )
 
-        df = msd_svc._fetch_station_detection_data(
+        df, _pf = msd_svc._fetch_station_detection_data(
             start_date="2025-06-01",
             end_date="2025-06-05",
             station="測試",
@@ -232,7 +232,7 @@ class TestDetectionEngineDecomposition:
             }),
         )
 
-        df = msd_svc._fetch_station_detection_data(
+        df, _pf = msd_svc._fetch_station_detection_data(
             start_date="2025-01-01",
             end_date="2025-03-31",
             station="測試",

@@ -27,6 +27,35 @@ const SESSION_CACHE_KEY = 'msd:cache';
 const SESSION_CACHE_TTL = 5 * 60 * 1000; // 5 min, matches backend Redis TTL
 const CHART_TOP_N = 10;
 
+function buildMaterialChartFromAttribution(records) {
+  if (!records || records.length === 0) return [];
+  const sorted = [...records].sort((a, b) => b.DEFECT_QTY - a.DEFECT_QTY);
+  const items = [];
+  const other = { input_qty: 0, defect_qty: 0, lot_count: 0 };
+  for (let i = 0; i < sorted.length; i++) {
+    const rec = sorted[i];
+    if (i < CHART_TOP_N) {
+      const rate = rec.INPUT_QTY > 0 ? Math.round((rec.DEFECT_QTY / rec.INPUT_QTY) * 1e6) / 1e4 : 0;
+      items.push({ name: rec.MATERIAL_KEY, input_qty: rec.INPUT_QTY, defect_qty: rec.DEFECT_QTY, defect_rate: rate, lot_count: rec.DETECTION_LOT_COUNT });
+    } else {
+      other.input_qty += rec.INPUT_QTY;
+      other.defect_qty += rec.DEFECT_QTY;
+      other.lot_count += rec.DETECTION_LOT_COUNT;
+    }
+  }
+  if (other.defect_qty > 0 || other.input_qty > 0) {
+    const rate = other.input_qty > 0 ? Math.round((other.defect_qty / other.input_qty) * 1e6) / 1e4 : 0;
+    items.push({ name: '其他', ...other, defect_rate: rate });
+  }
+  const totalDefects = items.reduce((s, d) => s + d.defect_qty, 0);
+  let cumsum = 0;
+  for (const item of items) {
+    cumsum += item.defect_qty;
+    item.cumulative_pct = totalDefects > 0 ? Math.round((cumsum / totalDefects) * 1e4) / 100 : 0;
+  }
+  return items;
+}
+
 function buildMachineChartFromAttribution(records) {
   if (!records || records.length === 0) return [];
   const agg = {};
@@ -200,6 +229,43 @@ const filteredByMachineData = computed(() => {
   return filtered.length > 0 ? buildMachineChartFromAttribution(filtered) : [];
 });
 
+// --- Material type filter for raw material chart ---
+const {
+  committed: materialChartFilters,
+  updateField: updateMaterialField,
+} = useFilterOrchestrator({
+  fields: {
+    materialType: { trigger: 'immediate', initial: [] },
+  },
+});
+const materialTypeFilter = computed({
+  get: () => materialChartFilters.materialType,
+  set: (v) => updateMaterialField('materialType', v),
+});
+const materialTypeOptions = computed(() => {
+  const materials = analysisData.value?.materials_attribution;
+  if (!Array.isArray(materials) || materials.length === 0) return [];
+  const seen = new Set();
+  const options = [];
+  for (const rec of materials) {
+    const part = rec.MATERIAL_PART_NAME;
+    if (part && !seen.has(part)) {
+      seen.add(part);
+      options.push(part);
+    }
+  }
+  return options.sort((a, b) => a.localeCompare(b, 'zh-TW'));
+});
+const filteredByMaterialData = computed(() => {
+  const materials = analysisData.value?.materials_attribution;
+  const hasFilter = materialTypeFilter.value.length > 0;
+  if (!hasFilter || !Array.isArray(materials) || materials.length === 0) {
+    return analysisData.value?.charts?.by_material ?? [];
+  }
+  const filtered = materials.filter(rec => materialTypeFilter.value.includes(rec.MATERIAL_PART_NAME));
+  return filtered.length > 0 ? buildMaterialChartFromAttribution(filtered) : [];
+});
+
 const suspectMachineNames = computed(() => {
   const data = filteredByMachineData.value;
   if (!Array.isArray(data)) return [];
@@ -247,7 +313,7 @@ const completenessWarningText = computed(() => {
 const showAnalysisSkeleton = computed(() => hasQueried.value && loading.querying && !eventsAggregation.value);
 const showAnalysisCharts = computed(() => hasQueried.value && (Boolean(eventsAggregation.value) || restoredFromCache.value));
 
-const skeletonChartCount = computed(() => (isForward.value ? 4 : 5));
+const skeletonChartCount = computed(() => (isForward.value ? 4 : 6));
 
 const totalAncestorCount = computed(() => trace.stage_results.lineage?.total_ancestor_count || analysisData.value?.total_ancestor_count || 0);
 
@@ -412,6 +478,7 @@ async function loadAnalysis() {
   currentTraceQueryId.value = null;
   updateUpstreamField('station', []);
   updateUpstreamField('spec', []);
+  updateMaterialField('materialType', []);
   trace.abort();
   trace.reset();
   loading.querying = true;
@@ -687,13 +754,26 @@ void initPage();
                     @close="suspectPanelMachine = null"
                   />
                 </div>
-                <ParetoChart title="依原物料歸因" :data="analysisData.charts?.by_material" />
+                <ParetoChart title="依原物料歸因" :data="filteredByMaterialData">
+                  <template #header-extra>
+                    <div class="chart-inline-filters">
+                      <MultiSelect
+                        v-if="materialTypeOptions.length > 1"
+                        :model-value="materialTypeFilter"
+                        :options="materialTypeOptions"
+                        placeholder="全部原物料"
+                        @update:model-value="materialTypeFilter = $event"
+                      />
+                    </div>
+                  </template>
+                </ParetoChart>
               </div>
               <div class="charts-row">
                 <ParetoChart title="依源頭批次歸因" :data="analysisData.charts?.by_wafer_root" />
-                <ParetoChart title="依不良原因" :data="analysisData.charts?.by_loss_reason" />
+                <ParetoChart title="依Workflow歸因" :data="analysisData.charts?.by_workflow" />
               </div>
               <div class="charts-row">
+                <ParetoChart title="依不良原因" :data="analysisData.charts?.by_loss_reason" />
                 <ParetoChart title="依偵測機台" :data="analysisData.charts?.by_detection_machine" />
               </div>
             </template>

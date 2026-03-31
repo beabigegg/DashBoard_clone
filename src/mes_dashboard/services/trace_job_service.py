@@ -926,7 +926,9 @@ def execute_trace_events_job(
                     _lineage_ancestors = _lineage_payload.get("ancestors") if isinstance(_lineage_payload, dict) else None
                     if isinstance(_lineage_ancestors, dict) and _lineage_ancestors:
                         from mes_dashboard.services.mid_section_defect_service import _write_msd_lineage_stage_spool
-                        _write_msd_lineage_stage_spool(trace_query_id, _lineage_ancestors)
+                        _lineage_cid_to_name = (_lineage_payload.get("cid_to_name") or _lineage_payload.get("names")) if isinstance(_lineage_payload, dict) else None
+                        _lineage_seed_roots = _lineage_payload.get("seed_roots") if isinstance(_lineage_payload, dict) else None
+                        _write_msd_lineage_stage_spool(trace_query_id, _lineage_ancestors, _lineage_cid_to_name, _lineage_seed_roots)
                         logger.info(
                             "trace job MSD lineage spool written job_id=%s ancestor_count=%s",
                             job_id, len(_lineage_ancestors),

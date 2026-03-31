@@ -91,6 +91,7 @@ TOP_N = 10
 DIMENSION_MAP = {
     'by_machine': 'EQUIPMENT_NAME',
     'by_detection_machine': 'DETECTION_EQUIPMENTNAME',
+    'by_workflow': 'WORKFLOW',
 }
 
 # Forward dimension column mapping
@@ -635,6 +636,7 @@ def build_trace_aggregation_from_events(
         'genealogy_status': genealogy_status,
         'detail_total_count': len(detail),
         'attribution': attribution,
+        'materials_attribution': mat_attribution,
         'quality_meta': quality_meta,
     }
     if _msd_pf:
@@ -805,6 +807,7 @@ def _build_trace_aggregation_container_mode(
         'genealogy_status': genealogy_status,
         'detail_total_count': len(detail),
         'attribution': attribution,
+        'materials_attribution': mat_attribution,
         'quality_meta': quality_meta,
     }
 
@@ -959,27 +962,40 @@ def _write_msd_lineage_stage_spool(
     trace_query_id: str,
     ancestors: Dict[str, Any],
     cid_to_name: Optional[Dict[str, str]] = None,
+    seed_roots: Optional[Dict[str, str]] = None,
 ) -> None:
-    """Persist simplified MSD lineage stage for DuckDB attribution joins."""
+    """Persist simplified MSD lineage stage for DuckDB attribution joins.
+
+    Each row is a (DESCENDANT_ID, ANCESTOR_ID, ANCESTOR_NAME) edge.
+    ``SEED_ROOT_NAME`` is populated per-row from ``seed_roots`` so DuckDB
+    can aggregate by the true root without re-traversing parent chains.
+    """
     import tempfile
     from pathlib import Path
 
     from mes_dashboard.core.query_spool_store import register_stage_spool_file
     from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE, _STAGE_LINEAGE
 
+    _names = cid_to_name or {}
+    _roots = seed_roots or {}
+
     rows: List[Dict[str, Any]] = []
     for descendant_id, values in (ancestors or {}).items():
         if not isinstance(values, (list, set, tuple)):
             continue
+        safe_descendant = _safe_str(descendant_id)
+        if not safe_descendant:
+            continue
+        root_name = _safe_str(_roots.get(safe_descendant))
         for ancestor_id in values:
             safe_ancestor = _safe_str(ancestor_id)
-            safe_descendant = _safe_str(descendant_id)
-            if not safe_ancestor or not safe_descendant:
+            if not safe_ancestor:
                 continue
             rows.append({
                 "DESCENDANT_ID": safe_descendant,
                 "ANCESTOR_ID": safe_ancestor,
-                "ANCESTOR_NAME": _safe_str((cid_to_name or {}).get(safe_ancestor)) or safe_ancestor,
+                "ANCESTOR_NAME": _safe_str(_names.get(safe_ancestor)) or safe_ancestor,
+                "SEED_ROOT_NAME": root_name or "",
             })
 
     if not rows:
@@ -1103,7 +1119,8 @@ def _execute_msd_compat_job(
                 if isinstance(values, (list, set, tuple)):
                     target_set.update(_safe_str(value) for value in values if _safe_str(value))
             target_cids = sorted(target_set)
-            _write_msd_lineage_stage_spool(trace_query_id, backward_ancestors, cid_to_name)
+            _seed_roots = lineage_result.get("seed_roots", {}) if isinstance(lineage_result, dict) else {}
+            _write_msd_lineage_stage_spool(trace_query_id, backward_ancestors, cid_to_name, _seed_roots)
 
         update_job_progress(
             _MSD_COMPAT_JOB_PREFIX,

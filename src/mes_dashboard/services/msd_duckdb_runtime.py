@@ -308,6 +308,7 @@ class MsdDuckdbRuntime:
                 "genealogy_status": "ready",
                 "detail_total_count": len(detail),
                 "attribution": attribution,
+                "materials_attribution": material_attribution,
                 "trace_query_id": self.trace_query_id,
             }
             return {"summary": summary, "detail": detail}
@@ -560,14 +561,19 @@ class MsdDuckdbRuntime:
                 by_machine = self._compute_machine_chart(conn)
                 by_material = self._compute_material_chart(conn)
                 affected_machine_count = self._compute_affected_machine_count(conn)
+                raw_attribution = self._compute_raw_machine_attribution(conn)
+                raw_materials_attribution = self._compute_raw_materials_attribution(conn)
             else:
                 by_machine = []
                 by_material = []
                 affected_machine_count = 0
+                raw_attribution = []
+                raw_materials_attribution = []
 
             by_loss_reason = self._compute_loss_reason_chart(conn)
             by_detection_machine = self._compute_detection_machine_chart(conn)
             by_wafer_root = self._compute_wafer_root_chart(conn) if lineage_available else []
+            by_workflow = self._compute_workflow_chart(conn)
 
             conn.close()
 
@@ -580,13 +586,15 @@ class MsdDuckdbRuntime:
                 "by_material": by_material,
                 "by_wafer_root": by_wafer_root,
                 "by_loss_reason": by_loss_reason,
+                "by_workflow": by_workflow,
             }
 
             return {
                 "kpi": kpi,
                 "charts": charts,
                 "daily_trend": daily_trend,
-                "attribution": by_machine,
+                "attribution": raw_attribution,
+                "materials_attribution": raw_materials_attribution,
                 "available_loss_reasons": available_loss_reasons,
                 "genealogy_status": "ready",
                 "detail_total_count": detail_total_count,
@@ -790,10 +798,48 @@ class MsdDuckdbRuntime:
             return []
 
     def _compute_wafer_root_chart(self, conn) -> List[Dict[str, Any]]:
-        """Build by_wafer_root chart: roots = ancestors that are not descendants."""
+        """Build by_wafer_root chart using pre-computed SEED_ROOT_NAME when available."""
         try:
-            rows = conn.execute(
+            # Check if SEED_ROOT_NAME column exists (new spool format)
+            has_seed_root = False
+            try:
+                conn.execute("SELECT SEED_ROOT_NAME FROM lineage LIMIT 0")
+                has_seed_root = True
+            except Exception:
+                pass
+
+            if has_seed_root:
+                sql = """
+                WITH seed_roots AS (
+                    SELECT DISTINCT DESCENDANT_ID, SEED_ROOT_NAME
+                    FROM lineage
+                    WHERE SEED_ROOT_NAME IS NOT NULL AND TRIM(SEED_ROOT_NAME) != ''
+                ),
+                defective_kpis AS (
+                    SELECT CONTAINERID,
+                           MAX(TRACKINQTY) AS trackin_qty,
+                           SUM(REJECTQTY)  AS defect_qty
+                    FROM detection WHERE REJECTQTY > 0
+                    GROUP BY CONTAINERID
+                ),
+                root_agg AS (
+                    SELECT
+                        sr.SEED_ROOT_NAME                   AS name,
+                        COUNT(DISTINCT dk.CONTAINERID)      AS lot_count,
+                        SUM(dk.defect_qty)                  AS defect_qty,
+                        SUM(dk.trackin_qty)                  AS input_qty
+                    FROM defective_kpis dk
+                    JOIN seed_roots sr ON sr.DESCENDANT_ID = dk.CONTAINERID
+                    GROUP BY name
+                )
+                SELECT name, lot_count, defect_qty, input_qty
+                FROM root_agg
+                ORDER BY defect_qty DESC
+                LIMIT 10
                 """
+            else:
+                # Fallback for old spool format: infer roots as ancestors not in descendants
+                sql = """
                 WITH defective_kpis AS (
                     SELECT CONTAINERID,
                            MAX(TRACKINQTY) AS trackin_qty,
@@ -825,7 +871,8 @@ class MsdDuckdbRuntime:
                 ORDER BY defect_qty DESC
                 LIMIT 10
                 """
-            ).fetchall()
+
+            rows = conn.execute(sql).fetchall()
             return self._to_pareto_items(rows)
         except Exception as exc:
             logger.debug("_compute_wafer_root_chart failed: %s", exc)
@@ -989,6 +1036,167 @@ class MsdDuckdbRuntime:
         except Exception as exc:
             logger.debug("_compute_detail_total_count failed: %s", exc)
             return 0
+
+    def _compute_workflow_chart(self, conn) -> List[Dict[str, Any]]:
+        """Build by_workflow Pareto chart from detection spool WORKFLOW field."""
+        try:
+            rows = conn.execute(
+                """
+                WITH lot_workflow AS (
+                    SELECT
+                        CONTAINERID,
+                        COALESCE(NULLIF(TRIM(WORKFLOW), ''), '(未知)') AS workflow,
+                        MAX(TRACKINQTY) AS trackin_qty,
+                        SUM(REJECTQTY)  AS defect_qty
+                    FROM detection
+                    WHERE REJECTQTY > 0
+                    GROUP BY CONTAINERID, workflow
+                ),
+                workflow_agg AS (
+                    SELECT
+                        workflow AS name,
+                        COUNT(DISTINCT CONTAINERID) AS lot_count,
+                        SUM(defect_qty)             AS defect_qty,
+                        SUM(trackin_qty)            AS input_qty
+                    FROM lot_workflow
+                    GROUP BY workflow
+                )
+                SELECT name, lot_count, defect_qty, input_qty
+                FROM workflow_agg
+                ORDER BY defect_qty DESC
+                LIMIT 10
+                """
+            ).fetchall()
+            return self._to_pareto_items(rows)
+        except Exception as exc:
+            logger.debug("_compute_workflow_chart failed: %s", exc)
+            return []
+
+    def _compute_raw_machine_attribution(self, conn) -> List[Dict[str, Any]]:
+        """Compute raw machine attribution records with WORKCENTER_GROUP and EQUIPMENT_NAME.
+
+        Returns records compatible with the frontend's ``upstreamStationOptions``,
+        ``upstreamSpecOptions``, and ``buildMachineChartFromAttribution`` expectations.
+        """
+        try:
+            rows = conn.execute(
+                """
+                WITH defective_kpis AS (
+                    SELECT CONTAINERID,
+                           MAX(TRACKINQTY)  AS trackin_qty,
+                           SUM(REJECTQTY)   AS defect_qty
+                    FROM detection WHERE REJECTQTY > 0
+                    GROUP BY CONTAINERID
+                ),
+                machine_agg AS (
+                    SELECT
+                        COALESCE(NULLIF(TRIM(e.WORKCENTER_GROUP), ''), '(未知)') AS wc_group,
+                        COALESCE(NULLIF(TRIM(e.EQUIPMENTNAME), ''), '(未知)')    AS eq_name,
+                        COALESCE(TRIM(e.EQUIPMENTID), '')                        AS eq_id,
+                        COUNT(DISTINCT dk.CONTAINERID)                           AS lot_count,
+                        SUM(dk.defect_qty)                                       AS defect_qty,
+                        SUM(dk.trackin_qty)                                      AS input_qty
+                    FROM defective_kpis dk
+                    JOIN lineage l ON l.DESCENDANT_ID = dk.CONTAINERID
+                    JOIN events  e ON e.CONTAINERID   = l.ANCESTOR_ID
+                    WHERE e.EQUIPMENTNAME IS NOT NULL AND TRIM(e.EQUIPMENTNAME) != ''
+                    GROUP BY wc_group, eq_name, eq_id
+                )
+                SELECT wc_group, eq_name, eq_id, lot_count, defect_qty, input_qty
+                FROM machine_agg
+                ORDER BY defect_qty DESC
+                """
+            ).fetchall()
+
+            # Look up RESOURCEFAMILYNAME from resource cache
+            eq_ids = [str(r[2]) for r in rows if r[2]]
+            eq_family_map: Dict[str, str] = {}
+            if eq_ids:
+                try:
+                    from mes_dashboard.services.resource_cache import get_resources_by_ids
+                    resources = get_resources_by_ids(eq_ids)
+                    for res in resources:
+                        rid = str(res.get('RESOURCEID', ''))
+                        family = res.get('RESOURCEFAMILYNAME') or ''
+                        if rid and family:
+                            eq_family_map[rid] = family
+                except Exception:
+                    pass
+
+            attribution = []
+            for r in rows:
+                wc_group, eq_name, eq_id = str(r[0]), str(r[1]), str(r[2] or '')
+                lot_count, defect_qty, input_qty = int(r[3] or 0), int(r[4] or 0), int(r[5] or 0)
+                rate = round(defect_qty / input_qty * 100, 4) if input_qty else 0.0
+                attribution.append({
+                    'WORKCENTER_GROUP': wc_group,
+                    'EQUIPMENT_NAME': eq_name,
+                    'EQUIPMENT_ID': eq_id,
+                    'RESOURCEFAMILYNAME': eq_family_map.get(eq_id, '(未知)'),
+                    'DETECTION_LOT_COUNT': lot_count,
+                    'INPUT_QTY': input_qty,
+                    'DEFECT_QTY': defect_qty,
+                    'DEFECT_RATE': rate,
+                })
+            return attribution
+        except Exception as exc:
+            logger.debug("_compute_raw_machine_attribution failed: %s", exc)
+            return []
+
+    def _compute_raw_materials_attribution(self, conn) -> List[Dict[str, Any]]:
+        """Compute raw materials attribution records with MATERIAL_PART_NAME.
+
+        Returns records compatible with the frontend's ``materialTypeOptions``
+        and ``buildMaterialChartFromAttribution`` expectations.
+        """
+        try:
+            rows = conn.execute(
+                """
+                WITH defective_kpis AS (
+                    SELECT CONTAINERID,
+                           MAX(TRACKINQTY)  AS trackin_qty,
+                           SUM(REJECTQTY)   AS defect_qty
+                    FROM detection WHERE REJECTQTY > 0
+                    GROUP BY CONTAINERID
+                ),
+                mat_agg AS (
+                    SELECT
+                        COALESCE(NULLIF(TRIM(e.MATERIALPARTNAME), ''), '(未知)') AS part_name,
+                        COALESCE(TRIM(e.MATERIALLOTNAME), '')                    AS lot_name,
+                        COUNT(DISTINCT dk.CONTAINERID)                            AS lot_count,
+                        SUM(dk.defect_qty)                                        AS defect_qty,
+                        SUM(dk.trackin_qty)                                       AS input_qty
+                    FROM defective_kpis dk
+                    JOIN lineage l ON l.DESCENDANT_ID = dk.CONTAINERID
+                    JOIN events  e ON e.CONTAINERID   = l.ANCESTOR_ID
+                    WHERE e.MATERIALPARTNAME IS NOT NULL AND TRIM(e.MATERIALPARTNAME) != ''
+                    GROUP BY part_name, lot_name
+                )
+                SELECT part_name, lot_name, lot_count, defect_qty, input_qty
+                FROM mat_agg
+                ORDER BY defect_qty DESC
+                """
+            ).fetchall()
+
+            attribution = []
+            for r in rows:
+                part_name, lot_name = str(r[0]), str(r[1] or '')
+                lot_count, defect_qty, input_qty = int(r[2] or 0), int(r[3] or 0), int(r[4] or 0)
+                rate = round(defect_qty / input_qty * 100, 4) if input_qty else 0.0
+                display_name = f"{part_name} ({lot_name})" if lot_name else part_name
+                attribution.append({
+                    'MATERIAL_KEY': display_name,
+                    'MATERIAL_PART_NAME': part_name,
+                    'MATERIAL_LOT_NAME': lot_name,
+                    'DETECTION_LOT_COUNT': lot_count,
+                    'INPUT_QTY': input_qty,
+                    'DEFECT_QTY': defect_qty,
+                    'DEFECT_RATE': rate,
+                })
+            return attribution
+        except Exception as exc:
+            logger.debug("_compute_raw_materials_attribution failed: %s", exc)
+            return []
 
     @staticmethod
     def _to_pareto_items(rows) -> List[Dict[str, Any]]:
