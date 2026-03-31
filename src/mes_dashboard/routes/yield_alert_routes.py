@@ -10,7 +10,6 @@ from datetime import date, timedelta
 from flask import Blueprint, request
 
 from mes_dashboard.core.heavy_query_telemetry import (
-    record_guard_reject,
     record_memory_error,
 )
 from mes_dashboard.core.response import (
@@ -25,7 +24,6 @@ from mes_dashboard.core.response import (
 )
 
 from mes_dashboard.core.cache import cache_get, cache_set
-from mes_dashboard.core.database import get_slow_query_active_count
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
 from mes_dashboard.services.yield_alert_dataset_cache import (
@@ -59,8 +57,6 @@ _YIELD_ALERT_ENABLED = os.getenv("YIELD_ALERT_CENTER_ENABLED", "true").strip().l
     "yes",
     "on",
 }
-
-_HEAVY_QUERY_REJECT_THRESHOLD = max(1, int(os.getenv("HEAVY_QUERY_REJECT_THRESHOLD", "4")))
 
 _DEFAULT_CACHE_TTL = max(30, int(os.getenv("YIELD_ALERT_CACHE_TTL_SECONDS", "300")))
 
@@ -152,6 +148,12 @@ def _cache_response(namespace: str, payload_key: dict, compute_fn):
 @yield_alert_bp.route("/api/yield-alert/query", methods=["POST"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_query():
+    """Primary query: execute Oracle → dataset cache → return query_id.
+
+    Supports two response codes:
+      200 - existing cached result served immediately
+      202 - cache miss enqueued to RQ for background execution
+    """
     if not _YIELD_ALERT_ENABLED:
         return not_found_error("yield_alert_disabled")
 
@@ -164,23 +166,68 @@ def api_yield_alert_query():
     if not start_date or not end_date:
         return validation_error("缺少必要參數: start_date, end_date")
 
-    # Phase 0: concurrency fast-rejection
-    try:
-        if get_slow_query_active_count() >= _HEAVY_QUERY_REJECT_THRESHOLD:
-            record_guard_reject(
-                "yield_alert.query",
-                reason="slow_query_active_threshold",
-            )
+    # Check if cache already exists — serve immediately if so
+    from mes_dashboard.services.yield_alert_dataset_cache import (
+        _CACHE_SCHEMA_VERSION,
+        _get_cached_payload,
+        _make_query_id,
+    )
+
+    query_id = _make_query_id(
+        {
+            "cache_schema_version": _CACHE_SCHEMA_VERSION,
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+    )
+
+    if _get_cached_payload(query_id) is not None:
+        try:
+            result = execute_primary_query(start_date=start_date, end_date=end_date)
+            return success_response(result)
+        except MemoryError as exc:
+            record_memory_error("yield_alert.query", reason="rss_guard")
             return error_response(
                 SERVICE_UNAVAILABLE,
-                "系統忙碌中，請稍後再試",
+                str(exc),
+                status_code=503,
+                headers={"Retry-After": "30"},
+            )
+        except ValueError as exc:
+            return error_response(VALIDATION_ERROR, str(exc), status_code=400, meta={"max_query_days": MAX_QUERY_DAYS})
+        except Exception:
+            logger.exception("Yield alert primary query failed (cache hit path)")
+            return internal_error("主查詢執行失敗")
+
+    # Cache miss — try async path
+    from mes_dashboard.services.async_query_job_service import is_async_available
+    from mes_dashboard.services.yield_alert_job_service import (
+        YIELD_ALERT_ASYNC_ENABLED,
+        enqueue_yield_alert_query,
+    )
+
+    if YIELD_ALERT_ASYNC_ENABLED and is_async_available():
+        job_id, err = enqueue_yield_alert_query({"start_date": start_date, "end_date": end_date})
+        if job_id is None:
+            logger.warning("yield_alert async enqueue failed (%s)", err)
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "背景查詢服務不可用，請稍後再試",
                 status_code=503,
                 meta={"retry_after_seconds": 30},
                 headers={"Retry-After": "30"},
             )
-    except Exception:
-        pass
+        return success_response(
+            {
+                "async": True,
+                "job_id": job_id,
+                "status_url": f"/api/yield-alert/job/{job_id}",
+                "query_id": query_id,
+            },
+            status_code=202,
+        )
 
+    # Sync fallback (RQ unavailable or async disabled)
     try:
         result = execute_primary_query(start_date=start_date, end_date=end_date)
         return success_response(result)
@@ -206,6 +253,18 @@ def api_yield_alert_query():
     except Exception:
         logger.exception("Yield alert primary query failed")
         return internal_error("主查詢執行失敗")
+
+
+# ── GET /api/yield-alert/job/<job_id> ────────────────────────────────────────
+
+@yield_alert_bp.route("/api/yield-alert/job/<job_id>", methods=["GET"])
+def api_yield_alert_job_status(job_id: str):
+    """Get async query job status."""
+    from mes_dashboard.services.async_query_job_service import get_job_status
+    status = get_job_status("yield_alert", job_id)
+    if status is None:
+        return not_found_error("Job not found")
+    return success_response(status)
 
 
 @yield_alert_bp.route("/api/yield-alert/analyze", methods=["POST"])

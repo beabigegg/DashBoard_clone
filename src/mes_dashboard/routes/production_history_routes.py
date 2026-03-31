@@ -5,11 +5,12 @@ Blueprint: production_history_bp
 Prefix: /api/production-history
 
 Endpoints:
-  POST /query   — Oracle primary query → spool → first-page + matrix
-  POST /page    — DuckDB detail page (dataset-backed)
-  POST /matrix  — DuckDB matrix summary (dataset-backed)
-  POST /options — DuckDB distinct filter options (dataset-backed)
-  GET  /export  — DuckDB full CSV stream (dataset-backed)
+  POST /query          — Oracle primary query → spool → first-page + matrix (200) or async job (202)
+  GET  /job/<job_id>   — Async job status
+  POST /page           — DuckDB detail page (dataset-backed)
+  POST /matrix         — DuckDB matrix summary (dataset-backed)
+  POST /options        — DuckDB distinct filter options (dataset-backed)
+  GET  /export         — DuckDB full CSV stream (dataset-backed)
 """
 
 from __future__ import annotations
@@ -20,7 +21,6 @@ import os
 from flask import Blueprint, Response, request, stream_with_context
 
 from mes_dashboard.core.heavy_query_telemetry import (
-    record_guard_reject,
     record_memory_error,
 )
 from mes_dashboard.core.query_spool_store import get_spool_file_path
@@ -37,6 +37,7 @@ from mes_dashboard.core.response import (
 )
 from mes_dashboard.services.production_history_service import (
     get_type_options,
+    make_canonical_spool_id,
     query_production_history,
 )
 from mes_dashboard.services.production_history_sql_runtime import (
@@ -103,6 +104,12 @@ def api_production_history_type_options():
 
 @production_history_bp.route("/api/production-history/query", methods=["POST"])
 def api_production_history_query():
+    """Primary query: execute Oracle → spool → return results.
+
+    Supports two response codes:
+      200 - existing spooled result served immediately
+      202 - spool miss enqueued to RQ for background execution
+    """
     if not _ENABLED:
         return not_found_error("production_history_disabled")
 
@@ -110,22 +117,63 @@ def api_production_history_query():
     if payload_error is not None:
         return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
+    # Check if spool already exists for these params — serve immediately if so
+    try:
+        dataset_id = make_canonical_spool_id(body)
+    except (KeyError, ValueError):
+        dataset_id = None
+
+    if dataset_id and get_spool_file_path(_SPOOL_NAMESPACE, dataset_id) is not None:
+        try:
+            result = query_production_history(body)
+            return success_response(result, meta=result.pop("meta", None))
+        except MemoryError:
+            record_memory_error("production_history.query", reason="rss_guard")
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "伺服器記憶體不足，請稍後再試",
+                status_code=503,
+                meta={"retry_after_seconds": 60, "error_code": "memory_guard_rejected"},
+                headers={"Retry-After": "60"},
+            )
+        except ValueError as exc:
+            return error_response(VALIDATION_ERROR, str(exc), status_code=400)
+        except Exception:
+            logger.exception("production_history primary query failed (spool hit path)")
+            return internal_error("生產歷程查詢失敗")
+
+    # Spool miss — try async path
+    from mes_dashboard.services.async_query_job_service import is_async_available
+    from mes_dashboard.services.production_history_job_service import (
+        PRODUCTION_HISTORY_ASYNC_ENABLED,
+        enqueue_production_history_query,
+    )
+
+    if PRODUCTION_HISTORY_ASYNC_ENABLED and is_async_available():
+        job_id, err = enqueue_production_history_query(body)
+        if job_id is None:
+            logger.warning("production_history async enqueue failed (%s)", err)
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "背景查詢服務不可用，請稍後再試",
+                status_code=503,
+                meta={"retry_after_seconds": 30},
+                headers={"Retry-After": "30"},
+            )
+        return success_response(
+            {
+                "async": True,
+                "job_id": job_id,
+                "status_url": f"/api/production-history/job/{job_id}",
+                "dataset_id": dataset_id or "",
+            },
+            status_code=202,
+        )
+
+    # Sync fallback (RQ unavailable or async disabled)
     try:
         result = query_production_history(body)
         return success_response(result, meta=result.pop("meta", None))
-    except RuntimeError as exc:
-        msg = str(exc)
-        if "heavy_query_overloaded" in msg:
-            record_guard_reject("production_history.query", reason="heavy_query_slot_full")
-            return error_response(
-                SERVICE_UNAVAILABLE,
-                "系統查詢排隊中，請稍後再試",
-                status_code=503,
-                meta={"retry_after_seconds": 30, "error_code": "heavy_query_overloaded"},
-                headers={"Retry-After": "30"},
-            )
-        logger.exception("production_history query runtime error")
-        return internal_error("查詢執行失敗")
     except MemoryError:
         record_memory_error("production_history.query", reason="rss_guard")
         return error_response(
@@ -140,6 +188,18 @@ def api_production_history_query():
     except Exception:
         logger.exception("production_history primary query failed")
         return internal_error("生產歷程查詢失敗")
+
+
+# ── GET /api/production-history/job/<job_id> ─────────────────────────────────
+
+@production_history_bp.route("/api/production-history/job/<job_id>", methods=["GET"])
+def api_production_history_job_status(job_id: str):
+    """Get async query job status."""
+    from mes_dashboard.services.async_query_job_service import get_job_status
+    status = get_job_status("production_history", job_id)
+    if status is None:
+        return not_found_error("Job not found")
+    return success_response(status)
 
 
 # ── POST /api/production-history/page ────────────────────────────────────────

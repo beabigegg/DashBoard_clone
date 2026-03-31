@@ -24,6 +24,9 @@ logger = logging.getLogger("mes_dashboard.rq_monitor_service")
 _QUEUE_NAMES: List[str] = [
     os.getenv("TRACE_WORKER_QUEUE", "trace-events"),
     os.getenv("REJECT_WORKER_QUEUE", "reject-query"),
+    os.getenv("MSD_WORKER_QUEUE", "msd-analysis"),
+    os.getenv("PRODUCTION_HISTORY_WORKER_QUEUE", "production-history-query"),
+    os.getenv("YIELD_ALERT_WORKER_QUEUE", "yield-alert-query"),
 ]
 
 

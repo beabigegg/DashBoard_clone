@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
+import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling.js';
 import { useYieldAlertDuckDB } from './useYieldAlertDuckDB.js';
 import { isDuckDBSupported } from '../core/duckdb-client.js';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
@@ -56,6 +57,16 @@ const committedDateRange = reactive({
   start_date: '',
   end_date: '',
 });
+
+const jobProgress = reactive({
+  active: false,
+  jobId: null,
+  status: '',
+  progress: '',
+  pct: 0,
+});
+
+let _jobAbortController = null;
 
 const granularity = ref('day');
 const GRANULARITY_OPTIONS = [
@@ -296,12 +307,60 @@ function isCacheExpiredError(error) {
 }
 
 async function executePrimaryQuery() {
+  // Cancel any in-progress polling
+  if (_jobAbortController) {
+    _jobAbortController.abort();
+    _jobAbortController = null;
+  }
+
   const resp = await apiPost('/api/yield-alert/query', {
     start_date: filters.start_date,
     end_date: filters.end_date,
   }, {
     timeout: API_TIMEOUT,
   });
+
+  const respData = resp?.data || {};
+
+  // ---- Async 202 path ----
+  if (resp?._status === 202 || (respData.async === true && respData.job_id)) {
+    const jobId = respData.job_id;
+    const statusUrl = respData.status_url || `/api/yield-alert/job/${jobId}`;
+    const preQueryId = respData.query_id;
+
+    jobProgress.active = true;
+    jobProgress.jobId = jobId;
+    jobProgress.status = 'queued';
+    jobProgress.progress = '';
+    jobProgress.pct = 0;
+
+    const controller = new AbortController();
+    _jobAbortController = controller;
+
+    try {
+      await pollJobUntilComplete(statusUrl, {
+        signal: controller.signal,
+        onProgress: (statusResp) => {
+          jobProgress.status = statusResp.status;
+          jobProgress.progress = statusResp.progress || '';
+          jobProgress.pct = statusResp.pct || 0;
+        },
+      });
+    } finally {
+      if (_jobAbortController === controller) _jobAbortController = null;
+      jobProgress.active = false;
+    }
+
+    // Use the pre-computed query_id from the 202 response
+    if (preQueryId) {
+      queryId.value = String(preQueryId);
+    }
+    committedDateRange.start_date = filters.start_date;
+    committedDateRange.end_date = filters.end_date;
+    return;
+  }
+
+  // ---- Sync 200 path ----
   if (!resp.success || !resp.data?.query_id) {
     throw new Error(resp.error || '主查詢執行失敗');
   }

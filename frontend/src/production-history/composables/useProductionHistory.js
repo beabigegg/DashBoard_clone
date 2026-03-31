@@ -1,5 +1,6 @@
 import { ref, reactive, computed } from 'vue';
 import { apiPost, apiGet } from '../../core/api.js';
+import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling.js';
 
 const API_TIMEOUT = 360000;
 
@@ -53,8 +54,26 @@ export function useProductionHistory() {
   const overloadError = ref(null);   // { code, retryAfterSeconds }
   const expiredDataset = ref(false);
 
+  // ── Async job progress state ────────────────────────────────────────────────
+  const jobProgress = reactive({
+    active: false,
+    jobId: null,
+    status: '',
+    progress: '',
+    pct: 0,
+  });
+
+  let _jobAbortController = null;
+
   // ── Primary query ──────────────────────────────────────────────────────────
   async function runQuery(queryParams) {
+    // Cancel any in-progress polling
+    if (_jobAbortController) {
+      _jobAbortController.abort();
+      _jobAbortController = null;
+    }
+    jobProgress.active = false;
+
     loading.value = true;
     error.value = null;
     overloadError.value = null;
@@ -63,7 +82,50 @@ export function useProductionHistory() {
 
     try {
       const resp = await apiPost('/api/production-history/query', queryParams, { timeout: API_TIMEOUT });
-      const data = resp.data;
+      const respData = resp?.data || {};
+
+      // ---- Async 202 path ----
+      if (resp?._status === 202 || (respData.async === true && respData.job_id)) {
+        const jobId = respData.job_id;
+        const statusUrl = respData.status_url || `/api/production-history/job/${jobId}`;
+
+        jobProgress.active = true;
+        jobProgress.jobId = jobId;
+        jobProgress.status = 'queued';
+        jobProgress.progress = '';
+        jobProgress.pct = 0;
+
+        const controller = new AbortController();
+        _jobAbortController = controller;
+
+        try {
+          await pollJobUntilComplete(statusUrl, {
+            signal: controller.signal,
+            onProgress: (statusResp) => {
+              jobProgress.status = statusResp.status;
+              jobProgress.progress = statusResp.progress || '';
+              jobProgress.pct = statusResp.pct || 0;
+            },
+          });
+        } finally {
+          if (_jobAbortController === controller) _jobAbortController = null;
+          jobProgress.active = false;
+        }
+
+        // Load view data using dataset_id returned from job
+        const resolvedDatasetId = respData.dataset_id;
+        if (resolvedDatasetId) {
+          datasetId.value = resolvedDatasetId;
+          _clearMatrixFilter();
+          _clearSupplementaryFilter();
+          await Promise.all([fetchPage(1), _fetchMatrix()]);
+          fetchSupplementaryOptions();
+        }
+        return;
+      }
+
+      // ---- Sync 200 path ----
+      const data = respData;
       datasetId.value = data.dataset_id;
       datasetMeta.value = resp.meta || null;
 
@@ -79,7 +141,13 @@ export function useProductionHistory() {
       _clearSupplementaryFilter();
       fetchSupplementaryOptions();
     } catch (err) {
-      if (err.status === 503) {
+      if (err?.name === 'AbortError') {
+        error.value = '查詢已取消';
+      } else if (err?.errorCode === 'JOB_FAILED') {
+        error.value = err?.message || '背景查詢失敗';
+      } else if (err?.errorCode === 'JOB_POLL_TIMEOUT') {
+        error.value = '背景查詢超時，請稍後重試';
+      } else if (err.status === 503) {
         overloadError.value = {
           code: err.payload?.error?.code || 'SERVICE_UNAVAILABLE',
           retryAfterSeconds: err.retryAfterSeconds || 30,
@@ -89,6 +157,7 @@ export function useProductionHistory() {
       }
     } finally {
       loading.value = false;
+      jobProgress.active = false;
     }
   }
 
@@ -238,6 +307,7 @@ export function useProductionHistory() {
     detailLoading,
     overloadError,
     expiredDataset,
+    jobProgress,
     runQuery,
     fetchPage,
     applyMatrixFilter,
