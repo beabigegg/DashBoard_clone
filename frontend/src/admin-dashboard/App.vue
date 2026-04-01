@@ -9,6 +9,7 @@ import {
   watch,
 } from 'vue';
 
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
 const tabs = [
@@ -109,37 +110,35 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="theme-admin-dashboard dashboard-root">
-    <header class="dashboard-header">
-      <div class="dashboard-header-inner">
-        <h1 class="dashboard-title">Admin Dashboard</h1>
-        <div class="dashboard-header-actions">
-          <label class="auto-refresh-toggle">
-            <input
-              type="checkbox"
-              :checked="autoRefreshEnabled"
-              @change="autoRefreshEnabled = !autoRefreshEnabled; toggleAutoRefresh()"
-            />
-            自動更新 (30s)
-          </label>
-          <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="refreshing" @click="refreshNow">
-            {{ refreshing ? '更新中...' : '重新整理' }}
-          </button>
-        </div>
-      </div>
+    <PageHeader
+      title="Admin Dashboard"
+      :refreshing="refreshing"
+      @refresh="refreshNow"
+    >
+      <template #subtitle>
+        <label class="auto-refresh-toggle">
+          <input
+            type="checkbox"
+            :checked="autoRefreshEnabled"
+            @change="autoRefreshEnabled = !autoRefreshEnabled; toggleAutoRefresh()"
+          />
+          自動更新 (30s)
+        </label>
+      </template>
+    </PageHeader>
 
-      <nav class="dashboard-tabs" aria-label="Admin dashboard tabs">
-        <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          type="button"
-          class="dashboard-tab"
-          :class="{ 'is-active': tab.key === activeTabKey }"
-          @click="setActiveTab(tab.key)"
-        >
-          {{ tab.label }}
-        </button>
-      </nav>
-    </header>
+    <nav class="dashboard-tabs" aria-label="Admin dashboard tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        type="button"
+        class="dashboard-tab"
+        :class="{ 'is-active': tab.key === activeTabKey }"
+        @click="setActiveTab(tab.key)"
+      >
+        {{ tab.label }}
+      </button>
+    </nav>
 
     <main class="dashboard-main">
       <KeepAlive>

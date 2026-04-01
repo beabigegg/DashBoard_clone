@@ -81,6 +81,47 @@ class TestGetRqWorkerDetails:
         assert result["workers"] == []
         assert result["summary"]["total"] == 0
 
+    def test_birth_date_has_utc_suffix(self):
+        from datetime import datetime
+        w = MagicMock()
+        w.name = "worker-tz"
+        w.get_state.return_value = "idle"
+        w.get_current_job.return_value = None
+        w.queues = []
+        w.birth_date = datetime(2026, 4, 1, 0, 0, 0)  # naive UTC datetime
+        w.successful_job_count = 0
+        w.failed_job_count = 0
+
+        mock_conn = MagicMock()
+        with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_redis_client", return_value=mock_conn), \
+             patch("rq.Worker") as mock_worker_cls:
+            mock_worker_cls.all.return_value = [w]
+            result = svc.get_rq_worker_details()
+
+        birth = result["workers"][0]["birth_date"]
+        assert birth is not None
+        assert "+00:00" in birth
+
+    def test_null_birth_date_returns_null(self):
+        w = MagicMock()
+        w.name = "worker-no-birth"
+        w.get_state.return_value = "idle"
+        w.get_current_job.return_value = None
+        w.queues = []
+        w.birth_date = None
+        w.successful_job_count = 0
+        w.failed_job_count = 0
+
+        mock_conn = MagicMock()
+        with patch.object(svc, "_check_rq_installed", return_value=True), \
+             patch.object(svc, "get_redis_client", return_value=mock_conn), \
+             patch("rq.Worker") as mock_worker_cls:
+            mock_worker_cls.all.return_value = [w]
+            result = svc.get_rq_worker_details()
+
+        assert result["workers"][0]["birth_date"] is None
+
 
 # ---------------------------------------------------------------------------
 # get_rq_queue_details

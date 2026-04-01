@@ -510,15 +510,6 @@ def api_performance_detail():
         "worker_pid": os.getpid(),
     }
 
-    # ---- Pareto materialization telemetry ----
-    pareto_materialization = None
-    try:
-        from mes_dashboard.services.reject_pareto_materialized import get_telemetry
-        pareto_materialization = get_telemetry()
-    except Exception as exc:
-        logger.warning("Failed to collect pareto materialization telemetry: %s", exc)
-        pareto_materialization = {"error": str(exc)}
-
     # ---- Worker memory guard telemetry ----
     worker_memory_guard = None
     try:
@@ -566,7 +557,6 @@ def api_performance_detail():
         "route_cache": route_cache,
         "db_pool": db_pool,
         "direct_connections": direct_connections,
-        "pareto_materialization": pareto_materialization,
         "worker_memory_guard": worker_memory_guard,
         "heavy_query_telemetry": heavy_query_telemetry,
         "async_workers": async_workers,
@@ -1114,7 +1104,7 @@ def api_worker_status():
         import psutil
         process = psutil.Process(os.getpid())
         worker_start_time = datetime.fromtimestamp(
-            process.create_time()
+            process.create_time(), tz=timezone.utc
         ).isoformat()
     except ImportError:
         # psutil not installed, try /proc on Linux

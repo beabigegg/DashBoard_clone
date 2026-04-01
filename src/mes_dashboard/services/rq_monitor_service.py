@@ -92,7 +92,8 @@ def get_rq_worker_details() -> dict:
         birth = None
         try:
             if w.birth_date:
-                birth = w.birth_date.isoformat() if hasattr(w.birth_date, "isoformat") else str(w.birth_date)
+                bd = w.birth_date.replace(tzinfo=timezone.utc)
+                birth = bd.isoformat() if hasattr(bd, "isoformat") else str(bd)
         except Exception:
             pass
 

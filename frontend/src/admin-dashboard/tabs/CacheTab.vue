@@ -62,32 +62,6 @@ const routeCacheMissRate = computed(() => {
   return value != null ? `${(value * 100).toFixed(1)}%` : '-';
 });
 
-const paretoHitRateDisplay = computed(() => {
-  const value = perfDetail.value?.pareto_materialization?.hit_rate;
-  return value != null ? `${(value * 100).toFixed(1)}%` : '-';
-});
-
-const paretoBuildLatencyDisplay = computed(() => {
-  const seconds = perfDetail.value?.pareto_materialization?.last_build_latency_s;
-  return seconds != null ? `${seconds.toFixed(2)}s` : '-';
-});
-
-const paretoPayloadDisplay = computed(() => {
-  const bytes = perfDetail.value?.pareto_materialization?.last_snapshot_payload_bytes;
-  if (bytes == null) return '-';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
-});
-
-const paretoFallbackReasons = computed(() => {
-  const reasons = perfDetail.value?.pareto_materialization?.fallback_reasons;
-  if (!reasons || typeof reasons !== 'object') return [];
-  return Object.entries(reasons)
-    .filter(([, count]) => count > 0)
-    .map(([reason, count]) => ({ reason, count }));
-});
-
 const redisTrendSeries = [
   { name: '記憶體 (MB)', key: 'redis_used_memory_mb', color: 'rgb(6, 182, 212)' },
 ];
@@ -177,31 +151,6 @@ onMounted(() => {
           <SummaryCard label="未命中率" :value="routeCacheMissRate" accent="warning" />
           <SummaryCard label="總讀取" :value="perfDetail.route_cache.reads_total" accent="info" />
         </SummaryCardGroup>
-      </div>
-    </SectionCard>
-
-    <SectionCard
-      v-if="perfDetail?.pareto_materialization && !perfDetail.pareto_materialization.error"
-    >
-      <template #header><h2 class="panel-title">Pareto 物化層</h2></template>
-      <SummaryCardGroup :columns="5">
-        <SummaryCard label="命中率" :value="paretoHitRateDisplay" accent="success" />
-        <SummaryCard label="命中次數" :value="perfDetail.pareto_materialization.hit" accent="success" />
-        <SummaryCard label="未命中次數" :value="perfDetail.pareto_materialization.miss" accent="warning" />
-        <SummaryCard label="建構次數" :value="perfDetail.pareto_materialization.build" accent="info" />
-        <SummaryCard label="建構成功" :value="perfDetail.pareto_materialization.build_ok" accent="success" />
-        <SummaryCard label="建構失敗" :value="perfDetail.pareto_materialization.build_fail" accent="danger" />
-        <SummaryCard label="Fallback 次數" :value="perfDetail.pareto_materialization.fallback" accent="warning" />
-        <SummaryCard label="超大拒絕" :value="perfDetail.pareto_materialization.rejected_oversize" accent="danger" />
-        <SummaryCard label="最近建構耗時" :value="paretoBuildLatencyDisplay" accent="neutral" />
-        <SummaryCard label="Snapshot 大小" :value="paretoPayloadDisplay" accent="neutral" />
-      </SummaryCardGroup>
-      <div class="pareto-fallback-reasons" v-if="paretoFallbackReasons.length">
-        <h3 class="sub-title">Fallback 原因分布</h3>
-        <DataTable :data="paretoFallbackReasons">
-          <DataTableColumn columnKey="reason" label="原因" />
-          <DataTableColumn columnKey="count" label="次數" align="right" />
-        </DataTable>
       </div>
     </SectionCard>
 

@@ -1,50 +1,9 @@
 /* Admin Performance Dashboard */
 
 .perf-dashboard {
-  max-width: 1280px;
+  max-width: 1800px;
   margin: 0 auto;
   padding: 0 theme('spacing.token.p16') theme('spacing.token.p32');
-}
-
-/* Header */
-.perf-header {
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
-  color: theme('colors.white');
-  padding: theme('spacing.shell') theme('spacing.panel');
-  border-radius: 0 0 12px 12px;
-  margin: 0 calc(-1 * theme('spacing.token.p16')) theme('spacing.shell');
-}
-
-.perf-header-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: theme('spacing.block');
-}
-
-.perf-title {
-  font-size: 1.4rem;
-  font-weight: 700;
-}
-
-.perf-header-actions {
-  display: flex;
-  align-items: center;
-  gap: theme('spacing.block');
-}
-
-.auto-refresh-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.auto-refresh-toggle input[type='checkbox'] {
-  accent-color: theme('colors.white');
 }
 
 /* Panel */

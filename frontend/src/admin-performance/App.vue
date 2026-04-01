@@ -1,21 +1,17 @@
 <template>
   <div class="perf-dashboard theme-admin-performance">
-    <!-- Header -->
-    <header class="perf-header">
-      <div class="perf-header-inner">
-        <h1 class="perf-title">效能監控儀表板</h1>
-        <div class="perf-header-actions">
-          <label class="auto-refresh-toggle">
-            <input type="checkbox" v-model="autoRefreshEnabled" @change="toggleAutoRefresh" />
-            自動更新 (30s)
-          </label>
-          <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="refreshAll" :disabled="loading">
-            <template v-if="loading">更新中...</template>
-            <template v-else>重新整理</template>
-          </button>
-        </div>
-      </div>
-    </header>
+    <PageHeader
+      title="效能監控儀表板"
+      :refreshing="loading"
+      @refresh="refreshAll"
+    >
+      <template #subtitle>
+        <label class="auto-refresh-toggle">
+          <input type="checkbox" v-model="autoRefreshEnabled" @change="toggleAutoRefresh" />
+          自動更新 (30s)
+        </label>
+      </template>
+    </PageHeader>
 
     <!-- Status Cards -->
     <section class="panel">
@@ -556,6 +552,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import { apiGet, apiPost } from '../core/api.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 
+import PageHeader from '../shared-ui/components/PageHeader.vue';
 import GaugeBar from './components/GaugeBar.vue';
 import StatCard from './components/StatCard.vue';
 import StatusDot from './components/StatusDot.vue';
