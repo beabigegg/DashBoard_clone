@@ -28,6 +28,7 @@
 | 數據表查詢工具 | `/tables` | ✅ 已完成 |
 | 設備維修查詢 | `/job-query` | ✅ 已完成 |
 | 批次追蹤工具 | `/query-tool` | ✅ 已完成 |
+| 生產歷史分析 | `/production-history` | ✅ 已完成 |
 
 ### 管理與基礎設施
 
@@ -36,10 +37,14 @@
 | Portal Shell no-iframe SPA 路由 | ✅ 已完成 |
 | Portal 動態抽屜導覽管理 | ✅ 已完成 |
 | 管理員認證系統（LDAP） | ✅ 已完成 |
+| 統一管理儀表板（`/admin-dashboard`） | ✅ 已完成 |
 | 效能監控儀表板（`/admin/performance`） | ✅ 已完成 |
+| 使用者用量 KPI 儀表板（`/admin-user-usage-kpi`） | ✅ 已完成 |
+| AI 智能查詢助手（Text2SQL / Function / Agent 模式） | ✅ 已完成 |
+| 異常偵測排程器（DuckDB 自動分析） | ✅ 已完成 |
 | Redis 多層快取系統 | ✅ 已完成 |
 | DuckDB 快取查詢引擎（後端 + 前端 WASM） | ✅ 已完成 |
-| RQ 非同步任務佇列（trace/reject worker） | ✅ 已完成 |
+| RQ 非同步任務佇列（trace/reject/production-history/yield-alert/msd worker） | ✅ 已完成 |
 | 熔斷器保護機制 | ✅ 已完成 |
 | Worker 記憶體防護（RSS guard + OOM 保護） | ✅ 已完成 |
 | Worker Watchdog 重啟控制 | ✅ 已完成 |
@@ -68,7 +73,8 @@
 | Pandas | 2.3 | 資料處理 |
 | PyArrow | 17.x+ | Parquet 序列化（Redis DataFrame 快取） |
 | DuckDB | 1.x | 快取查詢引擎（Parquet 支援的 reject/yield SQL runtime） |
-| RQ | 1.16+ | 非同步任務佇列（trace/reject heavy queries） |
+| RQ | 1.16+ | 非同步任務佇列（trace/reject/production-history/yield-alert/msd） |
+| Requests + PyYAML | — | LLM API 呼叫 + AI function registry |
 
 ### 前端技術棧
 
@@ -134,7 +140,7 @@ DashBoard_vite/
 │   │   ├── trace_routes.py         # 追溯非同步任務 API
 │   │   ├── admin_routes.py / auth_routes.py / health_routes.py
 │   │   └── dashboard_routes.py     # 儀表板 API
-│   ├── services/                   # 服務層（40 個模組）
+│   ├── services/                   # 服務層（45+ 模組）
 │   │   ├── wip_service.py          # WIP 業務邏輯
 │   │   ├── resource_service.py / resource_cache.py / resource_dataset_cache.py
 │   │   ├── resource_history_service.py / resource_history_sql_runtime.py
@@ -148,6 +154,8 @@ DashBoard_vite/
 │   │   ├── batch_query_engine.py   # 批次查詢引擎（Redis+Parquet 快取）
 │   │   ├── event_fetcher.py        # 非同步事件收集
 │   │   ├── async_query_job_service.py / trace_job_service.py  # RQ 任務管理
+│   │   ├── ai_query_service.py / ai_agent_loop.py  # AI 智能查詢（Text2SQL/Function/Agent）
+│   │   ├── anomaly_detection_scheduler.py  # 異常偵測排程
 │   │   ├── filter_cache.py         # 篩選選項快取
 │   │   ├── realtime_equipment_cache.py  # 即時設備狀態快取
 │   │   ├── page_registry.py / navigation_contract.py  # 頁面/導覽管理
@@ -177,7 +185,7 @@ DashBoard_vite/
 │   │   │   ├── field-contracts.js  # 欄位契約
 │   │   │   ├── shell-navigation.js # 導覽結構
 │   │   │   └── ...                 # 其他 helpers
-│   │   ├── shared-ui/              # 全站共用 UI 元件
+│   │   ├── shared-ui/              # 全站共用 UI 元件（AiChatPanel/DataTable/LoadingOverlay 等）
 │   │   ├── shared-composables/     # 共用 Vue composables
 │   │   ├── styles/                 # 全站 Tailwind CSS
 │   │   ├── portal-shell/           # Portal Shell SPA（主路由容器）
@@ -196,7 +204,10 @@ DashBoard_vite/
 │   │   ├── mid-section-defect/     # 中段不良追溯（Vue 3 SFC）
 │   │   ├── material-trace/         # 材料追溯（Vue 3 SFC）
 │   │   ├── tables/                 # 數據表查詢（Vue 3 SFC）
+│   │   ├── production-history/      # 生產歷史分析（Vue 3 SFC）
+│   │   ├── admin-dashboard/        # 統一管理儀表板（Vue 3 SFC）
 │   │   ├── admin-performance/      # 效能監控（Vue 3 SFC）
+│   │   ├── admin-user-usage-kpi/   # 使用者用量 KPI（Vue 3 SFC）
 │   │   ├── job-query/              # 設備維修查詢
 │   │   ├── query-tool/             # 批次追蹤工具
 │   │   ├── workers/                # Web Worker（DuckDB 等）
@@ -223,6 +234,7 @@ DashBoard_vite/
 │   ├── mes-dashboard.service       # Gunicorn 服務
 │   ├── mes-dashboard-trace-worker.service   # RQ trace worker 服務
 │   ├── mes-dashboard-reject-worker.service  # RQ reject worker 服務
+│   ├── mes-dashboard-msd-worker.service     # RQ MSD lineage worker 服務
 │   └── mes-dashboard-watchdog.service       # Watchdog 服務
 ├── tests/                          # 後端測試（pytest，127+ 檔案）
 ├── docs/                           # 技術文件
@@ -262,8 +274,8 @@ DashBoard_vite/
 
 ### 4. 非同步任務處理
 
-- **RQ task queue**：trace-events、reject-query 兩個 worker 佇列
-- **Event Fetcher**：批次容錯收集（可設定 partial failure 策略）
+- **RQ task queue**：五個專用 worker 佇列（trace-events、reject-query、production-history、yield-alert、msd-lineage）
+- **Event Fetcher**：批次容錯收集（可設定 partial failure 策略）+ streaming spool（無 row 上限）
 - **Batch Query Engine**：長時間查詢拆批 + Redis+Parquet 快取
 
 ### 5. Runtime 韌性
@@ -273,7 +285,23 @@ DashBoard_vite/
 - Worker Watchdog：cooldown + retry budget + churn window；超標進入 guarded mode 需 admin override
 - **Worker 記憶體防護**：RSS projection + graduated response（warn → restrict → force-recycle）
 
-### 6. 安全防護
+### 6. AI 智能查詢
+
+- **三種運作模式**：Text2SQL（自然語言 → SQL）、Function（工具呼叫 + function registry）、Agent（迭代式精煉）
+- **Schema 感知**：AI Schema Context 自動內省表格/欄位 + 相關性篩選
+- **業務語境**：AI Business Context 提供領域詞彙、範例查詢
+- **三輪澄清**：AI Query Understanding 意圖分類 + 追問管線
+- **前端整合**：`AiChatPanel` 共用元件，嵌入各報表頁面
+- **LLM 端點**：可配置 Ollama 或相容 API（`AI_API_URL`、`AI_MODEL`）
+- **頻率控制**：預設 3 請求/60 秒
+
+### 7. 異常偵測
+
+- **排程 daemon**：每日自動執行（可配置時段，預設 08:00）
+- **DuckDB 運算**：獨立命名空間（`anomaly_*_dataset`）避免與使用者查詢衝突
+- **Pre-seed**：排程器預產 spool Parquet 檔案，結果快取至 Redis 供所有 worker 共享
+
+### 8. 安全防護
 
 - Production `SECRET_KEY` 缺失時啟動失敗（fail-fast）
 - CSRF token 驗證（admin form + admin mutation API）
@@ -385,6 +413,8 @@ nano .env
 | Worker 策略 | `WORKER_RESTART_*`, `RESILIENCE_*` | Watchdog 重啟與韌性門檻 |
 | Rate Limit | `WIP_MATRIX_RATE_LIMIT_*`, `RESOURCE_*_RATE_LIMIT_*` | 高成本 API 頻率限制 |
 | 記憶體防護 | `PROCESS_CACHE_MAX_SIZE`, `WIP_PROCESS_CACHE_MAX_SIZE` | Process-level LRU 快取 |
+| AI 查詢 | `AI_API_URL`, `AI_MODEL`, `AI_MODE`, `AI_REQUEST_TIMEOUT` | LLM 端點與模式設定 |
+| 異常偵測 | `ANOMALY_DETECTION_HOUR` | 排程執行時段（預設 08:00） |
 
 ### 生產環境注意事項
 
@@ -410,7 +440,7 @@ sudo chmod 640 /opt/mes-dashboard/.env
 
 # 3. 啟用服務
 sudo systemctl daemon-reload
-sudo systemctl enable --now mes-dashboard mes-dashboard-trace-worker mes-dashboard-reject-worker mes-dashboard-watchdog
+sudo systemctl enable --now mes-dashboard mes-dashboard-trace-worker mes-dashboard-reject-worker mes-dashboard-msd-worker mes-dashboard-watchdog
 
 # 4. 驗證 runtime contract
 RUNTIME_CONTRACT_ENFORCE=true ./scripts/start_server.sh check
@@ -420,12 +450,12 @@ RUNTIME_CONTRACT_ENFORCE=true ./scripts/start_server.sh check
 
 ```bash
 ./scripts/start_server.sh stop
-sudo systemctl stop mes-dashboard mes-dashboard-trace-worker mes-dashboard-reject-worker mes-dashboard-watchdog
+sudo systemctl stop mes-dashboard mes-dashboard-trace-worker mes-dashboard-reject-worker mes-dashboard-msd-worker mes-dashboard-watchdog
 git checkout <previous-commit>
 pip install -r requirements.txt
 npm --prefix frontend install && npm --prefix frontend run build
 ./scripts/start_server.sh start
-sudo systemctl start mes-dashboard mes-dashboard-trace-worker mes-dashboard-reject-worker mes-dashboard-watchdog
+sudo systemctl start mes-dashboard mes-dashboard-trace-worker mes-dashboard-reject-worker mes-dashboard-msd-worker mes-dashboard-watchdog
 ```
 
 ---
@@ -438,7 +468,8 @@ sudo systemctl start mes-dashboard mes-dashboard-trace-worker mes-dashboard-reje
 - **即時報表**：WIP 即時概況、設備即時概況、QC-GATE 狀態
 - **歷史報表**：設備歷史績效、Hold 歷史績效、不良歷史分析、良率警示中心
 - **查詢工具**：設備維修查詢、Excel 查詢工具、批次追蹤工具、材料追溯
-- **開發工具**（admin only）：TMTT 不良分析、數據表查詢、頁面管理、效能監控
+- **分析工具**：生產歷史分析
+- **開發工具**（admin only）：TMTT 不良分析、數據表查詢、頁面管理、效能監控、使用者用量 KPI
 - 抽屜/頁面配置可由管理員動態管理（新增、重排、刪除）
 
 ### WIP 即時概況
@@ -473,7 +504,8 @@ sudo systemctl start mes-dashboard mes-dashboard-trace-worker mes-dashboard-reje
 
 ### 設備歷史績效
 
-- 9 張 KPI 卡片 + 4 個 vue-echarts 圖表（趨勢折線/堆疊柱狀/workcenter 對比/OU% 熱圖）
+- OEE KPI 整合（稼動率 × 效能率 × 良率）+ 9 張 KPI 卡片
+- 4 個 vue-echarts 圖表（趨勢折線/堆疊柱狀/workcenter 對比/OU% 熱圖）
 - 三層階層明細表（`HierarchyTable`），hours + percentage 格式
 - 日期區間 + 粒度切換（日/週/月/年）+ Group/Family/Machine 級聯多選
 - DuckDB-WASM 前端 view compute offload + CSV 串流匯出
@@ -512,6 +544,12 @@ sudo systemctl start mes-dashboard mes-dashboard-trace-worker mes-dashboard-reje
 - 6 張 KPI 卡片 + 6 張 Pareto 圖表 + 日趨勢 + LOT 明細分頁
 - 不良原因多選篩選（205 種，24h Redis 快取）
 
+### 生產歷史分析（Production History）
+
+- 歷史生產量矩陣（Workcenter × 日期）+ 明細表
+- 日期區間篩選 + RQ 非同步查詢（production-history worker）
+- DuckDB SQL runtime 處理大量歷史數據
+
 ### 數據表查詢工具
 
 - DWH 表格分類卡片目錄（即時/快照/歷史/輔助）+ 大表標記
@@ -522,12 +560,15 @@ sudo systemctl start mes-dashboard mes-dashboard-trace-worker mes-dashboard-reje
 
 - LDAP 認證登入（支援本地測試模式）
 - 頁面狀態管理（released/dev）+ 抽屜管理（CRUD + 排序）
-- 效能監控儀表板（`/admin/performance`）：
-  - 系統狀態總覽（Database/Redis/Circuit Breaker/Worker 狀態）
-  - 查詢效能指標（P50/P95/P99 延遲/慢查詢統計）
-  - 系統日誌檢視 + 日誌管理 + Worker 控制
-  - 多 Worker RSS 記憶體彙總監控
-  - 30 秒自動更新
+- 統一管理儀表板（`/admin-dashboard`）：
+  - Overview：系統狀態總覽（Database/Redis/Circuit Breaker/Worker）
+  - Cache：快取命中率、TTL、記憶體用量
+  - Logs：系統日誌檢視 + 日誌管理
+  - Worker：Worker 狀態控制 + RSS 記憶體監控
+  - Performance：查詢效能指標（P50/P95/P99 延遲/慢查詢統計）
+  - Usage：使用者登入/用量 KPI
+- 使用者用量 KPI 儀表板（`/admin-user-usage-kpi`）：
+  - DAU 趨勢、時段分布、部門統計、Top 使用者排行
 
 ---
 
@@ -614,5 +655,5 @@ lsof -i :8080
 
 ---
 
-**文檔版本**: 6.0
-**最後更新**: 2026-03-13
+**文檔版本**: 7.0
+**最後更新**: 2026-04-01
