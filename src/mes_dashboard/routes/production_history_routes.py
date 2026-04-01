@@ -100,6 +100,45 @@ def api_production_history_type_options():
         return internal_error("Type 選項查詢失敗")
 
 
+# ── GET /api/production-history/count ────────────────────────────────────────
+
+@production_history_bp.route("/api/production-history/count", methods=["GET"])
+def api_production_history_count():
+    """Row-count baseline for data integrity probes.
+
+    Returns COUNT(*) of grouped production records for the given date range,
+    running a single-pass query without chunking.  Used to detect truncation
+    in the chunk-merge pipeline.  pj_types is optional (all types if omitted).
+    """
+    if not _ENABLED:
+        return not_found_error("production_history_disabled")
+
+    start_date = (request.args.get("start_date") or "").strip()
+    end_date = (request.args.get("end_date") or "").strip()
+    if not start_date or not end_date:
+        return validation_error("缺少必要參數: start_date, end_date")
+
+    # Accept repeated ?pj_types=X&pj_types=Y OR single comma-separated value
+    pj_types_raw = request.args.getlist("pj_types")
+    if len(pj_types_raw) == 1 and "," in pj_types_raw[0]:
+        pj_types_raw = [t.strip() for t in pj_types_raw[0].split(",") if t.strip()]
+    pj_types = [t.strip() for t in pj_types_raw if t.strip()]
+
+    try:
+        from mes_dashboard.services.production_history_service import query_row_count
+        count = query_row_count(
+            start_date=start_date,
+            end_date=end_date,
+            pj_types=pj_types or None,
+        )
+        return success_response({"count": count})
+    except ValueError as exc:
+        return validation_error(str(exc))
+    except Exception:
+        logger.exception("production_history count query failed")
+        return internal_error("count query failed")
+
+
 # ── POST /api/production-history/query ───────────────────────────────────────
 
 @production_history_bp.route("/api/production-history/query", methods=["POST"])

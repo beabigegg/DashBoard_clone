@@ -1035,3 +1035,29 @@ def query_analytics(
         "raw_items": _derive_raw_items(df),
         "meta": meta,
     }
+
+
+def query_row_count(
+    *,
+    start_date: str,
+    end_date: str,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
+) -> int:
+    """Return COUNT(*) for the given date range using the same filters as query_list.
+
+    Used by the integrity-probe count endpoint to establish a DB baseline for
+    comparison against the batch-merge API pipeline result.
+    """
+    _validate_range(start_date, end_date)
+    where_clause, params, _ = _build_where_clause(
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    sql = _prepare_sql("count", where_clause=where_clause, base_variant="lot")
+    df = read_sql_df(sql, _common_params(start_date, end_date, params))
+    if df is not None and not df.empty:
+        return _as_int(df.iloc[0].get("ROW_COUNT"))
+    return 0

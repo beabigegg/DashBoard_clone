@@ -42,6 +42,7 @@ from mes_dashboard.services.reject_history_service import (
     get_filter_options,
     query_analytics,
     query_list,
+    query_row_count,
     query_dimension_pareto,
     query_reason_pareto,
     query_summary,
@@ -737,6 +738,25 @@ def api_reject_history_query():
         import traceback
         traceback.print_exc()
         return internal_error("主查詢執行失敗")
+
+
+@reject_history_bp.route("/api/reject-history/count", methods=["GET"])
+def api_reject_history_count():
+    """Row-count baseline for data integrity probes.
+
+    Returns COUNT(*) for the given date range using the same default filters
+    as the primary list query.  Intended for stress/integrity test use only.
+    """
+    start_date, end_date, err = _parse_date_range()
+    if err:
+        return err
+    try:
+        count = query_row_count(start_date=start_date, end_date=end_date)
+        return success_response({"count": count})
+    except ValueError as exc:
+        return validation_error(str(exc))
+    except Exception:
+        return internal_error("count query failed")
 
 
 @reject_history_bp.route("/api/reject-history/job/<job_id>", methods=["GET"])

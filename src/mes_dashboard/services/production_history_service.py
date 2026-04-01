@@ -527,10 +527,51 @@ def _run_oracle_to_spool(params: Dict[str, Any], dataset_id: str) -> Dict[str, A
 def make_canonical_spool_id(params: Dict[str, Any]) -> str:
     """Return the canonical on-demand spool id for a production-history query.
 
-    Delegates to the internal ``_make_dataset_id`` which already includes
-    pj_types, date range, and all user-supplied filter params.
+    Normalises raw request params through ``validate_query_params`` so that
+    optional list fields (lot_ids, work_orders, …) are always present before
+    ``_make_dataset_id`` accesses them via direct subscript.
 
     This function is the stable public entry point for external callers
     (routes, tests) that need to look up or reuse an existing spool.
     """
-    return _make_dataset_id(params)
+    return _make_dataset_id(validate_query_params(params))
+
+
+def query_row_count(
+    *,
+    start_date: str,
+    end_date: str,
+    pj_types: Optional[List[str]] = None,
+) -> int:
+    """Return COUNT(*) of grouped production records for the given date range.
+
+    Runs a single-pass query over the full date range (no chunking) using the
+    same GROUP BY as main_query.sql.  Used by the integrity-probe count endpoint
+    to detect truncation in the chunk-merge pipeline.
+
+    If pj_types is None or empty, counts all product types.
+    """
+    start_dt = _parse_date(start_date)
+    end_dt = _parse_date(end_date)
+    end_date_excl = (end_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    normalized_pj_types = [str(t).strip() for t in (pj_types or []) if str(t).strip()]
+    extra_params: Dict[str, Any] = {}
+    extra_sql = ""
+    if normalized_pj_types:
+        qb = QueryBuilder()
+        qb.add_in_condition("c.PJ_TYPE", normalized_pj_types)
+        extra_clause = qb.get_conditions_sql()
+        _, extra_bind = qb.build_where_only()
+        if extra_clause:
+            extra_sql = f"AND {extra_clause}"
+            extra_params.update(extra_bind)
+
+    sql = SQLLoader.load("production_history/count_query").replace("{{ EXTRA_FILTERS }}", extra_sql)
+    bind_params: Dict[str, Any] = {"start_date": start_date, "end_date_excl": end_date_excl}
+    bind_params.update(extra_params)
+
+    df = read_sql_df_slow(sql, params=bind_params, caller="production_history.count")
+    if df is not None and not df.empty:
+        return int(df.iloc[0].get("ROW_COUNT") or 0)
+    return 0

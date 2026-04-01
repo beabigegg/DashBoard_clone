@@ -35,9 +35,10 @@ class AsyncJobResult:
     status: str  # "sync_hit" | "completed" | "failed" | "timeout"
     elapsed: float
     poll_count: int
-    data: Optional[Any] = None  # Parsed response body on success
+    data: Optional[Any] = None       # Parsed response["data"] on success
     error: Optional[str] = None
     http_status: Optional[int] = None
+    full_body: Optional[dict] = None  # Full parsed JSON response (includes "meta")
 
 
 class AsyncJobPoller:
@@ -66,6 +67,7 @@ class AsyncJobPoller:
         path: str,
         payload: Optional[Any] = None,
         params: Optional[dict] = None,
+        refetch_on_complete: bool = False,
     ) -> AsyncJobResult:
         """Submit a query and wait for the result.
 
@@ -111,6 +113,7 @@ class AsyncJobPoller:
                 poll_count=0,
                 data=(body.get("data") if isinstance(body, dict) else body),
                 http_status=200,
+                full_body=body if isinstance(body, dict) else None,
             )
 
         # Async accepted
@@ -129,7 +132,13 @@ class AsyncJobPoller:
                 # Derive status URL from path convention
                 status_url = f"{self._base_url}{path}/status/{job_id}"
 
-            return self._poll(job_id, status_url, start)
+            result = self._poll(job_id, status_url, start)
+
+            # Re-fetch the actual result from the original endpoint (now a cache hit)
+            if refetch_on_complete and result.status == "completed":
+                result = self._refetch(result, method, path, payload, params, start)
+
+            return result
 
         # Unexpected status
         return AsyncJobResult(
@@ -139,6 +148,46 @@ class AsyncJobPoller:
             poll_count=0,
             error=f"HTTP {resp.status_code}",
             http_status=resp.status_code,
+        )
+
+    def _refetch(
+        self,
+        prev: "AsyncJobResult",
+        method: str,
+        path: str,
+        payload: Optional[Any],
+        params: Optional[dict],
+        start: float,
+    ) -> "AsyncJobResult":
+        """Re-call the original endpoint after job completion to get the cached result."""
+        url = f"{self._base_url}{path}"
+        try:
+            if method.upper() == "POST":
+                resp = requests.post(url, json=payload, params=params, timeout=_TIMEOUT)
+            else:
+                resp = requests.get(url, params=params or payload, timeout=_TIMEOUT)
+        except Exception as exc:
+            # Re-fetch failed; return original result with error note
+            prev.error = f"refetch failed: {exc}"
+            return prev
+
+        if resp.status_code != 200:
+            prev.error = f"refetch returned HTTP {resp.status_code}"
+            return prev
+
+        try:
+            body = resp.json()
+        except Exception:
+            return prev
+
+        return AsyncJobResult(
+            job_id=prev.job_id,
+            status="completed",
+            elapsed=time.time() - start,
+            poll_count=prev.poll_count,
+            data=body.get("data") if isinstance(body, dict) else body,
+            http_status=200,
+            full_body=body if isinstance(body, dict) else None,
         )
 
     def _poll(self, job_id: Optional[str], status_url: Optional[str], start: float) -> AsyncJobResult:

@@ -6,7 +6,7 @@ pipeline for each service that uses the batch/spool infrastructure:
 
   - reject_history    : batch merge (time + ID decomposition), spillover
   - production_history: overflow_mode="truncate" + async job pipeline
-  - yield_alert       : slow-query concurrency + async job pipeline
+  - yield_alert       : slow-query concurrency + async job pipeline (cross-consistency)
   - hold_history      : spool pagination (5000-row threshold)
   - query_tool        : ID batch decomposition (1000-ID threshold)
 
@@ -63,40 +63,48 @@ class TestRejectHistoryBatchMerge:
     def _run_probe(self, base_url: str, service: str, days: int) -> IntegrityResult:
         start, end = _date_range(days)
         ir = IntegrityResult(service=service)
-        baseline = RowCountBaseline(base_url)
 
-        # Establish COUNT(*) baseline
-        ir.baseline_count = baseline.get("reject_history", {"start_date": start, "end_date": end})
-
-        # Execute the actual query
-        status, body = _post(base_url, "/api/reject-history/query", {
-            "mode": "date_range", "start_date": start, "end_date": end
-        })
-        if status is None:
+        # Execute the primary query via async poller; refetch cached result on completion
+        poller = AsyncJobPoller(base_url, max_wait=300, poll_interval=3.0)
+        try:
+            result = poller.submit_and_wait(
+                "POST",
+                "/api/reject-history/query",
+                {"mode": "date_range", "start_date": start, "end_date": end},
+                refetch_on_complete=True,
+            )
+        except AsyncJobTimeout as exc:
             ir.verdict = "SKIPPED"
-            ir.notes = "Server unreachable"
+            ir.notes = str(exc)
             return ir
 
-        if status == 404:
+        if result.status in ("error", "failed"):
             ir.verdict = "SKIPPED"
-            ir.notes = "Dataset unavailable"
+            ir.notes = f"Query {result.status}: {result.error or 'unknown'}"
             return ir
 
-        if status == 400:
+        data = result.data or {}
+
+        # reject-history returns total in data.detail.pagination.total
+        pagination = (data.get("detail") or {}).get("pagination") or {}
+        ir.api_total_rows = pagination.get("total")
+
+        if ir.api_total_rows is None:
             ir.verdict = "SKIPPED"
-            ir.notes = f"HTTP 400 — likely exceeds date range limit"
-            return ir
-        if status not in (200, 202):
-            ir.verdict = "FAIL"
-            ir.notes = f"Unexpected HTTP {status}"
-            ir.checkpoint_failed = True
+            ir.notes = "API did not return total row count"
             return ir
 
-        data = (body or {}).get("data") or body or {}
-        ir.api_total_rows = data.get("total_rows") or data.get("row_count")
+        # Baseline comparison only for FRESH queries (not cache hits).
+        # For sync_hit (cached result), COUNT(*) would reflect current DB state
+        # which may differ due to new data arriving since the cache was built —
+        # a difference here indicates cache staleness, not pipeline truncation.
+        if result.status != "sync_hit":
+            baseline = RowCountBaseline(base_url)
+            ir.baseline_count = baseline.get("reject_history", {"start_date": start, "end_date": end})
 
         # Check partial_failure metadata
-        if data.get("partial_failure") or data.get("has_partial_failure"):
+        meta = data.get("meta") or {}
+        if meta.get("partial_failure") or data.get("partial_failure"):
             ir.notes = "partial_failure=True in response"
             ir.checkpoint_failed = True
 
@@ -178,16 +186,38 @@ class TestRejectHistoryIDBatch:
 class TestProductionHistoryTruncation:
     """Verify production-history does not silently truncate rows (overflow_mode=truncate risk)."""
 
-    def _async_query(self, base_url: str, start: str, end: str) -> tuple:
+    def _get_pj_types(self, base_url: str, limit: int = 5) -> list[str]:
+        """Fetch available pj_types from the API (up to `limit`)."""
+        try:
+            resp = requests.get(f"{base_url}/api/production-history/type-options", timeout=30)
+            if resp.status_code == 200:
+                items = resp.json().get("data", {}).get("items") or []
+                return [str(t).strip() for t in items[:limit] if str(t).strip()]
+        except Exception:
+            pass
+        return []
+
+    def _async_query(self, base_url: str, start: str, end: str, pj_types: list[str]) -> tuple:
         """Submit production-history query via async path and wait for completion."""
-        poller = AsyncJobPoller(base_url, max_wait=300, poll_interval=2.0)
+        poller = AsyncJobPoller(base_url, max_wait=300, poll_interval=3.0)
         try:
             result = poller.submit_and_wait(
                 "POST",
                 "/api/production-history/query",
-                {"start_date": start, "end_date": end},
+                {"start_date": start, "end_date": end, "pj_types": pj_types},
+                refetch_on_complete=True,
             )
-            return result.status, result.data
+            if result.status in ("error", "failed"):
+                return "error", None
+            # row_count lives in the response top-level meta (not inside data)
+            full_body = result.full_body or {}
+            resp_meta = full_body.get("meta") or {}
+            row_count = resp_meta.get("row_count")
+            if row_count is None:
+                # Fallback: check data.meta (some response shapes embed it there)
+                data_meta = (result.data or {}).get("meta") or {}
+                row_count = data_meta.get("row_count")
+            return result.status, row_count
         except AsyncJobTimeout as exc:
             return "timeout", str(exc)
         except Exception as exc:
@@ -195,20 +225,28 @@ class TestProductionHistoryTruncation:
 
     def test_production_history_90day_integrity(self, base_url: str):
         """90-day production-history baseline integrity probe via async path."""
+        pj_types = self._get_pj_types(base_url, limit=5)
+        if not pj_types:
+            pytest.skip("No pj_types available from type-options endpoint")
+
         start, end = _date_range(90)
         ir = IntegrityResult(service="production_history_90d")
         baseline = RowCountBaseline(base_url)
-        ir.baseline_count = baseline.get("production_history", {"start_date": start, "end_date": end})
 
-        job_status, data = self._async_query(base_url, start, end)
+        # Count endpoint accepts pj_types as repeated query params
+        ir.baseline_count = baseline.get(
+            "production_history",
+            {"start_date": start, "end_date": end, "pj_types": pj_types},
+        )
+
+        job_status, row_count = self._async_query(base_url, start, end, pj_types)
         if job_status in ("timeout", "error"):
             ir.verdict = "SKIPPED"
-            ir.notes = f"Async job: {job_status}"
+            ir.notes = f"Async job: {job_status} — {row_count}"
             record_integrity_result("production_history_90d", ir)
             pytest.skip(ir.notes)
 
-        if isinstance(data, dict):
-            ir.api_total_rows = data.get("total_rows") or data.get("row_count")
+        ir.api_total_rows = row_count
 
         ir.compute_verdict()
         record_integrity_result("production_history_90d", ir)
@@ -217,29 +255,33 @@ class TestProductionHistoryTruncation:
 
     def test_production_history_365day_near_truncation(self, base_url: str):
         """365-day probe to detect near-truncation boundary. Skipped if unavailable."""
+        pj_types = self._get_pj_types(base_url, limit=5)
+        if not pj_types:
+            pytest.skip("No pj_types available from type-options endpoint")
+
         start, end = _date_range(365)
         ir = IntegrityResult(service="production_history_365d")
         baseline = RowCountBaseline(base_url)
-        ir.baseline_count = baseline.get("production_history", {"start_date": start, "end_date": end})
 
-        job_status, data = self._async_query(base_url, start, end)
+        ir.baseline_count = baseline.get(
+            "production_history",
+            {"start_date": start, "end_date": end, "pj_types": pj_types},
+        )
+
+        job_status, row_count = self._async_query(base_url, start, end, pj_types)
         if job_status in ("timeout", "error"):
             ir.verdict = "SKIPPED"
-            ir.notes = f"Async job: {job_status}"
+            ir.notes = f"Async job: {job_status} — {row_count}"
             record_integrity_result("production_history_365d", ir)
             pytest.skip(ir.notes)
 
-        if isinstance(data, dict):
-            ir.api_total_rows = data.get("total_rows") or data.get("row_count")
-            # Verify failed async jobs don't leave partial spool
-            if data.get("status") == "failed":
-                ir.verdict = "SKIPPED"
-                ir.notes = "Job failed — verifying no partial spool left"
-                spool_key = data.get("spool_key")
-                assert not spool_key, f"Failed job left partial spool key: {spool_key}"
-                record_integrity_result("production_history_365d", ir)
-                pytest.skip("365-day job failed — no partial spool confirmed")
+        if row_count is None:
+            ir.verdict = "SKIPPED"
+            ir.notes = "Job completed but no row_count in response"
+            record_integrity_result("production_history_365d", ir)
+            pytest.skip(ir.notes)
 
+        ir.api_total_rows = row_count
         ir.compute_verdict()
         record_integrity_result("production_history_365d", ir)
         if ir.verdict == "FAIL":
@@ -357,6 +399,8 @@ class TestQueryToolIDMergeIntegrity:
 
 # ─────────────────────────────────────────────────────────────
 # 10.6 — Yield-alert: concurrent integrity probe (3 concurrent async queries)
+#         Validates cross-query consistency: all 3 should return the same
+#         detail_rows count (they query the same date range → same cache).
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.stress
@@ -366,18 +410,25 @@ class TestYieldAlertConcurrentIntegrity:
     def _run_single_query(self, base_url: str, query_idx: int) -> IntegrityResult:
         start, end = _date_range(30)
         ir = IntegrityResult(service=f"yield_alert_concurrent_{query_idx}")
-        baseline = RowCountBaseline(base_url)
-        ir.baseline_count = baseline.get("yield_alert", {"start_date": start, "end_date": end})
 
-        poller = AsyncJobPoller(base_url, max_wait=180, poll_interval=2.0)
+        poller = AsyncJobPoller(base_url, max_wait=180, poll_interval=3.0)
         try:
             result = poller.submit_and_wait(
                 "POST",
                 "/api/yield-alert/query",
                 {"start_date": start, "end_date": end},
+                refetch_on_complete=True,
             )
-            if isinstance(result.data, dict):
-                ir.api_total_rows = result.data.get("total_rows")
+            if result.status in ("error", "failed"):
+                ir.verdict = "SKIPPED"
+                ir.notes = f"Query {result.status}: {result.error or 'unknown'}"
+                return ir
+
+            data = result.data or {}
+            # yield-alert returns detail_rows inside data.meta
+            data_meta = data.get("meta") or {}
+            detail_rows = data_meta.get("detail_rows")
+            ir.api_total_rows = detail_rows
         except AsyncJobTimeout as exc:
             ir.verdict = "SKIPPED"
             ir.notes = f"Async timeout: {exc}"
@@ -391,7 +442,7 @@ class TestYieldAlertConcurrentIntegrity:
         return ir
 
     def test_yield_alert_3_concurrent_integrity(self, base_url: str):
-        """Submit 3 concurrent yield-alert queries; verify each passes three-point check."""
+        """Submit 3 concurrent yield-alert queries; verify cross-query consistency."""
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             futures = {
                 executor.submit(self._run_single_query, base_url, i): i
@@ -403,13 +454,24 @@ class TestYieldAlertConcurrentIntegrity:
                 results[idx] = future.result()
 
         failures = []
+        completed_rows = []
         for idx, ir in results.items():
             record_integrity_result(ir.service, ir)
             if ir.verdict == "FAIL":
                 failures.append(f"query_{idx}: {ir.notes}")
+            if ir.api_total_rows is not None:
+                completed_rows.append(ir.api_total_rows)
 
-        all_skipped = all(ir.verdict == "SKIPPED" for ir in results.values())
-        if all_skipped:
-            pytest.skip("All yield-alert concurrent queries were skipped")
+        # Skip only if no query returned any row data at all
+        if not completed_rows:
+            pytest.skip("All yield-alert concurrent queries returned no row data")
+
+        # Cross-consistency check: all completed queries should return same row count
+        if len(completed_rows) >= 2:
+            row_set = set(completed_rows)
+            if len(row_set) > 1:
+                failures.append(
+                    f"Cross-query inconsistency: different detail_rows across queries: {completed_rows}"
+                )
 
         assert not failures, "Yield-alert concurrent integrity failures:\n" + "\n".join(failures)

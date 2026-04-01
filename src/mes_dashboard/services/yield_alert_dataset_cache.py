@@ -29,6 +29,7 @@ from mes_dashboard.core.interactive_memory_guard import maybe_gc_collect
 from mes_dashboard.core.query_spool_store import (
     QUERY_SPOOL_DIR,
     get_spool_file_path,
+    get_spool_metadata,
     register_spool_file,
     store_spooled_df,
 )
@@ -465,13 +466,18 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
     if cached is not None:
         logger.info("Yield alert dataset cache hit: query_id=%s", query_id)
         linkage_ready = cached.get("linkage_df") is not None and not cached["linkage_df"].empty
+        spool_meta = get_spool_metadata(_SPOOL_NAMESPACE, query_id) or {}
+        detail_rows = spool_meta.get("row_count")
+        cache_hit_meta: dict = {
+            "cache_hit": True,
+            "max_query_days": MAX_QUERY_DAYS,
+            "linkage_ready": linkage_ready,
+        }
+        if detail_rows is not None:
+            cache_hit_meta["detail_rows"] = int(detail_rows)
         return {
             "query_id": query_id,
-            "meta": {
-                "cache_hit": True,
-                "max_query_days": MAX_QUERY_DAYS,
-                "linkage_ready": linkage_ready,
-            },
+            "meta": cache_hit_meta,
         }
 
     logger.info("Yield alert dataset cache miss: query_id=%s", query_id)
