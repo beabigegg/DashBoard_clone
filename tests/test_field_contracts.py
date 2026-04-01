@@ -97,7 +97,7 @@ def test_resource_history_export_uses_contract_headers(
         'WC-A': {'group': '站點-A', 'sequence': 1}
     }
 
-    mock_read_sql.return_value = pd.DataFrame([
+    main_df = pd.DataFrame([
         {
             'HISTORYID': 'RES-A',
             'PRD_HOURS': 10,
@@ -109,6 +109,8 @@ def test_resource_history_export_uses_contract_headers(
             'TOTAL_HOURS': 16,
         }
     ])
+    # export_resource_history_csv calls read_sql_df twice: main query + OEE facts
+    mock_read_sql.side_effect = [main_df, pd.DataFrame()]
 
     with patch('mes_dashboard.services.resource_history_service._get_filtered_resources', return_value=[
         {

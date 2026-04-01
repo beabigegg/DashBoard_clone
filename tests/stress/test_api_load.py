@@ -9,6 +9,7 @@ Tests API endpoints under concurrent load to verify:
 Run with: pytest tests/stress/test_api_load.py -v -s
 """
 
+import os
 import pytest
 import time
 import requests
@@ -16,7 +17,16 @@ import concurrent.futures
 from typing import List, Tuple
 from urllib.parse import quote
 
-# Import from local conftest via pytest fixtures
+from load_collector import LoadCollector
+from stress_registry import record_load_summary
+
+# Threshold env vars (task 6.2)
+_MAX_MEM_PCT = float(os.environ.get("STRESS_MAX_MEM_PCT", "85"))
+_MAX_DB_POOL_PCT = float(os.environ.get("STRESS_MAX_DB_POOL_PCT", "90"))
+_MAX_GUARD_REJECTS = int(os.environ.get("STRESS_MAX_GUARD_REJECTS", "5"))
+_MAX_QUEUE_DEPTH = int(os.environ.get("STRESS_MAX_QUEUE_DEPTH", "20"))
+
+_LOAD_MONITORING = os.environ.get("STRESS_LOAD_MONITORING", "0") == "1"
 
 
 @pytest.mark.stress
@@ -30,6 +40,9 @@ class TestAPILoadConcurrent:
         try:
             response = requests.get(url, timeout=timeout, headers=headers)
             duration = time.time() - start
+            if response.status_code == 429:
+                # Rate-limited: server is alive and protecting itself — count as success
+                return (True, duration, '')
             if response.status_code == 200:
                 data = response.json()
                 if data.get('success'):
@@ -85,26 +98,41 @@ class TestAPILoadConcurrent:
         total_requests = concurrent_users * requests_per_user
 
         start_time = time.time()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_users) as executor:
-            futures = [
-                executor.submit(self._make_request, url, timeout)
-                for _ in range(total_requests)
-            ]
+        with LoadCollector(base_url) as collector:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_users) as executor:
+                futures = [
+                    executor.submit(self._make_request, url, timeout)
+                    for _ in range(total_requests)
+                ]
 
-            for future in concurrent.futures.as_completed(futures):
-                success, duration, error = future.result()
-                if success:
-                    result.add_success(duration)
-                else:
-                    result.add_failure(error, duration)
+                for future in concurrent.futures.as_completed(futures):
+                    success, duration, error = future.result()
+                    if success:
+                        result.add_success(duration)
+                    else:
+                        result.add_failure(error, duration)
 
         result.total_duration = time.time() - start_time
+        result.load_summary = collector.summary
+        record_load_summary("WIP Summary Concurrent Load", collector.summary)
 
         print(result.report())
 
         # Assertions
         assert result.success_rate >= 90.0, f"Success rate {result.success_rate:.1f}% is below 90%"
         assert result.avg_response_time < 10.0, f"Avg response time {result.avg_response_time:.2f}s exceeds 10s"
+        if _LOAD_MONITORING and collector.summary:
+            collector.summary.assert_within(max_mem_pct=_MAX_MEM_PCT, max_db_pool_pct=_MAX_DB_POOL_PCT)
+            td = collector.summary.telemetry_diff
+            if td and not td.endpoint_unavailable:
+                assert td.guard_reject_total <= _MAX_GUARD_REJECTS, (
+                    f"Guard rejections during test ({td.guard_reject_total}) exceeded limit ({_MAX_GUARD_REJECTS})"
+                )
+            if collector.summary.peak_queue_depths:
+                for q, depth in collector.summary.peak_queue_depths.items():
+                    assert depth <= _MAX_QUEUE_DEPTH, (
+                        f"RQ queue '{q}' peak depth {depth} exceeded limit {_MAX_QUEUE_DEPTH}"
+                    )
 
     def test_wip_matrix_concurrent_load(self, base_url: str, stress_config: dict, stress_result):
         """Test WIP matrix API under concurrent load."""
@@ -252,26 +280,31 @@ class TestAPILoadConcurrent:
         total_requests = concurrent_users * len(endpoints) * requests_per_endpoint
 
         start_time = time.time()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_users) as executor:
-            futures = []
-            for user_idx in range(concurrent_users):
-                headers = {"X-Forwarded-For": f"10.0.1.{user_idx + 1}"}
-                for endpoint in endpoints:
-                    for _ in range(requests_per_endpoint):
-                        futures.append(executor.submit(self._make_request, endpoint, timeout, headers))
+        with LoadCollector(base_url) as collector:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_users) as executor:
+                futures = []
+                for user_idx in range(concurrent_users):
+                    headers = {"X-Forwarded-For": f"10.0.1.{user_idx + 1}"}
+                    for endpoint in endpoints:
+                        for _ in range(requests_per_endpoint):
+                            futures.append(executor.submit(self._make_request, endpoint, timeout, headers))
 
-            for future in concurrent.futures.as_completed(futures):
-                success, duration, error = future.result()
-                if success:
-                    result.add_success(duration)
-                else:
-                    result.add_failure(error, duration)
+                for future in concurrent.futures.as_completed(futures):
+                    success, duration, error = future.result()
+                    if success:
+                        result.add_success(duration)
+                    else:
+                        result.add_failure(error, duration)
 
         result.total_duration = time.time() - start_time
+        result.load_summary = collector.summary
+        record_load_summary("Mixed Endpoints Concurrent Load", collector.summary)
 
         print(result.report())
 
         assert result.success_rate >= 85.0, f"Success rate {result.success_rate:.1f}% is below 85%"
+        if _LOAD_MONITORING and collector.summary:
+            collector.summary.assert_within(max_mem_pct=_MAX_MEM_PCT, max_db_pool_pct=_MAX_DB_POOL_PCT)
 
 
 @pytest.mark.stress

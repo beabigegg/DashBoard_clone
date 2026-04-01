@@ -116,8 +116,8 @@ class TestEquipmentCaching:
     """10.4/10.5 — equipment query caching via Redis."""
 
     def test_equipment_status_cache_hit(self, monkeypatch):
-        """Redis cache hit → returns cached result without Oracle query."""
-        import mes_dashboard.core.redis_df_store as rds
+        """Spool cache hit → returns cached result without Oracle query."""
+        import mes_dashboard.core.query_spool_store as spool_store
 
         calls = {"sql": 0}
 
@@ -132,7 +132,7 @@ class TestEquipmentCaching:
             "TOTAL_HOURS": [68.0],
         })
 
-        monkeypatch.setattr(rds, "redis_load_df", lambda key: cached_df)
+        monkeypatch.setattr(spool_store, "load_spooled_df", lambda ns, key: cached_df)
 
         def fail_sql(*args, **kwargs):
             calls["sql"] += 1

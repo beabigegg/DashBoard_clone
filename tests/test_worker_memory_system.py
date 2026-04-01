@@ -289,6 +289,13 @@ def _make_import_raiser(blocked_module: str):
 # ---------------------------------------------------------------------------
 
 class TestSystemMemoryTelemetryFields:
+    def setup_method(self, method):
+        from mes_dashboard.core.worker_memory_guard import _telemetry
+        _telemetry.system_mem_total_mb = 0.0
+        _telemetry.system_mem_available_mb = 0.0
+        _telemetry.system_mem_used_pct = 0.0
+        _telemetry.system_memory_pressure = False
+
     def test_to_dict_includes_system_memory_fields(self):
         """_telemetry.to_dict() should include system_memory_pressure and the two MB/pct fields."""
         from mes_dashboard.core.worker_memory_guard import _telemetry

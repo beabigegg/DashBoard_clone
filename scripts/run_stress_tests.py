@@ -34,6 +34,10 @@ def run_backend_tests(url: str, config: dict) -> dict:
     env['STRESS_CONCURRENT_USERS'] = str(config.get('concurrent_users', 10))
     env['STRESS_REQUESTS_PER_USER'] = str(config.get('requests_per_user', 20))
     env['STRESS_TIMEOUT'] = str(config.get('timeout', 30))
+    if config.get('load_monitoring'):
+        env['STRESS_LOAD_MONITORING'] = '1'
+    else:
+        env.pop('STRESS_LOAD_MONITORING', None)
 
     print("\n" + "=" * 60)
     print("Running Backend API Load Tests")
@@ -135,6 +139,7 @@ def main():
     parser.add_argument('--frontend-only', action='store_true', help='Run only frontend tests')
     parser.add_argument('--quick', action='store_true', help='Quick test with minimal load')
     parser.add_argument('--heavy', action='store_true', help='Heavy load test')
+    parser.add_argument('--load-monitor', action='store_true', help='Enable system load monitoring')
     parser.add_argument('--url', default='http://127.0.0.1:5000', help='Target URL')
     parser.add_argument('--report', help='Save report to file')
 
@@ -145,20 +150,27 @@ def main():
         config = {
             'concurrent_users': 3,
             'requests_per_user': 5,
-            'timeout': 30
+            'timeout': 30,
+            'load_monitoring': False,
         }
     elif args.heavy:
         config = {
             'concurrent_users': 50,
             'requests_per_user': 50,
-            'timeout': 60
+            'timeout': 60,
+            'load_monitoring': True,
         }
     else:
         config = {
             'concurrent_users': 10,
             'requests_per_user': 20,
-            'timeout': 30
+            'timeout': 30,
+            'load_monitoring': args.load_monitor,
         }
+
+    # --load-monitor flag overrides --heavy's default on/off
+    if args.load_monitor and not config.get('load_monitoring'):
+        config['load_monitoring'] = True
 
     print("\n" + "=" * 60)
     print("MES Dashboard Stress Test Suite")

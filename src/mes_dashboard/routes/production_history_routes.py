@@ -183,6 +183,17 @@ def api_production_history_query():
             meta={"retry_after_seconds": 60, "error_code": "memory_guard_rejected"},
             headers={"Retry-After": "60"},
         )
+    except RuntimeError as exc:
+        if "heavy_query_overloaded" in str(exc):
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "查詢伺服器負載過高，請稍後再試",
+                status_code=503,
+                meta={"retry_after_seconds": 30, "error_code": "heavy_query_overloaded"},
+                headers={"Retry-After": "30"},
+            )
+        logger.exception("production_history primary query failed")
+        return internal_error("生產歷程查詢失敗")
     except ValueError as exc:
         return error_response(VALIDATION_ERROR, str(exc), status_code=400)
     except Exception:

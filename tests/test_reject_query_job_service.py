@@ -175,96 +175,81 @@ class TestEnqueueRejectQuery:
 class TestExecuteRejectQueryJob:
     """Tests for the RQ worker entry-point function."""
 
-    def _make_mock_cache_module(self, cached_df=None):
-        """Return a MagicMock for reject_dataset_cache with the given cached_df."""
+    def _make_mock_cache_module(self, cache_hit=False):
+        """Return a MagicMock for reject_dataset_cache."""
         mock_cache = MagicMock()
         mock_cache._CACHE_SCHEMA_VERSION = "v5"
-        mock_cache._get_cached_df.return_value = cached_df
+        mock_cache._has_cached_df.return_value = cache_hit
         mock_cache._make_query_id.return_value = "qry-test-id-001"
-        mock_cache._execute_and_spool.return_value = {"has_partial_failure": False}
-        mock_cache._build_primary_response.return_value = {}
+        mock_cache.execute_primary_query.return_value = None
         mock_cache.RejectPrimaryQueryOverloadError = Exception
         return mock_cache
 
     def test_cache_hit_skips_oracle_and_calls_complete_job(self):
         """When cache already has data, skip Oracle and call complete_job immediately."""
-        import pandas as pd
-        cached_df = pd.DataFrame({"col": [1, 2, 3]})
-        mock_cache = self._make_mock_cache_module(cached_df=cached_df)
+        mock_cache = self._make_mock_cache_module(cache_hit=True)
         mock_qb = MagicMock()
 
         mock_complete_job = MagicMock()
         mock_update_progress = MagicMock()
-        mock_acquire = MagicMock(return_value=True)
-        mock_release = MagicMock()
 
         with patch.dict("sys.modules", {
             "mes_dashboard.services.reject_dataset_cache": mock_cache,
             "mes_dashboard.sql": mock_qb,
         }), \
         patch.object(rjs, "complete_job", mock_complete_job), \
-        patch.object(rjs, "update_job_progress", mock_update_progress), \
-        patch.object(rjs, "acquire_heavy_query_slot", mock_acquire), \
-        patch.object(rjs, "release_heavy_query_slot", mock_release):
+        patch.object(rjs, "update_job_progress", mock_update_progress):
             rjs.execute_reject_query_job(
                 job_id="reject-cache-hit",
                 mode="date_range",
                 params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
             )
 
-        mock_cache._execute_and_spool.assert_not_called()
+        mock_cache.execute_primary_query.assert_not_called()
         mock_complete_job.assert_called_once_with(
             "reject", "reject-cache-hit", query_id="qry-test-id-001"
         )
 
-    def test_successful_execution_calls_execute_and_spool_then_complete(self):
-        """Happy path: _execute_and_spool is called and complete_job is called with query_id."""
-        mock_cache = self._make_mock_cache_module(cached_df=None)
+    def test_successful_execution_calls_execute_primary_query_then_complete(self):
+        """Happy path: execute_primary_query is called and complete_job is called with query_id."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
         mock_qb = MagicMock()
 
         mock_complete_job = MagicMock()
         mock_update_progress = MagicMock()
-        mock_acquire = MagicMock(return_value=True)
-        mock_release = MagicMock()
 
         with patch.dict("sys.modules", {
             "mes_dashboard.services.reject_dataset_cache": mock_cache,
             "mes_dashboard.sql": mock_qb,
         }), \
         patch.object(rjs, "complete_job", mock_complete_job), \
-        patch.object(rjs, "update_job_progress", mock_update_progress), \
-        patch.object(rjs, "acquire_heavy_query_slot", mock_acquire), \
-        patch.object(rjs, "release_heavy_query_slot", mock_release):
+        patch.object(rjs, "update_job_progress", mock_update_progress):
             rjs.execute_reject_query_job(
                 job_id="reject-success",
                 mode="date_range",
                 params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
             )
 
-        mock_cache._execute_and_spool.assert_called_once()
+        mock_cache.execute_primary_query.assert_called_once()
         mock_complete_job.assert_called_once_with(
             "reject", "reject-success", query_id="qry-test-id-001"
         )
 
     def test_failure_path_calls_complete_job_with_error_and_reraises(self):
-        """When _execute_and_spool raises, complete_job should be called with error and exception re-raised."""
-        mock_cache = self._make_mock_cache_module(cached_df=None)
-        mock_cache._execute_and_spool.side_effect = RuntimeError("ORA-timeout")
+        """When execute_primary_query raises, complete_job is called with error and exception re-raised."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
+        mock_cache.execute_primary_query.side_effect = RuntimeError("ORA-timeout")
         mock_qb = MagicMock()
 
         mock_complete_job = MagicMock()
         mock_update_progress = MagicMock()
-        mock_acquire = MagicMock(return_value=True)
-        mock_release = MagicMock()
 
         with patch.dict("sys.modules", {
             "mes_dashboard.services.reject_dataset_cache": mock_cache,
             "mes_dashboard.sql": mock_qb,
         }), \
         patch.object(rjs, "complete_job", mock_complete_job), \
-        patch.object(rjs, "update_job_progress", mock_update_progress), \
-        patch.object(rjs, "acquire_heavy_query_slot", mock_acquire), \
-        patch.object(rjs, "release_heavy_query_slot", mock_release):
+        patch.object(rjs, "update_job_progress", mock_update_progress):
             with pytest.raises(RuntimeError, match="ORA-timeout"):
                 rjs.execute_reject_query_job(
                     job_id="reject-fail",
@@ -279,52 +264,47 @@ class TestExecuteRejectQueryJob:
         assert complete_call_kwargs.kwargs.get("error") is not None
         assert "ORA-timeout" in complete_call_kwargs.kwargs["error"]
 
-    def test_concurrency_slot_acquired_and_released(self):
-        """Should acquire slot before execution and release it in the finally block."""
-        mock_cache = self._make_mock_cache_module(cached_df=None)
+    def test_execute_primary_query_called_with_correct_params(self):
+        """execute_primary_query should receive all params from the job payload."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
         mock_qb = MagicMock()
 
         mock_complete_job = MagicMock()
         mock_update_progress = MagicMock()
-        mock_acquire = MagicMock(return_value=True)
-        mock_release = MagicMock()
 
         with patch.dict("sys.modules", {
             "mes_dashboard.services.reject_dataset_cache": mock_cache,
             "mes_dashboard.sql": mock_qb,
         }), \
         patch.object(rjs, "complete_job", mock_complete_job), \
-        patch.object(rjs, "update_job_progress", mock_update_progress), \
-        patch.object(rjs, "acquire_heavy_query_slot", mock_acquire), \
-        patch.object(rjs, "release_heavy_query_slot", mock_release):
+        patch.object(rjs, "update_job_progress", mock_update_progress):
             rjs.execute_reject_query_job(
-                job_id="reject-slot",
+                job_id="reject-params",
                 mode="date_range",
                 params={"start_date": "2024-01-01", "end_date": "2024-03-01"},
             )
 
-        mock_acquire.assert_called_once()
-        mock_release.assert_called_once()
+        mock_cache.execute_primary_query.assert_called_once()
+        call_kwargs = mock_cache.execute_primary_query.call_args.kwargs
+        assert call_kwargs.get("mode") == "date_range"
+        assert call_kwargs.get("start_date") == "2024-01-01"
+        assert call_kwargs.get("end_date") == "2024-03-01"
 
-    def test_concurrency_slot_released_even_on_failure(self):
-        """The concurrency slot should be released even when execution raises."""
-        mock_cache = self._make_mock_cache_module(cached_df=None)
-        mock_cache._execute_and_spool.side_effect = ValueError("bad data")
+    def test_failure_on_query_still_calls_complete_job(self):
+        """Even when execute_primary_query raises ValueError, complete_job is called with error."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
+        mock_cache.execute_primary_query.side_effect = ValueError("bad data")
         mock_qb = MagicMock()
 
         mock_complete_job = MagicMock()
         mock_update_progress = MagicMock()
-        mock_acquire = MagicMock(return_value=True)
-        mock_release = MagicMock()
 
         with patch.dict("sys.modules", {
             "mes_dashboard.services.reject_dataset_cache": mock_cache,
             "mes_dashboard.sql": mock_qb,
         }), \
         patch.object(rjs, "complete_job", mock_complete_job), \
-        patch.object(rjs, "update_job_progress", mock_update_progress), \
-        patch.object(rjs, "acquire_heavy_query_slot", mock_acquire), \
-        patch.object(rjs, "release_heavy_query_slot", mock_release):
+        patch.object(rjs, "update_job_progress", mock_update_progress):
             with pytest.raises(ValueError):
                 rjs.execute_reject_query_job(
                     job_id="reject-slot-fail",
@@ -332,55 +312,27 @@ class TestExecuteRejectQueryJob:
                     params={"start_date": "2024-01-01", "end_date": "2024-03-01"},
                 )
 
-        mock_release.assert_called_once()
+        mock_complete_job.assert_called_once()
+        assert mock_complete_job.call_args.kwargs.get("error") is not None
 
-    def test_slot_not_released_when_acquire_returns_false(self):
-        """Should not call release when acquire returns False (slot was not taken)."""
-        mock_cache = self._make_mock_cache_module(cached_df=None)
+    def test_job_completes_regardless_of_mode_parameter(self):
+        """execute_reject_query_job should attempt execution for any mode value."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
         mock_qb = MagicMock()
 
         mock_complete_job = MagicMock()
         mock_update_progress = MagicMock()
-        mock_acquire = MagicMock(return_value=False)
-        mock_release = MagicMock()
 
         with patch.dict("sys.modules", {
             "mes_dashboard.services.reject_dataset_cache": mock_cache,
             "mes_dashboard.sql": mock_qb,
         }), \
         patch.object(rjs, "complete_job", mock_complete_job), \
-        patch.object(rjs, "update_job_progress", mock_update_progress), \
-        patch.object(rjs, "acquire_heavy_query_slot", mock_acquire), \
-        patch.object(rjs, "release_heavy_query_slot", mock_release):
+        patch.object(rjs, "update_job_progress", mock_update_progress):
             rjs.execute_reject_query_job(
-                job_id="reject-no-slot",
-                mode="date_range",
+                job_id="reject-any-mode",
+                mode="lot_id",
                 params={"start_date": "2024-01-01", "end_date": "2024-03-01"},
             )
 
-        mock_release.assert_not_called()
-
-    def test_raises_value_error_for_unsupported_mode(self):
-        """Should raise ValueError for modes other than date_range."""
-        mock_cache = self._make_mock_cache_module(cached_df=None)
-        mock_qb = MagicMock()
-
-        mock_complete_job = MagicMock()
-        mock_update_progress = MagicMock()
-        mock_acquire = MagicMock(return_value=False)
-        mock_release = MagicMock()
-
-        with patch.dict("sys.modules", {
-            "mes_dashboard.services.reject_dataset_cache": mock_cache,
-            "mes_dashboard.sql": mock_qb,
-        }), \
-        patch.object(rjs, "complete_job", mock_complete_job), \
-        patch.object(rjs, "update_job_progress", mock_update_progress), \
-        patch.object(rjs, "acquire_heavy_query_slot", mock_acquire), \
-        patch.object(rjs, "release_heavy_query_slot", mock_release):
-            with pytest.raises((ValueError, Exception)):
-                rjs.execute_reject_query_job(
-                    job_id="reject-bad-mode",
-                    mode="container",
-                    params={"start_date": "2024-01-01", "end_date": "2024-03-01"},
-                )
+        mock_complete_job.assert_called_once()

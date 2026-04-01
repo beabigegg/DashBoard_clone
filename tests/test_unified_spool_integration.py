@@ -27,21 +27,40 @@ class TestMsdFullChain:
     def msd_spool(self, tmp_path: pathlib.Path):
         events_df = pd.DataFrame(
             [
-                ("LOT-A", "STATION-1", 10, 200, "2025-02-01"),
-                ("LOT-A", "STATION-2", 5, 200, "2025-02-01"),
-                ("LOT-B", "STATION-1", 3, 100, "2025-02-02"),
+                ("LOT-A", "LOT-A", "STATION-1", 10, 200, "2025-02-01", None, None, None),
+                ("LOT-A", "LOT-A", "STATION-2", 5, 200, "2025-02-01", None, None, None),
+                ("LOT-B", "LOT-B", "STATION-1", 3, 100, "2025-02-02", None, None, None),
             ],
-            columns=["CONTAINER_ID", "STATION_NAME", "DEFECT_QTY", "INPUT_QTY", "TXNDATE"],
+            columns=[
+                "CONTAINER_ID", "CONTAINERID", "STATION_NAME",
+                "DEFECT_QTY", "INPUT_QTY", "TXNDATE",
+                "EQUIPMENTID", "EQUIPMENTNAME", "WORKCENTER_GROUP",
+            ],
         )
         lineage_df = pd.DataFrame(
             [("EQPT-X", "LOT-A"), ("EQPT-Y", "LOT-B")],
-            columns=["ANCESTOR_NAME", "DESCENDANT_ID"],
+            columns=["ANCESTOR_ID", "DESCENDANT_ID"],
+        )
+        # Detection spool for backward-direction detail: LOT-A has 2 loss reasons, LOT-B has 1
+        detection_df = pd.DataFrame(
+            [
+                ("LOT-A", "LOT-A-001", "GA", "PL1", "WF1", "RC1", "EQP1", 200, "YieldLimit", 10),
+                ("LOT-A", "LOT-A-001", "GA", "PL1", "WF1", "RC1", "EQP1", 200, "OtherReason", 5),
+                ("LOT-B", "LOT-B-001", "GA", "PL1", "WF1", "RC2", "EQP2", 100, "YieldLimit", 3),
+            ],
+            columns=[
+                "CONTAINERID", "CONTAINERNAME", "PJ_TYPE", "PRODUCTLINENAME",
+                "WORKFLOW", "FINISHEDRUNCARD", "DETECTION_EQUIPMENTNAME",
+                "TRACKINQTY", "LOSSREASONNAME", "REJECTQTY",
+            ],
         )
         events_path = tmp_path / "events.parquet"
         lineage_path = tmp_path / "lineage.parquet"
+        detection_path = tmp_path / "detection.parquet"
         events_df.to_parquet(events_path, index=False)
         lineage_df.to_parquet(lineage_path, index=False)
-        return str(events_path), str(lineage_path)
+        detection_df.to_parquet(detection_path, index=False)
+        return str(events_path), str(lineage_path), str(detection_path)
 
     def test_trace_query_id_is_deterministic(self):
         from mes_dashboard.services.trace_job_service import make_trace_query_id
@@ -54,13 +73,13 @@ class TestMsdFullChain:
     def test_summary_from_spool(self, msd_spool):
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
 
-        events_path, lineage_path = msd_spool
+        events_path, lineage_path, detection_path = msd_spool
         rt = MsdDuckdbRuntime("tqid-chain-test")
         rt._events_path = events_path
         rt._lineage_path = lineage_path
         rt._resolved = True
 
-        summary = rt.get_summary()
+        summary = rt.get_summary(direction="forward")
         assert summary is not None
         assert summary["kpi"]["lot_count"] == 2
         assert summary["kpi"]["defect_qty"] == 18  # 10 + 5 + 3
@@ -68,10 +87,11 @@ class TestMsdFullChain:
     def test_detail_from_spool(self, msd_spool):
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
 
-        events_path, lineage_path = msd_spool
+        events_path, lineage_path, detection_path = msd_spool
         rt = MsdDuckdbRuntime("tqid-chain-test")
         rt._events_path = events_path
-        rt._lineage_path = lineage_path
+        rt._lineage_path = None  # skip lineage joins to keep test self-contained
+        rt._detection_path = detection_path
         rt._resolved = True
 
         detail = rt.get_detail(page=1, per_page=2)
@@ -83,7 +103,7 @@ class TestMsdFullChain:
     def test_export_from_spool(self, msd_spool):
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
 
-        events_path, lineage_path = msd_spool
+        events_path, lineage_path, detection_path = msd_spool
         rt = MsdDuckdbRuntime("tqid-chain-test")
         rt._events_path = events_path
         rt._lineage_path = lineage_path
@@ -100,13 +120,14 @@ class TestMsdFullChain:
         """Summary, detail, and export should all reflect the same dataset."""
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
 
-        events_path, lineage_path = msd_spool
+        events_path, lineage_path, detection_path = msd_spool
         rt = MsdDuckdbRuntime("tqid-chain-full")
         rt._events_path = events_path
-        rt._lineage_path = lineage_path
+        rt._lineage_path = None  # skip lineage joins for detail
+        rt._detection_path = detection_path
         rt._resolved = True
 
-        summary = rt.get_summary()
+        summary = rt.get_summary(direction="forward")
         detail = rt.get_detail(page=1, per_page=100)
         chunks = list(rt.export_csv(chunk_size=100))
         full_csv = b"".join(chunks).decode("utf-8-sig", errors="replace")

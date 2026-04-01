@@ -161,5 +161,5 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_integration)
         if "e2e" in item.keywords and not run_e2e:
             item.add_marker(skip_e2e)
-        if ("stress" in item.keywords or "load" in item.keywords) and not run_stress:
+        if (item.get_closest_marker("stress") or item.get_closest_marker("load")) and not run_stress:
             item.add_marker(skip_stress)

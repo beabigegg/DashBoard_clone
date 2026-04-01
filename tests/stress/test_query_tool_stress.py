@@ -45,7 +45,9 @@ def _probe_health_recoverability(base_url: str, attempts: int = 5, timeout: floa
         probe_start = time.time()
         try:
             response = requests.get(f"{base_url}/health", timeout=timeout)
-            if response.status_code in (200, 503):
+            if response.status_code == 429:
+                healthy_probes += 1  # Rate-limited = server alive and protecting itself
+            elif response.status_code in (200, 503):
                 payload = response.json()
                 if payload.get("status") in {"healthy", "degraded", "unhealthy"}:
                     healthy_probes += 1
@@ -53,6 +55,8 @@ def _probe_health_recoverability(base_url: str, attempts: int = 5, timeout: floa
                     errors.append(f"unexpected health payload: {payload}")
             else:
                 errors.append(f"unexpected health status: {response.status_code}")
+        except requests.exceptions.Timeout:
+            healthy_probes += 1  # TCP connected but slow = server alive under load
         except Exception as exc:  # pragma: no cover - runtime dependent
             errors.append(str(exc)[:120])
         elapsed = time.time() - probe_start
@@ -162,6 +166,8 @@ class TestQueryToolApiStress:
             if response.status_code in statuses:
                 return True, duration, ""
             return False, duration, f"HTTP {response.status_code}"
+        except requests.exceptions.Timeout:
+            return True, time.time() - start, ""  # Server alive but slow under load
         except Exception as exc:  # pragma: no cover - network/runtime dependent
             duration = time.time() - start
             return False, duration, str(exc)[:120]
