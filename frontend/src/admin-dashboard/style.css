@@ -14,22 +14,25 @@
 }
 
 .theme-admin-dashboard .dashboard-tab {
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid theme('colors.stroke.soft');
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  color: theme('colors.white');
+  background: theme('colors.surface.muted');
+  color: theme('colors.text.secondary');
   font-size: 0.85rem;
   padding: theme('spacing.token.p5') theme('spacing.token.p12');
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .theme-admin-dashboard .dashboard-tab:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: theme('colors.surface.hover');
+  color: theme('colors.text.primary');
 }
 
 .theme-admin-dashboard .dashboard-tab.is-active {
-  background: theme('colors.white');
-  color: theme('colors.token.h1e293b');
+  background: theme('colors.brand.500');
+  color: theme('colors.white');
+  border-color: theme('colors.brand.500');
   font-weight: 600;
 }
 
