@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import threading
 import time
 from decimal import Decimal
@@ -124,6 +125,16 @@ def _target_path(namespace: str, query_id: str) -> Path:
     if not str(path).startswith(f"{root_str}{os.sep}"):
         raise ValueError("Invalid spool target path")
     return path
+
+
+def _move_into_place(src_path: Path, dest_path: Path) -> None:
+    """Move a temp parquet into place, tolerating Docker cross-device mounts."""
+    src = Path(src_path)
+    dest = Path(dest_path)
+    try:
+        src.replace(dest)
+    except OSError:
+        shutil.move(str(src), str(dest))
 
 
 def _safe_stage(stage: str) -> str:
@@ -484,7 +495,7 @@ def register_spool_file(
     try:
         dest = _target_path(namespace, safe_query_id)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        Path(src_path).replace(dest)
+        _move_into_place(Path(src_path), dest)
 
         now_ts = int(time.time())
         metadata = {
@@ -551,7 +562,7 @@ def register_stage_spool_file(
     try:
         dest = _stage_target_path(namespace, safe_query_id, safe_st)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        Path(src_path).replace(dest)
+        _move_into_place(Path(src_path), dest)
 
         now_ts = int(time.time())
         metadata = {

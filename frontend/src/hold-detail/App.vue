@@ -69,6 +69,10 @@ const lastUpdate = computed(() => {
   return summary.value?.dataUpdateDate ?? '--';
 });
 
+function goBackToOverview() {
+  navigateToRuntimeRoute('/hold-overview');
+}
+
 function unwrapApiResult(result, fallbackMessage) {
   if (result?.success) {
     return result.data;
@@ -392,7 +396,11 @@ onMounted(() => {
       @refresh="manualRefresh"
     >
       <template #header-left>
-        <a :href="backToOverviewHref" class="ui-btn ui-btn--ghost btn-back">&larr; Hold Overview</a>
+        <a
+          :href="backToOverviewHref"
+          class="ui-btn ui-btn--ghost btn-back"
+          @click.prevent="goBackToOverview"
+        >&larr; Hold Overview</a>
       </template>
       <template #header-left-after>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>

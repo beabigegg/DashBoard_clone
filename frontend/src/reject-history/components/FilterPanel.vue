@@ -187,7 +187,7 @@ function emitSupplementary(patch) {
       <div class="supplementary-header">補充篩選 (快取內篩選)</div>
       <div class="supplementary-toolbar">
         <div class="pareto-fixed-note">
-          Pareto 固定累計前 80%，且 TYPE / WORKFLOW / EQUIPMENT 僅顯示 TOP 20。
+          Pareto 固定累計前 80%，且 TYPE / EQUIPMENT 僅顯示 TOP 20。
           明細與匯出 CSV 仍保留完整篩選結果，不受此顯示限制影響。
         </div>
       </div>

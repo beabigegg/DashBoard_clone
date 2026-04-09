@@ -973,7 +973,7 @@ def _write_msd_lineage_stage_spool(
     import tempfile
     from pathlib import Path
 
-    from mes_dashboard.core.query_spool_store import register_stage_spool_file
+    from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR, register_stage_spool_file
     from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE, _STAGE_LINEAGE
 
     _names = cid_to_name or {}
@@ -1002,7 +1002,9 @@ def _write_msd_lineage_stage_spool(
         return
 
     df = pd.DataFrame(rows)
-    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+    ns_dir = (QUERY_SPOOL_DIR / SPOOL_NAMESPACE).resolve()
+    ns_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False, dir=ns_dir) as tmp:
         tmp_path = Path(tmp.name)
     df.to_parquet(tmp_path, engine="pyarrow", index=False)
 
@@ -1025,13 +1027,15 @@ def _write_msd_detection_stage_spool(
     import tempfile
     from pathlib import Path
 
-    from mes_dashboard.core.query_spool_store import register_stage_spool_file
+    from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR, register_stage_spool_file
     from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE, _STAGE_DETECTION
 
     if detection_df is None or detection_df.empty:
         return
 
-    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+    ns_dir = (QUERY_SPOOL_DIR / SPOOL_NAMESPACE).resolve()
+    ns_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False, dir=ns_dir) as tmp:
         tmp_path = Path(tmp.name)
     detection_df.to_parquet(tmp_path, engine="pyarrow", index=False)
 

@@ -77,7 +77,7 @@ from mes_dashboard.config.constants import CACHE_TTL_DATASET
 _CACHE_TTL = CACHE_TTL_DATASET
 _CACHE_MAX_SIZE = 1
 _REDIS_NAMESPACE = "reject_dataset"
-_CACHE_SCHEMA_VERSION = 4
+_CACHE_SCHEMA_VERSION = 7
 _REJECT_PRIMARY_SQL_TEMPLATE = "primary"
 _REJECT_ENGINE_GRAIN_DAYS = max(1, int(os.getenv("REJECT_ENGINE_GRAIN_DAYS", "10")))
 _REJECT_ENGINE_PARALLEL = max(1, int(os.getenv("REJECT_ENGINE_PARALLEL", "1")))
@@ -1427,7 +1427,6 @@ def _paginate_detail(
                 "WORKCENTERNAME": _normalize_text(row.get("WORKCENTERNAME")),
                 "SPECNAME": _normalize_text(row.get("SPECNAME")),
                 "EQUIPMENTNAME": _normalize_text(row.get("EQUIPMENTNAME")),
-                "WORKFLOWNAME": _normalize_text(row.get("WORKFLOWNAME")),
                 "PRODUCTLINENAME": _normalize_text(row.get("PRODUCTLINENAME")),
                 "PJ_TYPE": _normalize_text(row.get("PJ_TYPE")),
                 "CONTAINERNAME": _normalize_text(row.get("CONTAINERNAME")),

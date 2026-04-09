@@ -55,7 +55,6 @@ function onPageChange(newPage) {
         <DataTableColumn column-key="PRODUCTLINENAME" label="Package" :sortable="true" />
         <DataTableColumn column-key="PJ_FUNCTION" label="FUNCTION" :sortable="true" />
         <DataTableColumn column-key="PJ_TYPE" label="TYPE" :sortable="true" />
-        <DataTableColumn column-key="WORKFLOWNAME" label="WORKFLOW" :sortable="true" />
         <DataTableColumn column-key="PRODUCTNAME" label="PRODUCT" :sortable="true" />
         <DataTableColumn column-key="LOSSREASONNAME" label="原因" :sortable="true" />
         <DataTableColumn column-key="EQUIPMENTNAME" label="EQUIPMENT" :sortable="true" />
@@ -67,7 +66,6 @@ function onPageChange(newPage) {
         <template #cell="{ row, columnKey, value }">
           <template v-if="columnKey === 'CONTAINERNAME'">{{ row.CONTAINERNAME || '' }}</template>
           <template v-else-if="columnKey === 'PJ_FUNCTION'">{{ row.PJ_FUNCTION || '' }}</template>
-          <template v-else-if="columnKey === 'WORKFLOWNAME'">{{ row.WORKFLOWNAME || '' }}</template>
           <template v-else-if="columnKey === 'PRODUCTNAME'">{{ row.PRODUCTNAME || '' }}</template>
           <template v-else-if="columnKey === 'EQUIPMENTNAME'">{{ row.EQUIPMENTNAME || '' }}</template>
           <template v-else-if="columnKey === 'REJECTCOMMENT'">{{ row.REJECTCOMMENT || '' }}</template>

@@ -1170,6 +1170,7 @@ def _write_msd_events_spool(
     import pandas as pd
     import tempfile
     from pathlib import Path
+    from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR
     from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE, _STAGE_EVENTS
     from mes_dashboard.core.query_spool_store import register_stage_spool_file
 
@@ -1184,7 +1185,9 @@ def _write_msd_events_spool(
         return
 
     df = pd.DataFrame(rows)
-    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+    ns_dir = (QUERY_SPOOL_DIR / SPOOL_NAMESPACE).resolve()
+    ns_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False, dir=ns_dir) as tmp:
         tmp_path = Path(tmp.name)
     df.to_parquet(tmp_path, engine="pyarrow", index=False)
 
@@ -1225,10 +1228,13 @@ def _write_msd_events_spool_from_paths(
     from pathlib import Path as _Path
     import pyarrow as pa
     import pyarrow.parquet as pq
+    from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR
     from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE, _STAGE_EVENTS
     from mes_dashboard.core.query_spool_store import register_stage_spool_file
 
-    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as _tmp:
+    ns_dir = (QUERY_SPOOL_DIR / SPOOL_NAMESPACE).resolve()
+    ns_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False, dir=ns_dir) as _tmp:
         tmp_path = _Path(_tmp.name)
 
     # First pass: collect schemas from all available domain parquets so we can
@@ -1403,12 +1409,15 @@ def _build_job_msd_aggregation(
                                 _STAGE_DETECTION,
                             )
                             from mes_dashboard.core.query_spool_store import (
+                                QUERY_SPOOL_DIR as _QUERY_SPOOL_DIR,
                                 register_stage_spool_file as _reg_stage,
                                 get_spool_metadata as _get_meta,
                             )
                             _det_meta = _get_meta("msd_detect", detection_hash) or {}
                             _det_row_count = int(_det_meta.get("row_count", 0))
-                            with _tmpmod.NamedTemporaryFile(suffix=".parquet", delete=False) as _tf:
+                            _ns_dir = (_QUERY_SPOOL_DIR / _MSD_NS).resolve()
+                            _ns_dir.mkdir(parents=True, exist_ok=True)
+                            with _tmpmod.NamedTemporaryFile(suffix=".parquet", delete=False, dir=_ns_dir) as _tf:
                                 _det_copy = _AggPath(_tf.name)
                             _shutil.copy2(detection_path, _det_copy)
                             _reg_stage(_MSD_NS, trace_query_id, _STAGE_DETECTION, _det_copy, _det_row_count)
