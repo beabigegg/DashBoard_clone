@@ -17,6 +17,7 @@ env/
 dist/
 build/
 *.whl
+node_modules/
 frontend/node_modules/
 
 # IDE
@@ -56,6 +57,7 @@ htmlcov/
 
 # Runtime data
 tmp/
+temp/
 reports/
 
 # Deploy artifacts
