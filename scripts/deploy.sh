@@ -144,8 +144,8 @@ install_frontend() {
         return 0
     fi
 
-    log_info "Installing frontend dependencies..."
-    npm --prefix "${ROOT}/frontend" install --no-audit --no-fund
+    log_info "Installing frontend dependencies (npm ci — strict lock file)..."
+    npm --prefix "${ROOT}/frontend" ci
 
     log_info "Building frontend assets (Vite)..."
     npm --prefix "${ROOT}/frontend" run build

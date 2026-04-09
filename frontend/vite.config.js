@@ -6,6 +6,10 @@ export default defineConfig(({ mode }) => ({
   base: '/static/dist/',
   plugins: [vue()],
   publicDir: false,
+  esbuild: {
+    // production build 時移除所有 console.* 呼叫，避免洩漏除錯資訊
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
+  },
   build: {
     outDir: '../src/mes_dashboard/static/dist',
     emptyOutDir: false,

@@ -551,6 +551,13 @@ def create_app(config_name: str | None = None) -> Flask:
     security_headers = _build_security_headers(
         allow_unsafe_eval=_resolve_csp_allow_unsafe_eval(app),
     )
+    # CORS: 解析 CORS_ALLOWED_ORIGINS 環境變數（逗號分隔的來源清單）
+    # 同源架構（單 Port）無需設定；開發時 Vite dev server 跨 port 才需要
+    _cors_allowed_origins: frozenset[str] = frozenset(
+        o.strip()
+        for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+        if o.strip()
+    )
 
     # Route-level cache backend (L1 memory + optional L2 Redis)
     app.extensions["cache"] = create_default_cache_backend()
@@ -674,6 +681,21 @@ def create_app(config_name: str | None = None) -> Flask:
             )
         else:
             response.headers.pop("Strict-Transport-Security", None)
+        # CORS: 僅在明確設定允許來源時加入標頭（同源架構保持不加）
+        if _cors_allowed_origins:
+            origin = request.headers.get("Origin", "")
+            if origin in _cors_allowed_origins:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Vary"] = "Origin"
+                if request.method == "OPTIONS":
+                    response.headers["Access-Control-Allow-Methods"] = (
+                        "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                    )
+                    response.headers["Access-Control-Allow-Headers"] = (
+                        "Content-Type, Authorization, X-CSRFToken"
+                    )
+                    response.headers["Access-Control-Max-Age"] = "86400"
         _normalize_session_cookie_security(
             response,
             secure=request_is_secure,

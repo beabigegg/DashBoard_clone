@@ -1,0 +1,914 @@
+openapi: "3.1.0"
+info:
+  title: MES Dashboard API
+  version: "1.0.0"
+  description: |
+    MES Dashboard 報表系統 REST API。
+    所有 `/api/*` 端點（health-exception 除外）回傳統一 JSON 封包：
+    - 成功：`{"status": "ok", "data": ...}`
+    - 錯誤：`{"status": "error", "message": "..."}`
+    - 非同步任務提交（202）：`{"status": "ok", "job_id": "...", ...}`
+
+servers:
+  - url: http://localhost:8080
+    description: 本地開發環境
+
+tags:
+  - name: auth
+    description: 認證與 Session 管理
+  - name: health
+    description: 健康檢查（不強制 JSON 封包）
+  - name: wip
+    description: WIP 在製品查詢
+  - name: hold
+    description: Hold 分析
+  - name: reject-history
+    description: 不良歷史分析（含非同步）
+  - name: yield-alert
+    description: 良率警示中心（含非同步）
+  - name: resource
+    description: 設備即時概況
+  - name: resource-history
+    description: 設備歷史績效
+  - name: material-trace
+    description: 材料追溯（含非同步）
+  - name: production-history
+    description: 生產歷史分析（含非同步）
+  - name: mid-section-defect
+    description: 中段製程不良追溯
+  - name: qc-gate
+    description: QC-GATE 即時狀態
+  - name: job-query
+    description: 設備維修查詢
+  - name: query-tool
+    description: 批次追蹤工具
+  - name: analytics
+    description: 異常偵測分析
+  - name: ai
+    description: AI 智能查詢（Text2SQL / Function / Agent）
+  - name: admin
+    description: 管理員 API（需 Admin 角色）
+  - name: spool
+    description: 查詢結果 Parquet Spool 下載
+
+# ============================================================
+# 共用元件
+# ============================================================
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Flask server-side session cookie（登入後自動附帶）
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        data:
+          description: 回傳資料（型別依各端點定義）
+
+    ErrorEnvelope:
+      type: object
+      required: [status, message]
+      properties:
+        status:
+          type: string
+          enum: [error]
+        message:
+          type: string
+          description: 人類可讀的錯誤說明
+
+    AsyncJobResponse:
+      type: object
+      required: [status, job_id]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        job_id:
+          type: string
+          description: RQ 任務 ID，用於後續輪詢
+        async:
+          type: boolean
+          enum: [true]
+        status_url:
+          type: string
+          description: 輪詢狀態的 URL
+
+    JobStatusResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        data:
+          type: object
+          properties:
+            job_status:
+              type: string
+              enum: [pending, running, done, failed]
+              description: 任務執行狀態
+            result:
+              description: 任務完成後的結果（job_status=done 時存在）
+            error:
+              type: string
+              description: 任務失敗原因（job_status=failed 時存在）
+
+    UserInfo:
+      type: object
+      properties:
+        username:
+          type: string
+        displayName:
+          type: string
+        real_name:
+          type: string
+        mail:
+          type: string
+        department:
+          type: string
+        telephoneNumber:
+          type: string
+        is_admin:
+          type: boolean
+
+    HealthSummary:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, critical]
+        database:
+          type: object
+          properties:
+            status:
+              type: string
+            circuit_breaker:
+              type: string
+        cache:
+          type: object
+          properties:
+            redis_enabled:
+              type: boolean
+            status:
+              type: string
+        system_memory:
+          type: object
+          properties:
+            total_mb:
+              type: number
+            available_mb:
+              type: number
+            used_pct:
+              type: number
+            pressure:
+              type: string
+        async_workers:
+          type: object
+          properties:
+            rq_available:
+              type: boolean
+            workers:
+              type: integer
+            queues:
+              type: array
+              items:
+                type: string
+
+  responses:
+    Unauthorized:
+      description: 未登入或 Session 已過期
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: 無存取權限（需 Admin 角色）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: 資源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    TooManyRequests:
+      description: 超出頻率限制
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: 建議等待秒數
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ServiceUnavailable:
+      description: 服務不可用（資料庫熔斷或系統過載）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+security:
+  - sessionCookie: []
+
+# ============================================================
+# 端點定義
+# ============================================================
+paths:
+
+  # ── 認證 ─────────────────────────────────────────────────
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: 使用者登入（LDAP）
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: 登入成功，Session Cookie 自動設定
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserInfo'
+        "401":
+          description: 帳密錯誤
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        "429":
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: 登出，清除 Session
+      responses:
+        "200":
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: 取得當前登入使用者資訊
+      security: []
+      responses:
+        "200":
+          description: 已登入時回傳使用者資訊，未登入時回傳 null
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        nullable: true
+                        oneOf:
+                          - $ref: '#/components/schemas/UserInfo'
+                          - type: "null"
+
+  /api/auth/heartbeat:
+    patch:
+      tags: [auth]
+      summary: Session 保活（更新 last_active 時間）
+      responses:
+        "200":
+          description: 保活成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── 健康檢查 ─────────────────────────────────────────────
+  /health:
+    get:
+      tags: [health]
+      summary: 系統健康摘要
+      security: []
+      description: |
+        回傳系統各元件健康狀態。此端點不強制使用標準 JSON 封包格式，
+        監控系統直接解析頂層 payload。
+      responses:
+        "200":
+          description: 健康摘要（status 可能為 healthy / degraded / critical）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthSummary'
+
+  /health/deep:
+    get:
+      tags: [health]
+      summary: 深度健康診斷（含連線池、Circuit Breaker 詳情）
+      security: []
+      responses:
+        "200":
+          description: 詳細健康診斷結果
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ── WIP ──────────────────────────────────────────────────
+  /api/wip/overview:
+    get:
+      tags: [wip]
+      summary: WIP 概況矩陣（工作中心 × 批次狀態）
+      responses:
+        "200":
+          description: WIP 矩陣資料
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/wip/detail:
+    get:
+      tags: [wip]
+      summary: WIP 明細查詢（支援篩選 + 分頁）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: WIP 明細清單（含分頁資訊）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── 不良歷史 ─────────────────────────────────────────────
+  /api/reject-history/query:
+    post:
+      tags: [reject-history]
+      summary: 提交不良歷史查詢（同步或非同步自動判斷）
+      description: |
+        日期範圍 ≤ REJECT_ASYNC_DAY_THRESHOLD 天（預設 10）時同步回傳結果（200）；
+        超過門檻時轉非同步（202），回傳 job_id 供輪詢。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start_date, end_date]
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+                product:
+                  type: string
+                workcenter:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: 同步查詢完成，直接回傳結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "202":
+          description: 查詢進入非同步佇列
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/reject-history/job/{job_id}:
+    get:
+      tags: [reject-history]
+      summary: 輪詢不良歷史非同步任務狀態
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 任務狀態（pending / running / done / failed）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatusResponse'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/reject-history/options:
+    get:
+      tags: [reject-history]
+      summary: 不良歷史篩選選項（產品、工作中心、原因）
+      responses:
+        "200":
+          description: 篩選選項清單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /api/reject-history/export:
+    get:
+      tags: [reject-history]
+      summary: 匯出不良歷史為 Excel
+      responses:
+        "200":
+          description: Excel 檔案下載
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  # ── 良率警示 ─────────────────────────────────────────────
+  /api/yield-alert/query:
+    post:
+      tags: [yield-alert]
+      summary: 提交良率警示查詢（同步或非同步）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          description: 同步結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "202":
+          description: 非同步任務
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/yield-alert/job/{job_id}:
+    get:
+      tags: [yield-alert]
+      summary: 輪詢良率警示非同步任務狀態
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 任務狀態
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatusResponse'
+
+  /api/yield-alert/alerts:
+    get:
+      tags: [yield-alert]
+      summary: 取得良率警示清單
+      responses:
+        "200":
+          description: 良率警示清單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  # ── 材料追溯 ─────────────────────────────────────────────
+  /api/material-trace/query:
+    post:
+      tags: [material-trace]
+      summary: 提交材料追溯查詢（非同步）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [container_ids]
+              properties:
+                container_ids:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 200
+      responses:
+        "200":
+          description: Spool 命中，直接回傳分頁結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "202":
+          description: 非同步任務
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/material-trace/job/{job_id}:
+    get:
+      tags: [material-trace]
+      summary: 輪詢材料追溯非同步任務狀態
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 任務狀態
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatusResponse'
+
+  # ── 生產歷史 ─────────────────────────────────────────────
+  /api/production-history/query:
+    post:
+      tags: [production-history]
+      summary: 提交生產歷史查詢（同步或非同步）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start_date, end_date]
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+                product:
+                  type: string
+                workcenter:
+                  type: string
+      responses:
+        "200":
+          description: Spool 命中或同步完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "202":
+          description: 非同步任務
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobResponse'
+
+  /api/production-history/job/{job_id}:
+    get:
+      tags: [production-history]
+      summary: 輪詢生產歷史非同步任務狀態
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 任務狀態
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatusResponse'
+
+  # ── 異常偵測 ─────────────────────────────────────────────
+  /api/analytics/anomaly-summary:
+    get:
+      tags: [analytics]
+      summary: 取得最新異常偵測摘要（需啟用 ANALYTICS_ANOMALY_DETECTION_ENABLED）
+      responses:
+        "200":
+          description: 異常偵測摘要
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/analytics/equipment-deviation:
+    get:
+      tags: [analytics]
+      summary: 設備稼動異常偵測結果
+      responses:
+        "200":
+          description: 設備稼動異常清單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /api/analytics/reject-spikes:
+    get:
+      tags: [analytics]
+      summary: 不良率突增偵測結果
+      responses:
+        "200":
+          description: 不良突增清單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /api/analytics/yield-anomalies:
+    get:
+      tags: [analytics]
+      summary: 良率異常偵測結果
+      responses:
+        "200":
+          description: 良率異常清單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /api/analytics/hold-outliers:
+    get:
+      tags: [analytics]
+      summary: Hold 離群偵測結果
+      responses:
+        "200":
+          description: Hold 離群清單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /api/analytics/recalculate:
+    post:
+      tags: [analytics]
+      summary: 手動觸發異常偵測重新計算（Admin）
+      responses:
+        "200":
+          description: 觸發成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  # ── AI 查詢 ──────────────────────────────────────────────
+  /api/ai/query:
+    post:
+      tags: [ai]
+      summary: AI 智能查詢（需啟用 AI_QUERY_ENABLED）
+      description: |
+        依 AI_MODE 選擇運作模式：
+        - `text2sql`（預設）：自然語言 → SQL → 執行 → 摘要
+        - `function`：三輪 function call 管線
+        - `agent`：迭代式多工具協作
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  description: 自然語言查詢問題
+      responses:
+        "200":
+          description: AI 查詢結果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          answer:
+                            type: string
+                          chart_data:
+                            nullable: true
+                          sql_used:
+                            type: string
+                            nullable: true
+                          tool_trace:
+                            type: array
+                            items:
+                              type: object
+                          needs_clarification:
+                            type: boolean
+        "429":
+          $ref: '#/components/responses/TooManyRequests'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── 管理員 ───────────────────────────────────────────────
+  /api/system-status:
+    get:
+      tags: [admin]
+      summary: 系統狀態摘要（Admin）
+      responses:
+        "200":
+          description: 系統狀態
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /api/metrics:
+    get:
+      tags: [admin]
+      summary: 效能指標（Admin）
+      responses:
+        "200":
+          description: 效能指標數據
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /api/logs:
+    get:
+      tags: [admin]
+      summary: 應用日誌（Admin）
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [DEBUG, INFO, WARNING, ERROR]
+      responses:
+        "200":
+          description: 日誌清單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /api/worker/restart:
+    post:
+      tags: [admin]
+      summary: 重啟 Gunicorn Worker（Admin）
+      responses:
+        "200":
+          description: 重啟指令已發送
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /api/user-usage-kpi:
+    get:
+      tags: [admin]
+      summary: 使用者用量 KPI 儀表板資料（Admin）
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: department
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: KPI 資料
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  # ── Spool 下載 ───────────────────────────────────────────
+  /api/spool/{namespace}/{query_id}.parquet:
+    get:
+      tags: [spool]
+      summary: 下載查詢結果 Parquet 檔案（供前端 DuckDB-WASM 使用）
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: query_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Parquet 二進位檔案
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Spool 不存在或已過期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'

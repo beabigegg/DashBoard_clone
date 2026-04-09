@@ -1,0 +1,49 @@
+# Version control
+.git/
+.gitignore
+
+# IDE and OS
+.claude/
+.vscode/
+.idea/
+.DS_Store
+nul
+
+# Python artifacts
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+
+# Frontend deps (installed fresh during build)
+frontend/node_modules/
+
+# Environment files (not baked into image; used by docker-compose at runtime)
+.env
+.env.*
+
+# Dev / test / ops only
+tests/
+scripts/
+deploy/
+openspec/
+contract/
+shared/
+
+# Logs, temp, uploads
+*.log
+logs/
+tmp/
+temp/
+uploads/
+outputs/
+
+# Documentation
+*.md
+
+# Misc
+environment.yml
+pyproject.toml
+pytest.ini

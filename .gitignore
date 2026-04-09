@@ -58,6 +58,13 @@ htmlcov/
 tmp/
 reports/
 
+# Deploy artifacts
+*.tar.gz
+deploy_package.tar.gz
+
+# Frontend build output (rebuilt during deploy)
+src/mes_dashboard/static/dist/
+
 # AI/LLM generated artifacts (not source)
 docs/API_USAGE_CAPABILITY_REPORT.md
 docs/oom_*.md

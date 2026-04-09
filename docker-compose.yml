@@ -1,0 +1,48 @@
+services:
+  mes-dashboard-app:
+    build: .
+    container_name: mes-dashboard-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override REDIS_URL to use Docker service name instead of localhost
+      - REDIS_URL=redis://mes-dashboard-redis:6379/0
+      # Disable Conda runtime contract check (Docker uses pip, not Conda)
+      - RUNTIME_CONTRACT_ENFORCE=false
+      # Timezone
+      - TZ=Asia/Taipei
+    ports:
+      - "8080:8080"
+    volumes:
+      - app_logs:/app/logs
+      - app_spool:/app/tmp/query_spool
+    depends_on:
+      mes-dashboard-redis:
+        condition: service_healthy
+    networks:
+      - mes-dashboard-net
+
+  mes-dashboard-redis:
+    image: redis:7-alpine
+    container_name: mes-dashboard-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 768mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - mes-dashboard-net
+
+volumes:
+  redis_data:
+  app_logs:
+  app_spool:
+
+networks:
+  mes-dashboard-net:
+    driver: bridge
