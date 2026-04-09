@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, shallowRef, triggerRef } from 'vue';
+import { computed, nextTick, onMounted, ref, shallowRef, triggerRef, watch } from 'vue';
 
 import VChart from 'vue-echarts';
 import { use } from 'echarts/core';
@@ -742,6 +742,31 @@ function getChartInstance() {
   return chartComponent.chart || null;
 }
 
+// Force ECharts tree to re-layout after SPA navigation or when data first
+// arrives. Without this, the chart can initialize with a zero-width container
+// (e.g. during route transition) and the tree node positions stay stuck at
+// the stale layout until a hard reload. resize() alone does not re-run the
+// tree layout, so we also re-apply the option with notMerge.
+async function forceRelayout() {
+  await nextTick();
+  const instance = getChartInstance();
+  if (!instance) return;
+  instance.resize();
+  instance.setOption(chartOption.value, { notMerge: true });
+}
+
+onMounted(() => {
+  if (hasData.value) {
+    void forceRelayout();
+  }
+});
+
+watch(hasData, (next) => {
+  if (next) {
+    void forceRelayout();
+  }
+});
+
 function escapeCsvField(value) {
   const text = normalizeText(value);
   if (text === '') {
@@ -965,7 +990,7 @@ function exportRelationCsv() {
         class="lineage-tree-chart"
         :style="{ height: chartHeight, width: '100%' }"
         :option="chartOption"
-        :autoresize="{ throttle: 100 }"
+        :autoresize="true"
         @click="handleNodeClick"
       />
     </div>
