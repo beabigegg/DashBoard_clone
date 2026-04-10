@@ -160,7 +160,7 @@ def login():
     session.clear()
     session["user"] = user_payload
     session.permanent = True
-    rotate_csrf_token()
+    new_csrf = rotate_csrf_token()
 
     logger.info("User logged in: %s (admin=%s)", username, admin_flag)
 
@@ -172,6 +172,7 @@ def login():
         "department": user_payload["department"],
         "telephoneNumber": user_payload["telephoneNumber"],
         "is_admin": admin_flag,
+        "csrf_token": new_csrf,
     })
 
 

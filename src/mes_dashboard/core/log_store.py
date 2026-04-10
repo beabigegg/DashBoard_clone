@@ -402,6 +402,35 @@ class LogStore:
 
         return deleted
 
+    def clear_all_logs(self) -> int:
+        """Delete ALL unsynced logs (user-triggered full clear).
+
+        Returns:
+            Number of logs deleted.
+        """
+        if not LOG_STORE_ENABLED or not self._initialized:
+            return 0
+
+        deleted = 0
+        try:
+            with self._write_lock:
+                with self._get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM logs WHERE synced = 0")
+                    deleted = cursor.rowcount
+                    # Also clean up already-synced old records
+                    cursor.execute("DELETE FROM logs WHERE synced = 1")
+                    deleted += cursor.rowcount
+                    conn.commit()
+
+            if deleted > 0:
+                logger.info(f"Cleared all logs: {deleted} entries deleted")
+
+        except Exception as e:
+            logger.error(f"Failed to clear all logs: {e}")
+
+        return deleted
+
     def get_stats(self) -> Dict[str, Any]:
         """Get log store statistics.
 

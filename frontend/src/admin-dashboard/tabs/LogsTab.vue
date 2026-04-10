@@ -42,10 +42,17 @@ function onSearchInput() {
 }
 
 async function cleanupLogs() {
+  if (!window.confirm('確定要清理所有日誌？')) return;
   cleanupLoading.value = true;
   try {
-    await apiPost('/admin/api/logs/cleanup', {});
+    const result = await apiPost('/admin/api/logs/cleanup', { clear_all: true });
+    const deleted = result?.data?.deleted ?? 0;
+    if (deleted > 0) {
+      window.alert(`已清理 ${deleted} 筆日誌`);
+    }
     await loadLogs();
+  } catch (err) {
+    window.alert('清理日誌失敗：' + (err.message || '未知錯誤'));
   } finally {
     cleanupLoading.value = false;
   }

@@ -816,10 +816,11 @@ def api_logs_cleanup():
 
     data = request.get_json(silent=True) or {}
     include_mysql = data.get("include_mysql", False)
+    clear_all = data.get("clear_all", False)
 
     log_store = get_log_store()
     stats_before = log_store.get_stats()
-    deleted = log_store.cleanup_old_logs()
+    deleted = log_store.clear_all_logs() if clear_all else log_store.cleanup_old_logs()
     stats_after = log_store.get_stats()
 
     mysql_deleted = 0

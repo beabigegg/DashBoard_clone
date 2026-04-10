@@ -33,6 +33,14 @@ export function useAuth() {
     const data = await res.json();
     if (data.success) {
       user.value = data.data;
+      // Update CSRF meta tag with the rotated token from the server
+      const newCsrf = data.data?.csrf_token;
+      if (newCsrf) {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) {
+          meta.setAttribute('content', newCsrf);
+        }
+      }
     }
     return data;
   }

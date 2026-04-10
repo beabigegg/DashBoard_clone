@@ -20,7 +20,7 @@ COPY gunicorn.conf.py .
 COPY supervisord.conf .
 
 # Create writable runtime directories
-RUN mkdir -p /app/logs /app/tmp/query_spool
+RUN mkdir -p /app/logs /app/logs/archive /app/tmp /app/tmp/query_spool
 
 ENV PYTHONPATH=/app/src
 
