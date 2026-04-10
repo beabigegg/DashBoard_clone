@@ -30,7 +30,6 @@ scripts/
 deploy/
 openspec/
 contract/
-shared/
 
 # Logs, temp, uploads
 *.log
