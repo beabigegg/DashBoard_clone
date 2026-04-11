@@ -11,6 +11,7 @@ import re
 import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from decimal import Decimal
 from typing import Any, Callable, Dict, List, Tuple
 
 from mes_dashboard.core.cache import cache_get, cache_set
@@ -533,7 +534,10 @@ class EventFetcher:
             nonlocal writer, schema
             if not rows:
                 return
-            col_arrays = {col: [row[i] for row in rows] for i, col in enumerate(columns)}
+            col_arrays = {
+                col: [float(v) if isinstance(v, Decimal) else v for v in (row[i] for row in rows)]
+                for i, col in enumerate(columns)
+            }
             table = pa.table(col_arrays)
             with lock:
                 if writer is None:

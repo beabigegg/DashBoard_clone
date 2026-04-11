@@ -8,6 +8,7 @@ import io
 import json
 import logging
 import os
+from decimal import Decimal
 from typing import Any, Dict, Generator, List, Optional
 
 import pandas as pd
@@ -300,7 +301,10 @@ def _execute_batched_query_to_parquet(
                 if not rows:
                     continue
 
-                col_arrays: Dict[str, list] = {col: [row[j] for row in rows] for j, col in enumerate(columns)}
+                col_arrays: Dict[str, list] = {
+                    col: [float(v) if isinstance(v, Decimal) else v for v in (row[j] for row in rows)]
+                    for j, col in enumerate(columns)
+                }
 
                 # Inline WORKCENTER_GROUP enrichment
                 if mapping and "WORKCENTERNAME" in col_arrays:
