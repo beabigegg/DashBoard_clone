@@ -19,7 +19,7 @@ class TestAdminMetricsEndpoint:
 
     def test_metrics_accessible(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/metrics", timeout=30
+            f"{app_server}/admin/api/metrics", timeout=30, allow_redirects=False
         )
         assert resp.status_code in (200, 302, 401, 403)
         if resp.status_code == 200:
@@ -28,7 +28,7 @@ class TestAdminMetricsEndpoint:
 
     def test_metrics_has_latency_percentiles(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/metrics", timeout=30
+            f"{app_server}/admin/api/metrics", timeout=30, allow_redirects=False
         )
         if resp.status_code == 200:
             payload = resp.json()
@@ -44,7 +44,7 @@ class TestAdminPerformanceDetailEndpoint:
 
     def test_performance_detail_accessible(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/performance-detail", timeout=30
+            f"{app_server}/admin/api/performance-detail", timeout=30, allow_redirects=False
         )
         assert resp.status_code in (200, 302, 401, 403)
         if resp.status_code == 200:
@@ -53,7 +53,7 @@ class TestAdminPerformanceDetailEndpoint:
 
     def test_performance_detail_returns_list(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/performance-detail", timeout=30
+            f"{app_server}/admin/api/performance-detail", timeout=30, allow_redirects=False
         )
         if resp.status_code == 200:
             payload = resp.json()
@@ -67,7 +67,7 @@ class TestAdminPerformanceHistoryEndpoint:
 
     def test_performance_history_accessible(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/performance-history", timeout=30
+            f"{app_server}/admin/api/performance-history", timeout=30, allow_redirects=False
         )
         assert resp.status_code in (200, 302, 401, 403)
         if resp.status_code == 200:
@@ -76,7 +76,7 @@ class TestAdminPerformanceHistoryEndpoint:
 
     def test_performance_history_default_minutes(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/performance-history?minutes=30", timeout=30
+            f"{app_server}/admin/api/performance-history?minutes=30", timeout=30, allow_redirects=False
         )
         assert resp.status_code in (200, 302, 401, 403)
 

@@ -8,6 +8,9 @@ import time
 
 import pytest
 import requests
+from playwright.sync_api import Page, expect
+
+from tests.e2e.browser_helpers import goto_shell_route, wait_for_any_visible
 
 
 def _post_reject_query(
@@ -297,3 +300,44 @@ class TestRejectHistoryLongRangeE2E:
         assert export_resp.status_code == 200, export_resp.text[:300]
         assert "text/csv" in export_resp.headers.get("Content-Type", "")
         assert "LOT" in export_resp.text[:200]
+
+
+@pytest.mark.e2e
+class TestRejectHistoryBrowserE2E:
+    """Browser E2E for reject-history primary workflow."""
+
+    def test_reject_history_page_runs_primary_query(self, page: Page, app_server: str):
+        preflight = _post_reject_query(
+            app_server,
+            {
+                "mode": "date_range",
+                "start_date": "2026-03-01",
+                "end_date": "2026-03-07",
+            },
+            timeout=120,
+            max_attempts=1,
+        )
+        if preflight.status_code == 503:
+            pytest.skip("reject-history service busy")
+
+        goto_shell_route(page, app_server, "/reject-history", "報廢歷史查詢")
+        expect(page.get_by_role("heading", name="報廢歷史查詢")).to_be_visible()
+
+        query_button = page.locator(".filter-panel .ui-btn--primary").first
+        expect(query_button).to_be_enabled(timeout=60000)
+        query_button.click()
+
+        wait_for_any_visible(
+            page,
+            [
+                "text=明細列表",
+                ".async-job-status-bar",
+                ".warning-banner",
+            ],
+            timeout_ms=180000,
+        )
+
+        if page.locator(".async-job-status-bar").count() > 0:
+            expect(page.locator("text=明細列表")).to_be_visible(timeout=180000)
+        else:
+            expect(page.locator("text=明細列表")).to_be_visible()

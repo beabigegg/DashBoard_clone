@@ -318,11 +318,13 @@ class TestQueryToolBackendIntegration:
             "profile": "query_tool",
             "container_ids": [container_id],
         })
-        assert lineage_resp.status_code == 200
-        payload = lineage_resp.json()
-        inner = payload.get("data", {})
-        assert "children_map" in payload or "ancestors" in payload or "data" in payload or \
-               (isinstance(inner, dict) and ("children_map" in inner or "ancestors" in inner))
+        # 200 = sync result, 202 = async job accepted
+        assert lineage_resp.status_code in (200, 202)
+        if lineage_resp.status_code == 200:
+            payload = lineage_resp.json()
+            inner = payload.get("data", {})
+            assert "children_map" in payload or "ancestors" in payload or "data" in payload or \
+                   (isinstance(inner, dict) and ("children_map" in inner or "ancestors" in inner))
 
 
 # ---------------------------------------------------------------------------

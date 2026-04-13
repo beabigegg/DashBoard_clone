@@ -18,6 +18,8 @@ from mes_dashboard.app import create_app
 from mes_dashboard.services import page_registry
 from mes_dashboard.routes import user_auth_routes
 
+pytestmark = [pytest.mark.e2e, pytest.mark.local_e2e]
+
 
 @pytest.fixture
 def temp_page_status(tmp_path):

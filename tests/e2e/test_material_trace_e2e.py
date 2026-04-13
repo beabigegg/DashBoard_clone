@@ -12,6 +12,9 @@ import time
 
 import pytest
 import requests
+from playwright.sync_api import Page, expect
+
+from tests.e2e.browser_helpers import goto_shell_route, wait_for_any_visible
 
 
 def _poll_material_trace_until_ready(app_server, job_id, timeout=180):
@@ -114,3 +117,44 @@ class TestMaterialTraceE2E:
             return
         assert "rows" in data or "items" in data
         assert "pagination" in data
+
+
+@pytest.mark.e2e
+class TestMaterialTraceBrowserE2E:
+    """Browser E2E for the material-trace page workflow."""
+
+    def test_material_trace_page_executes_forward_query(self, page: Page, app_server: str):
+        probe = requests.post(
+            f"{app_server}/api/material-trace/query",
+            json={
+                "mode": "lot",
+                "values": ["TEST-LOT-001"],
+                "page": 1,
+                "per_page": 10,
+            },
+            timeout=120,
+        )
+        if probe.status_code not in (200, 202):
+            pytest.skip(f"Material trace preflight unavailable: {probe.status_code}")
+
+        goto_shell_route(page, app_server, "/material-trace", "原物料追溯查詢")
+        expect(page.get_by_role("heading", name="原物料追溯查詢")).to_be_visible()
+
+        textarea = page.locator("textarea.filter-textarea")
+        expect(textarea).to_be_visible()
+        textarea.fill("TEST-LOT-001")
+
+        query_button = page.locator(".filter-toolbar .ui-btn--primary").first
+        expect(query_button).to_be_enabled()
+        query_button.click()
+
+        wait_for_any_visible(
+            page,
+            [
+                "text=查詢結果",
+                ".warning-banner",
+                ".ui-table-wrap",
+            ],
+            timeout_ms=180000,
+        )
+        expect(page.locator("text=查詢結果")).to_be_visible()

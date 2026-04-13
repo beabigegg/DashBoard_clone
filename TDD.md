@@ -69,7 +69,9 @@ WATCHDOG_RUNTIME_DIR=./tmp
 |----------|----------|------|
 | 單元測試（預設） | `pytest tests/` | 不需要 Oracle/Redis，全部 Mock |
 | 整合測試 | `pytest tests/ --run-integration` | 需要真實 Oracle 連線（從 `.env` 讀取） |
-| E2E 測試 | `pytest tests/ --run-e2e` | 需要完整環境 |
+| E2E 測試（本地） | `./scripts/run_e2e.sh` | 需要完整環境，自動檢查本地伺服器狀態，log 至 `logs/e2e_local.log` |
+| E2E 測試（雙 target） | `E2E_REMOTE_URL=http://host:port ./scripts/run_e2e.sh` | 先跑本地，再跑遠端 sequential；遠端 log 至 `logs/e2e_remote.log` |
+| E2E 測試（直接） | `pytest tests/ --run-e2e` | 可用 `E2E_BASE_URL` / `E2E_BASE_PATH` 指向指定站台 |
 | 前端測試 | `npm --prefix frontend test` | Node.js test runner |
 
 ### 2.4 主要 Fixtures（`tests/conftest.py`）

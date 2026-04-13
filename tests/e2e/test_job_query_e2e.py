@@ -11,6 +11,9 @@ Run with: pytest tests/e2e/test_job_query_e2e.py -v -s
 
 import pytest
 import requests
+from playwright.sync_api import Page, expect
+
+from tests.e2e.browser_helpers import goto_shell_route, wait_for_any_visible
 
 
 @pytest.mark.e2e
@@ -87,3 +90,43 @@ class TestJobQueryE2E:
         assert resp.status_code == 400
         payload = resp.json()
         assert "730" in payload.get("error", {}).get("message", "")
+
+
+@pytest.mark.e2e
+class TestJobQueryBrowserE2E:
+    """Browser E2E for the job-query page workflow."""
+
+    def test_job_query_page_restores_url_and_runs_query(self, page: Page, app_server: str):
+        res_resp = requests.get(f"{app_server}/api/job-query/resources", timeout=30)
+        if res_resp.status_code != 200:
+            pytest.skip("Cannot discover job-query resources")
+        resources = res_resp.json().get("data", {}).get("data", [])
+        if not resources:
+            pytest.skip("No job-query resources available")
+
+        resource_id = str(resources[0].get("RESOURCEID", "")).strip()
+        if not resource_id:
+            pytest.skip("No RESOURCEID available for browser workflow")
+
+        goto_shell_route(
+            page,
+            app_server,
+            "/job-query",
+            "設備維修查詢",
+            resource_ids=resource_id,
+            start_date="2026-03-01",
+            end_date="2026-03-07",
+        )
+        expect(page.get_by_role("heading", name="設備維修查詢")).to_be_visible()
+        expect(page.locator("text=已選設備：1")).to_be_visible(timeout=60000)
+
+        wait_for_any_visible(
+            page,
+            [
+                ".job-query-page .ui-table-wrap",
+                "text=目前無資料",
+                "text=維修紀錄",
+            ],
+            timeout_ms=120000,
+        )
+        expect(page.locator("text=維修紀錄")).to_be_visible()

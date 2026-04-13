@@ -71,7 +71,7 @@ class TestQueryToolUiUxE2E:
         """Multi-query input should sync counter + URL and survive reload."""
         _intercept_navigation_as_admin(page)
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(1500)
+        expect(page.locator("textarea.query-tool-textarea:visible").first).to_be_visible(timeout=30000)
 
         visible_textarea = page.locator("textarea.query-tool-textarea:visible").first
         visible_textarea.fill("GA26010001\nGA26010002, GA26010003")
@@ -120,8 +120,9 @@ class TestQueryToolUiUxE2E:
             timeout=60000,
         )
 
-        page.wait_for_timeout(1500)
         date_inputs = page.locator("input[type='date']")
+        expect(date_inputs.first).to_be_visible(timeout=30000)
+        expect(date_inputs.nth(1)).to_be_visible(timeout=30000)
         expect(date_inputs.first).to_have_value(start_date)
         expect(date_inputs.nth(1)).to_have_value(end_date)
 
@@ -146,7 +147,7 @@ class TestQueryToolUiUxE2E:
         """Rapid resolve + tab switching should keep page responsive without crashes."""
         _intercept_navigation_as_admin(page)
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(1200)
+        expect(page.locator("select.query-tool-select:visible").first).to_be_visible(timeout=30000)
 
         js_errors = []
         page.on("pageerror", lambda error: js_errors.append(str(error)))

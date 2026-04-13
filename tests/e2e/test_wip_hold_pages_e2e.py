@@ -16,10 +16,14 @@ def _pick_workcenter(app_server: str) -> str:
     """Pick a real workcenter to reduce flaky E2E failures."""
     try:
         response = requests.get(f"{app_server}/api/wip/meta/workcenters", timeout=10)
-        payload = response.json() if response.ok else {}
-        items = payload.get("data") or []
-        if items:
+        if response.status_code == 200:
+            payload = response.json()
+            items = payload.get("data") or []
+            if not items:
+                pytest.skip("No workcenter data available")
             return items[0].get("name") or "TMTT"
+    except pytest.skip.Exception:
+        raise
     except Exception:
         pass
     return "TMTT"
@@ -29,10 +33,14 @@ def _pick_hold_reason(app_server: str) -> str:
     """Pick a real hold reason to reduce flaky E2E failures."""
     try:
         response = requests.get(f"{app_server}/api/wip/overview/hold", timeout=10)
-        payload = response.json() if response.ok else {}
-        items = (payload.get("data") or {}).get("items") or []
-        if items:
+        if response.status_code == 200:
+            payload = response.json()
+            items = (payload.get("data") or {}).get("items") or []
+            if not items:
+                pytest.skip("No hold reason data available")
             return items[0].get("reason") or "YieldLimit"
+    except pytest.skip.Exception:
+        raise
     except Exception:
         pass
     return "YieldLimit"
@@ -149,32 +157,44 @@ class TestWipAndHoldPagesE2E:
 
     def test_hold_detail_calls_summary_distribution_and_lots(self, page: Page, app_server: str):
         reason = _pick_hold_reason(app_server)
-        seen = set()
-
-        def handle_response(resp):
-            parsed = urlparse(resp.url)
-            query = parse_qs(parsed.query)
-            if query.get("reason", [None])[0] != reason:
-                return
-            if parsed.path.endswith("/api/wip/hold-detail/summary"):
-                seen.add("summary")
-            elif parsed.path.endswith("/api/wip/hold-detail/distribution"):
-                seen.add("distribution")
-            elif parsed.path.endswith("/api/wip/hold-detail/lots"):
-                seen.add("lots")
-
-        page.on("response", handle_response)
         page.goto(
             f"{app_server}/hold-detail?reason={quote(reason)}",
             wait_until="commit",
             timeout=60000,
         )
 
-        deadline = time.time() + 30
-        while time.time() < deadline and len(seen) < 3:
-            page.wait_for_timeout(200)
+        summary_resp = _wait_for_response(
+            page,
+            lambda resp: (
+                "/api/wip/hold-detail/summary" in resp.url
+                and parse_qs(urlparse(resp.url).query).get("reason", [None])[0] == reason
+            ),
+            timeout_seconds=30.0,
+        )
+        assert summary_resp is not None, "Did not observe summary request"
+        assert summary_resp.ok
 
-        assert seen == {"summary", "distribution", "lots"}
+        distribution_resp = _wait_for_response(
+            page,
+            lambda resp: (
+                "/api/wip/hold-detail/distribution" in resp.url
+                and parse_qs(urlparse(resp.url).query).get("reason", [None])[0] == reason
+            ),
+            timeout_seconds=30.0,
+        )
+        assert distribution_resp is not None, "Did not observe distribution request"
+        assert distribution_resp.ok
+
+        lots_resp = _wait_for_response(
+            page,
+            lambda resp: (
+                "/api/wip/hold-detail/lots" in resp.url
+                and parse_qs(urlparse(resp.url).query).get("reason", [None])[0] == reason
+            ),
+            timeout_seconds=30.0,
+        )
+        assert lots_resp is not None, "Did not observe lots request"
+        assert lots_resp.ok
 
     def test_portal_shell_deep_links_keep_detail_routes(self, page: Page, app_server: str):
         workcenter = _pick_workcenter(app_server)

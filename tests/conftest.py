@@ -2,13 +2,16 @@
 """Pytest configuration and fixtures for MES Dashboard tests."""
 
 import logging
-import pytest
-import sys
 import os
+import sys
+from urllib.parse import urlsplit
 
-# Add the src directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+import pytest
+
+# Add the src directory and project root to Python path
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(_PROJECT_ROOT, 'src'))
+sys.path.insert(0, _PROJECT_ROOT)
 _TMP_DIR = os.path.join(_PROJECT_ROOT, 'tmp')
 
 # Test baseline env: keep pytest isolated from local runtime/.env side effects.
@@ -20,6 +23,18 @@ os.environ.setdefault('WATCHDOG_RUNTIME_DIR', _TMP_DIR)
 os.environ.setdefault('WATCHDOG_RESTART_FLAG', os.path.join(_TMP_DIR, 'mes_dashboard_restart.flag'))
 os.environ.setdefault('WATCHDOG_PID_FILE', os.path.join(_TMP_DIR, 'gunicorn.pid'))
 os.environ.setdefault('WATCHDOG_STATE_FILE', os.path.join(_TMP_DIR, 'mes_dashboard_restart_state.json'))
+
+
+def _is_external_e2e_target() -> bool:
+    """Return True when e2e tests target a remote/external deployment."""
+    explicit = os.environ.get('E2E_EXTERNAL_TARGET', '').strip().lower()
+    if explicit in {'1', 'true', 'yes', 'on'}:
+        return True
+    if explicit in {'0', 'false', 'no', 'off'}:
+        return False
+
+    host = urlsplit(os.environ.get('E2E_BASE_URL', 'http://127.0.0.1:8080')).hostname or ''
+    return host not in {'127.0.0.1', 'localhost', '0.0.0.0'}
 
 
 def _load_dotenv_if_present():
@@ -113,6 +128,9 @@ def pytest_configure(config):
         "markers", "e2e: mark test as end-to-end test (requires running server)"
     )
     config.addinivalue_line(
+        "markers", "local_e2e: mark test as requiring an in-process local Flask app"
+    )
+    config.addinivalue_line(
         "markers", "redis: mark test as requiring Redis connection"
     )
     config.addinivalue_line(
@@ -155,11 +173,17 @@ def pytest_collection_modifyitems(config, items):
     skip_integration = pytest.mark.skip(reason="need --run-integration option to run")
     skip_e2e = pytest.mark.skip(reason="need --run-e2e option to run")
     skip_stress = pytest.mark.skip(reason="need --run-stress option to run")
+    skip_local_e2e = pytest.mark.skip(
+        reason="requires local in-process app; skip when targeting an external E2E deployment"
+    )
+    external_e2e_target = _is_external_e2e_target()
 
     for item in items:
         if "integration" in item.keywords and not run_integration:
             item.add_marker(skip_integration)
         if "e2e" in item.keywords and not run_e2e:
             item.add_marker(skip_e2e)
+        if "local_e2e" in item.keywords and external_e2e_target:
+            item.add_marker(skip_local_e2e)
         if (item.get_closest_marker("stress") or item.get_closest_marker("load")) and not run_stress:
             item.add_marker(skip_stress)

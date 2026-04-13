@@ -18,7 +18,7 @@ import pytest
 import redis
 import requests
 
-pytestmark = [pytest.mark.e2e]
+pytestmark = [pytest.mark.e2e, pytest.mark.local_only]
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 REDIS_KEY_PREFIX = os.getenv("REDIS_KEY_PREFIX", "mes_wip")

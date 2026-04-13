@@ -12,6 +12,9 @@ Run with: pytest tests/e2e/test_production_history_e2e.py -v --run-e2e
 
 import pytest
 import requests
+from playwright.sync_api import Page, expect
+
+from tests.e2e.browser_helpers import goto_shell_route, wait_for_any_visible
 
 
 @pytest.mark.e2e
@@ -25,7 +28,8 @@ class TestProductionHistoryTypeOptions:
         assert resp.status_code == 200
         payload = resp.json()
         assert payload["success"] is True
-        assert isinstance(payload["data"], list) or "pj_types" in payload.get("data", {})
+        data = payload["data"]
+        assert isinstance(data, dict) and isinstance(data.get("items"), list)
 
 
 @pytest.mark.e2e
@@ -62,8 +66,9 @@ class TestProductionHistoryQuery:
             },
             timeout=120,
         )
-        assert resp.status_code in (200, 503)
-        if resp.status_code == 200:
+        # 200/202 = success (sync or async); 400 = no data for range; 503 = overloaded
+        assert resp.status_code in (200, 202, 400, 503)
+        if resp.status_code in (200, 202):
             payload = resp.json()
             assert payload["success"] is True
             assert "dataset_id" in payload["data"]
@@ -109,3 +114,49 @@ class TestProductionHistoryMatrix:
         assert resp.status_code in (410, 400)
         payload = resp.json()
         assert payload["success"] is False
+
+
+@pytest.mark.e2e
+class TestProductionHistoryBrowserE2E:
+    """Browser E2E for production-history primary workflow."""
+
+    def test_production_history_page_runs_query(self, page: Page, app_server: str):
+        resp = requests.get(f"{app_server}/api/production-history/type-options", timeout=30)
+        if resp.status_code != 200:
+            pytest.skip("Cannot load production-history type options")
+        payload = resp.json().get("data", {})
+        type_items = payload.get("items") if isinstance(payload, dict) else payload
+        if not type_items:
+            pytest.skip("No production-history types available")
+
+        first_type = type_items[0]
+        if isinstance(first_type, dict):
+            type_label = str(first_type.get("label") or first_type.get("value") or first_type.get("name") or "").strip()
+        else:
+            type_label = str(first_type).strip()
+        if not type_label:
+            pytest.skip("Unable to resolve production-history type label")
+
+        goto_shell_route(page, app_server, "/production-history", "生產歷程查詢")
+        expect(page.get_by_role("heading", name="生產歷程查詢")).to_be_visible()
+
+        trigger = page.locator(".ph-app__filter-field--type .multi-select-trigger").first
+        expect(trigger).to_be_visible(timeout=60000)
+        trigger.click()
+        page.locator(".multi-select-option", has_text=type_label).first.click()
+        page.locator(".multi-select-actions button", has_text="關閉").click()
+
+        query_button = page.locator(".ph-app__filter-actions .ui-btn--primary").first
+        expect(query_button).to_be_enabled()
+        query_button.click()
+
+        wait_for_any_visible(
+            page,
+            [
+                "text=Workcenter x Equipment Matrix",
+                "text=明細資料",
+                ".ph-app__empty-state",
+            ],
+            timeout_ms=180000,
+        )
+        expect(page.locator("text=明細資料")).to_be_visible(timeout=180000)

@@ -20,7 +20,7 @@ class TestAdminDashboardSystemStatus:
 
     def test_system_status_returns_success_envelope(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/system-status", timeout=30
+            f"{app_server}/admin/api/system-status", timeout=30, allow_redirects=False
         )
         # Unauthenticated requests will be redirected or return 401/403;
         # authenticated env will return 200.
@@ -31,7 +31,7 @@ class TestAdminDashboardSystemStatus:
 
     def test_system_status_data_shape_when_authenticated(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/system-status", timeout=30
+            f"{app_server}/admin/api/system-status", timeout=30, allow_redirects=False
         )
         if resp.status_code == 200:
             payload = resp.json()
@@ -45,7 +45,7 @@ class TestAdminDashboardWorkerStatus:
 
     def test_worker_status_accessible(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/worker/status", timeout=30
+            f"{app_server}/admin/api/worker/status", timeout=30, allow_redirects=False
         )
         assert resp.status_code in (200, 302, 401, 403)
         if resp.status_code == 200:
@@ -54,7 +54,7 @@ class TestAdminDashboardWorkerStatus:
 
     def test_worker_status_has_required_fields(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/worker/status", timeout=30
+            f"{app_server}/admin/api/worker/status", timeout=30, allow_redirects=False
         )
         if resp.status_code == 200:
             payload = resp.json()
@@ -69,7 +69,7 @@ class TestAdminDashboardStorageInfo:
 
     def test_storage_info_returns_disk_metrics(self, app_server):
         resp = requests.get(
-            f"{app_server}/admin/api/storage-info", timeout=30
+            f"{app_server}/admin/api/storage-info", timeout=30, allow_redirects=False
         )
         assert resp.status_code in (200, 302, 401, 403)
         if resp.status_code == 200:

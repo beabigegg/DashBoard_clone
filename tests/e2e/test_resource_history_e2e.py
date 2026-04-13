@@ -19,6 +19,8 @@ import mes_dashboard.core.database as db
 import mes_dashboard.core.redis_client as _redis_mod
 from mes_dashboard.app import create_app
 
+pytestmark = [pytest.mark.e2e, pytest.mark.local_e2e]
+
 
 @pytest.fixture
 def app():

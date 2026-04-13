@@ -39,6 +39,7 @@ from mes_dashboard.services.production_history_service import (
     get_type_options,
     make_canonical_spool_id,
     query_production_history,
+    validate_query_params,
 )
 from mes_dashboard.services.production_history_sql_runtime import (
     compute_detail_page,
@@ -156,11 +157,13 @@ def api_production_history_query():
     if payload_error is not None:
         return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
-    # Check if spool already exists for these params — serve immediately if so
     try:
-        dataset_id = make_canonical_spool_id(body)
-    except (KeyError, ValueError):
-        dataset_id = None
+        validate_query_params(body)
+    except ValueError as exc:
+        return error_response(VALIDATION_ERROR, str(exc), status_code=400)
+
+    # Check if spool already exists for these params — serve immediately if so
+    dataset_id = make_canonical_spool_id(body)
 
     if dataset_id and get_spool_file_path(_SPOOL_NAMESPACE, dataset_id) is not None:
         try:

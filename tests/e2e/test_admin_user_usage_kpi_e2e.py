@@ -19,6 +19,7 @@ class TestAdminUserUsageKpiEndpoint:
         resp = requests.get(
             f"{app_server}/admin/api/user-usage-kpi",
             timeout=30,
+            allow_redirects=False,
         )
         assert resp.status_code in (200, 400, 302, 401, 403)
         if resp.status_code in (200, 400):
@@ -30,6 +31,7 @@ class TestAdminUserUsageKpiEndpoint:
             f"{app_server}/admin/api/user-usage-kpi",
             params={"start_date": "2026-03-01", "end_date": "2026-03-31"},
             timeout=60,
+            allow_redirects=False,
         )
         assert resp.status_code in (200, 302, 401, 403)
         if resp.status_code == 200:
@@ -47,6 +49,7 @@ class TestAdminUserUsageKpiEndpoint:
                 "department": "ENG",
             },
             timeout=60,
+            allow_redirects=False,
         )
         assert resp.status_code in (200, 302, 401, 403)
         if resp.status_code == 200:
@@ -58,6 +61,7 @@ class TestAdminUserUsageKpiEndpoint:
             f"{app_server}/admin/api/user-usage-kpi",
             params={"start_date": "2026-03-01", "end_date": "2026-03-31"},
             timeout=60,
+            allow_redirects=False,
         )
         if resp.status_code == 200:
             payload = resp.json()
