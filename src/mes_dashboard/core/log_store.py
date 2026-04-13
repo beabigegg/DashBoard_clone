@@ -14,7 +14,7 @@ import sqlite3
 import threading
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
 
@@ -72,6 +72,33 @@ _MIGRATION_COLUMNS = [
 ]
 
 _HOSTNAME = socket.gethostname()
+
+
+def _normalize_iso_to_utc(value) -> str:
+    """Normalize a timestamp value to UTC ISO 8601 string with +00:00 suffix.
+
+    Accepts a datetime object or string. Naive values (no timezone info) are
+    assumed to be in the server's current local timezone and converted to UTC.
+
+    Returns:
+        UTC ISO 8601 string in format YYYY-MM-DDTHH:MM:SS.ffffff+00:00
+    """
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str) and value:
+        try:
+            dt = datetime.fromisoformat(value)
+        except (ValueError, TypeError):
+            return value  # Return original string if unparseable
+    else:
+        return str(value) if value is not None else ''
+
+    if dt.tzinfo is None:
+        # Assume server local timezone
+        local_tz = datetime.now().astimezone().tzinfo
+        dt = dt.replace(tzinfo=local_tz)
+
+    return dt.astimezone(timezone.utc).isoformat()
 
 
 # ============================================================
@@ -202,7 +229,7 @@ class LogStore:
         if not self._initialized:
             self.initialize()
 
-        timestamp = datetime.now().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         extra_str = None
         if extra:
             import json
@@ -291,7 +318,12 @@ class LogStore:
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
 
-                return [dict(row) for row in rows]
+                result = []
+                for row in rows:
+                    d = dict(row)
+                    d['timestamp'] = _normalize_iso_to_utc(d.get('timestamp'))
+                    result.append(d)
+                return result
         except Exception as e:
             logger.error(f"Failed to query logs: {e}")
             return []
@@ -523,7 +555,12 @@ class LogStore:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(query, params)
-                return [dict(row) for row in cursor.fetchall()]
+                result = []
+                for row in cursor.fetchall():
+                    d = dict(row)
+                    d['timestamp'] = _normalize_iso_to_utc(d.get('timestamp'))
+                    result.append(d)
+                return result
         except Exception as e:
             logger.error(f"Failed to query_logs_all: {e}")
             return []

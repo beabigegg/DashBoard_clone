@@ -88,3 +88,50 @@ class TestAdminDashboardPageLoad:
             allow_redirects=True,
         )
         assert resp.status_code in (200, 302, 401, 403)
+
+
+@pytest.mark.e2e
+class TestAdminDashboardLogs:
+    """E2E tests for /admin/api/logs."""
+
+    def test_logs_accessible(self, app_server):
+        import re
+        resp = requests.get(
+            f"{app_server}/admin/api/logs?limit=5", timeout=30, allow_redirects=False
+        )
+        assert resp.status_code in (200, 302, 401, 403)
+        if resp.status_code == 200:
+            payload = resp.json()
+            assert payload["success"] is True
+            logs = payload.get("data", {}).get("logs", [])
+            ts_pattern = re.compile(
+                r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?\+00:00$'
+            )
+            for row in logs:
+                ts = row.get("timestamp", "")
+                assert ts_pattern.match(ts), (
+                    f"timestamp {ts!r} does not match UTC ISO 8601 format"
+                )
+
+
+@pytest.mark.e2e
+class TestAdminLogCleanup:
+    """E2E tests for log cleanup endpoints."""
+
+    def test_log_files_cleanup_accessible(self, app_server):
+        resp = requests.post(
+            f"{app_server}/admin/api/log-files/cleanup",
+            json={"targets": ["logs"]},
+            timeout=30,
+            allow_redirects=False,
+        )
+        assert resp.status_code in (200, 302, 401, 403)
+
+    def test_logs_cleanup_accessible(self, app_server):
+        resp = requests.post(
+            f"{app_server}/admin/api/logs/cleanup",
+            json={"clear_all": True},
+            timeout=30,
+            allow_redirects=False,
+        )
+        assert resp.status_code in (200, 302, 401, 403)

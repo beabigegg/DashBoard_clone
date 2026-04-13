@@ -270,10 +270,18 @@ def api_logs():
         )
         mysql_rows = _query_mysql_logs(level=level, q=q, since=since, limit=limit)
 
-        # Merge sort by timestamp DESC — normalise to str for cross-source comparison
+        # Merge sort by timestamp DESC — parse to datetime for correct cross-source ordering
+        def _sort_key(r):
+            ts = r.get("timestamp") or ""
+            try:
+                return datetime.fromisoformat(ts)
+            except (ValueError, TypeError):
+                from datetime import timezone as _tz
+                return datetime.min.replace(tzinfo=_tz.utc)
+
         all_rows = sorted(
             sqlite_rows + mysql_rows,
-            key=lambda r: str(r.get("timestamp") or ""),
+            key=_sort_key,
             reverse=True,
         )
         merged = all_rows[offset: offset + limit]
@@ -323,9 +331,18 @@ def _query_mysql_logs(
         with get_mysql_connection() as conn:
             result = conn.execute(sql, params)
             keys = result.keys()
-            return [dict(zip(keys, row)) for row in result.fetchall()]
+            rows = []
+            for row in result.fetchall():
+                d = dict(zip(keys, row))
+                from mes_dashboard.core.log_store import _normalize_iso_to_utc
+                d['timestamp'] = _normalize_iso_to_utc(d.get('timestamp'))
+                rows.append(d)
+            return rows
     except Exception as exc:
-        logger.warning("MySQL log query failed, falling back to SQLite only: %s", exc)
+        logger.error(
+            "MySQL log query failed, falling back to SQLite only: %s", exc,
+            exc_info=True,
+        )
         return []
 
 
@@ -657,7 +674,10 @@ def _query_mysql_metrics(minutes: int = 30, bucket_seconds: int = 30) -> list:
                 rows.append(d)
             return rows
     except Exception as exc:
-        logger.warning("MySQL metrics query failed, using SQLite only: %s", exc)
+        logger.error(
+            "MySQL metrics query failed, using SQLite only: %s", exc,
+            exc_info=True,
+        )
         return []
 
 

@@ -6,7 +6,7 @@ import pytest
 import sqlite3
 import tempfile
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from mes_dashboard.core.log_store import (
@@ -108,7 +108,7 @@ class TestLogStore:
 
         # Record time after first log
         time.sleep(0.1)
-        since_time = datetime.now().isoformat()
+        since_time = datetime.now(timezone.utc).isoformat()
 
         # Write some new logs
         time.sleep(0.1)
@@ -185,7 +185,7 @@ class TestLogStoreRetention:
             # Insert an old log directly into the database
             conn = sqlite3.connect(temp_db_path)
             cursor = conn.cursor()
-            old_time = (datetime.now() - timedelta(days=2)).isoformat()
+            old_time = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
             cursor.execute("""
                 INSERT INTO logs (timestamp, level, logger_name, message)
                 VALUES (?, 'INFO', 'test', 'Old message')
@@ -354,7 +354,7 @@ class TestLogStoreSyncFields:
 
         # Manually backdate the timestamp to make it "old"
         conn = sqlite3.connect(temp_db_path)
-        old_ts = (datetime.now() - timedelta(hours=2)).isoformat()
+        old_ts = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
         conn.execute("UPDATE logs SET timestamp = ? WHERE synced = 1", (old_ts,))
         conn.commit()
         conn.close()
@@ -374,3 +374,73 @@ class TestLogStoreSyncFields:
 
         batch = log_store.get_unsynced(batch_size=3)
         assert len(batch) == 3
+
+
+class TestLogStoreTimestampNormalization:
+    """Test _normalize_iso_to_utc helper and read-side normalization."""
+
+    @pytest.fixture
+    def temp_db_path(self):
+        fd, path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        yield path
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+    @pytest.fixture
+    def log_store(self, temp_db_path):
+        store = LogStore(db_path=temp_db_path)
+        store.initialize()
+        return store
+
+    def test_normalize_naive_string(self):
+        """Naive ISO string is treated as local time and converted to UTC."""
+        from mes_dashboard.core.log_store import _normalize_iso_to_utc
+        result = _normalize_iso_to_utc("2026-04-13T03:48:30.123456")
+        assert result.endswith("+00:00")
+        # Must be parseable as a UTC datetime
+        dt = datetime.fromisoformat(result)
+        assert dt.tzinfo is not None
+
+    def test_normalize_aware_string(self):
+        """Aware ISO string is normalized to +00:00."""
+        from mes_dashboard.core.log_store import _normalize_iso_to_utc
+        result = _normalize_iso_to_utc("2026-04-13T11:48:30.000000+08:00")
+        assert result.endswith("+00:00")
+        dt = datetime.fromisoformat(result)
+        assert dt.hour == 3  # 11:00+08:00 == 03:00 UTC
+
+    def test_normalize_datetime_object(self):
+        """datetime object (naive) is converted to UTC ISO string."""
+        from mes_dashboard.core.log_store import _normalize_iso_to_utc
+        naive_dt = datetime(2026, 4, 13, 12, 0, 0, 0)
+        result = _normalize_iso_to_utc(naive_dt)
+        assert result.endswith("+00:00")
+        # Result must be parseable as UTC datetime
+        dt = datetime.fromisoformat(result)
+        assert dt.tzinfo is not None
+
+    def test_normalize_unparseable_string(self):
+        """Unparseable string is returned as-is without crashing."""
+        from mes_dashboard.core.log_store import _normalize_iso_to_utc
+        result = _normalize_iso_to_utc("not-a-date")
+        assert result == "not-a-date"
+
+    def test_query_logs_normalizes_naive_timestamp(self, log_store, temp_db_path):
+        """query_logs normalizes naive timestamps stored directly in SQLite."""
+        # Insert a naive timestamp directly bypassing write_log
+        conn = sqlite3.connect(temp_db_path)
+        conn.execute(
+            "INSERT INTO logs (timestamp, level, logger_name, message) "
+            "VALUES (?, 'INFO', 'test', 'legacy row')",
+            ("2026-04-13T03:48:30.000000",)
+        )
+        conn.commit()
+        conn.close()
+
+        logs = log_store.query_logs(limit=10)
+        legacy = [l for l in logs if l["message"] == "legacy row"]
+        assert len(legacy) == 1
+        assert legacy[0]["timestamp"].endswith("+00:00")

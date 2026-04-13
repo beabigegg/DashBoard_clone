@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 
 import { apiGet, apiPost } from '../../core/api.js';
+import { formatLogTime } from '../../core/datetime.js';
 import GaugeBar from '../../admin-shared/components/GaugeBar.vue';
 import StatCard from '../../admin-shared/components/StatCard.vue';
 import StatusDot from '../../admin-shared/components/StatusDot.vue';
@@ -15,27 +16,22 @@ import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 import {
   usePerfDetail,
   usePerfHistory,
-  useStorageInfo,
 } from '../../admin-shared/composables/useAdminData.js';
 
 const perfDetailHook = usePerfDetail();
 const historyHook = usePerfHistory(30, 30);
-const storageHook = useStorageInfo();
 
 const workerData = ref(null);
 const workerStatusError = ref('');
 const restartLoading = ref(false);
 const showRestartModal = ref(false);
-const storagePurging = ref(false);
 
 const perfDetail = computed(() => perfDetailHook.data.value || null);
 const historyData = computed(() => historyHook.data.value || []);
-const storageInfo = computed(() => storageHook.data.value || null);
 
 const errorMessage = computed(
   () => perfDetailHook.error.value
     || historyHook.error.value
-    || storageHook.error.value
     || workerStatusError.value
     || '',
 );
@@ -87,15 +83,7 @@ const rqWorkers = computed(() => asyncWorkers.value.workers?.workers || []);
 const rqQueues = computed(() => asyncWorkers.value.queues?.queues || []);
 const heavyQuerySlots = computed(() => asyncWorkers.value.slots || null);
 
-const workerStartTimeDisplay = computed(() => {
-  const value = workerData.value?.worker_start_time;
-  if (!value) return '-';
-  try {
-    return new Date(value).toLocaleString('zh-TW');
-  } catch {
-    return value;
-  }
-});
+const workerStartTimeDisplay = computed(() => formatLogTime(workerData.value?.worker_start_time));
 
 const workerCooldownActive = computed(() => workerData.value?.cooldown?.active || false);
 const cooldownDisplay = computed(() => {
@@ -148,14 +136,6 @@ function formatUptime(birthDate) {
   }
 }
 
-function formatBytes(bytes) {
-  if (bytes == null || bytes === 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
-  return `${(bytes / 1073741824).toFixed(2)} GB`;
-}
-
 async function loadWorkerStatus() {
   workerStatusError.value = '';
   try {
@@ -179,42 +159,10 @@ async function doRestart() {
   }
 }
 
-async function purgeMetricsHistory() {
-  if (!window.confirm('確定要清除所有效能快照資料？清除後趨勢圖將重新累積。')) {
-    return;
-  }
-  storagePurging.value = true;
-  try {
-    await apiPost('/admin/api/performance-history/purge', {});
-    await Promise.all([storageHook.refresh(), historyHook.refresh()]);
-  } finally {
-    storagePurging.value = false;
-  }
-}
-
-async function cleanupLogFiles(targets) {
-  const label = targets.includes('logs') && targets.includes('archive')
-    ? '所有 Log 和 Archive'
-    : targets.includes('archive')
-      ? 'Archive 目錄'
-      : 'Log 檔案';
-  if (!window.confirm(`確定要清理${label}？`)) {
-    return;
-  }
-  storagePurging.value = true;
-  try {
-    await apiPost('/admin/api/log-files/cleanup', { targets });
-    await storageHook.refresh();
-  } finally {
-    storagePurging.value = false;
-  }
-}
-
 async function refresh() {
   await Promise.all([
     perfDetailHook.refresh(),
     historyHook.refresh(),
-    storageHook.refresh(),
     loadWorkerStatus(),
   ]);
 }
@@ -409,74 +357,6 @@ onMounted(() => {
       :snapshots="historyData"
       :series="asyncQueueTrendSeries"
     />
-
-    <SectionCard v-if="storageInfo">
-      <template #header><h2 class="panel-title">儲存空間管理</h2></template>
-      <p class="storage-total">總使用量：{{ formatBytes(storageInfo.total_bytes) }}</p>
-
-      <div class="storage-section">
-        <h4>SQLite 資料庫</h4>
-        <DataTable :data="storageInfo.sqlite_files || []">
-          <DataTableColumn columnKey="path" label="檔案" />
-          <DataTableColumn columnKey="size_bytes" label="大小" align="right" />
-          <DataTableColumn columnKey="actions" label="操作" />
-          <template #cell="{ row, columnKey }">
-            <template v-if="columnKey === 'size_bytes'">{{ formatBytes(row.size_bytes) }}</template>
-            <template v-else-if="columnKey === 'actions'">
-              <button
-                v-if="row.path.includes('metrics_history')"
-                class="ui-btn ui-btn--danger ui-btn--sm"
-                :disabled="storagePurging"
-                @click="purgeMetricsHistory"
-              >
-                清除快照
-              </button>
-            </template>
-            <template v-else>{{ row[columnKey] }}</template>
-          </template>
-        </DataTable>
-      </div>
-
-      <div class="storage-section">
-        <h4>Log 檔案</h4>
-        <DataTable :data="storageInfo.log_files || []">
-          <DataTableColumn columnKey="path" label="檔案" />
-          <DataTableColumn columnKey="size_bytes" label="大小" align="right" />
-          <template #cell="{ row, columnKey }">
-            <template v-if="columnKey === 'size_bytes'">{{ formatBytes(row.size_bytes) }}</template>
-            <template v-else>{{ row[columnKey] }}</template>
-          </template>
-        </DataTable>
-      </div>
-
-      <div class="storage-section" v-if="storageInfo.archive_files?.length">
-        <h4>Archive ({{ storageInfo.archive_files.length }} 檔, {{ formatBytes(storageInfo.archive_total_bytes) }})</h4>
-        <DataTable :data="storageInfo.archive_files || []">
-          <DataTableColumn columnKey="path" label="檔案" />
-          <DataTableColumn columnKey="size_bytes" label="大小" align="right" />
-          <template #cell="{ row, columnKey }">
-            <template v-if="columnKey === 'size_bytes'">{{ formatBytes(row.size_bytes) }}</template>
-            <template v-else>{{ row[columnKey] }}</template>
-          </template>
-        </DataTable>
-      </div>
-
-      <div class="storage-actions">
-        <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="storagePurging" @click="cleanupLogFiles(['logs'])">
-          {{ storagePurging ? '清理中...' : '清空 Log 檔案' }}
-        </button>
-        <button
-          class="ui-btn ui-btn--ghost ui-btn--sm"
-          :disabled="storagePurging || !storageInfo.archive_files?.length"
-          @click="cleanupLogFiles(['archive'])"
-        >
-          清空 Archive
-        </button>
-        <button class="ui-btn ui-btn--danger ui-btn--sm" :disabled="storagePurging" @click="cleanupLogFiles(['logs', 'archive'])">
-          全部清理
-        </button>
-      </div>
-    </SectionCard>
 
     <SectionCard>
       <template #header><h2 class="panel-title">Worker 控制</h2></template>
