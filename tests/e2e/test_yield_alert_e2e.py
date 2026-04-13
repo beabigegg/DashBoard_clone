@@ -33,7 +33,9 @@ class TestYieldAlertFilterOptions:
         payload = resp.json()
         assert payload["success"] is True
         assert "workcenter_groups" in payload["data"]
-        assert isinstance(payload["data"]["workcenter_groups"], list)
+        groups = payload["data"]["workcenter_groups"]
+        assert isinstance(groups, list)
+        assert len(groups) > 0, "Yield alert filter options returned empty workcenter_groups"
 
 
 @pytest.mark.e2e
@@ -62,6 +64,11 @@ class TestYieldAlertSummary:
         if resp.status_code == 200:
             payload = resp.json()
             assert payload["success"] is True
+            data = payload["data"]
+            assert data.get("transaction_qty", 0) > 0, (
+                f"Yield alert summary returned zero transaction_qty — Oracle may have failed silently "
+                f"(data: {data})"
+            )
 
 
 @pytest.mark.e2e
@@ -99,6 +106,8 @@ class TestYieldAlertAlerts:
         data = payload["data"]
         assert "items" in data
         assert "pagination" in data
+        assert len(data["items"]) > 0, "Yield alert alerts returned empty items for known date range"
+        assert data["pagination"].get("total", 0) > 0, "Yield alert alerts pagination.total is 0"
 
     def test_alerts_respects_per_page_cap(self, api_base_url):
         """GET /alerts caps per_page to max allowed value."""
@@ -123,7 +132,7 @@ class TestYieldAlertTrend:
     """E2E tests for Yield Alert trend endpoint."""
 
     def test_trend_returns_data(self, api_base_url):
-        """GET /trend with valid dates returns trend data."""
+        """GET /trend with valid dates returns trend data with data points."""
         resp = requests.get(
             f"{api_base_url}/yield-alert/trend",
             params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
@@ -132,6 +141,8 @@ class TestYieldAlertTrend:
         assert resp.status_code == 200
         payload = resp.json()
         assert payload["success"] is True
+        items = payload["data"].get("items", [])
+        assert len(items) > 0, "Yield alert trend returned no data points for a 7-day range with known data"
 
 
 @pytest.mark.e2e
@@ -152,8 +163,8 @@ class TestYieldAlertQuery:
             json={"start_date": "2026-03-01", "end_date": "2026-03-07"},
             timeout=120,
         )
-        # May return 200 or 503 if system is busy
-        if resp.status_code == 200:
+        # 200 = sync result, 202 = async job queued (RQ workers active), 503 = busy
+        if resp.status_code in (200, 202):
             payload = resp.json()
             assert payload["success"] is True
         else:

@@ -167,40 +167,61 @@ class TestRejectHistoryBasicE2E:
             timeout=60,
         )
         assert view_resp.status_code == 200
-        assert view_resp.json()["success"] is True
+        view_payload = view_resp.json()
+        assert view_payload["success"] is True
+        view_data = view_payload["data"]
+        assert view_data.get("total_row_count", 0) > 0, (
+            "Reject history view returned 0 total_row_count — Oracle query may have failed silently"
+        )
+        assert len(view_data.get("detail", {}).get("items", [])) > 0, (
+            "Reject history view detail.items is empty despite non-zero total_row_count"
+        )
 
     def test_summary_returns_data(self, app_server: str):
-        """GET /summary returns reject summary KPIs."""
+        """GET /summary returns reject summary KPIs with non-zero values."""
         resp = requests.get(
             f"{app_server}/api/reject-history/summary",
             params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
             timeout=60,
         )
         assert resp.status_code == 200
-        assert resp.json()["success"] is True
+        payload = resp.json()
+        assert payload["success"] is True
+        data = payload["data"]
+        assert (data.get("REJECT_TOTAL_QTY", 0) > 0 or data.get("DEFECT_QTY", 0) > 0), (
+            f"Reject history summary returned all-zero KPIs — Oracle may have failed silently "
+            f"(data: {data})"
+        )
 
     def test_trend_returns_data(self, app_server: str):
-        """GET /trend returns reject trend."""
+        """GET /trend returns reject trend with data points."""
         resp = requests.get(
             f"{app_server}/api/reject-history/trend",
             params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
             timeout=60,
         )
         assert resp.status_code == 200
-        assert resp.json()["success"] is True
+        payload = resp.json()
+        assert payload["success"] is True
+        items = payload["data"].get("items", [])
+        assert len(items) > 0, "Reject history trend returned no data points for a 7-day range with known data"
 
     def test_reason_pareto_returns_data(self, app_server: str):
-        """GET /reason-pareto returns pareto analysis."""
+        """GET /reason-pareto returns pareto analysis (empty is valid if no reason data)."""
         resp = requests.get(
             f"{app_server}/api/reject-history/reason-pareto",
             params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
             timeout=60,
         )
         assert resp.status_code == 200
-        assert resp.json()["success"] is True
+        payload = resp.json()
+        assert payload["success"] is True
+        data = payload["data"]
+        assert isinstance(data.get("items", []), list), "reason-pareto items should be a list"
+        # Note: items may legitimately be empty if no reason codes are assigned in this period
 
     def test_list_returns_paginated_data(self, app_server: str):
-        """GET /list returns paginated reject records."""
+        """GET /list returns paginated reject records with actual rows."""
         resp = requests.get(
             f"{app_server}/api/reject-history/list",
             params={
@@ -212,7 +233,11 @@ class TestRejectHistoryBasicE2E:
             timeout=60,
         )
         assert resp.status_code == 200
-        assert resp.json()["success"] is True
+        payload = resp.json()
+        assert payload["success"] is True
+        data = payload["data"]
+        assert len(data.get("items", [])) > 0, "Reject history list returned empty items for known date range"
+        assert data.get("pagination", {}).get("total", 0) > 0, "Reject history pagination.total is 0"
 
 
 @pytest.mark.e2e

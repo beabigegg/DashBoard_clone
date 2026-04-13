@@ -94,7 +94,7 @@ class TestHoldHistoryView:
         assert resp.status_code == 400
 
     def test_view_returns_data(self, api_base_url, query_id):
-        """GET /view with valid query_id returns hold data."""
+        """GET /view with valid query_id returns hold data with actual records."""
         resp = requests.get(
             f"{api_base_url}/hold-history/view",
             params={"query_id": query_id},
@@ -104,11 +104,17 @@ class TestHoldHistoryView:
         payload = resp.json()
         assert payload["success"] is True
         data = payload["data"]
-        # Should contain trend, reason_pareto, duration, and/or list data
         assert isinstance(data, dict)
+        assert data.get("total_row_count", 0) > 0, (
+            "Hold history view returned 0 total_row_count — Oracle query may have failed silently "
+            f"(data keys: {list(data.keys())})"
+        )
+        items = data.get("list", {}).get("items", [])
+        assert len(items) > 0, "Hold history list.items is empty despite non-zero total_row_count"
+        assert len(data.get("trend", [])) > 0, "Hold history trend data is empty"
 
     def test_view_pagination(self, api_base_url, query_id):
-        """GET /view supports pagination parameters."""
+        """GET /view supports pagination and returns non-empty page."""
         resp = requests.get(
             f"{api_base_url}/hold-history/view",
             params={"query_id": query_id, "page": 1, "per_page": 10},
@@ -117,6 +123,9 @@ class TestHoldHistoryView:
         assert resp.status_code == 200
         payload = resp.json()
         assert payload["success"] is True
+        data = payload["data"]
+        items = data.get("list", {}).get("items", [])
+        assert len(items) > 0, "Hold history pagination returned empty items page"
 
     def test_view_with_hold_type_filter(self, api_base_url, query_id):
         """GET /view with hold_type filter returns filtered data."""

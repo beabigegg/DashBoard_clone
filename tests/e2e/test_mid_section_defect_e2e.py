@@ -38,6 +38,8 @@ def _poll_msd_detail_until_ready(app_server, params, timeout=180):
             continue
         if last_response.status_code == 503:
             pytest.skip("Service busy")
+        if last_response.status_code == 410:
+            pytest.skip("trace_query_id cache expired before detail could be polled")
         assert last_response.status_code == 409, (
             f"Expected 200/409 while polling MSD detail, got {last_response.status_code}: "
             f"{last_response.text[:200]}"
@@ -76,7 +78,7 @@ class TestMidSectionDefectE2E:
         assert resp.status_code == 400
 
     def test_analysis_returns_data(self, app_server):
-        """GET /analysis with valid dates returns analysis summary."""
+        """GET /analysis with valid dates returns analysis summary with actual data."""
         resp = requests.get(
             f"{app_server}/api/mid-section-defect/analysis",
             params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
@@ -88,6 +90,13 @@ class TestMidSectionDefectE2E:
         assert resp.status_code == 200
         payload = resp.json()
         assert payload["success"] is True
+        data = payload["data"]
+        assert data.get("detail_total_count", 0) > 0, (
+            "MSD analysis returned detail_total_count=0 — Oracle query may have failed silently"
+        )
+        assert len(data.get("daily_trend", [])) > 0, (
+            "MSD analysis returned empty daily_trend for a 7-day range with known data"
+        )
 
     def test_analysis_detail_returns_paginated_data(self, app_server):
         """GET /analysis/detail with valid dates returns paginated records."""

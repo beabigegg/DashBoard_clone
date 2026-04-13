@@ -90,12 +90,25 @@ class TestMaterialTraceE2E:
         assert resp.status_code == 400
 
     def test_query_with_valid_params_succeeds(self, app_server):
-        """POST /query with valid lot IDs returns data immediately or via async polling."""
+        """POST /query with a real container name returns actual trace rows."""
+        # Discover a real container from reject history (known to have data)
+        reject_resp = requests.get(
+            f"{app_server}/api/reject-history/list",
+            params={"start_date": "2026-03-01", "end_date": "2026-03-07", "page": 1, "per_page": 1},
+            timeout=60,
+        )
+        container_name = None
+        if reject_resp.status_code == 200:
+            items = reject_resp.json().get("data", {}).get("items", [])
+            container_name = items[0].get("CONTAINERNAME") if items else None
+        if not container_name:
+            pytest.skip("Cannot discover a real container from reject history to use in material trace test")
+
         resp = requests.post(
             f"{app_server}/api/material-trace/query",
             json={
                 "mode": "lot",
-                "values": ["TEST-LOT-001"],
+                "values": [container_name],
                 "page": 1,
                 "per_page": 10,
             },
@@ -111,12 +124,19 @@ class TestMaterialTraceE2E:
             assert data.get("query_hash")
             final_status = _poll_material_trace_until_ready(app_server, data["job_id"])
             assert final_status is not None, "Material trace async job polling timed out"
-            assert final_status.get("status") in ("queued", "started", "running", "completed"), (
-                f"Material trace async job entered unexpected state: {final_status}"
+            assert final_status.get("status") == "completed", (
+                f"Material trace async job did not complete: {final_status}"
             )
+            # After completion, the result should be fetchable and non-empty
+            # (job result verification is done via the job status endpoint)
             return
-        assert "rows" in data or "items" in data
-        assert "pagination" in data
+        assert "rows" in data or "items" in data, "Sync material trace response missing rows/items key"
+        assert "pagination" in data, "Sync material trace response missing pagination key"
+        rows = data.get("rows") or data.get("items") or []
+        assert len(rows) > 0, (
+            f"Material trace returned empty rows for container '{container_name}' — "
+            "API format error or Oracle query failed silently"
+        )
 
 
 @pytest.mark.e2e

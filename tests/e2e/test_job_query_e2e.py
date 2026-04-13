@@ -21,12 +21,14 @@ class TestJobQueryE2E:
     """E2E tests for Job Query endpoints."""
 
     def test_resources_returns_list(self, app_server):
-        """GET /resources returns available equipment list."""
+        """GET /resources returns available equipment list with actual items."""
         resp = requests.get(f"{app_server}/api/job-query/resources", timeout=30)
         assert resp.status_code == 200
         payload = resp.json()
         assert payload["success"] is True
         assert isinstance(payload["data"], dict)
+        resources = payload["data"].get("data", [])
+        assert len(resources) > 0, "Job query resources returned empty list — resource cache may be empty or Oracle failed"
 
     def test_jobs_requires_params(self, app_server):
         """POST /jobs without required params returns 400."""
@@ -36,32 +38,41 @@ class TestJobQueryE2E:
         assert resp.status_code == 400
 
     def test_jobs_returns_data_with_valid_params(self, app_server):
-        """POST /jobs with valid params returns job data."""
-        # First discover a resource
+        """POST /jobs with valid params returns job data (tries multiple resources to find one with jobs)."""
         res_resp = requests.get(f"{app_server}/api/job-query/resources", timeout=30)
         if res_resp.status_code != 200:
             pytest.skip("Cannot discover resources")
-        res_data = res_resp.json().get("data", {})
-        resources = res_data.get("data", [])
+        resources = res_resp.json().get("data", {}).get("data", [])
         if not resources:
             pytest.skip("No resources available")
 
-        resource_id = str(resources[0].get("RESOURCEID", ""))
-        if not resource_id:
-            pytest.skip("No RESOURCEID in first resource")
+        # Try up to 10 resources until we find one with jobs in the date range
+        found_jobs = False
+        for resource in resources[:10]:
+            resource_id = str(resource.get("RESOURCEID", ""))
+            if not resource_id:
+                continue
+            resp = requests.post(
+                f"{app_server}/api/job-query/jobs",
+                json={
+                    "resource_ids": [resource_id],
+                    "start_date": "2026-03-01",
+                    "end_date": "2026-03-07",
+                },
+                timeout=60,
+            )
+            assert resp.status_code == 200
+            payload = resp.json()
+            assert payload["success"] is True
+            if payload["data"].get("total", 0) > 0:
+                found_jobs = True
+                assert len(payload["data"].get("data", [])) > 0, (
+                    "job-query jobs total > 0 but data list is empty — API format mismatch"
+                )
+                break
 
-        resp = requests.post(
-            f"{app_server}/api/job-query/jobs",
-            json={
-                "resource_ids": [resource_id],
-                "start_date": "2026-03-01",
-                "end_date": "2026-03-07",
-            },
-            timeout=60,
-        )
-        assert resp.status_code == 200
-        payload = resp.json()
-        assert payload["success"] is True
+        if not found_jobs:
+            pytest.skip("No jobs found for first 10 resources in 2026-03-01 ~ 2026-03-07")
 
     def test_jobs_rejects_too_many_resources(self, app_server):
         """POST /jobs with >50 resource_ids returns 400."""

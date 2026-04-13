@@ -41,6 +41,8 @@ class TestAnomalyYieldEndpoint:
             data = payload.get("data")
             # API returns {"data": {"count": N, "items": [...]}} or {"data": [...]}
             assert isinstance(data, (list, dict))
+            items = data if isinstance(data, list) else data.get("items", data.get("data", []))
+            assert len(items) > 0, "Yield anomalies returned empty list — analytics may have failed silently"
 
 
 @pytest.mark.e2e
@@ -58,6 +60,9 @@ class TestAnomalyRejectSpikesEndpoint:
             data = payload.get("data")
             # API returns {"data": {"count": N, "items": [...]}} or {"data": [...]}
             assert isinstance(data, (list, dict))
+            items = data if isinstance(data, list) else data.get("items", data.get("data", []))
+            if len(items) == 0:
+                pytest.skip("reject-spikes returned empty list — no spike anomalies in current window")
 
 
 @pytest.mark.e2e
@@ -72,6 +77,9 @@ class TestAnomalyHoldOutliersEndpoint:
         if resp.status_code == 200:
             payload = resp.json()
             assert payload["success"] is True
+            data = payload.get("data")
+            items = data if isinstance(data, list) else data.get("items", data.get("data", [])) if isinstance(data, dict) else []
+            assert len(items) > 0, "hold-outliers returned empty list — hold outlier detection may have failed silently"
 
 
 @pytest.mark.e2e
@@ -86,6 +94,10 @@ class TestAnomalyEquipmentDeviationsEndpoint:
         if resp.status_code == 200:
             payload = resp.json()
             assert payload["success"] is True
+            data = payload.get("data")
+            items = data if isinstance(data, list) else data.get("items", data.get("data", [])) if isinstance(data, dict) else []
+            if len(items) == 0:
+                pytest.skip("equipment-deviations returned empty list — no deviations in current window")
 
 
 @pytest.mark.e2e
@@ -109,7 +121,7 @@ class TestAnomalyOverviewBrowserE2E:
     def test_anomaly_overview_page_navigates_to_detail_page(self, page: Page, app_server: str):
         goto_shell_route(page, app_server, "/anomaly-overview", "異常總覽")
         expect(page.get_by_role("heading", name="異常總覽")).to_be_visible()
-        expect(page.locator("text=偵測邏輯：")).to_be_visible(timeout=60000)
+        expect(page.locator("text=偵測邏輯：").first).to_be_visible(timeout=60000)
 
         nav_button = page.locator(".ao-nav-link").first
         expect(nav_button).to_be_visible()

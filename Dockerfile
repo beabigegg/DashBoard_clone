@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY data/ ./data/
 COPY shared/ ./shared/
+COPY docs/ ./docs/
 COPY gunicorn.conf.py .
 COPY supervisord.conf .
 
