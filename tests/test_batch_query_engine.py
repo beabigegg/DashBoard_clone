@@ -2,6 +2,7 @@
 """Unit tests for BatchQueryEngine module."""
 
 import json
+from pathlib import Path
 import pytest
 from unittest.mock import patch, MagicMock, call
 
@@ -851,3 +852,70 @@ class TestMergeChunksToSpool:
                 )
 
         assert not list(tmp_path.glob("*badhash*.parquet"))
+
+    def test_precreates_temp_file_before_parquet_writer(self, tmp_path, monkeypatch):
+        """The temp spool file must exist before PyArrow opens it."""
+        import pyarrow.parquet as pq
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        chunk = pd.DataFrame({"A": [1], "B": ["x"]})
+
+        class FakeWriter:
+            def __init__(self, path, schema):  # noqa: ANN001
+                self.path = Path(path)
+                assert self.path.exists()
+
+            def write_table(self, table):  # noqa: ANN001
+                return None
+
+            def close(self):
+                return None
+
+        monkeypatch.setattr(pq, "ParquetWriter", FakeWriter)
+
+        with patch.object(bqe, "iterate_chunks", return_value=iter([chunk])):
+            spool_path, total_rows = bqe.merge_chunks_to_spool(
+                "reject",
+                "precreate",
+                spool_dir=tmp_path,
+            )
+
+        assert total_rows == 1
+        assert spool_path is not None
+        assert spool_path.exists()
+
+    def test_merge_chunks_to_spool_survives_cleanup_race(self, tmp_path, monkeypatch):
+        """Shared spool writer must keep its target alive across cleanup passes."""
+        import pyarrow.parquet as pq
+        import mes_dashboard.services.batch_query_engine as bqe
+        from mes_dashboard.core import query_spool_store as spool_store
+
+        chunk = pd.DataFrame({"A": [1], "B": ["x"]})
+        spool_dir = tmp_path / "reject"
+
+        class FakeWriter:
+            def __init__(self, path, schema):  # noqa: ANN001
+                spool_store.cleanup_expired_spool(namespace=None)
+                self.path = Path(path)
+                assert self.path.exists()
+
+            def write_table(self, table):  # noqa: ANN001
+                return None
+
+            def close(self):
+                return None
+
+        monkeypatch.setattr(spool_store, "QUERY_SPOOL_DIR", tmp_path)
+        monkeypatch.setattr(pq, "ParquetWriter", FakeWriter)
+
+        with patch.object(bqe, "iterate_chunks", return_value=iter([chunk])):
+            spool_path, total_rows = bqe.merge_chunks_to_spool(
+                "reject",
+                "race-safe",
+                spool_dir=spool_dir,
+            )
+
+        assert total_rows == 1
+        assert spool_path is not None
+        assert spool_path.exists()
+        assert spool_path.parent == spool_dir

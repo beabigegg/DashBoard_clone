@@ -15,6 +15,7 @@ import json
 import logging
 import math
 import os
+import tempfile
 import threading
 import time
 from datetime import date, timedelta
@@ -248,8 +249,15 @@ def _streaming_write_to_spool(
     import pyarrow.parquet as pq
     from pathlib import Path
 
-    tmp_path = (QUERY_SPOOL_DIR / _SPOOL_NAMESPACE / f"{query_id}_streaming.tmp.parquet").resolve()
-    tmp_path.parent.mkdir(parents=True, exist_ok=True)
+    spool_dir = (QUERY_SPOOL_DIR / _SPOOL_NAMESPACE).resolve()
+    spool_dir.mkdir(parents=True, exist_ok=True)
+    tmp_fd, tmp_path_str = tempfile.mkstemp(
+        prefix=f"{query_id}_streaming_",
+        suffix=".tmp.parquet",
+        dir=spool_dir,
+    )
+    os.close(tmp_fd)
+    tmp_path = Path(tmp_path_str)
 
     writer = None
     schema = None

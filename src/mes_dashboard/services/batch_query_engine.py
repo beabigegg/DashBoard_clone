@@ -33,6 +33,7 @@ import hashlib
 import json
 import logging
 import os
+import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -701,7 +702,13 @@ def merge_chunks_to_spool(
 
     spool_dir = _Path(spool_dir)
     spool_dir.mkdir(parents=True, exist_ok=True)
-    tmp_path = spool_dir / f"{cache_prefix}_{query_hash}_streaming.tmp.parquet"
+    tmp_fd, tmp_path_str = tempfile.mkstemp(
+        prefix=f"{cache_prefix}_{query_hash}_streaming_",
+        suffix=".tmp.parquet",
+        dir=spool_dir,
+    )
+    os.close(tmp_fd)
+    tmp_path = _Path(tmp_path_str)
 
     writer: Optional[pq.ParquetWriter] = None
     schema: Optional[pa.Schema] = None

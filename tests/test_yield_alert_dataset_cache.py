@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
+import pytest
 
 import mes_dashboard.services.yield_alert_dataset_cache as dataset_cache
 
@@ -151,6 +154,105 @@ def test_prepare_detail_chunk_handles_null_values():
     assert df["REASON_RAW"].iloc[0] == "(UNMAPPED)"
     assert df["TRANSACTION_QTY"].iloc[0] == 0.0
     assert df["SCRAP_QTY"].iloc[0] == 0.0
+
+
+def test_streaming_write_to_spool_precreates_temp_file(monkeypatch, tmp_path):
+    """The temp parquet file must exist before ParquetWriter opens it."""
+    import pyarrow.parquet as pq
+
+    columns = [
+        "DATE_BUCKET", "WIP_ENTITY_NAME", "REASON_RAW", "REASON_NAME",
+        "DEPARTMENT_NAME", "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME",
+        "FUNCTION_NAME", "OPERATION_SEQ_NUM", "TRANSACTION_QTY", "SCRAP_QTY",
+    ]
+    rows = [
+        (
+            "2026-02-21", "GA-WO-001", "031_腳架氧化", "031_腳架氧化",
+            "焊接_WB", "L1", "PKG-A", "TYPE-A",
+            "FUNC-A", 10, 100.0, 5.0,
+        )
+    ]
+
+    class FakeWriter:
+        def __init__(self, path: str, schema):  # noqa: ANN001
+            self.path = Path(path)
+            assert self.path.exists()
+
+        def write_table(self, table):  # noqa: ANN001
+            return None
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(dataset_cache, "QUERY_SPOOL_DIR", tmp_path)
+    monkeypatch.setattr(
+        dataset_cache,
+        "read_sql_df_slow_iter",
+        lambda *_args, **_kwargs: iter([(columns, rows)]),
+    )
+    monkeypatch.setattr(pq, "ParquetWriter", FakeWriter)
+
+    spool_path, total_rows = dataset_cache._streaming_write_to_spool(
+        "SELECT 1",
+        {},
+        "testqid1234",
+    )
+
+    assert total_rows == 1
+    assert spool_path is not None
+    assert spool_path.exists()
+    assert spool_path.parent == tmp_path / dataset_cache._SPOOL_NAMESPACE
+
+
+def test_streaming_write_to_spool_survives_cleanup_race(monkeypatch, tmp_path):
+    """Cleanup between temp-path allocation and writer init must not remove the target."""
+    import pyarrow.parquet as pq
+    from mes_dashboard.core import query_spool_store as spool_store
+
+    columns = [
+        "DATE_BUCKET", "WIP_ENTITY_NAME", "REASON_RAW", "REASON_NAME",
+        "DEPARTMENT_NAME", "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME",
+        "FUNCTION_NAME", "OPERATION_SEQ_NUM", "TRANSACTION_QTY", "SCRAP_QTY",
+    ]
+    rows = [
+        (
+            "2026-02-21", "GA-WO-001", "031_腳架氧化", "031_腳架氧化",
+            "焊接_WB", "L1", "PKG-A", "TYPE-A",
+            "FUNC-A", 10, 100.0, 5.0,
+        )
+    ]
+
+    class FakeWriter:
+        def __init__(self, path: str, schema):  # noqa: ANN001
+            spool_store.cleanup_expired_spool(namespace=None)
+            self.path = Path(path)
+            assert self.path.exists()
+
+        def write_table(self, table):  # noqa: ANN001
+            return None
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(dataset_cache, "QUERY_SPOOL_DIR", tmp_path)
+    monkeypatch.setattr(spool_store, "QUERY_SPOOL_DIR", tmp_path)
+    monkeypatch.setattr(
+        dataset_cache,
+        "read_sql_df_slow_iter",
+        lambda *_args, **_kwargs: iter([(columns, rows)]),
+    )
+    monkeypatch.setattr(pq, "ParquetWriter", FakeWriter)
+
+    spool_path, total_rows = dataset_cache._streaming_write_to_spool(
+        "SELECT 1",
+        {},
+        "testrace1234",
+    )
+
+    assert total_rows == 1
+    assert spool_path is not None
+    assert spool_path.exists()
+    assert spool_path.parent == tmp_path / dataset_cache._SPOOL_NAMESPACE
 
 
 # ──────────────────────────────────────────────────────────────────────────────
