@@ -699,7 +699,7 @@ def _query_alerts(
         """
     )
     all_quality_keys = _fetch_dict_rows(
-        conn, keys_sql, combined_params + threshold_params
+        conn, keys_sql, all_cte_params + threshold_params
     )
 
     return {
