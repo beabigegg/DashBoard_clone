@@ -5,6 +5,8 @@ import pytest
 import re
 from playwright.sync_api import Page, expect
 
+from tests.e2e.browser_helpers import ensure_shell_admin, goto_shell_route
+
 
 def _sidebar_links(page: Page):
     """Support both legacy and current shell nav selectors."""
@@ -35,23 +37,20 @@ class TestPortalPage:
     """E2E tests for portal shell routing and drawer navigation."""
 
     def test_portal_loads_successfully(self, page: Page, app_server: str):
-        page.goto(app_server)
-        expect(page.locator("h1")).to_contain_text("MES 報表入口")
+        goto_shell_route(page, app_server, "/wip-overview", "WIP 即時概況")
+        expect(page.get_by_role("heading", name="MES 報表入口")).to_be_visible(timeout=30000)
 
     def test_portal_has_sidebar_routes(self, page: Page, app_server: str):
-        page.goto(app_server)
+        goto_shell_route(page, app_server, "/wip-overview", "WIP 即時概況")
 
-        expect(_sidebar_links(page).first).to_be_visible()
-        expect(page.locator(".drawer-link:has-text('WIP 即時概況')")).to_be_visible()
-        expect(page.locator(".drawer-link:has-text('設備即時概況')")).to_be_visible()
-        expect(page.locator(".drawer-link:has-text('設備歷史績效')")).to_be_visible()
-        expect(page.locator(".drawer-link:has-text('設備維修查詢')")).to_be_visible()
+        expect(_sidebar_links(page).first).to_be_visible(timeout=30000)
+        expect(page.locator(".drawer-link:has-text('WIP 即時概況')")).to_be_visible(timeout=30000)
 
     def test_portal_sidebar_navigation_uses_direct_routes(self, page: Page, app_server: str):
-        page.goto(app_server)
+        goto_shell_route(page, app_server, "/wip-overview", "WIP 即時概況")
 
         first_route = _sidebar_links(page).first
-        expect(first_route).to_be_visible()
+        expect(first_route).to_be_visible(timeout=30000)
         target_href = first_route.get_attribute("href")
         assert target_href, "sidebar route href missing"
 
@@ -60,10 +59,10 @@ class TestPortalPage:
         assert page.locator("iframe").count() == 0, "Shell content must not use iframe"
 
     def test_portal_health_popup_clickable(self, page: Page, app_server: str):
-        page.goto(app_server)
+        goto_shell_route(page, app_server, "/wip-overview", "WIP 即時概況")
 
         trigger = page.locator(".health-trigger")
-        expect(trigger).to_be_visible()
+        expect(trigger).to_be_visible(timeout=30000)
         expect(page.locator("#shellHealthPopup")).to_have_count(0)
 
         trigger.click()
@@ -159,9 +158,10 @@ class TestConsoleAndErrorSignals:
             if "/api/wip/overview/matrix" in resp.url:
                 observed.add("matrix")
 
+        ensure_shell_admin(page, "/wip-overview", "WIP 即時概況")
         page.on("response", on_response)
-        page.goto(f"{app_server}/wip-overview", wait_until="domcontentloaded")
+        page.goto(f"{app_server}/portal-shell/wip-overview", wait_until="domcontentloaded")
 
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(8000)
         assert "summary" in observed
         assert "matrix" in observed

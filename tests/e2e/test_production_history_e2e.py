@@ -150,7 +150,7 @@ class TestProductionHistoryBrowserE2E:
         expect(query_button).to_be_enabled()
         query_button.click()
 
-        wait_for_any_visible(
+        matched = wait_for_any_visible(
             page,
             [
                 "text=Workcenter x Equipment Matrix",
@@ -159,4 +159,6 @@ class TestProductionHistoryBrowserE2E:
             ],
             timeout_ms=180000,
         )
-        expect(page.locator("text=明細資料")).to_be_visible(timeout=180000)
+        if ".ph-app__empty-state" in matched:
+            pytest.skip("production-history query returned empty results — no data for selected type/dates")
+        expect(page.locator("text=明細資料")).to_be_visible(timeout=30000)

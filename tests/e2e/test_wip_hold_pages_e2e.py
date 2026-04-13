@@ -11,6 +11,8 @@ import pytest
 import requests
 from playwright.sync_api import Page, expect
 
+from tests.e2e.browser_helpers import ensure_shell_admin
+
 
 def _pick_workcenter(app_server: str) -> str:
     """Pick a real workcenter to reduce flaky E2E failures."""
@@ -93,34 +95,55 @@ def _wait_for_response(page: Page, predicate, timeout_seconds: float = 30.0):
     return matched[0] if matched else None
 
 
+def _pre_register_response_listener(page: Page, predicate):
+    """Register listener immediately; return a waiter to call after goto."""
+    matched = []
+
+    def handle_response(resp):
+        try:
+            if predicate(resp):
+                matched.append(resp)
+        except Exception:
+            return
+
+    page.on("response", handle_response)
+
+    def wait(timeout_seconds: float = 30.0):
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline and not matched:
+            page.wait_for_timeout(200)
+        return matched[0] if matched else None
+
+    return wait
+
+
 @pytest.mark.e2e
 class TestWipAndHoldPagesE2E:
     """E2E tests for WIP/Hold page URL + API behavior."""
 
     def test_wip_overview_restores_status_from_url(self, page: Page, app_server: str):
+        ensure_shell_admin(page, "/wip-overview", "WIP 即時概況")
+        wait = _pre_register_response_listener(
+            page,
+            lambda resp: (
+                "/api/wip/overview/matrix" in resp.url
+                and "type=PJA3460" in resp.url
+            ),
+        )
         page.goto(
-            f"{app_server}/wip-overview?type=PJA3460&status=queue",
+            f"{app_server}/portal-shell/wip-overview?type=PJA3460&status=queue",
             wait_until="commit",
             timeout=60000,
         )
-        response = _wait_for_response_url_tokens(
-            page,
-            ["/api/wip/overview/matrix", "type=PJA3460", "status=QUEUE"],
-            timeout_seconds=30.0,
-        )
+        response = wait(timeout_seconds=30.0)
         assert response is not None, "Did not observe expected matrix request with URL filters"
         assert response.ok
         expect(page.locator("body")).to_be_visible()
 
     def test_wip_detail_reads_status_and_back_link_keeps_filters(self, page: Page, app_server: str):
         workcenter = _pick_workcenter(app_server)
-        page.goto(
-            f"{app_server}/wip-detail?workcenter={quote(workcenter)}&type=PJA3460&status=queue",
-            wait_until="commit",
-            timeout=60000,
-        )
-
-        response = _wait_for_response(
+        ensure_shell_admin(page, "/wip-detail", "WIP 明細")
+        wait = _pre_register_response_listener(
             page,
             lambda resp: (
                 "/api/wip/detail/" in resp.url
@@ -130,8 +153,14 @@ class TestWipAndHoldPagesE2E:
                 )
                 and parse_qs(urlparse(resp.url).query).get("status", [None])[0] in {"QUEUE", "queue"}
             ),
-            timeout_seconds=30.0,
         )
+        page.goto(
+            f"{app_server}/portal-shell/wip-detail?workcenter={quote(workcenter)}&type=PJA3460&status=queue",
+            wait_until="commit",
+            timeout=60000,
+        )
+
+        response = wait(timeout_seconds=30.0)
         assert response is not None, "Did not observe expected detail request with URL filters"
         assert response.ok
 
@@ -157,79 +186,81 @@ class TestWipAndHoldPagesE2E:
 
     def test_hold_detail_calls_summary_distribution_and_lots(self, page: Page, app_server: str):
         reason = _pick_hold_reason(app_server)
-        page.goto(
-            f"{app_server}/hold-detail?reason={quote(reason)}",
-            wait_until="commit",
-            timeout=60000,
-        )
-
-        summary_resp = _wait_for_response(
+        ensure_shell_admin(page, "/hold-detail", "Hold 明細")
+        wait_summary = _pre_register_response_listener(
             page,
             lambda resp: (
                 "/api/wip/hold-detail/summary" in resp.url
                 and parse_qs(urlparse(resp.url).query).get("reason", [None])[0] == reason
             ),
-            timeout_seconds=30.0,
         )
-        assert summary_resp is not None, "Did not observe summary request"
-        assert summary_resp.ok
-
-        distribution_resp = _wait_for_response(
+        wait_distribution = _pre_register_response_listener(
             page,
             lambda resp: (
                 "/api/wip/hold-detail/distribution" in resp.url
                 and parse_qs(urlparse(resp.url).query).get("reason", [None])[0] == reason
             ),
-            timeout_seconds=30.0,
         )
-        assert distribution_resp is not None, "Did not observe distribution request"
-        assert distribution_resp.ok
-
-        lots_resp = _wait_for_response(
+        wait_lots = _pre_register_response_listener(
             page,
             lambda resp: (
                 "/api/wip/hold-detail/lots" in resp.url
                 and parse_qs(urlparse(resp.url).query).get("reason", [None])[0] == reason
             ),
-            timeout_seconds=30.0,
         )
-        assert lots_resp is not None, "Did not observe lots request"
-        assert lots_resp.ok
-
-    def test_portal_shell_deep_links_keep_detail_routes(self, page: Page, app_server: str):
-        workcenter = _pick_workcenter(app_server)
-        page.goto(
-            f"{app_server}/portal-shell/wip-detail?workcenter={quote(workcenter)}&status=queue",
-            wait_until="commit",
-            timeout=60000,
-        )
-        expect(page).to_have_url(re.compile(r".*/portal-shell/wip-detail\\?.*workcenter=.*"))
-        detail_response = _wait_for_response(
-            page,
-            lambda resp: (
-                "/api/wip/detail/" in resp.url
-                and parse_qs(urlparse(resp.url).query).get("status", [None])[0] in {"QUEUE", "queue"}
-            ),
-            timeout_seconds=30.0,
-        )
-        assert detail_response is not None
-        assert detail_response.ok
-
-        reason = _pick_hold_reason(app_server)
         page.goto(
             f"{app_server}/portal-shell/hold-detail?reason={quote(reason)}",
             wait_until="commit",
             timeout=60000,
         )
-        expect(page).to_have_url(re.compile(r".*/portal-shell/hold-detail\\?.*reason=.*"))
-        summary_response = _wait_for_response(
+
+        summary_resp = wait_summary(timeout_seconds=30.0)
+        assert summary_resp is not None, "Did not observe summary request"
+        assert summary_resp.ok
+
+        distribution_resp = wait_distribution(timeout_seconds=30.0)
+        assert distribution_resp is not None, "Did not observe distribution request"
+        assert distribution_resp.ok
+
+        lots_resp = wait_lots(timeout_seconds=30.0)
+        assert lots_resp is not None, "Did not observe lots request"
+        assert lots_resp.ok
+
+    def test_portal_shell_deep_links_keep_detail_routes(self, page: Page, app_server: str):
+        workcenter = _pick_workcenter(app_server)
+        ensure_shell_admin(page, "/wip-detail", "WIP 明細")
+        wait_detail = _pre_register_response_listener(
+            page,
+            lambda resp: (
+                "/api/wip/detail/" in resp.url
+                and parse_qs(urlparse(resp.url).query).get("status", [None])[0] in {"QUEUE", "queue"}
+            ),
+        )
+        page.goto(
+            f"{app_server}/portal-shell/wip-detail?workcenter={quote(workcenter)}&status=queue",
+            wait_until="commit",
+            timeout=60000,
+        )
+        expect(page).to_have_url(re.compile(r".*/portal-shell/wip-detail\?.*workcenter=.*"))
+        detail_response = wait_detail(timeout_seconds=30.0)
+        assert detail_response is not None
+        assert detail_response.ok
+
+        reason = _pick_hold_reason(app_server)
+        wait_summary = _pre_register_response_listener(
             page,
             lambda resp: (
                 "/api/wip/hold-detail/summary" in resp.url
                 and parse_qs(urlparse(resp.url).query).get("reason", [None])[0] == reason
             ),
-            timeout_seconds=30.0,
         )
+        page.goto(
+            f"{app_server}/portal-shell/hold-detail?reason={quote(reason)}",
+            wait_until="commit",
+            timeout=60000,
+        )
+        expect(page).to_have_url(re.compile(r".*/portal-shell/hold-detail\?.*reason=.*"))
+        summary_response = wait_summary(timeout_seconds=30.0)
         assert summary_response is not None
         assert summary_response.ok
 

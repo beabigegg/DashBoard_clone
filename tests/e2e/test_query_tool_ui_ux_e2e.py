@@ -11,6 +11,8 @@ import pytest
 import requests
 from playwright.sync_api import Page, expect
 
+from tests.e2e.browser_helpers import ensure_shell_admin
+
 
 QUERY_TOOL_BASE = "/portal-shell/query-tool"
 
@@ -69,6 +71,7 @@ class TestQueryToolUiUxE2E:
 
     def test_lot_multi_query_counter_and_url_round_trip(self, page: Page, app_server: str):
         """Multi-query input should sync counter + URL and survive reload."""
+        ensure_shell_admin(page, "/query-tool", "批次追蹤工具")
         _intercept_navigation_as_admin(page)
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="domcontentloaded", timeout=60000)
         expect(page.locator("textarea.query-tool-textarea:visible").first).to_be_visible(timeout=30000)
@@ -108,6 +111,7 @@ class TestQueryToolUiUxE2E:
         if not equipment_id:
             pytest.skip("Unable to determine equipment id")
 
+        ensure_shell_admin(page, "/query-tool", "批次追蹤工具")
         _intercept_navigation_as_admin(page)
         start_date = "2026-01-01"
         end_date = "2026-01-31"
@@ -145,6 +149,7 @@ class TestQueryToolUiUxE2E:
 
     def test_rapid_resolve_and_tab_switching_no_ui_crash(self, page: Page, app_server: str):
         """Rapid resolve + tab switching should keep page responsive without crashes."""
+        ensure_shell_admin(page, "/query-tool", "批次追蹤工具")
         _intercept_navigation_as_admin(page)
         page.goto(f"{app_server}{QUERY_TOOL_BASE}?tab=lot", wait_until="domcontentloaded", timeout=60000)
         expect(page.locator("select.query-tool-select:visible").first).to_be_visible(timeout=30000)

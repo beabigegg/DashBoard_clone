@@ -24,6 +24,7 @@ def _parse(response) -> dict:
 _VALID_QUERY_BODY = {
     "start_date": "2024-01-01",
     "end_date": "2024-02-01",
+    "pj_types": ["PJ"],
 }
 
 _SYNC_RESULT = {
