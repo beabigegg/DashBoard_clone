@@ -664,6 +664,30 @@ def iterate_chunks(
 # ============================================================
 
 
+def _promote_null_schema(schema: "pa.Schema") -> "pa.Schema":
+    """Replace null-typed fields in *schema* with large_string.
+
+    When the first chunk from Oracle has all-NULL values in an optional string
+    column (e.g. CAUSECODENAME, RELEASECOMMENTS), PyArrow infers the column
+    type as ``null``.  A subsequent chunk that carries real string values
+    cannot be cast ``string → null`` (unsupported), causing the merge to fail.
+
+    Promoting ``null`` fields to ``large_string`` at schema-init time lets
+    the ParquetWriter accept both null-only and string-filled chunks without
+    type errors.  The ``null → large_string`` direction IS supported by PyArrow.
+    """
+    import pyarrow as pa
+
+    if not any(pa.types.is_null(f.type) for f in schema):
+        return schema
+    return pa.schema([
+        pa.field(f.name, pa.large_string(), nullable=True)
+        if pa.types.is_null(f.type)
+        else f
+        for f in schema
+    ])
+
+
 def merge_chunks_to_spool(
     cache_prefix: str,
     query_hash: str,
@@ -750,15 +774,23 @@ def merge_chunks_to_spool(
             table = pa.Table.from_pandas(df_chunk, preserve_index=False)
 
             if writer is None:
-                schema = table.schema
+                # Promote null-typed columns to large_string so that later
+                # chunks carrying real string values can be cast without error.
+                # (PyArrow cannot cast string → null, but null → large_string is fine.)
+                schema = _promote_null_schema(table.schema)
+                if schema is not table.schema:
+                    table = table.cast(schema, safe=False)
                 writer = pq.ParquetWriter(str(tmp_path), schema)
 
             # Align schema for subsequent chunks (drop unexpected columns, fill missing)
             if table.schema != schema:
+                # Re-promote in case this chunk also has new null-typed columns
+                # not seen before (edge case: column was non-null in chunk 1 but
+                # the schema field is already set, so this only affects truly new fields).
                 try:
                     table = table.cast(schema, safe=False)
                 except Exception:
-                    # Best-effort: select only columns in schema
+                    # Best-effort: select only columns present in both schemas
                     common_cols = [f.name for f in schema if f.name in table.schema.names]
                     if not common_cols:
                         chunk_index += 1

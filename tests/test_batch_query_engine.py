@@ -919,3 +919,95 @@ class TestMergeChunksToSpool:
         assert spool_path is not None
         assert spool_path.exists()
         assert spool_path.parent == spool_dir
+
+    def test_null_typed_column_in_first_chunk_succeeds(self, tmp_path):
+        """Chunk 1 has all-None optional column (null type); chunk 2 has real strings.
+
+        This reproduces the production crash in get_jobs_by_resources where
+        columns like CAUSECODENAME are all-NULL in the first time-slice but
+        carry real strings in a later slice.  PyArrow infers the column as
+        ``null`` type from chunk 1; previously, casting ``string → null`` in
+        chunk 2 raised ArrowNotImplementedError.
+        """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        # Chunk 1: CAUSECODENAME is entirely None (all jobs undiagnosed)
+        chunk1 = pd.DataFrame({
+            "JOBID": ["J001", "J002"],
+            "RESOURCENAME": ["EQP-A", "EQP-B"],
+            "CAUSECODENAME": [None, None],       # all-null → PyArrow infers null type
+            "REPAIRCODENAME": [None, None],       # same
+        })
+        # Chunk 2: CAUSECODENAME now has real string values
+        chunk2 = pd.DataFrame({
+            "JOBID": ["J003", "J004"],
+            "RESOURCENAME": ["EQP-A", "EQP-C"],
+            "CAUSECODENAME": ["電源異常", "機械故障"],  # real strings
+            "REPAIRCODENAME": [None, "更換零件"],
+        })
+
+        with patch.object(bqe, "iterate_chunks", return_value=iter([chunk1, chunk2])):
+            spool_path, total_rows = bqe.merge_chunks_to_spool(
+                "job", "null-promo-test", spool_dir=tmp_path
+            )
+
+        assert total_rows == 4
+        assert spool_path is not None and spool_path.exists()
+
+        result = pd.read_parquet(str(spool_path), engine="pyarrow")
+        assert len(result) == 4
+        assert list(result["JOBID"]) == ["J001", "J002", "J003", "J004"]
+        # Rows from chunk 1 keep their nulls; chunk 2 has real values
+        assert pd.isna(result.loc[0, "CAUSECODENAME"])
+        assert result.loc[2, "CAUSECODENAME"] == "電源異常"
+        assert result.loc[3, "REPAIRCODENAME"] == "更換零件"
+
+    def test_null_typed_column_all_chunks_null_still_works(self, tmp_path):
+        """All chunks have null-typed optional column — should produce valid parquet."""
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        chunk1 = pd.DataFrame({"JOBID": ["J001"], "CAUSECODENAME": [None]})
+        chunk2 = pd.DataFrame({"JOBID": ["J002"], "CAUSECODENAME": [None]})
+
+        with patch.object(bqe, "iterate_chunks", return_value=iter([chunk1, chunk2])):
+            spool_path, total_rows = bqe.merge_chunks_to_spool(
+                "job", "all-null-test", spool_dir=tmp_path
+            )
+
+        assert total_rows == 2
+        result = pd.read_parquet(str(spool_path), engine="pyarrow")
+        assert len(result) == 2
+        assert pd.isna(result.loc[0, "CAUSECODENAME"])
+        assert pd.isna(result.loc[1, "CAUSECODENAME"])
+
+    def test_promote_null_schema_helper(self):
+        """_promote_null_schema replaces null-typed fields with large_string."""
+        import pyarrow as pa
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        schema = pa.schema([
+            pa.field("ID", pa.int64()),
+            pa.field("NAME", pa.large_string()),
+            pa.field("OPT_CODE", pa.null()),      # null-typed optional column
+            pa.field("OPT_COMMENT", pa.null()),   # another null-typed column
+        ])
+        promoted = bqe._promote_null_schema(schema)
+
+        assert promoted.field("ID").type == pa.int64()            # unchanged
+        assert promoted.field("NAME").type == pa.large_string()   # unchanged
+        assert promoted.field("OPT_CODE").type == pa.large_string()    # promoted
+        assert promoted.field("OPT_COMMENT").type == pa.large_string() # promoted
+
+    def test_promote_null_schema_noop_when_no_nulls(self):
+        """_promote_null_schema returns the same object when no null-typed fields."""
+        import pyarrow as pa
+        import mes_dashboard.services.batch_query_engine as bqe
+
+        schema = pa.schema([
+            pa.field("ID", pa.int64()),
+            pa.field("NAME", pa.large_string()),
+        ])
+        result = bqe._promote_null_schema(schema)
+        assert result is schema  # identity — no copy needed
