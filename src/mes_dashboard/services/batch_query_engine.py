@@ -555,6 +555,24 @@ class MergeChunksMaxRowsExceeded(RuntimeError):
         self.chunk_index = int(chunk_index)
 
 
+class ChunkSchemaMismatch(RuntimeError):
+    """Raised when a later chunk's column set diverges from the first chunk.
+
+    All chunks in a single batch job come from the same SQL, so their column
+    sets must be identical. A mismatch indicates an upstream bug (e.g. SELECT
+    drift, column rename) and must not be silently masked.
+    """
+
+    def __init__(self, *, chunk_index: int, expected: list, got: list):
+        super().__init__(
+            "merge_chunks chunk schema mismatch "
+            f"(chunk_index={chunk_index}, expected={expected}, got={got})"
+        )
+        self.chunk_index = int(chunk_index)
+        self.expected = list(expected)
+        self.got = list(got)
+
+
 def merge_chunks(
     cache_prefix: str,
     query_hash: str,
@@ -782,23 +800,16 @@ def merge_chunks_to_spool(
                     table = table.cast(schema, safe=False)
                 writer = pq.ParquetWriter(str(tmp_path), schema)
 
-            # Align schema for subsequent chunks (drop unexpected columns, fill missing)
             if table.schema != schema:
-                # Re-promote in case this chunk also has new null-typed columns
-                # not seen before (edge case: column was non-null in chunk 1 but
-                # the schema field is already set, so this only affects truly new fields).
-                try:
-                    table = table.cast(schema, safe=False)
-                except Exception:
-                    # Best-effort: select only columns present in both schemas
-                    common_cols = [f.name for f in schema if f.name in table.schema.names]
-                    if not common_cols:
-                        chunk_index += 1
-                        continue
-                    table = table.select(common_cols).cast(
-                        pa.schema([schema.field(c) for c in common_cols]),
-                        safe=False,
+                if set(table.schema.names) != set(schema.names):
+                    raise ChunkSchemaMismatch(
+                        chunk_index=chunk_index,
+                        expected=list(schema.names),
+                        got=list(table.schema.names),
                     )
+                if table.schema.names != schema.names:
+                    table = table.select(list(schema.names))
+                table = table.cast(schema, safe=False)
 
             writer.write_table(table)
             total_rows += len(df_chunk)

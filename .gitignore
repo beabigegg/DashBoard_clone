@@ -52,6 +52,9 @@ GEMINI.md
 htmlcov/
 .tox/
 
+# Local-only spool snapshot fixtures (captured from real DB)
+tests/fixtures/spool_snapshots/
+
 # Jupyter
 .ipynb_checkpoints/
 

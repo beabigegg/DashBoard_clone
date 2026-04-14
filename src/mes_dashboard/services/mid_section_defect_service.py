@@ -1486,6 +1486,14 @@ def _fetch_station_detection_data(
             cache_set(cache_key, df.to_dict('records'), ttl=CACHE_TTL_DETECTION)
         return df, _msd_partial_failure
     except Exception as exc:
+        from mes_dashboard.services.batch_query_engine import ChunkSchemaMismatch
+        if isinstance(exc, ChunkSchemaMismatch):
+            logger.error(
+                "Station detection aborted: chunk schema drift (station=%s, "
+                "chunk_index=%d, expected=%s, got=%s). Upstream SQL/view likely changed.",
+                station, exc.chunk_index, exc.expected, exc.got,
+            )
+            raise
         logger.error("Station detection query failed (station=%s): %s", station, exc, exc_info=True)
         return None, {}
 

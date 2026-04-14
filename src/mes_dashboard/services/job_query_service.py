@@ -299,6 +299,14 @@ def get_jobs_by_resources(
         return result
 
     except Exception as exc:
+        from mes_dashboard.services.batch_query_engine import ChunkSchemaMismatch
+        if isinstance(exc, ChunkSchemaMismatch):
+            logger.error(
+                "Job query aborted: chunk schema drift detected (chunk_index=%d, "
+                "expected=%s, got=%s). Upstream SQL/view likely changed.",
+                exc.chunk_index, exc.expected, exc.got,
+            )
+            raise
         logger.exception("Job query failed: %s", exc)
         return {'error': QUERY_ERROR_MESSAGE}
 
