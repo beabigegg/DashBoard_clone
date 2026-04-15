@@ -131,7 +131,8 @@ def refresh_cache(force: bool = False) -> bool:
     # Cross-worker lock (fail-open when Redis unavailable).
     if not try_acquire_lock(_LOCK_NAME, ttl_seconds=120):
         logger.debug("Scrap exclusion cache refresh skipped (lock held by another worker)")
-        return bool(get_excluded_reasons())
+        with _CACHE_LOCK:
+            return bool(_CACHE.get("loaded"))
 
     try:
         reasons = _read_enabled_reasons_from_oracle()
