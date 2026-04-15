@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
-import { apiGet } from '../core/api.js';
+import { apiGet, apiPost } from '../core/api.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
@@ -313,8 +313,7 @@ function buildFilterOptionsParams(sourceFilters = filters) {
 }
 
 async function fetchSummary(signal) {
-  const result = await apiGet('/api/hold-overview/summary', {
-    params: buildAllFilterParams(),
+  const result = await apiPost('/api/hold-overview/summary', buildAllFilterParams(), {
     timeout: API_TIMEOUT,
     signal,
   });
@@ -322,8 +321,7 @@ async function fetchSummary(signal) {
 }
 
 async function fetchMatrix(signal) {
-  const result = await apiGet('/api/hold-overview/matrix', {
-    params: buildAllFilterParams(),
+  const result = await apiPost('/api/hold-overview/matrix', buildAllFilterParams(), {
     timeout: API_TIMEOUT,
     signal,
   });
@@ -331,8 +329,7 @@ async function fetchMatrix(signal) {
 }
 
 async function fetchHold(signal, extraParams = {}) {
-  const result = await apiGet('/api/wip/overview/hold', {
-    params: { ...buildAllFilterParams(), ...extraParams },
+  const result = await apiPost('/api/wip/overview/hold', { ...buildAllFilterParams(), ...extraParams }, {
     timeout: API_TIMEOUT,
     signal,
   });
@@ -340,8 +337,7 @@ async function fetchHold(signal, extraParams = {}) {
 }
 
 async function fetchLots(signal) {
-  const result = await apiGet('/api/hold-overview/lots', {
-    params: buildLotsParams(),
+  const result = await apiPost('/api/hold-overview/lots', buildLotsParams(), {
     timeout: API_TIMEOUT,
     signal,
   });

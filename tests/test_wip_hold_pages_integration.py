@@ -297,3 +297,121 @@ def test_hold_detail_api_contract_flow(client):
             page=2,
             page_size=80,
         )
+
+
+# ============================================================
+# Phase-2 POST tests: hold overview + wip/overview/hold
+# ============================================================
+
+
+def test_wip_hold_post_avoids_url_length_limit(client):
+    """POST /api/wip/overview/hold with 60 lotids must reach service correctly."""
+    lots = [f"LOT{i:04d}" for i in range(60)]
+    payload = {"lotid": ",".join(lots), "workcenter": "DA"}
+
+    with patch("mes_dashboard.routes.wip_routes.get_wip_hold_summary") as mock_svc:
+        mock_svc.return_value = {"items": []}
+
+        resp = client.post("/api/wip/overview/hold", json=payload)
+
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["success"] is True
+        mock_svc.assert_called_once_with(
+            include_dummy=False,
+            workorder=None,
+            lotid=",".join(lots),
+            package=None,
+            pj_type=None,
+            firstname=None,
+            waferdesc=None,
+            workcenter="DA",
+        )
+
+
+def test_hold_overview_endpoints_accept_post(client):
+    """All four hold-overview endpoints must accept POST with large payload."""
+    lots = [f"LOT{i:04d}" for i in range(60)]
+    payload = {"lotid": ",".join(lots), "reason": ["YieldLimit", "Rework"]}
+
+    summary_rv = {"total_lots": 0, "total_qty": 0}
+    matrix_rv = {
+        "workcenters": [], "packages": [], "matrix": {},
+        "workcenter_totals": {}, "package_totals": {}, "grand_total": 0,
+    }
+    treemap_rv = {"groups": []}
+    lots_rv = {
+        "lots": [],
+        "pagination": {"page": 1, "page_size": 50, "total_count": 0, "total_pages": 1},
+    }
+
+    with (
+        patch("mes_dashboard.routes.hold_overview_routes.get_hold_detail_summary") as mock_summary,
+        patch("mes_dashboard.routes.hold_overview_routes.get_wip_matrix") as mock_matrix,
+        patch("mes_dashboard.routes.hold_overview_routes.get_hold_overview_treemap") as mock_treemap,
+        patch("mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots") as mock_lots,
+    ):
+        mock_summary.return_value = summary_rv
+        mock_matrix.return_value = matrix_rv
+        mock_treemap.return_value = treemap_rv
+        mock_lots.return_value = lots_rv
+
+        r_summary = client.post("/api/hold-overview/summary", json=payload)
+        r_matrix = client.post("/api/hold-overview/matrix", json=payload)
+        r_treemap = client.post("/api/hold-overview/treemap", json={"reason": ["YieldLimit"]})
+        r_lots = client.post("/api/hold-overview/lots", json=payload)
+
+        assert r_summary.status_code == 200
+        assert r_matrix.status_code == 200
+        assert r_treemap.status_code == 200
+        assert r_lots.status_code == 200
+
+        # Verify reason list passed as proper Python list to service
+        call_reason = mock_summary.call_args.kwargs.get("reason") or mock_summary.call_args[1].get("reason")
+        assert call_reason == ["YieldLimit", "Rework"]
+
+
+def test_hold_overview_reason_list_coercion(client):
+    """CSV GET and array POST must produce the same list passed to service."""
+    with patch("mes_dashboard.routes.hold_overview_routes.get_hold_detail_summary") as mock_svc:
+        mock_svc.return_value = {"total_lots": 0, "total_qty": 0}
+
+        client.get("/api/hold-overview/summary?reason=YieldLimit,Rework")
+        get_reason = mock_svc.call_args.kwargs.get("reason")
+
+        mock_svc.reset_mock()
+
+        client.post("/api/hold-overview/summary", json={"reason": ["YieldLimit", "Rework"]})
+        post_reason = mock_svc.call_args.kwargs.get("reason")
+
+        assert get_reason == post_reason
+
+
+def test_hold_overview_lots_post_pagination(client):
+    """POST body page/per_page must arrive as int at service layer."""
+    with patch("mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots") as mock_svc:
+        mock_svc.return_value = {
+            "lots": [],
+            "pagination": {"page": 2, "page_size": 80, "total_count": 0, "total_pages": 1},
+        }
+
+        resp = client.post("/api/hold-overview/lots", json={"page": 2, "per_page": 80})
+
+        assert resp.status_code == 200
+        kwargs = mock_svc.call_args.kwargs
+        assert kwargs["page"] == 2
+        assert kwargs["page_size"] == 80
+        assert isinstance(kwargs["page"], int)
+        assert isinstance(kwargs["page_size"], int)
+
+
+def test_max_content_length_rejects_oversized_body(client):
+    """Payloads exceeding MAX_CONTENT_LENGTH (2 MB) must return 413."""
+    big_payload = "x" * (3 * 1024 * 1024)  # 3 MB raw string
+
+    resp = client.post(
+        "/api/wip/overview/hold",
+        data=big_payload,
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 413

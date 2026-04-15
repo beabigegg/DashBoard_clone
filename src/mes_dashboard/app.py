@@ -525,6 +525,8 @@ def create_app(config_name: str | None = None) -> Flask:
     config_class = get_config(config_name)
     app.config.from_object(config_class)
     app.config["PORTAL_SPA_ENABLED"] = _resolve_portal_spa_enabled(app)
+    _max_body_mb = int(os.getenv("MAX_REQUEST_BODY_MB", "2"))
+    app.config["MAX_CONTENT_LENGTH"] = _max_body_mb * 1024 * 1024
     is_production = _is_production_env(app)
 
     # Session configuration with environment-aware secret validation.
@@ -1299,6 +1301,9 @@ def _register_error_handlers(app: Flask) -> None:
     @app.errorhandler(Exception)
     def handle_exception(e):
         """Handle uncaught exceptions."""
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            return e
         logger = logging.getLogger('mes_dashboard')
         logger.error(f"Uncaught exception: {e}", exc_info=True)
         if _is_api_request():

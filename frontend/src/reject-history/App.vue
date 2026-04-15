@@ -304,8 +304,7 @@ async function fetchBatchPareto() {
   loading.pareto = true;
 
   try {
-    const resp = await apiGet('/api/reject-history/batch-pareto', {
-      params: buildBatchParetoParams(),
+    const resp = await apiPost('/api/reject-history/batch-pareto', buildBatchParetoParams(), {
       timeout: API_TIMEOUT,
     });
     if (isStaleParetoRequest(requestId)) return;
@@ -639,8 +638,7 @@ async function refreshView() {
       },
     });
 
-    const resp = await apiGet('/api/reject-history/view', {
-      params,
+    const resp = await apiPost('/api/reject-history/view', params, {
       timeout: API_TIMEOUT,
     });
     if (isStaleRequest(requestId)) return;
@@ -749,8 +747,7 @@ async function refreshDetailPage() {
       },
     });
 
-    const resp = await apiGet('/api/reject-history/view', {
-      params,
+    const resp = await apiPost('/api/reject-history/view', params, {
       timeout: API_TIMEOUT,
     });
     if (isStaleRequest(requestId)) return;

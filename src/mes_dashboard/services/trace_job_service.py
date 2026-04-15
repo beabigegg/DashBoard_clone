@@ -854,6 +854,31 @@ def execute_trace_events_job(
             ]
             _direction = str(_msd_params.get("direction") or "backward").strip() or "backward"
             _lineage_payload = _resolve_msd_lineage_payload(payload)
+            # If lineage spool expired, re-resolve synchronously so ancestors are available
+            # for event expansion and attribution JOIN.
+            if not _lineage_payload and _seed_container_ids:
+                try:
+                    from mes_dashboard.services.lineage_engine import LineageEngine
+                    from mes_dashboard.services.trace_lineage_job_service import (
+                        _build_backward_response,
+                        _build_forward_response,
+                    )
+                    if _direction == "backward":
+                        _reresolved = LineageEngine.resolve_full_genealogy(_seed_container_ids)
+                        _lineage_payload = _build_backward_response(_seed_container_ids, _reresolved)
+                    else:
+                        _reresolved = LineageEngine.resolve_forward_tree(_seed_container_ids)
+                        _lineage_payload = _build_forward_response(_reresolved)
+                    logger.info(
+                        "trace job MSD lineage re-resolved job_id=%s ancestor_count=%s",
+                        job_id,
+                        len(_lineage_payload.get("ancestors") or {}),
+                    )
+                except Exception as _relin_exc:
+                    logger.warning(
+                        "trace job MSD lineage re-resolve failed job_id=%s: %s",
+                        job_id, _relin_exc,
+                    )
             _expanded_container_ids = _expand_msd_container_ids(
                 _seed_container_ids,
                 _lineage_payload,
@@ -938,6 +963,31 @@ def execute_trace_events_job(
                         "trace job MSD lineage spool write failed job_id=%s: %s",
                         job_id, _lin_exc,
                     )
+
+                # Write detection spool for container mode so DuckDB attribution works.
+                # Date-range mode gets detection from _fetch_station_detection_data (called
+                # inside _build_trace_aggregation_container_mode via compat job); container
+                # mode must write it here so MsdDuckdbRuntime.get_summary() can find it.
+                _msd_mode = str(_msd_params.get("mode") or "date_range").strip()
+                if _msd_mode == "container" and _seed_container_ids:
+                    try:
+                        from mes_dashboard.services.mid_section_defect_service import (
+                            _fetch_detection_by_container_ids,
+                            _write_msd_detection_stage_spool,
+                        )
+                        _det_station = str(_msd_params.get("station") or "測試").strip()
+                        _det_df = _fetch_detection_by_container_ids(_seed_container_ids, _det_station)
+                        if _det_df is not None and not _det_df.empty:
+                            _write_msd_detection_stage_spool(trace_query_id, _det_df)
+                            logger.info(
+                                "trace job MSD container detection spool written job_id=%s rows=%d",
+                                job_id, len(_det_df),
+                            )
+                    except Exception as _det_exc:
+                        logger.warning(
+                            "trace job MSD container detection spool failed job_id=%s: %s",
+                            job_id, _det_exc,
+                        )
 
                 _update_meta(job_id, progress="building response")
             finally:

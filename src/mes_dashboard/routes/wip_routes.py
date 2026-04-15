@@ -166,11 +166,14 @@ def api_overview_matrix():
     return internal_error()
 
 
-@wip_bp.route('/overview/hold')
+@wip_bp.route('/overview/hold', methods=['GET', 'POST'])
 def api_overview_hold():
     """API: Get hold summary grouped by hold reason.
 
-    Query Parameters:
+    Accepts GET (query params) or POST (JSON body) to avoid URL length limits
+    when many filter values are selected.
+
+    Parameters (query string for GET, JSON body for POST):
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
         package: Optional PACKAGE_LEF filter (exact match)
@@ -183,14 +186,15 @@ def api_overview_hold():
     Returns:
         JSON with items list containing reason, lots, qty
     """
-    workorder = request.args.get('workorder', '').strip() or None
-    lotid = request.args.get('lotid', '').strip() or None
-    package = request.args.get('package', '').strip() or None
-    pj_type = request.args.get('type', '').strip() or None
-    firstname = request.args.get('firstname', '').strip() or None
-    waferdesc = request.args.get('waferdesc', '').strip() or None
-    workcenter = request.args.get('workcenter', '').strip() or None
-    include_dummy = parse_bool_query(request.args.get('include_dummy'))
+    args = _get_wip_args()
+    workorder = args.get('workorder', '').strip() or None
+    lotid = args.get('lotid', '').strip() or None
+    package = args.get('package', '').strip() or None
+    pj_type = args.get('type', '').strip() or None
+    firstname = args.get('firstname', '').strip() or None
+    waferdesc = args.get('waferdesc', '').strip() or None
+    workcenter = args.get('workcenter', '').strip() or None
+    include_dummy = parse_bool_query(args.get('include_dummy'))
 
     result = get_wip_hold_summary(
         include_dummy=include_dummy,

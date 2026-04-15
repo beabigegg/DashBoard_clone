@@ -13,12 +13,12 @@ This file is the governed inventory for API contract classification and exceptio
 
 | File | Scope |
 | :--- | :--- |
-| `wip_routes.py` | All JSON API endpoints — `GET /api/wip/overview/summary`, `GET /api/wip/overview/matrix`, `GET /api/wip/meta/filter-options` also accept `POST` with JSON body (same params) to avoid URL length limits when many filter values are selected |
+| `wip_routes.py` | All JSON API endpoints — `GET /api/wip/overview/summary`, `GET /api/wip/overview/matrix`, `GET /api/wip/meta/filter-options`, `GET /api/wip/overview/hold` also accept `POST` with JSON body (same params) to avoid URL length limits when many filter values are selected |
 | `dashboard_routes.py` | All JSON API endpoints |
 | `hold_routes.py` | All JSON API endpoints |
-| `hold_overview_routes.py` | All JSON API endpoints |
+| `hold_overview_routes.py` | All JSON API endpoints — `/summary`, `/matrix`, `/treemap`, `/lots` accept `POST` with JSON body to avoid URL length limits; `reason` param may be a CSV string (GET) or JSON array (POST) |
 | `hold_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410): view miss returns 410 `cache_expired`; client re-triggers `execute_primary_query()` synchronously |
-| `reject_history_routes.py` | All JSON API endpoints — **Type B** (async 202 polling on 410): includes `GET /api/reject-history/job/<job_id>` (async job status); `POST /api/reject-history/query` may return HTTP 202 with `{"async": true, "job_id": ..., "status_url": ...}` when query is enqueued as background job; view miss (410) → client dispatches new async job → polling |
+| `reject_history_routes.py` | All JSON API endpoints — **Type B** (async 202 polling on 410): includes `GET /api/reject-history/job/<job_id>` (async job status); `POST /api/reject-history/query` may return HTTP 202 with `{"async": true, "job_id": ..., "status_url": ...}` when query is enqueued as background job; view miss (410) → client dispatches new async job → polling; `/batch-pareto` and `/view` also accept `POST` with JSON body (multi-value params as JSON arrays) to avoid URL length limits |
 | `resource_routes.py` | All JSON API endpoints |
 | `resource_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410): `POST /api/resource/history/query` checks canonical base spool first (DuckDB filter at view time, task 7.2); falls through to Oracle path on spool miss; response shape unchanged: `{query_id, summary, detail}`; view miss returns 410 `cache_expired`; client re-triggers `execute_primary_query()` synchronously |
 | `yield_alert_routes.py` | All JSON API endpoints — **Type B** (async 202 polling): `POST /api/yield-alert/query` may return HTTP 202 with `{"async": true, "job_id": ..., "status_url": ..., "query_id": ...}` when query is enqueued as background job; includes `GET /api/yield-alert/job/<job_id>` (async job status); when RQ is unavailable falls back to sync 200 path; view miss returns 410 `cache_expired`; client re-triggers query |

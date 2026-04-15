@@ -129,13 +129,35 @@ def _parse_date_range(required: bool = True) -> tuple[Optional[str], Optional[st
     return start_date, end_date, None
 
 
-def _parse_multi_param(name: str) -> list[str]:
+def _get_request_args() -> dict:
+    """Return request params from JSON body (POST) or query string (GET)."""
+    if request.method == 'POST':
+        return request.get_json(silent=True) or {}
+    return request.args
+
+
+def _parse_multi_param(name: str, args=None) -> list[str]:
+    source = args if args is not None else request.args
     values = []
-    for raw in request.args.getlist(name):
-        for token in str(raw).split(","):
-            item = token.strip()
-            if item:
-                values.append(item)
+    # Use getlist() for MultiDict (GET query string); plain dict comes from POST JSON body.
+    if hasattr(source, 'getlist'):
+        for raw in source.getlist(name):
+            for token in str(raw).split(","):
+                item = token.strip()
+                if item:
+                    values.append(item)
+    else:
+        raw_value = source.get(name)
+        if isinstance(raw_value, list):
+            for item in raw_value:
+                token = str(item).strip()
+                if token:
+                    values.append(token)
+        elif raw_value is not None:
+            for token in str(raw_value).split(","):
+                item = token.strip()
+                if item:
+                    values.append(item)
     # Deduplicate while preserving order.
     seen = set()
     deduped = []
@@ -197,31 +219,36 @@ _REJECT_PARETO_SCOPE_FIXED = "top80"
 _REJECT_BATCH_PARETO_DISPLAY_SCOPE_FIXED = "top20"
 
 
-def _parse_common_bools() -> tuple[Optional[tuple[dict, int]], bool, bool, bool]:
+def _parse_common_bools(args=None) -> tuple[Optional[tuple[dict, int]], bool, bool, bool]:
     """Parse include_excluded_scrap, exclude_material_scrap, exclude_pb_diode."""
+    source = args if args is not None else request.args
     for name in ("include_excluded_scrap", "exclude_material_scrap", "exclude_pb_diode"):
-        raw = str(request.args.get(name, "") or "").strip().lower()
+        raw_val = source.get(name, "") if isinstance(source, dict) else source.get(name, "")
+        if isinstance(raw_val, bool):
+            continue
+        raw = str(raw_val or "").strip().lower()
         if raw not in _VALID_BOOL_STRINGS:
             return ({"success": False, "error": f"Invalid {name}, use true/false"}, 400), False, True, True
 
-    include_excluded_scrap = parse_bool_query(
-        request.args.get("include_excluded_scrap", ""),
-        default=False,
-    )
-    exclude_material_scrap = parse_bool_query(
-        request.args.get("exclude_material_scrap", "true"),
-        default=True,
-    )
-    exclude_pb_diode = parse_bool_query(
-        request.args.get("exclude_pb_diode", "true"),
-        default=True,
-    )
+    def _get_bool(name, default_str):
+        raw_val = source.get(name, None) if isinstance(source, dict) else source.get(name, None)
+        if isinstance(raw_val, bool):
+            return raw_val
+        if raw_val is None:
+            return parse_bool_query(default_str, default=(default_str.lower() not in ("false", "0", "no", "n", "off", "")))
+        return parse_bool_query(str(raw_val), default=False)
+
+    include_excluded_scrap = _get_bool("include_excluded_scrap", "")
+    exclude_material_scrap = _get_bool("exclude_material_scrap", "true")
+    exclude_pb_diode = _get_bool("exclude_pb_diode", "true")
     return None, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode
 
 
-def _parse_pareto_selection() -> tuple[Optional[tuple[dict, int]], Optional[str], Optional[list[str]]]:
-    pareto_dimension = request.args.get("pareto_dimension", "").strip().lower()
-    pareto_values = _parse_multi_param("pareto_values")
+def _parse_pareto_selection(args=None) -> tuple[Optional[tuple[dict, int]], Optional[str], Optional[list[str]]]:
+    source = args if args is not None else request.args
+    raw_dim = source.get("pareto_dimension", "")
+    pareto_dimension = str(raw_dim).strip().lower() if raw_dim else ""
+    pareto_values = _parse_multi_param("pareto_values", args)
     if pareto_values and not pareto_dimension:
         pareto_dimension = "reason"
     if pareto_dimension and pareto_dimension not in _VALID_PARETO_DIMENSIONS:
@@ -235,10 +262,10 @@ def _parse_pareto_selection() -> tuple[Optional[tuple[dict, int]], Optional[str]
     return None, (pareto_dimension or None), (pareto_values or None)
 
 
-def _parse_multi_pareto_selections() -> dict[str, list[str]]:
+def _parse_multi_pareto_selections(args=None) -> dict[str, list[str]]:
     selections: dict[str, list[str]] = {}
     for dim, param_name in _PARETO_SELECTION_PARAMS.items():
-        values = _parse_multi_param(param_name)
+        values = _parse_multi_param(param_name, args)
         if values:
             selections[dim] = values
     return selections
@@ -451,18 +478,22 @@ def api_reject_history_reason_pareto():
         return internal_error("查詢柏拉圖資料失敗")
 
 
-@reject_history_bp.route("/api/reject-history/batch-pareto", methods=["GET"])
+@reject_history_bp.route("/api/reject-history/batch-pareto", methods=["GET", "POST"])
 def api_reject_history_batch_pareto():
     """Batch pareto view: compute all dimensions from cache only."""
-    query_id = request.args.get("query_id", "").strip()
+    args = _get_request_args()
+    query_id = args.get("query_id", "")
+    if isinstance(query_id, str):
+        query_id = query_id.strip()
     if not query_id:
         return validation_error("缺少必要參數: query_id")
 
-    bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
+    bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools(args)
     if bool_error:
         return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
-    metric_mode = request.args.get("metric_mode", "reject_total").strip().lower() or "reject_total"
+    raw_metric = args.get("metric_mode", "reject_total")
+    metric_mode = str(raw_metric).strip().lower() or "reject_total"
     pareto_scope = _REJECT_PARETO_SCOPE_FIXED
     pareto_display_scope = _REJECT_BATCH_PARETO_DISPLAY_SCOPE_FIXED
 
@@ -472,11 +503,11 @@ def api_reject_history_batch_pareto():
             metric_mode=metric_mode,
             pareto_scope=pareto_scope,
             pareto_display_scope=pareto_display_scope,
-            packages=_parse_multi_param("packages") or None,
-            workcenter_groups=_parse_multi_param("workcenter_groups") or None,
-            reasons=_parse_multi_param("reasons") or None,
-            trend_dates=_parse_multi_param("trend_dates") or None,
-            pareto_selections=_parse_multi_pareto_selections(),
+            packages=_parse_multi_param("packages", args) or None,
+            workcenter_groups=_parse_multi_param("workcenter_groups", args) or None,
+            reasons=_parse_multi_param("reasons", args) or None,
+            trend_dates=_parse_multi_param("trend_dates", args) or None,
+            pareto_selections=_parse_multi_pareto_selections(args),
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
@@ -791,38 +822,57 @@ def _inject_reject_spool_info(data: dict, query_id: str) -> None:
         pass
 
 
-@reject_history_bp.route("/api/reject-history/view", methods=["GET"])
+@reject_history_bp.route("/api/reject-history/view", methods=["GET", "POST"])
 def api_reject_history_view():
     """Supplementary view: read cache → filter → return derived data."""
-    query_id = request.args.get("query_id", "").strip()
+    args = _get_request_args()
+    query_id = args.get("query_id", "")
+    if isinstance(query_id, str):
+        query_id = query_id.strip()
     if not query_id:
         return validation_error("缺少必要參數: query_id")
 
-    page = request.args.get("page", 1, type=int) or 1
-    per_page = request.args.get("per_page", 50, type=int) or 50
-    metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
-    reasons = _parse_multi_param("reasons") or None
-    detail_reason = request.args.get("detail_reason", "").strip() or None
-    pareto_selections = _parse_multi_pareto_selections()
+    try:
+        page = int(args.get("page", 1) or 1)
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        per_page = int(args.get("per_page", 50) or 50)
+    except (TypeError, ValueError):
+        per_page = 50
+    raw_metric = args.get("metric_filter", "all")
+    metric_filter = str(raw_metric).strip().lower() or "all"
+    reasons = _parse_multi_param("reasons", args) or None
+    raw_dr = args.get("detail_reason", "")
+    detail_reason = str(raw_dr).strip() or None if raw_dr else None
+    pareto_selections = _parse_multi_pareto_selections(args)
     pareto_dimension = None
     pareto_values = None
     if not pareto_selections:
-        pareto_error, pareto_dimension, pareto_values = _parse_pareto_selection()
+        pareto_error, pareto_dimension, pareto_values = _parse_pareto_selection(args)
         if pareto_error:
             return validation_error(pareto_error[0].get("error", "查詢失敗"))
 
-    include_excluded_scrap = request.args.get("include_excluded_scrap", "false").lower() == "true"
-    exclude_material_scrap = request.args.get("exclude_material_scrap", "true").lower() != "false"
-    exclude_pb_diode = request.args.get("exclude_pb_diode", "true").lower() != "false"
+    def _get_bool_simple(name, default_true):
+        raw_val = args.get(name)
+        if isinstance(raw_val, bool):
+            return raw_val
+        if raw_val is None:
+            return default_true
+        return str(raw_val).lower() not in ("false", "0", "no", "n", "off") if default_true else str(raw_val).lower() in ("true", "1", "yes", "y", "on")
+
+    include_excluded_scrap = _get_bool_simple("include_excluded_scrap", False)
+    exclude_material_scrap = _get_bool_simple("exclude_material_scrap", True)
+    exclude_pb_diode = _get_bool_simple("exclude_pb_diode", True)
 
     try:
         result = apply_view(
             query_id=query_id,
-            packages=_parse_multi_param("packages") or None,
-            workcenter_groups=_parse_multi_param("workcenter_groups") or None,
+            packages=_parse_multi_param("packages", args) or None,
+            workcenter_groups=_parse_multi_param("workcenter_groups", args) or None,
             reasons=reasons,
             metric_filter=metric_filter,
-            trend_dates=_parse_multi_param("trend_dates") or None,
+            trend_dates=_parse_multi_param("trend_dates", args) or None,
             detail_reason=detail_reason,
             pareto_dimension=pareto_dimension,
             pareto_values=pareto_values,
