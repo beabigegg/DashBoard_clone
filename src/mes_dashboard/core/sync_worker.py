@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -283,36 +284,42 @@ class SyncWorker:
         if not rows:
             return
 
-        try:
-            with get_mysql_connection() as conn:
-                for row in rows:
-                    ts = _parse_ts(row.get("timestamp"))
-                    conn.execute(
-                        text("""
-                            INSERT IGNORE INTO dashboard_logs
-                                (sync_id, timestamp, level, logger_name, message,
-                                 request_id, user, ip, extra)
-                            VALUES
-                                (:sync_id, :timestamp, :level, :logger_name, :message,
-                                 :request_id, :user, :ip, :extra)
-                        """),
-                        {
-                            "sync_id": row.get("sync_id"),
-                            "timestamp": ts,
-                            "level": row.get("level"),
-                            "logger_name": row.get("logger_name"),
-                            "message": row.get("message"),
-                            "request_id": row.get("request_id"),
-                            "user": row.get("user"),
-                            "ip": row.get("ip"),
-                            "extra": row.get("extra"),
-                        }
-                    )
-            # Mark synced after successful MySQL write
-            self._log_store.mark_synced([r["id"] for r in rows])
-            logger.debug("SyncWorker: synced %d log rows to MySQL", len(rows))
-        except Exception as exc:
-            logger.warning("SyncWorker: MySQL unavailable for logs, will retry: %s", exc)
+        params = [
+            {
+                "sync_id": row.get("sync_id"),
+                "timestamp": _parse_ts(row.get("timestamp")),
+                "level": row.get("level"),
+                "logger_name": row.get("logger_name"),
+                "message": row.get("message"),
+                "request_id": row.get("request_id"),
+                "user": row.get("user"),
+                "ip": row.get("ip"),
+                "extra": row.get("extra"),
+            }
+            for row in rows
+        ]
+        sql = text("""
+            INSERT IGNORE INTO dashboard_logs
+                (sync_id, timestamp, level, logger_name, message,
+                 request_id, user, ip, extra)
+            VALUES
+                (:sync_id, :timestamp, :level, :logger_name, :message,
+                 :request_id, :user, :ip, :extra)
+        """)
+        for attempt in range(3):
+            try:
+                with get_mysql_connection() as conn:
+                    conn.execute(sql, params)
+                self._log_store.mark_synced([r["id"] for r in rows])
+                logger.debug("SyncWorker: synced %d log rows to MySQL", len(rows))
+                return
+            except Exception as exc:
+                if attempt < 2 and _is_deadlock(exc):
+                    logger.debug("SyncWorker: deadlock on logs insert, retry %d/3", attempt + 1)
+                    time.sleep(0.05 * (2 ** attempt))
+                    continue
+                logger.warning("SyncWorker: MySQL unavailable for logs, will retry: %s", exc)
+                return
 
     # ----------------------------------------------------------
     # Metrics sync
@@ -328,83 +335,90 @@ class SyncWorker:
         if not rows:
             return
 
-        try:
-            with get_mysql_connection() as conn:
-                for row in rows:
-                    ts = _parse_ts(row.get("ts"))
-                    conn.execute(
-                        text("""
-                            INSERT IGNORE INTO dashboard_metrics_snapshots
-                                (sync_id, ts, worker_pid,
-                                 pool_saturation, pool_checked_out, pool_checked_in,
-                                 pool_overflow, pool_max_capacity,
-                                 redis_used_memory, redis_hit_rate,
-                                 rc_l1_hit_rate, rc_l2_hit_rate, rc_miss_rate,
-                                 latency_p50_ms, latency_p95_ms, latency_p99_ms, latency_count,
-                                 slow_query_active, slow_query_waiting, worker_rss_bytes,
-                                 service_rss_bytes,
-                                 system_mem_available_mb, system_mem_used_pct,
-                                 rq_workers_total, rq_workers_busy, rq_queue_depth,
-                                 heavy_query_slots_active,
-                                 heavy_query_guard_reject_total,
-                                 heavy_query_memory_error_total,
-                                 heavy_query_async_fallback_total,
-                                 online_count)
-                            VALUES
-                                (:sync_id, :ts, :worker_pid,
-                                 :pool_saturation, :pool_checked_out, :pool_checked_in,
-                                 :pool_overflow, :pool_max_capacity,
-                                 :redis_used_memory, :redis_hit_rate,
-                                 :rc_l1_hit_rate, :rc_l2_hit_rate, :rc_miss_rate,
-                                 :latency_p50_ms, :latency_p95_ms, :latency_p99_ms, :latency_count,
-                                 :slow_query_active, :slow_query_waiting, :worker_rss_bytes,
-                                 :service_rss_bytes,
-                                 :system_mem_available_mb, :system_mem_used_pct,
-                                 :rq_workers_total, :rq_workers_busy, :rq_queue_depth,
-                                 :heavy_query_slots_active,
-                                 :heavy_query_guard_reject_total,
-                                 :heavy_query_memory_error_total,
-                                 :heavy_query_async_fallback_total,
-                                 :online_count)
-                        """),
-                        {
-                            "sync_id": row.get("sync_id"),
-                            "ts": ts,
-                            "worker_pid": row.get("worker_pid"),
-                            "pool_saturation": row.get("pool_saturation"),
-                            "pool_checked_out": row.get("pool_checked_out"),
-                            "pool_checked_in": row.get("pool_checked_in"),
-                            "pool_overflow": row.get("pool_overflow"),
-                            "pool_max_capacity": row.get("pool_max_capacity"),
-                            "redis_used_memory": row.get("redis_used_memory"),
-                            "redis_hit_rate": row.get("redis_hit_rate"),
-                            "rc_l1_hit_rate": row.get("rc_l1_hit_rate"),
-                            "rc_l2_hit_rate": row.get("rc_l2_hit_rate"),
-                            "rc_miss_rate": row.get("rc_miss_rate"),
-                            "latency_p50_ms": row.get("latency_p50_ms"),
-                            "latency_p95_ms": row.get("latency_p95_ms"),
-                            "latency_p99_ms": row.get("latency_p99_ms"),
-                            "latency_count": row.get("latency_count"),
-                            "slow_query_active": row.get("slow_query_active"),
-                            "slow_query_waiting": row.get("slow_query_waiting"),
-                            "worker_rss_bytes": row.get("worker_rss_bytes"),
-                            "service_rss_bytes": row.get("service_rss_bytes"),
-                            "system_mem_available_mb": row.get("system_mem_available_mb"),
-                            "system_mem_used_pct": row.get("system_mem_used_pct"),
-                            "rq_workers_total": row.get("rq_workers_total"),
-                            "rq_workers_busy": row.get("rq_workers_busy"),
-                            "rq_queue_depth": row.get("rq_queue_depth"),
-                            "heavy_query_slots_active": row.get("heavy_query_slots_active"),
-                            "heavy_query_guard_reject_total": row.get("heavy_query_guard_reject_total"),
-                            "heavy_query_memory_error_total": row.get("heavy_query_memory_error_total"),
-                            "heavy_query_async_fallback_total": row.get("heavy_query_async_fallback_total"),
-                            "online_count": row.get("online_count"),
-                        }
-                    )
-            self._metrics_store.mark_synced([r["id"] for r in rows])
-            logger.debug("SyncWorker: synced %d metrics rows to MySQL", len(rows))
-        except Exception as exc:
-            logger.warning("SyncWorker: MySQL unavailable for metrics, will retry: %s", exc)
+        params = [
+            {
+                "sync_id": row.get("sync_id"),
+                "ts": _parse_ts(row.get("ts")),
+                "worker_pid": row.get("worker_pid"),
+                "pool_saturation": row.get("pool_saturation"),
+                "pool_checked_out": row.get("pool_checked_out"),
+                "pool_checked_in": row.get("pool_checked_in"),
+                "pool_overflow": row.get("pool_overflow"),
+                "pool_max_capacity": row.get("pool_max_capacity"),
+                "redis_used_memory": row.get("redis_used_memory"),
+                "redis_hit_rate": row.get("redis_hit_rate"),
+                "rc_l1_hit_rate": row.get("rc_l1_hit_rate"),
+                "rc_l2_hit_rate": row.get("rc_l2_hit_rate"),
+                "rc_miss_rate": row.get("rc_miss_rate"),
+                "latency_p50_ms": row.get("latency_p50_ms"),
+                "latency_p95_ms": row.get("latency_p95_ms"),
+                "latency_p99_ms": row.get("latency_p99_ms"),
+                "latency_count": row.get("latency_count"),
+                "slow_query_active": row.get("slow_query_active"),
+                "slow_query_waiting": row.get("slow_query_waiting"),
+                "worker_rss_bytes": row.get("worker_rss_bytes"),
+                "service_rss_bytes": row.get("service_rss_bytes"),
+                "system_mem_available_mb": row.get("system_mem_available_mb"),
+                "system_mem_used_pct": row.get("system_mem_used_pct"),
+                "rq_workers_total": row.get("rq_workers_total"),
+                "rq_workers_busy": row.get("rq_workers_busy"),
+                "rq_queue_depth": row.get("rq_queue_depth"),
+                "heavy_query_slots_active": row.get("heavy_query_slots_active"),
+                "heavy_query_guard_reject_total": row.get("heavy_query_guard_reject_total"),
+                "heavy_query_memory_error_total": row.get("heavy_query_memory_error_total"),
+                "heavy_query_async_fallback_total": row.get("heavy_query_async_fallback_total"),
+                "online_count": row.get("online_count"),
+            }
+            for row in rows
+        ]
+        sql = text("""
+            INSERT IGNORE INTO dashboard_metrics_snapshots
+                (sync_id, ts, worker_pid,
+                 pool_saturation, pool_checked_out, pool_checked_in,
+                 pool_overflow, pool_max_capacity,
+                 redis_used_memory, redis_hit_rate,
+                 rc_l1_hit_rate, rc_l2_hit_rate, rc_miss_rate,
+                 latency_p50_ms, latency_p95_ms, latency_p99_ms, latency_count,
+                 slow_query_active, slow_query_waiting, worker_rss_bytes,
+                 service_rss_bytes,
+                 system_mem_available_mb, system_mem_used_pct,
+                 rq_workers_total, rq_workers_busy, rq_queue_depth,
+                 heavy_query_slots_active,
+                 heavy_query_guard_reject_total,
+                 heavy_query_memory_error_total,
+                 heavy_query_async_fallback_total,
+                 online_count)
+            VALUES
+                (:sync_id, :ts, :worker_pid,
+                 :pool_saturation, :pool_checked_out, :pool_checked_in,
+                 :pool_overflow, :pool_max_capacity,
+                 :redis_used_memory, :redis_hit_rate,
+                 :rc_l1_hit_rate, :rc_l2_hit_rate, :rc_miss_rate,
+                 :latency_p50_ms, :latency_p95_ms, :latency_p99_ms, :latency_count,
+                 :slow_query_active, :slow_query_waiting, :worker_rss_bytes,
+                 :service_rss_bytes,
+                 :system_mem_available_mb, :system_mem_used_pct,
+                 :rq_workers_total, :rq_workers_busy, :rq_queue_depth,
+                 :heavy_query_slots_active,
+                 :heavy_query_guard_reject_total,
+                 :heavy_query_memory_error_total,
+                 :heavy_query_async_fallback_total,
+                 :online_count)
+        """)
+        for attempt in range(3):
+            try:
+                with get_mysql_connection() as conn:
+                    conn.execute(sql, params)
+                self._metrics_store.mark_synced([r["id"] for r in rows])
+                logger.debug("SyncWorker: synced %d metrics rows to MySQL", len(rows))
+                return
+            except Exception as exc:
+                if attempt < 2 and _is_deadlock(exc):
+                    logger.debug("SyncWorker: deadlock on metrics insert, retry %d/3", attempt + 1)
+                    time.sleep(0.05 * (2 ** attempt))
+                    continue
+                logger.warning("SyncWorker: MySQL unavailable for metrics, will retry: %s", exc)
+                return
 
     # ----------------------------------------------------------
     # Login session sync
@@ -420,43 +434,51 @@ class SyncWorker:
         if not rows:
             return
 
-        try:
-            with get_mysql_connection() as conn:
-                for row in rows:
-                    conn.execute(
-                        text("""
-                            REPLACE INTO dashboard_login_sessions
-                                (sync_id, session_id, emp_id, username, display_name,
-                                 real_name, department, email, phone, domain, ip,
-                                 login_time, last_active, logout_time, duration_sec, is_admin)
-                            VALUES
-                                (:sync_id, :session_id, :emp_id, :username, :display_name,
-                                 :real_name, :department, :email, :phone, :domain, :ip,
-                                 :login_time, :last_active, :logout_time, :duration_sec, :is_admin)
-                        """),
-                        {
-                            "sync_id": row.get("sync_id"),
-                            "session_id": row.get("session_id"),
-                            "emp_id": row.get("emp_id"),
-                            "username": row.get("username"),
-                            "display_name": row.get("display_name"),
-                            "real_name": row.get("real_name"),
-                            "department": row.get("department"),
-                            "email": row.get("email"),
-                            "phone": row.get("phone"),
-                            "domain": row.get("domain"),
-                            "ip": row.get("ip"),
-                            "login_time": _parse_ts(row.get("login_time")),
-                            "last_active": _parse_ts(row.get("last_active")),
-                            "logout_time": _parse_ts(row.get("logout_time")),
-                            "duration_sec": row.get("duration_sec"),
-                            "is_admin": row.get("is_admin"),
-                        },
-                    )
-            self._login_store.mark_synced([r["id"] for r in rows])
-            logger.debug("SyncWorker: synced %d login session rows to MySQL", len(rows))
-        except Exception as exc:
-            logger.warning("SyncWorker: MySQL unavailable for login sessions, will retry: %s", exc)
+        params = [
+            {
+                "sync_id": row.get("sync_id"),
+                "session_id": row.get("session_id"),
+                "emp_id": row.get("emp_id"),
+                "username": row.get("username"),
+                "display_name": row.get("display_name"),
+                "real_name": row.get("real_name"),
+                "department": row.get("department"),
+                "email": row.get("email"),
+                "phone": row.get("phone"),
+                "domain": row.get("domain"),
+                "ip": row.get("ip"),
+                "login_time": _parse_ts(row.get("login_time")),
+                "last_active": _parse_ts(row.get("last_active")),
+                "logout_time": _parse_ts(row.get("logout_time")),
+                "duration_sec": row.get("duration_sec"),
+                "is_admin": row.get("is_admin"),
+            }
+            for row in rows
+        ]
+        sql = text("""
+            REPLACE INTO dashboard_login_sessions
+                (sync_id, session_id, emp_id, username, display_name,
+                 real_name, department, email, phone, domain, ip,
+                 login_time, last_active, logout_time, duration_sec, is_admin)
+            VALUES
+                (:sync_id, :session_id, :emp_id, :username, :display_name,
+                 :real_name, :department, :email, :phone, :domain, :ip,
+                 :login_time, :last_active, :logout_time, :duration_sec, :is_admin)
+        """)
+        for attempt in range(3):
+            try:
+                with get_mysql_connection() as conn:
+                    conn.execute(sql, params)
+                self._login_store.mark_synced([r["id"] for r in rows])
+                logger.debug("SyncWorker: synced %d login session rows to MySQL", len(rows))
+                return
+            except Exception as exc:
+                if attempt < 2 and _is_deadlock(exc):
+                    logger.debug("SyncWorker: deadlock on login sessions insert, retry %d/3", attempt + 1)
+                    time.sleep(0.05 * (2 ** attempt))
+                    continue
+                logger.warning("SyncWorker: MySQL unavailable for login sessions, will retry: %s", exc)
+                return
 
     # ----------------------------------------------------------
     # Orphan session cleanup
@@ -481,6 +503,13 @@ class SyncWorker:
 # ============================================================
 # Helpers
 # ============================================================
+
+def _is_deadlock(exc: Exception) -> bool:
+    """Return True if exc is a MySQL deadlock error (1213)."""
+    orig = getattr(exc, 'orig', exc)
+    args = getattr(orig, 'args', ())
+    return bool(args) and args[0] == 1213
+
 
 def _parse_ts(ts_str) -> Optional[datetime]:
     """Convert ISO text timestamp to datetime for MySQL DATETIME(3)."""
