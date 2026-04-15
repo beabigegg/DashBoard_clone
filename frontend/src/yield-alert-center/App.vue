@@ -656,6 +656,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  _jobAbortController?.abort();
   duckdbActivating.value = false;
   duckdb.deactivate();
 });

@@ -97,3 +97,14 @@ The alert candidate table SHALL allow users to expand individual rows to view ME
 ### Requirement: Alert row action SHALL navigate to reject-history page
 **Reason**: 跳轉至 reject-history 頁面無法直接提供原因明細，且 drilldown-context 依賴的 linkage 映射永遠失敗。
 **Migration**: 改為 inline 展開 MES 報廢明細（見上方 MODIFIED Requirement）。
+
+## ADDED Requirements (fix-page-query-race-condition)
+
+### Requirement: Yield Alert Center page SHALL abort active Job polling on unmount
+When the Yield Alert Center component is destroyed (user navigates away), any active RQ Job polling controller SHALL be aborted immediately to prevent background network activity.
+
+#### Scenario: Polling stops on navigation
+- **WHEN** a user triggers a query that initiates an async RQ Job
+- **AND** the user navigates away from Yield Alert Center before the job completes
+- **THEN** the `_jobAbortController` SHALL be aborted in `onUnmounted`
+- **THEN** no further requests SHALL be sent to the job status endpoint after component destruction

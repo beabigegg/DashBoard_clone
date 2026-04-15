@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import EquipmentView from './components/EquipmentView.vue';
@@ -75,6 +76,8 @@ function readStateFromUrl() {
 
 const initialState = readStateFromUrl();
 const activeTab = ref(initialState.tab);
+
+const { nextRequestId } = useRequestGuard();
 
 const lotResolve = useLotResolve({
   inputType: initialState.lotInputType,
@@ -443,6 +446,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('popstate', handlePopState);
+  nextRequestId();
 });
 
 watch(

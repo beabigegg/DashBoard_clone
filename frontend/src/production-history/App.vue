@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { apiGet } from '../core/api.js';
 import { useProductionHistory } from './composables/useProductionHistory.js';
+import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -32,6 +33,8 @@ const {
   applySupplementaryFilter,
   buildExportUrl,
 } = useProductionHistory();
+
+const { nextRequestId, isStaleRequest } = useRequestGuard();
 
 // ── Type MultiSelect state ───────────────────────────────────────────────
 const typeOptions = ref([]);
@@ -73,12 +76,15 @@ function validate() {
 }
 
 async function handleQuery() {
+  if (loading.value) return;
   if (!validate()) return;
+  const requestId = nextRequestId();
   await runQuery({
     pj_types: selectedTypes.value,
     start_date: formStartDate.value,
     end_date: formEndDate.value,
   });
+  if (isStaleRequest(requestId)) return;
 }
 
 // ── Supplementary filter change handler ──────────────────────────────────
