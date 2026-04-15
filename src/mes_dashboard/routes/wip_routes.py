@@ -15,6 +15,17 @@ from mes_dashboard.core.response import (
     internal_error,
 )
 from mes_dashboard.core.utils import parse_bool_query
+
+
+def _get_wip_args():
+    """Return filter params from JSON body (POST) or query string (GET).
+
+    Both request.args (MultiDict) and a plain dict support .get(key, default),
+    so callers can use the result uniformly.
+    """
+    if request.method == 'POST':
+        return request.get_json(silent=True) or {}
+    return request.args
 from mes_dashboard.services.wip_service import (
     get_wip_summary,
     get_wip_matrix,
@@ -54,11 +65,14 @@ _WIP_DETAIL_RATE_LIMIT = configured_rate_limit(
 # Overview APIs
 # ============================================================
 
-@wip_bp.route('/overview/summary')
+@wip_bp.route('/overview/summary', methods=['GET', 'POST'])
 def api_overview_summary():
     """API: Get WIP KPI summary for overview dashboard.
 
-    Query Parameters:
+    Accepts GET (query params) or POST (JSON body) to avoid URL length limits
+    when many filter values are selected.
+
+    Parameters (query string for GET, JSON body for POST):
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
         package: Optional PACKAGE_LEF filter (exact match)
@@ -70,13 +84,14 @@ def api_overview_summary():
     Returns:
         JSON with totalLots, totalQtyPcs, byWipStatus, dataUpdateDate
     """
-    workorder = request.args.get('workorder', '').strip() or None
-    lotid = request.args.get('lotid', '').strip() or None
-    package = request.args.get('package', '').strip() or None
-    pj_type = request.args.get('type', '').strip() or None
-    firstname = request.args.get('firstname', '').strip() or None
-    waferdesc = request.args.get('waferdesc', '').strip() or None
-    include_dummy = parse_bool_query(request.args.get('include_dummy'))
+    args = _get_wip_args()
+    workorder = (args.get('workorder', '') or '').strip() or None
+    lotid = (args.get('lotid', '') or '').strip() or None
+    package = (args.get('package', '') or '').strip() or None
+    pj_type = (args.get('type', '') or '').strip() or None
+    firstname = (args.get('firstname', '') or '').strip() or None
+    waferdesc = (args.get('waferdesc', '') or '').strip() or None
+    include_dummy = parse_bool_query(args.get('include_dummy'))
 
     result = get_wip_summary(
         include_dummy=include_dummy,
@@ -92,12 +107,15 @@ def api_overview_summary():
     return internal_error()
 
 
-@wip_bp.route('/overview/matrix')
+@wip_bp.route('/overview/matrix', methods=['GET', 'POST'])
 @_WIP_MATRIX_RATE_LIMIT
 def api_overview_matrix():
     """API: Get workcenter x product line matrix for overview dashboard.
 
-    Query Parameters:
+    Accepts GET (query params) or POST (JSON body) to avoid URL length limits
+    when many filter values are selected.
+
+    Parameters (query string for GET, JSON body for POST):
         workorder: Optional WORKORDER filter (fuzzy match)
         lotid: Optional LOTID filter (fuzzy match)
         package: Optional PACKAGE_LEF filter (exact match)
@@ -113,15 +131,16 @@ def api_overview_matrix():
         JSON with workcenters, packages, matrix, workcenter_totals,
         package_totals, grand_total
     """
-    workorder = request.args.get('workorder', '').strip() or None
-    lotid = request.args.get('lotid', '').strip() or None
-    package = request.args.get('package', '').strip() or None
-    pj_type = request.args.get('type', '').strip() or None
-    firstname = request.args.get('firstname', '').strip() or None
-    waferdesc = request.args.get('waferdesc', '').strip() or None
-    include_dummy = parse_bool_query(request.args.get('include_dummy'))
-    status = request.args.get('status', '').strip().upper() or None
-    hold_type = request.args.get('hold_type', '').strip().lower() or None
+    args = _get_wip_args()
+    workorder = (args.get('workorder', '') or '').strip() or None
+    lotid = (args.get('lotid', '') or '').strip() or None
+    package = (args.get('package', '') or '').strip() or None
+    pj_type = (args.get('type', '') or '').strip() or None
+    firstname = (args.get('firstname', '') or '').strip() or None
+    waferdesc = (args.get('waferdesc', '') or '').strip() or None
+    include_dummy = parse_bool_query(args.get('include_dummy'))
+    status = (args.get('status', '') or '').strip().upper() or None
+    hold_type = (args.get('hold_type', '') or '').strip().lower() or None
 
     # Validate status parameter
     if status and status not in ('RUN', 'QUEUE', 'HOLD'):
@@ -192,15 +211,18 @@ def api_overview_hold():
 # Detail APIs
 # ============================================================
 
-@wip_bp.route('/detail/<workcenter>')
+@wip_bp.route('/detail/<workcenter>', methods=['GET', 'POST'])
 @_WIP_DETAIL_RATE_LIMIT
 def api_detail(workcenter: str):
     """API: Get WIP detail for a specific workcenter group.
 
+    Accepts GET (query params) or POST (JSON body) to avoid URL length limits
+    when many filter values are selected.
+
     Args:
         workcenter: WORKCENTER_GROUP name (URL path parameter)
 
-    Query Parameters:
+    Parameters (query string for GET, JSON body for POST):
         package: Optional PRODUCTLINENAME filter
         type: Optional PJ_TYPE filter (exact match)
         firstname: Optional FIRSTNAME filter (exact match)
@@ -217,22 +239,30 @@ def api_detail(workcenter: str):
     Returns:
         JSON with workcenter, summary, specs, lots, pagination, sys_date
     """
-    package = request.args.get('package', '').strip() or None
-    pj_type = request.args.get('type', '').strip() or None
-    firstname = request.args.get('firstname', '').strip() or None
-    waferdesc = request.args.get('waferdesc', '').strip() or None
-    status = request.args.get('status', '').strip().upper() or None
-    hold_type = request.args.get('hold_type', '').strip().lower() or None
-    workorder = request.args.get('workorder', '').strip() or None
-    lotid = request.args.get('lotid', '').strip() or None
-    include_dummy = parse_bool_query(request.args.get('include_dummy'))
-    page = request.args.get('page', 1, type=int)
-    page_size = request.args.get('page_size', 100, type=int)
+    args = _get_wip_args()
+    package = (args.get('package', '') or '').strip() or None
+    pj_type = (args.get('type', '') or '').strip() or None
+    firstname = (args.get('firstname', '') or '').strip() or None
+    waferdesc = (args.get('waferdesc', '') or '').strip() or None
+    status = (args.get('status', '') or '').strip().upper() or None
+    hold_type = (args.get('hold_type', '') or '').strip().lower() or None
+    workorder = (args.get('workorder', '') or '').strip() or None
+    lotid = (args.get('lotid', '') or '').strip() or None
+    include_dummy = parse_bool_query(args.get('include_dummy'))
 
-    if page is None:
-        page = 1
-    if page_size is None:
-        page_size = 100
+    # page/page_size: GET args supports type=int; POST body values may already be int
+    def _parse_int(value, default):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
+
+    if request.method == 'POST':
+        page = _parse_int(args.get('page', 1), 1)
+        page_size = _parse_int(args.get('page_size', 100), 100)
+    else:
+        page = request.args.get('page', 1, type=int) or 1
+        page_size = request.args.get('page_size', 100, type=int) or 100
 
     page = max(page, 1)
     page_size = max(1, min(page_size, 500))
@@ -322,18 +352,23 @@ def api_meta_packages():
     return internal_error()
 
 
-@wip_bp.route('/meta/filter-options')
+@wip_bp.route('/meta/filter-options', methods=['GET', 'POST'])
 def api_meta_filter_options():
-    """API: Get interdependent WIP overview filter options from cache-backed source."""
-    include_dummy = parse_bool_query(request.args.get('include_dummy'))
-    workorder = request.args.get('workorder', '').strip() or None
-    lotid = request.args.get('lotid', '').strip() or None
-    package = request.args.get('package', '').strip() or None
-    pj_type = request.args.get('type', '').strip() or None
-    firstname = request.args.get('firstname', '').strip() or None
-    waferdesc = request.args.get('waferdesc', '').strip() or None
-    status = request.args.get('status', '').strip() or None
-    hold_type = request.args.get('hold_type', '').strip() or None
+    """API: Get interdependent WIP overview filter options from cache-backed source.
+
+    Accepts GET (query params) or POST (JSON body) to avoid URL length limits
+    when many filter values are selected.
+    """
+    args = _get_wip_args()
+    include_dummy = parse_bool_query(args.get('include_dummy'))
+    workorder = (args.get('workorder', '') or '').strip() or None
+    lotid = (args.get('lotid', '') or '').strip() or None
+    package = (args.get('package', '') or '').strip() or None
+    pj_type = (args.get('type', '') or '').strip() or None
+    firstname = (args.get('firstname', '') or '').strip() or None
+    waferdesc = (args.get('waferdesc', '') or '').strip() or None
+    status = (args.get('status', '') or '').strip() or None
+    hold_type = (args.get('hold_type', '') or '').strip() or None
 
     result = get_wip_filter_options(
         include_dummy=include_dummy,

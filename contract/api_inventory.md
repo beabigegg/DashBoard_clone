@@ -13,7 +13,7 @@ This file is the governed inventory for API contract classification and exceptio
 
 | File | Scope |
 | :--- | :--- |
-| `wip_routes.py` | All JSON API endpoints |
+| `wip_routes.py` | All JSON API endpoints — `GET /api/wip/overview/summary`, `GET /api/wip/overview/matrix`, `GET /api/wip/meta/filter-options` also accept `POST` with JSON body (same params) to avoid URL length limits when many filter values are selected |
 | `dashboard_routes.py` | All JSON API endpoints |
 | `hold_routes.py` | All JSON API endpoints |
 | `hold_overview_routes.py` | All JSON API endpoints |

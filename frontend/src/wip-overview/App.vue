@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
-import { apiGet } from '../core/api.js';
+import { apiPost } from '../core/api.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { buildWipOverviewQueryParams } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
@@ -120,8 +120,7 @@ function buildFilters(status = null) {
 }
 
 async function fetchSummary(signal) {
-  const result = await apiGet('/api/wip/overview/summary', {
-    params: buildFilters(),
+  const result = await apiPost('/api/wip/overview/summary', buildFilters(), {
     timeout: API_TIMEOUT,
     signal,
   });
@@ -129,8 +128,7 @@ async function fetchSummary(signal) {
 }
 
 async function fetchMatrix(signal) {
-  const result = await apiGet('/api/wip/overview/matrix', {
-    params: buildFilters(activeStatusFilter.value),
+  const result = await apiPost('/api/wip/overview/matrix', buildFilters(activeStatusFilter.value), {
     timeout: API_TIMEOUT,
     signal,
   });
@@ -141,9 +139,8 @@ async function loadFilterOptions(sourceFilters = filters) {
   const requestToken = ++filterOptionsRequestToken;
 
   try {
-    const params = buildWipOverviewQueryParams(sourceFilters);
-    const result = await apiGet('/api/wip/meta/filter-options', {
-      params,
+    const body = buildWipOverviewQueryParams(sourceFilters);
+    const result = await apiPost('/api/wip/meta/filter-options', body, {
       timeout: API_TIMEOUT,
       silent: true,
     });

@@ -99,6 +99,153 @@ def test_wip_overview_and_detail_status_parameter_contract(client):
         )
 
 
+def test_wip_overview_post_avoids_url_length_limit(client):
+    """POST body should be accepted on summary, matrix, and filter-options.
+
+    This covers the 'Request Line is too large' regression: when many lot IDs
+    or work orders are selected the query string exceeds Gunicorn's 4094-byte
+    limit.  The frontend now sends POST with a JSON body; the backend must
+    accept it and pass parsed params to the service layer identically to GET.
+    """
+    many_lots = ",".join(f"LOT{i:04d}" for i in range(60))  # ~420 chars just for lotid
+    payload = {"lotid": many_lots, "type": "PJA3460", "status": "queue"}
+
+    with (
+        patch("mes_dashboard.routes.wip_routes.get_wip_summary") as mock_summary,
+        patch("mes_dashboard.routes.wip_routes.get_wip_matrix") as mock_matrix,
+        patch("mes_dashboard.routes.wip_routes.get_wip_filter_options") as mock_opts,
+    ):
+        mock_summary.return_value = {
+            "totalLots": 0, "totalQtyPcs": 0, "byWipStatus": {}, "dataUpdateDate": None,
+        }
+        mock_matrix.return_value = {
+            "workcenters": [], "packages": [], "matrix": {},
+            "workcenter_totals": {}, "package_totals": {}, "grand_total": 0,
+        }
+        mock_opts.return_value = {
+            "workorders": [], "lotids": [], "packages": [],
+            "types": [], "firstnames": [], "waferdescs": [],
+        }
+
+        summary_resp = client.post(
+            "/api/wip/overview/summary",
+            json=payload,
+        )
+        matrix_resp = client.post(
+            "/api/wip/overview/matrix",
+            json=payload,
+        )
+        opts_resp = client.post(
+            "/api/wip/meta/filter-options",
+            json={"lotid": many_lots, "type": "PJA3460"},
+        )
+
+        assert summary_resp.status_code == 200
+        assert matrix_resp.status_code == 200
+        assert opts_resp.status_code == 200
+        assert json.loads(summary_resp.data)["success"] is True
+        assert json.loads(matrix_resp.data)["success"] is True
+        assert json.loads(opts_resp.data)["success"] is True
+
+        mock_summary.assert_called_once_with(
+            include_dummy=False,
+            workorder=None,
+            lotid=many_lots,
+            package=None,
+            pj_type="PJA3460",
+            firstname=None,
+            waferdesc=None,
+        )
+        mock_matrix.assert_called_once_with(
+            include_dummy=False,
+            workorder=None,
+            lotid=many_lots,
+            status="QUEUE",
+            hold_type=None,
+            package=None,
+            pj_type="PJA3460",
+            firstname=None,
+            waferdesc=None,
+        )
+        mock_opts.assert_called_once_with(
+            include_dummy=False,
+            workorder=None,
+            lotid=many_lots,
+            package=None,
+            pj_type="PJA3460",
+            firstname=None,
+            waferdesc=None,
+            status=None,
+            hold_type=None,
+        )
+
+
+def test_wip_detail_post_avoids_url_length_limit(client):
+    """POST body should be accepted on /api/wip/detail/<workcenter>."""
+    many_lots = ",".join(f"LOT{i:04d}" for i in range(60))
+
+    with patch("mes_dashboard.routes.wip_routes.get_wip_detail") as mock_detail:
+        mock_detail.return_value = {
+            "workcenter": "TMTT",
+            "summary": {
+                "total_lots": 0, "on_equipment_lots": 0,
+                "waiting_lots": 0, "hold_lots": 0,
+            },
+            "specs": [],
+            "lots": [],
+            "pagination": {"page": 1, "page_size": 20, "total_count": 0, "total_pages": 1},
+            "sys_date": None,
+        }
+
+        resp = client.post(
+            "/api/wip/detail/TMTT",
+            json={"lotid": many_lots, "type": "PJA3460", "page": 1, "page_size": 20},
+        )
+
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["success"] is True
+
+        mock_detail.assert_called_once_with(
+            workcenter="TMTT",
+            package=None,
+            pj_type="PJA3460",
+            status=None,
+            hold_type=None,
+            workorder=None,
+            lotid=many_lots,
+            firstname=None,
+            waferdesc=None,
+            include_dummy=False,
+            page=1,
+            page_size=20,
+        )
+
+
+def test_wip_overview_get_still_works_after_post_support(client):
+    """Adding POST must not break existing GET callers."""
+    with patch("mes_dashboard.routes.wip_routes.get_wip_matrix") as mock_matrix:
+        mock_matrix.return_value = {
+            "workcenters": [], "packages": [], "matrix": {},
+            "workcenter_totals": {}, "package_totals": {}, "grand_total": 0,
+        }
+
+        resp = client.get("/api/wip/overview/matrix?type=PJA3460&status=queue")
+
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["success"] is True
+        mock_matrix.assert_called_once_with(
+            include_dummy=False,
+            workorder=None,
+            lotid=None,
+            status="QUEUE",
+            hold_type=None,
+            package=None,
+            pj_type="PJA3460",
+            firstname=None,
+            waferdesc=None,
+        )
+
+
 def test_hold_detail_api_contract_flow(client):
     """Hold detail summary/distribution/lots should all accept the same reason."""
     with (

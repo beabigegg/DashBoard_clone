@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 
-import { apiGet } from '../core/api.js';
+import { apiGet, apiPost } from '../core/api.js';
 import { replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
 import { buildWipDetailQueryParams, buildWipOverviewQueryParams } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
@@ -172,15 +172,14 @@ async function fetchDetail(signal) {
     return null;
   }
 
-  const params = buildWipDetailQueryParams({
+  const body = buildWipDetailQueryParams({
     page: page.value,
     pageSize: PAGE_SIZE,
     filters,
     statusFilter: activeStatusFilter.value,
   });
 
-  const result = await apiGet(`/api/wip/detail/${encodeURIComponent(workcenter.value)}`, {
-    params,
+  const result = await apiPost(`/api/wip/detail/${encodeURIComponent(workcenter.value)}`, body, {
     timeout: API_TIMEOUT,
     signal,
   });
@@ -191,9 +190,8 @@ async function loadFilterOptions(sourceFilters = filters) {
   const requestToken = ++filterOptionsRequestToken;
 
   try {
-    const params = buildWipOverviewQueryParams(sourceFilters);
-    const result = await apiGet('/api/wip/meta/filter-options', {
-      params,
+    const body = buildWipOverviewQueryParams(sourceFilters);
+    const result = await apiPost('/api/wip/meta/filter-options', body, {
       timeout: API_TIMEOUT,
       silent: true,
     });
