@@ -613,6 +613,9 @@ async function refreshView() {
       console.warn('[DuckDB] computeView failed, falling back to server:', err);
       duckdbMode.value = false;
       duckdb.deactivate();
+      // fetchBatchPareto() returned early (saw duckdbMode=true at call time) —
+      // re-trigger via server so pareto is not left stale after DuckDB fallback.
+      void fetchBatchPareto();
     }
   }
 
