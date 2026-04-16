@@ -5,16 +5,26 @@ Define stable requirements for wip-detail-page.
 
 
 ### Requirement: Detail page SHALL receive drill-down parameters from Overview
-The page SHALL read URL query parameters to initialize its state from the Overview page drill-down.
+The page SHALL initialize its state from two sources in priority order:
+1. `loadWipNavigationState()` from sessionStorage (primary — used when arriving via drilldown)
+2. URL query parameters (fallback — used for direct URL access or bookmarks)
+
+The `workcenter` parameter SHALL always be read from the URL (it is always present and short).
 
 #### Scenario: URL parameter initialization
 - **WHEN** the page loads with `?workcenter={name}` in the URL
 - **THEN** the page SHALL use the specified workcenter for data loading
 - **THEN** the page title SHALL display "WIP Detail - {workcenter}"
 
-#### Scenario: Filter passthrough from Overview
-- **WHEN** the URL contains additional filter parameters (workorder, lotid, package, type)
-- **THEN** filter inputs SHALL be pre-filled with those values
+#### Scenario: Filter passthrough from sessionStorage (primary path)
+- **WHEN** the page loads with `?workcenter={name}` and `loadWipNavigationState()` returns stored filters
+- **THEN** filter inputs SHALL be pre-filled with the sessionStorage values
+- **THEN** data SHALL be loaded with those filters applied
+- **THEN** the sessionStorage entry SHALL be consumed
+
+#### Scenario: Filter passthrough from URL params (fallback path)
+- **WHEN** the page loads with filter parameters in the URL and no sessionStorage state exists
+- **THEN** filter inputs SHALL be pre-filled with URL parameter values
 - **THEN** data SHALL be loaded with those filters applied
 
 #### Scenario: Status passthrough from Overview
@@ -124,17 +134,23 @@ The page SHALL paginate lot data with server-side support, preserving scroll pos
 - **THEN** once data loads, the overlay SHALL be removed and new rows SHALL display
 
 ### Requirement: Detail page SHALL have back navigation to Overview with filter preservation
-The page SHALL provide a way to return to the Overview page while preserving all current filter state.
+The page SHALL provide a way to return to the Overview page while preserving all current filter state. The back action SHALL use SPA navigation (not `<a href>`).
 
 #### Scenario: Back button with filter state
 - **WHEN** user clicks the "← Overview" button in the header
-- **THEN** the page SHALL navigate to `/wip-overview` with current filter values (workorder, lotid, package, type) and status as URL parameters
-- **THEN** only non-empty filter values SHALL appear as URL parameters
+- **THEN** the page SHALL call `storeWipNavigationState(filters, status)` to save current filter state
+- **THEN** the page SHALL navigate via `navigateToRuntimeRoute('/wip-overview')` (no query params)
+- **THEN** the navigation SHALL NOT trigger a full page load to the server
 
 #### Scenario: Back button reflects Detail changes
 - **WHEN** the user modifies filters or status in Detail (e.g., changes status from RUN to QUEUE)
-- **THEN** the back button URL SHALL dynamically update to reflect the current Detail filter state
+- **THEN** the back action SHALL save the modified filter state to sessionStorage
 - **THEN** navigating back SHALL cause Overview to load with the updated filter state
+
+#### Scenario: Back navigation URL never exceeds server limit
+- **WHEN** user clicks back with 100+ selected lotids and workorders
+- **THEN** the navigation URL SHALL be `/wip-overview` (no query params — state is in sessionStorage)
+- **THEN** no `400 Bad Request` error SHALL occur
 
 ### Requirement: Detail page SHALL auto-refresh and handle request cancellation
 The page SHALL auto-refresh and cancel stale requests identically to Overview.
@@ -146,10 +162,11 @@ The page SHALL auto-refresh and cancel stale requests identically to Overview.
 - **THEN** new requests SHALL cancel in-flight requests via AbortController
 
 ### Requirement: Detail page SHALL synchronize status filter to URL
-The page SHALL include the active status filter in URL state management.
+The page SHALL include the active status filter in URL state management. The length-guarded `replaceRuntimeHistory` SHALL automatically handle overflow.
 
 #### Scenario: Status included in URL state
-- **WHEN** the status filter is active
-- **THEN** `updateUrlState()` SHALL include `status={value}` in the URL parameters
+- **WHEN** a status filter is active and `updateUrlState()` runs
+- **THEN** the URL SHALL include the `status` parameter
+- **THEN** if the total URL exceeds 2000 chars, the guard SHALL spill to sessionStorage automatically
 - **WHEN** the status filter is cleared
 - **THEN** the `status` parameter SHALL be removed from the URL

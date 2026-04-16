@@ -81,12 +81,21 @@ The heatmap SHALL allow switching between OU%, OEE%, and AVAIL% metrics.
 - **THEN** no additional API call SHALL be made — data for all metrics SHALL be present in the existing response
 
 ### Requirement: CSV export SHALL include OEE% column
-The CSV export SHALL include OEE-related fields alongside existing columns.
+The CSV export SHALL include OEE-related fields alongside existing columns. The export request SHALL use POST with JSON body instead of GET with query string to avoid URL length limits.
 
 #### Scenario: Export with OEE data
 - **WHEN** user exports resource history data to CSV
 - **THEN** the CSV SHALL include columns: `OEE%`, `Yield%`, `TRACKOUT_QTY`, `NG_QTY`
 - **THEN** OEE% SHALL appear between OU% and AVAIL%, followed by Yield%, TRACKOUT_QTY, NG_QTY after AVAIL% (matching the KPI card and detail table column order)
+
+#### Scenario: Export uses POST to avoid URL length limits
+- **WHEN** user clicks export with many workcenter_groups, families, and resource_ids selected
+- **THEN** the export request SHALL be sent as POST to `/api/resource/history/export` with JSON body
+- **THEN** no `400 Bad Request` error SHALL occur regardless of filter set size
+
+#### Scenario: Export download triggers file save
+- **WHEN** POST export returns successfully
+- **THEN** the response blob SHALL be downloaded with filename `resource_history_{start}_{end}.csv`
 
 ### Requirement: Database query execution path
 The resource-history service SHALL use `read_sql_df_slow` (dedicated connection) for all Oracle queries. The canonical spool path (`try_compute_query_from_canonical_spool`) SHALL be attempted first on every POST /query; if the spool is valid the Oracle path SHALL be skipped entirely. The spool validity window SHALL be governed by `CACHE_TTL_DATASET_SECONDS` (default 7200 seconds).

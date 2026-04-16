@@ -9,10 +9,10 @@ const props = defineProps({
     default: () => ({ page: 1, per_page: 25, total_rows: 0, total_pages: 0 }),
   },
   loading: { type: Boolean, default: false },
-  exportUrl: { type: String, default: null },
+  canExport: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['page-change']);
+const emit = defineEmits(['page-change', 'export-csv']);
 
 function formatTs(value) {
   if (!value) return '';
@@ -35,14 +35,14 @@ function formatTs(value) {
           <span class="ph-detail-count">
             共 {{ pagination.total_rows.toLocaleString() }} 筆
           </span>
-          <a
-            v-if="exportUrl"
-            :href="exportUrl"
+          <button
+            v-if="canExport"
+            type="button"
             class="ui-btn ui-btn--sm"
-            download
+            @click="emit('export-csv')"
           >
             匯出 CSV
-          </a>
+          </button>
         </div>
       </div>
 

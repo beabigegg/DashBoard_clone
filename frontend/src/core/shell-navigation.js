@@ -56,7 +56,51 @@ export function navigateToRuntimeRoute(path, { replace = false } = {}) {
   window.location.href = target;
 }
 
+const URL_SAFE_LENGTH = 2000;
+const URL_STATE_KEY_PREFIX = 'url-state:';
+
 export function replaceRuntimeHistory(path) {
   const target = toRuntimeRoute(path);
+
+  // Guard: if URL exceeds safe length, spill query params to sessionStorage
+  if (target.length > URL_SAFE_LENGTH) {
+    const qIndex = path.indexOf('?');
+    if (qIndex !== -1) {
+      const logicalPathname = path.slice(0, qIndex);
+      const query = path.slice(qIndex + 1);
+      const storageKey = URL_STATE_KEY_PREFIX + logicalPathname;
+      try {
+        sessionStorage.setItem(storageKey, query);
+      } catch {
+        // sessionStorage unavailable — fall through to full URL
+      }
+      window.history.replaceState({}, '', toRuntimeRoute(logicalPathname + '?_s=1'));
+      return;
+    }
+  }
+
   window.history.replaceState({}, '', target);
+}
+
+/**
+ * Restore URL state spilled by replaceRuntimeHistory on previous navigation.
+ * Call synchronously before app mount so initializePage reads the full params.
+ */
+export function restoreUrlState() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('_s') !== '1') {
+    return;
+  }
+
+  const logicalPathname = toShellRouterPath(window.location.pathname);
+  const storageKey = URL_STATE_KEY_PREFIX + logicalPathname;
+
+  try {
+    const stored = sessionStorage.getItem(storageKey);
+    sessionStorage.removeItem(storageKey);
+    const newSearch = stored ? '?' + stored : '';
+    window.history.replaceState({}, '', window.location.pathname + newSearch);
+  } catch {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
 }

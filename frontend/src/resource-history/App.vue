@@ -13,6 +13,7 @@ import {
   toResourceFilterSnapshot,
 } from '../core/resource-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { postExport } from '../core/post-export.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useResourceHistoryDuckDB } from './useResourceHistoryDuckDB.js';
 
@@ -567,21 +568,21 @@ function handleToggleAllRows({ expand, rowIds }) {
   });
 }
 
-function exportCsv() {
+async function exportCsv() {
   if (!committedFilters.startDate || !committedFilters.endDate) {
     queryError.value = '請先設定查詢條件';
     return;
   }
 
-  const queryString = buildQueryStringFromFilters(committedFilters);
-  const link = document.createElement('a');
-  link.href = `/api/resource/history/export?${queryString}`;
-  link.download = `resource_history_${committedFilters.startDate}_to_${committedFilters.endDate}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
   exportMessage.value = 'CSV 匯出中...';
+  const queryParams = buildResourceHistoryQueryParams(committedFilters);
+  const filename = `resource_history_${committedFilters.startDate}_to_${committedFilters.endDate}.csv`;
+  try {
+    await postExport('/api/resource/history/export', queryParams, filename);
+  } catch (error) {
+    queryError.value = error?.message || 'CSV 匯出失敗';
+    exportMessage.value = '';
+  }
 }
 
 async function initPage() {

@@ -373,28 +373,37 @@ def api_production_history_options():
 
 # ── GET /api/production-history/export ───────────────────────────────────────
 
-@production_history_bp.route("/api/production-history/export", methods=["GET"])
+@production_history_bp.route("/api/production-history/export", methods=["GET", "POST"])
 def api_production_history_export():
     if not _ENABLED:
         return not_found_error("production_history_disabled")
 
-    dataset_id = str(request.args.get("dataset_id") or "").strip()
-    spool_or_err = _require_dataset(dataset_id)
-    if not isinstance(spool_or_err, str):
-        return spool_or_err
-    spool_path = spool_or_err
-
-    filter_params = {
-        "workcenter_group": str(request.args.get("workcenter_group") or "").strip(),
-        "spec": str(request.args.get("spec") or "").strip(),
-        "equipment_id": str(request.args.get("equipment_id") or "").strip(),
-        "month": str(request.args.get("month") or "").strip(),
-    }
-    # Supplementary multi-select filters (comma-separated in query string)
-    for key in ("work_orders", "lot_ids", "packages", "bop_codes", "workcenter_groups", "equipment_ids"):
-        raw = str(request.args.get(key) or "").strip()
-        if raw:
-            filter_params[key] = [v.strip() for v in raw.split(",") if v.strip()]
+    # Parse parameters from JSON body (POST) or query string (GET)
+    if request.method == 'POST':
+        body = request.get_json(silent=True) or {}
+        dataset_id = str(body.get("dataset_id") or "").strip()
+        spool_or_err = _require_dataset(dataset_id)
+        if not isinstance(spool_or_err, str):
+            return spool_or_err
+        spool_path = spool_or_err
+        filter_params = _parse_filter_params(body)
+    else:
+        dataset_id = str(request.args.get("dataset_id") or "").strip()
+        spool_or_err = _require_dataset(dataset_id)
+        if not isinstance(spool_or_err, str):
+            return spool_or_err
+        spool_path = spool_or_err
+        filter_params = {
+            "workcenter_group": str(request.args.get("workcenter_group") or "").strip(),
+            "spec": str(request.args.get("spec") or "").strip(),
+            "equipment_id": str(request.args.get("equipment_id") or "").strip(),
+            "month": str(request.args.get("month") or "").strip(),
+        }
+        # Supplementary multi-select filters (comma-separated in query string)
+        for key in ("work_orders", "lot_ids", "packages", "bop_codes", "workcenter_groups", "equipment_ids"):
+            raw = str(request.args.get(key) or "").strip()
+            if raw:
+                filter_params[key] = [v.strip() for v in raw.split(",") if v.strip()]
 
     def _generate():
         try:

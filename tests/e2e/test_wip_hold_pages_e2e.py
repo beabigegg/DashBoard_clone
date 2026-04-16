@@ -165,7 +165,7 @@ class TestWipAndHoldPagesE2E:
         assert response.ok
         expect(page.locator("body")).to_be_visible()
 
-    def test_wip_detail_reads_status_and_back_link_keeps_filters(self, page: Page, app_server: str):
+    def test_wip_detail_reads_status_and_back_button_exists(self, page: Page, app_server: str):
         workcenter = _pick_workcenter(app_server)
         ensure_shell_admin(page, "/wip-detail", "WIP 明細")
         # Filters are now sent as POST body — match on URL path only.
@@ -183,13 +183,13 @@ class TestWipAndHoldPagesE2E:
         assert response is not None, "Did not observe expected detail request with URL filters"
         assert response.ok
 
-        back_link = page.locator("a.btn-back, a.ui-btn--ghost").filter(has_text="Overview").first
-        back_href = back_link.get_attribute("href") or ""
-        parsed = urlparse(back_href)
-        params = parse_qs(parsed.query)
-        assert parsed.path in {"/wip-overview", "/portal-shell/wip-overview"}
-        assert params.get("type", [None])[0] == "PJA3460"
-        assert params.get("status", [None])[0] in {"queue", "QUEUE"}
+        # Back navigation is now a <button> (SPA navigation via sessionStorage),
+        # not an <a href> that would cause 400 errors with large filter sets.
+        back_btn = page.locator("button.ui-btn--ghost").filter(has_text="Overview").first
+        assert back_btn.count() > 0, (
+            "Back navigation element not found as <button>. "
+            "WIP detail back link must use SPA button navigation to avoid URL length 400 errors."
+        )
 
     def test_hold_detail_without_reason_redirects_to_overview(self, page: Page, app_server: str):
         nav_resp = _get_with_retry(f"{app_server}/api/portal/navigation", attempts=3, timeout=10.0)

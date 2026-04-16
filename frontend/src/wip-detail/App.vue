@@ -3,7 +3,8 @@ import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
-import { replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
+import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state.js';
 import { buildWipDetailQueryParams, buildWipOverviewQueryParams } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
@@ -302,41 +303,10 @@ const tableData = computed(() => ({
   specs: detailData.value?.specs || [],
   pagination: detailData.value?.pagination || { page: 1, page_size: PAGE_SIZE, total_count: 0, total_pages: 1 },
 }));
-const backUrl = computed(() => {
-  const params = new URLSearchParams();
-
-  const workorder = serializeFilterValue(filters.workorder);
-  const lotid = serializeFilterValue(filters.lotid);
-  const pkg = serializeFilterValue(filters.package);
-  const type = serializeFilterValue(filters.type);
-  const firstname = serializeFilterValue(filters.firstname);
-  const waferdesc = serializeFilterValue(filters.waferdesc);
-
-  if (workorder) {
-    params.set('workorder', workorder);
-  }
-  if (lotid) {
-    params.set('lotid', lotid);
-  }
-  if (pkg) {
-    params.set('package', pkg);
-  }
-  if (type) {
-    params.set('type', type);
-  }
-  if (firstname) {
-    params.set('firstname', firstname);
-  }
-  if (waferdesc) {
-    params.set('waferdesc', waferdesc);
-  }
-  if (activeStatusFilter.value) {
-    params.set('status', activeStatusFilter.value);
-  }
-
-  const query = params.toString();
-  return toRuntimeRoute(query ? `/wip-overview?${query}` : '/wip-overview');
-});
+function navigateBack() {
+  storeWipNavigationState(filters, activeStatusFilter.value);
+  navigateToRuntimeRoute('/wip-overview');
+}
 
 function updateFilters(nextFilters) {
   filters.workorder = normalizeArrayValues(nextFilters.workorder);
@@ -444,17 +414,32 @@ async function manualRefresh() {
 }
 
 async function initializePage() {
+  // workcenter always from URL
   workcenter.value = getUrlParam('workcenter');
 
-  updateFilters({
-    workorder: parseCsvParam('workorder'),
-    lotid: parseCsvParam('lotid'),
-    package: parseCsvParam('package'),
-    type: parseCsvParam('type'),
-    firstname: parseCsvParam('firstname'),
-    waferdesc: parseCsvParam('waferdesc'),
-  });
-  activeStatusFilter.value = getUrlParam('status') || null;
+  // Prefer sessionStorage navigation state (from overview drilldown), fall back to URL params
+  const navState = loadWipNavigationState();
+  if (navState) {
+    updateFilters({
+      workorder: navState.workorder || [],
+      lotid: navState.lotid || [],
+      package: navState.package || [],
+      type: navState.type || [],
+      firstname: navState.firstname || [],
+      waferdesc: navState.waferdesc || [],
+    });
+    activeStatusFilter.value = navState.status || getUrlParam('status') || null;
+  } else {
+    updateFilters({
+      workorder: parseCsvParam('workorder'),
+      lotid: parseCsvParam('lotid'),
+      package: parseCsvParam('package'),
+      type: parseCsvParam('type'),
+      firstname: parseCsvParam('firstname'),
+      waferdesc: parseCsvParam('waferdesc'),
+    });
+    activeStatusFilter.value = getUrlParam('status') || null;
+  }
 
   if (!workcenter.value) {
     const signal = createAbortSignal('wip-detail-init');
@@ -505,7 +490,7 @@ onBeforeUnmount(() => {
       @refresh="manualRefresh"
     >
       <template #header-left>
-        <a :href="backUrl" class="ui-btn ui-btn--ghost ui-btn--sm">&larr; Overview</a>
+        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="navigateBack">&larr; Overview</button>
       </template>
     </PageHeader>
 

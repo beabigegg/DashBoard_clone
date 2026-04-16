@@ -1,7 +1,9 @@
 import { ensureMesApiAvailable } from '../core/api.js';
 import { getPageContract } from '../core/field-contracts.js';
 import { escapeHtml, groupBy, sortBy, safeText } from '../core/table-tree.js';
+import { restoreUrlState } from '../core/shell-navigation.js';
 
+restoreUrlState();
 ensureMesApiAvailable();
 window.__MES_FRONTEND_CORE__ = { groupBy, sortBy, escapeHtml, safeText };
 window.__FIELD_CONTRACTS__ = window.__FIELD_CONTRACTS__ || {};

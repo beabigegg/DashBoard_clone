@@ -255,7 +255,7 @@ def api_resource_history_view():
 # Export (kept — uses existing service directly)
 # ============================================================
 
-@resource_history_bp.route('/export', methods=['GET'])
+@resource_history_bp.route('/export', methods=['GET', 'POST'])
 def api_resource_history_export():
     """API: Export detail data as CSV.
 
@@ -272,16 +272,28 @@ def api_resource_history_export():
     Returns:
         CSV file download.
     """
-    # Parse query parameters
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    granularity = request.args.get('granularity', 'day')
-    workcenter_groups = request.args.getlist('workcenter_groups') or None
-    families = request.args.getlist('families') or None
-    resource_ids = request.args.getlist('resource_ids') or None
-    is_production = request.args.get('is_production') == '1'
-    is_key = request.args.get('is_key') == '1'
-    is_monitor = request.args.get('is_monitor') == '1'
+    # Parse parameters from JSON body (POST) or query string (GET)
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        granularity = data.get('granularity', 'day')
+        workcenter_groups = data.get('workcenter_groups') or None
+        families = data.get('families') or None
+        resource_ids = data.get('resource_ids') or None
+        is_production = bool(data.get('is_production'))
+        is_key = bool(data.get('is_key'))
+        is_monitor = bool(data.get('is_monitor'))
+    else:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        granularity = request.args.get('granularity', 'day')
+        workcenter_groups = request.args.getlist('workcenter_groups') or None
+        families = request.args.getlist('families') or None
+        resource_ids = request.args.getlist('resource_ids') or None
+        is_production = request.args.get('is_production') == '1'
+        is_key = request.args.get('is_key') == '1'
+        is_monitor = request.args.get('is_monitor') == '1'
 
     # Validate required parameters
     if not start_date or not end_date:

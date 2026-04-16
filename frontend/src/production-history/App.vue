@@ -31,7 +31,7 @@ const {
   fetchPage,
   applyMatrixFilter,
   applySupplementaryFilter,
-  buildExportUrl,
+  exportCsv: doExportCsv,
 } = useProductionHistory();
 
 const { nextRequestId, isStaleRequest } = useRequestGuard();
@@ -102,7 +102,14 @@ async function handleClearFilter() {
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────
-const exportUrl = computed(() => buildExportUrl());
+async function exportCsv() {
+  try {
+    await doExportCsv();
+  } catch (err) {
+    // error is shown via the ErrorBanner bound to `error` in the composable
+    console.error('Export failed', err);
+  }
+}
 
 // ── Defaults ───────────────────────────────────────────────────────────────
 const today = new Date();
@@ -270,7 +277,8 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
         :rows="detailRows"
         :pagination="pagination"
         :loading="detailLoading"
-        :export-url="exportUrl"
+        :can-export="!!datasetId"
+        @export-csv="exportCsv"
         @page-change="fetchPage"
       />
     </template>

@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { apiPost } from '../core/api.js';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state.js';
 import { buildWipOverviewQueryParams } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
@@ -347,36 +348,12 @@ function clearFilters() {
 }
 
 function navigateToDetail(workcenter) {
+  storeWipNavigationState(filters, activeStatusFilter.value);
+
   const params = new URLSearchParams();
-  params.append('workcenter', workcenter);
-
-  const workorder = serializeFilterValue(filters.workorder);
-  const lotid = serializeFilterValue(filters.lotid);
-  const pkg = serializeFilterValue(filters.package);
-  const type = serializeFilterValue(filters.type);
-  const firstname = serializeFilterValue(filters.firstname);
-  const waferdesc = serializeFilterValue(filters.waferdesc);
-
-  if (workorder) {
-    params.append('workorder', workorder);
-  }
-  if (lotid) {
-    params.append('lotid', lotid);
-  }
-  if (pkg) {
-    params.append('package', pkg);
-  }
-  if (type) {
-    params.append('type', type);
-  }
-  if (firstname) {
-    params.append('firstname', firstname);
-  }
-  if (waferdesc) {
-    params.append('waferdesc', waferdesc);
-  }
+  params.set('workcenter', workcenter);
   if (activeStatusFilter.value) {
-    params.append('status', activeStatusFilter.value);
+    params.set('status', activeStatusFilter.value);
   }
 
   navigateToRuntimeRoute(`/wip-detail?${params.toString()}`);
@@ -387,15 +364,29 @@ async function manualRefresh() {
 }
 
 async function initializePage() {
-  updateFilters({
-    workorder: parseCsvParam('workorder'),
-    lotid: parseCsvParam('lotid'),
-    package: parseCsvParam('package'),
-    type: parseCsvParam('type'),
-    firstname: parseCsvParam('firstname'),
-    waferdesc: parseCsvParam('waferdesc'),
-  });
-  activeStatusFilter.value = getUrlParam('status') || null;
+  // Prefer sessionStorage state (returning from wip-detail), fall back to URL params
+  const navState = loadWipNavigationState();
+  if (navState) {
+    updateFilters({
+      workorder: navState.workorder || [],
+      lotid: navState.lotid || [],
+      package: navState.package || [],
+      type: navState.type || [],
+      firstname: navState.firstname || [],
+      waferdesc: navState.waferdesc || [],
+    });
+    activeStatusFilter.value = navState.status || null;
+  } else {
+    updateFilters({
+      workorder: parseCsvParam('workorder'),
+      lotid: parseCsvParam('lotid'),
+      package: parseCsvParam('package'),
+      type: parseCsvParam('type'),
+      firstname: parseCsvParam('firstname'),
+      waferdesc: parseCsvParam('waferdesc'),
+    });
+    activeStatusFilter.value = getUrlParam('status') || null;
+  }
 
   // Sync initial values to orchestrator
   filterOrchestrator.draft.status = activeStatusFilter.value;

@@ -905,36 +905,50 @@ def api_reject_history_view():
         return internal_error("視圖查詢失敗")
 
 
-@reject_history_bp.route("/api/reject-history/export-cached", methods=["GET"])
+@reject_history_bp.route("/api/reject-history/export-cached", methods=["GET", "POST"])
 def api_reject_history_export_cached():
-    """Export CSV from cached dataset."""
-    query_id = request.args.get("query_id", "").strip()
+    """Export CSV from cached dataset. Accepts GET (query params) or POST (JSON body)."""
+    args = _get_request_args()
+
+    query_id = args.get("query_id", "")
+    if isinstance(query_id, str):
+        query_id = query_id.strip()
     if not query_id:
         return validation_error("缺少必要參數: query_id")
 
-    metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
-    reasons = _parse_multi_param("reasons") or None
-    detail_reason = request.args.get("detail_reason", "").strip() or None
-    pareto_selections = _parse_multi_pareto_selections()
+    raw_metric = args.get("metric_filter", "all")
+    metric_filter = str(raw_metric).strip().lower() or "all"
+    reasons = _parse_multi_param("reasons", args) or None
+    raw_dr = args.get("detail_reason", "")
+    detail_reason = str(raw_dr).strip() or None if raw_dr else None
+    pareto_selections = _parse_multi_pareto_selections(args)
     pareto_dimension = None
     pareto_values = None
     if not pareto_selections:
-        pareto_error, pareto_dimension, pareto_values = _parse_pareto_selection()
+        pareto_error, pareto_dimension, pareto_values = _parse_pareto_selection(args)
         if pareto_error:
             return validation_error(pareto_error[0].get("error", "查詢失敗"))
 
-    include_excluded_scrap = request.args.get("include_excluded_scrap", "false").lower() == "true"
-    exclude_material_scrap = request.args.get("exclude_material_scrap", "true").lower() != "false"
-    exclude_pb_diode = request.args.get("exclude_pb_diode", "true").lower() != "false"
+    def _get_bool_simple(name, default_true):
+        raw_val = args.get(name)
+        if isinstance(raw_val, bool):
+            return raw_val
+        if raw_val is None:
+            return default_true
+        return str(raw_val).lower() not in ("false", "0", "no", "n", "off") if default_true else str(raw_val).lower() in ("true", "1", "yes", "y", "on")
+
+    include_excluded_scrap = _get_bool_simple("include_excluded_scrap", False)
+    exclude_material_scrap = _get_bool_simple("exclude_material_scrap", True)
+    exclude_pb_diode = _get_bool_simple("exclude_pb_diode", True)
 
     try:
         rows = export_csv_from_cache(
             query_id=query_id,
-            packages=_parse_multi_param("packages") or None,
-            workcenter_groups=_parse_multi_param("workcenter_groups") or None,
+            packages=_parse_multi_param("packages", args) or None,
+            workcenter_groups=_parse_multi_param("workcenter_groups", args) or None,
             reasons=reasons,
             metric_filter=metric_filter,
-            trend_dates=_parse_multi_param("trend_dates") or None,
+            trend_dates=_parse_multi_param("trend_dates", args) or None,
             detail_reason=detail_reason,
             pareto_dimension=pareto_dimension,
             pareto_values=pareto_values,

@@ -11,6 +11,7 @@ import {
   validateDateRange,
 } from '../core/reject-history-filters.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { postExport } from '../core/post-export.js';
 import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRejectHistoryDuckDB } from './useRejectHistoryDuckDB.js';
@@ -899,7 +900,7 @@ function removeFilterChip(chip) {
   }
 }
 
-// ---- CSV export (from cache) ----
+// ---- CSV export (from cache, via POST to avoid URL length limits) ----
 async function exportCsv() {
   if (loading.exporting || !queryId.value) return;
 
@@ -907,48 +908,31 @@ async function exportCsv() {
   errorMessage.value = '';
 
   try {
-    const params = new URLSearchParams();
-    params.set('query_id', queryId.value);
-    for (const pkg of supplementaryFilters.packages) params.append('packages', pkg);
-    for (const wc of supplementaryFilters.workcenterGroups) params.append('workcenter_groups', wc);
-    for (const r of supplementaryFilters.reasons) params.append('reasons', r);
-    params.set('metric_filter', metricFilterParam());
-    for (const date of selectedTrendDates.value) params.append('trend_dates', date);
-    for (const [dimension, key] of Object.entries(PARETO_SELECTION_PARAM_MAP)) {
-      for (const value of paretoSelections[dimension] || []) {
-        params.append(key, value);
-      }
-    }
+    const body = {
+      query_id: queryId.value,
+      packages: supplementaryFilters.packages,
+      workcenter_groups: supplementaryFilters.workcenterGroups,
+      reasons: supplementaryFilters.reasons,
+      metric_filter: metricFilterParam(),
+      trend_dates: selectedTrendDates.value,
+      ...Object.fromEntries(
+        Object.entries(PARETO_SELECTION_PARAM_MAP)
+          .filter(([dimension]) => (paretoSelections[dimension] || []).length > 0)
+          .map(([dimension, key]) => [key, paretoSelections[dimension]])
+      ),
+    };
 
-    if (committedPrimary.includeExcludedScrap) params.set('include_excluded_scrap', 'true');
-    if (!committedPrimary.excludeMaterialScrap) params.set('exclude_material_scrap', 'false');
-    if (!committedPrimary.excludePbDiode) params.set('exclude_pb_diode', 'false');
+    if (committedPrimary.includeExcludedScrap) body.include_excluded_scrap = true;
+    if (!committedPrimary.excludeMaterialScrap) body.exclude_material_scrap = false;
+    if (!committedPrimary.excludePbDiode) body.exclude_pb_diode = false;
 
-    const response = await fetch(`/api/reject-history/export-cached?${params.toString()}`);
-
-    if (response.status === 410) {
-      errorMessage.value = '快取已過期，請重新查詢後再匯出';
-      return;
-    }
-    if (!response.ok) {
-      throw new Error('匯出 CSV 失敗');
-    }
-
-    const blob = await response.blob();
-    const disposition = response.headers.get('Content-Disposition') || '';
-    const filenameMatch = disposition.match(/filename=(.+?)(?:;|$)/);
-    const filename = filenameMatch ? filenameMatch[1] : 'reject_history_export.csv';
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    await postExport('/api/reject-history/export-cached', body, 'reject_history_export.csv');
   } catch (error) {
-    errorMessage.value = error?.message || '匯出 CSV 失敗';
+    if (error?.status === 410) {
+      errorMessage.value = '快取已過期，請重新查詢後再匯出';
+    } else {
+      errorMessage.value = error?.message || '匯出 CSV 失敗';
+    }
   } finally {
     loading.exporting = false;
   }

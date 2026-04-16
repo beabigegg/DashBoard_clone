@@ -1,6 +1,7 @@
 import { ref, reactive, computed } from 'vue';
 import { apiPost, apiGet } from '../../core/api.js';
 import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling.js';
+import { postExport } from '../../core/post-export.js';
 
 const API_TIMEOUT = 360000;
 
@@ -276,18 +277,18 @@ export function useProductionHistory() {
     await fetchPage(1);
   }
 
-  // ── Export URL ─────────────────────────────────────────────────────────────
-  function buildExportUrl() {
-    if (!datasetId.value) return null;
-    const params = new URLSearchParams({ dataset_id: datasetId.value });
-    if (matrixFilter.workcenter_group) params.set('workcenter_group', matrixFilter.workcenter_group);
-    if (matrixFilter.spec) params.set('spec', matrixFilter.spec);
-    if (matrixFilter.equipment_id) params.set('equipment_id', matrixFilter.equipment_id);
-    if (matrixFilter.month) params.set('month', matrixFilter.month);
+  // ── Export ─────────────────────────────────────────────────────────────────
+  async function exportCsv() {
+    if (!datasetId.value) return;
+    const body = { dataset_id: datasetId.value };
+    if (matrixFilter.workcenter_group) body.workcenter_group = matrixFilter.workcenter_group;
+    if (matrixFilter.spec) body.spec = matrixFilter.spec;
+    if (matrixFilter.equipment_id) body.equipment_id = matrixFilter.equipment_id;
+    if (matrixFilter.month) body.month = matrixFilter.month;
     for (const [key, arr] of Object.entries(supplementaryFilter)) {
-      if (arr.length) params.set(key, arr.join(','));
+      if (arr.length) body[key] = arr;
     }
-    return `/api/production-history/export?${params}`;
+    await postExport('/api/production-history/export', body, `production-history-${datasetId.value}.csv`);
   }
 
   return {
@@ -312,6 +313,6 @@ export function useProductionHistory() {
     fetchPage,
     applyMatrixFilter,
     applySupplementaryFilter,
-    buildExportUrl,
+    exportCsv,
   };
 }
