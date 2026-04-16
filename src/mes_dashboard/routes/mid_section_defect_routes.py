@@ -137,7 +137,8 @@ def api_analysis():
     if cached is not None:
         return success_response(_build_summary_payload(cached))
 
-    result = query_analysis(start_date, end_date, loss_reasons, station, direction)
+    from mes_dashboard.core.permissions import get_owner_token
+    result = query_analysis(start_date, end_date, loss_reasons, station, direction, owner=get_owner_token())
 
     if result is None:
         return internal_error('查詢失敗，請稍後再試')

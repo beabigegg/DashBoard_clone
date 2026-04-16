@@ -135,6 +135,7 @@ def enqueue_trace_lineage(
     *,
     profile: str,
     container_ids: List[str],
+    owner: str,
     params: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[str], Optional[str], str]:
     query_id = make_trace_lineage_query_id(profile, container_ids, params=params)
@@ -142,6 +143,7 @@ def enqueue_trace_lineage(
     enqueued_job_id, error = enqueue_job(
         queue_name=TRACE_LINEAGE_QUEUE,
         worker_fn=_execute_trace_lineage_job,
+        owner=owner,
         job_id=job_id,
         kwargs={
             "job_id": job_id,

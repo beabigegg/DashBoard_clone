@@ -146,6 +146,7 @@ class TestEnqueueJob:
             job_id, err = svc.enqueue_job(
                 queue_name="test-queue",
                 worker_fn=_worker_fn,
+                owner="test-owner",
                 kwargs={"foo": "bar"},
                 prefix="async",
             )
@@ -172,6 +173,7 @@ class TestEnqueueJob:
             svc.enqueue_job(
                 queue_name="test-queue",
                 worker_fn=_worker_fn,
+                owner="test-owner",
                 prefix="async",
             )
 
@@ -179,6 +181,7 @@ class TestEnqueueJob:
         mapping = hset_call.kwargs.get("mapping") or hset_call[1].get("mapping")
         assert mapping["status"] == "queued"
         assert mapping["queue_name"] == "test-queue"
+        assert mapping["owner"] == "test-owner"
         assert mapping["error"] == ""
 
     def test_returns_none_error_when_rq_not_installed(self):
@@ -187,6 +190,7 @@ class TestEnqueueJob:
             job_id, err = svc.enqueue_job(
                 queue_name="test-queue",
                 worker_fn=lambda: None,
+                owner="test-owner",
             )
         assert job_id is None
         assert err is not None
@@ -199,6 +203,7 @@ class TestEnqueueJob:
             job_id, err = svc.enqueue_job(
                 queue_name="test-queue",
                 worker_fn=lambda: None,
+                owner="test-owner",
             )
         assert job_id is None
         assert err is not None
@@ -220,6 +225,7 @@ class TestEnqueueJob:
             job_id, err = svc.enqueue_job(
                 queue_name="test-queue",
                 worker_fn=_worker_fn,
+                owner="test-owner",
             )
 
         assert job_id is None
@@ -244,6 +250,7 @@ class TestEnqueueJob:
             job_id, err = svc.enqueue_job(
                 queue_name="test-queue",
                 worker_fn=_worker_fn,
+                owner="test-owner",
                 job_id="my-custom-id",
                 prefix="async",
             )
@@ -262,7 +269,7 @@ class TestEnqueueJob:
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch.object(svc, "_build_default_retry", return_value=default_retry), \
              patch("rq.Queue", return_value=mock_queue):
-            svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None)
+            svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None, owner="test-owner")
 
         enqueue_kwargs = mock_queue.enqueue.call_args.kwargs
         assert enqueue_kwargs["retry"] is default_retry
@@ -276,7 +283,7 @@ class TestEnqueueJob:
              patch.object(svc, "get_control_redis_client", return_value=mock_conn), \
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch("rq.Queue", return_value=mock_queue):
-            svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None, retry=None)
+            svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None, owner="test-owner", retry=None)
 
         enqueue_kwargs = mock_queue.enqueue.call_args.kwargs
         assert "retry" in enqueue_kwargs
@@ -295,6 +302,7 @@ class TestEnqueueJob:
             svc.enqueue_job(
                 queue_name="test-queue",
                 worker_fn=lambda: None,
+                owner="test-owner",
                 retry=custom_retry,
             )
 
@@ -551,7 +559,7 @@ class TestMultiStageProgress:
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch.object(svc, "_check_rq_installed", return_value=True), \
              patch("rq.Queue", return_value=mock_queue):
-            svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None, prefix="test")
+            svc.enqueue_job(queue_name="test-queue", worker_fn=lambda: None, owner="test-owner", prefix="test")
 
         hset_call = mock_conn.hset.call_args
         mapping = hset_call.kwargs.get("mapping") or hset_call[1].get("mapping")

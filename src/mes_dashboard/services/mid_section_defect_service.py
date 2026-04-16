@@ -261,10 +261,16 @@ def ensure_analysis_background_job(
     station: str,
     direction: str,
     trace_query_id: str,
+    owner: str,
     seed_container_ids: Optional[List[str]] = None,
     seed_container_names: Optional[Dict[str, str]] = None,
 ) -> Optional[str]:
-    """Ensure a background MSD compatibility refresh job exists for this trace id."""
+    """Ensure a background MSD compatibility refresh job exists for this trace id.
+
+    This function is always called from within a Flask request context (via
+    query_analysis ← Flask route handler), so owner is derived server-side by
+    the route and threaded through here.
+    """
     if not trace_query_id or not is_async_available():
         return None
 
@@ -276,6 +282,7 @@ def ensure_analysis_background_job(
     queued_job_id, _err = enqueue_job(
         queue_name=MSD_COMPAT_QUEUE,
         worker_fn=_execute_msd_compat_job,
+        owner=owner,
         job_id=job_id,
         prefix=_MSD_COMPAT_JOB_PREFIX,
         job_timeout=MSD_COMPAT_JOB_TIMEOUT_SECONDS,
@@ -304,6 +311,7 @@ def query_analysis(
     loss_reasons: Optional[List[str]] = None,
     station: str = '測試',
     direction: str = 'backward',
+    owner: str = '',
 ) -> Optional[Dict[str, Any]]:
     """Main entry point for defect traceability analysis.
 
@@ -373,6 +381,7 @@ def query_analysis(
         station=station,
         direction=direction,
         trace_query_id=trace_query_id,
+        owner=owner,
         seed_container_ids=seed_container_ids,
         seed_container_names=seed_container_names,
     )

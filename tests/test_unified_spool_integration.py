@@ -160,7 +160,7 @@ class TestWarmupSchedulerLeader:
         enqueue_count = [0]
         lock_acquired = [False]
 
-        def fake_try_acquire(name, ttl_seconds=60):
+        def fake_try_acquire(name, ttl_seconds=60, *, fail_mode=None):
             if not lock_acquired[0]:
                 lock_acquired[0] = True
                 return True

@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
@@ -198,18 +199,7 @@ const splitHold = computed(() => {
 let filterOptionsDebounceTimer = null;
 let filterOptionsRequestToken = 0;
 
-function unwrapApiResult(result, fallbackMessage) {
-  if (result?.success) {
-    return result.data;
-  }
-  if (result?.success === false) {
-    throw new Error(result.error || fallbackMessage);
-  }
-  if (result?.data !== undefined) {
-    return result.data;
-  }
-  return result;
-}
+// unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
 function getUrlParam(name) {
   return new URLSearchParams(window.location.search).get(name)?.trim() || '';

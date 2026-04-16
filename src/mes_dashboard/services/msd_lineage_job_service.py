@@ -43,9 +43,13 @@ _SPOOL_NAMESPACE = "msd-lineage"
 def enqueue_msd_lineage(
     *,
     container_ids: List[str],
+    owner: str,
     direction: str = "backward",
 ) -> Tuple[Optional[str], Optional[str]]:
     """Enqueue a lineage resolution job to the MSD RQ worker.
+
+    Args:
+        owner: Caller identity from the Flask session (see get_owner_token).
 
     Returns:
         (job_id, None) on success, (None, error_message) on failure.
@@ -54,6 +58,7 @@ def enqueue_msd_lineage(
     return enqueue_job(
         queue_name=MSD_LINEAGE_QUEUE,
         worker_fn=_execute_msd_lineage_job,
+        owner=owner,
         job_id=job_id,
         kwargs={
             "job_id": job_id,

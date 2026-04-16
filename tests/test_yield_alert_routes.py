@@ -238,3 +238,70 @@ def test_drilldown_context_returns_payload(mock_payload, client):
     payload = response.get_json()
     assert payload["success"] is True
     assert payload["data"]["match_status"] == "exact"
+
+
+class TestJobExpiry410PollingRace:
+    """Polling /api/yield-alert/view after cache expiry must return 410 CACHE_EXPIRED.
+
+    Simulates the race where a client starts polling with a query_id after
+    the cached results have already expired (TTL elapsed between query and view).
+    """
+
+    def test_view_returns_410_when_cache_expired(self, client):
+        """apply_cached_view returning None must produce 410 CACHE_EXPIRED envelope."""
+        with patch(
+            'mes_dashboard.routes.yield_alert_routes.apply_cached_view',
+            return_value=None,
+        ):
+            rv = client.get(
+                '/api/yield-alert/view',
+                query_string={'query_id': 'stale-query-id-001'},
+            )
+
+        assert rv.status_code == 410
+        body = rv.get_json()
+        assert body['success'] is False
+        assert body['error']['code'] == 'CACHE_EXPIRED'
+
+    def test_view_410_has_envelope_meta(self, client):
+        """410 CACHE_EXPIRED response must include standard meta.timestamp."""
+        with patch(
+            'mes_dashboard.routes.yield_alert_routes.apply_cached_view',
+            return_value=None,
+        ):
+            rv = client.get(
+                '/api/yield-alert/view',
+                query_string={'query_id': 'expired-abc'},
+            )
+
+        body = rv.get_json()
+        assert 'meta' in body
+        assert 'timestamp' in body['meta']
+
+    def test_view_410_polling_race_after_job_complete(self, client):
+        """Simulate a polling race: job completes but cache TTL elapses before view call."""
+        # Round 1: job completes, returns 200 via query
+        # Round 2: view called → cache already expired → 410
+        with patch(
+            'mes_dashboard.routes.yield_alert_routes.apply_cached_view',
+            return_value=None,
+        ):
+            rv1 = client.get(
+                '/api/yield-alert/view',
+                query_string={'query_id': 'race-condition-qid'},
+            )
+            rv2 = client.get(
+                '/api/yield-alert/view',
+                query_string={'query_id': 'race-condition-qid'},
+            )
+
+        # Both calls after expiry must consistently return 410
+        assert rv1.status_code == 410
+        assert rv2.status_code == 410
+
+    def test_view_missing_query_id_returns_400_not_410(self, client):
+        """Missing query_id must return 400 VALIDATION_ERROR, not 410 CACHE_EXPIRED."""
+        rv = client.get('/api/yield-alert/view')
+        body = rv.get_json()
+        assert rv.status_code == 400
+        assert body['error']['code'] == 'VALIDATION_ERROR'

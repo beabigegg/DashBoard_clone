@@ -1,4 +1,27 @@
-const DEFAULT_TIMEOUT = 30000;
+const DEFAULT_TIMEOUT = 90000;
+
+// DEV-mode guard — no-op in production builds
+let _guardResponse = null;
+if (import.meta.env.DEV) {
+  import('./dev-warnings.js').then((m) => {
+    _guardResponse = m.guardResponse;
+  }).catch(() => {});
+}
+
+// App-version check — lazy-loaded to avoid circular deps
+let _appVersionCheck = null;
+import('./app-version-check.js').then((m) => {
+  _appVersionCheck = m.appVersionCheck;
+}).catch(() => {});
+
+// ---------------------------------------------------------------------------
+// Per-endpoint in-flight dedup
+//
+// Keyed by `method|url|bodyFingerprint`.  Concurrent calls with the same key
+// share a single in-flight promise; subsequent callers resolve with the same
+// result.  The entry is removed when the promise settles.
+// ---------------------------------------------------------------------------
+const _inFlight = new Map();
 
 function getCsrfToken() {
   return document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -101,6 +124,28 @@ function createAbortSignal(timeoutMs, externalSignal) {
   };
 }
 
+/**
+ * Build a dedup key for an in-flight request.
+ *
+ * Only deduplicates GET requests and safe POST requests where body is a plain
+ * JSON object.  Non-deduplicable requests (FormData, streaming) return null.
+ *
+ * @param {string} method
+ * @param {string} url
+ * @param {*} body
+ * @returns {string|null}
+ */
+function _buildDedupKey(method, url, body) {
+  const m = String(method).toUpperCase();
+  if (m === 'GET') return `GET|${url}|`;
+
+  if (m === 'POST' && body && typeof body === 'string') {
+    // body is JSON.stringify'd payload — use it as fingerprint directly
+    return `POST|${url}|${body}`;
+  }
+  return null;
+}
+
 async function parseResponsePayload(response) {
   const contentType = response.headers.get('content-type') || '';
 
@@ -116,15 +161,7 @@ async function parseResponsePayload(response) {
   }
 }
 
-async function fetchJson(url, options = {}) {
-  const {
-    timeout = DEFAULT_TIMEOUT,
-    params,
-    signal: externalSignal,
-    ...fetchOptions
-  } = options;
-
-  const requestUrl = buildUrlWithParams(url, params);
+async function _fetchJsonRaw(requestUrl, fetchOptions, externalSignal, timeout) {
   const { signal, cleanup } = createAbortSignal(timeout, externalSignal);
 
   try {
@@ -137,10 +174,52 @@ async function fetchJson(url, options = {}) {
     if (!response.ok) {
       throw buildApiError(response, data);
     }
+    // DEV-mode: validate envelope shape against registered schemas
+    if (_guardResponse) {
+      try {
+        _guardResponse(requestUrl, data);
+      } catch (_e) {
+        // Guard must never throw in production path
+      }
+    }
+    // App-version check
+    if (_appVersionCheck) {
+      try {
+        _appVersionCheck(data?.meta);
+      } catch (_e) {
+        // Must never crash the request path
+      }
+    }
     return data;
   } finally {
     cleanup();
   }
+}
+
+async function fetchJson(url, options = {}) {
+  const {
+    timeout = DEFAULT_TIMEOUT,
+    params,
+    signal: externalSignal,
+    noDedup = false,
+    ...fetchOptions
+  } = options;
+
+  const requestUrl = buildUrlWithParams(url, params);
+  const dedupKey = noDedup ? null : _buildDedupKey(fetchOptions.method || 'GET', requestUrl, fetchOptions.body);
+
+  if (dedupKey) {
+    const existing = _inFlight.get(dedupKey);
+    if (existing) return existing;
+
+    const promise = _fetchJsonRaw(requestUrl, fetchOptions, externalSignal, timeout).finally(() => {
+      _inFlight.delete(dedupKey);
+    });
+    _inFlight.set(dedupKey, promise);
+    return promise;
+  }
+
+  return _fetchJsonRaw(requestUrl, fetchOptions, externalSignal, timeout);
 }
 
 export async function apiGet(url, options = {}) {
@@ -188,6 +267,21 @@ export async function apiUpload(url, formData, options = {}) {
     headers: withCsrfHeaders(options.headers || {}, 'POST'),
     body: formData,
   });
+}
+
+/**
+ * Returns the current count of in-flight deduped requests (for testing only).
+ * @returns {number}
+ */
+export function _inFlightSize() {
+  return _inFlight.size;
+}
+
+/**
+ * Clear the in-flight dedup map (for testing only).
+ */
+export function _clearInFlight() {
+  _inFlight.clear();
 }
 
 export function ensureMesApiAvailable() {

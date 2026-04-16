@@ -305,3 +305,110 @@ class TestAPIContentType(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# ============================================================
+# Spool metadata injection tests (pytest style)
+# ============================================================
+
+import pytest
+
+
+@pytest.fixture
+def _rh_client():
+    import mes_dashboard.core.database as _db
+    _db._ENGINE = None
+    from mes_dashboard.app import create_app
+    app = create_app('testing')
+    app.config['TESTING'] = True
+    return app.test_client()
+
+
+class TestResourceHistorySpoolInjection:
+    """_inject_resource_spool_info: conditional spool_download_url and total_row_count."""
+
+    @patch('mes_dashboard.routes.resource_history_routes.apply_view')
+    @patch('mes_dashboard.routes.resource_history_routes._RESOURCE_LOCAL_COMPUTE_ENABLED', True)
+    @patch('mes_dashboard.core.query_spool_store.get_spool_metadata')
+    def test_view_injects_total_row_count_when_spool_available(
+        self, mock_meta, mock_view, _rh_client
+    ):
+        """total_row_count must be present in view response when spool has metadata."""
+        mock_view.return_value = {"rows": [], "pagination": {}}
+        mock_meta.return_value = {"row_count": 100, "schema_version": 1}
+
+        rv = _rh_client.get('/api/resource/history/view?query_id=rh-test-001')
+        body = rv.get_json()
+        assert rv.status_code == 200
+        assert body['success'] is True
+        assert body['data']['total_row_count'] == 100
+
+    @patch('mes_dashboard.routes.resource_history_routes.apply_view')
+    @patch('mes_dashboard.routes.resource_history_routes._RESOURCE_LOCAL_COMPUTE_ENABLED', True)
+    @patch('mes_dashboard.core.query_spool_store.get_spool_metadata')
+    def test_view_injects_spool_download_url_when_above_threshold(
+        self, mock_meta, mock_view, _rh_client
+    ):
+        """spool_download_url must be present when row_count >= threshold."""
+        from mes_dashboard.routes.resource_history_routes import _RESOURCE_SPOOL_THRESHOLD
+        mock_view.return_value = {"rows": [], "pagination": {}}
+        mock_meta.return_value = {"row_count": _RESOURCE_SPOOL_THRESHOLD, "schema_version": 1}
+
+        with patch('mes_dashboard.routes.resource_history_routes._inject_resource_metadata'):
+            rv = _rh_client.get('/api/resource/history/view?query_id=rh-large-001')
+
+        body = rv.get_json()
+        assert rv.status_code == 200
+        assert 'spool_download_url' in body['data']
+        assert 'rh-large-001' in body['data']['spool_download_url']
+
+    @patch('mes_dashboard.routes.resource_history_routes.apply_view')
+    @patch('mes_dashboard.routes.resource_history_routes._RESOURCE_LOCAL_COMPUTE_ENABLED', True)
+    @patch('mes_dashboard.core.query_spool_store.get_spool_metadata')
+    def test_view_omits_spool_url_when_below_threshold(
+        self, mock_meta, mock_view, _rh_client
+    ):
+        """spool_download_url must NOT be present when row_count is below threshold."""
+        mock_view.return_value = {"rows": [], "pagination": {}}
+        mock_meta.return_value = {"row_count": 10, "schema_version": 1}  # below threshold
+
+        rv = _rh_client.get('/api/resource/history/view?query_id=rh-small-001')
+        body = rv.get_json()
+        assert rv.status_code == 200
+        assert 'spool_download_url' not in body['data']
+
+    @patch('mes_dashboard.routes.resource_history_routes.apply_view')
+    @patch('mes_dashboard.routes.resource_history_routes._RESOURCE_LOCAL_COMPUTE_ENABLED', True)
+    @patch('mes_dashboard.core.query_spool_store.get_spool_metadata')
+    def test_view_omits_spool_fields_when_no_metadata(
+        self, mock_meta, mock_view, _rh_client
+    ):
+        """When spool has no metadata, spool fields must not appear in response."""
+        mock_view.return_value = {"rows": [], "pagination": {}}
+        mock_meta.return_value = None  # no spool metadata
+
+        rv = _rh_client.get('/api/resource/history/view?query_id=rh-none-001')
+        body = rv.get_json()
+        assert rv.status_code == 200
+        assert 'total_row_count' not in body['data']
+        assert 'spool_download_url' not in body['data']
+
+    @patch('mes_dashboard.routes.resource_history_routes.apply_view')
+    @patch('mes_dashboard.routes.resource_history_routes._RESOURCE_LOCAL_COMPUTE_ENABLED', True)
+    @patch('mes_dashboard.core.query_spool_store.get_spool_metadata')
+    @patch('mes_dashboard.routes.resource_history_routes._inject_resource_metadata')
+    def test_resource_metadata_optional_in_response(
+        self, mock_inject_meta, mock_meta, mock_view, _rh_client
+    ):
+        """resource_metadata is optional; view response must not break if absent."""
+        from mes_dashboard.routes.resource_history_routes import _RESOURCE_SPOOL_THRESHOLD
+        mock_view.return_value = {"rows": [], "pagination": {}}
+        mock_meta.return_value = {"row_count": _RESOURCE_SPOOL_THRESHOLD, "schema_version": 1}
+        mock_inject_meta.return_value = None  # does nothing — metadata not injected
+
+        rv = _rh_client.get('/api/resource/history/view?query_id=rh-nometa-001')
+        body = rv.get_json()
+        assert rv.status_code == 200
+        assert body['success'] is True
+        # resource_metadata absent is OK — optional field
+        assert 'resource_metadata' not in body['data']

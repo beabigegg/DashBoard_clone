@@ -36,6 +36,13 @@ from mes_dashboard.services.container_resolution_policy import (
     validate_resolution_result,
 )
 from mes_dashboard.core.interactive_memory_guard import process_rss_mb
+from mes_dashboard.core.exceptions import (
+    UserInputError,
+    ResourceNotFoundError,
+    QueryTimeoutError,
+    DataContractError,
+    InternalQueryError,
+)
 from mes_dashboard.core.query_quality_contract import unpack_event_fetch_result
 from mes_dashboard.services.event_fetcher import EventFetcher
 
@@ -514,12 +521,12 @@ def resolve_lots(input_type: str, values: List[str]) -> Dict[str, Any]:
     # Validate input
     validation_error = validate_lot_input(input_type, values)
     if validation_error:
-        return {'error': validation_error}
+        raise UserInputError(validation_error)
 
     # Clean values
     cleaned = normalize_input_values(values)
     if not cleaned:
-        return {'error': '請輸入有效的查詢條件'}
+        raise UserInputError('請輸入有效的查詢條件')
 
     try:
         if input_type == 'lot_id':
@@ -535,7 +542,7 @@ def resolve_lots(input_type: str, values: List[str]) -> Dict[str, Any]:
         elif input_type == 'gd_work_order':
             result = _resolve_by_gd_work_order(cleaned)
         else:
-            return {'error': f'不支援的輸入類型: {input_type}'}
+            raise UserInputError(f'不支援的輸入類型: {input_type}')
 
         guard_assessment = assess_resolution_result(result)
         overflow_tokens = guard_assessment.get("expansion_offenders") or []
@@ -557,12 +564,14 @@ def resolve_lots(input_type: str, values: List[str]) -> Dict[str, Any]:
         # Keep compatibility: validation API remains available for strict call sites.
         guard_error = validate_resolution_result(result, strict=False)
         if guard_error:
-            return {'error': guard_error}
+            raise UserInputError(guard_error)
         return result
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"LOT resolution failed: {exc}")
-        return {'error': f'解析失敗: {str(exc)}'}
+        raise InternalQueryError('解析失敗', cause=exc)
 
 
 def _resolve_by_lot_id(lot_ids: List[str]) -> Dict[str, Any]:
@@ -668,7 +677,7 @@ def _resolve_by_gd_lot_id(gd_lot_ids: List[str]) -> Dict[str, Any]:
     """Resolve GD lot IDs to CONTAINERID with strict GD validation."""
     invalid = [value for value in gd_lot_ids if not _is_gd_like(_literal_prefix_before_wildcard(value))]
     if invalid:
-        return {'error': f'GD LOT ID 格式錯誤: {", ".join(invalid)}'}
+        raise UserInputError(f'GD LOT ID 格式錯誤: {", ".join(invalid)}')
 
     builder = QueryBuilder()
     _add_exact_or_pattern_condition(builder, "CONTAINERNAME", gd_lot_ids, case_insensitive=True)
@@ -846,7 +855,7 @@ def _resolve_by_work_order(work_orders: List[str]) -> Dict[str, Any]:
     """
     invalid = [value for value in work_orders if _is_gd_like(_literal_prefix_before_wildcard(value))]
     if invalid:
-        return {'error': f'正向工單僅支援 GA/GC，請改用反向 GD 工單查詢: {", ".join(invalid)}'}
+        raise UserInputError(f'正向工單僅支援 GA/GC，請改用反向 GD 工單查詢: {", ".join(invalid)}')
 
     builder = QueryBuilder()
     _add_exact_or_pattern_condition(builder, "MFGORDERNAME", work_orders, case_insensitive=True)
@@ -889,7 +898,7 @@ def _resolve_by_gd_work_order(work_orders: List[str]) -> Dict[str, Any]:
     """Resolve GD work orders to CONTAINERID."""
     invalid = [value for value in work_orders if not _is_gd_like(_literal_prefix_before_wildcard(value))]
     if invalid:
-        return {'error': f'GD 工單格式錯誤: {", ".join(invalid)}'}
+        raise UserInputError(f'GD 工單格式錯誤: {", ".join(invalid)}')
 
     builder = QueryBuilder()
     _add_exact_or_pattern_condition(builder, "MFGORDERNAME", work_orders, case_insensitive=True)
@@ -1054,7 +1063,7 @@ def get_lot_history(
         Dict with 'data', 'total', 'pagination', 'quality_meta', or 'error'.
     """
     if not container_id:
-        return {'error': '請指定 CONTAINERID'}
+        raise UserInputError('請指定 CONTAINERID')
 
     try:
         _check_rss_guard("LOT 生產履歷查詢")
@@ -1097,9 +1106,11 @@ def get_lot_history(
 
     except MemoryError:
         raise
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"LOT history query failed for {container_id}: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_adjacent_lots(
@@ -1121,7 +1132,7 @@ def get_adjacent_lots(
         Dict with 'data' (adjacent lots with relative_position) and metadata.
     """
     if not all([equipment_id, target_trackin_time]):
-        return {'error': '請指定設備和目標時間'}
+        raise UserInputError('請指定設備和目標時間')
 
     try:
         # Parse target time
@@ -1150,9 +1161,11 @@ def get_adjacent_lots(
             'time_window_hours': time_window_hours,
         }
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"Adjacent lots query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 # ============================================================
@@ -1176,10 +1189,10 @@ def get_lot_history_batch(
         Dict with 'data' (merged history records) and 'total'.
     """
     if not container_ids:
-        return {'error': '請指定 CONTAINERID'}
+        raise UserInputError('請指定 CONTAINERID')
     max_ids = _max_batch_container_ids()
     if len(container_ids) > max_ids:
-        return {'error': f'container_ids 數量不可超過 {max_ids} 筆'}
+        raise UserInputError(f'container_ids 數量不可超過 {max_ids} 筆')
     normalized_page = _sanitize_page(page)
     normalized_per_page = _sanitize_per_page(per_page)
     spool_query_id = _build_query_tool_batch_query_id("history", container_ids)
@@ -1264,9 +1277,11 @@ def get_lot_history_batch(
 
     except MemoryError:
         raise
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"LOT history batch query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_lot_associations_batch(
@@ -1286,14 +1301,14 @@ def get_lot_associations_batch(
         Dict with 'data' (merged records) and 'total'.
     """
     if not container_ids:
-        return {'error': '請指定 CONTAINERID'}
+        raise UserInputError('請指定 CONTAINERID')
     max_ids = _max_batch_container_ids()
     if len(container_ids) > max_ids:
-        return {'error': f'container_ids 數量不可超過 {max_ids} 筆'}
+        raise UserInputError(f'container_ids 數量不可超過 {max_ids} 筆')
 
     valid_batch_types = {'materials', 'rejects', 'holds'}
     if assoc_type not in valid_batch_types:
-        return {'error': f'批次查詢不支援類型: {assoc_type}'}
+        raise UserInputError(f'批次查詢不支援類型: {assoc_type}')
     normalized_page = _sanitize_page(page)
     normalized_per_page = _sanitize_per_page(per_page)
     spool_query_id = _build_query_tool_batch_query_id(assoc_type, container_ids)
@@ -1370,9 +1385,11 @@ def get_lot_associations_batch(
 
     except MemoryError:
         raise
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"LOT {assoc_type} batch query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 # ============================================================
@@ -1391,7 +1408,7 @@ def get_lot_materials(container_id: str, *, page: int = 1, per_page: int = 0) ->
         Dict with 'data', 'total', 'pagination', 'quality_meta', or 'error'.
     """
     if not container_id:
-        return {'error': '請指定 CONTAINERID'}
+        raise UserInputError('請指定 CONTAINERID')
 
     try:
         events_by_cid, quality_meta = _fetch_domain_records([container_id], "materials")
@@ -1414,9 +1431,11 @@ def get_lot_materials(container_id: str, *, page: int = 1, per_page: int = 0) ->
             'quality_meta': quality_meta,
         }
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"LOT materials query failed for {container_id}: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_lot_rejects(container_id: str, *, page: int = 1, per_page: int = 0) -> Dict[str, Any]:
@@ -1431,7 +1450,7 @@ def get_lot_rejects(container_id: str, *, page: int = 1, per_page: int = 0) -> D
         Dict with 'data', 'total', 'pagination', 'quality_meta', or 'error'.
     """
     if not container_id:
-        return {'error': '請指定 CONTAINERID'}
+        raise UserInputError('請指定 CONTAINERID')
 
     try:
         events_by_cid, quality_meta = _fetch_domain_records([container_id], "rejects")
@@ -1455,9 +1474,11 @@ def get_lot_rejects(container_id: str, *, page: int = 1, per_page: int = 0) -> D
             'quality_meta': quality_meta,
         }
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"LOT rejects query failed for {container_id}: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_lot_holds(container_id: str, *, page: int = 1, per_page: int = 0) -> Dict[str, Any]:
@@ -1472,7 +1493,7 @@ def get_lot_holds(container_id: str, *, page: int = 1, per_page: int = 0) -> Dic
         Dict with 'data', 'total', 'pagination', 'quality_meta', or 'error'.
     """
     if not container_id:
-        return {'error': '請指定 CONTAINERID'}
+        raise UserInputError('請指定 CONTAINERID')
 
     try:
         events_by_cid, quality_meta = _fetch_domain_records([container_id], "holds")
@@ -1494,9 +1515,11 @@ def get_lot_holds(container_id: str, *, page: int = 1, per_page: int = 0) -> Dic
             'quality_meta': quality_meta,
         }
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"LOT holds query failed for {container_id}: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_lot_split_merge_history(
@@ -1530,7 +1553,7 @@ def get_lot_split_merge_history(
         Dict with 'data' (split/merge history records) and 'total', or 'error'.
     """
     if not work_order:
-        return {'error': '請指定工單號', 'data': [], 'total': 0}
+        raise UserInputError('請指定工單號')
 
     try:
         builder = QueryBuilder()
@@ -1594,20 +1617,17 @@ def get_lot_split_merge_history(
             'mode': mode,
         }
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         error_str = str(exc)
         logger.error(f"Split/merge history query failed for MFGORDERNAME={work_order}: {exc}")
 
         # Check for timeout error (DPY-4024, ORA-01013, or TimeoutError from read_sql_df_slow)
         if 'timeout' in error_str.lower() or 'DPY-4024' in error_str or 'ORA-01013' in error_str:
-            return {
-                'error': f'查詢逾時（超過 120 秒）',
-                'timeout': True,
-                'data': [],
-                'total': 0
-            }
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc)
 
-        return {'error': f'查詢失敗: {error_str}', 'data': [], 'total': 0}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def _get_mfg_order_for_lot(container_id: str) -> Optional[str]:
@@ -1662,7 +1682,7 @@ def get_lot_splits(
         Dict with 'production_history', 'serial_numbers', and totals.
     """
     if not container_id:
-        return {'error': '請指定 CONTAINERID'}
+        raise UserInputError('請指定 CONTAINERID')
 
     result = {
         'production_history': [],
@@ -1689,20 +1709,19 @@ def get_lot_splits(
 
         if mfg_order:
             logger.info(f"Querying production history for MFGORDERNAME={mfg_order} (LOT: {container_id})")
-            history_result = get_lot_split_merge_history(
-                work_order=mfg_order,
-                current_container_id=container_id,
-                full_history=full_history,
-            )
-            logger.info(f"[DEBUG] history_result keys: {list(history_result.keys())}")
-            logger.info(f"[DEBUG] history_result total: {history_result.get('total', 0)}")
-
-            if 'error' not in history_result:
+            try:
+                history_result = get_lot_split_merge_history(
+                    work_order=mfg_order,
+                    current_container_id=container_id,
+                    full_history=full_history,
+                )
+                logger.info(f"[DEBUG] history_result keys: {list(history_result.keys())}")
+                logger.info(f"[DEBUG] history_result total: {history_result.get('total', 0)}")
                 result['production_history'] = history_result.get('data', [])
                 result['total_history'] = history_result.get('total', 0)
                 result['work_order'] = mfg_order
                 logger.info(f"[DEBUG] production_history has {len(result['production_history'])} records")
-            elif history_result.get('timeout'):
+            except QueryTimeoutError:
                 # Timeout error - show user-friendly message
                 result['production_history_timeout'] = True
                 result['production_history_timeout_message'] = (
@@ -1711,10 +1730,10 @@ def get_lot_splits(
                 )
                 result['work_order'] = mfg_order
                 logger.warning(f"Production history query timed out for {mfg_order}")
-            else:
+            except Exception as history_exc:
                 # Other error
-                result['production_history_error'] = history_result.get('error')
-                logger.error(f"[DEBUG] history_result error: {history_result.get('error')}")
+                result['production_history_error'] = str(history_exc)
+                logger.error(f"[DEBUG] history_result error: {history_exc}")
         else:
             logger.warning(f"Could not find MFGORDERNAME for {container_id}, skipping production history")
             result['production_history_skip_reason'] = '無法取得工單號，跳過生產拆併批查詢。'
@@ -1794,7 +1813,7 @@ def get_lot_jobs(
         Dict with 'data' (job records) and 'total', or 'error'.
     """
     if not all([equipment_id, time_start, time_end]):
-        return {'error': '請指定設備和時間範圍'}
+        raise UserInputError('請指定設備和時間範圍')
 
     try:
         # Parse times
@@ -1827,9 +1846,11 @@ def get_lot_jobs(
             'time_range': {'start': time_start, 'end': time_end},
         }
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"LOT jobs query failed for {equipment_id}: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_lot_jobs_with_history(
@@ -1852,7 +1873,7 @@ def get_lot_jobs_with_history(
         Dict with 'data' (flattened job+txn records) and 'total', or 'error'.
     """
     if not all([equipment_id, time_start, time_end]):
-        return {'error': '請指定設備和時間範圍'}
+        raise UserInputError('請指定設備和時間範圍')
 
     try:
         if isinstance(time_start, str):
@@ -1885,11 +1906,13 @@ def get_lot_jobs_with_history(
             'equipment_id': equipment_id,
         }
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(
             f"LOT jobs with txn history query failed for {equipment_id}: {exc}"
         )
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 # ============================================================
@@ -2118,21 +2141,21 @@ def resolve_lot_equipment(
         Dict with equipment_ids, equipment_names, date_range, trace_map.
     """
     if not values:
-        return {'error': '請輸入至少一筆查詢條件'}
+        raise UserInputError('請輸入至少一筆查詢條件')
 
     if len(values) > MAX_LOT_EQUIPMENT_INPUT:
-        return {'error': f'輸入數量不得超過 {MAX_LOT_EQUIPMENT_INPUT} 筆'}
+        raise UserInputError(f'輸入數量不得超過 {MAX_LOT_EQUIPMENT_INPUT} 筆')
 
     if input_type not in ('lot_id', 'work_order'):
-        return {'error': f'不支援的輸入類型: {input_type}'}
+        raise UserInputError(f'不支援的輸入類型: {input_type}')
 
     if not workcenter_groups:
-        return {'error': '請選擇站點群組'}
+        raise UserInputError('請選擇站點群組')
 
     workcenters = _get_workcenters_for_groups(workcenter_groups)
     if not workcenters:
         group_names = '、'.join(workcenter_groups)
-        return {'error': f'找不到站點群組「{group_names}」對應的站點'}
+        raise ResourceNotFoundError(f'找不到站點群組「{group_names}」對應的站點')
 
     try:
         _check_rss_guard("批次追蹤生產設備 lookup")
@@ -2140,8 +2163,10 @@ def resolve_lot_equipment(
         # Step 1: Resolve input to container names
         if input_type == 'work_order':
             resolve_result = resolve_lots('work_order', values)
+            # resolve_lots now raises on error; this check is a safety belt for any
+            # residual dict-based callers that may still exist.
             if 'error' in resolve_result:
-                return {'error': resolve_result['error']}
+                raise UserInputError(resolve_result['error'])
             resolved_data = resolve_result.get('data', [])
             if not resolved_data:
                 return {
@@ -2232,9 +2257,11 @@ def resolve_lot_equipment(
 
     except MemoryError:
         raise
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"Lot equipment lookup failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 # ============================================================
@@ -2261,11 +2288,11 @@ def get_equipment_status_hours(
     # Validate inputs
     validation_error = validate_equipment_input(equipment_ids)
     if validation_error:
-        return {'error': validation_error}
+        raise UserInputError(validation_error)
 
     validation_error = validate_date_range(start_date, end_date)
     if validation_error:
-        return {'error': validation_error}
+        raise UserInputError(validation_error)
 
     try:
         from mes_dashboard.services.batch_query_engine import compute_query_hash
@@ -2330,9 +2357,11 @@ def get_equipment_status_hours(
             'date_range': {'start': start_date, 'end': end_date},
         }
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"Equipment status hours query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_equipment_lots(
@@ -2356,11 +2385,11 @@ def get_equipment_lots(
     # Validate inputs
     validation_error = validate_equipment_input(equipment_ids)
     if validation_error:
-        return {'error': validation_error}
+        raise UserInputError(validation_error)
 
     validation_error = validate_date_range(start_date, end_date)
     if validation_error:
-        return {'error': validation_error}
+        raise UserInputError(validation_error)
 
     try:
         _check_rss_guard("設備批次 LOT 查詢")
@@ -2392,9 +2421,11 @@ def get_equipment_lots(
 
     except MemoryError:
         raise
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"Equipment lots query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_equipment_materials(
@@ -2415,11 +2446,11 @@ def get_equipment_materials(
         Dict with 'data' (material summary) and 'total'.
     """
     if not equipment_names:
-        return {'error': '請選擇至少一台設備'}
+        raise UserInputError('請選擇至少一台設備')
 
     validation_error = validate_date_range(start_date, end_date)
     if validation_error:
-        return {'error': validation_error}
+        raise UserInputError(validation_error)
 
     try:
         _check_rss_guard("設備原料消耗查詢")
@@ -2445,9 +2476,11 @@ def get_equipment_materials(
 
     except MemoryError:
         raise
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"Equipment materials query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_equipment_rejects(
@@ -2468,11 +2501,11 @@ def get_equipment_rejects(
         Dict with 'data' (reject summary) and 'total'.
     """
     if not equipment_names:
-        return {'error': '請選擇至少一台設備'}
+        raise UserInputError('請選擇至少一台設備')
 
     validation_error = validate_date_range(start_date, end_date)
     if validation_error:
-        return {'error': validation_error}
+        raise UserInputError(validation_error)
 
     try:
         _check_rss_guard("設備不良品查詢")
@@ -2498,9 +2531,11 @@ def get_equipment_rejects(
 
     except MemoryError:
         raise
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"Equipment rejects query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 def get_equipment_jobs(
@@ -2523,11 +2558,11 @@ def get_equipment_jobs(
     # Validate inputs
     validation_error = validate_equipment_input(equipment_ids)
     if validation_error:
-        return {'error': validation_error}
+        raise UserInputError(validation_error)
 
     validation_error = validate_date_range(start_date, end_date)
     if validation_error:
-        return {'error': validation_error}
+        raise UserInputError(validation_error)
 
     try:
         builder = QueryBuilder()
@@ -2550,9 +2585,11 @@ def get_equipment_jobs(
             'date_range': {'start': start_date, 'end': end_date},
         }
 
+    except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
+        raise
     except Exception as exc:
         logger.error(f"Equipment jobs query failed: {exc}")
-        return {'error': f'查詢失敗: {str(exc)}'}
+        raise InternalQueryError('查詢失敗', cause=exc)
 
 
 # ============================================================

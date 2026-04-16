@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet } from '../core/api.js';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
 import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
@@ -73,18 +74,7 @@ function goBackToOverview() {
   navigateToRuntimeRoute('/hold-overview');
 }
 
-function unwrapApiResult(result, fallbackMessage) {
-  if (result?.success) {
-    return result.data;
-  }
-  if (result?.success === false) {
-    throw new Error(result.error || fallbackMessage);
-  }
-  if (result?.data !== undefined) {
-    return result.data;
-  }
-  return result;
-}
+// unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
 async function fetchSummary(signal) {
   const result = await apiGet('/api/wip/hold-detail/summary', {

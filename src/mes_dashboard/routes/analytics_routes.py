@@ -52,9 +52,12 @@ def anomaly_summary():
     if cached is None:
         return success_response(
             {"total_count": 0, "severity": "ok", "breakdown": {}},
-            meta={"source": "cache_miss"},
+            meta={"source": "cache_miss", "cache_state": "cold"},
         )
-    return success_response(cached.get("data", {}), meta=cached.get("meta", {}))
+    meta = dict(cached.get("meta", {}))
+    if "cache_state" not in meta:
+        meta["cache_state"] = "warm"
+    return success_response(cached.get("data", {}), meta=meta)
 
 
 def _serve_cached_detail(detector_name: str):

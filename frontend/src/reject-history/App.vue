@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
+import { unwrapApiResult } from '../core/unwrap-api-result.js';
 import { isDuckDBSupported } from '../core/duckdb-client.js';
 import {
   buildViewParams,
@@ -238,15 +239,7 @@ function paretoMetricApiMode() {
   return paretoMetricMode.value === 'defect' ? 'defect' : 'reject_total';
 }
 
-function unwrapApiResult(result, fallbackMessage) {
-  if (result?.success === true) {
-    return result;
-  }
-  if (result?.success === false) {
-    throw new Error(result.error || fallbackMessage);
-  }
-  return result;
-}
+// unwrapApiResult imported from ../core/unwrap-api-result.js
 
 function resetParetoSelections() {
   for (const dimension of PARETO_DIMENSIONS) {

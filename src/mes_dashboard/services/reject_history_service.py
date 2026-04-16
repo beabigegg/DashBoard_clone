@@ -319,11 +319,15 @@ def _list_to_csv(
     buffer.seek(0)
     buffer.truncate(0)
 
-    for row in rows:
-        writer.writerow(row)
-        yield buffer.getvalue()
-        buffer.seek(0)
-        buffer.truncate(0)
+    try:
+        for row in rows:
+            writer.writerow(row)
+            yield buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate(0)
+    except Exception as exc:
+        logger.error("CSV stream error mid-write: %s", exc)
+        yield f"\n__STREAM_ERROR__,{exc}\n"
 
 
 def _extract_distinct_text_values(df: pd.DataFrame, column: str) -> list[str]:

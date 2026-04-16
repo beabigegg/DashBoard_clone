@@ -295,11 +295,12 @@ class TestLotHistoryEndpoint:
 
     @patch('mes_dashboard.routes.query_tool_routes.get_lot_history')
     def test_lot_history_service_error(self, mock_query, client):
-        """Should return error from service."""
-        mock_query.return_value = {'error': '查詢失敗'}
+        """Service raising InternalQueryError should return 500."""
+        from mes_dashboard.core.exceptions import InternalQueryError
+        mock_query.side_effect = InternalQueryError("查詢失敗")
 
         response = client.get('/api/query-tool/lot-history?container_id=invalid')
-        assert response.status_code == 400
+        assert response.status_code == 500
         data = json.loads(response.data)
         assert 'error' in data
 

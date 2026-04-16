@@ -23,6 +23,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from mes_dashboard.core.exceptions import LockUnavailableError
 from mes_dashboard.core.redis_client import (
     get_control_redis_client,
     get_key,
@@ -806,11 +807,13 @@ def _worker_loop() -> None:
     )
     while not _STOP_EVENT.wait(QUERY_SPOOL_CLEANUP_INTERVAL_SECONDS):
         try:
-            if try_acquire_lock(_CLEANUP_LOCK_NAME, ttl_seconds=120):
+            if try_acquire_lock(_CLEANUP_LOCK_NAME, ttl_seconds=120, fail_mode="raise"):
                 try:
                     cleanup_expired_spool(namespace=None)
                 finally:
                     release_lock(_CLEANUP_LOCK_NAME)
+        except LockUnavailableError as exc:
+            logger.warning("Query spool cleanup skipped: Redis unavailable (%s)", exc)
         except Exception as exc:
             logger.warning("Query spool cleanup failed: %s", exc)
     logger.info("Query spool cleanup worker stopped")

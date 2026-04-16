@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import { apiGet, apiPost, ensureMesApiAvailable } from '../core/api.js';
+import { unwrapApiResult } from '../core/unwrap-api-result.js';
 import { buildResourceKpiFromHours } from '../core/compute.js';
 import { checkLocalComputeEligibility } from '../core/duckdb-activation-policy.js';
 import {
@@ -148,15 +149,7 @@ function resetToDefaultFilters(target) {
   assignFilterState(target, defaults);
 }
 
-function unwrapApiResult(result, fallbackMessage) {
-  if (result?.success === true) {
-    return result;
-  }
-  if (result?.success === false) {
-    throw new Error(result.error || fallbackMessage);
-  }
-  return result;
-}
+// unwrapApiResult imported from ../core/unwrap-api-result.js
 
 function mergeComputedKpi(source) {
   return {

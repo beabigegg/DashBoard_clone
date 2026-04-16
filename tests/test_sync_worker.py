@@ -79,7 +79,11 @@ class TestNormalSyncFlow:
         ):
             worker._sync_logs()
 
-        assert mock_conn.execute.call_count == 2
+        # After a6fecb9: executemany — execute called ONCE with a list of 2 params
+        assert mock_conn.execute.call_count == 1
+        call_params = mock_conn.execute.call_args[0][1]
+        assert isinstance(call_params, list)
+        assert len(call_params) == 2
         assert len(temp_log_store.get_unsynced()) == 0
 
     def test_sync_metrics_inserts_to_mysql_and_marks_synced(self, worker, temp_metrics_store):

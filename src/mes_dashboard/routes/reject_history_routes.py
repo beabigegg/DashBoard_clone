@@ -742,7 +742,8 @@ def api_reject_history_query():
             job_params["container_input_type"] = container_input_type
             job_params["container_values"] = container_values
 
-        job_id, err = enqueue_reject_query(mode, job_params)
+        from mes_dashboard.core.permissions import get_owner_token
+        job_id, err = enqueue_reject_query(mode, job_params, owner=get_owner_token())
         if job_id is None:
             logger.warning("reject async enqueue failed (%s)", err)
             return error_response(

@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { MATRIX_STATUS_COLUMNS, OU_BADGE_THRESHOLDS, STATUS_DISPLAY_MAP, normalizeStatus } from '../resource-shared/constants.js';
@@ -117,15 +118,7 @@ const tooltipState = reactive({
   position: { x: 0, y: 0 },
 });
 
-function unwrapApiResult(result, fallbackMessage) {
-  if (result?.success === true) {
-    return result.data;
-  }
-  if (result?.success === false) {
-    throw new Error(result.error || fallbackMessage);
-  }
-  return result;
-}
+// unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
 function buildFilterParams() {
   const params = {};

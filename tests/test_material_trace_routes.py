@@ -329,6 +329,110 @@ class TestFilterOptions:
         assert payload["success"] is True
         assert payload["data"]["workcenter_groups"] == ["焊接_DB", "焊線_WB"]
 
+
+# ============================================================
+# query_hash stability
+# ============================================================
+
+
+class TestQueryHashStability:
+    """make_route_query_hash must produce deterministic, stable IDs."""
+
+    def test_same_inputs_same_hash(self):
+        from mes_dashboard.services.material_trace_service import make_route_query_hash
+        h1 = make_route_query_hash("workorder", ["WO-001", "WO-002"])
+        h2 = make_route_query_hash("workorder", ["WO-001", "WO-002"])
+        assert h1 == h2
+
+    def test_value_order_normalized(self):
+        """Values in different order must produce the same hash."""
+        from mes_dashboard.services.material_trace_service import make_route_query_hash
+        h1 = make_route_query_hash("workorder", ["WO-001", "WO-002"])
+        h2 = make_route_query_hash("workorder", ["WO-002", "WO-001"])
+        assert h1 == h2
+
+    def test_different_mode_different_hash(self):
+        from mes_dashboard.services.material_trace_service import make_route_query_hash
+        h1 = make_route_query_hash("workorder", ["WO-001"])
+        h2 = make_route_query_hash("lot_id", ["WO-001"])
+        assert h1 != h2
+
+    def test_different_values_different_hash(self):
+        from mes_dashboard.services.material_trace_service import make_route_query_hash
+        h1 = make_route_query_hash("workorder", ["WO-001"])
+        h2 = make_route_query_hash("workorder", ["WO-999"])
+        assert h1 != h2
+
+    def test_hash_starts_with_mtrace_prefix(self):
+        from mes_dashboard.services.material_trace_service import make_route_query_hash
+        h = make_route_query_hash("workorder", ["WO-001"])
+        assert h.startswith("mtrace-")
+
+    def test_hash_is_url_safe(self):
+        """Hash must contain only URL/filename-safe characters."""
+        import re
+        from mes_dashboard.services.material_trace_service import make_route_query_hash
+        h = make_route_query_hash("workorder", ["WO-001", "WO-002"])
+        assert re.match(r'^[a-zA-Z0-9\-_]+$', h), f"Hash not URL-safe: {h!r}"
+
+    def test_workcenter_groups_affect_hash(self):
+        """workcenter_groups must be included in the hash key."""
+        from mes_dashboard.services.material_trace_service import make_route_query_hash
+        h1 = make_route_query_hash("workorder", ["WO-001"], workcenter_groups=["DB"])
+        h2 = make_route_query_hash("workorder", ["WO-001"], workcenter_groups=["WB"])
+        assert h1 != h2
+
+    def test_no_workcenter_groups_vs_empty_same_hash(self):
+        """None and [] for workcenter_groups must produce the same hash."""
+        from mes_dashboard.services.material_trace_service import make_route_query_hash
+        h1 = make_route_query_hash("workorder", ["WO-001"], workcenter_groups=None)
+        h2 = make_route_query_hash("workorder", ["WO-001"], workcenter_groups=[])
+        assert h1 == h2
+
+
+# ============================================================
+# Export 409 QUERY_NOT_READY (already covered; verified via alias)
+# ============================================================
+
+
+class TestExport409QueryNotReady:
+    """Dedicated class for 409 QUERY_NOT_READY export error — explicit race case."""
+
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_export_spool_miss_returns_409(self, mock_runtime_cls, client):
+        """When spool is not available, export must return 409 QUERY_NOT_READY."""
+        mock_runtime = mock_runtime_cls.return_value
+        mock_runtime.is_available.return_value = False
+
+        response = client.post(
+            "/api/material-trace/export",
+            data=json.dumps({"mode": "workorder", "values": ["WO-001"], "query_hash": "mtrace-miss-001"}),
+            content_type="application/json",
+        )
+        assert response.status_code == 409
+        payload = response.get_json()
+        assert payload["success"] is False
+        assert payload["error"]["code"] == "QUERY_NOT_READY"
+
+    @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
+    def test_export_after_spool_expiry_is_409(self, mock_runtime_cls, client):
+        """If spool was created but has since expired, export must still return 409."""
+        mock_runtime = mock_runtime_cls.return_value
+        mock_runtime.is_available.return_value = False  # spool gone
+
+        response = client.post(
+            "/api/material-trace/export",
+            data=json.dumps({
+                "mode": "workorder",
+                "values": ["WO-EXPIRED"],
+                "query_hash": "mtrace-expired-001",
+            }),
+            content_type="application/json",
+        )
+        assert response.status_code == 409
+        payload = response.get_json()
+        assert payload["error"]["code"] == "QUERY_NOT_READY"
+
     @patch("mes_dashboard.routes.material_trace_routes.get_workcenter_groups")
     def test_filter_options_unavailable_returns_503(self, mock_groups, client):
         mock_groups.return_value = None

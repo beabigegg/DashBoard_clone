@@ -192,7 +192,8 @@ def api_production_history_query():
     )
 
     if PRODUCTION_HISTORY_ASYNC_ENABLED and is_async_available():
-        job_id, err = enqueue_production_history_query(body)
+        from mes_dashboard.core.permissions import get_owner_token
+        job_id, err = enqueue_production_history_query(body, owner=get_owner_token())
         if job_id is None:
             logger.warning("production_history async enqueue failed (%s)", err)
             return error_response(

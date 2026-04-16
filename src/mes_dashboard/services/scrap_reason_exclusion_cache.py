@@ -128,8 +128,8 @@ def refresh_cache(force: bool = False) -> bool:
     if not force and _seconds_since_update() < _REFRESH_SECONDS:
         return True
 
-    # Cross-worker lock (fail-open when Redis unavailable).
-    if not try_acquire_lock(_LOCK_NAME, ttl_seconds=120):
+    # Cross-worker lock (fail-closed when Redis unavailable — serve stale data).
+    if not try_acquire_lock(_LOCK_NAME, ttl_seconds=120, fail_mode="closed"):
         logger.debug("Scrap exclusion cache refresh skipped (lock held by another worker)")
         with _CACHE_LOCK:
             return bool(_CACHE.get("loaded"))

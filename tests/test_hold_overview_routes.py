@@ -243,3 +243,107 @@ class TestHoldOverviewLotsRoute(TestHoldOverviewRoutesBase):
         self.assertEqual(payload['error']['code'], 'TOO_MANY_REQUESTS')
         self.assertEqual(response.headers.get('Retry-After'), '4')
         mock_service.assert_not_called()
+
+
+class TestHoldOverviewTreemapEdgeCases(TestHoldOverviewRoutesBase):
+    """Treemap edge cases: 3-level nesting, leaf without children, POST reasons, GET compat."""
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_overview_treemap')
+    def test_treemap_3_level_nesting(self, mock_service):
+        """Treemap with 3-level nested children must pass through intact."""
+        three_level = {
+            'items': [
+                {
+                    'name': 'quality',
+                    'value': 10,
+                    'children': [
+                        {
+                            'name': '品質確認',
+                            'value': 10,
+                            'children': [
+                                {'name': 'WB', 'value': 5, 'children': []},
+                                {'name': 'CP', 'value': 5, 'children': []},
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+        mock_service.return_value = three_level
+
+        response = self.client.get('/api/hold-overview/treemap')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        children = payload['data']['items'][0]['children'][0]['children']
+        self.assertEqual(len(children), 2)
+        self.assertEqual(children[0]['name'], 'WB')
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_overview_treemap')
+    def test_treemap_leaf_without_children(self, mock_service):
+        """Treemap leaf node with no children key must be handled gracefully."""
+        leaf_only = {
+            'items': [
+                {'name': 'quality', 'value': 5}  # no 'children' key
+            ]
+        }
+        mock_service.return_value = leaf_only
+
+        response = self.client.get('/api/hold-overview/treemap')
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        # Leaf node is passed through unchanged
+        self.assertEqual(payload['data']['items'][0]['name'], 'quality')
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_overview_treemap')
+    def test_treemap_post_json_reasons(self, mock_service):
+        """POST /api/hold-overview/treemap must accept JSON body with reasons list."""
+        mock_service.return_value = {'items': []}
+
+        response = self.client.post(
+            '/api/hold-overview/treemap',
+            data=json.dumps({'reason': ['品質確認', '特殊需求管控'], 'hold_type': 'quality'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        call_args = mock_service.call_args
+        self.assertEqual(call_args.kwargs.get('reason'), ['品質確認', '特殊需求管控'])
+        self.assertEqual(call_args.kwargs.get('hold_type'), 'quality')
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_overview_treemap')
+    def test_treemap_get_legacy_compat(self, mock_service):
+        """GET /api/hold-overview/treemap still works (legacy compatibility)."""
+        mock_service.return_value = {'items': []}
+
+        response = self.client.get('/api/hold-overview/treemap?hold_type=quality')
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.data)
+        self.assertTrue(payload['success'])
+
+
+class TestHoldOverviewSummaryPostCompat(TestHoldOverviewRoutesBase):
+    """POST /api/hold-overview/summary compatibility tests."""
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_summary')
+    def test_summary_post_json_body(self, mock_service):
+        """POST with JSON body must work identically to GET with query params."""
+        mock_service.return_value = {
+            'totalLots': 5,
+            'totalQty': 100,
+            'avgAge': 2.0,
+            'maxAge': 8.0,
+            'workcenterCount': 2,
+            'dataUpdateDate': None,
+        }
+
+        response = self.client.post(
+            '/api/hold-overview/summary',
+            data=json.dumps({'reason': ['品質確認'], 'hold_type': 'quality'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.data)
+        self.assertTrue(payload['success'])

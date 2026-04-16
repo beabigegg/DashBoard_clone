@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
+from contextlib import contextmanager
+from typing import Iterator, Literal, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 import redis
@@ -202,24 +203,73 @@ def close_redis() -> None:
             _REDIS_CONTROL_CLIENT = None
 
 
-def try_acquire_lock(lock_name: str, ttl_seconds: int = 60) -> bool:
+def try_acquire_lock(
+    lock_name: str,
+    ttl_seconds: int = 60,
+    *,
+    fail_mode: Literal["closed", "raise", "open"],
+) -> bool:
     """Try to acquire a distributed lock using Redis SET NX.
 
     Uses the control-plane Redis client so locks are not subject to cache
     eviction pressure.  Non-blocking: returns False immediately if held.
 
+    Spec: ``distributed-lock-policy`` (openspec/changes/redis-lock-policy).
+
     Args:
         lock_name: Name of the lock (will be prefixed with key prefix).
         ttl_seconds: Lock expiration time in seconds (prevents deadlocks).
+        fail_mode: Required keyword-only argument controlling behaviour when
+            Redis is unavailable or raises an exception:
+
+            ``"closed"``
+                Return ``False`` — the caller must treat the protected
+                operation as "don't run now".  Use this for cache-refresh
+                patterns where serving stale data for one tick is acceptable.
+
+            ``"raise"``
+                Raise :class:`~mes_dashboard.core.exceptions.LockUnavailableError`
+                — the caller must catch it and abort the current tick cleanly.
+                Use this for leader-election patterns where running without
+                exclusivity is a correctness bug.
+
+            ``"open"``
+                Log a warning and return ``True`` (previous behaviour).
+                Use **only** when duplicate execution is genuinely cheap and
+                idempotent.  Each opt-in site MUST carry a
+                ``# fail_mode=open: <reason>`` comment.
 
     Returns:
         True if lock was acquired, False if already held by another process.
+        Under ``fail_mode="closed"`` or ``fail_mode="open"`` also returns a
+        boolean when Redis is unavailable.
+
+    Raises:
+        LockUnavailableError: When Redis is unavailable and
+            ``fail_mode="raise"``.
     """
+    from mes_dashboard.core.exceptions import LockUnavailableError
+    from mes_dashboard.core.heavy_query_telemetry import record_lock_fail_mode_triggered
+
+    def _handle_failure(cause: Optional[Exception]) -> bool:
+        record_lock_fail_mode_triggered(lock_name, fail_mode)
+        if fail_mode == "closed":
+            logger.warning(f"Redis unavailable, skipping lock for {lock_name} (fail-closed)")
+            return False
+        elif fail_mode == "raise":
+            logger.warning(f"Redis unavailable, raising for lock {lock_name} (fail-raise)")
+            raise LockUnavailableError(
+                f"Could not acquire lock '{lock_name}': Redis unavailable",
+                details={"lock_name": lock_name},
+                cause=cause,
+            ) from cause
+        else:  # "open"
+            logger.warning(f"Redis unavailable, proceeding without lock for {lock_name} (fail-open)")
+            return True
+
     client = get_control_redis_client()
     if client is None:
-        # Redis unavailable - allow operation to proceed (fail-open)
-        logger.warning(f"Redis unavailable, skipping lock for {lock_name}")
-        return True
+        return _handle_failure(None)
 
     try:
         lock_key = f"{REDIS_KEY_PREFIX}:lock:{lock_name}"
@@ -232,8 +282,42 @@ def try_acquire_lock(lock_name: str, ttl_seconds: int = 60) -> bool:
         return bool(acquired)
     except Exception as e:
         logger.warning(f"Failed to acquire lock {lock_name}: {e}")
-        # Fail-open: allow operation if Redis has issues
-        return True
+        return _handle_failure(e)
+
+
+@contextmanager
+def with_distributed_lock(
+    name: str,
+    ttl_seconds: int = 60,
+    *,
+    fail_mode: Literal["closed", "raise", "open"],
+) -> Iterator[bool]:
+    """Context manager wrapping :func:`try_acquire_lock` and :func:`release_lock`.
+
+    Yields ``True`` if the lock was acquired, ``False`` if not (only possible
+    under ``fail_mode="closed"``).  Under ``fail_mode="raise"`` a
+    :class:`~mes_dashboard.core.exceptions.LockUnavailableError` propagates
+    before the body is entered.
+
+    The lock is released in a ``finally`` block only when it was acquired.
+
+    Example::
+
+        with with_distributed_lock("my_job", ttl_seconds=120, fail_mode="closed") as acquired:
+            if not acquired:
+                return  # Redis unavailable, skip this tick
+            do_expensive_work()
+
+    Import path: ``from mes_dashboard.core.redis_client import with_distributed_lock``
+    """
+    acquired = try_acquire_lock(name, ttl_seconds, fail_mode=fail_mode)
+    if not acquired:
+        yield False
+        return
+    try:
+        yield True
+    finally:
+        release_lock(name)
 
 
 def release_lock(lock_name: str) -> None:

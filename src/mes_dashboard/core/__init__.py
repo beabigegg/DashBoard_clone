@@ -17,6 +17,7 @@ from .utils import (
     convert_datetime_fields,
     format_api_response,
 )
+from .redis_client import try_acquire_lock, release_lock, with_distributed_lock
 
 __all__ = [
     "get_db_connection",
@@ -36,4 +37,7 @@ __all__ = [
     "build_equipment_filter_sql",
     "convert_datetime_fields",
     "format_api_response",
+    "try_acquire_lock",
+    "release_lock",
+    "with_distributed_lock",
 ]

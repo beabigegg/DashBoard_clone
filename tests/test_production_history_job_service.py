@@ -29,7 +29,7 @@ class TestEnqueueProductionHistoryQuery:
         params = {"start_date": "2024-01-01", "end_date": "2024-02-01"}
 
         with patch.object(pjs, "enqueue_job", mock_enqueue_job):
-            job_id, err = pjs.enqueue_production_history_query(params)
+            job_id, err = pjs.enqueue_production_history_query(params, owner="test-owner")
 
         assert job_id == "prod-hist-abc123"
         assert err is None
@@ -44,7 +44,7 @@ class TestEnqueueProductionHistoryQuery:
     def test_returns_job_id_and_none_on_success(self):
         """Should return (job_id, None) when enqueue_job succeeds."""
         with patch.object(pjs, "enqueue_job", return_value=("prod-hist-deadbeef", None)):
-            job_id, err = pjs.enqueue_production_history_query({})
+            job_id, err = pjs.enqueue_production_history_query({}, owner="test-owner")
         assert job_id is not None
         assert job_id.startswith("prod-hist-")
         assert err is None
@@ -52,7 +52,7 @@ class TestEnqueueProductionHistoryQuery:
     def test_returns_none_and_error_on_failure(self):
         """Should return (None, error_message) when enqueue_job fails."""
         with patch.object(pjs, "enqueue_job", return_value=(None, "Redis down")):
-            job_id, err = pjs.enqueue_production_history_query({})
+            job_id, err = pjs.enqueue_production_history_query({}, owner="test-owner")
         assert job_id is None
         assert err == "Redis down"
 
@@ -65,7 +65,7 @@ class TestEnqueueProductionHistoryQuery:
             return (kwargs.get("job_id"), None)
 
         with patch.object(pjs, "enqueue_job", side_effect=_capture):
-            pjs.enqueue_production_history_query({})
+            pjs.enqueue_production_history_query({}, owner="test-owner")
 
         assert captured["job_id"].startswith("prod-hist-")
 
@@ -73,7 +73,7 @@ class TestEnqueueProductionHistoryQuery:
         """Should pass job_timeout and result_ttl from module-level config."""
         mock_enqueue_job = MagicMock(return_value=("prod-hist-ttl-test", None))
         with patch.object(pjs, "enqueue_job", mock_enqueue_job):
-            pjs.enqueue_production_history_query({})
+            pjs.enqueue_production_history_query({}, owner="test-owner")
 
         call_kwargs = mock_enqueue_job.call_args.kwargs
         assert call_kwargs["job_timeout"] == pjs.PRODUCTION_HISTORY_JOB_TIMEOUT_SECONDS
@@ -85,7 +85,7 @@ class TestEnqueueProductionHistoryQuery:
         retry_cfg = object()
         with patch.object(pjs, "enqueue_job", mock_enqueue_job), \
              patch.object(pjs, "_build_retry", return_value=retry_cfg):
-            pjs.enqueue_production_history_query({})
+            pjs.enqueue_production_history_query({}, owner="test-owner")
 
         call_kwargs = mock_enqueue_job.call_args.kwargs
         assert call_kwargs["retry"] is retry_cfg

@@ -308,7 +308,8 @@ class TestWarmupTasks:
         mock_ensure.assert_called_once()
 
     @patch('mes_dashboard.services.yield_alert_dataset_cache.ensure_dataset_loaded', return_value={'query_id': 'qid-y', 'cache_hit': False})
-    def test_warmup_yield_alert_dataset_delegates(self, mock_ensure):
+    @patch('mes_dashboard.core.cache_updater.try_acquire_lock', return_value=True)
+    def test_warmup_yield_alert_dataset_delegates(self, mock_lock, mock_ensure):
         import mes_dashboard.core.cache_updater as cu
 
         updater = cu.CacheUpdater(interval=1)
@@ -322,7 +323,7 @@ class TestWarmupTasks:
 
         updater = cu.CacheUpdater(interval=1)
         updater._warmup_yield_alert_dataset()
-        mock_lock.assert_called_once_with("yield_alert_warmup", ttl_seconds=120)
+        mock_lock.assert_called_once_with("yield_alert_warmup", ttl_seconds=120, fail_mode="closed")
         mock_ensure.assert_not_called()
 
     @patch('mes_dashboard.services.yield_alert_dataset_cache.ensure_dataset_loaded', return_value={'query_id': 'qid-y', 'cache_hit': False})

@@ -53,3 +53,63 @@ API routes defined directly in `app.py` SHALL be migrated to helper-based respon
 - **WHEN** `/api/query_table`, `/api/get_table_columns`, or `/api/get_table_info` returns JSON responses
 - **THEN** responses SHALL be migrated to standardized helper output or be explicitly documented as temporary transition exceptions with a retirement plan
 
+### Requirement: Standard error envelope SHALL include a QUERY_TIMEOUT code for upstream timeouts
+The unified response helper module SHALL define a `QUERY_TIMEOUT` error code constant and a `query_timeout_error(message, details=None)` helper that returns the standard error envelope with HTTP status 504. This code SHALL be used for upstream database query timeouts so operators can distinguish them from generic service unavailability (`SERVICE_UNAVAILABLE`, 503) and from user input errors (`VALIDATION_ERROR`, 400).
+
+#### Scenario: Helper returns 504 envelope
+- **WHEN** `query_timeout_error("查詢逾時，請縮小日期範圍")` is called
+- **THEN** the response SHALL be HTTP 504
+- **THEN** the body SHALL be `{"success": false, "error": {"code": "QUERY_TIMEOUT", "message": "查詢逾時，請縮小日期範圍"}, "meta": {"timestamp": <iso-string>}}`
+
+#### Scenario: Constant exposed for endpoint classification
+- **WHEN** contract governance lists known error codes
+- **THEN** `QUERY_TIMEOUT` SHALL appear alongside `VALIDATION_ERROR`, `NOT_FOUND`, `INTERNAL_ERROR`, `SERVICE_UNAVAILABLE`, etc.
+
+### Requirement: Envelope meta SHALL include an app_version field
+All standard-JSON envelope responses SHALL include `meta.app_version` reflecting the currently deployed application version.
+
+#### Scenario: Success envelope contains app_version
+- **WHEN** `success_response(...)` is invoked
+- **THEN** `meta.app_version` SHALL contain a non-empty version string
+
+#### Scenario: Error envelope contains app_version
+- **WHEN** any error helper (`validation_error`, `not_found_error`, `internal_error`, `error_response`) is invoked
+- **THEN** `meta.app_version` SHALL contain the same version string
+
+### Requirement: Anomaly-summary envelope SHALL disambiguate cache-miss from empty result
+`analytics_routes.anomaly_summary` SHALL include a `meta.cache_state` field so clients can distinguish a cold cache from a genuinely empty result.
+
+#### Scenario: Warm cache hit
+- **WHEN** the anomaly cache is warm and contains items
+- **THEN** the response SHALL carry `meta.cache_state='warm'`
+
+#### Scenario: Cold cache fallback
+- **WHEN** the anomaly cache is cold and the route returns the soft fallback
+- **THEN** the response SHALL carry `meta.cache_state='cold'` AND `data.items` SHALL be `[]`
+
+#### Scenario: Stale cache served
+- **WHEN** the cache TTL has been exceeded but a stale value is served while refresh is queued
+- **THEN** the response SHALL carry `meta.cache_state='stale'`
+
+### Requirement: All registered routes SHALL be reachable by the envelope runtime sweep
+Every Flask route not explicitly listed as a contract exception SHALL be exercised by the runtime envelope sweep and validated via `tests/fixtures/route_contract_matrix.py`.
+
+#### Scenario: Route matrix completeness
+- **WHEN** a new route is added to the application
+- **THEN** the developer SHALL add a corresponding entry to `route_contract_matrix.py` with sample params and expected data shape
+
+#### Scenario: Sweep coverage threshold
+- **WHEN** the envelope runtime sweep executes
+- **THEN** at least 90% of non-exempted routes SHALL be covered
+
+### Requirement: Job abandonment endpoint SHALL exist for best-effort cleanup
+`POST /api/job/<id>/abandon` SHALL be added for clients to signal abandonment of in-flight async jobs.
+
+#### Scenario: Owner abandons job
+- **WHEN** the session owner calls `POST /api/job/<id>/abandon`
+- **THEN** the server SHALL mark the job abandoned and schedule expedited cleanup
+
+#### Scenario: Non-owner is rejected
+- **WHEN** a client without ownership calls the abandon endpoint
+- **THEN** the response SHALL be `{ success:false, error:{ code:'FORBIDDEN' } }` with HTTP 403
+

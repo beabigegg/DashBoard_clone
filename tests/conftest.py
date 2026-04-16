@@ -179,7 +179,8 @@ def pytest_collection_modifyitems(config, items):
     external_e2e_target = _is_external_e2e_target()
 
     for item in items:
-        if "integration" in item.keywords and not run_integration:
+        # Use get_closest_marker to avoid matching "integration_real" via keyword string-in check
+        if item.get_closest_marker("integration") and not item.get_closest_marker("integration_real") and not run_integration:
             item.add_marker(skip_integration)
         if "e2e" in item.keywords and not run_e2e:
             item.add_marker(skip_e2e)

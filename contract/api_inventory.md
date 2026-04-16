@@ -1,6 +1,6 @@
 # API Inventory (Governed Source List)
 
-Updated: 2026-03-29
+Updated: 2026-04-15
 
 This file is the governed inventory for API contract classification and exception boundaries.
 
@@ -39,12 +39,15 @@ This file is the governed inventory for API contract classification and exceptio
 | `analytics_routes.py` | All JSON API endpoints — GET /api/analytics/yield-anomalies, GET /api/analytics/reject-spikes, GET /api/analytics/hold-outliers, GET /api/analytics/equipment-deviation, GET /api/analytics/anomaly-summary, GET /api/analytics/yield-anomalies/drilldown, GET /api/analytics/reject-spikes/drilldown, GET /api/analytics/hold-outliers/drilldown, GET /api/analytics/equipment-deviation/drilldown; all gated by ANALYTICS_ANOMALY_DETECTION_ENABLED feature flag |
 | `user_auth_routes.py` | `POST /api/auth/login` (public — rate limited, 5/5min; JSON body: `{username, password}`; response data: `{username, displayName, real_name, mail, department, telephoneNumber, is_admin}`), `POST /api/auth/logout` (public — clears session, records logout_time), `GET /api/auth/me` (public — returns `null` if not logged in), `PATCH /api/auth/heartbeat` (login_required — updates last_active) |
 | `ai_routes.py` | POST /api/ai/query — natural language query; pipeline selected by AI_MODE env var (`text2sql` default: classify → generate SQL → execute → summarize; `function`: 3-round function call pipeline; `agent`: agentic loop with multi-tool orchestration); request body: `{question}`; response data: `{answer, chart_data, query_used, params_used, suggestions, sql_used, tool_trace, needs_clarification}` — `sql_used` (string\|null) contains the generated SQL, `tool_trace` (array of `{step, function, summary, error?}`) contains execution steps, `needs_clarification` (boolean) indicates whether the AI is asking the user for more information rather than returning a final answer (always `false` for `text2sql` and `function` modes); gated by AI_QUERY_ENABLED feature flag |
+| `job_routes.py` | `GET /api/job/<job_id>?prefix=<p>` — returns current status of an async job; query param `prefix` (string, required) identifies the job namespace; 200 `{...status_data}` on success; 404 `NOT_FOUND` if job_id+prefix not found; 400 if prefix is missing. `POST /api/job/<job_id>/abandon` — marks an in-flight async job as abandoned; request body: `{prefix, owner?}`; `prefix` (string, required) identifies the job namespace (e.g. `"reject"`, `"yield_alert"`); if job metadata contains an `owner` field the caller must supply a matching `owner` value or receive 403 `FORBIDDEN`; 200 `{job_id, status: "abandoned", already_abandoned}` on success (idempotent — already-abandoned jobs return 200); 404 `NOT_FOUND` if job_id+prefix not found; 409 `JOB_ALREADY_TERMINAL` if job is completed or failed; rate limited at 30 req/60s; `meta.app_version` injected by `success_response` helper; called via `sendBeacon` from `beforeunload` hook in portal-shell |
 
 ### health-exception (keep stable top-level payload; no forced envelope wrapping)
 
 | File | Endpoints | Reason |
 | :--- | :--- | :--- |
 | `health_routes.py` | `/health`, `/health/deep`, `/health/frontend-shell` | Consumed by monitoring systems and shell health UI |
+
+**Compatibility note (2026-04-15):** All `standard-json` endpoints now inject `meta.app_version` (string, server application version from `APP_VERSION` env or package metadata) in every `success_response` and `error_response` envelope.  Clients can compare this to the bundle version for stale-frontend detection.  `analytics_routes.py` anomaly-summary endpoint additionally injects `meta.cache_state ∈ {warm, cold, stale}` to signal whether data was served from cache or freshly computed.  Both fields are additive additions (backward-compatible).
 
 **Compatibility note (2026-03-11):** `/health` and `/health/deep` responses now include additive `system_memory` (`{total_mb, available_mb, used_pct, pressure}`) and `async_workers` (`{rq_available, workers, queues, slots}`) blocks. These are backward-compatible additions (contract §6.4: additive fields are allowed). `/admin/api/performance-detail` also includes `async_workers` in the response. Monitoring integrations that parse these endpoints by strict schema must be updated if they reject unknown keys.
 

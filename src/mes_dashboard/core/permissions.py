@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from functools import wraps
 from typing import TYPE_CHECKING, Callable
+from uuid import uuid4
 
 from flask import session
 
@@ -12,6 +13,26 @@ from mes_dashboard.core.response import forbidden_error, unauthorized_error
 
 if TYPE_CHECKING:
     from typing import Any
+
+
+def get_owner_token() -> str:
+    """Return a stable owner identity for the current session.
+
+    For logged-in users, returns ``session["user"]["username"]``.
+    For anonymous users, lazily mints a uuid4 hex token stored in
+    ``session["mes_owner_token"]``.
+
+    Note: The first call for an anonymous user mutates the session (lazy mint),
+    which marks it dirty and causes a Set-Cookie on the response.
+    """
+    user = session.get("user")
+    if user:
+        return user.get("username", "")
+    token = session.get("mes_owner_token")
+    if not token:
+        token = uuid4().hex
+        session["mes_owner_token"] = token
+    return token
 
 
 def is_admin_logged_in() -> bool:

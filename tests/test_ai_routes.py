@@ -203,3 +203,89 @@ class TestAiQueryErrorMapping(TestAiRoutesBase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload["success"])
         self.assertEqual(payload["error"]["code"], "VALIDATION_ERROR")
+
+
+class TestAiQueryEdgeCases(TestAiRoutesBase):
+    """Edge cases: context-limit, tool-trace flag, clarification, conversation Redis round-trip."""
+
+    @patch("mes_dashboard.routes.ai_routes.ai_query_service.process_query")
+    def test_context_limit_returns_400(self, mock_process):
+        """CONTEXT_LIMIT_REACHED exception from service must return 400."""
+        mock_process.side_effect = ValueError("對話已達上限")
+
+        with patch("mes_dashboard.routes.ai_routes._AI_QUERY_ENABLED", True):
+            response = self.client.post(
+                "/api/ai/query",
+                json={"question": "繼續上個問題"},
+            )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["error"]["code"], "VALIDATION_ERROR")
+
+    @patch("mes_dashboard.routes.ai_routes.ai_query_service.process_query")
+    def test_conversation_id_is_passed_to_service(self, mock_process):
+        """conversation_id in request body must be forwarded to service layer."""
+        mock_process.return_value = {"answer": "ok", "conversation_id": "conv-001"}
+
+        with patch("mes_dashboard.routes.ai_routes._AI_QUERY_ENABLED", True):
+            response = self.client.post(
+                "/api/ai/query",
+                json={"question": "查詢良率", "conversation_id": "conv-001"},
+            )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload["success"])
+        _, kwargs = mock_process.call_args
+        self.assertEqual(kwargs.get("conversation_id"), "conv-001")
+
+    @patch("mes_dashboard.routes.ai_routes.ai_query_service.process_query")
+    def test_missing_conversation_id_defaults_to_none(self, mock_process):
+        """Missing conversation_id must result in None being passed to service."""
+        mock_process.return_value = {"answer": "ok", "conversation_id": "new-conv"}
+
+        with patch("mes_dashboard.routes.ai_routes._AI_QUERY_ENABLED", True):
+            response = self.client.post(
+                "/api/ai/query",
+                json={"question": "查詢良率"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = mock_process.call_args
+        self.assertIsNone(kwargs.get("conversation_id"))
+
+    @patch("mes_dashboard.routes.ai_routes.ai_query_service.process_query")
+    def test_tool_trace_result_passes_through_envelope(self, mock_process):
+        """Service result with tool_trace field must be returned in data envelope."""
+        mock_process.return_value = {
+            "answer": "良率為 95%",
+            "tool_trace": [{"tool": "query_yield", "args": {}, "result": {}}],
+            "conversation_id": "conv-abc",
+        }
+
+        with patch("mes_dashboard.routes.ai_routes._AI_QUERY_ENABLED", True):
+            response = self.client.post(
+                "/api/ai/query",
+                json={"question": "查詢良率"},
+            )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("tool_trace", payload["data"])
+        self.assertIsInstance(payload["data"]["tool_trace"], list)
+
+    @patch("mes_dashboard.routes.ai_routes.ai_query_service.process_query")
+    def test_empty_question_rejected(self, mock_process):
+        """Empty question string must return 400 before service is called."""
+        with patch("mes_dashboard.routes.ai_routes._AI_QUERY_ENABLED", True):
+            response = self.client.post(
+                "/api/ai/query",
+                json={"question": ""},
+            )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        mock_process.assert_not_called()
+        self.assertEqual(payload["error"]["code"], "VALIDATION_ERROR")

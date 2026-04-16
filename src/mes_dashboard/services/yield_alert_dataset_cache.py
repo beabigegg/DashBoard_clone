@@ -493,7 +493,7 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
     if _STREAMING_SPOOL_ENABLED:
         # ── Streaming spool path ─────────────────────────────────────────
         lock_name = f"yield_alert_primary:{query_id}"
-        lock_acquired = try_acquire_lock(lock_name, ttl_seconds=300)
+        lock_acquired = try_acquire_lock(lock_name, ttl_seconds=300, fail_mode="closed")
         if not lock_acquired:
             # Another worker is executing the same query — wait for it to finish
             logger.info(

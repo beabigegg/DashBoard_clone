@@ -34,6 +34,18 @@ from typing import Any, Dict, Optional
 
 from flask import jsonify, request
 
+
+def _get_app_version() -> str:
+    """Return the application version string from env or package metadata."""
+    env_ver = os.getenv("APP_VERSION")
+    if env_ver:
+        return env_ver
+    try:
+        from mes_dashboard import version as _pkg_version
+        return _pkg_version
+    except Exception:
+        return "unknown"
+
 # ============================================================
 # Standard Error Codes
 # ============================================================
@@ -61,6 +73,9 @@ INTERNAL_ERROR = "INTERNAL_ERROR"
 # Cache signals (used as flow-control error codes in cache-backed routes)
 CACHE_EXPIRED = "CACHE_EXPIRED"
 CACHE_MISS = "CACHE_MISS"
+
+# Query-tool errors (service-layer typed exceptions)
+QUERY_TIMEOUT = "QUERY_TIMEOUT"
 
 # External service errors (AI / LLM API)
 EXTERNAL_SERVICE_TIMEOUT = "EXTERNAL_SERVICE_TIMEOUT"
@@ -98,11 +113,16 @@ def success_response(
 
     # Add metadata if provided
     if meta is not None:
-        response["meta"] = meta
+        merged_meta = dict(meta)
+        if "timestamp" not in merged_meta:
+            merged_meta["timestamp"] = datetime.now().isoformat()
+        if "app_version" not in merged_meta:
+            merged_meta["app_version"] = _get_app_version()
+        response["meta"] = merged_meta
     else:
-        # Add default metadata
         response["meta"] = {
             "timestamp": datetime.now().isoformat(),
+            "app_version": _get_app_version(),
         }
 
     return jsonify(response), status_code
@@ -146,6 +166,7 @@ def error_response(
 
     response_meta: Dict[str, Any] = {
         "timestamp": datetime.now().isoformat(),
+        "app_version": _get_app_version(),
     }
     if meta:
         response_meta.update(meta)
@@ -347,4 +368,19 @@ def context_limit_error(details: Optional[str] = None):
         "對話已達上限，請開啟新對話繼續",
         details,
         status_code=400
+    )
+
+
+def query_timeout_error(message: str, details: Optional[str] = None):
+    """Return a query timeout error response (HTTP 504).
+
+    Use when a service-layer ``QueryTimeoutError`` is caught — the upstream
+    Oracle query exceeded its configured timeout and the user should narrow
+    their search range and retry.
+    """
+    return error_response(
+        QUERY_TIMEOUT,
+        message,
+        details,
+        status_code=504
     )

@@ -37,6 +37,10 @@ _DOMAIN_SPOOL_MISSES = Counter()
 _DOMAIN_LIFECYCLE_FAILURES = Counter()
 _LIFECYCLE_FAILURE_REASONS = Counter()
 
+# Lock fail-mode trigger counters: mes.lock.fail_mode_triggered{name=<lock>,mode=<mode>}
+_LOCK_FAIL_MODE_TOTAL = 0
+_LOCK_FAIL_MODE_BY_NAME_MODE: Counter = Counter()
+
 
 def _normalize_token(value: str | None, *, default: str) -> str:
     text = str(value or "").strip()
@@ -93,6 +97,19 @@ def record_spool_miss(domain: str, query_id: str = "") -> None:
         _DOMAIN_SPOOL_MISSES[domain_name] += 1
 
 
+def record_lock_fail_mode_triggered(lock_name: str, mode: str) -> None:
+    """Record that a distributed lock's fail-mode branch was triggered.
+
+    Increments ``mes.lock.fail_mode_triggered{name=<lock>,mode=<mode>}``.
+    Called whenever Redis is unavailable or raises during lock acquisition.
+    """
+    global _LOCK_FAIL_MODE_TOTAL
+    key = f"{lock_name}:{mode}"
+    with _LOCK:
+        _LOCK_FAIL_MODE_TOTAL += 1
+        _LOCK_FAIL_MODE_BY_NAME_MODE[key] += 1
+
+
 def record_lifecycle_failure(domain: str, reason: str = "unknown") -> None:
     """Record a result-lifecycle failure (expired, corrupt, runtime error)."""
     domain_name = _normalize_token(domain, default="unknown_domain")
@@ -122,10 +139,13 @@ def get_heavy_query_telemetry() -> Dict[str, Any]:
             "domain_spool_misses": _counter_rows(_DOMAIN_SPOOL_MISSES, "domain"),
             "domain_lifecycle_failures": _counter_rows(_DOMAIN_LIFECYCLE_FAILURES, "domain"),
             "lifecycle_failure_reasons": _counter_rows(_LIFECYCLE_FAILURE_REASONS, "reason"),
+            "lock_fail_mode_triggered_total": int(_LOCK_FAIL_MODE_TOTAL),
+            "lock_fail_mode_triggered": _counter_rows(_LOCK_FAIL_MODE_BY_NAME_MODE, "lock_mode"),
         }
 
 
 def reset_heavy_query_telemetry() -> None:
+    global _LOCK_FAIL_MODE_TOTAL
     with _LOCK:
         _COUNTERS.clear()
         _COUNTERS.update(
@@ -148,3 +168,5 @@ def reset_heavy_query_telemetry() -> None:
         _DOMAIN_SPOOL_MISSES.clear()
         _DOMAIN_LIFECYCLE_FAILURES.clear()
         _LIFECYCLE_FAILURE_REASONS.clear()
+        _LOCK_FAIL_MODE_TOTAL = 0
+        _LOCK_FAIL_MODE_BY_NAME_MODE.clear()

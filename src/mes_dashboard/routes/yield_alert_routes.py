@@ -207,7 +207,8 @@ def api_yield_alert_query():
     )
 
     if YIELD_ALERT_ASYNC_ENABLED and is_async_available():
-        job_id, err = enqueue_yield_alert_query({"start_date": start_date, "end_date": end_date})
+        from mes_dashboard.core.permissions import get_owner_token
+        job_id, err = enqueue_yield_alert_query({"start_date": start_date, "end_date": end_date}, owner=get_owner_token())
         if job_id is None:
             logger.warning("yield_alert async enqueue failed (%s)", err)
             return error_response(

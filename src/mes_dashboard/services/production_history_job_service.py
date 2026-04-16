@@ -62,11 +62,13 @@ def _build_retry():
 
 def enqueue_production_history_query(
     params: Dict[str, Any],
+    owner: str,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Enqueue a production-history primary query to the RQ worker.
 
     Args:
         params: Full raw params dict passed through to execute_production_history_job.
+        owner: Caller identity from the Flask session (see get_owner_token).
 
     Returns:
         (job_id, None) on success, (None, error_message) on failure.
@@ -75,6 +77,7 @@ def enqueue_production_history_query(
     return enqueue_job(
         queue_name=PRODUCTION_HISTORY_WORKER_QUEUE,
         worker_fn=execute_production_history_job,
+        owner=owner,
         job_id=job_id,
         kwargs={"job_id": job_id, "params": params},
         prefix=_JOB_PREFIX,

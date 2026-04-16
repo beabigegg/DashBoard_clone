@@ -160,7 +160,7 @@ class CacheUpdater:
             return False
 
         # Try to acquire distributed lock (non-blocking)
-        if not try_acquire_lock("wip_cache_update", ttl_seconds=120):
+        if not try_acquire_lock("wip_cache_update", ttl_seconds=120, fail_mode="closed"):
             logger.debug("Another worker is updating WIP cache, skipping")
             return False
 
@@ -336,7 +336,7 @@ class CacheUpdater:
                 return False
 
         # Try to acquire distributed lock (non-blocking)
-        if not try_acquire_lock("resource_cache_update", ttl_seconds=300):
+        if not try_acquire_lock("resource_cache_update", ttl_seconds=300, fail_mode="closed"):
             logger.debug("Another worker is updating resource cache, skipping")
             return False
 
@@ -384,7 +384,7 @@ class CacheUpdater:
             ),
         ):
             try:
-                if not try_acquire_lock(lock_name, ttl_seconds=120):
+                if not try_acquire_lock(lock_name, ttl_seconds=120, fail_mode="closed"):
                     logger.debug("Another worker holds %s lock, skipping", lock_name)
                     continue
                 try:
@@ -420,7 +420,7 @@ class CacheUpdater:
         )
 
     def _warmup_yield_alert_dataset(self) -> None:
-        if not try_acquire_lock("yield_alert_warmup", ttl_seconds=120):
+        if not try_acquire_lock("yield_alert_warmup", ttl_seconds=120, fail_mode="closed"):
             logger.debug("Another worker is running yield-alert warmup, skipping")
             return
         try:

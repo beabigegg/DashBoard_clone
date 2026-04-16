@@ -417,3 +417,97 @@ class TestLotTraceGuards:
             "end_date": "2026-03-31",
         })
         assert result["end_date_exclusive"] == "2026-04-01"
+
+
+class TestProductionHistory730dBoundary:
+    """730-day boundary, 731-day validation error, and dataset_id hash stability."""
+
+    def test_730d_boundary_is_valid(self):
+        """Exactly 730 days must be accepted (boundary condition)."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+            MAX_DATE_RANGE_DAYS,
+        )
+        assert MAX_DATE_RANGE_DAYS == 730, "MAX_DATE_RANGE_DAYS must be 730"
+        # Exactly 730 days: span = (end - start).days + 1 = 730
+        # 2024-01-01 + 729 days = 2025-12-30 (2024 is leap: 366d, then 364 days in 2025)
+        result = validate_query_params({
+            "pj_types": ["GA"],
+            "start_date": "2024-01-01",
+            "end_date": "2025-12-30",
+        })
+        assert result is not None
+
+    def test_731d_returns_validation_error(self, client):
+        """731-day range must be rejected with 400 VALIDATION_ERROR."""
+        response = client.post(
+            '/api/production-history/query',
+            data=__import__('json').dumps({
+                "pj_types": ["GA"],
+                "start_date": "2024-01-01",
+                "end_date": "2026-01-01",  # 731+ days
+            }),
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert payload['success'] is False
+        assert payload['error']['code'] == 'VALIDATION_ERROR'
+
+    def test_missing_pj_types_returns_validation_error(self, client):
+        """Missing pj_types must return 400 VALIDATION_ERROR."""
+        response = client.post(
+            '/api/production-history/query',
+            data=__import__('json').dumps({
+                "start_date": "2024-01-01",
+                "end_date": "2024-01-31",
+            }),
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert payload['success'] is False
+        assert payload['error']['code'] == 'VALIDATION_ERROR'
+
+    def test_empty_pj_types_returns_validation_error(self, client):
+        """Empty pj_types list must return 400 VALIDATION_ERROR."""
+        response = client.post(
+            '/api/production-history/query',
+            data=__import__('json').dumps({
+                "pj_types": [],
+                "start_date": "2024-01-01",
+                "end_date": "2024-01-31",
+            }),
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert payload['success'] is False
+
+    def _base_params(self):
+        return {
+            "pj_types": ["GA"],
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-31",
+            "lot_ids": [],
+            "work_orders": [],
+            "packages": [],
+            "bop_codes": [],
+            "workcenter_groups": [],
+            "workcenter_names": [],
+            "equipment_ids": [],
+        }
+
+    def test_dataset_id_hash_stability(self):
+        """dataset_id generated for same params must be identical across calls."""
+        from mes_dashboard.services.production_history_service import _make_dataset_id
+        params_a = self._base_params()
+        params_b = self._base_params()
+        assert _make_dataset_id(params_a) == _make_dataset_id(params_b)
+
+    def test_dataset_id_different_for_different_params(self):
+        """dataset_id must differ for different query params."""
+        from mes_dashboard.services.production_history_service import _make_dataset_id
+        params_a = self._base_params()
+        params_b = {**self._base_params(), "pj_types": ["FA"]}
+        assert _make_dataset_id(params_a) != _make_dataset_id(params_b)

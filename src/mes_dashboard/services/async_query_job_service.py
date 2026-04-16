@@ -124,6 +124,7 @@ def enqueue_job(
     *,
     queue_name: str,
     worker_fn,
+    owner: str,
     job_id: Optional[str] = None,
     kwargs: Optional[Dict[str, Any]] = None,
     prefix: str = "async",
@@ -132,6 +133,11 @@ def enqueue_job(
     retry: Any = _DEFAULT_RETRY_SENTINEL,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Enqueue a callable to a named RQ queue.
+
+    Args:
+        owner: Caller identity derived from the Flask session (username for
+               logged-in users, uuid4 hex token for anonymous users).  Required
+               so the abandon endpoint can enforce ownership server-side.
 
     Returns:
         (job_id, None) on success, (None, error_message) on failure.
@@ -150,6 +156,7 @@ def enqueue_job(
     meta = {
         "status": "queued",
         "queue_name": queue_name,
+        "owner": owner,
         "created_at": str(time.time()),
         "completed_at": "",
         "progress": "",
@@ -216,6 +223,7 @@ def get_job_status(prefix: str, job_id: str) -> Optional[Dict[str, Any]]:
         "created_at": created_at,
         "elapsed_seconds": round(elapsed, 1),
         "error": meta.get("error") or None,
+        "owner": meta.get("owner") or None,
     }
 
     # Include pct if present

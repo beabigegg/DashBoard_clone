@@ -11,7 +11,9 @@ Contains Flask Blueprint for batch tracing and equipment period query endpoints:
 
 import gc
 import hashlib
+import logging
 import os
+from functools import wraps
 
 from flask import Blueprint, request, Response, render_template, current_app
 
@@ -25,12 +27,67 @@ from mes_dashboard.core.response import (
     validation_error,
     not_found_error,
     internal_error,
+    query_timeout_error,
     service_unavailable_error,
     error_response,
     VALIDATION_ERROR,
     INTERNAL_ERROR,
     NOT_FOUND,
 )
+from mes_dashboard.core.exceptions import (
+    UserInputError,
+    ResourceNotFoundError,
+    QueryTimeoutError,
+    DataContractError,
+    InternalQueryError,
+)
+
+logger = logging.getLogger('mes_dashboard.query_tool_routes')
+
+
+def map_service_errors(fn):
+    """Decorator that maps typed service exceptions to HTTP responses.
+
+    Catches each ``MesServiceError`` subclass from ``core.exceptions`` and
+    returns the matching response helper.  Unknown exceptions are logged with
+    a full traceback and returned as ``internal_error()``.
+
+    Apply this decorator to every route handler that calls into
+    ``query_tool_service`` so that the handler body never needs its own
+    try/except for error-envelope construction.
+    """
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except UserInputError as e:
+            return validation_error(e.message)
+        except ResourceNotFoundError as e:
+            return not_found_error(e.message)
+        except QueryTimeoutError as e:
+            return query_timeout_error(e.message)
+        except DataContractError as e:
+            logger.error(
+                "data contract error in %s: %s (details=%s)",
+                fn.__name__, e.message, e.details,
+                exc_info=e.cause,
+            )
+            return internal_error(e.message)
+        except InternalQueryError as e:
+            logger.error(
+                "internal query error in %s: %s",
+                fn.__name__, e.message,
+                exc_info=e.cause,
+            )
+            return internal_error(e.message)
+        except Exception as e:
+            logger.error(
+                "unexpected error in %s",
+                fn.__name__,
+                exc_info=True,
+            )
+            return internal_error()
+    return wrapper
 from mes_dashboard.services.query_tool_service import (
     resolve_lots,
     get_lot_history,
@@ -291,6 +348,7 @@ def query_tool_page():
 
 @query_tool_bp.route('/api/query-tool/resolve', methods=['POST'])
 @_QUERY_TOOL_RESOLVE_RATE_LIMIT
+@map_service_errors
 def resolve_lot_input():
     """Resolve user input to CONTAINERID list.
 
@@ -342,9 +400,6 @@ def resolve_lot_input():
 
     result = resolve_lots(input_type, values)
 
-    if 'error' in result:
-        return validation_error(result.get('error', '查詢失敗'))
-
     if cache_key is not None:
         cache_set(cache_key, result, ttl=60)
 
@@ -357,6 +412,7 @@ def resolve_lot_input():
 
 @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
 @_QUERY_TOOL_HISTORY_RATE_LIMIT
+@map_service_errors
 def query_lot_history():
     """Query production history for one or more LOTs.
 
@@ -411,9 +467,6 @@ def query_lot_history():
     else:
         return validation_error('請指定 CONTAINERID')
 
-    if 'error' in result:
-        return validation_error(result.get('error', '查詢失敗'))
-
     resp, status = success_response(result)
     total = result.get('total', 0)
     if total > 10000:
@@ -427,6 +480,7 @@ def query_lot_history():
 
 @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
 @_QUERY_TOOL_ADJACENT_RATE_LIMIT
+@map_service_errors
 def query_adjacent_lots():
     """Query adjacent lots (前後批) for a specific equipment.
 
@@ -449,9 +503,6 @@ def query_adjacent_lots():
 
     result = get_adjacent_lots(equipment_id, target_time, time_window)
 
-    if 'error' in result:
-        return validation_error(result.get('error', '查詢失敗'))
-
     return success_response(result)
 
 
@@ -461,6 +512,7 @@ def query_adjacent_lots():
 
 @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
 @_QUERY_TOOL_ASSOC_RATE_LIMIT
+@map_service_errors
 def query_lot_associations():
     """Query association data for one or more LOTs.
 
@@ -525,9 +577,6 @@ def query_lot_associations():
 
             result = get_lot_jobs(equipment_id, time_start, time_end)
 
-    if 'error' in result:
-        return validation_error(result.get('error', '查詢失敗'))
-
     return success_response(result)
 
 
@@ -537,6 +586,7 @@ def query_lot_associations():
 
 @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
 @_QUERY_TOOL_EQUIPMENT_RATE_LIMIT
+@map_service_errors
 def query_equipment_period():
     """Query equipment data for a time period.
 
@@ -610,9 +660,6 @@ def query_equipment_period():
             result = get_equipment_jobs(equipment_ids, start_date, end_date)
     except MemoryError as exc:
         return _memory_error_response(f"query_tool.equipment_period.{query_type}", exc)
-
-    if 'error' in result:
-        return validation_error(result.get('error', '查詢失敗'))
 
     resp, status = success_response(result)
     total = result.get('total', 0)
@@ -693,6 +740,7 @@ def get_workcenter_groups_list():
 
 @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
 @_QUERY_TOOL_LOT_EQUIP_RATE_LIMIT
+@map_service_errors
 def lookup_lot_equipment():
     """Look up which equipment processed given lots at a workcenter group.
 
@@ -728,9 +776,6 @@ def lookup_lot_equipment():
     except MemoryError as exc:
         return _memory_error_response("query_tool.lot_equipment_lookup", exc)
 
-    if 'error' in result:
-        return validation_error(result['error'])
-
     return success_response(result)
 
 
@@ -761,6 +806,7 @@ def get_equipment_recent_jobs_route(equipment_id):
 
 @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 @_QUERY_TOOL_EXPORT_RATE_LIMIT
+@map_service_errors
 def export_csv():
     """Export query results as CSV.
 
@@ -907,11 +953,7 @@ def export_csv():
         else:
             return validation_error(f'不支援的匯出類型: {export_type}')
 
-        if result is None or 'error' in result:
-            error_msg = result.get('error', '查詢失敗') if result else '查詢失敗'
-            return validation_error(error_msg)
-
-        export_data = result.get('data', [])
+        export_data = result.get('data', []) if result else []
         if not export_data:
             return not_found_error('查無資料')
 
@@ -939,5 +981,3 @@ def export_csv():
 
     except MemoryError as exc:
         return _memory_error_response("query_tool.export_csv", exc)
-    except Exception as exc:
-        return internal_error(f'匯出失敗: {str(exc)}')

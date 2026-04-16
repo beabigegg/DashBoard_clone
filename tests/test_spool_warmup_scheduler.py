@@ -75,7 +75,7 @@ def test_leader_lock_prevents_duplicate_enqueue():
 
     lock_holder = [False]
 
-    def fake_try_acquire_lock(name, ttl_seconds=60):
+    def fake_try_acquire_lock(name, ttl_seconds=60, *, fail_mode=None):
         if not lock_holder[0]:
             lock_holder[0] = True
             return True

@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api.js';
+import { unwrapApiResult } from '../core/unwrap-api-result.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useTraceProgress } from '../shared-composables/useTraceProgress.js';
 import TraceProgressBar from '../shared-composables/TraceProgressBar.vue';
@@ -359,12 +360,7 @@ function toDateString(value) {
   return value.toISOString().slice(0, 10);
 }
 
-function unwrapApiResult(result, fallbackMessage) {
-  if (result?.success === true) {
-    return result;
-  }
-  throw new Error(result?.error || fallbackMessage);
-}
+// unwrapApiResult imported from ../core/unwrap-api-result.js
 
 function buildFilterParams() {
   const snapshot = committedFilters.value;

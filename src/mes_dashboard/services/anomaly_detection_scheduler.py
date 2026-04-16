@@ -205,7 +205,7 @@ def _run_computation() -> bool:
     from mes_dashboard.core.redis_client import release_lock, try_acquire_lock
     from mes_dashboard.services.anomaly_detection_sql_runtime import compute_and_cache_all
 
-    if not try_acquire_lock("anomaly_detection_compute", ttl_seconds=600):
+    if not try_acquire_lock("anomaly_detection_compute", ttl_seconds=600, fail_mode="closed"):
         logger.debug("Another worker is computing anomalies, skipping")
         return False
 
@@ -259,7 +259,7 @@ def _scheduler_loop() -> None:
         if now.hour >= _SCHEDULE_HOUR and last_run_date != today_str:
             from mes_dashboard.core.redis_client import release_lock, try_acquire_lock
 
-            if try_acquire_lock("anomaly_daily_refresh", ttl_seconds=300):
+            if try_acquire_lock("anomaly_daily_refresh", ttl_seconds=300, fail_mode="closed"):
                 try:
                     logger.info("Anomaly detection: daily run — refreshing all anomaly spools...")
                     _refresh_all_spool()

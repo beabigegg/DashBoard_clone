@@ -26,6 +26,7 @@ import threading
 import time
 from typing import Optional
 
+from mes_dashboard.core.exceptions import LockUnavailableError
 from mes_dashboard.core.redis_client import (
     REDIS_ENABLED,
     get_redis_client,
@@ -179,8 +180,12 @@ def run_warmup_cycle() -> bool:
     if not REDIS_ENABLED:
         return False
 
-    if not try_acquire_lock(WARMUP_LEADER_LOCK_NAME, ttl_seconds=WARMUP_LEADER_LOCK_TTL):
-        logger.debug("Warmup scheduler: another worker holds the leader lock, skipping")
+    try:
+        if not try_acquire_lock(WARMUP_LEADER_LOCK_NAME, ttl_seconds=WARMUP_LEADER_LOCK_TTL, fail_mode="raise"):
+            logger.debug("Warmup scheduler: another worker holds the leader lock, skipping")
+            return False
+    except LockUnavailableError as exc:
+        logger.warning("Warmup scheduler: Redis unavailable, skipping leader election (%s)", exc)
         return False
 
     try:

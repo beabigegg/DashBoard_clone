@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
 import { checkLocalComputeEligibility } from '../core/duckdb-activation-policy.js';
 import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
@@ -140,18 +141,7 @@ function setDefaultDateRange() {
   orchestrator.draft.endDate = toDateString(end);
 }
 
-function unwrapApiResult(result, fallbackMessage) {
-  if (result?.success) {
-    return result.data;
-  }
-  if (result?.success === false) {
-    throw new Error(result.error || fallbackMessage);
-  }
-  if (result?.data !== undefined) {
-    return result.data;
-  }
-  return result;
-}
+// unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
 function normalizeListPayload(payload) {
   const pagination = payload?.pagination || {};

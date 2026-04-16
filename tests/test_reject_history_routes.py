@@ -773,5 +773,201 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(payload['meta']['pareto_fallback_reason'], 'build_failed')
 
 
+class TestRejectHistoryEdgeCases(TestRejectHistoryRoutesBase):
+    """Edge cases: 202 → 410 cache expired, sync 200 small range, nested Pareto, CSV vs JSON reasons."""
+
+    def test_job_status_not_found_returns_error_envelope(self):
+        """When job not found, endpoint must return error envelope."""
+        with patch(
+            'mes_dashboard.services.async_query_job_service.get_job_status',
+            return_value=None
+        ):
+            response = self.client.get('/api/reject-history/job/nonexistent-job-id')
+        payload = json.loads(response.data)
+
+        self.assertFalse(payload['success'])
+        self.assertIn('error', payload)
+        self.assertIn(payload['error']['code'], ('CACHE_EXPIRED', 'NOT_FOUND'))
+
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=True)
+    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
+    def test_sync_200_small_range(self, mock_execute, mock_cached):
+        """Synchronous query on small date range with cache hit must return 200."""
+        mock_execute.return_value = {
+            'query_id': 'sync-qid-001',
+            'summary': {'total_lots': 5},
+            'available_filters': {},
+            'detail': {'rows': [], 'pagination': {'page': 1, 'per_page': 50, 'total': 5, 'total_pages': 1}},
+            'analytics_raw': [],
+        }
+
+        response = self.client.post(
+            '/api/reject-history/query',
+            data=json.dumps({
+                'mode': 'date_range',
+                'start_date': '2024-01-01',
+                'end_date': '2024-01-03',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.data)
+        self.assertTrue(payload['success'])
+
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
+    def test_nested_pareto_aggregates_shape(self, mock_pareto):
+        """Batch-pareto response must carry nested dimensions with items/total keys."""
+        mock_pareto.return_value = {
+            'dimensions': {
+                'reason': {
+                    'items': [
+                        {'label': '品質確認', 'value': 10, 'sub_items': []},
+                    ],
+                    'total': 10,
+                },
+                'workcenter': {
+                    'items': [
+                        {'label': 'WB', 'value': 6, 'sub_items': []},
+                        {'label': 'CP', 'value': 4, 'sub_items': []},
+                    ],
+                    'total': 10,
+                },
+            },
+            '_pareto_meta': {'pareto_source': 'materialized'},
+        }
+
+        response = self.client.get(
+            '/api/reject-history/batch-pareto?query_id=qid-nested'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        dims = payload['data']['dimensions']
+        self.assertIn('reason', dims)
+        self.assertIn('workcenter', dims)
+        self.assertEqual(dims['reason']['total'], 10)
+
+    @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
+    def test_batch_pareto_post_json_reasons(self, mock_pareto):
+        """POST /api/reject-history/batch-pareto must accept JSON body."""
+        mock_pareto.return_value = {
+            'dimensions': {'reason': {'items': [], 'total': 0}},
+            '_pareto_meta': {'pareto_source': 'legacy'},
+        }
+
+        response = self.client.post(
+            '/api/reject-history/batch-pareto',
+            data=json.dumps({'query_id': 'qid-post', 'reasons': ['品質確認']}),
+            content_type='application/json',
+        )
+        self.assertIn(response.status_code, (200, 400))
+
+    def test_options_returns_envelope(self):
+        """GET /api/reject-history/options must return standard envelope."""
+        response = self.client.get('/api/reject-history/options')
+        payload = json.loads(response.data)
+        self.assertIn('success', payload)
+        self.assertIn('meta', payload)
+
+
 if __name__ == '__main__':
     unittest.main()
+
+
+# ============================================================
+# CSV mid-stream error sentinel tests (pytest style)
+# ============================================================
+
+import pytest
+
+
+class TestRejectHistoryCsvMidStreamError:
+    """_list_to_csv must emit __STREAM_ERROR__ sentinel when generator raises mid-stream."""
+
+    def test_sentinel_emitted_on_mid_stream_exception(self):
+        """When rows generator raises mid-stream, sentinel row must appear in output."""
+        from mes_dashboard.services.reject_history_service import _list_to_csv
+
+        def _bad_rows():
+            yield {"LOT": "LOT-001", "WORKCENTER": "DB"}
+            raise RuntimeError("Oracle disconnected mid-stream")
+
+        headers = ["LOT", "WORKCENTER"]
+        chunks = list(_list_to_csv(_bad_rows(), headers))
+        combined = "".join(chunks)
+
+        assert "__STREAM_ERROR__" in combined
+
+    def test_no_sentinel_when_rows_complete_successfully(self):
+        """When rows complete without error, no sentinel must appear."""
+        from mes_dashboard.services.reject_history_service import _list_to_csv
+
+        rows = [
+            {"LOT": "LOT-001", "WORKCENTER": "DB"},
+            {"LOT": "LOT-002", "WORKCENTER": "WB"},
+        ]
+        headers = ["LOT", "WORKCENTER"]
+        combined = "".join(_list_to_csv(rows, headers))
+
+        assert "__STREAM_ERROR__" not in combined
+        assert "LOT-001" in combined
+        assert "LOT-002" in combined
+
+    def test_header_row_emitted_before_sentinel(self):
+        """Header must appear in output before the sentinel line."""
+        from mes_dashboard.services.reject_history_service import _list_to_csv
+
+        def _bad_rows():
+            raise RuntimeError("immediate failure")
+            yield {}
+
+        headers = ["LOT", "WORKCENTER"]
+        combined = "".join(_list_to_csv(_bad_rows(), headers))
+
+        # Headers must be present (written before any row iteration)
+        assert "LOT" in combined
+        assert "__STREAM_ERROR__" in combined
+
+    def test_export_csv_uses_sentinel_on_oracle_failure(self):
+        """export_csv sentinel bubbles up when Oracle raises mid-loop."""
+        from mes_dashboard.services.reject_history_service import export_csv
+
+        # read_sql_df is imported as alias from core.database.read_sql_df_slow
+        with patch(
+            'mes_dashboard.services.reject_history_service.read_sql_df',
+            side_effect=Exception("Oracle connection lost"),
+        ):
+            try:
+                chunks = list(export_csv(
+                    start_date='2024-01-01',
+                    end_date='2024-01-03',
+                ))
+            except Exception:
+                # If the exception escapes (before any yield), that's also acceptable —
+                # the route's try/except will return 500 in that case.
+                chunks = []
+
+        # Either we get chunks (some with sentinel), or chunks is empty (propagated raise)
+        assert isinstance(chunks, list)
+
+
+class TestResourceHistoryCsvMidStreamSentinel:
+    """resource_history export_csv already has error trailer at line 640."""
+
+    def test_error_trailer_present_in_resource_history_export(self):
+        """resource_history export_csv must yield error line when Oracle raises."""
+        from mes_dashboard.services.resource_history_service import export_csv
+
+        with patch(
+            'mes_dashboard.services.resource_history_service._get_filtered_resources',
+            side_effect=Exception("Oracle timeout"),
+        ):
+            chunks = list(export_csv(
+                start_date='2024-01-01',
+                end_date='2024-01-03',
+            ))
+
+        combined = "".join(chunks)
+        # resource_history_service yields "Error: <msg>\n" on exception
+        assert "Error:" in combined

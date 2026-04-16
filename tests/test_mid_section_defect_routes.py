@@ -46,9 +46,9 @@ def test_analysis_success(mock_query_analysis):
     assert payload['success'] is True
     assert payload['data']['detail_total_count'] == 2
     assert payload['data']['kpi']['total_input'] == 100
-    mock_query_analysis.assert_called_once_with(
-        '2025-01-01', '2025-01-31', ['A', 'B'], '測試', 'backward',
-    )
+    call_args = mock_query_analysis.call_args
+    assert call_args.args == ('2025-01-01', '2025-01-31', ['A', 'B'], '測試', 'backward')
+    assert "owner" in call_args.kwargs
 
 
 @patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis')
@@ -68,9 +68,9 @@ def test_analysis_with_station_and_direction(mock_query_analysis):
     )
 
     assert response.status_code == 200
-    mock_query_analysis.assert_called_once_with(
-        '2025-01-01', '2025-01-31', None, '成型', 'forward',
-    )
+    call_args = mock_query_analysis.call_args
+    assert call_args.args == ('2025-01-01', '2025-01-31', None, '成型', 'forward')
+    assert "owner" in call_args.kwargs
 
 
 def test_analysis_missing_dates_returns_400():

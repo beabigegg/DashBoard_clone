@@ -150,10 +150,12 @@ def api_material_trace_query():
 
         # ── Spool miss — enqueue async RQ job ───────────────────────────────
         try:
+            from mes_dashboard.core.permissions import get_owner_token
             generated_job_id = f"mtrace-{uuid.uuid4().hex[:12]}"
             job_id, err = enqueue_job(
                 queue_name=MATERIAL_TRACE_QUEUE,
                 worker_fn=rq_material_trace_job,
+                owner=get_owner_token(),
                 prefix="material_trace",
                 job_id=generated_job_id,
                 kwargs={

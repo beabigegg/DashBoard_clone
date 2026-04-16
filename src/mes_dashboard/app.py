@@ -357,6 +357,56 @@ def _load_shell_deferred_routes() -> set[str]:
     return deferred_from_contract | deferred_from_scope
 
 
+def _validate_spool_dir(app: Flask) -> None:
+    """Warn if QUERY_SPOOL_DIR is missing, not writable, or not a shared mount.
+
+    Does NOT raise — the app starts regardless.  This validation is advisory only
+    and surfaces misconfigurations early in the log so operators notice before
+    the first real query hits a spool-write failure.
+    """
+    logger = logging.getLogger("mes_dashboard")
+    raw_dir = os.getenv("QUERY_SPOOL_DIR", "tmp/query_spool")
+    spool_path = Path(raw_dir).resolve()
+
+    # 1. Directory existence and writability.
+    if not spool_path.exists():
+        logger.warning(
+            "QUERY_SPOOL_DIR does not exist: %s  "
+            "(spool writes will fail until the directory is created)",
+            spool_path,
+        )
+    elif not os.access(spool_path, os.W_OK):
+        logger.warning(
+            "QUERY_SPOOL_DIR exists but is not writable: %s  "
+            "(spool writes will fail — check directory permissions)",
+            spool_path,
+        )
+
+    # 2. Cross-worker sharing heuristic.
+    #    Paths under /tmp or relative paths are process-local on most deployments
+    #    and will NOT be visible to other Gunicorn workers or Docker sidecars.
+    raw_stripped = raw_dir.strip()
+    is_under_tmp = spool_path.parts[0:2] == (os.sep, "tmp") if spool_path.is_absolute() else False
+    is_relative = not os.path.isabs(raw_stripped)
+
+    if is_relative:
+        logger.warning(
+            "QUERY_SPOOL_DIR is a relative path (%r → %s).  "
+            "Relative paths resolve against the process working directory, which may "
+            "differ across Gunicorn workers or Docker containers.  "
+            "Set QUERY_SPOOL_DIR to a shared absolute mount path for multi-worker deployments.",
+            raw_stripped,
+            spool_path,
+        )
+    elif is_under_tmp:
+        logger.warning(
+            "QUERY_SPOOL_DIR resolves under /tmp (%s).  "
+            "/tmp is typically process-local (tmpfs) and NOT shared across containers or workers.  "
+            "Use a shared volume mount (e.g. /var/lib/mes_dashboard/spool) in production.",
+            spool_path,
+        )
+
+
 def _validate_in_scope_asset_readiness(app: Flask) -> None:
     """Validate in-scope dist assets and enforce fail-fast policy when configured."""
     dist_dir = Path(app.static_folder or "") / "dist"
@@ -549,6 +599,7 @@ def create_app(config_name: str | None = None) -> Flask:
     # Configure logging first
     _configure_logging(app)
     _validate_runtime_contract(app)
+    _validate_spool_dir(app)
     _validate_in_scope_asset_readiness(app)
     security_headers = _build_security_headers(
         allow_unsafe_eval=_resolve_csp_allow_unsafe_eval(app),
@@ -569,6 +620,23 @@ def create_app(config_name: str | None = None) -> Flask:
     running_pytest = bool(os.getenv("PYTEST_CURRENT_TEST"))
     is_testing_runtime = bool(app.config.get("TESTING")) or app.testing or running_pytest
     with app.app_context():
+        # Shared-volume probe is written unconditionally (even in testing mode) so
+        # that real-environment integration tests can verify cross-worker visibility.
+        # The background check is only launched in production to avoid polluting logs.
+        try:
+            from mes_dashboard.core.spool_dir_check import write_pid_probe, check_shared_volume
+            write_pid_probe()
+            if not is_testing_runtime:
+                threading.Thread(
+                    target=check_shared_volume,
+                    kwargs={"timeout": 30},
+                    daemon=True,
+                    name="spool-volume-check",
+                ).start()
+        except Exception as _spool_chk_exc:
+            logging.getLogger("mes_dashboard").warning(
+                "spool_dir_check init failed (non-fatal): %s", _spool_chk_exc
+            )
         if not is_testing_runtime:
             get_engine()
             start_keepalive()  # Keep database connections alive

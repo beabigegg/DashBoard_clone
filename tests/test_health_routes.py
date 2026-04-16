@@ -236,3 +236,35 @@ def test_get_portal_shell_asset_status_reports_missing_css_as_unhealthy(tmp_path
 
     assert result["status"] == "unhealthy"
     assert any("portal-shell.css" in error for error in result["errors"])
+
+
+@patch('mes_dashboard.routes.health_routes.check_database', return_value=('ok', None))
+@patch('mes_dashboard.routes.health_routes.check_redis', return_value=('ok', None))
+@patch('mes_dashboard.routes.health_routes.get_route_cache_status', return_value={'mode': 'l1+l2', 'degraded': False})
+@patch('mes_dashboard.core.circuit_breaker.get_circuit_breaker_status', return_value={'state': 'CLOSED', 'enabled': True, 'failure_count': 0, 'success_count': 0, 'total_count': 0, 'failure_rate': 0.0})
+def test_health_top_level_contract_frozen(_mock_cb, _mock_route_cache, _mock_redis, _mock_db):
+    """GET /health non-envelope top-level keys must remain stable.
+
+    Pinned key set: status, services, resilience, route_cache.
+    Adding new top-level keys is allowed; removing pinned ones is a contract break.
+    """
+    response = _client().get('/health')
+    assert response.status_code == 200
+    payload = response.get_json()
+
+    # These keys are contractually frozen — must always be present
+    REQUIRED_TOP_LEVEL_KEYS = {'status', 'services'}
+    for key in REQUIRED_TOP_LEVEL_KEYS:
+        assert key in payload, (
+            f"/health response missing required top-level key '{key}'. "
+            "This key is contractually frozen — do not remove it."
+        )
+
+    # status must be one of the three defined values
+    assert payload['status'] in ('healthy', 'degraded', 'unhealthy'), (
+        f"/health 'status' must be 'healthy', 'degraded', or 'unhealthy', got: {payload['status']!r}"
+    )
+
+    # Must NOT use the standard success/data/meta envelope
+    assert 'success' not in payload, "/health must NOT use the success/data/meta envelope"
+    assert 'data' not in payload, "/health must NOT wrap payload under 'data' key"

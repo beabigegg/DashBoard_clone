@@ -11,6 +11,14 @@ import pytest
 import mes_dashboard.services.yield_alert_dataset_cache as dataset_cache
 
 
+@pytest.fixture(autouse=True)
+def _stub_lock(monkeypatch):
+    monkeypatch.setattr(
+        dataset_cache, "try_acquire_lock", lambda *args, **kwargs: True
+    )
+    monkeypatch.setattr(dataset_cache, "release_lock", lambda *args, **kwargs: None)
+
+
 def test_execute_primary_query_returns_cached_query_id(monkeypatch):
     monkeypatch.setattr(
         dataset_cache,

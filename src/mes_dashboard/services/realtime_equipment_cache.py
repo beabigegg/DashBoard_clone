@@ -672,7 +672,7 @@ def refresh_equipment_status_cache(force: bool = False) -> bool:
         True if refresh succeeded, False otherwise.
     """
     # Try to acquire distributed lock (non-blocking)
-    if not try_acquire_lock("equipment_status_cache_update", ttl_seconds=120):
+    if not try_acquire_lock("equipment_status_cache_update", ttl_seconds=120, fail_mode="closed"):
         logger.debug("Another worker is refreshing equipment status cache, skipping")
         return False
 

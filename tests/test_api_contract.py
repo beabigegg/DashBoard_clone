@@ -210,5 +210,234 @@ class TestStandardJsonEnvelopeShape(unittest.TestCase):
         self.assertIn('timestamp', data['meta'])
 
 
+class TestEnvelopeRuntimeSweep(unittest.TestCase):
+    """Runtime sweep: call every registered API route and assert envelope shape."""
+
+    def setUp(self):
+        db._ENGINE = None
+        self.app = create_app('testing')
+        self.app.config['TESTING'] = True
+        self.client = self.app.test_client()
+
+    def _assert_envelope(self, data: dict, url: str):
+        """Assert standard { success, data|error, meta } envelope."""
+        self.assertIn(
+            'success', data,
+            f"{url} response missing 'success' field"
+        )
+        self.assertIn(
+            'meta', data,
+            f"{url} response missing 'meta' field"
+        )
+        self.assertIn(
+            'timestamp', data.get('meta', {}),
+            f"{url} meta missing 'timestamp'"
+        )
+        if data.get('success'):
+            self.assertIn(
+                'data', data,
+                f"{url} success response missing 'data' field"
+            )
+        else:
+            self.assertIn(
+                'error', data,
+                f"{url} error response missing 'error' field"
+            )
+            error = data['error']
+            self.assertIn(
+                'code', error,
+                f"{url} error missing 'code'"
+            )
+            self.assertIn(
+                'message', error,
+                f"{url} error missing 'message'"
+            )
+
+    def _resolve_url(self, pattern: str, method: str, params: dict | None) -> tuple[str, str | None]:
+        """Resolve a URL pattern to a callable URL, substituting path params."""
+        import re
+        url = pattern
+        url = re.sub(r'<[^>]+>', 'TEST_ID', url)
+        if method == 'GET' and params:
+            from urllib.parse import urlencode
+            url = f"{url}?{urlencode(params)}"
+        return url
+
+    def test_envelope_runtime_sweep(self):
+        """Iterate matrix entries and assert envelope shape for each callable route."""
+        from tests.fixtures.route_contract_matrix import (
+            ROUTE_CONTRACT_MATRIX,
+            SKIP_RUNTIME_SWEEP,
+            NON_ENVELOPED_ENDPOINTS,
+        )
+
+        failures = []
+
+        for pattern, method, params, expected_shape in ROUTE_CONTRACT_MATRIX:
+            if pattern in SKIP_RUNTIME_SWEEP:
+                continue
+            if expected_shape in ('non_json', 'streaming'):
+                continue
+
+            url = self._resolve_url(pattern, method, params)
+
+            try:
+                if method == 'GET':
+                    resp = self.client.get(url)
+                elif method == 'POST':
+                    resp = self.client.post(
+                        url,
+                        data=json.dumps(params or {}),
+                        content_type='application/json',
+                    )
+                elif method == 'PATCH':
+                    resp = self.client.patch(
+                        url,
+                        data=json.dumps(params or {}),
+                        content_type='application/json',
+                    )
+                else:
+                    continue
+
+                if resp.content_type and 'application/json' in resp.content_type:
+                    data = json.loads(resp.data)
+                    if 'success' not in data:
+                        failures.append(
+                            f"{method} {pattern} ({url}): response missing 'success' field"
+                        )
+                        continue
+                    if 'meta' not in data:
+                        failures.append(
+                            f"{method} {pattern} ({url}): response missing 'meta' field"
+                        )
+                        continue
+                    if 'timestamp' not in data.get('meta', {}):
+                        failures.append(
+                            f"{method} {pattern} ({url}): meta missing 'timestamp'"
+                        )
+
+            except Exception as e:
+                failures.append(f"{method} {pattern}: unexpected exception: {e}")
+
+        self.assertEqual(
+            failures,
+            [],
+            "Envelope sweep failures:\n" + "\n".join(failures)
+        )
+
+
+class TestRouteMatrixComplete(unittest.TestCase):
+    """Verify every registered route has a matrix entry or is explicitly skipped."""
+
+    def setUp(self):
+        db._ENGINE = None
+        self.app = create_app('testing')
+
+    def test_route_matrix_complete(self):
+        """Every registered Flask route must appear in ROUTE_CONTRACT_MATRIX or SKIP_RUNTIME_SWEEP."""
+        from tests.fixtures.route_contract_matrix import (
+            ROUTE_CONTRACT_MATRIX,
+            SKIP_RUNTIME_SWEEP,
+            NON_ENVELOPED_ENDPOINTS,
+        )
+
+        matrix_patterns = {entry[0] for entry in ROUTE_CONTRACT_MATRIX}
+        covered = matrix_patterns | set(SKIP_RUNTIME_SWEEP) | set(NON_ENVELOPED_ENDPOINTS)
+
+        # Non-API routes that are intentionally outside the matrix
+        EXCLUDED_PREFIXES = ('/', '/static', '/portal-shell', '/admin')
+        EXCLUDED_EXACT = {
+            '/favicon.ico',
+        }
+
+        missing = []
+        for rule in self.app.url_map.iter_rules():
+            pattern = str(rule)
+            # Skip non-API, static, and HTML page routes
+            if not pattern.startswith('/api') and not pattern.startswith('/health'):
+                continue
+            if pattern in EXCLUDED_EXACT:
+                continue
+            if any(pattern.startswith(p) for p in EXCLUDED_PREFIXES if p != '/api'):
+                continue
+            if pattern not in covered:
+                missing.append(pattern)
+
+        self.assertEqual(
+            missing,
+            [],
+            "Routes missing from contract matrix (add to ROUTE_CONTRACT_MATRIX or SKIP_RUNTIME_SWEEP):\n"
+            + "\n".join(sorted(missing))
+        )
+
+
+class TestErrorEnvelopeCodesInAllowlist(unittest.TestCase):
+    """Verify error responses use predefined error codes."""
+
+    def setUp(self):
+        db._ENGINE = None
+        self.app = create_app('testing')
+        self.app.config['TESTING'] = True
+        self.client = self.app.test_client()
+
+    def test_error_codes_are_defined_constants(self):
+        """All error code constants must be non-empty strings."""
+        from mes_dashboard.core.response import (
+            DB_CONNECTION_FAILED,
+            DB_QUERY_TIMEOUT,
+            DB_QUERY_ERROR,
+            DB_POOL_EXHAUSTED,
+            SERVICE_UNAVAILABLE,
+            CIRCUIT_BREAKER_OPEN,
+            VALIDATION_ERROR,
+            UNAUTHORIZED,
+            FORBIDDEN,
+            NOT_FOUND,
+            TOO_MANY_REQUESTS,
+            INTERNAL_ERROR,
+            CACHE_EXPIRED,
+            CACHE_MISS,
+            EXTERNAL_SERVICE_TIMEOUT,
+            EXTERNAL_SERVICE_ERROR,
+            CONTEXT_LIMIT_REACHED,
+        )
+        ALLOWLIST = {
+            DB_CONNECTION_FAILED, DB_QUERY_TIMEOUT, DB_QUERY_ERROR,
+            DB_POOL_EXHAUSTED, SERVICE_UNAVAILABLE, CIRCUIT_BREAKER_OPEN,
+            VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, NOT_FOUND,
+            TOO_MANY_REQUESTS, INTERNAL_ERROR, CACHE_EXPIRED, CACHE_MISS,
+            EXTERNAL_SERVICE_TIMEOUT, EXTERNAL_SERVICE_ERROR, CONTEXT_LIMIT_REACHED,
+        }
+        for code in ALLOWLIST:
+            self.assertIsInstance(code, str)
+            self.assertTrue(len(code) > 0)
+
+    def test_validation_error_code_in_envelope(self):
+        """Validation error from wip_routes must return VALIDATION_ERROR code."""
+        from mes_dashboard.core.response import VALIDATION_ERROR
+        resp = self.client.get('/api/wip/overview/matrix?status=INVALID')
+        data = json.loads(resp.data)
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error']['code'], VALIDATION_ERROR)
+
+    def test_not_found_error_code_in_envelope(self):
+        """Not-found error must return NOT_FOUND code."""
+        from mes_dashboard.core.response import NOT_FOUND
+        from unittest.mock import patch
+        with patch('mes_dashboard.routes.wip_routes.get_lot_detail', return_value=None):
+            resp = self.client.get('/api/wip/lot/NONEXISTENT-LOT')
+        data = json.loads(resp.data)
+        self.assertEqual(data['error']['code'], NOT_FOUND)
+
+    def test_internal_error_code_in_envelope(self):
+        """Internal error must return INTERNAL_ERROR code."""
+        from mes_dashboard.core.response import INTERNAL_ERROR
+        from unittest.mock import patch
+        with patch('mes_dashboard.routes.wip_routes.get_wip_summary', return_value=None):
+            resp = self.client.get('/api/wip/overview/summary')
+        data = json.loads(resp.data)
+        self.assertEqual(data['error']['code'], INTERNAL_ERROR)
+
+
 if __name__ == "__main__":
     unittest.main()

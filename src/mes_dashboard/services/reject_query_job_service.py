@@ -87,12 +87,14 @@ def should_use_async(mode: str, start_date: Optional[str], end_date: Optional[st
 def enqueue_reject_query(
     mode: str,
     params: Dict[str, Any],
+    owner: str,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Enqueue a reject primary query to the RQ reject-query worker.
 
     Args:
         mode: "date_range" (container mode is not async).
         params: Full params dict passed through to execute_reject_query_job.
+        owner: Caller identity from the Flask session (see get_owner_token).
 
     Returns:
         (job_id, None) on success, (None, error_message) on failure.
@@ -101,6 +103,7 @@ def enqueue_reject_query(
     return enqueue_job(
         queue_name=REJECT_WORKER_QUEUE,
         worker_fn=execute_reject_query_job,
+        owner=owner,
         job_id=job_id,
         kwargs={"job_id": job_id, "mode": mode, "params": params},
         prefix=_JOB_PREFIX,

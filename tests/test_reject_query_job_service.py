@@ -105,7 +105,7 @@ class TestEnqueueRejectQuery:
         params = {"start_date": "2024-01-01", "end_date": "2024-02-01"}
 
         with patch.object(rjs, "enqueue_job", mock_enqueue_job):
-            job_id, err = rjs.enqueue_reject_query("date_range", params)
+            job_id, err = rjs.enqueue_reject_query("date_range", params, owner="test-owner")
 
         assert job_id == "reject-abc123"
         assert err is None
@@ -114,6 +114,7 @@ class TestEnqueueRejectQuery:
         call_kwargs = mock_enqueue_job.call_args.kwargs
         assert call_kwargs["queue_name"] == rjs.REJECT_WORKER_QUEUE
         assert call_kwargs["worker_fn"] is rjs.execute_reject_query_job
+        assert call_kwargs["owner"] == "test-owner"
         assert call_kwargs["prefix"] == "reject"
         assert call_kwargs["kwargs"]["mode"] == "date_range"
         assert call_kwargs["kwargs"]["params"] is params
@@ -121,7 +122,7 @@ class TestEnqueueRejectQuery:
     def test_returns_job_id_and_none_on_success(self):
         """Should return (job_id, None) when enqueue_job succeeds."""
         with patch.object(rjs, "enqueue_job", return_value=("reject-deadbeef", None)):
-            job_id, err = rjs.enqueue_reject_query("date_range", {})
+            job_id, err = rjs.enqueue_reject_query("date_range", {}, owner="test-owner")
         assert job_id is not None
         assert job_id.startswith("reject-")
         assert err is None
@@ -129,7 +130,7 @@ class TestEnqueueRejectQuery:
     def test_returns_none_and_error_on_failure(self):
         """Should return (None, error_message) when enqueue_job fails."""
         with patch.object(rjs, "enqueue_job", return_value=(None, "Redis down")):
-            job_id, err = rjs.enqueue_reject_query("date_range", {})
+            job_id, err = rjs.enqueue_reject_query("date_range", {}, owner="test-owner")
         assert job_id is None
         assert err == "Redis down"
 
@@ -142,7 +143,7 @@ class TestEnqueueRejectQuery:
             return (kwargs.get("job_id"), None)
 
         with patch.object(rjs, "enqueue_job", side_effect=_capture):
-            rjs.enqueue_reject_query("date_range", {})
+            rjs.enqueue_reject_query("date_range", {}, owner="test-owner")
 
         assert captured["job_id"].startswith("reject-")
 
@@ -150,7 +151,7 @@ class TestEnqueueRejectQuery:
         """Should pass job_timeout and result_ttl from module-level config."""
         mock_enqueue_job = MagicMock(return_value=("reject-ttl-test", None))
         with patch.object(rjs, "enqueue_job", mock_enqueue_job):
-            rjs.enqueue_reject_query("date_range", {})
+            rjs.enqueue_reject_query("date_range", {}, owner="test-owner")
 
         call_kwargs = mock_enqueue_job.call_args.kwargs
         assert call_kwargs["job_timeout"] == rjs.REJECT_JOB_TIMEOUT_SECONDS
@@ -162,7 +163,7 @@ class TestEnqueueRejectQuery:
         retry_cfg = object()
         with patch.object(rjs, "enqueue_job", mock_enqueue_job), \
              patch.object(rjs, "_build_retry", return_value=retry_cfg):
-            rjs.enqueue_reject_query("date_range", {})
+            rjs.enqueue_reject_query("date_range", {}, owner="test-owner")
 
         call_kwargs = mock_enqueue_job.call_args.kwargs
         assert call_kwargs["retry"] is retry_cfg

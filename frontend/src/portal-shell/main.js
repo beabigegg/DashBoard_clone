@@ -4,6 +4,7 @@ import App from './App.vue';
 import { router } from './router.js';
 import '../styles/tailwind.css';
 import './style.css';
+import { getPendingJobs, deregisterJob } from '../core/pending-jobs-registry.js';
 
 const PRELOAD_RECOVERY_KEY = 'portal-shell:preload-recovered';
 const PRELOAD_RECOVERY_TTL_MS = 2 * 60 * 1000;
@@ -53,5 +54,27 @@ window.__MES_PORTAL_SHELL_NAVIGATE__ = (target, { replace = false } = {}) => {
     });
   }
 };
+
+// ---------------------------------------------------------------------------
+// Best-effort job abandonment on page unload
+//
+// When the user navigates away or closes the tab, fire sendBeacon for each
+// pending async job so the server can mark them abandoned promptly.
+// sendBeacon is used because XHR/fetch are unreliable during unload.
+// ---------------------------------------------------------------------------
+window.addEventListener('beforeunload', () => {
+  const pendingJobs = getPendingJobs();
+  for (const { job_id, prefix } of pendingJobs) {
+    try {
+      const payload = JSON.stringify({ prefix });
+      const sent = navigator.sendBeacon(`/api/job/${job_id}/abandon`, new Blob([payload], { type: 'application/json' }));
+      if (sent) {
+        deregisterJob(job_id);
+      }
+    } catch {
+      // sendBeacon failures must not block unload
+    }
+  }
+});
 
 app.mount('#app');

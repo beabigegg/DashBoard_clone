@@ -740,9 +740,11 @@ def lineage():
             headers={"Retry-After": "30"},
         )
 
+    from mes_dashboard.core.permissions import get_owner_token
     job_id, err, enqueued_query_id = enqueue_trace_lineage(
         profile=profile,
         container_ids=container_ids,
+        owner=get_owner_token(),
         params=params,
     )
     if job_id is None:

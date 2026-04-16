@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 
 import { apiGet } from '../../core/api.js';
+import { unwrapApiData as unwrapApiResult } from '../../core/unwrap-api-result.js';
 import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 
 const props = defineProps({
@@ -17,18 +18,7 @@ const loading = ref(false);
 const errorMessage = ref('');
 const detail = ref(null);
 
-function unwrapApiResult(result, fallbackMessage) {
-  if (result?.success) {
-    return result.data;
-  }
-  if (result?.success === false) {
-    throw new Error(result.error || fallbackMessage);
-  }
-  if (result?.data !== undefined) {
-    return result.data;
-  }
-  return result;
-}
+// unwrapApiResult imported from ../../core/unwrap-api-result.js (as unwrapApiData)
 
 async function loadLotDetail(lotId) {
   if (!lotId) {
