@@ -471,28 +471,30 @@ def _pandas_matrix_view(spool_path: str, filter_params: Dict[str, Any]) -> Dict[
 
 # ── Filter options ────────────────────────────────────────────────────────────
 
-def compute_filter_options(spool_path: str) -> Dict[str, List[str]]:
+def compute_filter_options(
+    spool_path: str,
+    filter_params: Optional[Dict[str, Any]] = None,
+) -> Dict[str, List[str]]:
     """Return distinct values for each filterable column in the spool.
 
-    Runs six separate ``SELECT DISTINCT`` queries (one per column) to avoid
-    DuckDB limitations with ``ARRAY_AGG ... ORDER BY`` in older builds.
+    Supports cross-filtering (exclude-self pattern): when filter_params contains
+    staged selections, each field's options are narrowed by all OTHER fields'
+    selections so incompatible combinations cannot be built.
 
     Args:
         spool_path: Absolute path to the Parquet spool file.
+        filter_params: Optional staged filter dict.  For each returned field the
+            filter is applied with that field's own key excluded, so the user
+            can still see all valid values for the field they are currently
+            configuring.
 
     Returns:
-        {
-          "work_orders":       [...],
-          "lot_ids":           [...],
-          "packages":          [...],
-          "bop_codes":         [...],
-          "workcenter_groups": [...],
-          "equipment_ids":     [...],
-        }
+        {work_orders, lot_ids, packages, bop_codes, workcenter_groups, equipment_ids}
         All values are sorted strings.  Empty lists are returned on any
         non-MemoryError failure so the caller always gets a safe dict.
     """
-    # Simple 1:1 column mappings (key → Parquet column)
+    filter_params = filter_params or {}
+
     _SIMPLE_COLUMNS = [
         ("work_orders",  "WORK_ORDER"),
         ("lot_ids",      "CONTAINERNAME"),
@@ -500,15 +502,22 @@ def compute_filter_options(spool_path: str) -> Dict[str, List[str]]:
         ("bop_codes",    "PJ_BOP"),
     ]
 
-    empty: Dict[str, List[str]] = {
-        k: [] for k, _ in _SIMPLE_COLUMNS
-    }
+    empty: Dict[str, List[str]] = {k: [] for k, _ in _SIMPLE_COLUMNS}
     empty["workcenter_groups"] = []
     empty["equipment_ids"] = []
 
     if not _SQL_VIEW_ENABLED:
         logger.debug("compute_filter_options: SQL view disabled, returning empty options")
         return empty
+
+    def _col_where(col: str, exclude_key: str, params: Dict[str, Any]) -> tuple[str, List[Any]]:
+        """Build WHERE for a single-column DISTINCT query with cross-filter applied."""
+        cross = {k: v for k, v in params.items() if k != exclude_key}
+        base_where, bind = _build_filter_where(cross)
+        not_null = f"{_qid(col)} IS NOT NULL AND {_qid(col)} != ''"
+        if base_where:
+            return f"{base_where} AND {not_null}", bind
+        return f"WHERE {not_null}", bind
 
     try:
         from mes_dashboard.config.workcenter_groups import get_workcenter_group
@@ -518,25 +527,18 @@ def compute_filter_options(spool_path: str) -> Dict[str, List[str]]:
 
         result: Dict[str, List[str]] = {}
 
-        # Simple columns — straight DISTINCT
+        # Simple columns — cross-filtered (exclude self)
         for key, col in _SIMPLE_COLUMNS:
-            sql = (
-                f"SELECT DISTINCT {_qid(col)} AS val "
-                f"FROM ph_src "
-                f"WHERE {_qid(col)} IS NOT NULL AND {_qid(col)} != '' "
-                f"ORDER BY val"
-            )
-            rows = _fetch_dict_rows(conn, sql)
+            where, bind = _col_where(col, key, filter_params)
+            sql = f"SELECT DISTINCT {_qid(col)} AS val FROM ph_src {where} ORDER BY val"
+            rows = _fetch_dict_rows(conn, sql, bind)
             result[key] = [str(r["val"]) for r in rows]
 
-        # workcenter_groups — map raw names → canonical group names, sorted by order
-        wc_sql = (
-            "SELECT DISTINCT \"WORKCENTERNAME\" AS val "
-            "FROM ph_src "
-            "WHERE \"WORKCENTERNAME\" IS NOT NULL AND \"WORKCENTERNAME\" != '' "
-        )
-        wc_rows = _fetch_dict_rows(conn, wc_sql)
-        group_set: Dict[str, int] = {}  # group_name → order
+        # workcenter_groups — map raw WORKCENTERNAME → canonical group, cross-filtered
+        wc_where, wc_bind = _col_where("WORKCENTERNAME", "workcenter_groups", filter_params)
+        wc_sql = f'SELECT DISTINCT "WORKCENTERNAME" AS val FROM ph_src {wc_where}'
+        wc_rows = _fetch_dict_rows(conn, wc_sql, wc_bind)
+        group_set: Dict[str, int] = {}
         for r in wc_rows:
             gname, order = get_workcenter_group(str(r["val"]))
             label = gname if gname else str(r["val"])
@@ -545,14 +547,10 @@ def compute_filter_options(spool_path: str) -> Dict[str, List[str]]:
             name for name, _ in sorted(group_set.items(), key=lambda x: (x[1], x[0]))
         ]
 
-        # equipment_ids — use EQUIPMENTNAME for display
-        eqp_sql = (
-            "SELECT DISTINCT \"EQUIPMENTNAME\" AS val "
-            "FROM ph_src "
-            "WHERE \"EQUIPMENTNAME\" IS NOT NULL AND \"EQUIPMENTNAME\" != '' "
-            "ORDER BY val"
-        )
-        eqp_rows = _fetch_dict_rows(conn, eqp_sql)
+        # equipment_ids — use EQUIPMENTNAME, cross-filtered
+        eqp_where, eqp_bind = _col_where("EQUIPMENTNAME", "equipment_ids", filter_params)
+        eqp_sql = f'SELECT DISTINCT "EQUIPMENTNAME" AS val FROM ph_src {eqp_where} ORDER BY val'
+        eqp_rows = _fetch_dict_rows(conn, eqp_sql, eqp_bind)
         result["equipment_ids"] = [str(r["val"]) for r in eqp_rows]
 
         conn.close()

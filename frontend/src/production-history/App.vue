@@ -21,6 +21,7 @@ const {
   matrixFilter,
   supplementaryOptions,
   supplementaryFilter,
+  stagedFilter,
   supplementaryOptionsLoading,
   detailRows,
   pagination,
@@ -30,7 +31,7 @@ const {
   runQuery,
   fetchPage,
   applyMatrixFilter,
-  applySupplementaryFilter,
+  stageSupplementaryFilter,
   exportCsv: doExportCsv,
 } = useProductionHistory();
 
@@ -87,9 +88,9 @@ async function handleQuery() {
   if (isStaleRequest(requestId)) return;
 }
 
-// ── Supplementary filter change handler ──────────────────────────────────
+// ── Supplementary filter change handler (stage only, apply on 查詢) ────────
 function onSupplementaryChange(field, values) {
-  applySupplementaryFilter(field, values);
+  stageSupplementaryFilter(field, values);
 }
 
 // ── Matrix interaction ─────────────────────────────────────────────────────
@@ -161,7 +162,7 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
         <div class="ui-filter-group">
           <label class="ui-filter-label">工單號</label>
           <MultiSelect
-            :model-value="supplementaryFilter.work_orders"
+            :model-value="stagedFilter.work_orders"
             :options="supplementaryOptions.work_orders"
             :loading="supplementaryOptionsLoading"
             :searchable="true"
@@ -172,7 +173,7 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
         <div class="ui-filter-group">
           <label class="ui-filter-label">LOT ID</label>
           <MultiSelect
-            :model-value="supplementaryFilter.lot_ids"
+            :model-value="stagedFilter.lot_ids"
             :options="supplementaryOptions.lot_ids"
             :loading="supplementaryOptionsLoading"
             :searchable="true"
@@ -183,7 +184,7 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
         <div class="ui-filter-group">
           <label class="ui-filter-label">Package</label>
           <MultiSelect
-            :model-value="supplementaryFilter.packages"
+            :model-value="stagedFilter.packages"
             :options="supplementaryOptions.packages"
             :loading="supplementaryOptionsLoading"
             :searchable="true"
@@ -194,7 +195,7 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
         <div class="ui-filter-group">
           <label class="ui-filter-label">BOP</label>
           <MultiSelect
-            :model-value="supplementaryFilter.bop_codes"
+            :model-value="stagedFilter.bop_codes"
             :options="supplementaryOptions.bop_codes"
             :loading="supplementaryOptionsLoading"
             :searchable="true"
@@ -205,7 +206,7 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
         <div class="ui-filter-group">
           <label class="ui-filter-label">WorkCenter 群組</label>
           <MultiSelect
-            :model-value="supplementaryFilter.workcenter_groups"
+            :model-value="stagedFilter.workcenter_groups"
             :options="supplementaryOptions.workcenter_groups"
             :loading="supplementaryOptionsLoading"
             :searchable="true"
@@ -216,7 +217,7 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
         <div class="ui-filter-group">
           <label class="ui-filter-label">Equipment</label>
           <MultiSelect
-            :model-value="supplementaryFilter.equipment_ids"
+            :model-value="stagedFilter.equipment_ids"
             :options="supplementaryOptions.equipment_ids"
             :loading="supplementaryOptionsLoading"
             :searchable="true"

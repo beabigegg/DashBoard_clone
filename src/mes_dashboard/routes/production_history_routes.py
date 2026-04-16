@@ -354,8 +354,10 @@ def api_production_history_options():
         return spool_or_err
     spool_path = spool_or_err
 
+    filter_params = _parse_filter_params(body)
+
     try:
-        result = compute_filter_options(spool_path)
+        result = compute_filter_options(spool_path, filter_params)
         return success_response(result)
     except MemoryError:
         record_memory_error("production_history.options", reason="rss_guard")

@@ -35,7 +35,19 @@ export function useProductionHistory() {
     equipment_ids: [],
   });
 
+  // Applied filter — sent to detail/matrix query endpoints
   const supplementaryFilter = reactive({
+    work_orders: [],
+    lot_ids: [],
+    packages: [],
+    bop_codes: [],
+    workcenter_groups: [],
+    equipment_ids: [],
+  });
+
+  // Staged filter — reflects what the user has selected in the UI but not yet
+  // applied.  Triggers cross-filter option refresh; applied only on 查詢 click.
+  const stagedFilter = reactive({
     work_orders: [],
     lot_ids: [],
     packages: [],
@@ -74,6 +86,8 @@ export function useProductionHistory() {
       _jobAbortController = null;
     }
     jobProgress.active = false;
+
+    const prevDatasetId = datasetId.value;
 
     loading.value = true;
     error.value = null;
@@ -118,9 +132,14 @@ export function useProductionHistory() {
         if (resolvedDatasetId) {
           datasetId.value = resolvedDatasetId;
           _clearMatrixFilter();
-          _clearSupplementaryFilter();
+          if (resolvedDatasetId !== prevDatasetId) {
+            _clearStagedFilter();
+            _clearSupplementaryFilter();
+          } else {
+            _copyStagedToApplied();
+          }
           await Promise.all([fetchPage(1), _fetchMatrix()]);
-          fetchSupplementaryOptions();
+          fetchSupplementaryOptions(stagedFilter);
         }
         return;
       }
@@ -134,13 +153,24 @@ export function useProductionHistory() {
         matrixTree.value = data.matrix.tree || [];
         matrixMonthColumns.value = data.matrix.month_columns || [];
       }
-      if (data.detail) {
+      _clearMatrixFilter();
+      const datasetChanged = data.dataset_id !== prevDatasetId;
+      if (datasetChanged) {
+        _clearStagedFilter();
+        _clearSupplementaryFilter();
+      } else {
+        _copyStagedToApplied();
+      }
+      // If applied filters are active, re-fetch filtered page+matrix.
+      // (The primary query response always returns an unfiltered first page.)
+      const hasActiveSuppFilter = Object.values(supplementaryFilter).some((arr) => arr.length > 0);
+      if (!datasetChanged && hasActiveSuppFilter) {
+        await Promise.all([fetchPage(1), _fetchMatrix()]);
+      } else if (data.detail) {
         detailRows.value = data.detail.rows || [];
         pagination.value = data.detail.pagination || pagination.value;
       }
-      _clearMatrixFilter();
-      _clearSupplementaryFilter();
-      fetchSupplementaryOptions();
+      fetchSupplementaryOptions(stagedFilter);
     } catch (err) {
       if (err?.name === 'AbortError') {
         error.value = '查詢已取消';
@@ -216,9 +246,14 @@ export function useProductionHistory() {
     if (!datasetId.value) return;
     matrixLoading.value = true;
     try {
+      const suppPayload = {};
+      for (const [key, arr] of Object.entries(supplementaryFilter)) {
+        if (arr.length) suppPayload[key] = arr;
+      }
       const resp = await apiPost('/api/production-history/matrix', {
         dataset_id: datasetId.value,
         ...matrixFilter,
+        ...suppPayload,
       });
       matrixTree.value = resp.data.tree || [];
       matrixMonthColumns.value = resp.data.month_columns || [];
@@ -247,14 +282,35 @@ export function useProductionHistory() {
     supplementaryFilter.equipment_ids = [];
   }
 
-  // ── Supplementary options from spool ────────────────────────────────────────
-  async function fetchSupplementaryOptions() {
+  function _clearStagedFilter() {
+    stagedFilter.work_orders = [];
+    stagedFilter.lot_ids = [];
+    stagedFilter.packages = [];
+    stagedFilter.bop_codes = [];
+    stagedFilter.workcenter_groups = [];
+    stagedFilter.equipment_ids = [];
+  }
+
+  function _copyStagedToApplied() {
+    supplementaryFilter.work_orders = [...stagedFilter.work_orders];
+    supplementaryFilter.lot_ids = [...stagedFilter.lot_ids];
+    supplementaryFilter.packages = [...stagedFilter.packages];
+    supplementaryFilter.bop_codes = [...stagedFilter.bop_codes];
+    supplementaryFilter.workcenter_groups = [...stagedFilter.workcenter_groups];
+    supplementaryFilter.equipment_ids = [...stagedFilter.equipment_ids];
+  }
+
+  // ── Supplementary options from spool (with cross-filter support) ───────────
+  // filterParams: staged selections to narrow-down options (exclude-self per field)
+  async function fetchSupplementaryOptions(filterParams = {}) {
     if (!datasetId.value) return;
     supplementaryOptionsLoading.value = true;
     try {
-      const resp = await apiPost('/api/production-history/options', {
-        dataset_id: datasetId.value,
-      });
+      const body = { dataset_id: datasetId.value };
+      for (const [key, arr] of Object.entries(filterParams)) {
+        if (Array.isArray(arr) && arr.length) body[key] = arr;
+      }
+      const resp = await apiPost('/api/production-history/options', body);
       const d = resp.data || {};
       supplementaryOptions.value = {
         work_orders: d.work_orders || [],
@@ -271,10 +327,13 @@ export function useProductionHistory() {
     }
   }
 
-  // ── Apply supplementary filter and re-fetch page ──────────────────────────
-  async function applySupplementaryFilter(field, values) {
-    supplementaryFilter[field] = values;
-    await fetchPage(1);
+  // ── Stage a supplementary filter selection (no immediate query) ────────────
+  // Updates the staged selection and re-fetches options with cross-filtering so
+  // other dropdowns narrow to only compatible values.  Detail/matrix are NOT
+  // updated until 查詢 is clicked.
+  async function stageSupplementaryFilter(field, values) {
+    stagedFilter[field] = values;
+    await fetchSupplementaryOptions(stagedFilter);
   }
 
   // ── Export ─────────────────────────────────────────────────────────────────
@@ -302,6 +361,7 @@ export function useProductionHistory() {
     matrixFilter,
     supplementaryOptions,
     supplementaryFilter,
+    stagedFilter,
     supplementaryOptionsLoading,
     detailRows,
     pagination,
@@ -312,7 +372,7 @@ export function useProductionHistory() {
     runQuery,
     fetchPage,
     applyMatrixFilter,
-    applySupplementaryFilter,
+    stageSupplementaryFilter,
     exportCsv,
   };
 }
