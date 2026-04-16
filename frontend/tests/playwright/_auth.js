@@ -70,3 +70,34 @@ export async function loginViaApi(page) {
     timeout: 20_000,
   });
 }
+
+/**
+ * Navigate to a portal-shell sub-page via sidebar link click.
+ *
+ * Direct `page.goto('/portal-shell/<route>')` does NOT trigger Vue SPA
+ * routing — the shell mounts but the child view stays on the default
+ * (wip-overview).  Clicking the sidebar <a> fires the Vue router properly.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} route  The route segment, e.g. "reject-history", "hold-overview"
+ * @param {object} [opts]
+ * @param {string} [opts.waitForSelector]  Optional selector to wait for after navigation
+ * @param {number} [opts.timeout]  Timeout in ms (default 20_000)
+ */
+export async function navigateViaSidebar(page, route, opts = {}) {
+  const { waitForSelector, timeout = 20_000 } = opts;
+
+  // Navigate to portal-shell SPA base (not portal-shell.html which is a
+  // different entry point without sidebar navigation).
+  await page.goto('/portal-shell/');
+  await page.waitForTimeout(2_000);
+
+  await page.waitForSelector(`a[href*="${route}"]`, { timeout });
+  await page.click(`a[href*="${route}"]`);
+
+  if (waitForSelector) {
+    await page.waitForSelector(waitForSelector, { timeout });
+  } else {
+    await page.waitForTimeout(3_000);
+  }
+}
