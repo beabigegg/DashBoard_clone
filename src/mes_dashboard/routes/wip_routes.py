@@ -73,8 +73,8 @@ def api_overview_summary():
     when many filter values are selected.
 
     Parameters (query string for GET, JSON body for POST):
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
         package: Optional PACKAGE_LEF filter (exact match)
         pj_type: Optional PJ_TYPE filter (exact match)
         firstname: Optional FIRSTNAME filter (exact match)
@@ -116,8 +116,8 @@ def api_overview_matrix():
     when many filter values are selected.
 
     Parameters (query string for GET, JSON body for POST):
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
         package: Optional PACKAGE_LEF filter (exact match)
         pj_type: Optional PJ_TYPE filter (exact match)
         firstname: Optional FIRSTNAME filter (exact match)
@@ -174,8 +174,8 @@ def api_overview_hold():
     when many filter values are selected.
 
     Parameters (query string for GET, JSON body for POST):
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
         package: Optional PACKAGE_LEF filter (exact match)
         type: Optional PJ_TYPE filter (exact match)
         firstname: Optional FIRSTNAME filter (exact match)
@@ -234,8 +234,8 @@ def api_detail(workcenter: str):
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
         include_dummy: Include DUMMY lots (default: false)
         page: Page number (default 1)
         page_size: Records per page (default 100, max 500)
@@ -265,8 +265,10 @@ def api_detail(workcenter: str):
         page = _parse_int(args.get('page', 1), 1)
         page_size = _parse_int(args.get('page_size', 100), 100)
     else:
-        page = request.args.get('page', 1, type=int) or 1
-        page_size = request.args.get('page_size', 100, type=int) or 100
+        _page_raw = request.args.get('page', None, type=int)
+        page = _page_raw if _page_raw is not None else 1
+        _page_size_raw = request.args.get('page_size', None, type=int)
+        page_size = _page_size_raw if _page_size_raw is not None else 100
 
     page = max(page, 1)
     page_size = max(1, min(page_size, 500))
@@ -401,8 +403,8 @@ def api_meta_search():
         include_dummy: Include DUMMY lots (default: false)
 
         Cross-filter parameters (for interdependent filter suggestions):
-        workorder: Optional WORKORDER cross-filter (fuzzy match)
-        lotid: Optional LOTID cross-filter (fuzzy match)
+        workorder: Optional WORKORDER cross-filter (exact match, case-insensitive)
+        lotid: Optional LOTID cross-filter (exact match, case-insensitive)
         package: Optional PACKAGE_LEF cross-filter (exact match)
         type: Optional PJ_TYPE cross-filter (exact match)
 

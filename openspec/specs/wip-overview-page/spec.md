@@ -54,7 +54,7 @@ The page SHALL display a cross-tabulation table of workcenters vs packages.
 - **THEN** filter values SHALL be transferred via sessionStorage, not URL parameters
 
 ### Requirement: Overview page SHALL support autocomplete filtering
-The page SHALL provide autocomplete-enabled filter inputs for WORKORDER, LOT ID, PACKAGE, and TYPE.
+The page SHALL provide autocomplete-enabled filter inputs for WORKORDER, LOT ID, PACKAGE, and TYPE. Filter values selected from the dropdown list SHALL be matched against the dataset using **exact match** (case-insensitive). Fuzzy/substring search SHALL only occur at the autocomplete suggestion stage (UI layer, via `/api/wip/meta/search`); once values are applied as filters, only rows with exact field values SHALL appear in results.
 
 #### Scenario: Autocomplete search
 - **WHEN** user types 2+ characters in a filter input
@@ -74,6 +74,15 @@ The page SHALL provide autocomplete-enabled filter inputs for WORKORDER, LOT ID,
 - **WHEN** filters are applied
 - **THEN** active filters SHALL be displayed as removable tags (e.g., "WO: {value} ×")
 - **THEN** clicking a tag's remove button SHALL clear that filter, reload data, and update the URL
+
+#### Scenario: LOTID exact match returns only precise results
+- **WHEN** user selects `LOT-123` from the LOTID filter dropdown and applies filters
+- **THEN** the summary and matrix SHALL only include lots where `LOTID` exactly equals `LOT-123`
+- **THEN** lots with LOTID `LOT-1234`, `XLOT-123`, or any other partial match SHALL NOT appear
+
+#### Scenario: WORKORDER exact match returns only precise results
+- **WHEN** user selects `WO001` from the WORKORDER filter dropdown and applies filters
+- **THEN** results SHALL only include lots where `WORKORDER` exactly equals `WO001`
 
 ### Requirement: Overview page SHALL auto-refresh and handle request cancellation
 The page SHALL automatically refresh data and prevent stale request pile-up.

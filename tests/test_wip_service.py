@@ -341,23 +341,31 @@ class TestGetWipFilterOptions(unittest.TestCase):
         self.assertEqual(result['waferdescs'], ['SiC'])
 
     @patch('mes_dashboard.services.wip_service._get_wip_search_index', return_value=None)
-    @patch('mes_dashboard.services.wip_service._select_with_snapshot_indexes')
+    @patch('mes_dashboard.services.wip_service._get_wip_snapshot')
     @patch('mes_dashboard.services.wip_service._get_wip_dataframe')
     def test_falls_back_to_cache_dataframe(
         self,
         mock_cached_wip,
-        mock_select_with_snapshot,
+        mock_get_snapshot,
         _mock_get_index,
     ):
+        import numpy as np
         mock_cached_wip.return_value = pd.DataFrame({'WORKORDER': ['WO1']})
-        mock_select_with_snapshot.return_value = pd.DataFrame({
-            'WORKORDER': ['WO2', 'WO1'],
-            'LOTID': ['LOT2', 'LOT1'],
-            'PACKAGE_LEF': ['PKG2', 'PKG1'],
-            'PJ_TYPE': ['TYPE2', 'TYPE1'],
-            'FIRSTNAME': ['WF002', 'WF001'],
-            'WAFERDESC': ['Si', 'SiC'],
-        })
+        mock_get_snapshot.return_value = {
+            "row_count": 2,
+            "frame": pd.DataFrame(),
+            "indexes": {
+                "workorder": {"WO2": np.array([0]), "WO1": np.array([1])},
+                "lotid": {"LOT2": np.array([0]), "LOT1": np.array([1])},
+                "package": {"PKG2": np.array([0]), "PKG1": np.array([1])},
+                "pj_type": {"TYPE2": np.array([0]), "TYPE1": np.array([1])},
+                "firstname": {"WF002": np.array([0]), "WF001": np.array([1])},
+                "waferdesc": {"Si": np.array([0]), "SiC": np.array([1])},
+                "wip_status": {},
+                "hold_type": {},
+                "workcenter": {},
+            },
+        }
 
         result = get_wip_filter_options()
 
@@ -1074,6 +1082,102 @@ class TestWipServiceIntegration:
             assert filtered_result is not None
             # Filtered count should be less than or equal to total
             assert filtered_result['totalLots'] <= all_result['totalLots']
+
+
+class TestExactFilterLotidWorkorder(unittest.TestCase):
+    """Tests for exact-match filtering of LOTID and WORKORDER via snapshot indexes.
+
+    Regression suite for fix-exact-filter-lotid-workorder:
+    - Ensures substring matches are NOT returned (e.g. "A100" must not hit "A1004")
+    - Ensures snapshot indexes include "lotid" and "workorder" keys
+    """
+
+    def _make_snapshot(self, df):
+        """Build a minimal snapshot dict from a DataFrame for patching."""
+        from mes_dashboard.services.wip_service import (
+            _build_value_index,
+            _add_wip_status_columns,
+        )
+        filtered = _add_wip_status_columns(df.copy()).reset_index(drop=True)
+        indexes = {
+            "workcenter": _build_value_index(filtered, "WORKCENTER_GROUP"),
+            "package": _build_value_index(filtered, "PACKAGE_LEF"),
+            "pj_type": _build_value_index(filtered, "PJ_TYPE"),
+            "firstname": _build_value_index(filtered, "FIRSTNAME"),
+            "waferdesc": _build_value_index(filtered, "WAFERDESC"),
+            "wip_status": _build_value_index(filtered, "WIP_STATUS"),
+            "hold_type": {},
+            "lotid": _build_value_index(filtered, "LOTID"),
+            "workorder": _build_value_index(filtered, "WORKORDER"),
+        }
+        return {
+            "version": "test",
+            "built_at": "2026-01-01T00:00:00",
+            "row_count": len(filtered),
+            "frame": filtered,
+            "indexes": indexes,
+            "frame_bytes": 0,
+            "index_bucket_count": 0,
+        }
+
+    def _sample_df(self):
+        """Minimal DataFrame with overlapping LOTID/WORKORDER names."""
+        return pd.DataFrame({
+            "LOTID": ["A100", "A1004", "XA100", "B200"],
+            "WORKORDER": ["WO001", "WO0010", "WO001X", "WO002"],
+            "WORKCENTER_GROUP": ["CUT", "CUT", "CUT", "CUT"],
+            "PACKAGE_LEF": ["PKG1", "PKG1", "PKG1", "PKG2"],
+            "PJ_TYPE": ["TYPE1", "TYPE1", "TYPE1", "TYPE2"],
+            "FIRSTNAME": ["Alice", "Alice", "Alice", "Bob"],
+            "WAFERDESC": ["W1", "W1", "W1", "W2"],
+            "HOLDREASONNAME": [None, None, None, None],
+            "EQUIPMENTCOUNT": [0, 1, 0, 0],
+            "CURRENTHOLDCOUNT": [0, 0, 0, 0],
+            "QTY": [1, 1, 1, 1],
+        })
+
+    def test_lotid_exact_match_excludes_superstring(self):
+        """Filtering lotid='A100' must not return rows with LOTID='A1004'."""
+        from mes_dashboard.services.wip_service import _select_with_snapshot_indexes
+        df = self._sample_df()
+        snapshot = self._make_snapshot(df)
+
+        with patch('mes_dashboard.services.wip_service._get_wip_snapshot', return_value=snapshot):
+            result = _select_with_snapshot_indexes(lotid="A100")
+
+        self.assertIsNotNone(result)
+        returned_lotids = set(result["LOTID"].tolist())
+        self.assertIn("A100", returned_lotids)
+        self.assertNotIn("A1004", returned_lotids)
+        self.assertNotIn("XA100", returned_lotids)
+
+    def test_workorder_exact_match_excludes_superstring(self):
+        """Filtering workorder='WO001' must not return rows with WORKORDER='WO0010'."""
+        from mes_dashboard.services.wip_service import _select_with_snapshot_indexes
+        df = self._sample_df()
+        snapshot = self._make_snapshot(df)
+
+        with patch('mes_dashboard.services.wip_service._get_wip_snapshot', return_value=snapshot):
+            result = _select_with_snapshot_indexes(workorder="WO001")
+
+        self.assertIsNotNone(result)
+        returned_workorders = set(result["WORKORDER"].tolist())
+        self.assertIn("WO001", returned_workorders)
+        self.assertNotIn("WO0010", returned_workorders)
+        self.assertNotIn("WO001X", returned_workorders)
+
+    def test_snapshot_indexes_include_lotid_and_workorder(self):
+        """_build_wip_snapshot() must include 'lotid' and 'workorder' in the indexes dict."""
+        from mes_dashboard.services.wip_service import _build_wip_snapshot
+        df = self._sample_df()
+        snapshot = _build_wip_snapshot(df, include_dummy=False, version="test")
+        self.assertIn("lotid", snapshot["indexes"])
+        self.assertIn("workorder", snapshot["indexes"])
+        # Sanity: the indexes are non-empty dicts
+        self.assertIsInstance(snapshot["indexes"]["lotid"], dict)
+        self.assertIsInstance(snapshot["indexes"]["workorder"], dict)
+        self.assertGreater(len(snapshot["indexes"]["lotid"]), 0)
+        self.assertGreater(len(snapshot["indexes"]["workorder"]), 0)
 
 
 if __name__ == "__main__":

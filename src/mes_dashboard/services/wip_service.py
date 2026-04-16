@@ -69,8 +69,8 @@ def _build_base_conditions_builder(
 
     Args:
         include_dummy: If False (default), exclude LOTID containing 'DUMMY'
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
         builder: Optional existing QueryBuilder to add conditions to
 
     Returns:
@@ -292,6 +292,96 @@ def _intersect_positions(current: Optional[np.ndarray], candidate: Optional[np.n
     return np.intersect1d(current, candidate, assume_unique=False)
 
 
+def _compute_snapshot_positions(
+    snapshot: Dict[str, Any],
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
+    workcenter: Optional[str] = None,
+    status: Optional[str] = None,
+    hold_type: Optional[str] = None,
+) -> Optional[np.ndarray]:
+    """Compute selected row positions from snapshot indexes without materializing a DataFrame.
+
+    Returns None if no filters applied (all rows selected), or a numpy array of
+    selected row positions (may be empty if filters match zero rows).
+    """
+    indexes = snapshot["indexes"]
+    selected_positions: Optional[np.ndarray] = None
+
+    if workcenter:
+        selected_positions = _intersect_positions(
+            selected_positions, _lookup_positions(indexes["workcenter"], workcenter)
+        )
+    if package:
+        selected_positions = _intersect_positions(
+            selected_positions, _lookup_positions(indexes["package"], package)
+        )
+    if pj_type:
+        selected_positions = _intersect_positions(
+            selected_positions, _lookup_positions(indexes["pj_type"], pj_type)
+        )
+    if firstname:
+        selected_positions = _intersect_positions(
+            selected_positions, _lookup_positions(indexes["firstname"], firstname)
+        )
+    if waferdesc:
+        selected_positions = _intersect_positions(
+            selected_positions, _lookup_positions(indexes["waferdesc"], waferdesc)
+        )
+    if status:
+        selected_positions = _intersect_positions(
+            selected_positions, indexes["wip_status"].get(str(status).upper())
+        )
+    if hold_type:
+        selected_positions = _intersect_positions(
+            selected_positions, indexes["hold_type"].get(str(hold_type).lower())
+        )
+    if workorder:
+        selected_positions = _intersect_positions(
+            selected_positions, _lookup_positions(indexes["workorder"], workorder)
+        )
+    if lotid:
+        selected_positions = _intersect_positions(
+            selected_positions, _lookup_positions(indexes["lotid"], lotid)
+        )
+
+    return selected_positions
+
+
+def _distinct_values_from_index(
+    index_map: Dict[str, np.ndarray],
+    selected_positions: Optional[np.ndarray],
+    row_count: int,
+) -> List[str]:
+    """Return sorted distinct non-empty values for a column using the snapshot index.
+
+    Avoids DataFrame materialisation by working directly with position arrays.
+    - selected_positions=None  → all rows selected, return all index keys
+    - selected_positions empty → no rows, return []
+    - otherwise               → use a boolean mask to filter index keys
+    """
+    if selected_positions is None:
+        return sorted(k.strip() for k in index_map if k.strip())
+    if len(selected_positions) == 0:
+        return []
+
+    mask = np.zeros(row_count, dtype=bool)
+    mask[selected_positions] = True
+
+    result = []
+    for key, positions in index_map.items():
+        k = key.strip()
+        if not k:
+            continue
+        if mask[positions].any():
+            result.append(k)
+    return sorted(result)
+
+
 def _select_with_snapshot_indexes(
     include_dummy: bool = False,
     workorder: Optional[str] = None,
@@ -309,57 +399,25 @@ def _select_with_snapshot_indexes(
         return None
 
     df = snapshot["frame"]
-    indexes = snapshot["indexes"]
-    selected_positions: Optional[np.ndarray] = None
-
-    if workcenter:
-        selected_positions = _intersect_positions(
-            selected_positions,
-            _lookup_positions(indexes["workcenter"], workcenter),
-        )
-    if package:
-        selected_positions = _intersect_positions(
-            selected_positions,
-            _lookup_positions(indexes["package"], package),
-        )
-    if pj_type:
-        selected_positions = _intersect_positions(
-            selected_positions,
-            _lookup_positions(indexes["pj_type"], pj_type),
-        )
-    if firstname:
-        selected_positions = _intersect_positions(
-            selected_positions,
-            _lookup_positions(indexes["firstname"], firstname),
-        )
-    if waferdesc:
-        selected_positions = _intersect_positions(
-            selected_positions,
-            _lookup_positions(indexes["waferdesc"], waferdesc),
-        )
-    if status:
-        selected_positions = _intersect_positions(
-            selected_positions,
-            indexes["wip_status"].get(str(status).upper()),
-        )
-    if hold_type:
-        selected_positions = _intersect_positions(
-            selected_positions,
-            indexes["hold_type"].get(str(hold_type).lower()),
-        )
+    selected_positions = _compute_snapshot_positions(
+        snapshot,
+        workorder=workorder,
+        lotid=lotid,
+        package=package,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
+        workcenter=workcenter,
+        status=status,
+        hold_type=hold_type,
+    )
 
     if selected_positions is None:
-        result = df
+        return df
     elif len(selected_positions) == 0:
-        result = df.iloc[0:0]
+        return df.iloc[0:0]
     else:
-        result = df.iloc[selected_positions]
-
-    if workorder:
-        result = result[_contains_any_mask(result['WORKORDER'], workorder)]
-    if lotid:
-        result = result[_contains_any_mask(result['LOTID'], lotid)]
-    return result
+        return df.iloc[selected_positions]
 
 
 def _build_search_signatures(
@@ -612,9 +670,17 @@ def _build_wip_snapshot(df: pd.DataFrame, include_dummy: bool, version: str) -> 
         "waferdesc": _build_value_index(filtered, "WAFERDESC"),
         "wip_status": _build_value_index(filtered, "WIP_STATUS"),
         "hold_type": _build_value_index(pd.DataFrame({"HOLD_TYPE": hold_type_series}), "HOLD_TYPE"),
+        "lotid": _build_value_index(filtered, "LOTID"),
+        "workorder": _build_value_index(filtered, "WORKORDER"),
     }
 
     exact_bucket_count = sum(len(bucket) for bucket in indexes.values())
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "_build_wip_snapshot index sizes: lotid=%d workorder=%d",
+            len(indexes["lotid"]),
+            len(indexes["workorder"]),
+        )
     return {
         "version": version,
         "built_at": datetime.now().isoformat(),
@@ -804,8 +870,8 @@ def _filter_base_conditions(
     Args:
         df: DataFrame to filter
         include_dummy: If False (default), exclude LOTID containing 'DUMMY'
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
 
     Returns:
         Filtered DataFrame
@@ -843,8 +909,8 @@ def get_wip_summary(
 
     Args:
         include_dummy: If True, include DUMMY lots (default: False)
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
         package: Optional PACKAGE_LEF filter (exact match)
         pj_type: Optional PJ_TYPE filter (exact match)
         firstname: Optional FIRSTNAME filter (exact match)
@@ -1032,8 +1098,8 @@ def get_wip_matrix(
 
     Args:
         include_dummy: If True, include DUMMY lots (default: False)
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
@@ -1260,8 +1326,8 @@ def get_wip_hold_summary(
 
     Args:
         include_dummy: If True, include DUMMY lots (default: False)
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
         package: Optional PACKAGE_LEF filter (exact match)
         pj_type: Optional PJ_TYPE filter (exact match)
         firstname: Optional FIRSTNAME filter (exact match)
@@ -1430,8 +1496,8 @@ def get_wip_detail(
         status: Optional WIP status filter ('RUN', 'QUEUE', 'HOLD')
         hold_type: Optional hold type filter ('quality', 'non-quality')
                    Only effective when status='HOLD'
-        workorder: Optional WORKORDER filter (fuzzy match)
-        lotid: Optional LOTID filter (fuzzy match)
+        workorder: Optional WORKORDER filter (exact match, case-insensitive)
+        lotid: Optional LOTID filter (exact match, case-insensitive)
         include_dummy: If True, include DUMMY lots (default: False)
         page: Page number (1-based)
         page_size: Number of records per page
@@ -2057,19 +2123,33 @@ def _get_filter_options_cache_payload(
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
 ) -> Optional[Dict[str, List[str]]]:
+    """Compute cross-filter option lists from snapshot indexes without materialising DataFrames.
+
+    For each filter field we compute positions with that field's own filter excluded
+    (cross-filter semantics), then use _distinct_values_from_index to read distinct
+    values directly from the index — no row-level scan required.
+    """
+    snapshot = _get_wip_snapshot(include_dummy=include_dummy)
+    if snapshot is None:
+        return None
+
+    indexes = snapshot["indexes"]
+    row_count = snapshot["row_count"]
+
+    # field → (result_key, index_key)
     by_field = {
-        "workorder": ("workorders", "WORKORDER"),
-        "lotid": ("lotids", "LOTID"),
-        "package": ("packages", "PACKAGE_LEF"),
-        "pj_type": ("types", "PJ_TYPE"),
-        "firstname": ("firstnames", "FIRSTNAME"),
-        "waferdesc": ("waferdescs", "WAFERDESC"),
+        "workorder": ("workorders", "workorder"),
+        "lotid": ("lotids", "lotid"),
+        "package": ("packages", "package"),
+        "pj_type": ("types", "pj_type"),
+        "firstname": ("firstnames", "firstname"),
+        "waferdesc": ("waferdescs", "waferdesc"),
     }
 
     payload: Dict[str, List[str]] = {}
-    for field, (key, column) in by_field.items():
-        df = _select_with_snapshot_indexes(
-            include_dummy=include_dummy,
+    for field, (result_key, index_key) in by_field.items():
+        positions = _compute_snapshot_positions(
+            snapshot,
             workorder=None if field == "workorder" else workorder,
             lotid=None if field == "lotid" else lotid,
             package=None if field == "package" else package,
@@ -2079,9 +2159,9 @@ def _get_filter_options_cache_payload(
             status=status,
             hold_type=hold_type,
         )
-        if df is None:
-            return None
-        payload[key] = _distinct_non_empty_values(df, column)
+        payload[result_key] = _distinct_values_from_index(
+            indexes[index_key], positions, row_count
+        )
 
     return payload
 
@@ -2168,7 +2248,7 @@ def search_workorders(
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
         include_dummy: If True, include DUMMY lots (default: False)
-        lotid: Optional LOTID cross-filter (fuzzy match)
+        lotid: Optional LOTID cross-filter (exact match, case-insensitive)
         package: Optional PACKAGE_LEF cross-filter (exact match)
         pj_type: Optional PJ_TYPE cross-filter (exact match)
 
@@ -2277,7 +2357,7 @@ def search_lot_ids(
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
         include_dummy: If True, include DUMMY lots (default: False)
-        workorder: Optional WORKORDER cross-filter (fuzzy match)
+        workorder: Optional WORKORDER cross-filter (exact match, case-insensitive)
         package: Optional PACKAGE_LEF cross-filter (exact match)
         pj_type: Optional PJ_TYPE cross-filter (exact match)
 
@@ -2384,8 +2464,8 @@ def search_packages(
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
         include_dummy: If True, include DUMMY lots (default: False)
-        workorder: Optional WORKORDER cross-filter (fuzzy match)
-        lotid: Optional LOTID cross-filter (fuzzy match)
+        workorder: Optional WORKORDER cross-filter (exact match, case-insensitive)
+        lotid: Optional LOTID cross-filter (exact match, case-insensitive)
         pj_type: Optional PJ_TYPE cross-filter (exact match)
 
     Returns:
@@ -2497,8 +2577,8 @@ def search_types(
         q: Search query (minimum 2 characters)
         limit: Maximum number of results (default: 20, max: 50)
         include_dummy: If True, include DUMMY lots (default: False)
-        workorder: Optional WORKORDER cross-filter (fuzzy match)
-        lotid: Optional LOTID cross-filter (fuzzy match)
+        workorder: Optional WORKORDER cross-filter (exact match, case-insensitive)
+        lotid: Optional LOTID cross-filter (exact match, case-insensitive)
         package: Optional PACKAGE_LEF cross-filter (exact match)
 
     Returns:
