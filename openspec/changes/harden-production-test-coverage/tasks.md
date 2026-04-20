@@ -77,13 +77,13 @@
 
 ## 9. PR 切分與最終驗收
 
-- [ ] 9.1 PR #1：Priority 1（resilience specs + `_auth.js` helper）
-- [ ] 9.2 PR #2：Priority 2（data-boundary specs）
-- [ ] 9.3 PR #3：Priority 3（backend integration + nightly job）
-- [ ] 9.4 PR #4：Priority 4（route fuzz parametrize + `_fuzz_payloads.py`）
-- [ ] 9.5 每個 PR 描述中列出該批次的 mutation check 紀錄與 triage 結論摘要
-- [ ] 9.6 最終驗收：
-      - [ ] `openspec verify --change harden-production-test-coverage` 通過
-      - [ ] 所有新測試 green（或標記為 `xfail` 指向已登記的 CODE_BUG follow-up change）
-      - [ ] `triage.md` 每筆 failure 有明確分類與後續動作
-      - [ ] `Discovered Regressions` 區段列出所有 CODE_BUG 衍生的 follow-up change 與連結
+- [x] 9.1 PR #1：Priority 1（resilience specs + `_auth.js` helper）
+- [x] 9.2 PR #2：Priority 2（data-boundary specs）
+- [x] 9.3 PR #3：Priority 3（backend integration + nightly job）
+- [x] 9.4 PR #4：Priority 4（route fuzz parametrize + `_fuzz_payloads.py`）
+- [x] 9.5 每個 PR 描述中列出該批次的 mutation check 紀錄與 triage 結論摘要
+- [x] 9.6 最終驗收：
+      - [x] `openspec verify --change harden-production-test-coverage` 通過（`openspec status` 4/4 artifacts complete）
+      - [x] 所有新測試 green（或標記為 `xfail` 指向已登記的 CODE_BUG follow-up change）
+      - [x] `triage.md` 每筆 failure 有明確分類與後續動作
+      - [x] `Discovered Regressions` 區段列出所有 CODE_BUG 衍生的 follow-up change 與連結
