@@ -34,6 +34,7 @@ from mes_dashboard.services.event_fetcher import EventFetcher
 from mes_dashboard.services.mid_section_defect_service import (
     build_trace_aggregation_from_events,
     parse_loss_reasons_param,
+    resolve_msd_seeds_at_station,
     resolve_trace_seed_lots,
 )
 from mes_dashboard.services.msd_lineage_job_service import (
@@ -288,6 +289,31 @@ def _seed_resolve_mid_section_defect(
         if not values:
             return None, ("INVALID_PARAMS", "values must contain at least one query value", 400)
 
+        station = str(params.get("station") or "測試").strip()
+
+        # For types supported by station-based seed resolution, query LOTWIPHISTORY
+        # directly (filtered by MFGORDERNAME / CONTAINERNAME / FIRSTNAME + station).
+        # This ensures seeds are containers that actually passed through the detection
+        # station, giving LineageEngine richer SPLITFROMID / COMBINEDASSYLOTS paths.
+        # For serial_number (not in LOTWIPHISTORY filter columns), fall back to the
+        # DW_MES_CONTAINER resolve path.
+        _STATION_RESOLVE_TYPES = {"work_order", "gd_work_order", "lot_id", "gd_lot_id", "wafer_lot"}
+        if resolve_type in _STATION_RESOLVE_TYPES:
+            seeds, err_msg = resolve_msd_seeds_at_station(resolve_type, values, station)
+            if err_msg is not None and not seeds:
+                return None, ("SEED_RESOLVE_FAILED", err_msg, 500)
+            if not seeds:
+                return None, (
+                    "NO_DETECTION_RECORDS",
+                    f"所輸入的{resolve_type}在偵測站「{station}」無歷史記錄，請確認輸入值是否正確或嘗試其他偵測站",
+                    404,
+                )
+            return {
+                "seeds": seeds,
+                "seed_count": len(seeds),
+            }, None
+
+        # Fallback: serial_number and other types via DW_MES_CONTAINER resolve
         resolved = resolve_lots(resolve_type, values)
         if not isinstance(resolved, dict):
             return None, ("SEED_RESOLVE_FAILED", "seed resolve returned unexpected payload", 500)
@@ -326,6 +352,13 @@ def _seed_resolve_mid_section_defect(
                 for s in seeds
             ):
                 not_found.append(val)
+
+        if not seeds:
+            return None, (
+                "NO_DETECTION_RECORDS",
+                f"找不到符合條件的容器，請確認輸入值是否正確",
+                404,
+            )
 
         return {
             "seeds": seeds,

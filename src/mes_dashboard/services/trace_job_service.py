@@ -976,7 +976,14 @@ def execute_trace_events_job(
                             _write_msd_detection_stage_spool,
                         )
                         _det_station = str(_msd_params.get("station") or "測試").strip()
-                        _det_df = _fetch_detection_by_container_ids(_seed_container_ids, _det_station)
+                        # Use _expanded_container_ids (seeds + all lineage ancestors) so that
+                        # containers related via SPLITFROMID / COMBINEDASSYLOTS that passed
+                        # through the detection station are included in the spool.
+                        logger.info(
+                            "trace job MSD container detection: seed_count=%d expanded_count=%d station=%s",
+                            len(_seed_container_ids), len(_expanded_container_ids), _det_station,
+                        )
+                        _det_df = _fetch_detection_by_container_ids(_expanded_container_ids, _det_station)
                         if _det_df is not None and not _det_df.empty:
                             _write_msd_detection_stage_spool(trace_query_id, _det_df)
                             logger.info(

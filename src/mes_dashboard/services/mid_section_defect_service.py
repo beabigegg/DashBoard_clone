@@ -431,6 +431,76 @@ def parse_loss_reasons_param(loss_reasons: Any) -> Optional[List[str]]:
     return deduped or None
 
 
+_MSD_SEED_FILTER_COLUMN: Dict[str, str] = {
+    'work_order': 'MFGORDERNAME',
+    'gd_work_order': 'MFGORDERNAME',
+    'lot_id': 'CONTAINERNAME',
+    'gd_lot_id': 'CONTAINERNAME',
+    'wafer_lot': 'FIRSTNAME',
+}
+
+
+def resolve_msd_seeds_at_station(
+    resolve_type: str,
+    values: List[str],
+    station: str = '測試',
+) -> Tuple[List[Dict[str, str]], Optional[str]]:
+    """Find anchor containers at the detection station that match the user's input.
+
+    Queries LOTWIPHISTORY JOIN DW_MES_CONTAINER with a VALUE_FILTER built from
+    resolve_type, instead of querying DW_MES_CONTAINER alone.  This ensures the
+    returned seeds are containers that actually passed through the detection station,
+    giving LineageEngine richer SPLITFROMID / COMBINEDASSYLOTS connections.
+
+    Returns:
+        (seeds, error_message) — error_message is None on success, str on failure.
+    """
+    column = _MSD_SEED_FILTER_COLUMN.get(resolve_type)
+    if not column:
+        return [], f"resolve_type '{resolve_type}' is not supported for station-based seed resolution"
+
+    cleaned = [str(v).strip() for v in (values or []) if str(v).strip()]
+    if not cleaned:
+        return [], "values must not be empty"
+
+    quoted_values = ", ".join(f"'{v}'" for v in cleaned)
+    value_filter = f"c.{column} IN ({quoted_values})"
+
+    try:
+        station_filter, station_params = _build_station_filter(station, 'h')
+        sql = SQLLoader.load_with_params(
+            "mid_section_defect/station_seed_by_filter",
+            VALUE_FILTER=value_filter,
+            STATION_FILTER=station_filter,
+        )
+        df = read_sql_df(sql, station_params)
+    except Exception as exc:
+        logger.error(
+            "resolve_msd_seeds_at_station failed (resolve_type=%s station=%s): %s",
+            resolve_type, station, exc, exc_info=True,
+        )
+        return [], "偵測站種子查詢失敗"
+
+    if df is None or df.empty:
+        return [], None
+
+    seeds: List[Dict[str, str]] = []
+    seen: set = set()
+    for _, row in df.iterrows():
+        cid = _safe_str(row.get('CONTAINERID'))
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        name = _safe_str(row.get('CONTAINERNAME')) or cid
+        seeds.append({'container_id': cid, 'container_name': name, 'lot_id': name})
+
+    logger.info(
+        "resolve_msd_seeds_at_station: resolve_type=%s station=%s input_count=%d seed_count=%d",
+        resolve_type, station, len(cleaned), len(seeds),
+    )
+    return seeds, None
+
+
 def resolve_trace_seed_lots(
     start_date: str,
     end_date: str,
@@ -690,7 +760,11 @@ def _build_trace_aggregation_container_mode(
 
     normalized_loss_reasons = parse_loss_reasons_param(loss_reasons)
 
-    detection_df = _fetch_detection_by_container_ids(seed_container_ids, station)
+    # Expand seeds with lineage ancestors before querying the detection station.
+    # This mirrors the date_range pipeline where detection is searched across the
+    # full SPLITFROMID / COMBINEDASSYLOTS-expanded container set.
+    _detection_cids = _build_expanded_detection_cids(seed_container_ids, lineage_ancestors)
+    detection_df = _fetch_detection_by_container_ids(_detection_cids, station)
     if detection_df is None:
         return None
     if detection_df.empty:
@@ -709,7 +783,7 @@ def _build_trace_aggregation_container_mode(
             'genealogy_status': 'ready',
             'detail_total_count': 0,
             'attribution': [],
-            'container_mode_hint': '所選容器在此偵測站無記錄',
+            'container_mode_hint': '所選容器及其上游關聯容器在此偵測站均無記錄',
             'quality_meta': quality_meta,
         }
 
@@ -996,6 +1070,18 @@ def _write_msd_lineage_stage_spool(
         if not safe_descendant:
             continue
         root_name = _safe_str(_roots.get(safe_descendant))
+        # Self-link: lets DuckDB attribution JOIN pick up the seed container's own
+        # intermediate-station events (焊接, 成型, 電鍍 …) which are stored under
+        # its own CONTAINERID in the events spool but would otherwise be skipped
+        # because the attribution query only looks through lineage.ANCESTOR_ID.
+        # lot_ancestor_counts filters ANCESTOR_ID != DESCENDANT_ID so the count
+        # displayed in the detail table is not inflated.
+        rows.append({
+            "DESCENDANT_ID": safe_descendant,
+            "ANCESTOR_ID": safe_descendant,
+            "ANCESTOR_NAME": _safe_str(_names.get(safe_descendant)) or safe_descendant,
+            "SEED_ROOT_NAME": root_name or "",
+        })
         for ancestor_id in values:
             safe_ancestor = _safe_str(ancestor_id)
             if not safe_ancestor:
@@ -1505,6 +1591,33 @@ def _fetch_station_detection_data(
             raise
         logger.error("Station detection query failed (station=%s): %s", station, exc, exc_info=True)
         return None, {}
+
+
+def _build_expanded_detection_cids(
+    seed_container_ids: Optional[List[str]],
+    lineage_ancestors: Optional[Dict[str, Any]],
+) -> List[str]:
+    """Return seeds + all lineage ancestors as a deduplicated list for detection queries.
+
+    Container mode must search the detection station across the full expanded set
+    (initial seeds plus their SPLITFROMID / COMBINEDASSYLOTS ancestors) so that
+    containers related to the input that passed through the detection station are not missed.
+    """
+    seen: set = set()
+    result: List[str] = []
+    for cid in (seed_container_ids or []):
+        v = str(cid or "").strip()
+        if v and v not in seen:
+            seen.add(v)
+            result.append(v)
+    for ancestors in (lineage_ancestors or {}).values():
+        items = ancestors if isinstance(ancestors, (list, set)) else []
+        for cid in items:
+            v = str(cid or "").strip()
+            if v and v not in seen:
+                seen.add(v)
+                result.append(v)
+    return result
 
 
 def _fetch_detection_by_container_ids(

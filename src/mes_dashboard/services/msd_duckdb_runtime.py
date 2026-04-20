@@ -1272,7 +1272,9 @@ class MsdDuckdbRuntime:
                     """
                     CREATE TEMP TABLE lot_ancestor_counts AS
                     SELECT DESCENDANT_ID, COUNT(DISTINCT ANCESTOR_ID) AS ancestor_count
-                    FROM lineage GROUP BY DESCENDANT_ID
+                    FROM lineage
+                    WHERE ANCESTOR_ID != DESCENDANT_ID
+                    GROUP BY DESCENDANT_ID
                     """
                 )
                 conn.execute(

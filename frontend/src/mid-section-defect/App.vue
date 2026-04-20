@@ -515,10 +515,7 @@ async function loadAnalysis() {
     }
 
     if (!stageError || trace.completed_stages.value.includes('events')) {
-      // Container mode: no detail/export (no date range for legacy API)
-      if (!isContainerMode) {
-        await loadDetail(1, createAbortSignal('msd-detail'));
-      }
+      await loadDetail(1, createAbortSignal('msd-detail'));
       saveSession();
     }
 
@@ -569,7 +566,10 @@ function exportCsv() {
 
   const link = document.createElement('a');
   link.href = `/api/mid-section-defect/export?${params.toString()}`;
-  link.download = `mid_section_defect_${snapshot.station}_${snapshot.direction}_${snapshot.startDate}_to_${snapshot.endDate}.csv`;
+  const datePart = snapshot.queryMode === 'container'
+    ? (currentTraceQueryId.value || snapshot.containerInputType || 'container')
+    : `${snapshot.startDate}_to_${snapshot.endDate}`;
+  link.download = `mid_section_defect_${snapshot.station}_${snapshot.direction}_${datePart}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -791,7 +791,6 @@ void initPage();
       </transition>
 
       <DetailTable
-        v-if="committedFilters.queryMode !== 'container'"
         :data="detailData"
         :loading="detailLoading"
         :pagination="detailPagination"
