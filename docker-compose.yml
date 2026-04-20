@@ -12,6 +12,7 @@ services:
       - RUNTIME_CONTRACT_ENFORCE=false
       # Timezone
       - TZ=Asia/Taipei
+      - QUERY_SPOOL_DIR=/app/tmp/query_spool
     ports:
       - "8080:8080"
     volumes:
