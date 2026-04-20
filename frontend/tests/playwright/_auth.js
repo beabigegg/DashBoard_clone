@@ -72,6 +72,80 @@ export async function loginViaApi(page) {
 }
 
 /**
+ * Inject a mock API error for a URL pattern.
+ *
+ * The default body conforms to the MES Dashboard error envelope defined in
+ * `src/mes_dashboard/core/response.py` (success=false, error.code, error.message).
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string|RegExp} urlPattern  Passed to page.route()
+ * @param {number} status  HTTP status code (e.g. 500, 503)
+ * @param {object} [options]
+ * @param {object} [options.body]    Override response body (must match envelope schema)
+ * @param {number} [options.delay]   Milliseconds to delay before fulfilling
+ * @param {object} [options.headers] Extra response headers (e.g. { 'Retry-After': '30' })
+ * @returns {Promise<void>} Resolves once the route handler is registered
+ */
+export async function mockApiError(page, urlPattern, status, options = {}) {
+  const { body, delay, headers = {} } = options;
+
+  const codeMap = {
+    400: 'VALIDATION_ERROR',
+    401: 'UNAUTHORIZED',
+    403: 'FORBIDDEN',
+    404: 'NOT_FOUND',
+    429: 'TOO_MANY_REQUESTS',
+    500: 'INTERNAL_ERROR',
+    503: 'SERVICE_UNAVAILABLE',
+    504: 'DB_QUERY_TIMEOUT',
+  };
+  const defaultBody = {
+    success: false,
+    error: {
+      code: codeMap[status] || 'INTERNAL_ERROR',
+      message: `Mock error (status ${status})`,
+    },
+    meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+  };
+
+  await page.route(urlPattern, async (route) => {
+    if (delay) {
+      await new Promise((r) => setTimeout(r, delay));
+    }
+    await route.fulfill({
+      status,
+      contentType: 'application/json',
+      headers,
+      body: JSON.stringify(body ?? defaultBody),
+    });
+  });
+}
+
+/**
+ * Wait until the UI reaches an idle state:
+ *   - no `.loading-overlay` visible
+ *   - no button with `aria-busy="true"` or class `is-loading`
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number} [timeout=20_000]
+ */
+export async function waitForIdleUi(page, timeout = 20_000) {
+  await page.waitForFunction(
+    () => {
+      const overlay = document.querySelector(
+        '.loading-overlay:not([style*="display: none"]):not([style*="display:none"])'
+      );
+      if (overlay) return false;
+      const busyBtn = document.querySelector(
+        'button[aria-busy="true"], button.is-loading'
+      );
+      return !busyBtn;
+    },
+    { timeout },
+  );
+}
+
+/**
  * Navigate to a portal-shell sub-page via sidebar link click.
  *
  * Direct `page.goto('/portal-shell/<route>')` does NOT trigger Vue SPA

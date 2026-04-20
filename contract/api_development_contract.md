@@ -82,3 +82,21 @@
 *   **契約 6.2**: 若有新增、刪除、重新命名、搬移任何 API 端點（包含 `routes/*.py` 與 `app.py` 的 `/api/*` bridge 端點），必須在**同一個變更**同步更新 `contract/api_inventory.md`。
 *   **契約 6.3**: 每個 API 端點都必須被分類為 `standard-json`、`health-exception`、`stream-download-exception` 或 `legacy-transition` 之一。
 *   **契約 6.4**: 新增或變更例外端點時，必須在盤點清單補上例外原因、影響範圍與對應驗證（測試或檢查機制）說明。
+
+---
+
+#### **7. 測試層次定位 (Test Tier Positioning)**
+
+本節說明三個測試層次的職責邊界，避免 happy path、resilience 與 fault 測試混入同一檔。
+
+| 層次 | 目錄 | 觸發時機 | 覆蓋範圍 |
+|------|------|----------|----------|
+| **Resilience (韌性)** | `frontend/tests/playwright/resilience/` | pre-merge CI gate | API failure 注入（500/503/abort）、慢網路 overlay 行為、按鈕連點防重複、瀏覽器歷史 URL state 回復 |
+| **Data Boundary (資料邊界)** | `frontend/tests/playwright/data-boundary/` | pre-merge CI gate | 惡意輸入（SQL、100k 字串、Unicode、倒置日期）、空結果的 empty-state 顯示、匯出按鈕 disabled |
+| **Fault Integration (故障整合)** | `tests/integration/test_oracle_error_codes.py`, `test_redis_timeout_fallback.py`, `test_race_conditions.py` | nightly `--run-integration-real` | ORA-* 錯誤碼對應、Redis timeout fallback、race condition 並發競態 |
+
+**契約 7.1**：Happy path 契約驗證（既有 route tests、Vitest composables）不得混入 resilience / fault 情境。新增的 resilience / data-boundary / fault 測試必須放在對應子目錄，並以獨立 spec/file 呈現。
+
+**契約 7.2**：每個新 resilience 或 fault test 必須執行 **mutation check**（移除對應 handler → spec 應 FAIL），確認測試真的在偵測錯誤路徑，而非形式驗證。PR 描述應附 mutation check 紀錄。
+
+**契約 7.3**：Route 層 fuzz 測試（`tests/routes/test_fuzz_routes.py`）使用 `MALICIOUS_INPUTS` 常數（定義於 `tests/routes/_fuzz_payloads.py`）確保所有接受查詢條件的 API 端點對惡意 payload 以 `VALIDATION_ERROR` 回應而非 500。
