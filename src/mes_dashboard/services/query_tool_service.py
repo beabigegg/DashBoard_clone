@@ -57,7 +57,6 @@ logger = logging.getLogger('mes_dashboard.query_tool')
 
 # Constants
 BATCH_SIZE = 1000  # Oracle IN clause limit
-MAX_EQUIPMENTS = 20
 MAX_DATE_RANGE_DAYS = 730  # 2 years
 DEFAULT_TIME_WINDOW_HOURS = 168  # 1 week for better PJ_TYPE detection
 ADJACENT_LOTS_COUNT = 3
@@ -309,9 +308,6 @@ def validate_equipment_input(equipment_ids: List[str]) -> Optional[str]:
     """
     if not equipment_ids:
         return '請選擇至少一台設備'
-
-    if len(equipment_ids) > MAX_EQUIPMENTS:
-        return f'設備數量不得超過 {MAX_EQUIPMENTS} 台'
 
     return None
 

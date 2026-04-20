@@ -347,6 +347,22 @@
   gap: 8px;
 }
 
+.theme-query-tool .query-tool-page-size {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: theme('colors.text.subtle');
+}
+
+.theme-query-tool .query-tool-page-size select {
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 13px;
+  background: theme('colors.surface.card');
+}
+
 /* ---- MultiSelect 元件 ---- */
 .theme-query-tool .multi-select {
   position: relative;

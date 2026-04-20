@@ -92,6 +92,10 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  pageSizeOptions: {
+    type: Array,
+    default: () => [25, 50, 100, 200],
+  },
 });
 
 const emit = defineEmits([
@@ -101,6 +105,7 @@ const emit = defineEmits([
   'lookup',
   'change-sub-tab',
   'change-lots-page',
+  'change-lots-page-size',
   'export-sub-tab',
 ]);
 
@@ -242,13 +247,23 @@ function inputPlaceholder() {
           @export="emit('export-sub-tab', 'lots')"
         />
         <div
-          v-if="activeSubTab === 'lots' && (lotsPagination?.total_pages || 1) > 1"
+          v-if="activeSubTab === 'lots' && (lotsPagination?.total || 0) > 0"
           class="query-tool-pagination"
         >
           <span class="query-tool-muted">
             第 {{ lotsPagination.page }} / {{ lotsPagination.total_pages }} 頁，共
             {{ lotsPagination.total }} 筆
           </span>
+          <label class="query-tool-page-size">
+            每頁
+            <select
+              :value="lotsPagination.per_page"
+              @change="emit('change-lots-page-size', Number($event.target.value))"
+            >
+              <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+            </select>
+            筆
+          </label>
           <div class="query-tool-pagination-actions">
             <button
               type="button"

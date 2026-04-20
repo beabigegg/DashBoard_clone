@@ -394,8 +394,16 @@ async function handleLotDetailPageChange({ tab, page }) {
   await lotDetail.setSubTabPage(tab, page);
 }
 
+async function handleLotDetailPageSizeChange({ tab, perPage }) {
+  await lotDetail.setSubTabPerPage(tab, perPage);
+}
+
 async function handleReverseDetailPageChange({ tab, page }) {
   await reverseDetail.setSubTabPage(tab, page);
+}
+
+async function handleReverseDetailPageSizeChange({ tab, perPage }) {
+  await reverseDetail.setSubTabPerPage(tab, perPage);
 }
 
 async function handleChangeEquipmentSubTab(tab) {
@@ -420,6 +428,14 @@ async function handleChangeLotEquipmentSubTab(tab) {
 
 async function handleExportLotEquipmentSubTab(tab) {
   await lotEquipmentQuery.exportSubTab(tab);
+}
+
+async function handleEquipmentLotsPageSizeChange(perPage) {
+  await equipmentQuery.queryLots({ page: 1, perPage });
+}
+
+function handleLotEquipmentLotsPageSizeChange(perPage) {
+  lotEquipmentQuery.changeLotsPerPage(perPage);
 }
 
 onMounted(async () => {
@@ -565,6 +581,7 @@ watch(
           :detail-quality-meta="lotDetail.qualityMeta"
           :workcenter-groups="lotDetail.workcenterGroups.value"
           :selected-workcenter-groups="lotDetail.selectedWorkcenterGroups.value"
+          :page-size-options="lotDetail.pageSizeOptions"
           @update:input-type="lotResolve.setInputType($event)"
           @update:input-text="lotResolve.setInputText($event)"
           @resolve="handleResolveLots"
@@ -573,6 +590,7 @@ watch(
           @update-workcenter-groups="handleWorkcenterGroupChange"
           @export-lot-tab="handleExportLotTab"
           @change-page="handleLotDetailPageChange"
+          @change-page-size="handleLotDetailPageSizeChange"
         />
 
         <SerialReverseTraceView
@@ -608,6 +626,7 @@ watch(
           :detail-quality-meta="reverseDetail.qualityMeta"
           :workcenter-groups="reverseDetail.workcenterGroups.value"
           :selected-workcenter-groups="reverseDetail.selectedWorkcenterGroups.value"
+          :page-size-options="reverseDetail.pageSizeOptions"
           @update:input-type="reverseResolve.setInputType($event)"
           @update:input-text="reverseResolve.setInputText($event)"
           @resolve="handleResolveReverse"
@@ -616,6 +635,7 @@ watch(
           @update-workcenter-groups="handleReverseWorkcenterGroupChange"
           @export-lot-tab="handleExportReverseTab"
           @change-page="handleReverseDetailPageChange"
+          @change-page-size="handleReverseDetailPageSizeChange"
         />
 
         <LotEquipmentView
@@ -641,12 +661,14 @@ watch(
           :rejects-rows="lotEquipmentQuery.rejectsRows.value"
           :exporting="lotEquipmentQuery.exporting"
           :can-export-sub-tab="lotEquipmentQuery.canExportSubTab"
+          :page-size-options="lotEquipmentQuery.pageSizeOptions"
           @update:input-type="lotEquipmentQuery.inputType.value = $event"
           @update:input-text="lotEquipmentQuery.inputText.value = $event"
           @update:selected-workcenter-groups="lotEquipmentQuery.selectedWorkcenterGroups.value = $event"
           @lookup="handleLotEquipmentLookup"
           @change-sub-tab="handleChangeLotEquipmentSubTab"
-          @change-lots-page="lotEquipmentQuery.queryLots({ page: $event })"
+          @change-lots-page="lotEquipmentQuery.changeLotsPage($event)"
+          @change-lots-page-size="handleLotEquipmentLotsPageSizeChange"
           @export-sub-tab="handleExportLotEquipmentSubTab"
         />
 
@@ -665,6 +687,7 @@ watch(
           :rejects-rows="equipmentQuery.rejectsRows.value"
           :exporting="equipmentQuery.exporting"
           :can-export-sub-tab="equipmentQuery.canExportSubTab"
+          :page-size-options="equipmentQuery.pageSizeOptions"
           @update:selected-equipment-ids="equipmentQuery.setSelectedEquipmentIds($event)"
           @update:start-date="equipmentQuery.startDate.value = $event"
           @update:end-date="equipmentQuery.endDate.value = $event"
@@ -672,6 +695,7 @@ watch(
           @query-active-sub-tab="handleQueryEquipmentActiveTab"
           @change-sub-tab="handleChangeEquipmentSubTab"
           @change-lots-page="equipmentQuery.queryLots({ page: $event })"
+          @change-lots-page-size="handleEquipmentLotsPageSizeChange"
           @export-sub-tab="handleExportEquipmentSubTab"
         />
       </div>

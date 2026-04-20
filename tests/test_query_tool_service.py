@@ -18,7 +18,6 @@ from mes_dashboard.services.query_tool_service import (
     _resolve_by_work_order,
     get_lot_split_merge_history,
     BATCH_SIZE,
-    MAX_EQUIPMENTS,
     MAX_DATE_RANGE_DAYS,
 )
 
@@ -149,19 +148,6 @@ class TestValidateEquipmentInput:
         assert result is not None
         assert '至少一台' in result
 
-    def test_exceeds_equipment_limit(self):
-        """Should reject equipment IDs exceeding limit."""
-        values = [f'EQ{i:05d}' for i in range(MAX_EQUIPMENTS + 1)]
-        result = validate_equipment_input(values)
-        assert result is not None
-        assert '不得超過' in result
-        assert str(MAX_EQUIPMENTS) in result
-
-    def test_exactly_at_limit(self):
-        """Should accept equipment IDs exactly at limit."""
-        values = [f'EQ{i:05d}' for i in range(MAX_EQUIPMENTS)]
-        result = validate_equipment_input(values)
-        assert result is None
 
 
 class TestResolveQueriesUseBindParams:
@@ -430,9 +416,6 @@ class TestServiceConstants:
         """Max date range should be 730 days (2 years)."""
         assert MAX_DATE_RANGE_DAYS == 730
 
-    def test_max_equipments_is_reasonable(self):
-        """Max equipments should be sensible."""
-        assert 5 <= MAX_EQUIPMENTS <= 50
 
 
 class TestGetWorkcenterForGroups:

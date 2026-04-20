@@ -12,7 +12,8 @@ const LOT_SUB_TABS = Object.freeze([
   'jobs',
 ]);
 const PAGED_SUB_TABS = new Set(['history', 'materials', 'rejects', 'holds']);
-const DEFAULT_PER_PAGE = 200;
+const DEFAULT_PER_PAGE = 25;
+const PAGE_SIZE_OPTIONS = Object.freeze([25, 50, 100, 200]);
 
 const ASSOCIATION_TABS = new Set(['materials', 'rejects', 'holds', 'jobs']);
 
@@ -453,6 +454,18 @@ export function useLotDetail(initial = {}) {
     return loadAssociation(normalized, { force: true, page: pageNumber });
   }
 
+  async function setSubTabPerPage(tab, perPage) {
+    const normalized = normalizeSubTab(tab);
+    if (!PAGED_SUB_TABS.has(normalized)) {
+      return false;
+    }
+    pagination[normalized].per_page = Number(perPage) || DEFAULT_PER_PAGE;
+    if (normalized === 'history') {
+      return loadHistory({ force: true, page: 1 });
+    }
+    return loadAssociation(normalized, { force: true, page: 1 });
+  }
+
   function getRowsByTab(tab) {
     const normalized = normalizeSubTab(tab);
     if (normalized === 'history') {
@@ -532,7 +545,9 @@ export function useLotDetail(initial = {}) {
     setSelectedContainerId,
     setSelectedContainerIds,
     setSelectedWorkcenterGroups,
+    pageSizeOptions: PAGE_SIZE_OPTIONS,
     setSubTabPage,
+    setSubTabPerPage,
     getRowsByTab,
     exportSubTab,
     clearTabData,

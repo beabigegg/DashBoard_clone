@@ -5,7 +5,8 @@ import { exportCsv } from '../utils/csv.js';
 import { normalizeText, toDateInputValue, uniqueValues } from '../utils/values.js';
 
 const EQUIPMENT_SUB_TABS = Object.freeze(['lots', 'jobs', 'rejects']);
-const DEFAULT_LOTS_PER_PAGE = 200;
+const DEFAULT_LOTS_PER_PAGE = 25;
+const PAGE_SIZE_OPTIONS = Object.freeze([25, 50, 100, 200]);
 
 function normalizeSubTab(value) {
   const tab = normalizeText(value).toLowerCase();
@@ -149,13 +150,13 @@ export function useEquipmentQuery(initial = {}) {
     }
   }
 
-  async function queryLots({ page = null } = {}) {
+  async function queryLots({ page = null, perPage = null } = {}) {
     loading.lots = true;
     errors.filters = '';
     errors.lots = '';
 
     try {
-      const payload = await fetchEquipmentPeriod('lots', { page, perPage: DEFAULT_LOTS_PER_PAGE });
+      const payload = await fetchEquipmentPeriod('lots', { page, perPage: perPage ?? lotsPagination.value.per_page });
       lotsRows.value = Array.isArray(payload?.data) ? payload.data : [];
       lotsPagination.value = payload?.pagination || {
         page: Number(page || 1),
@@ -360,6 +361,7 @@ export function useEquipmentQuery(initial = {}) {
     resetDateRange,
     setSelectedEquipmentIds,
     setActiveSubTab,
+    pageSizeOptions: PAGE_SIZE_OPTIONS,
     queryLots,
     queryJobs,
     queryRejects,

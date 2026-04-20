@@ -1,11 +1,12 @@
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, readonly, ref } from 'vue';
 
 import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api.js';
 import { exportCsv } from '../utils/csv.js';
 import { normalizeText, parseInputValues } from '../utils/values.js';
 
 const EQUIPMENT_SUB_TABS = Object.freeze(['lots', 'jobs', 'rejects']);
-const DEFAULT_LOTS_PER_PAGE = 200;
+const DEFAULT_LOTS_PER_PAGE = 25;
+const PAGE_SIZE_OPTIONS = Object.freeze([25, 50, 100, 200]);
 const MAX_INPUT = 100;
 
 const INPUT_TYPE_OPTIONS = Object.freeze([
@@ -44,8 +45,25 @@ export function useLotEquipmentQuery(initial = {}) {
 
   // ── Sub-tab data (same as useEquipmentQuery) ──
   const activeSubTab = ref(normalizeSubTab(initial.activeSubTab));
-  const lotsRows = ref([]);
-  const lotsPagination = ref({ page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 });
+  const _allLotsRows = ref([]);
+  const _lotsPerPage = ref(DEFAULT_LOTS_PER_PAGE);
+  const _lotsCurrentPage = ref(1);
+
+  const lotsRows = computed(() => {
+    const start = (_lotsCurrentPage.value - 1) * _lotsPerPage.value;
+    return _allLotsRows.value.slice(start, start + _lotsPerPage.value);
+  });
+
+  const lotsPagination = computed(() => {
+    const total = _allLotsRows.value.length;
+    const perPage = _lotsPerPage.value;
+    return {
+      page: _lotsCurrentPage.value,
+      per_page: perPage,
+      total,
+      total_pages: Math.max(1, Math.ceil(total / perPage)),
+    };
+  });
   const jobsRows = ref([]);
   const rejectsRows = ref([]);
 
@@ -159,8 +177,8 @@ export function useLotEquipmentQuery(initial = {}) {
     endDate.value = '';
     lookupMessage.value = '';
     traceMap.value = {};
-    lotsRows.value = [];
-    lotsPagination.value = { page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 };
+    _allLotsRows.value = [];
+    _lotsCurrentPage.value = 1;
     jobsRows.value = [];
     rejectsRows.value = [];
     Object.keys(queried).forEach((k) => { queried[k] = false; });
@@ -244,7 +262,7 @@ export function useLotEquipmentQuery(initial = {}) {
     return payload?.data || {};
   }
 
-  async function queryLots({ page = null } = {}) {
+  async function queryLots() {
     loading.lots = true;
     errors.filters = '';
     errors.lots = '';
@@ -255,27 +273,34 @@ export function useLotEquipmentQuery(initial = {}) {
       const allRows = Array.isArray(payload?.data) ? payload.data : [];
       const relevant = relevantLotNames.value;
       // When relevant set is empty (e.g., work_order with no trace map), show all lots
-      lotsRows.value = relevant.size > 0
+      _allLotsRows.value = relevant.size > 0
         ? allRows.filter((row) => {
             const name = String(row.CONTAINERNAME || '').toUpperCase();
             return relevant.has(name);
           })
         : allRows;
-      lotsPagination.value = {
-        page: 1,
-        per_page: lotsRows.value.length,
-        total: lotsRows.value.length,
-        total_pages: 1,
-      };
+      _lotsCurrentPage.value = 1;
       queried.lots = true;
       return true;
     } catch (error) {
       errors.lots = error?.message || '查詢生產紀錄失敗';
-      lotsRows.value = [];
+      _allLotsRows.value = [];
       return false;
     } finally {
       loading.lots = false;
     }
+  }
+
+  function changeLotsPage(page) {
+    const p = Number(page);
+    if (!Number.isNaN(p) && p >= 1 && p <= lotsPagination.value.total_pages) {
+      _lotsCurrentPage.value = p;
+    }
+  }
+
+  function changeLotsPerPage(perPage) {
+    _lotsPerPage.value = Number(perPage) || DEFAULT_LOTS_PER_PAGE;
+    _lotsCurrentPage.value = 1;
   }
 
   async function queryJobs() {
@@ -333,7 +358,7 @@ export function useLotEquipmentQuery(initial = {}) {
 
   function canExportSubTab(tab) {
     const normalized = normalizeSubTab(tab);
-    if (normalized === 'lots') return lotsRows.value.length > 0;
+    if (normalized === 'lots') return _allLotsRows.value.length > 0;
     if (normalized === 'jobs') return jobsRows.value.length > 0;
     if (normalized === 'rejects') return rejectsRows.value.length > 0;
     return lotsRows.value.length > 0;
@@ -393,11 +418,14 @@ export function useLotEquipmentQuery(initial = {}) {
     exporting,
     bootstrap,
     lookupEquipment,
+    pageSizeOptions: PAGE_SIZE_OPTIONS,
     queryLots,
     queryJobs,
     queryRejects,
     queryActiveSubTab,
     setActiveSubTab,
+    changeLotsPage,
+    changeLotsPerPage,
     canExportSubTab,
     exportSubTab,
     clearResults,

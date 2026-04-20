@@ -62,6 +62,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  pageSizeOptions: {
+    type: Array,
+    default: () => [25, 50, 100, 200],
+  },
   qualityMeta: {
     type: Object,
     required: true,
@@ -76,7 +80,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['change-sub-tab', 'update-workcenter-groups', 'export-tab', 'change-page']);
+const emit = defineEmits(['change-sub-tab', 'update-workcenter-groups', 'export-tab', 'change-page', 'change-page-size']);
 
 const tabMeta = Object.freeze({
   history: { label: '歷程', emptyText: '無歷程資料' },
@@ -304,13 +308,23 @@ const detailCountLabel = computed(() => {
       />
 
       <div
-        v-if="activePagination.total_pages > 1"
+        v-if="activePagination.total > 0"
         class="query-tool-pagination"
       >
         <span class="query-tool-muted">
           第 {{ activePagination.page }} / {{ activePagination.total_pages }} 頁，共
           {{ activePagination.total }} 筆
         </span>
+        <label class="query-tool-page-size">
+          每頁
+          <select
+            :value="activePagination.per_page"
+            @change="emit('change-page-size', { tab: activeSubTab, perPage: Number($event.target.value) })"
+          >
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+          </select>
+          筆
+        </label>
         <div class="query-tool-pagination-actions">
           <button
             type="button"

@@ -128,6 +128,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  pageSizeOptions: {
+    type: Array,
+    default: () => [25, 50, 100, 200],
+  },
 });
 
 const emit = defineEmits([
@@ -139,6 +143,7 @@ const emit = defineEmits([
   'update-workcenter-groups',
   'export-lot-tab',
   'change-page',
+  'change-page-size',
 ]);
 </script>
 
@@ -196,10 +201,12 @@ const emit = defineEmits([
       :quality-meta="detailQualityMeta"
       :workcenter-groups="workcenterGroups"
       :selected-workcenter-groups="selectedWorkcenterGroups"
+      :page-size-options="pageSizeOptions"
       @change-sub-tab="emit('change-sub-tab', $event)"
       @update-workcenter-groups="emit('update-workcenter-groups', $event)"
       @export-tab="emit('export-lot-tab', $event)"
       @change-page="emit('change-page', $event)"
+      @change-page-size="emit('change-page-size', $event)"
     />
   </div>
 </template>
