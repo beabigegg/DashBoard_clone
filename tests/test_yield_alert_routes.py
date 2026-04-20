@@ -220,6 +220,35 @@ def test_filter_options_returns_workcenter_groups(mock_groups, client):
     assert payload["data"]["workcenter_groups"] == ["焊接_DB", "焊接_WB", "成型"]
 
 
+@patch("mes_dashboard.routes.yield_alert_routes.compute_cross_filter_options")
+def test_cross_filter_options_forwards_query_id_and_filters(mock_compute, client):
+    mock_compute.return_value = {
+        "lines": ["L1"],
+        "packages": ["PKG-A"],
+        "types": ["TYPE-A"],
+        "functions": ["FUNC-A"],
+    }
+
+    response = client.get(
+        "/api/yield-alert/cross-filter-options"
+        "?query_id=qid-001"
+        "&workcenter_groups=%E7%84%8A%E6%8E%A5_WB"
+        "&lines=L1"
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["success"] is True
+    assert payload["data"]["packages"] == ["PKG-A"]
+    mock_compute.assert_called_once()
+    _, kwargs = mock_compute.call_args
+    assert kwargs["query_id"] == "qid-001"
+    assert kwargs["filters"]["workcenter_groups"] == ["焊接_WB"]
+    assert "焊接_WB" in kwargs["filters"]["departments"]
+    assert "焊接_DW" in kwargs["filters"]["departments"]
+    assert kwargs["filters"]["lines"] == ["L1"]
+
+
 @patch("mes_dashboard.routes.yield_alert_routes.build_drilldown_payload")
 def test_drilldown_context_returns_payload(mock_payload, client):
     mock_payload.return_value = {

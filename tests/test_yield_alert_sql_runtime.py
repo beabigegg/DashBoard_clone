@@ -5,12 +5,15 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+import duckdb
+import pandas as pd
 from unittest.mock import patch, MagicMock
 
 from mes_dashboard.services.yield_alert_sql_runtime import (
     _qid,
     _sql_str_literal,
     _attach_spool_view,
+    compute_cross_filter_options,
     SQL_FALLBACK_DISABLED,
     SQL_FALLBACK_DEP_MISSING,
     SQL_FALLBACK_SPOOL_MISS,
@@ -93,3 +96,55 @@ class TestDeptSeqMap:
 
     def test_seq_map_starts_at_zero(self):
         assert 0 in _DEPT_SEQ_MAP.values()
+
+
+class TestCrossFilterOptions:
+    def test_compute_cross_filter_options_applies_other_dimension_filters(self, tmp_path, monkeypatch):
+        parquet_path = tmp_path / "yield-alert.parquet"
+        pd.DataFrame([
+            {
+                "DEPARTMENT_GROUP": "焊接_WB",
+                "LINE_NAME": "L1",
+                "PACKAGE_NAME": "PKG-A",
+                "TYPE_NAME": "TYPE-A",
+                "FUNCTION_NAME": "FUNC-A",
+            },
+            {
+                "DEPARTMENT_GROUP": "焊接_WB",
+                "LINE_NAME": "L1",
+                "PACKAGE_NAME": "PKG-B",
+                "TYPE_NAME": "TYPE-B",
+                "FUNCTION_NAME": "FUNC-B",
+            },
+            {
+                "DEPARTMENT_GROUP": "切割",
+                "LINE_NAME": "L2",
+                "PACKAGE_NAME": "PKG-C",
+                "TYPE_NAME": "TYPE-C",
+                "FUNCTION_NAME": "FUNC-C",
+            },
+        ]).to_parquet(parquet_path, index=False)
+
+        monkeypatch.setattr(
+            "mes_dashboard.services.yield_alert_sql_runtime.get_spool_file_path",
+            lambda namespace, query_id: str(parquet_path),
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.core.duckdb_runtime.create_heavy_query_connection",
+            lambda: duckdb.connect(database=":memory:"),
+        )
+
+        result = compute_cross_filter_options(
+            query_id="qid-001",
+            filters={
+                "departments": ["焊接_WB"],
+                "lines": ["L1"],
+                "packages": ["PKG-A"],
+            },
+        )
+
+        assert result is not None
+        assert result["lines"] == ["L1"]
+        assert result["packages"] == ["PKG-A", "PKG-B"]
+        assert result["types"] == ["TYPE-A"]
+        assert result["functions"] == ["FUNC-A"]

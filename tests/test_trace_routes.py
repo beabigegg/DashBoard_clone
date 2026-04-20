@@ -152,8 +152,6 @@ def test_seed_resolve_query_tool_rejects_reverse_only_type():
     ("resolve_type", "input_value"),
     [
         ("serial_number", "SN-001"),
-        ("gd_work_order", "GD25060001"),
-        ("gd_lot_id", "GD25060502-A11"),
     ],
 )
 @patch('mes_dashboard.routes.trace_routes.resolve_lots')
@@ -189,6 +187,79 @@ def test_seed_resolve_mid_section_defect_container_supports_reverse_input_types(
     assert payload['data']['stage'] == 'seed-resolve'
     assert payload['data']['seed_count'] == 1
     assert payload['data']['seeds'][0]['container_id'] == 'CID-MSD'
+
+
+@pytest.mark.parametrize(
+    ("resolve_type", "input_value"),
+    [
+        ("gd_work_order", "GD25060001"),
+        ("gd_lot_id", "GD25060502-A11"),
+        ("work_order", "GA26010001"),
+        ("lot_id", "LOT-001"),
+        ("wafer_lot", "WAFER-001"),
+    ],
+)
+@patch('mes_dashboard.routes.trace_routes.resolve_msd_seeds_at_station')
+def test_seed_resolve_mid_section_defect_container_station_resolve_types_use_detection_history(
+    mock_resolve_station,
+    resolve_type,
+    input_value,
+):
+    mock_resolve_station.return_value = (
+        [
+            {
+                'container_id': 'CID-MSD',
+                'container_name': 'LOT-MSD',
+                'lot_id': 'LOT-MSD',
+            }
+        ],
+        None,
+    )
+
+    client = _client()
+    response = client.post(
+        '/api/trace/seed-resolve',
+        json={
+            'profile': 'mid_section_defect',
+            'params': {
+                'mode': 'container',
+                'resolve_type': resolve_type,
+                'values': [input_value],
+                'station': '測試',
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['data']['seed_count'] == 1
+    assert payload['data']['seeds'][0]['container_id'] == 'CID-MSD'
+    mock_resolve_station.assert_called_once_with(resolve_type, [input_value], '測試')
+
+
+@patch('mes_dashboard.routes.trace_routes.resolve_msd_seeds_at_station')
+def test_seed_resolve_mid_section_defect_container_station_resolve_types_return_404_when_no_detection_records(
+    mock_resolve_station,
+):
+    mock_resolve_station.return_value = ([], None)
+
+    client = _client()
+    response = client.post(
+        '/api/trace/seed-resolve',
+        json={
+            'profile': 'mid_section_defect',
+            'params': {
+                'mode': 'container',
+                'resolve_type': 'gd_work_order',
+                'values': ['GD25060001'],
+                'station': '測試',
+            },
+        },
+    )
+
+    assert response.status_code == 404
+    payload = response.get_json()
+    assert payload['error']['code'] == 'NO_DETECTION_RECORDS'
 
 
 @patch('mes_dashboard.routes.trace_routes.resolve_trace_seed_lots')

@@ -19,6 +19,7 @@ from mes_dashboard.services.mid_section_defect_service import (
     query_analysis_detail,
     query_all_loss_reasons,
     query_station_options,
+    resolve_msd_seeds_at_station,
 )
 
 
@@ -42,6 +43,43 @@ def test_query_analysis_exceeds_max_days_returns_error():
 
     assert 'error' in result
     assert '730' in result['error']
+
+
+@patch('mes_dashboard.services.mid_section_defect_service.read_sql_df')
+@patch('mes_dashboard.services.mid_section_defect_service.SQLLoader.load_with_params')
+@patch('mes_dashboard.services.mid_section_defect_service._build_station_filter')
+def test_resolve_msd_seeds_at_station_deduplicates_results_and_uses_station_sql(
+    mock_build_station_filter,
+    mock_load_sql,
+    mock_read_sql,
+):
+    mock_build_station_filter.return_value = ('h.STATION = :station', {'station': '測試'})
+    mock_load_sql.return_value = 'SELECT * FROM fake_station_seed_sql'
+    mock_read_sql.return_value = pd.DataFrame([
+        {'CONTAINERID': 'CID-001', 'CONTAINERNAME': 'LOT-001'},
+        {'CONTAINERID': 'CID-001', 'CONTAINERNAME': 'LOT-001'},
+        {'CONTAINERID': 'CID-002', 'CONTAINERNAME': 'LOT-002'},
+    ])
+
+    seeds, err = resolve_msd_seeds_at_station('gd_work_order', ['WO-001', 'WO-001'], station='測試')
+
+    assert err is None
+    assert seeds == [
+        {'container_id': 'CID-001', 'container_name': 'LOT-001', 'lot_id': 'LOT-001'},
+        {'container_id': 'CID-002', 'container_name': 'LOT-002', 'lot_id': 'LOT-002'},
+    ]
+    mock_build_station_filter.assert_called_once_with('測試', 'h')
+    mock_load_sql.assert_called_once()
+    assert mock_load_sql.call_args.args[0] == 'mid_section_defect/station_seed_by_filter'
+    assert mock_load_sql.call_args.kwargs['VALUE_FILTER'] == "c.MFGORDERNAME IN ('WO-001', 'WO-001')"
+    mock_read_sql.assert_called_once_with('SELECT * FROM fake_station_seed_sql', {'station': '測試'})
+
+
+def test_resolve_msd_seeds_at_station_rejects_unsupported_type():
+    seeds, err = resolve_msd_seeds_at_station('serial_number', ['SN-001'])
+
+    assert seeds == []
+    assert 'not supported' in err
 
 
 @patch('mes_dashboard.services.mid_section_defect_service.query_analysis')

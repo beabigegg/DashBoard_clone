@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { useEquipmentQuery } from '../src/query-tool/composables/useEquipmentQuery.js';
-import { useLotDetail } from '../src/query-tool/composables/useLotDetail.js';
-import { useLotLineage } from '../src/query-tool/composables/useLotLineage.js';
-import { useLotResolve } from '../src/query-tool/composables/useLotResolve.js';
+import { useEquipmentQuery } from '../../src/query-tool/composables/useEquipmentQuery.js';
+import { useLotDetail } from '../../src/query-tool/composables/useLotDetail.js';
+import { useLotLineage } from '../../src/query-tool/composables/useLotLineage.js';
+import { useLotResolve } from '../../src/query-tool/composables/useLotResolve.js';
 
 
 function setupWindowMesApi({ get, post } = {}) {
@@ -398,6 +398,73 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
     const latestHistoryCall = getCalls.filter((url) => url.startsWith('/api/query-tool/lot-history?')).at(-1);
     const latestParams = new URL(latestHistoryCall, 'http://local.test').searchParams;
     assert.equal(latestParams.get('workcenter_groups'), 'WB');
+  } finally {
+    restore();
+  }
+});
+
+
+test('useLotDetail changing per-page resets current page to 1 for paged tabs', async () => {
+  const getCalls = [];
+  const restore = setupWindowMesApi({
+    get: async (url) => {
+      getCalls.push(url);
+      const parsed = new URL(url, 'http://local.test');
+      if (parsed.pathname === '/api/query-tool/lot-history') {
+        const page = Number(parsed.searchParams.get('page') || 1);
+        const perPage = Number(parsed.searchParams.get('per_page') || 25);
+        return {
+          data: {
+            data: [{ CONTAINERID: `CID-H-${page}`, EQUIPMENTID: 'EQ-01' }],
+            pagination: { page, per_page: perPage, total: 8, total_pages: Math.ceil(8 / perPage) || 1 },
+            quality_meta: { status: 'complete', reasons: [] },
+          },
+        };
+      }
+      if (parsed.pathname === '/api/query-tool/lot-associations') {
+        const assocType = parsed.searchParams.get('type');
+        const page = Number(parsed.searchParams.get('page') || 1);
+        const perPage = Number(parsed.searchParams.get('per_page') || 25);
+        return {
+          data: {
+            data: [{ TYPE: assocType, PAGE: page }],
+            pagination: { page, per_page: perPage, total: 5, total_pages: Math.ceil(5 / perPage) || 1 },
+            quality_meta: { status: 'complete', reasons: [] },
+          },
+        };
+      }
+      return { data: {} };
+    },
+  });
+
+  try {
+    const detail = useLotDetail({ activeSubTab: 'history' });
+    await detail.setSelectedContainerId('CID-001');
+
+    await detail.setSubTabPage('history', 2);
+    assert.equal(detail.pagination.history.page, 2);
+
+    await detail.setSubTabPerPage('history', 50);
+    assert.equal(detail.pagination.history.page, 1);
+    assert.equal(detail.pagination.history.per_page, 50);
+    const latestHistoryCall = getCalls.filter((url) => url.startsWith('/api/query-tool/lot-history?')).at(-1);
+    const historyParams = new URL(latestHistoryCall, 'http://local.test').searchParams;
+    assert.equal(historyParams.get('page'), '1');
+    assert.equal(historyParams.get('per_page'), '50');
+
+    await detail.setActiveSubTab('materials');
+    await detail.setSubTabPage('materials', 3);
+    assert.equal(detail.pagination.materials.page, 3);
+
+    await detail.setSubTabPerPage('materials', 100);
+    assert.equal(detail.pagination.materials.page, 1);
+    assert.equal(detail.pagination.materials.per_page, 100);
+    const latestMaterialsCall = getCalls
+      .filter((url) => url.includes('/api/query-tool/lot-associations?') && url.includes('type=materials'))
+      .at(-1);
+    const materialParams = new URL(latestMaterialsCall, 'http://local.test').searchParams;
+    assert.equal(materialParams.get('page'), '1');
+    assert.equal(materialParams.get('per_page'), '100');
   } finally {
     restore();
   }

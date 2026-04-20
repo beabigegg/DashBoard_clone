@@ -418,3 +418,142 @@ class TestTraceQueryIdCanonical:
         )
         assert isinstance(tqid, str)
         assert len(tqid) > 0
+
+
+class _InMemoryRedis:
+    def __init__(self):
+        self.kv = {}
+        self.sets = {}
+
+    def setex(self, key, ttl, value):
+        self.kv[key] = value
+
+    def get(self, key):
+        return self.kv.get(key)
+
+    def sadd(self, key, value):
+        self.sets.setdefault(key, set()).add(value)
+
+    def smembers(self, key):
+        return self.sets.get(key, set())
+
+    def expire(self, key, ttl):
+        return True
+
+
+def test_msd_container_mode_worker_writes_real_stage_spools_consumable_by_duckdb(tmp_path):
+    """End-to-end regression guard for the recent MSD container-mode fix.
+
+    Covers the real worker write path:
+    seed container ids + lineage ancestors -> stage parquet spools ->
+    DuckDB summary/detail. The assertion on ``UPSTREAM_MACHINE_COUNT == 2``
+    verifies the self-link lineage row keeps the seed's own intermediate-station
+    event in attribution, which is the production bug this change fixed.
+    """
+    import mes_dashboard.core.query_spool_store as spool_store
+    import mes_dashboard.services.trace_job_service as tjs
+    from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+
+    fake_redis = _InMemoryRedis()
+    ctrl = MagicMock()
+
+    def _fake_fetch_events_to_parquet(container_ids, domain, dest):
+        assert domain == "upstream_history"
+        rows = [
+            {
+                "CONTAINERID": "CID-SEED",
+                "WORKCENTER_GROUP": "成型",
+                "EQUIPMENTID": "EQ-SEED",
+                "EQUIPMENTNAME": "FORM-01",
+                "SPECNAME": "SPEC-SEED",
+                "TRACKINTIMESTAMP": "2025-01-10 08:00:00",
+                "MATERIALPARTNAME": None,
+                "MATERIALLOTNAME": None,
+            },
+            {
+                "CONTAINERID": "CID-ANC-1",
+                "WORKCENTER_GROUP": "焊接_WB",
+                "EQUIPMENTID": "EQ-ANC-1",
+                "EQUIPMENTNAME": "WIRE-01",
+                "SPECNAME": "SPEC-ANC",
+                "TRACKINTIMESTAMP": "2025-01-09 08:00:00",
+                "MATERIALPARTNAME": None,
+                "MATERIALLOTNAME": None,
+            },
+        ]
+        pd.DataFrame(rows).to_parquet(dest, index=False)
+        return len(rows), {
+            "status": "complete",
+            "scope": "domain",
+            "domain": domain,
+            "reasons": [],
+        }
+
+    detection_df = pd.DataFrame([
+        {
+            "CONTAINERID": "CID-SEED",
+            "CONTAINERNAME": "LOT-SEED",
+            "PJ_TYPE": "TYPE-A",
+            "PRODUCTLINENAME": "PKG-A",
+            "WORKFLOW": "WF-A",
+            "FINISHEDRUNCARD": "RC-001",
+            "DETECTION_EQUIPMENTNAME": "DET-01",
+            "TRACKINQTY": 100,
+            "LOSSREASONNAME": "R1",
+            "REJECTQTY": 5,
+            "TRACKINTIMESTAMP": "2025-01-10 09:00:00",
+        }
+    ])
+
+    with patch.object(spool_store, "QUERY_SPOOL_DIR", tmp_path), \
+         patch.object(spool_store, "get_redis_client", return_value=fake_redis), \
+         patch.object(tjs, "get_redis_client", return_value=fake_redis), \
+         patch.object(tjs, "get_control_redis_client", return_value=ctrl), \
+         patch("mes_dashboard.rq_worker_preload.ensure_rq_logging"), \
+         patch("mes_dashboard.services.event_fetcher.EventFetcher.fetch_events_to_parquet", side_effect=_fake_fetch_events_to_parquet), \
+         patch.object(tjs, "_build_job_msd_aggregation", return_value=({"kpi": {"lot_count": 1}}, None)), \
+         patch("mes_dashboard.services.mid_section_defect_service._fetch_detection_by_container_ids", return_value=detection_df):
+        tjs.execute_trace_events_job(
+            "job-msd-e2e-001",
+            "mid_section_defect",
+            ["CID-SEED"],
+            ["upstream_history"],
+            {
+                "seed_container_ids": ["CID-SEED"],
+                "lineage": {
+                    "ancestors": {"CID-SEED": ["CID-ANC-1"]},
+                    "cid_to_name": {"CID-SEED": "LOT-SEED", "CID-ANC-1": "LOT-ANC-1"},
+                    "seed_roots": {"CID-SEED": "ROOT-001"},
+                },
+                "params": {
+                    "mode": "container",
+                    "direction": "backward",
+                    "station": "測試",
+                },
+            },
+        )
+
+        trace_query_id = tjs.make_trace_query_id(
+            profile="mid_section_defect",
+            container_ids=["CID-SEED"],
+            station="測試",
+            direction="backward",
+        )
+
+        rt = MsdDuckdbRuntime(trace_query_id)
+        assert rt.is_available() is True
+
+        summary = rt.get_summary(direction="backward")
+        detail = rt.get_detail(page=1, per_page=20, direction="backward")
+
+    assert summary is not None
+    assert summary["kpi"]["lot_count"] == 1
+    assert summary["detail_total_count"] == 1
+
+    assert detail is not None
+    assert detail["pagination"]["total"] == 1
+    row = detail["items"][0]
+    assert row["CONTAINERNAME"] == "LOT-SEED"
+    assert row["UPSTREAM_MACHINE_COUNT"] == 2
+    machine_names = {item["machine"] for item in row["UPSTREAM_MACHINES"]}
+    assert machine_names == {"FORM-01", "WIRE-01"}

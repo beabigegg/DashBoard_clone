@@ -300,6 +300,75 @@ def test_execute_job_success(mock_fetch, mock_ctrl_redis, mock_redis, mock_spool
     assert last_meta["status"] == "finished"
 
 
+@patch("mes_dashboard.rq_worker_preload.ensure_rq_logging")
+@patch.object(tjs, "_store_result_manifest")
+@patch.object(tjs, "_write_trace_events_spool")
+@patch.object(tjs, "get_redis_client")
+@patch.object(tjs, "get_control_redis_client")
+@patch.object(tjs, "_build_job_msd_aggregation")
+@patch.object(tjs, "_write_msd_events_spool_from_paths")
+@patch.object(tjs, "_resolve_msd_lineage_payload")
+@patch("mes_dashboard.services.event_fetcher.EventFetcher.fetch_events_to_parquet")
+@patch("mes_dashboard.services.mid_section_defect_service._write_msd_detection_stage_spool")
+@patch("mes_dashboard.services.mid_section_defect_service._fetch_detection_by_container_ids")
+def test_execute_job_msd_container_mode_fetches_detection_for_expanded_container_ids(
+    mock_fetch_detection,
+    mock_write_detection_stage,
+    mock_fetch_events_to_parquet,
+    mock_resolve_lineage,
+    mock_write_events_stage,
+    mock_build_aggregation,
+    mock_ctrl_redis,
+    mock_redis,
+    mock_write_trace_spool,
+    mock_store_manifest,
+    _mock_ensure_rq_logging,
+):
+    mock_fetch_events_to_parquet.return_value = (
+        1,
+        {"status": "complete", "scope": "domain", "domain": "upstream_history", "reasons": []},
+    )
+    mock_resolve_lineage.return_value = {
+        "ancestors": {
+            "CID-SEED": ["CID-ANCESTOR-1", "CID-ANCESTOR-2"],
+        },
+    }
+    mock_fetch_detection.return_value = MagicMock(empty=False, __len__=lambda self: 2)
+    mock_build_aggregation.return_value = ({"kpi": {"lot_count": 1}}, None)
+    mock_ctrl_redis.return_value = MagicMock()
+    mock_redis.return_value = MagicMock()
+    mock_write_trace_spool.return_value = None
+    mock_store_manifest.return_value = None
+
+    tjs.execute_trace_events_job(
+        "test-job-msd-1",
+        "mid_section_defect",
+        ["CID-SEED"],
+        ["upstream_history"],
+        {
+            "seed_container_ids": ["CID-SEED"],
+            "params": {
+                "mode": "container",
+                "station": "測試",
+                "direction": "backward",
+            },
+        },
+    )
+
+    mock_fetch_events_to_parquet.assert_called_once()
+    fetched_container_ids = mock_fetch_events_to_parquet.call_args.args[0]
+    assert fetched_container_ids == ["CID-SEED", "CID-ANCESTOR-1", "CID-ANCESTOR-2"]
+
+    mock_fetch_detection.assert_called_once_with(
+        ["CID-SEED", "CID-ANCESTOR-1", "CID-ANCESTOR-2"],
+        "測試",
+    )
+    mock_write_detection_stage.assert_called_once()
+    assert mock_write_detection_stage.call_args.args[1] is mock_fetch_detection.return_value
+    mock_write_events_stage.assert_called_once()
+    mock_build_aggregation.assert_called_once()
+
+
 @patch.object(tjs, "_write_trace_events_spool")
 @patch.object(tjs, "get_redis_client")
 @patch.object(tjs, "get_control_redis_client")
