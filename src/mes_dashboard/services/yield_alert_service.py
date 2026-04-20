@@ -896,21 +896,74 @@ def query_alert_candidates(
     }
 
 
-def query_reason_detail(*, workorder: str, date_bucket: str, reason_code: str = "", department: str = "") -> list[dict]:
+def _bucket_to_date_range(date_bucket: str, granularity: str) -> tuple[str, str]:
+    """Expand a bucketed date string to (start_date, end_date) in YYYY-MM-DD format."""
+    import calendar
+    from datetime import date as _date, timedelta
+
+    if granularity == "month":
+        # date_bucket = "YYYY-MM"
+        try:
+            year, month = int(date_bucket[:4]), int(date_bucket[5:7])
+            last_day = calendar.monthrange(year, month)[1]
+            return f"{year:04d}-{month:02d}-01", f"{year:04d}-{month:02d}-{last_day:02d}"
+        except (ValueError, IndexError):
+            return date_bucket, date_bucket
+
+    if granularity == "year":
+        # date_bucket = "YYYY"
+        try:
+            year = int(date_bucket[:4])
+            return f"{year:04d}-01-01", f"{year:04d}-12-31"
+        except (ValueError, IndexError):
+            return date_bucket, date_bucket
+
+    if granularity == "week":
+        # date_bucket = "YYYY-MM-DD" (week Monday)
+        try:
+            monday = _date.fromisoformat(date_bucket)
+            sunday = monday + timedelta(days=6)
+            return date_bucket, sunday.isoformat()
+        except (ValueError, AttributeError):
+            return date_bucket, date_bucket
+
+    # day (default)
+    return date_bucket, date_bucket
+
+
+def query_reason_detail(*, workorder: str, date_bucket: str, reason_code: str = "", department: str = "", granularity: str = "day") -> list[dict]:
     if not workorder or not date_bucket:
         return []
+
+    start_date, end_date = _bucket_to_date_range(date_bucket, granularity)
+    norm_reason = reason_code.strip().upper() if reason_code and reason_code.strip() else None
+    norm_dept   = department.strip() if department and department.strip() else None
 
     sql = SQLLoader.load("yield_alert/reason_detail")
     params: dict = {
         "workorder": workorder,
-        "date_bucket": date_bucket,
-        "reason_code": reason_code.strip().upper() if reason_code and reason_code.strip() else None,
-        "department": department.strip() if department and department.strip() else None,
+        "start_date": start_date,
+        "end_date": end_date,
+        "reason_code": norm_reason,
     }
     df = read_sql_df_slow(sql, params)
 
+    if df.empty:
+        params_no_filter = {**params, "reason_code": None}
+        df_no_filter = read_sql_df_slow(sql, params_no_filter)
+        logger.warning(
+            "reason_detail empty: workorder=%s start=%s end=%s "
+            "reason_code=%r department=%r rows_no_filter=%d",
+            workorder, start_date, end_date,
+            norm_reason, norm_dept, len(df_no_filter),
+        )
+
     items: list[dict] = []
     for _, row in df.iterrows():
+        wc_name = str(row.get("WORKCENTERNAME") or "")
+        py_group = _normalize_yield_department_group(wc_name)
+        if norm_dept and py_group != norm_dept:
+            continue
         txn_time = row.get("TXN_TIME")
         if hasattr(txn_time, "strftime"):
             txn_time_str = txn_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -919,8 +972,8 @@ def query_reason_detail(*, workorder: str, date_bucket: str, reason_code: str = 
         items.append({
             "txn_time": txn_time_str,
             "containername": str(row.get("CONTAINERNAME") or ""),
-            "workcentername": str(row.get("WORKCENTERNAME") or ""),
-            "workcenter_group": str(row.get("WORKCENTER_GROUP") or ""),
+            "workcentername": wc_name,
+            "workcenter_group": py_group if py_group != "(NA)" else str(row.get("WORKCENTER_GROUP") or ""),
             "specname": str(row.get("SPECNAME") or ""),
             "equipmentname": str(row.get("EQUIPMENTNAME") or ""),
             "productname": str(row.get("PRODUCTNAME") or ""),

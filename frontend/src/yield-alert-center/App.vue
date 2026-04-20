@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
 import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling.js';
@@ -564,7 +564,7 @@ function onSort(field) {
     sortState.sort_by = field;
     sortState.sort_dir = field === 'date_bucket' ? 'desc' : 'asc';
   }
-  runQuery(1);
+  void runAlertPage(1);
 }
 
 function goToPage(nextPage) {
@@ -607,6 +607,7 @@ async function toggleReasonDetail(row) {
         date_bucket: row.date_bucket,
         reason_code: row.reason_code || '',
         department: row.department || '',
+        granularity: granularity.value,
       },
       timeout: API_TIMEOUT,
     });
@@ -648,6 +649,48 @@ function resetFilters() {
   errorMessage.value = '';
   syncUrlState();
 }
+
+// ── Issue 1: granularity 變更立即 re-query，不需點套用篩選 ─────────────────
+watch(granularity, (newVal, oldVal) => {
+  if (newVal !== oldVal && queryId.value && hasQueried.value && !loading.value) {
+    void runQuery(1);
+  }
+});
+
+// ── Cross-filter: dimension filter changes narrow other dropdowns' options ────
+// Does NOT auto-run the full query; user still clicks "套用篩選" to execute.
+let _crossFilterTimer = null;
+async function fetchCrossFilterOptions() {
+  if (!queryId.value || !hasQueried.value) return;
+  const params = new URLSearchParams({ query_id: queryId.value });
+  for (const g of filters.workcenterGroups) params.append('workcenter_groups', g);
+  for (const v of filters.lines)            params.append('lines', v);
+  for (const v of filters.packages)         params.append('packages', v);
+  for (const v of filters.types)            params.append('types', v);
+  for (const v of filters.functions)        params.append('functions', v);
+  try {
+    const resp = await apiGet(`/api/yield-alert/cross-filter-options?${params.toString()}`, { timeout: 15000 });
+    if (!resp.success) return;
+    const fo = resp.data || {};
+    if (fo.lines?.length)     lineOptions.value     = fo.lines;
+    if (fo.packages?.length)  packageOptions.value  = fo.packages;
+    if (fo.types?.length)     typeOptions.value     = fo.types;
+    if (fo.functions?.length) functionOptions.value = fo.functions;
+  } catch (_e) {
+    // Cross-filter is best-effort; silently ignore network errors
+  }
+}
+function scheduleCrossFilter() {
+  if (!queryId.value || !hasQueried.value) return;
+  clearTimeout(_crossFilterTimer);
+  _crossFilterTimer = setTimeout(() => { void fetchCrossFilterOptions(); }, 300);
+}
+
+watch(() => [...filters.workcenterGroups], scheduleCrossFilter);
+watch(() => [...filters.lines],            scheduleCrossFilter);
+watch(() => [...filters.packages],         scheduleCrossFilter);
+watch(() => [...filters.types],            scheduleCrossFilter);
+watch(() => [...filters.functions],        scheduleCrossFilter);
 
 onMounted(() => {
   setDefaultDateRange();

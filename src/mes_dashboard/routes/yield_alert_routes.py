@@ -46,6 +46,7 @@ from mes_dashboard.services.yield_alert_service import (
     query_yield_summary,
     query_yield_trend,
 )
+from mes_dashboard.services.yield_alert_sql_runtime import compute_cross_filter_options
 
 logger = logging.getLogger("mes_dashboard.yield_alert_routes")
 
@@ -574,12 +575,13 @@ def api_yield_alert_reason_detail():
     date_bucket = str(request.args.get("date_bucket", "")).strip()
     reason_code = str(request.args.get("reason_code", "")).strip()
     department = str(request.args.get("department", "")).strip()
+    granularity = str(request.args.get("granularity", "day") or "day").strip().lower()
 
     if not workorder or not date_bucket:
         return validation_error("缺少必要參數: workorder, date_bucket")
 
     try:
-        items = query_reason_detail(workorder=workorder, date_bucket=date_bucket, reason_code=reason_code, department=department)
+        items = query_reason_detail(workorder=workorder, date_bucket=date_bucket, reason_code=reason_code, department=department, granularity=granularity)
         return success_response({
             "items": items,
             "workorder": workorder,
@@ -629,3 +631,24 @@ def api_yield_alert_filter_options():
     except Exception:
         logger.exception("Yield alert filter options query failed")
         return internal_error("載入站別群組選項失敗")
+
+
+@yield_alert_bp.route("/api/yield-alert/cross-filter-options", methods=["GET"])
+@_QUERY_RATE_LIMIT
+def api_yield_alert_cross_filter_options():
+    """Return available dimension options filtered by the other currently-selected
+    dimensions.  Uses the cached spool; never re-queries Oracle."""
+    if not _YIELD_ALERT_ENABLED:
+        return not_found_error("yield_alert_disabled")
+
+    query_id = str(request.args.get("query_id", "")).strip()
+    if not query_id:
+        return validation_error("缺少必要參數: query_id")
+
+    filters = _common_filters()
+
+    result = compute_cross_filter_options(query_id=query_id, filters=filters)
+    if result is None:
+        return cache_expired_error()
+
+    return success_response(result)

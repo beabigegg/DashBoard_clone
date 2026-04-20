@@ -262,7 +262,7 @@ def _query_trend(
     )
 
     tx_sql = f"""
-        SELECT {bucket_expr} AS bucket, SUM(TRANSACTION_QTY) AS tx_qty
+        SELECT "DATE_BUCKET" AS bucket, SUM(TRANSACTION_QTY) AS tx_qty
         FROM (
             SELECT {bucket_expr} AS DATE_BUCKET,
                    SUM("TRANSACTION_QTY") AS TRANSACTION_QTY
@@ -324,7 +324,7 @@ def _query_heatmap(
     )
 
     tx_sql = f"""
-        SELECT {bucket_expr} AS bucket, "DEPARTMENT_GROUP", SUM(TRANSACTION_QTY) AS tx_qty
+        SELECT "DATE_BUCKET" AS bucket, "DEPARTMENT_GROUP", SUM(TRANSACTION_QTY) AS tx_qty
         FROM (
             SELECT {bucket_expr} AS DATE_BUCKET, "DEPARTMENT_GROUP",
                    SUM("TRANSACTION_QTY") AS TRANSACTION_QTY
@@ -495,6 +495,7 @@ def _query_alerts(
     full_params: List[Any],
     reason_excl_sql: str,
     reason_excl_params: List[Any],
+    granularity: str,
     risk_threshold: float,
     min_scrap_qty: float,
     sort_by: str,
@@ -502,7 +503,15 @@ def _query_alerts(
     page: int,
     per_page: int,
 ) -> Dict[str, Any]:
-    """Compute alert groups with SQL-level filtering, sorting, and pagination."""
+    """Compute alert groups with SQL-level filtering, sorting, and pagination.
+
+    Applies the same time-granularity bucketing as trend/heatmap so that
+    the alerts table rows match the selected granularity (day/week/month/year).
+    TX dedup uses a two-level approach (inner: dedup per raw daily date;
+    outer: sum bucketed totals) to avoid double-counting.
+    """
+    bucket_expr = _granularity_bucket_expr(granularity)
+
     combined_where = (
         f"WHERE {full_where} AND {reason_excl_sql} AND \"SCRAP_QTY\" <> 0"
         if full_where
@@ -510,60 +519,61 @@ def _query_alerts(
     )
     combined_params = full_params + reason_excl_params
 
-    group_by_cols = ", ".join(_qid(c) for c in [
-        "DATE_BUCKET", "WORKORDER", "REASON_CODE", "REASON_NAME",
-        "DEPARTMENT_GROUP", "PROCESS_CATEGORY", "LINE_NAME", "PACKAGE_NAME",
-        "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
-    ])
-
     safe_threshold = float(risk_threshold)
     safe_min_scrap = float(min_scrap_qty)
 
-    # Build tx_lookup WHERE: same dimension filters but without reason exclusion or SCRAP_QTY filter
     tx_where = f"WHERE {full_where}" if full_where else ""
 
-    tx_join_cols = ", ".join(_qid(c) for c in [
-        "DATE_BUCKET", "WORKORDER",
+    # Non-date columns used in alert grouping
+    alert_extra_cols = [
+        "WORKORDER", "REASON_CODE", "REASON_NAME",
         "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
         "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
-    ])
+    ]
+    # Non-date columns used in TX dedup (no REASON_* columns)
+    tx_extra_cols = [
+        "WORKORDER",
+        "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
+        "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
+    ]
 
-    tx_join_on = " AND ".join(
-        f"ag.{_qid(c)} IS NOT DISTINCT FROM tx.{_qid(c)}"
-        for c in [
-            "DATE_BUCKET", "WORKORDER",
-            "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
-            "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
-        ]
+    alert_extra_sql = ", ".join(_qid(c) for c in alert_extra_cols)
+    tx_extra_sql    = ", ".join(_qid(c) for c in tx_extra_cols)
+
+    tx_join_on = (
+        'ag."DATE_BUCKET" IS NOT DISTINCT FROM tx."DATE_BUCKET" AND '
+        + " AND ".join(
+            f'ag.{_qid(c)} IS NOT DISTINCT FROM tx.{_qid(c)}'
+            for c in tx_extra_cols
+        )
     )
 
-    # DuckDB allows HAVING to reference aliases defined in SELECT
+    # Two-level TX dedup:
+    #   _tx_daily  – groups by raw DATE_BUCKET → one TX value per (raw_date, workorder, …)
+    #   tx_lookup  – groups by bucketed DATE_BUCKET → sums daily TX into the bucket period
     base_sql = f"""
-        WITH tx_lookup AS (
+        WITH _tx_daily AS (
             SELECT
-                {tx_join_cols},
-                SUM("TRANSACTION_QTY") AS transaction_qty
+                {bucket_expr} AS bucketed_date,
+                {tx_extra_sql},
+                SUM("TRANSACTION_QTY") AS tx_raw
             FROM yield_alert_src
             {tx_where}
-            GROUP BY {tx_join_cols}
+            GROUP BY "DATE_BUCKET", {tx_extra_sql}
+        ),
+        tx_lookup AS (
+            SELECT bucketed_date AS "DATE_BUCKET", {tx_extra_sql}, SUM(tx_raw) AS transaction_qty
+            FROM _tx_daily
+            GROUP BY bucketed_date, {tx_extra_sql}
         ),
         alert_groups AS (
             SELECT
-                "DATE_BUCKET",
-                "WORKORDER",
-                "REASON_CODE",
-                "REASON_NAME",
-                "DEPARTMENT_GROUP",
-                "PROCESS_CATEGORY",
-                "LINE_NAME",
-                "PACKAGE_NAME",
-                "TYPE_NAME",
-                "FUNCTION_NAME",
-                "OPERATION_TEXT",
+                {bucket_expr} AS "DATE_BUCKET",
+                {alert_extra_sql},
                 SUM("SCRAP_QTY") AS scrap_qty
             FROM yield_alert_src
             {combined_where}
-            GROUP BY {group_by_cols}
+            GROUP BY {bucket_expr}, {alert_extra_sql}
         ),
         alert_with_tx AS (
             SELECT ag.*, COALESCE(tx.transaction_qty, 0) AS transaction_qty
@@ -758,6 +768,77 @@ def _query_filter_options(conn: Any) -> Dict[str, List[str]]:
     return options
 
 
+# ── Cross-filter options ──────────────────────────────────────────────────────
+
+def compute_cross_filter_options(
+    *,
+    query_id: str,
+    filters: Dict[str, List[str]],
+) -> Optional[Dict[str, List[str]]]:
+    """Compute available dropdown options for each dimension filtered by all OTHER
+    currently-selected dimensions.  Enables cross-filter UX without re-querying Oracle.
+
+    Returns a dict with keys ``lines``, ``packages``, ``types``, ``functions``.
+    Returns ``None`` when the spool is missing (cache expired or DuckDB unavailable).
+    """
+    try:
+        from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
+    except Exception:
+        return None
+
+    parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
+    if not parquet_path:
+        return None
+
+    # (col_name, option_key, other_filter_keys_to_apply)
+    dim_specs = [
+        ("LINE_NAME",     "lines",     ["departments", "packages", "types", "functions"]),
+        ("PACKAGE_NAME",  "packages",  ["departments", "lines",    "types", "functions"]),
+        ("TYPE_NAME",     "types",     ["departments", "lines",    "packages", "functions"]),
+        ("FUNCTION_NAME", "functions", ["departments", "lines",    "packages", "types"]),
+    ]
+    exclude_values: Set[str] = {"(NA)", "-1", ""}
+
+    conn = None
+    try:
+        conn = create_heavy_query_connection()
+        _attach_spool_view(conn, parquet_path)
+
+        result: Dict[str, List[str]] = {}
+        for col, opt_key, other_keys in dim_specs:
+            other_filters = {k: v for k, v in filters.items() if k in other_keys}
+            where_sql, where_params = _build_dimension_filter_sql(other_filters, dept_proc_only=False)
+            not_null_cond = f"{_qid(col)} IS NOT NULL"
+            where_clause = f"WHERE {where_sql} AND {not_null_cond}" if where_sql else f"WHERE {not_null_cond}"
+
+            sql = (
+                f"SELECT DISTINCT CAST({_qid(col)} AS VARCHAR) AS v "
+                f"FROM yield_alert_src "
+                f"{where_clause} "
+                f"ORDER BY 1"
+            )
+            rows = _fetch_dict_rows(conn, sql, where_params)
+            result[opt_key] = [
+                str(r["v"]) for r in rows
+                if r.get("v") is not None and str(r["v"]).strip() not in exclude_values
+            ]
+
+        return result
+
+    except Exception as exc:
+        logger.warning(
+            "yield_alert_sql_runtime: cross_filter_options failed (query_id=%s): %s",
+            query_id, exc,
+        )
+        return None
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 # ── Task 4.9: Entry point ─────────────────────────────────────────────────────
 
 def try_compute_view_from_spool(
@@ -852,6 +933,7 @@ def try_compute_view_from_spool(
             full_params=full_params,
             reason_excl_sql=reason_excl_sql,
             reason_excl_params=reason_excl_params,
+            granularity=granularity,
             risk_threshold=risk_threshold,
             min_scrap_qty=min_scrap_qty,
             sort_by=sort_by,
