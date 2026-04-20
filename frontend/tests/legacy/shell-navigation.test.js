@@ -5,7 +5,7 @@ import {
   isPortalShellRuntime,
   navigateToRuntimeRoute,
   toRuntimeRoute,
-} from '../src/core/shell-navigation.js';
+} from '../../src/core/shell-navigation.js';
 
 
 test('isPortalShellRuntime detects portal-shell path prefix', () => {

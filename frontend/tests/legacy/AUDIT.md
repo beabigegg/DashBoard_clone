@@ -14,36 +14,24 @@ done
 Current status:
 
 - Total files: `33`
-- Passing under current legacy harness: `12`
-- Failing under current legacy harness: `21`
+- Passing under current legacy harness: `33`
+- Failing under current legacy harness: `0`
 
-Failure categories:
+What was fixed in this cleanup pass:
 
-- `18` files: broken relative import paths such as `../src/...` resolving to `frontend/tests/src/...`
-- `2` files: missing file paths referenced by the test harness (`ENOENT`)
-- `1` file: Vite runtime dependency (`import.meta.env`) executed under plain `node --test`
+- corrected broken relative import paths from `../src/...` to the real module location
+- fixed legacy governance test pathing to root-level `docs/`
+- hardened `frontend/src/core/api.js` so non-Vite runners do not crash on `import.meta.env`
+- updated stale query-tool legacy expectations from default `per_page=200` to current behavior `25`
 
 Implication:
 
-- A large part of `frontend/tests/legacy/` is not giving real regression protection today.
-- These tests can look present in the repo while being effectively dead under the current harness.
-- New frontend regression coverage should prefer the active `vitest` pipeline in `frontend/tests/**`.
-
-Examples of broken-import failures:
-
-- `tests/legacy/autocomplete.test.js`
-- `tests/legacy/material-trace-composables.test.js`
-- `tests/legacy/portal-shell-route-query.test.js`
-- `tests/legacy/yield-alert-center-utils.test.js`
-
-Example of runtime-harness mismatch:
-
-- `tests/legacy/query-tool-composables.test.js`
-  - imports production modules that reference `import.meta.env`
-  - this is incompatible with plain `node --test`
+- The legacy suite is runnable again, so it now provides real baseline protection.
+- New frontend regression coverage should still prefer the active `vitest` pipeline in `frontend/tests/**`.
+- The legacy suite should be treated as compatibility coverage, not the primary place for new tests.
 
 Recommended cleanup order:
 
-1. Migrate behaviorally important composable tests to `vitest`
-2. Fix or remove dead legacy files with broken `../src/...` import paths
-3. Keep only legacy tests that still run cleanly and cover non-Vite pure functions
+1. Keep new composable and component tests in `vitest`
+2. Retain legacy tests only when they cover pure-function compatibility checks well
+3. Gradually migrate high-value legacy files into `frontend/tests/**` and retire duplicates

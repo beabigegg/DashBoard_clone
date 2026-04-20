@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildWipAutocompleteParams,
   fetchWipAutocompleteItems,
-} from '../src/core/autocomplete.js';
+} from '../../src/core/autocomplete.js';
 
 test('buildWipAutocompleteParams keeps cross-filters except active field', () => {
   const params = buildWipAutocompleteParams('lotid', 'L123', {

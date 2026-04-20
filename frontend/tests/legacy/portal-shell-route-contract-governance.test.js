@@ -10,12 +10,12 @@ import {
   getRouteContract,
   getKnownRoutes,
   validateRouteContractMap,
-} from '../src/portal-shell/routeContracts.js';
+} from '../../src/portal-shell/routeContracts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const backendContractPath = path.resolve(
   __dirname,
-  '../../docs/migration/full-modernization-architecture-blueprint/route_contracts.json',
+  '../../../docs/migration/full-modernization-architecture-blueprint/route_contracts.json',
 );
 
 

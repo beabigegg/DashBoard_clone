@@ -8,7 +8,7 @@ import {
   buildSidebarUiState,
   parseSidebarCollapsedPreference,
   serializeSidebarCollapsedPreference,
-} from '../src/portal-shell/sidebarState.js';
+} from '../../src/portal-shell/sidebarState.js';
 
 function readSource(relativePath) {
   const directPath = resolve(process.cwd(), relativePath);

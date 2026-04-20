@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildLaunchHref } from '../src/portal-shell/routeQuery.js';
-import { toRuntimeRoute } from '../src/core/shell-navigation.js';
+import { buildLaunchHref } from '../../src/portal-shell/routeQuery.js';
+import { toRuntimeRoute } from '../../src/core/shell-navigation.js';
 
 test('list-detail workflow preserves wip filters across launch href and shell runtime prefix', () => {
   const detailHref = buildLaunchHref('/wip-detail', {

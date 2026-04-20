@@ -1,8 +1,9 @@
 const DEFAULT_TIMEOUT = 90000;
+const IS_DEV = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
 
 // DEV-mode guard — no-op in production builds
 let _guardResponse = null;
-if (import.meta.env.DEV) {
+if (IS_DEV) {
   import('./dev-warnings.js').then((m) => {
     _guardResponse = m.guardResponse;
   }).catch(() => {});

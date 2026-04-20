@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   PRIMARY_QUERY_MAX_DAYS,
   validateDateRange,
-} from '../src/core/reject-history-filters.js';
+} from '../../src/core/reject-history-filters.js';
 
 test('reject-history date range validates half-year max days', () => {
   assert.equal(PRIMARY_QUERY_MAX_DAYS, 190);

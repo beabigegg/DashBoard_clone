@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildDynamicNavigationState } from '../src/portal-shell/navigationState.js';
-import { buildLaunchHref } from '../src/portal-shell/routeQuery.js';
-import { getRouteContract } from '../src/portal-shell/routeContracts.js';
+import { buildDynamicNavigationState } from '../../src/portal-shell/navigationState.js';
+import { buildLaunchHref } from '../../src/portal-shell/routeQuery.js';
+import { getRouteContract } from '../../src/portal-shell/routeContracts.js';
 
 const WAVE_B_NATIVE_CASES = Object.freeze([
   {

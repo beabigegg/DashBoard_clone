@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseMultiLineInput } from '../src/core/reject-history-filters.js';
+import { parseMultiLineInput } from '../../src/core/reject-history-filters.js';
 
 
 // ── parseMultiLineInput ────────────────────────────────────────────────────

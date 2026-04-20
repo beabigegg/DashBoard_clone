@@ -16,7 +16,7 @@ import { readFile } from 'node:fs/promises';
 
 globalThis.__testDuckdbSupport = () => true;
 
-const policyPath = new URL('../src/core/duckdb-activation-policy.js', import.meta.url);
+const policyPath = new URL('../../src/core/duckdb-activation-policy.js', import.meta.url);
 const policySource = await readFile(policyPath, 'utf8');
 const transformedSource = policySource.replace(
   "import { isDuckDBSupported } from './duckdb-client.js';",

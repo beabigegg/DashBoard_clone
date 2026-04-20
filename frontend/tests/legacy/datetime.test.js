@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 // Import the module under test
-import { formatLogTime } from '../src/core/datetime.js';
+import { formatLogTime } from '../../src/core/datetime.js';
 
 
 // ── formatLogTime ──────────────────────────────────────────────────────────

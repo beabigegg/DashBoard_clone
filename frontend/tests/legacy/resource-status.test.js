@@ -9,7 +9,7 @@ import {
   STATUS_AGGREGATION,
   MATRIX_STATUS_COLUMNS,
   OU_BADGE_THRESHOLDS,
-} from '../src/resource-shared/constants.js';
+} from '../../src/resource-shared/constants.js';
 
 
 // ── normalizeStatus ────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import {
   buildWipDetailQueryParams,
   splitHoldByType,
   prepareParetoData,
-} from '../src/core/wip-derive.js';
+} from '../../src/core/wip-derive.js';
 
 test('buildWipOverviewQueryParams keeps only non-empty filters', () => {
   const params = buildWipOverviewQueryParams({

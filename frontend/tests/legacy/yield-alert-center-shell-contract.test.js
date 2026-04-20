@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getNativeModuleLoader } from '../src/portal-shell/nativeModuleRegistry.js';
-import { buildLaunchHref } from '../src/portal-shell/routeQuery.js';
-import { getRouteContract } from '../src/portal-shell/routeContracts.js';
+import { getNativeModuleLoader } from '../../src/portal-shell/nativeModuleRegistry.js';
+import { buildLaunchHref } from '../../src/portal-shell/routeQuery.js';
+import { getRouteContract } from '../../src/portal-shell/routeContracts.js';
 
 
 test('yield-alert-center route contract is native and has loader', () => {

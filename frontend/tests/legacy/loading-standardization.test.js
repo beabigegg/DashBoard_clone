@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const srcDir = resolve(import.meta.dirname, '../src');
+const srcDir = resolve(import.meta.dirname, '../../src');
 
 function readSrc(relPath) {
   return readFileSync(resolve(srcDir, relPath), 'utf8');

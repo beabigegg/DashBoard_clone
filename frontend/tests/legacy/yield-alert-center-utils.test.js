@@ -5,7 +5,7 @@ import {
   buildDrilldownNotice,
   parseTokenList,
   toQueryParams,
-} from '../src/yield-alert-center/utils.js';
+} from '../../src/yield-alert-center/utils.js';
 
 
 test('parseTokenList splits newline/comma and deduplicates', () => {

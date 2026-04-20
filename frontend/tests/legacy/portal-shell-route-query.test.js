@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildLaunchHref } from '../src/portal-shell/routeQuery.js';
+import { buildLaunchHref } from '../../src/portal-shell/routeQuery.js';
 
 test('buildLaunchHref keeps base target route without query payload', () => {
   assert.equal(buildLaunchHref('/job-query'), '/job-query');

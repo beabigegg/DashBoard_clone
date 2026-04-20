@@ -7,7 +7,7 @@ import {
   buildHealthFallbackDetail,
   labelFromHealthStatus,
   normalizeFrontendShellHealth,
-} from '../src/portal-shell/healthSummary.js';
+} from '../../src/portal-shell/healthSummary.js';
 
 function readSource(relativePath) {
   const directPath = resolve(process.cwd(), relativePath);

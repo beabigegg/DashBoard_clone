@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { toRuntimeRoute } from '../src/core/shell-navigation.js';
-import { getNativeModuleLoader } from '../src/portal-shell/nativeModuleRegistry.js';
-import { buildDynamicNavigationState } from '../src/portal-shell/navigationState.js';
-import { getRouteContract } from '../src/portal-shell/routeContracts.js';
+import { toRuntimeRoute } from '../../src/core/shell-navigation.js';
+import { getNativeModuleLoader } from '../../src/portal-shell/nativeModuleRegistry.js';
+import { buildDynamicNavigationState } from '../../src/portal-shell/navigationState.js';
+import { getRouteContract } from '../../src/portal-shell/routeContracts.js';
 
 const WAVE_A_ROUTES = Object.freeze([
   '/wip-overview',

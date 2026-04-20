@@ -5,13 +5,13 @@ import {
   buildRejectOptionsRequestParams,
   buildViewParams,
   pruneRejectFilterSelections,
-} from '../src/core/reject-history-filters.js';
+} from '../../src/core/reject-history-filters.js';
 import {
   buildResourceHistoryQueryParams,
   deriveResourceFamilyOptions,
   deriveResourceMachineOptions,
   pruneResourceFilterSelections,
-} from '../src/core/resource-history-filters.js';
+} from '../../src/core/resource-history-filters.js';
 
 test('reject-history draft options params include full context', () => {
   const params = buildRejectOptionsRequestParams({

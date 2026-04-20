@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildDynamicNavigationState,
   normalizeNavigationDrawers,
-} from '../src/portal-shell/navigationState.js';
+} from '../../src/portal-shell/navigationState.js';
 
 
 test('normalizeNavigationDrawers enforces deterministic order and visibility', () => {
