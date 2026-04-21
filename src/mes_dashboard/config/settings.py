@@ -41,6 +41,15 @@ class Config:
     TESTING = False
     ENV = "production"
 
+    # Whether the `/internal/metrics` blueprint is imported + registered.
+    # Defaults to False so production never even imports the module.  Only
+    # TestingConfig flips this on, which the nightly / soak workflows reuse
+    # by calling create_app("testing").  This is Layer 1 of the three-layer
+    # gate defined in openspec harden-real-infra-test-coverage / 3.1.
+    # Flask's ``Config.from_object()`` only copies UPPERCASE attributes, so
+    # the key name is intentionally capitalised.
+    REGISTER_INTERNAL_METRICS = False
+
     # Database pool defaults (can be overridden by env)
     DB_POOL_SIZE = _int_env("DB_POOL_SIZE", 5)
     DB_MAX_OVERFLOW = _int_env("DB_MAX_OVERFLOW", 10)
@@ -162,6 +171,10 @@ class TestingConfig(Config):
     DB_SLOW_MAX_CONCURRENT = 1
     DB_SLOW_POOL_ENABLED = False
     CSRF_ENABLED = False
+
+    # Testing / nightly / soak configs register the /internal/metrics
+    # blueprint; the runtime env + loopback gates still apply.
+    REGISTER_INTERNAL_METRICS = True
 
 
 def get_config(env: str | None = None) -> Type[Config]:

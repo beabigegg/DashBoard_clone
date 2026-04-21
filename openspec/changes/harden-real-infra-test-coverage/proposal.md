@@ -6,7 +6,7 @@
 | :--- | :--- |
 | Oracle image | `gvenzl/oracle-xe:21-slim`（XE 21c，~1.5GB）。官方 `container-registry.oracle.com/database/free:latest`（23c Free，~6GB）不在本提案範圍；若未來有 23c-specific 行為要驗再開 follow-up change |
 | toxiproxy 部署 | CI 用 GHA `services:`、local 用 `docker-compose.test.yml`；port / service name / proxy name / healthcheck / env var key 由 `tests/integration/_infra_topology.py` 單一常數模組生成，兩份 YAML 皆由此產出，避免手動漂移 |
-| `/internal/metrics` 三層 gate | **Layer 1**：Flask blueprint 只在 app config `register_internal_metrics=True` 時註冊（僅 testing / nightly / soak config factory 會設）；**Layer 2**：runtime 檢查 `INTERNAL_METRICS_ENABLED=1`；**Layer 3**：route 內 `request.remote_addr` loopback 檢查。明確定位為 internal-only app surface，**不是 admin API 過渡階段**，不進任何 production deploy config |
+| `/internal/metrics` 三層 gate | **Layer 1**：Flask blueprint 只在 app config `register_internal_metrics=True` 時註冊（僅 testing / nightly / soak config factory 會設；實作屬性名為 `REGISTER_INTERNAL_METRICS` 大寫，因 Flask `Config.from_object()` 只吸收 UPPERCASE 屬性）；**Layer 2**：runtime 檢查 `INTERNAL_METRICS_ENABLED=1`；**Layer 3**：route 內 `request.remote_addr` loopback 檢查。明確定位為 internal-only app surface，**不是 admin API 過渡階段**，不進任何 production deploy config |
 | `/internal/metrics` 指標類別 | **7 類**（含 `rq` queue depth）：`pool` / `duckdb` / `redis` / `spool` / `worker_rss` / `circuit_breaker` / `rq` |
 | Stability 門檻 | **20-day × 60-run window 下 pass rate = 100%** 且每檔 p95 wall time < 180s 才可升 gate。數學理由：60 runs 下 1 次失敗即 98.3%，寫 99% 是假寬鬆。若未來要放鬆到 99.0%，必須先把樣本擴到 ≥ 100 runs 再談 |
 | `oracle-fault-injection` CI 定位 | 只進 nightly + workflow_dispatch，**不進 pre-merge required check**。理由：高價值高成本、受環境影響較大，作為 regression sentinel 而非 gate |

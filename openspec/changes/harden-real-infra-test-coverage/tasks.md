@@ -64,26 +64,26 @@
 
 ## 3. Phase 3 — Soak workload + `/internal/metrics`（PR #5）
 
-- [ ] 3.1 新增 Flask route `src/mes_dashboard/routes/internal_routes.py`：`GET /internal/metrics`，三層 gate：
-  - **Layer 1（blueprint registration gate）**：`src/mes_dashboard/app.py` 的 app factory 只在 app config `register_internal_metrics=True` 時 import + `register_blueprint()`；production config factory **連 import 都不做**，讓 route 在 URL map 裡不存在
+- [x] 3.1 新增 Flask route `src/mes_dashboard/routes/internal_routes.py`：`GET /internal/metrics`，三層 gate（PR #5a）：
+  - **Layer 1（blueprint registration gate）**：`src/mes_dashboard/app.py` 的 app factory 只在 app config `REGISTER_INTERNAL_METRICS=True`（Flask `Config.from_object` 僅複製大寫屬性故採大寫）時 import + `register_blueprint()`；production config factory **連 import 都不做**，讓 route 在 URL map 裡不存在
   - **Layer 2（runtime env gate）**：handler 第一行檢查 `os.getenv("INTERNAL_METRICS_ENABLED") == "1"`，否則 `not_found_error()`
-  - **Layer 3（loopback defense-in-depth）**：`request.remote_addr not in {"127.0.0.1", "::1"}` → `not_found_error()`
-- [ ] 3.2 新增 `src/mes_dashboard/services/internal_metrics_service.py`：收集 **7 類指標**，回 dict：
-  - `pool` — SQLAlchemy pool checkout / checkin / size / overflow
-  - `duckdb` — 臨時檔總 bytes、檔案數
-  - `redis` — key count（依 prefix 分類）
-  - `spool` — `QUERY_SPOOL_DIR` 使用量（bytes / file_count）
-  - `worker_rss` — 每個 gunicorn worker PID 的 RSS bytes
-  - `circuit_breaker` — 當前 state + 失敗計數
-  - `rq` — **每個 RQ queue 的 `pending` / `started` / `failed` / `finished` / `deferred` 深度**
-- [ ] 3.3 新增單元測試 `tests/routes/test_internal_routes.py`（6 個）：
-  - `config.register_internal_metrics=False` → URL map 不含 `/internal/metrics`（asserts `app.url_map` 無此 rule）
-  - `config.register_internal_metrics=True` + `INTERNAL_METRICS_ENABLED` 未設 → 404
-  - `config.register_internal_metrics=True` + env 設為 `"0"` → 404
-  - `config.register_internal_metrics=True` + env 設為 `"1"` + remote_addr 非 loopback → 404
-  - `config.register_internal_metrics=True` + env 設為 `"1"` + loopback → 200 + **7 類** key 齊全
-  - production config factory 不 import `internal_routes` module（assert `"mes_dashboard.routes.internal_routes" not in sys.modules` 在 production config 載入後）
-- [ ] 3.4 更新 `contract/api_inventory.md`：新增 `/internal/metrics` **Internal-only** 條目；明確標註「不是 admin API 的過渡階段、不進任何 production deploy config、只服務 testing / nightly / soak workflow」
+  - **Layer 3（loopback defense-in-depth）**：`request.remote_addr not in {"127.0.0.1", "::1"}` → `not_found_error()`；非 loopback 拒絕事件寫入 warning log
+- [x] 3.2 新增 `src/mes_dashboard/services/internal_metrics_service.py`（PR #5a）：`collect_internal_metrics()` 收集 **7 類指標**，每個 collector 獨立 try/except 避免單一 collector 故障拖垮整個 snapshot：
+  - `pool` — SQLAlchemy pool checkout / checkin / size / overflow（複用 `core/database.get_pool_status()`）
+  - `duckdb` — `DUCKDB_TEMP_DIR` 底下 temp_bytes / file_count；未設 temp dir 時回 `enabled=False`
+  - `redis` — 9 個 namespace prefix 的 key_count（data/route_cache/equipment_status/reject_dataset/hold_dataset/yield_alert_dataset/meta/lock/scrap_exclusion）
+  - `spool` — `QUERY_SPOOL_DIR` 總 bytes / file_count + 每 namespace 細目
+  - `worker_rss` — 本 worker 的 pid + RSS bytes（跨 worker 聚合由呼叫端 N 次 scrape + group by PID 完成，避免從 Flask 內掃 /proc tree）
+  - `circuit_breaker` — 複用 `get_circuit_breaker_status()`
+  - `rq` — **每 queue `pending`/`started`/`failed`/`finished`/`deferred` 深度**（新實作，不複用 `rq_monitor_service.get_rq_queue_details()`，因後者未讀 finished/deferred，無法偵測 "no resource leak but backlog creeps upward"）
+- [x] 3.3 新增單元測試 `tests/routes/test_internal_routes.py`（6 個，PR #5a，全綠）：
+  - `test_flag_false_omits_internal_metrics_from_url_map` — `REGISTER_INTERNAL_METRICS=False` → URL map 不含 `/internal/metrics`（subprocess 隔離，避免 sys.modules 清除污染姊妹測試）
+  - `test_env_gate_blocks_when_env_var_unset` — 註冊 + env 未設 → 404
+  - `test_env_gate_blocks_when_env_var_is_zero` — env="0" → 404
+  - `test_loopback_gate_blocks_non_loopback_remote_addr` — env="1" + `REMOTE_ADDR=10.0.0.5` → 404 且 body 無 `data` key
+  - `test_all_gates_open_returns_seven_category_snapshot` — env="1" + loopback → 200 + 7 類 key 齊全 + 每 queue 含 5 個 registry 欄位
+  - `test_production_factory_does_not_import_internal_routes_module` — subprocess 啟動 production factory，assert URL map 無 rule 且 `"mes_dashboard.routes.internal_routes" not in sys.modules`
+- [x] 3.4 更新 `contract/api_inventory.md`：新增 `Internal-only (NOT an admin API, NOT part of any production deploy config)` 分類，列出三層 gate 與「此端點 NOT 是 admin API 過渡階段、任何真 admin API 須走 `/api/admin/...` 加 auth、production deploy config 禁止開 `REGISTER_INTERNAL_METRICS` 與 `INTERNAL_METRICS_ENABLED`」明文條款（PR #5a）
 - [ ] 3.5 新增 `tests/integration/test_soak_workload.py`（掛 `@pytest.mark.soak`）：
   - [ ] 3.5.1 fixture `soak_config` 支援 `duration_seconds` / `sample_interval_seconds`（預設 1800 / 30）
   - [ ] 3.5.2 spawn `gunicorn_workers(n=2)` 搭配 `INTERNAL_METRICS_ENABLED=1`

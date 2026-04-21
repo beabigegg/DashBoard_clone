@@ -674,6 +674,14 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(admin_bp)
     app.register_blueprint(health_bp)
 
+    # Layer 1 gate for /internal/metrics: only testing / nightly / soak
+    # configs set REGISTER_INTERNAL_METRICS=True.  Production config leaves
+    # it False so the module is never even imported and the URL rule never
+    # enters the map — see openspec harden-real-infra-test-coverage spec 3.1.
+    if app.config.get("REGISTER_INTERNAL_METRICS"):
+        from mes_dashboard.routes.internal_routes import internal_bp
+        app.register_blueprint(internal_bp)
+
     # ========================================================
     # Permission Middleware
     # ========================================================

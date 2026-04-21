@@ -148,6 +148,8 @@ A dedicated test file `tests/integration/test_soak_workload.py` SHALL spawn real
 The Flask application SHALL expose `GET /internal/metrics` only through the conjunction of three independent gates:
 
 1. **Layer 1 (registration-time gate)** — The `internal_routes` blueprint SHALL only be imported and registered when the app config contains `register_internal_metrics=True`. Only the testing / nightly / soak config factories SHALL set this flag. Production config factories SHALL NOT import the `internal_routes` module at all; the URL map SHALL NOT contain any rule for `/internal/metrics` in production.
+
+    *Implementation note:* the attribute name is spelled `REGISTER_INTERNAL_METRICS` (uppercase) in `config/settings.py` and `app.config` because Flask's `Config.from_object()` only ingests UPPERCASE class attributes; lowercase values would silently not reach `app.config` and the gate would default to False. Scenario text below uses lowercase for readability; implementation MUST use UPPERCASE.
 2. **Layer 2 (runtime env gate)** — Even when the blueprint is registered, the route handler SHALL first check `os.getenv("INTERNAL_METRICS_ENABLED") == "1"` and return `not_found_error()` (404) otherwise.
 3. **Layer 3 (network defense-in-depth)** — The handler SHALL additionally check `request.remote_addr in {"127.0.0.1", "::1"}` and return `not_found_error()` otherwise. This layer is defense-in-depth only; the security posture SHALL NOT rely on `remote_addr` alone.
 

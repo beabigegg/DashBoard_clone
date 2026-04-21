@@ -69,6 +69,7 @@
 
 - **選擇**：
   - **Layer 1（registration-time gate）**：Flask blueprint 只在 app config `register_internal_metrics=True` 時被 `register_blueprint()`。只有 testing / nightly / soak 對應的 config factory 會把此 flag 設為 True；production 的 config factory 連 blueprint 都不 import，讓 route 在 URL map 裡根本不存在。這是最強的一層——即使 env 被誤設、即使 TCP 接口錯誤曝光，沒註冊的 route 連 404 之外的任何洩漏路徑都不存在。
+    - **實作注意**：實際 attribute 名稱是 `REGISTER_INTERNAL_METRICS`（大寫），因為 Flask `Config.from_object()` 只複製 UPPERCASE 屬性；若寫成小寫會被 Flask 忽略，`app.config.get("register_internal_metrics")` 恆回 `None`，gate 永遠不觸發。本 design/spec 描述以小寫呈現以提升可讀性，實作 MUST 用大寫。
   - **Layer 2（runtime env gate）**：blueprint 被註冊後，route handler 第一件事檢查 `os.getenv("INTERNAL_METRICS_ENABLED") == "1"`，未設或非 `"1"` 回 `not_found_error()`。這層守 config factory 誤用（例如開發者手滑在非 testing config 開了 flag）。
   - **Layer 3（network-layer defense-in-depth）**：gunicorn `--bind 127.0.0.1:<port>` 單獨監聽 loopback；route 內 assertion `request.remote_addr in {"127.0.0.1", "::1"}`，非 loopback 仍回 404。這層只是縱深防禦——不單獨依賴 `remote_addr`（proxy / gunicorn 組合下 `remote_addr` 不可靠）。
   - Response：`success_response(data={...})`，不用 Prometheus exposition format、不用 OpenMetrics；純 JSON dict 7 類鍵 `pool / duckdb / redis / spool / worker_rss / circuit_breaker / rq`。

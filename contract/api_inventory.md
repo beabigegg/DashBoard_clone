@@ -47,6 +47,12 @@ This file is the governed inventory for API contract classification and exceptio
 | :--- | :--- | :--- |
 | `health_routes.py` | `/health`, `/health/deep`, `/health/frontend-shell` | Consumed by monitoring systems and shell health UI |
 
+### Internal-only (NOT an admin API, NOT part of any production deploy config)
+
+| File | Endpoint | Gates | Notes |
+| :--- | :--- | :--- | :--- |
+| `internal_routes.py` | `GET /internal/metrics` | **Layer 1** — blueprint imported + registered only when `app.config["REGISTER_INTERNAL_METRICS"]=True` (uppercase is required for Flask `Config.from_object` to copy the attribute); ProductionConfig leaves it False so the module is never imported in prod. **Layer 2** — handler requires `INTERNAL_METRICS_ENABLED=1`; otherwise returns 404 `NOT_FOUND`. **Layer 3** — handler requires `request.remote_addr ∈ {"127.0.0.1", "::1"}`; defense-in-depth, NOT the primary security layer. | Sole consumer is the soak-workload test (`tests/integration/test_soak_workload.py`) and the nightly metrics probe (`tests/integration/_metrics_probe.py`). Response uses `success_response({pool, duckdb, redis, spool, worker_rss, circuit_breaker, rq})` — 7 stable keys. **This endpoint is explicitly NOT an admin API precursor and NOT a stepping stone to future observability endpoints; any real admin surface MUST live under `/api/admin/...` with proper auth.** Production deploy configs MUST NOT set `REGISTER_INTERNAL_METRICS=True` and MUST NOT export `INTERNAL_METRICS_ENABLED=1`. |
+
 **Compatibility note (2026-04-15):** All `standard-json` endpoints now inject `meta.app_version` (string, server application version from `APP_VERSION` env or package metadata) in every `success_response` and `error_response` envelope.  Clients can compare this to the bundle version for stale-frontend detection.  `analytics_routes.py` anomaly-summary endpoint additionally injects `meta.cache_state ∈ {warm, cold, stale}` to signal whether data was served from cache or freshly computed.  Both fields are additive additions (backward-compatible).
 
 **Compatibility note (2026-03-11):** `/health` and `/health/deep` responses now include additive `system_memory` (`{total_mb, available_mb, used_pct, pressure}`) and `async_workers` (`{rq_available, workers, queues, slots}`) blocks. These are backward-compatible additions (contract §6.4: additive fields are allowed). `/admin/api/performance-detail` also includes `async_workers` in the response. Monitoring integrations that parse these endpoints by strict schema must be updated if they reject unknown keys.
