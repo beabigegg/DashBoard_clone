@@ -1,0 +1,58 @@
+name: measure-stability
+
+on:
+  schedule:
+    - cron: "30 2 * * *"  # nightly at 02:30 UTC (after backend-tests at 02:00)
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Comma-separated test targets"
+        default: "multi_worker,redis_chaos,real_multi_worker"
+        required: false
+      runs:
+        description: "Runs per target"
+        default: "3"
+        required: false
+
+jobs:
+  measure:
+    name: Measure real-infra test stability
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest redis rq pytest-json-report
+
+      - name: Install redis-server
+        run: sudo apt-get install -y redis-server
+
+      - name: Start redis-server
+        run: redis-server --daemonize yes
+
+      - name: Run stability measurement
+        env:
+          TARGETS: ${{ github.event.inputs.targets || 'multi_worker,redis_chaos,real_multi_worker' }}
+          RUNS: ${{ github.event.inputs.runs || '3' }}
+        run: |
+          python scripts/measure_real_infra_stability.py \
+            --tests "$TARGETS" \
+            --runs "$RUNS" \
+            --out stability-results.jsonl
+
+      - name: Upload stability results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stability-results-${{ github.run_number }}
+          path: stability-results.jsonl
+          if-no-files-found: warn
+          retention-days: 90

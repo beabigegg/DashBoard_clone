@@ -6,7 +6,7 @@ context-manager release, exception safety, and 100-concurrent-job cleanup.
 Proves the framework-level contract without requiring a live Oracle connection.
 
 Real-Oracle connection leak detection (session kill, listener stop, network
-flap) is tracked separately under the future integration_real suite.
+flap) lives in tests/integration/test_real_oracle_fault_injection.py.
 
 Gate: @pytest.mark.integration AND --run-integration CLI flag.
 """

@@ -1,0 +1,41 @@
+# docker-compose.test.yml — test infrastructure for Oracle XE fault injection.
+#
+# Port numbers, image tags, service names, and credentials ALL come from
+# tests/integration/_infra_topology.py. If you change any value in that
+# module, update the corresponding lines here in the same commit.
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up -d
+#   conda run -n mes-dashboard pytest tests/integration/test_real_oracle_fault_injection.py \
+#       --run-integration-real -v
+#   docker compose -f docker-compose.test.yml down
+
+version: "3.9"
+
+services:
+
+  oracle-xe:                                # ORACLE_XE_SERVICE
+    image: gvenzl/oracle-xe:21-slim         # ORACLE_XE_IMAGE
+    environment:
+      ORACLE_PASSWORD: "MES_SYS_PW_1"      # ORACLE_SYS_PASSWORD
+      APP_USER: "mes_test"                  # ORACLE_TEST_USER
+      APP_USER_PASSWORD: "mes_test_pw"      # ORACLE_TEST_PASSWORD
+    ports:
+      - "1521:1521"                         # ORACLE_XE_PORT
+    healthcheck:
+      # healthcheck.sh is bundled in every gvenzl/oracle-xe image
+      test: ["CMD-SHELL", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+
+  toxiproxy:                                # TOXIPROXY_SERVICE
+    image: shopify/toxiproxy:2.9            # TOXIPROXY_IMAGE
+    ports:
+      - "8474:8474"                         # TOXIPROXY_ADMIN_PORT
+      - "15210:15210"                       # TOXIPROXY_ORACLE_LISTEN_PORT
+    # toxiproxy starts immediately; the fixture creates the Oracle proxy entry
+    # via the admin API after Oracle itself is confirmed ready.
+    depends_on:
+      - oracle-xe

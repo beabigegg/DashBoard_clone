@@ -255,6 +255,30 @@ class TestMappedOraCodesAtAppBoundary:
         assert err.get("code") == "DB_QUERY_TIMEOUT"
         assert resp.headers.get("Retry-After") is None
 
+    def test_ora_00028_session_kill_returns_retryable_connection_failed(self, client, monkeypatch):
+        """ORA-00028 (session killed by DBA) maps to DB_CONNECTION_FAILED 503 + Retry-After.
+
+        Session kill is a connection-layer event; the client should retry rather
+        than treating it as a query-logic failure (500).
+
+        Mutation check: removing "00028" from retryable_connection_codes in app.py
+        causes this to return 500 DB_QUERY_ERROR instead of 503 DB_CONNECTION_FAILED.
+        """
+        from mes_dashboard.routes import resource_history_routes as rh_routes
+
+        def _raise(*args, **kwargs):
+            raise _ora_error("00028", "your session has been killed")
+
+        monkeypatch.setattr(rh_routes, "get_filter_options", _raise)
+        monkeypatch.setattr(rh_routes, "cache_get", lambda *a, **k: None)
+
+        resp = client.get("/api/resource/history/options")
+        body = resp.get_json(silent=True) or {}
+        err = body.get("error") or {}
+        assert resp.status_code == 503
+        assert err.get("code") == "DB_CONNECTION_FAILED"
+        assert resp.headers.get("Retry-After") == "30"
+
     def test_unknown_ora_returns_db_query_error_not_internal_error(self, client, monkeypatch):
         from mes_dashboard.routes import resource_history_routes as rh_routes
 

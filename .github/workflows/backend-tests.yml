@@ -131,6 +131,90 @@ jobs:
             --run-integration-real -v --tb=short
         continue-on-error: false
 
+  oracle-fault-injection:
+    name: Oracle XE fault injection tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    # Service names, ports, and image tags mirror tests/integration/_infra_topology.py.
+    # If you update that module, update these service declarations in the same commit.
+    services:
+      oracle-xe:                                   # ORACLE_XE_SERVICE
+        image: gvenzl/oracle-xe:21-slim            # ORACLE_XE_IMAGE
+        env:
+          ORACLE_PASSWORD: MES_SYS_PW_1            # ORACLE_SYS_PASSWORD
+          APP_USER: mes_test                        # ORACLE_TEST_USER
+          APP_USER_PASSWORD: mes_test_pw            # ORACLE_TEST_PASSWORD
+        ports:
+          - 1521:1521                               # ORACLE_XE_PORT
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+          --health-start-period 90s
+
+      toxiproxy:                                   # TOXIPROXY_SERVICE
+        image: shopify/toxiproxy:2.9               # TOXIPROXY_IMAGE
+        ports:
+          - 8474:8474                              # TOXIPROXY_ADMIN_PORT
+          - 15210:15210                            # TOXIPROXY_ORACLE_LISTEN_PORT
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest oracledb
+
+      - name: Wait for Oracle XE readiness
+        # GHA does not block steps on service healthcheck completion, so we
+        # poll here explicitly before handing off to pytest.  This step fails
+        # fast (exits 1) if Oracle is not reachable within 240s, giving a
+        # clear signal without relying on the fixture's internal timeout.
+        timeout-minutes: 6
+        run: |
+          python - <<'EOF'
+          import sys, time, oracledb
+          deadline = time.monotonic() + 240
+          last_exc = None
+          while time.monotonic() < deadline:
+              try:
+                  c = oracledb.connect(
+                      user="mes_test", password="mes_test_pw",
+                      dsn="127.0.0.1:1521/XEPDB1",
+                  )
+                  c.close()
+                  print("Oracle XE is ready")
+                  sys.exit(0)
+              except Exception as exc:
+                  last_exc = exc
+                  print(f"Waiting for Oracle XE... ({exc})", flush=True)
+                  time.sleep(5)
+          print(f"Oracle XE did not become ready within 240s. Last error: {last_exc}")
+          sys.exit(1)
+          EOF
+
+      - name: Run Oracle fault injection smoke tests
+        run: |
+          python -m pytest tests/integration/test_real_oracle_fault_injection.py \
+            --run-integration-real -v --tb=short
+        continue-on-error: false
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oracle-fault-injection-logs
+          path: /tmp/pytest-*/
+          if-no-files-found: ignore
+
   multi-worker-concurrency:
     name: Multi-worker RQ concurrency tests
     runs-on: ubuntu-latest

@@ -1378,7 +1378,8 @@ def _register_error_handlers(app: Flask) -> None:
         ora_code = _extract_ora_code(e)
         details = str(e) if app.debug else None
 
-        retryable_connection_codes = {"12514", "12541", "03113", "03135"}
+        # ORA-00028: session killed — connection-layer event, client should retry
+        retryable_connection_codes = {"12514", "12541", "03113", "03135", "00028"}
         if ora_code == "01017":
             logger.warning("Oracle auth/connection configuration error (ORA-%s)", ora_code)
             return db_connection_error(details)

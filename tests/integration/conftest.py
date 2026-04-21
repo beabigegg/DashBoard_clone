@@ -309,3 +309,51 @@ try:
     from ._oracle_xe_fixture import oracle_xe, oracle_xe_fault  # noqa: F401, E402
 except ImportError:
     pass
+
+
+# ---------------------------------------------------------------------------
+# Oracle XE app bridge fixture (Phase 2B — HTTP envelope + circuit breaker)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def oracle_xe_app(oracle_xe: str, monkeypatch: pytest.MonkeyPatch):
+    """Function-scoped Flask test_client routed to the Oracle XE container.
+
+    Patches CONNECTION_STRING in core/database.py before creating a fresh
+    Flask app, so any route that calls get_engine() will use the Oracle XE
+    container rather than the production DB.  Engine singletons (_ENGINE,
+    _HEALTH_ENGINE, _SLOW_ENGINE) are reset to None on entry; monkeypatch
+    teardown restores them automatically.
+
+    Yields a Flask test_client for Phase 2B HTTP envelope assertions.
+
+    Prerequisite: oracle_xe fixture must succeed (container ready and
+    toxiproxy proxy entry created).
+    """
+    from urllib.parse import quote_plus
+
+    import mes_dashboard.core.database as _db
+    from mes_dashboard.app import create_app
+
+    from ._infra_topology import ORACLE_TEST_PASSWORD, ORACLE_TEST_USER
+
+    # oracle_xe yields "127.0.0.1:1521/XEPDB1"
+    host_port, service_name = oracle_xe.rsplit("/", 1)
+    host, port = host_port.rsplit(":", 1)
+
+    xe_url = (
+        f"oracle+oracledb://{ORACLE_TEST_USER}:{quote_plus(ORACLE_TEST_PASSWORD)}"
+        f"@{host}:{port}/?service_name={service_name}"
+    )
+
+    monkeypatch.setattr(_db, "CONNECTION_STRING", xe_url)
+    monkeypatch.setattr(_db, "_ENGINE", None)
+    monkeypatch.setattr(_db, "_HEALTH_ENGINE", None)
+    monkeypatch.setattr(_db, "_SLOW_ENGINE", None)
+
+    app = create_app("testing")
+    app.config["TESTING"] = True
+
+    with app.test_client() as client:
+        yield client
