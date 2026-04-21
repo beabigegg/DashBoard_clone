@@ -78,7 +78,7 @@ jobs:
           python -m pytest tests/ \
             --ignore=tests/e2e \
             --ignore=tests/stress \
-            --collect-only -q | grep -E "^[0-9]+ tests? collected"
+            --collect-only -q | grep -E "[0-9]+ tests? collected"
 
   nightly-integration-real:
     name: Nightly real-subprocess integration tests
