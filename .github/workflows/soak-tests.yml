@@ -1,0 +1,104 @@
+name: soak-tests
+
+# Runs the 30-minute soak workload weekly + on manual dispatch.  The job
+# targets spec 3.1 (six resource-regression properties) from
+# openspec/changes/harden-real-infra-test-coverage; see
+# tests/integration/test_soak_workload.py for the assertions and
+# scripts/soak_local.sh for the 5-minute local equivalent.
+#
+# The workflow never changes the soak test's internal logic — it only
+# wires up scheduling, env knobs, and artifact retention.  If CI later
+# reveals a false positive in the checkers, fix the checker in its own
+# PR before adjusting anything here.
+
+on:
+  schedule:
+    # 18:00 UTC Sunday = 02:00 Taipei Monday — off-hours for both CI
+    # and ops, and far from the nightly backend-tests slot (02:00 UTC).
+    - cron: "0 18 * * 0"
+
+  workflow_dispatch:
+    inputs:
+      duration_seconds:
+        description: "Soak duration (seconds). Default 1800 (30min). Max 7200 (2h)."
+        required: false
+        default: "1800"
+      interval_seconds:
+        description: "Sampling interval (seconds). Default 30."
+        required: false
+        default: "30"
+
+jobs:
+  soak:
+    name: 30-minute soak workload (six resource-regression properties)
+    runs-on: ubuntu-latest
+    # 150 min = 2h30m: covers the 7200s (2h) dispatch upper bound plus
+    # ~30 min of worker boot/teardown, artifact upload, and pip install.
+    timeout-minutes: 150
+
+    env:
+      # Defaults match the scheduled 30-min run; dispatch inputs override.
+      SOAK_DURATION_SECONDS: ${{ github.event.inputs.duration_seconds || '1800' }}
+      SOAK_INTERVAL_SECONDS: ${{ github.event.inputs.interval_seconds || '30' }}
+      # Artifact dir is inside GITHUB_WORKSPACE so upload-artifact can find it.
+      SOAK_ARTIFACT_DIR: ${{ github.workspace }}/artifacts/soak-ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Enforce duration upper bound (7200s)
+        # workflow_dispatch inputs are raw strings; GHA has no native range
+        # validation, so we fail fast here.  Scheduled runs always pass
+        # because default is 1800.
+        run: |
+          python - <<'EOF'
+          import os, sys
+          raw = os.environ["SOAK_DURATION_SECONDS"]
+          try:
+              d = int(raw)
+          except ValueError:
+              sys.exit(f"SOAK_DURATION_SECONDS must be an integer, got: {raw!r}")
+          if d < 60:
+              sys.exit(f"SOAK_DURATION_SECONDS must be >= 60, got {d}")
+          if d > 7200:
+              sys.exit(f"SOAK_DURATION_SECONDS must be <= 7200 (2h), got {d}")
+          print(f"duration accepted: {d}s")
+          EOF
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest redis
+
+      - name: Install redis-server
+        run: sudo apt-get install -y redis-server
+
+      - name: Start redis-server
+        run: redis-server --daemonize yes
+
+      - name: Prepare artifact directory
+        run: mkdir -p "${SOAK_ARTIFACT_DIR}"
+
+      - name: Run soak workload
+        # `-s` so the test's progress prints reach the job log in real
+        # time.  `--run-integration-real` opts in to the integration_real
+        # tier (the soak test is marked both @integration_real and @soak).
+        run: |
+          python -m pytest tests/integration/test_soak_workload.py \
+              --run-integration-real \
+              -m soak \
+              -s -v \
+              --tb=short
+
+      - name: Upload soak artifact (always, retained 30 days)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-metrics
+          path: ${{ env.SOAK_ARTIFACT_DIR }}/soak-metrics-*.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -99,14 +99,18 @@
   - [x] 3.5.6 總是 dump 時序為 `soak-metrics-<timestamp>.json` artifact（schema: `{schema_version, duration_seconds, sample_interval_seconds, warmup_seconds, workers, traffic_stats, samples, started_at, ended_at}`）到 `SOAK_ARTIFACT_DIR` 或 `tmp_path`；pass/fail 一視同仁
   - [x] 3.5.7 檔頭 docstring 寫入定位聲明：「30 分 default 抓短至中期 leak、120 分 dispatch 抓中長期、超過 120 分不在自動 CI 範圍；通過 ≠ 證明無 leak」+ 三模式 table（local/CI/dispatch）+ warm-up window 說明
 - [x] 3.6 新增 `scripts/soak_local.sh`（PR #5b）：本地 5 分鐘縮水版（`duration=300 interval=30`）；env 變數覆寫；artifact 落到 `artifacts/soak-local/<UTC-stamp>/`；缺 redis-server/conda 時 exit 2 並提示原因；失敗時 artifact 仍保留
-- [ ] 3.7 新增 `.github/workflows/soak-tests.yml`：
-  - 週日 `cron: "0 4 * * 0"` + `workflow_dispatch`（input `duration_seconds` 上限 7200）
-  - `timeout-minutes: 150`（容納 120 分 dispatch 覆寫 + 啟停緩衝）
-  - 上傳 `soak-metrics-*.json` artifact、保留 30 天
-- [ ] 3.8 Mutation check：
-  - 暫時把 `_query_execution` 的 `finally: connection.close()` 註解 → `test_soak_workload` 應 FAIL（pool slope 上升）
-  - 暫時把 circuit breaker 的 half-open 過渡邏輯改成每次都 open/close → `circuit_breaker_transitions` 斷言 FAIL
-- [ ] 3.9 本地跑 `./scripts/soak_local.sh` 全綠、artifact 產出
+- [x] 3.7 新增 `.github/workflows/soak-tests.yml`（PR #5c）：
+  - 週日 `cron: "0 18 * * 0"`（UTC 週日 18:00 = 台北週一 02:00，離 backend-tests 02:00 UTC 夠遠）
+  - `workflow_dispatch` 帶 `duration_seconds` / `interval_seconds` input；duration 用 fail-fast step 檢查 `60 ≤ d ≤ 7200`（GHA 沒有 native input range，所以在 workflow 內擋）
+  - `timeout-minutes: 150` 容納 7200s + worker 啟停 + artifact 上傳
+  - `upload-artifact@v4` + `retention-days: 30`，`if: always()` 保證 FAIL 也保留 artifact
+  - **不改 soak test 內部邏輯**；workflow 只接現有腳本與 artifact 路徑
+- [ ] 3.8 Mutation check（PR #5c — 手動 run，evidence 附在 PR description 與本檔）：
+  - **Target A — pool 洩漏**：`src/mes_dashboard/core/database.py:855` 附近 `finally:` 內 `conn.close()` 註解掉 → 跑 `./scripts/soak_local.sh` → `_check_pool_slope` 應 FAIL（tail_sat 高 / head/tail saturation diff > 0.4，或 N ≥ 20 時 OLS > 0.05/sample）
+  - **Target B — circuit breaker 震盪**：`src/mes_dashboard/core/circuit_breaker.py` HALF_OPEN 轉換（約 L136–L189）改成「每個呼叫都 open/close 或 close/open」→ `_check_circuit_breaker_transitions` 應 FAIL（transitions ≥ 3）
+  - 執行流程：(1) 改動 (2) 跑 300s soak (3) 確認 FAIL + 對應 artifact 存下 (4) `git checkout -- <file>` 還原 (5) 重跑 soak 確認回綠
+  - Evidence：PR description 附兩筆 artifact（mutation-A-artifact/ 與 mutation-B-artifact/ 兩個 soak-metrics JSON）＋ 對應 pytest log 片段；本檔完成時回勾 `[x]`
+- [ ] 3.9 CI workflow 實跑通過一次（手動 `workflow_dispatch` 300s smoke）驗證 cron 設定、artifact 上傳、retention 設定正確；通過後回勾
 
 ## 4. Phase 4 — Pre-merge gate 升級（PR #6 — **條件觸發**）
 
@@ -157,7 +161,7 @@
 - [ ] 6.1 CLAUDE.md Project Commands 新增：
   - `docker compose -f docker-compose.test.yml up -d` / `down`
   - `conda run -n mes-dashboard pytest --run-integration-real tests/integration/test_real_oracle_fault_injection.py -v`
-  - `./scripts/soak_local.sh`
+  - [x] `./scripts/soak_local.sh`（PR #5c — 僅這一條本次處理；其餘延後到後續 PR）
   - `python scripts/measure_real_infra_stability.py --runs 3`
 - [ ] 6.2 每 PR 描述必附：
   - Mutation check 驗證記錄（哪一行被移除 → 哪些測試 FAIL）
