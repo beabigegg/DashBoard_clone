@@ -20,7 +20,7 @@ class TestCommonFilters:
             CommonFilters.add_location_exclusion(builder)
 
         assert len(builder.conditions) == 1
-        assert "LOCATIONNAME IS NULL OR LOCATIONNAME NOT IN" in builder.conditions[0]
+        assert "LOCATIONNAME IS NULL OR (LOCATIONNAME NOT IN" in builder.conditions[0]
         assert builder.params["p0"] == "ATEC"
         assert builder.params["p1"] == "F區"
 
@@ -42,7 +42,7 @@ class TestCommonFilters:
         ):
             CommonFilters.add_location_exclusion(builder, column="LOC_NAME")
 
-        assert "LOC_NAME IS NULL OR LOC_NAME NOT IN" in builder.conditions[0]
+        assert "LOC_NAME IS NULL OR (LOC_NAME NOT IN" in builder.conditions[0]
 
     def test_add_asset_status_exclusion(self):
         """Test asset status exclusion filter."""
@@ -54,7 +54,7 @@ class TestCommonFilters:
             CommonFilters.add_asset_status_exclusion(builder)
 
         assert len(builder.conditions) == 1
-        assert "PJ_ASSETSSTATUS IS NULL OR PJ_ASSETSSTATUS NOT IN" in builder.conditions[0]
+        assert "PJ_ASSETSSTATUS IS NULL OR (PJ_ASSETSSTATUS NOT IN" in builder.conditions[0]
 
     def test_add_asset_status_exclusion_empty(self):
         """Test asset status exclusion with empty list."""

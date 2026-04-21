@@ -60,7 +60,7 @@ class TestQueryBuilder:
         builder.add_not_in_condition("location", ["ATEC"], allow_null=True)
 
         assert len(builder.conditions) == 1
-        assert "(location IS NULL OR location NOT IN (:p0))" in builder.conditions[0]
+        assert "(location IS NULL OR (location NOT IN (:p0)))" in builder.conditions[0]
 
     def test_add_like_condition_both(self):
         """Test LIKE condition with wildcards on both sides."""
