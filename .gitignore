@@ -52,6 +52,12 @@ GEMINI.md
 htmlcov/
 .tox/
 
+# Hypothesis: track failure shrinks, ignore the rest
+# Failure examples are committed to share across CI and local runs
+# but the bulk database is kept local only
+.hypothesis/
+!.hypothesis/examples/
+
 # Local-only spool snapshot fixtures (captured from real DB)
 tests/fixtures/spool_snapshots/
 

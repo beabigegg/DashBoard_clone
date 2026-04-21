@@ -51,3 +51,28 @@ The tier-4 tests are intended for a nightly CI job. This is tracked as a follow-
 > "Add nightly CI job: `pytest tests/integration/ --run-integration-real -v`"
 
 Pre-merge CI stays on tiers 1–3 only.
+
+### Multi-worker concurrency tests (sub-tier of Tier 4)
+
+Tests in `tests/integration/test_multi_worker_concurrency.py` are marked with both `integration_real` and `multi_worker`. They spawn real RQ worker subprocesses and exercise concurrent-access scenarios:
+
+- **Job idempotence**: crash a worker mid-job; verify no duplicate side-effects after re-pickup
+- **Export deduplication**: two workers with identical fingerprint → exactly one execution
+- **Stale lock recovery**: lock holder crash → TTL-based recovery verified
+- **Result race safety**: 100 concurrent write/read rounds, no partial reads
+- **Queue fairness**: 30 jobs / 3 workers — every worker processes ≥ 1
+
+#### Running multi-worker tests locally
+
+```bash
+conda run -n mes-dashboard pytest -m multi_worker --run-integration-real -v
+```
+
+#### Adding a new multi-worker test
+
+1. Add a mock job function to `tests/integration/_multi_worker_jobs.py`.
+   - Record side-effects via `_push_effect(r, job_id, "completed")`.
+   - For cross-worker synchronisation use `WorkerBarrier` from `_multi_worker_harness.py`.
+2. Write the test in `test_multi_worker_concurrency.py`, mark with `@pytest.mark.multi_worker`.
+3. Use `MultiWorkerHarness(redis_url, worker_count=N)` as a context manager.
+4. Assert on `read_side_effects(r, job_id)`.

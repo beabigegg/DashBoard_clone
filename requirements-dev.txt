@@ -1,0 +1,5 @@
+# Development-only dependencies (not required in production)
+# Install with: pip install -r requirements-dev.txt
+
+# Property-based testing
+hypothesis>=6.0,<7.0
