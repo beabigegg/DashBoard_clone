@@ -17,7 +17,9 @@ A dedicated test file `tests/integration/test_real_oracle_fault_injection.py` SH
 
 - **WHEN** the toxiproxy `timeout` toxic is applied to the Oracle-proxy route
 - **THEN** the driver SHALL raise `oracledb.OperationalError` or `oracledb.DatabaseError`
-- **THEN** the exception message SHALL contain an `ORA-` error code
+- **THEN** the exception message SHALL contain either an `ORA-` (server-side) or `DPY-` (client-side, python-oracledb thin driver) error code
+
+*(Note: python-oracledb's thin client uses `DPY-4011` / `DPY-6005` for connection-layer events when the server never responds. Accepting both prefixes reflects actual driver behaviour.)*
 
 *(Route response code and `Retry-After` header assertions are Phase 2B. `DB_TRANSIENT_ERROR` is not a defined error code in `core/response.py` and SHALL NOT appear in Phase 2A tests.)*
 
