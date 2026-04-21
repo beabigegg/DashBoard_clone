@@ -300,6 +300,12 @@ def _wait_for_health(url: str, timeout: float = 15) -> None:
 # ---------------------------------------------------------------------------
 # Oracle XE + toxiproxy fixtures (Phase 1 — real Oracle fault injection)
 # ---------------------------------------------------------------------------
-# Defined in _oracle_xe_fixture.py; imported here so pytest auto-discovers them.
+# Fixtures defined in _oracle_xe_fixture.py (gitignored / in-progress); imported
+# here so pytest auto-discovers them when the infra support module is present.
+# The import is soft so unit/integration collection keeps working on machines
+# that don't have the Oracle-XE fault-injection support files yet.
 
-from ._oracle_xe_fixture import oracle_xe, oracle_xe_fault  # noqa: F401, E402
+try:
+    from ._oracle_xe_fixture import oracle_xe, oracle_xe_fault  # noqa: F401, E402
+except ImportError:
+    pass
