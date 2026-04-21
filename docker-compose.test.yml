@@ -31,7 +31,7 @@ services:
       start_period: 90s
 
   toxiproxy:                                # TOXIPROXY_SERVICE
-    image: shopify/toxiproxy:2.9            # TOXIPROXY_IMAGE
+    image: ghcr.io/shopify/toxiproxy:2.9.0  # TOXIPROXY_IMAGE
     ports:
       - "8474:8474"                         # TOXIPROXY_ADMIN_PORT
       - "15210:15210"                       # TOXIPROXY_ORACLE_LISTEN_PORT

@@ -156,7 +156,7 @@ jobs:
           --health-start-period 90s
 
       toxiproxy:                                   # TOXIPROXY_SERVICE
-        image: shopify/toxiproxy:2.9               # TOXIPROXY_IMAGE
+        image: ghcr.io/shopify/toxiproxy:2.9.0     # TOXIPROXY_IMAGE
         ports:
           - 8474:8474                              # TOXIPROXY_ADMIN_PORT
           - 15210:15210                            # TOXIPROXY_ORACLE_LISTEN_PORT
@@ -240,8 +240,12 @@ jobs:
         run: redis-server --daemonize yes
 
       - name: Run multi-worker concurrency tests
+        # Target the specific file instead of `-m multi_worker` so pytest does
+        # not collect tests/e2e (needs playwright) or tests/property (needs
+        # hypothesis) during marker filtering — those are out of scope here.
         run: |
-          python -m pytest -m multi_worker --run-integration-real -v --tb=short
+          python -m pytest tests/integration/test_multi_worker_concurrency.py \
+              --run-integration-real -v --tb=short
         continue-on-error: false
 
       - name: Upload worker logs on failure

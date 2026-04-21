@@ -37,10 +37,13 @@ ORACLE_TEST_PASSWORD: str = "mes_test_pw"
 ORACLE_READINESS_TIMEOUT_S: int = 240
 
 # ---------------------------------------------------------------------------
-# Toxiproxy  (shopify/toxiproxy:2.9)
+# Toxiproxy  (ghcr.io/shopify/toxiproxy:2.9.0)
 # ---------------------------------------------------------------------------
+# Shopify moved publishing from Docker Hub to GitHub Container Registry around
+# v2.9; the Docker Hub "shopify/toxiproxy" repo has no 2.9 tag (manifest
+# unknown). Use ghcr.io with the full semver tag.
 
-TOXIPROXY_IMAGE: str = "shopify/toxiproxy:2.9"
+TOXIPROXY_IMAGE: str = "ghcr.io/shopify/toxiproxy:2.9.0"
 
 # Service / container name
 TOXIPROXY_SERVICE: str = "toxiproxy"
