@@ -51,6 +51,7 @@ GEMINI.md
 .coverage
 htmlcov/
 .tox/
+artifacts/
 
 # Hypothesis: track failure shrinks, ignore the rest
 # Failure examples are committed to share across CI and local runs

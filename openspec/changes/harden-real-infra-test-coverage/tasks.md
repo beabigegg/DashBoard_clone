@@ -12,7 +12,7 @@
 - [x] 1.1 新增 `docker-compose.test.yml` 宣告 `oracle-xe`（**`gvenzl/oracle-xe:21-slim`**）+ `toxiproxy`（`shopify/toxiproxy:2.9`）兩個 service；全部 service name / port / healthcheck 來源自 `_infra_topology.py`（1.1 檔頭註解指向該常數模組，避免兩份 YAML 漂移）
 - [x] 1.2 新增 `tests/integration/_oracle_xe_fixture.py`：session-scoped `oracle_xe` fixture（wait-for-ready max 240s、使用 `gvenzl/oracle-xe` 的 `APP_USER` / `APP_USER_PASSWORD` env vars 建立 `MES_TEST` schema + `mes_test` user、yield DSN、teardown drop schema）
 - [x] 1.3 在 `_oracle_xe_fixture.py` 加 function-scoped `oracle_xe_fault` fixture：透過 toxiproxy HTTP API（`urllib.request` 打 `TOXIPROXY_ADMIN_PORT`）提供 `.add_toxic(name, type, attrs)` 與 teardown `.clear_toxics()`
-- [ ] 1.4 新增 `tests/integration/_metrics_probe.py`（為 Phase 3 預留）：`MetricsProbe(base_url)` + `.snapshot()` + `.stream(duration, interval)` 用 `urllib.request`
+- [x] 1.4 新增 `tests/integration/_metrics_probe.py`（PR #5b 一併落地）：`MetricsProbe(base_url)` + `.snapshot()` + `.stream(duration, interval)` 用 `urllib.request`；`ProbeGateClosed` / `ProbeHTTPError` 精準錯誤；`_detect_gate_hint()` 提供三層 gate 命中診斷文字
 - [x] 1.5 新增 `tests/integration/test_real_oracle_fault_injection.py` smoke test（4 個）：
   - [x] 1.5.1 `test_oracle_xe_accepts_connections`：fixture 起得來、能 `SELECT 1 FROM DUAL`
   - [x] 1.5.2 `test_toxiproxy_latency_toxic_adds_delay`：加 500ms latency → query 真實耗時 ≥ 500ms
@@ -84,15 +84,21 @@
   - `test_all_gates_open_returns_seven_category_snapshot` — env="1" + loopback → 200 + 7 類 key 齊全 + 每 queue 含 5 個 registry 欄位
   - `test_production_factory_does_not_import_internal_routes_module` — subprocess 啟動 production factory，assert URL map 無 rule 且 `"mes_dashboard.routes.internal_routes" not in sys.modules`
 - [x] 3.4 更新 `contract/api_inventory.md`：新增 `Internal-only (NOT an admin API, NOT part of any production deploy config)` 分類，列出三層 gate 與「此端點 NOT 是 admin API 過渡階段、任何真 admin API 須走 `/api/admin/...` 加 auth、production deploy config 禁止開 `REGISTER_INTERNAL_METRICS` 與 `INTERNAL_METRICS_ENABLED`」明文條款（PR #5a）
-- [ ] 3.5 新增 `tests/integration/test_soak_workload.py`（掛 `@pytest.mark.soak`）：
-  - [ ] 3.5.1 fixture `soak_config` 支援 `duration_seconds` / `sample_interval_seconds`（預設 1800 / 30）
-  - [ ] 3.5.2 spawn `gunicorn_workers(n=2)` 搭配 `INTERNAL_METRICS_ENABLED=1`
-  - [ ] 3.5.3 背景 thread 用 5 個 endpoint 輪發 2–5 req/s（Query Tool、Reject History、Hold Overview、WIP Overview、Resource History）
-  - [ ] 3.5.4 另一 thread 每 30s `MetricsProbe.snapshot()` append 到時序 list
-  - [ ] 3.5.5 跑完後斷言 D5 的 **6 條性質**（pool slope、duckdb cap、redis convergence、rss growth、circuit breaker transitions、**rq queue depth**尾段 ≤ 首段 × 1.5）
-  - [ ] 3.5.6 總是 dump 時序為 `soak-metrics-<timestamp>.json` artifact
-  - [ ] 3.5.7 在檔頭 docstring 寫清楚「30 分 default 抓短至中期 leak、120 分 dispatch 抓中長期、超過 120 分不在自動 CI 範圍；通過 ≠ 證明無 leak」定位聲明
-- [ ] 3.6 新增 `scripts/soak_local.sh`：本地 5 分鐘縮水版（`duration=300 interval=30`）
+- [x] 3.5 新增 `tests/integration/test_soak_workload.py`（掛 `@pytest.mark.integration_real` + `@pytest.mark.soak`，PR #5b）：
+  - [x] 3.5.1 fixture `soak_config` 支援 `SOAK_DURATION_SECONDS` / `SOAK_INTERVAL_SECONDS` / `SOAK_WARMUP_SECONDS` / `SOAK_ARTIFACT_DIR` 環境變數（預設 1800 / 30 / `min(60, duration//5)`）；duration/interval 邊界檢查（避免「取樣數 < 4 讓性質失去統計意義」）
+  - [x] 3.5.2 spawn `gunicorn_workers(n=2)` 搭配 `INTERNAL_METRICS_ENABLED=1`（由 `_soak_env` fixture 在 gunicorn_workers 前 monkeypatch.setenv）；Layer 1 由 TestingConfig.REGISTER_INTERNAL_METRICS=True 觸發；Layer 3 由 probe 打 127.0.0.1 滿足
+  - [x] 3.5.3 背景 thread 輪發 5 個 endpoint（/health、/api/reject-history/options、/api/hold-overview/summary、/api/query-tool/resolve、/query）在所有 workers 上以 ~3 req/s（測試模式下多數 route 會回 4xx/5xx，但對性質量測無影響——我們要的是 pipeline 被 exercise）
+  - [x] 3.5.4 另一 thread 用 `MetricsProbe.stream()` 每 `SOAK_INTERVAL_SECONDS` snapshot 累積到 list；單次 snapshot 失敗不中斷串流（記錄 `{error,error_type}`，時序繼續）
+  - [x] 3.5.5 跑完後斷言 **6 條性質**，全部可計算、可失敗、錯誤訊息自帶頭/尾 median、ratio、offender PID 等診斷資料：
+    - (a) `_check_pool_slope` — pool 飽和度 head/tail 比較 + (N≥20) OLS 斜率嚴格閾值；短跑用 saturation 訊號避免 `checkout-checkin` 小樣本雜訊（SQLAlchemy QueuePool 的 checkedout/checkedin 是瞬時值非累計值，短跑 OLS 雜訊>閾值）
+    - (b) `_check_duckdb_bounded` — max ≤ Q1×3；Q1=0 時改要求 max ≤ 1MiB
+    - (c) `_check_redis_converges` — head/tail mean ±10%；head=0 時改要求 tail ≤ 10
+    - (d) `_check_rss_growth` — head-median vs tail-median < 15%（取代「first sample → peak」以避免暫時性尖峰誤判）
+    - (e) `_check_circuit_breaker_transitions` — 狀態轉換次數 < 3
+    - (f) `_check_rq_queue_depth` — 每 queue tail mean ≤ head mean × 1.5；head=0 時改要求 tail ≤ 5；無 RQ 資料時 skip 並 print
+  - [x] 3.5.6 總是 dump 時序為 `soak-metrics-<timestamp>.json` artifact（schema: `{schema_version, duration_seconds, sample_interval_seconds, warmup_seconds, workers, traffic_stats, samples, started_at, ended_at}`）到 `SOAK_ARTIFACT_DIR` 或 `tmp_path`；pass/fail 一視同仁
+  - [x] 3.5.7 檔頭 docstring 寫入定位聲明：「30 分 default 抓短至中期 leak、120 分 dispatch 抓中長期、超過 120 分不在自動 CI 範圍；通過 ≠ 證明無 leak」+ 三模式 table（local/CI/dispatch）+ warm-up window 說明
+- [x] 3.6 新增 `scripts/soak_local.sh`（PR #5b）：本地 5 分鐘縮水版（`duration=300 interval=30`）；env 變數覆寫；artifact 落到 `artifacts/soak-local/<UTC-stamp>/`；缺 redis-server/conda 時 exit 2 並提示原因；失敗時 artifact 仍保留
 - [ ] 3.7 新增 `.github/workflows/soak-tests.yml`：
   - 週日 `cron: "0 4 * * 0"` + `workflow_dispatch`（input `duration_seconds` 上限 7200）
   - `timeout-minutes: 150`（容納 120 分 dispatch 覆寫 + 啟停緩衝）
