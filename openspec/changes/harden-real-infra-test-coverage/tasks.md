@@ -106,11 +106,20 @@
   - `upload-artifact@v4` + `retention-days: 30`，`if: always()` 保證 FAIL 也保留 artifact
   - **不改 soak test 內部邏輯**；workflow 只接現有腳本與 artifact 路徑
   - **Scope limitation（PR #5c wave-3）**：GitHub-hosted runner 上沒有 Oracle / `oracledb` / DuckDB runtime，CI 實質上只驗 workflow plumbing + RSS / Redis 趨勢；pool / duckdb / circuit_breaker 三項 checker 在 CI 下是 trivial signal（零流量、零狀態轉換），**CI green ≠ 這三項 leak-free**。這三項的真實 leak 檢驗僅限於本地 `./scripts/soak_local.sh`（有真 Oracle）；詳見 `tests/integration/test_soak_workload.py` 模組 docstring 的「Signal strength: CI vs local」段
-- [ ] 3.8 Mutation check（PR #5c — 手動 run，evidence 附在 PR description 與本檔）：
-  - **Target A — pool 洩漏**：`src/mes_dashboard/core/database.py:855` 附近 `finally:` 內 `conn.close()` 註解掉 → 跑 `./scripts/soak_local.sh` → `_check_pool_slope` 應 FAIL（tail_sat 高 / head/tail saturation diff > 0.4，或 N ≥ 20 時 OLS > 0.05/sample）
-  - **Target B — circuit breaker 震盪**：`src/mes_dashboard/core/circuit_breaker.py` HALF_OPEN 轉換（約 L136–L189）改成「每個呼叫都 open/close 或 close/open」→ `_check_circuit_breaker_transitions` 應 FAIL（transitions ≥ 3）
-  - 執行流程：(1) 改動 (2) 跑 300s soak (3) 確認 FAIL + 對應 artifact 存下 (4) `git checkout -- <file>` 還原 (5) 重跑 soak 確認回綠
-  - Evidence：PR description 附兩筆 artifact（mutation-A-artifact/ 與 mutation-B-artifact/ 兩個 soak-metrics JSON）＋ 對應 pytest log 片段；本檔完成時回勾 `[x]`
+- [~] 3.8 Mutation check（PR #5c wave-5 — 手動 run；B verified, A N/A with documented limitation）：
+  - **Target B — circuit breaker 震盪 ✅ VERIFIED**：
+    - Mutation 位置：`src/mes_dashboard/core/circuit_breaker.py` `state` property（L130-L142）加入「每次 read rotate `CLOSED → OPEN → HALF_OPEN → CLOSED`」的三態輪轉；`record_success` 原本的 HALF_OPEN 觸發路徑太稀疏（10s 取樣抓不到），改用 state property 每次 read 都 advance 才穩定可觀測
+    - Env 覆寫：`CIRCUIT_BREAKER_ENABLED=true`（TestingConfig 下 CB 預設 disabled，必須顯式打開），`SOAK_INTERVAL_SECONDS=10`（30s 取樣錯過快速 cycle，10s 才抓得到）
+    - **Fail 證據**：`./scripts/soak_local.sh` FAIL（exit=1）；assertion 訊息 `[circuit_breaker_transitions] observed 20 state transitions (threshold = 3)`；artifact `artifacts/mutation-B/mutated-v3/soak-metrics-1776814608.json`；pytest log `artifacts/mutation-B/mutated-v3-pytest.log`
+    - **Revert 方式**：`git restore --source=HEAD -- src/mes_dashboard/core/circuit_breaker.py`；`git status` 確認 working tree clean
+    - **Revert-pass 證據**：同 env 重跑 soak，六條性質全 PASS；artifact `artifacts/mutation-B/baseline/soak-metrics-1776814981.json`；post-warmup transitions = 0，state 全程 `CLOSED`
+  - **Target A — pool 洩漏 ⚠️ N/A (documented limitation)**：
+    - **根因**：TestingConfig `DB_POOL_SIZE=1, DB_MAX_OVERFLOW=0`（[settings.py:162-163](src/mes_dashboard/config/settings.py#L162-L163)）。`conn.close()` 拿掉後 pool 在第一個 DB 請求（~100ms 內）瞬間滿池、saturation=1.0 恆定
+    - **Checker 兩條訊號都不觸發**：
+      - head/tail saturation ratio（[test_soak_workload.py:532-546](tests/integration/test_soak_workload.py#L532-L546)）要求 `head_sat < 0.5 AND tail_sat > 0.9`；瞬間滿池讓兩端皆為 1.0
+      - OLS 斜率嚴格閾值 0.05/sample 僅在 `N ≥ 20` 啟動（[test_soak_workload.py:548-550](tests/integration/test_soak_workload.py#L548-L550)）；5-min run N=10、30-min run N=60 OLS slope=0（instantaneous counter 恆定），亦無法觸發
+    - **結論**：現有 `_check_pool_slope` 對「瞬間滿池」leak 存在 documented blind spot，已在 PR #5b 的 checker 註解承認小 pool 語意（「signal oscillates in {-1, 0, +1}」）
+    - **未來補法（follow-up 不在本 change）**：需另開 OpenSpec change，擇一：(a) 新增 `SoakConfig`（`DB_POOL_SIZE ≥ 20` + `DB_MAX_OVERFLOW ≥ 5`）讓梯度可見；(b) 改 mutation target 為漸進式 acquire leak（每次查詢 acquire 兩條但只 release 一條）；(c) 擴 checker 增加「saturation 恆滿且 request rejection 高」的組合訊號
 - [x] 3.9 CI workflow 實跑通過一次（PR #5c — `workflow_dispatch` 300s smoke，run id 24722453377 on `beabigegg/DashBoard_clone`，conclusion: success）；首跑暴露 `gunicorn_workers` fixture 會打到 /health 但 TestingConfig 下 `check_database` 仍連真 Oracle → 503，修正見 PR #5c wave-2（`check_database` 在 `has_app_context() and current_app.config["TESTING"]` 時短路回 `ok`）。六條性質 PASS、artifact 落檔、retention 30 天。
 
 ## 4. Phase 4 — Pre-merge gate 升級（PR #6 — **條件觸發**）
