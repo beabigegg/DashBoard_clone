@@ -272,6 +272,12 @@ class TestGetResourcesByIds:
 class TestGetResourcesByFilter:
     """Test get_resources_by_filter function."""
 
+    @staticmethod
+    def _legacy_snapshot():
+        # Force legacy/filter-from-records path so these unit tests remain
+        # independent from shared in-process resource index state.
+        return {"ready": False}
+
     def test_filters_by_workcenter(self):
         """Test filters resources by workcenter."""
         import mes_dashboard.services.resource_cache as rc
@@ -282,10 +288,11 @@ class TestGetResourcesByFilter:
             {'RESOURCEID': 'R003', 'WORKCENTERNAME': 'WC1'}
         ]
 
-        with patch.object(rc, 'get_all_resources', return_value=mock_resources):
-            result = rc.get_resources_by_filter(workcenters=['WC1'])
+        with patch.object(rc, 'get_resource_index_snapshot', return_value=self._legacy_snapshot()):
+            with patch.object(rc, 'get_all_resources', return_value=mock_resources):
+                result = rc.get_resources_by_filter(workcenters=['WC1'])
 
-            assert len(result) == 2
+                assert len(result) == 2
 
     def test_filters_by_family(self):
         """Test filters resources by family."""
@@ -296,11 +303,12 @@ class TestGetResourcesByFilter:
             {'RESOURCEID': 'R002', 'RESOURCEFAMILYNAME': 'F2'}
         ]
 
-        with patch.object(rc, 'get_all_resources', return_value=mock_resources):
-            result = rc.get_resources_by_filter(families=['F1'])
+        with patch.object(rc, 'get_resource_index_snapshot', return_value=self._legacy_snapshot()):
+            with patch.object(rc, 'get_all_resources', return_value=mock_resources):
+                result = rc.get_resources_by_filter(families=['F1'])
 
-            assert len(result) == 1
-            assert result[0]['RESOURCEFAMILYNAME'] == 'F1'
+                assert len(result) == 1
+                assert result[0]['RESOURCEFAMILYNAME'] == 'F1'
 
     def test_filters_by_production_flag(self):
         """Test filters resources by production flag."""
@@ -312,10 +320,11 @@ class TestGetResourcesByFilter:
             {'RESOURCEID': 'R003', 'PJ_ISPRODUCTION': 1}
         ]
 
-        with patch.object(rc, 'get_all_resources', return_value=mock_resources):
-            result = rc.get_resources_by_filter(is_production=True)
+        with patch.object(rc, 'get_resource_index_snapshot', return_value=self._legacy_snapshot()):
+            with patch.object(rc, 'get_all_resources', return_value=mock_resources):
+                result = rc.get_resources_by_filter(is_production=True)
 
-            assert len(result) == 2
+                assert len(result) == 2
 
     def test_combines_multiple_filters(self):
         """Test combines multiple filter criteria."""
@@ -327,11 +336,12 @@ class TestGetResourcesByFilter:
             {'RESOURCEID': 'R003', 'WORKCENTERNAME': 'WC2', 'RESOURCEFAMILYNAME': 'F1'}
         ]
 
-        with patch.object(rc, 'get_all_resources', return_value=mock_resources):
-            result = rc.get_resources_by_filter(workcenters=['WC1'], families=['F1'])
+        with patch.object(rc, 'get_resource_index_snapshot', return_value=self._legacy_snapshot()):
+            with patch.object(rc, 'get_all_resources', return_value=mock_resources):
+                result = rc.get_resources_by_filter(workcenters=['WC1'], families=['F1'])
 
-            assert len(result) == 1
-            assert result[0]['RESOURCEID'] == 'R001'
+                assert len(result) == 1
+                assert result[0]['RESOURCEID'] == 'R001'
 
 
 class TestGetCacheStatus:

@@ -24,7 +24,10 @@ class TestRejectHistoryRoutesBase(unittest.TestCase):
 
 
 class TestRejectHistoryPageRoute(unittest.TestCase):
-    @patch.dict(os.environ, {'PORTAL_SPA_ENABLED': 'false'})
+    @patch.dict(os.environ, {
+        'PORTAL_SPA_ENABLED': 'false',
+        'MODERNIZATION_RETIRE_IN_SCOPE_RUNTIME_FALLBACK': 'false',
+    })
     @patch('mes_dashboard.app.os.path.exists', return_value=False)
     def test_reject_history_page_fallback_contains_vite_entry(self, _mock_exists):
         db._ENGINE = None

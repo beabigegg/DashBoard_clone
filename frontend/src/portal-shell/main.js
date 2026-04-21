@@ -5,6 +5,7 @@ import { router } from './router.js';
 import '../styles/tailwind.css';
 import './style.css';
 import { getPendingJobs, deregisterJob } from '../core/pending-jobs-registry.js';
+import { restoreUrlState } from '../core/shell-navigation.js';
 
 const PRELOAD_RECOVERY_KEY = 'portal-shell:preload-recovered';
 const PRELOAD_RECOVERY_TTL_MS = 2 * 60 * 1000;
@@ -45,6 +46,7 @@ window.addEventListener('vite:preloadError', (event) => {
 
 const app = createApp(App);
 app.use(router);
+restoreUrlState();
 
 window.__MES_PORTAL_SHELL_NAVIGATE__ = (target, { replace = false } = {}) => {
   const navigate = replace ? router.replace(target) : router.push(target);

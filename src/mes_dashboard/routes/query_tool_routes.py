@@ -18,6 +18,7 @@ from functools import wraps
 from flask import Blueprint, request, Response, render_template, current_app
 
 from mes_dashboard.core.cache import cache_get, cache_set
+from mes_dashboard.core.database import DatabaseDegradedError
 from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
@@ -60,6 +61,9 @@ def map_service_errors(fn):
     def wrapper(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
+        except DatabaseDegradedError:
+            # Let app-level degraded handlers return retry-aware 503 responses.
+            raise
         except UserInputError as e:
             return validation_error(e.message)
         except ResourceNotFoundError as e:

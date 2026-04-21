@@ -7,6 +7,7 @@ from typing import Optional
 from flask import Blueprint, current_app, request, send_from_directory
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.request_validation import validate_workcenter_group_filter
 from mes_dashboard.core.response import (
     internal_error,
     success_response,
@@ -120,6 +121,10 @@ def hold_overview_page():
 def api_hold_overview_summary():
     """Return summary KPI data for hold overview page."""
     args = _get_request_args()
+    if "workcenter_group" in args:
+        workcenter_group_error = validate_workcenter_group_filter(args.get("workcenter_group"))
+        if workcenter_group_error:
+            return validation_error(workcenter_group_error)
     hold_type, error = _parse_hold_type(default='all', args=args)
     if error:
         return error

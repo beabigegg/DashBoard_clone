@@ -8,6 +8,7 @@ Uses DWH.DW_MES_LOT_V view for real-time WIP data.
 from flask import Blueprint, request
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.request_validation import validate_workcenter_group_filter
 from mes_dashboard.core.response import (
     success_response,
     validation_error,
@@ -85,6 +86,10 @@ def api_overview_summary():
         JSON with totalLots, totalQtyPcs, byWipStatus, dataUpdateDate
     """
     args = _get_wip_args()
+    if "workcenter_group" in args:
+        workcenter_group_error = validate_workcenter_group_filter(args.get("workcenter_group"))
+        if workcenter_group_error:
+            return validation_error(workcenter_group_error)
     workorder = (args.get('workorder', '') or '').strip() or None
     lotid = (args.get('lotid', '') or '').strip() or None
     package = (args.get('package', '') or '').strip() or None

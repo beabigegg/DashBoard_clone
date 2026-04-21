@@ -43,6 +43,11 @@ function toShellPath(targetRoute) {
   return normalizeRoutePath(targetRoute);
 }
 
+function isPortalShellRootPath() {
+  const path = String(window.location.pathname || '').replace(/\/+$/, '');
+  return path === '/portal-shell' || path === '';
+}
+
 const isLoginPage = computed(() => route.path === '/login');
 
 const breadcrumb = computed(() => {
@@ -160,7 +165,7 @@ async function loadNavigation() {
       }
     }
 
-    if (route.path === '/') {
+    if (route.path === '/' && isPortalShellRootPath()) {
       const firstRoute = state?.drawers?.[0]?.pages?.[0]?.route;
       const defaultShellPath = firstRoute ? normalizeRoutePath(firstRoute) : '/';
       if (defaultShellPath !== '/') {

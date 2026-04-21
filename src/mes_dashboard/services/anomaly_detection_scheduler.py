@@ -87,14 +87,26 @@ def _copy_to_anomaly_namespace(source_ns: str, anomaly_ns: str) -> bool:
         dest_dir = QUERY_SPOOL_DIR.resolve() / re.sub(r"[^A-Za-z0-9._-]", "_", anomaly_ns)
         dest_dir.mkdir(parents=True, exist_ok=True)
 
-        # Remove old anomaly spool files before copying fresh data
-        for old in dest_dir.glob("*.parquet"):
-            old.unlink(missing_ok=True)
-
         # Use a stable query_id derived from the anomaly namespace
         query_id = hashlib.sha256(anomaly_ns.encode()).hexdigest()[:16]
         dest_path = dest_dir / f"{query_id}.parquet"
-        shutil.copy2(str(files[0]), str(dest_path))
+        tmp_dest = dest_path.with_suffix(".parquet.tmp")
+        if tmp_dest.exists():
+            tmp_dest.unlink(missing_ok=True)
+
+        # Copy to temp file first to avoid exposing partial parquet to readers.
+        shutil.copy2(str(files[0]), str(tmp_dest))
+        with tmp_dest.open("rb+") as fh:
+            fh.flush()
+            os.fsync(fh.fileno())
+
+        tmp_dest.replace(dest_path)
+
+        # Best-effort cleanup for stale files from previous runs.
+        for old in dest_dir.glob("*.parquet"):
+            if old == dest_path:
+                continue
+            old.unlink(missing_ok=True)
 
         # Register in Redis so cleanup worker recognizes it (not orphan)
         try:
@@ -236,14 +248,21 @@ def _scheduler_loop() -> None:
     if _STOP_EVENT.is_set():
         return
 
-    logger.info("Anomaly detection: ensuring spool data for initial computation...")
-    seeded = _ensure_spool_data()
-    if seeded > 0:
-        logger.info("Anomaly detection: seeded %d missing spool datasets", seeded)
+    from mes_dashboard.core.redis_client import release_lock, try_acquire_lock
+    if try_acquire_lock("anomaly_initial_refresh", ttl_seconds=300, fail_mode="closed"):
+        try:
+            logger.info("Anomaly detection: ensuring spool data for initial computation...")
+            seeded = _ensure_spool_data()
+            if seeded > 0:
+                logger.info("Anomaly detection: seeded %d missing spool datasets", seeded)
 
-    if not _STOP_EVENT.is_set():
-        logger.info("Anomaly detection: running initial computation...")
-        _run_computation()
+            if not _STOP_EVENT.is_set():
+                logger.info("Anomaly detection: running initial computation...")
+                _run_computation()
+        finally:
+            release_lock("anomaly_initial_refresh")
+    else:
+        logger.debug("Anomaly detection: another worker is handling initial seed/compute, skipping")
 
     last_run_date: str | None = None
 

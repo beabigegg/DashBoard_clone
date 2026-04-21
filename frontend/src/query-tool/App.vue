@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import { replaceRuntimeHistory } from '../core/shell-navigation.js';
+import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 
 import PageHeader from '../shared-ui/components/PageHeader.vue';
@@ -267,12 +267,18 @@ function syncUrlState() {
     return;
   }
 
-  replaceRuntimeHistory(nextQuery ? `/query-tool?${nextQuery}` : '/query-tool');
+  const target = nextQuery ? `/query-tool?${nextQuery}` : '/query-tool';
+  if (
+    typeof window.__MES_PORTAL_SHELL_NAVIGATE__ === 'function'
+    && String(window.location.pathname || '').startsWith('/portal-shell')
+  ) {
+    navigateToRuntimeRoute(target, { replace: true });
+    return;
+  }
+  replaceRuntimeHistory(target);
 }
 
-async function applyStateFromUrl() {
-  const state = readStateFromUrl();
-
+async function applyHydratedUrlState(state) {
   suppressUrlSync.value = true;
 
   activeTab.value = state.tab;
@@ -310,6 +316,11 @@ async function applyStateFromUrl() {
     reverseLineage.selectNode(state.reverseSelectedContainerId);
     await reverseDetail.setSelectedContainerId(state.reverseSelectedContainerId);
   }
+}
+
+async function applyStateFromUrl() {
+  const state = readStateFromUrl();
+  await applyHydratedUrlState(state);
 }
 
 function handlePopState() {
@@ -446,16 +457,7 @@ onMounted(async () => {
     equipmentQuery.bootstrap(),
     lotEquipmentQuery.bootstrap(),
   ]);
-
-  if (initialState.lotSelectedContainerId) {
-    lotLineage.selectNode(initialState.lotSelectedContainerId);
-    await lotDetail.setSelectedContainerId(initialState.lotSelectedContainerId);
-  }
-
-  if (initialState.reverseSelectedContainerId) {
-    reverseLineage.selectNode(initialState.reverseSelectedContainerId);
-    await reverseDetail.setSelectedContainerId(initialState.reverseSelectedContainerId);
-  }
+  await applyStateFromUrl();
 
   syncUrlState();
 });

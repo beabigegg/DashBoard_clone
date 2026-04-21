@@ -1301,6 +1301,9 @@ def _register_error_handlers(app: Flask) -> None:
         forbidden_error,
         not_found_error,
         internal_error,
+        db_connection_error,
+        db_query_timeout_error,
+        db_query_error,
         pool_exhausted_error,
         error_response,
         INTERNAL_ERROR
@@ -1308,7 +1311,9 @@ def _register_error_handlers(app: Flask) -> None:
     from mes_dashboard.core.database import (
         DatabasePoolExhaustedError,
         DatabaseCircuitOpenError,
+        _extract_ora_code,
     )
+    import oracledb
     from mes_dashboard.core.response import circuit_breaker_error
 
     @app.errorhandler(401)
@@ -1365,6 +1370,27 @@ def _register_error_handlers(app: Flask) -> None:
             str(e) if app.debug else None,
             retry_after_seconds=retry_after,
         )
+
+    @app.errorhandler(oracledb.DatabaseError)
+    def handle_oracle_database_error(e: oracledb.DatabaseError):
+        """Handle Oracle driver exceptions with ORA-code-aware contracts."""
+        logger = logging.getLogger('mes_dashboard')
+        ora_code = _extract_ora_code(e)
+        details = str(e) if app.debug else None
+
+        retryable_connection_codes = {"12514", "12541", "03113", "03135"}
+        if ora_code == "01017":
+            logger.warning("Oracle auth/connection configuration error (ORA-%s)", ora_code)
+            return db_connection_error(details)
+        if ora_code in retryable_connection_codes:
+            logger.warning("Oracle transient connectivity error (ORA-%s)", ora_code)
+            return db_connection_error(details, retry_after_seconds=30)
+        if ora_code == "01555":
+            logger.warning("Oracle snapshot-too-old error (ORA-%s)", ora_code)
+            return db_query_timeout_error(details)
+
+        logger.error("Unmapped Oracle database error (ORA-%s)", ora_code, exc_info=True)
+        return db_query_error(details)
 
     @app.errorhandler(Exception)
     def handle_exception(e):

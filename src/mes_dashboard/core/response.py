@@ -15,6 +15,7 @@ Provides consistent response envelope for all API endpoints.
 | Rate limit exceeded | `too_many_requests_error()` | 429 |
 | DB connection down | `db_connection_error(details)` | 503 |
 | DB query timeout | `db_query_timeout_error(details)` | 504 |
+| DB query error | `db_query_error(details)` | 500 |
 | Circuit breaker open | `circuit_breaker_error(details)` | 503 |
 | DB pool exhausted | `pool_exhausted_error(details)` | 503 |
 | Cache expired | `cache_expired_error(details)` | 410 |
@@ -195,13 +196,24 @@ def _is_development_mode() -> bool:
 # Convenience Functions for Common Errors
 # ============================================================
 
-def db_connection_error(details: Optional[str] = None):
+def db_connection_error(
+    details: Optional[str] = None,
+    retry_after_seconds: Optional[int] = None,
+):
     """Return a database connection error response."""
+    headers = None
+    meta = None
+    if retry_after_seconds is not None:
+        retry_after_seconds = max(int(retry_after_seconds), 1)
+        headers = {"Retry-After": str(retry_after_seconds)}
+        meta = {"retry_after_seconds": retry_after_seconds}
     return error_response(
         DB_CONNECTION_FAILED,
         "資料庫連線失敗，請稍後再試",
         details,
-        status_code=503
+        status_code=503,
+        meta=meta,
+        headers=headers,
     )
 
 
@@ -212,6 +224,16 @@ def db_query_timeout_error(details: Optional[str] = None):
         "資料庫查詢逾時，請稍後再試",
         details,
         status_code=504
+    )
+
+
+def db_query_error(details: Optional[str] = None):
+    """Return a database query error response."""
+    return error_response(
+        DB_QUERY_ERROR,
+        "資料庫查詢失敗，請稍後再試",
+        details,
+        status_code=500
     )
 
 

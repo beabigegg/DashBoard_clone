@@ -25,6 +25,7 @@ from mes_dashboard.core.response import (
 from mes_dashboard.core.heavy_query_telemetry import record_memory_error
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.request_validation import parse_json_payload
+from mes_dashboard.core.request_validation import validate_optional_date_range
 from mes_dashboard.core.utils import parse_bool_query
 from mes_dashboard.services.reject_dataset_cache import (
     apply_view,
@@ -123,6 +124,8 @@ def _parse_date_range(required: bool = True) -> tuple[Optional[str], Optional[st
 
     if not start_date or not end_date:
         if required:
+            return None, None, ({"success": False, "error": "缺少必要參數: start_date, end_date"}, 400)
+        if start_date or end_date:
             return None, None, ({"success": False, "error": "缺少必要參數: start_date, end_date"}, 400)
         start_date, end_date = _default_date_range()
 
@@ -276,6 +279,9 @@ def api_reject_history_options():
     start_date, end_date, date_error = _parse_date_range(required=False)
     if date_error:
         return validation_error(date_error[0].get("error", "日期格式錯誤"))
+    strict_date_error = validate_optional_date_range(start_date, end_date)
+    if strict_date_error:
+        return validation_error(strict_date_error)
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:

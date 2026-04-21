@@ -15,6 +15,7 @@ def _login_as_admin(client) -> None:
 
 def test_yield_alert_page_fallback_contains_vite_entry(monkeypatch):
     monkeypatch.setenv("PORTAL_SPA_ENABLED", "false")
+    monkeypatch.setenv("MODERNIZATION_RETIRE_IN_SCOPE_RUNTIME_FALLBACK", "false")
     app = create_app("testing")
     app.config["TESTING"] = True
     client = app.test_client()

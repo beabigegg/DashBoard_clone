@@ -89,6 +89,11 @@ class TestUrlLengthGuardSessionStorageE2E:
     def test_wip_overview_restores_state_from_session_storage(self, page: Page, app_server: str):
         """6.2: Navigate to ?_s=1 with pre-seeded sessionStorage — state restores without 400."""
         ensure_shell_admin(page, "/wip-overview", "WIP 即時概況")
+        page.goto(
+            f"{app_server}/portal-shell/wip-overview",
+            wait_until="domcontentloaded",
+            timeout=60000,
+        )
 
         # Pre-seed sessionStorage as if replaceRuntimeHistory had spilled
         fake_query = "workorder=WO0001,WO0002&status=RUN"
@@ -121,6 +126,11 @@ class TestUrlLengthGuardSessionStorageE2E:
     def test_hold_overview_restores_state_from_session_storage(self, page: Page, app_server: str):
         """6.3: Hold-overview large filter set spills to sessionStorage then restores on refresh."""
         ensure_shell_admin(page, "/hold-overview", "Hold 概況")
+        page.goto(
+            f"{app_server}/portal-shell/hold-overview",
+            wait_until="domcontentloaded",
+            timeout=60000,
+        )
 
         # Simulate state from a large hold_type + workcenter filter
         fake_query = "hold_type=quality&workcenter=A,B,C"
@@ -131,7 +141,7 @@ class TestUrlLengthGuardSessionStorageE2E:
 
         wait = _pre_register_response_listener(
             page,
-            lambda resp: "/api/wip/hold" in resp.url,
+            lambda resp: "/api/hold-overview/" in resp.url,
         )
 
         page.goto(

@@ -1178,6 +1178,7 @@ def test_resolve_containers_deduplicates_container_ids(monkeypatch):
     )
     monkeypatch.setenv("CONTAINER_RESOLVE_MAX_EXPANSION_PER_TOKEN", "10")
     monkeypatch.setenv("CONTAINER_RESOLVE_MAX_CONTAINER_IDS", "10")
+    monkeypatch.setenv("CONTAINER_RESOLVE_PATTERN_MIN_PREFIX_LEN", "3")
 
     resolved = cache_svc.resolve_containers("lot", ["LOT%"])
 

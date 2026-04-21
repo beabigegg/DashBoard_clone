@@ -24,6 +24,7 @@ COPY supervisord.conf .
 RUN mkdir -p /app/logs /app/logs/archive /app/tmp /app/tmp/query_spool
 
 ENV PYTHONPATH=/app/src
+ENV QUERY_SPOOL_DIR=/app/tmp/query_spool
 
 EXPOSE 8080
 

@@ -5,6 +5,13 @@ import NativeRouteView from './views/NativeRouteView.vue';
 import ShellHomeView from './views/ShellHomeView.vue';
 import { buildDynamicNavigationState } from './navigationState.js';
 import { normalizeRoutePath } from './routeContracts.js';
+import { restoreUrlState } from '../core/shell-navigation.js';
+
+// `createWebHistory` below captures `window.location` synchronously and immediately
+// `replaceState`s with the captured value. If `?_s=1` is still in the URL when that
+// happens, vue-router will stamp it back even after `restoreUrlState` tries to strip it.
+// Restore before createRouter so the history layer sees the reconstructed query.
+restoreUrlState();
 
 let allowedRoutePaths = new Set(['/']);
 let dynamicRouteNames = [];

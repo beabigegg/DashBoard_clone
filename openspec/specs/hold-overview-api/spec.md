@@ -1,9 +1,6 @@
 ## Purpose
 Define stable requirements for hold-overview-api.
-
 ## Requirements
-
-
 ### Requirement: Hold Overview API SHALL provide summary statistics
 The API SHALL return aggregated summary KPIs for hold lots.
 `GET /api/hold-overview/summary` SHALL also accept `POST` with a JSON body carrying the same parameters, to avoid Gunicorn's 4094-byte request-line limit when many filter values are selected.
@@ -195,3 +192,20 @@ Hold Overview API endpoints (`/api/hold-overview/summary`, `/api/hold-overview/m
 #### Scenario: WIP hold GET backward compatibility
 - **WHEN** `GET /api/wip/overview/hold?hold_type=quality&lotid=LOT001,LOT002` is called
 - **THEN** the response SHALL return HTTP 200 unchanged from existing behavior
+
+### Requirement: Hold Overview summary endpoint SHALL reject malformed workcenter filters
+`GET /api/hold-overview/summary` SHALL validate `workcenter_group` and other
+supported filter fields before invoking downstream query logic.
+
+#### Scenario: Invalid workcenter_group returns validation error
+- **WHEN** `/api/hold-overview/summary` receives a malformed `workcenter_group`
+- **THEN** the response SHALL return HTTP 400 or 422
+- **THEN** the response SHALL use `error.code = VALIDATION_ERROR`
+
+#### Scenario: Malformed workcenter filter does not masquerade as empty result
+- **WHEN** `/api/hold-overview/summary` receives a malicious or structurally
+  invalid `workcenter_group`
+- **THEN** the response SHALL NOT return `success: true` with an empty dataset
+- **THEN** the route SHALL reject the request before downstream summary
+  computation
+

@@ -32,6 +32,18 @@ from routes._fuzz_payloads import MALICIOUS_INPUTS
 # Shared app/client fixture
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Reset rate-limit state between fuzz tests to avoid 429 cross-test bleed."""
+    try:
+        from mes_dashboard.core import rate_limit as rl_mod
+        with rl_mod._RATE_LOCK:
+            rl_mod._RATE_ATTEMPTS.clear()
+    except Exception:
+        pass
+    yield
+
+
 def _make_client():
     from mes_dashboard.app import create_app
     import mes_dashboard.core.database as db
@@ -64,6 +76,35 @@ def _assert_valid_json(response, endpoint: str):
         pytest.fail(f"{endpoint} returned invalid JSON: {exc}\nBody: {raw[:300]}")
 
 
+def _assert_validation_error(response, payload, endpoint: str):
+    """Strict: response must be a 4xx VALIDATION_ERROR envelope.
+
+    Used when the fuzz case MUST be rejected by the route's input validator.
+    Combines not-500, status 400/422, JSON body, success=False, and
+    error.code == 'VALIDATION_ERROR' into a single assertion.
+    """
+    raw = response.data[:500]
+    assert response.status_code != 500, (
+        f"{endpoint} returned 500 for payload {payload!r}: {raw!r}"
+    )
+    assert response.status_code in (400, 422), (
+        f"{endpoint} expected 400/422 for payload {payload!r}, "
+        f"got {response.status_code}: {raw!r}"
+    )
+    body = response.get_json(silent=True)
+    assert body is not None, (
+        f"{endpoint} non-JSON body for payload {payload!r}: {raw!r}"
+    )
+    assert body.get("success") is False, (
+        f"{endpoint} envelope missing success=False for {payload!r}: {body}"
+    )
+    err = body.get("error") or {}
+    assert err.get("code") == "VALIDATION_ERROR", (
+        f"{endpoint} expected error.code=VALIDATION_ERROR for {payload!r}, "
+        f"got {err.get('code')!r} (body={body})"
+    )
+
+
 def _payload_to_str(payload: Any) -> str:
     """Convert a payload to a string value for GET params, best-effort."""
     if isinstance(payload, str):
@@ -91,8 +132,7 @@ def test_reject_history_options_rejects_malicious_start_date(payload):
     client = _make_client()
     qs = _fuzz_query_string("start_date", payload, {"end_date": "2026-01-07"})
     r = client.get(f"/api/reject-history/options?{qs}")
-    _assert_not_500(r, payload, "/api/reject-history/options")
-    _assert_valid_json(r, "/api/reject-history/options")
+    _assert_validation_error(r, payload, "/api/reject-history/options")
 
 
 @pytest.mark.parametrize("payload", MALICIOUS_INPUTS)
@@ -108,14 +148,7 @@ def test_reject_history_query_rejects_malicious_payload(payload):
         json=body,
         content_type="application/json",
     )
-    _assert_not_500(r, payload, "/api/reject-history/query")
-    _assert_valid_json(r, "/api/reject-history/query")
-    if r.status_code in (400, 422):
-        data = r.get_json()
-        if data and "error" in data:
-            assert data["error"]["code"] == "VALIDATION_ERROR", (
-                f"Expected VALIDATION_ERROR, got {data['error']['code']}"
-            )
+    _assert_validation_error(r, payload, "/api/reject-history/query")
 
 
 # ---------------------------------------------------------------------------
@@ -135,8 +168,7 @@ def test_query_tool_resolve_rejects_malicious_input(payload):
         json=body,
         content_type="application/json",
     )
-    _assert_not_500(r, payload, "/api/query-tool/resolve")
-    _assert_valid_json(r, "/api/query-tool/resolve")
+    _assert_validation_error(r, payload, "/api/query-tool/resolve")
 
 
 @pytest.mark.parametrize("payload", MALICIOUS_INPUTS)
@@ -153,12 +185,11 @@ def test_query_tool_query_rejects_malicious_date(payload):
             "end_date": "2026-01-07",
         }
     r = client.post(
-        "/api/query-tool/query",
+        "/api/query-tool/lot-equipment-lookup",
         json=body,
         content_type="application/json",
     )
-    _assert_not_500(r, payload, "/api/query-tool/query")
-    _assert_valid_json(r, "/api/query-tool/query")
+    _assert_validation_error(r, payload, "/api/query-tool/lot-equipment-lookup")
 
 
 # ---------------------------------------------------------------------------
@@ -169,9 +200,8 @@ def test_query_tool_query_rejects_malicious_date(payload):
 def test_hold_history_rejects_malicious_date(payload):
     client = _make_client()
     qs = _fuzz_query_string("start_date", payload, {"end_date": "2026-01-07"})
-    r = client.get(f"/api/hold-history?{qs}")
-    _assert_not_500(r, payload, "/api/hold-history")
-    _assert_valid_json(r, "/api/hold-history")
+    r = client.get(f"/api/hold-history/view?{qs}")
+    _assert_validation_error(r, payload, "/api/hold-history/view")
 
 
 # ---------------------------------------------------------------------------
@@ -182,9 +212,8 @@ def test_hold_history_rejects_malicious_date(payload):
 def test_hold_overview_rejects_malicious_filter(payload):
     client = _make_client()
     qs = _fuzz_query_string("workcenter_group", payload)
-    r = client.get(f"/api/hold-overview?{qs}")
-    _assert_not_500(r, payload, "/api/hold-overview")
-    _assert_valid_json(r, "/api/hold-overview")
+    r = client.get(f"/api/hold-overview/summary?{qs}")
+    _assert_validation_error(r, payload, "/api/hold-overview/summary")
 
 
 # ---------------------------------------------------------------------------
@@ -204,8 +233,7 @@ def test_production_history_rejects_malicious_date(payload):
         json=body,
         content_type="application/json",
     )
-    _assert_not_500(r, payload, "/api/production-history/query")
-    _assert_valid_json(r, "/api/production-history/query")
+    _assert_validation_error(r, payload, "/api/production-history/query")
 
 
 # ---------------------------------------------------------------------------
@@ -216,9 +244,8 @@ def test_production_history_rejects_malicious_date(payload):
 def test_resource_history_rejects_malicious_date(payload):
     client = _make_client()
     qs = _fuzz_query_string("start_date", payload, {"end_date": "2026-01-07"})
-    r = client.get(f"/api/resource-history?{qs}")
-    _assert_not_500(r, payload, "/api/resource-history")
-    _assert_valid_json(r, "/api/resource-history")
+    r = client.get(f"/api/resource/history/view?{qs}")
+    _assert_validation_error(r, payload, "/api/resource/history/view")
 
 
 # ---------------------------------------------------------------------------
@@ -229,9 +256,8 @@ def test_resource_history_rejects_malicious_date(payload):
 def test_yield_alert_rejects_malicious_date(payload):
     client = _make_client()
     qs = _fuzz_query_string("start_date", payload, {"end_date": "2026-01-07"})
-    r = client.get(f"/api/yield-alert?{qs}")
-    _assert_not_500(r, payload, "/api/yield-alert")
-    _assert_valid_json(r, "/api/yield-alert")
+    r = client.get(f"/api/yield-alert/alerts?{qs}")
+    _assert_validation_error(r, payload, "/api/yield-alert/alerts")
 
 
 # ---------------------------------------------------------------------------
@@ -246,12 +272,11 @@ def test_material_trace_rejects_malicious_lot_id(payload):
     else:
         body = {"lot_id": _payload_to_str(payload)}
     r = client.post(
-        "/api/trace/lot",
+        "/api/material-trace/query",
         json=body,
         content_type="application/json",
     )
-    _assert_not_500(r, payload, "/api/trace/lot")
-    _assert_valid_json(r, "/api/trace/lot")
+    _assert_validation_error(r, payload, "/api/material-trace/query")
 
 
 # ---------------------------------------------------------------------------
@@ -262,9 +287,8 @@ def test_material_trace_rejects_malicious_lot_id(payload):
 def test_mid_section_defect_rejects_malicious_date(payload):
     client = _make_client()
     qs = _fuzz_query_string("start_date", payload, {"end_date": "2026-01-07"})
-    r = client.get(f"/api/mid-section-defect?{qs}")
-    _assert_not_500(r, payload, "/api/mid-section-defect")
-    _assert_valid_json(r, "/api/mid-section-defect")
+    r = client.get(f"/api/mid-section-defect/analysis?{qs}")
+    _assert_validation_error(r, payload, "/api/mid-section-defect/analysis")
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +299,5 @@ def test_mid_section_defect_rejects_malicious_date(payload):
 def test_wip_rejects_malicious_filter(payload):
     client = _make_client()
     qs = _fuzz_query_string("workcenter_group", payload)
-    r = client.get(f"/api/wip?{qs}")
-    _assert_not_500(r, payload, "/api/wip")
-    _assert_valid_json(r, "/api/wip")
+    r = client.get(f"/api/wip/overview/summary?{qs}")
+    _assert_validation_error(r, payload, "/api/wip/overview/summary")

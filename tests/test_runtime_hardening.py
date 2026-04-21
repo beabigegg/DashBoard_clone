@@ -38,7 +38,10 @@ def _shutdown(app):
 
 
 def test_production_requires_secret_key(monkeypatch):
+    from mes_dashboard.config.settings import ProductionConfig
+
     monkeypatch.delenv("SECRET_KEY", raising=False)
+    monkeypatch.setattr(ProductionConfig, "SECRET_KEY", None, raising=False)
     monkeypatch.setenv("REALTIME_EQUIPMENT_CACHE_ENABLED", "false")
     db._ENGINE = None
     db._HEALTH_ENGINE = None
