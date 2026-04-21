@@ -94,6 +94,5 @@ docs/runbooks/
 # DB schema query & doc generation tools
 tools/
 
-# Migration-phase CI workflows & feature flags
-.github/
+# Migration-phase feature flags
 data/modernization_feature_flags.json

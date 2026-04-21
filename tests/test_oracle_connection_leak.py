@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Integration tests: Oracle connection-pool leak detection.
+"""Pool bookkeeping integration tests: SQLAlchemy connection checkout/checkin semantics.
 
-Requires a live Oracle connection and a running Flask app context.
+Verifies connection lifecycle accounting via an in-memory mock engine:
+context-manager release, exception safety, and 100-concurrent-job cleanup.
+Proves the framework-level contract without requiring a live Oracle connection.
+
+Real-Oracle connection leak detection (session kill, listener stop, network
+flap) is tracked separately under the future integration_real suite.
+
 Gate: @pytest.mark.integration AND --run-integration CLI flag.
 """
 

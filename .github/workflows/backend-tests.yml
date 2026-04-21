@@ -1,0 +1,165 @@
+name: backend-tests
+
+on:
+  schedule:
+    - cron: "0 2 * * *"  # nightly at 02:00 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/mes_dashboard/services/**"
+      - "src/mes_dashboard/routes/**"
+      - "src/mes_dashboard/core/**"
+      - "src/mes_dashboard/config/**"
+      - "src/mes_dashboard/sql/**"
+      - "tests/**"
+      - "!tests/e2e/**"
+      - "!tests/stress/**"
+      - ".github/workflows/backend-tests.yml"
+  push:
+    branches: [ main ]
+    paths:
+      - "src/mes_dashboard/services/**"
+      - "src/mes_dashboard/routes/**"
+      - "src/mes_dashboard/core/**"
+      - "tests/**"
+      - "!tests/e2e/**"
+      - "!tests/stress/**"
+
+jobs:
+  unit-and-integration-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest
+
+      - name: Install dev dependencies
+        run: |
+          python -m pip install hypothesis
+
+      - name: Run unit and integration tests
+        run: |
+          python -m pytest tests/ \
+            --ignore=tests/e2e \
+            --ignore=tests/stress \
+            -v \
+            --tb=short \
+            -q
+
+      - name: Run property-based tests (advisory)
+        env:
+          HYPOTHESIS_PROFILE: ci
+        run: |
+          python -m pytest -m property -v --tb=short
+        continue-on-error: true  # advisory until two weeks of stable green runs
+
+      - name: Upload Hypothesis failure examples
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hypothesis-examples
+          path: .hypothesis/examples/
+          if-no-files-found: ignore
+
+      - name: Verify test count is non-zero
+        run: |
+          python -m pytest tests/ \
+            --ignore=tests/e2e \
+            --ignore=tests/stress \
+            --collect-only -q | grep -E "^[0-9]+ tests? collected"
+
+  nightly-integration-real:
+    name: Nightly real-subprocess integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest redis
+
+      - name: Install redis-server
+        run: sudo apt-get install -y redis-server
+
+      - name: Install dev dependencies
+        run: python -m pip install hypothesis
+
+      - name: Run property-based tests (nightly deep run)
+        env:
+          HYPOTHESIS_PROFILE: nightly
+        run: |
+          python -m pytest -m property -v --tb=short
+        continue-on-error: true
+
+      - name: Upload Hypothesis failure examples
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hypothesis-examples-nightly
+          path: .hypothesis/examples/
+          if-no-files-found: ignore
+
+      - name: Run Redis timeout fallback integration tests
+        run: |
+          python -m pytest tests/integration/test_redis_timeout_fallback.py \
+            --run-integration-real -v --tb=short
+        continue-on-error: false
+
+      - name: Run race condition integration tests
+        run: |
+          python -m pytest tests/integration/test_race_conditions.py \
+            --run-integration-real -v --tb=short
+        continue-on-error: false
+
+  multi-worker-concurrency:
+    name: Multi-worker RQ concurrency tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest redis rq
+
+      - name: Install redis-server
+        run: sudo apt-get install -y redis-server
+
+      - name: Start redis-server
+        run: redis-server --daemonize yes
+
+      - name: Run multi-worker concurrency tests
+        run: |
+          python -m pytest -m multi_worker --run-integration-real -v --tb=short
+        continue-on-error: false
+
+      - name: Upload worker logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-worker-logs
+          path: /tmp/pytest-*/
+          if-no-files-found: ignore

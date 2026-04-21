@@ -9,8 +9,7 @@ Injects exceptions with ORA-* messages and verifies:
   - Retry-After header present for circuit-breaker-open responses
 
 Run with:
-    conda run -n mes-dashboard pytest tests/integration/test_oracle_error_codes.py \
-        --run-integration-real -v
+    conda run -n mes-dashboard pytest tests/integration/test_oracle_error_codes.py -v
 """
 
 from __future__ import annotations
@@ -20,9 +19,6 @@ import time
 from unittest.mock import patch
 
 import pytest
-
-pytestmark = pytest.mark.integration_real
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -79,25 +75,21 @@ def _make_minimal_app():
 class TestOraCodeExtraction:
     """Verify _extract_ora_code parses ORA-NNNNN from exception strings."""
 
-    @pytest.mark.integration_real
     def test_extracts_01017(self):
         from mes_dashboard.core.database import _extract_ora_code
         exc = _make_ora_error("01017", "invalid username/password")
         assert _extract_ora_code(exc) == "01017"
 
-    @pytest.mark.integration_real
     def test_extracts_12514(self):
         from mes_dashboard.core.database import _extract_ora_code
         exc = _make_ora_error("12514", "TNS: no listener")
         assert _extract_ora_code(exc) == "12514"
 
-    @pytest.mark.integration_real
     def test_extracts_01555(self):
         from mes_dashboard.core.database import _extract_ora_code
         exc = _make_ora_error("01555", "snapshot too old")
         assert _extract_ora_code(exc) == "01555"
 
-    @pytest.mark.integration_real
     def test_returns_unknown_for_non_ora_error(self):
         from mes_dashboard.core.database import _extract_ora_code
         assert _extract_ora_code(RuntimeError("no ora code here")) == "UNKNOWN"
@@ -110,7 +102,6 @@ class TestOraCodeExtraction:
 class TestCircuitBreakerFailureCount:
     """Circuit breaker must increment failure count when CIRCUIT_BREAKER_ENABLED=true."""
 
-    @pytest.mark.integration_real
     def test_record_failure_increments_counter(self, monkeypatch):
         monkeypatch.setenv("CIRCUIT_BREAKER_ENABLED", "true")
         _reset_circuit_breaker()
@@ -132,7 +123,6 @@ class TestCircuitBreakerFailureCount:
         finally:
             monkeypatch.setattr(cb_mod, "CIRCUIT_BREAKER_ENABLED", original_enabled)
 
-    @pytest.mark.integration_real
     def test_multiple_failures_approach_threshold(self, monkeypatch):
         import mes_dashboard.core.circuit_breaker as cb_mod
         monkeypatch.setattr(cb_mod, "CIRCUIT_BREAKER_ENABLED", True)
@@ -154,7 +144,6 @@ class TestCircuitBreakerFailureCount:
 class TestResponseEnvelopeErrorCodes:
     """API response envelopes must carry correct error codes for DB failures."""
 
-    @pytest.mark.integration_real
     def test_db_connection_error_returns_503_with_correct_code(self):
         from mes_dashboard.core import response as resp_module
         app = _make_minimal_app()
@@ -165,7 +154,6 @@ class TestResponseEnvelopeErrorCodes:
         assert data["success"] is False
         assert data["error"]["code"] == resp_module.DB_CONNECTION_FAILED
 
-    @pytest.mark.integration_real
     def test_db_connection_error_12514_returns_503(self):
         from mes_dashboard.core import response as resp_module
         app = _make_minimal_app()
@@ -176,7 +164,6 @@ class TestResponseEnvelopeErrorCodes:
         assert data["success"] is False
         assert data["error"]["code"] == resp_module.DB_CONNECTION_FAILED
 
-    @pytest.mark.integration_real
     def test_circuit_breaker_open_includes_retry_after_header(self):
         from mes_dashboard.core import response as resp_module
         app = _make_minimal_app()
@@ -185,7 +172,6 @@ class TestResponseEnvelopeErrorCodes:
         assert status == 503
         assert resp_obj.headers.get("Retry-After") == "30"
 
-    @pytest.mark.integration_real
     def test_error_envelope_is_valid_json_structure(self):
         app = _make_minimal_app()
         with app.test_client() as client:

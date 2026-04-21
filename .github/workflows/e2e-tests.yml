@@ -1,0 +1,61 @@
+name: e2e-tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL of the running MES Dashboard server"
+        required: false
+        default: "http://127.0.0.1:8080"
+      base_path:
+        description: "Optional deployment path prefix, e.g. /mes-dashboard"
+        required: false
+        default: ""
+      external_target:
+        description: "Set to true when targeting a deployed site so local-only e2e tests are skipped"
+        required: false
+        default: "false"
+      test_filter:
+        description: "Optional pytest -k filter to run specific e2e tests"
+        required: false
+        default: ""
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      E2E_BASE_URL: ${{ github.event.inputs.base_url || 'http://127.0.0.1:8080' }}
+      E2E_BASE_PATH: ${{ github.event.inputs.base_path || '' }}
+      E2E_EXTERNAL_TARGET: ${{ github.event.inputs.external_target || 'false' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest requests
+
+      - name: Run e2e tests
+        run: |
+          FILTER="${{ github.event.inputs.test_filter }}"
+          if [ -n "${FILTER}" ]; then
+            python -m pytest tests/e2e/ -v -m e2e -k "${FILTER}" --tb=short
+          else
+            python -m pytest tests/e2e/ -v -m e2e --tb=short
+          fi
+        env:
+          E2E_BASE_URL: ${{ env.E2E_BASE_URL }}
+          E2E_BASE_PATH: ${{ env.E2E_BASE_PATH }}
+          E2E_EXTERNAL_TARGET: ${{ env.E2E_EXTERNAL_TARGET }}
+
+      - name: Report test results
+        if: always()
+        run: |
+          echo "E2E tests completed against: ${E2E_BASE_URL}${E2E_BASE_PATH}"
+          echo "External target mode: ${E2E_EXTERNAL_TARGET}"

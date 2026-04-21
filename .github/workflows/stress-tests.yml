@@ -1,0 +1,62 @@
+name: stress-tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      stress_test_url:
+        description: "Base URL of the running MES Dashboard server"
+        required: false
+        default: "http://127.0.0.1:8080"
+      concurrent_users:
+        description: "Number of concurrent users (default: 10)"
+        required: false
+        default: "10"
+      requests_per_user:
+        description: "Requests per user (default: 20)"
+        required: false
+        default: "20"
+      test_filter:
+        description: "Optional pytest -k filter to run specific stress tests"
+        required: false
+        default: ""
+
+jobs:
+  stress-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      STRESS_TEST_URL: ${{ github.event.inputs.stress_test_url || 'http://127.0.0.1:8080' }}
+      STRESS_CONCURRENT_USERS: ${{ github.event.inputs.concurrent_users || '10' }}
+      STRESS_REQUESTS_PER_USER: ${{ github.event.inputs.requests_per_user || '20' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest requests
+
+      - name: Run stress tests
+        run: |
+          FILTER="${{ github.event.inputs.test_filter }}"
+          if [ -n "${FILTER}" ]; then
+            python -m pytest tests/stress/ -v -m stress --run-stress -k "${FILTER}" --tb=short -s
+          else
+            python -m pytest tests/stress/ -v -m stress --run-stress --tb=short -s
+          fi
+        env:
+          STRESS_TEST_URL: ${{ env.STRESS_TEST_URL }}
+          STRESS_CONCURRENT_USERS: ${{ env.STRESS_CONCURRENT_USERS }}
+          STRESS_REQUESTS_PER_USER: ${{ env.STRESS_REQUESTS_PER_USER }}
+
+      - name: Report stress test results
+        if: always()
+        run: |
+          echo "Stress tests completed against: ${STRESS_TEST_URL}"
+          echo "Config: ${STRESS_CONCURRENT_USERS} users x ${STRESS_REQUESTS_PER_USER} requests"

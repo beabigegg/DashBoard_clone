@@ -1,0 +1,71 @@
+name: full-modernization-gates
+
+on:
+  pull_request:
+    paths:
+      - "frontend/src/portal-shell/**"
+      - "frontend/src/qc-gate/**"
+      - "frontend/src/tables/**"
+      - "frontend/src/excel-query/**"
+      - "frontend/src/query-tool/**"
+      - "frontend/src/mid-section-defect/**"
+      - "frontend/tests/portal-shell-*.test.js"
+      - "src/mes_dashboard/**"
+      - "tests/test_portal_shell_routes.py"
+      - "tests/test_full_modernization_gates.py"
+      - "tests/test_asset_readiness_policy.py"
+      - "scripts/check_full_modernization_gates.py"
+      - "docs/migration/full-modernization-architecture-blueprint/**"
+      - "docs/migration/deferred-route-modernization-follow-up/**"
+      - "openspec/changes/full-modernization-architecture-blueprint/**"
+      - "openspec/changes/deferred-route-modernization-follow-up/**"
+      - "data/modernization_feature_flags.json"
+      - ".github/workflows/full-modernization-gates.yml"
+  push:
+    branches: [ main ]
+    paths:
+      - "frontend/src/portal-shell/**"
+      - "frontend/src/qc-gate/**"
+      - "frontend/src/tables/**"
+      - "frontend/src/excel-query/**"
+      - "frontend/src/query-tool/**"
+      - "frontend/src/mid-section-defect/**"
+      - "frontend/tests/portal-shell-*.test.js"
+      - "src/mes_dashboard/**"
+      - "tests/test_portal_shell_routes.py"
+      - "tests/test_full_modernization_gates.py"
+      - "tests/test_asset_readiness_policy.py"
+      - "scripts/check_full_modernization_gates.py"
+      - "docs/migration/full-modernization-architecture-blueprint/**"
+      - "docs/migration/deferred-route-modernization-follow-up/**"
+      - "openspec/changes/full-modernization-architecture-blueprint/**"
+      - "openspec/changes/deferred-route-modernization-follow-up/**"
+      - "data/modernization_feature_flags.json"
+      - ".github/workflows/full-modernization-gates.yml"
+
+jobs:
+  frontend-route-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run shell governance tests
+        run: node --test frontend/tests/portal-shell-navigation.test.js frontend/tests/portal-shell-route-contract-governance.test.js
+
+  backend-modernization-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest
+      - name: Run modernization governance gate script
+        run: python scripts/check_full_modernization_gates.py --mode block
+      - name: Run backend canonical/fallback gate tests
+        run: python -m pytest tests/test_portal_shell_routes.py tests/test_full_modernization_gates.py tests/test_asset_readiness_policy.py -q
