@@ -26,7 +26,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from flask import Blueprint, current_app, jsonify, make_response
+from flask import Blueprint, current_app, has_app_context, jsonify, make_response
 
 from mes_dashboard.core.database import (
     get_health_engine,
@@ -193,6 +193,15 @@ def check_database() -> tuple[str, str | None]:
         Tuple of (status, error_message).
         status is 'ok' or 'error'.
     """
+    # TestingConfig marks the app as hermetic (FLASK_ENV=testing).  The soak
+    # and real-infra fixtures boot Gunicorn workers under that config with no
+    # Oracle connection expected — probing the real DB would 503 on CI where
+    # Oracle is absent, blocking the workers from ever becoming healthy.
+    # Production and development leave TESTING=False, so the real probe below
+    # still runs exactly as before.  has_app_context() guard preserves the
+    # legacy call-without-context path used by low-level runtime tests.
+    if has_app_context() and current_app.config.get("TESTING"):
+        return 'ok', None
     try:
         engine = get_health_engine()
         with engine.connect() as conn:

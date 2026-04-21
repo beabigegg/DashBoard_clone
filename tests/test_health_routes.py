@@ -268,3 +268,56 @@ def test_health_top_level_contract_frozen(_mock_cb, _mock_route_cache, _mock_red
     # Must NOT use the standard success/data/meta envelope
     assert 'success' not in payload, "/health must NOT use the success/data/meta envelope"
     assert 'data' not in payload, "/health must NOT wrap payload under 'data' key"
+
+
+# ---------------------------------------------------------------------------
+# check_database() TestingConfig short-circuit
+# ---------------------------------------------------------------------------
+#
+# Regression guard for the CI failure exposed by soak-tests.yml (PR #5c):
+# TestingConfig marks the app as hermetic, but check_database() was still
+# hitting Oracle and returning 503, which blocked gunicorn_workers fixture
+# health checks on CI runners that have no Oracle.  The short-circuit keeps
+# production behaviour identical while letting TestingConfig do what it says
+# on the tin.
+
+
+def test_check_database_short_circuits_when_config_is_testing():
+    """TestingConfig -> check_database returns ok without touching Oracle."""
+    from mes_dashboard.routes import health_routes as hr
+
+    app = create_app('testing')
+    assert app.config['TESTING'] is True
+
+    with app.app_context(), patch.object(hr, 'get_health_engine') as mock_engine:
+        status, err = hr.check_database()
+
+    assert status == 'ok'
+    assert err is None
+    assert mock_engine.call_count == 0, (
+        "get_health_engine() must NOT be invoked under TestingConfig — "
+        "the hermetic short-circuit is the whole point of this guard."
+    )
+
+
+def test_check_database_runs_real_probe_when_not_testing():
+    """Production path still calls get_health_engine and reports failures."""
+    from mes_dashboard.routes import health_routes as hr
+
+    app = create_app('testing')
+    app.config['TESTING'] = False
+
+    class _BoomEngine:
+        def connect(self):
+            raise RuntimeError('simulated oracle outage')
+
+    with app.app_context(), patch.object(
+        hr, 'get_health_engine', return_value=_BoomEngine()
+    ) as mock_engine:
+        status, err = hr.check_database()
+
+    assert status == 'error'
+    assert 'simulated oracle outage' in err
+    assert mock_engine.call_count == 1, (
+        "Non-TESTING path must still invoke get_health_engine() exactly once."
+    )
