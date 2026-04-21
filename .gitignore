@@ -85,8 +85,13 @@ docs/oom_*.md
 docs/MES_Database_Reference.md
 docs/Oracle_Authorized_Objects.md
 
-# Migration planning artifacts
-docs/migration/
+# Migration planning artifacts (ignored by default; three runtime configs below are tracked)
+docs/migration/*
+!docs/migration/full-modernization-architecture-blueprint/
+docs/migration/full-modernization-architecture-blueprint/*
+!docs/migration/full-modernization-architecture-blueprint/route_scope_matrix.json
+!docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json
+!docs/migration/full-modernization-architecture-blueprint/route_contracts.json
 
 # Operational runbooks
 docs/runbooks/

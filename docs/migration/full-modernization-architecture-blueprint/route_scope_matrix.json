@@ -1,0 +1,21 @@
+{
+  "in_scope": [
+    { "route": "/wip-overview", "category": "report" },
+    { "route": "/wip-detail", "category": "report" },
+    { "route": "/hold-overview", "category": "report" },
+    { "route": "/hold-detail", "category": "report" },
+    { "route": "/hold-history", "category": "report" },
+    { "route": "/reject-history", "category": "report" },
+    { "route": "/resource", "category": "report" },
+    { "route": "/resource-history", "category": "report" },
+    { "route": "/qc-gate", "category": "report" },
+    { "route": "/job-query", "category": "report" },
+    { "route": "/tables", "category": "report" },
+    { "route": "/query-tool", "category": "report" },
+    { "route": "/mid-section-defect", "category": "report" },
+    { "route": "/yield-alert-center", "category": "report" },
+    { "route": "/admin/pages", "category": "admin" },
+    { "route": "/admin/dashboard", "category": "admin" }
+  ],
+  "deferred": []
+}
