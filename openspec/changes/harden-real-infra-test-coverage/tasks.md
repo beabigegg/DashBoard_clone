@@ -110,7 +110,7 @@
   - **Target B — circuit breaker 震盪**：`src/mes_dashboard/core/circuit_breaker.py` HALF_OPEN 轉換（約 L136–L189）改成「每個呼叫都 open/close 或 close/open」→ `_check_circuit_breaker_transitions` 應 FAIL（transitions ≥ 3）
   - 執行流程：(1) 改動 (2) 跑 300s soak (3) 確認 FAIL + 對應 artifact 存下 (4) `git checkout -- <file>` 還原 (5) 重跑 soak 確認回綠
   - Evidence：PR description 附兩筆 artifact（mutation-A-artifact/ 與 mutation-B-artifact/ 兩個 soak-metrics JSON）＋ 對應 pytest log 片段；本檔完成時回勾 `[x]`
-- [ ] 3.9 CI workflow 實跑通過一次（手動 `workflow_dispatch` 300s smoke）驗證 cron 設定、artifact 上傳、retention 設定正確；通過後回勾
+- [x] 3.9 CI workflow 實跑通過一次（PR #5c — `workflow_dispatch` 300s smoke，run id 24722453377 on `beabigegg/DashBoard_clone`，conclusion: success）；首跑暴露 `gunicorn_workers` fixture 會打到 /health 但 TestingConfig 下 `check_database` 仍連真 Oracle → 503，修正見 PR #5c wave-2（`check_database` 在 `has_app_context() and current_app.config["TESTING"]` 時短路回 `ok`）。六條性質 PASS、artifact 落檔、retention 30 天。
 
 ## 4. Phase 4 — Pre-merge gate 升級（PR #6 — **條件觸發**）
 
