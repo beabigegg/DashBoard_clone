@@ -48,6 +48,8 @@ jobs:
           python -m pip install hypothesis
 
       - name: Run unit and integration tests
+        env:
+          PORTAL_SPA_ENABLED: "true"
         run: |
           python -m pytest tests/ \
             --ignore=tests/e2e \
