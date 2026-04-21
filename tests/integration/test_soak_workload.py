@@ -39,6 +39,31 @@ DuckDB is initialising its runtime, and Redis caches are being primed
 Assertions are still evaluated on the remaining post-warm-up window,
 and the warm-up samples are kept in the artifact for debuggability.
 
+Signal strength: CI vs local
+----------------------------
+The six checkers do NOT produce equally meaningful signals in every
+environment.  What each mode actually exercises:
+
+  * **Local (``./scripts/soak_local.sh``)** — full six-signal run.
+    Real Oracle + DuckDB + populated caches mean pool / duckdb /
+    circuit_breaker / RQ all see traffic, so a mutation like
+    commenting out ``finally: conn.close()`` on the query path will
+    manifest as a measurable ``_check_pool_slope`` regression.  This
+    is the only mode in which the mutation recipes from spec task 3.8
+    are meaningful.
+  * **GitHub-hosted CI (``.github/workflows/soak-tests.yml``)** —
+    primarily validates workflow plumbing + RSS and Redis trends.
+    The CI runner has no Oracle, no ``oracledb`` client, and no
+    DuckDB runtime, so routes fail at 4xx/5xx before acquiring DB
+    connections.  Pool / duckdb / circuit_breaker checkers end up
+    trivially passing on zero activity — a green CI run does **not**
+    certify those three subsystems as leak-free.
+
+A green soak run is interpreted as "no regression in the signals this
+mode actually exercises", never as "no leak anywhere".  Use local soak
+as the source of truth for pool / duckdb / CB; use CI soak as a
+cadence safety net for plumbing drift and long-term RSS creep.
+
 Artifact:
   After every run (pass OR fail) a file ``soak-metrics-<ts>.json`` is
   written into ``SOAK_ARTIFACT_DIR`` (default: the session tmp dir) and

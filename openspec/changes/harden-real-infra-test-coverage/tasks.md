@@ -105,6 +105,7 @@
   - `timeout-minutes: 150` 容納 7200s + worker 啟停 + artifact 上傳
   - `upload-artifact@v4` + `retention-days: 30`，`if: always()` 保證 FAIL 也保留 artifact
   - **不改 soak test 內部邏輯**；workflow 只接現有腳本與 artifact 路徑
+  - **Scope limitation（PR #5c wave-3）**：GitHub-hosted runner 上沒有 Oracle / `oracledb` / DuckDB runtime，CI 實質上只驗 workflow plumbing + RSS / Redis 趨勢；pool / duckdb / circuit_breaker 三項 checker 在 CI 下是 trivial signal（零流量、零狀態轉換），**CI green ≠ 這三項 leak-free**。這三項的真實 leak 檢驗僅限於本地 `./scripts/soak_local.sh`（有真 Oracle）；詳見 `tests/integration/test_soak_workload.py` 模組 docstring 的「Signal strength: CI vs local」段
 - [ ] 3.8 Mutation check（PR #5c — 手動 run，evidence 附在 PR description 與本檔）：
   - **Target A — pool 洩漏**：`src/mes_dashboard/core/database.py:855` 附近 `finally:` 內 `conn.close()` 註解掉 → 跑 `./scripts/soak_local.sh` → `_check_pool_slope` 應 FAIL（tail_sat 高 / head/tail saturation diff > 0.4，或 N ≥ 20 時 OLS > 0.05/sample）
   - **Target B — circuit breaker 震盪**：`src/mes_dashboard/core/circuit_breaker.py` HALF_OPEN 轉換（約 L136–L189）改成「每個呼叫都 open/close 或 close/open」→ `_check_circuit_breaker_transitions` 應 FAIL（transitions ≥ 3）
