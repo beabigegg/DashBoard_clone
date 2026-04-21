@@ -60,7 +60,7 @@
 - [x] 2.10 修正 `tests/test_oracle_connection_leak.py:8-9` docstring：移除「future integration_real suite」誤導文案；改為「Real-Oracle connection leak detection lives in tests/integration/test_real_oracle_fault_injection.py.」
 - [x] 2.11 撰寫 `test_circuit_breaker_counts_real_driver_failures`（`TestOraclePhase2BEnvelopes`）：monkeypatch `CIRCUIT_BREAKER_ENABLED=True`、reset singleton、_ENGINE 指向 closed port → N 次真實 oracledb 連線失敗；驗證 failure_count 遞增、state→OPEN、下一次 read_sql_df 立即拋 DatabaseCircuitOpenError；mutation check：移除 CIRCUIT_BREAKER_ENABLED patch → record_failure 是 no-op → circuit 永遠不開
 - [x] 2.12 Mutation check：已記錄於各測試 docstring 中的 "Mutation check:" 段落：(a) 2.8 移除 reset_peer toxic → 無 rollback → sentinel 行存在 → 缺席斷言 fail；(b) 2.9 移除 conn.close() → busy>0 → leak 斷言 fail；(c) 2.11 移除 CIRCUIT_BREAKER_ENABLED patch → circuit 永不開 → state≠OPEN 斷言 fail
-- [ ] 2.13 本地容器驗證（code complete, env validation pending）：`docker compose -f docker-compose.test.yml up -d && conda run -n mes-dashboard pytest tests/integration/test_real_oracle_fault_injection.py --run-integration-real -v` 全綠；`contract/api_development_contract.md` 無需調整（ORA-00028 → DB_CONNECTION_FAILED 不改變現有文件化 envelope 格式）
+- [x] 2.13 容器驗證完成（2026-04-21 `workflow_dispatch` nightly run）：GHA `oracle-fault-injection` job 2m 1s 全綠（12 tests passed）；配套 `multi-worker-concurrency`（56s）、`nightly-integration-real`（47s）、`unit-and-integration-tests`（5m 45s）同次 run 皆全綠；修正後的 `ghcr.io/shopify/toxiproxy:2.9.0` image + 目標化 multi-worker pytest 指令已驗證；`contract/api_development_contract.md` 無需調整（ORA-00028 → DB_CONNECTION_FAILED 不改變現有文件化 envelope 格式）
 
 ## 3. Phase 3 — Soak workload + `/internal/metrics`（PR #5）
 
