@@ -53,15 +53,6 @@ atexit.register(_atexit_sweep)
 # ---------------------------------------------------------------------------
 
 
-def pytest_addoption(parser: pytest.Parser) -> None:
-    parser.addoption(
-        "--run-integration-real",
-        action="store_true",
-        default=False,
-        help="Run real-subprocess integration tests (requires redis-server, gunicorn)",
-    )
-
-
 def pytest_collection_modifyitems(
     config: pytest.Config, items: List[pytest.Item]
 ) -> None:
@@ -304,3 +295,11 @@ def _wait_for_health(url: str, timeout: float = 15) -> None:
         f"Health check {url!r} did not return 200 within {timeout}s. "
         f"Last error: {last_exc}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Oracle XE + toxiproxy fixtures (Phase 1 — real Oracle fault injection)
+# ---------------------------------------------------------------------------
+# Defined in _oracle_xe_fixture.py; imported here so pytest auto-discovers them.
+
+from ._oracle_xe_fixture import oracle_xe, oracle_xe_fault  # noqa: F401, E402

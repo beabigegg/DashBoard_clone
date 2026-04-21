@@ -161,6 +161,12 @@ def pytest_addoption(parser):
         default=False,
         help="Run stress/load tests that require running server"
     )
+    parser.addoption(
+        "--run-integration-real",
+        action="store_true",
+        default=False,
+        help="Run real-subprocess integration tests (requires redis-server, gunicorn)"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
