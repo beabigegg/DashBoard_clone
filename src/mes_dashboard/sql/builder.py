@@ -63,6 +63,22 @@ class QueryBuilder:
         self.params[param_name] = value
         return self
 
+    # Oracle limits IN-list to 1000 expressions; split into batches joined by OR.
+    _ORA_IN_LIMIT = 999
+
+    def _build_in_clauses(self, column: str, values: List[Any]) -> str:
+        """Register bind params for *values* and return OR-joined IN clause(s)."""
+        clauses = []
+        for i in range(0, len(values), self._ORA_IN_LIMIT):
+            batch = values[i : i + self._ORA_IN_LIMIT]
+            param_names = []
+            for val in batch:
+                p = self._next_param()
+                param_names.append(f":{p}")
+                self.params[p] = val
+            clauses.append(f"{column} IN ({', '.join(param_names)})")
+        return f"({' OR '.join(clauses)})" if len(clauses) > 1 else clauses[0]
+
     def add_in_condition(
         self,
         column: str,
@@ -81,13 +97,7 @@ class QueryBuilder:
         if not values:
             return self
 
-        param_names = []
-        for val in values:
-            param_name = self._next_param()
-            param_names.append(f":{param_name}")
-            self.params[param_name] = val
-
-        self.conditions.append(f"{column} IN ({', '.join(param_names)})")
+        self.conditions.append(self._build_in_clauses(column, values))
         return self
 
     def add_not_in_condition(
@@ -110,18 +120,23 @@ class QueryBuilder:
         if not values:
             return self
 
-        param_names = []
-        for val in values:
-            param_name = self._next_param()
-            param_names.append(f":{param_name}")
-            self.params[param_name] = val
+        # Build NOT IN batches joined with AND (exclude all batches)
+        clauses = []
+        for i in range(0, len(values), self._ORA_IN_LIMIT):
+            batch = values[i : i + self._ORA_IN_LIMIT]
+            param_names = []
+            for val in batch:
+                p = self._next_param()
+                param_names.append(f":{p}")
+                self.params[p] = val
+            clauses.append(f"{column} NOT IN ({', '.join(param_names)})")
 
-        not_in_clause = f"{column} NOT IN ({', '.join(param_names)})"
+        not_in_clause = " AND ".join(clauses) if len(clauses) > 1 else clauses[0]
 
         if allow_null:
-            self.conditions.append(f"({column} IS NULL OR {not_in_clause})")
+            self.conditions.append(f"({column} IS NULL OR ({not_in_clause}))")
         else:
-            self.conditions.append(not_in_clause)
+            self.conditions.append(f"({not_in_clause})" if len(clauses) > 1 else not_in_clause)
 
         return self
 
