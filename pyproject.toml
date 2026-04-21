@@ -54,6 +54,9 @@ dependencies = [
 
     # System Monitoring
     "psutil>=5.9.0,<7.0.0",
+
+    # Config / Data Serialization (ai_function_registry)
+    "PyYAML>=6.0,<7.0.0",
 ]
 
 [project.optional-dependencies]

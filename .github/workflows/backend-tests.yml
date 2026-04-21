@@ -24,6 +24,8 @@ on:
       - "tests/**"
       - "!tests/e2e/**"
       - "!tests/stress/**"
+      - "pyproject.toml"
+      - ".github/workflows/backend-tests.yml"
 
 jobs:
   unit-and-integration-tests:

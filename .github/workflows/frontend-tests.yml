@@ -11,6 +11,7 @@ on:
     paths:
       - "frontend/src/**"
       - "frontend/tests/**"
+      - ".github/workflows/frontend-tests.yml"
 
 jobs:
   frontend-unit-tests:
