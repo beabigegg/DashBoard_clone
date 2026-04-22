@@ -173,7 +173,7 @@
   - `conda run -n mes-dashboard pytest --run-integration-real tests/integration/test_real_oracle_fault_injection.py -v`
   - [x] `./scripts/soak_local.sh`（PR #5c — 僅這一條本次處理；其餘延後到後續 PR）
   - `python scripts/measure_real_infra_stability.py --runs 3`
-- [ ] 6.2 每 PR 描述必附：
+- [x] 6.2 每 PR 描述必附（task 6.2 — 模板落地）：模板見 `openspec/changes/harden-real-infra-test-coverage/pr_description_template.md`，七個強制欄位：Scope / Scenario 對照 / Verification (local + CI) / Mutation evidence / Artifacts & workflow links / Known limitations / Follow-ups。本 change 的 PR #1–#5c 為回溯對照（commit message 與本檔 task 收斂說明事實上已涵蓋模板主要欄位）；Phase 4/5 remaining work + Target A follow-up 為首批強制採用者。`.github/PULL_REQUEST_TEMPLATE.md` 刻意不動，避免擴散到此 change 範圍以外的 PR。
   - Mutation check 驗證記錄（哪一行被移除 → 哪些測試 FAIL）
   - 相關 Scenario 對照
   - 本批若有 CODE_BUG 發現 → 列 follow-up change 連結
