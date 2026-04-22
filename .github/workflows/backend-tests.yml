@@ -255,3 +255,67 @@ jobs:
           name: multi-worker-logs
           path: /tmp/pytest-*/
           if-no-files-found: ignore
+
+  real-infra-smoke:
+    # ================================================================
+    # Stage 4a — INFORMATIONAL ONLY (non-required, non-blocking).
+    #
+    # This job runs on every pull_request but is NOT in branch
+    # protection's required status checks.  Reviewers see failures
+    # visibly but merges are not blocked.
+    #
+    # Promotion to Stage 4b (required) is gated on stability
+    # thresholds documented in docs/ci_real_infra_gate_policy.md:
+    #   - 20-day × 60-run window pass rate = 100%
+    #   - per-file p95 wall time < 180s
+    #
+    # The job name "real-infra-smoke" is deliberately final — when
+    # Stage 4b lands, only branch protection changes; this workflow
+    # stays the same.
+    #
+    # Spec: openspec/changes/harden-real-infra-test-coverage/specs/
+    #       multi-worker-concurrency-test-coverage/spec.md
+    #       "Pre-merge gate upgrade SHALL follow a two-stage rollout"
+    # ================================================================
+    name: real-infra-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest redis rq
+
+      - name: Install redis-server
+        run: sudo apt-get install -y redis-server
+
+      - name: Start redis-server
+        run: redis-server --daemonize yes
+
+      - name: Run real-infra smoke (3 files)
+        # Scope locked to the three files in the delta spec:
+        #   "Pre-merge `real-infra-smoke` job SHALL run a bounded,
+        #    dedicated subset"
+        run: |
+          python -m pytest \
+              tests/integration/test_multi_worker_concurrency.py \
+              tests/integration/test_redis_chaos.py \
+              tests/integration/test_real_multi_worker.py \
+              --run-integration-real -v --tb=short
+        continue-on-error: false
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-infra-smoke-logs
+          path: /tmp/pytest-*/
+          if-no-files-found: ignore

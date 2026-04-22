@@ -20,13 +20,13 @@ Moving `tests/integration/test_multi_worker_concurrency.py`, `tests/integration/
 
 ### Requirement: Pre-merge gate upgrade SHALL require explicit, mathematically honest stability thresholds
 
-The pre-merge `real-infra-smoke` job SHALL be introduced only after the stability dataset shows, over a rolling 20-day × 60-run window:
+Promoting the pre-merge `real-infra-smoke` job to a **required** status check SHALL be permitted only after the stability dataset shows, over a rolling 20-day × 60-run window:
 - **Pass rate = 100%** (zero failures across all 60 runs)
 - **p95 wall time < 180 seconds** for each individual file
 
 The 100% threshold is deliberate and mathematically honest: a 60-run window admits only `0/60` or `1/60` failure outcomes, giving pass rates of 100% or 98.3%. Expressing this threshold as "≥ 99%" would appear to tolerate occasional failure while in fact requiring zero — a misleading policy. To tolerate ≤ 1 failure (99.0%) the sample SHALL first be expanded to ≥ 100 runs (e.g., a 34-day × 3-file window), via a separate OpenSpec change.
 
-Until both thresholds are met, the three files SHALL remain in the nightly-only tier and no pre-merge `real-infra-smoke` job SHALL exist.
+Until both thresholds are met, the three files SHALL remain in the nightly-only tier for **required-check** purposes. An **informational (non-required, non-blocking) `real-infra-smoke` job** MAY be introduced earlier as Stage 4a, provided it is explicitly excluded from branch protection's required status checks and its failures do not gate PR merge. The detailed two-stage rollout is governed by the separate "Pre-merge gate upgrade SHALL follow a two-stage rollout" requirement below.
 
 #### Scenario: Thresholds met — gate upgrade is permitted
 
@@ -66,6 +66,34 @@ When the upgrade is approved, `.github/workflows/backend-tests.yml` SHALL declar
 - **WHEN** the nightly schedule fires
 - **THEN** the existing `nightly-integration-real` job SHALL continue to execute the full `integration_real` tier
 - **THEN** the pre-merge smoke and the nightly job SHALL coexist (the nightly one is a superset)
+
+### Requirement: Pre-merge gate upgrade SHALL follow a two-stage rollout
+
+The introduction of `real-infra-smoke` into the pre-merge pipeline SHALL proceed in two explicit stages, documented in `docs/ci_real_infra_gate_policy.md`:
+
+- **Stage 4a — Informational (non-required)**: the job is wired into `pull_request` triggers but is NOT added to branch protection's required status checks. Failures are visible to reviewers but do not block merge. This stage MAY start before the 20-day × 60-run window is complete, giving early feedback on PR-triggered failures.
+- **Stage 4b — Required (blocking)**: the job is added to branch protection's required status checks. This stage SHALL NOT start until the stability thresholds defined in the preceding requirement are met.
+
+The job name `real-infra-smoke` SHALL be the same across both stages so that Stage 4b promotion is a branch-protection-only change and does not require a workflow rename.
+
+#### Scenario: Stage 4a introduction without stability thresholds
+
+- **WHEN** the `real-infra-smoke` job is first added to `backend-tests.yml`
+- **THEN** the job SHALL be marked in workflow comments and `docs/ci_real_infra_gate_policy.md` as "Stage 4a — informational only"
+- **THEN** the job SHALL NOT be added to branch protection's required status checks at this stage
+
+#### Scenario: Stage 4a → Stage 4b promotion
+
+- **WHEN** the rolling 20-day × 60-run window satisfies both thresholds (pass rate = 100%, p95 < 180s per file)
+- **THEN** a branch-protection change MAY add `real-infra-smoke` to the required status checks
+- **THEN** `docs/ci_real_infra_gate_policy.md` SHALL record the promotion date and the measurement window used
+- **THEN** `docs/real_infra_stability_report.md` SHALL be regenerated and committed alongside the promotion record
+
+#### Scenario: Stage 4a failures do not block merge
+
+- **WHEN** `real-infra-smoke` fails on a pull request during Stage 4a
+- **THEN** the PR SHALL remain mergeable (not blocked by this failure)
+- **THEN** the failure SHALL be triaged per the `triage.md` workflow but SHALL NOT automatically trigger a revert
 
 ### Requirement: Pre-merge gate SHALL be reverted automatically when post-upgrade flakiness exceeds threshold
 

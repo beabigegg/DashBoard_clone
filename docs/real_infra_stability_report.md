@@ -47,6 +47,50 @@ Relaxing the pass-rate threshold to 99% requires expanding the window to
 
 ---
 
+## Local Pre-Filter
+
+> **Status**: `local pre-filter` is a supplementary go/no-go signal, NOT a
+> substitute for the 20-day × 60-run CI window used for Stage 4b promotion
+> (see `docs/ci_real_infra_gate_policy.md` §4).  It is recorded here so
+> that reviewers can audit the Stage 4a decision against real data.
+>
+> Local burn-in compresses 60 runs per target into a single session and
+> therefore lacks cross-day / cross-runner variance.  A 100% pass rate
+> locally is a **necessary but not sufficient** signal for gate promotion.
+
+### 2026-04-22 session — Stage 4a go/no-go signal
+
+- **Script**: `scripts/measure_real_infra_stability.py --tests multi_worker,redis_chaos,real_multi_worker --runs 60`
+- **Artifact**: `artifacts/stability-local/stability-20260422T010200Z.jsonl` (180 records)
+- **Log**: `artifacts/stability-local/stability-20260422T010200Z.log`
+- **Environment**: mes-dashboard conda env, local redis-server, no Oracle (real_multi_worker uses gunicorn + RQ only)
+- **Wall-clock span**: 01:02:54 UTC → 03:24:27 UTC (2h 22m total)
+
+| Target | Runs | Pass | Failures | Mean wall (s) | p95 wall (s) | Max wall (s) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| multi_worker | 60 | 60 | 0 | 59.8 | 72.5 | 73.8 |
+| redis_chaos | 60 | 60 | 0 | 45.9 | 55.6 | 60.9 |
+| real_multi_worker | 60 | 60 | 0 | 36.7 | 44.7 | 49.1 |
+| **Aggregate** | **180** | **180** | **0** | — | — | — |
+
+**Verdict**: green — Stage 4a land is go.  900 test assertions across 180
+runs, zero failures; every target's p95 is well below the 180s gate
+threshold.  This result is **sufficient** to land `real-infra-smoke` as
+an informational PR check (Stage 4a).  It is **not sufficient** for Stage
+4b promotion, which still requires the 20-day × 60-run CI window.
+
+**Limitations explicitly acknowledged**:
+1. Single-session burn-in does not exercise cross-day variance (package
+   mirror state, Docker Hub rate limits, weekend vs weekday runner load)
+2. Local dev environment has warmer caches and a known-good Redis install
+   path — it does not match CI's `apt-get install redis-server` cold path
+3. No Oracle container ran in this session; `test_real_multi_worker.py`
+   does not use Oracle, so this is scope-correct, but any future target
+   that touches Oracle would need a separate session with the fault-injection
+   container stack
+
+---
+
 ## Per-Run Flakiness Log
 
 Record individual failures here as they occur.  Each entry feeds the
