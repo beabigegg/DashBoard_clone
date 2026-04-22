@@ -130,13 +130,14 @@
   - 若 `pass_rate == 100%`（60 runs 內 0 失敗）且每檔 `p95_wall_time < 180s` → 進 4.4
   - 若不達標 → 跳到 4.A 分支處理 flakiness，不動 gate
   - **不用 99%**：60-run window 下 1 次失敗 = 98.3%，寫 99% 看似允許偶發實際等於要求 100%，會造成政策文件的信任缺口
-- [ ] 4.4a **Stage 4a（informational）— 本週可 land，不需 stability data**：新增 `.github/workflows/backend-tests.yml` 的 `real-infra-smoke` job：
+- [x] 4.4a **Stage 4a（informational）— landed 2026-04-22 (commit `ba4f6d0`)**：`.github/workflows/backend-tests.yml` 新增 `real-infra-smoke` job：
   - 在 `pull_request` 或 `workflow_dispatch` 觸發（**不加 `schedule`**；nightly 的 `multi-worker-concurrency` job 已涵蓋此 scope）
   - 只跑 `test_multi_worker_concurrency.py` + `test_redis_chaos.py` + `test_real_multi_worker.py` + `--run-integration-real`
   - `timeout-minutes: 10`
   - 失敗**不 block merge**（不加入 branch protection 的 required status checks）
   - Job 名稱直接用最終名 `real-infra-smoke`，後續升 4b 只動 branch protection 不動 YAML
   - Workflow 註解 + `docs/ci_real_infra_gate_policy.md` 明標 "Stage 4a — informational only"
+  - **CI 驗證（2026-04-22）**：`workflow_dispatch` 手動觸發、commit `ba4f6d0`、五個 job 全綠（`real-infra-smoke` 1m 0s、total 4m 40s）；job 名稱、scope、觸發條件、不阻擋 merge 四項預期一致；local pre-filter 180/180 綠附在 `docs/real_infra_stability_report.md` § Local Pre-Filter
 - [ ] 4.4b **Stage 4b（required）— 等 20-day × 60-run window 達標後執行**：
   - 把 `real-infra-smoke` 加進 GitHub branch protection 的 required status checks
   - 不需改 `backend-tests.yml`
