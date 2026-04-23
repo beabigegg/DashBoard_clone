@@ -89,6 +89,45 @@ an informational PR check (Stage 4a).  It is **not sufficient** for Stage
    that touches Oracle would need a separate session with the fault-injection
    container stack
 
+### 2026-04-23 session — cross-day burn-in (morning peak)
+
+- **Script**: `scripts/measure_real_infra_stability.py --tests multi_worker,redis_chaos,real_multi_worker --runs 60`
+- **Artifact**: `artifacts/stability-local/stability-20260423T000218Z.jsonl` (180 records)
+- **Log**: `artifacts/stability-local/stability-20260423T000218Z.log`
+- **Environment**: mes-dashboard conda env, local redis-server, no Oracle
+- **Wall-clock span**: 00:03:26 UTC → 02:26:39 UTC (2h 23m total)
+- **Timing rationale**: ~23 h after the 2026-04-22 01:02 UTC session, during
+  local morning peak load, to exercise cross-day host variance (different
+  system load, network state, cache warmth)
+
+| Target | Runs | Pass | Failures | Mean wall (s) | p95 wall (s) | Max wall (s) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| multi_worker | 60 | 60 | 0 | 63.0 | 75.0 | 79.9 |
+| redis_chaos | 60 | 60 | 0 | 45.1 | 55.9 | 63.5 |
+| real_multi_worker | 60 | 60 | 0 | 36.2 | 43.2 | 52.5 |
+| **Aggregate** | **180** | **180** | **0** | — | — | — |
+
+**Drift vs 2026-04-22 session** (Δ p95 vs previous session):
+
+| Target | 2026-04-22 p95 | 2026-04-23 p95 | Δ |
+| :--- | ---: | ---: | ---: |
+| multi_worker | 72.5 s | 75.0 s | +2.5 s |
+| redis_chaos | 55.6 s | 55.9 s | +0.3 s |
+| real_multi_worker | 44.7 s | 43.2 s | −1.5 s |
+
+**Verdict**: green — two back-to-back 180-run sessions across different
+times of day both land 100% pass.  Combined local signal now stands at
+**360/360 runs** (1,800 test assertions) with zero failures and every
+target's p95 remains well below the 180 s gate threshold (worst case
+multi_worker 75 s = 42% of budget).  Cross-day drift is in the noise
+floor.
+
+**Still-insufficient-for-Stage-4b reasons unchanged**: local burn-in
+remains a go-no-go pre-filter, not a substitute for the CI 20-day × 60-run
+window (see `docs/ci_real_infra_gate_policy.md` §4).  The 2026-04-22
+CI `measure-stability` scheduled run did fire (Day 1 of the rolling
+window), so CI data accumulation is on schedule.
+
 ---
 
 ## Per-Run Flakiness Log
