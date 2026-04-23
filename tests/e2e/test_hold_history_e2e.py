@@ -159,3 +159,79 @@ class TestHoldHistoryView:
         assert resp.status_code == 410
         payload = resp.json()
         assert payload["success"] is False
+
+
+@pytest.mark.e2e
+class TestHoldHistoryDurationPayloadFields:
+    """E2E tests verifying new duration payload fields are present (task 8.1)."""
+
+    @pytest.fixture(autouse=True)
+    def _query_id(self, api_base_url):
+        self._api_base_url = api_base_url
+        resp = requests.post(
+            f"{api_base_url}/hold-history/query",
+            json={"start_date": "2026-03-01", "end_date": "2026-03-07"},
+            timeout=120,
+        )
+        assert resp.status_code == 200
+        data = resp.json().get("data", {})
+        self.query_id = data.get("query_id") or data.get("meta", {}).get("query_id")
+        self.bootstrap_duration = data.get("duration", {})
+
+    def test_duration_has_avg_released_hours(self):
+        dur = self.bootstrap_duration
+        assert "avgReleasedHours" in dur, "duration payload missing avgReleasedHours"
+        assert dur["avgReleasedHours"] >= 0
+
+    def test_duration_has_avg_on_hold_hours(self):
+        dur = self.bootstrap_duration
+        assert "avgOnHoldHours" in dur, "duration payload missing avgOnHoldHours"
+        assert dur["avgOnHoldHours"] >= 0
+
+    def test_duration_has_max_released_hours(self):
+        dur = self.bootstrap_duration
+        assert "maxReleasedHours" in dur, "duration payload missing maxReleasedHours"
+        assert dur["maxReleasedHours"] >= 0
+
+    def test_duration_has_max_on_hold_hours(self):
+        dur = self.bootstrap_duration
+        assert "maxOnHoldHours" in dur, "duration payload missing maxOnHoldHours"
+        assert dur["maxOnHoldHours"] >= 0
+
+    def test_duration_via_view_endpoint(self):
+        if not self.query_id:
+            pytest.skip("No query_id available")
+        resp = requests.get(
+            f"{self._api_base_url}/hold-history/view",
+            params={"query_id": self.query_id, "hold_type": "quality"},
+            timeout=60,
+        )
+        if resp.status_code == 410:
+            pytest.skip("Cache expired")
+        assert resp.status_code == 200
+        dur = resp.json()["data"].get("duration", {})
+        assert "avgReleasedHours" in dur
+        assert "maxReleasedHours" in dur
+
+
+@pytest.mark.e2e
+class TestHoldHistoryTrendRepeatQualityField:
+    """E2E tests verifying repeatQualityHoldQty is present in trend days (task 8.1)."""
+
+    def test_query_trend_days_have_repeat_quality(self, api_base_url):
+        resp = requests.post(
+            f"{api_base_url}/hold-history/query",
+            json={"start_date": "2026-03-01", "end_date": "2026-03-07"},
+            timeout=120,
+        )
+        assert resp.status_code == 200
+        data = resp.json().get("data", {})
+        trend = data.get("trend", {})
+        days = trend.get("days", [])
+        assert len(days) > 0
+        day = days[0]
+        for section_key in ("quality", "non_quality", "all"):
+            section = day.get(section_key, {})
+            assert "repeatQualityHoldQty" in section, \
+                f"trend day section '{section_key}' missing repeatQualityHoldQty"
+            assert section["repeatQualityHoldQty"] >= 0

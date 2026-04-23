@@ -56,6 +56,10 @@ jobs:
             tests/test_redis_client.py \
             tests/test_runtime_hardening.py \
             tests/test_hold_routes.py \
+            tests/test_hold_history_routes.py \
+            tests/test_hold_history_service.py \
+            tests/test_hold_history_sql_runtime.py \
+            tests/test_hold_history_sql_parity.py \
             tests/test_wip_routes.py \
             tests/test_job_query_frontend_safety.py \
             -k "not TestJobQueryPage and not TestHoldDetailPageRoute and not TestPageRoutes"

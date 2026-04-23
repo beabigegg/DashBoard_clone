@@ -418,32 +418,6 @@ async function refreshViewPage() {
 
 // ---- Computed ----
 
-function estimateAvgHoldHours(items) {
-  const bucketHours = {
-    '<4h': 2,
-    '4-24h': 14,
-    '1-3d': 48,
-    '>3d': 96,
-  };
-
-  let weightedHours = 0;
-  let totalCount = 0;
-
-  (items || []).forEach((item) => {
-    const count = Number(item?.count || 0);
-    const range = String(item?.range || '').trim();
-    const representative = Number(bucketHours[range] || 0);
-    weightedHours += count * representative;
-    totalCount += count;
-  });
-
-  if (totalCount <= 0) {
-    return 0;
-  }
-
-  return weightedHours / totalCount;
-}
-
 const trendTypeKey = computed(() => (orchestrator.committed.holdType === 'non-quality' ? 'non_quality' : orchestrator.committed.holdType));
 
 const selectedTrendDays = computed(() => {
@@ -456,6 +430,7 @@ const selectedTrendDays = computed(() => {
       newHoldQty: Number(section.newHoldQty || 0),
       releaseQty: Number(section.releaseQty || 0),
       futureHoldQty: Number(section.futureHoldQty || 0),
+      repeatQualityHoldQty: Number(section.repeatQualityHoldQty || 0),
     };
   });
 });
@@ -466,8 +441,8 @@ const summary = computed(() => {
   const releaseQty = days.reduce((total, item) => total + Number(item.releaseQty || 0), 0);
   const newHoldQty = days.reduce((total, item) => total + Number(item.newHoldQty || 0), 0);
   const futureHoldQty = days.reduce((total, item) => total + Number(item.futureHoldQty || 0), 0);
+  const repeatQualityHoldQty = days.reduce((total, item) => total + Number(item.repeatQualityHoldQty || 0), 0);
   const netChange = releaseQty - newHoldQty - futureHoldQty;
-  const avgHoldHours = estimateAvgHoldHours(durationData.value?.items || []);
 
   const today = new Date().toISOString().slice(0, 10);
   const pastDays = days.filter((d) => d.date <= today);
@@ -475,14 +450,20 @@ const summary = computed(() => {
   const stillOnHoldCount = Number(lastDay.holdQty || 0);
   const newHoldSnapshotCount = Number(lastDay.newHoldQty || 0);
 
+  const dur = durationData.value || {};
+
   return {
     releaseQty,
     newHoldQty,
     futureHoldQty,
+    repeatQualityHoldQty,
     stillOnHoldCount,
     newHoldSnapshotCount,
     netChange,
-    avgHoldHours,
+    avgReleasedHours: Number(dur.avgReleasedHours || 0),
+    avgOnHoldHours: Number(dur.avgOnHoldHours || 0),
+    maxReleasedHours: Number(dur.maxReleasedHours || 0),
+    maxOnHoldHours: Number(dur.maxOnHoldHours || 0),
   };
 });
 

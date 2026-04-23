@@ -25,13 +25,28 @@ filtered AS (
       WHEN RELEASETXNDATE IS NULL THEN (SYSDATE - HOLDTXNDATE) * 24
       ELSE (RELEASETXNDATE - HOLDTXNDATE) * 24
     END AS hold_hours,
-    qty
+    qty,
+    CASE WHEN RELEASETXNDATE IS NOT NULL THEN 1 ELSE 0 END AS is_released
   FROM history_base
   WHERE hold_day BETWEEN TO_DATE(:start_date, 'YYYY-MM-DD') AND TO_DATE(:end_date, 'YYYY-MM-DD')
     AND (:hold_type = 'all' OR hold_type = :hold_type)
     AND (:include_new = 1
       OR (:include_on_hold = 1 AND RELEASETXNDATE IS NULL)
       OR (:include_released = 1 AND RELEASETXNDATE IS NOT NULL))
+),
+released_agg AS (
+  SELECT
+    ROUND(AVG(hold_hours), 2) AS avg_released_hours,
+    ROUND(MAX(hold_hours), 2) AS max_released_hours
+  FROM filtered
+  WHERE is_released = 1
+),
+on_hold_agg AS (
+  SELECT
+    ROUND(AVG(hold_hours), 2) AS avg_on_hold_hours,
+    ROUND(MAX(hold_hours), 2) AS max_on_hold_hours
+  FROM filtered
+  WHERE is_released = 0
 ),
 bucketed AS (
   SELECT
@@ -72,8 +87,14 @@ SELECT
     WHEN t.total_qty = 0 THEN 0
     ELSE ROUND(NVL(c.qty, 0) * 100 / t.total_qty, 2)
   END AS pct,
-  b.order_key
+  b.order_key,
+  NVL(r.avg_released_hours, 0) AS avg_released_hours,
+  NVL(r.max_released_hours, 0) AS max_released_hours,
+  NVL(o.avg_on_hold_hours, 0) AS avg_on_hold_hours,
+  NVL(o.max_on_hold_hours, 0) AS max_on_hold_hours
 FROM buckets b
 LEFT JOIN bucket_counts c ON c.range_label = b.range_label
 CROSS JOIN totals t
+CROSS JOIN released_agg r
+CROSS JOIN on_hold_agg o
 ORDER BY b.order_key

@@ -162,7 +162,7 @@ def _query_trend(
     day_map: Dict[str, Dict[str, Dict[str, int]]] = {}
     for d in dates:
         day_map[d] = {
-            k: {"holdQty": 0, "newHoldQty": 0, "releaseQty": 0, "futureHoldQty": 0}
+            k: {"holdQty": 0, "newHoldQty": 0, "releaseQty": 0, "futureHoldQty": 0, "repeatQualityHoldQty": 0}
             for k in ("quality", "non_quality", "all")
         }
 
@@ -254,6 +254,25 @@ def _query_trend(
             day_map[d][ht_key]["futureHoldQty"] = qty
         day_map[d]["all"]["futureHoldQty"] = day_map[d]["all"]["futureHoldQty"] + qty
 
+    # ── Batch 5: repeatQualityHoldQty (quality repeat holds: rn_future_reason > 1) ──
+    repeat_sql = """
+        SELECT
+            CAST("hold_day" AS VARCHAR) AS day_str,
+            COALESCE(SUM("QTY"), 0) AS v
+        FROM hold_src
+        WHERE CAST("hold_day" AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+          AND "RN_FUTURE_REASON" > 1
+          AND "HOLD_TYPE" = 'quality'
+        GROUP BY "hold_day"
+    """
+    for r in _fetch_dict_rows(conn, repeat_sql, [start_date, end_date]):
+        d = str(r["day_str"])[:10]
+        if d not in day_map:
+            continue
+        qty = _si(r["v"])
+        day_map[d]["quality"]["repeatQualityHoldQty"] = qty
+        day_map[d]["all"]["repeatQualityHoldQty"] = qty
+
     # Assemble result in date order
     days: List[Dict[str, Any]] = []
     for d in dates:
@@ -329,20 +348,26 @@ def _query_duration(
     end_date: Optional[str] = None,
     reason: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Compute hold duration distribution via CASE buckets in DuckDB."""
+    """Compute hold duration distribution via CASE buckets in DuckDB.
+
+    Bucket computation uses released-only rows (RELEASETXNDATE IS NOT NULL).
+    AVG/MAX metrics are computed for released and on-hold rows separately.
+    """
     type_clause = _build_hold_type_clause(hold_type)
     record_clause = _build_record_type_clause(record_type, start_date, end_date)
 
-    where_parts = ['"RELEASETXNDATE" IS NOT NULL']
+    base_parts: List[str] = []
     if type_clause:
-        where_parts.append(type_clause)
+        base_parts.append(type_clause)
     if record_clause:
-        where_parts.append(record_clause)
+        base_parts.append(record_clause)
     if reason:
-        where_parts.append(f'TRIM("HOLDREASONNAME") = {_sql_str_literal(reason.strip())}')
-    where_sql = "WHERE " + " AND ".join(where_parts)
+        base_parts.append(f'TRIM("HOLDREASONNAME") = {_sql_str_literal(reason.strip())}')
 
-    sql = f"""
+    bucket_parts = ['"RELEASETXNDATE" IS NOT NULL'] + base_parts
+    bucket_where = "WHERE " + " AND ".join(bucket_parts)
+
+    bucket_sql = f"""
         SELECT
             CASE
                 WHEN "HOLD_HOURS" < 4      THEN '<4h'
@@ -353,10 +378,34 @@ def _query_duration(
             COUNT(*) AS cnt,
             COALESCE(SUM("QTY"), 0) AS qty
         FROM hold_src
-        {where_sql}
+        {bucket_where}
         GROUP BY 1
     """
-    rows = _fetch_dict_rows(conn, sql)
+
+    released_parts = ['"RELEASETXNDATE" IS NOT NULL'] + base_parts
+    released_where = "WHERE " + " AND ".join(released_parts)
+    released_sql = f"""
+        SELECT
+            ROUND(AVG("HOLD_HOURS"), 2) AS avg_released_hours,
+            ROUND(MAX("HOLD_HOURS"), 2) AS max_released_hours
+        FROM hold_src
+        {released_where}
+    """
+
+    on_hold_parts = ['"RELEASETXNDATE" IS NULL'] + base_parts
+    on_hold_where = "WHERE " + " AND ".join(on_hold_parts)
+    on_hold_sql = f"""
+        SELECT
+            ROUND(AVG("HOLD_HOURS"), 2) AS avg_on_hold_hours,
+            ROUND(MAX("HOLD_HOURS"), 2) AS max_on_hold_hours
+        FROM hold_src
+        {on_hold_where}
+    """
+
+    rows = _fetch_dict_rows(conn, bucket_sql)
+    released_rows = _fetch_dict_rows(conn, released_sql)
+    on_hold_rows = _fetch_dict_rows(conn, on_hold_sql)
+
     bucket_map = {r["bucket"]: {"count": _si(r["cnt"]), "qty": _si(r["qty"])} for r in rows}
     total_qty = sum(v["qty"] for v in bucket_map.values())
 
@@ -371,7 +420,16 @@ def _query_duration(
             "pct": round((qty / total_qty * 100) if total_qty > 0 else 0, 2),
         })
 
-    return {"items": items}
+    rel = released_rows[0] if released_rows else {}
+    oh = on_hold_rows[0] if on_hold_rows else {}
+
+    return {
+        "items": items,
+        "avgReleasedHours": round(_sf(rel.get("avg_released_hours")), 2),
+        "avgOnHoldHours": round(_sf(oh.get("avg_on_hold_hours")), 2),
+        "maxReleasedHours": round(_sf(rel.get("max_released_hours")), 2),
+        "maxOnHoldHours": round(_sf(oh.get("max_on_hold_hours")), 2),
+    }
 
 
 # ── Task 4.5: List SQL ────────────────────────────────────────────────────────

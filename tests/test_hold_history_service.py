@@ -346,6 +346,80 @@ class TestHoldHistoryServiceFunctions(unittest.TestCase):
         self.assertIn('ROW_NUMBER', sql)
         self.assertIn('FUTUREHOLDCOMMENTS', sql)
 
+    @patch('mes_dashboard.services.hold_history_service.read_sql_df')
+    def test_duration_returns_avg_max_released_and_on_hold(self, mock_read_sql_df):
+        mock_read_sql_df.return_value = pd.DataFrame(
+            [
+                {
+                    'RANGE_LABEL': '<4h', 'ITEM_COUNT': 3, 'QTY': 300, 'PCT': 50.0,
+                    'AVG_RELEASED_HOURS': 2.5, 'MAX_RELEASED_HOURS': 3.8,
+                    'AVG_ON_HOLD_HOURS': 120.0, 'MAX_ON_HOLD_HOURS': 240.0,
+                },
+                {
+                    'RANGE_LABEL': '4-24h', 'ITEM_COUNT': 3, 'QTY': 300, 'PCT': 50.0,
+                    'AVG_RELEASED_HOURS': 2.5, 'MAX_RELEASED_HOURS': 3.8,
+                    'AVG_ON_HOLD_HOURS': 120.0, 'MAX_ON_HOLD_HOURS': 240.0,
+                },
+            ]
+        )
+
+        result = hold_history_service.get_hold_history_duration('2026-02-01', '2026-02-07', 'quality')
+
+        self.assertIn('avgReleasedHours', result)
+        self.assertIn('avgOnHoldHours', result)
+        self.assertIn('maxReleasedHours', result)
+        self.assertIn('maxOnHoldHours', result)
+        self.assertEqual(result['avgReleasedHours'], 2.5)
+        self.assertEqual(result['maxReleasedHours'], 3.8)
+        self.assertEqual(result['avgOnHoldHours'], 120.0)
+        self.assertEqual(result['maxOnHoldHours'], 240.0)
+        self.assertEqual(len(result['items']), 2)
+
+    @patch('mes_dashboard.services.hold_history_service.read_sql_df')
+    def test_duration_empty_df_returns_zero_avg_max(self, mock_read_sql_df):
+        mock_read_sql_df.return_value = pd.DataFrame([])
+
+        result = hold_history_service.get_hold_history_duration('2026-02-01', '2026-02-07', 'quality')
+
+        self.assertEqual(result['avgReleasedHours'], 0.0)
+        self.assertEqual(result['avgOnHoldHours'], 0.0)
+        self.assertEqual(result['maxReleasedHours'], 0.0)
+        self.assertEqual(result['maxOnHoldHours'], 0.0)
+        self.assertEqual(result['items'], [])
+
+    def test_empty_trend_metrics_includes_repeat_quality(self):
+        metrics = hold_history_service._empty_trend_metrics()
+        self.assertIn('repeatQualityHoldQty', metrics)
+        self.assertEqual(metrics['repeatQualityHoldQty'], 0)
+
+    def test_normalize_trend_day_old_payload_defaults_repeat_quality_to_zero(self):
+        old_payload = {
+            'date': '2026-02-01',
+            'quality': {'holdQty': 10, 'newHoldQty': 2, 'releaseQty': 1, 'futureHoldQty': 0},
+            'non_quality': {'holdQty': 4, 'newHoldQty': 1, 'releaseQty': 0, 'futureHoldQty': 0},
+            'all': {'holdQty': 14, 'newHoldQty': 3, 'releaseQty': 1, 'futureHoldQty': 0},
+        }
+
+        normalized = hold_history_service._normalize_trend_day(old_payload)
+
+        self.assertEqual(normalized['quality']['repeatQualityHoldQty'], 0)
+        self.assertEqual(normalized['non_quality']['repeatQualityHoldQty'], 0)
+        self.assertEqual(normalized['all']['repeatQualityHoldQty'], 0)
+
+    def test_normalize_trend_day_reads_repeat_quality_when_present(self):
+        payload = {
+            'date': '2026-02-01',
+            'quality': {'holdQty': 10, 'newHoldQty': 2, 'releaseQty': 1, 'futureHoldQty': 0, 'repeatQualityHoldQty': 5},
+            'non_quality': {'holdQty': 4, 'newHoldQty': 1, 'releaseQty': 0, 'futureHoldQty': 0, 'repeatQualityHoldQty': 0},
+            'all': {'holdQty': 14, 'newHoldQty': 3, 'releaseQty': 1, 'futureHoldQty': 0, 'repeatQualityHoldQty': 5},
+        }
+
+        normalized = hold_history_service._normalize_trend_day(payload)
+
+        self.assertEqual(normalized['quality']['repeatQualityHoldQty'], 5)
+        self.assertEqual(normalized['non_quality']['repeatQualityHoldQty'], 0)
+        self.assertEqual(normalized['all']['repeatQualityHoldQty'], 5)
+
 
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()

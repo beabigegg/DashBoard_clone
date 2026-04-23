@@ -68,6 +68,7 @@ def _build_sample_rows(n_holds: int = 30) -> List[Dict[str, Any]]:
             "hold_day": hold_day,
             "release_day": release_day,
             "RN_HOLD_DAY": 1 if i % 2 == 0 else 2,
+            "RN_FUTURE_REASON": (i // len(_REASONS)) + 1,  # repeats every len(_REASONS) lots
             "IS_FUTURE_HOLD": 0,
             "FUTURE_HOLD_FLAG": 0,
         })
@@ -236,7 +237,7 @@ class TestHoldHistorySqlParity:
             "HOLDEMP", "HOLDCOMMENTS", "RELEASETXNDATE", "RELEASEEMP",
             "RELEASECOMMENTS", "HOLD_HOURS", "NCRID", "FUTUREHOLDCOMMENTS",
             "HOLD_TYPE", "hold_day", "release_day", "RN_HOLD_DAY",
-            "IS_FUTURE_HOLD", "FUTURE_HOLD_FLAG",
+            "RN_FUTURE_REASON", "IS_FUTURE_HOLD", "FUTURE_HOLD_FLAG",
         ]
         with tempfile.TemporaryDirectory() as tmp:
             duck_df = pd.DataFrame(columns=duck_cols)
@@ -244,3 +245,116 @@ class TestHoldHistorySqlParity:
             result = _run_duckdb_view(path)
             assert len(result["reason_pareto"]["items"]) == 0
             assert result["list"]["pagination"]["total"] == 0
+
+
+class TestDurationAvgMaxParity:
+    """DuckDB _query_duration() AVG/MAX fields are structurally correct."""
+
+    @classmethod
+    def setup_class(cls):
+        import tempfile
+        cls.tmp = tempfile.TemporaryDirectory()
+        rows = _build_sample_rows(30)
+        df = pd.DataFrame(rows)
+        cls.parquet_path = _write_parquet(df, cls.tmp.name)
+
+    @classmethod
+    def teardown_class(cls):
+        cls.tmp.cleanup()
+
+    def _run_duration(self, **kwargs):
+        import duckdb
+        from mes_dashboard.services.hold_history_sql_runtime import _attach_spool_view, _query_duration
+        conn = duckdb.connect(database=":memory:")
+        try:
+            _attach_spool_view(conn, self.parquet_path)
+            return _query_duration(conn, **kwargs)
+        finally:
+            conn.close()
+
+    def test_avg_released_hours_non_negative(self):
+        result = self._run_duration(hold_type="quality", record_type="new",
+                                    start_date=_START_DATE, end_date=_END_DATE)
+        assert result["avgReleasedHours"] >= 0
+        assert result["maxReleasedHours"] >= 0
+        assert result["avgOnHoldHours"] >= 0
+        assert result["maxOnHoldHours"] >= 0
+
+    def test_avg_leq_max(self):
+        result = self._run_duration(hold_type="quality", record_type="new",
+                                    start_date=_START_DATE, end_date=_END_DATE)
+        if result["maxReleasedHours"] > 0:
+            assert result["avgReleasedHours"] <= result["maxReleasedHours"]
+        if result["maxOnHoldHours"] > 0:
+            assert result["avgOnHoldHours"] <= result["maxOnHoldHours"]
+
+    def test_empty_spool_returns_zero_avg_max(self):
+        import tempfile, duckdb
+        from mes_dashboard.services.hold_history_sql_runtime import _attach_spool_view, _query_duration
+        duck_cols = [
+            "CONTAINERID", "LOT_ID", "PJ_WORKORDER", "PRODUCTNAME",
+            "WORKCENTERNAME", "HOLDREASONNAME", "QTY", "HOLDTXNDATE",
+            "HOLDEMP", "HOLDCOMMENTS", "RELEASETXNDATE", "RELEASEEMP",
+            "RELEASECOMMENTS", "HOLD_HOURS", "NCRID", "FUTUREHOLDCOMMENTS",
+            "HOLD_TYPE", "hold_day", "release_day", "RN_HOLD_DAY",
+            "RN_FUTURE_REASON", "IS_FUTURE_HOLD", "FUTURE_HOLD_FLAG",
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            duck_df = pd.DataFrame(columns=duck_cols)
+            path = _write_parquet(duck_df, tmp)
+            conn = duckdb.connect(database=":memory:")
+            try:
+                _attach_spool_view(conn, path)
+                result = _query_duration(conn, hold_type="quality", record_type="new",
+                                         start_date=_START_DATE, end_date=_END_DATE)
+            finally:
+                conn.close()
+        assert result["avgReleasedHours"] == 0.0
+        assert result["maxReleasedHours"] == 0.0
+        assert result["avgOnHoldHours"] == 0.0
+        assert result["maxOnHoldHours"] == 0.0
+
+
+class TestRepeatQualityHoldQtyParity:
+    """DuckDB _query_trend() repeatQualityHoldQty is consistent and non-negative."""
+
+    @classmethod
+    def setup_class(cls):
+        import tempfile
+        cls.tmp = tempfile.TemporaryDirectory()
+        rows = _build_sample_rows(30)
+        df = pd.DataFrame(rows)
+        cls.parquet_path = _write_parquet(df, cls.tmp.name)
+
+    @classmethod
+    def teardown_class(cls):
+        cls.tmp.cleanup()
+
+    def _run_trend(self):
+        import duckdb
+        from mes_dashboard.services.hold_history_sql_runtime import _attach_spool_view, _query_trend
+        conn = duckdb.connect(database=":memory:")
+        try:
+            _attach_spool_view(conn, self.parquet_path)
+            return _query_trend(conn, start_date=_START_DATE, end_date=_END_DATE)
+        finally:
+            conn.close()
+
+    def test_each_day_has_repeat_quality_field(self):
+        result = self._run_trend()
+        for day in result["days"]:
+            assert "repeatQualityHoldQty" in day["quality"]
+            assert "repeatQualityHoldQty" in day["non_quality"]
+            assert "repeatQualityHoldQty" in day["all"]
+
+    def test_repeat_quality_non_negative(self):
+        result = self._run_trend()
+        for day in result["days"]:
+            assert day["quality"]["repeatQualityHoldQty"] >= 0
+            assert day["non_quality"]["repeatQualityHoldQty"] == 0  # non-quality can't be quality
+            assert day["all"]["repeatQualityHoldQty"] >= 0
+
+    def test_repeat_quality_all_equals_quality_sum(self):
+        result = self._run_trend()
+        for day in result["days"]:
+            assert day["all"]["repeatQualityHoldQty"] == day["quality"]["repeatQualityHoldQty"]

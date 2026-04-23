@@ -75,6 +75,7 @@ history_enriched AS (
     HOLDREASONID,
     HOLDREASONNAME,
     rn_hold_day,
+    rn_future_reason,
     CASE
       WHEN is_future_hold = 1 AND rn_future_reason <> 1 THEN 0
       ELSE 1
@@ -114,7 +115,13 @@ daily_hold AS (
         AND h.rn_hold_day = 1
         AND h.future_hold_flag = 0
       THEN h.qty ELSE 0
-    END) AS future_hold_qty
+    END) AS future_hold_qty,
+    SUM(CASE
+      WHEN h.hold_day = c.day_date
+        AND h.rn_future_reason > 1
+        AND h.hold_type = 'quality'
+      THEN h.qty ELSE 0
+    END) AS repeat_quality_hold_qty
   FROM calendar c
   JOIN history_enriched h
     ON h.hold_day <= c.day_date + 1
@@ -129,7 +136,8 @@ daily_all AS (
     SUM(hold_qty) AS hold_qty,
     SUM(new_hold_qty) AS new_hold_qty,
     SUM(release_qty) AS release_qty,
-    SUM(future_hold_qty) AS future_hold_qty
+    SUM(future_hold_qty) AS future_hold_qty,
+    SUM(repeat_quality_hold_qty) AS repeat_quality_hold_qty
   FROM daily_hold
   GROUP BY day_date
 )
@@ -139,14 +147,15 @@ SELECT
   NVL(d.hold_qty, 0) AS hold_qty,
   NVL(d.new_hold_qty, 0) AS new_hold_qty,
   NVL(d.release_qty, 0) AS release_qty,
-  NVL(d.future_hold_qty, 0) AS future_hold_qty
+  NVL(d.future_hold_qty, 0) AS future_hold_qty,
+  NVL(d.repeat_quality_hold_qty, 0) AS repeat_quality_hold_qty
 FROM calendar c
 CROSS JOIN hold_types t
 LEFT JOIN (
-  SELECT day_date, hold_type, hold_qty, new_hold_qty, release_qty, future_hold_qty
+  SELECT day_date, hold_type, hold_qty, new_hold_qty, release_qty, future_hold_qty, repeat_quality_hold_qty
   FROM daily_hold
   UNION ALL
-  SELECT day_date, hold_type, hold_qty, new_hold_qty, release_qty, future_hold_qty
+  SELECT day_date, hold_type, hold_qty, new_hold_qty, release_qty, future_hold_qty, repeat_quality_hold_qty
   FROM daily_all
 ) d ON d.day_date = c.day_date AND d.hold_type = t.hold_type
 ORDER BY c.day_date, t.hold_type

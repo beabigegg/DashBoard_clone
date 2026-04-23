@@ -109,3 +109,119 @@ class TestFallbackConstants:
 class TestSpoolNamespace:
     def test_hold_dataset_namespace(self):
         assert _SPOOL_NAMESPACE == "hold_dataset"
+
+
+class TestQueryDurationNewFields:
+    """_query_duration() returns avgReleasedHours / avgOnHoldHours / maxReleasedHours / maxOnHoldHours."""
+
+    def _make_conn(self, bucket_rows, released_rows, on_hold_rows):
+        mock_conn = MagicMock()
+        call_count = [0]
+
+        def execute_side_effect(sql, params=None):
+            call_count[0] += 1
+            cursor = MagicMock()
+            if call_count[0] == 1:  # bucket query
+                cursor.description = [("bucket",), ("cnt",), ("qty",)]
+                cursor.fetchall.return_value = bucket_rows
+            elif call_count[0] == 2:  # released AVG/MAX
+                cursor.description = [("avg_released_hours",), ("max_released_hours",)]
+                cursor.fetchall.return_value = released_rows
+            else:  # on-hold AVG/MAX
+                cursor.description = [("avg_on_hold_hours",), ("max_on_hold_hours",)]
+                cursor.fetchall.return_value = on_hold_rows
+            return cursor
+
+        mock_conn.execute.side_effect = execute_side_effect
+        return mock_conn
+
+    def test_returns_avg_max_fields(self):
+        from mes_dashboard.services.hold_history_sql_runtime import _query_duration
+        conn = self._make_conn(
+            bucket_rows=[("<4h", 5, 500)],
+            released_rows=[(3.5, 8.0)],
+            on_hold_rows=[(96.0, 200.0)],
+        )
+        result = _query_duration(conn, hold_type="quality", record_type="new")
+        assert "avgReleasedHours" in result
+        assert "maxReleasedHours" in result
+        assert "avgOnHoldHours" in result
+        assert "maxOnHoldHours" in result
+        assert result["avgReleasedHours"] == 3.5
+        assert result["maxReleasedHours"] == 8.0
+        assert result["avgOnHoldHours"] == 96.0
+        assert result["maxOnHoldHours"] == 200.0
+
+    def test_empty_spool_returns_zero(self):
+        from mes_dashboard.services.hold_history_sql_runtime import _query_duration
+        conn = self._make_conn(
+            bucket_rows=[],
+            released_rows=[(None, None)],
+            on_hold_rows=[(None, None)],
+        )
+        result = _query_duration(conn, hold_type="quality", record_type="new")
+        assert result["avgReleasedHours"] == 0.0
+        assert result["maxReleasedHours"] == 0.0
+        assert result["avgOnHoldHours"] == 0.0
+        assert result["maxOnHoldHours"] == 0.0
+        assert result["items"] == [
+            {"range": "<4h",  "count": 0, "qty": 0, "pct": 0},
+            {"range": "4-24h", "count": 0, "qty": 0, "pct": 0},
+            {"range": "1-3d",  "count": 0, "qty": 0, "pct": 0},
+            {"range": ">3d",   "count": 0, "qty": 0, "pct": 0},
+        ]
+
+
+class TestQueryTrendRepeatQuality:
+    """_query_trend() includes repeatQualityHoldQty in each day."""
+
+    def _make_trend_conn(self, dates, repeat_rows=None):
+        from datetime import date, timedelta
+        mock_conn = MagicMock()
+        call_count = [0]
+
+        def execute_side_effect(sql, params=None):
+            call_count[0] += 1
+            cursor = MagicMock()
+            if call_count[0] == 1:  # dates series
+                cursor.description = [("d",)]
+                cursor.fetchall.return_value = [(d,) for d in dates]
+            elif call_count[0] == 2:  # holdQty batch
+                cursor.description = [("day_str",), ("ht",), ("v",)]
+                cursor.fetchall.return_value = []
+            elif call_count[0] == 3:  # newHoldQty batch
+                cursor.description = [("day_str",), ("ht",), ("v",)]
+                cursor.fetchall.return_value = []
+            elif call_count[0] == 4:  # releaseQty batch
+                cursor.description = [("day_str",), ("ht",), ("v",)]
+                cursor.fetchall.return_value = []
+            elif call_count[0] == 5:  # futureHoldQty batch
+                cursor.description = [("day_str",), ("ht",), ("v",)]
+                cursor.fetchall.return_value = []
+            else:  # repeatQualityHoldQty batch
+                cursor.description = [("day_str",), ("v",)]
+                cursor.fetchall.return_value = repeat_rows or []
+            return cursor
+
+        mock_conn.execute.side_effect = execute_side_effect
+        return mock_conn
+
+    def test_day_map_initialized_with_repeat_quality(self):
+        from mes_dashboard.services.hold_history_sql_runtime import _query_trend
+        conn = self._make_trend_conn(["2026-02-01", "2026-02-02"])
+        result = _query_trend(conn, start_date="2026-02-01", end_date="2026-02-02")
+        day = result["days"][0]
+        assert "repeatQualityHoldQty" in day["quality"]
+        assert "repeatQualityHoldQty" in day["non_quality"]
+        assert "repeatQualityHoldQty" in day["all"]
+
+    def test_repeat_quality_accumulates_from_batch(self):
+        from mes_dashboard.services.hold_history_sql_runtime import _query_trend
+        conn = self._make_trend_conn(
+            ["2026-02-01", "2026-02-02"],
+            repeat_rows=[("2026-02-01", 8)],
+        )
+        result = _query_trend(conn, start_date="2026-02-01", end_date="2026-02-02")
+        assert result["days"][0]["quality"]["repeatQualityHoldQty"] == 8
+        assert result["days"][0]["all"]["repeatQualityHoldQty"] == 8
+        assert result["days"][1]["quality"]["repeatQualityHoldQty"] == 0

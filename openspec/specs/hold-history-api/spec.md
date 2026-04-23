@@ -4,7 +4,7 @@ Define stable requirements for hold-history-api.
 ## Requirements
 
 ### Requirement: Hold History API SHALL provide daily trend data with Redis caching
-The Hold History API SHALL return trend, reason-pareto, duration, and list data from a single cached dataset via a two-phase query pattern (POST /query + GET /view). The old independent GET endpoints for trend, reason-pareto, duration, and list SHALL be replaced.
+The Hold History API SHALL return trend, reason-pareto, duration, and list data from a single cached dataset via a two-phase query pattern (POST /query + GET /view). The trend payload SHALL include a stable "quality repeat hold" series derived from `(lot, reason)` re-hold history, independent of the `FUTUREHOLDCOMMENTS` column.
 
 #### Scenario: Primary query endpoint
 - **WHEN** `POST /api/hold-history/query` is called with `{ start_date, end_date, hold_type }`
@@ -31,6 +31,15 @@ The Hold History API SHALL return trend, reason-pareto, duration, and list data 
 - **WHEN** trend data is aggregated by hold type
 - **THEN** quality classification SHALL use the same NON_QUALITY_HOLD_REASONS set as existing hold endpoints
 
+#### Scenario: Quality repeat hold series in trend payload
+
+- **WHEN** daily trend is computed for each day in the query range
+- **THEN** each day SHALL include `repeatQualityHoldQty`: `SUM(QTY)` over rows where `hold_day = day AND RN_FUTURE_REASON > 1 AND hold_type = 'quality'`
+- **AND** the computation SHALL NOT require `FUTUREHOLDCOMMENTS IS NOT NULL`
+- **AND** the partition for `RN_FUTURE_REASON` SHALL use `(CONTAINERID, HOLDREASONID)` ordered by `HOLDTXNDATE` (same as existing `base_facts.sql`)
+- **AND** the value SHALL be consistent across Oracle (`trend.sql`), DuckDB server (`hold_history_sql_runtime._query_trend`), and DuckDB WASM (`useHoldHistoryDuckDB.queryTrend`)
+- **AND** the existing `newHoldQty` / `releaseQty` / `holdQty` / `futureHoldQty` calculations SHALL remain unchanged
+
 ### Requirement: Hold History API SHALL provide reason Pareto data
 The reason Pareto data SHALL be derived from the cached dataset, not from a separate Oracle query.
 
@@ -41,12 +50,28 @@ The reason Pareto data SHALL be derived from the cached dataset, not from a sepa
 - **THEN** items SHALL be sorted by count descending
 
 ### Requirement: Hold History API SHALL provide hold duration distribution
-The duration distribution SHALL be derived from the cached dataset.
+The duration distribution SHALL be derived from the cached dataset, and the response SHALL include real-average and real-maximum hold-duration metrics alongside the bucket distribution.
 
 #### Scenario: Duration from cache
 - **WHEN** duration is requested via GET /view
-- **THEN** the cached DataFrame SHALL be filtered to released holds only
+- **THEN** the cached DataFrame SHALL be filtered to released holds only for bucket computation
 - **THEN** 4 buckets SHALL be computed: <4h, 4-24h, 1-3d, >3d
+
+#### Scenario: Real-average and real-maximum hold duration in duration payload
+
+- **WHEN** duration is requested via GET /view or returned from POST /query bootstrap
+- **THEN** the response SHALL include `avgReleasedHours`: `AVG(HOLD_HOURS)` over rows where `RELEASETXNDATE IS NOT NULL` after applying `hold_type`, `record_type`, and `reason` filters
+- **AND** the response SHALL include `avgOnHoldHours`: `AVG(HOLD_HOURS)` over rows where `RELEASETXNDATE IS NULL` after applying the same filters
+- **AND** the response SHALL include `maxReleasedHours`: `MAX(HOLD_HOURS)` over rows where `RELEASETXNDATE IS NOT NULL` after applying the same filters
+- **AND** the response SHALL include `maxOnHoldHours`: `MAX(HOLD_HOURS)` over rows where `RELEASETXNDATE IS NULL` after applying the same filters
+- **AND** all four values SHALL be numeric (rounded to 2 decimal places) or `0` when no matching rows exist
+- **AND** all four values SHALL be computed consistently across the Oracle SQL path (`duration.sql`), the DuckDB SQL runtime path (`hold_history_sql_runtime._query_duration`), and the client-side DuckDB-WASM path (`useHoldHistoryDuckDB.queryDuration`)
+
+#### Scenario: Duration payload shape
+
+- **WHEN** a client receives the duration section of any hold-history response
+- **THEN** the payload SHALL match `{ items: [{ range, count, qty, pct }], avgReleasedHours: number, avgOnHoldHours: number, maxReleasedHours: number, maxOnHoldHours: number }`
+- **AND** `items` order and semantics SHALL remain unchanged from prior behavior
 
 ### Requirement: Hold History API SHALL provide paginated detail list
 The detail list SHALL be paginated from the cached dataset.

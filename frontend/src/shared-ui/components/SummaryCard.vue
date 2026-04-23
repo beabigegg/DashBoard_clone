@@ -19,6 +19,10 @@ const props = defineProps({
     type: String,
     default: 'brand'
   },
+  tooltip: {
+    type: String,
+    default: null
+  },
   clickable: {
     type: Boolean,
     default: false
@@ -86,13 +90,17 @@ function handleClick() {
     :style="{ '--accent-bar': accentColor.bar, '--accent-text': accentColor.text }"
     :role="clickable ? 'button' : undefined"
     :tabindex="clickable ? 0 : undefined"
+    :title="tooltip || undefined"
     @click="handleClick"
     @keydown.enter="handleClick"
     @keydown.space.prevent="handleClick"
   >
     <div class="summary-card__accent-bar" />
     <div class="summary-card__body">
-      <div class="summary-card__label">{{ label }}</div>
+      <div class="summary-card__label">
+        {{ label }}
+        <span v-if="tooltip" class="summary-card__tooltip-icon" :aria-label="tooltip">?</span>
+      </div>
       <div
         class="summary-card__value"
         :class="{ 'summary-card__value--pulse': valuePulse }"
@@ -156,6 +164,23 @@ function handleClick() {
   margin-top: 6px;
   font-size: 12px;
   color: theme('colors.text.muted');
+}
+
+.summary-card__tooltip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid theme('colors.text.muted');
+  font-size: 9px;
+  font-weight: 700;
+  color: theme('colors.text.muted');
+  cursor: help;
+  margin-left: 3px;
+  vertical-align: middle;
+  line-height: 1;
 }
 
 /* Clickable state */

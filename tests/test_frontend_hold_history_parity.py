@@ -325,3 +325,80 @@ class TestHoldHistoryListPaginationParity:
         """).fetchdf()
         dates = list(rows["hold_dt"])
         assert dates == sorted(dates, reverse=True), "Frontend list order must be DESC by HOLDTXNDATE"
+
+
+class TestDurationAvgMaxParityFrontendVsServer:
+    """avgReleasedHours / avgOnHoldHours / maxReleasedHours / maxOnHoldHours
+    computed by DuckDB server (_query_duration) are non-negative and AVG ≤ MAX."""
+
+    def _run_server_duration(self, parquet_path, hold_type="quality"):
+        import duckdb as _duckdb
+        from mes_dashboard.services.hold_history_sql_runtime import _attach_spool_view, _query_duration
+        conn = _duckdb.connect(":memory:")
+        try:
+            _attach_spool_view(conn, parquet_path)
+            return _query_duration(conn, hold_type=hold_type, record_type="new",
+                                   start_date=_START_DATE, end_date=_END_DATE)
+        finally:
+            conn.close()
+
+    def test_avg_max_fields_present(self, parquet_path):
+        result = self._run_server_duration(parquet_path)
+        assert "avgReleasedHours" in result
+        assert "avgOnHoldHours" in result
+        assert "maxReleasedHours" in result
+        assert "maxOnHoldHours" in result
+
+    def test_avg_non_negative(self, parquet_path):
+        result = self._run_server_duration(parquet_path)
+        assert result["avgReleasedHours"] >= 0
+        assert result["avgOnHoldHours"] >= 0
+
+    def test_avg_leq_max(self, parquet_path):
+        result = self._run_server_duration(parquet_path)
+        if result["maxReleasedHours"] > 0:
+            assert result["avgReleasedHours"] <= result["maxReleasedHours"]
+        if result["maxOnHoldHours"] > 0:
+            assert result["avgOnHoldHours"] <= result["maxOnHoldHours"]
+
+    @pytest.mark.parametrize("hold_type", ["quality", "non-quality", "all"])
+    def test_avg_max_per_hold_type(self, parquet_path, hold_type):
+        result = self._run_server_duration(parquet_path, hold_type=hold_type)
+        assert result["avgReleasedHours"] >= 0
+        assert result["maxReleasedHours"] >= 0
+
+
+class TestRepeatQualityParityFrontendVsServer:
+    """repeatQualityHoldQty in DuckDB server trend equals pandas reference computation."""
+
+    def _pandas_repeat_quality_total(self, df):
+        mask = (
+            (df["HOLD_TYPE"] == "quality") &
+            (df["RN_FUTURE_REASON"] > 1) &
+            (pd.to_datetime(df["HOLD_DAY"]).dt.date >= pd.Timestamp(_START_DATE).date()) &
+            (pd.to_datetime(df["HOLD_DAY"]).dt.date <= pd.Timestamp(_END_DATE).date())
+        )
+        return int(df.loc[mask, "QTY"].sum())
+
+    def _run_server_trend(self, parquet_path):
+        import duckdb as _duckdb
+        from mes_dashboard.services.hold_history_sql_runtime import _attach_spool_view, _query_trend
+        conn = _duckdb.connect(":memory:")
+        try:
+            _attach_spool_view(conn, parquet_path)
+            return _query_trend(conn, start_date=_START_DATE, end_date=_END_DATE)
+        finally:
+            conn.close()
+
+    def test_repeat_quality_total_matches_pandas(self, sample_df, parquet_path):
+        expected_total = self._pandas_repeat_quality_total(sample_df)
+        trend = self._run_server_trend(parquet_path)
+        server_total = sum(d["quality"]["repeatQualityHoldQty"] for d in trend["days"])
+        assert server_total == expected_total
+
+    def test_repeat_quality_integer_consistency(self, parquet_path):
+        trend = self._run_server_trend(parquet_path)
+        for day in trend["days"]:
+            qty = day["quality"]["repeatQualityHoldQty"]
+            assert isinstance(qty, int) or (isinstance(qty, float) and qty == int(qty))
+            assert qty >= 0

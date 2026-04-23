@@ -100,7 +100,8 @@ async function queryTrend(client, startDate, endDate) {
       SUM(CASE WHEN CAST(${qid('RELEASE_DAY')} AS DATE) = d.d THEN ${qid('QTY')} ELSE 0 END) AS all_releaseQty,
       SUM(CASE WHEN ${qid('HOLD_TYPE')} = 'quality'     AND CAST(${qid('HOLD_DAY')} AS DATE) = d.d AND ${qid('IS_FUTURE_HOLD')} = 1 AND ${qid('FUTURE_HOLD_FLAG')} = 1 THEN ${qid('QTY')} ELSE 0 END) AS quality_futureHoldQty,
       SUM(CASE WHEN ${qid('HOLD_TYPE')} = 'non-quality' AND CAST(${qid('HOLD_DAY')} AS DATE) = d.d AND ${qid('IS_FUTURE_HOLD')} = 1 AND ${qid('FUTURE_HOLD_FLAG')} = 1 THEN ${qid('QTY')} ELSE 0 END) AS non_quality_futureHoldQty,
-      SUM(CASE WHEN CAST(${qid('HOLD_DAY')} AS DATE) = d.d AND ${qid('IS_FUTURE_HOLD')} = 1 AND ${qid('FUTURE_HOLD_FLAG')} = 1 THEN ${qid('QTY')} ELSE 0 END) AS all_futureHoldQty
+      SUM(CASE WHEN CAST(${qid('HOLD_DAY')} AS DATE) = d.d AND ${qid('IS_FUTURE_HOLD')} = 1 AND ${qid('FUTURE_HOLD_FLAG')} = 1 THEN ${qid('QTY')} ELSE 0 END) AS all_futureHoldQty,
+      SUM(CASE WHEN ${qid('HOLD_TYPE')} = 'quality' AND CAST(${qid('HOLD_DAY')} AS DATE) = d.d AND ${qid('RN_FUTURE_REASON')} > 1 THEN ${qid('QTY')} ELSE 0 END) AS repeatQualityHoldQty
     FROM generate_series(DATE ${qs(startDate)}, DATE ${qs(endDate)}, INTERVAL 1 DAY) t(d)
     CROSS JOIN ${TABLE_NAME} f
     GROUP BY d.d
@@ -114,18 +115,21 @@ async function queryTrend(client, startDate, endDate) {
       newHoldQty: sf(row.quality_newHoldQty),
       releaseQty: sf(row.quality_releaseQty),
       futureHoldQty: sf(row.quality_futureHoldQty),
+      repeatQualityHoldQty: sf(row.repeatQualityHoldQty),
     },
     non_quality: {
       holdQty: sf(row.non_quality_holdQty),
       newHoldQty: sf(row.non_quality_newHoldQty),
       releaseQty: sf(row.non_quality_releaseQty),
       futureHoldQty: sf(row.non_quality_futureHoldQty),
+      repeatQualityHoldQty: 0,
     },
     all: {
       holdQty: sf(row.all_holdQty),
       newHoldQty: sf(row.all_newHoldQty),
       releaseQty: sf(row.all_releaseQty),
       futureHoldQty: sf(row.all_futureHoldQty),
+      repeatQualityHoldQty: sf(row.repeatQualityHoldQty),
     },
   }));
   return { days };
@@ -167,9 +171,9 @@ async function queryReasonPareto(client, baseConditions) {
 // ── Duration distribution query ───────────────────────────────────────────────
 
 async function queryDuration(client, baseConditions) {
-  const releaseConditions = [...baseConditions, `${qid('RELEASETXNDATE')} IS NOT NULL`];
-  const where = buildWhere(releaseConditions);
-  const sql = `
+  const bucketConditions = [...baseConditions, `${qid('RELEASETXNDATE')} IS NOT NULL`];
+  const bucketWhere = buildWhere(bucketConditions);
+  const bucketSql = `
     SELECT
       CASE
         WHEN ${qid('HOLD_HOURS')} < 4  THEN '<4h'
@@ -180,12 +184,37 @@ async function queryDuration(client, baseConditions) {
       COUNT(*) AS cnt,
       SUM(COALESCE(${qid('QTY')}, 0)) AS qty
     FROM ${TABLE_NAME}
-    ${where}
+    ${bucketWhere}
     GROUP BY range
   `;
-  const rows = await client.sendQuery(sql);
+
+  const releasedConditions = [...baseConditions, `${qid('RELEASETXNDATE')} IS NOT NULL`];
+  const releasedWhere = buildWhere(releasedConditions);
+  const releasedSql = `
+    SELECT
+      ROUND(AVG(${qid('HOLD_HOURS')}), 2) AS avg_released_hours,
+      ROUND(MAX(${qid('HOLD_HOURS')}), 2) AS max_released_hours
+    FROM ${TABLE_NAME}
+    ${releasedWhere}
+  `;
+
+  const onHoldConditions = [...baseConditions, `${qid('RELEASETXNDATE')} IS NULL`];
+  const onHoldWhere = buildWhere(onHoldConditions);
+  const onHoldSql = `
+    SELECT
+      ROUND(AVG(${qid('HOLD_HOURS')}), 2) AS avg_on_hold_hours,
+      ROUND(MAX(${qid('HOLD_HOURS')}), 2) AS max_on_hold_hours
+    FROM ${TABLE_NAME}
+    ${onHoldWhere}
+  `;
+
+  const [rows, releasedRows, onHoldRows] = await Promise.all([
+    client.sendQuery(bucketSql),
+    client.sendQuery(releasedSql),
+    client.sendQuery(onHoldSql),
+  ]);
+
   const total = rows.reduce((sum, r) => sum + sf(r.qty), 0);
-  // Return in canonical order
   const orderMap = { '<4h': 0, '4-24h': 1, '1-3d': 2, '>3d': 3 };
   rows.sort((a, b) => (orderMap[a.range] ?? 9) - (orderMap[b.range] ?? 9));
   const items = rows.map(row => ({
@@ -194,7 +223,17 @@ async function queryDuration(client, baseConditions) {
     qty: sf(row.qty),
     pct: total > 0 ? Math.round((sf(row.qty) / total * 100) * 100) / 100 : 0,
   }));
-  return { items };
+
+  const rel = releasedRows[0] || {};
+  const oh = onHoldRows[0] || {};
+
+  return {
+    items,
+    avgReleasedHours: Math.round(sf(rel.avg_released_hours) * 100) / 100,
+    avgOnHoldHours: Math.round(sf(oh.avg_on_hold_hours) * 100) / 100,
+    maxReleasedHours: Math.round(sf(rel.max_released_hours) * 100) / 100,
+    maxOnHoldHours: Math.round(sf(oh.max_on_hold_hours) * 100) / 100,
+  };
 }
 
 // ── Paginated list query ──────────────────────────────────────────────────────

@@ -341,3 +341,45 @@ class TestHoldPartialFailure:
         result = cache_svc.execute_primary_query(start_date="2025-01-01", end_date="2025-03-31")
 
         assert "partial_failure" not in result.get("_meta", {})
+
+
+class TestDurationPayloadShape:
+    """Verify duration payload always includes new avgReleasedHours/avgOnHoldHours/maxReleasedHours/maxOnHoldHours keys.
+
+    These are computed from spool data at query time (not stored in spool), so we verify the
+    DuckDB runtime path passes them through apply_view without dropping them.
+    """
+
+    def test_apply_view_preserves_duration_new_fields(self, monkeypatch):
+        """apply_view result containing new duration fields is passed through unchanged."""
+        import mes_dashboard.services.hold_dataset_cache as cache_svc
+        from unittest.mock import MagicMock
+
+        expected_duration = {
+            "items": [{"range": "<4h", "count": 2, "qty": 200, "pct": 100.0}],
+            "avgReleasedHours": 2.5,
+            "avgOnHoldHours": 48.0,
+            "maxReleasedHours": 3.8,
+            "maxOnHoldHours": 200.0,
+        }
+
+        def fake_try_compute(*, query_id, **kwargs):
+            return {
+                "trend": {"days": []},
+                "reason_pareto": {"items": []},
+                "duration": expected_duration,
+                "list": {"items": [], "pagination": {"page": 1, "perPage": 20, "total": 0, "totalPages": 1}},
+            }, {"view_sql_latency_s": 0.01}
+
+        monkeypatch.setattr(
+            "mes_dashboard.services.hold_history_sql_runtime.try_compute_view_from_spool",
+            fake_try_compute,
+        )
+
+        result = cache_svc.apply_view(query_id="test-qid-123", hold_type="quality")
+
+        dur = result["duration"]
+        assert dur["avgReleasedHours"] == 2.5
+        assert dur["avgOnHoldHours"] == 48.0
+        assert dur["maxReleasedHours"] == 3.8
+        assert dur["maxOnHoldHours"] == 200.0

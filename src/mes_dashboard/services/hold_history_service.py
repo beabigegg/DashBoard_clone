@@ -176,6 +176,7 @@ def _empty_trend_metrics() -> Dict[str, int]:
         'newHoldQty': 0,
         'releaseQty': 0,
         'futureHoldQty': 0,
+        'repeatQualityHoldQty': 0,
     }
 
 
@@ -206,6 +207,7 @@ def _normalize_trend_day(payload: Dict[str, Any], fallback_day: Optional[str] = 
             'newHoldQty': _safe_int(section.get('newHoldQty')),
             'releaseQty': _safe_int(section.get('releaseQty')),
             'futureHoldQty': _safe_int(section.get('futureHoldQty')),
+            'repeatQualityHoldQty': _safe_int(section.get('repeatQualityHoldQty')),
         }
 
     return normalized
@@ -238,6 +240,7 @@ def _build_month_trend_from_df(df: pd.DataFrame) -> list[Dict[str, Any]]:
             'newHoldQty': _safe_int(row.get('NEW_HOLD_QTY')),
             'releaseQty': _safe_int(row.get('RELEASE_QTY')),
             'futureHoldQty': _safe_int(row.get('FUTURE_HOLD_QTY')),
+            'repeatQualityHoldQty': _safe_int(row.get('REPEAT_QUALITY_HOLD_QTY')),
         }
 
     return [day_map[key] for key in sorted(day_map)]
@@ -396,16 +399,31 @@ def get_hold_history_duration(
         df = read_sql_df(sql, params)
 
         items: list[Dict[str, Any]] = []
+        avg_released_hours = 0.0
+        avg_on_hold_hours = 0.0
+        max_released_hours = 0.0
+        max_on_hold_hours = 0.0
         if df is not None and not df.empty:
-            for _, row in df.iterrows():
+            for i, (_, row) in enumerate(df.iterrows()):
                 items.append({
                     'range': _clean_text(row.get('RANGE_LABEL')) or '-',
                     'count': _safe_int(row.get('ITEM_COUNT')),
                     'qty': _safe_int(row.get('QTY')),
                     'pct': round(_safe_float(row.get('PCT')), 2),
                 })
+                if i == 0:
+                    avg_released_hours = round(_safe_float(row.get('AVG_RELEASED_HOURS')), 2)
+                    avg_on_hold_hours = round(_safe_float(row.get('AVG_ON_HOLD_HOURS')), 2)
+                    max_released_hours = round(_safe_float(row.get('MAX_RELEASED_HOURS')), 2)
+                    max_on_hold_hours = round(_safe_float(row.get('MAX_ON_HOLD_HOURS')), 2)
 
-        return {'items': items}
+        return {
+            'items': items,
+            'avgReleasedHours': avg_released_hours,
+            'avgOnHoldHours': avg_on_hold_hours,
+            'maxReleasedHours': max_released_hours,
+            'maxOnHoldHours': max_on_hold_hours,
+        }
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
     except Exception as exc:
