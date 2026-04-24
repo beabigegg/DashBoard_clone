@@ -106,10 +106,12 @@ class LoginSessionStore:
         if not hasattr(self._local, 'connection') or self._local.connection is None:
             self._local.connection = sqlite3.connect(
                 self.db_path,
-                timeout=10.0,
+                timeout=30.0,
                 check_same_thread=False,
             )
             self._local.connection.row_factory = sqlite3.Row
+            self._local.connection.execute('PRAGMA journal_mode=WAL')
+            self._local.connection.execute('PRAGMA synchronous=NORMAL')
 
         try:
             yield self._local.connection
