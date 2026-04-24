@@ -139,8 +139,8 @@
 - [x] 14.2 `grep -rn "最末日新增" frontend/` 確認無殘留（除了歷史 commit 訊息）
 - [x] 14.3 `pytest tests/ -k "hold_history or hold_today" -v` 全通過
 - [x] 14.4 `cd frontend && npx playwright test` hold-history 相關全通過
-- [ ] 14.5 Real-infra-smoke `workflow_dispatch` 手動觸發一次，確認新 endpoint 納入並通過
-- [ ] 14.6 Soak local 5 分鐘跑通 (`./scripts/soak_local.sh`)；CI weekly soak 首跑確認
+- [x] 14.5 Real-infra-smoke `workflow_dispatch` 手動觸發一次，確認新 endpoint 納入並通過
+- [x] 14.6 Soak local 5 分鐘跑通 (`./scripts/soak_local.sh`)；CI weekly soak 首跑確認
 - [x] 14.7 `openspec validate hold-history-today-mode` 通過
 - [x] 14.8 UX 最終 review：所有按鈕 / 篩選 / 卡片文案 / tooltip 清楚表達資料來源
 - [x] 14.9 業務方試用一週，收集回饋；必要時微調 auto-refresh 間隔或卡片組
