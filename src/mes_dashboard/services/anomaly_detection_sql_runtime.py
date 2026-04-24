@@ -38,7 +38,6 @@ _NS_HOLD = "anomaly_hold_dataset"
 _NS_RESOURCE = "anomaly_resource_dataset"
 
 _DEFAULT_YIELD_THRESHOLD = 2.0
-_DEFAULT_SPIKE_THRESHOLD = 50.0  # pct_change threshold
 _DEFAULT_HOLD_PERCENTILE = 0.95
 _DEFAULT_DEVIATION_THRESHOLD = 15.0  # OU% points
 
@@ -269,7 +268,7 @@ def detect_yield_anomalies(
 def detect_reject_spikes(
     *,
     query_id: Optional[str] = None,
-    spike_threshold_pct: float = _DEFAULT_SPIKE_THRESHOLD,
+    z_threshold: float = _DEFAULT_YIELD_THRESHOLD,
 ) -> Tuple[Optional[List[Dict[str, Any]]], Dict[str, Any]]:
     """Detect reject quantity spikes via Z-score on reject_dataset spool.
 
@@ -352,7 +351,7 @@ def detect_reject_spikes(
               AND (reject_qty - baseline_qty) / baseline_std > ?
             ORDER BY z_score DESC
         """
-        rows = _fetch_dict_rows(conn, sql, [_DEFAULT_YIELD_THRESHOLD])
+        rows = _fetch_dict_rows(conn, sql, [z_threshold])
         items = [
             {
                 "workcenter_group": str(r.get("workcenter_group") or ""),

@@ -14,7 +14,6 @@ from mes_dashboard.services.anomaly_detection_sql_runtime import (
     SQL_FALLBACK_SPOOL_MISS,
     SQL_FALLBACK_RUNTIME_ERROR,
     _DEFAULT_YIELD_THRESHOLD,
-    _DEFAULT_SPIKE_THRESHOLD,
     _DEFAULT_HOLD_PERCENTILE,
     _DEFAULT_DEVIATION_THRESHOLD,
 )
@@ -84,9 +83,6 @@ class TestThresholdDefaults:
     def test_yield_threshold_is_zscore(self):
         assert isinstance(_DEFAULT_YIELD_THRESHOLD, float)
         assert _DEFAULT_YIELD_THRESHOLD > 0
-
-    def test_spike_threshold_is_percentage(self):
-        assert _DEFAULT_SPIKE_THRESHOLD > 0
 
     def test_hold_percentile_is_between_0_and_1(self):
         assert 0 < _DEFAULT_HOLD_PERCENTILE < 1
