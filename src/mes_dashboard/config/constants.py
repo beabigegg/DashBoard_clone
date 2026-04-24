@@ -77,7 +77,6 @@ CACHE_TTL_HOLD_TODAY = int(             # Hold today snapshot cache: 60 sec (env
 
 # ── Hold Today Snapshot settings ──
 HOLD_TODAY_AUTO_REFRESH_SECONDS = int(_os.getenv('HOLD_TODAY_AUTO_REFRESH_SECONDS', '60'))
-HOLD_TODAY_MAX_SNAPSHOT_ROWS = int(_os.getenv('HOLD_TODAY_MAX_SNAPSHOT_ROWS', '10000'))
 HOLD_TODAY_MODE_ENABLED = _os.getenv('HOLD_TODAY_MODE_ENABLED', 'true').strip().lower() in ('1', 'true', 'yes')
 
 

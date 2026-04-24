@@ -18,7 +18,7 @@ from mes_dashboard.core.database import (
     read_sql_df_slow as read_sql_df,
 )
 from mes_dashboard.core.redis_client import get_key, get_redis_client
-from mes_dashboard.config.constants import CACHE_TTL_HOLD_TODAY, HOLD_TODAY_MAX_SNAPSHOT_ROWS
+from mes_dashboard.config.constants import CACHE_TTL_HOLD_TODAY
 from mes_dashboard.services.filter_cache import get_workcenter_group as _get_wc_group
 from mes_dashboard.sql.filters import CommonFilters
 
@@ -438,8 +438,6 @@ def execute_today_snapshot(
         per_page_eff = 0  # sentinel: return all rows
     else:
         per_page_eff = max(1, min(int(per_page or 50), 200))
-    max_rows = HOLD_TODAY_MAX_SNAPSHOT_ROWS
-
     if not export_mode:
         cache_key = _cache_key(sm, ht, record_type, reason, duration_range, page, per_page_eff)
         cached = _get_cache(cache_key)
@@ -447,18 +445,10 @@ def execute_today_snapshot(
             return cached
 
     sql = _load_today_snapshot_sql() if sm == 'today' else _load_current_snapshot_sql()
-    params = {'max_rows': max_rows + 1}
-    df = read_sql_df(sql, params)
+    df = read_sql_df(sql, {})
 
     if df is None or df.empty:
         df = pd.DataFrame()
-
-    truncated = False
-    total_before_limit = 0
-    if not df.empty and len(df) > max_rows:
-        truncated = True
-        total_before_limit = len(df)
-        df = df.iloc[:max_rows]
 
     if not df.empty and ht != 'all':
         df = df[df['HOLD_TYPE'] == ht]
@@ -473,14 +463,6 @@ def execute_today_snapshot(
     df_filtered = _apply_reason_filter(df_filtered, reason)
     df_filtered = _apply_duration_filter(df_filtered, duration_range)
 
-    meta: Dict[str, Any] = {}
-    if truncated:
-        meta = {
-            'truncated': True,
-            'total_before_limit': total_before_limit,
-            'limit_applied': max_rows,
-        }
-
     result: Dict[str, Any] = {
         'query_id': _make_query_id(sm, ht),
         'snapshot_mode': sm,
@@ -489,8 +471,6 @@ def execute_today_snapshot(
         'duration': _build_duration(df_filtered),
         'list': _build_list(df_filtered, 1 if export_mode else page, per_page_eff),
     }
-    if meta:
-        result['_meta'] = meta
 
     if not export_mode:
         _set_cache(cache_key, result)

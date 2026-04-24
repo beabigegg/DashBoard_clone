@@ -189,21 +189,5 @@ class TestTruncation(unittest.TestCase):
         self.addCleanup(patcher_cache_set.stop)
         self.addCleanup(patcher_wc.stop)
 
-    def test_truncated_when_over_limit(self):
-        import importlib
-        import mes_dashboard.services.hold_today_snapshot_service as svc
-        # Build 5 rows but set max_rows to 2 via constant patch
-        rows = [_make_row(TODAY, None, TODAY, releasetxndate=None, containerid=f'L{i}') for i in range(5)]
-        self.mock_read.return_value = _df(*rows)
-
-        with patch.object(svc, 'HOLD_TODAY_MAX_SNAPSHOT_ROWS', 2):
-            result = svc.execute_today_snapshot(hold_type='quality')
-
-        self.assertIn('_meta', result)
-        self.assertTrue(result['_meta']['truncated'])
-        self.assertGreater(result['_meta']['total_before_limit'], 2)
-        self.assertEqual(result['_meta']['limit_applied'], 2)
-
-
 if __name__ == '__main__':
     unittest.main()

@@ -38,14 +38,12 @@ const todaySnapshotData = ref(null);
 const todayRecordType = ref('on_hold');
 const todayLoading = ref(false);
 const todayError = ref('');
-const todayTruncated = ref(false);
 
 // ── Current-mode state ────────────────────────────────────────────────────────
 const currentSnapshotData = ref(null);
 const currentRecordType = ref('on_hold');
 const currentLoading = ref(false);
 const currentError = ref('');
-const currentTruncated = ref(false);
 
 // ── Range-mode state ──────────────────────────────────────────────────────────
 const queryId = ref('');
@@ -232,7 +230,6 @@ async function executeTodaySnapshot({ silent = false } = {}) {
   if (!silent) {
     todayLoading.value = true;
     todayError.value = '';
-    todayTruncated.value = false;
   }
 
   try {
@@ -249,9 +246,6 @@ async function executeTodaySnapshot({ silent = false } = {}) {
     const resp = await apiPost('/api/hold-history/today-snapshot', body, { timeout: API_TIMEOUT });
     const result = unwrapApiResult(resp, '當日快照取得失敗');
     todaySnapshotData.value = result;
-    if (result._meta?.truncated) {
-      todayTruncated.value = true;
-    }
   } catch (error) {
     if (!silent) {
       todayError.value = error?.message || '當日快照取得失敗';
@@ -270,7 +264,6 @@ async function executeCurrentSnapshot({ silent = false } = {}) {
   if (!silent) {
     currentLoading.value = true;
     currentError.value = '';
-    currentTruncated.value = false;
   }
 
   try {
@@ -287,9 +280,6 @@ async function executeCurrentSnapshot({ silent = false } = {}) {
     const resp = await apiPost('/api/hold-history/today-snapshot', body, { timeout: API_TIMEOUT });
     const result = unwrapApiResult(resp, '現況快照取得失敗');
     currentSnapshotData.value = result;
-    if (result._meta?.truncated) {
-      currentTruncated.value = true;
-    }
   } catch (error) {
     if (!silent) {
       currentError.value = error?.message || '現況快照取得失敗';
@@ -1009,10 +999,6 @@ onMounted(async () => {
     </PageHeader>
 
     <ErrorBanner :message="errorMessage || todayError || currentError" :dismissible="false" />
-
-    <div v-if="todayTruncated || currentTruncated" class="truncation-warning" role="alert">
-      ⚠ 資料量超過上限，僅顯示前 10,000 筆。請縮小篩選條件以取得完整結果。
-    </div>
 
     <FilterBar
       :start-date="orchestrator.committed.startDate"
