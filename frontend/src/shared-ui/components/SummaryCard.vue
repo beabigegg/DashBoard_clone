@@ -57,7 +57,10 @@ const formattedValue = computed(() => {
   const v = props.value
   if (v === null || v === undefined) return '—'
   if (props.format === 'number') {
-    return Number(v).toLocaleString('zh-TW')
+    const n = Number(v)
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}KK`
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`
+    return n.toLocaleString('zh-TW')
   }
   if (props.format === 'percent') {
     return `${Number(v).toFixed(1)}%`
@@ -97,7 +100,7 @@ function handleClick() {
   >
     <div class="summary-card__accent-bar" />
     <div class="summary-card__body">
-      <div class="summary-card__label">
+      <div class="summary-card__label" :title="label">
         {{ label }}
         <span v-if="tooltip" class="summary-card__tooltip-icon" :aria-label="tooltip">?</span>
       </div>
@@ -150,6 +153,9 @@ function handleClick() {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .summary-card__value {

@@ -221,6 +221,7 @@ class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
             duration_range=None,
             page=2,
             per_page=20,
+            export_mode=False,
         )
 
     @patch('mes_dashboard.routes.hold_history_routes.apply_view')
@@ -266,3 +267,129 @@ class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
         self.assertEqual(payload['error']['code'], 'TOO_MANY_REQUESTS')
         self.assertEqual(response.headers.get('Retry-After'), '5')
         mock_view.assert_not_called()
+
+
+class TestHoldHistoryTodaySnapshotRoute(TestHoldHistoryRoutesBase):
+    """Test POST /api/hold-history/today-snapshot endpoint."""
+
+    GOOD_RESULT = {
+        'query_id': 'today_quality_123',
+        'summary': {
+            'onHoldTotalCount': 50,
+            'onHoldTotalQty': 200,
+            'todayNewQty': 10,
+            'todayReleaseQty': 5,
+            'todayFutureHoldQty': 2,
+            'onHoldAvgHours': 24.5,
+            'onHoldMaxHours': 120.0,
+        },
+        'reason_pareto': {'items': []},
+        'duration': {'items': []},
+        'list': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 1}},
+    }
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_today_snapshot')
+    def test_today_snapshot_success_returns_200(self, mock_exec):
+        mock_exec.return_value = self.GOOD_RESULT
+        response = self.client.post('/api/hold-history/today-snapshot', json={})
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        self.assertIn('summary', payload['data'])
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_today_snapshot')
+    def test_today_snapshot_summary_keys_present(self, mock_exec):
+        mock_exec.return_value = self.GOOD_RESULT
+        response = self.client.post('/api/hold-history/today-snapshot', json={})
+        data = json.loads(response.data)['data']
+        expected_keys = {
+            'onHoldTotalCount', 'onHoldTotalQty', 'todayNewQty',
+            'todayReleaseQty', 'todayFutureHoldQty',
+            'onHoldAvgHours', 'onHoldMaxHours',
+        }
+        self.assertTrue(expected_keys.issubset(set(data['summary'].keys())))
+
+    def test_today_snapshot_invalid_record_type_returns_400(self):
+        response = self.client.post(
+            '/api/hold-history/today-snapshot',
+            json={'record_type': 'released'},  # 'released' is range-mode only
+        )
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload['success'])
+
+    def test_today_snapshot_invalid_duration_range_returns_400(self):
+        response = self.client.post(
+            '/api/hold-history/today-snapshot',
+            json={'duration_range': 'invalid-range'},
+        )
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload['success'])
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_today_snapshot')
+    def test_today_snapshot_db_unavailable_returns_503(self, mock_exec):
+        from mes_dashboard.core.database import DatabaseCircuitOpenError
+        mock_exec.side_effect = DatabaseCircuitOpenError('circuit open')
+        response = self.client.post('/api/hold-history/today-snapshot', json={})
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(payload['success'])
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_today_snapshot')
+    def test_today_snapshot_pool_exhausted_returns_503(self, mock_exec):
+        from mes_dashboard.core.database import DatabasePoolExhaustedError
+        mock_exec.side_effect = DatabasePoolExhaustedError('pool exhausted')
+        response = self.client.post('/api/hold-history/today-snapshot', json={})
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(payload['success'])
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_today_snapshot')
+    def test_today_snapshot_runtime_error_returns_503(self, mock_exec):
+        mock_exec.side_effect = RuntimeError('unexpected')
+        response = self.client.post('/api/hold-history/today-snapshot', json={})
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(payload['success'])
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_today_snapshot')
+    def test_today_snapshot_valid_record_types(self, mock_exec):
+        mock_exec.return_value = self.GOOD_RESULT
+        for rt in ['on_hold', 'new', 'release', 'on_hold,new', 'new,release']:
+            response = self.client.post(
+                '/api/hold-history/today-snapshot',
+                json={'record_type': rt},
+            )
+            self.assertEqual(response.status_code, 200, f'record_type={rt!r} should be 200')
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_today_snapshot')
+    def test_today_snapshot_default_hold_type_is_quality(self, mock_exec):
+        mock_exec.return_value = self.GOOD_RESULT
+        self.client.post('/api/hold-history/today-snapshot', json={})
+        call_kwargs = mock_exec.call_args[1]
+        self.assertEqual(call_kwargs['hold_type'], 'quality')
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_today_snapshot')
+    def test_today_snapshot_no_trend_key(self, mock_exec):
+        """Today-snapshot response must NOT include a trend field."""
+        mock_exec.return_value = self.GOOD_RESULT
+        response = self.client.post('/api/hold-history/today-snapshot', json={})
+        data = json.loads(response.data)['data']
+        self.assertNotIn('trend', data)
+
+
+class TestHoldHistoryConfigRoute(TestHoldHistoryRoutesBase):
+    """Test GET /api/hold-history/config endpoint."""
+
+    def test_config_returns_200(self):
+        response = self.client.get('/api/hold-history/config')
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+
+    def test_config_has_feature_flag_keys(self):
+        response = self.client.get('/api/hold-history/config')
+        data = json.loads(response.data)['data']
+        self.assertIn('today_mode_enabled', data)
+        self.assertIn('auto_refresh_seconds', data)
