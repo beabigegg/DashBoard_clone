@@ -2,52 +2,243 @@
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue'
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue'
 
-const FUTURE_HOLD_TOOLTIP =
-  '當下仍標記為 Future Hold 的總量。此指標依 PJMES043 原廠邏輯（同工單同原因的重複 Hold 且有 Future Hold 備註）計算。lot release 後 MES 可能清除備註，導致歷史日期的數值隨時間衰減。若需穩定指標請參考「品質重複觸發」。'
+// ── Range mode tooltips ──────────────────────────────────────────────────────
+const RANGE_FUTURE_HOLD_TOOLTIP =
+  '有標註 FUTURE HOLD 備註的 Hold 總量（PJMES043 原廠邏輯）。lot release 後 MES 可能清除備註，導致歷史數值衰減。'
 
-const REPEAT_QUALITY_TOOLTIP =
-  '同工單同原因的 quality Hold 再次發生總量（基於歷史重複推斷，不依賴 FutureHold 備註，值不會衰減）'
+const RANGE_REPEAT_QUALITY_TOOLTIP =
+  '同 LOT ID 因相同品質原因的重複 HOLD 總量（RN > 1，值不隨時間衰減）'
+
+// ── Today mode tooltips ──────────────────────────────────────────────────────
+const TODAY_ON_HOLD_LOTS_TOOLTIP =
+  '當日-1 07:30 → 當日 07:30 視為當日，班次結束時仍在 Hold 的 LOT 件數'
+
+const TODAY_ON_HOLD_QTY_TOOLTIP =
+  '班次結束時仍在 Hold 的總 QTY'
+
+const TODAY_REPEAT_QUALITY_TOOLTIP =
+  '當日班次內同 LOT ID 相同品質原因的重複 HOLD 總量'
+
+const TODAY_AVG_HOURS_TOOLTIP =
+  '班次結束時仍在 Hold 的 lot 之平均時長，時長計算至 07:30 當日（班次結束點）'
+
+// ── Current mode tooltips ────────────────────────────────────────────────────
+const CURRENT_ON_HOLD_LOTS_TOOLTIP =
+  '目前真實未釋放的所有 LOT 件數（RELEASETXNDATE IS NULL）'
+
+const CURRENT_ON_HOLD_QTY_TOOLTIP =
+  '目前真實未釋放的所有 QTY 加總'
+
+const CURRENT_REPEAT_QUALITY_TOOLTIP =
+  '本班次內同 LOT ID 相同品質原因的重複 HOLD 總量'
+
+const CURRENT_AVG_HOURS_TOOLTIP =
+  '目前仍在 Hold 的 lot 之平均時長，以 SYSDATE 即時計算'
 
 const props = defineProps({
   summary: {
     type: Object,
-    default: () => ({
-      releaseQty: 0,
-      newHoldQty: 0,
-      futureHoldQty: 0,
-      repeatQualityHoldQty: 0,
-      stillOnHoldCount: 0,
-      newHoldSnapshotCount: 0,
-      netChange: 0,
-      avgReleasedHours: 0,
-      avgOnHoldHours: 0,
-      maxReleasedHours: 0,
-      maxOnHoldHours: 0,
-    }),
+    default: () => ({}),
+  },
+  mode: {
+    type: String,
+    default: 'range',
   },
 })
 </script>
 
 <template>
-  <SummaryCardGroup :columns="11">
-    <SummaryCard label="On Hold 數量"        :value="summary.stillOnHoldCount"       format="number"   accent="danger" />
-    <SummaryCard label="最末日新增 Hold"     :value="summary.newHoldSnapshotCount"    format="number"   accent="warning" />
-    <SummaryCard label="累計新增 Hold"       :value="summary.newHoldQty"              format="number"   accent="danger" />
-    <SummaryCard label="累計 Release"        :value="summary.releaseQty"              format="number"   accent="success" />
-    <SummaryCard label="累計 Future Hold"    :value="summary.futureHoldQty"           format="number"   accent="warning" :tooltip="FUTURE_HOLD_TOOLTIP" />
-    <SummaryCard label="品質重複觸發"        :value="summary.repeatQualityHoldQty"    format="number"   accent="danger"  :tooltip="REPEAT_QUALITY_TOOLTIP" />
-    <SummaryCard label="累計淨變動"          :value="summary.netChange"               format="number"   :accent="summary.netChange >= 0 ? 'success' : 'danger'" />
-    <SummaryCard label="已解除平均時長"      :value="summary.avgReleasedHours"        format="duration" accent="neutral">
-      <template #sub>hr</template>
-    </SummaryCard>
-    <SummaryCard label="持續 Hold 平均時長"  :value="summary.avgOnHoldHours"          format="duration" accent="neutral">
-      <template #sub>hr</template>
-    </SummaryCard>
-    <SummaryCard label="已解除最長時長"      :value="summary.maxReleasedHours"        format="duration" accent="neutral">
-      <template #sub>hr</template>
-    </SummaryCard>
-    <SummaryCard label="持續 Hold 最長時長" :value="summary.maxOnHoldHours"          format="duration" accent="neutral">
-      <template #sub>hr</template>
-    </SummaryCard>
-  </SummaryCardGroup>
+  <!-- Range mode: 9-card layout -->
+  <template v-if="mode === 'range'">
+    <SummaryCardGroup :columns="9">
+      <SummaryCard
+        label="累計新增"
+        :value="summary.newHoldQty ?? 0"
+        format="number"
+        accent="danger"
+      />
+      <SummaryCard
+        label="累計 Release"
+        :value="summary.releaseQty ?? 0"
+        format="number"
+        accent="success"
+      />
+      <SummaryCard
+        label="累計 Future Hold"
+        :value="summary.futureHoldQty ?? 0"
+        format="number"
+        accent="warning"
+        :tooltip="RANGE_FUTURE_HOLD_TOOLTIP"
+      />
+      <SummaryCard
+        label="品質重複 HOLD"
+        :value="summary.repeatQualityHoldQty ?? 0"
+        format="number"
+        accent="danger"
+        :tooltip="RANGE_REPEAT_QUALITY_TOOLTIP"
+      />
+      <SummaryCard
+        label="累計淨變動"
+        :value="summary.netChange ?? 0"
+        format="number"
+        :accent="(summary.netChange ?? 0) >= 0 ? 'success' : 'danger'"
+      />
+      <SummaryCard
+        label="RELEASE 平均時長"
+        :value="summary.avgReleasedHours ?? 0"
+        format="duration"
+        accent="neutral"
+      >
+        <template #sub>hr</template>
+      </SummaryCard>
+      <SummaryCard
+        label="ON HOLD 平均時長"
+        :value="summary.avgOnHoldHours ?? 0"
+        format="duration"
+        accent="neutral"
+      >
+        <template #sub>hr</template>
+      </SummaryCard>
+      <SummaryCard
+        label="RELEASE 最長時長"
+        :value="summary.maxReleasedHours ?? 0"
+        format="duration"
+        accent="neutral"
+      >
+        <template #sub>hr</template>
+      </SummaryCard>
+      <SummaryCard
+        label="ON HOLD 最長時長"
+        :value="summary.maxOnHoldHours ?? 0"
+        format="duration"
+        accent="neutral"
+      >
+        <template #sub>hr</template>
+      </SummaryCard>
+    </SummaryCardGroup>
+  </template>
+
+  <!-- Today mode: 8-card layout -->
+  <template v-else-if="mode === 'today'">
+    <SummaryCardGroup :columns="8">
+      <SummaryCard
+        label="ON HOLD (LOTs)"
+        :value="summary.onHoldLots ?? 0"
+        format="number"
+        accent="danger"
+        :tooltip="TODAY_ON_HOLD_LOTS_TOOLTIP"
+      />
+      <SummaryCard
+        label="ON HOLD (QTY)"
+        :value="summary.onHoldQty ?? 0"
+        format="number"
+        accent="danger"
+        :tooltip="TODAY_ON_HOLD_QTY_TOOLTIP"
+      />
+      <SummaryCard
+        label="當日新增"
+        :value="summary.todayNewQty ?? 0"
+        format="number"
+        accent="warning"
+      />
+      <SummaryCard
+        label="當日 Release"
+        :value="summary.todayReleaseQty ?? 0"
+        format="number"
+        accent="success"
+      />
+      <SummaryCard
+        label="當日 Future Hold"
+        :value="summary.todayFutureHoldQty ?? 0"
+        format="number"
+        accent="warning"
+      />
+      <SummaryCard
+        label="品質重複 HOLD"
+        :value="summary.repeatQualityHoldQty ?? 0"
+        format="number"
+        accent="danger"
+        :tooltip="TODAY_REPEAT_QUALITY_TOOLTIP"
+      />
+      <SummaryCard
+        label="ON HOLD 平均時長"
+        :value="summary.onHoldAvgHours ?? 0"
+        format="duration"
+        accent="neutral"
+        :tooltip="TODAY_AVG_HOURS_TOOLTIP"
+      >
+        <template #sub>hr</template>
+      </SummaryCard>
+      <SummaryCard
+        label="ON HOLD 最長時長"
+        :value="summary.onHoldMaxHours ?? 0"
+        format="duration"
+        accent="neutral"
+      >
+        <template #sub>hr</template>
+      </SummaryCard>
+    </SummaryCardGroup>
+  </template>
+
+  <!-- Current mode: 8-card layout -->
+  <template v-else-if="mode === 'current'">
+    <SummaryCardGroup :columns="8">
+      <SummaryCard
+        label="ON HOLD (LOTs)"
+        :value="summary.onHoldLots ?? 0"
+        format="number"
+        accent="danger"
+        :tooltip="CURRENT_ON_HOLD_LOTS_TOOLTIP"
+      />
+      <SummaryCard
+        label="ON HOLD (QTY)"
+        :value="summary.onHoldQty ?? 0"
+        format="number"
+        accent="danger"
+        :tooltip="CURRENT_ON_HOLD_QTY_TOOLTIP"
+      />
+      <SummaryCard
+        label="現況新增"
+        :value="summary.currentNewQty ?? 0"
+        format="number"
+        accent="warning"
+      />
+      <SummaryCard
+        label="現況 Release"
+        :value="summary.currentReleaseQty ?? 0"
+        format="number"
+        accent="success"
+      />
+      <SummaryCard
+        label="現況 Future Hold"
+        :value="summary.currentFutureHoldQty ?? 0"
+        format="number"
+        accent="warning"
+      />
+      <SummaryCard
+        label="品質重複 HOLD"
+        :value="summary.repeatQualityHoldQty ?? 0"
+        format="number"
+        accent="danger"
+        :tooltip="CURRENT_REPEAT_QUALITY_TOOLTIP"
+      />
+      <SummaryCard
+        label="ON HOLD 平均時長"
+        :value="summary.onHoldAvgHours ?? 0"
+        format="duration"
+        accent="neutral"
+        :tooltip="CURRENT_AVG_HOURS_TOOLTIP"
+      >
+        <template #sub>hr</template>
+      </SummaryCard>
+      <SummaryCard
+        label="ON HOLD 最長時長"
+        :value="summary.onHoldMaxHours ?? 0"
+        format="duration"
+        accent="neutral"
+      >
+        <template #sub>hr</template>
+      </SummaryCard>
+    </SummaryCardGroup>
+  </template>
 </template>

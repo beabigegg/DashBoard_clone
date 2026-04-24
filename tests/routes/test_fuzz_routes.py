@@ -205,6 +205,47 @@ def test_hold_history_rejects_malicious_date(payload):
 
 
 # ---------------------------------------------------------------------------
+# Hold History today-snapshot route
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("payload", MALICIOUS_INPUTS)
+def test_hold_today_snapshot_rejects_malicious_hold_type(payload):
+    client = _make_client()
+    r = client.post(
+        "/api/hold-history/today-snapshot",
+        json={"hold_type": payload, "record_type": "on_hold"},
+        content_type="application/json",
+    )
+    assert r.status_code != 500, f"500 on hold_type={payload!r}"
+    body = r.data.decode("utf-8")
+    json.loads(body)  # must be valid JSON
+
+
+@pytest.mark.parametrize("payload", MALICIOUS_INPUTS)
+def test_hold_today_snapshot_rejects_malicious_record_type(payload):
+    client = _make_client()
+    r = client.post(
+        "/api/hold-history/today-snapshot",
+        json={"record_type": payload},
+        content_type="application/json",
+    )
+    assert r.status_code != 500, f"500 on record_type={payload!r}"
+    json.loads(r.data.decode("utf-8"))
+
+
+@pytest.mark.parametrize("payload", MALICIOUS_INPUTS)
+def test_hold_today_snapshot_rejects_malicious_reason(payload):
+    client = _make_client()
+    r = client.post(
+        "/api/hold-history/today-snapshot",
+        json={"reason": payload, "record_type": "on_hold"},
+        content_type="application/json",
+    )
+    assert r.status_code != 500, f"500 on reason={payload!r}"
+    json.loads(r.data.decode("utf-8"))
+
+
+# ---------------------------------------------------------------------------
 # Hold Overview routes
 # ---------------------------------------------------------------------------
 

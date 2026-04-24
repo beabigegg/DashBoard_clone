@@ -119,6 +119,8 @@ _TRAFFIC_ENDPOINTS: Tuple[Tuple[str, str, Dict[str, Any]], ...] = (
     ("POST", "/api/hold-overview/summary", {"json": {}}),
     ("POST", "/api/query-tool/resolve", {"json": {"lot": "SOAK_PROBE"}}),
     ("POST", "/query", {"json": {}}),  # resource_history_bp prefix "/query"
+    # today-snapshot simulates auto-refresh pattern (60s interval in real usage)
+    ("POST", "/api/hold-history/today-snapshot", {"json": {"hold_type": "quality", "record_type": "on_hold"}}),
 )
 
 

@@ -396,6 +396,7 @@ def _collect_redis_namespace_memory(client) -> list:
         ("equipment", f"{key_prefix}:equipment_status:data"),
         ("reject_dataset", f"{key_prefix}:reject_dataset:*"),
         ("hold_dataset", f"{key_prefix}:hold_dataset:*"),
+        ("hold_today", f"{key_prefix}:hold_today:*"),
         ("yield_alert", f"{key_prefix}:yield_alert_dataset:*"),
     ]
 
@@ -466,7 +467,7 @@ def api_performance_detail():
                 # Scan key counts per namespace
                 namespace_prefixes = [
                     "data", "route_cache", "equipment_status",
-                    "reject_dataset", "meta", "lock", "scrap_exclusion",
+                    "reject_dataset", "hold_today", "meta", "lock", "scrap_exclusion",
                 ]
                 namespaces = []
                 for ns in namespace_prefixes:

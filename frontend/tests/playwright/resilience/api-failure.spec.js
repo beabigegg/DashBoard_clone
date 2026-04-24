@@ -156,3 +156,49 @@ test.describe('Hold Overview — network abort (timedout)', () => {
     await waitForErrorFeedback(page);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Hold History today-snapshot — API failure (no white screen)
+// ---------------------------------------------------------------------------
+
+test.describe('Hold History today mode — today-snapshot API 503 (no white screen)', () => {
+  test.beforeEach(async ({ page }) => {
+    // Mock today-snapshot to return 503; primary query returns success
+    await page.route('**/api/hold-history/today-snapshot', (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: { code: 'SERVICE_UNAVAILABLE', message: '服務暫時無法使用' } }),
+      }),
+    );
+    await page.route('**/api/hold-history/config', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { today_mode_enabled: true, auto_refresh_seconds: 60 } }),
+      }),
+    );
+    await loginViaApi(page);
+    await navigateViaSidebar(page, 'hold-history', {});
+  });
+
+  test('page does not white-screen when today-snapshot returns 503', async ({ page }) => {
+    // Navigate to today mode
+    const todayBtn = page.locator('button:has-text("當日")').first();
+    if (await todayBtn.count() > 0) {
+      await todayBtn.click();
+    }
+    await waitForIdleUi(page, 15_000);
+    // Page body should still be visible (no white screen)
+    await expect(page.locator('.hold-history-page')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('error feedback visible after today-snapshot 503', async ({ page }) => {
+    const todayBtn = page.locator('button:has-text("當日")').first();
+    if (await todayBtn.count() > 0) {
+      await todayBtn.click();
+    }
+    await waitForIdleUi(page, 15_000);
+    await waitForErrorFeedback(page);
+  });
+});

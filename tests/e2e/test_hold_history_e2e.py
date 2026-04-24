@@ -235,3 +235,137 @@ class TestHoldHistoryTrendRepeatQualityField:
             assert "repeatQualityHoldQty" in section, \
                 f"trend day section '{section_key}' missing repeatQualityHoldQty"
             assert section["repeatQualityHoldQty"] >= 0
+
+
+# ============================================================
+# Today-mode E2E tests (hold-history-today-mode)
+# ============================================================
+
+_TODAY_SUMMARY_KEYS = {
+    "onHoldTotalCount",
+    "onHoldTotalQty",
+    "todayNewQty",
+    "todayReleaseQty",
+    "todayFutureHoldQty",
+    "onHoldAvgHours",
+    "onHoldMaxHours",
+}
+
+_TODAY_RECORD_TYPES = ["on_hold", "new", "release"]
+
+
+@pytest.mark.e2e
+class TestHoldHistoryConfig:
+    """E2E: GET /api/hold-history/config feature-flag endpoint."""
+
+    def test_config_returns_200(self, api_base_url):
+        resp = requests.get(f"{api_base_url}/hold-history/config", timeout=10)
+        assert resp.status_code == 200
+        payload = resp.json()
+        assert payload["success"] is True
+
+    def test_config_has_today_mode_enabled(self, api_base_url):
+        resp = requests.get(f"{api_base_url}/hold-history/config", timeout=10)
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert "today_mode_enabled" in data
+        assert isinstance(data["today_mode_enabled"], bool)
+
+    def test_config_has_auto_refresh_seconds(self, api_base_url):
+        resp = requests.get(f"{api_base_url}/hold-history/config", timeout=10)
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert "auto_refresh_seconds" in data
+        assert isinstance(data["auto_refresh_seconds"], int)
+        assert data["auto_refresh_seconds"] > 0
+
+
+@pytest.mark.e2e
+class TestHoldHistoryTodaySnapshot:
+    """E2E: POST /api/hold-history/today-snapshot endpoint."""
+
+    def _post_snapshot(self, api_base_url, **kwargs):
+        body = {"hold_type": "quality", "record_type": "on_hold", **kwargs}
+        return requests.post(
+            f"{api_base_url}/hold-history/today-snapshot",
+            json=body,
+            timeout=60,
+        )
+
+    def test_today_snapshot_returns_200_or_503(self, api_base_url):
+        """Endpoint must respond with 200 (data) or 503 (DB unavailable), never 500."""
+        resp = self._post_snapshot(api_base_url)
+        assert resp.status_code in (200, 503), (
+            f"Expected 200 or 503, got {resp.status_code}. "
+            "A 500 indicates an unhandled exception in the route."
+        )
+        payload = resp.json()
+        assert "success" in payload
+
+    def test_today_snapshot_envelope_structure(self, api_base_url):
+        """On 200, response must have success=True and a data dict."""
+        resp = self._post_snapshot(api_base_url)
+        if resp.status_code == 503:
+            pytest.skip("DB unavailable in this environment")
+        assert resp.status_code == 200
+        payload = resp.json()
+        assert payload["success"] is True
+        assert isinstance(payload.get("data"), dict)
+
+    def test_today_snapshot_summary_keys(self, api_base_url):
+        """On 200, summary must contain all 7 expected keys."""
+        resp = self._post_snapshot(api_base_url)
+        if resp.status_code == 503:
+            pytest.skip("DB unavailable in this environment")
+        data = resp.json()["data"]
+        summary = data.get("summary", {})
+        missing = _TODAY_SUMMARY_KEYS - set(summary.keys())
+        assert not missing, f"summary missing keys: {missing}"
+
+    def test_today_snapshot_no_trend_key(self, api_base_url):
+        """today-snapshot must NOT include a 'trend' key (trend is range-only)."""
+        resp = self._post_snapshot(api_base_url)
+        if resp.status_code == 503:
+            pytest.skip("DB unavailable in this environment")
+        data = resp.json()["data"]
+        assert "trend" not in data, "today-snapshot should not expose 'trend'"
+
+    def test_today_snapshot_has_list_and_pareto(self, api_base_url):
+        """On 200, list and reason_pareto dicts must be present."""
+        resp = self._post_snapshot(api_base_url)
+        if resp.status_code == 503:
+            pytest.skip("DB unavailable in this environment")
+        data = resp.json()["data"]
+        assert "list" in data
+        assert "reason_pareto" in data
+
+    def test_today_snapshot_rejects_bad_record_type(self, api_base_url):
+        """Invalid record_type for today mode → 400."""
+        resp = self._post_snapshot(api_base_url, record_type="new_wrong")
+        assert resp.status_code == 400
+        payload = resp.json()
+        assert payload["success"] is False
+
+    def test_today_snapshot_rejects_bad_duration_range(self, api_base_url):
+        """Invalid duration_range → 400."""
+        resp = self._post_snapshot(api_base_url, duration_range="bad")
+        assert resp.status_code == 400
+
+    @pytest.mark.parametrize("record_type", _TODAY_RECORD_TYPES)
+    def test_today_snapshot_all_record_types_accepted(self, api_base_url, record_type):
+        """Each valid record_type returns 200 or 503 (never 400)."""
+        resp = self._post_snapshot(api_base_url, record_type=record_type)
+        assert resp.status_code in (200, 503), (
+            f"record_type={record_type!r} unexpectedly returned {resp.status_code}"
+        )
+
+    def test_today_snapshot_summary_numeric_values(self, api_base_url):
+        """All summary values must be non-negative numbers."""
+        resp = self._post_snapshot(api_base_url)
+        if resp.status_code == 503:
+            pytest.skip("DB unavailable in this environment")
+        summary = resp.json()["data"]["summary"]
+        for key in _TODAY_SUMMARY_KEYS:
+            val = summary.get(key, -1)
+            assert isinstance(val, (int, float)), f"summary.{key} is not a number: {val!r}"
+            assert val >= 0, f"summary.{key} is negative: {val}"

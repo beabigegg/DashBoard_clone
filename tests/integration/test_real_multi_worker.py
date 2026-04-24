@@ -244,3 +244,72 @@ def test_cross_worker_spool_round_trip(gunicorn_workers, temp_spool_dir):
     assert resp_read.get("data", {}).get("rows") == [{"x": 1, "y": 2}], (
         f"Round-trip data mismatch: {resp_read}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Stage 4a dispatched smoke: today-snapshot endpoint (hold-history-today-mode)
+# ---------------------------------------------------------------------------
+
+_TODAY_SUMMARY_REQUIRED_KEYS = {
+    "onHoldTotalCount",
+    "onHoldTotalQty",
+    "todayNewQty",
+    "todayReleaseQty",
+    "todayFutureHoldQty",
+    "onHoldAvgHours",
+    "onHoldMaxHours",
+}
+
+
+@pytest.mark.parametrize("gunicorn_workers", [1], indirect=True)
+def test_today_snapshot_stage4a_smoke(gunicorn_workers):
+    """Stage 4a: POST /api/hold-history/today-snapshot returns 200 with envelope + summary keys.
+
+    Accepts 503 when Oracle is unavailable (CI without a real DB).
+    Never accepts 500 — that indicates an unhandled application error.
+    """
+    assert len(gunicorn_workers) >= 1
+    _, port = gunicorn_workers[0]
+
+    url = f"http://127.0.0.1:{port}/api/hold-history/today-snapshot"
+    body = json.dumps({"hold_type": "quality", "record_type": "on_hold"}).encode()
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            status = resp.status
+            raw = resp.read()
+    except urllib.error.HTTPError as exc:
+        status = exc.code
+        raw = exc.read()
+
+    assert status != 500, (
+        f"today-snapshot returned HTTP 500 — unhandled exception in route. "
+        f"Body: {raw[:300]!r}"
+    )
+    assert status in (200, 503), (
+        f"today-snapshot returned unexpected status {status}. "
+        f"Body: {raw[:300]!r}"
+    )
+
+    payload = json.loads(raw)
+    assert "success" in payload, f"Response missing 'success' field: {payload}"
+
+    if status == 200:
+        assert payload["success"] is True
+        data = payload.get("data", {})
+        assert isinstance(data, dict), f"'data' should be a dict, got {type(data)}"
+        summary = data.get("summary", {})
+        missing = _TODAY_SUMMARY_REQUIRED_KEYS - set(summary.keys())
+        assert not missing, (
+            f"today-snapshot summary missing keys: {missing}. "
+            f"Got keys: {list(summary.keys())}"
+        )
+        assert "trend" not in data, (
+            "today-snapshot must NOT include 'trend' (range-mode only)"
+        )

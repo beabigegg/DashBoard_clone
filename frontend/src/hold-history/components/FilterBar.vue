@@ -14,40 +14,31 @@ const props = defineProps({
     type: String,
     default: 'quality',
   },
+  mode: {
+    type: String,
+    default: 'range',
+  },
+  todayModeEnabled: {
+    type: Boolean,
+    default: true,
+  },
   disabled: {
     type: Boolean,
     default: false,
   },
 });
 
-const emit = defineEmits(['apply', 'hold-type-change']);
+const emit = defineEmits(['apply', 'hold-type-change', 'mode-change']);
 
-// Local date state — changes don't auto-trigger queries
 const localStartDate = ref(props.startDate);
 const localEndDate = ref(props.endDate);
 
-// Sync from parent when props change (URL restore, programmatic set)
-watch(
-  () => props.startDate,
-  (v) => {
-    localStartDate.value = v;
-  },
-);
-watch(
-  () => props.endDate,
-  (v) => {
-    localEndDate.value = v;
-  },
-);
+watch(() => props.startDate, (v) => { localStartDate.value = v; });
+watch(() => props.endDate, (v) => { localEndDate.value = v; });
 
-// Hold type still emits immediately (cache-only refresh, no Oracle query)
 const holdTypeModel = computed({
-  get() {
-    return props.holdType || 'quality';
-  },
-  set(nextValue) {
-    emit('hold-type-change', nextValue || 'quality');
-  },
+  get() { return props.holdType || 'quality'; },
+  set(nextValue) { emit('hold-type-change', nextValue || 'quality'); },
 });
 
 function handleApply() {
@@ -56,31 +47,82 @@ function handleApply() {
     endDate: localEndDate.value,
   });
 }
+
+function setMode(newMode) {
+  if (newMode !== props.mode) {
+    emit('mode-change', newMode);
+  }
+}
 </script>
 
 <template>
   <section class="filter-bar card">
-    <div class="filter-group date-group">
-      <label class="filter-label" for="hold-history-start-date">開始日期</label>
-      <input
-        id="hold-history-start-date"
-        v-model="localStartDate"
-        class="date-input"
-        type="date"
-        :disabled="disabled"
-      />
+    <div v-if="todayModeEnabled" class="filter-group mode-toggle-group">
+      <span class="filter-label">查詢模式</span>
+      <div class="mode-toggle" role="group" aria-label="查詢模式切換">
+        <button
+          type="button"
+          class="mode-btn"
+          :class="{ active: mode === 'range' }"
+          :disabled="disabled"
+          :title="'日期區間：選取日期範圍查看歷史 Hold / Release 事件'"
+          @click="setMode('range')"
+        >
+          日期區間
+        </button>
+        <button
+          type="button"
+          class="mode-btn"
+          :class="{ active: mode === 'today' }"
+          :disabled="disabled"
+          :title="'當日：查看當下所有 On Hold lot 及今日新增 / Release 動態，每 60 秒自動刷新'"
+          @click="setMode('today')"
+        >
+          當日
+        </button>
+        <button
+          type="button"
+          class="mode-btn"
+          :class="{ active: mode === 'current' }"
+          :disabled="disabled"
+          :title="'現況：查看即時 On Hold 狀態及本班次新增/Release 動態，每 60 秒自動刷新'"
+          @click="setMode('current')"
+        >
+          現況
+        </button>
+      </div>
     </div>
 
-    <div class="filter-group date-group">
-      <label class="filter-label" for="hold-history-end-date">結束日期</label>
-      <input
-        id="hold-history-end-date"
-        v-model="localEndDate"
-        class="date-input"
-        type="date"
-        :disabled="disabled"
-      />
-    </div>
+    <template v-if="mode === 'range'">
+      <div class="filter-group date-group">
+        <label class="filter-label" for="hold-history-start-date">開始日期</label>
+        <input
+          id="hold-history-start-date"
+          v-model="localStartDate"
+          class="date-input"
+          type="date"
+          :disabled="disabled"
+        />
+      </div>
+
+      <div class="filter-group date-group">
+        <label class="filter-label" for="hold-history-end-date">結束日期</label>
+        <input
+          id="hold-history-end-date"
+          v-model="localEndDate"
+          class="date-input"
+          type="date"
+          :disabled="disabled"
+        />
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="filter-group date-group date-group--today-placeholder">
+        <span class="filter-label">資料日期</span>
+        <span class="today-date-badge" title="日期由 server SYSDATE 推算（07:30 班別切換）">今日（伺服器時間）</span>
+      </div>
+    </template>
 
     <div class="filter-group hold-type-group">
       <label class="filter-label" for="hold-history-hold-type">Hold Type</label>
@@ -96,7 +138,7 @@ function handleApply() {
       </select>
     </div>
 
-    <div class="filter-group filter-action-group">
+    <div v-if="mode === 'range'" class="filter-group filter-action-group">
       <button
         type="button"
         class="ui-btn ui-btn--primary"

@@ -11,6 +11,11 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime
+
+from mes_dashboard.config.constants import (
+    HOLD_TODAY_AUTO_REFRESH_SECONDS,
+    HOLD_TODAY_MODE_ENABLED,
+)
 from typing import Optional
 
 from flask import Blueprint, current_app, request, send_from_directory
@@ -19,6 +24,7 @@ from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.response import (
     cache_expired_error,
     internal_error,
+    service_unavailable_error,
     success_response,
     validation_error,
 )
@@ -30,6 +36,8 @@ from mes_dashboard.services.hold_dataset_cache import (
     apply_view,
     execute_primary_query,
 )
+from mes_dashboard.services.hold_today_snapshot_service import execute_today_snapshot
+from mes_dashboard.core.database import DatabaseCircuitOpenError, DatabasePoolExhaustedError
 
 logger = logging.getLogger("mes_dashboard.hold_history_routes")
 
@@ -85,6 +93,14 @@ _HOLD_HISTORY_QUERY_RATE_LIMIT = configured_rate_limit(
     max_attempts_env='HOLD_HISTORY_TREND_RATE_LIMIT_MAX_REQUESTS',
     window_seconds_env='HOLD_HISTORY_TREND_RATE_LIMIT_WINDOW_SECONDS',
     default_max_attempts=60,
+    default_window_seconds=60,
+)
+
+_HOLD_TODAY_SNAPSHOT_RATE_LIMIT = configured_rate_limit(
+    bucket='hold-today-snapshot',
+    max_attempts_env='HOLD_TODAY_SNAPSHOT_RATE_LIMIT_MAX_REQUESTS',
+    window_seconds_env='HOLD_TODAY_SNAPSHOT_RATE_LIMIT_WINDOW_SECONDS',
+    default_max_attempts=120,
     default_window_seconds=60,
 )
 
@@ -222,6 +238,7 @@ def api_hold_history_view():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     page = max(page or 1, 1)
+    export_mode = request.args.get('export', '0') == '1'
     per_page = max(1, min(per_page or 50, 200))
 
     try:
@@ -233,6 +250,7 @@ def api_hold_history_view():
             duration_range=raw_duration,
             page=page,
             per_page=per_page,
+            export_mode=export_mode,
         )
     except Exception as exc:
         logger.error("Hold history view failed: %s", exc)
@@ -243,3 +261,90 @@ def api_hold_history_view():
 
     _inject_hold_spool_info(result, query_id)
     return success_response(result)
+
+
+# ============================================================
+# GET /api/hold-history/config — feature flags for frontend
+# ============================================================
+
+
+@hold_history_bp.route('/api/hold-history/config')
+def api_hold_history_config():
+    """Return feature flags and client-side config for Hold History page."""
+    return success_response({
+        'today_mode_enabled': HOLD_TODAY_MODE_ENABLED,
+        'auto_refresh_seconds': HOLD_TODAY_AUTO_REFRESH_SECONDS,
+    })
+
+
+# ============================================================
+# POST /api/hold-history/today-snapshot — today-mode snapshot
+# ============================================================
+
+
+@hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
+@_HOLD_TODAY_SNAPSHOT_RATE_LIMIT
+def api_hold_history_today_snapshot():
+    """Return a snapshot for 當日 or 現況 mode.
+
+    snapshot_mode: 'today' (當日, shift boundary) | 'current' (現況, live)
+    """
+    body = request.get_json(silent=True) or {}
+
+    raw_snapshot_mode = str(body.get('snapshot_mode', 'today') or 'today').strip().lower()
+    if raw_snapshot_mode not in ('today', 'current'):
+        return validation_error(f'Invalid snapshot_mode: {raw_snapshot_mode!r}')
+
+    hold_type = _normalize_hold_type(str(body.get('hold_type', '')))
+
+    raw_record_type = str(body.get('record_type', 'on_hold')).strip()
+    parts = [p.strip().lower() for p in raw_record_type.split(',') if p.strip()]
+    if not parts:
+        parts = ['on_hold']
+    today_valid = {'on_hold', 'new', 'release'}
+    for p in parts:
+        if p not in today_valid:
+            return validation_error(f'Invalid record_type for today mode: {p!r}')
+    record_type = ','.join(parts)
+
+    raw_reason = body.get('reason', '') or ''
+    if not isinstance(raw_reason, str):
+        return validation_error('Invalid reason: must be a string')
+    reason = raw_reason.strip()
+    if '\x00' in reason or len(reason) > 200:
+        return validation_error('Invalid reason value')
+    reason = reason or None
+
+    raw_duration = str(body.get('duration_range', '') or '').strip() or None
+    if raw_duration and raw_duration not in _VALID_DURATION_RANGES:
+        return validation_error('Invalid duration_range')
+
+    try:
+        page = int(body.get('page', 1) or 1)
+        per_page = int(body.get('per_page', 50) or 50)
+    except (TypeError, ValueError):
+        return validation_error('Invalid page or per_page: must be integers')
+    page = max(page, 1)
+    export_mode = bool(body.get('export'))
+    per_page = max(1, min(per_page, 200))
+
+    try:
+        result = execute_today_snapshot(
+            snapshot_mode=raw_snapshot_mode,
+            hold_type=hold_type,
+            record_type=record_type,
+            reason=reason,
+            duration_range=raw_duration,
+            page=page,
+            per_page=per_page,
+            export_mode=export_mode,
+        )
+        return success_response(result)
+    except (DatabaseCircuitOpenError, DatabasePoolExhaustedError) as exc:
+        logger.error("Hold today snapshot DB unavailable: %s", exc)
+        return service_unavailable_error('database_unavailable')
+    except Exception as exc:
+        # Any service-level failure (including Oracle connection errors) is
+        # treated as temporary unavailability, not an application bug.
+        logger.error("Hold today snapshot failed: %s", exc)
+        return service_unavailable_error('database_unavailable')

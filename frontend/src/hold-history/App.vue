@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import { apiGet, apiPost } from '../core/api.js';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
@@ -8,6 +8,7 @@ import { replaceRuntimeHistory } from '../core/shell-navigation.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
 import { useHoldHistoryDuckDB } from './useHoldHistoryDuckDB.js';
+import { useAutoRefresh } from './useAutoRefresh.js';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
@@ -25,11 +26,30 @@ import SummaryCards from './components/SummaryCards.vue';
 const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 20;
 
+// ── Feature flags (loaded from /api/hold-history/config) ─────────────────────
+const todayModeEnabled = ref(true);
+const autoRefreshSeconds = ref(60);
+
+// ── Mode ──────────────────────────────────────────────────────────────────────
+const mode = ref('range'); // 'range' | 'today' | 'current'
+
+// ── Today-mode state ──────────────────────────────────────────────────────────
+const todaySnapshotData = ref(null);
+const todayRecordType = ref('on_hold');
+const todayLoading = ref(false);
+const todayError = ref('');
+const todayTruncated = ref(false);
+
+// ── Current-mode state ────────────────────────────────────────────────────────
+const currentSnapshotData = ref(null);
+const currentRecordType = ref('on_hold');
+const currentLoading = ref(false);
+const currentError = ref('');
+const currentTruncated = ref(false);
+
+// ── Range-mode state ──────────────────────────────────────────────────────────
 const queryId = ref('');
-
-// ── DuckDB local compute (Tasks 4.2–4.4) ─────────────────────────────────────
 const duckdb = useHoldHistoryDuckDB();
-
 const trendData = ref({ days: [] });
 const reasonParetoData = ref({ items: [] });
 const durationData = ref({ items: [] });
@@ -57,10 +77,17 @@ const loading = reactive({
 const errorMessage = ref('');
 const { nextRequestId, isStaleRequest } = useRequestGuard();
 
-// --- useFilterOrchestrator for two-phase query ---
-// Date fields: draft-apply -> executePrimaryQuery
-// holdType: immediate -> refreshView
-// recordType, reasonFilter, durationFilter: immediate -> refreshView
+// ── Auto-refresh (today / current mode) ───────────────────────────────────────
+const autoRefresh = useAutoRefresh({
+  get intervalMs() { return autoRefreshSeconds.value * 1000; },
+  fetchFn: () => {
+    if (mode.value === 'current') return executeCurrentSnapshot({ silent: true });
+    if (mode.value === 'today') return executeTodaySnapshot({ silent: true });
+    return Promise.resolve();
+  },
+});
+
+// ── Filter orchestrator (range mode) ─────────────────────────────────────────
 const orchestrator = useFilterOrchestrator({
   fields: {
     startDate: { trigger: 'draft-apply', initial: '' },
@@ -71,27 +98,25 @@ const orchestrator = useFilterOrchestrator({
     durationFilter: { trigger: 'immediate', initial: '' },
   },
   dependencies: [
-    // holdType change -> clear reason and duration, reset recordType to ['new']
     { when: 'holdType', then: ['reasonFilter', 'durationFilter'], action: 'clear' },
     { when: 'holdType', then: ['recordType'], action: 'reset', value: ['new'] },
-    // recordType change -> clear reason and duration
     { when: 'recordType', then: ['reasonFilter', 'durationFilter'], action: 'clear' },
   ],
   pagination: { resetOn: ['*'] },
   urlSync: { enabled: false },
   onFetch: (_committed) => {
-    // Immediate field changed -> view refresh (supplementary, reads from cache)
     page.value = 1;
     updateUrlState();
     void refreshView();
   },
   onPrimaryQuery: (_committed) => {
-    // Date apply -> primary query
     page.value = 1;
     updateUrlState();
     void executePrimaryQuery();
   },
 });
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toDateString(value) {
   const y = value.getFullYear();
@@ -120,6 +145,15 @@ function parseRecordTypeCsv(value) {
   return parsed.length > 0 ? [...new Set(parsed)] : ['new'];
 }
 
+function parseTodayRecordTypeCsv(value) {
+  const valid = new Set(['on_hold', 'new', 'release']);
+  const parsed = String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => valid.has(item));
+  return parsed.length > 0 ? [...new Set(parsed)] : ['on_hold'];
+}
+
 function setDefaultDateRange() {
   const now = new Date();
   let year = now.getFullYear();
@@ -141,8 +175,6 @@ function setDefaultDateRange() {
   orchestrator.draft.endDate = toDateString(end);
 }
 
-// unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
-
 function normalizeListPayload(payload) {
   const pagination = payload?.pagination || {};
   return {
@@ -159,27 +191,22 @@ function normalizeListPayload(payload) {
 function updateUrlState() {
   const params = new URLSearchParams();
 
-  if (orchestrator.committed.startDate) {
-    params.set('start_date', orchestrator.committed.startDate);
-  }
-  if (orchestrator.committed.endDate) {
-    params.set('end_date', orchestrator.committed.endDate);
-  }
-  if (orchestrator.committed.holdType) {
-    params.set('hold_type', orchestrator.committed.holdType);
-  }
-  const rt = orchestrator.committed.recordType;
-  if (Array.isArray(rt) && rt.length > 0) {
-    params.set('record_type', rt.join(','));
-  }
-  if (orchestrator.committed.reasonFilter) {
-    params.set('reason', orchestrator.committed.reasonFilter);
-  }
-  if (orchestrator.committed.durationFilter) {
-    params.set('duration_range', orchestrator.committed.durationFilter);
-  }
-  if (page.value > 1) {
-    params.set('page', String(page.value));
+  params.set('mode', mode.value);
+
+  if (mode.value === 'range') {
+    if (orchestrator.committed.startDate) params.set('start_date', orchestrator.committed.startDate);
+    if (orchestrator.committed.endDate) params.set('end_date', orchestrator.committed.endDate);
+    if (orchestrator.committed.holdType) params.set('hold_type', orchestrator.committed.holdType);
+    if (orchestrator.committed.reasonFilter) params.set('reason', orchestrator.committed.reasonFilter);
+    if (orchestrator.committed.durationFilter) params.set('duration_range', orchestrator.committed.durationFilter);
+    if (page.value > 1) params.set('page', String(page.value));
+  } else {
+    if (orchestrator.committed.holdType) params.set('hold_type', orchestrator.committed.holdType);
+    const rt = mode.value === 'current' ? currentRecordType.value : todayRecordType.value;
+    if (rt) params.set('record_type', rt);
+    if (orchestrator.committed.reasonFilter) params.set('reason', orchestrator.committed.reasonFilter);
+    if (orchestrator.committed.durationFilter) params.set('duration_range', orchestrator.committed.durationFilter);
+    if (page.value > 1) params.set('page', String(page.value));
   }
 
   replaceRuntimeHistory(`/hold-history?${params.toString()}`);
@@ -199,7 +226,83 @@ function applyViewResult(result, { listOnly = false } = {}) {
   detailData.value = normalizeListPayload(result.list);
 }
 
-// ---- Primary query (POST /query -> Oracle -> cache) ----
+// ── Today mode API ────────────────────────────────────────────────────────────
+
+async function executeTodaySnapshot({ silent = false } = {}) {
+  if (!silent) {
+    todayLoading.value = true;
+    todayError.value = '';
+    todayTruncated.value = false;
+  }
+
+  try {
+    const body = {
+      snapshot_mode: 'today',
+      hold_type: orchestrator.committed.holdType,
+      record_type: todayRecordType.value,
+      page: page.value,
+      per_page: DEFAULT_PER_PAGE,
+    };
+    if (orchestrator.committed.reasonFilter) body.reason = orchestrator.committed.reasonFilter;
+    if (orchestrator.committed.durationFilter) body.duration_range = orchestrator.committed.durationFilter;
+
+    const resp = await apiPost('/api/hold-history/today-snapshot', body, { timeout: API_TIMEOUT });
+    const result = unwrapApiResult(resp, '當日快照取得失敗');
+    todaySnapshotData.value = result;
+    if (result._meta?.truncated) {
+      todayTruncated.value = true;
+    }
+  } catch (error) {
+    if (!silent) {
+      todayError.value = error?.message || '當日快照取得失敗';
+    }
+    throw error;
+  } finally {
+    if (!silent) {
+      todayLoading.value = false;
+    }
+  }
+}
+
+// ── Current mode API ──────────────────────────────────────────────────────────
+
+async function executeCurrentSnapshot({ silent = false } = {}) {
+  if (!silent) {
+    currentLoading.value = true;
+    currentError.value = '';
+    currentTruncated.value = false;
+  }
+
+  try {
+    const body = {
+      snapshot_mode: 'current',
+      hold_type: orchestrator.committed.holdType || 'quality',
+      record_type: currentRecordType.value,
+      page: page.value,
+      per_page: DEFAULT_PER_PAGE,
+    };
+    if (orchestrator.committed.reasonFilter) body.reason = orchestrator.committed.reasonFilter;
+    if (orchestrator.committed.durationFilter) body.duration_range = orchestrator.committed.durationFilter;
+
+    const resp = await apiPost('/api/hold-history/today-snapshot', body, { timeout: API_TIMEOUT });
+    const result = unwrapApiResult(resp, '現況快照取得失敗');
+    currentSnapshotData.value = result;
+    if (result._meta?.truncated) {
+      currentTruncated.value = true;
+    }
+  } catch (error) {
+    if (!silent) {
+      currentError.value = error?.message || '現況快照取得失敗';
+    }
+    throw error;
+  } finally {
+    if (!silent) {
+      currentLoading.value = false;
+    }
+  }
+}
+
+// ── Range mode API ────────────────────────────────────────────────────────────
 
 async function executePrimaryQuery({ showOverlay = false } = {}) {
   const requestId = nextRequestId();
@@ -214,7 +317,6 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
   errorMessage.value = '';
   refreshError.value = false;
 
-  // Discard any previous local-compute state before evaluating new response (Task 4.4)
   duckdb.deactivate();
 
   try {
@@ -234,7 +336,6 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
     applyViewResult(result);
     updateUrlState();
 
-    // Attempt to activate local compute (Task 4.2)
     const { eligible } = checkLocalComputeEligibility({
       spoolDownloadUrl: result.spool_download_url,
       totalRowCount: result.total_row_count,
@@ -243,7 +344,7 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
       try {
         await duckdb.activate(result.spool_download_url, result.workcenter_mapping || {});
       } catch (_) {
-        // Activation failed — remain in server-view mode (Task 4.3)
+        // Activation failed — remain in server-view mode
       }
     }
 
@@ -266,8 +367,6 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
   }
 }
 
-// ---- View refresh (GET /view -> read cache -> filter) ----
-
 async function refreshView({ listOnly = false } = {}) {
   if (!queryId.value) return;
 
@@ -279,7 +378,6 @@ async function refreshView({ listOnly = false } = {}) {
   errorMessage.value = '';
 
   try {
-    // Task 4.2: Use local compute when active; skip /view request
     if (duckdb.isActive.value) {
       try {
         const result = await duckdb.computeView({
@@ -297,13 +395,11 @@ async function refreshView({ listOnly = false } = {}) {
         applyViewResult(result, { listOnly });
         return;
       } catch (localErr) {
-        // Task 4.3: Local compute failed — fall through to server /view
         console.warn('[hold-history] Local compute error, falling back to server:', localErr);
         duckdb.deactivate();
       }
     }
 
-    // Server-side /view fallback (Task 4.3)
     const params = {
       query_id: queryId.value,
       hold_type: orchestrator.committed.holdType,
@@ -312,20 +408,12 @@ async function refreshView({ listOnly = false } = {}) {
       per_page: DEFAULT_PER_PAGE,
     };
 
-    if (orchestrator.committed.reasonFilter) {
-      params.reason = orchestrator.committed.reasonFilter;
-    }
-    if (orchestrator.committed.durationFilter) {
-      params.duration_range = orchestrator.committed.durationFilter;
-    }
+    if (orchestrator.committed.reasonFilter) params.reason = orchestrator.committed.reasonFilter;
+    if (orchestrator.committed.durationFilter) params.duration_range = orchestrator.committed.durationFilter;
 
-    const resp = await apiGet('/api/hold-history/view', {
-      params,
-      timeout: API_TIMEOUT,
-    });
+    const resp = await apiGet('/api/hold-history/view', { params, timeout: API_TIMEOUT });
     if (isStaleRequest(requestId)) return;
 
-    // Cache expired -> auto re-execute primary query (Task 4.3)
     if (resp?.success === false && resp?.error === 'cache_expired') {
       duckdb.deactivate();
       await executePrimaryQuery();
@@ -344,8 +432,6 @@ async function refreshView({ listOnly = false } = {}) {
   }
 }
 
-// ---- Pagination-only refresh (preserves scroll position) ----
-
 async function refreshViewPage() {
   if (!queryId.value) return;
 
@@ -354,7 +440,6 @@ async function refreshViewPage() {
   errorMessage.value = '';
 
   try {
-    // Task 4.4: Use local compute pagination when active (list-only, no chart refresh)
     if (duckdb.isActive.value) {
       try {
         const result = await duckdb.computeView({
@@ -377,7 +462,6 @@ async function refreshViewPage() {
       }
     }
 
-    // Server-side fallback (Task 4.3)
     const params = {
       query_id: queryId.value,
       hold_type: orchestrator.committed.holdType,
@@ -386,17 +470,10 @@ async function refreshViewPage() {
       per_page: DEFAULT_PER_PAGE,
     };
 
-    if (orchestrator.committed.reasonFilter) {
-      params.reason = orchestrator.committed.reasonFilter;
-    }
-    if (orchestrator.committed.durationFilter) {
-      params.duration_range = orchestrator.committed.durationFilter;
-    }
+    if (orchestrator.committed.reasonFilter) params.reason = orchestrator.committed.reasonFilter;
+    if (orchestrator.committed.durationFilter) params.duration_range = orchestrator.committed.durationFilter;
 
-    const resp = await apiGet('/api/hold-history/view', {
-      params,
-      timeout: API_TIMEOUT,
-    });
+    const resp = await apiGet('/api/hold-history/view', { params, timeout: API_TIMEOUT });
     if (isStaleRequest(requestId)) return;
 
     const result = unwrapApiResult(resp, '視圖查詢失敗');
@@ -416,7 +493,60 @@ async function refreshViewPage() {
   }
 }
 
-// ---- Computed ----
+// ── Mode switch ───────────────────────────────────────────────────────────────
+
+function handleModeChange(newMode) {
+  if (newMode === mode.value) return;
+
+  autoRefresh.stop();
+
+  if (newMode === 'today') {
+    // Switch to today: clear date params, reset todayRecordType
+    todayRecordType.value = 'on_hold';
+    orchestrator.committed.reasonFilter = '';
+    orchestrator.draft.reasonFilter = '';
+    orchestrator.committed.durationFilter = '';
+    orchestrator.draft.durationFilter = '';
+    page.value = 1;
+    mode.value = 'today';
+    todaySnapshotData.value = null;
+    updateUrlState();
+    void executeTodaySnapshot().then(() => {
+      autoRefresh.start();
+    });
+  } else if (newMode === 'current') {
+    // Switch to current: reset currentRecordType, clear filters
+    currentRecordType.value = 'on_hold';
+    orchestrator.committed.reasonFilter = '';
+    orchestrator.draft.reasonFilter = '';
+    orchestrator.committed.durationFilter = '';
+    orchestrator.draft.durationFilter = '';
+    page.value = 1;
+    mode.value = 'current';
+    currentSnapshotData.value = null;
+    updateUrlState();
+    void executeCurrentSnapshot().then(() => {
+      autoRefresh.start();
+    });
+  } else {
+    // Switch to range: restore default date range, clear record_type from URL
+    mode.value = 'range';
+    orchestrator.committed.recordType = ['new'];
+    orchestrator.draft.recordType = ['new'];
+    orchestrator.committed.reasonFilter = '';
+    orchestrator.draft.reasonFilter = '';
+    orchestrator.committed.durationFilter = '';
+    orchestrator.draft.durationFilter = '';
+    page.value = 1;
+    if (!orchestrator.committed.startDate || !orchestrator.committed.endDate) {
+      setDefaultDateRange();
+    }
+    updateUrlState();
+    void executePrimaryQuery({ showOverlay: true });
+  }
+}
+
+// ── Computed ──────────────────────────────────────────────────────────────────
 
 const trendTypeKey = computed(() => (orchestrator.committed.holdType === 'non-quality' ? 'non_quality' : orchestrator.committed.holdType));
 
@@ -436,6 +566,13 @@ const selectedTrendDays = computed(() => {
 });
 
 const summary = computed(() => {
+  if (mode.value === 'today') {
+    return todaySnapshotData.value?.summary || {};
+  }
+  if (mode.value === 'current') {
+    return currentSnapshotData.value?.summary || {};
+  }
+
   const days = selectedTrendDays.value;
 
   const releaseQty = days.reduce((total, item) => total + Number(item.releaseQty || 0), 0);
@@ -448,7 +585,6 @@ const summary = computed(() => {
   const pastDays = days.filter((d) => d.date <= today);
   const lastDay = pastDays.length > 0 ? pastDays[pastDays.length - 1] : {};
   const stillOnHoldCount = Number(lastDay.holdQty || 0);
-  const newHoldSnapshotCount = Number(lastDay.newHoldQty || 0);
 
   const dur = durationData.value || {};
 
@@ -458,7 +594,6 @@ const summary = computed(() => {
     futureHoldQty,
     repeatQualityHoldQty,
     stillOnHoldCount,
-    newHoldSnapshotCount,
     netChange,
     avgReleasedHours: Number(dur.avgReleasedHours || 0),
     avgOnHoldHours: Number(dur.avgOnHoldHours || 0),
@@ -467,111 +602,297 @@ const summary = computed(() => {
   };
 });
 
+const activeReasonParetoItems = computed(() => {
+  if (mode.value === 'today') {
+    return todaySnapshotData.value?.reason_pareto?.items || [];
+  }
+  if (mode.value === 'current') {
+    return currentSnapshotData.value?.reason_pareto?.items || [];
+  }
+  return reasonParetoData.value?.items || [];
+});
+
+const activeDurationData = computed(() => {
+  if (mode.value === 'today') {
+    return todaySnapshotData.value?.duration || { items: [] };
+  }
+  if (mode.value === 'current') {
+    return currentSnapshotData.value?.duration || { items: [] };
+  }
+  return durationData.value || { items: [] };
+});
+
+const activeDetailData = computed(() => {
+  if (mode.value === 'today') {
+    return normalizeListPayload(todaySnapshotData.value?.list);
+  }
+  if (mode.value === 'current') {
+    return normalizeListPayload(currentSnapshotData.value?.list);
+  }
+  return detailData.value;
+});
+
+const activeLoading = computed(() => {
+  if (mode.value === 'today') return todayLoading.value;
+  if (mode.value === 'current') return currentLoading.value;
+  return loading.list;
+});
+
+const activeGlobalLoading = computed(() => {
+  if (mode.value === 'today') return todayLoading.value;
+  if (mode.value === 'current') return currentLoading.value;
+  return loading.global;
+});
+
+const todayEmptyState = computed(() => {
+  if (mode.value !== 'today') return false;
+  if (todayLoading.value) return false;
+  return (todaySnapshotData.value?.list?.items?.length ?? 0) === 0;
+});
+
+const currentEmptyState = computed(() => {
+  if (mode.value !== 'current') return false;
+  if (currentLoading.value) return false;
+  return (currentSnapshotData.value?.list?.items?.length ?? 0) === 0;
+});
+
 const holdTypeLabel = computed(() => {
-  if (orchestrator.committed.holdType === 'non-quality') {
-    return '非品質異常';
-  }
-  if (orchestrator.committed.holdType === 'all') {
-    return '全部';
-  }
+  if (orchestrator.committed.holdType === 'non-quality') return '非品質異常';
+  if (orchestrator.committed.holdType === 'all') return '全部';
   return '品質異常';
 });
 
-// Provide a local computed ref for RecordTypeFilter v-model
+const staleLabel = computed(() => {
+  if (!autoRefresh.isStale.value) return '';
+  if (mode.value !== 'today' && mode.value !== 'current') return '';
+  if (!autoRefresh.lastRefreshAt.value) return '⚠ 自動更新已暫停';
+  const diff = Math.round((Date.now() - autoRefresh.lastRefreshAt.value.getTime()) / 1000);
+  return `⚠ 資料可能過期（${diff}s 前更新）`;
+});
+
 const recordTypeModel = computed({
-  get: () => orchestrator.committed.recordType,
+  get: () => {
+    if (mode.value === 'today') return todayRecordType.value;
+    if (mode.value === 'current') return currentRecordType.value;
+    return orchestrator.committed.recordType;
+  },
   set: (val) => {
-    orchestrator.updateField('recordType', val);
+    if (mode.value === 'today') {
+      todayRecordType.value = val;
+    } else if (mode.value === 'current') {
+      currentRecordType.value = val;
+    } else {
+      orchestrator.updateField('recordType', val);
+    }
   },
 });
 
-// ---- Event handlers ----
+// ── Event handlers ────────────────────────────────────────────────────────────
 
 function handleApply(next) {
   const nextStartDate = next?.startDate || '';
   const nextEndDate = next?.endDate || '';
-
-  // Update date drafts and apply
   orchestrator.draft.startDate = nextStartDate;
   orchestrator.draft.endDate = nextEndDate;
-  // Reset supplementary filters before apply
   orchestrator.committed.reasonFilter = '';
   orchestrator.draft.reasonFilter = '';
   orchestrator.committed.durationFilter = '';
   orchestrator.draft.durationFilter = '';
   orchestrator.committed.recordType = ['new'];
   orchestrator.draft.recordType = ['new'];
-
   orchestrator.applyDraft();
 }
 
 function handleHoldTypeChange(nextHoldType) {
   const holdType = nextHoldType || 'quality';
   if (orchestrator.committed.holdType === holdType) return;
-
   orchestrator.updateField('holdType', holdType);
+  if (mode.value === 'today') {
+    page.value = 1;
+    updateUrlState();
+    void executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    page.value = 1;
+    updateUrlState();
+    void executeCurrentSnapshot();
+  }
 }
 
 function handleRecordTypeChange() {
-  // recordType is already updated via v-model computed setter
-  // Dependencies (clear reason/duration) are handled by orchestrator
-  // onFetch triggers refreshView
+  if (mode.value === 'today') {
+    page.value = 1;
+    updateUrlState();
+    void executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    page.value = 1;
+    updateUrlState();
+    void executeCurrentSnapshot();
+  }
 }
 
 function handleReasonToggle(reason) {
   const nextReason = String(reason || '').trim();
-  if (!nextReason) {
-    return;
-  }
-
+  if (!nextReason) return;
   const current = orchestrator.committed.reasonFilter;
   orchestrator.updateField('reasonFilter', current === nextReason ? '' : nextReason);
+  if (mode.value === 'today') {
+    page.value = 1;
+    updateUrlState();
+    void executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    page.value = 1;
+    updateUrlState();
+    void executeCurrentSnapshot();
+  }
 }
 
 function clearReasonFilter() {
-  if (!orchestrator.committed.reasonFilter) {
-    return;
-  }
+  if (!orchestrator.committed.reasonFilter) return;
   orchestrator.updateField('reasonFilter', '');
+  if (mode.value === 'today') {
+    page.value = 1;
+    updateUrlState();
+    void executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    page.value = 1;
+    updateUrlState();
+    void executeCurrentSnapshot();
+  }
 }
 
 function handleDurationToggle(range) {
   const nextRange = String(range || '').trim();
-  if (!nextRange) {
-    return;
-  }
-
+  if (!nextRange) return;
   const current = orchestrator.committed.durationFilter;
   orchestrator.updateField('durationFilter', current === nextRange ? '' : nextRange);
+  if (mode.value === 'today') {
+    page.value = 1;
+    updateUrlState();
+    void executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    page.value = 1;
+    updateUrlState();
+    void executeCurrentSnapshot();
+  }
 }
 
 function clearDurationFilter() {
-  if (!orchestrator.committed.durationFilter) {
-    return;
-  }
+  if (!orchestrator.committed.durationFilter) return;
   orchestrator.updateField('durationFilter', '');
+  if (mode.value === 'today') {
+    page.value = 1;
+    updateUrlState();
+    void executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    page.value = 1;
+    updateUrlState();
+    void executeCurrentSnapshot();
+  }
 }
 
 function prevPage() {
-  if (paginationLoading.value || page.value <= 1) {
-    return;
-  }
+  if (paginationLoading.value || page.value <= 1) return;
   page.value -= 1;
   updateUrlState();
-  void refreshViewPage();
+  if (mode.value === 'today') {
+    void executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    void executeCurrentSnapshot();
+  } else {
+    void refreshViewPage();
+  }
 }
 
 function nextPage() {
-  if (paginationLoading.value) {
-    return;
-  }
-  const totalPages = Number(detailData.value?.pagination?.totalPages || 1);
-  if (page.value >= totalPages) {
-    return;
-  }
+  if (paginationLoading.value) return;
+  const totalPages = Number(activeDetailData.value?.pagination?.totalPages || 1);
+  if (page.value >= totalPages) return;
   page.value += 1;
   updateUrlState();
-  void refreshViewPage();
+  if (mode.value === 'today') {
+    void executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    void executeCurrentSnapshot();
+  } else {
+    void refreshViewPage();
+  }
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+
+const exportLoading = ref(false);
+
+function _toCsvField(value) {
+  const s = String(value ?? '');
+  return s.includes(',') || s.includes('"') || s.includes('\n')
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+}
+
+function _buildCsv(items) {
+  const headers = [
+    'Lot ID', 'WorkOrder', 'Product', '站別', 'Hold Reason',
+    '數量', 'Hold 時間', 'Hold 人員', 'Hold Comment',
+    'Release 時間', 'Release 人員', 'Release Comment',
+    '時長(hr)', 'NCR', 'Future Hold Comment',
+  ];
+  const rows = items.map((r) => [
+    r.lotId, r.workorder, r.product, r.workcenter, r.holdReason,
+    r.qty, r.holdDate, r.holdEmp, r.holdComment,
+    r.releaseDate, r.releaseEmp, r.releaseComment,
+    r.holdHours, r.ncr, r.futureHoldComment,
+  ].map(_toCsvField).join(','));
+  return [headers.join(','), ...rows].join('\n');
+}
+
+function _downloadCsv(content, filename) {
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function handleExport() {
+  if (exportLoading.value) return;
+  exportLoading.value = true;
+  try {
+    let items = [];
+
+    if (mode.value === 'today' || mode.value === 'current') {
+      const body = {
+        snapshot_mode: mode.value === 'current' ? 'current' : 'today',
+        hold_type: orchestrator.committed.holdType,
+        record_type: mode.value === 'current' ? currentRecordType.value : todayRecordType.value,
+        export: true,
+      };
+      const resp = await apiPost('/api/hold-history/today-snapshot', body, { timeout: API_TIMEOUT });
+      const result = unwrapApiResult(resp, '匯出失敗');
+      items = result?.list?.items || [];
+    } else {
+      const params = {
+        query_id: queryId.value,
+        hold_type: orchestrator.committed.holdType,
+        record_type: recordTypeCsv(),
+        export: 1,
+      };
+      const resp = await apiGet('/api/hold-history/view', { params, timeout: API_TIMEOUT });
+      const result = unwrapApiResult(resp, '匯出失敗');
+      items = result?.list?.items || [];
+    }
+
+    if (!items.length) return;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    _downloadCsv(_buildCsv(items), `hold-history-${dateStr}.csv`);
+  } catch (err) {
+    console.error('[hold-history] CSV export failed:', err);
+  } finally {
+    exportLoading.value = false;
+  }
 }
 
 async function manualRefresh() {
@@ -581,10 +902,47 @@ async function manualRefresh() {
   orchestrator.committed.durationFilter = '';
   orchestrator.draft.durationFilter = '';
   updateUrlState();
-  await executePrimaryQuery();
+  if (mode.value === 'today') {
+    await executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    await executeCurrentSnapshot();
+  } else {
+    await executePrimaryQuery();
+  }
 }
 
-onMounted(() => {
+// ── Watch todayRecordType / currentRecordType (update URL only; actual fetch triggered by handler) ─
+watch(todayRecordType, () => {
+  if (mode.value === 'today') updateUrlState();
+});
+
+watch(currentRecordType, () => {
+  if (mode.value === 'current') updateUrlState();
+});
+
+// ── Mount ─────────────────────────────────────────────────────────────────────
+
+onMounted(async () => {
+  // Load feature flags
+  try {
+    const resp = await apiGet('/api/hold-history/config');
+    if (resp?.data) {
+      todayModeEnabled.value = resp.data.today_mode_enabled !== false;
+      if (resp.data.auto_refresh_seconds) {
+        autoRefreshSeconds.value = Number(resp.data.auto_refresh_seconds) || 60;
+      }
+    }
+  } catch {
+    // default values already set
+  }
+
+  // Read URL params
+  const urlMode = getUrlParam('mode');
+  const initMode = (urlMode === 'today' && todayModeEnabled.value) ? 'today'
+                 : (urlMode === 'current' && todayModeEnabled.value) ? 'current'
+                 : 'range';
+  mode.value = initMode;
+
   const startDate = getUrlParam('start_date');
   const endDate = getUrlParam('end_date');
   if (startDate && endDate) {
@@ -595,6 +953,7 @@ onMounted(() => {
   } else {
     setDefaultDateRange();
   }
+
   const initHoldType = normalizeHoldType(getUrlParam('hold_type'));
   orchestrator.committed.holdType = initHoldType;
   orchestrator.draft.holdType = initHoldType;
@@ -607,16 +966,32 @@ onMounted(() => {
   orchestrator.committed.durationFilter = initDuration;
   orchestrator.draft.durationFilter = initDuration;
 
-  const initRecordType = parseRecordTypeCsv(getUrlParam('record_type'));
-  orchestrator.committed.recordType = initRecordType;
-  orchestrator.draft.recordType = initRecordType;
-
   const parsedPage = Number.parseInt(getUrlParam('page'), 10);
   if (Number.isFinite(parsedPage) && parsedPage > 0) {
     page.value = parsedPage;
   }
-  updateUrlState();
-  void executePrimaryQuery({ showOverlay: true });
+
+  if (initMode === 'today') {
+    const initTodayRt = parseTodayRecordTypeCsv(getUrlParam('record_type'));
+    todayRecordType.value = Array.isArray(initTodayRt) ? (initTodayRt[0] || 'on_hold') : (initTodayRt || 'on_hold');
+    updateUrlState();
+    await executeTodaySnapshot({ showOverlay: false });
+    initialLoading.value = false;
+    autoRefresh.start();
+  } else if (initMode === 'current') {
+    const initCurrentRt = parseTodayRecordTypeCsv(getUrlParam('record_type'));
+    currentRecordType.value = Array.isArray(initCurrentRt) ? (initCurrentRt[0] || 'on_hold') : (initCurrentRt || 'on_hold');
+    updateUrlState();
+    await executeCurrentSnapshot({ showOverlay: false });
+    initialLoading.value = false;
+    autoRefresh.start();
+  } else {
+    const initRecordType = parseRecordTypeCsv(getUrlParam('record_type'));
+    orchestrator.committed.recordType = initRecordType;
+    orchestrator.draft.recordType = initRecordType;
+    updateUrlState();
+    void executePrimaryQuery({ showOverlay: true });
+  }
 });
 </script>
 
@@ -629,38 +1004,48 @@ onMounted(() => {
       <template #header-left />
       <template #header-left-after>
         <span class="hold-type-badge">{{ holdTypeLabel }}</span>
+        <span v-if="staleLabel" class="stale-indicator" aria-live="polite">{{ staleLabel }}</span>
       </template>
     </PageHeader>
 
-    <ErrorBanner :message="errorMessage" :dismissible="false" />
+    <ErrorBanner :message="errorMessage || todayError || currentError" :dismissible="false" />
+
+    <div v-if="todayTruncated || currentTruncated" class="truncation-warning" role="alert">
+      ⚠ 資料量超過上限，僅顯示前 10,000 筆。請縮小篩選條件以取得完整結果。
+    </div>
 
     <FilterBar
       :start-date="orchestrator.committed.startDate"
       :end-date="orchestrator.committed.endDate"
       :hold-type="orchestrator.committed.holdType"
-      :disabled="loading.global"
+      :mode="mode"
+      :today-mode-enabled="todayModeEnabled"
+      :disabled="activeGlobalLoading"
       @apply="handleApply"
       @hold-type-change="handleHoldTypeChange"
+      @mode-change="handleModeChange"
     />
 
-    <SummaryCards :summary="summary" />
+    <SummaryCards :summary="summary" :mode="mode" />
 
-    <DailyTrend :days="selectedTrendDays" />
+    <!-- DailyTrend hidden in today mode -->
+    <DailyTrend v-if="mode === 'range'" :days="selectedTrendDays" />
 
     <RecordTypeFilter
       v-model="recordTypeModel"
-      :disabled="loading.global"
+      :mode="mode"
+      :disabled="activeGlobalLoading"
       @update:model-value="handleRecordTypeChange"
     />
 
     <section class="hold-history-chart-grid">
       <ReasonPareto
-        :items="reasonParetoData.items || []"
+        :items="activeReasonParetoItems"
         :active-reason="orchestrator.committed.reasonFilter"
         @toggle="handleReasonToggle"
       />
       <DurationChart
-        :items="durationData.items || []"
+        :items="activeDurationData.items || []"
         :active-range="orchestrator.committed.durationFilter"
         @toggle="handleDurationToggle"
       />
@@ -673,15 +1058,26 @@ onMounted(() => {
       @clear-duration="clearDurationFilter"
     />
 
-    <div class="ui-table-wrap">
+    <EmptyState
+      v-if="todayEmptyState"
+      message="今日無符合條件的 lot"
+    />
+    <EmptyState
+      v-else-if="currentEmptyState"
+      message="現況無符合條件的 lot"
+    />
+
+    <div v-else class="ui-table-wrap">
       <DetailTable
-        :items="detailData.items || []"
-        :pagination="detailData.pagination"
-        :loading="loading.list"
+        :items="activeDetailData.items || []"
+        :pagination="activeDetailData.pagination"
+        :loading="activeLoading"
         :paginating="paginationLoading"
-        :error-message="errorMessage"
+        :exporting="exportLoading"
+        :error-message="errorMessage || todayError || currentError"
         @prev-page="prevPage"
         @next-page="nextPage"
+        @export="handleExport"
       />
     </div>
   </div>

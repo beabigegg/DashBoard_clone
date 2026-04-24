@@ -133,10 +133,11 @@
   gap: 12px;
 }
 
-.hold-history-summary-row {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
+/*
+ * Grid columns are controlled by SummaryCardGroup's :columns prop (inline style).
+ * Range mode uses 9 columns, today/current mode uses 8. We only keep
+ * container-query rules here so the card labels/values stay responsive.
+ */
 .hold-history-summary-row .summary-card {
   container-type: inline-size;
 }
@@ -252,27 +253,13 @@
   pointer-events: none;
 }
 
-@media (max-width: 1440px) {
-  .hold-history-summary-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 1080px) {
   .hold-history-chart-grid {
     grid-template-columns: 1fr;
   }
-
-  .hold-history-summary-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 760px) {
-  .hold-history-summary-row {
-    grid-template-columns: 1fr;
-  }
-
   .filter-bar {
     padding: theme('spacing.token.p14') theme('spacing.token.p16');
   }
@@ -284,4 +271,84 @@
   .hold-history-page .header h1 {
     font-size: 20px;
   }
+}
+
+/* ── Mode toggle ── */
+.theme-hold-history .mode-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-hold-history .mode-toggle {
+  display: flex;
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: theme('borderRadius.card');
+  overflow: hidden;
+}
+
+.theme-hold-history .mode-btn {
+  padding: 4px 14px;
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: theme('colors.text.secondary');
+  transition: background 0.15s, color 0.15s;
+}
+
+.theme-hold-history .mode-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.theme-hold-history .mode-btn.active {
+  background: theme('colors.accent.500');
+  color: #fff;
+}
+
+.theme-hold-history .today-date-badge {
+  font-size: 13px;
+  color: theme('colors.text.secondary');
+  padding: 4px 10px;
+  background: theme('colors.surface.muted');
+  border-radius: theme('borderRadius.card');
+}
+
+/* ── Stale indicator ── */
+.theme-hold-history .stale-indicator {
+  font-size: 12px;
+  color: theme('colors.state.warning');
+  margin-left: 8px;
+}
+
+/* ── Truncation warning ── */
+.theme-hold-history .truncation-warning {
+  margin: 8px 16px;
+  padding: 8px 12px;
+  background: #fff9e6;
+  border: 1px solid theme('colors.state.warning');
+  border-radius: theme('borderRadius.card');
+  font-size: 13px;
+  color: theme('colors.text.primary');
+}
+
+/* ── Column resize ── */
+.theme-hold-history .resizable-table-wrap {
+  position: relative;
+}
+
+.col-resize-handle {
+  position: absolute;
+  width: 8px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 10;
+  touch-action: none;
+}
+
+.col-resize-handle:hover,
+.col-resize-handle:active {
+  background: theme('colors.accent.500');
+  opacity: 0.4;
 }

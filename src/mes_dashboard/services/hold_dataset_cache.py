@@ -268,6 +268,7 @@ def apply_view(
     per_page: int = 50,
     _start_date: Optional[str] = None,
     _end_date: Optional[str] = None,
+    export_mode: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Read cache -> apply filters -> return derived data. Returns None if expired (→ route returns 410).
 
@@ -302,6 +303,7 @@ def apply_view(
             per_page=per_page,
             start_date=resolved_start_date,
             end_date=resolved_end_date,
+            export_mode=export_mode,
         )
         if sql_result is not None:
             return {**sql_result, "_meta": sql_meta}

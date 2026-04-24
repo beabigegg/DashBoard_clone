@@ -72,6 +72,13 @@ CACHE_TTL_DETECTION = 300               # MSD detection data: 5 min
 CACHE_TTL_LOSS_REASONS = 86400          # MSD loss reason list: 24 hours
 CACHE_TTL_FILTER_GENERAL = 86400        # General filter options: 24 hours
 CACHE_TTL_PROCESS_L1 = 30              # Process-level L1 cache: 30 sec
+CACHE_TTL_HOLD_TODAY = int(             # Hold today snapshot cache: 60 sec (env-overridable)
+    _os.getenv('HOLD_TODAY_CACHE_TTL_SECONDS', '60'))
+
+# ── Hold Today Snapshot settings ──
+HOLD_TODAY_AUTO_REFRESH_SECONDS = int(_os.getenv('HOLD_TODAY_AUTO_REFRESH_SECONDS', '60'))
+HOLD_TODAY_MAX_SNAPSHOT_ROWS = int(_os.getenv('HOLD_TODAY_MAX_SNAPSHOT_ROWS', '10000'))
+HOLD_TODAY_MODE_ENABLED = _os.getenv('HOLD_TODAY_MODE_ENABLED', 'true').strip().lower() in ('1', 'true', 'yes')
 
 
 # ============================================================

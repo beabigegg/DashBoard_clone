@@ -446,9 +446,15 @@ def _query_list(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Paginated hold list: filter by hold_type + reason, sorted by HOLDTXNDATE DESC."""
-    page = max(int(page), 1)
-    per_page = min(max(int(per_page), 1), 200)
+    """Paginated hold list: filter by hold_type + reason, sorted by HOLDTXNDATE DESC.
+
+    When per_page <= 0 (export mode), all matching rows are returned without
+    LIMIT/OFFSET and pagination metadata reflects a single page of all rows.
+    """
+    export_mode = per_page <= 0
+    if not export_mode:
+        page = max(int(page), 1)
+        per_page = min(max(int(per_page), 1), 200)
 
     type_clause = _build_hold_type_clause(hold_type)
     record_clause = _build_record_type_clause(record_type, start_date, end_date)
@@ -472,34 +478,62 @@ def _query_list(
     count_rows = _fetch_dict_rows(conn, count_sql, params)
     total = _si(count_rows[0]["total"]) if count_rows else 0
 
-    total_pages = max(1, math.ceil(total / per_page))
-    page = min(page, total_pages)
-    offset = (page - 1) * per_page
+    if export_mode:
+        page_sql = f"""
+            SELECT
+                CAST("CONTAINERID" AS VARCHAR)   AS CONTAINERID,
+                CAST("LOT_ID" AS VARCHAR)        AS LOT_ID,
+                CAST("PJ_WORKORDER" AS VARCHAR)  AS PJ_WORKORDER,
+                CAST("PRODUCTNAME" AS VARCHAR)   AS PRODUCTNAME,
+                CAST("WORKCENTERNAME" AS VARCHAR) AS WORKCENTERNAME,
+                CAST("HOLDREASONNAME" AS VARCHAR) AS HOLDREASONNAME,
+                "QTY",
+                "HOLDTXNDATE",
+                CAST("HOLDEMP" AS VARCHAR)       AS HOLDEMP,
+                CAST("HOLDCOMMENTS" AS VARCHAR)  AS HOLDCOMMENTS,
+                "RELEASETXNDATE",
+                CAST("RELEASEEMP" AS VARCHAR)    AS RELEASEEMP,
+                CAST("RELEASECOMMENTS" AS VARCHAR) AS RELEASECOMMENTS,
+                "HOLD_HOURS",
+                CAST("NCRID" AS VARCHAR)         AS NCRID,
+                CAST("FUTUREHOLDCOMMENTS" AS VARCHAR) AS FUTUREHOLDCOMMENTS
+            FROM hold_src
+            {where_sql}
+            ORDER BY "HOLDTXNDATE" DESC NULLS LAST
+        """
+        page_rows = _fetch_dict_rows(conn, page_sql, params)
+        page = 1
+        per_page = total
+        total_pages = 1
+    else:
+        total_pages = max(1, math.ceil(total / per_page))
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
 
-    page_sql = f"""
-        SELECT
-            CAST("CONTAINERID" AS VARCHAR)   AS CONTAINERID,
-            CAST("LOT_ID" AS VARCHAR)        AS LOT_ID,
-            CAST("PJ_WORKORDER" AS VARCHAR)  AS PJ_WORKORDER,
-            CAST("PRODUCTNAME" AS VARCHAR)   AS PRODUCTNAME,
-            CAST("WORKCENTERNAME" AS VARCHAR) AS WORKCENTERNAME,
-            CAST("HOLDREASONNAME" AS VARCHAR) AS HOLDREASONNAME,
-            "QTY",
-            "HOLDTXNDATE",
-            CAST("HOLDEMP" AS VARCHAR)       AS HOLDEMP,
-            CAST("HOLDCOMMENTS" AS VARCHAR)  AS HOLDCOMMENTS,
-            "RELEASETXNDATE",
-            CAST("RELEASEEMP" AS VARCHAR)    AS RELEASEEMP,
-            CAST("RELEASECOMMENTS" AS VARCHAR) AS RELEASECOMMENTS,
-            "HOLD_HOURS",
-            CAST("NCRID" AS VARCHAR)         AS NCRID,
-            CAST("FUTUREHOLDCOMMENTS" AS VARCHAR) AS FUTUREHOLDCOMMENTS
-        FROM hold_src
-        {where_sql}
-        ORDER BY "HOLDTXNDATE" DESC NULLS LAST
-        LIMIT ? OFFSET ?
-    """
-    page_rows = _fetch_dict_rows(conn, page_sql, params + [per_page, offset])
+        page_sql = f"""
+            SELECT
+                CAST("CONTAINERID" AS VARCHAR)   AS CONTAINERID,
+                CAST("LOT_ID" AS VARCHAR)        AS LOT_ID,
+                CAST("PJ_WORKORDER" AS VARCHAR)  AS PJ_WORKORDER,
+                CAST("PRODUCTNAME" AS VARCHAR)   AS PRODUCTNAME,
+                CAST("WORKCENTERNAME" AS VARCHAR) AS WORKCENTERNAME,
+                CAST("HOLDREASONNAME" AS VARCHAR) AS HOLDREASONNAME,
+                "QTY",
+                "HOLDTXNDATE",
+                CAST("HOLDEMP" AS VARCHAR)       AS HOLDEMP,
+                CAST("HOLDCOMMENTS" AS VARCHAR)  AS HOLDCOMMENTS,
+                "RELEASETXNDATE",
+                CAST("RELEASEEMP" AS VARCHAR)    AS RELEASEEMP,
+                CAST("RELEASECOMMENTS" AS VARCHAR) AS RELEASECOMMENTS,
+                "HOLD_HOURS",
+                CAST("NCRID" AS VARCHAR)         AS NCRID,
+                CAST("FUTUREHOLDCOMMENTS" AS VARCHAR) AS FUTUREHOLDCOMMENTS
+            FROM hold_src
+            {where_sql}
+            ORDER BY "HOLDTXNDATE" DESC NULLS LAST
+            LIMIT ? OFFSET ?
+        """
+        page_rows = _fetch_dict_rows(conn, page_sql, params + [per_page, offset])
 
     # Lazy import to avoid circular dependency
     try:
@@ -616,6 +650,7 @@ def try_compute_view_from_spool(
     per_page: int = 50,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    export_mode: bool = False,
 ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     """Try to compute the full view result via DuckDB over the Parquet spool.
 
@@ -682,7 +717,7 @@ def try_compute_view_from_spool(
             record_type=record_type,
             duration_range=duration_range,
             page=page,
-            per_page=per_page,
+            per_page=0 if export_mode else per_page,
             start_date=resolved_start,
             end_date=resolved_end,
         )
