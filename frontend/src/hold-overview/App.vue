@@ -182,19 +182,7 @@ const reasonOptions = computed(() => {
   );
 });
 
-const splitHold = computed(() => {
-  const base = splitHoldByType(hold.value);
-  const activeReasons = (orchestrator.committed.reason || []).map((v) => String(v).trim()).filter(Boolean);
-  if (!activeReasons.length) {
-    return base;
-  }
-
-  const reasonSet = new Set(activeReasons);
-  return {
-    quality: base.quality.filter((item) => reasonSet.has(String(item?.reason || '').trim())),
-    nonQuality: base.nonQuality.filter((item) => reasonSet.has(String(item?.reason || '').trim())),
-  };
-});
+const splitHold = computed(() => splitHoldByType(hold.value));
 
 let filterOptionsDebounceTimer = null;
 let filterOptionsRequestToken = 0;
@@ -581,9 +569,17 @@ function handleFilterChange(next) {
     return;
   }
 
-  // Use orchestrator to update fields - onFetch callback handles the rest
-  orchestrator.updateField('holdType', nextHoldType);
-  orchestrator.updateField('reason', nextReason);
+  // Batch both fields before triggering a single fetch to avoid double API calls
+  orchestrator.committed.holdType = nextHoldType;
+  orchestrator.committed.reason = nextReason;
+  orchestrator.draft.holdType = nextHoldType;
+  orchestrator.draft.reason = nextReason;
+
+  matrixFilter.value = null;
+  page.value = 1;
+  updateUrlState();
+  void loadFilterOptions(filters);
+  void loadAllData(false);
 }
 
 function handleMatrixSelect(nextFilter) {
