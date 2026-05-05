@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 294
-visible-files: 878
+visible-files: 882
 omitted-dirs: 105
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -324,6 +324,7 @@ DashBoard_vite/
 |   |   |   |-- duckdb-client.js
 |   |   |   |-- endpoint-schemas.js
 |   |   |   |-- field-contracts.js
+|   |   |   |-- index.ts
 |   |   |   |-- pending-jobs-registry.js
 |   |   |   |-- post-export.js
 |   |   |   |-- reject-history-filters.js
@@ -605,7 +606,8 @@ DashBoard_vite/
 |   |-- playwright.config.js
 |   |-- postcss.config.js
 |   |-- tailwind.config.js
-|   |-- vite.config.js
+|   |-- tsconfig.json
+|   |-- vite.config.ts
 |   \-- vitest.config.js
 |-- logs/
 |   |-- admin_logs.sqlite
@@ -856,6 +858,8 @@ DashBoard_vite/
 |   \-- field_contracts.json
 |-- specs/
 |   |-- context/
+|   |   |-- contracts-index.md
+|   |   \-- project-map.md
 |   \-- templates/
 |       |-- archive.md
 |       |-- change-classification.md
