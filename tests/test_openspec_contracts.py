@@ -124,13 +124,13 @@ class TestApiResponseContractUnification:
         )
 
     def test_api_inventory_documents_job_routes(self):
-        inventory = _src_text("contract/api_inventory.md")
+        inventory = _src_text("contracts/api/api-inventory.md")
         assert "job_routes.py" in inventory, (
-            "contract/api_inventory.md must document job_routes.py POST /api/job/<id>/abandon"
+            "contracts/api/api-inventory.md must document job_routes.py POST /api/job/<id>/abandon"
         )
 
     def test_api_inventory_documents_app_version(self):
-        inventory = _src_text("contract/api_inventory.md")
+        inventory = _src_text("contracts/api/api-inventory.md")
         assert "app_version" in inventory
 
 
