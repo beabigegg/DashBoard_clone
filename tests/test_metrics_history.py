@@ -12,9 +12,8 @@ import os
 import sqlite3
 import tempfile
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
 from mes_dashboard.core.metrics_history import (
     MetricsHistoryCollector,

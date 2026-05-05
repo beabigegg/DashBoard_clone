@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
-import time
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Any, Dict, List
 
 from mes_dashboard.core.redis_client import get_redis_client

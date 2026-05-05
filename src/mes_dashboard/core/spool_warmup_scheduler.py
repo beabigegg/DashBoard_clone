@@ -23,14 +23,12 @@ from __future__ import annotations
 import logging
 import os
 import threading
-import time
 from typing import Optional
 
 from mes_dashboard.core.exceptions import LockUnavailableError
 from mes_dashboard.core.redis_client import (
     REDIS_ENABLED,
     get_redis_client,
-    get_key,
     try_acquire_lock,
     release_lock,
 )

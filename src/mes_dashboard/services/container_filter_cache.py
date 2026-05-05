@@ -20,8 +20,6 @@ from mes_dashboard.core.redis_client import (
     get_key,
     get_redis_client,
     REDIS_ENABLED,
-    try_acquire_lock,
-    release_lock,
 )
 
 logger = logging.getLogger("mes_dashboard.container_filter_cache")

@@ -13,15 +13,12 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import math
 import os
 import tempfile
-import threading
 import time
 from datetime import date, timedelta
 from typing import Any, Optional
 
-import numpy as np
 import pandas as pd
 
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
@@ -44,13 +41,11 @@ from mes_dashboard.services.yield_alert_service import (
     VALID_SORT_FIELDS,
     _YIELD_WORKCENTER_GROUP_ORDER,
     _bucket_to_text,
-    _build_normalized_exclusion_tokens,
     _compute_reject_linkage,
     _load_excluded_reason_tokens,
     _normalize_process_category,
     _normalize_tokens,
     _normalize_yield_department_group,
-    _risk_level,
     _safe_float,
     build_canonical_key,
     normalize_reason_code,
@@ -245,7 +240,6 @@ def _streaming_write_to_spool(
     Returns (tmp_path, total_rows). If no rows were returned, returns (None, 0)
     and cleans up the temp file.
     """
-    import pyarrow as pa
     import pyarrow.parquet as pq
     from pathlib import Path
 

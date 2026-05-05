@@ -5,7 +5,7 @@ Provides safe SQL query building with parameterized conditions.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 @dataclass

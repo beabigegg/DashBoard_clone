@@ -16,9 +16,7 @@ Run with:
 
 from __future__ import annotations
 
-import time
 from datetime import datetime
-from typing import Generator
 
 import pytest
 import redis as redis_lib
@@ -51,7 +49,6 @@ class TestRedisTimeoutFallback:
         """A SETEX with deliberate large value on a near-zero timeout client raises."""
         # Use a very short timeout — the connect usually succeeds but operations
         # on a near-zero budget should fail with TimeoutError.
-        import socket
 
         # Create a raw socket and consume the port so the client can't connect
         # at all (guaranteed ConnectionError regardless of op timing).
@@ -206,7 +203,7 @@ class TestRedisTimeoutFallback:
                 # 200 (degraded OK), 401/403 (auth required), 404 (route not found)
                 # — any is acceptable here as long as it's not 500
                 assert r.status_code != 500, (
-                    f"Got 500 — Redis timeout should degrade gracefully, not crash"
+                    "Got 500 — Redis timeout should degrade gracefully, not crash"
                 )
         except Exception:
             pytest.skip("App factory failed — Oracle / env not available in CI")

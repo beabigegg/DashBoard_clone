@@ -6,7 +6,7 @@ and timeout behavior compatible with the MesApi client.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import json
 
 from mes_dashboard.app import create_app

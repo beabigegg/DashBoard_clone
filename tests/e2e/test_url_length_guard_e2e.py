@@ -99,7 +99,7 @@ class TestUrlLengthGuardSessionStorageE2E:
         fake_query = "workorder=WO0001,WO0002&status=RUN"
         page.evaluate(
             """([key, value]) => { sessionStorage.setItem(key, value); }""",
-            [f"url-state:/wip-overview", fake_query],
+            ["url-state:/wip-overview", fake_query],
         )
 
         wait = _pre_register_response_listener(
@@ -136,7 +136,7 @@ class TestUrlLengthGuardSessionStorageE2E:
         fake_query = "hold_type=quality&workcenter=A,B,C"
         page.evaluate(
             """([key, value]) => { sessionStorage.setItem(key, value); }""",
-            [f"url-state:/hold-overview", fake_query],
+            ["url-state:/hold-overview", fake_query],
         )
 
         wait = _pre_register_response_listener(

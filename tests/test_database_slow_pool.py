@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import itertools
 from unittest.mock import MagicMock, patch
 
 import pandas as pd

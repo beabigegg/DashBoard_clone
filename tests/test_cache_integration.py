@@ -5,9 +5,8 @@ Tests API endpoints with cache enabled/disabled scenarios.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pandas as pd
-import json
 
 
 @pytest.fixture

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Unit tests for query_timeout_error() helper in mes_dashboard.core.response."""
 
-import pytest
 
 from mes_dashboard.core.response import query_timeout_error, QUERY_TIMEOUT
 

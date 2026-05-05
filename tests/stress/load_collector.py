@@ -8,7 +8,7 @@ in a background thread during stress test execution to collect system metrics.
 import threading
 import time
 import requests
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 

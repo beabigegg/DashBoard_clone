@@ -22,7 +22,6 @@ from mes_dashboard.core.response import (
     success_response,
     validation_error,
     internal_error,
-    service_unavailable_error,
 )
 from mes_dashboard.core.utils import get_days_back, parse_bool_query
 

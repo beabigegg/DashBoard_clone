@@ -9,7 +9,7 @@ Contains Flask Blueprint for maintenance job query endpoints:
 
 import logging
 
-from flask import Blueprint, request, Response, render_template
+from flask import Blueprint, Response, render_template
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.modernization_policy import maybe_redirect_to_canonical_shell

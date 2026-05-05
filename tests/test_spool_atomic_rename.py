@@ -11,15 +11,12 @@ These tests are unit-level (no DB, no Redis) and run without --run-integration.
 
 from __future__ import annotations
 
-import os
-import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
 import pandas as pd
-import pytest
 
 
 # ---------------------------------------------------------------------------

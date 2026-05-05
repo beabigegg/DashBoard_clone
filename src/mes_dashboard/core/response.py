@@ -33,7 +33,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from flask import jsonify, request
+from flask import jsonify
 
 
 def _get_app_version() -> str:

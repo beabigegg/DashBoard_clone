@@ -32,9 +32,6 @@ from mes_dashboard.core.query_spool_store import load_spooled_df, store_spooled_
 
 MATERIAL_TRACE_QUEUE = os.getenv("TRACE_WORKER_QUEUE", "trace-events")
 from mes_dashboard.services.batch_query_engine import compute_query_hash
-from mes_dashboard.services.container_resolution_policy import (
-    validate_resolution_request,
-)
 from mes_dashboard.services.filter_cache import (
     get_workcenter_mapping,
     get_workcenters_for_groups,

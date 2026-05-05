@@ -40,7 +40,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 # ---------------------------------------------------------------------------
 # Known test targets
@@ -82,7 +82,7 @@ def _run_once(target_path: str, json_out: Path) -> dict:
         "--run-integration-real",
         "--tb=line",
         "-q",
-        f"--json-report",
+        "--json-report",
         f"--json-report-file={json_out}",
     ]
 

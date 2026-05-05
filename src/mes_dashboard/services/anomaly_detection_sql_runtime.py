@@ -172,7 +172,7 @@ def detect_yield_anomalies(
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
 
     try:
-        import duckdb  # type: ignore
+        pass  # type: ignore
     except Exception:
         return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
@@ -283,7 +283,7 @@ def detect_reject_spikes(
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
 
     try:
-        import duckdb  # type: ignore
+        pass  # type: ignore
     except Exception:
         return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
@@ -393,7 +393,7 @@ def detect_hold_outliers(
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
 
     try:
-        import duckdb  # type: ignore
+        pass  # type: ignore
     except Exception:
         return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
@@ -596,7 +596,7 @@ def detect_equipment_deviations(
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
 
     try:
-        import duckdb  # type: ignore
+        pass  # type: ignore
     except Exception:
         return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
@@ -740,7 +740,7 @@ def drilldown_yield_trend(
     if not _ANALYTICS_ENABLED:
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
     try:
-        import duckdb  # type: ignore  # noqa: F811
+        pass  # type: ignore  # noqa: F811
     except Exception:
         return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
@@ -809,7 +809,7 @@ def drilldown_reject_trend(
     if not _ANALYTICS_ENABLED:
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
     try:
-        import duckdb  # type: ignore  # noqa: F811
+        pass  # type: ignore  # noqa: F811
     except Exception:
         return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
@@ -875,7 +875,7 @@ def drilldown_hold_detail(
     if not _ANALYTICS_ENABLED:
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
     try:
-        import duckdb  # type: ignore  # noqa: F811
+        pass  # type: ignore  # noqa: F811
     except Exception:
         return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
 
@@ -948,7 +948,7 @@ def drilldown_equipment_trend(
     if not _ANALYTICS_ENABLED:
         return None, {"fallback_reason": SQL_FALLBACK_DISABLED}
     try:
-        import duckdb  # type: ignore  # noqa: F811
+        pass  # type: ignore  # noqa: F811
     except Exception:
         return None, {"fallback_reason": SQL_FALLBACK_DEP_MISSING}
 

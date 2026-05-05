@@ -14,7 +14,7 @@ or broker is required.
 
 import time
 import uuid
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -30,7 +30,6 @@ except ImportError:
 from mes_dashboard.services.async_query_job_service import (
     complete_job,
     get_job_status,
-    update_job_progress,
 )
 
 
@@ -62,7 +61,7 @@ def _make_redis_store():
 
 def _meta_key_full(prefix: str, job_id: str) -> str:
     """Return the exact Redis key used by async_query_job_service._meta_key()."""
-    from mes_dashboard.core.redis_client import get_key, REDIS_KEY_PREFIX
+    from mes_dashboard.core.redis_client import get_key
     return get_key(f"{prefix}:job:{job_id}:meta")
 
 

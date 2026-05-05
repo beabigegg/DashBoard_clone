@@ -1454,7 +1454,6 @@ def test_run_reject_chunk_wraps_sql_with_rownum(monkeypatch, tmp_path):
     )
 
     # mock merge_chunks_to_spool to avoid needing full spool infra
-    from pathlib import Path
     fake_spool = tmp_path / "fake.parquet"
     pd.DataFrame({"V": [1]}).to_parquet(str(fake_spool), engine="pyarrow", index=False)
 
@@ -1645,7 +1644,6 @@ class TestRejectPartialFailureMeta:
 
     def test_logger_warning_on_partial_failure(self, monkeypatch, caplog):
         """logger.warning is emitted when partial failure is stored."""
-        import logging
         import mes_dashboard.services.reject_dataset_cache as reject_svc
 
         # Verify the module has warning call by checking source

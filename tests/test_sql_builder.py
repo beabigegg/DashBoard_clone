@@ -1,6 +1,5 @@
 """Tests for Query Builder."""
 
-import pytest
 
 from mes_dashboard.sql.builder import QueryBuilder
 

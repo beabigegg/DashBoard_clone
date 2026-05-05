@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 import pandas as pd
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 @pytest.fixture(autouse=True)

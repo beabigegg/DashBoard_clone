@@ -22,7 +22,6 @@ import hashlib
 import json
 import logging
 import os
-import sys
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -322,7 +321,6 @@ def build_snapshot(
     large for materialization (size guardrail), or an empty snapshot when
     filtering yields zero rows.
     """
-    import pandas as pd  # local import: keep module bootstrap light
 
     from mes_dashboard.services.reject_dataset_cache import (
         _DIM_TO_DF_COLUMN,

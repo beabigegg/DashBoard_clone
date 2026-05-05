@@ -11,7 +11,6 @@ All expected values verified by hand computation.
 
 from __future__ import annotations
 
-import pytest
 
 from mes_dashboard.services.resource_history_sql_runtime import (
     _calc_ou_pct,

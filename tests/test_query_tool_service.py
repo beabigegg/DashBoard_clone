@@ -7,7 +7,6 @@ Tests the core service functions without database dependencies:
 - Constants validation
 """
 
-import pytest
 from mes_dashboard.services.query_tool_service import (
     validate_date_range,
     validate_lot_input,

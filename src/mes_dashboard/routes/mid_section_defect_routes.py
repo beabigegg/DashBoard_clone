@@ -12,7 +12,6 @@ from mes_dashboard.core.response import (
     success_response,
     validation_error,
     internal_error,
-    error_response,
     cache_expired_error,
 )
 from mes_dashboard.core.cache import cache_get, make_cache_key

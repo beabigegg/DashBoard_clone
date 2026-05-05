@@ -16,7 +16,6 @@ from __future__ import annotations
 import os
 import signal
 import time
-from pathlib import Path
 
 import pytest
 import redis as redis_lib
@@ -118,7 +117,6 @@ def test_fail_closed_during_outage(cache_and_control_redis, monkeypatch):
 
     # Force module to re-read env and rebuild clients
     import mes_dashboard.core.redis_client as rc
-    import importlib
     # Patch module-level globals to use our URLs
     rc.REDIS_URL = cache_url
     rc.REDIS_CONTROL_URL = control_url
@@ -127,7 +125,6 @@ def test_fail_closed_during_outage(cache_and_control_redis, monkeypatch):
     rc._REDIS_CONTROL_CLIENT = None
 
     import mes_dashboard.core.heavy_query_telemetry as telemetry
-    from threading import Lock
     with telemetry._LOCK:
         initial_count = telemetry._LOCK_FAIL_MODE_TOTAL
 

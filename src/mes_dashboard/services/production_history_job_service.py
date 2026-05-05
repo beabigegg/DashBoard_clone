@@ -23,7 +23,6 @@ except Exception:  # pragma: no cover - optional dependency path
 from mes_dashboard.services.async_query_job_service import (
     complete_job,
     enqueue_job,
-    is_async_available,
     update_job_progress,
 )
 

@@ -19,18 +19,15 @@ from typing import Any, Dict, List, Optional
 from flask import Blueprint, Response, request
 
 from mes_dashboard.core.cache import cache_get, cache_set
+from mes_dashboard.services.event_fetcher import EventFetcher  # noqa: F401  (re-exported for test patching)
 from mes_dashboard.core.query_quality_contract import (
     QUALITY_SCOPE_DOMAIN,
     QUALITY_SCOPE_QUERY,
-    QUALITY_STATUS_FAILED,
-    build_quality_meta,
     merge_quality_metas,
     normalize_quality_meta,
-    unpack_event_fetch_result,
 )
 from mes_dashboard.core.rate_limit import configured_rate_limit
 from mes_dashboard.core.response import error_response, success_response
-from mes_dashboard.services.event_fetcher import EventFetcher
 from mes_dashboard.services.mid_section_defect_service import (
     build_trace_aggregation_from_events,
     parse_loss_reasons_param,
@@ -356,7 +353,7 @@ def _seed_resolve_mid_section_defect(
         if not seeds:
             return None, (
                 "NO_DETECTION_RECORDS",
-                f"找不到符合條件的容器，請確認輸入值是否正確",
+                "找不到符合條件的容器，請確認輸入值是否正確",
                 404,
             )
 
@@ -578,6 +575,11 @@ def _build_msd_aggregation(
     if not isinstance(params, dict):
         return None, ("INVALID_PARAMS", "params is required for mid_section_defect profile", 400)
 
+    # Compute these early so the DuckDB fast-path (try block) can use them.
+    raw_loss_reasons = params.get("loss_reasons")
+    loss_reasons = parse_loss_reasons_param(raw_loss_reasons)
+    direction = str(params.get("direction") or "backward").strip()
+
     # Task 5.2: try spool-backed DuckDB runtime first when a valid spool exists.
     # This avoids large in-memory pandas aggregation in the gunicorn worker.
     try:
@@ -615,9 +617,6 @@ def _build_msd_aggregation(
         if not start_date or not end_date:
             return None, ("INVALID_PARAMS", "start_date/end_date is required in params", 400)
 
-    raw_loss_reasons = params.get("loss_reasons")
-    loss_reasons = parse_loss_reasons_param(raw_loss_reasons)
-
     lineage_ancestors = _parse_lineage_payload(payload)
     lineage_roots = _parse_lineage_roots(payload)
     seed_container_ids = _normalize_strings(payload.get("seed_container_ids", []))
@@ -628,7 +627,6 @@ def _build_msd_aggregation(
     materials_events = domain_results.get("materials", {})
     downstream_events = domain_results.get("downstream_rejects", {})
     station = str(params.get("station") or "測試").strip()
-    direction = str(params.get("direction") or "backward").strip()
 
     aggregation = build_trace_aggregation_from_events(
         start_date,

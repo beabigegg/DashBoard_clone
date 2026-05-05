@@ -11,7 +11,6 @@ Cache layers:
 
 from __future__ import annotations
 
-import gc
 import hashlib
 import json
 import logging
@@ -55,7 +54,6 @@ from mes_dashboard.services.reject_history_service import (
     _as_float,
     _as_int,
     _build_where_clause,
-    _derive_summary,
     _extract_distinct_text_values,
     _extract_workcenter_group_options,
     _normalize_text,
@@ -902,7 +900,6 @@ def execute_primary_query(
 
         # Decide whether to route through BatchQueryEngine
         from mes_dashboard.services.batch_query_engine import (
-            MergeChunksMaxRowsExceeded,
             compute_query_hash,
             decompose_by_ids,
             decompose_by_time_range,
@@ -945,7 +942,7 @@ def execute_primary_query(
             )
 
         stored_via_spool = False
-        spool_ready_for_response = False
+        _spool_ready_for_response = False
 
         if use_engine and engine_chunks:
             # --- Engine path ---
@@ -1044,7 +1041,7 @@ def execute_primary_query(
                 if spool_registered:
                     _dataset_cache.set(query_id, True)
                     stored_via_spool = True
-                    spool_ready_for_response = True
+                    _spool_ready_for_response = True
                     df = pd.DataFrame()
                 else:
                     # Fallback: spool_tmp_path still exists if register_spool_file did not move it
@@ -1085,7 +1082,7 @@ def execute_primary_query(
 
         if not stored_via_spool and not df.empty:
             stored_via_spool = _store_query_result(query_id, df)
-            spool_ready_for_response = bool(stored_via_spool)
+            _spool_ready_for_response = bool(stored_via_spool)
 
         if partial_failure_meta.get("has_partial_failure"):
             flag_ttl = (

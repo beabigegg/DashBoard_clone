@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Unit tests for ai_agent_loop.py"""
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from mes_dashboard.services import ai_agent_loop as loop
 

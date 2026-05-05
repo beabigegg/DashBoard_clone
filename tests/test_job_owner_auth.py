@@ -8,7 +8,7 @@ where enqueue_job() never wrote owner and abandon was unauthenticated.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

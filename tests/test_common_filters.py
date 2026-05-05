@@ -1,6 +1,5 @@
 """Tests for Common Filters."""
 
-import pytest
 from unittest.mock import patch
 
 from mes_dashboard.sql.builder import QueryBuilder

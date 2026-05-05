@@ -7,7 +7,7 @@ import csv
 import io
 import logging
 from datetime import date, datetime
-from typing import Any, Dict, Generator, Iterable, Optional
+from typing import Any, Generator, Iterable, Optional
 
 import pandas as pd
 
@@ -203,7 +203,7 @@ def _build_where_clause(
     normalized_reasons = sorted({_normalize_text(v) for v in (reasons or []) if _normalize_text(v)})
     material_reason_selected = MATERIAL_REASON_OPTION in normalized_reasons
     reason_name_filters = [value for value in normalized_reasons if value != MATERIAL_REASON_OPTION]
-    normalized_categories = sorted({_normalize_text(v) for v in (categories or []) if _normalize_text(v)})
+    _normalized_categories = sorted({_normalize_text(v) for v in (categories or []) if _normalize_text(v)})
 
     if normalized_wc_groups:
         from mes_dashboard.services.filter_cache import get_specs_for_groups

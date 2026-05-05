@@ -32,8 +32,6 @@ from mes_dashboard.core.response import (
     service_unavailable_error,
     error_response,
     VALIDATION_ERROR,
-    INTERNAL_ERROR,
-    NOT_FOUND,
 )
 from mes_dashboard.core.exceptions import (
     UserInputError,
@@ -84,7 +82,7 @@ def map_service_errors(fn):
                 exc_info=e.cause,
             )
             return internal_error(e.message)
-        except Exception as e:
+        except Exception:
             logger.error(
                 "unexpected error in %s",
                 fn.__name__,
@@ -110,11 +108,9 @@ from mes_dashboard.services.query_tool_service import (
     get_equipment_rejects,
     get_equipment_jobs,
     resolve_lot_equipment,
-    export_to_csv,
     generate_csv_stream,
     validate_date_range,
     validate_lot_input,
-    validate_equipment_input,
 )
 
 

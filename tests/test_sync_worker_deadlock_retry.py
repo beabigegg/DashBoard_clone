@@ -11,9 +11,8 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
-import pytest
 
 
 class TestIsDeadlock:
@@ -79,7 +78,6 @@ class TestSyncLogsDeadlockRetry:
 
     def test_sync_logs_retries_on_deadlock_and_succeeds(self):
         """If first attempt raises deadlock, second attempt must succeed."""
-        from mes_dashboard.core.sync_worker import MYSQL_OPS_ENABLED
 
         worker = self._make_worker()
         worker._log_store.get_unsynced.return_value = [

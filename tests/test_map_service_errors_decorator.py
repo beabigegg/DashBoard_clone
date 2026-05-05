@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Unit tests for the map_service_errors route decorator."""
 
-import pytest
 
 from mes_dashboard.core.exceptions import (
     UserInputError,

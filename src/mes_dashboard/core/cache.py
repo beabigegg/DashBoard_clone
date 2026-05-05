@@ -7,7 +7,6 @@ Falls back to Oracle direct query when Redis is unavailable.
 
 from __future__ import annotations
 
-import io
 import json
 import logging
 import os

@@ -16,7 +16,6 @@ from __future__ import annotations
 import csv
 import io
 import logging
-import time
 from typing import Any, Dict, Generator, List, Optional
 
 from mes_dashboard.core.feature_flags import resolve_bool_flag
@@ -66,7 +65,7 @@ def _build_wc_group_condition(
     """Build a single workcenter-group WHERE fragment (ILIKE patterns or exact match)."""
     if group_name in workcenter_groups:
         cfg = workcenter_groups[group_name]
-        like_parts = [f"WORKCENTERNAME ILIKE ?" for _ in cfg["patterns"]]
+        like_parts = ["WORKCENTERNAME ILIKE ?" for _ in cfg["patterns"]]
         clause = "(" + " OR ".join(like_parts) + ")"
         p = [f"%{pat}%" for pat in cfg["patterns"]]
         for excl in cfg.get("exclude", []):
@@ -391,7 +390,7 @@ def _build_matrix_tree(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {"tree": tree, "month_columns": month_columns}
 
 
-def _apply_pandas_wc_group_filter(df: "pd.DataFrame", group_name: str, workcenter_groups: Dict) -> "pd.DataFrame":
+def _apply_pandas_wc_group_filter(df: "pd.DataFrame", group_name: str, workcenter_groups: Dict) -> "pd.DataFrame":  # noqa: F821
     """Filter DataFrame by a single workcenter group name."""
     import pandas as pd
 
@@ -408,7 +407,7 @@ def _apply_pandas_wc_group_filter(df: "pd.DataFrame", group_name: str, workcente
         return df[df["WORKCENTERNAME"] == group_name]
 
 
-def _apply_pandas_filter(df: "pd.DataFrame", filter_params: Dict[str, Any]) -> "pd.DataFrame":
+def _apply_pandas_filter(df: "pd.DataFrame", filter_params: Dict[str, Any]) -> "pd.DataFrame":  # noqa: F821
     import pandas as pd
     from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS
 

@@ -11,10 +11,7 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
-from unittest.mock import patch
 
-import pytest
 
 import mes_dashboard.core.redis_client as redis_client_module
 from mes_dashboard.core.exceptions import LockUnavailableError

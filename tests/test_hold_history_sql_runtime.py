@@ -176,7 +176,6 @@ class TestQueryTrendRepeatQuality:
     """_query_trend() includes repeatQualityHoldQty in each day."""
 
     def _make_trend_conn(self, dates, repeat_rows=None):
-        from datetime import date, timedelta
         mock_conn = MagicMock()
         call_count = [0]
 

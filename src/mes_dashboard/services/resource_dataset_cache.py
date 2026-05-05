@@ -223,7 +223,7 @@ def execute_primary_query(
             compute_query_hash,
             should_decompose_by_time,
         )
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from concurrent.futures import ThreadPoolExecutor
 
         base_sql = _load_sql("base_facts")
         base_sql = base_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)

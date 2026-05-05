@@ -12,9 +12,8 @@ Covers:
 from __future__ import annotations
 
 import time
-import threading
 from typing import List
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import patch
 
 import pytest
 

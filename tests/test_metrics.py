@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
 """Unit tests for performance metrics module."""
 
-import pytest
 from mes_dashboard.core.metrics import (
     QueryMetrics,
     MetricsSummary,
     get_query_metrics,
     get_metrics_summary,
-    record_query_latency,
-    SLOW_QUERY_THRESHOLD
+    record_query_latency
 )
 
 

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, current_app, g, make_response, redirect, render_template, request, send_from_directory, url_for
+from flask import Blueprint, current_app, g, make_response, redirect, render_template, request, url_for
 
 from mes_dashboard.core.csrf import get_csrf_token
 from mes_dashboard.core.permissions import admin_required
@@ -405,7 +405,7 @@ def _collect_redis_namespace_memory(client) -> list:
         try:
             # Find a representative key
             if pattern.endswith(":*"):
-                base = pattern[:-2]
+                _base = pattern[:-2]
                 cursor, keys = client.scan(cursor=0, match=pattern, count=5)
                 sample_key = keys[0] if keys else None
             else:
@@ -1133,7 +1133,7 @@ def api_worker_status():
         try:
             stat_path = f"/proc/{os.getpid()}/stat"
             with open(stat_path) as f:
-                stat = f.read().split()
+                _stat = f.read().split()
                 # Field 22 is starttime in clock ticks since boot
                 # This is a simplified fallback
                 pass

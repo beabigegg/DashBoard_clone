@@ -14,7 +14,7 @@ import pytest
 import time
 import requests
 import concurrent.futures
-from typing import List, Tuple
+from typing import Tuple
 from urllib.parse import quote
 
 from load_collector import LoadCollector

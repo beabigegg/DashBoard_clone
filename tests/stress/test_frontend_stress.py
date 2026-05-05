@@ -138,7 +138,7 @@ class TestToastStress:
         # All should be gone after dismissAll
         loading_count = page.locator('.mes-toast-loading').count()
         assert loading_count == 0, f"Loading toasts not dismissed: {loading_count}"
-        print(f"  Loading toast dismiss test passed")
+        print("  Loading toast dismiss test passed")
 
 
 @pytest.mark.stress
@@ -214,7 +214,7 @@ class TestMesApiStress:
         print(f"\n  {results['total']} concurrent requests in {results['duration']}ms")
         print(f"  Success: {results['successCount']}/{results['total']}")
 
-        assert results['successCount'] >= 6, f"Too many concurrent failures"
+        assert results['successCount'] >= 6, "Too many concurrent failures"
 
     def test_abort_controller_stress(self, page: Page, app_server: str):
         """Test AbortController under rapid request cancellation."""
@@ -259,7 +259,7 @@ class TestMesApiStress:
 
         # Most should either abort or complete
         total_resolved = results['aborted'] + results['completed']
-        assert total_resolved >= 5, f"Too many unresolved requests"
+        assert total_resolved >= 5, "Too many unresolved requests"
 
 
 @pytest.mark.stress
@@ -485,7 +485,7 @@ class TestConsoleErrorMonitoring:
         page.wait_for_timeout(2000)
 
         if js_errors:
-            print(f"\n  JavaScript errors detected:")
+            print("\n  JavaScript errors detected:")
             for err in js_errors[:5]:
                 print(f"    - {err[:100]}")
 

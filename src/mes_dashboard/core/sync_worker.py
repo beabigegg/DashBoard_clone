@@ -19,7 +19,7 @@ import os
 import threading
 import time
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Optional
 
 logger = logging.getLogger('mes_dashboard.sync_worker')
 

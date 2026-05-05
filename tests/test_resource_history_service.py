@@ -5,8 +5,8 @@ Tests the service layer functions for resource history analysis.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta
+from unittest.mock import patch
+from datetime import datetime
 
 import pandas as pd
 
@@ -25,7 +25,6 @@ from mes_dashboard.services.resource_history_service import (
     _calc_availability_pct,
     _build_kpi_from_df,
     _build_detail_from_raw_df,
-    MAX_QUERY_DAYS,
 )
 
 

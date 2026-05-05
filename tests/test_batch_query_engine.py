@@ -4,7 +4,7 @@
 import json
 from pathlib import Path
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 import pandas as pd
 
@@ -15,7 +15,6 @@ from mes_dashboard.services.batch_query_engine import (
     decompose_by_time_range,
     execute_plan,
     merge_chunks,
-    iterate_chunks,
     should_decompose_by_time,
     should_decompose_by_ids,
 )
@@ -929,8 +928,6 @@ class TestMergeChunksToSpool:
         ``null`` type from chunk 1; previously, casting ``string → null`` in
         chunk 2 raised ArrowNotImplementedError.
         """
-        import pyarrow as pa
-        import pyarrow.parquet as pq
         import mes_dashboard.services.batch_query_engine as bqe
 
         # Chunk 1: CAUSECODENAME is entirely None (all jobs undiagnosed)

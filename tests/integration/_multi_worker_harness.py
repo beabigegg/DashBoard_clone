@@ -20,7 +20,6 @@ WorkerBarrier
 
 from __future__ import annotations
 
-import json
 import os
 import signal
 import subprocess
@@ -178,7 +177,6 @@ class MultiWorkerHarness:
     # ------------------------------------------------------------------
 
     def start(self) -> "MultiWorkerHarness":
-        import pytest
 
         self.redis = self._connect()
         if self.flush_on_start:

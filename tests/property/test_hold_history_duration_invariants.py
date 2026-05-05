@@ -10,7 +10,6 @@ Invariants verified:
   - avgOnHoldHours <= maxOnHoldHours (when maxOnHoldHours > 0)
   - repeatQualityHoldQty >= 0 for all trend days
 """
-import math
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path

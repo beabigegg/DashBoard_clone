@@ -13,7 +13,7 @@ Coverage:
 
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -391,7 +391,6 @@ class TestLotTraceGuards:
     def test_validate_query_params_max_date_range(self):
         from mes_dashboard.services.production_history_service import (
             validate_query_params,
-            MAX_DATE_RANGE_DAYS,
         )
         with pytest.raises(ValueError, match="日期區間超過上限"):
             validate_query_params({

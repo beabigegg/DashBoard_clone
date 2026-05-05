@@ -6,7 +6,6 @@ Tests Redis connection management with mocked Redis.
 
 import pytest
 from unittest.mock import patch, MagicMock
-import importlib
 
 
 class TestRedisClient:

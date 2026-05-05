@@ -6,7 +6,7 @@ Tests the API endpoints with mocked service dependencies.
 
 import pytest
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from mes_dashboard import create_app
 

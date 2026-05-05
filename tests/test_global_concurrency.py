@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 import mes_dashboard.core.global_concurrency as gc_mod
 

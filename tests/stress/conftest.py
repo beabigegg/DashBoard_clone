@@ -4,7 +4,6 @@
 import pytest
 import os
 import sys
-import time
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
@@ -17,9 +16,6 @@ from stress_registry import (
     session_load_summaries,
     session_chunk_boundary_results,
     session_integrity_results,
-    record_load_summary,
-    record_chunk_boundary,
-    record_integrity_result,
 )
 
 
@@ -105,9 +101,9 @@ class StressTestResult:
             if ls.peak_db_pool_pct is not None:
                 lines.append(f"  Peak DB Pool:        {ls.peak_db_pool_pct:.1f}%")
             else:
-                lines.append(f"  Peak DB Pool:        N/A")
+                lines.append("  Peak DB Pool:        N/A")
             if ls.peak_queue_depths:
-                lines.append(f"  Peak RQ Queue Depths:")
+                lines.append("  Peak RQ Queue Depths:")
                 for q in RQ_QUEUES:
                     depth = ls.peak_queue_depths.get(q, 0)
                     lines.append(f"    {q:<32} {depth}")
@@ -126,7 +122,7 @@ class StressTestResult:
                     lines.append(f"  Spool Cache Hits:    {td.spool_cache_hit}")
                     lines.append(f"  Spool Cache Misses:  {td.spool_cache_miss}")
         if self.errors:
-            lines.append(f"Errors (first 5):")
+            lines.append("Errors (first 5):")
             for err in self.errors[:5]:
                 lines.append(f"  - {err[:100]}")
         return "\n".join(lines)

@@ -34,7 +34,6 @@ import json
 import logging
 import os
 import tempfile
-import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, Generator, List, Optional
@@ -682,7 +681,7 @@ def iterate_chunks(
 # ============================================================
 
 
-def _promote_null_schema(schema: "pa.Schema") -> "pa.Schema":
+def _promote_null_schema(schema: "pa.Schema") -> "pa.Schema":  # noqa: F821
     """Replace null-typed fields in *schema* with large_string.
 
     When the first chunk from Oracle has all-NULL values in an optional string

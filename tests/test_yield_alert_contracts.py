@@ -10,7 +10,6 @@ from mes_dashboard.services.yield_alert_contracts import (
     LinkageQualityMeta,
     YieldSummaryItem,
     YieldTrendItem,
-    YieldAlertRow,
     YieldAlertPagination,
     YieldAlertResponse,
     MatchStatus,

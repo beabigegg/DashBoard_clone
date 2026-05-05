@@ -6,7 +6,6 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pandas as pd
-import pytest
 
 from mes_dashboard.services.lineage_engine import LineageEngine
 

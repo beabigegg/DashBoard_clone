@@ -22,7 +22,7 @@ from typing import Dict, List, Any, Optional, Generator, Tuple
 
 import pandas as pd
 
-from mes_dashboard.core.database import read_sql_df_slow as read_sql_df, get_db_connection
+from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.sql import SQLLoader, QueryBuilder
 from mes_dashboard.config.field_contracts import get_export_headers, get_export_api_keys
 
@@ -186,7 +186,6 @@ def get_jobs_by_resources(
         )
         from mes_dashboard.core.query_spool_store import (
             QUERY_SPOOL_DIR,
-            get_spool_file_path,
             read_spool_records,
             register_spool_file,
         )

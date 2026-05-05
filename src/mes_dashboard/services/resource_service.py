@@ -16,11 +16,9 @@ from mes_dashboard.core.database import (
     DatabasePoolExhaustedError,
     DatabaseCircuitOpenError,
 )
-from mes_dashboard.core.utils import get_days_back, build_equipment_filter_sql
 from mes_dashboard.config.constants import (
     EXCLUDED_LOCATIONS,
     EXCLUDED_ASSET_STATUSES,
-    DEFAULT_DAYS_BACK,
     STATUS_CATEGORIES,
 )
 from mes_dashboard.sql import SQLLoader, QueryBuilder
@@ -567,7 +565,7 @@ def get_resource_status_summary(
     udt = by_status['UDT']
     sdt = by_status['SDT']
     egt = by_status['EGT']
-    nst = by_status['NST']
+    _nst = by_status['NST']
 
     ou_denominator = prd + sby + udt + sdt + egt
     ou_pct = round(prd / ou_denominator * 100, 1) if ou_denominator > 0 else 0

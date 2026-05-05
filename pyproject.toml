@@ -77,3 +77,20 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 mes_dashboard = ["templates/**/*", "sql/**/*.sql"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E402",  # module-level import not at top of file (intentional lazy-import pattern)
+    "E501",  # line too long
+    "W291",  # trailing whitespace
+    "W293",  # whitespace before ':'
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["F841", "E741", "E702", "E701", "E731", "F401"]
+"scripts/**" = ["F841", "E741"]

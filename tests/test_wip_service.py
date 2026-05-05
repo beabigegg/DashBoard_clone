@@ -5,7 +5,7 @@ Tests the WIP query functions that use DW_MES_LOT_V view.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from functools import wraps
 import pandas as pd
 import threading

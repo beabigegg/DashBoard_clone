@@ -11,7 +11,7 @@ import csv
 import io
 import logging
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, Optional
 
 logger = logging.getLogger("mes_dashboard.material_trace_duckdb_runtime")
 

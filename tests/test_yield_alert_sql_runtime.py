@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import duckdb
 import pandas as pd
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 from mes_dashboard.services.yield_alert_sql_runtime import (
     _qid,

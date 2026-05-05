@@ -9,11 +9,8 @@ IntegrityResult, AsyncJobPoller.
 import json
 import sys
 import os
-import threading
 import time
-from dataclasses import dataclass
-from typing import Optional
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import importlib.util
 
@@ -26,15 +23,12 @@ if _STRESS_DIR not in sys.path:
 
 from load_collector import (
     LoadCollector,
-    LoadSample,
     LoadSummary,
     TelemetryDiff,
     RQ_QUEUES,
-    _to_float,
-    _to_int,
 )
-from integrity_helpers import IntegrityResult, PaginationWalker, RowCountBaseline
-from async_helpers import AsyncJobPoller, AsyncJobResult, AsyncJobTimeout
+from integrity_helpers import IntegrityResult, PaginationWalker
+from async_helpers import AsyncJobPoller, AsyncJobTimeout
 
 # Load the stress conftest under a unique module name to avoid name collision
 # with pytest's conftest mechanism (pytest uses 'conftest' internally).

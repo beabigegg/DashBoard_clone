@@ -11,7 +11,6 @@ migration (openspec/changes/api-contract-unification).
 """
 
 import ast
-import os
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -268,7 +267,6 @@ class TestEnvelopeRuntimeSweep(unittest.TestCase):
         from tests.fixtures.route_contract_matrix import (
             ROUTE_CONTRACT_MATRIX,
             SKIP_RUNTIME_SWEEP,
-            NON_ENVELOPED_ENDPOINTS,
         )
 
         failures = []

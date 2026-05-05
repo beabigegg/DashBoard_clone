@@ -4,8 +4,7 @@
 Tests merged resource status queries and summary functions.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestGetMergedResourceStatus:

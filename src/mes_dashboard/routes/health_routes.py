@@ -35,7 +35,6 @@ from mes_dashboard.core.database import (
 )
 from mes_dashboard.core.redis_client import (
     get_redis_client,
-    redis_available,
     REDIS_ENABLED
 )
 from mes_dashboard.core.cache import (
@@ -641,7 +640,6 @@ def deep_health_check():
     from mes_dashboard.core.permissions import is_admin_logged_in
     from mes_dashboard.core.circuit_breaker import get_circuit_breaker_status
     from mes_dashboard.core.metrics import get_metrics_summary
-    from flask import redirect, url_for, request
 
     # Require admin authentication - return JSON error for API consistency
     if not is_admin_logged_in():

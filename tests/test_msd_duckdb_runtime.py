@@ -18,9 +18,8 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from mes_dashboard.services.msd_duckdb_runtime import (
     MsdDuckdbRuntime,

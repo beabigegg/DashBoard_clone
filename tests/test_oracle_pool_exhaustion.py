@@ -6,8 +6,7 @@ produce the correct HTTP 503 error envelope, retry-after header, and log
 messages — without requiring a real Oracle connection.
 """
 
-import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -86,8 +85,6 @@ class TestOraclePoolExhaustion:
     def test_circuit_breaker_state_transitions_on_repeated_failures(self, app):
         """Repeated DatabasePoolExhaustedError calls should eventually trigger circuit open."""
         from mes_dashboard.core.circuit_breaker import (
-            CircuitBreaker,
-            CircuitState,
             get_database_circuit_breaker,
         )
 

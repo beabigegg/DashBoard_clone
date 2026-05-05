@@ -22,7 +22,6 @@ from mes_dashboard.core.redis_client import (
 from mes_dashboard.services.async_query_job_service import (
     complete_job,
     get_job_status,
-    update_job_progress,
     _meta_key,
 )
 

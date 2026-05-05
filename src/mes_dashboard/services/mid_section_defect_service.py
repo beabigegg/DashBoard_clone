@@ -37,7 +37,6 @@ import io
 import logging
 import math
 import os
-import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -73,7 +72,6 @@ logger = logging.getLogger('mes_dashboard.mid_section_defect')
 MAX_QUERY_DAYS = 730  # 2 years
 from mes_dashboard.config.constants import (
     CACHE_TTL_DETECTION,
-    CACHE_TTL_LOSS_REASONS,
 )
 
 FORWARD_PIPELINE_MAX_WORKERS = int(os.getenv('FORWARD_PIPELINE_MAX_WORKERS', '2'))

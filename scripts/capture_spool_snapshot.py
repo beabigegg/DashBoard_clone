@@ -33,7 +33,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List
 
-import pandas as pd
 
 # Resolve repo root + ensure src/ on path (script may run from anywhere)
 REPO_ROOT = Path(__file__).resolve().parent.parent

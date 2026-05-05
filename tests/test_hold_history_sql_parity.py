@@ -289,7 +289,8 @@ class TestDurationAvgMaxParity:
             assert result["avgOnHoldHours"] <= result["maxOnHoldHours"]
 
     def test_empty_spool_returns_zero_avg_max(self):
-        import tempfile, duckdb
+        import tempfile
+        import duckdb
         from mes_dashboard.services.hold_history_sql_runtime import _attach_spool_view, _query_duration
         duck_cols = [
             "CONTAINERID", "LOT_ID", "PJ_WORKORDER", "PRODUCTNAME",

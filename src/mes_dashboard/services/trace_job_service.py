@@ -260,7 +260,6 @@ def _get_spool_result(
     limit: int = 0,
 ) -> Dict[str, Any]:
     """Reconstruct trace events result from per-domain spool stages."""
-    import pandas as pd
     from mes_dashboard.core.query_spool_store import load_spooled_df
 
     query_id = meta["query_id"]

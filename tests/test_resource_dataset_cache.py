@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import importlib
 import pandas as pd
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from mes_dashboard.services import resource_dataset_cache as cache_svc
 
@@ -348,7 +348,6 @@ class TestResourceEngineParallel:
 
     def test_default_parallel_is_1(self, monkeypatch):
         """Without RESOURCE_ENGINE_PARALLEL → both execute_plan calls get parallel=1."""
-        import os
         engine_calls = []
         monkeypatch.delenv("RESOURCE_ENGINE_PARALLEL", raising=False)
         monkeypatch.setattr(cache_svc, "_RESOURCE_ENGINE_PARALLEL", 1)

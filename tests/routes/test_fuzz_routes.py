@@ -19,7 +19,6 @@ from __future__ import annotations
 import json
 import sys
 import os
-import unittest
 from typing import Any
 
 import pytest

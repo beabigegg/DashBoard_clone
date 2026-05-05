@@ -353,7 +353,6 @@ class TestDurationPayloadShape:
     def test_apply_view_preserves_duration_new_fields(self, monkeypatch):
         """apply_view result containing new duration fields is passed through unchanged."""
         import mes_dashboard.services.hold_dataset_cache as cache_svc
-        from unittest.mock import MagicMock
 
         expected_duration = {
             "items": [{"range": "<4h", "count": 2, "qty": 200, "pct": 100.0}],

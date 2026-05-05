@@ -9,11 +9,8 @@ Integration tests covering query_spool_store lifecycle:
 """
 
 import json
-import os
-import tempfile
 import threading
 import time
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -22,7 +19,6 @@ import pytest
 import mes_dashboard.core.query_spool_store as spool_mod
 from mes_dashboard.core.query_spool_store import (
     _move_into_place,
-    _target_path,
     cleanup_expired_spool,
     get_spool_file_path,
     store_spooled_df,
@@ -165,7 +161,7 @@ class TestSpoolLifecycle:
             "schema_version": 1,
             "namespace": "test_ns",
             "query_id": "stale-id12345678",
-            "relative_path": f"test_ns/stale-id12345678.parquet",
+            "relative_path": "test_ns/stale-id12345678.parquet",
             "row_count": 3,
             "column_count": 2,
             "columns_hash": "abc",

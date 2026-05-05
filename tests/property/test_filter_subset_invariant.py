@@ -10,10 +10,10 @@ The filter model:
 """
 
 import pytest
-from hypothesis import given, assume
+from hypothesis import given
 
 from mes_dashboard.services.yield_alert_service import _normalize_tokens
-from tests.property.strategies import filter_dict, synthetic_dataset, synthetic_row
+from tests.property.strategies import filter_dict, synthetic_dataset
 
 _FILTER_TO_COLUMN = {
     "departments": "DEPARTMENT_GROUP",

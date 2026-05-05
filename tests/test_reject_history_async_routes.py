@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import mes_dashboard.core.database as db
 from mes_dashboard.app import create_app

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for mes_dashboard.core.cache_plane module."""
 
-import pytest
 
 from mes_dashboard.core.cache_plane import (
     CachePlane,

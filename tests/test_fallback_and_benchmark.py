@@ -12,7 +12,6 @@ Tests:
 from __future__ import annotations
 
 import os
-import json
 import time
 from typing import Any, Dict, Optional
 
@@ -96,7 +95,6 @@ class TestFallbackPaths:
         # service call instead of HTTP
         from mes_dashboard.services.resource_dataset_cache import apply_view
         from mes_dashboard.services.resource_history_sql_runtime import (
-            _SQL_VIEW_ENABLED,
             SQL_FALLBACK_DISABLED,
         )
         import mes_dashboard.services.resource_history_sql_runtime as runtime

@@ -38,7 +38,6 @@ class TestGetOwnerToken:
     def test_anonymous_re_read_returns_same_value(self, app):
         """Anonymous user: second call returns same token as first."""
         with app.test_request_context():
-            from flask import session
             first = get_owner_token()
             second = get_owner_token()
         assert first == second

@@ -13,7 +13,6 @@ from typing import Any, Dict, List, Optional
 from unittest import mock
 
 import pandas as pd
-import pytest
 
 
 # ---------------------------------------------------------------------------

@@ -635,7 +635,6 @@ def test_single_flight_wait_logs_on_lock_contention(monkeypatch, caplog):
 
 def test_spool_write_failure_logs_warning(monkeypatch, caplog):
     """SpoolWriteError from streaming write is raised with descriptive message."""
-    import logging
     import pytest
 
     monkeypatch.setattr(dataset_cache, "_get_cached_payload", lambda _qid: None)

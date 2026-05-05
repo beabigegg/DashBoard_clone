@@ -15,9 +15,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from mes_dashboard.services.query_tool_sql_runtime import (
     _qid,

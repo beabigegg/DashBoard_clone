@@ -7,25 +7,22 @@ resource details with job info, OU trends, and utilization heatmap.
 
 import logging
 import pandas as pd
-from typing import Optional, Dict, List, Any, Tuple
+from typing import Optional, Dict, List, Tuple
 
 logger = logging.getLogger('mes_dashboard.dashboard_service')
 
 from mes_dashboard.core.database import (
-    get_db_connection,
     read_sql_df,
     DatabasePoolExhaustedError,
     DatabaseCircuitOpenError,
 )
-from mes_dashboard.core.utils import get_days_back, build_equipment_filter_sql
+from mes_dashboard.core.utils import get_days_back
 from mes_dashboard.config.constants import (
     EXCLUDED_LOCATIONS,
     EXCLUDED_ASSET_STATUSES,
-    DEFAULT_DAYS_BACK,
 )
 from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS, get_workcenter_group
 from mes_dashboard.services.resource_service import (
-    get_resource_latest_status_subquery,
     get_resource_status_summary,
     get_workcenter_status_matrix,
 )

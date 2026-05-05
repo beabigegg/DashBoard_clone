@@ -9,7 +9,6 @@ parquet files and mock external dependencies.
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
 
 import pandas as pd

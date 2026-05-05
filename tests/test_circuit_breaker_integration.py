@@ -25,7 +25,6 @@ from unittest.mock import patch
 import pytest
 
 from mes_dashboard.core.circuit_breaker import (
-    CIRCUIT_BREAKER_ENABLED,
     CircuitBreaker,
     CircuitState,
 )

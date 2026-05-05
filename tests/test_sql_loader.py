@@ -1,8 +1,7 @@
 """Tests for SQL Loader."""
 
 import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from mes_dashboard.sql.loader import SQLLoader
 

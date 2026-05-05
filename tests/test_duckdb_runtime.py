@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for mes_dashboard.core.duckdb_runtime module."""
 
-import os
 import pytest
-from unittest.mock import patch, MagicMock
 
 from mes_dashboard.core.duckdb_runtime import (
     SpoolMissError,

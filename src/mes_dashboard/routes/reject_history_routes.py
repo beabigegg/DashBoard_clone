@@ -45,7 +45,6 @@ from mes_dashboard.services.reject_history_service import (
     query_list,
     query_row_count,
     query_dimension_pareto,
-    query_reason_pareto,
     query_summary,
     query_trend,
 )

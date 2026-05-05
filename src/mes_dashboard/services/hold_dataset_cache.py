@@ -18,7 +18,7 @@ import os
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 

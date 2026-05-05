@@ -11,8 +11,7 @@ from unittest.mock import patch
 
 from mes_dashboard.core.log_store import (
     LogStore,
-    SQLiteLogHandler,
-    LOG_STORE_ENABLED
+    SQLiteLogHandler
 )
 
 

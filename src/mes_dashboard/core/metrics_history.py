@@ -13,7 +13,6 @@ import os
 import socket
 import sqlite3
 import threading
-import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path

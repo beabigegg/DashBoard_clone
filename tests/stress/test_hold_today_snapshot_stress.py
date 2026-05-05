@@ -134,6 +134,6 @@ class TestHoldTodaySnapshotConcurrent:
                     pass  # Connection errors are acceptable under stress
 
         assert not five_hundreds, (
-            f"today-snapshot returned HTTP 500 under concurrent load:\n"
+            "today-snapshot returned HTTP 500 under concurrent load:\n"
             + "\n".join(five_hundreds[:10])
         )

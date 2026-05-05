@@ -297,7 +297,7 @@ class EventFetcher:
                             if cid in containers:
                                 enriched = dict(record)
                                 enriched["CONTAINERID"] = cid
-                                grouped[cid].append(enriched)
+                                grouped[cid].append(enriched)  # noqa: F821
                                 total_row_count[0] += 1
                         if total_row_count[0] >= max_total_rows:
                             logger.warning(
@@ -310,7 +310,7 @@ class EventFetcher:
                     cid = record.get("CONTAINERID")
                     if not isinstance(cid, str) or not cid:
                         continue
-                    grouped[cid].append(record)
+                    grouped[cid].append(record)  # noqa: F821
                     total_row_count[0] += 1
                     if total_row_count[0] >= max_total_rows:
                         logger.warning(

@@ -4,7 +4,7 @@ Common SQL Filters
 Provides reusable filter building methods for common query patterns.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 from mes_dashboard.config import EXCLUDED_ASSET_STATUSES, EXCLUDED_LOCATIONS
 from mes_dashboard.config.constants import EQUIPMENT_FLAG_FILTERS

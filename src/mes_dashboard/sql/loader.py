@@ -6,7 +6,6 @@ Provides SQL file loading with LRU caching and structural parameter substitution
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 
 class SQLLoader:

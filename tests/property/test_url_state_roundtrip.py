@@ -10,9 +10,8 @@ any Flask `request.args` parsing builds on.
 """
 
 import pytest
-from urllib.parse import urlencode, parse_qs, quote, unquote
-from hypothesis import given, assume
-from hypothesis import strategies as st
+from urllib.parse import urlencode, parse_qs
+from hypothesis import given
 
 from tests.property.strategies import url_state
 

@@ -13,7 +13,6 @@ NOTE: Probes that require a dataset large enough to reach spillover thresholds
 are marked with pytest.mark.skipif guards that detect insufficient data.
 """
 
-import json
 import os
 import time
 import pytest
@@ -130,7 +129,7 @@ class TestContainerIDBatchBoundary:
         )
 
         if status is None:
-            record_chunk_boundary(label, "UNEXPECTED", f"connection error")
+            record_chunk_boundary(label, "UNEXPECTED", "connection error")
             pytest.skip(f"Server unreachable: {body}")
 
         if expect_ok:

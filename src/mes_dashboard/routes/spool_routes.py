@@ -12,7 +12,7 @@ from flask import Blueprint, request, Response
 
 from mes_dashboard.core.csrf import validate_csrf, should_enforce_csrf
 from mes_dashboard.core.query_spool_store import get_spool_file_path
-from mes_dashboard.core.response import not_found_error, validation_error
+from mes_dashboard.core.response import validation_error
 
 spool_bp = Blueprint("spool", __name__, url_prefix="/api/spool")
 

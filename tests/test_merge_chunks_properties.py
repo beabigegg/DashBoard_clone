@@ -20,7 +20,6 @@ I9  Null promotion:              null-typed col in chunk 1 + strings later works
 """
 
 import random
-from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd

@@ -7,10 +7,9 @@ batch-merge → spool → pagination pipeline.
 """
 
 import os
-import time
 import requests
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 # Configurable tolerance: default 0.1%
 _TOLERANCE_PCT = float(os.environ.get("STRESS_ROW_COUNT_TOLERANCE_PCT", "0.1"))

@@ -13,8 +13,6 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from mes_dashboard.core.database import (
-    DatabaseCircuitOpenError,
-    DatabasePoolExhaustedError,
     read_sql_df_slow as read_sql_df,
 )
 from mes_dashboard.core.redis_client import get_key, get_redis_client
@@ -166,7 +164,7 @@ def _apply_record_type_filter_today(df: pd.DataFrame, record_type: str) -> pd.Da
     """
     types = {t.strip().lower() for t in record_type.split(',') if t.strip()}
     masks = []
-    today = df['TODAY_DATE'].iloc[0] if not df.empty else None
+    _today = df['TODAY_DATE'].iloc[0] if not df.empty else None
     if 'on_hold' in types:
         masks.append(df['RELEASETXNDATE'].isna() | (df['RELEASE_DAY'] > df['TODAY_DATE']))
     if 'new' in types:

@@ -7,7 +7,7 @@ safeguards (memory guard, batched queries), and wildcard support.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -16,10 +16,8 @@ from mes_dashboard.services.material_trace_service import (
     _check_memory_guard,
     _compute_cache_key,
     _enrich_workcenter_group,
-    _IN_BATCH_SIZE,
     _is_pattern_token,
     _resolve_container_ids,
-    _resolve_workcenter_names,
     execute_to_spool,
     export_csv,
     forward_query,

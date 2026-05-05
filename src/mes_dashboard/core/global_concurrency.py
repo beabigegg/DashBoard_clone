@@ -19,7 +19,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Optional
 
 from mes_dashboard.core.redis_client import get_key, get_redis_client
 

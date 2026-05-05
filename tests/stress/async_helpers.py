@@ -7,7 +7,7 @@ production-history and yield-alert async RQ workers.
 
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional
 
 import requests
@@ -213,7 +213,7 @@ class AsyncJobPoller:
 
             try:
                 poll_resp = requests.get(status_url, timeout=_TIMEOUT)
-            except Exception as exc:
+            except Exception:
                 continue  # Transient connectivity issue; keep polling
 
             if poll_resp.status_code not in (200, 202):

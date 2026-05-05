@@ -882,7 +882,6 @@ if __name__ == '__main__':
 # CSV mid-stream error sentinel tests (pytest style)
 # ============================================================
 
-import pytest
 
 
 class TestRejectHistoryCsvMidStreamError:

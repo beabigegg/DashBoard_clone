@@ -2,7 +2,6 @@
 """Unit tests for circuit breaker module."""
 
 import os
-import pytest
 import time
 from unittest.mock import patch
 
@@ -12,9 +11,7 @@ os.environ['CIRCUIT_BREAKER_ENABLED'] = 'true'
 from mes_dashboard.core.circuit_breaker import (
     CircuitBreaker,
     CircuitState,
-    get_database_circuit_breaker,
-    get_circuit_breaker_status,
-    CIRCUIT_BREAKER_ENABLED
+    get_circuit_breaker_status
 )
 
 

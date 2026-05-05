@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from mes_dashboard.services.reject_cache_sql_runtime import (
     _qid,

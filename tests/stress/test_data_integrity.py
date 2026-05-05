@@ -16,16 +16,14 @@ summary table (per-service OK / DATA LOSS / SKIPPED).
 
 import concurrent.futures
 import os
-import time
 from datetime import date, timedelta
-from typing import Optional
 
 import pytest
 import requests
 
 from async_helpers import AsyncJobPoller, AsyncJobTimeout
 from stress_registry import record_integrity_result
-from integrity_helpers import IntegrityResult, PaginationWalker, RowCountBaseline, _TOLERANCE_PCT
+from integrity_helpers import IntegrityResult, PaginationWalker, RowCountBaseline
 
 _TIMEOUT = float(os.environ.get("STRESS_TIMEOUT", "60"))
 

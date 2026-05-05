@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Dict, List, Any
 
 from mes_dashboard.core.database import read_sql_df

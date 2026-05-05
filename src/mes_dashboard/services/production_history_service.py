@@ -17,8 +17,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -308,7 +307,7 @@ def _resolve_lot_ids_with_trace(
 def _resolve_container_ids_by_names(names: List[str]) -> Dict[str, str]:
     """Resolve CONTAINERNAME list → {CONTAINERNAME: CONTAINERID} map."""
     from mes_dashboard.core.database import read_sql_df
-    from mes_dashboard.sql import QueryBuilder, SQLLoader
+    from mes_dashboard.sql import QueryBuilder
 
     if not names:
         return {}
@@ -551,7 +550,7 @@ def query_row_count(
 
     If pj_types is None or empty, counts all product types.
     """
-    start_dt = _parse_date(start_date)
+    _start_dt = _parse_date(start_date)
     end_dt = _parse_date(end_date)
     end_date_excl = (end_dt + timedelta(days=1)).strftime("%Y-%m-%d")
 

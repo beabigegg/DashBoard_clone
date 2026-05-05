@@ -5,8 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+from unittest.mock import patch
 
 from mes_dashboard.services.material_trace_duckdb_runtime import (
     MaterialTraceDuckdbRuntime,

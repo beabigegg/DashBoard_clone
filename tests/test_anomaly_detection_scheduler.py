@@ -2,8 +2,7 @@
 """Tests for anomaly_detection_scheduler spool seed log-level handling."""
 
 import logging
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestSpoolSeedLogLevel:

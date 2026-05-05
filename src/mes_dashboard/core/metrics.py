@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-import time
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
@@ -139,7 +138,7 @@ class QueryMetrics:
                 index = min(index, count - 1)
                 return sorted_latencies[index]
 
-            slow_count = sum(1 for l in sorted_latencies if l > SLOW_QUERY_THRESHOLD)
+            slow_count = sum(1 for v in sorted_latencies if v > SLOW_QUERY_THRESHOLD)
 
             return {
                 "p50": get_percentile_value(50),

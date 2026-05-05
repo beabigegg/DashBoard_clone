@@ -119,7 +119,6 @@ def _pre_register_response_listener(page: Page, predicate):
 
 def _pre_register_post_request_listener(page: Page, url_token: str):
     """Register a request listener for POST calls matching url_token."""
-    import json as _json
 
     matched = []
 
@@ -288,7 +287,6 @@ class TestWipAndHoldPagesE2E:
         Gunicorn's 4094-byte limit.  The frontend must send POST for summary,
         matrix, detail, and filter-options.
         """
-        import json as _json
 
         ensure_shell_admin(page, "/wip-overview", "WIP 即時概況")
 

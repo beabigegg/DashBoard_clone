@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 from mes_dashboard.services.trace_lineage_job_service import (
     make_trace_lineage_query_id,

@@ -18,7 +18,6 @@ The analytics anomaly-summary endpoint is used as the test target because:
 from __future__ import annotations
 
 import os
-import time
 from unittest.mock import patch
 
 import pytest

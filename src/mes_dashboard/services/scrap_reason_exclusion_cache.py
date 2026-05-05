@@ -14,7 +14,6 @@ import json
 import logging
 import os
 import threading
-import time
 from datetime import datetime
 from typing import Iterable
 
@@ -162,7 +161,7 @@ def get_excluded_reasons(force_refresh: bool = False) -> set[str]:
     """Get currently cached exclusion reason codes."""
     with _CACHE_LOCK:
         loaded = bool(_CACHE.get("loaded"))
-        reasons = set(_CACHE.get("reasons", set()))
+        _reasons = set(_CACHE.get("reasons", set()))
 
     if force_refresh:
         refresh_cache(force=True)

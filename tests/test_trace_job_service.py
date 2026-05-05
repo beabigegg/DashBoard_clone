@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 import mes_dashboard.services.async_query_job_service as aqs
 import mes_dashboard.services.trace_job_service as tjs

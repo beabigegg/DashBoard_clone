@@ -5,7 +5,7 @@ Only `str | None` is a valid return type. Callers must never see a raw
 """
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
 from mes_dashboard.core.request_validation import (

@@ -6,7 +6,6 @@ load_spooled_df reads back identical data. Redis is mocked (in-memory
 dict) so that only the Parquet I/O path is exercised for real.
 """
 
-import json
 import os
 import pytest
 import pandas as pd

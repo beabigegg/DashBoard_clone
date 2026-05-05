@@ -9,7 +9,7 @@ Integration tests covering the ProcessLevelCache and MemoryTTLCache lifecycle:
 
 import threading
 import time
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
 import pytest
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import contextmanager
-from typing import Generator, Optional
+from typing import Generator
 
 logger = logging.getLogger('mes_dashboard.mysql_client')
 

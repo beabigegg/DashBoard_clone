@@ -7,7 +7,6 @@ Tests cache read/write functionality and fallback mechanism.
 import pytest
 from unittest.mock import patch, MagicMock
 import pandas as pd
-import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor

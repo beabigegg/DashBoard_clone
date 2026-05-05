@@ -4,7 +4,6 @@
 Tests the core service functions without database dependencies.
 """
 
-import pytest
 from unittest.mock import patch
 from mes_dashboard.services.job_query_service import (
     validate_date_range,
@@ -216,7 +215,6 @@ class TestJobEngineParallel:
 
     def _make_engine_env(self, monkeypatch, *, engine_calls):
         import mes_dashboard.services.batch_query_engine as engine_mod
-        import mes_dashboard.services.job_query_service as job_svc
 
         def fake_execute_plan(chunks, query_fn, **kwargs):
             engine_calls.append(kwargs.get("parallel"))

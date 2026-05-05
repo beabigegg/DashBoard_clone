@@ -3,16 +3,14 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
-import pytest
 
 from mes_dashboard.services.msd_lineage_job_service import (
     _reconstruct_lineage_response,
     _resolve_backward_lineage,
     get_msd_lineage_job_result,
-    get_msd_lineage_job_status,
 )
 
 

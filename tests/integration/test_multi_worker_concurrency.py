@@ -32,7 +32,7 @@ from typing import List
 import pytest
 import redis as redis_lib
 
-from tests.integration._multi_worker_harness import MultiWorkerHarness, WorkerBarrier
+from tests.integration._multi_worker_harness import MultiWorkerHarness
 from tests.integration._multi_worker_jobs import (
     job_crashable,
     job_dedup_export,

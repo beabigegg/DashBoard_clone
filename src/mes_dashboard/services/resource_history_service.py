@@ -23,7 +23,7 @@ from typing import Optional, Dict, List, Any, Generator
 import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
-from mes_dashboard.sql import QueryBuilder, SQLLoader
+from mes_dashboard.sql import SQLLoader
 from mes_dashboard.config.field_contracts import get_export_headers, get_export_api_keys
 
 logger = logging.getLogger('mes_dashboard.resource_history')
