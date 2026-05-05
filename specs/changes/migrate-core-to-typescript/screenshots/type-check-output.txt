@@ -1,5 +1,0 @@
-
-> mes-dashboard-frontend@0.1.0 type-check
-> vue-tsc --noEmit
-
-type-check: 0 errors

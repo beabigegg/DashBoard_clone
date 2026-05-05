@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 294
-visible-files: 882
+visible-files: 884
 omitted-dirs: 105
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -277,7 +277,8 @@ DashBoard_vite/
 |   |-- logs/
 |   |   \-- admin_logs.sqlite
 |   |-- scripts/
-|   |   \-- css-governance-check.js
+|   |   |-- css-governance-check.js
+|   |   \-- ts-resolver-loader.mjs
 |   |-- src/
 |   |   |-- admin-dashboard/
 |   |   |   |-- tabs/
@@ -314,28 +315,29 @@ DashBoard_vite/
 |   |   |   \-- fonts/
 |   |   |       \-- ... (max depth)
 |   |   |-- core/
-|   |   |   |-- api.js
-|   |   |   |-- app-version-check.js
-|   |   |   |-- autocomplete.js
-|   |   |   |-- compute.js
-|   |   |   |-- datetime.js
-|   |   |   |-- dev-warnings.js
-|   |   |   |-- duckdb-activation-policy.js
-|   |   |   |-- duckdb-client.js
-|   |   |   |-- endpoint-schemas.js
-|   |   |   |-- field-contracts.js
+|   |   |   |-- api.ts
+|   |   |   |-- app-version-check.ts
+|   |   |   |-- autocomplete.ts
+|   |   |   |-- compute.ts
+|   |   |   |-- datetime.ts
+|   |   |   |-- dev-warnings.ts
+|   |   |   |-- duckdb-activation-policy.ts
+|   |   |   |-- duckdb-client.ts
+|   |   |   |-- endpoint-schemas.ts
+|   |   |   |-- field-contracts.ts
 |   |   |   |-- index.ts
-|   |   |   |-- pending-jobs-registry.js
-|   |   |   |-- post-export.js
-|   |   |   |-- reject-history-filters.js
-|   |   |   |-- resource-history-filters.js
-|   |   |   |-- risk-score.js
-|   |   |   |-- schema-guard.js
-|   |   |   |-- shell-navigation.js
-|   |   |   |-- table-tree.js
-|   |   |   |-- unwrap-api-result.js
-|   |   |   |-- wip-derive.js
-|   |   |   \-- wip-navigation-state.js
+|   |   |   |-- pending-jobs-registry.ts
+|   |   |   |-- post-export.ts
+|   |   |   |-- reject-history-filters.ts
+|   |   |   |-- resource-history-filters.ts
+|   |   |   |-- risk-score.ts
+|   |   |   |-- schema-guard.ts
+|   |   |   |-- shell-navigation.ts
+|   |   |   |-- table-tree.ts
+|   |   |   |-- types.ts
+|   |   |   |-- unwrap-api-result.ts
+|   |   |   |-- wip-derive.ts
+|   |   |   \-- wip-navigation-state.ts
 |   |   |-- hold-detail/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
