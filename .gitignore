@@ -10,6 +10,7 @@ venv/
 ENV/
 env/
 .venv/
+!contracts/env/
 
 # Package build artifacts
 *.egg-info/

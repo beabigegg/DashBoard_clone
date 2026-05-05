@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.0.0
+schema-version: 1.1.0
 last-changed: 2026-05-05
 breaking-change-policy: deprecate-2-minors
 ---
@@ -18,15 +18,17 @@ breaking-change-policy: deprecate-2-minors
 |---|---:|---|---:|---|---|---|
 | contract-validate | 0 | local pre-PR | yes | `cdd-kit validate` | platform-team | — |
 | lint | 0 | local / PR | yes | `ruff check .` | application-team | — |
-| type-check | 0 | local / PR | yes | `mypy src/` | application-team | — |
-| unit-tests | 1 | PR | yes | `pytest` | application-team | test report |
+| type-check | 0 | local / PR | informational | `mypy src/` | application-team | — |
+| unit-mock-integration | 1 | PR | yes | `pytest -m "not (e2e or integration_real or stress or load or soak or multi_worker)" --ignore=tests/integration --ignore=tests/stress --ignore=tests/e2e --ignore=tests/manual -x` | application-team | junit XML |
 | frontend-unit | 1 | PR | yes | `cd frontend && npm run test` | application-team | vitest report |
 | css-governance | 1 | PR | yes | `cd frontend && npm run css:check` | application-team | governance report |
-| critical-e2e | 1 | PR | yes | `npx playwright test --project=critical` (TBD) | application-team | playwright trace |
-| visual-regression | 2 | PR | informational | (TBD) | application-team | screenshot diff |
-| real-infra-smoke | 2 | PR | informational | — | platform-team | — |
-| nightly-integration | 3 | nightly (`0 18 * * 1`) | yes (nightly) | `pytest --run-integration-real` | application-team | test report |
-| stress-soak | 4 | weekly / `workflow_dispatch` | yes (weekly) | locust / k6 (TBD) | platform-team | perf report |
+| playwright-resilience | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/resilience/` | application-team | playwright trace |
+| playwright-data-boundary | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/data-boundary/` | application-team | playwright trace |
+| playwright-critical-journeys | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/hold-overview.spec.js tests/playwright/reject-history.spec.js tests/playwright/query-tool.spec.js` | application-team | playwright trace |
+| visual-regression | 2 | PR | informational | (TBD — Playwright screenshot diff) | application-team | screenshot diff |
+| nightly-integration | 3 | weekly schedule / dispatch | yes (nightly) | `pytest tests/integration/ --run-integration-real -m "integration_real or multi_worker" -x` | application-team | test report |
+| stress-load | 4 | weekly schedule / dispatch | yes (weekly) | `pytest tests/stress/ -m "stress or load"` | platform-team | perf report |
+| soak | 4 | weekly schedule / dispatch | yes (weekly) | `pytest tests/integration/test_soak_workload.py --run-integration-real -m "soak"` | platform-team | soak report |
 
 ## Required Check Policy
 
@@ -53,11 +55,34 @@ breaking-change-policy: deprecate-2-minors
 
 | job | trigger | stack | status |
 |---|---|---|---|
-| `contract-and-fast-tests` | push/PR | Python 3.10 + Node 20 + conda mes-dashboard | configured |
-| `e2e-critical` | PR only | (Playwright — TBD) | placeholder |
-| `scheduled-stress-soak` | weekly schedule / dispatch | (locust/k6 — TBD) | placeholder |
+| `contract-and-fast-tests` | push / PR | Python 3.10 + Node 20 + conda mes-dashboard | configured |
+| `e2e-critical` | PR only | Node 20 + conda + Playwright chromium | configured |
+| `nightly-integration` | weekly schedule / dispatch | conda mes-dashboard | configured |
+| `scheduled-stress-soak` | weekly schedule / dispatch | conda mes-dashboard | configured |
 
-**TODO：** 填入 `e2e-critical` 和 `scheduled-stress-soak` job 的實際命令。
+**Test markers（pytest.ini）：**
+- `integration` — mock DB（pre-merge OK）
+- `e2e` / `local_e2e` — 需要 running server 或 in-process Flask
+- `integration_real` — 需 `--run-integration-real` + real Oracle/Redis（Tier 3）
+- `stress` / `load` — concurrent load（Tier 4）
+- `soak` / `multi_worker` — 需 `--run-integration-real`（Tier 4）
+- `property` — Hypothesis property tests（Tier 1，pre-merge OK）
+
+**Test directories：**
+
+| directory | marker | tier | pre-merge |
+|---|---|---:|---:|
+| `tests/` (root) | none / integration | 1 | yes |
+| `tests/routes/` | none | 1 | yes |
+| `tests/property/` | property | 1 | yes |
+| `tests/e2e/` | e2e / local_e2e | 1 | local_e2e only |
+| `tests/integration/` | integration_real | 3 | no |
+| `tests/stress/` | stress / load | 4 | no |
+| `tests/manual/` | — | manual | no |
+| `frontend/tests/` (Vitest) | — | 1 | yes |
+| `frontend/tests/playwright/resilience/` | — | 1 | yes |
+| `frontend/tests/playwright/data-boundary/` | — | 1 | yes |
+| `frontend/tests/playwright/*.spec.js` | — | 1 | yes |
 
 ## Informational Gate Promotion Policy
 
