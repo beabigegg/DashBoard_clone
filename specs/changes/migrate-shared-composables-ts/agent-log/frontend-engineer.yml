@@ -1,0 +1,67 @@
+change-id: migrate-shared-composables-ts
+agent: frontend-engineer
+timestamp: "2026-05-05T00:00:00Z"
+status: complete
+files-read:
+  - specs/changes/migrate-shared-composables-ts/change-classification.md
+  - specs/changes/migrate-shared-composables-ts/test-plan.md
+  - specs/changes/migrate-shared-composables-ts/change-request.md
+  - frontend/src/shared-composables/index.js
+  - frontend/src/shared-composables/useRequestGuard.js
+  - frontend/src/shared-composables/useAsyncJobPolling.js
+  - frontend/src/shared-composables/useAutoRefresh.js
+  - frontend/src/shared-composables/useAiChat.js
+  - frontend/src/shared-composables/useAutocomplete.js
+  - frontend/src/shared-composables/useFilterOrchestrator.js
+  - frontend/src/shared-composables/usePaginationState.js
+  - frontend/src/shared-composables/useQueryState.js
+  - frontend/src/shared-composables/useSortableTable.js
+  - frontend/src/shared-composables/useTraceProgress.js
+  - frontend/src/shared-composables/useUrlSync.js
+  - frontend/src/core/types.ts
+  - frontend/src/core/api.ts
+  - frontend/src/wip-shared/composables/useAutoRefresh.js
+  - frontend/src/wip-shared/composables/useAutocomplete.js
+  - frontend/tsconfig.json
+  - frontend/tests/shared-composables/useAsyncJobPolling.test.js
+  - frontend/tests/shared-composables/useAutoRefresh.test.js
+  - frontend/tests/shared-composables/useRequestGuard.test.js
+  - frontend/tests/abort/production-history-abort.test.js
+  - frontend/tests/abort/reject-history-abort.test.js
+  - frontend/tests/abort/query-tool-abort.test.js
+  - tests/test_frontend_compute_parity.py
+  - tests/test_frontend_duckdb_parity.py
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/shared-composables/index.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useAiChat.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useAsyncJobPolling.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useAutocomplete.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useAutoRefresh.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useFilterOrchestrator.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/usePaginationState.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useQueryState.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useRequestGuard.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useSortableTable.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useTraceProgress.ts" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useUrlSync.ts" }
+  - { type: files-changed, pointer: "frontend/tsconfig.json" }
+  - { type: files-changed, pointer: "frontend/tests/shared-composables/useAsyncJobPolling.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/shared-composables/useAutoRefresh.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/shared-composables/useRequestGuard.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/abort/production-history-abort.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/abort/reject-history-abort.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/abort/query-tool-abort.test.js" }
+  - { type: components-affected, pointer: "frontend/src/shared-composables/useAiChat.ts" }
+  - { type: components-affected, pointer: "frontend/src/shared-composables/useAsyncJobPolling.ts" }
+  - { type: components-affected, pointer: "frontend/src/shared-composables/useRequestGuard.ts" }
+  - { type: screenshot-paths, pointer: "n/a (pure TypeScript migration — no visual changes)" }
+  - { type: accessibility-audit, pointer: "n/a (no DOM or component changes)" }
+  - { type: gate-result, pointer: "cdd-kit gate migrate-shared-composables-ts: npm run type-check exit 0" }
+  - { type: gate-result, pointer: "cdd-kit gate migrate-shared-composables-ts: npm run test 270/270" }
+  - { type: gate-result, pointer: "cdd-kit gate migrate-shared-composables-ts: npm run build success" }
+notes: |
+  Type decisions: useAutoRefresh and useAutocomplete wrap wip-shared/.js files with no TS
+  declarations — used @ts-expect-error + cast to declared interface. Vue Ref/ComputedRef
+  use import type to avoid runtime errors. query-tool-abort.test.js: converted require()
+  to static import (CJS cannot load ES Module .ts files). Python parity audit: zero matches.
+next-action: none

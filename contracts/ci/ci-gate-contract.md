@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.0
+schema-version: 1.3.1
 last-changed: 2026-05-05
 breaking-change-policy: deprecate-2-minors
 ---
@@ -39,6 +39,13 @@ breaking-change-policy: deprecate-2-minors
 - **From Phase 1a onward**: `include` is `["src/core/**/*"]`, covering all 21 core `.ts` modules under `strict: true`. The gate's effective coverage increased substantially in the same PR that performed the `.js` → `.ts` rename.
 - **Status unchanged**: the gate remains **informational** (continue-on-error: true). Promotion to required follows the standard Informational Gate Promotion Policy.
 - **No schema-version bump**: this is a coverage expansion, not a contract interface change.
+
+### frontend-type-check scope expansion (Phase 1b — migrate-shared-composables-ts)
+
+- **Before Phase 1b**: `tsconfig.json` `include` was `["src/core/**/*"]`, covering 21 core `.ts` modules.
+- **From Phase 1b onward**: `include` is `["src/core/**/*", "src/shared-composables/**/*"]`, additionally covering all 11 shared-composable `.ts` modules under `strict: true`.
+- **Status unchanged**: the gate remains **informational** (continue-on-error: true). Promotion to required follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.1 (patch)**: additive prose only — gate tier, command, and status are unchanged. Matching Phase 1a precedent at ci 1.2.1.
 
 ## Required Check Policy
 

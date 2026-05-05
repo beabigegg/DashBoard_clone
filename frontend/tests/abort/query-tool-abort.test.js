@@ -23,6 +23,7 @@ vi.mock('../../src/core/api.js', () => ({
 }));
 
 import { apiPost } from '../../src/core/api.js';
+import { useRequestGuard } from '../../src/shared-composables/useRequestGuard.ts';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -35,7 +36,7 @@ afterEach(() => {
 
 describe('query-tool abort — useRequestGuard invalidation on unmount', () => {
   it('nextRequestId on unmount marks any captured request id as stale', () => {
-    const { useRequestGuard } = require('../../src/shared-composables/useRequestGuard.js');
+    // useRequestGuard imported at top of file
     const { nextRequestId, isStaleRequest } = useRequestGuard();
 
     // Simulate: component fires a request
@@ -50,7 +51,7 @@ describe('query-tool abort — useRequestGuard invalidation on unmount', () => {
   });
 
   it('response arriving after unmount-triggered nextRequestId is dropped', () => {
-    const { useRequestGuard } = require('../../src/shared-composables/useRequestGuard.js');
+    // useRequestGuard imported at top of file
     const { nextRequestId, isStaleRequest } = useRequestGuard();
 
     const results = [];

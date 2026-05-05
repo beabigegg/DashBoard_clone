@@ -2,20 +2,57 @@ import { reactive, ref, watch, toRaw } from 'vue';
 import { useRequestGuard } from './useRequestGuard.js';
 import { useUrlSync } from './useUrlSync.js';
 
+export type FieldTrigger = 'immediate' | 'draft-apply';
+export type DependencyAction = 'reload-options' | 'clear' | 'reset';
+
+export interface FieldDefinition {
+  trigger?: FieldTrigger;
+  initial?: unknown;
+  options?: unknown[];
+}
+
+export interface FieldDependency {
+  when: string;
+  then?: string | string[];
+  action: DependencyAction;
+  value?: unknown;
+  debounce?: number;
+}
+
+export interface PaginationConfig {
+  resetOn?: string[];
+}
+
+export interface UrlSyncConfig {
+  enabled: boolean;
+}
+
+export interface FilterOrchestratorConfig {
+  fields?: Record<string, FieldDefinition>;
+  dependencies?: FieldDependency[];
+  pagination?: PaginationConfig;
+  urlSync?: UrlSyncConfig;
+  onFetch?: (committed: Record<string, unknown>) => void;
+  onPrimaryQuery?: (committed: Record<string, unknown>) => void;
+  onViewRefresh?: (committed: Record<string, unknown>) => void;
+  onLoadOptions?: (fieldName: string, committed: Record<string, unknown>) => Promise<unknown[]>;
+}
+
+export interface FilterOrchestratorComposable {
+  committed: Record<string, unknown>;
+  draft: Record<string, unknown>;
+  options: Record<string, unknown[]>;
+  pagination: { page: number };
+  updateField: (name: string, value: unknown) => void;
+  applyDraft: () => void;
+  resetAll: () => void;
+  setPage: (page: number) => void;
+}
+
 /**
  * Configuration-driven filter state management composable.
- *
- * @param {Object} config
- * @param {Object} config.fields - { [name]: { trigger: 'immediate'|'draft-apply', initial, options? } }
- * @param {Array}  config.dependencies - [{ when, then, action: 'reload-options'|'clear'|'reset', value?, debounce? }]
- * @param {Object} config.pagination - { resetOn: ['*'] | string[] }
- * @param {Object} config.urlSync - { enabled: boolean }
- * @param {Function} config.onFetch - callback when committed state changes (for immediate / apply)
- * @param {Function} config.onPrimaryQuery - callback for two-phase primary query
- * @param {Function} config.onViewRefresh - callback for two-phase supplementary refresh
- * @param {Function} [config.onLoadOptions] - async (fieldName, committed) => string[] | {label,value}[]
  */
-export function useFilterOrchestrator(config) {
+export function useFilterOrchestrator(config: FilterOrchestratorConfig): FilterOrchestratorComposable {
   const {
     fields: fieldDefs = {},
     dependencies = [],
@@ -34,33 +71,34 @@ export function useFilterOrchestrator(config) {
   const urlState = urlSyncConfig.enabled ? readFromUrl() : {};
 
   // Build committed and draft from field definitions
-  const committed = reactive({});
-  const draft = reactive({});
-  const options = reactive({});
-  const pagination = reactive({ page: 1 });
+  const committed = reactive<Record<string, unknown>>({});
+  const draft = reactive<Record<string, unknown>>({});
+  const options = reactive<Record<string, unknown[]>>({});
+  const pagination = reactive<{ page: number }>({ page: 1 });
 
   for (const [name, def] of Object.entries(fieldDefs)) {
     const urlVal = urlState[name];
     const initial = urlVal !== undefined ? urlVal : (def.initial !== undefined ? def.initial : null);
     committed[name] = initial;
     draft[name] = initial;
-    options[name] = def.options || [];
+    options[name] = (def.options || []) as unknown[];
   }
 
   // Debounce timers
-  const debounceTimers = {};
+  const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
-  function scheduleAction(dep, changedField) {
+  function scheduleAction(dep: FieldDependency, changedField: string): void {
     const delay = dep.debounce || 0;
-    const key = `${dep.when}->${dep.then?.join(',')}`;
+    const thenKey = Array.isArray(dep.then) ? dep.then.join(',') : dep.then;
+    const key = `${dep.when}->${thenKey}`;
     clearTimeout(debounceTimers[key]);
     debounceTimers[key] = setTimeout(() => {
       executeDependencyAction(dep, changedField);
     }, delay);
   }
 
-  function executeDependencyAction(dep, _changedField) {
-    const targets = Array.isArray(dep.then) ? dep.then : [dep.then];
+  function executeDependencyAction(dep: FieldDependency, _changedField: string): void {
+    const targets = Array.isArray(dep.then) ? dep.then : [dep.then as string];
     for (const target of targets) {
       if (!(target in fieldDefs)) continue;
       if (dep.action === 'clear') {
@@ -79,7 +117,7 @@ export function useFilterOrchestrator(config) {
     }
   }
 
-  function triggerDependencies(changedField) {
+  function triggerDependencies(changedField: string): void {
     for (const dep of dependencies) {
       if (dep.when === changedField) {
         if (dep.debounce) {
@@ -91,14 +129,14 @@ export function useFilterOrchestrator(config) {
     }
   }
 
-  function resetPaginationIfNeeded(changedField) {
+  function resetPaginationIfNeeded(changedField: string): void {
     const resetOn = paginationConfig.resetOn || [];
     if (resetOn.includes('*') || resetOn.includes(changedField)) {
       pagination.page = 1;
     }
   }
 
-  function syncUrlIfEnabled() {
+  function syncUrlIfEnabled(): void {
     if (urlSyncConfig.enabled) {
       syncToUrl(toRaw(committed));
     }
@@ -108,7 +146,7 @@ export function useFilterOrchestrator(config) {
    * Update a field value. For immediate fields, also updates committed and triggers fetch.
    * For draft-apply fields, only updates draft.
    */
-  function updateField(name, value) {
+  function updateField(name: string, value: unknown): void {
     const def = fieldDefs[name];
     if (!def) return;
 
@@ -128,8 +166,8 @@ export function useFilterOrchestrator(config) {
   /**
    * Apply all draft values to committed and trigger fetch.
    */
-  function applyDraft() {
-    const changedFields = [];
+  function applyDraft(): void {
+    const changedFields: string[] = [];
     let hasDraftApplyChange = false;
     for (const name of Object.keys(fieldDefs)) {
       if (draft[name] !== committed[name]) {
@@ -160,7 +198,7 @@ export function useFilterOrchestrator(config) {
   /**
    * Reset all fields to their initial values.
    */
-  function resetAll() {
+  function resetAll(): void {
     for (const [name, def] of Object.entries(fieldDefs)) {
       const initial = def.initial !== undefined ? def.initial : null;
       committed[name] = initial;
@@ -173,7 +211,7 @@ export function useFilterOrchestrator(config) {
   /**
    * Set pagination page.
    */
-  function setPage(page) {
+  function setPage(page: number): void {
     pagination.page = page;
     syncUrlIfEnabled();
   }

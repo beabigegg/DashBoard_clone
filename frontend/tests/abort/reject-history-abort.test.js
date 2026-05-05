@@ -46,7 +46,7 @@ afterEach(() => {
 
 describe('reject-history abort — pollJobUntilComplete with signal', () => {
   it('abort before first poll prevents any apiGet calls', async () => {
-    const { pollJobUntilComplete } = await import('../../src/shared-composables/useAsyncJobPolling.js');
+    const { pollJobUntilComplete } = await import('../../src/shared-composables/useAsyncJobPolling.ts');
 
     const controller = new AbortController();
     controller.abort();
@@ -67,7 +67,7 @@ describe('reject-history abort — pollJobUntilComplete with signal', () => {
   });
 
   it('abort during polling stops further apiGet calls', async () => {
-    const { pollJobUntilComplete } = await import('../../src/shared-composables/useAsyncJobPolling.js');
+    const { pollJobUntilComplete } = await import('../../src/shared-composables/useAsyncJobPolling.ts');
 
     apiGet.mockResolvedValue({ data: { status: 'running', pct: 10 } });
 

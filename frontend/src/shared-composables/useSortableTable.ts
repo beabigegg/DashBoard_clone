@@ -1,16 +1,32 @@
 import { computed, ref } from 'vue';
+import type { Ref, ComputedRef } from 'vue';
+
+export type SortDirection = 'asc' | 'desc';
+export type SortType = 'string' | 'number' | 'date';
+
+export type DataRow = Record<string, unknown>;
+
+export interface SortableTableComposable<T extends DataRow = DataRow> {
+  sortKey: Ref<string>;
+  sortDirection: Ref<SortDirection>;
+  sortedData: ComputedRef<T[]>;
+  setSortKey: (key: string) => void;
+  toggleSort: (key: string) => void;
+}
 
 /**
  * Composable for client-side column sorting.
  *
- * @param {import('vue').Ref<Array>|import('vue').ComputedRef<Array>} data - reactive data array
- * @returns {{ sortKey, sortDirection, sortedData, setSortKey, toggleSort }}
+ * @param data - reactive data array
+ * @returns { sortKey, sortDirection, sortedData, setSortKey, toggleSort }
  */
-export function useSortableTable(data) {
-  const sortKey = ref('');
-  const sortDirection = ref('asc'); // 'asc' | 'desc'
+export function useSortableTable<T extends DataRow = DataRow>(
+  data: Ref<T[]> | ComputedRef<T[]>,
+): SortableTableComposable<T> {
+  const sortKey: Ref<string> = ref('');
+  const sortDirection: Ref<SortDirection> = ref('asc');
 
-  function detectType(value) {
+  function detectType(value: unknown): SortType {
     if (value === null || value === undefined || value === '') {
       return 'string';
     }
@@ -37,7 +53,7 @@ export function useSortableTable(data) {
    * Normalize a date string to ensure reliable parsing.
    * Handles YYYY/M/D, YYYY-M-D, with optional time components.
    */
-  function normalizeDateStr(value) {
+  function normalizeDateStr(value: unknown): Date {
     const str = String(value).trim();
     // Replace slashes with dashes for consistent parsing
     // "2026/2/27 22:39:37" → "2026-2-27 22:39:37"
@@ -46,7 +62,7 @@ export function useSortableTable(data) {
     return Number.isNaN(d.getTime()) ? new Date(str) : d;
   }
 
-  function compareValues(a, b, type) {
+  function compareValues(a: unknown, b: unknown, type: SortType): number {
     if (a === null || a === undefined || a === '') return 1;
     if (b === null || b === undefined || b === '') return -1;
 
@@ -54,13 +70,13 @@ export function useSortableTable(data) {
       return Number(a) - Number(b);
     }
     if (type === 'date') {
-      return normalizeDateStr(a) - normalizeDateStr(b);
+      return normalizeDateStr(a).getTime() - normalizeDateStr(b).getTime();
     }
     // string — locale-aware
     return String(a).localeCompare(String(b), 'zh-Hant', { numeric: true, sensitivity: 'base' });
   }
 
-  const sortedData = computed(() => {
+  const sortedData: ComputedRef<T[]> = computed(() => {
     const rows = data.value ?? [];
     const key = sortKey.value;
     if (!key) {
@@ -71,12 +87,12 @@ export function useSortableTable(data) {
 
     // Detect type from first non-null value
     const firstRow = rows.find((r) => r[key] !== null && r[key] !== undefined && r[key] !== '');
-    const type = firstRow ? detectType(firstRow[key]) : 'string';
+    const type: SortType = firstRow ? detectType(firstRow[key]) : 'string';
 
     return [...rows].sort((a, b) => compareValues(a[key], b[key], type) * direction);
   });
 
-  function setSortKey(key) {
+  function setSortKey(key: string): void {
     if (sortKey.value === key) {
       sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
     } else {
@@ -85,7 +101,7 @@ export function useSortableTable(data) {
     }
   }
 
-  function toggleSort(key) {
+  function toggleSort(key: string): void {
     setSortKey(key);
   }
 

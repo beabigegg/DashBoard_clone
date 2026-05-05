@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { pollJobUntilComplete, useAsyncJobPolling } from '../../src/shared-composables/useAsyncJobPolling.js';
+import { pollJobUntilComplete, useAsyncJobPolling } from '../../src/shared-composables/useAsyncJobPolling.ts';
 
 // Mock the apiGet function used internally
 vi.mock('../../src/core/api.js', () => ({

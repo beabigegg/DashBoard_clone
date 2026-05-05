@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useRequestGuard } from '../../src/shared-composables/useRequestGuard.js';
+import { useRequestGuard } from '../../src/shared-composables/useRequestGuard.ts';
 
 describe('useRequestGuard — basic API', () => {
   beforeEach(() => {

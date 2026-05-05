@@ -1,0 +1,24 @@
+change-id: migrate-shared-composables-ts
+agent: contract-reviewer
+timestamp: "2026-05-05T00:00:00Z"
+status: complete
+files-read:
+  - specs/changes/migrate-shared-composables-ts/context-manifest.md
+  - specs/changes/migrate-shared-composables-ts/change-classification.md
+  - specs/changes/migrate-shared-composables-ts/change-request.md
+  - contracts/ci/ci-gate-contract.md
+  - contracts/CHANGELOG.md
+  - frontend/tsconfig.json
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/ci/ci-gate-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/CHANGELOG.md" }
+  - { type: verdict, pointer: "contracts/ci/ci-gate-contract.md: schema-version 1.3.0 → 1.3.1 (patch)" }
+  - { type: version-bumps, pointer: "contracts/ci/ci-gate-contract.md:6" }
+  - { type: breaking-changes, pointer: "n/a (additive prose only; no gate tier, command, or status changed)" }
+  - { type: consumers-impacted, pointer: "n/a (no API/CSS/env/data/business surface touched; tsconfig include expansion is additive)" }
+notes: |
+  All non-CI contract surfaces confirmed no-change. CI gate contract required a patch
+  to document Phase 1b tsconfig include scope expansion in Gate Compatibility Notes.
+  Schema-version bumped to 1.3.1 (additive prose only). CHANGELOG entry [ci 1.3.1]
+  added. No breaking changes; no consumers impacted.
+next-action: none

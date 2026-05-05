@@ -1,0 +1,35 @@
+change-id: migrate-shared-composables-ts
+agent: test-strategist
+timestamp: "2026-05-05T00:00:00Z"
+status: complete
+files-read:
+  - specs/changes/migrate-shared-composables-ts/change-classification.md
+  - specs/changes/migrate-shared-composables-ts/change-request.md
+  - specs/changes/migrate-shared-composables-ts/test-plan.md
+  - frontend/src/shared-composables/index.js
+  - frontend/src/shared-composables/useAsyncJobPolling.js
+  - frontend/src/shared-composables/useAutoRefresh.js
+  - frontend/src/shared-composables/useRequestGuard.js
+  - frontend/tests/shared-composables/useAsyncJobPolling.test.js
+  - frontend/tests/shared-composables/useAutoRefresh.test.js
+  - frontend/tests/shared-composables/useRequestGuard.test.js
+  - frontend/tests/core/api-dedup.test.js
+  - frontend/package.json
+  - frontend/tsconfig.json
+  - specs/changes/migrate-shared-composables-ts/agent-log/contract-reviewer.yml
+notes: |
+  Test file rename policy: keep .test.js (Phase 1a precedent — api-dedup.test.js is still .js).
+  Critical mechanical risk: 6 test files reference shared-composables with explicit .js extension
+  and must update specifiers after source rename. 8 composables have no unit coverage (pre-existing
+  gap, out of scope).
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/migrate-shared-composables-ts/test-plan.md" }
+  - { type: tdd-pairs, pointer: "frontend/tests/shared-composables/useAsyncJobPolling.test.js" }
+  - { type: tdd-pairs, pointer: "frontend/tests/shared-composables/useAutoRefresh.test.js" }
+  - { type: tdd-pairs, pointer: "frontend/tests/shared-composables/useRequestGuard.test.js" }
+  - { type: tdd-pairs, pointer: "frontend/tests/abort/reject-history-abort.test.js" }
+  - { type: tdd-pairs, pointer: "frontend/tests/abort/production-history-abort.test.js" }
+  - { type: tdd-pairs, pointer: "frontend/tests/abort/query-tool-abort.test.js" }
+  - { type: coverage-tiers, pointer: "specs/changes/migrate-shared-composables-ts/test-plan.md" }
+  - { type: mapping-completeness, pointer: "specs/changes/migrate-shared-composables-ts/test-plan.md" }
+next-action: none

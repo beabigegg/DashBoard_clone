@@ -1,0 +1,22 @@
+change-id: migrate-shared-composables-ts
+agent: ci-cd-gatekeeper
+timestamp: "2026-05-05T00:00:00Z"
+status: complete
+files-read:
+  - specs/changes/migrate-shared-composables-ts/context-manifest.md
+  - specs/changes/migrate-shared-composables-ts/change-classification.md
+  - specs/changes/migrate-shared-composables-ts/test-plan.md
+  - contracts/ci/ci-gate-contract.md
+  - .github/workflows/frontend-tests.yml
+  - frontend/package.json
+  - frontend/tsconfig.json
+artifacts:
+  - { type: ci-gates-plan, pointer: "specs/changes/migrate-shared-composables-ts/ci-gates.md" }
+  - { type: tiers-modified, pointer: "n/a (no gate tier changes; frontend-type-check scope expanded but remains informational Tier 1)" }
+  - { type: gate-promotions, pointer: "n/a (frontend-type-check remains informational; no gate moved between tiers)" }
+  - { type: workflow-files-changed, pointer: "n/a (.github/workflows/frontend-tests.yml requires no edits)" }
+  - { type: required-status-checks, pointer: ".github/workflows/frontend-tests.yml" }
+notes: |
+  No workflow YAML changes required. frontend-tests.yml triggers on frontend/src/**,
+  runs type-check (informational) and Vitest suite (required). Gate eligibility: mergeable.
+next-action: none

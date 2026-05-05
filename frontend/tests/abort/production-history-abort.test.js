@@ -22,13 +22,13 @@ vi.mock('../../src/core/api.js', () => ({
 }));
 
 // Mock pollJobUntilComplete so we can control its lifecycle
-vi.mock('../../src/shared-composables/useAsyncJobPolling.js', () => ({
+vi.mock('../../src/shared-composables/useAsyncJobPolling.ts', () => ({
   pollJobUntilComplete: vi.fn(),
   useAsyncJobPolling: vi.fn(() => ({ pollJobUntilComplete: vi.fn() })),
 }));
 
 import { apiPost } from '../../src/core/api.js';
-import { pollJobUntilComplete } from '../../src/shared-composables/useAsyncJobPolling.js';
+import { pollJobUntilComplete } from '../../src/shared-composables/useAsyncJobPolling.ts';
 
 beforeEach(() => {
   vi.useFakeTimers();

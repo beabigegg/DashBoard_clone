@@ -1,0 +1,21 @@
+change-id: migrate-shared-composables-ts
+agent: change-classifier
+timestamp: "2026-05-05T00:00:00Z"
+status: complete
+files-read:
+  - specs/changes/migrate-shared-composables-ts/change-request.md
+  - specs/changes/migrate-shared-composables-ts/context-manifest.md
+  - specs/context/project-map.md
+  - specs/context/contracts-index.md
+artifacts:
+  - { type: tier, pointer: "Tier 2" }
+  - { type: risk, pointer: "medium" }
+  - { type: required-artifacts, pointer: "change-request, classification, test-plan, ci-gates, tasks" }
+  - { type: required-reviewers, pointer: "contract-reviewer, test-strategist, frontend-engineer, ci-cd-gatekeeper, qa-reviewer" }
+  - { type: context-manifest-draft, pointer: "specs/changes/migrate-shared-composables-ts/context-manifest.md" }
+notes: |
+  Phase 1b TypeScript migration of frontend/src/shared-composables/ (11 .js files
+  + index.js + 1 .vue). Pure type-layer refactor with no API/CSS/env/data/business
+  surface impact. Tier 2 selected (module-level scope, cross-module compile-time
+  consumers, established Phase 1a pattern reduces unknowns). No architecture review needed.
+next-action: none

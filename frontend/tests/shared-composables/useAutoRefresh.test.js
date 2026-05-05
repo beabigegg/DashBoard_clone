@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 import { mount } from '@vue/test-utils';
-import { useAutoRefresh } from '../../src/shared-composables/useAutoRefresh.js';
+import { useAutoRefresh } from '../../src/shared-composables/useAutoRefresh.ts';
 
 // Helper: mount a component that calls useAutoRefresh with given options,
 // returning { wrapper, refreshSpy, ...returned composable }
