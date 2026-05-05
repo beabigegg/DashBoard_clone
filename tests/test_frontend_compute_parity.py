@@ -43,7 +43,7 @@ def _backend_expected(case: dict[str, float]) -> dict[str, float]:
 
 def test_frontend_compute_matches_backend_formulas():
     repo_root = Path(__file__).resolve().parents[1]
-    compute_module = repo_root / 'frontend' / 'src' / 'core' / 'compute.js'
+    compute_module = repo_root / 'frontend' / 'src' / 'core' / 'compute.ts'
     fixture = _load_fixture()
     cases = fixture["cases"]
     tolerance = fixture["metric_tolerance"]
@@ -56,7 +56,7 @@ def test_frontend_compute_matches_backend_formulas():
     )
 
     completed = subprocess.run(
-        ['node', '--input-type=module', '-e', node_code, json.dumps(cases)],
+        ['node', '--experimental-strip-types', '--input-type=module', '-e', node_code, json.dumps(cases)],
         cwd=repo_root,
         check=True,
         capture_output=True,
