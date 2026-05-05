@@ -39,6 +39,10 @@ jobs:
           activate-environment: mes-dashboard
           auto-activate-base: false
 
+      - name: Install project package
+        shell: bash -el {0}
+        run: pip install -e .
+
       - name: Lint (ruff)
         shell: bash -el {0}
         run: ruff check .
