@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.1.0
+schema-version: 1.2.0
 last-changed: 2026-05-05
 breaking-change-policy: deprecate-2-minors
 ---
@@ -68,36 +68,147 @@ breaking-change-policy: deprecate-2-minors
 
 | method | path | auth | request schema | response schema | errors | tests |
 |---|---|---|---|---|---|---|
-| GET | /api/wip/overview/summary | required | query params | success_response | 400/500 | route tests |
-| POST | /api/wip/overview/summary | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/hold/overview | required | query params | success_response | 400/500 | route tests |
-| POST | /api/hold-history/today-snapshot | required | JSON body | success_response | 400/503 | e2e tests |
-| POST | /api/reject-history/query | required | JSON body | success_response | 202/400/500 | route tests |
-| GET | /api/reject-history/job/<job_id> | required | — | success_response | 404 | route tests |
-| POST | /api/resource/history/query | required | JSON body | success_response | 400/410/500 | route tests |
-| POST | /api/yield-alert/query | required | JSON body | success_response | 202/400/500 | route tests |
-| GET | /api/yield-alert/cross-filter-options | required | query params | success_response | 400/410 | route tests |
-| POST | /api/production-history/query | required | JSON body | success_response | 202/400/503 | route tests |
-| POST | /api/production-history/page | required | JSON body | success_response | 400/410 | route tests |
-| GET | /api/production-history/export | required | query params | csv-stream | 400/410 | e2e tests |
-| POST | /api/trace/lineage | required | JSON body | success_response | 202/400/500 | route tests |
-| GET | /api/trace/lineage/job/<job_id> | required | — | success_response | 404 | route tests |
-| GET | /api/mid-section-defect/analysis | required | query params | success_response | 400/500 | route tests |
-| POST | /api/material-trace/query | required | JSON body | success_response | 202/400/503 | route tests |
-| POST | /api/material-trace/export | required | JSON body | csv-stream | 400/409 | e2e tests |
-| GET | /api/analytics/anomaly-summary | required | query params | success_response | 400/503 | route tests |
-| POST | /api/auth/login | public | JSON body | success_response | 400/401/429 | route tests |
+| POST | /api/auth/login | public | JSON {username,password} | success_response | 400/401/429 | route tests |
 | POST | /api/auth/logout | public | — | success_response | — | route tests |
 | GET | /api/auth/me | public | — | success_response | — | route tests |
 | PATCH | /api/auth/heartbeat | required | — | success_response | 401 | route tests |
-| POST | /api/ai/query | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/job/<job_id> | required | query params | success_response | 400/404 | route tests |
-| POST | /api/job/<job_id>/abandon | required | JSON body | success_response | 403/404/409 | route tests |
-| POST | /api/admin/analytics/recalculate | admin | — | success_response | 403/500 | route tests |
-| GET | /admin/api/user-usage-kpi | admin | query params | success_response | 400/403 | route tests |
 | GET | /health | none | — | health-payload | — | smoke tests |
 | GET | /health/deep | none | — | health-payload | — | smoke tests |
+| GET | /api/job/<job_id> | required | ?prefix= | success_response | 400/404 | route tests |
+| POST | /api/job/<job_id>/abandon | required | JSON body | success_response | 403/404/409 | route tests |
 | GET | /api/spool/<namespace>/<query_id>.parquet | required | — | parquet-binary | 404/410 | route tests |
+| GET | /api/wip/overview/summary | required | query params | success_response | 400/500 | route tests |
+| GET | /api/wip/overview/matrix | required | query params | success_response | 400/500 | route tests |
+| GET | /api/wip/overview/hold | required | query params | success_response | 400/500 | route tests |
+| GET | /api/wip/detail/<workcenter> | required | query params | success_response | 400/500 | route tests |
+| GET | /api/wip/lot/<lotid> | required | — | success_response | 404/500 | route tests |
+| GET | /api/wip/meta/workcenters | required | — | success_response | 500 | route tests |
+| GET | /api/wip/meta/packages | required | — | success_response | 500 | route tests |
+| GET | /api/wip/meta/filter-options | required | query params | success_response | 500 | route tests |
+| GET | /api/wip/meta/search | required | ?q= | success_response | 400/500 | route tests |
+| GET | /api/hold-overview/summary | required | query params | success_response | 400/500 | route tests |
+| GET | /api/hold-overview/matrix | required | query params | success_response | 400/500 | route tests |
+| GET | /api/hold-overview/treemap | required | query params | success_response | 400/500 | route tests |
+| GET | /api/hold-overview/lots | required | query params | success_response | 400/500 | route tests |
+| GET | /api/wip/hold-detail/summary | required | query params | success_response | 400/500 | route tests |
+| GET | /api/wip/hold-detail/distribution | required | query params | success_response | 400/500 | route tests |
+| GET | /api/wip/hold-detail/lots | required | query params | success_response | 400/500 | route tests |
+| GET | /api/hold-history/config | required | — | success_response | 500 | route tests |
+| POST | /api/hold-history/query | required | JSON body | success_response | 400/410/500 | route tests |
+| POST | /api/hold-history/today-snapshot | required | JSON body | success_response | 400/503 | e2e tests |
+| GET | /api/hold-history/view | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/qc-gate/summary | required | — | success_response | 500 | route tests |
+| GET | /api/resource/by_status | required | — | success_response | 500 | route tests |
+| GET | /api/resource/by_workcenter | required | — | success_response | 500 | route tests |
+| GET | /api/resource/workcenter_status_matrix | required | — | success_response | 500 | route tests |
+| POST | /api/resource/detail | required | JSON body | success_response | 400/500 | route tests |
+| GET | /api/resource/filter_options | required | — | success_response | 500 | route tests |
+| GET | /api/resource/status_values | required | — | success_response | 500 | route tests |
+| GET | /api/resource/status | required | query params | success_response | 400/500 | route tests |
+| GET | /api/resource/status/options | required | — | success_response | 500 | route tests |
+| GET | /api/resource/status/summary | required | query params | success_response | 400/500 | route tests |
+| GET | /api/resource/status/matrix | required | query params | success_response | 400/500 | route tests |
+| GET | /api/resource/history/options | required | — | success_response | 500 | route tests |
+| POST | /api/resource/history/query | required | JSON body | success_response | 400/410/500 | route tests |
+| GET | /api/resource/history/view | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/resource/history/export | required | query params | csv-stream | 400/410 | e2e tests |
+| GET | /api/reject-history/options | required | — | success_response | 500 | route tests |
+| GET | /api/reject-history/summary | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/reject-history/trend | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/reject-history/reason-pareto | required | ?query_id= | success_response | 400/410 | route tests |
+| POST | /api/reject-history/batch-pareto | required | JSON body | success_response | 400/410 | route tests |
+| GET | /api/reject-history/list | required | ?query_id=&page= | success_response | 400/410 | route tests |
+| GET | /api/reject-history/export | required | ?query_id= | csv-stream | 400/410 | e2e tests |
+| GET | /api/reject-history/export-cached | required | ?query_id= | csv-stream | 400/410 | e2e tests |
+| GET | /api/reject-history/analytics | required | ?query_id= | success_response | 400/410 | route tests |
+| POST | /api/reject-history/query | required | JSON body | success_response | 202/400/500 | route tests |
+| GET | /api/reject-history/count | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/reject-history/job/<job_id> | required | — | success_response | 404 | route tests |
+| GET | /api/reject-history/view | required | ?query_id= | success_response | 400/410 | route tests |
+| POST | /api/yield-alert/query | required | JSON body | success_response | 202/400/500 | route tests |
+| GET | /api/yield-alert/job/<job_id> | required | — | success_response | 404 | route tests |
+| GET | /api/yield-alert/analyze | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/yield-alert/view | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/yield-alert/summary | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/yield-alert/trend | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/yield-alert/alerts | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/yield-alert/reason-detail | required | ?query_id=&reason= | success_response | 400/410 | route tests |
+| GET | /api/yield-alert/drilldown-context | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/yield-alert/filter-options | required | — | success_response | 500 | route tests |
+| GET | /api/yield-alert/cross-filter-options | required | ?query_id=&lines[]=... | success_response | 400/410 | route tests |
+| GET | /api/production-history/type-options | required | — | success_response | 500 | route tests |
+| GET | /api/production-history/options | required | — | success_response | 503 | route tests |
+| POST | /api/production-history/query | required | JSON body | success_response | 202/400/503 | route tests |
+| GET | /api/production-history/job/<job_id> | required | — | success_response | 404 | route tests |
+| POST | /api/production-history/page | required | JSON body | success_response | 400/410 | route tests |
+| POST | /api/production-history/matrix | required | JSON body | success_response | 400/410 | route tests |
+| GET | /api/production-history/count | required | ?query_id= | success_response | 400/410 | route tests |
+| GET | /api/production-history/export | required | query params | csv-stream | 400/410 | e2e tests |
+| POST | /api/material-trace/query | required | JSON body | success_response | 202/400/503 | route tests |
+| GET | /api/material-trace/job/<job_id> | required | — | success_response | 404 | route tests |
+| POST | /api/material-trace/export | required | JSON {query_hash} | csv-stream | 400/409 | e2e tests |
+| GET | /api/material-trace/filter-options | required | — | success_response | 500 | route tests |
+| POST | /api/trace/seed-resolve | required | JSON body | success_response | 400/500 | route tests |
+| POST | /api/trace/lineage | required | JSON body | success_response | 202/400/500 | route tests |
+| GET | /api/trace/lineage/job/<job_id> | required | — | success_response | 404 | route tests |
+| GET | /api/trace/lineage/job/<job_id>/result | required | — | success_response | 404/410 | route tests |
+| POST | /api/trace/events | required | JSON body | success_response | 400/500 | route tests |
+| GET | /api/trace/job/<job_id> | required | — | success_response | 404 | route tests |
+| GET | /api/trace/job/<job_id>/result | required | — | success_response | 404/410 | route tests |
+| GET | /api/trace/job/<job_id>/stream | required | — | ndjson-stream | 404 | e2e tests |
+| GET | /api/mid-section-defect/station-options | required | — | success_response | 500 | route tests |
+| GET | /api/mid-section-defect/analysis | required | query params | success_response | 400/500 | route tests |
+| GET | /api/mid-section-defect/analysis/detail | required | query params | success_response | 400/500 | route tests |
+| GET | /api/mid-section-defect/loss-reasons | required | — | success_response | 500 | route tests |
+| GET | /api/mid-section-defect/export | required | query params | csv-stream | 400/500 | e2e tests |
+| GET | /api/analytics/anomaly-summary | required | — | success_response+cache_state | 503 | route tests |
+| GET | /api/analytics/yield-anomalies | required | — | success_response | 503 | route tests |
+| GET | /api/analytics/reject-spikes | required | — | success_response | 503 | route tests |
+| GET | /api/analytics/hold-outliers | required | — | success_response | 503 | route tests |
+| GET | /api/analytics/equipment-deviation | required | — | success_response | 503 | route tests |
+| GET | /api/analytics/yield-anomalies/drilldown | required | ?query_id= | success_response | 400/410/503 | route tests |
+| GET | /api/analytics/reject-spikes/drilldown | required | ?query_id= | success_response | 400/410/503 | route tests |
+| GET | /api/analytics/hold-outliers/drilldown | required | ?query_id= | success_response | 400/410/503 | route tests |
+| GET | /api/analytics/equipment-deviation/drilldown | required | ?query_id= | success_response | 400/410/503 | route tests |
+| POST | /api/query-tool/resolve | required | JSON body | success_response | 400/500 | route tests |
+| GET | /api/query-tool/lot-history | required | ?lot_id= | success_response | 400/500 | route tests |
+| GET | /api/query-tool/adjacent-lots | required | ?lot_id= | success_response | 400/500 | route tests |
+| GET | /api/query-tool/lot-associations | required | ?lot_id= | success_response | 400/500 | route tests |
+| POST | /api/query-tool/equipment-period | required | JSON body | success_response | 400/500 | route tests |
+| GET | /api/query-tool/equipment-list | required | — | success_response | 500 | route tests |
+| GET | /api/query-tool/workcenter-groups | required | — | success_response | 500 | route tests |
+| POST | /api/query-tool/lot-equipment-lookup | required | JSON body | success_response | 400/500 | route tests |
+| GET | /api/query-tool/equipment-recent-jobs/<equipment_id> | required | — | success_response | 404/500 | route tests |
+| POST | /api/query-tool/export-csv | required | JSON body | csv-stream | 400/500 | e2e tests |
+| GET | /api/job-query/resources | required | — | success_response | 500 | route tests |
+| POST | /api/job-query/jobs | required | JSON body | success_response | 400/500 | route tests |
+| GET | /api/job-query/txn/<job_id> | required | — | success_response | 404/500 | route tests |
+| POST | /api/job-query/export | required | JSON body | csv-stream | 400/500 | e2e tests |
+| POST | /api/dashboard/kpi | required | JSON body | success_response | 400/500 | route tests |
+| POST | /api/dashboard/workcenter_cards | required | JSON body | success_response | 400/500 | route tests |
+| POST | /api/dashboard/detail | required | JSON body | success_response | 400/500 | route tests |
+| POST | /api/dashboard/ou_trend | required | JSON body | success_response | 400/500 | route tests |
+| POST | /api/dashboard/utilization_heatmap | required | JSON body | success_response | 400/500 | route tests |
+| POST | /api/ai/query | required | JSON body | success_response | 400/500 | route tests |
+| GET | /admin/api/system-status | admin | — | success_response | 403/500 | route tests |
+| GET | /admin/api/metrics | admin | — | success_response | 403/500 | route tests |
+| GET | /admin/api/logs | admin | query params | success_response | 403/500 | route tests |
+| DELETE | /admin/api/logs/cleanup | admin | — | success_response | 403/500 | route tests |
+| DELETE | /admin/api/log-files/cleanup | admin | — | success_response | 403/500 | route tests |
+| GET | /admin/api/performance-detail | admin | query params | success_response | 403/500 | route tests |
+| GET | /admin/api/performance-history | admin | query params | success_response | 403/500 | route tests |
+| DELETE | /admin/api/performance-history/purge | admin | — | success_response | 403/500 | route tests |
+| GET | /admin/api/storage-info | admin | — | success_response | 403/500 | route tests |
+| POST | /admin/api/worker/restart | admin | — | success_response | 403/500 | route tests |
+| GET | /admin/api/worker/status | admin | — | success_response | 403/500 | route tests |
+| GET | /admin/api/user-usage-kpi | admin | ?start_date=&end_date=&department= | success_response | 400/403 | route tests |
+| GET | /admin/api/pages | admin | — | success_response | 403/500 | route tests |
+| GET | /admin/api/drawers | admin | — | success_response | 403/500 | route tests |
+| POST | /admin/api/drawers | admin | JSON body | success_response | 400/403 | route tests |
+| GET | /admin/api/drawers/<drawer_id> | admin | — | success_response | 403/404 | route tests |
+| PUT | /admin/api/drawers/<drawer_id> | admin | JSON body | success_response | 400/403/404 | route tests |
+| DELETE | /admin/api/drawers/<drawer_id> | admin | — | success_response | 403/404 | route tests |
+| POST | /admin/api/analytics/recalculate | admin | — | success_response | 403/500 | route tests |
 
 ## 5. Routing & Naming
 
