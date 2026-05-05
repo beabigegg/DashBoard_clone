@@ -1,0 +1,102 @@
+---
+contract: css
+summary: UI token policy, component styling rules, and visual review constraints.
+owner: application-team
+surface: ui
+schema-version: 1.1.0
+last-changed: 2026-05-05
+breaking-change-policy: deprecate-2-minors
+---
+
+# CSS / UI Contract — MES Dashboard
+
+> 來源：遷移自 `contract/css_development_contract.md` v1.1（2026-05-05）
+
+## Token Source of Truth
+
+**`frontend/tailwind.config.js` 是唯一真實來源。**
+
+| 契約 | 規則 |
+|---|---|
+| 2.1 | 禁止在任何 `.css` 的 `:root` 中手動定義設計規範（顏色、間距、字體等） |
+| 2.2 | 所有新設計規範必須加入 `tailwind.config.js` 的 `theme.extend` |
+| 2.3 | CSS 檔案中引用設計規範必須透過 Tailwind `theme()` 函式 |
+| 2.4 | **例外**：第三方圖表函式庫（ECharts）因 API 限制無法用 `theme()`，允許在 JS/Vue 圖表設定物件中使用色碼，但須遵守圖表例外治理（見下§6） |
+
+## 樣式決策框架
+
+| 契約 | 規則 |
+|---|---|
+| 3.1 | 優先使用 Tailwind 功能類別（utility-first）；例：`flex items-center rounded-lg` |
+| 3.2 | 一組功能類別組合在專案中重複出現 **3 次以上**時，抽象化為語意化元件類別 |
+| 3.2.1 | 元件類別使用 `@apply` 組合 Tailwind 功能類別 |
+| 3.2.2 | **全域複用**元件（按鈕、輸入框、徽章）必須定義在 `frontend/src/styles/tailwind.css` 的 `@layer components` 中，以 `ui-` 前綴 |
+| 3.2.3 | 僅當樣式無法透過 Tailwind 實現（偽元素、複雜 `calc()`）才在元件類別撰寫原生 CSS，仍需用 `theme()` |
+| 3.3 | **嚴格禁止**在 Vue `<template>` 中使用 `style="..."` 定義靜態樣式（僅限動態綁定） |
+
+## 樣式作用域與隔離
+
+| 契約 | 規則 |
+|---|---|
+| 4.1 | 功能區塊的樣式檔（如 `resource-shared/styles.css`）**嚴禁**包含 `html`, `body`, `*` 等全域標籤的樣式 |
+| 4.2 | 每個主要功能區塊必須定義唯一「主題根類別」（如 `.theme-resource`, `.theme-wip`），應用於最外層容器 |
+| 4.3 | 功能區塊所有樣式規則必須以主題根類別為父選擇器，防止洩漏 |
+
+## 基礎樣式
+
+| 契約 | 規則 |
+|---|---|
+| 5.1 | 所有全域基礎樣式和 CSS 重置必須統一在 `frontend/src/styles/tailwind.css` 的 `@layer base` 定義（`preflight` 已被禁用） |
+| 5.2 | 任何其他 CSS 檔案禁止包含自己的基礎樣式重置 |
+
+## 圖表與函式庫例外治理
+
+| 契約 | 規則 |
+|---|---|
+| 6.1 | 例外只適用於第三方圖表函式庫設定（ECharts `option`, `itemStyle`, `visualMap`, `lineStyle`）；不適用於一般 CSS 或 Vue template style |
+| 6.2 | 圖表顏色優先由集中 palette/token 映射取得，不得在多處散落重複硬編碼 |
+| 6.3 | 必須保留 HEX 的條件：色碼位於圖表設定上下文；具備明確語意（`danger`, `warning`, `seriesA`）；同一檔案重複色碼需抽為常數或 palette |
+| 6.4 | 圖表例外需透過 `frontend/scripts/css-governance-check.js` 盤點（warning/allow-candidate）；非圖表上下文的 HEX 視為違規（error） |
+
+## Component Rules
+
+| component | variants | states | allowed overrides |
+|---|---|---|---|
+| `DataTable.vue` | — | loading（`:loading` prop）、empty | 只能透過 props/slots；禁止外部定義 `data-table-*` CSS |
+| `SummaryCard` | `accent` prop | — | 不得保留舊的 `.summary-card` / `.summary-grid` CSS |
+| `Chip` | `tone` prop | — | 禁止自訂 pill/tag CSS 取代 tone 系統 |
+| `SectionCard` | — | — | 禁止在 feature CSS 新增 `.section-card` |
+| `ErrorBanner` | — | — | 禁止在 feature CSS 新增 `.error-banner` |
+| `LoadingOverlay` | `tier="page"` | — | 禁止自訂 full-page spinner |
+
+## Loading 三層治理
+
+| 場景 | 必須使用 | 禁止 |
+|---|---|---|
+| Page-level（初始化全局等待） | `<LoadingOverlay tier="page" />` | 自訂 `@keyframes` + fixed/absolute 全屏遮罩 |
+| Component-level（按鈕 busy） | `is-loading` class + `<LoadingSpinner size="sm" />` + `disabled` + loading 文案 | 保留自定義 `.btn-spinner` |
+| Block-level（DataTable） | `DataTable :loading` prop | 同一區塊並存 `ui-table-wrap.is-loading` 與 `:loading` |
+| Block-level（非 DataTable） | `<BlockLoadingState />` 或 `<EmptyState type="loading" />` | — |
+
+所有 loading 動畫必須尊重 `prefers-reduced-motion`。
+
+## CSS Inventory Governance
+
+| 契約 | 規則 |
+|---|---|
+| 7.1 | `contracts/css/css-inventory.md`（若存在）或 `contract/css_inventory.md` 為 `frontend/src/**/*.css` 的治理索引 |
+| 7.2 | 新增/刪除/重新命名/搬移任何 CSS 檔案，必須在同一變更更新清單 |
+| 7.3 | CSS 規則大幅搬移時，必須更新清單的 scope/notes 欄位 |
+| 7.4 | `src/mes_dashboard/static/dist/*` 產物不屬清單治理範圍 |
+
+## Forbidden Practices
+
+- 硬編碼 token 值（顏色、間距）繞過 `tailwind.config.js`
+- 功能區塊樣式洩漏至全域（缺少主題根類別作用域）
+- 從外部 CSS 覆寫共用元件內部樣式（DataTable、SummaryCard、Chip、SectionCard、ErrorBanner）
+- 未審查的 z-index 添加
+- 多種 loading 表現並存於同一區塊
+
+## Visual Review Policy
+
+所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
