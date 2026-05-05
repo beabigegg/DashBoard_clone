@@ -304,7 +304,7 @@
 
 .theme-hold-history .mode-btn.active {
   background: theme('colors.accent.500');
-  color: #fff;
+  color: theme('colors.surface.card');
 }
 
 .theme-hold-history .today-date-badge {

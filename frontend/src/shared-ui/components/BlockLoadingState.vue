@@ -27,7 +27,7 @@ defineProps({
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: var(--text-secondary, #64748b);
+  color: theme('colors.text.secondary');
   font-size: 13px;
 }
 

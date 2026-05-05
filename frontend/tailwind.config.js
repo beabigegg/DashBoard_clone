@@ -170,6 +170,7 @@ export default {
           hffffff: '#ffffff',
           h10b981: '#10b981',
           h6b7280: '#6b7280',
+          h6d28d9: '#6d28d9',
           h9333ea: '#9333ea',
           h999999: '#999999',
           hea580c: '#ea580c',

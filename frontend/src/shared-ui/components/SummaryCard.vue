@@ -35,23 +35,7 @@ const props = defineProps({
 
 const emit = defineEmits(['click'])
 
-const ACCENT_MAP = {
-  brand:   { bar: '#0080C8', text: '#0080C8' },
-  success: { bar: '#22c55e', text: '#15803d' },
-  warning: { bar: '#f59e0b', text: '#b45309' },
-  danger:  { bar: '#ef4444', text: '#b91c1c' },
-  info:    { bar: '#3b82f6', text: '#1d4ed8' },
-  neutral: { bar: '#9ca3af', text: '#64748b' },
-  // Equipment state tokens
-  prd:     { bar: '#22c55e', text: '#15803d' },
-  sby:     { bar: '#3b82f6', text: '#1d4ed8' },
-  udt:     { bar: '#f59e0b', text: '#b45309' },
-  sdt:     { bar: '#ef4444', text: '#b91c1c' },
-  egt:     { bar: '#8b5cf6', text: '#6d28d9' },
-  nst:     { bar: '#9ca3af', text: '#64748b' }
-}
-
-const accentColor = computed(() => ACCENT_MAP[props.accent] ?? ACCENT_MAP.brand)
+const accentColor = computed(() => props.accent ?? 'brand')
 
 const formattedValue = computed(() => {
   const v = props.value
@@ -90,7 +74,7 @@ function handleClick() {
       'summary-card--clickable': clickable,
       'summary-card--active': clickable && active,
     }"
-    :style="{ '--accent-bar': accentColor.bar, '--accent-text': accentColor.text }"
+    :data-accent="accentColor"
     :role="clickable ? 'button' : undefined"
     :tabindex="clickable ? 0 : undefined"
     :title="tooltip || undefined"
@@ -228,4 +212,18 @@ function handleClick() {
     transform: none;
   }
 }
+
+/* Accent tokens — all colors resolved via theme() to avoid hardcoded HEX */
+.summary-card[data-accent="brand"]   { --accent-bar: theme('colors.brand.500');    --accent-text: theme('colors.brand.500'); }
+.summary-card[data-accent="success"] { --accent-bar: theme('colors.state.success'); --accent-text: theme('colors.token.h15803d'); }
+.summary-card[data-accent="warning"] { --accent-bar: theme('colors.state.warning'); --accent-text: theme('colors.token.hb45309'); }
+.summary-card[data-accent="danger"]  { --accent-bar: theme('colors.state.danger');  --accent-text: theme('colors.token.hb91c1c'); }
+.summary-card[data-accent="info"]    { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8'); }
+.summary-card[data-accent="neutral"] { --accent-bar: theme('colors.state.neutral'); --accent-text: theme('colors.text.secondary'); }
+.summary-card[data-accent="prd"]     { --accent-bar: theme('colors.state.success'); --accent-text: theme('colors.token.h15803d'); }
+.summary-card[data-accent="sby"]     { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8'); }
+.summary-card[data-accent="udt"]     { --accent-bar: theme('colors.state.warning'); --accent-text: theme('colors.token.hb45309'); }
+.summary-card[data-accent="sdt"]     { --accent-bar: theme('colors.state.danger');  --accent-text: theme('colors.token.hb91c1c'); }
+.summary-card[data-accent="egt"]     { --accent-bar: theme('colors.token.h8b5cf6'); --accent-text: theme('colors.token.h6d28d9'); }
+.summary-card[data-accent="nst"]     { --accent-bar: theme('colors.state.neutral'); --accent-text: theme('colors.text.secondary'); }
 </style>

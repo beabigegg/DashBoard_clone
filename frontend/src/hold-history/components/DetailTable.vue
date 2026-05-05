@@ -276,18 +276,18 @@ onUnmounted(() => {
   padding: 5px 12px;
   font-size: 12px;
   font-weight: 600;
-  border: 1px solid #0080C8;
+  border: 1px solid theme('colors.brand.500');
   border-radius: 6px;
   background: transparent;
-  color: #0080C8;
+  color: theme('colors.brand.500');
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
 }
 
 .export-csv-btn:hover:not(:disabled) {
-  background: #0080C8;
-  color: #fff;
+  background: theme('colors.brand.500');
+  color: theme('colors.surface.card');
 }
 
 .export-csv-btn:disabled {

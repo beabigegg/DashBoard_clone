@@ -108,27 +108,27 @@ function handleRemove(e) {
 }
 
 .chip--success {
-  background: #dcfce7;
-  color: #15803d;
-  border-color: #bbf7d0;
+  background: theme('colors.token.hdcfce7');
+  color: theme('colors.token.h15803d');
+  border-color: theme('colors.token.hbbf7d0');
 }
 
 .chip--warning {
-  background: #fef3c7;
-  color: #b45309;
-  border-color: #fde68a;
+  background: theme('colors.token.hfef3c7');
+  color: theme('colors.token.hb45309');
+  border-color: theme('colors.token.hfde68a');
 }
 
 .chip--danger {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fecaca;
+  background: theme('colors.token.hfee2e2');
+  color: theme('colors.token.hb91c1c');
+  border-color: theme('colors.token.hfecaca');
 }
 
 .chip--info {
-  background: #dbeafe;
-  color: #1d4ed8;
-  border-color: #bfdbfe;
+  background: theme('colors.token.hdbeafe');
+  color: theme('colors.token.h1d4ed8');
+  border-color: theme('colors.token.hbfdbfe');
 }
 
 .chip--clickable {
