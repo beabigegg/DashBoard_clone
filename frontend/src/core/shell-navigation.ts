@@ -1,4 +1,4 @@
-function normalizeTargetPath(path) {
+function normalizeTargetPath(path: string | null | undefined): string {
   const normalized = String(path || '').trim();
   if (!normalized) {
     return '/';
@@ -6,7 +6,7 @@ function normalizeTargetPath(path) {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
-function toShellRouterPath(path) {
+function toShellRouterPath(path: string): string {
   const normalized = normalizeTargetPath(path);
   if (!normalized.startsWith('/portal-shell')) {
     return normalized;
@@ -19,17 +19,24 @@ function toShellRouterPath(path) {
   return stripped.startsWith('/') ? stripped : `/${stripped}`;
 }
 
-function getShellRouterBridge() {
+function getShellRouterBridge(): ((path: string, options?: { replace?: boolean }) => void) | null {
   const bridge = window.__MES_PORTAL_SHELL_NAVIGATE__;
   return typeof bridge === 'function' ? bridge : null;
 }
 
-export function isPortalShellRuntime(currentPathname = null) {
+export function isPortalShellRuntime(currentPathname: string | null = null): boolean {
   const pathname = currentPathname ?? window.location.pathname;
   return String(pathname || '').startsWith('/portal-shell');
 }
 
-export function toRuntimeRoute(path, { currentPathname = null } = {}) {
+export interface ToRuntimeRouteOptions {
+  currentPathname?: string | null;
+}
+
+export function toRuntimeRoute(
+  path: string,
+  { currentPathname = null }: ToRuntimeRouteOptions = {}
+): string {
   const normalized = normalizeTargetPath(path);
   if (normalized.startsWith('/portal-shell')) {
     return normalized;
@@ -40,7 +47,11 @@ export function toRuntimeRoute(path, { currentPathname = null } = {}) {
   return normalized;
 }
 
-export function navigateToRuntimeRoute(path, { replace = false } = {}) {
+export interface NavigateOptions {
+  replace?: boolean;
+}
+
+export function navigateToRuntimeRoute(path: string, { replace = false }: NavigateOptions = {}): void {
   const target = toRuntimeRoute(path);
   const shellRouterBridge = getShellRouterBridge();
 
@@ -59,7 +70,7 @@ export function navigateToRuntimeRoute(path, { replace = false } = {}) {
 const URL_SAFE_LENGTH = 2000;
 const URL_STATE_KEY_PREFIX = 'url-state:';
 
-export function replaceRuntimeHistory(path) {
+export function replaceRuntimeHistory(path: string): void {
   const target = toRuntimeRoute(path);
 
   // Guard: if URL exceeds safe length, spill query params to sessionStorage
@@ -86,7 +97,7 @@ export function replaceRuntimeHistory(path) {
  * Restore URL state spilled by replaceRuntimeHistory on previous navigation.
  * Call synchronously before app mount so initializePage reads the full params.
  */
-export function restoreUrlState() {
+export function restoreUrlState(): void {
   const params = new URLSearchParams(window.location.search);
   if (params.get('_s') !== '1') {
     return;

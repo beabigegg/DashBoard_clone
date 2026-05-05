@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.2.0
+schema-version: 1.2.1
 last-changed: 2026-05-05
 breaking-change-policy: deprecate-2-minors
 ---
@@ -30,6 +30,15 @@ breaking-change-policy: deprecate-2-minors
 | nightly-integration | 3 | weekly schedule / dispatch | yes (nightly) | `pytest tests/integration/ --run-integration-real -m "integration_real or multi_worker" -x` | application-team | test report |
 | stress-load | 4 | weekly schedule / dispatch | yes (weekly) | `pytest tests/stress/ -m "stress or load"` | platform-team | perf report |
 | soak | 4 | weekly schedule / dispatch | yes (weekly) | `pytest tests/integration/test_soak_workload.py --run-integration-real -m "soak"` | platform-team | soak report |
+
+## Gate Compatibility Notes
+
+### frontend-type-check scope expansion (Phase 1a — migrate-core-to-typescript)
+
+- **Before Phase 1a**: `tsconfig.json` `include` was `["src/core/"]` targeting only the `index.ts` barrel placeholder. The gate ran 0 substantive `.ts` modules through strict-mode checking.
+- **From Phase 1a onward**: `include` is `["src/core/**/*"]`, covering all 21 core `.ts` modules under `strict: true`. The gate's effective coverage increased substantially in the same PR that performed the `.js` → `.ts` rename.
+- **Status unchanged**: the gate remains **informational** (continue-on-error: true). Promotion to required follows the standard Informational Gate Promotion Policy.
+- **No schema-version bump**: this is a coverage expansion, not a contract interface change.
 
 ## Required Check Policy
 

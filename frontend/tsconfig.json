@@ -16,6 +16,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/core/"],
+  "include": ["src/core/**/*"],
   "exclude": ["node_modules", "dist"]
 }

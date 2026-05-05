@@ -5,14 +5,18 @@
  * triggers a browser file download.  Use this instead of a GET <a href> when
  * filter arrays could make the URL exceed Gunicorn's limit_request_line.
  *
- * @param {string} url      - API endpoint URL
- * @param {object} body     - JSON-serializable request body
- * @param {string} filename - Suggested download filename
- * @throws {Error} On non-2xx responses (message includes status code).
- *                 On HTTP 410: throws with message '410' so callers can
- *                 distinguish dataset-expiry from generic failures.
+ * @param url      - API endpoint URL
+ * @param body     - JSON-serializable request body
+ * @param filename - Suggested download filename
+ * @throws Error On non-2xx responses (message includes status code).
+ *               On HTTP 410: throws with message '410' so callers can
+ *               distinguish dataset-expiry from generic failures.
  */
-export async function postExport(url, body, filename) {
+export async function postExport(
+  url: string,
+  body: unknown,
+  filename: string
+): Promise<void> {
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

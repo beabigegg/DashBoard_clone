@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 /**
  * DuckDB-WASM client — thin wrapper over the Web Worker.
  *
@@ -8,29 +10,43 @@
  *   await client.registerParquet('my_table', arrayBuffer)
  *   const rows = await client.sendQuery('SELECT * FROM my_table LIMIT 10')
  *   client.destroy()
- *
- * The client is a lazy singleton per page — calling getDuckDBClient() multiple
- * times returns the same instance. Call destroy() to release resources.
  */
 
 import DuckDBWorker from '../workers/duckdb-worker.js?worker';
 
-let _instance = null;
+interface PendingCall {
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
+}
+
+interface WorkerMessage {
+  id: number;
+  type: string;
+  [key: string]: unknown;
+}
+
+interface WorkerResponse {
+  id: number;
+  ok: boolean;
+  result: unknown;
+  error: string;
+}
+
+let _instance: DuckDBClient | null = null;
 
 export class DuckDBClient {
-  constructor() {
-    this._worker = null;
-    this._pending = new Map();   // id → { resolve, reject }
-    this._nextId = 1;
-    this._ready = false;
-  }
+  private _worker: Worker | null = null;
+  private _pending: Map<number, PendingCall> = new Map();
+  private _nextId = 1;
+  private _ready = false;
 
   /** Lazy-init the Web Worker and DuckDB-WASM. */
-  async init() {
+  async init(): Promise<void> {
     if (this._ready) return;
     this._worker = new DuckDBWorker();
-    this._worker.onmessage = (evt) => this._handleMessage(evt.data);
-    this._worker.onerror  = (err) => {
+    this._worker.onmessage = (evt: MessageEvent<WorkerResponse>) =>
+      this._handleMessage(evt.data);
+    this._worker.onerror = (err: ErrorEvent) => {
       // Surface any unhandled worker errors to pending promises
       for (const [, { reject }] of this._pending) {
         reject(new Error(err.message));
@@ -43,31 +59,31 @@ export class DuckDBClient {
 
   /**
    * Register a Parquet ArrayBuffer as a named view in DuckDB.
-   * @param {string} tableName
-   * @param {ArrayBuffer} buffer
+   * @param tableName
+   * @param buffer
    */
-  async registerParquet(tableName, buffer) {
+  async registerParquet(tableName: string, buffer: ArrayBuffer): Promise<void> {
     await this.init();
     await this._send('register', { tableName, buffer }, [buffer]);
   }
 
   /**
    * Execute a SQL query and return plain JS object rows.
-   * @param {string} sql
-   * @returns {Promise<Array<object>>}
+   * @param sql
+   * @returns rows
    */
-  async sendQuery(sql) {
+  async sendQuery(sql: string): Promise<unknown[]> {
     await this.init();
-    return this._send('query', { sql });
+    return this._send('query', { sql }) as Promise<unknown[]>;
   }
 
   /** Terminate the worker and release all resources. */
-  destroy() {
+  destroy(): void {
     if (this._worker) {
       // Best-effort graceful shutdown
       try { this._send('destroy', {}).catch(() => {}); } catch (_) {}
       setTimeout(() => {
-        try { this._worker.terminate(); } catch (_) {}
+        try { this._worker?.terminate(); } catch (_) {}
         this._worker = null;
       }, 500);
     }
@@ -78,15 +94,20 @@ export class DuckDBClient {
 
   // ── Private ─────────────────────────────────────────────────────────────
 
-  _send(type, payload, transferable = []) {
+  private _send(
+    type: string,
+    payload: Record<string, unknown>,
+    transferable: Transferable[] = []
+  ): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = this._nextId++;
       this._pending.set(id, { resolve, reject });
-      this._worker.postMessage({ id, type, ...payload }, transferable);
+      const msg: WorkerMessage = { id, type, ...payload };
+      this._worker!.postMessage(msg, transferable);
     });
   }
 
-  _handleMessage({ id, ok, result, error }) {
+  private _handleMessage({ id, ok, result, error }: WorkerResponse): void {
     const pending = this._pending.get(id);
     if (!pending) return;
     this._pending.delete(id);
@@ -102,7 +123,7 @@ export class DuckDBClient {
  * Return the singleton DuckDB client for this page.
  * Creates it on first call.
  */
-export function getDuckDBClient() {
+export function getDuckDBClient(): DuckDBClient {
   if (!_instance) {
     _instance = new DuckDBClient();
   }
@@ -110,7 +131,7 @@ export function getDuckDBClient() {
 }
 
 /** Check if DuckDB-WASM is supported (Worker + WebAssembly available). */
-export function isDuckDBSupported() {
+export function isDuckDBSupported(): boolean {
   try {
     return (
       typeof Worker !== 'undefined' &&
@@ -125,15 +146,15 @@ export function isDuckDBSupported() {
 /**
  * Download a Parquet spool file and return its ArrayBuffer.
  * Includes CSRF token and an optional timeout (default 120s).
- * @param {string} url  - Spool download URL
- * @param {number} [timeout=120000]
- * @returns {Promise<ArrayBuffer>}
+ * @param url  - Spool download URL
+ * @param timeout
  */
-export async function fetchParquetBuffer(url, timeout = 120000) {
+export async function fetchParquetBuffer(url: string, timeout = 120000): Promise<ArrayBuffer> {
   const controller = new AbortController();
   const timerId = setTimeout(() => controller.abort(), timeout);
   try {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const csrfToken =
+      (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
     const resp = await fetch(url, {
       method: 'GET',
       headers: { 'X-CSRF-Token': csrfToken },

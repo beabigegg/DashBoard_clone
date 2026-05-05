@@ -1,11 +1,11 @@
-function toTrimmedString(value) {
+function toTrimmedString(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }
   return String(value).trim();
 }
 
-function normalizeFilterValue(value) {
+function normalizeFilterValue(value: unknown): string {
   if (Array.isArray(value)) {
     return value
       .map((item) => toTrimmedString(item))
@@ -15,7 +15,12 @@ function normalizeFilterValue(value) {
   return toTrimmedString(value);
 }
 
-export function normalizeStatusFilter(statusFilter) {
+export interface WipStatusFilterResult {
+  status?: string;
+  hold_type?: string;
+}
+
+export function normalizeStatusFilter(statusFilter: string | null | undefined): WipStatusFilterResult {
   if (!statusFilter) {
     return {};
   }
@@ -28,8 +33,23 @@ export function normalizeStatusFilter(statusFilter) {
   return { status: String(statusFilter).toUpperCase() };
 }
 
-export function buildWipOverviewQueryParams(filters = {}, statusFilter = null) {
-  const params = {};
+export interface WipFilters {
+  workorder?: unknown;
+  lotid?: unknown;
+  package?: unknown;
+  type?: unknown;
+  firstname?: unknown;
+  waferdesc?: unknown;
+  [key: string]: unknown;
+}
+
+export type WipOverviewQueryParams = Record<string, string>;
+
+export function buildWipOverviewQueryParams(
+  filters: WipFilters = {},
+  statusFilter: string | null = null
+): WipOverviewQueryParams {
+  const params: WipOverviewQueryParams = {};
   const workorder = normalizeFilterValue(filters.workorder);
   const lotid = normalizeFilterValue(filters.lotid);
   const pkg = normalizeFilterValue(filters.package);
@@ -47,12 +67,17 @@ export function buildWipOverviewQueryParams(filters = {}, statusFilter = null) {
   return { ...params, ...normalizeStatusFilter(statusFilter) };
 }
 
-export function buildWipDetailQueryParams({
-  page,
-  pageSize,
-  filters = {},
-  statusFilter = null,
-}) {
+export interface WipDetailQueryOptions {
+  page: number;
+  pageSize: number;
+  filters?: WipFilters;
+  statusFilter?: string | null;
+}
+
+export function buildWipDetailQueryParams(
+  options: WipDetailQueryOptions
+): Record<string, unknown> {
+  const { page, pageSize, filters = {}, statusFilter = null } = options;
   return {
     page,
     page_size: pageSize,
@@ -60,14 +85,36 @@ export function buildWipDetailQueryParams({
   };
 }
 
-export function splitHoldByType(data) {
-  const items = Array.isArray(data?.items) ? data.items : [];
+export interface WipItem {
+  holdType?: string;
+  reason?: unknown;
+  qty?: unknown;
+  lots?: unknown;
+  [key: string]: unknown;
+}
+
+export interface HoldSplit {
+  quality: WipItem[];
+  nonQuality: WipItem[];
+}
+
+export function splitHoldByType(data: { items?: WipItem[] } | null | undefined): HoldSplit {
+  const items = Array.isArray(data?.items) ? data!.items : [];
   const quality = items.filter((item) => item?.holdType === 'quality');
   const nonQuality = items.filter((item) => item?.holdType !== 'quality');
   return { quality, nonQuality };
 }
 
-export function prepareParetoData(items) {
+export interface ParetoData {
+  reasons: string[];
+  qtys: number[];
+  lots: number[];
+  cumulative: number[];
+  totalQty: number;
+  items: WipItem[];
+}
+
+export function prepareParetoData(items: WipItem[]): ParetoData {
   if (!Array.isArray(items) || items.length === 0) {
     return { reasons: [], qtys: [], lots: [], cumulative: [], totalQty: 0, items: [] };
   }

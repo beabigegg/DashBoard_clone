@@ -1,23 +1,23 @@
-function normalizeText(value) {
+function normalizeText(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }
   return String(value).trim();
 }
 
-function normalizeBoolean(value, fallback = false) {
+function normalizeBoolean(value: unknown, fallback = false): boolean {
   if (value === undefined) {
     return fallback;
   }
   return Boolean(value);
 }
 
-function normalizeArray(values) {
+function normalizeArray(values: unknown): string[] {
   if (!Array.isArray(values)) {
     return [];
   }
-  const seen = new Set();
-  const result = [];
+  const seen = new Set<string>();
+  const result: string[] = [];
   for (const item of values) {
     const text = normalizeText(item);
     if (!text || seen.has(text)) {
@@ -29,7 +29,21 @@ function normalizeArray(values) {
   return result;
 }
 
-function applyUpstreamResourceFilters(resources, filters) {
+export interface ResourceItem {
+  workcenterGroup?: unknown;
+  family?: unknown;
+  isProduction?: unknown;
+  isKey?: unknown;
+  isMonitor?: unknown;
+  name?: unknown;
+  id?: unknown;
+  [key: string]: unknown;
+}
+
+function applyUpstreamResourceFilters(
+  resources: ResourceItem[],
+  filters: ResourceFilterSnapshot
+): ResourceItem[] {
   let list = Array.isArray(resources) ? resources : [];
   const groups = new Set(normalizeArray(filters.workcenterGroups));
 
@@ -49,7 +63,32 @@ function applyUpstreamResourceFilters(resources, filters) {
   return list;
 }
 
-export function toResourceFilterSnapshot(input = {}) {
+export interface ResourceFilterInput {
+  startDate?: unknown;
+  endDate?: unknown;
+  granularity?: unknown;
+  workcenterGroups?: unknown;
+  families?: unknown;
+  machines?: unknown;
+  isProduction?: unknown;
+  isKey?: unknown;
+  isMonitor?: unknown;
+  [key: string]: unknown;
+}
+
+export interface ResourceFilterSnapshot {
+  startDate: string;
+  endDate: string;
+  granularity: string;
+  workcenterGroups: string[];
+  families: string[];
+  machines: string[];
+  isProduction: boolean;
+  isKey: boolean;
+  isMonitor: boolean;
+}
+
+export function toResourceFilterSnapshot(input: ResourceFilterInput = {}): ResourceFilterSnapshot {
   return {
     startDate: normalizeText(input.startDate),
     endDate: normalizeText(input.endDate),
@@ -63,10 +102,13 @@ export function toResourceFilterSnapshot(input = {}) {
   };
 }
 
-export function deriveResourceFamilyOptions(resources = [], filters = {}) {
+export function deriveResourceFamilyOptions(
+  resources: ResourceItem[] = [],
+  filters: ResourceFilterInput = {}
+): string[] {
   const next = toResourceFilterSnapshot(filters);
   const filtered = applyUpstreamResourceFilters(resources, next);
-  const families = new Set();
+  const families = new Set<string>();
   for (const resource of filtered) {
     const value = normalizeText(resource.family);
     if (value) {
@@ -76,7 +118,15 @@ export function deriveResourceFamilyOptions(resources = [], filters = {}) {
   return [...families].sort((left, right) => left.localeCompare(right));
 }
 
-export function deriveResourceMachineOptions(resources = [], filters = {}) {
+export interface MachineOption {
+  label: string;
+  value: string;
+}
+
+export function deriveResourceMachineOptions(
+  resources: ResourceItem[] = [],
+  filters: ResourceFilterInput = {}
+): MachineOption[] {
   const next = toResourceFilterSnapshot(filters);
   let filtered = applyUpstreamResourceFilters(resources, next);
   const families = new Set(next.families);
@@ -93,7 +143,24 @@ export function deriveResourceMachineOptions(resources = [], filters = {}) {
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
-export function pruneResourceFilterSelections(filters = {}, { familyOptions = [], machineOptions = [] } = {}) {
+export interface PruneResourceFilterOptions {
+  familyOptions?: unknown[];
+  machineOptions?: MachineOption[];
+}
+
+export interface PruneResourceFilterResult {
+  filters: ResourceFilterSnapshot;
+  removed: {
+    families: string[];
+    machines: string[];
+  };
+  removedCount: number;
+}
+
+export function pruneResourceFilterSelections(
+  filters: ResourceFilterInput = {},
+  { familyOptions = [], machineOptions = [] }: PruneResourceFilterOptions = {}
+): PruneResourceFilterResult {
   const next = toResourceFilterSnapshot(filters);
   const hasFamilyOptions = Array.isArray(familyOptions);
   const hasMachineOptions = Array.isArray(machineOptions);
@@ -105,8 +172,8 @@ export function pruneResourceFilterSelections(filters = {}, { familyOptions = []
   );
 
   const removed = {
-    families: [],
-    machines: [],
+    families: [] as string[],
+    machines: [] as string[],
   };
 
   if (hasFamilyOptions) {
@@ -136,9 +203,23 @@ export function pruneResourceFilterSelections(filters = {}, { familyOptions = []
   };
 }
 
-export function buildResourceHistoryQueryParams(filters = {}) {
+export interface ResourceHistoryQueryParams {
+  start_date: string;
+  end_date: string;
+  granularity: string;
+  workcenter_groups: string[];
+  families: string[];
+  resource_ids: string[];
+  is_production?: string;
+  is_key?: string;
+  is_monitor?: string;
+}
+
+export function buildResourceHistoryQueryParams(
+  filters: ResourceFilterInput = {}
+): ResourceHistoryQueryParams {
   const next = toResourceFilterSnapshot(filters);
-  const params = {
+  const params: ResourceHistoryQueryParams = {
     start_date: next.startDate,
     end_date: next.endDate,
     granularity: next.granularity,

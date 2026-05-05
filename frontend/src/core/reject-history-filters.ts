@@ -1,16 +1,16 @@
-function normalizeText(value) {
+function normalizeText(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }
   return String(value).trim();
 }
 
-function normalizeArray(values) {
+function normalizeArray(values: unknown): string[] {
   if (!Array.isArray(values)) {
     return [];
   }
-  const seen = new Set();
-  const result = [];
+  const seen = new Set<string>();
+  const result: string[] = [];
   for (const item of values) {
     const text = normalizeText(item);
     if (!text || seen.has(text)) {
@@ -22,7 +22,7 @@ function normalizeArray(values) {
   return result;
 }
 
-function normalizeBoolean(value, fallback = false) {
+function normalizeBoolean(value: unknown, fallback = false): boolean {
   if (value === undefined) {
     return fallback;
   }
@@ -31,7 +31,32 @@ function normalizeBoolean(value, fallback = false) {
 
 export const PRIMARY_QUERY_MAX_DAYS = 190;
 
-export function toRejectFilterSnapshot(input = {}) {
+export interface RejectFilterInput {
+  startDate?: unknown;
+  endDate?: unknown;
+  workcenterGroups?: unknown;
+  packages?: unknown;
+  reasons?: unknown;
+  includeExcludedScrap?: unknown;
+  excludeMaterialScrap?: unknown;
+  excludePbDiode?: unknown;
+  paretoTop80?: unknown;
+  [key: string]: unknown;
+}
+
+export interface RejectFilterSnapshot {
+  startDate: string;
+  endDate: string;
+  workcenterGroups: string[];
+  packages: string[];
+  reasons: string[];
+  includeExcludedScrap: boolean;
+  excludeMaterialScrap: boolean;
+  excludePbDiode: boolean;
+  paretoTop80: boolean;
+}
+
+export function toRejectFilterSnapshot(input: RejectFilterInput = {}): RejectFilterSnapshot {
   return {
     startDate: normalizeText(input.startDate),
     endDate: normalizeText(input.endDate),
@@ -45,16 +70,24 @@ export function toRejectFilterSnapshot(input = {}) {
   };
 }
 
-export function extractWorkcenterGroupValues(options = []) {
+export interface WorkcenterGroupOption {
+  name?: string;
+  value?: string;
+  label?: string;
+  [key: string]: unknown;
+}
+
+export function extractWorkcenterGroupValues(options: Array<WorkcenterGroupOption | string> = []): string[] {
   if (!Array.isArray(options)) {
     return [];
   }
-  const values = [];
-  const seen = new Set();
+  const values: string[] = [];
+  const seen = new Set<string>();
   for (const option of options) {
     let value = '';
     if (option && typeof option === 'object') {
-      value = normalizeText(option.name || option.value || option.label);
+      const opt = option as WorkcenterGroupOption;
+      value = normalizeText(opt.name || opt.value || opt.label);
     } else {
       value = normalizeText(option);
     }
@@ -67,7 +100,26 @@ export function extractWorkcenterGroupValues(options = []) {
   return values;
 }
 
-export function pruneRejectFilterSelections(filters = {}, options = {}) {
+export interface RejectFilterOptions {
+  workcenterGroups?: Array<WorkcenterGroupOption | string>;
+  packages?: unknown[];
+  reasons?: unknown[];
+}
+
+export interface PruneRejectFilterResult {
+  filters: RejectFilterSnapshot;
+  removed: {
+    workcenterGroups: string[];
+    packages: string[];
+    reasons: string[];
+  };
+  removedCount: number;
+}
+
+export function pruneRejectFilterSelections(
+  filters: RejectFilterInput = {},
+  options: RejectFilterOptions = {}
+): PruneRejectFilterResult {
   const next = toRejectFilterSnapshot(filters);
   const hasWorkcenterOptions = Array.isArray(options.workcenterGroups);
   const hasPackageOptions = Array.isArray(options.packages);
@@ -77,9 +129,9 @@ export function pruneRejectFilterSelections(filters = {}, options = {}) {
   const validReasons = new Set(normalizeArray(options.reasons));
 
   const removed = {
-    workcenterGroups: [],
-    packages: [],
-    reasons: [],
+    workcenterGroups: [] as string[],
+    packages: [] as string[],
+    reasons: [] as string[],
   };
 
   if (hasWorkcenterOptions) {
@@ -122,9 +174,20 @@ export function pruneRejectFilterSelections(filters = {}, options = {}) {
   };
 }
 
-export function buildRejectOptionsRequestParams(filters = {}) {
+export interface RejectOptionsRequestParams {
+  start_date: string;
+  end_date: string;
+  workcenter_groups: string[];
+  packages: string[];
+  include_excluded_scrap: boolean;
+  exclude_material_scrap: boolean;
+  exclude_pb_diode: boolean;
+  reasons?: string[];
+}
+
+export function buildRejectOptionsRequestParams(filters: RejectFilterInput = {}): RejectOptionsRequestParams {
   const next = toRejectFilterSnapshot(filters);
-  const params = {
+  const params: RejectOptionsRequestParams = {
     start_date: next.startDate,
     end_date: next.endDate,
     workcenter_groups: next.workcenterGroups,
@@ -139,9 +202,20 @@ export function buildRejectOptionsRequestParams(filters = {}) {
   return params;
 }
 
-export function buildRejectCommonQueryParams(filters = {}, { reasons: extraReasons = [] } = {}) {
+export interface RejectCommonQueryParams extends RejectOptionsRequestParams {
+  reasons?: string[];
+}
+
+export interface BuildRejectCommonQueryOptions {
+  reasons?: unknown[];
+}
+
+export function buildRejectCommonQueryParams(
+  filters: RejectFilterInput = {},
+  { reasons: extraReasons = [] }: BuildRejectCommonQueryOptions = {}
+): RejectCommonQueryParams {
   const next = toRejectFilterSnapshot(filters);
-  const params = {
+  const params: RejectCommonQueryParams = {
     start_date: next.startDate,
     end_date: next.endDate,
     workcenter_groups: next.workcenterGroups,
@@ -157,15 +231,15 @@ export function buildRejectCommonQueryParams(filters = {}, { reasons: extraReaso
   return params;
 }
 
-export function parseMultiLineInput(text) {
+export function parseMultiLineInput(text: string | null | undefined): string[] {
   if (!text) return [];
   const tokens = String(text)
     .split(/[\n,]+/)
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => s.replace(/\*/g, '%'));
-  const seen = new Set();
-  const result = [];
+  const seen = new Set<string>();
+  const result: string[] = [];
   for (const token of tokens) {
     if (!seen.has(token)) {
       seen.add(token);
@@ -175,7 +249,7 @@ export function parseMultiLineInput(text) {
   return result;
 }
 
-export function validateDateRange(startDate, endDate) {
+export function validateDateRange(startDate: unknown, endDate: unknown): string {
   const start = normalizeText(startDate);
   const end = normalizeText(endDate);
   if (!start || !end) {
@@ -191,31 +265,60 @@ export function validateDateRange(startDate, endDate) {
     return '結束日期必須大於起始日期';
   }
   const dayMs = 24 * 60 * 60 * 1000;
-  const days = Math.floor((endDt - startDt) / dayMs) + 1;
+  const days = Math.floor((endDt.getTime() - startDt.getTime()) / dayMs) + 1;
   if (days > PRIMARY_QUERY_MAX_DAYS) {
     return `查詢範圍不可超過 ${PRIMARY_QUERY_MAX_DAYS} 天（約半年）`;
   }
   return '';
 }
 
-export function buildViewParams(queryId, {
-  supplementaryFilters = {},
-  metricFilter = 'all',
-  trendDates = [],
-  detailReason = '',
-  paretoSelections = {},
-  page = 1,
-  perPage = 20,
-  policyFilters = {},
-} = {}) {
-  const params = { query_id: queryId };
-  if (supplementaryFilters.packages?.length > 0) {
+export interface ViewParamsOptions {
+  supplementaryFilters?: {
+    packages?: string[];
+    workcenterGroups?: string[];
+    reasons?: string[];
+    [key: string]: unknown;
+  };
+  metricFilter?: string;
+  trendDates?: unknown[];
+  detailReason?: string;
+  paretoSelections?: {
+    reason?: unknown;
+    package?: unknown;
+    type?: unknown;
+    [key: string]: unknown;
+  };
+  page?: number;
+  perPage?: number;
+  policyFilters?: {
+    includeExcludedScrap?: boolean;
+    excludeMaterialScrap?: boolean;
+    excludePbDiode?: boolean;
+    [key: string]: unknown;
+  };
+}
+
+export function buildViewParams(
+  queryId: string,
+  {
+    supplementaryFilters = {},
+    metricFilter = 'all',
+    trendDates = [],
+    detailReason = '',
+    paretoSelections = {},
+    page = 1,
+    perPage = 20,
+    policyFilters = {},
+  }: ViewParamsOptions = {}
+): Record<string, unknown> {
+  const params: Record<string, unknown> = { query_id: queryId };
+  if (supplementaryFilters.packages && supplementaryFilters.packages.length > 0) {
     params.packages = supplementaryFilters.packages;
   }
-  if (supplementaryFilters.workcenterGroups?.length > 0) {
+  if (supplementaryFilters.workcenterGroups && supplementaryFilters.workcenterGroups.length > 0) {
     params.workcenter_groups = supplementaryFilters.workcenterGroups;
   }
-  if (supplementaryFilters.reasons?.length > 0) {
+  if (supplementaryFilters.reasons && supplementaryFilters.reasons.length > 0) {
     params.reasons = supplementaryFilters.reasons;
   }
   if (metricFilter && metricFilter !== 'all') {
@@ -227,7 +330,7 @@ export function buildViewParams(queryId, {
   if (detailReason) {
     params.detail_reason = detailReason;
   }
-  const selectionParamMap = {
+  const selectionParamMap: Record<string, string> = {
     reason: 'sel_reason',
     package: 'sel_package',
     type: 'sel_type',

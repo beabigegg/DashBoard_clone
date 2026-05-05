@@ -19,10 +19,10 @@ const _logTimeFormatter = new Intl.DateTimeFormat('zh-TW', {
  * Returns '-' for null/undefined/empty input.
  * Returns the original value if it cannot be parsed.
  *
- * @param {string|null|undefined} iso - ISO 8601 timestamp string
- * @returns {string} Formatted date string or '-' or original value
+ * @param iso - ISO 8601 timestamp string
+ * @returns Formatted date string or '-' or original value
  */
-export function formatLogTime(iso) {
+export function formatLogTime(iso: string | null | undefined): string {
   if (iso == null || iso === '') return '-';
   try {
     const d = new Date(iso);

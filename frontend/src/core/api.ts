@@ -1,8 +1,12 @@
+/// <reference types="vite/client" />
+
+import type { ApiResponse } from './types.js';
+
 const DEFAULT_TIMEOUT = 90000;
 const IS_DEV = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
 
 // DEV-mode guard — no-op in production builds
-let _guardResponse = null;
+let _guardResponse: ((url: string, data: unknown) => void) | null = null;
 if (IS_DEV) {
   import('./dev-warnings.js').then((m) => {
     _guardResponse = m.guardResponse;
@@ -10,9 +14,10 @@ if (IS_DEV) {
 }
 
 // App-version check — lazy-loaded to avoid circular deps
-let _appVersionCheck = null;
+// TODO: type this as AppVersionMeta once circular import is resolved
+let _appVersionCheck: ((meta: unknown) => void) | null = null;
 import('./app-version-check.js').then((m) => {
-  _appVersionCheck = m.appVersionCheck;
+  _appVersionCheck = m.appVersionCheck as (meta: unknown) => void;
 }).catch(() => {});
 
 // ---------------------------------------------------------------------------
@@ -22,13 +27,39 @@ import('./app-version-check.js').then((m) => {
 // share a single in-flight promise; subsequent callers resolve with the same
 // result.  The entry is removed when the promise settles.
 // ---------------------------------------------------------------------------
-const _inFlight = new Map();
+const _inFlight = new Map<string, Promise<unknown>>();
 
-function getCsrfToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.content || '';
+export interface FetchOptions extends RequestInit {
+  timeout?: number;
+  params?: Record<string, unknown>;
+  signal?: AbortSignal;
+  noDedup?: boolean;
+  silent?: boolean;
+  retries?: number;
 }
 
-function withCsrfHeaders(headers = {}, method = 'GET') {
+// TODO: type MesApiBridge more precisely once the bridge contract is documented
+interface MesApiBridge {
+  __mesApiBridge?: boolean;
+  get?: (url: string, options?: FetchOptions) => Promise<unknown>;
+  post?: (url: string, payload: unknown, options?: FetchOptions) => Promise<unknown>;
+}
+
+declare global {
+  interface Window {
+    MesApi?: MesApiBridge;
+    __MES_PORTAL_SHELL_NAVIGATE__?: (path: string, options?: { replace?: boolean }) => void;
+  }
+}
+
+function getCsrfToken(): string {
+  return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+}
+
+function withCsrfHeaders(
+  headers: Record<string, string> = {},
+  method = 'GET'
+): Record<string, string> {
   const normalized = String(method).toUpperCase();
   const merged = { ...headers };
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalized)) {
@@ -40,24 +71,37 @@ function withCsrfHeaders(headers = {}, method = 'GET') {
   return merged;
 }
 
-function buildApiError(response, payload) {
+interface ApiError extends Error {
+  status: number;
+  payload: unknown;
+  errorCode: string | null;
+  retryAfterSeconds: number | null;
+}
+
+function buildApiError(response: Response, payload: unknown): ApiError {
+  const p = payload as Record<string, unknown> | null | undefined;
   const message =
-    payload?.error?.message ||
-    (typeof payload?.error === 'string' ? payload.error : null) ||
-    payload?.message ||
+    (p?.error as Record<string, unknown> | undefined)?.message as string ||
+    (typeof p?.error === 'string' ? p.error : null) ||
+    p?.message as string ||
     `HTTP ${response.status}`;
 
-  const error = new Error(message);
+  const error = new Error(message) as ApiError;
   error.status = response.status;
   error.payload = payload;
-  error.errorCode = payload?.error?.code || payload?.code || null;
+  error.errorCode =
+    ((p?.error as Record<string, unknown> | undefined)?.code as string) ||
+    p?.code as string ||
+    null;
   error.retryAfterSeconds = Number(
-    payload?.meta?.retry_after_seconds || response.headers.get('Retry-After') || 0
+    (p?.meta as Record<string, unknown> | undefined)?.retry_after_seconds ||
+    response.headers.get('Retry-After') ||
+    0
   ) || null;
   return error;
 }
 
-function buildUrlWithParams(url, params) {
+function buildUrlWithParams(url: string, params: Record<string, unknown> | undefined): string {
   if (!params || typeof params !== 'object') {
     return url;
   }
@@ -88,14 +132,23 @@ function buildUrlWithParams(url, params) {
   return url.includes('?') ? `${url}&${query}` : `${url}?${query}`;
 }
 
-function isExternalMesApiBridge(candidate) {
-  return Boolean(candidate?.get) && !candidate.__mesApiBridge;
+function isExternalMesApiBridge(candidate: unknown): candidate is MesApiBridge {
+  const c = candidate as MesApiBridge | null | undefined;
+  return Boolean(c?.get) && !c?.__mesApiBridge;
 }
 
-function createAbortSignal(timeoutMs, externalSignal) {
+interface AbortController_ {
+  signal: AbortSignal;
+  cleanup: () => void;
+}
+
+function createAbortSignal(
+  timeoutMs: number,
+  externalSignal: AbortSignal | undefined
+): AbortController_ {
   const controller = new AbortController();
-  let timeoutId = null;
-  let onAbort = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let onAbort: (() => void) | null = null;
 
   if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
     timeoutId = setTimeout(() => {
@@ -130,13 +183,8 @@ function createAbortSignal(timeoutMs, externalSignal) {
  *
  * Only deduplicates GET requests and safe POST requests where body is a plain
  * JSON object.  Non-deduplicable requests (FormData, streaming) return null.
- *
- * @param {string} method
- * @param {string} url
- * @param {*} body
- * @returns {string|null}
  */
-function _buildDedupKey(method, url, body) {
+function _buildDedupKey(method: string, url: string, body: unknown): string | null {
   const m = String(method).toUpperCase();
   if (m === 'GET') return `GET|${url}|`;
 
@@ -147,7 +195,7 @@ function _buildDedupKey(method, url, body) {
   return null;
 }
 
-async function parseResponsePayload(response) {
+async function parseResponsePayload(response: Response): Promise<unknown> {
   const contentType = response.headers.get('content-type') || '';
 
   if (contentType.includes('application/json')) {
@@ -162,7 +210,12 @@ async function parseResponsePayload(response) {
   }
 }
 
-async function _fetchJsonRaw(requestUrl, fetchOptions, externalSignal, timeout) {
+async function _fetchJsonRaw(
+  requestUrl: string,
+  fetchOptions: RequestInit,
+  externalSignal: AbortSignal | undefined,
+  timeout: number
+): Promise<unknown> {
   const { signal, cleanup } = createAbortSignal(timeout, externalSignal);
 
   try {
@@ -186,7 +239,7 @@ async function _fetchJsonRaw(requestUrl, fetchOptions, externalSignal, timeout) 
     // App-version check
     if (_appVersionCheck) {
       try {
-        _appVersionCheck(data?.meta);
+        _appVersionCheck((data as Record<string, unknown>)?.meta);
       } catch (_e) {
         // Must never crash the request path
       }
@@ -197,7 +250,7 @@ async function _fetchJsonRaw(requestUrl, fetchOptions, externalSignal, timeout) 
   }
 }
 
-async function fetchJson(url, options = {}) {
+async function fetchJson(url: string, options: FetchOptions = {}): Promise<unknown> {
   const {
     timeout = DEFAULT_TIMEOUT,
     params,
@@ -207,7 +260,9 @@ async function fetchJson(url, options = {}) {
   } = options;
 
   const requestUrl = buildUrlWithParams(url, params);
-  const dedupKey = noDedup ? null : _buildDedupKey(fetchOptions.method || 'GET', requestUrl, fetchOptions.body);
+  const dedupKey = noDedup
+    ? null
+    : _buildDedupKey(fetchOptions.method || 'GET', requestUrl, fetchOptions.body);
 
   if (dedupKey) {
     const existing = _inFlight.get(dedupKey);
@@ -223,20 +278,30 @@ async function fetchJson(url, options = {}) {
   return _fetchJsonRaw(requestUrl, fetchOptions, externalSignal, timeout);
 }
 
-export async function apiGet(url, options = {}) {
+export async function apiGet<T = unknown>(
+  url: string,
+  options: FetchOptions = {}
+): Promise<ApiResponse<T>> {
   if (isExternalMesApiBridge(window.MesApi)) {
-    return window.MesApi.get(url, options);
+    return window.MesApi.get!(url, options) as Promise<ApiResponse<T>>;
   }
-  return fetchJson(url, { ...options, method: 'GET' });
+  return fetchJson(url, { ...options, method: 'GET' }) as Promise<ApiResponse<T>>;
 }
 
-export async function apiPost(url, payload, options = {}) {
+export async function apiPost<T = unknown>(
+  url: string,
+  payload: unknown,
+  options: FetchOptions = {}
+): Promise<ApiResponse<T>> {
   if (isExternalMesApiBridge(window.MesApi) && window.MesApi?.post) {
-    const enrichedOptions = {
+    const enrichedOptions: FetchOptions = {
       ...options,
-      headers: withCsrfHeaders(options.headers || {}, 'POST'),
+      headers: withCsrfHeaders(
+        (options.headers || {}) as Record<string, string>,
+        'POST'
+      ),
     };
-    return window.MesApi.post(url, payload, enrichedOptions);
+    return window.MesApi.post(url, payload, enrichedOptions) as Promise<ApiResponse<T>>;
   }
 
   return fetchJson(url, {
@@ -245,68 +310,77 @@ export async function apiPost(url, payload, options = {}) {
     headers: withCsrfHeaders(
       {
         'Content-Type': 'application/json',
-        ...(options.headers || {}),
+        ...((options.headers || {}) as Record<string, string>),
       },
       'POST'
     ),
     body: JSON.stringify(payload),
-  });
+  }) as Promise<ApiResponse<T>>;
 }
 
-export async function apiUpload(url, formData, options = {}) {
+export async function apiUpload<T = unknown>(
+  url: string,
+  formData: FormData,
+  options: FetchOptions = {}
+): Promise<ApiResponse<T>> {
   if (isExternalMesApiBridge(window.MesApi) && window.MesApi?.post) {
-    const enrichedOptions = {
+    const enrichedOptions: FetchOptions = {
       ...options,
-      headers: withCsrfHeaders(options.headers || {}, 'POST'),
+      headers: withCsrfHeaders(
+        (options.headers || {}) as Record<string, string>,
+        'POST'
+      ),
     };
-    return window.MesApi.post(url, formData, enrichedOptions);
+    return window.MesApi.post(url, formData, enrichedOptions) as Promise<ApiResponse<T>>;
   }
 
   return fetchJson(url, {
     ...options,
     method: 'POST',
-    headers: withCsrfHeaders(options.headers || {}, 'POST'),
+    headers: withCsrfHeaders((options.headers || {}) as Record<string, string>, 'POST'),
     body: formData,
-  });
+  }) as Promise<ApiResponse<T>>;
 }
 
 /**
  * Returns the current count of in-flight deduped requests (for testing only).
- * @returns {number}
  */
-export function _inFlightSize() {
+export function _inFlightSize(): number {
   return _inFlight.size;
 }
 
 /**
  * Clear the in-flight dedup map (for testing only).
  */
-export function _clearInFlight() {
+export function _clearInFlight(): void {
   _inFlight.clear();
 }
 
-export function ensureMesApiAvailable() {
+export function ensureMesApiAvailable(): MesApiBridge {
   if (window.MesApi) {
     return window.MesApi;
   }
 
-  const bridge = {
+  const bridge: MesApiBridge = {
     __mesApiBridge: true,
-    get(url, options) {
+    get(url: string, options?: FetchOptions) {
       return fetchJson(url, { ...options, method: 'GET' });
     },
-    post(url, payload, options = {}) {
+    post(url: string, payload: unknown, options: FetchOptions = {}) {
       const method = options.method || 'POST';
       const headers = withCsrfHeaders(
         {
           'Content-Type': 'application/json',
-          ...(options.headers || {}),
+          ...((options.headers || {}) as Record<string, string>),
         },
         method
       );
 
       const body = payload instanceof FormData ? payload : JSON.stringify(payload);
-      const normalizedHeaders = payload instanceof FormData ? withCsrfHeaders(options.headers || {}, method) : headers;
+      const normalizedHeaders =
+        payload instanceof FormData
+          ? withCsrfHeaders((options.headers || {}) as Record<string, string>, method)
+          : headers;
 
       return fetchJson(url, {
         ...options,

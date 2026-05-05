@@ -12,9 +12,9 @@
 import { assertShape } from './schema-guard.js';
 import { ENDPOINT_SCHEMAS } from './endpoint-schemas.js';
 
-const _warned = new Set();
+const _warned = new Set<string>();
 
-function _warn(key, msg) {
+function _warn(key: string, msg: string): void {
   const verbose =
     typeof localStorage !== 'undefined' && localStorage.getItem('schema-guard-verbose') === '1';
   if (verbose || !_warned.has(key)) {
@@ -28,10 +28,13 @@ function _warn(key, msg) {
  *
  * Common source: Number(payload?.pagination?.page) when page is undefined.
  *
- * @param {object} pagination - The pagination object from API response
- * @param {string} [endpoint] - Endpoint path for context
+ * @param pagination - The pagination object from API response
+ * @param endpoint - Endpoint path for context
  */
-export function detectNaNPagination(pagination, endpoint = 'unknown') {
+export function detectNaNPagination(
+  pagination: Record<string, unknown> | null | undefined,
+  endpoint = 'unknown'
+): void {
   if (!pagination || typeof pagination !== 'object') return;
 
   const numericFields = ['page', 'per_page', 'total', 'total_pages'];
@@ -49,10 +52,10 @@ export function detectNaNPagination(pagination, endpoint = 'unknown') {
 /**
  * Detect unknown envelope shape (missing success/data/meta fields).
  *
- * @param {*} response - The raw API response
- * @param {string} [endpoint] - Endpoint path for context
+ * @param response - The raw API response
+ * @param endpoint - Endpoint path for context
  */
-export function detectUnknownEnvelope(response, endpoint = 'unknown') {
+export function detectUnknownEnvelope(response: unknown, endpoint = 'unknown'): void {
   if (!response || typeof response !== 'object') {
     _warn(
       `unknown-envelope:${endpoint}:null`,
@@ -61,14 +64,16 @@ export function detectUnknownEnvelope(response, endpoint = 'unknown') {
     return;
   }
 
-  if (!('success' in response)) {
+  const r = response as Record<string, unknown>;
+
+  if (!('success' in r)) {
     _warn(
       `unknown-envelope:${endpoint}:no-success`,
       `Response missing 'success' field at ${endpoint} — may be legacy or malformed`
     );
   }
 
-  if (!('meta' in response) && 'success' in response) {
+  if (!('meta' in r) && 'success' in r) {
     _warn(
       `unknown-envelope:${endpoint}:no-meta`,
       `Response missing 'meta' field at ${endpoint}`
@@ -82,16 +87,17 @@ export function detectUnknownEnvelope(response, endpoint = 'unknown') {
  * Calls assertShape on the data payload. Emits console.warn on mismatch.
  * No-op if no schema is registered for the endpoint.
  *
- * @param {string} endpoint - The API endpoint path (e.g. '/api/hold-overview/summary')
- * @param {object} response - The full API response envelope
+ * @param endpoint - The API endpoint path (e.g. '/api/hold-overview/summary')
+ * @param response - The full API response envelope
  */
-export function guardResponse(endpoint, response) {
+export function guardResponse(endpoint: string, response: unknown): void {
   detectUnknownEnvelope(response, endpoint);
 
   const schema = ENDPOINT_SCHEMAS[endpoint];
   if (!schema) return;
 
-  const data = response?.data;
+  const r = response as Record<string, unknown> | null | undefined;
+  const data = r?.data;
   if (data === undefined || data === null) {
     _warn(
       `guard:${endpoint}:null-data`,
@@ -106,11 +112,11 @@ export function guardResponse(endpoint, response) {
 /**
  * Detect array fields that contain non-object items or unexpected primitive shapes.
  *
- * @param {Array} arr - The array to inspect
- * @param {string} [fieldPath] - Dot-path label for context (e.g. 'data.items')
- * @param {string} [endpoint] - Endpoint path for context
+ * @param arr - The array to inspect
+ * @param fieldPath - Dot-path label for context (e.g. 'data.items')
+ * @param endpoint - Endpoint path for context
  */
-export function detectArrayShape(arr, fieldPath = 'items', endpoint = 'unknown') {
+export function detectArrayShape(arr: unknown, fieldPath = 'items', endpoint = 'unknown'): void {
   if (!Array.isArray(arr)) {
     _warn(
       `array-shape:${endpoint}:${fieldPath}:not-array`,
@@ -133,13 +139,13 @@ export function detectArrayShape(arr, fieldPath = 'items', endpoint = 'unknown')
 /**
  * Detect spool download URLs with unexpected content-type hints.
  *
- * Spool URLs are expected to be parquet or CSV.  Warn if the URL suggests
- * a different format (e.g. JSON, XML) which would break the download handler.
- *
- * @param {string|null|undefined} spoolUrl - The spool_download_url from API response
- * @param {string} [endpoint] - Endpoint path for context
+ * @param spoolUrl - The spool_download_url from API response
+ * @param endpoint - Endpoint path for context
  */
-export function detectSpoolContentType(spoolUrl, endpoint = 'unknown') {
+export function detectSpoolContentType(
+  spoolUrl: string | null | undefined,
+  endpoint = 'unknown'
+): void {
   if (!spoolUrl) return;
   if (typeof spoolUrl !== 'string') {
     _warn(
@@ -164,26 +170,24 @@ export function detectSpoolContentType(spoolUrl, endpoint = 'unknown') {
 /**
  * Detect async job responses missing the expected polling signal fields.
  *
- * When a 202 async response is returned, the client expects either
- * `job_id` (for job-based polling) or `query_id` (for spool-based polling).
- * Warn if neither is present.
- *
- * @param {object} data - The `data` field from an API response
- * @param {string} [endpoint] - Endpoint path for context
+ * @param data - The `data` field from an API response
+ * @param endpoint - Endpoint path for context
  */
-export function detectMissingSignal(data, endpoint = 'unknown') {
+export function detectMissingSignal(data: unknown, endpoint = 'unknown'): void {
   if (!data || typeof data !== 'object') return;
+
+  const d = data as Record<string, unknown>;
 
   // Only check async-style responses (those with async=true or status field)
   const looksAsync =
-    data.async === true ||
-    data.status === 'queued' ||
-    data.status === 'running' ||
-    data.job_id !== undefined;
+    d.async === true ||
+    d.status === 'queued' ||
+    d.status === 'running' ||
+    d.job_id !== undefined;
 
   if (!looksAsync) return;
 
-  const hasSignal = data.job_id || data.query_id || data.dataset_id;
+  const hasSignal = d.job_id || d.query_id || d.dataset_id;
   if (!hasSignal) {
     _warn(
       `missing-signal:${endpoint}`,
@@ -195,6 +199,6 @@ export function detectMissingSignal(data, endpoint = 'unknown') {
 /**
  * Reset warned set (for testing only).
  */
-export function _resetWarned() {
+export function _resetWarned(): void {
   _warned.clear();
 }

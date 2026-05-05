@@ -21,11 +21,13 @@
  * Array item spec: { __array: itemSpec } — every item is validated against itemSpec
  */
 
-const _warned = new Set();
-const _isVerbose = () =>
+import type { FieldSpec } from './endpoint-schemas.js';
+
+const _warned = new Set<string>();
+const _isVerbose = (): boolean =>
   typeof localStorage !== 'undefined' && localStorage.getItem('schema-guard-verbose') === '1';
 
-function _warn(key, msg) {
+function _warn(key: string, msg: string): void {
   if (_isVerbose() || !_warned.has(key)) {
     _warned.add(key);
     console.warn(`[schema-guard] ${msg}`);
@@ -35,28 +37,28 @@ function _warn(key, msg) {
 /**
  * Assert that value matches spec. Calls console.warn (DEV only) on mismatch.
  *
- * @param {*} value - Value to check
- * @param {string|object} spec - Spec string or nested object spec
- * @param {string} [path=''] - Dot-separated path for error messages
- * @returns {boolean} true if valid, false if mismatch
+ * @param value - Value to check
+ * @param spec - Spec string or nested object spec
+ * @param path - Dot-separated path for error messages
+ * @returns true if valid, false if mismatch
  */
-export function assertShape(value, spec, path = '') {
+export function assertShape(value: unknown, spec: FieldSpec, path = ''): boolean {
   if (typeof spec === 'string') {
     return _checkPrimitive(value, spec, path);
   }
 
   if (spec && typeof spec === 'object' && !Array.isArray(spec)) {
     if ('__array' in spec) {
-      return _checkArrayItems(value, spec.__array, path);
+      return _checkArrayItems(value, (spec as { __array: FieldSpec }).__array, path);
     }
-    return _checkObject(value, spec, path);
+    return _checkObject(value, spec as Record<string, FieldSpec>, path);
   }
 
   _warn(`assertShape:unknown:${path}`, `Unknown spec type at '${path}': ${typeof spec}`);
   return false;
 }
 
-function _checkPrimitive(value, spec, path) {
+function _checkPrimitive(value: unknown, spec: string, path: string): boolean {
   const optional = spec.endsWith('?');
   const baseSpec = optional ? spec.slice(0, -1) : spec;
 
@@ -113,18 +115,19 @@ function _checkPrimitive(value, spec, path) {
   }
 }
 
-function _checkObject(value, spec, path) {
+function _checkObject(value: unknown, spec: Record<string, FieldSpec>, path: string): boolean {
   if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) {
     _warn(`type:${path}`, `'${path}' expected object, got ${_typeof(value)}`);
     return false;
   }
 
+  const obj = value as Record<string, unknown>;
   let valid = true;
   for (const [key, fieldSpec] of Object.entries(spec)) {
     const fieldPath = path ? `${path}.${key}` : key;
     const optional = typeof fieldSpec === 'string' && fieldSpec.endsWith('?');
 
-    if (!(key in value)) {
+    if (!(key in obj)) {
       if (!optional) {
         _warn(`missing:${fieldPath}`, `Missing required field '${fieldPath}'`);
         valid = false;
@@ -132,14 +135,14 @@ function _checkObject(value, spec, path) {
       continue;
     }
 
-    if (!assertShape(value[key], fieldSpec, fieldPath)) {
+    if (!assertShape(obj[key], fieldSpec, fieldPath)) {
       valid = false;
     }
   }
   return valid;
 }
 
-function _checkArrayItems(value, itemSpec, path) {
+function _checkArrayItems(value: unknown, itemSpec: FieldSpec, path: string): boolean {
   if (!Array.isArray(value)) {
     _warn(`type:${path}`, `'${path}' expected array for item validation, got ${_typeof(value)}`);
     return false;
@@ -154,16 +157,16 @@ function _checkArrayItems(value, itemSpec, path) {
   return valid;
 }
 
-function _typeof(value) {
+function _typeof(value: unknown): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'array';
   return typeof value;
 }
 
-function _preview(value) {
+function _preview(value: unknown): string {
   try {
     const str = JSON.stringify(value);
-    return str && str.length > 50 ? str.slice(0, 50) + '...' : str;
+    return str && str.length > 50 ? str.slice(0, 50) + '...' : str ?? String(value);
   } catch {
     return String(value);
   }
@@ -172,6 +175,6 @@ function _preview(value) {
 /**
  * Reset warned set (for testing only).
  */
-export function _resetWarned() {
+export function _resetWarned(): void {
   _warned.clear();
 }

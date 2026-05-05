@@ -3,17 +3,11 @@
  *
  * Persists async job IDs to localStorage so that in-flight jobs survive
  * page refresh and can be recovered on next load.
- *
- * Schema per entry (JSON-serialised in localStorage):
- *   {
- *     job_id:    string   — RQ job identifier
- *     prefix:    string   — service prefix (e.g. "reject", "yield_alert")
- *     endpoint:  string   — originating API endpoint (for UI context)
- *     queued_at: number   — epoch ms (Date.now())
- *   }
- *
- * Storage key: "mes:pending_jobs"
  */
+
+import type { PendingJobEntry } from './types.js';
+
+export type { PendingJobEntry } from './types.js';
 
 const STORAGE_KEY = 'mes:pending_jobs';
 const MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours — beyond job TTL, safe to discard
@@ -22,18 +16,18 @@ const MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours — beyond job TTL, safe to di
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function _readAll() {
+function _readAll(): PendingJobEntry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as PendingJobEntry[]) : [];
   } catch {
     return [];
   }
 }
 
-function _writeAll(entries) {
+function _writeAll(entries: PendingJobEntry[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   } catch {
@@ -41,7 +35,7 @@ function _writeAll(entries) {
   }
 }
 
-function _isExpired(entry) {
+function _isExpired(entry: PendingJobEntry): boolean {
   return typeof entry.queued_at === 'number' && Date.now() - entry.queued_at > MAX_AGE_MS;
 }
 
@@ -52,11 +46,15 @@ function _isExpired(entry) {
 /**
  * Register a newly-enqueued job.
  *
- * @param {string} job_id  - RQ job ID
- * @param {string} prefix  - Service prefix (e.g. "reject")
- * @param {string} [endpoint] - Originating endpoint for UI context
+ * @param job_id  - RQ job ID
+ * @param prefix  - Service prefix (e.g. "reject")
+ * @param endpoint - Originating endpoint for UI context
  */
-export function registerJob(job_id, prefix, endpoint = '') {
+export function registerJob(
+  job_id: string | null | undefined,
+  prefix: string | null | undefined,
+  endpoint = ''
+): void {
   if (!job_id || !prefix) return;
 
   const existing = _readAll().filter((e) => !_isExpired(e));
@@ -68,10 +66,8 @@ export function registerJob(job_id, prefix, endpoint = '') {
 
 /**
  * Remove a job from the registry (called when job completes, fails, or is abandoned).
- *
- * @param {string} job_id
  */
-export function deregisterJob(job_id) {
+export function deregisterJob(job_id: string): void {
   if (!job_id) return;
   const updated = _readAll().filter((e) => e.job_id !== job_id);
   _writeAll(updated);
@@ -79,10 +75,8 @@ export function deregisterJob(job_id) {
 
 /**
  * Return all non-expired pending jobs.
- *
- * @returns {Array<{job_id: string, prefix: string, endpoint: string, queued_at: number}>}
  */
-export function getPendingJobs() {
+export function getPendingJobs(): PendingJobEntry[] {
   const all = _readAll();
   const valid = all.filter((e) => !_isExpired(e));
   // Persist the pruned list back (cleanup stale entries)
@@ -95,7 +89,7 @@ export function getPendingJobs() {
 /**
  * Clear all pending jobs (e.g. on logout).
  */
-export function clearAllJobs() {
+export function clearAllJobs(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
@@ -105,10 +99,7 @@ export function clearAllJobs() {
 
 /**
  * Returns true if a job_id is currently tracked as pending.
- *
- * @param {string} job_id
- * @returns {boolean}
  */
-export function isJobPending(job_id) {
+export function isJobPending(job_id: string): boolean {
   return getPendingJobs().some((e) => e.job_id === job_id);
 }

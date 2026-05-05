@@ -10,15 +10,21 @@
  *   low    : otherwise
  */
 
+export type RiskLevel = 'high' | 'medium' | 'low';
+
 /**
  * Calculate the risk score for a single alert group.
  *
- * @param {number} yieldPct   - Yield percentage (0–100)
- * @param {number} scrapQty   - Absolute scrap quantity
- * @param {number} threshold  - Risk threshold (e.g. 98.5)
- * @returns {number} risk_score, rounded to 4 decimal places
+ * @param yieldPct   - Yield percentage (0–100)
+ * @param scrapQty   - Absolute scrap quantity
+ * @param threshold  - Risk threshold (e.g. 98.5)
+ * @returns risk_score, rounded to 4 decimal places
  */
-export function calcRiskScore(yieldPct, scrapQty, threshold) {
+export function calcRiskScore(
+  yieldPct: number,
+  scrapQty: number,
+  threshold: number
+): number {
   const yp = Number(yieldPct);
   const sq = Number(scrapQty);
   const th = Number(threshold);
@@ -30,12 +36,16 @@ export function calcRiskScore(yieldPct, scrapQty, threshold) {
 /**
  * Determine the risk level for a single alert group.
  *
- * @param {number} yieldPct   - Yield percentage (0–100)
- * @param {number} scrapQty   - Absolute scrap quantity
- * @param {number} threshold  - Risk threshold (e.g. 98.5)
- * @returns {'high'|'medium'|'low'}
+ * @param yieldPct   - Yield percentage (0–100)
+ * @param scrapQty   - Absolute scrap quantity
+ * @param threshold  - Risk threshold (e.g. 98.5)
+ * @returns RiskLevel: 'high' | 'medium' | 'low'
  */
-export function calcRiskLevel(yieldPct, scrapQty, threshold) {
+export function calcRiskLevel(
+  yieldPct: number,
+  scrapQty: number,
+  threshold: number
+): RiskLevel {
   const yp = Number(yieldPct);
   const sq = Number(scrapQty);
   const th = Number(threshold);

@@ -13,16 +13,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { stripTypeScriptTypes } from 'node:module';
 
 globalThis.__testDuckdbSupport = () => true;
 
-const policyPath = new URL('../../src/core/duckdb-activation-policy.js', import.meta.url);
+const policyPath = new URL('../../src/core/duckdb-activation-policy.ts', import.meta.url);
 const policySource = await readFile(policyPath, 'utf8');
 const transformedSource = policySource.replace(
   "import { isDuckDBSupported } from './duckdb-client.js';",
   "const isDuckDBSupported = () => globalThis.__testDuckdbSupport();",
 );
-const policyModuleUrl = `data:text/javascript;base64,${Buffer.from(transformedSource, 'utf8').toString('base64')}`;
+// Strip TypeScript types before encoding as data:text/javascript (Node 24+)
+const jsSource = stripTypeScriptTypes(transformedSource);
+const policyModuleUrl = `data:text/javascript;base64,${Buffer.from(jsSource, 'utf8').toString('base64')}`;
 const { checkLocalComputeEligibility } = await import(policyModuleUrl);
 
 function withDuckdbSupport(supported, fn) {
