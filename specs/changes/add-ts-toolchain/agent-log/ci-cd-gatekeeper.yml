@@ -1,0 +1,20 @@
+change-id: add-ts-toolchain
+agent: ci-cd-gatekeeper
+timestamp: "2026-05-05T11:30:00+08:00"
+status: complete
+files-read:
+  - specs/changes/add-ts-toolchain/context-manifest.md
+  - .github/workflows/frontend-tests.yml
+  - frontend/package.json
+  - contracts/ci/ci-gate-contract.md
+artifacts:
+  - { type: workflow-files-changed, pointer: ".github/workflows/frontend-tests.yml:35-38" }
+  - { type: required-status-checks, pointer: "n/a (frontend-type-check starts as informational continue-on-error:true; existing required job frontend-unit-tests unchanged)" }
+  - { type: tiers-modified, pointer: "contracts/ci/ci-gate-contract.md:25" }
+  - { type: gate-promotions, pointer: "n/a (frontend-type-check introduced as informational; promotion to required deferred pending 20 days/60 runs/>=95% pass rate)" }
+  - { type: files-changed, pointer: "specs/changes/add-ts-toolchain/ci-gates.md:1-end" }
+next-action: none
+notes: |
+  Added Type check (vue-tsc --noEmit) step to frontend-tests.yml with
+  continue-on-error:true (informational per contract). Wrote ci-gates.md with
+  full gate table, promotion policy, and rollback instructions.

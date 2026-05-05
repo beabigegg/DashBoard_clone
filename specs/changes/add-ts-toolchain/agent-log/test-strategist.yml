@@ -1,0 +1,20 @@
+change-id: add-ts-toolchain
+agent: test-strategist
+timestamp: "2026-05-05T10:00:00+08:00"
+status: complete
+files-read:
+  - specs/changes/add-ts-toolchain/context-manifest.md
+  - specs/changes/add-ts-toolchain/change-classification.md
+  - frontend/package.json
+  - .github/workflows/frontend-tests.yml
+  - contracts/ci/ci-gate-contract.md
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/add-ts-toolchain/test-plan.md" }
+  - { type: tdd-pairs, pointer: "n/a (no new source files; verification via CLI smoke commands and cdd-kit validate only)" }
+  - { type: coverage-tiers, pointer: "specs/changes/add-ts-toolchain/test-plan.md:1-80" }
+  - { type: mapping-completeness, pointer: "specs/changes/add-ts-toolchain/test-plan.md:5-30" }
+next-action: none
+notes: |
+  Toolchain-only change. All 8 ACs mapped in test-plan.md via smoke verification
+  commands. No new test files required. Existing Vitest suite provides regression
+  coverage at Tier 1.

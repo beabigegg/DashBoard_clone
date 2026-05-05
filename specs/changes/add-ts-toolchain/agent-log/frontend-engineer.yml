@@ -1,0 +1,24 @@
+change-id: add-ts-toolchain
+agent: frontend-engineer
+timestamp: "2026-05-05T10:30:00+08:00"
+status: complete
+files-read:
+  - specs/changes/add-ts-toolchain/change-classification.md
+  - frontend/package.json
+  - frontend/vite.config.js
+artifacts:
+  - { type: files-changed, pointer: "frontend/package.json:1-38" }
+  - { type: files-changed, pointer: "frontend/tsconfig.json:1-21" }
+  - { type: files-changed, pointer: "frontend/vite.config.ts:1-67" }
+  - { type: files-changed, pointer: "frontend/src/core/index.ts:1-1" }
+  - { type: components-affected, pointer: "n/a (pure toolchain change; no UI components modified)" }
+  - { type: screenshot-paths, pointer: "n/a (no UI rendered; toolchain-only phase)" }
+  - { type: accessibility-audit, pointer: "n/a (no new interactive elements; toolchain-only change)" }
+  - { type: test-results, pointer: "frontend/tests: 270/270 pass (27 files, Vitest 4.1.4)" }
+next-action: none
+notes: |
+  Installed typescript@6.0.3, vue-tsc@3.2.8, @types/node@25.6.0 as devDeps.
+  Added type-check script. Created tsconfig.json (strict, allowJs:false, src/core/).
+  Renamed vite.config.js -> vite.config.ts. Added src/core/index.ts placeholder
+  (export {}) to prevent TS18003 on empty include. Verified: type-check exits 0,
+  npm run test 270/270 pass.

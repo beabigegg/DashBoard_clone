@@ -1,0 +1,20 @@
+change-id: add-ts-toolchain
+agent: contract-reviewer
+timestamp: "2026-05-05T09:30:00+08:00"
+status: complete
+files-read:
+  - specs/changes/add-ts-toolchain/context-manifest.md
+  - contracts/ci/ci-gate-contract.md
+  - contracts/CHANGELOG.md
+  - frontend/package.json
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/ci/ci-gate-contract.md:1-115" }
+  - { type: contracts-reviewed, pointer: "contracts/CHANGELOG.md:1-10" }
+  - { type: version-bumps, pointer: "contracts/ci/ci-gate-contract.md:6" }
+  - { type: breaking-changes, pointer: "n/a (additive gate row only; no existing gate removed or reclassified)" }
+  - { type: consumers-impacted, pointer: "n/a (frontend-type-check starts informational; continue-on-error: true; does not block any existing consumer)" }
+next-action: none
+notes: |
+  Confirmed API, CSS/UI, env, data-shape, and business-rules contracts unaffected.
+  Updated ci-gate-contract.md schema-version 1.1.0 -> 1.2.0; added frontend-type-check
+  gate row (tier 1, informational). Added [ci 1.2.0] entry to contracts/CHANGELOG.md.

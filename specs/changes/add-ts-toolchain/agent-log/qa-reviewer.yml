@@ -1,0 +1,26 @@
+change-id: add-ts-toolchain
+agent: qa-reviewer
+timestamp: "2026-05-05T13:34:30+08:00"
+status: complete
+files-read:
+  - specs/changes/add-ts-toolchain/change-request.md
+  - specs/changes/add-ts-toolchain/change-classification.md
+  - specs/changes/add-ts-toolchain/test-plan.md
+  - specs/changes/add-ts-toolchain/ci-gates.md
+  - specs/changes/add-ts-toolchain/tasks.yml
+  - frontend/package.json
+  - frontend/tsconfig.json
+  - frontend/vite.config.ts
+  - .github/workflows/frontend-tests.yml
+  - contracts/ci/ci-gate-contract.md
+artifacts:
+  - { type: gate-results, pointer: "cdd-kit gate add-ts-toolchain: 0 errors" }
+  - { type: ci-run-url, pointer: "n/a (local-only verification; PR not yet opened)" }
+  - { type: evidence-quality, pointer: "frontend/tests: 270/270 pass (27 files, Vitest 4.1.4); npm run type-check exits 0" }
+  - { type: failure-routing, pointer: "n/a (no failures; all 8 ACs verified at source)" }
+  - { type: decision, pointer: "specs/changes/add-ts-toolchain/tasks.yml: approved" }
+next-action: none
+notes: |
+  All 8 ACs verified at source. type-check exits 0, 270 vitest tests pass,
+  cdd-kit validate passes, ci-gate-contract schema-version 1.2.0 correct.
+  Release-ready: approved.

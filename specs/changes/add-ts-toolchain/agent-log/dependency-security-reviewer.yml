@@ -1,0 +1,18 @@
+change-id: add-ts-toolchain
+agent: dependency-security-reviewer
+timestamp: "2026-05-05T11:00:00+08:00"
+status: complete
+files-read:
+  - specs/changes/add-ts-toolchain/context-manifest.md
+  - frontend/package.json
+  - frontend/package-lock.json
+artifacts:
+  - { type: packages-reviewed, pointer: "frontend/package.json:20-26" }
+  - { type: cve-findings, pointer: "n/a (0 high, 0 critical; 1 moderate pre-existing postcss@8.5.6 GHSA-qx2v-qp2m-jg93 not introduced by this change)" }
+  - { type: license-issues, pointer: "n/a (all packages MIT or Apache-2.0; zero copyleft in 349-package lockfile scan)" }
+  - { type: lockfile-changes, pointer: "frontend/package-lock.json:1-end (lockfileVersion 3; 349 packages; integrity hashes verified against npm registry)" }
+next-action: none
+notes: |
+  typescript@6.0.3 (Apache-2.0), vue-tsc@3.2.8 (MIT), @types/node@25.6.0 (MIT).
+  All devOnly. No CVEs, no install scripts. One pre-existing moderate postcss CVE
+  is unrelated to this change. Verdict: approved.

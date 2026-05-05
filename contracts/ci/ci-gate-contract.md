@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.1.0
+schema-version: 1.2.0
 last-changed: 2026-05-05
 breaking-change-policy: deprecate-2-minors
 ---
@@ -22,6 +22,7 @@ breaking-change-policy: deprecate-2-minors
 | unit-mock-integration | 1 | PR | yes | `pytest -m "not (e2e or integration_real or stress or load or soak or multi_worker)" --ignore=tests/integration --ignore=tests/stress --ignore=tests/e2e --ignore=tests/manual -x` | application-team | junit XML |
 | frontend-unit | 1 | PR | yes | `cd frontend && npm run test` | application-team | vitest report |
 | css-governance | 1 | PR | yes | `cd frontend && npm run css:check` | application-team | governance report |
+| frontend-type-check | 1 | PR | informational | `cd frontend && npm run type-check` | application-team | — |
 | playwright-resilience | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/resilience/` | application-team | playwright trace |
 | playwright-data-boundary | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/data-boundary/` | application-team | playwright trace |
 | playwright-critical-journeys | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/hold-overview.spec.js tests/playwright/reject-history.spec.js tests/playwright/query-tool.spec.js` | application-team | playwright trace |
@@ -51,7 +52,7 @@ breaking-change-policy: deprecate-2-minors
 
 ## Workflow Configuration
 
-檔案：`.github/workflows/contract-driven-gates.yml`
+檔案：`.github/workflows/contract-driven-gates.yml`、`.github/workflows/frontend-tests.yml`
 
 | job | trigger | stack | status |
 |---|---|---|---|
@@ -59,6 +60,7 @@ breaking-change-policy: deprecate-2-minors
 | `e2e-critical` | PR only | Node 20 + conda + Playwright chromium | configured |
 | `nightly-integration` | weekly schedule / dispatch | conda mes-dashboard | configured |
 | `scheduled-stress-soak` | weekly schedule / dispatch | conda mes-dashboard | configured |
+| `frontend-type-check` | push / PR | Node 20 + vue-tsc | configured |
 
 **Test markers（pytest.ini）：**
 - `integration` — mock DB（pre-merge OK）

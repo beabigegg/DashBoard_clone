@@ -1,0 +1,18 @@
+change-id: add-ts-toolchain
+agent: change-classifier
+timestamp: "2026-05-05T09:00:00+08:00"
+status: complete
+files-read:
+  - specs/changes/add-ts-toolchain/change-request.md
+  - specs/context/project-map.md
+  - specs/context/contracts-index.md
+artifacts:
+  - { type: tier, pointer: "specs/changes/add-ts-toolchain/change-classification.md:10" }
+  - { type: risk, pointer: "specs/changes/add-ts-toolchain/change-classification.md:13" }
+  - { type: required-artifacts, pointer: "specs/changes/add-ts-toolchain/change-classification.md:23" }
+  - { type: required-reviewers, pointer: "specs/changes/add-ts-toolchain/change-classification.md:56" }
+  - { type: context-manifest-draft, pointer: "specs/changes/add-ts-toolchain/context-manifest.md" }
+next-action: none
+notes: |
+  Tier 3 ci-cd-change / tooling-setup. No business code, no runtime behavior change.
+  Only CI gate contract is updated. No context expansion requests needed.
