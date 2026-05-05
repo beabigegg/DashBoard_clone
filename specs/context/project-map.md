@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 294
-visible-files: 884
+visible-files: 885
 omitted-dirs: 105
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -33,6 +33,7 @@ Use this deterministic map to choose candidate context paths before reading file
 ```
 DashBoard_vite/
 |-- .cdd/
+|   |-- code-map.yml
 |   |-- context-policy.json
 |   \-- model-policy.json
 |-- .github/
@@ -458,19 +459,19 @@ DashBoard_vite/
 |   |   |   |-- main.js
 |   |   |   \-- style.css
 |   |   |-- shared-composables/
-|   |   |   |-- index.js
+|   |   |   |-- index.ts
 |   |   |   |-- TraceProgressBar.vue
-|   |   |   |-- useAiChat.js
-|   |   |   |-- useAsyncJobPolling.js
-|   |   |   |-- useAutocomplete.js
-|   |   |   |-- useAutoRefresh.js
-|   |   |   |-- useFilterOrchestrator.js
-|   |   |   |-- usePaginationState.js
-|   |   |   |-- useQueryState.js
-|   |   |   |-- useRequestGuard.js
-|   |   |   |-- useSortableTable.js
-|   |   |   |-- useTraceProgress.js
-|   |   |   \-- useUrlSync.js
+|   |   |   |-- useAiChat.ts
+|   |   |   |-- useAsyncJobPolling.ts
+|   |   |   |-- useAutocomplete.ts
+|   |   |   |-- useAutoRefresh.ts
+|   |   |   |-- useFilterOrchestrator.ts
+|   |   |   |-- usePaginationState.ts
+|   |   |   |-- useQueryState.ts
+|   |   |   |-- useRequestGuard.ts
+|   |   |   |-- useSortableTable.ts
+|   |   |   |-- useTraceProgress.ts
+|   |   |   \-- useUrlSync.ts
 |   |   |-- shared-ui/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)

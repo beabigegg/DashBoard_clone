@@ -1,0 +1,24 @@
+change-id: migrate-shared-composables-ts
+agent: contract-reviewer
+timestamp: "2026-05-05T00:00:00Z"
+status: complete
+files-read:
+  - CLAUDE.md
+  - specs/changes/migrate-shared-composables-ts/context-manifest.md
+  - specs/changes/migrate-shared-composables-ts/agent-log/frontend-engineer.yml
+  - frontend/tests/abort/query-tool-abort.test.js
+  - frontend/src/shared-composables/useAutoRefresh.ts
+  - frontend/src/shared-composables/useAutocomplete.ts
+artifacts:
+  - { type: contracts-reviewed, pointer: "CLAUDE.md" }
+  - { type: contracts-reviewed, pointer: "specs/changes/migrate-shared-composables-ts/agent-log/frontend-engineer.yml" }
+  - { type: version-bumps, pointer: "n/a (CLAUDE.md guidance additions carry no schema version)" }
+  - { type: breaking-changes, pointer: "none" }
+  - { type: consumers-impacted, pointer: "none" }
+notes: |
+  Lesson A (CJS→ESM test conversion) and Lesson B (@ts-expect-error + cast pattern):
+  both promoted to CLAUDE.md ## TypeScript Migration Rules as Rules #5 and #6.
+  Lesson C (import type for Vue Ref/ComputedRef): do-not-promote — justification
+  was technically inaccurate; enforcement belongs in ESLint, not prose guidance.
+  No contract file versioned changes required.
+next-action: none

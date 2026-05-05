@@ -1,6 +1,6 @@
-# generated: 2026-05-05T08:36:05Z by cdd-kit 2.0.13
-# files: 751, src-lines: 199426, map-lines: 16928, compression: 11.8x
-# sources-digest: 16bdf788df3252bf812be371b3af198d86831a64979ac07c2f4dc83dfcfeff5c
+# generated: 2026-05-05T09:51:14Z by cdd-kit 2.0.13
+# files: 751, src-lines: 199733, map-lines: 16989, compression: 11.8x
+# sources-digest: 504f8bc00da807de78fbd6662b30bc6540351b4ab49572f7dfbe7fce0b041f66
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -2469,88 +2469,148 @@ frontend/src/shared-composables/TraceProgressBar.vue:  # 166 lines
     - { name: hasStageError, lines: 27-30 }
     - { name: stageState, lines: 32-43 }
 
-frontend/src/shared-composables/index.js:  # 8 lines
+frontend/src/shared-composables/index.ts:  # 8 lines
 
-frontend/src/shared-composables/useAiChat.js:  # 158 lines
+frontend/src/shared-composables/useAiChat.ts:  # 202 lines
   imports:
     - { module: vue, items: [computed, ref], line: 1 }
+    - { module: vue, items: [Ref, ComputedRef], line: 2 }
   functions:
-    - { name: useAiChat, lines: 7-154 }
-    - { name: createConversationId, lines: 156-158 }
+    - { name: useAiChat, lines: 36-198 }
+    - { name: createConversationId, lines: 200-202 }
+  interfaces:
+    - { name: AiMessage, lines: 6-17 }
+    - { name: AiChatComposable, lines: 19-30 }
+  types:
+    - { name: MessageRole, lines: 4-4 }
 
-frontend/src/shared-composables/useAsyncJobPolling.js:  # 89 lines
+frontend/src/shared-composables/useAsyncJobPolling.ts:  # 104 lines
   imports:
-    - { module: '../core/api.js', items: [apiGet], line: 13 }
+    - { module: '../core/api.js', items: [apiGet], line: 1 }
   constants:
-    - { name: JOB_POLL_INTERVAL_MS, line: 15 }
-    - { name: JOB_POLL_MAX_MS, line: 16 }
+    - { name: JOB_POLL_INTERVAL_MS, line: 3 }
+    - { name: JOB_POLL_MAX_MS, line: 4 }
   functions:
-    - { name: sleep, lines: 18-20 }
-    - { name: async pollJobUntilComplete, lines: 39-79 }
-    - { name: useAsyncJobPolling, lines: 85-89 }
+    - { name: sleep, lines: 6-8 }
+    - { name: async pollJobUntilComplete, lines: 50-94 }
+    - { name: useAsyncJobPolling, lines: 100-104 }
+  interfaces:
+    - { name: JobStatusResponse, lines: 10-16 }
+    - { name: PollOptions, lines: 18-23 }
+    - { name: AsyncJobPollingComposable, lines: 25-27 }
+    - { name: JobError, lines: 29-31 }  # local
 
-frontend/src/shared-composables/useAutoRefresh.js:  # 5 lines
+frontend/src/shared-composables/useAutoRefresh.ts:  # 25 lines
   imports:
-    - { module: '../wip-shared/composables/useAutoRefresh.js', items: [useAutoRefresh], line: 1 }
+    - { module: '../wip-shared/composables/useAutoRefresh.js', items: [useAutoRefresh], line: 3 }
   functions:
-    - { name: useAutoRefresh, lines: 3-5 }
+    - { name: useAutoRefresh, lines: 23-25 }
+  interfaces:
+    - { name: AutoRefreshOptions, lines: 5-11 }
+    - { name: AutoRefreshComposable, lines: 13-21 }
 
-frontend/src/shared-composables/useAutocomplete.js:  # 5 lines
+frontend/src/shared-composables/useAutocomplete.ts:  # 35 lines
   imports:
-    - { module: '../wip-shared/composables/useAutocomplete.js', items: [useAutocomplete], line: 1 }
+    - { module: '../wip-shared/composables/useAutocomplete.js', items: [useAutocomplete], line: 3 }
   functions:
-    - { name: useAutocomplete, lines: 3-5 }
+    - { name: useAutocomplete, lines: 33-35 }
+  interfaces:
+    - { name: AutocompleteFieldState, lines: 5-10 }
+    - { name: AutocompleteOptions, lines: 12-18 }
+    - { name: AutocompleteComposable, lines: 20-31 }
 
-frontend/src/shared-composables/useFilterOrchestrator.js:  # 191 lines
+frontend/src/shared-composables/useFilterOrchestrator.ts:  # 229 lines
   imports:
     - { module: vue, items: [reactive, ref, watch, toRaw], line: 1 }
     - { module: './useRequestGuard.js', items: [useRequestGuard], line: 2 }
     - { module: './useUrlSync.js', items: [useUrlSync], line: 3 }
   functions:
-    - { name: useFilterOrchestrator, lines: 18-191 }
+    - { name: useFilterOrchestrator, lines: 55-229 }
+  interfaces:
+    - { name: FieldDefinition, lines: 8-12 }
+    - { name: FieldDependency, lines: 14-20 }
+    - { name: PaginationConfig, lines: 22-24 }
+    - { name: UrlSyncConfig, lines: 26-28 }
+    - { name: FilterOrchestratorConfig, lines: 30-39 }
+    - { name: FilterOrchestratorComposable, lines: 41-50 }
+  types:
+    - { name: FieldTrigger, lines: 5-5 }
+    - { name: DependencyAction, lines: 6-6 }
 
-frontend/src/shared-composables/usePaginationState.js:  # 35 lines
+frontend/src/shared-composables/usePaginationState.ts:  # 66 lines
   imports:
     - { module: vue, items: [computed, ref], line: 1 }
+    - { module: vue, items: [Ref, ComputedRef], line: 2 }
   functions:
-    - { name: usePaginationState, lines: 3-35 }
+    - { name: usePaginationState, lines: 34-66 }
+  interfaces:
+    - { name: PaginationInitial, lines: 4-10 }
+    - { name: PaginationPayload, lines: 12-21 }
+    - { name: PaginationState, lines: 23-32 }
 
-frontend/src/shared-composables/useQueryState.js:  # 23 lines
+frontend/src/shared-composables/useQueryState.ts:  # 25 lines
   functions:
-    - { name: readQueryState, lines: 1-8 }
-    - { name: writeQueryState, lines: 10-23 }
+    - { name: readQueryState, lines: 3-10 }
+    - { name: writeQueryState, lines: 12-25 }
+  types:
+    - { name: QueryStateRecord, lines: 1-1 }
 
-frontend/src/shared-composables/useRequestGuard.js:  # 16 lines
+frontend/src/shared-composables/useRequestGuard.ts:  # 22 lines
   imports:
     - { module: vue, items: [ref], line: 1 }
+    - { module: vue, items: [Ref], line: 2 }
   functions:
-    - { name: useRequestGuard, lines: 3-16 }
+    - { name: useRequestGuard, lines: 9-22 }
+  interfaces:
+    - { name: RequestGuard, lines: 4-7 }
 
-frontend/src/shared-composables/useSortableTable.js:  # 99 lines
+frontend/src/shared-composables/useSortableTable.ts:  # 115 lines
   imports:
     - { module: vue, items: [computed, ref], line: 1 }
+    - { module: vue, items: [Ref, ComputedRef], line: 2 }
   functions:
-    - { name: useSortableTable, lines: 9-99 }
+    - { name: useSortableTable, lines: 23-115 }
+  interfaces:
+    - { name: SortableTableComposable, lines: 9-15 }
+  types:
+    - { name: SortDirection, lines: 4-4 }
+    - { name: SortType, lines: 5-5 }
+    - { name: DataRow, lines: 7-7 }
 
-frontend/src/shared-composables/useTraceProgress.js:  # 436 lines
+frontend/src/shared-composables/useTraceProgress.ts:  # 531 lines
   imports:
     - { module: vue, items: [reactive, ref], line: 1 }
-    - { module: '../core/api.js', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
-    - { module: './useAsyncJobPolling.js', items: [pollJobUntilComplete], line: 4 }
+    - { module: vue, items: [Ref], line: 2 }
+    - { module: '../core/api.js', items: [apiGet, apiPost, ensureMesApiAvailable], line: 4 }
+    - { module: './useAsyncJobPolling.js', items: [pollJobUntilComplete], line: 5 }
   constants:
-    - { name: DEFAULT_STAGE_TIMEOUT_MS, line: 8 }
-    - { name: PROFILE_DOMAINS, line: 9 }
+    - { name: DEFAULT_STAGE_TIMEOUT_MS, line: 9 }
+    - { name: PROFILE_DOMAINS, line: 13 }
   functions:
-    - { name: unwrapEnvelope, lines: 15-20 }
-    - { name: stageKey, lines: 22-26 }
-    - { name: normalizeSeedContainerIds, lines: 28-53 }
-    - { name: collectAllContainerIds, lines: 55-92 }
-    - { name: async consumeNDJSONStream, lines: 103-150 }
-    - { name: useTraceProgress, lines: 152-436 }
+    - { name: unwrapEnvelope, lines: 63-68 }
+    - { name: stageKey, lines: 70-74 }
+    - { name: normalizeSeedContainerIds, lines: 76-105 }
+    - { name: collectAllContainerIds, lines: 107-152 }
+    - { name: async consumeNDJSONStream, lines: 159-211 }
+    - { name: useTraceProgress, lines: 213-531 }
+  interfaces:
+    - { name: TraceProgressOptions, lines: 22-24 }
+    - { name: StageError, lines: 26-29 }
+    - { name: StageErrors, lines: 31-35 }
+    - { name: StageResults, lines: 37-41 }
+    - { name: JobProgress, lines: 43-49 }
+    - { name: TraceProgressComposable, lines: 51-61 }
+  types:
+    - { name: ProfileKey, lines: 11-11 }  # local
+    - { name: TraceProfile, lines: 19-19 }
+    - { name: TraceDirection, lines: 20-20 }
 
-frontend/src/shared-composables/useUrlSync.js:  # 33 lines
+frontend/src/shared-composables/useUrlSync.ts:  # 42 lines
   functions:
-    - { name: useUrlSync, lines: 1-33 }
+    - { name: useUrlSync, lines: 10-42 }
+  interfaces:
+    - { name: UrlSyncState, lines: 1-3 }
+    - { name: UrlSync, lines: 5-8 }
 
 frontend/src/shared-ui/components/AiChartRenderer.vue:  # 421 lines
   imports:
@@ -3145,12 +3205,13 @@ frontend/tests/abort/production-history-abort.test.js:  # 209 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 13 }
     - { module: '../../src/core/api.js', items: [apiPost], line: 30 }
-    - { module: '../../src/shared-composables/useAsyncJobPolling.js', items: [pollJobUntilComplete], line: 31 }
+    - { module: '../../src/shared-composables/useAsyncJobPolling.ts', items: [pollJobUntilComplete], line: 31 }
 
-frontend/tests/abort/query-tool-abort.test.js:  # 150 lines
+frontend/tests/abort/query-tool-abort.test.js:  # 151 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 15 }
     - { module: '../../src/core/api.js', items: [apiPost], line: 25 }
+    - { module: '../../src/shared-composables/useRequestGuard.ts', items: [useRequestGuard], line: 26 }
 
 frontend/tests/abort/reject-history-abort.test.js:  # 174 lines
   imports:
@@ -3629,7 +3690,7 @@ frontend/tests/schema-guard.test.js:  # 157 lines
 frontend/tests/shared-composables/useAsyncJobPolling.test.js:  # 237 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 12 }
-    - { module: '../../src/shared-composables/useAsyncJobPolling.js', items: [pollJobUntilComplete, useAsyncJobPolling], line: 13 }
+    - { module: '../../src/shared-composables/useAsyncJobPolling.ts', items: [pollJobUntilComplete, useAsyncJobPolling], line: 13 }
     - { module: '../../src/core/api.js', items: [apiGet], line: 21 }
 
 frontend/tests/shared-composables/useAutoRefresh.test.js:  # 242 lines
@@ -3637,14 +3698,14 @@ frontend/tests/shared-composables/useAutoRefresh.test.js:  # 242 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 15 }
     - { module: vue, items: [defineComponent, h], line: 16 }
     - { module: '@vue/test-utils', items: [mount], line: 17 }
-    - { module: '../../src/shared-composables/useAutoRefresh.js', items: [useAutoRefresh], line: 18 }
+    - { module: '../../src/shared-composables/useAutoRefresh.ts', items: [useAutoRefresh], line: 18 }
   functions:
     - { name: mountWithAutoRefresh, lines: 22-41 }
 
 frontend/tests/shared-composables/useRequestGuard.test.js:  # 155 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 9 }
-    - { module: '../../src/shared-composables/useRequestGuard.js', items: [useRequestGuard], line: 10 }
+    - { module: '../../src/shared-composables/useRequestGuard.ts', items: [useRequestGuard], line: 10 }
 
 frontend/tests/unwrap-api-result.test.js:  # 88 lines
   imports:
