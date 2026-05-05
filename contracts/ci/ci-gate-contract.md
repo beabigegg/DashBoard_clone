@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.2.1
+schema-version: 1.3.0
 last-changed: 2026-05-05
 breaking-change-policy: deprecate-2-minors
 ---
@@ -61,15 +61,23 @@ breaking-change-policy: deprecate-2-minors
 
 ## Workflow Configuration
 
-檔案：`.github/workflows/contract-driven-gates.yml`、`.github/workflows/frontend-tests.yml`
+檔案：`.github/workflows/contract-driven-gates.yml`、`.github/workflows/frontend-tests.yml`、`.github/workflows/backend-tests.yml`
 
 | job | trigger | stack | status |
 |---|---|---|---|
-| `contract-and-fast-tests` | push / PR | Python 3.10 + Node 20 + conda mes-dashboard | configured |
-| `e2e-critical` | PR only | Node 20 + conda + Playwright chromium | configured |
+| `contract-and-fast-tests` | push / PR | Python 3.11 + Node 22 + conda mes-dashboard | configured |
+| `e2e-critical` | PR only | Node 22 + conda + Playwright chromium | configured |
 | `nightly-integration` | weekly schedule / dispatch | conda mes-dashboard | configured |
 | `scheduled-stress-soak` | weekly schedule / dispatch | conda mes-dashboard | configured |
-| `frontend-type-check` | push / PR | Node 20 + vue-tsc | configured |
+| `frontend-unit-tests` | push / PR | Node 22 + vue-tsc | configured |
+| `unit-and-integration-tests` | push / PR | Python 3.13 + Node 22 | configured |
+
+**Node version constraint**: All jobs that run pytest (including `unit-and-integration-tests` in `backend-tests.yml`) MUST include `uses: actions/setup-node@v4 / node-version: "22"`. `tests/test_frontend_*_parity.py` call Node subprocesses with `--experimental-strip-types`, which requires Node ≥22.6. Dropping this step causes all parity tests to fail with exit code 9.
+
+### Environment Constraints (conda)
+
+- `environment.yml` MUST pin `nodejs>=22.6` (not `>=22`). Conda may resolve `>=22` to 22.0–22.5, which lack `--experimental-strip-types`. In CI, pytest runs in `shell: bash -el {0}` (conda-activated login shell), making conda's node take precedence over `setup-node@v4`'s node. A loose pin silently breaks all parity tests.
+  Evidence: `environment.yml:16`; CI fix commit `b2fd91b`.
 
 **Test markers（pytest.ini）：**
 - `integration` — mock DB（pre-merge OK）

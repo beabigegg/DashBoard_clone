@@ -1,0 +1,24 @@
+change-id: migrate-core-to-typescript
+agent: qa-reviewer
+timestamp: "2026-05-05T07:50:00Z"
+status: complete
+files-read:
+  - specs/changes/migrate-core-to-typescript/tasks.yml
+  - specs/changes/migrate-core-to-typescript/change-classification.md
+  - specs/changes/migrate-core-to-typescript/test-plan.md
+  - specs/changes/migrate-core-to-typescript/ci-gates.md
+  - specs/changes/migrate-core-to-typescript/agent-log/change-classifier.yml
+  - specs/changes/migrate-core-to-typescript/agent-log/contract-reviewer.yml
+  - specs/changes/migrate-core-to-typescript/agent-log/test-strategist.yml
+  - specs/changes/migrate-core-to-typescript/agent-log/ci-cd-gatekeeper.yml
+  - frontend/src/core/index.ts
+  - frontend/src/core/types.ts
+  - frontend/tsconfig.json
+artifacts:
+  - { type: gate-results, pointer: "type-check: pass, vitest: pass (270/270), frontend-build: pass" }
+  - { type: ci-run-url, pointer: "n/a (local-only; CI gates fire on push)" }
+  - { type: evidence-quality, pointer: "log" }
+  - { type: decision, pointer: "approved" }
+  - { type: failure-routing, pointer: "none" }
+next-action: none
+notes: "AC-1..AC-8 verified. 0 .js in core/, ApiResponse<T> exported at index.ts:8, tsconfig include=src/core/**/* line 19. F-001 closed. frontend-type-check intentionally informational."
