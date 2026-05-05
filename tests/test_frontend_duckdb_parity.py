@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def _run_node(code: str, args: list | None = None) -> str:
     """Execute JS code via Node.js and return stdout."""
-    cmd = ['node', '--input-type=module', '-e', code]
+    cmd = ['node', '--experimental-strip-types', '--input-type=module', '-e', code]
     if args:
         cmd.extend(str(a) for a in args)
     result = subprocess.run(
@@ -65,7 +65,7 @@ class TestYieldAlertRiskScoreParity:
         return "low"
 
     def test_risk_score_parity(self):
-        module = REPO_ROOT / 'frontend' / 'src' / 'core' / 'risk-score.js'
+        module = REPO_ROOT / 'frontend' / 'src' / 'core' / 'risk-score.ts'
         cases_json = json.dumps(self.CASES)
 
         node_code = (
@@ -153,7 +153,7 @@ class TestYieldAlertYieldPctParity:
     ]
 
     def test_yield_pct_formula(self):
-        module = REPO_ROOT / 'frontend' / 'src' / 'core' / 'risk-score.js'
+        module = REPO_ROOT / 'frontend' / 'src' / 'core' / 'risk-score.ts'
         node_code = (
             "const cases = JSON.parse(process.argv[1]);"
             "const results = cases.map(([tx, sc]) => {"

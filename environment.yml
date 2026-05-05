@@ -13,7 +13,7 @@ dependencies:
   # Python version - pinned for consistency across deployments
   - python=3.11
   # Frontend build toolchain (Vite)
-  - nodejs>=22
+  - nodejs>=22.6
 
   # Use pip for Python packages (better compatibility with pypi packages)
   - pip
