@@ -1,12 +1,20 @@
-<script setup>
+<script setup lang="ts">
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
 
-defineProps({
-  cards: { type: Array, default: () => [] },
-});
+interface KpiCard {
+  key: string;
+  label: string;
+  value: number;
+  lane: string;
+  isPct: boolean;
+}
 
-const LANE_ACCENT_MAP = {
+defineProps<{
+  cards?: KpiCard[];
+}>();
+
+const LANE_ACCENT_MAP: Record<string, string> = {
   reject: 'danger',
   defect: 'info',
   neutral: 'neutral',

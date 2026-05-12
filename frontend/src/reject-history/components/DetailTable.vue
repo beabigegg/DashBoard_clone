@@ -1,33 +1,43 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import DataTable from '../../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 
-const props = defineProps({
-  items: { type: Array, default: () => [] },
-  pagination: {
-    type: Object,
-    default: () => ({ page: 1, perPage: 20, total: 0, totalPages: 1 }),
-  },
-  loading: { type: Boolean, default: false },
-  paginating: { type: Boolean, default: false },
-  selectedParetoCount: { type: Number, default: 0 },
-  selectedParetoSummary: { type: String, default: '' },
+interface Pagination {
+  page: number;
+  perPage: number;
+  total: number;
+  totalPages: number;
+}
+
+const props = defineProps<{
+  items?: unknown[];
+  pagination?: Pagination;
+  loading?: boolean;
+  paginating?: boolean;
+  selectedParetoCount?: number;
+  selectedParetoSummary?: string;
+}>();
+
+const emit = defineEmits<{
+  (e: 'go-to-page', page: number): void;
+  (e: 'clear-pareto-selection'): void;
+}>();
+
+const tablePagination = computed(() => {
+  const p = props.pagination ?? { page: 1, perPage: 20, total: 0, totalPages: 1 };
+  return {
+    page: p.page,
+    totalPages: p.totalPages,
+    infoText: `共 ${Number(p.total || 0).toLocaleString('zh-TW')} 筆`,
+  };
 });
 
-const emit = defineEmits(['go-to-page', 'clear-pareto-selection']);
-
-const tablePagination = computed(() => ({
-  page: props.pagination.page,
-  totalPages: props.pagination.totalPages,
-  infoText: `共 ${Number(props.pagination.total || 0).toLocaleString('zh-TW')} 筆`,
-}));
-
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   return Number(value || 0).toLocaleString('zh-TW');
 }
 
-function onPageChange(newPage) {
+function onPageChange(newPage: number): void {
   emit('go-to-page', newPage);
 }
 </script>
