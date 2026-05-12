@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 294
-visible-files: 885
+visible-files: 901
 omitted-dirs: 105
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -224,6 +224,18 @@ DashBoard_vite/
 |   |-- gate-policy.md
 |   |-- playwright-nightly.md
 |   \-- required-check-policy.md
+|-- ci-templates/
+|   |-- bun.yml
+|   |-- conda.yml
+|   |-- go.yml
+|   |-- npm.yml
+|   |-- pip.yml
+|   |-- pnpm.yml
+|   |-- poetry.yml
+|   |-- rust.yml
+|   |-- unknown.yml
+|   |-- uv.yml
+|   \-- yarn.yml
 |-- contracts/
 |   |-- api/
 |   |   |-- api-contract.md
@@ -475,7 +487,7 @@ DashBoard_vite/
 |   |   |-- shared-ui/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
-|   |   |   \-- index.js
+|   |   |   \-- index.ts
 |   |   |-- styles/
 |   |   |   \-- tailwind.css
 |   |   |-- tables/
@@ -613,8 +625,21 @@ DashBoard_vite/
 |   |-- vite.config.ts
 |   \-- vitest.config.js
 |-- logs/
+|   |-- archive/
+|   |-- access.log
 |   |-- admin_logs.sqlite
-|   \-- login_sessions.sqlite
+|   |-- error.log
+|   |-- login_sessions.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
+|   |-- metrics_history.sqlite
+|   |-- rq_msd_worker.log
+|   |-- rq_prod_hist_worker.log
+|   |-- rq_reject_worker.log
+|   |-- rq_worker.log
+|   |-- rq_yield_alert_worker.log
+|   |-- startup.log
+|   \-- watchdog.log
 |-- openspec/
 |   |-- archive/
 |   |   |-- 2026-03-26-system-status-and-online-presence/
@@ -1229,25 +1254,14 @@ DashBoard_vite/
 |   |-- query_spool/
 |   |   |-- anomaly_hold_dataset/
 |   |   |   \-- 7c193f4e1ec6e300.parquet
+|   |   |-- anomaly_resource_dataset/
+|   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- hold_dataset/
-|   |   |   |-- 44249536daa7ea5e.parquet
-|   |   |   |-- 4bd16ea73a4bbf32.parquet
-|   |   |   \-- 95e42fcaaa327839.parquet
-|   |   |-- msd-events/
-|   |   |-- reject_dataset/
-|   |   |   |-- 3511280f81a0f4eb.parquet
-|   |   |   |-- 679917c51221d095.parquet
-|   |   |   \-- 78e599fe0d8d79c7.parquet
+|   |   |   \-- d819c1954d0eb112.parquet
 |   |   |-- resource_dataset/
-|   |   |   |-- 44404b8c8320a4dc.parquet
-|   |   |   \-- c5c811f2b223e0cf.parquet
+|   |   |   \-- e9418fc999c636fc.parquet
 |   |   |-- resource_oee/
-|   |   |   |-- 44404b8c8320a4dc.parquet
-|   |   |   \-- c5c811f2b223e0cf.parquet
-|   |   |-- yield_alert_dataset/
-|   |   |   |-- b14cb138e6173d12.parquet
-|   |   |   |-- d34c4109d641dd36.parquet
-|   |   |   \-- f90475d8fa771e62.parquet
+|   |   |   \-- e9418fc999c636fc.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_102819.json
@@ -1291,7 +1305,9 @@ DashBoard_vite/
 |   |   |-- probe_128971.json
 |   |   |-- probe_129725.json
 |   |   |-- probe_129909.json
-|   |   \-- ... (243 more entries truncated; cap=50)
+|   |   |-- probe_130003.json
+|   |   |-- probe_13168.json
+|   |   \-- ... (240 more entries truncated; cap=50)
 |   \-- mes_dashboard_restart_state.json
 |-- tools/
 |   |-- generate_documentation.py

@@ -103,3 +103,6 @@ tools/
 
 # Migration-phase feature flags
 data/modernization_feature_flags.json
+
+# cdd-kit generated backups (do not commit)
+.cdd/.refresh-backup/
