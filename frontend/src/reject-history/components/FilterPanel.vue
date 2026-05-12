@@ -1,36 +1,77 @@
-<script setup>
+<script setup lang="ts">
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
-const props = defineProps({
-  filters: { type: Object, required: true },
-  queryMode: { type: String, default: 'date_range' },
-  containerInputType: { type: String, default: 'lot' },
-  containerInput: { type: String, default: '' },
-  availableFilters: { type: Object, default: () => ({}) },
-  supplementaryFilters: { type: Object, default: () => ({}) },
-  queryId: { type: String, default: '' },
-  resolutionInfo: { type: Object, default: null },
-  loading: { type: Object, required: true },
-  activeFilterChips: { type: Array, default: () => [] },
-  primaryQueryMaxDays: { type: Number, default: 190 },
-});
+interface DraftFilters {
+  startDate: string;
+  endDate: string;
+  includeExcludedScrap: boolean;
+  excludeMaterialScrap: boolean;
+  excludePbDiode: boolean;
+}
 
-const emit = defineEmits([
-  'apply',
-  'clear',
-  'export-csv',
-  'remove-chip',
-  'update:queryMode',
-  'update:containerInputType',
-  'update:containerInput',
-  'supplementary-change',
-]);
+interface AvailableFilters {
+  workcenterGroups?: string[];
+  packages?: string[];
+  reasons?: string[];
+}
 
-function emitSupplementary(patch) {
+interface SupplementaryFilters {
+  packages?: string[];
+  workcenterGroups?: string[];
+  reasons?: string[];
+}
+
+interface LoadingState {
+  querying?: boolean;
+  exporting?: boolean;
+  [key: string]: unknown;
+}
+
+interface ResolutionInfo {
+  resolved_count: number;
+  expansion_info?: Record<string, unknown>;
+  not_found?: string[];
+}
+
+interface FilterChip {
+  key: string;
+  label: string;
+  removable: boolean;
+  type: string;
+  value: string;
+  dimension?: string;
+}
+
+const props = defineProps<{
+  filters: DraftFilters;
+  queryMode?: string;
+  containerInputType?: string;
+  containerInput?: string;
+  availableFilters?: AvailableFilters;
+  supplementaryFilters?: SupplementaryFilters;
+  queryId?: string;
+  resolutionInfo?: ResolutionInfo | null;
+  loading: LoadingState;
+  activeFilterChips?: FilterChip[];
+  primaryQueryMaxDays?: number;
+}>();
+
+const emit = defineEmits<{
+  (e: 'apply'): void;
+  (e: 'clear'): void;
+  (e: 'export-csv'): void;
+  (e: 'remove-chip', chip: FilterChip): void;
+  (e: 'update:queryMode', value: string): void;
+  (e: 'update:containerInputType', value: string): void;
+  (e: 'update:containerInput', value: string): void;
+  (e: 'supplementary-change', value: { packages: string[]; workcenterGroups: string[]; reasons: string[] }): void;
+}>();
+
+function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups: string[]; reasons: string[] }>): void {
   emit('supplementary-change', {
-    packages: props.supplementaryFilters.packages || [],
-    workcenterGroups: props.supplementaryFilters.workcenterGroups || [],
-    reasons: props.supplementaryFilters.reasons || [],
+    packages: props.supplementaryFilters?.packages || [],
+    workcenterGroups: props.supplementaryFilters?.workcenterGroups || [],
+    reasons: props.supplementaryFilters?.reasons || [],
     ...patch,
   });
 }
@@ -94,7 +135,7 @@ function emitSupplementary(patch) {
               id="container-type"
               class="filter-input container-type-select"
               :value="containerInputType"
-              @change="$emit('update:containerInputType', $event.target.value)"
+              @change="$emit('update:containerInputType', ($event.target as HTMLSelectElement).value)"
             >
               <option value="lot">LOT</option>
               <option value="work_order">工單</option>
@@ -109,7 +150,7 @@ function emitSupplementary(patch) {
             class="filter-input filter-textarea"
             rows="3"
             :value="containerInput"
-            @input="$emit('update:containerInput', $event.target.value)"
+            @input="$emit('update:containerInput', ($event.target as HTMLTextAreaElement).value)"
             placeholder="GA26020001-A00-001&#10;GA260200%&#10;..."
           ></textarea>
         </div>

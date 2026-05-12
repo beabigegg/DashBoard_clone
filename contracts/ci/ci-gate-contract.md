@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.4
+schema-version: 1.3.5
 last-changed: 2026-05-12
 breaking-change-policy: deprecate-2-minors
 ---
@@ -67,6 +67,13 @@ breaking-change-policy: deprecate-2-minors
 - **From Phase 1f onward**: `include` is `["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*", "src/admin-shared/**/*", "src/resource-shared/**/*", "src/wip-shared/**/*"]`, additionally covering the 6 modules in `wip-shared/` (3 Vue SFCs + 2 composables + 1 constants module) under `strict: true`. This phase also removes `@ts-expect-error` suppressions from `shared-composables/` and `shared-ui/` that were placed as explicit cross-phase placeholders.
 - **Status unchanged**: the gate remains **informational** (continue-on-error: true). Promotion to required follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.4 (patch)**: additive prose only — gate tier, command, and status are unchanged. Matching Phase 1e precedent at ci 1.3.3.
+
+### frontend-type-check scope expansion (Phase 3 — migrate-reject-history-ts)
+
+- **Before Phase 3**: `tsconfig.json` `include` covered `core/`, `shared-composables/`, `shared-ui/`, `admin-shared/`, `resource-shared/`, `wip-shared/`.
+- **From Phase 3 onward**: `include` gains `"src/reject-history/**/*"`, covering `App.vue`, `main.ts`, `useRejectHistoryDuckDB.ts`, and 6 component SFCs (`DetailTable.vue`, `FilterPanel.vue`, `ParetoGrid.vue`, `ParetoSection.vue`, `SummaryCards.vue`, `TrendChart.vue`) under `strict: true`.
+- **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.5 (patch)**: additive prose only — gate tier, command, and status are unchanged. Matching Phase 1f precedent at ci 1.3.4.
 
 ## Required Check Policy
 

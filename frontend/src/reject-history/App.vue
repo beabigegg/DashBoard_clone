@@ -1,20 +1,21 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 
-import { apiGet, apiPost } from '../core/api.js';
-import { unwrapApiResult } from '../core/unwrap-api-result.js';
-import { isDuckDBSupported } from '../core/duckdb-client.js';
+import { apiGet, apiPost } from '../core/api';
+import { unwrapApiResult } from '../core/unwrap-api-result';
+import { isDuckDBSupported } from '../core/duckdb-client';
 import {
   buildViewParams,
   parseMultiLineInput,
   PRIMARY_QUERY_MAX_DAYS,
   validateDateRange,
-} from '../core/reject-history-filters.js';
-import { replaceRuntimeHistory } from '../core/shell-navigation.js';
-import { postExport } from '../core/post-export.js';
-import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
-import { useRejectHistoryDuckDB } from './useRejectHistoryDuckDB.js';
+} from '../core/reject-history-filters';
+import { replaceRuntimeHistory } from '../core/shell-navigation';
+import { postExport } from '../core/post-export';
+import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
+import { useRejectHistoryDuckDB } from './useRejectHistoryDuckDB';
+import type { DetailRow, SummaryData } from './useRejectHistoryDuckDB';
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
@@ -27,18 +28,150 @@ import ParetoGrid from './components/ParetoGrid.vue';
 import SummaryCards from './components/SummaryCards.vue';
 import TrendChart from './components/TrendChart.vue';
 
+// ── Local type aliases ────────────────────────────────────────────────────────
+
+interface DraftFilters {
+  startDate: string;
+  endDate: string;
+  includeExcludedScrap: boolean;
+  excludeMaterialScrap: boolean;
+  excludePbDiode: boolean;
+}
+
+interface CommittedPrimary {
+  mode: string;
+  startDate: string;
+  endDate: string;
+  containerInputType: string;
+  containerValues: string[];
+  includeExcludedScrap: boolean;
+  excludeMaterialScrap: boolean;
+  excludePbDiode: boolean;
+}
+
+interface SupplementaryFilters {
+  packages: string[];
+  workcenterGroups: string[];
+  reasons: string[];
+}
+
+interface AvailableFiltersState {
+  workcenterGroups: string[];
+  packages: string[];
+  reasons: string[];
+}
+
+interface LoadingState {
+  initial: boolean;
+  querying: boolean;
+  list: boolean;
+  pareto: boolean;
+  exporting: boolean;
+}
+
+interface JobProgressState {
+  active: boolean;
+  jobId: string | null;
+  status: string | null;
+  progress: string;
+  pct: number;
+  elapsedSeconds: number;
+}
+
+interface ResolutionInfo {
+  resolved_count: number;
+  expansion_info?: Record<string, unknown>;
+  not_found?: string[];
+}
+
+interface DetailPaginationState {
+  page: number;
+  perPage: number;
+  total: number;
+  totalPages: number;
+}
+
+interface DetailState {
+  items: DetailRow[];
+  pagination: DetailPaginationState;
+}
+
+interface ParetoItemData {
+  reason: string;
+  metric_value: number;
+  MOVEIN_QTY: number;
+  REJECT_TOTAL_QTY: number;
+  DEFECT_QTY: number;
+  count: number;
+  pct: number;
+  cumPct: number;
+}
+
+interface ParetoDimensionState {
+  items: ParetoItemData[];
+  dimension: string;
+  metric_mode: string;
+}
+
+interface ParetoDataState {
+  reason: ParetoDimensionState;
+  package: ParetoDimensionState;
+  type: ParetoDimensionState;
+}
+
+interface ParetoSelectionsState {
+  reason: string[];
+  package: string[];
+  type: string[];
+}
+
+interface FilterChip {
+  key: string;
+  label: string;
+  removable: boolean;
+  type: string;
+  value: string;
+  dimension?: string;
+}
+
+interface KpiCard {
+  key: string;
+  label: string;
+  value: number;
+  lane: string;
+  isPct: boolean;
+}
+
+interface TrendItem {
+  bucket_date: string;
+  MOVEIN_QTY: number;
+  REJECT_TOTAL_QTY: number;
+  DEFECT_QTY: number;
+  REJECT_RATE_PCT: number;
+  DEFECT_RATE_PCT: number;
+}
+
+interface AnalyticsRawItem {
+  bucket_date: string;
+  MOVEIN_QTY: number;
+  REJECT_TOTAL_QTY: number;
+  DEFECT_QTY: number;
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
 const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 20;
 const DUCKDB_THRESHOLD = 5000;
-const PARETO_DIMENSIONS = ['reason', 'package', 'type'];
+const PARETO_DIMENSIONS: string[] = ['reason', 'package', 'type'];
 const PARETO_DISPLAY_SCOPE_FIXED = 'top20';
-const PARETO_SELECTION_PARAM_MAP = {
+const PARETO_SELECTION_PARAM_MAP: Record<string, string> = {
   reason: 'sel_reason',
   package: 'sel_package',
   type: 'sel_type',
 };
 
-function createEmptyParetoSelections() {
+function createEmptyParetoSelections(): ParetoSelectionsState {
   return {
     reason: [],
     package: [],
@@ -46,7 +179,7 @@ function createEmptyParetoSelections() {
   };
 }
 
-function createEmptyParetoData() {
+function createEmptyParetoData(): ParetoDataState {
   return {
     reason: { items: [], dimension: 'reason', metric_mode: 'reject_total' },
     package: { items: [], dimension: 'package', metric_mode: 'reject_total' },
@@ -54,7 +187,7 @@ function createEmptyParetoData() {
   };
 }
 
-function getDimensionLabel(dimension) {
+function getDimensionLabel(dimension: string): string {
   switch (dimension) {
     case 'reason':
       return '不良原因';
@@ -68,11 +201,11 @@ function getDimensionLabel(dimension) {
 }
 
 // ---- Primary query form state ----
-const queryMode = ref('date_range');
-const containerInputType = ref('lot');
-const containerInput = ref('');
+const queryMode = ref<string>('date_range');
+const containerInputType = ref<string>('lot');
+const containerInput = ref<string>('');
 
-const draftFilters = reactive({
+const draftFilters = reactive<DraftFilters>({
   startDate: '',
   endDate: '',
   includeExcludedScrap: false,
@@ -81,7 +214,7 @@ const draftFilters = reactive({
 });
 
 // ---- Committed primary params (for URL + chips) ----
-const committedPrimary = reactive({
+const committedPrimary = reactive<CommittedPrimary>({
   mode: 'date_range',
   startDate: '',
   endDate: '',
@@ -93,26 +226,26 @@ const committedPrimary = reactive({
 });
 
 // ---- Query result state ----
-const queryId = ref('');
-const resolutionInfo = ref(null);
-const availableFilters = ref({ workcenterGroups: [], packages: [], reasons: [] });
+const queryId = ref<string>('');
+const resolutionInfo = ref<ResolutionInfo | null>(null);
+const availableFilters = ref<AvailableFiltersState>({ workcenterGroups: [], packages: [], reasons: [] });
 
 // ---- Supplementary filters (post-query, applied via /view) ----
-const supplementaryFilters = reactive({
+const supplementaryFilters = reactive<SupplementaryFilters>({
   packages: [],
   workcenterGroups: [],
   reasons: [],
 });
 
 // ---- Interactive state ----
-const page = ref(1);
-const selectedTrendDates = ref([]);
-const trendLegendSelected = ref({ '扣帳報廢量': true, '不扣帳報廢量': true });
-const paretoSelections = reactive(createEmptyParetoSelections());
-const paretoData = reactive(createEmptyParetoData());
+const page = ref<number>(1);
+const selectedTrendDates = ref<string[]>([]);
+const trendLegendSelected = ref<Record<string, boolean>>({ '扣帳報廢量': true, '不扣帳報廢量': true });
+const paretoSelections = reactive<ParetoSelectionsState>(createEmptyParetoSelections());
+const paretoData = reactive<ParetoDataState>(createEmptyParetoData());
 
 // ---- Data state ----
-const summary = ref({
+const summary = ref<SummaryData>({
   MOVEIN_QTY: 0,
   REJECT_TOTAL_QTY: 0,
   DEFECT_QTY: 0,
@@ -122,8 +255,8 @@ const summary = ref({
   AFFECTED_LOT_COUNT: 0,
   AFFECTED_WORKORDER_COUNT: 0,
 });
-const analyticsRawItems = ref([]);
-const detail = ref({
+const analyticsRawItems = ref<AnalyticsRawItem[]>([]);
+const detail = ref<DetailState>({
   items: [],
   pagination: {
     page: 1,
@@ -134,26 +267,26 @@ const detail = ref({
 });
 
 // ---- Loading / error state ----
-const loading = reactive({
+const loading = reactive<LoadingState>({
   initial: false,
   querying: false,
   list: false,
   pareto: false,
   exporting: false,
 });
-const paginationLoading = ref(false);
-const errorMessage = ref('');
-const partialFailureWarning = ref('');
-const lastQueryAt = ref('');
-const refreshSuccess = ref(false);
-const refreshError = ref(false);
+const paginationLoading = ref<boolean>(false);
+const errorMessage = ref<string>('');
+const partialFailureWarning = ref<string>('');
+const lastQueryAt = ref<string>('');
+const refreshSuccess = ref<boolean>(false);
+const refreshError = ref<boolean>(false);
 
 // ---- DuckDB-WASM state ----
 const duckdb = useRejectHistoryDuckDB();
-const duckdbMode = ref(false);   // true when frontend DuckDB-WASM has taken over view computation
+const duckdbMode = ref<boolean>(false);   // true when frontend DuckDB-WASM has taken over view computation
 
 // ---- Async job progress state ----
-const jobProgress = reactive({
+const jobProgress = reactive<JobProgressState>({
   active: false,
   jobId: null,
   status: null,
@@ -161,31 +294,32 @@ const jobProgress = reactive({
   pct: 0,
   elapsedSeconds: 0,
 });
-let _jobAbortController = null;
+let _jobAbortController: AbortController | null = null;
 
 // ---- Request staleness tracking ----
 let activeRequestId = 0;
 let activeParetoRequestId = 0;
 
-function nextRequestId() {
+function nextRequestId(): number {
   activeRequestId += 1;
   return activeRequestId;
 }
 
-function isStaleRequest(id) {
+function isStaleRequest(id: number): boolean {
   return id !== activeRequestId;
 }
 
-function nextParetoRequestId() {
+function nextParetoRequestId(): number {
   activeParetoRequestId += 1;
   return activeParetoRequestId;
 }
 
-function isStaleParetoRequest(id) {
+function isStaleParetoRequest(id: number): boolean {
   return id !== activeParetoRequestId;
 }
 
 // -- useFilterOrchestrator: two-phase (primary query -> supplementary filters unlock) --
+// TODO: type — useFilterOrchestrator accepts a loose config object; _committed param is untyped from the JS composable
 const filterOrchestrator = useFilterOrchestrator({
   fields: {
     startDate:            { trigger: 'draft-apply', initial: '' },
@@ -213,14 +347,14 @@ const filterOrchestrator = useFilterOrchestrator({
 });
 
 // ---- Helpers ----
-function toDateString(value) {
+function toDateString(value: Date): string {
   const y = value.getFullYear();
   const m = String(value.getMonth() + 1).padStart(2, '0');
   const d = String(value.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
-function setDefaultDateRange() {
+function setDefaultDateRange(): void {
   const today = new Date();
   const end = new Date(today);
   end.setDate(end.getDate() - 1);
@@ -230,27 +364,27 @@ function setDefaultDateRange() {
   draftFilters.endDate = toDateString(end);
 }
 
-function metricFilterParam() {
+function metricFilterParam(): string {
   const mode = paretoMetricMode.value;
   if (mode === 'reject' || mode === 'defect') return mode;
   return 'all';
 }
 
-function paretoMetricApiMode() {
+function paretoMetricApiMode(): string {
   return paretoMetricMode.value === 'defect' ? 'defect' : 'reject_total';
 }
 
-// unwrapApiResult imported from ../core/unwrap-api-result.js
+// unwrapApiResult imported from ../core/unwrap-api-result
 
-function resetParetoSelections() {
+function resetParetoSelections(): void {
   for (const dimension of PARETO_DIMENSIONS) {
-    paretoSelections[dimension] = [];
+    paretoSelections[dimension as keyof ParetoSelectionsState] = [];
   }
 }
 
-function resetParetoData() {
+function resetParetoData(): void {
   for (const dimension of PARETO_DIMENSIONS) {
-    paretoData[dimension] = {
+    paretoData[dimension as keyof ParetoDataState] = {
       items: [],
       dimension,
       metric_mode: paretoMetricApiMode(),
@@ -258,8 +392,8 @@ function resetParetoData() {
   }
 }
 
-function buildBatchParetoParams() {
-  const params = {
+function buildBatchParetoParams(): Record<string, unknown> {
+  const params: Record<string, unknown> = {
     query_id: queryId.value,
     metric_mode: paretoMetricApiMode(),
     pareto_scope: 'top80',
@@ -282,14 +416,15 @@ function buildBatchParetoParams() {
     params.trend_dates = selectedTrendDates.value;
   }
   for (const [dimension, key] of Object.entries(PARETO_SELECTION_PARAM_MAP)) {
-    if (paretoSelections[dimension]?.length > 0) {
-      params[key] = paretoSelections[dimension];
+    const sel = paretoSelections[dimension as keyof ParetoSelectionsState];
+    if (sel?.length > 0) {
+      params[key] = sel;
     }
   }
   return params;
 }
 
-async function fetchBatchPareto() {
+async function fetchBatchPareto(): Promise<void> {
   if (!queryId.value) return;
   // In DuckDB mode, batch_pareto is computed inside refreshView() — skip server call.
   if (duckdbMode.value && duckdb.isActive.value) return;
@@ -303,25 +438,29 @@ async function fetchBatchPareto() {
     });
     if (isStaleParetoRequest(requestId)) return;
 
-    if (resp?.success === false && resp?.error === 'cache_miss') {
+    // TODO: type — resp is untyped from core/api (JS, not yet migrated); cast via unknown
+    const respAny = resp as Record<string, unknown>;
+    if (respAny?.success === false && respAny?.error === 'cache_miss') {
       await executePrimaryQuery();
       return;
     }
 
-    const result = unwrapApiResult(resp, '查詢批次 Pareto 失敗');
-    const dimensions = result.data?.dimensions || {};
+    const result = unwrapApiResult(resp, '查詢批次 Pareto 失敗') as Record<string, unknown> | null | undefined;
+    const resultData = (result?.data as Record<string, unknown> | undefined);
+    const dimensions = (resultData?.dimensions || {}) as Record<string, ParetoDimensionState>;
     for (const dimension of PARETO_DIMENSIONS) {
-      paretoData[dimension] = dimensions[dimension] || {
+      paretoData[dimension as keyof ParetoDataState] = dimensions[dimension] || {
         items: [],
         dimension,
         metric_mode: paretoMetricApiMode(),
       };
     }
-  } catch (error) {
+  } catch (err) {
     if (isStaleParetoRequest(requestId)) return;
     resetParetoData();
-    if (error?.name !== 'AbortError') {
-      errorMessage.value = error?.message || '查詢批次 Pareto 失敗';
+    const e = err as Record<string, unknown>;
+    if (e?.name !== 'AbortError') {
+      errorMessage.value = String(e?.message || '查詢批次 Pareto 失敗');
     }
   } finally {
     if (!isStaleParetoRequest(requestId)) {
@@ -331,7 +470,7 @@ async function fetchBatchPareto() {
 }
 
 // ---- Primary query (POST /query → Oracle → cache) ----
-function cancelAsyncJob() {
+function cancelAsyncJob(): void {
   if (_jobAbortController) {
     _jobAbortController.abort();
     _jobAbortController = null;
@@ -339,7 +478,7 @@ function cancelAsyncJob() {
   jobProgress.active = false;
 }
 
-async function _loadViewAfterQuery(queryIdValue) {
+async function _loadViewAfterQuery(queryIdValue: string): Promise<void> {
   // After a successful query (sync or async), load view data via /view
   committedPrimary.mode = queryMode.value;
   committedPrimary.startDate = draftFilters.startDate;
@@ -354,11 +493,13 @@ async function _loadViewAfterQuery(queryIdValue) {
   queryId.value = queryIdValue;
 }
 
-async function _applyQueryResult(result) {
-  const meta = result.meta || {};
+async function _applyQueryResult(result: Record<string, unknown>): Promise<void> {
+  const meta = (result.meta || {}) as Record<string, unknown>;
   if (meta.has_partial_failure) {
     const failedChunkCount = Number(meta.failed_chunk_count || 0);
-    const failedRanges = Array.isArray(meta.failed_ranges) ? meta.failed_ranges : [];
+    const failedRanges: Array<{ start: string; end: string }> = Array.isArray(meta.failed_ranges)
+      ? (meta.failed_ranges as Array<{ start: string; end: string }>)
+      : [];
     if (failedRanges.length > 0) {
       const rangesText = failedRanges
         .map((item) => `${item.start} ~ ${item.end}`)
@@ -369,12 +510,12 @@ async function _applyQueryResult(result) {
     }
   }
 
-  resolutionInfo.value = result.resolution_info || null;
-  const af = result.available_filters || {};
+  resolutionInfo.value = (result.resolution_info as ResolutionInfo | null | undefined) ?? null;
+  const af = (result.available_filters || {}) as Record<string, unknown>;
   availableFilters.value = {
-    workcenterGroups: af.workcenter_groups || af.workcenterGroups || [],
-    packages: af.packages || [],
-    reasons: af.reasons || [],
+    workcenterGroups: (af.workcenter_groups as string[] | undefined) || (af.workcenterGroups as string[] | undefined) || [],
+    packages: (af.packages as string[] | undefined) || [],
+    reasons: (af.reasons as string[] | undefined) || [],
   };
 
   supplementaryFilters.packages = [];
@@ -386,14 +527,14 @@ async function _applyQueryResult(result) {
   resetParetoData();
 
   analyticsRawItems.value = Array.isArray(result.analytics_raw)
-    ? result.analytics_raw
+    ? (result.analytics_raw as AnalyticsRawItem[])
     : [];
-  summary.value = result.summary || summary.value;
-  detail.value = result.detail || detail.value;
+  summary.value = (result.summary as SummaryData) || summary.value;
+  detail.value = (result.detail as DetailState) || detail.value;
 
   // Activate DuckDB-WASM mode for large datasets
-  const totalRowCount = result.total_row_count ?? 0;
-  const spoolUrl = result.spool_download_url;
+  const totalRowCount = (result.total_row_count as number | undefined) ?? 0;
+  const spoolUrl = result.spool_download_url as string | undefined;
   if (spoolUrl && totalRowCount >= DUCKDB_THRESHOLD && isDuckDBSupported() && !duckdbMode.value) {
     try {
       await duckdb.activate(spoolUrl);
@@ -412,12 +553,12 @@ async function _applyQueryResult(result) {
   }
 
   const _now = new Date();
-  const _pad = (n) => String(n).padStart(2, '0');
+  const _pad = (n: number) => String(n).padStart(2, '0');
   lastQueryAt.value = `${_now.getFullYear()}-${_pad(_now.getMonth() + 1)}-${_pad(_now.getDate())} ${_pad(_now.getHours())}:${_pad(_now.getMinutes())}:${_pad(_now.getSeconds())}`;
   updateUrlState();
 }
 
-async function executePrimaryQuery() {
+async function executePrimaryQuery(): Promise<void> {
   const requestId = nextRequestId();
   loading.querying = true;
   loading.list = true;
@@ -428,7 +569,7 @@ async function executePrimaryQuery() {
   cancelAsyncJob();
 
   try {
-    const body = { mode: queryMode.value };
+    const body: Record<string, unknown> = { mode: queryMode.value };
 
     if (queryMode.value === 'date_range') {
       const dateValidationError = validateDateRange(
@@ -436,7 +577,7 @@ async function executePrimaryQuery() {
         draftFilters.endDate,
       );
       if (dateValidationError) {
-        errorMessage.value = dateValidationError;
+        errorMessage.value = dateValidationError as string;
         return;
       }
       body.start_date = draftFilters.startDate;
@@ -469,11 +610,13 @@ async function executePrimaryQuery() {
     if (isStaleRequest(requestId)) return;
 
     // ---- Async 202 path ----
-    const respData = resp?.data || {};
-    if (resp?._status === 202 || (respData.async === true && respData.job_id)) {
-      const jobId = respData.job_id;
-      const statusUrl = respData.status_url || `/api/reject-history/job/${jobId}`;
-      const preQueryId = respData.query_id;
+    // TODO: type — resp is untyped from core/api (JS, not yet migrated); cast via Record<string, unknown>
+    const respAny = resp as Record<string, unknown>;
+    const respData = (respAny?.data || {}) as Record<string, unknown>;
+    if (respAny?._status === 202 || (respData.async === true && respData.job_id)) {
+      const jobId = respData.job_id as string;
+      const statusUrl = (respData.status_url as string | undefined) || `/api/reject-history/job/${jobId}`;
+      const preQueryId = respData.query_id as string;
 
       jobProgress.active = true;
       jobProgress.jobId = jobId;
@@ -487,12 +630,12 @@ async function executePrimaryQuery() {
       try {
         await pollJobUntilComplete(statusUrl, {
           signal: controller.signal,
-          onProgress: (statusResp) => {
+          onProgress: (statusResp: Record<string, unknown>) => {
             if (isStaleRequest(requestId)) return;
-            jobProgress.status = statusResp.status;
-            jobProgress.progress = statusResp.progress || '';
-            jobProgress.pct = statusResp.pct || 0;
-            jobProgress.elapsedSeconds = statusResp.elapsed_seconds || 0;
+            jobProgress.status = statusResp.status as string;
+            jobProgress.progress = (statusResp.progress as string) || '';
+            jobProgress.pct = (statusResp.pct as number) || 0;
+            jobProgress.elapsedSeconds = (statusResp.elapsed_seconds as number) || 0;
           },
         });
       } finally {
@@ -512,7 +655,7 @@ async function executePrimaryQuery() {
       // Explicitly clear loading state and fetch pareto here.
       loading.querying = false;
       const _now = new Date();
-  const _pad = (n) => String(n).padStart(2, '0');
+  const _pad = (n: number) => String(n).padStart(2, '0');
   lastQueryAt.value = `${_now.getFullYear()}-${_pad(_now.getMonth() + 1)}-${_pad(_now.getDate())} ${_pad(_now.getHours())}:${_pad(_now.getMinutes())}:${_pad(_now.getSeconds())}`;
       updateUrlState();
       await fetchBatchPareto();
@@ -523,23 +666,25 @@ async function executePrimaryQuery() {
 
     // ---- Sync 200 path (original behavior) ----
     const result = unwrapApiResult(resp, '主查詢執行失敗');
-    const resultData = result.data || result;
-    await _loadViewAfterQuery(resultData.query_id);
+    // TODO: type — unwrapApiResult returns untyped result from JS core module
+    const resultData = ((result as Record<string, unknown>).data || result) as Record<string, unknown>;
+    await _loadViewAfterQuery(resultData.query_id as string);
     await _applyQueryResult(resultData);
 
     refreshSuccess.value = true;
     setTimeout(() => { refreshSuccess.value = false; }, 1500);
-  } catch (error) {
+  } catch (err) {
     if (isStaleRequest(requestId)) return;
     refreshError.value = true;
-    if (error?.name === 'AbortError') {
+    const e = err as Record<string, unknown>;
+    if (e?.name === 'AbortError') {
       errorMessage.value = '查詢已取消';
-    } else if (error?.errorCode === 'JOB_FAILED') {
-      errorMessage.value = error?.message || '背景查詢失敗';
-    } else if (error?.errorCode === 'JOB_POLL_TIMEOUT') {
+    } else if (e?.errorCode === 'JOB_FAILED') {
+      errorMessage.value = String(e?.message || '背景查詢失敗');
+    } else if (e?.errorCode === 'JOB_POLL_TIMEOUT') {
       errorMessage.value = '背景查詢超時，請稍後重試';
     } else {
-      errorMessage.value = error?.message || '主查詢執行失敗';
+      errorMessage.value = String(e?.message || '主查詢執行失敗');
     }
   } finally {
     if (isStaleRequest(requestId)) return;
@@ -550,7 +695,7 @@ async function executePrimaryQuery() {
 }
 
 // ---- View refresh (GET /view → read cache → filter) ----
-async function refreshView() {
+async function refreshView(): Promise<void> {
   if (!queryId.value) return;
 
   const requestId = nextRequestId();
@@ -581,15 +726,15 @@ async function refreshView() {
       if (isStaleRequest(requestId)) return;
 
       analyticsRawItems.value = Array.isArray(result.analytics_raw)
-        ? result.analytics_raw
+        ? (result.analytics_raw as AnalyticsRawItem[])
         : analyticsRawItems.value;
-      summary.value = result.summary || summary.value;
-      detail.value = result.detail || detail.value;
+      summary.value = (result.summary as SummaryData) || summary.value;
+      detail.value = (result.detail as DetailState) || detail.value;
 
       // Update pareto data from combined result
-      const dims = result.batch_pareto?.dimensions || {};
+      const dims = (result.batch_pareto?.dimensions || {}) as Record<string, ParetoDimensionState>;
       for (const dimension of PARETO_DIMENSIONS) {
-        paretoData[dimension] = dims[dimension] || {
+        paretoData[dimension as keyof ParetoDataState] = dims[dimension] || {
           items: [],
           dimension,
           metric_mode: paretoMetricApiMode(),
@@ -599,9 +744,9 @@ async function refreshView() {
       const af = result.available_filters;
       if (af) {
         availableFilters.value = {
-          workcenterGroups: af.workcenter_groups || [],
-          packages: af.packages || [],
-          reasons: af.reasons || [],
+          workcenterGroups: (af.workcenter_groups as string[] | undefined) || [],
+          packages: (af.packages as string[] | undefined) || [],
+          reasons: (af.reasons as string[] | undefined) || [],
         };
       }
 
@@ -640,49 +785,52 @@ async function refreshView() {
     });
     if (isStaleRequest(requestId)) return;
 
-    if (resp?.success === false && resp?.error === 'cache_expired') {
+    const respAny = resp as Record<string, unknown>;
+    if (respAny?.success === false && respAny?.error === 'cache_expired') {
       await executePrimaryQuery();
       return;
     }
 
     const result = unwrapApiResult(resp, '視圖查詢失敗');
-    const data = result.data || result;
+    const resultAny = result as Record<string, unknown>;
+    const data = ((resultAny.data || result) as Record<string, unknown>);
 
     analyticsRawItems.value = Array.isArray(data.analytics_raw)
-      ? data.analytics_raw
+      ? (data.analytics_raw as AnalyticsRawItem[])
       : analyticsRawItems.value;
-    summary.value = data.summary || summary.value;
-    detail.value = data.detail || detail.value;
+    summary.value = (data.summary as SummaryData) || summary.value;
+    detail.value = (data.detail as DetailState) || detail.value;
 
     // Populate available filters (needed for async path and refreshes)
-    const af = data.available_filters;
+    const af = data.available_filters as Record<string, unknown> | undefined;
     if (af) {
       availableFilters.value = {
-        workcenterGroups: af.workcenter_groups || af.workcenterGroups || [],
-        packages: af.packages || [],
-        reasons: af.reasons || [],
+        workcenterGroups: (af.workcenter_groups as string[] | undefined) || (af.workcenterGroups as string[] | undefined) || [],
+        packages: (af.packages as string[] | undefined) || [],
+        reasons: (af.reasons as string[] | undefined) || [],
       };
     }
 
     // Activate DuckDB-WASM in background (fire-and-forget so loading.list is not blocked).
     // fetchBatchPareto() will still run from server since duckdbMode is still false here.
-    const totalRowCount = data.total_row_count ?? 0;
-    const spoolUrl = data.spool_download_url;
+    const totalRowCount = (data.total_row_count as number | undefined) ?? 0;
+    const spoolUrl = data.spool_download_url as string | undefined;
     if (spoolUrl && totalRowCount >= DUCKDB_THRESHOLD && isDuckDBSupported() && !duckdbMode.value) {
       duckdb.activate(spoolUrl).then(() => {
         duckdbMode.value = true;
-      }).catch(err => {
+      }).catch((err: unknown) => {
         console.warn('[DuckDB] activation failed, staying in server mode:', err);
       });
     }
 
     updateUrlState();
-  } catch (error) {
+  } catch (err) {
     if (isStaleRequest(requestId)) return;
-    if (error?.name === 'AbortError') {
+    const e = err as Record<string, unknown>;
+    if (e?.name === 'AbortError') {
       errorMessage.value = '查詢逾時，請縮短日期範圍後重試';
     } else {
-      errorMessage.value = error?.message || '視圖查詢失敗';
+      errorMessage.value = String(e?.message || '視圖查詢失敗');
     }
   } finally {
     if (isStaleRequest(requestId)) return;
@@ -690,7 +838,7 @@ async function refreshView() {
   }
 }
 
-async function refreshDetailPage() {
+async function refreshDetailPage(): Promise<void> {
   if (!queryId.value) return;
 
   const requestId = nextRequestId();
@@ -719,7 +867,7 @@ async function refreshDetailPage() {
         });
         if (isStaleRequest(requestId)) return;
 
-        detail.value = result.detail || detail.value;
+        detail.value = (result.detail as DetailState) || detail.value;
         updateUrlState();
         return;
       } catch (err) {
@@ -749,22 +897,25 @@ async function refreshDetailPage() {
     });
     if (isStaleRequest(requestId)) return;
 
-    if (resp?.success === false && resp?.error === 'cache_expired') {
+    const respAny2 = resp as Record<string, unknown>;
+    if (respAny2?.success === false && respAny2?.error === 'cache_expired') {
       paginationLoading.value = false;
       await executePrimaryQuery();
       return;
     }
 
-    const result = unwrapApiResult(resp, '視圖查詢失敗');
-    const data = result.data || result;
-    detail.value = data.detail || detail.value;
+    const result2 = unwrapApiResult(resp, '視圖查詢失敗');
+    const result2Any = result2 as Record<string, unknown>;
+    const data2 = (result2Any.data || result2) as Record<string, unknown>;
+    detail.value = (data2.detail as DetailState) || detail.value;
     updateUrlState();
-  } catch (error) {
+  } catch (err) {
     if (isStaleRequest(requestId)) return;
-    if (error?.name === 'AbortError') {
+    const e = err as Record<string, unknown>;
+    if (e?.name === 'AbortError') {
       errorMessage.value = '查詢逾時，請縮短日期範圍後重試';
     } else {
-      errorMessage.value = error?.message || '視圖查詢失敗';
+      errorMessage.value = String(e?.message || '視圖查詢失敗');
     }
   } finally {
     if (isStaleRequest(requestId)) return;
@@ -773,11 +924,11 @@ async function refreshDetailPage() {
 }
 
 // ---- Event handlers ----
-function applyFilters() {
+function applyFilters(): void {
   void executePrimaryQuery();
 }
 
-function clearFilters() {
+function clearFilters(): void {
   queryMode.value = 'date_range';
   containerInputType.value = 'lot';
   containerInput.value = '';
@@ -789,7 +940,7 @@ function clearFilters() {
   void executePrimaryQuery();
 }
 
-function goToPage(nextPage) {
+function goToPage(nextPage: number): void {
   if (
     paginationLoading.value
     || loading.list
@@ -802,11 +953,11 @@ function goToPage(nextPage) {
   void refreshDetailPage();
 }
 
-function onTrendDateClick(dateStr) {
+function onTrendDateClick(dateStr: string): void {
   if (!dateStr) return;
   const idx = selectedTrendDates.value.indexOf(dateStr);
   if (idx >= 0) {
-    selectedTrendDates.value = selectedTrendDates.value.filter((d) => d !== dateStr);
+    selectedTrendDates.value = selectedTrendDates.value.filter((d: string) => d !== dateStr);
   } else {
     selectedTrendDates.value = [...selectedTrendDates.value, dateStr];
   }
@@ -815,25 +966,25 @@ function onTrendDateClick(dateStr) {
   void Promise.all([refreshView(), fetchBatchPareto()]);
 }
 
-function onTrendLegendChange(selected) {
+function onTrendLegendChange(selected: Record<string, boolean>): void {
   trendLegendSelected.value = { ...selected };
   page.value = 1;
   updateUrlState();
   void Promise.all([refreshView(), fetchBatchPareto()]);
 }
 
-function onParetoItemToggle(dimension, itemValue) {
-  if (!Object.hasOwn(PARETO_SELECTION_PARAM_MAP, dimension)) {
+function onParetoItemToggle(dimension: string, itemValue: string): void {
+  if (!Object.prototype.hasOwnProperty.call(PARETO_SELECTION_PARAM_MAP, dimension)) {
     return;
   }
   const normalized = String(itemValue || '').trim();
   if (!normalized) return;
 
-  const current = paretoSelections[dimension] || [];
+  const current = paretoSelections[dimension as keyof ParetoSelectionsState] || [];
   if (current.includes(normalized)) {
-    paretoSelections[dimension] = current.filter((item) => item !== normalized);
+    paretoSelections[dimension as keyof ParetoSelectionsState] = current.filter((item: string) => item !== normalized);
   } else {
-    paretoSelections[dimension] = [...current, normalized];
+    paretoSelections[dimension as keyof ParetoSelectionsState] = [...current, normalized];
   }
 
   page.value = 1;
@@ -841,14 +992,14 @@ function onParetoItemToggle(dimension, itemValue) {
   void Promise.all([fetchBatchPareto(), refreshView()]);
 }
 
-function clearParetoSelection() {
+function clearParetoSelection(): void {
   resetParetoSelections();
   page.value = 1;
   updateUrlState();
   void Promise.all([fetchBatchPareto(), refreshView()]);
 }
 
-function onSupplementaryChange(filters) {
+function onSupplementaryChange(filters: { packages?: string[]; workcenterGroups?: string[]; reasons?: string[] }): void {
   supplementaryFilters.packages = filters.packages || [];
   supplementaryFilters.workcenterGroups = filters.workcenterGroups || [];
   supplementaryFilters.reasons = filters.reasons || [];
@@ -859,11 +1010,11 @@ function onSupplementaryChange(filters) {
   void Promise.all([refreshView(), fetchBatchPareto()]);
 }
 
-function removeFilterChip(chip) {
+function removeFilterChip(chip: FilterChip): void {
   if (!chip?.removable) return;
 
   if (chip.type === 'pareto-value') {
-    onParetoItemToggle(chip.dimension, chip.value);
+    onParetoItemToggle(chip.dimension ?? '', chip.value);
     return;
   }
 
@@ -876,7 +1027,7 @@ function removeFilterChip(chip) {
   }
 
   if (chip.type === 'reason') {
-    supplementaryFilters.reasons = supplementaryFilters.reasons.filter((r) => r !== chip.value);
+    supplementaryFilters.reasons = supplementaryFilters.reasons.filter((r: string) => r !== chip.value);
     page.value = 1;
     updateUrlState();
     void Promise.all([refreshView(), fetchBatchPareto()]);
@@ -885,7 +1036,7 @@ function removeFilterChip(chip) {
 
   if (chip.type === 'workcenter') {
     supplementaryFilters.workcenterGroups = supplementaryFilters.workcenterGroups.filter(
-      (g) => g !== chip.value,
+      (g: string) => g !== chip.value,
     );
     page.value = 1;
     updateUrlState();
@@ -895,7 +1046,7 @@ function removeFilterChip(chip) {
 
   if (chip.type === 'package') {
     supplementaryFilters.packages = supplementaryFilters.packages.filter(
-      (p) => p !== chip.value,
+      (p: string) => p !== chip.value,
     );
     page.value = 1;
     updateUrlState();
@@ -904,14 +1055,14 @@ function removeFilterChip(chip) {
 }
 
 // ---- CSV export (from cache, via POST to avoid URL length limits) ----
-async function exportCsv() {
+async function exportCsv(): Promise<void> {
   if (loading.exporting || !queryId.value) return;
 
   loading.exporting = true;
   errorMessage.value = '';
 
   try {
-    const body = {
+    const body: Record<string, unknown> = {
       query_id: queryId.value,
       packages: supplementaryFilters.packages,
       workcenter_groups: supplementaryFilters.workcenterGroups,
@@ -920,8 +1071,8 @@ async function exportCsv() {
       trend_dates: selectedTrendDates.value,
       ...Object.fromEntries(
         Object.entries(PARETO_SELECTION_PARAM_MAP)
-          .filter(([dimension]) => (paretoSelections[dimension] || []).length > 0)
-          .map(([dimension, key]) => [key, paretoSelections[dimension]])
+          .filter(([dimension]) => (paretoSelections[dimension as keyof ParetoSelectionsState] || []).length > 0)
+          .map(([dimension, key]) => [key, paretoSelections[dimension as keyof ParetoSelectionsState]])
       ),
     };
 
@@ -930,11 +1081,12 @@ async function exportCsv() {
     if (!committedPrimary.excludePbDiode) body.exclude_pb_diode = false;
 
     await postExport('/api/reject-history/export-cached', body, 'reject_history_export.csv');
-  } catch (error) {
-    if (error?.status === 410) {
+  } catch (err) {
+    const e = err as Record<string, unknown>;
+    if (e?.status === 410) {
       errorMessage.value = '快取已過期，請重新查詢後再匯出';
     } else {
-      errorMessage.value = error?.message || '匯出 CSV 失敗';
+      errorMessage.value = String(e?.message || '匯出 CSV 失敗');
     }
   } finally {
     loading.exporting = false;
@@ -942,11 +1094,11 @@ async function exportCsv() {
 }
 
 // ---- Computed: trend items (derived from analytics_raw) ----
-const trendItems = computed(() => {
+const trendItems = computed<TrendItem[]>(() => {
   const raw = analyticsRawItems.value;
   if (!raw || raw.length === 0) return [];
 
-  const byDate = {};
+  const byDate: Record<string, { MOVEIN_QTY: number; REJECT_TOTAL_QTY: number; DEFECT_QTY: number }> = {};
   for (const item of raw) {
     const d = item.bucket_date;
     if (!byDate[d]) {
@@ -1004,18 +1156,18 @@ const paretoMetricLabel = computed(() => {
   }
 });
 
-const selectedParetoCount = computed(() => {
+const selectedParetoCount = computed<number>(() => {
   let count = 0;
   for (const dimension of PARETO_DIMENSIONS) {
-    count += (paretoSelections[dimension] || []).length;
+    count += (paretoSelections[dimension as keyof ParetoSelectionsState] || []).length;
   }
   return count;
 });
 
-const selectedParetoSummary = computed(() => {
-  const tokens = [];
+const selectedParetoSummary = computed<string>(() => {
+  const tokens: string[] = [];
   for (const dimension of PARETO_DIMENSIONS) {
-    for (const value of paretoSelections[dimension] || []) {
+    for (const value of paretoSelections[dimension as keyof ParetoSelectionsState] || []) {
       tokens.push(`${getDimensionLabel(dimension)}:${value}`);
     }
   }
@@ -1025,8 +1177,8 @@ const selectedParetoSummary = computed(() => {
   return `${tokens.slice(0, 3).join(', ')}... (${tokens.length} 項)`;
 });
 
-const activeFilterChips = computed(() => {
-  const chips = [];
+const activeFilterChips = computed<FilterChip[]>(() => {
+  const chips: FilterChip[] = [];
 
   if (committedPrimary.mode === 'date_range') {
     chips.push({
@@ -1038,7 +1190,7 @@ const activeFilterChips = computed(() => {
     });
   } else {
     const inputLabel =
-      { lot: 'LOT', work_order: '工單', wafer_lot: 'WAFER LOT' }[
+      ({ lot: 'LOT', work_order: '工單', wafer_lot: 'WAFER LOT' } as Record<string, string>)[
         committedPrimary.containerInputType
       ] || 'LOT';
     chips.push({
@@ -1084,7 +1236,7 @@ const activeFilterChips = computed(() => {
     });
   }
 
-  supplementaryFilters.workcenterGroups.forEach((group) => {
+  supplementaryFilters.workcenterGroups.forEach((group: string) => {
     chips.push({
       key: `workcenter:${group}`,
       label: `WC: ${group}`,
@@ -1094,7 +1246,7 @@ const activeFilterChips = computed(() => {
     });
   });
 
-  supplementaryFilters.packages.forEach((pkg) => {
+  supplementaryFilters.packages.forEach((pkg: string) => {
     chips.push({
       key: `package:${pkg}`,
       label: `Package: ${pkg}`,
@@ -1118,7 +1270,7 @@ const activeFilterChips = computed(() => {
   }
 
   for (const dimension of PARETO_DIMENSIONS) {
-    for (const value of paretoSelections[dimension] || []) {
+    for (const value of paretoSelections[dimension as keyof ParetoSelectionsState] || []) {
       chips.push({
         key: `pareto-value:${dimension}:${value}`,
         label: `${getDimensionLabel(dimension)}: ${value}`,
@@ -1133,7 +1285,7 @@ const activeFilterChips = computed(() => {
   return chips;
 });
 
-const kpiCards = computed(() => {
+const kpiCards = computed<KpiCard[]>(() => {
   return [
     { key: 'REJECT_TOTAL_QTY', label: '扣帳報廢量', value: summary.value.REJECT_TOTAL_QTY, lane: 'reject', isPct: false },
     { key: 'DEFECT_QTY', label: '不扣帳報廢量', value: summary.value.DEFECT_QTY, lane: 'defect', isPct: false },
@@ -1155,13 +1307,13 @@ const pagination = computed(
 );
 
 // ---- URL state ----
-function appendArrayParams(params, key, values) {
+function appendArrayParams(params: URLSearchParams, key: string, values: string[]): void {
   for (const value of values || []) {
     params.append(key, value);
   }
 }
 
-function updateUrlState() {
+function updateUrlState(): void {
   const params = new URLSearchParams();
 
   params.set('mode', committedPrimary.mode);
@@ -1184,7 +1336,7 @@ function updateUrlState() {
 
   appendArrayParams(params, 'trend_dates', selectedTrendDates.value);
   for (const [dimension, key] of Object.entries(PARETO_SELECTION_PARAM_MAP)) {
-    appendArrayParams(params, key, paretoSelections[dimension] || []);
+    appendArrayParams(params, key, paretoSelections[dimension as keyof ParetoSelectionsState] || []);
   }
 
   if (page.value > 1) {
@@ -1195,7 +1347,7 @@ function updateUrlState() {
 }
 
 // ---- URL restore ----
-function readArrayParam(params, key) {
+function readArrayParam(params: URLSearchParams, key: string): string[] {
   const repeated = params
     .getAll(key)
     .map((value) => String(value || '').trim())
@@ -1209,7 +1361,7 @@ function readArrayParam(params, key) {
     .filter(Boolean);
 }
 
-function readBooleanParam(params, key, defaultValue = false) {
+function readBooleanParam(params: URLSearchParams, key: string, defaultValue = false): boolean {
   const value = String(params.get(key) || '').trim().toLowerCase();
   if (!value) {
     return defaultValue;
@@ -1217,7 +1369,7 @@ function readBooleanParam(params, key, defaultValue = false) {
   return ['1', 'true', 'yes', 'y', 'on'].includes(value);
 }
 
-function restoreFromUrl() {
+function restoreFromUrl(): void {
   const params = new URLSearchParams(window.location.search);
 
   const mode = String(params.get('mode') || '').trim();
@@ -1256,21 +1408,21 @@ function restoreFromUrl() {
 
   const restoredSelections = createEmptyParetoSelections();
   for (const [dimension, key] of Object.entries(PARETO_SELECTION_PARAM_MAP)) {
-    restoredSelections[dimension] = readArrayParam(params, key);
+    restoredSelections[dimension as keyof ParetoSelectionsState] = readArrayParam(params, key);
   }
 
   const legacyDimension = String(params.get('pareto_dimension') || '').trim().toLowerCase();
   const legacyValues = readArrayParam(params, 'pareto_values');
   const hasSelParams = Object.values(restoredSelections).some((values) => values.length > 0);
   if (!hasSelParams && legacyValues.length > 0) {
-    const fallbackDimension = Object.hasOwn(PARETO_SELECTION_PARAM_MAP, legacyDimension)
+    const fallbackDimension = Object.prototype.hasOwnProperty.call(PARETO_SELECTION_PARAM_MAP, legacyDimension)
       ? legacyDimension
       : 'reason';
-    restoredSelections[fallbackDimension] = legacyValues;
+    restoredSelections[fallbackDimension as keyof ParetoSelectionsState] = legacyValues;
   }
 
   for (const dimension of PARETO_DIMENSIONS) {
-    paretoSelections[dimension] = restoredSelections[dimension];
+    paretoSelections[dimension as keyof ParetoSelectionsState] = restoredSelections[dimension as keyof ParetoSelectionsState];
   }
 
   const parsedPage = Number(params.get('page') || '1');

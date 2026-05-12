@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { BarChart } from 'echarts/charts';
@@ -9,19 +9,32 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, BarChart, GridComponent, LegendComponent, TooltipComponent]);
 
-const props = defineProps({
-  items: { type: Array, default: () => [] },
-  selectedDates: { type: Array, default: () => [] },
-  loading: { type: Boolean, default: false },
-});
+interface TrendItem {
+  bucket_date: string;
+  MOVEIN_QTY: number;
+  REJECT_TOTAL_QTY: number;
+  DEFECT_QTY: number;
+  REJECT_RATE_PCT?: number;
+  DEFECT_RATE_PCT?: number;
+}
 
-const emit = defineEmits(['date-click', 'legend-change']);
+const props = defineProps<{
+  items?: TrendItem[];
+  selectedDates?: string[];
+  loading?: boolean;
+}>();
 
-const hasData = computed(() => Array.isArray(props.items) && props.items.length > 0);
+const emit = defineEmits<{
+  (e: 'date-click', date: string): void;
+  (e: 'legend-change', selected: Record<string, boolean>): void;
+}>();
+
+const hasData = computed(() => Array.isArray(props.items) && (props.items?.length ?? 0) > 0);
 
 const chartOption = computed(() => {
   const items = props.items || [];
-  const dateSet = props.selectedDates.length > 0 ? new Set(props.selectedDates) : null;
+  const selectedDates = props.selectedDates ?? [];
+  const dateSet: Set<string> | null = selectedDates.length > 0 ? new Set(selectedDates) : null;
   return {
     tooltip: {
       trigger: 'axis',
@@ -34,12 +47,12 @@ const chartOption = computed(() => {
     grid: { left: 48, right: 24, top: 22, bottom: 70, containLabel: false },
     xAxis: {
       type: 'category',
-      data: items.map((item) => item.bucket_date || ''),
+      data: items.map((item: TrendItem) => item.bucket_date || ''),
     },
     yAxis: {
       type: 'value',
       axisLabel: {
-        formatter(value) {
+        formatter(value: unknown) {
           return Number(value || 0).toLocaleString('zh-TW');
         },
       },
@@ -49,9 +62,10 @@ const chartOption = computed(() => {
         name: '扣帳報廢量',
         type: 'bar',
         color: 'rgb(220, 38, 38)',
-        data: items.map((item) => Number(item.REJECT_TOTAL_QTY || 0)),
+        data: items.map((item: TrendItem) => Number(item.REJECT_TOTAL_QTY || 0)),
         itemStyle: {
-          color(params) {
+          // TODO: type — echarts itemStyle color callback params is typed via echarts internals
+          color(params: { dataIndex: number }) {
             const date = items[params.dataIndex]?.bucket_date || '';
             return dateSet && !dateSet.has(date) ? 'rgb(249, 168, 168)' : 'rgb(220, 38, 38)';
           },
@@ -62,9 +76,10 @@ const chartOption = computed(() => {
         name: '不扣帳報廢量',
         type: 'bar',
         color: 'rgb(2, 132, 199)',
-        data: items.map((item) => Number(item.DEFECT_QTY || 0)),
+        data: items.map((item: TrendItem) => Number(item.DEFECT_QTY || 0)),
         itemStyle: {
-          color(params) {
+          // TODO: type — echarts itemStyle color callback params is typed via echarts internals
+          color(params: { dataIndex: number }) {
             const date = items[params.dataIndex]?.bucket_date || '';
             return dateSet && !dateSet.has(date) ? 'rgb(165, 216, 240)' : 'rgb(2, 132, 199)';
           },
@@ -75,7 +90,7 @@ const chartOption = computed(() => {
   };
 });
 
-function handleChartClick(params) {
+function handleChartClick(params: { componentType?: string; dataIndex: number }): void {
   if (params?.componentType !== 'series') {
     return;
   }
@@ -85,7 +100,7 @@ function handleChartClick(params) {
   }
 }
 
-function handleLegendChange(params) {
+function handleLegendChange(params: { selected?: Record<string, boolean> }): void {
   if (params?.selected) {
     emit('legend-change', { ...params.selected });
   }

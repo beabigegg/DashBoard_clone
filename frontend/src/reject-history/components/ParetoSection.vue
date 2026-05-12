@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { BarChart, LineChart } from 'echarts/charts';
@@ -9,30 +9,40 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
 
+interface ParetoItem {
+  reason: string;
+  metric_value: number;
+  pct: number;
+  cumPct: number;
+  [key: string]: unknown;
+}
+
 const DISPLAY_SCOPE_TOP20_DIMENSIONS = new Set(['type']);
 
-const props = defineProps({
-  items: { type: Array, default: () => [] },
-  selectedValues: { type: Array, default: () => [] },
-  selectedDates: { type: Array, default: () => [] },
-  metricLabel: { type: String, default: '報廢量' },
-  loading: { type: Boolean, default: false },
-  dimension: { type: String, default: 'reason' },
-  dimensionLabel: { type: String, default: 'Pareto' },
-  displayScope: { type: String, default: 'all' },
-});
+const props = defineProps<{
+  items?: ParetoItem[];
+  selectedValues?: string[];
+  selectedDates?: string[];
+  metricLabel?: string;
+  loading?: boolean;
+  dimension?: string;
+  dimensionLabel?: string;
+  displayScope?: string;
+}>();
 
-const emit = defineEmits(['item-toggle']);
+const emit = defineEmits<{
+  (e: 'item-toggle', value: string): void;
+}>();
 
 const selectedValueSet = computed(
-  () => new Set((props.selectedValues || []).map((item) => String(item || '').trim()),
-));
+  () => new Set((props.selectedValues || []).map((item: string) => String(item || '').trim())),
+);
 
-const displayItems = computed(() => {
+const displayItems = computed<ParetoItem[]>(() => {
   const items = Array.isArray(props.items) ? props.items : [];
   if (
     props.displayScope === 'top20'
-    && DISPLAY_SCOPE_TOP20_DIMENSIONS.has(props.dimension)
+    && DISPLAY_SCOPE_TOP20_DIMENSIONS.has(props.dimension ?? '')
   ) {
     return items.slice(0, 20);
   }
@@ -42,40 +52,43 @@ const displayItems = computed(() => {
 const hasData = computed(() => displayItems.value.length > 0);
 
 const showTop20Badge = computed(
-  () => props.displayScope === 'top20' && DISPLAY_SCOPE_TOP20_DIMENSIONS.has(props.dimension),
+  () => props.displayScope === 'top20' && DISPLAY_SCOPE_TOP20_DIMENSIONS.has(props.dimension ?? ''),
 );
 
-function isSelected(value) {
+function isSelected(value: unknown): boolean {
   return selectedValueSet.value.has(String(value || '').trim());
 }
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   return Number(value || 0).toLocaleString('zh-TW');
 }
 
-function formatPct(value) {
+function formatPct(value: unknown): string {
   return `${Number(value || 0).toFixed(2)}%`;
 }
 
 const chartOption = computed(() => {
   const items = displayItems.value;
+  const metricLabel = props.metricLabel ?? '報廢量';
   return {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross' },
-      formatter(params) {
-        const idx = Number(params?.[0]?.dataIndex || 0);
-        const item = items[idx] || {};
+      // TODO: type — echarts formatter params is typed via echarts internals; use unknown[]
+      formatter(params: unknown[]) {
+        const first = (params as Array<Record<string, unknown>>)?.[0];
+        const idx = Number(first?.dataIndex || 0);
+        const item = items[idx] || ({} as ParetoItem);
         return [
           `<b>${item.reason || '(未填寫)'}</b>`,
-          `${props.metricLabel}: ${formatNumber(item.metric_value || 0)}`,
+          `${metricLabel}: ${formatNumber(item.metric_value || 0)}`,
           `占比: ${Number(item.pct || 0).toFixed(2)}%`,
           `累計: ${Number(item.cumPct || 0).toFixed(2)}%`,
         ].join('<br/>');
       },
     },
     legend: {
-      data: [props.metricLabel, '累積%'],
+      data: [metricLabel, '累積%'],
       bottom: 0,
     },
     grid: {
@@ -86,7 +99,7 @@ const chartOption = computed(() => {
     },
     xAxis: {
       type: 'category',
-      data: items.map((item) => item.reason || '(未填寫)'),
+      data: items.map((item: ParetoItem) => item.reason || '(未填寫)'),
       axisLabel: {
         interval: 0,
         rotate: items.length > 10 ? 55 : items.length > 5 ? 35 : 0,
@@ -111,12 +124,13 @@ const chartOption = computed(() => {
     ],
     series: [
       {
-        name: props.metricLabel,
+        name: metricLabel,
         type: 'bar',
-        data: items.map((item) => Number(item.metric_value || 0)),
+        data: items.map((item: ParetoItem) => Number(item.metric_value || 0)),
         barMaxWidth: 34,
         itemStyle: {
-          color(params) {
+          // TODO: type — echarts itemStyle color callback params is typed via echarts internals
+          color(params: { dataIndex: number }) {
             const reason = items[params.dataIndex]?.reason || '';
             return isSelected(reason) ? 'rgb(185, 28, 28)' : 'rgb(37, 99, 235)';
           },
@@ -127,7 +141,7 @@ const chartOption = computed(() => {
         name: '累積%',
         type: 'line',
         yAxisIndex: 1,
-        data: items.map((item) => Number(item.cumPct || 0)),
+        data: items.map((item: ParetoItem) => Number(item.cumPct || 0)),
         lineStyle: { color: 'rgb(245, 158, 11)', width: 2 },
         itemStyle: { color: 'rgb(245, 158, 11)' },
         symbolSize: 6,
@@ -136,7 +150,7 @@ const chartOption = computed(() => {
   };
 });
 
-function handleChartClick(params) {
+function handleChartClick(params: { seriesType?: string; dataIndex: number }): void {
   if (params?.seriesType !== 'bar') {
     return;
   }

@@ -109,7 +109,7 @@ describe('reject-history abort — useRejectHistoryDuckDB deactivate on unmount'
     const { getDuckDBClient } = await import('../../src/core/duckdb-client.js');
     getDuckDBClient.mockReturnValue(mockClient);
 
-    const { useRejectHistoryDuckDB } = await import('../../src/reject-history/useRejectHistoryDuckDB.js');
+    const { useRejectHistoryDuckDB } = await import('../../src/reject-history/useRejectHistoryDuckDB.ts');
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -127,7 +127,7 @@ describe('reject-history abort — useRejectHistoryDuckDB deactivate on unmount'
   });
 
   it('calling computeView after deactivate throws without mutating active state', async () => {
-    const { useRejectHistoryDuckDB } = await import('../../src/reject-history/useRejectHistoryDuckDB.js');
+    const { useRejectHistoryDuckDB } = await import('../../src/reject-history/useRejectHistoryDuckDB.ts');
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

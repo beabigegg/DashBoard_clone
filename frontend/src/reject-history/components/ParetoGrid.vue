@@ -1,24 +1,43 @@
-<script setup>
+<script setup lang="ts">
 import ParetoSection from './ParetoSection.vue';
 
-const DIMENSIONS = [
+interface ParetoItem {
+  reason: string;
+  metric_value: number;
+  MOVEIN_QTY: number;
+  REJECT_TOTAL_QTY: number;
+  DEFECT_QTY: number;
+  count: number;
+  pct: number;
+  cumPct: number;
+}
+
+interface ParetoDimensionData {
+  items?: ParetoItem[];
+  dimension?: string;
+  metric_mode?: string;
+}
+
+const DIMENSIONS: { key: string; label: string }[] = [
   { key: 'reason', label: '不良原因' },
   { key: 'package', label: 'PACKAGE' },
   { key: 'type', label: 'TYPE' },
 ];
 
-const props = defineProps({
-  paretoData: { type: Object, default: () => ({}) },
-  paretoSelections: { type: Object, default: () => ({}) },
-  loading: { type: Boolean, default: false },
-  metricLabel: { type: String, default: '報廢量' },
-  selectedDates: { type: Array, default: () => [] },
-  displayScope: { type: String, default: 'all' },
-});
+const props = defineProps<{
+  paretoData?: Record<string, ParetoDimensionData>;
+  paretoSelections?: Record<string, string[]>;
+  loading?: boolean;
+  metricLabel?: string;
+  selectedDates?: string[];
+  displayScope?: string;
+}>();
 
-const emit = defineEmits(['item-toggle']);
+const emit = defineEmits<{
+  (e: 'item-toggle', dimension: string, value: string): void;
+}>();
 
-function onItemToggle(dimension, value) {
+function onItemToggle(dimension: string, value: string): void {
   emit('item-toggle', dimension, value);
 }
 </script>
