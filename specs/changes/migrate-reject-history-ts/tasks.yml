@@ -31,7 +31,7 @@ tasks:
   - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "pure TS migration — no visual changes" }
   - { id: "5.3", section: Review, title: "Contract review", status: done }
   - { id: "5.4", section: Review, title: "QA review", status: done }
-  - { id: "6.1", section: Verification, title: "Local gates", status: pending }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done }
   - { id: "6.2", section: Verification, title: "PR required gates", status: done }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "Tier 3 migration — no nightly/weekly gates required" }

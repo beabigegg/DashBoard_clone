@@ -31,6 +31,33 @@ job running pytest. See ci-gate-contract.md § Node version constraint.
 
 None. This migration adds no new gates and removes none.
 
+## Required gates
+
+`frontend-type-check`, `frontend-unit`, and `css-governance` are required gates.
+They must pass before this change can be merged. See pre-merge table above.
+
+## Trigger
+
+All three pre-merge gates trigger automatically on every PR push via the CI
+workflow defined in `.github/workflows/`. The two informational gates run on
+`main` branch pushes only.
+
+## Promotion policy
+
+Informational gates follow the standard Informational Gate Promotion Policy
+documented in `contracts/ci/ci-gate-contract.md`. Promotion requires:
+1. Three consecutive passing runs on `main`.
+2. A `contracts/ci/ci-gate-contract.md` PR updating the gate row's status to `required`.
+
+No gate introduced in this change is a candidate for promotion — all three
+pre-merge gates were already `required` before this change.
+
+## Rollback policy
+
+This change is a pure TypeScript rename. Rollback is achieved by reverting the
+two commits on `main` (`feat(migrate-reject-history-ts)` and its fix commit).
+No data migration or schema change is involved.
+
 ## How to run locally
 
 ```bash
