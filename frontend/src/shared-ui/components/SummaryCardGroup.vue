@@ -1,12 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  columns: {
-    type: [Number, String],
-    default: 'auto'
-  }
-})
+interface Props {
+  columns?: number | string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  columns: 'auto',
+});
 
 const gridStyle = computed(() => {
   if (!props.columns || props.columns === 'auto') {

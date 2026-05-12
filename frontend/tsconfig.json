@@ -16,6 +16,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/core/**/*", "src/shared-composables/**/*"],
+  "include": ["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,25 +1,29 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 import Chip from './Chip.vue'
 
-const props = defineProps({
-  activeFilters: {
-    type: Array,
-    default: null
-    // Expected shape: [{ key, label, tone? }]
-  },
-  collapsible: {
-    type: Boolean,
-    default: false
-  },
-  defaultOpen: {
-    type: Boolean,
-    default: true
-  }
-})
+interface ActiveFilter {
+  key: string;
+  label: string;
+  tone?: string;
+}
 
-const emit = defineEmits(['remove-filter'])
+interface Props {
+  activeFilters?: ActiveFilter[] | null;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  activeFilters: null,
+  collapsible: false,
+  defaultOpen: true,
+});
+
+const emit = defineEmits<{
+  (e: 'remove-filter', key: string): void;
+}>();
 
 const isOpen = ref(props.defaultOpen)
 
@@ -40,7 +44,7 @@ function toggle() {
         v-for="filter in activeFilters"
         :key="filter.key"
         :label="filter.label"
-        :tone="filter.tone || 'brand'"
+        :tone="(filter.tone as 'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'info') || 'brand'"
         removable
         @remove="emit('remove-filter', filter.key)"
       />

@@ -1,42 +1,30 @@
-<script setup>
+<script setup lang="ts">
 import { computed, useSlots } from 'vue';
 
-const props = defineProps({
-  title: {
-    type: String,
-    required: true,
-  },
-  cacheLevel: {
-    type: String,
-    default: '',
-  },
-  cacheText: {
-    type: String,
-    default: '',
-  },
-  lastUpdate: {
-    type: String,
-    default: '--',
-  },
-  refreshing: {
-    type: Boolean,
-    default: false,
-  },
-  refreshSuccess: {
-    type: Boolean,
-    default: false,
-  },
-  refreshError: {
-    type: Boolean,
-    default: false,
-  },
-  showRefresh: {
-    type: Boolean,
-    default: true,
-  },
+interface Props {
+  title: string;
+  cacheLevel?: string;
+  cacheText?: string;
+  lastUpdate?: string;
+  refreshing?: boolean;
+  refreshSuccess?: boolean;
+  refreshError?: boolean;
+  showRefresh?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  cacheLevel: '',
+  cacheText: '',
+  lastUpdate: '--',
+  refreshing: false,
+  refreshSuccess: false,
+  refreshError: false,
+  showRefresh: true,
 });
 
-defineEmits(['refresh']);
+defineEmits<{
+  (e: 'refresh'): void;
+}>();
 
 const slots = useSlots();
 const hasLeftSlot = computed(() => !!slots['header-left']);

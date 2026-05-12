@@ -1,22 +1,18 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 
-const props = defineProps({
-  variant: {
-    type: String,
-    default: 'default',
-    validator: (v) => ['default', 'elevated', 'outlined'].includes(v)
-  },
-  collapsible: {
-    type: Boolean,
-    default: false
-  },
-  defaultOpen: {
-    type: Boolean,
-    default: true
-  }
-})
+interface Props {
+  variant?: 'default' | 'elevated' | 'outlined';
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  variant: 'default',
+  collapsible: false,
+  defaultOpen: true,
+});
 
 const isOpen = ref(props.defaultOpen)
 

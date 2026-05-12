@@ -1,58 +1,54 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 
-const props = defineProps({
-  modelValue: {
-    type: Array,
-    default: () => [],
-  },
-  options: {
-    type: Array,
-    default: () => [],
-  },
-  placeholder: {
-    type: String,
-    default: '請選擇',
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  searchable: {
-    type: Boolean,
-    default: true,
-  },
-  selectAllScope: {
-    type: String,
-    default: 'visible',
-    validator: (v) => ['visible', 'all'].includes(v),
-  },
+interface NormalizedOption {
+  label: string;
+  value: string;
+}
+
+interface Props {
+  modelValue?: (string | number)[];
+  options?: (string | number | Record<string, unknown>)[];
+  placeholder?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  searchable?: boolean;
+  selectAllScope?: 'visible' | 'all';
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: () => [],
+  options: () => [],
+  placeholder: '請選擇',
+  disabled: false,
+  loading: false,
+  searchable: true,
+  selectAllScope: 'visible',
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: string[]): void;
+}>();
 
-const rootRef = ref(null);
-const searchRef = ref(null);
+const rootRef = ref<HTMLElement | null>(null);
+const searchRef = ref<HTMLInputElement | null>(null);
 const isOpen = ref(false);
 const searchQuery = ref('');
 
-const normalizedOptions = computed(() => {
+const normalizedOptions = computed((): NormalizedOption[] => {
   return props.options.map((option) => {
     if (option && typeof option === 'object') {
-      const value = option.value ?? option.name ?? option.label ?? '';
-      const label = option.label ?? option.name ?? option.value ?? '';
+      const opt = option as Record<string, unknown>;
+      const value = opt.value ?? opt.name ?? opt.label ?? '';
+      const label = opt.label ?? opt.name ?? opt.value ?? '';
       return { label: String(label), value: String(value) };
     }
     return { label: String(option), value: String(option) };
   });
 });
 
-const displayedOptions = computed(() => {
+const displayedOptions = computed((): NormalizedOption[] => {
   const q = searchQuery.value.trim().toLowerCase();
   if (!q) return normalizedOptions.value;
   return normalizedOptions.value.filter(
@@ -80,11 +76,11 @@ function toggleDropdown() {
   isOpen.value = !isOpen.value;
 }
 
-function isSelected(value) {
+function isSelected(value: string) {
   return selectedSet.value.has(String(value));
 }
 
-function toggleOption(value) {
+function toggleOption(value: string) {
   const next = new Set(selectedSet.value);
   const key = String(value);
   if (next.has(key)) next.delete(key);
@@ -106,12 +102,12 @@ function clearAll() {
   }
   const removing = new Set(displayedOptions.value.map((o) => o.value));
   const next = props.modelValue.filter((v) => !removing.has(String(v)));
-  emit('update:modelValue', next);
+  emit('update:modelValue', next.map(String));
 }
 
-function handleOutsideClick(event) {
+function handleOutsideClick(event: MouseEvent) {
   if (!isOpen.value || !rootRef.value) return;
-  if (!rootRef.value.contains(event.target)) isOpen.value = false;
+  if (!rootRef.value.contains(event.target as Node)) isOpen.value = false;
 }
 
 watch(isOpen, (open) => {

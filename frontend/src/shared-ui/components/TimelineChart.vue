@@ -1,62 +1,100 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
+// @ts-expect-error <not-yet-migrated: query-tool/utils — Phase 3 scope>
 import { formatDateTime, normalizeText, parseDateTime } from '../../query-tool/utils/values.js';
 
-const props = defineProps({
-  tracks: {
-    type: Array,
-    default: () => [],
-  },
-  events: {
-    type: Array,
-    default: () => [],
-  },
-  timeRange: {
-    type: Object,
-    default: null,
-  },
-  colorMap: {
-    type: Object,
-    default: () => ({}),
-  },
-  labelWidth: {
-    type: Number,
-    default: 200,
-  },
-  trackRowHeight: {
-    type: Number,
-    default: 44,
-  },
-  minChartWidth: {
-    type: Number,
-    default: 600,
-  },
+interface TimelineBar {
+  id?: string;
+  start: string | number;
+  end: string | number;
+  type?: string;
+  label?: string;
+  detail?: string;
+  color?: string;
+}
+
+interface TimelineLayer {
+  id?: string;
+  bars?: TimelineBar[];
+  opacity?: number;
+}
+
+interface TimelineTrack {
+  id?: string;
+  label?: string;
+  sublabel?: string;
+  sublabels?: string[];
+  layers?: TimelineLayer[];
+}
+
+interface TimelineEvent {
+  id?: string;
+  time: string | number;
+  type?: string;
+  shape?: string;
+  label?: string;
+  detail?: string;
+  color?: string;
+  trackId?: string;
+}
+
+interface TimeRange {
+  start?: string | number;
+  end?: string | number;
+}
+
+interface TooltipState {
+  visible: boolean;
+  x: number;
+  y: number;
+  title: string;
+  lines: string[];
+}
+
+interface Props {
+  tracks?: TimelineTrack[];
+  events?: TimelineEvent[];
+  timeRange?: TimeRange | null;
+  colorMap?: Record<string, string>;
+  labelWidth?: number;
+  trackRowHeight?: number;
+  minChartWidth?: number;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  tracks: () => [],
+  events: () => [],
+  timeRange: null,
+  colorMap: () => ({}),
+  labelWidth: 200,
+  trackRowHeight: 44,
+  minChartWidth: 600,
 });
 
 const AXIS_HEIGHT = 32;
 const RANGE_PAD_RATIO = 0.03;
 
-const tooltipRef = ref({
+const tooltipRef = ref<TooltipState>({
   visible: false,
   x: 0,
   y: 0,
   title: '',
   lines: [],
 });
-const containerRef = ref(null);
-const scrollRef = ref(null);
+const containerRef = ref<HTMLElement | null>(null);
+const scrollRef = ref<HTMLElement | null>(null);
 
-function toTimestamp(value) {
+function toTimestamp(value: string | number | null | undefined): number | null {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null;
   }
-  const date = parseDateTime(value);
+  const date = parseDateTime(value) as Date | null;
   return date ? date.getTime() : null;
 }
 
-function collectDomainTimestamps() {
-  const timestamps = [];
+function collectDomainTimestamps(): number[] {
+  const timestamps: number[] = [];
 
   props.tracks.forEach((track) => {
     const layers = Array.isArray(track?.layers) ? track.layers : [];
@@ -83,8 +121,8 @@ const normalizedTimeRange = computed(() => {
   const explicitStart = toTimestamp(props.timeRange?.start);
   const explicitEnd = toTimestamp(props.timeRange?.end);
 
-  let startMs;
-  let endMs;
+  let startMs: number;
+  let endMs: number;
 
   if (explicitStart !== null && explicitEnd !== null && explicitEnd > explicitStart) {
     startMs = explicitStart;
@@ -124,7 +162,7 @@ const trackCount = computed(() => props.tracks.length);
 const chartWidth = computed(() => {
   const hours = totalDurationMs.value / (1000 * 60 * 60);
   // Adaptive scaling: longer durations get fewer px/hour to stay compact
-  let pxPerHour;
+  let pxPerHour: number;
   if (hours <= 6) pxPerHour = 120;
   else if (hours <= 24) pxPerHour = 60;
   else if (hours <= 72) pxPerHour = 30;
@@ -137,15 +175,20 @@ const chartWidth = computed(() => {
 
 const svgHeight = computed(() => AXIS_HEIGHT + trackCount.value * props.trackRowHeight + 2);
 
-function rowTopByIndex(index) {
+function rowTopByIndex(index: number): number {
   return AXIS_HEIGHT + index * props.trackRowHeight;
 }
 
-function xByTimestamp(timestamp) {
+function xByTimestamp(timestamp: number): number {
   return ((timestamp - normalizedTimeRange.value.startMs) / totalDurationMs.value) * chartWidth.value;
 }
 
-function normalizeBar(bar) {
+interface NormalizedBar extends TimelineBar {
+  startMs: number;
+  endMs: number;
+}
+
+function normalizeBar(bar: TimelineBar): NormalizedBar | null {
   const startMs = toTimestamp(bar?.start);
   const endMs = toTimestamp(bar?.end);
   if (startMs === null || endMs === null) {
@@ -160,7 +203,11 @@ function normalizeBar(bar) {
   };
 }
 
-function normalizeEvent(event) {
+interface NormalizedEvent extends TimelineEvent {
+  timeMs: number;
+}
+
+function normalizeEvent(event: TimelineEvent): NormalizedEvent | null {
   const timeMs = toTimestamp(event?.time);
   if (timeMs === null) {
     return null;
@@ -175,11 +222,11 @@ const HOUR_MS = 1000 * 60 * 60;
 const DAY_MS = HOUR_MS * 24;
 
 const timelineTicks = computed(() => {
-  const ticks = [];
+  const ticks: { timeMs: number; label: string }[] = [];
   const rangeMs = totalDurationMs.value;
   const rangeHours = rangeMs / HOUR_MS;
 
-  let stepMs;
+  let stepMs: number;
   if (rangeHours <= 12) stepMs = HOUR_MS;
   else if (rangeHours <= 48) stepMs = HOUR_MS * 2;
   else if (rangeHours <= 168) stepMs = HOUR_MS * 6;
@@ -195,7 +242,7 @@ const timelineTicks = computed(() => {
 
   while (cursor <= end) {
     const date = new Date(cursor);
-    let label;
+    let label: string;
     if (stepMs < DAY_MS) {
       label = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:00`;
     } else {
@@ -220,15 +267,15 @@ const colorFallback = Object.freeze({
   default: 'var(--color-token-h94a3b8)',
 });
 
-function resolveColor(type) {
-  const key = normalizeText(type);
+function resolveColor(type: string | undefined): string {
+  const key = normalizeText(type) as string;
   if (key && props.colorMap[key]) {
     return props.colorMap[key];
   }
   return colorFallback.default;
 }
 
-function layerGeometry(trackIndex, layerIndex, layerCount) {
+function layerGeometry(trackIndex: number, layerIndex: number, layerCount: number): { y: number; height: number } {
   const rowTop = rowTopByIndex(trackIndex);
   const maxBarHeight = Math.max(16, props.trackRowHeight - 14);
   const scale = layerCount <= 1
@@ -245,14 +292,14 @@ function layerGeometry(trackIndex, layerIndex, layerCount) {
 }
 
 const legendItems = computed(() => {
-  const usedTypes = new Set();
+  const usedTypes = new Set<string>();
 
   props.tracks.forEach((track) => {
     const layers = Array.isArray(track?.layers) ? track.layers : [];
     layers.forEach((layer) => {
       const bars = Array.isArray(layer?.bars) ? layer.bars : [];
       bars.forEach((bar) => {
-        const key = normalizeText(bar?.type);
+        const key = normalizeText(bar?.type) as string;
         if (key) {
           usedTypes.add(key);
         }
@@ -261,7 +308,7 @@ const legendItems = computed(() => {
   });
 
   props.events.forEach((event) => {
-    const key = normalizeText(event?.type);
+    const key = normalizeText(event?.type) as string;
     if (key) {
       usedTypes.add(key);
     }
@@ -278,7 +325,7 @@ const legendItems = computed(() => {
 const TOOLTIP_MAX_W = 288; // max-w-72
 const TOOLTIP_EST_H = 120;
 
-function showTooltip(event, title, lines = []) {
+function showTooltip(event: MouseEvent, title: string, lines: string[] = []) {
   let x = event.clientX + 14;
   let y = event.clientY + 14;
 
@@ -318,46 +365,46 @@ onBeforeUnmount(() => {
   hideTooltip();
 });
 
-function handleBarHover(mouseEvent, bar, trackLabel) {
+function handleBarHover(mouseEvent: MouseEvent, bar: TimelineBar, trackLabel: string | undefined) {
   const normalized = normalizeBar(bar);
   if (!normalized) {
     return;
   }
 
-  const start = formatDateTime(normalized.start);
-  const end = formatDateTime(normalized.end);
+  const start = formatDateTime(normalized.start) as string;
+  const end = formatDateTime(normalized.end) as string;
   const durationHours = ((normalized.endMs - normalized.startMs) / HOUR_MS).toFixed(2);
 
-  const title = normalizeText(normalized.label) || normalizeText(normalized.type) || '區段';
+  const title = (normalizeText(normalized.label) || normalizeText(normalized.type) || '區段') as string;
   const lines = [
     `Track: ${trackLabel}`,
     `Start: ${start}`,
     `End: ${end}`,
     `Duration: ${durationHours}h`,
-    normalizeText(normalized.detail),
-  ].filter(Boolean);
+    normalizeText(normalized.detail) as string,
+  ].filter(Boolean) as string[];
 
   showTooltip(mouseEvent, title, lines);
 }
 
-function handleEventHover(mouseEvent, eventItem, trackLabel) {
+function handleEventHover(mouseEvent: MouseEvent, eventItem: TimelineEvent, trackLabel: string | undefined) {
   const normalized = normalizeEvent(eventItem);
   if (!normalized) {
     return;
   }
 
-  const title = normalizeText(normalized.label) || normalizeText(normalized.type) || '事件';
+  const title = (normalizeText(normalized.label) || normalizeText(normalized.type) || '事件') as string;
   const lines = [
     `Track: ${trackLabel}`,
-    `Time: ${formatDateTime(normalized.time)}`,
-    normalizeText(normalized.detail),
-  ].filter(Boolean);
+    `Time: ${formatDateTime(normalized.time) as string}`,
+    normalizeText(normalized.detail) as string,
+  ].filter(Boolean) as string[];
 
   showTooltip(mouseEvent, title, lines);
 }
 
-function eventPath(type, x, y) {
-  const normalizedType = normalizeText(type).toLowerCase();
+function eventPath(type: string | undefined, x: number, y: number): string {
+  const normalizedType = (normalizeText(type) as string).toLowerCase();
 
   if (normalizedType.includes('job') || normalizedType.includes('maint')) {
     return `M ${x} ${y - 7} L ${x - 7} ${y + 5} L ${x + 7} ${y + 5} Z`;
@@ -465,9 +512,9 @@ function eventPath(type, x, y) {
                 >
                   <rect
                     v-if="normalizeBar(bar)"
-                    :x="xByTimestamp(normalizeBar(bar).startMs)"
+                    :x="xByTimestamp(normalizeBar(bar)!.startMs)"
                     :y="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).y"
-                    :width="Math.max(4, xByTimestamp(normalizeBar(bar).endMs) - xByTimestamp(normalizeBar(bar).startMs))"
+                    :width="Math.max(4, xByTimestamp(normalizeBar(bar)!.endMs) - xByTimestamp(normalizeBar(bar)!.startMs))"
                     :height="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).height"
                     :fill="bar.color || resolveColor(bar.type)"
                     :opacity="layer.opacity ?? (layerIndex === 0 ? 0.45 : 0.9)"
@@ -482,7 +529,7 @@ function eventPath(type, x, y) {
               <template v-for="(eventItem, eventIndex) in events" :key="eventItem.id || `${trackIndex}-event-${eventIndex}`">
                 <path
                   v-if="normalizeEvent(eventItem) && normalizeText(eventItem.trackId) === normalizeText(track.id)"
-                  :d="eventPath(eventItem.shape || eventItem.type, xByTimestamp(normalizeEvent(eventItem).timeMs), rowTopByIndex(trackIndex) + (trackRowHeight / 2))"
+                  :d="eventPath(eventItem.shape || eventItem.type, xByTimestamp(normalizeEvent(eventItem)!.timeMs), rowTopByIndex(trackIndex) + (trackRowHeight / 2))"
                   :fill="eventItem.color || resolveColor(eventItem.type)"
                   stroke="var(--color-token-h0f172a)"
                   stroke-width="0.5"

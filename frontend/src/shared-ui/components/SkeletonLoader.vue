@@ -1,15 +1,14 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps({
-  type: {
-    type: String,
-    default: 'text',
-  },
-  rows: {
-    type: Number,
-    default: 3,
-  },
+interface Props {
+  type?: string;
+  rows?: number;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  type: 'text',
+  rows: 3,
 });
 
 const normalizedType = computed(() => {

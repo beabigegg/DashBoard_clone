@@ -1,13 +1,13 @@
-<script setup>
-defineProps({
-  size: {
-    type: String,
-    default: 'md',
-    validator: (v) => ['sm', 'md', 'lg'].includes(v),
-  },
+<script setup lang="ts">
+interface Props {
+  size?: 'sm' | 'md' | 'lg';
+}
+
+withDefaults(defineProps<Props>(), {
+  size: 'md',
 });
 
-const sizeMap = {
+const sizeMap: Record<string, { diameter: string; border: string }> = {
   sm: { diameter: '14px', border: '2px' },
   md: { diameter: '24px', border: '3px' },
   lg: { diameter: '42px', border: '4px' },

@@ -1,15 +1,14 @@
-<script setup>
+<script setup lang="ts">
 import LoadingSpinner from './LoadingSpinner.vue';
 
-defineProps({
-  text: {
-    type: String,
-    default: '載入中...',
-  },
-  minHeight: {
-    type: String,
-    default: '120px',
-  },
+interface Props {
+  text?: string;
+  minHeight?: string;
+}
+
+withDefaults(defineProps<Props>(), {
+  text: '載入中...',
+  minHeight: '120px',
 });
 </script>
 

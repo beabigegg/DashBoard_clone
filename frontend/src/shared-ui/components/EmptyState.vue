@@ -1,13 +1,13 @@
-<script setup>
-defineProps({
-  type: {
-    type: String,
-    default: 'no-data',
-    validator: (v) => ['no-data', 'filter-empty', 'error', 'loading'].includes(v),
-  },
+<script setup lang="ts">
+interface Props {
+  type?: 'no-data' | 'filter-empty' | 'error' | 'loading';
+}
+
+withDefaults(defineProps<Props>(), {
+  type: 'no-data',
 });
 
-const messages = {
+const messages: Record<string, string> = {
   'no-data': '目前沒有資料',
   'filter-empty': '找不到符合條件的資料',
   'error': '資料載入失敗，請稍後再試',

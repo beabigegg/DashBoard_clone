@@ -1,20 +1,38 @@
-<script setup>
+<script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 
 import AiChatMessage from './AiChatMessage.vue';
 
-const props = defineProps({
-  messages: { type: Array, default: () => [] },
-  isLoading: { type: Boolean, default: false },
-  isRateLimited: { type: Boolean, default: false },
-  canSubmit: { type: Boolean, default: true },
-  loadingStepText: { type: String, default: '' },
+interface AiMessage {
+  role: 'user' | 'ai' | 'clarification' | 'error' | 'loading';
+  content?: string;
+  [key: string]: unknown;
+}
+
+interface Props {
+  messages?: AiMessage[];
+  isLoading?: boolean;
+  isRateLimited?: boolean;
+  canSubmit?: boolean;
+  loadingStepText?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  messages: () => [],
+  isLoading: false,
+  isRateLimited: false,
+  canSubmit: true,
+  loadingStepText: '',
 });
 
-const emit = defineEmits(['close', 'submit', 'reset']);
+const emit = defineEmits<{
+  (e: 'close'): void;
+  (e: 'submit', text: string): void;
+  (e: 'reset'): void;
+}>();
 
 const inputText = ref('');
-const messagesContainer = ref(null);
+const messagesContainer = ref<HTMLElement | null>(null);
 
 
 function scrollToBottom() {
@@ -36,7 +54,7 @@ watch(
   () => scrollToBottom(),
 );
 
-function handleKeydown(event) {
+function handleKeydown(event: KeyboardEvent) {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
     handleSubmit();
@@ -50,11 +68,11 @@ function handleSubmit() {
   emit('submit', text);
 }
 
-function handleSuggestion(text) {
+function handleSuggestion(text: string) {
   emit('submit', text);
 }
 
-function handleEsc(event) {
+function handleEsc(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     emit('close');
   }
@@ -64,7 +82,7 @@ function handleEsc(event) {
  * Returns true if a divider should be shown before messages[idx].
  * Condition: idx > 0, messages[idx-1].role === 'ai', messages[idx].role === 'user'
  */
-function showDividerBefore(idx) {
+function showDividerBefore(idx: number) {
   if (idx === 0) return false;
   const prev = props.messages[idx - 1];
   const curr = props.messages[idx];

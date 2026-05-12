@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import VChart from 'vue-echarts';
 import { use } from 'echarts/core';
@@ -39,16 +39,15 @@ const CHART_PALETTE = {
   kpiNegative: '#ef4444',
 };
 
-const props = defineProps({
-  chartData: {
-    type: [Object, Array],
-    default: null,
-  },
-  queryUsed: {
-    type: String,
-    default: null,
-  },
-});
+interface Props {
+  chartData?: // TODO: type chart data (pareto/trend/heatmap/kpi/table union shape)
+    | Record<string, unknown>
+    | unknown[]
+    | null;
+  queryUsed?: string | null;
+}
+
+const props = defineProps<Props>();
 
 const chartType = computed(() => {
   const q = (props.queryUsed || '').toLowerCase();
@@ -61,7 +60,7 @@ const chartType = computed(() => {
   return detectFromData(props.chartData);
 });
 
-function detectFromData(data) {
+function detectFromData(data: unknown): string {
   if (!data) return 'empty';
   if (Array.isArray(data)) {
     if (data.length === 0) return 'empty';
@@ -73,9 +72,10 @@ function detectFromData(data) {
     }
   }
   if (typeof data === 'object' && !Array.isArray(data)) {
-    if (data.categories && data.values) return 'pareto';
-    if (data.series || data.xAxis) return 'trend';
-    if (data.items && Array.isArray(data.items)) return 'kpi';
+    const d = data as Record<string, unknown>;
+    if (d.categories && d.values) return 'pareto';
+    if (d.series || d.xAxis) return 'trend';
+    if (d.items && Array.isArray(d.items)) return 'kpi';
     return 'kpi';
   }
   return 'empty';
@@ -88,17 +88,17 @@ const isEmpty = computed(() => {
 });
 
 const paretoOption = computed(() => {
-  const data = props.chartData;
+  const data = props.chartData as Record<string, unknown> | unknown[] | null; // TODO: type pareto shape
   if (!data) return {};
 
-  const categories = data.categories || (Array.isArray(data) ? data.map((d) => d.name || d.label || '') : []);
-  const values = data.values || (Array.isArray(data) ? data.map((d) => d.value || d.qty || 0) : []);
+  const categories = (data as Record<string, unknown>).categories || (Array.isArray(data) ? (data as Record<string, unknown>[]).map((d) => d.name || d.label || '') : []);
+  const values = (data as Record<string, unknown>).values || (Array.isArray(data) ? (data as Record<string, unknown>[]).map((d) => d.value || d.qty || 0) : []);
 
   // Compute cumulative percentages
-  const total = values.reduce((s, v) => s + v, 0);
-  const cumPcts = [];
+  const total = (values as number[]).reduce((s: number, v: number) => s + v, 0);
+  const cumPcts: number[] = [];
   let cum = 0;
-  for (const v of values) {
+  for (const v of values as number[]) {
     cum += v;
     cumPcts.push(total > 0 ? Math.round((cum / total) * 1000) / 10 : 0);
   }
@@ -113,7 +113,7 @@ const paretoOption = computed(() => {
         rotate: 35,
         fontSize: 10,
         color: CHART_PALETTE.axisLabel,
-        formatter: (v) => (v.length > 6 ? v.slice(0, 6) + '...' : v),
+        formatter: (v: string) => (v.length > 6 ? v.slice(0, 6) + '...' : v),
       },
     },
     yAxis: [
@@ -147,22 +147,22 @@ const paretoOption = computed(() => {
 });
 
 const trendOption = computed(() => {
-  const data = props.chartData;
+  const data = props.chartData as Record<string, unknown> | unknown[] | null; // TODO: type trend shape
   if (!data) return {};
 
   // Expect either { xAxis: [...], series: [...] } or array of objects with date field
-  let xData = [];
-  let seriesList = [];
+  let xData: unknown[] = [];
+  let seriesList: unknown[] = [];
 
   if (Array.isArray(data)) {
-    const keys = Object.keys(data[0] || {});
+    const keys = Object.keys((data as Record<string, unknown>[])[0] || {});
     const timeKey = keys.find((k) => /date|time|day/i.test(k)) || keys[0];
     const valueKeys = keys.filter((k) => k !== timeKey);
-    xData = data.map((d) => d[timeKey]);
+    xData = (data as Record<string, unknown>[]).map((d) => d[timeKey]);
     seriesList = valueKeys.map((k, i) => ({
       type: 'line',
       name: k,
-      data: data.map((d) => d[k]),
+      data: (data as Record<string, unknown>[]).map((d) => d[k]),
       smooth: true,
       lineStyle: { color: i === 0 ? CHART_PALETTE.line : CHART_PALETTE.lineSecondary, width: 2 },
       itemStyle: { color: i === 0 ? CHART_PALETTE.line : CHART_PALETTE.lineSecondary },
@@ -170,8 +170,9 @@ const trendOption = computed(() => {
       symbolSize: 3,
     }));
   } else {
-    xData = data.xAxis || data.categories || [];
-    const rawSeries = data.series || [];
+    const d = data as Record<string, unknown>;
+    xData = (d.xAxis || d.categories || []) as unknown[];
+    const rawSeries = (d.series || []) as Record<string, unknown>[];
     seriesList = rawSeries.map((s, i) => ({
       type: 'line',
       name: s.name || `Series ${i + 1}`,
@@ -201,7 +202,7 @@ const trendOption = computed(() => {
 });
 
 const heatmapOption = computed(() => {
-  const data = props.chartData;
+  const data = props.chartData as Record<string, unknown> | null; // TODO: type heatmap shape
   if (!data) return {};
 
   const xLabels = data.xAxis || data.columns || [];
@@ -209,9 +210,9 @@ const heatmapOption = computed(() => {
   const points = data.data || data.values || [];
 
   let max = 1;
-  for (const p of points) {
-    const v = Array.isArray(p) ? p[2] : p.value;
-    if (v > max) max = v;
+  for (const p of points as unknown[]) {
+    const v = Array.isArray(p) ? (p as unknown[])[2] : (p as Record<string, unknown>).value;
+    if ((v as number) > max) max = v as number;
   }
 
   return {
@@ -249,21 +250,22 @@ const heatmapOption = computed(() => {
 
 const tableRows = computed(() => {
   if (!props.chartData) return [];
-  const data = Array.isArray(props.chartData) ? props.chartData : props.chartData.items || [];
-  return data.slice(0, 10);
+  const data = Array.isArray(props.chartData) ? props.chartData : (props.chartData as Record<string, unknown>).items || [];
+  return (data as unknown[]).slice(0, 10);
 });
 
 const tableColumns = computed(() => {
   if (tableRows.value.length === 0) return [];
-  return Object.keys(tableRows.value[0]);
+  return Object.keys(tableRows.value[0] as Record<string, unknown>);
 });
 
 const kpiItems = computed(() => {
   if (!props.chartData) return [];
   if (Array.isArray(props.chartData)) return props.chartData;
-  if (props.chartData.items) return props.chartData.items;
+  const d = props.chartData as Record<string, unknown>;
+  if (d.items) return d.items as unknown[];
   // Single KPI object
-  return Object.entries(props.chartData).map(([k, v]) => ({ label: k, value: v }));
+  return Object.entries(d).map(([k, v]) => ({ label: k, value: v }));
 });
 </script>
 
@@ -305,8 +307,8 @@ const kpiItems = computed(() => {
         :key="idx"
         class="ai-kpi-card"
       >
-        <span class="ai-kpi-label">{{ item.label || item.name || item.key }}</span>
-        <span class="ai-kpi-value">{{ item.value ?? item.count ?? '-' }}</span>
+        <span class="ai-kpi-label">{{ (item as Record<string, unknown>).label || (item as Record<string, unknown>).name || (item as Record<string, unknown>).key }}</span>
+        <span class="ai-kpi-value">{{ (item as Record<string, unknown>).value ?? (item as Record<string, unknown>).count ?? '-' }}</span>
       </div>
     </div>
 
@@ -320,7 +322,7 @@ const kpiItems = computed(() => {
         </thead>
         <tbody>
           <tr v-for="(row, idx) in tableRows" :key="idx">
-            <td v-for="col in tableColumns" :key="col">{{ row[col] ?? '' }}</td>
+            <td v-for="col in tableColumns" :key="col">{{ (row as Record<string, unknown>)[col] ?? '' }}</td>
           </tr>
         </tbody>
       </table>

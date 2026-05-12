@@ -1,16 +1,14 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps({
-  tone: {
-    type: String,
-    default: 'neutral',
-    validator: (v) => ['neutral', 'success', 'warning', 'danger', 'info'].includes(v),
-  },
-  text: {
-    type: String,
-    default: '',
-  },
+interface Props {
+  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info';
+  text?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  tone: 'neutral',
+  text: '',
 });
 
 const badgeClass = computed(() => `shared-status-badge tone-${props.tone}`);

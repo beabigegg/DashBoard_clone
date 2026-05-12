@@ -1,43 +1,52 @@
-<script setup>
-import { computed, provide, ref, toRef, watch } from 'vue'
+<script setup lang="ts">
+import { computed, provide, ref, toRef } from 'vue'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-vue-next'
-import { useSortableTable } from '../../shared-composables/useSortableTable.js'
+import { useSortableTable } from '../../shared-composables/useSortableTable'
 import EmptyState from './EmptyState.vue'
 import PaginationControl from './PaginationControl.vue'
 
-const props = defineProps({
-  data: {
-    type: Array,
-    default: () => []
-  },
-  loading: {
-    type: Boolean,
-    default: false
-  },
-  pagination: {
-    type: Object,
-    default: null
-    // Expected shape: { page, totalPages, infoText? }
-  },
-  serverSort: {
-    type: Boolean,
-    default: false
-  },
-  emptyType: {
-    type: String,
-    default: 'no-data'
-  }
-})
+interface ColumnDefinition {
+  key: string;
+  label: string;
+  sortable: boolean;
+  width: string | null;
+  align: string;
+}
 
-const emit = defineEmits(['sort', 'page-change'])
+interface PaginationShape {
+  page: number;
+  totalPages: number;
+  infoText?: string;
+}
+
+interface Props {
+  data?: Record<string, unknown>[];
+  loading?: boolean;
+  pagination?: PaginationShape | null;
+  serverSort?: boolean;
+  emptyType?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  data: () => [],
+  loading: false,
+  pagination: null,
+  serverSort: false,
+  emptyType: 'no-data',
+});
+
+const emit = defineEmits<{
+  (e: 'sort', payload: { key: string; direction: string }): void;
+  (e: 'page-change', page: number): void;
+}>();
 
 // --- Column registry ---
-const columns = ref([])
+const columns = ref<ColumnDefinition[]>([])
 
-provide('registerColumn', (col) => {
+provide('registerColumn', (col: ColumnDefinition) => {
   columns.value.push(col)
 })
-provide('unregisterColumn', (key) => {
+provide('unregisterColumn', (key: string) => {
   const idx = columns.value.findIndex((c) => c.key === key)
   if (idx !== -1) columns.value.splice(idx, 1)
 })
@@ -46,7 +55,7 @@ provide('unregisterColumn', (key) => {
 const dataRef = toRef(props, 'data')
 const { sortKey, sortDirection, sortedData, setSortKey } = useSortableTable(dataRef)
 
-function handleSort(col) {
+function handleSort(col: ColumnDefinition) {
   if (!col.sortable) return
   if (props.serverSort) {
     // Toggle direction for same key
@@ -60,16 +69,16 @@ function handleSort(col) {
   }
 }
 
-function sortIcon(col) {
+function sortIcon(col: ColumnDefinition) {
   if (!col.sortable) return null
   if (sortKey.value !== col.key) return ArrowUpDown
   return sortDirection.value === 'asc' ? ArrowUp : ArrowDown
 }
 
 // --- Expandable rows ---
-const expandedRow = ref(null)
+const expandedRow = ref<number | null>(null)
 
-function toggleExpand(index) {
+function toggleExpand(index: number) {
   expandedRow.value = expandedRow.value === index ? null : index
 }
 
@@ -195,7 +204,7 @@ const isEmpty = computed(() => !props.loading && displayData.value.length === 0)
               :colspan="($slots.expand ? 1 : 0) + columns.length"
               class="data-table-empty-cell"
             >
-              <EmptyState :type="emptyType" />
+              <EmptyState :type="emptyType as 'no-data' | 'filter-empty' | 'error' | 'loading'" />
             </td>
           </tr>
         </tbody>

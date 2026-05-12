@@ -1,19 +1,27 @@
-<script setup>
+<script setup lang="ts">
 import StatusBadge from './StatusBadge.vue';
 import AiChartRenderer from './AiChartRenderer.vue';
 
-defineProps({
-  message: {
-    type: Object,
-    required: true,
-  },
-  stepText: {
-    type: String,
-    default: '',
-  },
-});
+interface AiMessage {
+  role: 'user' | 'ai' | 'clarification' | 'error' | 'loading';
+  content?: string;
+  queryUsed?: string;
+  chartData?: unknown;
+  sqlUsed?: string;
+  toolTrace?: Array<{ step: number; function: string; summary: string; error?: string }>;
+  suggestions?: string[];
+}
 
-const emit = defineEmits(['suggest']);
+interface Props {
+  message: AiMessage;
+  stepText?: string;
+}
+
+defineProps<Props>();
+
+const emit = defineEmits<{
+  (e: 'suggest', suggestion: string): void;
+}>();
 </script>
 
 <template>
@@ -36,7 +44,7 @@ const emit = defineEmits(['suggest']);
 
       <AiChartRenderer
         v-if="message.chartData"
-        :chart-data="message.chartData"
+        :chart-data="message.chartData as Record<string, unknown> | unknown[]"
         :query-used="message.queryUsed"
       />
 

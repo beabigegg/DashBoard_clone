@@ -1,39 +1,28 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-const props = defineProps({
-  label: {
-    type: String,
-    required: true
-  },
-  value: {
-    type: [Number, String],
-    default: null
-  },
-  format: {
-    type: String,
-    default: null,
-    validator: (v) => ['number', 'percent', 'duration', null].includes(v)
-  },
-  accent: {
-    type: String,
-    default: 'brand'
-  },
-  tooltip: {
-    type: String,
-    default: null
-  },
-  clickable: {
-    type: Boolean,
-    default: false
-  },
-  active: {
-    type: Boolean,
-    default: false
-  }
-})
+interface Props {
+  label: string;
+  value?: number | string | null;
+  format?: 'number' | 'percent' | 'duration' | null;
+  accent?: string;
+  tooltip?: string | null;
+  clickable?: boolean;
+  active?: boolean;
+}
 
-const emit = defineEmits(['click'])
+const props = withDefaults(defineProps<Props>(), {
+  value: null,
+  format: null,
+  accent: 'brand',
+  tooltip: null,
+  clickable: false,
+  active: false,
+});
+
+const emit = defineEmits<{
+  (e: 'click'): void;
+}>();
 
 const accentColor = computed(() => props.accent ?? 'brand')
 

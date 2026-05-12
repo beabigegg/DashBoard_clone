@@ -1,48 +1,40 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
+// @ts-expect-error <not-yet-migrated: wip-shared/components — Phase 3 scope>
 import BasePagination from '../../wip-shared/components/Pagination.vue';
 
-const props = defineProps({
-  page: {
-    type: Number,
-    default: null,
-  },
-  modelValue: {
-    type: Number,
-    default: 1,
-  },
-  totalPages: {
-    type: Number,
-    default: 1,
-  },
-  infoText: {
-    type: String,
-    default: '',
-  },
-  visible: {
-    type: Boolean,
-    default: true,
-  },
-  showPageNumbers: {
-    type: Boolean,
-    default: false,
-  },
-  showPageSize: {
-    type: Boolean,
-    default: false,
-  },
-  pageSizeOptions: {
-    type: Array,
-    default: () => [10, 25, 50, 100],
-  },
-  pageSize: {
-    type: Number,
-    default: null,
-  },
+interface Props {
+  page?: number | null;
+  modelValue?: number;
+  totalPages?: number;
+  infoText?: string;
+  visible?: boolean;
+  showPageNumbers?: boolean;
+  showPageSize?: boolean;
+  pageSizeOptions?: number[];
+  pageSize?: number | null;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  page: null,
+  modelValue: 1,
+  totalPages: 1,
+  infoText: '',
+  visible: true,
+  showPageNumbers: false,
+  showPageSize: false,
+  pageSizeOptions: () => [10, 25, 50, 100],
+  pageSize: null,
 });
 
-const emit = defineEmits(['update:modelValue', 'change', 'prev', 'next', 'update:pageSize']);
+const emit = defineEmits<{
+  (e: 'update:modelValue', page: number): void;
+  (e: 'change', page: number): void;
+  (e: 'prev', page: number): void;
+  (e: 'next', page: number): void;
+  (e: 'update:pageSize', size: number): void;
+}>();
 
 const page = computed(() => {
   if (props.page !== null && props.page !== undefined) {
@@ -52,13 +44,14 @@ const page = computed(() => {
 });
 const safeTotalPages = computed(() => Math.max(Number(props.totalPages || 1), 1));
 
-function toPage(nextPage, eventName) {
+function toPage(nextPage: number, eventName: 'prev' | 'next' | 'change') {
   if (nextPage < 1 || nextPage > safeTotalPages.value || nextPage === page.value) {
     return;
   }
   emit('update:modelValue', nextPage);
   emit('change', nextPage);
-  emit(eventName, nextPage);
+  if (eventName === 'prev') emit('prev', nextPage);
+  else if (eventName === 'next') emit('next', nextPage);
 }
 
 function onPrev() {
@@ -69,29 +62,28 @@ function onNext() {
   toPage(page.value + 1, 'next');
 }
 
-function onPageInput(e) {
-  const val = Number(e.target.value);
+function onPageInput(e: Event) {
+  const val = Number((e.target as HTMLInputElement).value);
   if (!Number.isNaN(val) && val >= 1 && val <= safeTotalPages.value) {
     toPage(val, 'change');
   }
 }
 
-function onPageSizeChange(e) {
-  const val = Number(e.target.value);
+function onPageSizeChange(e: Event) {
+  const val = Number((e.target as HTMLSelectElement).value);
   if (!Number.isNaN(val) && val > 0) {
     emit('update:pageSize', val);
     toPage(1, 'change');
   }
 }
 
-const pageNumbers = computed(() => {
+const pageNumbers = computed((): (number | string)[] => {
   if (!props.showPageNumbers) return [];
   const total = safeTotalPages.value;
   const current = page.value;
   const delta = 2;
-  const range = [];
-  const pages = [];
-  let prev = null;
+  const range: number[] = [];
+  const pages: (number | string)[] = [];
 
   for (let i = Math.max(1, current - delta); i <= Math.min(total, current + delta); i++) {
     range.push(i);
@@ -135,7 +127,7 @@ const pageNumbers = computed(() => {
         :disabled="p === '...'"
         :aria-label="p !== '...' ? `第 ${p} 頁` : undefined"
         :aria-current="p === page ? 'page' : undefined"
-        @click="p !== '...' && toPage(p, 'change')"
+        @click="p !== '...' && toPage(p as number, 'change')"
       >
         {{ p }}
       </button>

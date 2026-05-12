@@ -1,12 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import LoadingSpinner from './LoadingSpinner.vue';
 
-defineProps({
-  tier: {
-    type: String,
-    default: 'section',
-    validator: (v) => ['page', 'section'].includes(v),
-  },
+interface Props {
+  tier?: 'page' | 'section';
+}
+
+withDefaults(defineProps<Props>(), {
+  tier: 'section',
 });
 </script>
 

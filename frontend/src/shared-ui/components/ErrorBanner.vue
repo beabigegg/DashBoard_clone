@@ -1,16 +1,17 @@
-<script setup>
-defineProps({
-  message: {
-    type: String,
-    default: '',
-  },
-  dismissible: {
-    type: Boolean,
-    default: true,
-  },
+<script setup lang="ts">
+interface Props {
+  message?: string;
+  dismissible?: boolean;
+}
+
+withDefaults(defineProps<Props>(), {
+  message: '',
+  dismissible: true,
 });
 
-const emit = defineEmits(['dismiss']);
+const emit = defineEmits<{
+  (e: 'dismiss'): void;
+}>();
 </script>
 
 <template>

@@ -1,34 +1,28 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { X } from 'lucide-vue-next'
 
-const props = defineProps({
-  label: {
-    type: String,
-    required: true
-  },
-  tone: {
-    type: String,
-    default: 'neutral',
-    validator: (v) => ['neutral', 'brand', 'success', 'warning', 'danger', 'info'].includes(v)
-  },
-  removable: {
-    type: Boolean,
-    default: false
-  },
-  clickable: {
-    type: Boolean,
-    default: false
-  },
-  disabled: {
-    type: Boolean,
-    default: false
-  }
-})
+interface Props {
+  label: string;
+  tone?: 'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'info';
+  removable?: boolean;
+  clickable?: boolean;
+  disabled?: boolean;
+}
 
-const emit = defineEmits(['remove', 'click'])
+const props = withDefaults(defineProps<Props>(), {
+  tone: 'neutral',
+  removable: false,
+  clickable: false,
+  disabled: false,
+});
 
-const TONE_CLASSES = {
+const emit = defineEmits<{
+  (e: 'remove'): void;
+  (e: 'click'): void;
+}>();
+
+const TONE_CLASSES: Record<string, string> = {
   neutral: 'chip--neutral',
   brand:   'chip--brand',
   success: 'chip--success',
@@ -43,7 +37,7 @@ function handleClick() {
   if (!props.disabled && props.clickable) emit('click')
 }
 
-function handleRemove(e) {
+function handleRemove(e: MouseEvent) {
   e.stopPropagation()
   if (!props.disabled) emit('remove')
 }
