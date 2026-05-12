@@ -7,7 +7,7 @@ import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 
-import { STATUS_COLORS } from '../../resource-shared/constants.js';
+import { STATUS_COLORS } from '../../resource-shared/constants';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent]);
 

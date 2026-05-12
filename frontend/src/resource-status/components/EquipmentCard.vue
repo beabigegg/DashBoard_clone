@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 
-import { getStatusDisplay, normalizeStatus } from '../../resource-shared/constants.js';
+import { getStatusDisplay, normalizeStatus } from '../../resource-shared/constants';
 
 const props = defineProps({
   equipment: {

@@ -1,41 +1,37 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-const props = defineProps({
-  modelValue: {
-    type: Array,
-    default: () => [],
-  },
-  options: {
-    type: Array,
-    default: () => [],
-  },
-  placeholder: {
-    type: String,
-    default: '請選擇',
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-  searchable: {
-    type: Boolean,
-    default: false,
-  },
-});
+type OptionObject = {
+  value?: string | number;
+  name?: string | number;
+  label?: string | number;
+};
+
+const props = defineProps<{
+  modelValue?: string[];
+  options?: Array<OptionObject | string | number>;
+  placeholder?: string;
+  disabled?: boolean;
+  searchable?: boolean;
+}>();
 
 const emit = defineEmits(['update:modelValue']);
 
-const rootRef = ref(null);
-const searchRef = ref(null);
+const rootRef = ref<HTMLElement | null>(null);
+const searchRef = ref<HTMLInputElement | null>(null);
 const isOpen = ref(false);
 const searchQuery = ref('');
 
+const resolvedModelValue = computed<string[]>(() => props.modelValue ?? []);
+const resolvedOptions = computed<Array<OptionObject | string | number>>(() => props.options ?? []);
+const resolvedPlaceholder = computed<string>(() => props.placeholder ?? '請選擇');
+
 const normalizedOptions = computed(() => {
-  return props.options.map((option) => {
+  return resolvedOptions.value.map((option) => {
     if (option && typeof option === 'object') {
-      const value = option.value ?? option.name ?? option.label ?? '';
-      const label = option.label ?? option.name ?? option.value ?? '';
+      const obj = option as OptionObject;
+      const value = obj.value ?? obj.name ?? obj.label ?? '';
+      const label = obj.label ?? obj.name ?? obj.value ?? '';
       return {
         label: String(label),
         value: String(value),
@@ -57,39 +53,41 @@ const displayedOptions = computed(() => {
   return normalizedOptions.value.filter((opt) => opt.label.toLowerCase().includes(q));
 });
 
-const selectedSet = computed(() => new Set((props.modelValue || []).map((value) => String(value))));
+const selectedSet = computed(
+  () => new Set(resolvedModelValue.value.map((value) => String(value)))
+);
 
 const selectedText = computed(() => {
-  if (!props.modelValue.length) {
-    return props.placeholder;
+  if (!resolvedModelValue.value.length) {
+    return resolvedPlaceholder.value;
   }
 
-  if (props.modelValue.length === 1) {
+  if (resolvedModelValue.value.length === 1) {
     const found = normalizedOptions.value.find(
-      (option) => option.value === String(props.modelValue[0])
+      (option) => option.value === String(resolvedModelValue.value[0])
     );
-    return found?.label || String(props.modelValue[0]);
+    return found?.label || String(resolvedModelValue.value[0]);
   }
 
-  return `已選 ${props.modelValue.length} 項`;
+  return `已選 ${resolvedModelValue.value.length} 項`;
 });
 
-function closeDropdown() {
+function closeDropdown(): void {
   isOpen.value = false;
 }
 
-function toggleDropdown() {
+function toggleDropdown(): void {
   if (props.disabled) {
     return;
   }
   isOpen.value = !isOpen.value;
 }
 
-function isSelected(value) {
+function isSelected(value: string): boolean {
   return selectedSet.value.has(String(value));
 }
 
-function toggleOption(value) {
+function toggleOption(value: string): void {
   const next = new Set(selectedSet.value);
   const key = String(value);
 
@@ -102,7 +100,7 @@ function toggleOption(value) {
   emit('update:modelValue', [...next]);
 }
 
-function selectAll() {
+function selectAll(): void {
   const next = new Set(selectedSet.value);
   for (const opt of displayedOptions.value) {
     next.add(opt.value);
@@ -110,22 +108,22 @@ function selectAll() {
   emit('update:modelValue', [...next]);
 }
 
-function clearAll() {
+function clearAll(): void {
   if (!searchQuery.value) {
     emit('update:modelValue', []);
     return;
   }
   const removing = new Set(displayedOptions.value.map((o) => o.value));
-  const next = props.modelValue.filter((v) => !removing.has(String(v)));
+  const next = resolvedModelValue.value.filter((v) => !removing.has(String(v)));
   emit('update:modelValue', next);
 }
 
-function handleOutsideClick(event) {
+function handleOutsideClick(event: MouseEvent): void {
   if (!isOpen.value || !rootRef.value) {
     return;
   }
 
-  if (!rootRef.value.contains(event.target)) {
+  if (!rootRef.value.contains(event.target as Node)) {
     isOpen.value = false;
   }
 }

@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue'
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue'
 import { buildResourceKpiFromHours } from '../../core/compute.js'
-import { OU_BADGE_THRESHOLDS } from '../../resource-shared/constants.js'
+import { OU_BADGE_THRESHOLDS } from '../../resource-shared/constants'
 
 const props = defineProps({
   kpi: {

@@ -7,7 +7,7 @@ import {
   STATUS_DISPLAY_MAP,
   normalizeStatus,
   resolveOuBadgeClass,
-} from '../../resource-shared/constants.js';
+} from '../../resource-shared/constants';
 
 const props = defineProps({
   equipment: {
