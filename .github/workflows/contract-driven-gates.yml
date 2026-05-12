@@ -1,4 +1,5 @@
-# Contract-driven gates — MES Dashboard
+# Contract-driven gates baseline (provided by cdd-kit).
+# Application/test commands MUST be customized for your stack.
 # See ci/gate-policy.md for tier semantics and promotion policy.
 
 name: contract-driven-gates
@@ -9,181 +10,69 @@ on:
   pull_request:
   workflow_dispatch:
   schedule:
-    - cron: '0 18 * * 1'   # weekly Monday 18:00 UTC → stress/soak gate
+    - cron: '0 18 * * 1'
 
 jobs:
-  # ──────────────────────────────────────────────────────────────
-  # Tier 0 / Tier 1 — PR Required Gate (blocks merge)
-  # Runs: contract validate, lint, type, unit + mock-integration,
-  #       route fuzz, property-based, CSS governance, frontend unit
-  # ──────────────────────────────────────────────────────────────
   contract-and-fast-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
 
       - name: Install cdd-kit
         run: npm install -g contract-driven-delivery
 
-      - name: Validate contracts
+      - name: Validate contracts and gates
         run: cdd-kit validate
 
-      - uses: conda-incubator/setup-miniconda@v3
-        with:
-          environment-file: environment.yml
-          activate-environment: mes-dashboard
-          auto-activate-base: false
-
-      - name: Install project package
-        shell: bash -el {0}
-        run: pip install -e .
-
-      - name: Lint (ruff)
-        shell: bash -el {0}
-        run: ruff check .
-
-      - name: Type check (mypy)
-        shell: bash -el {0}
-        run: mypy src/ || true   # informational until full coverage
-
-      - name: Unit + mock-integration tests
-        shell: bash -el {0}
+      - name: Repository-specific fast gate
         run: |
-          pytest \
-            -m "not (e2e or integration_real or stress or load or soak or multi_worker)" \
-            --ignore=tests/integration \
-            --ignore=tests/stress \
-            --ignore=tests/e2e \
-            --ignore=tests/manual \
-            -x --tb=short
+          # TODO: add your stack-specific commands here.
+          # This step is intentionally left as a placeholder — cdd-kit does not assume your stack.
+          # Examples of what belongs here:
+          #   lint:       npx eslint src/ / ruff check . / golangci-lint run
+          #   typecheck:  npx tsc --noEmit / mypy src/
+          #   build:      npm run build / go build ./...
+          #   unit tests: your test runner command (jest, vitest, pytest, go test, etc.)
+          echo "No stack-specific fast gate configured — add lint/typecheck/build/unit-test commands above."
 
-      - name: Frontend install
-        run: cd frontend && npm ci
-
-      - name: Frontend unit tests (Vitest)
-        run: cd frontend && npm run test
-
-      - name: CSS governance check
-        run: cd frontend && npm run css:check
-
-  # ──────────────────────────────────────────────────────────────
-  # Tier 1 — Critical E2E (blocks merge on PR)
-  # Playwright: resilience + data-boundary + critical journeys
-  # ──────────────────────────────────────────────────────────────
   e2e-critical:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install frontend deps
-        run: cd frontend && npm ci
-
-      - name: Install Playwright browsers
-        run: cd frontend && npx playwright install --with-deps chromium
-
-      - uses: conda-incubator/setup-miniconda@v3
-        with:
-          environment-file: environment.yml
-          activate-environment: mes-dashboard
-          auto-activate-base: false
-
-      - name: Build frontend (required for E2E)
-        run: cd frontend && npm run build
-
-      - name: Start Flask server
-        shell: bash -el {0}
+      - name: Critical E2E
         run: |
-          gunicorn -c gunicorn.conf.py \
-            'src.mes_dashboard.app:create_app()' \
-            --daemon --log-file /tmp/gunicorn.log
-          sleep 5   # wait for server ready
+          # TODO: add your critical E2E command here (Tier 1 — blocks merge).
+          # This step is intentionally left as a placeholder — cdd-kit does not assume your stack.
+          # Examples:
+          #   Playwright:  npx playwright test --project=critical
+          #   Cypress:     npx cypress run --spec "cypress/e2e/critical/**"
+          #   pytest:      python -m pytest tests/e2e/critical/ -x
+          echo "No critical E2E command configured — add your runner command above."
 
-      - name: Playwright — resilience tests
-        run: cd frontend && npx playwright test tests/playwright/resilience/
-
-      - name: Playwright — data-boundary tests
-        run: cd frontend && npx playwright test tests/playwright/data-boundary/
-
-      - name: Playwright — critical journeys
-        run: cd frontend && npx playwright test tests/playwright/hold-overview.spec.js tests/playwright/reject-history.spec.js tests/playwright/query-tool.spec.js
-
-      - name: Upload Playwright traces on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-traces
-          path: frontend/test-results/
-          retention-days: 7
-
-  # ──────────────────────────────────────────────────────────────
-  # Tier 3 — Nightly real-infra integration (not pre-merge)
-  # Requires real Oracle DB + Redis; runs on schedule or dispatch
-  # ──────────────────────────────────────────────────────────────
-  nightly-integration:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: conda-incubator/setup-miniconda@v3
-        with:
-          environment-file: environment.yml
-          activate-environment: mes-dashboard
-          auto-activate-base: false
-
-      - name: Real-infra integration tests
-        shell: bash -el {0}
-        run: |
-          pytest tests/integration/ \
-            --run-integration-real \
-            -m "integration_real or multi_worker" \
-            -x --tb=short
-
-  # ──────────────────────────────────────────────────────────────
-  # Tier 4 — Weekly stress / soak gate
-  # ──────────────────────────────────────────────────────────────
   scheduled-stress-soak:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: conda-incubator/setup-miniconda@v3
-        with:
-          environment-file: environment.yml
-          activate-environment: mes-dashboard
-          auto-activate-base: false
-
-      - name: Start Flask server for stress tests
-        shell: bash -el {0}
+      - name: Stress and soak tests
         run: |
-          gunicorn -c gunicorn.conf.py \
-            'src.mes_dashboard.app:create_app()' \
-            --daemon --log-file /tmp/gunicorn.log
-          sleep 5
-
-      - name: Stress + load tests
-        shell: bash -el {0}
-        run: |
-          pytest tests/stress/ \
-            -m "stress or load" \
-            --tb=short
-
-      - name: Soak workload test
-        shell: bash -el {0}
-        run: |
-          pytest tests/integration/test_soak_workload.py \
-            --run-integration-real \
-            -m "soak" \
-            -s --tb=short
+          # TODO: add your stress/soak workflow here (Tier 4 — weekly long-run gate).
+          # This step is intentionally left as a placeholder — cdd-kit does not assume your stack.
+          # Examples:
+          #   pytest soak:  python -m pytest tests/stress/ --soak-hours=4
+          #   k6 load:      k6 run --vus=50 --duration=4h tests/load/scenario.js
+          #   locust:       locust -f tests/stress/locustfile.py --headless -u 100 -r 10 --run-time 4h
+          echo "No stress/soak command configured — add your runner command above."
