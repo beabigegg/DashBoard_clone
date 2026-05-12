@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.1
-last-changed: 2026-05-05
+schema-version: 1.3.4
+last-changed: 2026-05-12
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -46,6 +46,27 @@ breaking-change-policy: deprecate-2-minors
 - **From Phase 1b onward**: `include` is `["src/core/**/*", "src/shared-composables/**/*"]`, additionally covering all 11 shared-composable `.ts` modules under `strict: true`.
 - **Status unchanged**: the gate remains **informational** (continue-on-error: true). Promotion to required follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.1 (patch)**: additive prose only — gate tier, command, and status are unchanged. Matching Phase 1a precedent at ci 1.2.1.
+
+### frontend-type-check scope expansion (Phase 1d — migrate-admin-shared-ts)
+
+- **Before Phase 1d**: `tsconfig.json` `include` was `["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*"]`, covering 54 modules across the three previously migrated scopes.
+- **From Phase 1d onward**: `include` is `["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*", "src/admin-shared/**/*"]`, additionally covering the 5 modules in `admin-shared/` (4 Vue SFCs + 1 composable) under `strict: true`.
+- **Status unchanged**: the gate remains **informational** (continue-on-error: true). Promotion to required follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.2 (patch)**: additive prose only — gate tier, command, and status are unchanged. Matching Phase 1b precedent at ci 1.3.1.
+
+### frontend-type-check scope expansion (Phase 1e — migrate-resource-shared-ts)
+
+- **Before Phase 1e**: `tsconfig.json` `include` was `["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*", "src/admin-shared/**/*"]`, covering 59 modules across the four previously migrated scopes.
+- **From Phase 1e onward**: `include` is `["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*", "src/admin-shared/**/*", "src/resource-shared/**/*"]`, additionally covering the 3 modules in `resource-shared/` (2 Vue SFCs + 1 constants module) under `strict: true`.
+- **Status unchanged**: the gate remains **informational** (continue-on-error: true). Promotion to required follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.3 (patch)**: additive prose only — gate tier, command, and status are unchanged. Matching Phase 1d precedent at ci 1.3.2.
+
+### frontend-type-check scope expansion (Phase 1f — migrate-wip-shared-ts)
+
+- **Before Phase 1f**: `tsconfig.json` `include` was `["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*", "src/admin-shared/**/*", "src/resource-shared/**/*"]`, covering 62 modules across the five previously migrated scopes.
+- **From Phase 1f onward**: `include` is `["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*", "src/admin-shared/**/*", "src/resource-shared/**/*", "src/wip-shared/**/*"]`, additionally covering the 6 modules in `wip-shared/` (3 Vue SFCs + 2 composables + 1 constants module) under `strict: true`. This phase also removes `@ts-expect-error` suppressions from `shared-composables/` and `shared-ui/` that were placed as explicit cross-phase placeholders.
+- **Status unchanged**: the gate remains **informational** (continue-on-error: true). Promotion to required follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.4 (patch)**: additive prose only — gate tier, command, and status are unchanged. Matching Phase 1e precedent at ci 1.3.3.
 
 ## Required Check Policy
 
@@ -137,3 +158,4 @@ Promote from informational to required after ALL of:
 ## Contract Change Policy
 
 新增、移除或修改 CI gate 時，必須同步更新此契約（同一 PR），並在 PR 描述說明影響的 tier 和原因。
+

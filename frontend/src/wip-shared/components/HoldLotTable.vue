@@ -1,70 +1,47 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
-import { useSortableTable } from '../../shared-composables/useSortableTable.js';
+import { useSortableTable } from '../../shared-composables/useSortableTable';
+import type { DataRow } from '../../shared-composables/useSortableTable';
 
 import Pagination from '../../shared-ui/components/PaginationControl.vue';
 
-const props = defineProps({
-  lots: {
-    type: Array,
-    default: () => [],
-  },
-  pagination: {
-    type: Object,
-    default: () => ({ page: 1, perPage: 20, total: 0, totalPages: 1 }),
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  errorMessage: {
-    type: String,
-    default: '',
-  },
-  hasActiveFilters: {
-    type: Boolean,
-    default: false,
-  },
-  filterText: {
-    type: String,
-    default: '',
-  },
-  paginating: {
-    type: Boolean,
-    default: false,
-  },
-  title: {
-    type: String,
-    default: 'Hold Lot Details',
-  },
-});
+const props = defineProps<{
+  lots?: DataRow[];
+  pagination?: { page: number; perPage: number; total: number; totalPages: number };
+  loading?: boolean;
+  errorMessage?: string;
+  hasActiveFilters?: boolean;
+  filterText?: string;
+  paginating?: boolean;
+  title?: string;
+}>();
 
 const emit = defineEmits(['clear-filters', 'prev-page', 'next-page']);
-const lotsRef = computed(() => props.lots);
+const lotsRef = computed((): DataRow[] => props.lots ?? []);
 const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(lotsRef);
 
-function currentSortLabel(key) {
+function currentSortLabel(key: string): string {
   if (sortKey.value !== key) {
     return '⇕';
   }
   return sortDirection.value === 'asc' ? '▲' : '▼';
 }
 
-function ariaSortFor(key) {
+function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
   if (sortKey.value !== key) {
     return 'none';
   }
   return sortDirection.value === 'asc' ? 'ascending' : 'descending';
 }
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   if (value === null || value === undefined || value === '-') {
     return '-';
   }
   return Number(value).toLocaleString('zh-TW');
 }
 
-function formatAge(value) {
+function formatAge(value: unknown): string {
   if (value === null || value === undefined || value === '-') {
     return '-';
   }
@@ -95,7 +72,7 @@ const pageInfo = computed(() => {
 <template>
   <section class="table-section">
     <div class="table-header">
-      <div class="table-title">{{ title }}</div>
+      <div class="table-title">{{ title ?? 'Hold Lot Details' }}</div>
       <div v-if="hasActiveFilters" class="filter-indicator">
         <span>篩選: {{ filterText }}</span>
         <span class="clear-btn" @click="emit('clear-filters')">×</span>
@@ -132,7 +109,7 @@ const pageInfo = computed(() => {
           <tr v-else-if="sortedData.length === 0">
             <td colspan="13" class="placeholder">No data</td>
           </tr>
-          <tr v-for="lot in sortedData" v-else :key="lot.lotId">
+          <tr v-for="lot in sortedData" v-else :key="lot.lotId as string">
             <td>{{ lot.lotId || '-' }}</td>
             <td>{{ lot.workorder || '-' }}</td>
             <td>{{ formatNumber(lot.qty) }}</td>
@@ -152,9 +129,9 @@ const pageInfo = computed(() => {
     </div>
 
     <Pagination
-      :visible="Number(pagination.totalPages || 1) > 1"
-      :page="Number(pagination.page || 1)"
-      :total-pages="Number(pagination.totalPages || 1)"
+      :visible="Number(pagination?.totalPages || 1) > 1"
+      :page="Number(pagination?.page || 1)"
+      :total-pages="Number(pagination?.totalPages || 1)"
       :info-text="pageInfo"
       @prev="emit('prev-page')"
       @next="emit('next-page')"

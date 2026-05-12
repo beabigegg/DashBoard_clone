@@ -1,0 +1,39 @@
+change-id: migrate-wip-shared-ts
+status: in-progress
+tier: 3
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: skipped }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: done, note: "no change needed — styles.css and pareto-styles.css not modified; no @layer additions" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: done, note: "ci-gate-contract.md bumped to 1.3.4 with Phase 1f note; CHANGELOG.md entry added" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "test-plan.md written; existing suites cover all ACs; @ts-expect-error removal verified by type-check exit 0" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: skipped }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped }
+  - { id: "4.1", section: Implementation, title: "Backend", status: skipped }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done, note: "constants.js→.ts, useAutocomplete.js→.ts, useAutoRefresh.js→.ts, 3 SFCs lang=ts, index.ts barrel, @ts-expect-error removed from 3 consumers, 4 stale .js specifiers fixed" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "ci-gates.md written; no workflow file changes needed — existing gates cover wip-shared after tsconfig.json expansion" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "css: no change; ci-gate-contract bumped to 1.3.4 with Phase 1f note; @ts-expect-error cleanup scope documented" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "approved-with-risk; all 15 ACs pass locally; CI gates pending" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "type-check 0 errors, build exit 0, css:check 0 new violations, 244 legacy tests pass; cdd-kit gate PASSED" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "CI: contract-validate, cdd-strict-gate, Playwright gates — pending CI run" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: pending, note: "frontend-type-check in CI — pending CI run" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

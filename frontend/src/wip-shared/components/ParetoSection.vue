@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import VChart from 'vue-echarts';
 import { use } from 'echarts/core';
@@ -10,28 +10,20 @@ import {
   LegendComponent,
 } from 'echarts/components';
 
-import { prepareParetoData } from '../../core/wip-derive.js';
+import { prepareParetoData } from '../../core/wip-derive';
+import type { WipItem } from '../../core/wip-derive';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
 
-const props = defineProps({
-  type: {
-    type: String,
-    required: true,
-  },
-  title: {
-    type: String,
-    required: true,
-  },
-  items: {
-    type: Array,
-    default: () => [],
-  },
-});
+const props = defineProps<{
+  type: string;
+  title: string;
+  items?: WipItem[];
+}>();
 
 const emit = defineEmits(['drilldown']);
 
-const paretoData = computed(() => prepareParetoData(props.items));
+const paretoData = computed(() => prepareParetoData(props.items ?? []));
 const hasData = computed(() => paretoData.value.items.length > 0);
 const countLabel = computed(() => `${paretoData.value.items.length} 項`);
 
@@ -39,14 +31,14 @@ const headerClass = computed(() => {
   return props.type === 'quality' ? 'quality' : 'non-quality';
 });
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   if (!value) {
     return '0';
   }
   return Number(value).toLocaleString('zh-TW');
 }
 
-function onReasonDrilldown(reason) {
+function onReasonDrilldown(reason: string): void {
   if (!reason || reason === '未知') {
     return;
   }
@@ -61,10 +53,11 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross' },
-      formatter(params) {
-        const reason = params?.[0]?.name || '';
-        const qty = params?.[0]?.value || 0;
-        const cumPct = params?.[1]?.value || 0;
+      formatter(params: unknown) {
+        const p = params as Array<{ name?: string; value?: unknown }>;
+        const reason = p?.[0]?.name || '';
+        const qty = p?.[0]?.value || 0;
+        const cumPct = p?.[1]?.value || 0;
         return `<strong>${reason}</strong><br/>QTY: ${formatNumber(qty)}<br/>累計: ${cumPct}%`;
       },
     },
@@ -82,7 +75,7 @@ const chartOption = computed(() => {
         rotate: 45,
         interval: 0,
         fontSize: 11,
-        formatter(value) {
+        formatter(value: string) {
           return value.length > 8 ? `${value.slice(0, 8)}…` : value;
         },
       },
@@ -125,11 +118,12 @@ const chartOption = computed(() => {
   };
 });
 
-function handleChartClick(params) {
-  if (params.componentType !== 'series' || params.seriesType !== 'bar') {
+function handleChartClick(params: unknown): void {
+  const p = params as { componentType?: string; seriesType?: string; dataIndex?: number };
+  if (p.componentType !== 'series' || p.seriesType !== 'bar') {
     return;
   }
-  const reason = paretoData.value.reasons[params.dataIndex];
+  const reason = paretoData.value.reasons[p.dataIndex ?? 0] ?? '';
   onReasonDrilldown(reason);
 }
 </script>
@@ -169,7 +163,7 @@ function handleChartClick(params) {
                 v-if="item.reason"
                 href="#"
                 class="reason-link"
-                @click.prevent="onReasonDrilldown(item.reason)"
+                @click.prevent="onReasonDrilldown(String(item.reason))"
               >
                 {{ item.reason }}
               </a>

@@ -4,7 +4,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { apiGet } from '../core/api.js';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
 import { navigateToRuntimeRoute, replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
-import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants.js';
+import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
 import { useRequestGuard } from '../shared-composables/useRequestGuard.js';

@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 294
-visible-files: 901
+visible-files: 903
 omitted-dirs: 105
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -310,8 +310,9 @@ DashBoard_vite/
 |   |   |-- admin-shared/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
-|   |   |   \-- composables/
-|   |   |       \-- ... (max depth)
+|   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
+|   |   |   \-- index.ts
 |   |   |-- admin-user-usage-kpi/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
@@ -461,7 +462,8 @@ DashBoard_vite/
 |   |   |-- resource-shared/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
-|   |   |   |-- constants.js
+|   |   |   |-- constants.ts
+|   |   |   |-- index.ts
 |   |   |   \-- styles.css
 |   |   |-- resource-status/
 |   |   |   |-- components/

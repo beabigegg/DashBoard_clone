@@ -1,6 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error wip-shared is not yet TypeScript — Phase 1c will migrate it
-import { useAutoRefresh as useAutoRefreshBase } from '../wip-shared/composables/useAutoRefresh.js';
+import { useAutoRefresh as useAutoRefreshBase } from '../wip-shared/composables/useAutoRefresh';
 
 export interface AutoRefreshOptions {
   onRefresh?: () => void | Promise<void>;

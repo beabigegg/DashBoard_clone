@@ -1,4 +1,4 @@
-export const NON_QUALITY_HOLD_REASONS = Object.freeze([
+export const NON_QUALITY_HOLD_REASONS: readonly string[] = Object.freeze([
   'IQC檢驗(久存品驗證)(QC)',
   '大中/安波幅50pcs樣品留樣(PD)',
   '工程驗證(PE)',
@@ -12,4 +12,4 @@ export const NON_QUALITY_HOLD_REASONS = Object.freeze([
   '盤點(收線)需求',
 ]);
 
-export const NON_QUALITY_HOLD_REASON_SET = new Set(NON_QUALITY_HOLD_REASONS);
+export const NON_QUALITY_HOLD_REASON_SET: ReadonlySet<string> = new Set(NON_QUALITY_HOLD_REASONS) as ReadonlySet<string>;

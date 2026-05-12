@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-// @ts-expect-error <not-yet-migrated: wip-shared/components — Phase 3 scope>
 import BasePagination from '../../wip-shared/components/Pagination.vue';
 
 interface Props {

@@ -1,6 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error wip-shared is not yet TypeScript — Phase 1c will migrate it
-import { useAutocomplete as useAutocompleteBase } from '../wip-shared/composables/useAutocomplete.js';
+import { useAutocomplete as useAutocompleteBase } from '../wip-shared/composables/useAutocomplete';
 
 export interface AutocompleteFieldState {
   query: string;

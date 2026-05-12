@@ -1,9 +1,11 @@
 import { onBeforeUnmount, onMounted } from 'vue';
 
+import type { AutoRefreshOptions } from '../../shared-composables/useAutoRefresh';
+
 const DEFAULT_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const JITTER_FACTOR = 0.15; // ±15% random jitter to prevent synchronized requests
 
-function jitteredInterval(baseMs) {
+function jitteredInterval(baseMs: number): number {
   const jitter = baseMs * JITTER_FACTOR * (2 * Math.random() - 1);
   return Math.max(1000, Math.round(baseMs + jitter));
 }
@@ -13,19 +15,19 @@ export function useAutoRefresh({
   intervalMs = DEFAULT_REFRESH_INTERVAL_MS,
   autoStart = true,
   refreshOnVisible = true,
-} = {}) {
-  let refreshTimer = null;
-  const controllers = new Map();
-  let pageHideHandler = null;
+}: AutoRefreshOptions = {}) {
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  const controllers = new Map<string, AbortController>();
+  let pageHideHandler: (() => void) | null = null;
 
-  function stopAutoRefresh() {
+  function stopAutoRefresh(): void {
     if (refreshTimer) {
       clearTimeout(refreshTimer);
       refreshTimer = null;
     }
   }
 
-  function scheduleNextRefresh() {
+  function scheduleNextRefresh(): void {
     stopAutoRefresh();
     refreshTimer = setTimeout(() => {
       if (!document.hidden) {
@@ -35,15 +37,15 @@ export function useAutoRefresh({
     }, jitteredInterval(intervalMs));
   }
 
-  function startAutoRefresh() {
+  function startAutoRefresh(): void {
     scheduleNextRefresh();
   }
 
-  function resetAutoRefresh() {
+  function resetAutoRefresh(): void {
     startAutoRefresh();
   }
 
-  function createAbortSignal(key = 'default') {
+  function createAbortSignal(key = 'default'): AbortSignal {
     const previous = controllers.get(key);
     if (previous) {
       previous.abort();
@@ -54,7 +56,7 @@ export function useAutoRefresh({
     return controller.signal;
   }
 
-  function clearAbortController(key = 'default') {
+  function clearAbortController(key = 'default'): void {
     const controller = controllers.get(key);
     if (controller) {
       controller.abort();
@@ -62,14 +64,14 @@ export function useAutoRefresh({
     }
   }
 
-  function abortAllRequests() {
+  function abortAllRequests(): void {
     controllers.forEach((controller) => {
       controller.abort();
     });
     controllers.clear();
   }
 
-  async function triggerRefresh({ force = false, resetTimer = false } = {}) {
+  async function triggerRefresh({ force = false, resetTimer = false } = {}): Promise<void> {
     if (!force && document.hidden) {
       return;
     }
@@ -79,7 +81,7 @@ export function useAutoRefresh({
     await onRefresh?.();
   }
 
-  function handleVisibilityChange() {
+  function handleVisibilityChange(): void {
     if (!refreshOnVisible || document.hidden) {
       return;
     }

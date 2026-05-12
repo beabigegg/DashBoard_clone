@@ -1,9 +1,25 @@
 import { reactive } from 'vue';
 
-import { debounce, fetchWipAutocompleteItems } from '../../core/autocomplete.js';
-import { apiGet } from '../../core/api.js';
+import { debounce, fetchWipAutocompleteItems } from '../../core/autocomplete';
+import type { WipAutocompleteFilters, WipAutocompleteParams } from '../../core/autocomplete';
+import { apiGet } from '../../core/api';
+import type { FetchOptions } from '../../core/api';
 
-function createFieldState() {
+interface UseAutocompleteOptions {
+  getFilters?: () => Record<string, unknown>;
+  request?: (url: string, options: { params: WipAutocompleteParams; silent: boolean; retries: number }) => Promise<unknown>;
+  debounceMs?: number;
+  minChars?: number;
+}
+
+interface FieldState {
+  query: string;
+  items: string[];
+  loading: boolean;
+  open: boolean;
+}
+
+function createFieldState(): FieldState {
   return {
     query: '',
     items: [],
@@ -12,23 +28,25 @@ function createFieldState() {
   };
 }
 
+const defaultRequest = (url: string, options?: FetchOptions) => apiGet(url, options);
+
 export function useAutocomplete({
   getFilters = () => ({}),
-  request = (url, options) => apiGet(url, options),
+  request = defaultRequest as UseAutocompleteOptions['request'],
   debounceMs = 300,
   minChars = 2,
-} = {}) {
-  const fields = reactive({});
-  const debouncedSearchers = new Map();
+}: UseAutocompleteOptions = {}) {
+  const fields = reactive<Record<string, FieldState>>({});
+  const debouncedSearchers = new Map<string, (...args: unknown[]) => unknown>();
 
-  function ensureField(type) {
+  function ensureField(type: string): FieldState {
     if (!fields[type]) {
       fields[type] = createFieldState();
     }
     return fields[type];
   }
 
-  async function search(type, rawQuery) {
+  async function search(type: string, rawQuery: unknown): Promise<string[]> {
     const field = ensureField(type);
     const query = String(rawQuery ?? '').trim();
 
@@ -43,29 +61,29 @@ export function useAutocomplete({
     const items = await fetchWipAutocompleteItems({
       searchType: type,
       query,
-      filters: getFilters(),
-      request,
+      filters: getFilters() as WipAutocompleteFilters,
+      request: request!,
     });
 
-    field.items = Array.isArray(items) ? items : [];
+    field.items = Array.isArray(items) ? (items as string[]) : [];
     field.open = true;
     field.loading = false;
     return field.items;
   }
 
-  function getDebouncedSearcher(type) {
+  function getDebouncedSearcher(type: string): (...args: unknown[]) => unknown {
     if (!debouncedSearchers.has(type)) {
       debouncedSearchers.set(
         type,
-        debounce((query) => {
-          void search(type, query);
+        debounce((...args: unknown[]) => {
+          void search(type, args[0]);
         }, debounceMs)
       );
     }
-    return debouncedSearchers.get(type);
+    return debouncedSearchers.get(type)!;
   }
 
-  function handleInput(type, value) {
+  function handleInput(type: string, value: string): void {
     const field = ensureField(type);
     field.query = value;
 
@@ -78,40 +96,40 @@ export function useAutocomplete({
     getDebouncedSearcher(type)(value);
   }
 
-  function handleFocus(type) {
+  function handleFocus(type: string): void {
     const field = ensureField(type);
     if (String(field.query ?? '').trim().length >= minChars) {
       void search(type, field.query);
     }
   }
 
-  function handleBlur(type, delayMs = 200) {
+  function handleBlur(type: string, delayMs = 200): void {
     setTimeout(() => {
       const field = ensureField(type);
       field.open = false;
     }, delayMs);
   }
 
-  function selectItem(type, value) {
+  function selectItem(type: string, value: string): string {
     const field = ensureField(type);
     field.query = value;
     field.open = false;
     return value;
   }
 
-  function setValue(type, value) {
+  function setValue(type: string, value: string | null | undefined): void {
     const field = ensureField(type);
     field.query = value ?? '';
   }
 
-  function clearField(type) {
+  function clearField(type: string): void {
     const field = ensureField(type);
     field.query = '';
     field.items = [];
     field.open = false;
   }
 
-  function hideAll() {
+  function hideAll(): void {
     Object.keys(fields).forEach((key) => {
       fields[key].open = false;
     });
