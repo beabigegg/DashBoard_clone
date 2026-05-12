@@ -9,3 +9,5 @@
 | migrate-admin-shared-ts | 2026 | 2026-05-12 | specs/archive/2026/migrate-admin-shared-ts/ |
 | migrate-resource-shared-ts | 2026 | 2026-05-12 | specs/archive/2026/migrate-resource-shared-ts/ |
 | migrate-wip-shared-ts | 2026 | 2026-05-12 | specs/archive/2026/migrate-wip-shared-ts/ |
+| migrate-reject-history-ts | 2026 | 2026-05-12 | specs/archive/2026/migrate-reject-history-ts/ |
+| migrate-hold-history-ts | 2026 | 2026-05-12 | specs/archive/2026/migrate-hold-history-ts/ |
