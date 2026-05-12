@@ -6,16 +6,9 @@ import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/compon
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
+import type { ParetoItem } from '../useRejectHistoryDuckDB';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
-
-interface ParetoItem {
-  reason: string;
-  metric_value: number;
-  pct: number;
-  cumPct: number;
-  [key: string]: unknown;
-}
 
 const DISPLAY_SCOPE_TOP20_DIMENSIONS = new Set(['type']);
 

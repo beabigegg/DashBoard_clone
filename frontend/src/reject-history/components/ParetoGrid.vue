@@ -1,16 +1,6 @@
 <script setup lang="ts">
 import ParetoSection from './ParetoSection.vue';
-
-interface ParetoItem {
-  reason: string;
-  metric_value: number;
-  MOVEIN_QTY: number;
-  REJECT_TOTAL_QTY: number;
-  DEFECT_QTY: number;
-  count: number;
-  pct: number;
-  cumPct: number;
-}
+import type { ParetoItem } from '../useRejectHistoryDuckDB';
 
 interface ParetoDimensionData {
   items?: ParetoItem[];
@@ -49,8 +39,8 @@ function onItemToggle(dimension: string, value: string): void {
       :key="dim.key"
       :dimension="dim.key"
       :dimension-label="dim.label"
-      :items="paretoData[dim.key]?.items || []"
-      :selected-values="paretoSelections[dim.key] || []"
+      :items="paretoData?.[dim.key]?.items || []"
+      :selected-values="paretoSelections?.[dim.key] || []"
       :selected-dates="selectedDates"
       :metric-label="metricLabel"
       :display-scope="displayScope"

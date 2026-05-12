@@ -214,11 +214,11 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
           ({{ Object.entries(resolutionInfo.expansion_info).map(([k, v]) => `${k}: ${v}`).join(', ') }})
         </span>
       </template>
-      <template v-if="resolutionInfo.not_found?.length > 0">
+      <template v-if="(resolutionInfo.not_found?.length ?? 0) > 0">
         <span class="resolution-warn">
-          ({{ resolutionInfo.not_found.length }} 筆未找到:
-          {{ resolutionInfo.not_found.slice(0, 10).join(', ')
-          }}{{ resolutionInfo.not_found.length > 10 ? '...' : '' }})
+          ({{ resolutionInfo.not_found?.length }} 筆未找到:
+          {{ resolutionInfo.not_found?.slice(0, 10).join(', ')
+          }}{{ (resolutionInfo.not_found?.length ?? 0) > 10 ? '...' : '' }})
         </span>
       </template>
     </div>
@@ -236,8 +236,8 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
         <div class="filter-group">
           <label class="filter-label">WORKCENTER GROUP</label>
           <MultiSelect
-            :model-value="supplementaryFilters.workcenterGroups"
-            :options="availableFilters.workcenterGroups || []"
+            :model-value="supplementaryFilters?.workcenterGroups"
+            :options="availableFilters?.workcenterGroups || []"
             placeholder="全部工作中心群組"
             searchable
             @update:model-value="emitSupplementary({ workcenterGroups: $event })"
@@ -247,8 +247,8 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
         <div class="filter-group">
           <label class="filter-label">Package</label>
           <MultiSelect
-            :model-value="supplementaryFilters.packages"
-            :options="availableFilters.packages || []"
+            :model-value="supplementaryFilters?.packages"
+            :options="availableFilters?.packages || []"
             placeholder="全部 Package"
             searchable
             @update:model-value="emitSupplementary({ packages: $event })"
@@ -258,8 +258,8 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
         <div class="filter-group">
           <label class="filter-label">報廢原因</label>
           <MultiSelect
-            :model-value="supplementaryFilters.reasons"
-            :options="availableFilters.reasons || []"
+            :model-value="supplementaryFilters?.reasons"
+            :options="availableFilters?.reasons || []"
             placeholder="全部原因"
             searchable
             @update:model-value="emitSupplementary({ reasons: $event })"
@@ -270,7 +270,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
 
     <div
       class="card-body ui-card-body active-filter-chip-row"
-      v-if="activeFilterChips.length > 0"
+      v-if="activeFilterChips && activeFilterChips.length > 0"
     >
       <div class="filter-label">套用中篩選</div>
       <div class="chip-list">

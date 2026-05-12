@@ -11,7 +11,7 @@ interface Pagination {
 }
 
 const props = defineProps<{
-  items?: unknown[];
+  items?: Record<string, unknown>[];
   pagination?: Pagination;
   loading?: boolean;
   paginating?: boolean;
@@ -47,7 +47,7 @@ function onPageChange(newPage: number): void {
     <div class="card-header ui-card-header">
       <div class="card-title ui-card-title">
         明細列表
-        <span v-if="selectedParetoCount > 0" class="detail-reason-badge">
+        <span v-if="(selectedParetoCount ?? 0) > 0" class="detail-reason-badge">
           Pareto 篩選: {{ selectedParetoSummary || `${selectedParetoCount} 項` }}
           <button type="button" class="badge-clear" @click="emit('clear-pareto-selection')">×</button>
         </span>
