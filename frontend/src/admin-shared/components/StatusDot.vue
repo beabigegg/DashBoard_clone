@@ -5,13 +5,9 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  status: {
-    type: String,
-    default: 'disabled',
-    validator: (v) => ['healthy', 'degraded', 'error', 'disabled'].includes(v),
-  },
-  label: { type: String, default: '' },
-});
+<script setup lang="ts">
+defineProps<{
+  status?: 'healthy' | 'degraded' | 'error' | 'disabled';
+  label?: string;
+}>();
 </script>

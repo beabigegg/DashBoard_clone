@@ -8,7 +8,7 @@ import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import SectionCard from '../../shared-ui/components/SectionCard.vue';
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
-import { useHealthSummary, usePerfHistory } from '../../admin-shared/composables/useAdminData.js';
+import { useHealthSummary, usePerfHistory } from '../../admin-shared/composables/useAdminData';
 
 const healthHook = useHealthSummary();
 const historyHook = usePerfHistory(30, 30);

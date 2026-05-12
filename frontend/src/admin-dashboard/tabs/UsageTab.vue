@@ -15,7 +15,7 @@ import SectionCard from '../../shared-ui/components/SectionCard.vue';
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
 import TrendChart from '../../admin-shared/components/TrendChart.vue';
-import { usePerfHistory, useUsageKpi } from '../../admin-shared/composables/useAdminData.js';
+import { usePerfHistory, useUsageKpi } from '../../admin-shared/composables/useAdminData';
 
 const startDate = ref('');
 const endDate = ref('');

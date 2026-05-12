@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { LineChart } from 'echarts/charts';
@@ -13,22 +13,34 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent]);
 
-const props = defineProps({
-  title: { type: String, default: '' },
-  snapshots: { type: Array, default: () => [] },
-  series: { type: Array, default: () => [] },
-  height: { type: String, default: '220px' },
-  yAxisLabel: { type: String, default: '' },
-  yMax: { type: Number, default: undefined },
-});
+interface SeriesDef {
+  name: string;
+  key: string;
+  color: string;
+  yAxisIndex?: number;
+}
 
-const hasData = computed(() => props.snapshots.length > 1);
+interface SnapshotRow {
+  ts?: string;
+  [key: string]: unknown;
+}
 
-function extractValue(row, key) {
+const props = defineProps<{
+  title?: string;
+  snapshots?: SnapshotRow[];
+  series?: SeriesDef[];
+  height?: string;
+  yAxisLabel?: string;
+  yMax?: number;
+}>();
+
+const hasData = computed(() => (props.snapshots?.length ?? 0) > 1);
+
+function extractValue(row: SnapshotRow, key: string): unknown {
   return row[key] ?? null;
 }
 
-function formatTime(ts) {
+function formatTime(ts: string | undefined): string {
   if (!ts) return '';
   const d = new Date(ts);
   const hh = String(d.getHours()).padStart(2, '0');
@@ -38,8 +50,8 @@ function formatTime(ts) {
 }
 
 const chartOption = computed(() => {
-  const data = props.snapshots || [];
-  const seriesDefs = props.series || [];
+  const data = props.snapshots ?? [];
+  const seriesDefs = props.series ?? [];
 
   const xLabels = data.map((row) => formatTime(row.ts));
 
@@ -51,11 +63,11 @@ const chartOption = computed(() => {
     areaStyle: { opacity: 0.12 },
     lineStyle: { width: 2 },
     itemStyle: { color: s.color },
-    yAxisIndex: s.yAxisIndex || 0,
+    yAxisIndex: s.yAxisIndex ?? 0,
     data: data.map((row) => extractValue(row, s.key)),
   }));
 
-  const yAxisConfig = { type: 'value', min: 0 };
+  const yAxisConfig: Record<string, unknown> = { type: 'value', min: 0 };
   if (props.yMax != null) yAxisConfig.max = props.yMax;
   if (props.yAxisLabel) {
     yAxisConfig.axisLabel = { formatter: `{value}${props.yAxisLabel}` };

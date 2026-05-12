@@ -1,8 +1,22 @@
-import { ref, unref } from 'vue';
+import { ref, unref, type Ref, type MaybeRef } from 'vue';
 
-import { apiGet } from '../../core/api.js';
+import { apiGet } from '../../core/api';
+import type { ApiResponse } from '../../core/types';
 
-function resolveValue(value, fallback = undefined) {
+interface DataFetcher<T> {
+  data: Ref<T | null>;
+  loading: Ref<boolean>;
+  error: Ref<string>;
+  refresh: () => Promise<T | null>;
+}
+
+interface DataFetcherOptions<T> {
+  initialData?: T | null;
+}
+
+function resolveValue<T>(value: MaybeRef<T | undefined | null>, fallback: T): T;
+function resolveValue<T>(value: MaybeRef<T | undefined | null>, fallback?: undefined): T | undefined;
+function resolveValue<T>(value: MaybeRef<T | undefined | null>, fallback?: T): T | undefined {
   const resolved = unref(value);
   if (resolved === undefined || resolved === null) {
     return fallback;
@@ -10,20 +24,26 @@ function resolveValue(value, fallback = undefined) {
   return resolved;
 }
 
-function resolveErrorMessage(error, fallback = '載入失敗') {
+function resolveErrorMessage(error: unknown, fallback = '載入失敗'): string {
   if (!error) return fallback;
-  if (typeof error?.message === 'string' && error.message.trim()) {
-    return error.message;
+  if (
+    typeof (error as { message?: unknown }).message === 'string' &&
+    ((error as { message: string }).message).trim()
+  ) {
+    return (error as { message: string }).message;
   }
   return fallback;
 }
 
-function createDataFetcher(fetcher, { initialData = null } = {}) {
-  const data = ref(initialData);
+function createDataFetcher<T>(
+  fetcher: () => Promise<T>,
+  { initialData = null }: DataFetcherOptions<T> = {}
+): DataFetcher<T> {
+  const data = ref<T | null>(initialData) as Ref<T | null>;
   const loading = ref(false);
   const error = ref('');
 
-  async function refresh() {
+  async function refresh(): Promise<T | null> {
     loading.value = true;
     error.value = '';
     try {
@@ -45,40 +65,56 @@ function createDataFetcher(fetcher, { initialData = null } = {}) {
   };
 }
 
-function unwrapEnvelope(payload) {
-  return payload?.data ?? payload ?? null;
+function unwrapEnvelope(payload: ApiResponse<unknown> | null | undefined): unknown {
+  if (!payload) return null;
+  if ('data' in payload) return payload.data ?? null;
+  return null;
 }
 
-export function useSystemStatus() {
+export function useSystemStatus(): DataFetcher<unknown> {
   return createDataFetcher(async () => {
     const response = await apiGet('/admin/api/system-status');
     return unwrapEnvelope(response);
   });
 }
 
-export function useMetrics() {
+export function useMetrics(): DataFetcher<unknown> {
   return createDataFetcher(async () => {
     const response = await apiGet('/admin/api/metrics');
     return unwrapEnvelope(response);
   });
 }
 
-export function usePerfDetail() {
+export function usePerfDetail(): DataFetcher<unknown> {
   return createDataFetcher(async () => {
     const response = await apiGet('/admin/api/performance-detail');
     return unwrapEnvelope(response);
   });
 }
 
-export function usePerfHistory(minutes = 30, bucket = 30) {
+interface PerfSnapshot {
+  ts?: string;
+  worker_rss_bytes?: number;
+  service_rss_bytes?: number;
+  redis_used_memory_mb?: number;
+  redis_used_memory?: number;
+  worker_rss_mb?: number;
+  service_rss_mb?: number;
+  [key: string]: unknown;
+}
+
+export function usePerfHistory(
+  minutes: MaybeRef<number | undefined> = 30,
+  bucket: MaybeRef<number | undefined> = 30
+): DataFetcher<PerfSnapshot[]> {
   return createDataFetcher(async () => {
-    const response = await apiGet('/admin/api/performance-history', {
+    const response = await apiGet<{ snapshots?: PerfSnapshot[] }>('/admin/api/performance-history', {
       params: {
         minutes: resolveValue(minutes, 30),
         bucket: resolveValue(bucket, 30),
       },
     });
-    const snapshots = response?.data?.snapshots || [];
+    const snapshots: PerfSnapshot[] = ('data' in response ? response.data?.snapshots : undefined) ?? [];
     return snapshots.map((snapshot) => ({
       ...snapshot,
       worker_rss_mb: snapshot.worker_rss_bytes
@@ -96,14 +132,18 @@ export function usePerfHistory(minutes = 30, bucket = 30) {
   }, { initialData: [] });
 }
 
-export function useStorageInfo() {
+export function useStorageInfo(): DataFetcher<unknown> {
   return createDataFetcher(async () => {
     const response = await apiGet('/admin/api/storage-info');
     return unwrapEnvelope(response);
   });
 }
 
-export function useUsageKpi(startDate, endDate, department) {
+export function useUsageKpi(
+  startDate: MaybeRef<string | undefined>,
+  endDate: MaybeRef<string | undefined>,
+  department: MaybeRef<string | undefined>
+): DataFetcher<unknown> {
   return createDataFetcher(async () => {
     const response = await apiGet('/admin/api/user-usage-kpi', {
       params: {
@@ -116,7 +156,12 @@ export function useUsageKpi(startDate, endDate, department) {
   });
 }
 
-export function useLogs(level, q, limit = 50, offset = 0) {
+export function useLogs(
+  level: MaybeRef<string | undefined>,
+  q: MaybeRef<string | undefined>,
+  limit: MaybeRef<number | undefined> = 50,
+  offset: MaybeRef<number | undefined> = 0
+): DataFetcher<unknown> {
   return createDataFetcher(async () => {
     const response = await apiGet('/admin/api/logs', {
       params: {
@@ -130,16 +175,22 @@ export function useLogs(level, q, limit = 50, offset = 0) {
   });
 }
 
-export function useHealthSummary() {
+interface HealthPayload {
+  message?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+export function useHealthSummary(): DataFetcher<HealthPayload> {
   return createDataFetcher(async () => {
     const response = await fetch('/health', {
       cache: 'no-store',
       credentials: 'same-origin',
     });
 
-    let payload = null;
+    let payload: HealthPayload | null = null;
     try {
-      payload = await response.json();
+      payload = await response.json() as HealthPayload;
     } catch {
       payload = null;
     }
@@ -149,6 +200,6 @@ export function useHealthSummary() {
       throw new Error(message);
     }
 
-    return payload || null;
+    return payload ?? {};
   });
 }

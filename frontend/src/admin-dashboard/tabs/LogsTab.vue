@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { apiPost } from '../../core/api.js';
 import { formatLogTime } from '../../core/datetime.js';
-import { useLogs, useStorageInfo } from '../../admin-shared/composables/useAdminData.js';
+import { useLogs, useStorageInfo } from '../../admin-shared/composables/useAdminData';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 import SectionCard from '../../shared-ui/components/SectionCard.vue';

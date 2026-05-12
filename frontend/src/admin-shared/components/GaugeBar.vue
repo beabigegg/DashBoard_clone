@@ -10,35 +10,43 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps({
-  label: { type: String, default: '' },
-  value: { type: Number, default: 0 },
-  max: { type: Number, default: 100 },
-  unit: { type: String, default: '%' },
-  displayText: { type: String, default: '' },
-  warningThreshold: { type: Number, default: 0.7 },
-  dangerThreshold: { type: Number, default: 0.9 },
-});
+const props = defineProps<{
+  label?: string;
+  value?: number;
+  max?: number;
+  unit?: string;
+  displayText?: string;
+  warningThreshold?: number;
+  dangerThreshold?: number;
+}>();
+
+const label = computed(() => props.label ?? '');
+const value = computed(() => props.value ?? 0);
+const max = computed(() => props.max ?? 100);
+const unit = computed(() => props.unit ?? '%');
+const displayText = computed(() => props.displayText ?? '');
+const warningThreshold = computed(() => props.warningThreshold ?? 0.7);
+const dangerThreshold = computed(() => props.dangerThreshold ?? 0.9);
 
 const ratio = computed(() => {
-  if (props.max <= 0) return 0;
-  return Math.min(Math.max(props.value / props.max, 0), 1);
+  if (max.value <= 0) return 0;
+  return Math.min(Math.max(value.value / max.value, 0), 1);
 });
 
 const displayValue = computed(() => {
-  if (props.displayText) return props.displayText;
-  if (props.unit === '%') {
+  if (displayText.value) return displayText.value;
+  if (unit.value === '%') {
     return `${(ratio.value * 100).toFixed(1)}%`;
   }
-  return `${props.value}${props.unit ? ' ' + props.unit : ''}`;
+  return `${value.value}${unit.value ? ' ' + unit.value : ''}`;
 });
 
 const fillColor = computed(() => {
-  if (ratio.value >= props.dangerThreshold) return 'var(--color-token-hef4444)';
-  if (ratio.value >= props.warningThreshold) return 'var(--color-token-hf59e0b)';
+  if (ratio.value >= dangerThreshold.value) return 'var(--color-token-hef4444)';
+  if (ratio.value >= warningThreshold.value) return 'var(--color-token-hf59e0b)';
   return 'var(--color-token-h22c55e)';
 });
 

@@ -16,7 +16,7 @@ import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 import {
   usePerfDetail,
   usePerfHistory,
-} from '../../admin-shared/composables/useAdminData.js';
+} from '../../admin-shared/composables/useAdminData';
 
 const perfDetailHook = usePerfDetail();
 const historyHook = usePerfHistory(30, 30);

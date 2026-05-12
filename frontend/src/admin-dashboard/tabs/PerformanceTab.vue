@@ -16,7 +16,7 @@ import {
   useMetrics,
   usePerfDetail,
   usePerfHistory,
-} from '../../admin-shared/composables/useAdminData.js';
+} from '../../admin-shared/composables/useAdminData';
 
 echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 

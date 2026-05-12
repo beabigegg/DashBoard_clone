@@ -5,14 +5,14 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps({
-  value: { type: [Number, String], default: '-' },
-  label: { type: String, default: '' },
-  unit: { type: String, default: '' },
-});
+const props = defineProps<{
+  value?: number | string;
+  label?: string;
+  unit?: string;
+}>();
 
 const formattedValue = computed(() => {
   if (props.value === null || props.value === undefined) return '-';
