@@ -744,6 +744,43 @@ def try_compute_view_from_spool(
         ]
         summary = _build_summary_from_analytics(analytics_raw)
 
+        # Fix: _build_summary_from_analytics sums per-(date,reason) distinct counts, which
+        # double-counts lots/workorders appearing in multiple groups. Override with direct
+        # COUNT(DISTINCT) on raw identifiers present in the spool.
+        if "PJ_WORKORDER" in cols and "CONTAINERNAME" in cols:
+            direct_sql = f"""
+                SELECT
+                    COUNT(DISTINCT "CONTAINERNAME") AS AFFECTED_LOT_COUNT,
+                    COUNT(DISTINCT "PJ_WORKORDER") AS AFFECTED_WORKORDER_COUNT
+                FROM reject_src
+                {where_clause}
+            """
+            direct_rows = _fetch_dict_rows(conn, direct_sql, base_params)
+            if direct_rows:
+                summary["AFFECTED_LOT_COUNT"] = _as_int(direct_rows[0].get("AFFECTED_LOT_COUNT"))
+                summary["AFFECTED_WORKORDER_COUNT"] = _as_int(direct_rows[0].get("AFFECTED_WORKORDER_COUNT"))
+        elif "CONTAINERNAME" in cols:
+            # Fallback for spool files predating PJ_WORKORDER addition: fix LOT count
+            # and de-dup WO count by (CONTAINERNAME, TXN_DAY) to remove reason inflation.
+            direct_sql = f"""
+                SELECT
+                    COUNT(DISTINCT "CONTAINERNAME") AS AFFECTED_LOT_COUNT,
+                    COALESCE(SUM(max_wo), 0) AS AFFECTED_WORKORDER_COUNT
+                FROM (
+                    SELECT
+                        "CONTAINERNAME",
+                        CAST("TXN_DAY" AS DATE) AS txn_day,
+                        MAX(COALESCE("AFFECTED_WORKORDER_COUNT", 0)) AS max_wo
+                    FROM reject_src
+                    {where_clause}
+                    GROUP BY "CONTAINERNAME", CAST("TXN_DAY" AS DATE)
+                )
+            """
+            direct_rows = _fetch_dict_rows(conn, direct_sql, base_params)
+            if direct_rows:
+                summary["AFFECTED_LOT_COUNT"] = _as_int(direct_rows[0].get("AFFECTED_LOT_COUNT"))
+                summary["AFFECTED_WORKORDER_COUNT"] = _as_int(direct_rows[0].get("AFFECTED_WORKORDER_COUNT"))
+
         detail_conditions = list(base_conditions)
         detail_params = list(base_params)
         if trend_dates and "TXN_DAY" in cols:

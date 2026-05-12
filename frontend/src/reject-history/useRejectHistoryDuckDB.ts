@@ -588,6 +588,58 @@ async function queryAvailableFilters(
   return result;
 }
 
+async function querySummaryDirect(
+  client: DuckDBClient,
+  baseWhere: string,
+): Promise<{ AFFECTED_LOT_COUNT: number; AFFECTED_WORKORDER_COUNT: number }> {
+  // Use COUNT(DISTINCT) on raw identifiers instead of summing per-group counts.
+  // PJ_WORKORDER is present in the spool since primary.sql was updated; fall back
+  // to AFFECTED_WORKORDER_COUNT de-dup for older spool files that predate the change.
+  const hasPjWorkorder = await client
+    .sendQuery(`SELECT COUNT(*) FROM ${TABLE_NAME} WHERE ${qid('PJ_WORKORDER')} IS NOT NULL LIMIT 1`)
+    .then(() => true)
+    .catch(() => false);
+
+  if (hasPjWorkorder) {
+    const sql = `
+      SELECT
+        COUNT(DISTINCT ${qid('CONTAINERNAME')}) AS AFFECTED_LOT_COUNT,
+        COUNT(DISTINCT ${qid('PJ_WORKORDER')}) AS AFFECTED_WORKORDER_COUNT
+      FROM ${TABLE_NAME}
+      ${baseWhere}
+    `;
+    const rows = await client.sendQuery(sql);
+    const r = (rows[0] ?? {}) as Record<string, unknown>;
+    return {
+      AFFECTED_LOT_COUNT: Number(r.AFFECTED_LOT_COUNT || 0),
+      AFFECTED_WORKORDER_COUNT: Number(r.AFFECTED_WORKORDER_COUNT || 0),
+    };
+  }
+
+  // Fallback for spool files that lack PJ_WORKORDER: de-dup by (CONTAINERNAME, TXN_DAY)
+  // to remove reason-level inflation, then count distinct containers for LOT.
+  const sql = `
+    SELECT
+      COUNT(DISTINCT ${qid('CONTAINERNAME')}) AS AFFECTED_LOT_COUNT,
+      COALESCE(SUM(max_wo), 0) AS AFFECTED_WORKORDER_COUNT
+    FROM (
+      SELECT
+        ${qid('CONTAINERNAME')},
+        CAST(${qid('TXN_DAY')} AS DATE) AS txn_day_cast,
+        MAX(COALESCE(${qid('AFFECTED_WORKORDER_COUNT')}, 0)) AS max_wo
+      FROM ${TABLE_NAME}
+      ${baseWhere}
+      GROUP BY ${qid('CONTAINERNAME')}, CAST(${qid('TXN_DAY')} AS DATE)
+    )
+  `;
+  const rows = await client.sendQuery(sql);
+  const r = (rows[0] ?? {}) as Record<string, unknown>;
+  return {
+    AFFECTED_LOT_COUNT: Number(r.AFFECTED_LOT_COUNT || 0),
+    AFFECTED_WORKORDER_COUNT: Number(r.AFFECTED_WORKORDER_COUNT || 0),
+  };
+}
+
 // ── Main composable ───────────────────────────────────────────────────────────
 
 export function useRejectHistoryDuckDB() {
@@ -661,7 +713,7 @@ export function useRejectHistoryDuckDB() {
     const allConditions = [...policyConditions, ...userConditions];
     const baseWhere = buildWhereClause(allConditions);
 
-    const [analyticsRaw, detailResult, paretoResult, availableFilters] = await Promise.all([
+    const [analyticsRaw, detailResult, paretoResult, availableFilters, summaryDirect] = await Promise.all([
       queryAnalyticsRaw(_client, baseWhere),
       queryDetail(_client, allConditions, {
         page,
@@ -675,11 +727,16 @@ export function useRejectHistoryDuckDB() {
         paretoSelections,
       }),
       queryAvailableFilters(_client, policyConditions),
+      querySummaryDirect(_client, baseWhere),
     ]);
 
     return {
       analytics_raw: analyticsRaw,
-      summary: buildSummaryFromAnalytics(analyticsRaw),
+      summary: {
+        ...buildSummaryFromAnalytics(analyticsRaw),
+        AFFECTED_LOT_COUNT: summaryDirect.AFFECTED_LOT_COUNT,
+        AFFECTED_WORKORDER_COUNT: summaryDirect.AFFECTED_WORKORDER_COUNT,
+      },
       detail: detailResult,
       batch_pareto: paretoResult,
       available_filters: availableFilters,
