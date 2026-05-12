@@ -32,8 +32,8 @@ tasks:
   - { id: "5.3", section: Review, title: "Contract review", status: done, note: "css: no change; ci-gate-contract bumped to 1.3.4 with Phase 1f note; @ts-expect-error cleanup scope documented" }
   - { id: "5.4", section: Review, title: "QA review", status: done, note: "approved-with-risk; all 15 ACs pass locally; CI gates pending" }
   - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "type-check 0 errors, build exit 0, css:check 0 new violations, 244 legacy tests pass; cdd-kit gate PASSED" }
-  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "CI: contract-validate, cdd-strict-gate, Playwright gates — pending CI run" }
-  - { id: "6.3", section: Verification, title: "Informational gates", status: pending, note: "frontend-type-check in CI — pending CI run" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "CI passed: contract-validate, cdd-strict-gate, Playwright gates all green" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "frontend-type-check in CI passed" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: skipped, note: "@ts-expect-error removal is already the documented flip-side of the placement rule in CLAUDE.md; no net-new lessons" }
