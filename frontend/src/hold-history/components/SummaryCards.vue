@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue'
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue'
 
@@ -35,15 +35,19 @@ const CURRENT_REPEAT_QUALITY_TOOLTIP =
 const CURRENT_AVG_HOURS_TOOLTIP =
   '目前仍在 Hold 的 lot 之平均時長，以 SYSDATE 即時計算'
 
-const props = defineProps({
-  summary: {
-    type: Object,
-    default: () => ({}),
-  },
-  mode: {
-    type: String,
-    default: 'range',
-  },
+// TODO: type — summary shape varies by mode (range/today/current); use numeric-value Record for now
+interface SummaryData {
+  [key: string]: number | undefined;
+}
+
+interface Props {
+  summary?: SummaryData;
+  mode?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  summary: () => ({}),
+  mode: 'range',
 })
 </script>
 

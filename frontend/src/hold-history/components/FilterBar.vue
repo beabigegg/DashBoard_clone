@@ -1,34 +1,29 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-const props = defineProps({
-  startDate: {
-    type: String,
-    default: '',
-  },
-  endDate: {
-    type: String,
-    default: '',
-  },
-  holdType: {
-    type: String,
-    default: 'quality',
-  },
-  mode: {
-    type: String,
-    default: 'range',
-  },
-  todayModeEnabled: {
-    type: Boolean,
-    default: true,
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
+interface Props {
+  startDate?: string;
+  endDate?: string;
+  holdType?: string;
+  mode?: string;
+  todayModeEnabled?: boolean;
+  disabled?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  startDate: '',
+  endDate: '',
+  holdType: 'quality',
+  mode: 'range',
+  todayModeEnabled: true,
+  disabled: false,
 });
 
-const emit = defineEmits(['apply', 'hold-type-change', 'mode-change']);
+const emit = defineEmits<{
+  apply: [payload: { startDate: string; endDate: string }];
+  'hold-type-change': [holdType: string];
+  'mode-change': [mode: string];
+}>();
 
 const localStartDate = ref(props.startDate);
 const localEndDate = ref(props.endDate);
@@ -41,14 +36,14 @@ const holdTypeModel = computed({
   set(nextValue) { emit('hold-type-change', nextValue || 'quality'); },
 });
 
-function handleApply() {
+function handleApply(): void {
   emit('apply', {
     startDate: localStartDate.value,
     endDate: localEndDate.value,
   });
 }
 
-function setMode(newMode) {
+function setMode(newMode: string): void {
   if (newMode !== props.mode) {
     emit('mode-change', newMode);
   }

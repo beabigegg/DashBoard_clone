@@ -1,16 +1,18 @@
-<script setup>
-defineProps({
-  reason: {
-    type: String,
-    default: '',
-  },
-  durationRange: {
-    type: String,
-    default: '',
-  },
+<script setup lang="ts">
+interface Props {
+  reason?: string;
+  durationRange?: string;
+}
+
+withDefaults(defineProps<Props>(), {
+  reason: '',
+  durationRange: '',
 });
 
-const emit = defineEmits(['clear-reason', 'clear-duration']);
+const emit = defineEmits<{
+  'clear-reason': [];
+  'clear-duration': [];
+}>();
 </script>
 
 <template>

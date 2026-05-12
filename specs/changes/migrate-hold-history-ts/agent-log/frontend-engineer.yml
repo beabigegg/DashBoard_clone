@@ -1,0 +1,147 @@
+agent: frontend-engineer
+change-id: migrate-hold-history-ts
+status: complete
+timestamp: 2026-05-12
+
+# ── useAutoRefresh decision (AC-2) ──────────────────────────────────────────────
+useAutoRefresh_decision: renamed-and-typed-in-place
+useAutoRefresh_reason: >
+  hold-history/useAutoRefresh.js exposes a divergent API from shared-composables/useAutoRefresh.ts.
+  Local API: { intervalMs, fetchFn } → { start, stop, lastRefreshAt, isStale, missCount }.
+  Shared API: { onRefresh, intervalMs, autoStart, refreshOnVisible } → { startAutoRefresh, stopAutoRefresh, ... }.
+  App.vue uses .start(), .stop(), .isStale.value, .lastRefreshAt.value — all local-API-specific.
+  Decision: rename to useAutoRefresh.ts and type in place. Delete old .js.
+  The shared composable wraps wip-shared/composables/useAutoRefresh.ts which has a third,
+  different API designed for wip-feature patterns with abort controllers and jitter.
+
+# ── Files renamed ────────────────────────────────────────────────────────────────
+files-renamed:
+  - from: frontend/src/hold-history/main.js
+    to: frontend/src/hold-history/main.ts
+  - from: frontend/src/hold-history/useAutoRefresh.js
+    to: frontend/src/hold-history/useAutoRefresh.ts
+    note: deleted .js, created .ts (diverges from shared)
+  - from: frontend/src/hold-history/useHoldHistoryDuckDB.js
+    to: frontend/src/hold-history/useHoldHistoryDuckDB.ts
+  - from: frontend/src/hold-history/App.vue
+    to: frontend/src/hold-history/App.vue
+    note: added lang="ts" to script setup; no file rename
+  - from: frontend/src/hold-history/components/FilterBar.vue
+    to: frontend/src/hold-history/components/FilterBar.vue
+    note: added lang="ts", defineProps<T>(), defineEmits<T>()
+  - from: frontend/src/hold-history/components/SummaryCards.vue
+    to: frontend/src/hold-history/components/SummaryCards.vue
+    note: added lang="ts", withDefaults(defineProps<Props>())
+  - from: frontend/src/hold-history/components/DailyTrend.vue
+    to: frontend/src/hold-history/components/DailyTrend.vue
+    note: added lang="ts", defineProps<Props>()
+  - from: frontend/src/hold-history/components/DetailTable.vue
+    to: frontend/src/hold-history/components/DetailTable.vue
+    note: added lang="ts", typed resize state, pointer event handlers
+  - from: frontend/src/hold-history/components/DurationChart.vue
+    to: frontend/src/hold-history/components/DurationChart.vue
+    note: added lang="ts", defineProps<T>(), echarts callback annotations
+  - from: frontend/src/hold-history/components/ReasonPareto.vue
+    to: frontend/src/hold-history/components/ReasonPareto.vue
+    note: added lang="ts", defineProps<T>(), echarts callback annotations
+  - from: frontend/src/hold-history/components/FilterIndicator.vue
+    to: frontend/src/hold-history/components/FilterIndicator.vue
+    note: added lang="ts", defineProps<T>(), defineEmits<T>()
+  - from: frontend/src/hold-history/components/RecordTypeFilter.vue
+    to: frontend/src/hold-history/components/RecordTypeFilter.vue
+    note: added lang="ts", defineProps<T>(), defineEmits<T>()
+
+# ── TODO:type annotations ────────────────────────────────────────────────────────
+todo_type_annotations:
+  - file: frontend/src/hold-history/App.vue
+    annotation: "// TODO: type — snapshot data shape from server API not yet formally typed; use Record for now"
+    reason: server today-snapshot and current-snapshot API response is not formally typed; needs API contract
+  - file: frontend/src/hold-history/App.vue
+    annotation: "// TODO: type — primary query response shape not yet formally typed"
+    reason: same as above; server /query and /view API response shape not in frontend/src/types/
+  - file: frontend/src/hold-history/App.vue
+    annotation: "// TODO: type — config API response shape not formally typed; cast via Record"
+    reason: /api/hold-history/config response not in typed API contracts
+  - file: frontend/src/hold-history/App.vue
+    annotation: "// TODO: type — export response shape not yet formally typed"
+    reason: CSV export path response not formally typed
+  - file: frontend/src/hold-history/App.vue
+    annotation: "// TODO: type — list payload shape from server API not yet formally typed"
+    reason: normalizeListPayload accepts server and DuckDB list payload; shape varies
+  - file: frontend/src/hold-history/App.vue
+    annotation: "// TODO: type — server and DuckDB trend data have same shape but server response not formally typed"
+    reason: TrendDay type defined in useHoldHistoryDuckDB.ts but server may return similar shape
+  - file: frontend/src/hold-history/App.vue
+    annotation: "// TODO: type — server view result shape not yet formally typed; cast to match ref type"
+    reason: applyViewResult casts server result fields to match ref types
+  - file: frontend/src/hold-history/components/SummaryCards.vue
+    annotation: "# TODO: type — summary shape varies by mode (range/today/current); use numeric-value Record"
+    reason: summary object has different keys depending on mode; needs mode-discriminated union
+  - file: frontend/src/hold-history/components/DetailTable.vue
+    annotation: "# TODO: type — items can come from DuckDB (typed) or server (untyped); accept unknown for now"
+    reason: HoldListItem type in DuckDB composable but server returns same shape without formal type
+  - file: frontend/src/hold-history/components/ReasonPareto.vue
+    annotation: "# TODO: type — items can come from DuckDB (typed) or server (untyped); use Record for now"
+    reason: same pattern as DetailTable
+  - file: frontend/src/hold-history/components/DurationChart.vue
+    annotation: "# TODO: type — items can come from DuckDB (typed) or server (untyped); use Record for now"
+    reason: same pattern as DetailTable
+  - file: frontend/src/hold-history/components/DailyTrend.vue
+    annotation: "# TODO: type echarts callback (multiple)"
+    reason: echarts formatter/color callbacks have complex internal types; annotated per CLAUDE.md rule
+  - file: frontend/src/hold-history/components/DurationChart.vue
+    annotation: "# TODO: type echarts callback (multiple)"
+    reason: same as DailyTrend
+  - file: frontend/src/hold-history/components/ReasonPareto.vue
+    annotation: "# TODO: type echarts callback (multiple)"
+    reason: same as DailyTrend
+
+# ── duckdb-client discovery ──────────────────────────────────────────────────────
+duckdb_client_note: >
+  frontend/src/core/duckdb-client is already .ts (not .js). The @ts-expect-error pattern
+  used in reject-history (for an unmigrated JS client) was not needed here. DuckDBClient
+  class is imported directly. sendQuery returns Promise<unknown[]> — handled via toRows()
+  cast helper to get Record<string, unknown>[].
+
+# ── Type-check result ────────────────────────────────────────────────────────────
+type_check_result:
+  command: "cd frontend && npm run type-check 2>&1 | tail -10"
+  output: |
+    > mes-dashboard-frontend@0.1.0 type-check
+    > vue-tsc --noEmit
+  error_count: 0
+  regressions: none
+
+# ── AC verification ──────────────────────────────────────────────────────────────
+ac_status:
+  AC-1: PASS  # main.js → main.ts; index.html unchanged
+  AC-2: PASS  # useAutoRefresh.js → useAutoRefresh.ts (in-place typed; APIs diverge)
+  AC-3: PASS  # useHoldHistoryDuckDB.js → .ts with explicit types; DuckDBClient imported from core
+  AC-4: PASS  # App.vue → lang="ts"; orchestrator.committed cast to typed accessor; bare specifiers
+  AC-5: PASS  # All 8 SFCs → lang="ts" with defineProps<T>()
+  AC-6: PASS  # No stale .js" specifiers in migrated files (only index.html which is excluded)
+  AC-7: PASS  # tsconfig.json include already had "src/hold-history/**/*" (verified)
+  AC-11: PASS # No bare any; all TODO:type annotations have reasons
+
+# ── Files read ───────────────────────────────────────────────────────────────────
+files-read:
+  - specs/changes/migrate-hold-history-ts/context-manifest.md
+  - frontend/src/hold-history/main.js
+  - frontend/src/hold-history/useAutoRefresh.js
+  - frontend/src/hold-history/useHoldHistoryDuckDB.js
+  - frontend/src/hold-history/App.vue
+  - frontend/src/hold-history/components/FilterBar.vue
+  - frontend/src/hold-history/components/SummaryCards.vue
+  - frontend/src/hold-history/components/DailyTrend.vue
+  - frontend/src/hold-history/components/DetailTable.vue
+  - frontend/src/hold-history/components/DurationChart.vue
+  - frontend/src/hold-history/components/ReasonPareto.vue
+  - frontend/src/hold-history/components/FilterIndicator.vue
+  - frontend/src/hold-history/components/RecordTypeFilter.vue
+  - frontend/src/reject-history/useRejectHistoryDuckDB.ts
+  - frontend/src/shared-composables/useAutoRefresh.ts
+  - frontend/src/wip-shared/composables/useAutoRefresh.ts
+  - frontend/src/core/duckdb-client.ts
+  - frontend/src/shared-composables/useFilterOrchestrator.ts
+  - frontend/src/shared-ui/components/DataTable.vue
+  - frontend/tsconfig.json

@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.5
+schema-version: 1.3.6
 last-changed: 2026-05-12
 breaking-change-policy: deprecate-2-minors
 ---
@@ -74,6 +74,13 @@ breaking-change-policy: deprecate-2-minors
 - **From Phase 3 onward**: `include` gains `"src/reject-history/**/*"`, covering `App.vue`, `main.ts`, `useRejectHistoryDuckDB.ts`, and 6 component SFCs (`DetailTable.vue`, `FilterPanel.vue`, `ParetoGrid.vue`, `ParetoSection.vue`, `SummaryCards.vue`, `TrendChart.vue`) under `strict: true`.
 - **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.5 (patch)**: additive prose only — gate tier, command, and status are unchanged. Matching Phase 1f precedent at ci 1.3.4.
+
+### frontend-type-check scope expansion (Phase 3 — migrate-hold-history-ts)
+
+- **Before this change**: `tsconfig.json` `include` covered `core/`, `shared-composables/`, `shared-ui/`, `admin-shared/`, `resource-shared/`, `wip-shared/`, `reject-history/`.
+- **From this change onward**: `include` gains `"src/hold-history/**/*"`, covering all `.ts`/`.vue` files migrated from `hold-history/` under `strict: true`.
+- **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.6 (patch)**: additive prose only — gate tier, command, and status are unchanged.
 
 ## Required Check Policy
 

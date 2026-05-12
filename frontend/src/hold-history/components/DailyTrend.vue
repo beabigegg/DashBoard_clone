@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { BarChart, LineChart } from 'echarts/charts';
@@ -9,18 +9,27 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, LegendComponent, TooltipComponent]);
 
-const props = defineProps({
-  days: {
-    type: Array,
-    default: () => [],
-  },
+interface TrendDayRow {
+  date?: string;
+  releaseQty?: number;
+  newHoldQty?: number;
+  futureHoldQty?: number;
+  holdQty?: number;
+}
+
+interface Props {
+  days?: TrendDayRow[];
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  days: () => [],
 });
 
 const hasData = computed(() => (props.days || []).length > 0);
 
 const chartOption = computed(() => {
   const days = props.days || [];
-  const dates = days.map((item) => item.date);
+  const dates = days.map((item) => item.date ?? '');
   const release = days.map((item) => Number(item.releaseQty || 0));
   const newHold = days.map((item) => -Math.abs(Number(item.newHoldQty || 0)));
   const futureHold = days.map((item) => -Math.abs(Number(item.futureHoldQty || 0)));
@@ -30,8 +39,10 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
-      formatter(params) {
-        const index = Number(params?.[0]?.dataIndex || 0);
+      // TODO: type echarts callback
+      formatter(params: unknown) {
+        const p = params as Array<{ dataIndex?: number }>;
+        const index = Number(p?.[0]?.dataIndex || 0);
         const row = days[index] || {};
         const parts = [
           `<b>${row.date || '--'}</b>`,
@@ -67,14 +78,16 @@ const chartOption = computed(() => {
         type: 'value',
         name: '增減量',
         axisLabel: {
-          formatter: (value) => Number(value || 0).toLocaleString('zh-TW'),
+          // TODO: type echarts callback
+          formatter: (value: unknown) => Number(value || 0).toLocaleString('zh-TW'),
         },
       },
       {
         type: 'value',
         name: 'On Hold',
         axisLabel: {
-          formatter: (value) => Number(value || 0).toLocaleString('zh-TW'),
+          // TODO: type echarts callback
+          formatter: (value: unknown) => Number(value || 0).toLocaleString('zh-TW'),
         },
       },
     ],

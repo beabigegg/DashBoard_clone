@@ -1,24 +1,29 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps({
-  modelValue: {
-    type: String,
-    default: 'on_hold',
-  },
-  mode: {
-    type: String,
-    default: 'range',
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
+interface RecordTypeOption {
+  value: string;
+  label: string;
+  tooltip: string;
+}
+
+interface Props {
+  modelValue?: string;
+  mode?: string;
+  disabled?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: 'on_hold',
+  mode: 'range',
+  disabled: false,
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits<{
+  'update:modelValue': [value: string];
+}>();
 
-const TODAY_OPTIONS = [
+const TODAY_OPTIONS: RecordTypeOption[] = [
   {
     value: 'on_hold',
     label: '當日ON HOLD快照',
@@ -36,7 +41,7 @@ const TODAY_OPTIONS = [
   },
 ];
 
-const CURRENT_OPTIONS = [
+const CURRENT_OPTIONS: RecordTypeOption[] = [
   {
     value: 'on_hold',
     label: 'ON HOLD',
@@ -56,7 +61,7 @@ const CURRENT_OPTIONS = [
 
 const activeOptions = computed(() => (props.mode === 'current' ? CURRENT_OPTIONS : TODAY_OPTIONS));
 
-function select(value) {
+function select(value: string): void {
   if (props.disabled || value === props.modelValue) return;
   emit('update:modelValue', value);
 }

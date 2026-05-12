@@ -1,14 +1,14 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
-import { apiGet, apiPost } from '../core/api.js';
-import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
-import { checkLocalComputeEligibility } from '../core/duckdb-activation-policy.js';
-import { replaceRuntimeHistory } from '../core/shell-navigation.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
-import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
-import { useHoldHistoryDuckDB } from './useHoldHistoryDuckDB.js';
-import { useAutoRefresh } from './useAutoRefresh.js';
+import { apiGet, apiPost } from '../core/api';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
+import { checkLocalComputeEligibility } from '../core/duckdb-activation-policy';
+import { replaceRuntimeHistory } from '../core/shell-navigation';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
+import { useRequestGuard } from '../shared-composables/useRequestGuard';
+import { useHoldHistoryDuckDB } from './useHoldHistoryDuckDB';
+import { useAutoRefresh } from './useAutoRefresh';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
@@ -26,21 +26,24 @@ import SummaryCards from './components/SummaryCards.vue';
 const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 20;
 
+// TODO: type — snapshot data shape from server API not yet formally typed; use Record for now
+type SnapshotData = Record<string, unknown> | null;
+
 // ── Feature flags (loaded from /api/hold-history/config) ─────────────────────
 const todayModeEnabled = ref(true);
 const autoRefreshSeconds = ref(60);
 
 // ── Mode ──────────────────────────────────────────────────────────────────────
-const mode = ref('range'); // 'range' | 'today' | 'current'
+const mode = ref<'range' | 'today' | 'current'>('range');
 
 // ── Today-mode state ──────────────────────────────────────────────────────────
-const todaySnapshotData = ref(null);
+const todaySnapshotData = ref<SnapshotData>(null);
 const todayRecordType = ref('on_hold');
 const todayLoading = ref(false);
 const todayError = ref('');
 
 // ── Current-mode state ────────────────────────────────────────────────────────
-const currentSnapshotData = ref(null);
+const currentSnapshotData = ref<SnapshotData>(null);
 const currentRecordType = ref('on_hold');
 const currentLoading = ref(false);
 const currentError = ref('');
@@ -48,11 +51,14 @@ const currentError = ref('');
 // ── Range-mode state ──────────────────────────────────────────────────────────
 const queryId = ref('');
 const duckdb = useHoldHistoryDuckDB();
-const trendData = ref({ days: [] });
-const reasonParetoData = ref({ items: [] });
-const durationData = ref({ items: [] });
+
+// TODO: type — server and DuckDB trend data have same shape but server response not formally typed
+type TrendDayRow = Record<string, unknown>;
+const trendData = ref<{ days: TrendDayRow[] }>({ days: [] });
+const reasonParetoData = ref<{ items: Record<string, unknown>[] }>({ items: [] });
+const durationData = ref<{ items: Record<string, unknown>[] } & Record<string, unknown>>({ items: [] });
 const detailData = ref({
-  items: [],
+  items: [] as unknown[],
   pagination: {
     page: 1,
     perPage: DEFAULT_PER_PAGE,
@@ -114,20 +120,32 @@ const orchestrator = useFilterOrchestrator({
   },
 });
 
+// Convenience typed accessor — orchestrator.committed is Record<string, unknown>
+// Fields are set from the fields config above (all strings or string[])
+const committed = orchestrator.committed as {
+  startDate: string;
+  endDate: string;
+  holdType: string;
+  recordType: string | string[];
+  reasonFilter: string;
+  durationFilter: string;
+};
+const draft = orchestrator.draft as typeof committed;
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function toDateString(value) {
+function toDateString(value: Date): string {
   const y = value.getFullYear();
   const m = String(value.getMonth() + 1).padStart(2, '0');
   const d = String(value.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
-function getUrlParam(name) {
+function getUrlParam(name: string): string {
   return new URLSearchParams(window.location.search).get(name)?.trim() || '';
 }
 
-function normalizeHoldType(value) {
+function normalizeHoldType(value: unknown): string {
   const holdType = String(value || '').trim();
   if (holdType === 'quality' || holdType === 'non-quality' || holdType === 'all') {
     return holdType;
@@ -135,7 +153,7 @@ function normalizeHoldType(value) {
   return 'quality';
 }
 
-function parseRecordTypeCsv(value) {
+function parseRecordTypeCsv(value: unknown): string[] {
   const parsed = String(value || '')
     .split(',')
     .map((item) => item.trim())
@@ -143,7 +161,7 @@ function parseRecordTypeCsv(value) {
   return parsed.length > 0 ? [...new Set(parsed)] : ['new'];
 }
 
-function parseTodayRecordTypeCsv(value) {
+function parseTodayRecordTypeCsv(value: unknown): string[] {
   const valid = new Set(['on_hold', 'new', 'release']);
   const parsed = String(value || '')
     .split(',')
@@ -167,16 +185,17 @@ function setDefaultDateRange() {
 
   const start = new Date(year, month, 1);
   const end = new Date(year, month + 1, 0);
-  orchestrator.committed.startDate = toDateString(start);
-  orchestrator.draft.startDate = toDateString(start);
-  orchestrator.committed.endDate = toDateString(end);
-  orchestrator.draft.endDate = toDateString(end);
+  committed.startDate = toDateString(start);
+  draft.startDate = toDateString(start);
+  committed.endDate = toDateString(end);
+  draft.endDate = toDateString(end);
 }
 
-function normalizeListPayload(payload) {
-  const pagination = payload?.pagination || {};
+function normalizeListPayload(payload: Record<string, unknown> | null | undefined) {
+  // TODO: type — list payload shape from server API not yet formally typed
+  const pagination = (payload?.pagination || {}) as Record<string, unknown>;
   return {
-    items: Array.isArray(payload?.items) ? payload.items : [],
+    items: Array.isArray(payload?.items) ? (payload.items as unknown[]) : [],
     pagination: {
       page: Number(pagination.page || page.value || 1),
       perPage: Number(pagination.perPage || DEFAULT_PER_PAGE),
@@ -192,18 +211,18 @@ function updateUrlState() {
   params.set('mode', mode.value);
 
   if (mode.value === 'range') {
-    if (orchestrator.committed.startDate) params.set('start_date', orchestrator.committed.startDate);
-    if (orchestrator.committed.endDate) params.set('end_date', orchestrator.committed.endDate);
-    if (orchestrator.committed.holdType) params.set('hold_type', orchestrator.committed.holdType);
-    if (orchestrator.committed.reasonFilter) params.set('reason', orchestrator.committed.reasonFilter);
-    if (orchestrator.committed.durationFilter) params.set('duration_range', orchestrator.committed.durationFilter);
+    if (committed.startDate) params.set('start_date', committed.startDate);
+    if (committed.endDate) params.set('end_date', committed.endDate);
+    if (committed.holdType) params.set('hold_type', committed.holdType);
+    if (committed.reasonFilter) params.set('reason', committed.reasonFilter);
+    if (committed.durationFilter) params.set('duration_range', committed.durationFilter);
     if (page.value > 1) params.set('page', String(page.value));
   } else {
-    if (orchestrator.committed.holdType) params.set('hold_type', orchestrator.committed.holdType);
+    if (committed.holdType) params.set('hold_type', committed.holdType);
     const rt = mode.value === 'current' ? currentRecordType.value : todayRecordType.value;
     if (rt) params.set('record_type', rt);
-    if (orchestrator.committed.reasonFilter) params.set('reason', orchestrator.committed.reasonFilter);
-    if (orchestrator.committed.durationFilter) params.set('duration_range', orchestrator.committed.durationFilter);
+    if (committed.reasonFilter) params.set('reason', committed.reasonFilter);
+    if (committed.durationFilter) params.set('duration_range', committed.durationFilter);
     if (page.value > 1) params.set('page', String(page.value));
   }
 
@@ -211,46 +230,47 @@ function updateUrlState() {
 }
 
 function recordTypeCsv() {
-  const rt = Array.isArray(orchestrator.committed.recordType) ? orchestrator.committed.recordType : [orchestrator.committed.recordType];
+  const rt = Array.isArray(committed.recordType) ? committed.recordType : [committed.recordType];
   return rt.join(',');
 }
 
-function applyViewResult(result, { listOnly = false } = {}) {
+function applyViewResult(result: Record<string, unknown>, { listOnly = false } = {}): void {
   if (!listOnly) {
-    trendData.value = result.trend || trendData.value;
-    reasonParetoData.value = result.reason_pareto || reasonParetoData.value;
-    durationData.value = result.duration || durationData.value;
+    // TODO: type — server view result shape not yet formally typed; cast to match ref type
+    trendData.value = (result.trend as { days: TrendDayRow[] }) || trendData.value;
+    reasonParetoData.value = (result.reason_pareto as { items: Record<string, unknown>[] }) || reasonParetoData.value;
+    durationData.value = (result.duration as { items: Record<string, unknown>[] } & Record<string, unknown>) || durationData.value;
   }
-  detailData.value = normalizeListPayload(result.list);
+  detailData.value = normalizeListPayload(result.list as Record<string, unknown>);
 }
 
 // ── Today mode API ────────────────────────────────────────────────────────────
 
-async function executeTodaySnapshot({ silent = false } = {}) {
+async function executeTodaySnapshot({ silent = false } = {}): Promise<void> {
   if (!silent) {
     todayLoading.value = true;
     todayError.value = '';
   }
 
   try {
-    const body = {
+    const body: Record<string, unknown> = {
       snapshot_mode: 'today',
-      hold_type: orchestrator.committed.holdType,
+      hold_type: committed.holdType,
       record_type: todayRecordType.value,
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
     };
-    if (orchestrator.committed.reasonFilter) body.reason = orchestrator.committed.reasonFilter;
-    if (orchestrator.committed.durationFilter) body.duration_range = orchestrator.committed.durationFilter;
+    if (committed.reasonFilter) body.reason = committed.reasonFilter;
+    if (committed.durationFilter) body.duration_range = committed.durationFilter;
 
     const resp = await apiPost('/api/hold-history/today-snapshot', body, { timeout: API_TIMEOUT });
-    const result = unwrapApiResult(resp, '當日快照取得失敗');
+    const result = unwrapApiResult(resp, '當日快照取得失敗') as SnapshotData;
     todaySnapshotData.value = result;
-  } catch (error) {
+  } catch (err) {
     if (!silent) {
-      todayError.value = error?.message || '當日快照取得失敗';
+      todayError.value = (err as Error)?.message || '當日快照取得失敗';
     }
-    throw error;
+    throw err;
   } finally {
     if (!silent) {
       todayLoading.value = false;
@@ -260,31 +280,31 @@ async function executeTodaySnapshot({ silent = false } = {}) {
 
 // ── Current mode API ──────────────────────────────────────────────────────────
 
-async function executeCurrentSnapshot({ silent = false } = {}) {
+async function executeCurrentSnapshot({ silent = false } = {}): Promise<void> {
   if (!silent) {
     currentLoading.value = true;
     currentError.value = '';
   }
 
   try {
-    const body = {
+    const body: Record<string, unknown> = {
       snapshot_mode: 'current',
-      hold_type: orchestrator.committed.holdType || 'quality',
+      hold_type: committed.holdType || 'quality',
       record_type: currentRecordType.value,
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
     };
-    if (orchestrator.committed.reasonFilter) body.reason = orchestrator.committed.reasonFilter;
-    if (orchestrator.committed.durationFilter) body.duration_range = orchestrator.committed.durationFilter;
+    if (committed.reasonFilter) body.reason = committed.reasonFilter;
+    if (committed.durationFilter) body.duration_range = committed.durationFilter;
 
     const resp = await apiPost('/api/hold-history/today-snapshot', body, { timeout: API_TIMEOUT });
-    const result = unwrapApiResult(resp, '現況快照取得失敗');
+    const result = unwrapApiResult(resp, '現況快照取得失敗') as SnapshotData;
     currentSnapshotData.value = result;
-  } catch (error) {
+  } catch (err) {
     if (!silent) {
-      currentError.value = error?.message || '現況快照取得失敗';
+      currentError.value = (err as Error)?.message || '現況快照取得失敗';
     }
-    throw error;
+    throw err;
   } finally {
     if (!silent) {
       currentLoading.value = false;
@@ -294,7 +314,7 @@ async function executeCurrentSnapshot({ silent = false } = {}) {
 
 // ── Range mode API ────────────────────────────────────────────────────────────
 
-async function executePrimaryQuery({ showOverlay = false } = {}) {
+async function executePrimaryQuery({ showOverlay = false } = {}): Promise<void> {
   const requestId = nextRequestId();
 
   if (showOverlay) {
@@ -311,28 +331,32 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
 
   try {
     const body = {
-      start_date: orchestrator.committed.startDate,
-      end_date: orchestrator.committed.endDate,
-      hold_type: orchestrator.committed.holdType,
+      start_date: committed.startDate,
+      end_date: committed.endDate,
+      hold_type: committed.holdType,
       record_type: recordTypeCsv(),
     };
 
     const resp = await apiPost('/api/hold-history/query', body, { timeout: API_TIMEOUT });
     if (isStaleRequest(requestId)) return;
 
-    const result = unwrapApiResult(resp, '主查詢執行失敗');
+    // TODO: type — primary query response shape not yet formally typed
+    const result = unwrapApiResult(resp, '主查詢執行失敗') as Record<string, unknown>;
 
-    queryId.value = result.query_id;
+    queryId.value = String(result.query_id || '');
     applyViewResult(result);
     updateUrlState();
 
     const { eligible } = checkLocalComputeEligibility({
-      spoolDownloadUrl: result.spool_download_url,
-      totalRowCount: result.total_row_count,
+      spoolDownloadUrl: result.spool_download_url as string | null | undefined,
+      totalRowCount: Number(result.total_row_count || 0),
     });
     if (eligible) {
       try {
-        await duckdb.activate(result.spool_download_url, result.workcenter_mapping || {});
+        await duckdb.activate(
+          String(result.spool_download_url),
+          (result.workcenter_mapping || {}) as Record<string, string>,
+        );
       } catch (_) {
         // Activation failed — remain in server-view mode
       }
@@ -340,12 +364,13 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
 
     refreshSuccess.value = true;
     setTimeout(() => { refreshSuccess.value = false; }, 1500);
-  } catch (error) {
+  } catch (err) {
     if (isStaleRequest(requestId)) return;
-    if (error?.name === 'AbortError') {
+    const e = err as Error & { name?: string };
+    if (e?.name === 'AbortError') {
       errorMessage.value = '查詢逾時，請縮短日期範圍後重試';
     } else {
-      errorMessage.value = error?.message || '主查詢執行失敗';
+      errorMessage.value = e?.message || '主查詢執行失敗';
     }
     refreshError.value = true;
   } finally {
@@ -357,7 +382,7 @@ async function executePrimaryQuery({ showOverlay = false } = {}) {
   }
 }
 
-async function refreshView({ listOnly = false } = {}) {
+async function refreshView({ listOnly = false } = {}): Promise<void> {
   if (!queryId.value) return;
 
   const requestId = nextRequestId();
@@ -371,18 +396,18 @@ async function refreshView({ listOnly = false } = {}) {
     if (duckdb.isActive.value) {
       try {
         const result = await duckdb.computeView({
-          startDate: orchestrator.committed.startDate,
-          endDate: orchestrator.committed.endDate,
-          holdType: orchestrator.committed.holdType,
-          recordTypes: Array.isArray(orchestrator.committed.recordType)
-            ? orchestrator.committed.recordType
-            : [orchestrator.committed.recordType || 'new'],
-          reason: orchestrator.committed.reasonFilter || null,
-          durationRange: orchestrator.committed.durationFilter || null,
+          startDate: committed.startDate,
+          endDate: committed.endDate,
+          holdType: committed.holdType,
+          recordTypes: Array.isArray(committed.recordType)
+            ? committed.recordType
+            : [committed.recordType || 'new'],
+          reason: committed.reasonFilter || null,
+          durationRange: committed.durationFilter || null,
           page: page.value,
           perPage: DEFAULT_PER_PAGE,
         });
-        applyViewResult(result, { listOnly });
+        applyViewResult(result as unknown as Record<string, unknown>, { listOnly });
         return;
       } catch (localErr) {
         console.warn('[hold-history] Local compute error, falling back to server:', localErr);
@@ -390,18 +415,18 @@ async function refreshView({ listOnly = false } = {}) {
       }
     }
 
-    const params = {
+    const params: Record<string, unknown> = {
       query_id: queryId.value,
-      hold_type: orchestrator.committed.holdType,
+      hold_type: committed.holdType,
       record_type: recordTypeCsv(),
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
     };
 
-    if (orchestrator.committed.reasonFilter) params.reason = orchestrator.committed.reasonFilter;
-    if (orchestrator.committed.durationFilter) params.duration_range = orchestrator.committed.durationFilter;
+    if (committed.reasonFilter) params.reason = committed.reasonFilter;
+    if (committed.durationFilter) params.duration_range = committed.durationFilter;
 
-    const resp = await apiGet('/api/hold-history/view', { params, timeout: API_TIMEOUT });
+    const resp = await apiGet('/api/hold-history/view', { params, timeout: API_TIMEOUT }) as Record<string, unknown>;
     if (isStaleRequest(requestId)) return;
 
     if (resp?.success === false && resp?.error === 'cache_expired') {
@@ -410,11 +435,11 @@ async function refreshView({ listOnly = false } = {}) {
       return;
     }
 
-    const result = unwrapApiResult(resp, '視圖查詢失敗');
+    const result = unwrapApiResult(resp, '視圖查詢失敗') as Record<string, unknown>;
     applyViewResult(result, { listOnly });
-  } catch (error) {
+  } catch (err) {
     if (isStaleRequest(requestId)) return;
-    errorMessage.value = error?.message || '載入資料失敗';
+    errorMessage.value = (err as Error)?.message || '載入資料失敗';
   } finally {
     if (isStaleRequest(requestId)) return;
     loading.global = false;
@@ -422,7 +447,7 @@ async function refreshView({ listOnly = false } = {}) {
   }
 }
 
-async function refreshViewPage() {
+async function refreshViewPage(): Promise<void> {
   if (!queryId.value) return;
 
   const requestId = nextRequestId();
@@ -433,18 +458,18 @@ async function refreshViewPage() {
     if (duckdb.isActive.value) {
       try {
         const result = await duckdb.computeView({
-          startDate: orchestrator.committed.startDate,
-          endDate: orchestrator.committed.endDate,
-          holdType: orchestrator.committed.holdType,
-          recordTypes: Array.isArray(orchestrator.committed.recordType)
-            ? orchestrator.committed.recordType
-            : [orchestrator.committed.recordType || 'new'],
-          reason: orchestrator.committed.reasonFilter || null,
-          durationRange: orchestrator.committed.durationFilter || null,
+          startDate: committed.startDate,
+          endDate: committed.endDate,
+          holdType: committed.holdType,
+          recordTypes: Array.isArray(committed.recordType)
+            ? committed.recordType
+            : [committed.recordType || 'new'],
+          reason: committed.reasonFilter || null,
+          durationRange: committed.durationFilter || null,
           page: page.value,
           perPage: DEFAULT_PER_PAGE,
         });
-        detailData.value = normalizeListPayload(result.list);
+        detailData.value = normalizeListPayload(result.list as unknown as Record<string, unknown>);
         return;
       } catch (localErr) {
         console.warn('[hold-history] Local compute pagination error, falling back:', localErr);
@@ -452,31 +477,32 @@ async function refreshViewPage() {
       }
     }
 
-    const params = {
+    const params: Record<string, unknown> = {
       query_id: queryId.value,
-      hold_type: orchestrator.committed.holdType,
+      hold_type: committed.holdType,
       record_type: recordTypeCsv(),
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
     };
 
-    if (orchestrator.committed.reasonFilter) params.reason = orchestrator.committed.reasonFilter;
-    if (orchestrator.committed.durationFilter) params.duration_range = orchestrator.committed.durationFilter;
+    if (committed.reasonFilter) params.reason = committed.reasonFilter;
+    if (committed.durationFilter) params.duration_range = committed.durationFilter;
 
     const resp = await apiGet('/api/hold-history/view', { params, timeout: API_TIMEOUT });
     if (isStaleRequest(requestId)) return;
 
-    const result = unwrapApiResult(resp, '視圖查詢失敗');
-    detailData.value = normalizeListPayload(result.list);
-  } catch (error) {
+    const result = unwrapApiResult(resp, '視圖查詢失敗') as Record<string, unknown>;
+    detailData.value = normalizeListPayload(result.list as Record<string, unknown>);
+  } catch (err) {
     if (isStaleRequest(requestId)) return;
-    if (error?.errorCode === 'CACHE_EXPIRED' || error?.status === 410) {
+    const e = err as Error & { errorCode?: string; status?: number };
+    if (e?.errorCode === 'CACHE_EXPIRED' || e?.status === 410) {
       paginationLoading.value = false;
       duckdb.deactivate();
       await executePrimaryQuery();
       return;
     }
-    errorMessage.value = error?.message || '載入資料失敗';
+    errorMessage.value = e?.message || '載入資料失敗';
   } finally {
     if (isStaleRequest(requestId)) return;
     paginationLoading.value = false;
@@ -485,7 +511,7 @@ async function refreshViewPage() {
 
 // ── Mode switch ───────────────────────────────────────────────────────────────
 
-function handleModeChange(newMode) {
+function handleModeChange(newMode: string): void {
   if (newMode === mode.value) return;
 
   autoRefresh.stop();
@@ -493,10 +519,10 @@ function handleModeChange(newMode) {
   if (newMode === 'today') {
     // Switch to today: clear date params, reset todayRecordType
     todayRecordType.value = 'on_hold';
-    orchestrator.committed.reasonFilter = '';
-    orchestrator.draft.reasonFilter = '';
-    orchestrator.committed.durationFilter = '';
-    orchestrator.draft.durationFilter = '';
+    committed.reasonFilter = '';
+    draft.reasonFilter = '';
+    committed.durationFilter = '';
+    draft.durationFilter = '';
     page.value = 1;
     mode.value = 'today';
     todaySnapshotData.value = null;
@@ -507,10 +533,10 @@ function handleModeChange(newMode) {
   } else if (newMode === 'current') {
     // Switch to current: reset currentRecordType, clear filters
     currentRecordType.value = 'on_hold';
-    orchestrator.committed.reasonFilter = '';
-    orchestrator.draft.reasonFilter = '';
-    orchestrator.committed.durationFilter = '';
-    orchestrator.draft.durationFilter = '';
+    committed.reasonFilter = '';
+    draft.reasonFilter = '';
+    committed.durationFilter = '';
+    draft.durationFilter = '';
     page.value = 1;
     mode.value = 'current';
     currentSnapshotData.value = null;
@@ -521,14 +547,14 @@ function handleModeChange(newMode) {
   } else {
     // Switch to range: restore default date range, clear record_type from URL
     mode.value = 'range';
-    orchestrator.committed.recordType = ['new'];
-    orchestrator.draft.recordType = ['new'];
-    orchestrator.committed.reasonFilter = '';
-    orchestrator.draft.reasonFilter = '';
-    orchestrator.committed.durationFilter = '';
-    orchestrator.draft.durationFilter = '';
+    committed.recordType = ['new'];
+    draft.recordType = ['new'];
+    committed.reasonFilter = '';
+    draft.reasonFilter = '';
+    committed.durationFilter = '';
+    draft.durationFilter = '';
     page.value = 1;
-    if (!orchestrator.committed.startDate || !orchestrator.committed.endDate) {
+    if (!committed.startDate || !committed.endDate) {
       setDefaultDateRange();
     }
     updateUrlState();
@@ -538,14 +564,15 @@ function handleModeChange(newMode) {
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 
-const trendTypeKey = computed(() => (orchestrator.committed.holdType === 'non-quality' ? 'non_quality' : orchestrator.committed.holdType));
+const trendTypeKey = computed(() => (committed.holdType === 'non-quality' ? 'non_quality' : committed.holdType));
 
 const selectedTrendDays = computed(() => {
   const days = Array.isArray(trendData.value?.days) ? trendData.value.days : [];
   return days.map((day) => {
-    const section = day?.[trendTypeKey.value] || {};
+    const key = trendTypeKey.value as string;
+    const section = (day?.[key] || {}) as Record<string, unknown>;
     return {
-      date: day?.date || '',
+      date: String(day?.date || ''),
       holdQty: Number(section.holdQty || 0),
       newHoldQty: Number(section.newHoldQty || 0),
       releaseQty: Number(section.releaseQty || 0),
@@ -557,10 +584,10 @@ const selectedTrendDays = computed(() => {
 
 const summary = computed(() => {
   if (mode.value === 'today') {
-    return todaySnapshotData.value?.summary || {};
+    return (todaySnapshotData.value?.summary as Record<string, number>) || {};
   }
   if (mode.value === 'current') {
-    return currentSnapshotData.value?.summary || {};
+    return (currentSnapshotData.value?.summary as Record<string, number>) || {};
   }
 
   const days = selectedTrendDays.value;
@@ -573,8 +600,8 @@ const summary = computed(() => {
 
   const today = new Date().toISOString().slice(0, 10);
   const pastDays = days.filter((d) => d.date <= today);
-  const lastDay = pastDays.length > 0 ? pastDays[pastDays.length - 1] : {};
-  const stillOnHoldCount = Number(lastDay.holdQty || 0);
+  const lastDay = pastDays.length > 0 ? pastDays[pastDays.length - 1] : null;
+  const stillOnHoldCount = Number(lastDay?.holdQty || 0);
 
   const dur = durationData.value || {};
 
@@ -594,30 +621,32 @@ const summary = computed(() => {
 
 const activeReasonParetoItems = computed(() => {
   if (mode.value === 'today') {
-    return todaySnapshotData.value?.reason_pareto?.items || [];
+    const rp = todaySnapshotData.value?.reason_pareto as Record<string, unknown> | undefined;
+    return (rp?.items as unknown[]) || [];
   }
   if (mode.value === 'current') {
-    return currentSnapshotData.value?.reason_pareto?.items || [];
+    const rp = currentSnapshotData.value?.reason_pareto as Record<string, unknown> | undefined;
+    return (rp?.items as unknown[]) || [];
   }
   return reasonParetoData.value?.items || [];
 });
 
 const activeDurationData = computed(() => {
   if (mode.value === 'today') {
-    return todaySnapshotData.value?.duration || { items: [] };
+    return (todaySnapshotData.value?.duration as { items: unknown[] }) || { items: [] };
   }
   if (mode.value === 'current') {
-    return currentSnapshotData.value?.duration || { items: [] };
+    return (currentSnapshotData.value?.duration as { items: unknown[] }) || { items: [] };
   }
   return durationData.value || { items: [] };
 });
 
 const activeDetailData = computed(() => {
   if (mode.value === 'today') {
-    return normalizeListPayload(todaySnapshotData.value?.list);
+    return normalizeListPayload(todaySnapshotData.value?.list as Record<string, unknown>);
   }
   if (mode.value === 'current') {
-    return normalizeListPayload(currentSnapshotData.value?.list);
+    return normalizeListPayload(currentSnapshotData.value?.list as Record<string, unknown>);
   }
   return detailData.value;
 });
@@ -637,18 +666,20 @@ const activeGlobalLoading = computed(() => {
 const todayEmptyState = computed(() => {
   if (mode.value !== 'today') return false;
   if (todayLoading.value) return false;
-  return (todaySnapshotData.value?.list?.items?.length ?? 0) === 0;
+  const list = todaySnapshotData.value?.list as Record<string, unknown> | undefined;
+  return ((list?.items as unknown[])?.length ?? 0) === 0;
 });
 
 const currentEmptyState = computed(() => {
   if (mode.value !== 'current') return false;
   if (currentLoading.value) return false;
-  return (currentSnapshotData.value?.list?.items?.length ?? 0) === 0;
+  const list = currentSnapshotData.value?.list as Record<string, unknown> | undefined;
+  return ((list?.items as unknown[])?.length ?? 0) === 0;
 });
 
 const holdTypeLabel = computed(() => {
-  if (orchestrator.committed.holdType === 'non-quality') return '非品質異常';
-  if (orchestrator.committed.holdType === 'all') return '全部';
+  if (committed.holdType === 'non-quality') return '非品質異常';
+  if (committed.holdType === 'all') return '全部';
   return '品質異常';
 });
 
@@ -661,12 +692,14 @@ const staleLabel = computed(() => {
 });
 
 const recordTypeModel = computed({
-  get: () => {
+  get: (): string => {
     if (mode.value === 'today') return todayRecordType.value;
     if (mode.value === 'current') return currentRecordType.value;
-    return orchestrator.committed.recordType;
+    // committed.recordType is string | string[] in range mode; RecordTypeFilter expects string
+    const rt = committed.recordType;
+    return Array.isArray(rt) ? (rt[0] || 'new') : String(rt || 'new');
   },
-  set: (val) => {
+  set: (val: string) => {
     if (mode.value === 'today') {
       todayRecordType.value = val;
     } else if (mode.value === 'current') {
@@ -679,23 +712,23 @@ const recordTypeModel = computed({
 
 // ── Event handlers ────────────────────────────────────────────────────────────
 
-function handleApply(next) {
+function handleApply(next: { startDate?: string; endDate?: string } | null): void {
   const nextStartDate = next?.startDate || '';
   const nextEndDate = next?.endDate || '';
-  orchestrator.draft.startDate = nextStartDate;
-  orchestrator.draft.endDate = nextEndDate;
-  orchestrator.committed.reasonFilter = '';
-  orchestrator.draft.reasonFilter = '';
-  orchestrator.committed.durationFilter = '';
-  orchestrator.draft.durationFilter = '';
-  orchestrator.committed.recordType = ['new'];
-  orchestrator.draft.recordType = ['new'];
+  draft.startDate = nextStartDate;
+  draft.endDate = nextEndDate;
+  committed.reasonFilter = '';
+  draft.reasonFilter = '';
+  committed.durationFilter = '';
+  draft.durationFilter = '';
+  committed.recordType = ['new'];
+  draft.recordType = ['new'];
   orchestrator.applyDraft();
 }
 
-function handleHoldTypeChange(nextHoldType) {
+function handleHoldTypeChange(nextHoldType: string): void {
   const holdType = nextHoldType || 'quality';
-  if (orchestrator.committed.holdType === holdType) return;
+  if (committed.holdType === holdType) return;
   orchestrator.updateField('holdType', holdType);
   if (mode.value === 'today') {
     page.value = 1;
@@ -720,10 +753,10 @@ function handleRecordTypeChange() {
   }
 }
 
-function handleReasonToggle(reason) {
+function handleReasonToggle(reason: string): void {
   const nextReason = String(reason || '').trim();
   if (!nextReason) return;
-  const current = orchestrator.committed.reasonFilter;
+  const current = committed.reasonFilter;
   orchestrator.updateField('reasonFilter', current === nextReason ? '' : nextReason);
   if (mode.value === 'today') {
     page.value = 1;
@@ -737,7 +770,7 @@ function handleReasonToggle(reason) {
 }
 
 function clearReasonFilter() {
-  if (!orchestrator.committed.reasonFilter) return;
+  if (!committed.reasonFilter) return;
   orchestrator.updateField('reasonFilter', '');
   if (mode.value === 'today') {
     page.value = 1;
@@ -750,10 +783,10 @@ function clearReasonFilter() {
   }
 }
 
-function handleDurationToggle(range) {
+function handleDurationToggle(range: string): void {
   const nextRange = String(range || '').trim();
   if (!nextRange) return;
-  const current = orchestrator.committed.durationFilter;
+  const current = committed.durationFilter;
   orchestrator.updateField('durationFilter', current === nextRange ? '' : nextRange);
   if (mode.value === 'today') {
     page.value = 1;
@@ -767,7 +800,7 @@ function handleDurationToggle(range) {
 }
 
 function clearDurationFilter() {
-  if (!orchestrator.committed.durationFilter) return;
+  if (!committed.durationFilter) return;
   orchestrator.updateField('durationFilter', '');
   if (mode.value === 'today') {
     page.value = 1;
@@ -812,14 +845,14 @@ function nextPage() {
 
 const exportLoading = ref(false);
 
-function _toCsvField(value) {
+function _toCsvField(value: unknown): string {
   const s = String(value ?? '');
   return s.includes(',') || s.includes('"') || s.includes('\n')
     ? `"${s.replace(/"/g, '""')}"`
     : s;
 }
 
-function _buildCsv(items) {
+function _buildCsv(items: Record<string, unknown>[]): string {
   const headers = [
     'Lot ID', 'WorkOrder', 'Product', '站別', 'Hold Reason',
     '數量', 'Hold 時間', 'Hold 人員', 'Hold Comment',
@@ -835,7 +868,7 @@ function _buildCsv(items) {
   return [headers.join(','), ...rows].join('\n');
 }
 
-function _downloadCsv(content, filename) {
+function _downloadCsv(content: string, filename: string): void {
   const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -847,32 +880,34 @@ function _downloadCsv(content, filename) {
   URL.revokeObjectURL(url);
 }
 
-async function handleExport() {
+async function handleExport(): Promise<void> {
   if (exportLoading.value) return;
   exportLoading.value = true;
   try {
-    let items = [];
+    let items: Record<string, unknown>[] = [];
 
     if (mode.value === 'today' || mode.value === 'current') {
       const body = {
         snapshot_mode: mode.value === 'current' ? 'current' : 'today',
-        hold_type: orchestrator.committed.holdType,
+        hold_type: committed.holdType,
         record_type: mode.value === 'current' ? currentRecordType.value : todayRecordType.value,
         export: true,
       };
       const resp = await apiPost('/api/hold-history/today-snapshot', body, { timeout: API_TIMEOUT });
-      const result = unwrapApiResult(resp, '匯出失敗');
-      items = result?.list?.items || [];
+      // TODO: type — export response shape not yet formally typed
+      const result = unwrapApiResult(resp, '匯出失敗') as Record<string, unknown>;
+      items = ((result?.list as Record<string, unknown>)?.items as Record<string, unknown>[]) || [];
     } else {
       const params = {
         query_id: queryId.value,
-        hold_type: orchestrator.committed.holdType,
+        hold_type: committed.holdType,
         record_type: recordTypeCsv(),
         export: 1,
       };
       const resp = await apiGet('/api/hold-history/view', { params, timeout: API_TIMEOUT });
-      const result = unwrapApiResult(resp, '匯出失敗');
-      items = result?.list?.items || [];
+      // TODO: type — export response shape not yet formally typed
+      const result = unwrapApiResult(resp, '匯出失敗') as Record<string, unknown>;
+      items = ((result?.list as Record<string, unknown>)?.items as Record<string, unknown>[]) || [];
     }
 
     if (!items.length) return;
@@ -887,10 +922,10 @@ async function handleExport() {
 
 async function manualRefresh() {
   page.value = 1;
-  orchestrator.committed.reasonFilter = '';
-  orchestrator.draft.reasonFilter = '';
-  orchestrator.committed.durationFilter = '';
-  orchestrator.draft.durationFilter = '';
+  committed.reasonFilter = '';
+  draft.reasonFilter = '';
+  committed.durationFilter = '';
+  draft.durationFilter = '';
   updateUrlState();
   if (mode.value === 'today') {
     await executeTodaySnapshot();
@@ -915,11 +950,13 @@ watch(currentRecordType, () => {
 onMounted(async () => {
   // Load feature flags
   try {
-    const resp = await apiGet('/api/hold-history/config');
-    if (resp?.data) {
-      todayModeEnabled.value = resp.data.today_mode_enabled !== false;
-      if (resp.data.auto_refresh_seconds) {
-        autoRefreshSeconds.value = Number(resp.data.auto_refresh_seconds) || 60;
+    // TODO: type — config API response shape not formally typed; cast via Record
+    const resp = await apiGet('/api/hold-history/config') as Record<string, unknown>;
+    const respData = resp?.data as Record<string, unknown> | undefined;
+    if (respData) {
+      todayModeEnabled.value = respData.today_mode_enabled !== false;
+      if (respData.auto_refresh_seconds) {
+        autoRefreshSeconds.value = Number(respData.auto_refresh_seconds) || 60;
       }
     }
   } catch {
@@ -936,25 +973,25 @@ onMounted(async () => {
   const startDate = getUrlParam('start_date');
   const endDate = getUrlParam('end_date');
   if (startDate && endDate) {
-    orchestrator.committed.startDate = startDate;
-    orchestrator.draft.startDate = startDate;
-    orchestrator.committed.endDate = endDate;
-    orchestrator.draft.endDate = endDate;
+    committed.startDate = startDate;
+    draft.startDate = startDate;
+    committed.endDate = endDate;
+    draft.endDate = endDate;
   } else {
     setDefaultDateRange();
   }
 
   const initHoldType = normalizeHoldType(getUrlParam('hold_type'));
-  orchestrator.committed.holdType = initHoldType;
-  orchestrator.draft.holdType = initHoldType;
+  committed.holdType = initHoldType;
+  draft.holdType = initHoldType;
 
   const initReason = getUrlParam('reason');
-  orchestrator.committed.reasonFilter = initReason;
-  orchestrator.draft.reasonFilter = initReason;
+  committed.reasonFilter = initReason;
+  draft.reasonFilter = initReason;
 
   const initDuration = getUrlParam('duration_range');
-  orchestrator.committed.durationFilter = initDuration;
-  orchestrator.draft.durationFilter = initDuration;
+  committed.durationFilter = initDuration;
+  draft.durationFilter = initDuration;
 
   const parsedPage = Number.parseInt(getUrlParam('page'), 10);
   if (Number.isFinite(parsedPage) && parsedPage > 0) {
@@ -965,20 +1002,20 @@ onMounted(async () => {
     const initTodayRt = parseTodayRecordTypeCsv(getUrlParam('record_type'));
     todayRecordType.value = Array.isArray(initTodayRt) ? (initTodayRt[0] || 'on_hold') : (initTodayRt || 'on_hold');
     updateUrlState();
-    await executeTodaySnapshot({ showOverlay: false });
+    await executeTodaySnapshot();
     initialLoading.value = false;
     autoRefresh.start();
   } else if (initMode === 'current') {
     const initCurrentRt = parseTodayRecordTypeCsv(getUrlParam('record_type'));
     currentRecordType.value = Array.isArray(initCurrentRt) ? (initCurrentRt[0] || 'on_hold') : (initCurrentRt || 'on_hold');
     updateUrlState();
-    await executeCurrentSnapshot({ showOverlay: false });
+    await executeCurrentSnapshot();
     initialLoading.value = false;
     autoRefresh.start();
   } else {
     const initRecordType = parseRecordTypeCsv(getUrlParam('record_type'));
-    orchestrator.committed.recordType = initRecordType;
-    orchestrator.draft.recordType = initRecordType;
+    committed.recordType = initRecordType;
+    draft.recordType = initRecordType;
     updateUrlState();
     void executePrimaryQuery({ showOverlay: true });
   }
@@ -1001,9 +1038,9 @@ onMounted(async () => {
     <ErrorBanner :message="errorMessage || todayError || currentError" :dismissible="false" />
 
     <FilterBar
-      :start-date="orchestrator.committed.startDate"
-      :end-date="orchestrator.committed.endDate"
-      :hold-type="orchestrator.committed.holdType"
+      :start-date="committed.startDate"
+      :end-date="committed.endDate"
+      :hold-type="committed.holdType"
       :mode="mode"
       :today-mode-enabled="todayModeEnabled"
       :disabled="activeGlobalLoading"
@@ -1026,20 +1063,20 @@ onMounted(async () => {
 
     <section class="hold-history-chart-grid">
       <ReasonPareto
-        :items="activeReasonParetoItems"
-        :active-reason="orchestrator.committed.reasonFilter"
+        :items="(activeReasonParetoItems as Record<string, unknown>[])"
+        :active-reason="committed.reasonFilter"
         @toggle="handleReasonToggle"
       />
       <DurationChart
-        :items="activeDurationData.items || []"
-        :active-range="orchestrator.committed.durationFilter"
+        :items="(activeDurationData.items as Record<string, unknown>[] || [])"
+        :active-range="committed.durationFilter"
         @toggle="handleDurationToggle"
       />
     </section>
 
     <FilterIndicator
-      :reason="orchestrator.committed.reasonFilter"
-      :duration-range="orchestrator.committed.durationFilter"
+      :reason="committed.reasonFilter"
+      :duration-range="committed.durationFilter"
       @clear-reason="clearReasonFilter"
       @clear-duration="clearDurationFilter"
     />

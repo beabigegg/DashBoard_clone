@@ -1,36 +1,57 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import DataTable from '../../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 
-const props = defineProps({
-  items: {
-    type: Array,
-    default: () => [],
-  },
-  pagination: {
-    type: Object,
-    default: () => ({ page: 1, perPage: 20, total: 0, totalPages: 1 }),
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  paginating: {
-    type: Boolean,
-    default: false,
-  },
-  exporting: {
-    type: Boolean,
-    default: false,
-  },
-  errorMessage: {
-    type: String,
-    default: '',
-  },
+interface HoldItem {
+  lotId?: string | null;
+  workorder?: string | null;
+  product?: string | null;
+  workcenter?: string | null;
+  holdReason?: string | null;
+  qty?: number | null;
+  holdDate?: string | null;
+  holdEmp?: string | null;
+  holdComment?: string | null;
+  releaseDate?: string | null;
+  releaseEmp?: string | null;
+  releaseComment?: string | null;
+  holdHours?: number | null;
+  ncr?: string | null;
+  futureHoldComment?: string | null;
+}
+
+interface Pagination {
+  page?: number;
+  perPage?: number;
+  total?: number;
+  totalPages?: number;
+}
+
+interface Props {
+  // TODO: type — items can come from DuckDB (typed) or server (untyped); accept unknown for now
+  items?: unknown[];
+  pagination?: Pagination;
+  loading?: boolean;
+  paginating?: boolean;
+  exporting?: boolean;
+  errorMessage?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  items: () => [],
+  pagination: () => ({ page: 1, perPage: 20, total: 0, totalPages: 1 }),
+  loading: false,
+  paginating: false,
+  exporting: false,
+  errorMessage: '',
 });
 
-const emit = defineEmits(['prev-page', 'next-page', 'export']);
+const emit = defineEmits<{
+  'prev-page': [];
+  'next-page': [];
+  export: [];
+}>();
 
 const pageSummary = computed(() => {
   const page = Number(props.pagination?.page || 1);
@@ -60,33 +81,34 @@ const tablePagination = computed(() => {
   };
 });
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   if (value === null || value === undefined || value === '') return '-';
   return Number(value).toLocaleString('zh-TW');
 }
 
-function formatHours(value) {
+function formatHours(value: unknown): string {
   if (value === null || value === undefined || value === '') return '-';
   return Number(value).toFixed(2);
 }
 
 const tip = reactive({ visible: false, text: '', x: 0, y: 0 });
 
-function showTip(event) {
-  const text = event.currentTarget.getAttribute('data-tip');
+function showTip(event: MouseEvent): void {
+  const target = event.currentTarget as HTMLElement;
+  const text = target.getAttribute('data-tip');
   if (!text) return;
-  const rect = event.currentTarget.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
   tip.text = text;
   tip.x = rect.left;
   tip.y = rect.bottom + 4;
   tip.visible = true;
 }
 
-function hideTip() {
+function hideTip(): void {
   tip.visible = false;
 }
 
-function handlePageChange(newPage) {
+function handlePageChange(newPage: number): void {
   const currentPage = Number(props.pagination?.page || 1);
   if (newPage < currentPage) emit('prev-page');
   else if (newPage > currentPage) emit('next-page');
@@ -94,35 +116,42 @@ function handlePageChange(newPage) {
 
 // ── Column resize ─────────────────────────────────────────────────────────────
 
-const tableWrap = ref(null);
-let resizeState = null;
-
-function getThElements() {
-  if (!tableWrap.value) return [];
-  return Array.from(tableWrap.value.querySelectorAll('table thead th'));
+interface ResizeState {
+  thIndex: number;
+  startX: number;
+  startWidth: number;
 }
 
-function getHandles() {
+const tableWrap = ref<HTMLElement | null>(null);
+let resizeState: ResizeState | null = null;
+
+function getThElements(): HTMLElement[] {
   if (!tableWrap.value) return [];
-  return Array.from(tableWrap.value.querySelectorAll('.col-resize-handle'));
+  return Array.from(tableWrap.value.querySelectorAll<HTMLElement>('table thead th'));
 }
 
-function repositionHandles() {
+function getHandles(): HTMLElement[] {
+  if (!tableWrap.value) return [];
+  return Array.from(tableWrap.value.querySelectorAll<HTMLElement>('.col-resize-handle'));
+}
+
+function repositionHandles(): void {
+  if (!tableWrap.value) return;
   const ths = getThElements();
   const handles = getHandles();
+  const wrapRect = tableWrap.value.getBoundingClientRect();
+  const scrollLeft = tableWrap.value.querySelector('.data-table-scroll')?.scrollLeft || 0;
   ths.forEach((th, i) => {
     const handle = handles[i];
     if (!handle) return;
     const rect = th.getBoundingClientRect();
-    const wrapRect = tableWrap.value.getBoundingClientRect();
-    const scrollLeft = tableWrap.value.querySelector('.data-table-scroll')?.scrollLeft || 0;
-    handle.style.left = `${rect.right - wrapRect.left + scrollLeft - 4}px`;
-    handle.style.top = `${rect.top - wrapRect.top}px`;
-    handle.style.height = `${rect.height}px`;
+    (handle as HTMLElement).style.left = `${rect.right - wrapRect.left + scrollLeft - 4}px`;
+    (handle as HTMLElement).style.top = `${rect.top - wrapRect.top}px`;
+    (handle as HTMLElement).style.height = `${rect.height}px`;
   });
 }
 
-function onPointerDown(e, thIndex) {
+function onPointerDown(e: PointerEvent, thIndex: number): void {
   e.preventDefault();
   const ths = getThElements();
   const th = ths[thIndex];
@@ -136,7 +165,7 @@ function onPointerDown(e, thIndex) {
   document.addEventListener('pointerup', onPointerUp);
 }
 
-function onPointerMove(e) {
+function onPointerMove(e: PointerEvent): void {
   if (!resizeState) return;
   const ths = getThElements();
   const th = ths[resizeState.thIndex];
@@ -147,14 +176,14 @@ function onPointerMove(e) {
   th.style.minWidth = `${newWidth}px`;
 }
 
-function onPointerUp() {
+function onPointerUp(): void {
   resizeState = null;
   document.removeEventListener('pointermove', onPointerMove);
   document.removeEventListener('pointerup', onPointerUp);
   repositionHandles();
 }
 
-function buildHandles() {
+function buildHandles(): void {
   if (!tableWrap.value) return;
   // Remove existing handles
   tableWrap.value.querySelectorAll('.col-resize-handle').forEach((h) => h.remove());
@@ -167,7 +196,7 @@ function buildHandles() {
     handle.className = 'col-resize-handle';
     handle.setAttribute('aria-hidden', 'true');
     handle.addEventListener('pointerdown', (e) => onPointerDown(e, i));
-    tableWrap.value.appendChild(handle);
+    tableWrap.value!.appendChild(handle);
   });
 
   repositionHandles();
@@ -209,7 +238,7 @@ onUnmounted(() => {
     <div class="card-body ui-card-body">
       <div ref="tableWrap" class="resizable-table-wrap">
         <DataTable
-          :data="items"
+          :data="(items as Record<string, unknown>[])"
           :loading="loading || paginating"
           :pagination="tablePagination"
           @page-change="handlePageChange"

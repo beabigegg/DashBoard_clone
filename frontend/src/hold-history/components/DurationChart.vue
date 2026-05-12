@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { BarChart } from 'echarts/charts';
@@ -9,24 +9,33 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent]);
 
-const props = defineProps({
-  items: {
-    type: Array,
-    default: () => [],
-  },
-  activeRange: {
-    type: String,
-    default: '',
-  },
+interface DurationItem {
+  range?: string;
+  qty?: number;
+  count?: number;
+  pct?: number;
+}
+
+interface Props {
+  // TODO: type — items can come from DuckDB (typed) or server (untyped); use Record for now
+  items?: Record<string, unknown>[];
+  activeRange?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  items: () => [],
+  activeRange: '',
 });
 
-const emit = defineEmits(['toggle']);
+const emit = defineEmits<{
+  toggle: [range: string];
+}>();
 
 const hasData = computed(() => (props.items || []).length > 0);
 
 const chartOption = computed(() => {
   const items = props.items || [];
-  const labels = items.map((item) => item.range || '-');
+  const labels = items.map((item) => String(item.range || '-'));
   const qtys = items.map((item) => Number(item.qty || 0));
   const pcts = items.map((item) => Number(item.pct || 0));
 
@@ -34,11 +43,13 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
-      formatter(params) {
-        const index = Number(params?.[0]?.dataIndex || 0);
+      // TODO: type echarts callback
+      formatter(params: unknown) {
+        const p = params as Array<{ dataIndex?: number }>;
+        const index = Number(p?.[0]?.dataIndex || 0);
         const item = items[index] || {};
         return [
-          `<b>${item.range || '-'}</b>`,
+          `<b>${String(item.range || '-')}</b>`,
           `數量: ${Number(item.qty || 0).toLocaleString('zh-TW')}`,
           `Lot 數: ${Number(item.count || 0).toLocaleString('zh-TW')}`,
           `占比: ${Number(item.pct || 0).toFixed(2)}%`,
@@ -55,7 +66,8 @@ const chartOption = computed(() => {
     xAxis: {
       type: 'value',
       axisLabel: {
-        formatter: (value) => Number(value || 0).toLocaleString('zh-TW'),
+        // TODO: type echarts callback
+        formatter: (value: unknown) => Number(value || 0).toLocaleString('zh-TW'),
       },
     },
     yAxis: {
@@ -68,7 +80,8 @@ const chartOption = computed(() => {
         data: qtys,
         barMaxWidth: 26,
         itemStyle: {
-          color(params) {
+          // TODO: type echarts callback
+          color(params: { dataIndex: number }) {
             const range = labels[params.dataIndex] || '';
             return range === props.activeRange ? 'rgb(220, 38, 38)' : 'rgb(124, 58, 237)';
           },
@@ -77,7 +90,8 @@ const chartOption = computed(() => {
         label: {
           show: true,
           position: 'right',
-          formatter(params) {
+          // TODO: type echarts callback
+          formatter(params: { dataIndex: number; value: unknown }) {
             const pct = Number(pcts[params.dataIndex] || 0).toFixed(1);
             const qty = Number(params.value || 0).toLocaleString('zh-TW');
             return `${qty} (${pct}%)`;
@@ -89,11 +103,11 @@ const chartOption = computed(() => {
   };
 });
 
-function handleChartClick(params) {
+function handleChartClick(params: { seriesType?: string; dataIndex?: number }): void {
   if (params?.seriesType !== 'bar') {
     return;
   }
-  const selected = props.items?.[params.dataIndex]?.range;
+  const selected = String(props.items?.[params.dataIndex ?? -1]?.range || '');
   if (!selected) {
     return;
   }

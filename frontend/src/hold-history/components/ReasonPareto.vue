@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { BarChart, LineChart } from 'echarts/charts';
@@ -9,24 +9,34 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
 
-const props = defineProps({
-  items: {
-    type: Array,
-    default: () => [],
-  },
-  activeReason: {
-    type: String,
-    default: '',
-  },
+interface ReasonParetoItem {
+  reason?: string;
+  qty?: number;
+  count?: number;
+  pct?: number;
+  cumPct?: number;
+}
+
+interface Props {
+  // TODO: type — items can come from DuckDB (typed) or server (untyped); use Record for now
+  items?: Record<string, unknown>[];
+  activeReason?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  items: () => [],
+  activeReason: '',
 });
 
-const emit = defineEmits(['toggle']);
+const emit = defineEmits<{
+  toggle: [reason: string];
+}>();
 
 const hasData = computed(() => (props.items || []).length > 0);
 
 const chartOption = computed(() => {
   const items = props.items || [];
-  const reasons = items.map((item) => item.reason || '(未填寫)');
+  const reasons = items.map((item) => String(item.reason || '(未填寫)'));
   const qtys = items.map((item) => Number(item.qty || 0));
   const cumPct = items.map((item) => Number(item.cumPct || 0));
 
@@ -34,10 +44,12 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross' },
-      formatter(params) {
-        const index = Number(params?.[0]?.dataIndex || 0);
+      // TODO: type echarts callback
+      formatter(params: unknown) {
+        const p = params as Array<{ dataIndex?: number }>;
+        const index = Number(p?.[0]?.dataIndex || 0);
         const item = items[index] || {};
-        const reason = item.reason || '(未填寫)';
+        const reason = String(item.reason || '(未填寫)');
         return [
           `<b>${reason}</b>`,
           `數量: ${Number(item.qty || 0).toLocaleString('zh-TW')}`,
@@ -74,7 +86,8 @@ const chartOption = computed(() => {
         type: 'value',
         name: '數量',
         axisLabel: {
-          formatter: (value) => Number(value || 0).toLocaleString('zh-TW'),
+          // TODO: type echarts callback
+          formatter: (value: unknown) => Number(value || 0).toLocaleString('zh-TW'),
         },
       },
       {
@@ -93,7 +106,8 @@ const chartOption = computed(() => {
         type: 'bar',
         data: qtys,
         itemStyle: {
-          color(params) {
+          // TODO: type echarts callback
+          color(params: { dataIndex: number }) {
             const reason = reasons[params.dataIndex] || '';
             return reason === props.activeReason ? 'rgb(220, 38, 38)' : 'rgb(29, 78, 216)';
           },
@@ -114,11 +128,11 @@ const chartOption = computed(() => {
   };
 });
 
-function handleChartClick(params) {
+function handleChartClick(params: { seriesType?: string; dataIndex?: number }): void {
   if (params?.seriesType !== 'bar') {
     return;
   }
-  const selected = props.items?.[params.dataIndex]?.reason;
+  const selected = String(props.items?.[params.dataIndex ?? -1]?.reason || '');
   if (!selected) {
     return;
   }
