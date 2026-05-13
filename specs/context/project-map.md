@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 292
-visible-files: 952
+visible-dirs: 291
+visible-files: 895
 omitted-dirs: 105
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -551,6 +551,8 @@ DashBoard_vite/
 |   |   |   |-- HoldMatrix.test.js
 |   |   |   |-- LoadingOverlay.test.js
 |   |   |   |-- LoadingSpinner.test.js
+|   |   |   |-- LotDetailTable.test.js
+|   |   |   |-- MatrixTable.test.js
 |   |   |   \-- ParetoGrid.test.js
 |   |   |-- core/
 |   |   |   \-- api-dedup.test.js
@@ -598,7 +600,8 @@ DashBoard_vite/
 |   |   |   |-- job-abandon-on-unload.spec.js
 |   |   |   |-- query-tool-url-state.spec.js
 |   |   |   |-- query-tool.spec.js
-|   |   |   \-- reject-history.spec.js
+|   |   |   |-- reject-history.spec.js
+|   |   |   \-- wip-matrix-drilldown.spec.js
 |   |   |-- query-tool/
 |   |   |   |-- App.url-state.test.js
 |   |   |   \-- useLotDetail.pagination.test.js
@@ -611,7 +614,8 @@ DashBoard_vite/
 |   |   |   |-- useMaterialTrace.validation.test.js
 |   |   |   |-- useProductionHistory.validation.test.js
 |   |   |   |-- useRejectHistory.validation.test.js
-|   |   |   \-- useYieldAlert.validation.test.js
+|   |   |   |-- useYieldAlert.validation.test.js
+|   |   |   \-- wip-url-params.test.js
 |   |   |-- yield-alert/
 |   |   |   \-- App.cross-filter.test.js
 |   |   |-- pending-jobs-registry.test.js
@@ -628,69 +632,7 @@ DashBoard_vite/
 |   |-- vite.config.ts
 |   \-- vitest.config.js
 |-- logs/
-|   |-- archive/
-|   |   |-- access_20260512_185736.log
-|   |   |-- access_20260512_193246.log
-|   |   |-- access_20260512_194914.log
-|   |   |-- access_20260512_195849.log
-|   |   |-- access_20260512_205033.log
-|   |   |-- access_20260513_080428.log
-|   |   |-- error_20260512_185736.log
-|   |   |-- error_20260512_193246.log
-|   |   |-- error_20260512_194914.log
-|   |   |-- error_20260512_195849.log
-|   |   |-- error_20260512_205033.log
-|   |   |-- error_20260513_080428.log
-|   |   |-- rq_msd_worker_20260512_185736.log
-|   |   |-- rq_msd_worker_20260512_193246.log
-|   |   |-- rq_msd_worker_20260512_194914.log
-|   |   |-- rq_msd_worker_20260512_195849.log
-|   |   |-- rq_msd_worker_20260512_205033.log
-|   |   |-- rq_msd_worker_20260513_080428.log
-|   |   |-- rq_prod_hist_worker_20260512_185736.log
-|   |   |-- rq_prod_hist_worker_20260512_193246.log
-|   |   |-- rq_prod_hist_worker_20260512_194914.log
-|   |   |-- rq_prod_hist_worker_20260512_195849.log
-|   |   |-- rq_prod_hist_worker_20260512_205033.log
-|   |   |-- rq_prod_hist_worker_20260513_080428.log
-|   |   |-- rq_reject_worker_20260512_185736.log
-|   |   |-- rq_reject_worker_20260512_193246.log
-|   |   |-- rq_reject_worker_20260512_194914.log
-|   |   |-- rq_reject_worker_20260512_195849.log
-|   |   |-- rq_reject_worker_20260512_205033.log
-|   |   |-- rq_reject_worker_20260513_080428.log
-|   |   |-- rq_worker_20260512_185736.log
-|   |   |-- rq_worker_20260512_193246.log
-|   |   |-- rq_worker_20260512_194914.log
-|   |   |-- rq_worker_20260512_195849.log
-|   |   |-- rq_worker_20260512_205033.log
-|   |   |-- rq_worker_20260513_080428.log
-|   |   |-- rq_yield_alert_worker_20260512_185736.log
-|   |   |-- rq_yield_alert_worker_20260512_193246.log
-|   |   |-- rq_yield_alert_worker_20260512_194914.log
-|   |   |-- rq_yield_alert_worker_20260512_195849.log
-|   |   |-- rq_yield_alert_worker_20260512_205033.log
-|   |   |-- rq_yield_alert_worker_20260513_080428.log
-|   |   |-- watchdog_20260512_185736.log
-|   |   |-- watchdog_20260512_193246.log
-|   |   |-- watchdog_20260512_194914.log
-|   |   |-- watchdog_20260512_195849.log
-|   |   |-- watchdog_20260512_205033.log
-|   |   \-- watchdog_20260513_080428.log
-|   |-- access.log
-|   |-- admin_logs.sqlite
-|   |-- error.log
-|   |-- login_sessions.sqlite
-|   |-- login_sessions.sqlite-shm
-|   |-- login_sessions.sqlite-wal
-|   |-- metrics_history.sqlite
-|   |-- rq_msd_worker.log
-|   |-- rq_prod_hist_worker.log
-|   |-- rq_reject_worker.log
-|   |-- rq_worker.log
-|   |-- rq_yield_alert_worker.log
-|   |-- startup.log
-|   \-- watchdog.log
+|   \-- admin_logs.sqlite
 |-- openspec/
 |   |-- archive/
 |   |   |-- 2026-03-26-system-status-and-online-presence/
@@ -1356,7 +1298,7 @@ DashBoard_vite/
 |   |   |-- probe_13168.json
 |   |   |-- probe_13169.json
 |   |   |-- probe_132749.json
-|   |   \-- ... (250 more entries truncated; cap=50)
+|   |   \-- ... (265 more entries truncated; cap=50)
 |   \-- mes_dashboard_restart_state.json
 |-- tools/
 |   |-- generate_documentation.py
