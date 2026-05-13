@@ -12,3 +12,4 @@
 | migrate-reject-history-ts | 2026 | 2026-05-12 | specs/archive/2026/migrate-reject-history-ts/ |
 | migrate-hold-history-ts | 2026 | 2026-05-12 | specs/archive/2026/migrate-hold-history-ts/ |
 | migrate-wip-hold-ts | 2026 | 2026-05-13 | specs/archive/2026/migrate-wip-hold-ts/ |
+| wip-hold-drilldown-filters | 2026 | 2026-05-13 | specs/archive/2026/wip-hold-drilldown-filters/ |
