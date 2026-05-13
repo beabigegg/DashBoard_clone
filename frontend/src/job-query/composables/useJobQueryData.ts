@@ -1,15 +1,56 @@
 import { computed, reactive, ref } from 'vue';
+import type { ComputedRef, Ref } from 'vue';
 
-import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api.js';
-import { replaceRuntimeHistory } from '../../core/shell-navigation.js';
+import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api';
+import { replaceRuntimeHistory } from '../../core/shell-navigation';
 
 ensureMesApiAvailable();
 
-function toDateString(date) {
+export interface FiltersState {
+  resourceIds: string[];
+  startDate: string;
+  endDate: string;
+  searchText: string;
+}
+
+export interface Resource {
+  RESOURCEID: string;
+  RESOURCENAME: string;
+  WORKCENTERNAME: string;
+  RESOURCEFAMILYNAME: string;
+}
+
+export interface UseJobQueryDataReturn {
+  resources: Ref<Resource[]>;
+  loadingResources: Ref<boolean>;
+  loadingJobs: Ref<boolean>;
+  loadingTxn: Ref<boolean>;
+  exporting: Ref<boolean>;
+  errorMessage: Ref<string>;
+  exportMessage: Ref<string>;
+  filters: FiltersState;
+  jobs: Ref<Record<string, unknown>[]>;
+  jobsColumns: ComputedRef<string[]>;
+  selectedJobId: Ref<string>;
+  txnRows: Ref<Record<string, unknown>[]>;
+  txnColumns: ComputedRef<string[]>;
+  filteredResources: ComputedRef<Resource[]>;
+  selectedResourceCount: ComputedRef<number>;
+  resetDateRangeToLast90Days: () => void;
+  hydrateFiltersFromUrl: () => void;
+  loadResources: () => Promise<void>;
+  toggleResource: (resourceId: string) => void;
+  queryJobs: () => Promise<boolean>;
+  loadTxn: (jobId: string) => Promise<void>;
+  exportCsv: () => Promise<boolean>;
+  getStatusTone: (status: unknown) => 'neutral' | 'success' | 'warning' | 'danger';
+}
+
+function toDateString(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function parseArrayQuery(params, key) {
+function parseArrayQuery(params: URLSearchParams, key: string): string[] {
   const repeated = params.getAll(key).map((item) => String(item || '').trim()).filter(Boolean);
   if (repeated.length > 0) {
     return repeated;
@@ -20,7 +61,7 @@ function parseArrayQuery(params, key) {
     .filter(Boolean);
 }
 
-function buildQueryString(filters) {
+function buildQueryString(filters: FiltersState): string {
   const params = new URLSearchParams();
   filters.resourceIds.forEach((resourceId) => params.append('resource_ids', resourceId));
   if (filters.startDate) {
@@ -35,7 +76,7 @@ function buildQueryString(filters) {
   return params.toString();
 }
 
-function buildStatusTone(status) {
+function buildStatusTone(status: unknown): 'neutral' | 'success' | 'warning' | 'danger' {
   const text = String(status || '').trim().toLowerCase();
   if (!text) {
     return 'neutral';
@@ -62,8 +103,8 @@ const TXN_DISPLAY_COLUMNS = Object.freeze([
   'CAUSECODENAME', 'REPAIRCODENAME', 'USER_NAME', 'COMMENTS',
 ]);
 
-export function useJobQueryData() {
-  const resources = ref([]);
+export function useJobQueryData(): UseJobQueryDataReturn {
+  const resources = ref<Resource[]>([]);
   const loadingResources = ref(false);
   const loadingJobs = ref(false);
   const loadingTxn = ref(false);
@@ -72,18 +113,18 @@ export function useJobQueryData() {
   const errorMessage = ref('');
   const exportMessage = ref('');
 
-  const filters = reactive({
+  const filters = reactive<FiltersState>({
     resourceIds: [],
     startDate: '',
     endDate: '',
     searchText: '',
   });
 
-  const jobs = ref([]);
+  const jobs = ref<Record<string, unknown>[]>([]);
   const selectedJobId = ref('');
-  const txnRows = ref([]);
+  const txnRows = ref<Record<string, unknown>[]>([]);
 
-  const filteredResources = computed(() => {
+  const filteredResources = computed<Resource[]>(() => {
     const query = String(filters.searchText || '').trim().toLowerCase();
     if (!query) {
       return resources.value;
@@ -96,19 +137,19 @@ export function useJobQueryData() {
     });
   });
 
-  const selectedResourceCount = computed(() => filters.resourceIds.length);
+  const selectedResourceCount = computed<number>(() => filters.resourceIds.length);
 
-  const jobsColumns = computed(() => {
+  const jobsColumns = computed<string[]>(() => {
     const available = new Set(Object.keys(jobs.value[0] || {}));
     return JOBS_DISPLAY_COLUMNS.filter((col) => available.has(col));
   });
 
-  const txnColumns = computed(() => {
+  const txnColumns = computed<string[]>(() => {
     const available = new Set(Object.keys(txnRows.value[0] || {}));
     return TXN_DISPLAY_COLUMNS.filter((col) => available.has(col));
   });
 
-  function resetDateRangeToLast90Days() {
+  function resetDateRangeToLast90Days(): void {
     const today = new Date();
     const start = new Date(today);
     start.setDate(start.getDate() - 90);
@@ -116,7 +157,7 @@ export function useJobQueryData() {
     filters.endDate = toDateString(today);
   }
 
-  function hydrateFiltersFromUrl() {
+  function hydrateFiltersFromUrl(): void {
     const params = new URLSearchParams(window.location.search);
     const resourceIds = parseArrayQuery(params, 'resource_ids');
     const startDate = String(params.get('start_date') || '').trim();
@@ -129,13 +170,13 @@ export function useJobQueryData() {
     filters.searchText = searchText;
   }
 
-  function syncUrlState() {
+  function syncUrlState(): void {
     const query = buildQueryString(filters);
     const nextUrl = query ? `/job-query?${query}` : '/job-query';
     replaceRuntimeHistory(nextUrl);
   }
 
-  function toggleResource(resourceId) {
+  function toggleResource(resourceId: string): void {
     const id = String(resourceId || '').trim();
     if (!id) {
       return;
@@ -147,7 +188,7 @@ export function useJobQueryData() {
     filters.resourceIds = [...filters.resourceIds, id];
   }
 
-  function validateInputs() {
+  function validateInputs(): string {
     if (filters.resourceIds.length === 0) {
       return '請選擇至少一台設備';
     }
@@ -170,22 +211,22 @@ export function useJobQueryData() {
     return '';
   }
 
-  async function loadResources() {
+  async function loadResources(): Promise<void> {
     loadingResources.value = true;
     errorMessage.value = '';
     try {
       const payload = await apiGet('/api/job-query/resources', { timeout: 360000, silent: true });
-      const inner = payload?.data || {};
-      resources.value = Array.isArray(inner?.data) ? inner.data : [];
+      const inner = (payload as Record<string, unknown>)?.['data'] as Record<string, unknown> | undefined ?? {};
+      resources.value = Array.isArray(inner['data']) ? (inner['data'] as Resource[]) : [];
     } catch (error) {
-      errorMessage.value = error?.message || '載入設備清單失敗';
+      errorMessage.value = (error as Error)?.message || '載入設備清單失敗';
       resources.value = [];
     } finally {
       loadingResources.value = false;
     }
   }
 
-  async function queryJobs() {
+  async function queryJobs(): Promise<boolean> {
     const validationError = validateInputs();
     if (validationError) {
       errorMessage.value = validationError;
@@ -209,11 +250,11 @@ export function useJobQueryData() {
         },
         { timeout: 360000, silent: true },
       );
-      const inner = payload?.data || {};
-      jobs.value = Array.isArray(inner?.data) ? inner.data : [];
+      const inner = (payload as Record<string, unknown>)?.['data'] as Record<string, unknown> | undefined ?? {};
+      jobs.value = Array.isArray(inner['data']) ? (inner['data'] as Record<string, unknown>[]) : [];
       return true;
     } catch (error) {
-      errorMessage.value = error?.message || '查詢失敗';
+      errorMessage.value = (error as Error)?.message || '查詢失敗';
       jobs.value = [];
       return false;
     } finally {
@@ -221,7 +262,7 @@ export function useJobQueryData() {
     }
   }
 
-  async function loadTxn(jobId) {
+  async function loadTxn(jobId: string): Promise<void> {
     const id = String(jobId || '').trim();
     if (!id) {
       return;
@@ -234,17 +275,17 @@ export function useJobQueryData() {
         timeout: 360000,
         silent: true,
       });
-      const inner = payload?.data || {};
-      txnRows.value = Array.isArray(inner?.data) ? inner.data : [];
+      const inner = (payload as Record<string, unknown>)?.['data'] as Record<string, unknown> | undefined ?? {};
+      txnRows.value = Array.isArray(inner['data']) ? (inner['data'] as Record<string, unknown>[]) : [];
     } catch (error) {
-      errorMessage.value = error?.message || '載入交易歷程失敗';
+      errorMessage.value = (error as Error)?.message || '載入交易歷程失敗';
       txnRows.value = [];
     } finally {
       loadingTxn.value = false;
     }
   }
 
-  async function exportCsv() {
+  async function exportCsv(): Promise<boolean> {
     const validationError = validateInputs();
     if (validationError) {
       errorMessage.value = validationError;
@@ -270,8 +311,8 @@ export function useJobQueryData() {
       if (!response.ok) {
         let message = `匯出失敗 (${response.status})`;
         try {
-          const payload = await response.json();
-          message = payload?.error || payload?.message || message;
+          const payload = await response.json() as Record<string, unknown>;
+          message = (payload['error'] as string | undefined) || (payload['message'] as string | undefined) || message;
         } catch {
           // ignore parse error
         }
@@ -291,14 +332,14 @@ export function useJobQueryData() {
       exportMessage.value = 'CSV 匯出成功';
       return true;
     } catch (error) {
-      errorMessage.value = error?.message || '匯出失敗';
+      errorMessage.value = (error as Error)?.message || '匯出失敗';
       return false;
     } finally {
       exporting.value = false;
     }
   }
 
-  function getStatusTone(status) {
+  function getStatusTone(status: unknown): 'neutral' | 'success' | 'warning' | 'danger' {
     return buildStatusTone(status);
   }
 

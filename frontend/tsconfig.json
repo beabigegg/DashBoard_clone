@@ -16,6 +16,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*", "src/admin-shared/**/*", "src/resource-shared/**/*", "src/wip-shared/**/*", "src/reject-history/**/*", "src/hold-history/**/*", "src/wip-overview/**/*", "src/wip-detail/**/*", "src/hold-overview/**/*", "src/hold-detail/**/*", "src/resource-status/**/*", "src/qc-gate/**/*", "src/resource-history/**/*"],
+  "include": ["src/core/**/*", "src/shared-composables/**/*", "src/shared-ui/**/*", "src/admin-shared/**/*", "src/resource-shared/**/*", "src/wip-shared/**/*", "src/reject-history/**/*", "src/hold-history/**/*", "src/wip-overview/**/*", "src/wip-detail/**/*", "src/hold-overview/**/*", "src/hold-detail/**/*", "src/resource-status/**/*", "src/qc-gate/**/*", "src/resource-history/**/*", "src/job-query/**/*"],
   "exclude": ["node_modules", "dist"]
 }

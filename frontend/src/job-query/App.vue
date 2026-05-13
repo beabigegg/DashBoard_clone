@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 
 import DataTable from '../shared-ui/components/DataTable.vue';
@@ -12,7 +12,7 @@ import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import StatusBadge from '../shared-ui/components/StatusBadge.vue';
-import { useJobQueryData } from './composables/useJobQueryData.js';
+import { useJobQueryData } from './composables/useJobQueryData';
 
 const ROWS_PER_PAGE = 25;
 
@@ -42,8 +42,13 @@ const {
 
 // ── Renderless component to trigger loadTxn when expand slot mounts ──
 const ExpandTxnLoader = {
-  props: { jobId: String, loadFn: Function },
-  mounted() { if (this.jobId && this.loadFn) this.loadFn(this.jobId); },
+  props: {
+    jobId: { type: String, required: true as const },
+    loadFn: { type: Function as unknown as () => (id: string) => Promise<void> | void, required: true as const },
+  },
+  mounted(this: { jobId: string; loadFn: (id: string) => Promise<void> | void }) {
+    if (this.jobId && this.loadFn) this.loadFn(this.jobId);
+  },
   render() { return null; },
 };
 
@@ -65,7 +70,7 @@ const jobsPagination = computed(() => {
   };
 });
 
-function handleJobsPageChange(page) {
+function handleJobsPageChange(page: number): void {
   currentPage.value = page;
 }
 
@@ -83,7 +88,7 @@ const resourceOptions = computed(() =>
   })),
 );
 
-function formatCellValue(value) {
+function formatCellValue(value: unknown): string {
   if (value === null || value === undefined || value === '') {
     return '-';
   }

@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.10
+schema-version: 1.3.11
 last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -102,6 +102,13 @@ breaking-change-policy: deprecate-2-minors
 - **From this change onward**: `include` gains `"src/resource-history/**/*"`, covering all `.ts`/`.vue` files migrated from `resource-history/` (`main.ts`, `useResourceHistoryDuckDB.ts`, `App.vue`, `components/FilterBar.vue`, `components/KpiCards.vue`, `components/TrendChart.vue`, `components/StackedChart.vue`, `components/ComparisonChart.vue`, `components/HeatmapChart.vue`, `components/DetailSection.vue`) under `strict: true`.
 - **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.9 (patch)**: additive prose only — gate tier, command, and status are unchanged.
+
+### frontend-type-check scope expansion (Phase 3 — migrate-job-query-ts)
+
+- **Before this change**: `tsconfig.json` `include` covered `core/`, `shared-composables/`, `shared-ui/`, `admin-shared/`, `resource-shared/`, `wip-shared/`, `reject-history/`, `hold-history/`, `wip-overview/`, `wip-detail/`, `hold-overview/`, `hold-detail/`, `resource-status/`, `qc-gate/`, `resource-history/`.
+- **From this change onward**: `include` gains `"src/job-query/**/*"`, covering all `.ts`/`.vue` files migrated from `job-query/` (`main.ts`, `App.vue`, `composables/useJobQueryData.ts`) under `strict: true`.
+- **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.11 (patch)**: additive prose only — gate tier, command, and status are unchanged.
 
 ### New test coverage — resource-history-perf
 

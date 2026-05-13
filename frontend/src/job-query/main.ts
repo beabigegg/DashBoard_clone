@@ -1,7 +1,31 @@
-import { ensureMesApiAvailable } from '../core/api.js';
-import { getPageContract } from '../core/field-contracts.js';
-import { escapeHtml, groupBy, sortBy, safeText } from '../core/table-tree.js';
-import { restoreUrlState } from '../core/shell-navigation.js';
+import { ensureMesApiAvailable } from '../core/api';
+import { getPageContract } from '../core/field-contracts';
+import { escapeHtml, groupBy, sortBy, safeText } from '../core/table-tree';
+import { restoreUrlState } from '../core/shell-navigation';
+
+declare const MesApi: {
+  get: (url: string) => Promise<Record<string, unknown>>;
+  post: (url: string, body: unknown) => Promise<Record<string, unknown>>;
+};
+declare const Toast: {
+  success: (msg: string) => void;
+  error: (msg: string) => void;
+};
+
+declare global {
+  interface Window {
+    __MES_FRONTEND_CORE__: Record<string, unknown>;
+    __FIELD_CONTRACTS__: Record<string, unknown>;
+  }
+}
+
+type Equipment = {
+  RESOURCEID: string;
+  RESOURCENAME: string;
+  WORKCENTERNAME: string;
+  RESOURCEFAMILYNAME: string;
+};
+type JobRecord = Record<string, unknown>;
 
 restoreUrlState();
 ensureMesApiAvailable();
@@ -13,11 +37,11 @@ window.__FIELD_CONTRACTS__['job_query:txn_table'] = getPageContract('job_query',
 const jobTableFields = getPageContract('job_query', 'jobs_table');
 const txnTableFields = getPageContract('job_query', 'txn_table');
 
-function toDataToken(value) {
+function toDataToken(value: unknown): string {
   return encodeURIComponent(safeText(value));
 }
 
-function fromDataToken(value) {
+function fromDataToken(value: string | null | undefined): string {
   if (!value) {
     return '';
   }
@@ -28,7 +52,7 @@ function fromDataToken(value) {
   }
 }
 
-function renderJobCell(job, apiKey) {
+function renderJobCell(job: JobRecord, apiKey: string): string {
   if (apiKey === 'JOBSTATUS') {
     const value = safeText(job[apiKey]);
     const classToken = safeText(value).replace(/[^A-Za-z0-9_-]/g, '_');
@@ -41,7 +65,7 @@ function renderJobCell(job, apiKey) {
   return escapeHtml(safeText(job[apiKey]));
 }
 
-function renderTxnCell(txn, apiKey) {
+function renderTxnCell(txn: JobRecord, apiKey: string): string {
   if (apiKey === 'FROMJOBSTATUS' || apiKey === 'JOBSTATUS') {
     const value = safeText(txn[apiKey], '-');
     const classToken = safeText(value).replace(/[^A-Za-z0-9_-]/g, '_');
@@ -52,17 +76,17 @@ function renderTxnCell(txn, apiKey) {
     return formatDate(txn[apiKey]);
   }
   if (apiKey === 'USER_NAME') {
-    return escapeHtml(safeText(txn.USER_NAME || txn.EMP_NAME));
+    return escapeHtml(safeText(txn['USER_NAME'] || txn['EMP_NAME']));
   }
   return escapeHtml(safeText(txn[apiKey]));
 }
 
 
         // State
-        let allEquipments = [];
-        let selectedEquipments = new Set();
-        let jobsData = [];
-        let expandedJobs = new Set();
+        let allEquipments: Equipment[] = [];
+        let selectedEquipments: Set<string> = new Set();
+        let jobsData: JobRecord[] = [];
+        let expandedJobs: Set<string> = new Set();
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -83,35 +107,37 @@ function renderTxnCell(txn, apiKey) {
             document.addEventListener('click', (e) => {
                 const dropdown = document.getElementById('equipmentDropdown');
                 const selector = document.querySelector('.equipment-selector');
-                if (!selector.contains(e.target)) {
+                if (dropdown && selector && !selector.contains(e.target as Node)) {
                     dropdown.classList.remove('show');
                 }
             });
         });
 
         // Load equipments from cache
-        async function loadEquipments() {
+        async function loadEquipments(): Promise<void> {
             try {
                 const data = await MesApi.get('/api/job-query/resources');
-                if (data.error) {
-                    document.getElementById('equipmentList').innerHTML = `<div class="error">${escapeHtml(data.error)}</div>`;
+                if (data['error']) {
+                    const el = document.getElementById('equipmentList');
+                    if (el) el.innerHTML = `<div class="error">${escapeHtml(data['error'])}</div>`;
                     return;
                 }
 
-                allEquipments = data.data;
+                allEquipments = data['data'] as Equipment[];
                 renderEquipmentList(allEquipments);
             } catch (error) {
-                document.getElementById('equipmentList').innerHTML = `<div class="error">載入失敗: ${escapeHtml(error.message)}</div>`;
+                const el = document.getElementById('equipmentList');
+                if (el) el.innerHTML = `<div class="error">載入失敗: ${escapeHtml((error as Error).message)}</div>`;
             }
         }
 
         // Render equipment list
-        function renderEquipmentList(equipments) {
+        function renderEquipmentList(equipments: Equipment[]): string {
             const container = document.getElementById('equipmentList');
 
             if (!equipments || equipments.length === 0) {
-                container.innerHTML = '<div class="empty-state">無設備資料</div>';
-                return;
+                if (container) container.innerHTML = '<div class="empty-state">無設備資料</div>';
+                return '';
             }
 
             let html = '';
@@ -150,17 +176,18 @@ function renderTxnCell(txn, apiKey) {
                 });
             });
 
-            container.innerHTML = html;
+            if (container) container.innerHTML = html;
+            return html;
         }
 
-        function handleEquipmentListClick(event) {
-            const trigger = event.target.closest('[data-action]');
+        function handleEquipmentListClick(event: Event): void {
+            const trigger = (event.target as Element).closest('[data-action]') as HTMLElement | null;
             if (!trigger) {
                 return;
             }
 
-            if (trigger.dataset.action === 'toggle-workcenter-group') {
-                const workcenterName = fromDataToken(trigger.dataset.workcenter);
+            if (trigger.dataset['action'] === 'toggle-workcenter-group') {
+                const workcenterName = fromDataToken(trigger.dataset['workcenter']);
                 if (!workcenterName) {
                     return;
                 }
@@ -168,8 +195,8 @@ function renderTxnCell(txn, apiKey) {
                 return;
             }
 
-            if (trigger.dataset.action === 'toggle-equipment') {
-                const resourceId = fromDataToken(trigger.dataset.resourceId);
+            if (trigger.dataset['action'] === 'toggle-equipment') {
+                const resourceId = fromDataToken(trigger.dataset['resourceId']);
                 if (!resourceId) {
                     return;
                 }
@@ -178,13 +205,13 @@ function renderTxnCell(txn, apiKey) {
         }
 
         // Toggle equipment dropdown
-        function toggleEquipmentDropdown() {
+        function toggleEquipmentDropdown(): void {
             const dropdown = document.getElementById('equipmentDropdown');
-            dropdown.classList.toggle('show');
+            if (dropdown) dropdown.classList.toggle('show');
         }
 
         // Filter equipments by search
-        function filterEquipments(query) {
+        function filterEquipments(query: string): void {
             const q = query.toLowerCase();
             const filtered = allEquipments.filter(eq =>
                 (eq.RESOURCENAME && eq.RESOURCENAME.toLowerCase().includes(q)) ||
@@ -195,7 +222,7 @@ function renderTxnCell(txn, apiKey) {
         }
 
         // Toggle equipment selection
-        function toggleEquipment(resourceId) {
+        function toggleEquipment(resourceId: string): void {
             if (selectedEquipments.has(resourceId)) {
                 selectedEquipments.delete(resourceId);
             } else {
@@ -203,7 +230,7 @@ function renderTxnCell(txn, apiKey) {
             }
             updateSelectedDisplay();
             renderEquipmentList(allEquipments.filter(eq => {
-                const search = document.querySelector('.equipment-search');
+                const search = document.querySelector('.equipment-search') as HTMLInputElement | null;
                 if (!search || !search.value) return true;
                 const q = search.value.toLowerCase();
                 return (eq.RESOURCENAME && eq.RESOURCENAME.toLowerCase().includes(q)) ||
@@ -212,7 +239,7 @@ function renderTxnCell(txn, apiKey) {
         }
 
         // Toggle entire workcenter group selection
-        function toggleWorkcenterGroup(workcenterName) {
+        function toggleWorkcenterGroup(workcenterName: string): void {
             const groupEquipments = allEquipments.filter(
                 (eq) => safeText(eq.WORKCENTERNAME, '未分類') === workcenterName
             );
@@ -227,7 +254,7 @@ function renderTxnCell(txn, apiKey) {
 
             updateSelectedDisplay();
             renderEquipmentList(allEquipments.filter((eq) => {
-                const search = document.querySelector('.equipment-search');
+                const search = document.querySelector('.equipment-search') as HTMLInputElement | null;
                 if (!search || !search.value) return true;
                 const q = search.value.toLowerCase();
                 return (eq.RESOURCENAME && eq.RESOURCENAME.toLowerCase().includes(q)) ||
@@ -236,9 +263,11 @@ function renderTxnCell(txn, apiKey) {
         }
 
         // Update selected display
-        function updateSelectedDisplay() {
+        function updateSelectedDisplay(): void {
             const display = document.getElementById('equipmentDisplay');
             const count = document.getElementById('selectedCount');
+
+            if (!display || !count) return;
 
             if (selectedEquipments.size === 0) {
                 display.textContent = '點擊選擇設備...';
@@ -257,24 +286,28 @@ function renderTxnCell(txn, apiKey) {
         }
 
         // Set last 90 days
-        function setLast90Days() {
+        function setLast90Days(): void {
             const today = new Date();
             const past = new Date();
             past.setDate(today.getDate() - 90);
 
-            document.getElementById('dateFrom').value = past.toISOString().split('T')[0];
-            document.getElementById('dateTo').value = today.toISOString().split('T')[0];
+            const dateFrom = document.getElementById('dateFrom') as HTMLInputElement | null;
+            const dateTo = document.getElementById('dateTo') as HTMLInputElement | null;
+            if (dateFrom) dateFrom.value = past.toISOString().split('T')[0];
+            if (dateTo) dateTo.value = today.toISOString().split('T')[0];
         }
 
         // Validate inputs
-        function validateInputs() {
+        function validateInputs(): boolean {
             if (selectedEquipments.size === 0) {
                 Toast.error('請選擇至少一台設備');
                 return false;
             }
 
-            const dateFrom = document.getElementById('dateFrom').value;
-            const dateTo = document.getElementById('dateTo').value;
+            const dateFromEl = document.getElementById('dateFrom') as HTMLInputElement | null;
+            const dateToEl = document.getElementById('dateTo') as HTMLInputElement | null;
+            const dateFrom = dateFromEl?.value ?? '';
+            const dateTo = dateToEl?.value ?? '';
 
             if (!dateFrom || !dateTo) {
                 Toast.error('請指定日期範圍');
@@ -289,7 +322,7 @@ function renderTxnCell(txn, apiKey) {
                 return false;
             }
 
-            const daysDiff = (to - from) / (1000 * 60 * 60 * 24);
+            const daysDiff = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24);
             if (daysDiff > 365) {
                 Toast.error('日期範圍不可超過 365 天');
                 return false;
@@ -299,48 +332,55 @@ function renderTxnCell(txn, apiKey) {
         }
 
         // Query jobs
-        async function queryJobs() {
+        async function queryJobs(): Promise<void> {
             if (!validateInputs()) return;
 
             const resultSection = document.getElementById('resultSection');
-            resultSection.innerHTML = `
+            if (resultSection) {
+                resultSection.innerHTML = `
                 <div class="loading">
                     <div class="loading-spinner"></div>
                     <br>查詢中...
                 </div>
             `;
+            }
 
-            document.getElementById('queryBtn').disabled = true;
-            document.getElementById('exportBtn').disabled = true;
+            const queryBtn = document.getElementById('queryBtn') as HTMLButtonElement | null;
+            const exportBtn = document.getElementById('exportBtn') as HTMLButtonElement | null;
+            if (queryBtn) queryBtn.disabled = true;
+            if (exportBtn) exportBtn.disabled = true;
 
             try {
+                const dateFromEl = document.getElementById('dateFrom') as HTMLInputElement | null;
+                const dateToEl = document.getElementById('dateTo') as HTMLInputElement | null;
                 const data = await MesApi.post('/api/job-query/jobs', {
                     resource_ids: Array.from(selectedEquipments),
-                    start_date: document.getElementById('dateFrom').value,
-                    end_date: document.getElementById('dateTo').value
+                    start_date: dateFromEl?.value ?? '',
+                    end_date: dateToEl?.value ?? '',
                 });
 
-                if (data.error) {
-                    resultSection.innerHTML = `<div class="error">${escapeHtml(data.error)}</div>`;
+                if (data['error']) {
+                    if (resultSection) resultSection.innerHTML = `<div class="error">${escapeHtml(data['error'])}</div>`;
                     return;
                 }
 
-                jobsData = data.data;
+                jobsData = data['data'] as JobRecord[];
                 expandedJobs.clear();
                 renderJobsTable();
 
-                document.getElementById('exportBtn').disabled = jobsData.length === 0;
+                if (exportBtn) exportBtn.disabled = jobsData.length === 0;
 
             } catch (error) {
-                resultSection.innerHTML = `<div class="error">查詢失敗: ${escapeHtml(error.message)}</div>`;
+                if (resultSection) resultSection.innerHTML = `<div class="error">查詢失敗: ${escapeHtml((error as Error).message)}</div>`;
             } finally {
-                document.getElementById('queryBtn').disabled = false;
+                if (queryBtn) queryBtn.disabled = false;
             }
         }
 
         // Render jobs table
-        function renderJobsTable() {
+        function renderJobsTable(): void {
             const resultSection = document.getElementById('resultSection');
+            if (!resultSection) return;
             const jobHeaders = jobTableFields.map((field) => `<th>${escapeHtml(field.ui_label)}</th>`).join('');
 
             if (!jobsData || jobsData.length === 0) {
@@ -372,8 +412,8 @@ function renderTxnCell(txn, apiKey) {
             `;
 
             jobsData.forEach((job, idx) => {
-                const isExpanded = expandedJobs.has(job.JOBID);
-                const jobIdToken = toDataToken(job.JOBID);
+                const isExpanded = expandedJobs.has(String(job['JOBID']));
+                const jobIdToken = toDataToken(job['JOBID']);
                 const jobCells = jobTableFields
                     .map((field) => `<td>${renderJobCell(job, field.api_key)}</td>`)
                     .join('');
@@ -405,21 +445,21 @@ function renderTxnCell(txn, apiKey) {
             resultSection.innerHTML = html;
 
             // Load expanded histories in batches to avoid thundering herd
-            const pendingLoads = [];
+            const pendingLoads: Array<{ jobId: string; idx: number }> = [];
             expandedJobs.forEach(jobId => {
-                const idx = jobsData.findIndex(j => j.JOBID === jobId);
+                const idx = jobsData.findIndex(j => j['JOBID'] === jobId);
                 if (idx >= 0) pendingLoads.push({ jobId, idx });
             });
             void loadHistoriesBatched(pendingLoads);
         }
 
-        function handleResultSectionClick(event) {
-            const trigger = event.target.closest('[data-action]');
+        function handleResultSectionClick(event: Event): void {
+            const trigger = (event.target as Element).closest('[data-action]') as HTMLElement | null;
             if (!trigger) {
                 return;
             }
 
-            const action = trigger.dataset.action;
+            const action = trigger.dataset['action'];
             if (action === 'expand-all') {
                 expandAll();
                 return;
@@ -429,8 +469,8 @@ function renderTxnCell(txn, apiKey) {
                 return;
             }
             if (action === 'toggle-job-history') {
-                const idx = Number.parseInt(trigger.dataset.rowIndex || '', 10);
-                const jobId = fromDataToken(trigger.dataset.jobId);
+                const idx = Number.parseInt(trigger.dataset['rowIndex'] || '', 10);
+                const jobId = fromDataToken(trigger.dataset['jobId']);
                 if (!Number.isInteger(idx) || !jobId) {
                     return;
                 }
@@ -439,39 +479,41 @@ function renderTxnCell(txn, apiKey) {
         }
 
         // Toggle job history
-        async function toggleJobHistory(jobId, idx) {
+        async function toggleJobHistory(jobId: string, idx: number): Promise<void> {
             const txnRow = document.getElementById(`txn-row-${idx}`);
             const jobRow = document.getElementById(`job-row-${idx}`);
-            const arrow = jobRow.querySelector('.arrow-icon');
+            const arrow = jobRow?.querySelector('.arrow-icon');
 
             if (expandedJobs.has(jobId)) {
                 expandedJobs.delete(jobId);
-                txnRow.classList.remove('show');
-                jobRow.classList.remove('expanded');
-                arrow.classList.remove('rotated');
+                txnRow?.classList.remove('show');
+                jobRow?.classList.remove('expanded');
+                arrow?.classList.remove('rotated');
             } else {
                 expandedJobs.add(jobId);
-                txnRow.classList.add('show');
-                jobRow.classList.add('expanded');
-                arrow.classList.add('rotated');
-                loadJobHistory(jobId, idx);
+                txnRow?.classList.add('show');
+                jobRow?.classList.add('expanded');
+                arrow?.classList.add('rotated');
+                void loadJobHistory(jobId, idx);
             }
         }
 
         // Load job history
-        async function loadJobHistory(jobId, idx) {
+        async function loadJobHistory(jobId: string, idx: number): Promise<void> {
             const container = document.getElementById(`txn-content-${idx}`);
+            if (!container) return;
             container.innerHTML = '<div class="loading" style="padding: var(--spacing-token-p20);"><div class="loading-spinner"></div></div>';
 
             try {
                 const data = await MesApi.get(`/api/job-query/txn/${jobId}`);
 
-                if (data.error) {
-                    container.innerHTML = `<div class="error" style="margin: var(--spacing-token-p10) var(--spacing-token-p20);">${escapeHtml(data.error)}</div>`;
+                if (data['error']) {
+                    container.innerHTML = `<div class="error" style="margin: var(--spacing-token-p10) var(--spacing-token-p20);">${escapeHtml(data['error'])}</div>`;
                     return;
                 }
 
-                if (!data.data || data.data.length === 0) {
+                const dataArr = data['data'] as JobRecord[] | null;
+                if (!dataArr || dataArr.length === 0) {
                     container.innerHTML = '<div style="padding: var(--spacing-token-p20); color: var(--color-token-h666666);">無交易歷史記錄</div>';
                     return;
                 }
@@ -487,7 +529,7 @@ function renderTxnCell(txn, apiKey) {
                         <tbody>
                 `;
 
-                data.data.forEach(txn => {
+                dataArr.forEach(txn => {
                     const txnCells = txnTableFields
                         .map((field) => `<td>${renderTxnCell(txn, field.api_key)}</td>`)
                         .join('');
@@ -502,13 +544,13 @@ function renderTxnCell(txn, apiKey) {
                 container.innerHTML = html;
 
             } catch (error) {
-                container.innerHTML = `<div class="error" style="margin: var(--spacing-token-p10) var(--spacing-token-p20);">載入失敗: ${escapeHtml(error.message)}</div>`;
+                container.innerHTML = `<div class="error" style="margin: var(--spacing-token-p10) var(--spacing-token-p20);">載入失敗: ${escapeHtml((error as Error).message)}</div>`;
             }
         }
 
         // Load multiple job histories with concurrency limit
         const BATCH_CONCURRENCY = 5;
-        async function loadHistoriesBatched(items) {
+        async function loadHistoriesBatched(items: Array<{ jobId: string; idx: number }>): Promise<void> {
             for (let i = 0; i < items.length; i += BATCH_CONCURRENCY) {
                 const batch = items.slice(i, i + BATCH_CONCURRENCY);
                 await Promise.all(batch.map(({ jobId, idx }) => loadJobHistory(jobId, idx)));
@@ -516,42 +558,48 @@ function renderTxnCell(txn, apiKey) {
         }
 
         // Expand all
-        function expandAll() {
-            jobsData.forEach((job, idx) => {
-                if (!expandedJobs.has(job.JOBID)) {
-                    expandedJobs.add(job.JOBID);
+        function expandAll(): void {
+            jobsData.forEach((job) => {
+                const jobId = String(job['JOBID']);
+                if (!expandedJobs.has(jobId)) {
+                    expandedJobs.add(jobId);
                 }
             });
             renderJobsTable();
         }
 
         // Collapse all
-        function collapseAll() {
+        function collapseAll(): void {
             expandedJobs.clear();
             renderJobsTable();
         }
 
         // Export CSV
-        async function exportCsv() {
+        async function exportCsv(): Promise<void> {
             if (!validateInputs()) return;
 
-            document.getElementById('exportBtn').disabled = true;
-            document.getElementById('exportBtn').textContent = '匯出中...';
+            const exportBtn = document.getElementById('exportBtn') as HTMLButtonElement | null;
+            if (exportBtn) {
+                exportBtn.disabled = true;
+                exportBtn.textContent = '匯出中...';
+            }
 
             try {
+                const dateFromEl = document.getElementById('dateFrom') as HTMLInputElement | null;
+                const dateToEl = document.getElementById('dateTo') as HTMLInputElement | null;
                 const response = await fetch('/api/job-query/export', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         resource_ids: Array.from(selectedEquipments),
-                        start_date: document.getElementById('dateFrom').value,
-                        end_date: document.getElementById('dateTo').value
+                        start_date: dateFromEl?.value ?? '',
+                        end_date: dateToEl?.value ?? '',
                     })
                 });
 
                 if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.error || '匯出失敗');
+                    const data = await response.json() as Record<string, unknown>;
+                    throw new Error((data['error'] as string | undefined) || '匯出失敗');
                 }
 
                 // Download file
@@ -559,7 +607,7 @@ function renderTxnCell(txn, apiKey) {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `job_history_${document.getElementById('dateFrom').value}_${document.getElementById('dateTo').value}.csv`;
+                a.download = `job_history_${dateFromEl?.value ?? ''}_${dateToEl?.value ?? ''}.csv`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -568,19 +616,21 @@ function renderTxnCell(txn, apiKey) {
                 Toast.success('CSV 匯出完成');
 
             } catch (error) {
-                Toast.error('匯出失敗: ' + error.message);
+                Toast.error('匯出失敗: ' + (error as Error).message);
             } finally {
-                document.getElementById('exportBtn').disabled = false;
-                document.getElementById('exportBtn').textContent = '匯出 CSV';
+                if (exportBtn) {
+                    exportBtn.disabled = false;
+                    exportBtn.textContent = '匯出 CSV';
+                }
             }
         }
 
         // Format date
-        function formatDate(dateStr) {
+        function formatDate(dateStr: unknown): string {
             if (!dateStr) return '';
-            return dateStr.replace('T', ' ').substring(0, 19);
+            return String(dateStr).replace('T', ' ').substring(0, 19);
         }
-    
+
 
 Object.assign(window, {
 loadEquipments,
