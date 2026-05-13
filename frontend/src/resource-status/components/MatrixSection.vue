@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import HierarchyTable from '../../resource-shared/components/HierarchyTable.vue';
@@ -9,24 +9,126 @@ import {
   resolveOuBadgeClass,
 } from '../../resource-shared/constants';
 
-const props = defineProps({
-  equipment: {
-    type: Array,
-    default: () => [],
-  },
-  expandedState: {
-    type: Object,
-    default: () => ({}),
-  },
-  matrixFilter: {
-    type: Array,
-    default: () => [],
-  },
+interface LotItem {
+  RUNCARDLOTID?: string;
+  LOTTRACKINQTY_PCS?: number | null;
+  LOTTRACKINTIME?: string | null;
+}
+
+interface EquipmentItem {
+  RESOURCEID: string;
+  RESOURCENAME: string;
+  EQUIPMENTASSETSSTATUS: string;
+  WORKCENTER_GROUP: string;
+  WORKCENTER_GROUP_SEQ: number;
+  RESOURCEFAMILYNAME: string;
+  WORKCENTERNAME: string;
+  LOCATIONNAME: string;
+  LOT_COUNT: number | string;
+  LOT_DETAILS: LotItem[];
+  JOBORDER: string;
+  JOBSTATUS: string;
+  JOBMODEL: string;
+  JOBSTAGE: string;
+  JOBID: string;
+  CREATEDATE: string;
+  CREATEUSERNAME: string;
+  CREATEUSER: string;
+  TECHNICIANUSERNAME: string;
+  TECHNICIANUSER: string;
+  SYMPTOMCODE: string;
+  CAUSECODE: string;
+  REPAIRCODE: string;
+  STATUS_CATEGORY: string;
+}
+
+interface MatrixFilter {
+  workcenter_group: string;
+  status: string;
+  family: string | null;
+  resource: string | null;
+}
+
+interface StatusCounts {
+  total: number;
+  PRD: number;
+  SBY: number;
+  UDT: number;
+  SDT: number;
+  EGT: number;
+  NST: number;
+  OTHER: number;
+  [key: string]: number;
+}
+
+interface ResourceNode {
+  id: string;
+  level: 2;
+  name: string;
+  workcenterGroup: string;
+  family: string;
+  resource: string | null;
+  statusKey: string;
+  statusRaw: string;
+  statusCategory: string;
+  values: { total: number };
+  rowClickable: boolean;
+  rowPayload: MatrixFilter;
+  rowSelected?: boolean;
+}
+
+interface FamilyNode {
+  id: string;
+  level: 1;
+  name: string;
+  workcenterGroup: string;
+  family: string;
+  counts: StatusCounts;
+  children: ResourceNode[];
+  selectedColumns?: Record<string, boolean>;
+}
+
+interface GroupNode {
+  id: string;
+  level: 0;
+  name: string;
+  workcenterGroup: string;
+  sequence: number;
+  counts: StatusCounts;
+  children: FamilyNode[];
+  familyMap?: Map<string, FamilyNode>;
+  selectedColumns?: Record<string, boolean>;
+}
+
+interface MatrixColumn {
+  key: string;
+  label: string;
+  className?: string;
+  value?: (node: unknown) => unknown;
+  render?: (node: unknown) => { text: unknown; badgeClass?: string };
+  cellClass?: (node: unknown) => string;
+  isClickable?: (node: unknown) => boolean;
+  isSelected?: (node: unknown) => boolean;
+  payload?: (node: unknown) => MatrixFilter | null;
+}
+
+const props = withDefaults(defineProps<{
+  equipment?: EquipmentItem[];
+  expandedState?: Record<string, boolean>;
+  matrixFilter?: MatrixFilter[];
+}>(), {
+  equipment: () => [],
+  expandedState: () => ({}),
+  matrixFilter: () => [],
 });
 
-const emit = defineEmits(['toggle-row', 'toggle-all', 'cell-filter']);
+const emit = defineEmits<{
+  'toggle-row': [rowId: string];
+  'toggle-all': [payload: { expand: boolean; rowIds: string[] }];
+  'cell-filter': [filter: MatrixFilter];
+}>();
 
-function createCounts() {
+function createCounts(): StatusCounts {
   return {
     total: 0,
     PRD: 0,
@@ -39,11 +141,11 @@ function createCounts() {
   };
 }
 
-function normalizeKey(value) {
+function normalizeKey(value: unknown): string {
   return String(value || 'unknown').replace(/[^\w\u4e00-\u9fa5-]+/g, '_');
 }
 
-function buildResourceNode(eq, groupName, familyName, statusKey, index) {
+function buildResourceNode(eq: EquipmentItem, groupName: string, familyName: string, statusKey: string, index: number): ResourceNode {
   const resourceId = eq.RESOURCEID || `resource_${index}`;
   const statusRaw = String(eq.EQUIPMENTASSETSSTATUS || '--').toUpperCase();
 
@@ -70,7 +172,7 @@ function buildResourceNode(eq, groupName, familyName, statusKey, index) {
   };
 }
 
-function calcOuPct(counts) {
+function calcOuPct(counts: StatusCounts): number {
   const denominator =
     Number(counts.PRD || 0) +
     Number(counts.SBY || 0) +
@@ -84,7 +186,10 @@ function calcOuPct(counts) {
   return (Number(counts.PRD || 0) / denominator) * 100;
 }
 
-function isMatrixFilterMatch(filters, { group, status, family = null, resource = null }) {
+function isMatrixFilterMatch(
+  filters: MatrixFilter[],
+  { group, status, family = null, resource = null }: { group: string; status: string; family?: string | null; resource?: string | null }
+): boolean {
   if (!filters || filters.length === 0) {
     return false;
   }
@@ -99,8 +204,10 @@ function isMatrixFilterMatch(filters, { group, status, family = null, resource =
   });
 }
 
-function buildMatrixHierarchy(equipment) {
-  const groupMap = new Map();
+type GroupNodeBuilding = GroupNode & { familyMap: Map<string, FamilyNode> };
+
+function buildMatrixHierarchy(equipment: EquipmentItem[]): GroupNode[] {
+  const groupMap = new Map<string, GroupNodeBuilding>();
 
   equipment.forEach((eq, index) => {
     const groupName = eq.WORKCENTER_GROUP || 'UNKNOWN';
@@ -111,22 +218,22 @@ function buildMatrixHierarchy(equipment) {
     if (!groupMap.has(groupName)) {
       groupMap.set(groupName, {
         id: `grp_${normalizeKey(groupName)}`,
-        level: 0,
+        level: 0 as const,
         name: groupName,
         workcenterGroup: groupName,
         sequence: groupSeq,
         counts: createCounts(),
         children: [],
-        familyMap: new Map(),
+        familyMap: new Map<string, FamilyNode>(),
       });
     }
 
-    const groupNode = groupMap.get(groupName);
+    const groupNode = groupMap.get(groupName)!;
 
     if (!groupNode.familyMap.has(familyName)) {
-      const familyNode = {
+      const familyNode: FamilyNode = {
         id: `fam_${normalizeKey(groupName)}_${normalizeKey(familyName)}`,
-        level: 1,
+        level: 1 as const,
         name: familyName,
         workcenterGroup: groupName,
         family: familyName,
@@ -137,7 +244,7 @@ function buildMatrixHierarchy(equipment) {
       groupNode.children.push(familyNode);
     }
 
-    const familyNode = groupNode.familyMap.get(familyName);
+    const familyNode = groupNode.familyMap.get(familyName)!;
     familyNode.children.push(buildResourceNode(eq, groupName, familyName, statusKey, index));
 
     groupNode.counts.total += 1;
@@ -192,8 +299,8 @@ function buildMatrixHierarchy(equipment) {
         ])
       );
 
-      delete groupNode.familyMap;
-      return groupNode;
+      delete (groupNode as Partial<GroupNodeBuilding>).familyMap;
+      return groupNode as GroupNode;
     })
     .sort((left, right) => {
       const seqDiff = Number(left.sequence || 999) - Number(right.sequence || 999);
@@ -208,60 +315,71 @@ function buildMatrixHierarchy(equipment) {
 
 const hierarchy = computed(() => buildMatrixHierarchy(props.equipment || []));
 
-function resolveEquipmentStatusClass(node) {
+function resolveEquipmentStatusClass(node: ResourceNode): string {
   if (node.statusCategory) {
     return `eq-status ${node.statusCategory}`;
   }
   return `eq-status ${String(node.statusKey || 'other').toLowerCase()}`;
 }
 
-const columns = computed(() => {
-  const baseColumns = [
+const columns = computed<MatrixColumn[]>(() => {
+  const baseColumns: MatrixColumn[] = [
     {
       key: 'total',
       label: '總數',
       className: 'col-total',
-      value: (node) => {
-        if (node.level === 2) {
+      value: (node: unknown) => {
+        // TODO: type hierarchy node union
+        const n = node as ResourceNode | FamilyNode | GroupNode;
+        if (n.level === 2) {
           return 1;
         }
-        return Number(node.counts?.total || 0);
+        return Number((n as FamilyNode | GroupNode).counts?.total || 0);
       },
     },
   ];
 
-  const statusColumns = MATRIX_STATUS_COLUMNS.map((status) => {
+  const statusColumns: MatrixColumn[] = MATRIX_STATUS_COLUMNS.map((status) => {
     const className = `col-${status.toLowerCase()}`;
     return {
       key: status,
       label: status,
       className,
-      render: (node) => {
-        if (node.level === 2) {
-          const active = node.statusKey === status;
+      render: (node: unknown) => {
+        // TODO: type hierarchy node union
+        const n = node as ResourceNode | FamilyNode | GroupNode;
+        if (n.level === 2) {
+          const active = (n as ResourceNode).statusKey === status;
           return {
             text: active ? '●' : '-',
           };
         }
         return {
-          text: Number(node.counts?.[status] || 0),
+          text: Number((n as FamilyNode | GroupNode).counts?.[status] || 0),
         };
       },
-      cellClass: (node) => {
-        if (node.level === 2) {
-          return node.statusKey === status ? '' : 'zero';
+      cellClass: (node: unknown): string => {
+        // TODO: type hierarchy node union
+        const n = node as ResourceNode | FamilyNode | GroupNode;
+        if (n.level === 2) {
+          return (n as ResourceNode).statusKey === status ? '' : 'zero';
         }
-        return Number(node.counts?.[status] || 0) === 0 ? 'zero' : '';
+        return Number((n as FamilyNode | GroupNode).counts?.[status] || 0) === 0 ? 'zero' : '';
       },
-      isClickable: (node) => node.level < 2,
-      isSelected: (node) => Boolean(node.selectedColumns?.[status]),
-      payload: (node) => {
-        if (node.level === 2) {
+      isClickable: (node: unknown): boolean => (node as { level: number }).level < 2,
+      isSelected: (node: unknown): boolean => {
+        const n = node as FamilyNode | GroupNode;
+        return Boolean(n.selectedColumns?.[status]);
+      },
+      payload: (node: unknown): MatrixFilter | null => {
+        // TODO: type hierarchy node union
+        const n = node as ResourceNode | FamilyNode | GroupNode;
+        if (n.level === 2) {
           return null;
         }
         return {
-          workcenter_group: node.workcenterGroup,
-          family: node.level === 1 ? node.family : null,
+          workcenter_group: n.workcenterGroup,
+          family: n.level === 1 ? (n as FamilyNode).family : null,
           resource: null,
           status,
         };
@@ -269,18 +387,21 @@ const columns = computed(() => {
     };
   });
 
-  const ouColumn = {
+  const ouColumn: MatrixColumn = {
     key: 'ou',
     label: 'OU%',
-    render: (node) => {
-      if (node.level === 2) {
+    render: (node: unknown) => {
+      // TODO: type hierarchy node union
+      const n = node as ResourceNode | FamilyNode | GroupNode;
+      if (n.level === 2) {
+        const rn = n as ResourceNode;
         return {
-          text: STATUS_DISPLAY_MAP[node.statusKey] || node.statusRaw || '--',
-          badgeClass: resolveEquipmentStatusClass(node),
+          text: STATUS_DISPLAY_MAP[rn.statusKey] || rn.statusRaw || '--',
+          badgeClass: resolveEquipmentStatusClass(rn),
         };
       }
 
-      const ouValue = calcOuPct(node.counts || {});
+      const ouValue = calcOuPct((n as FamilyNode | GroupNode).counts);
       return {
         text: `${ouValue.toFixed(1)}%`,
         badgeClass: `ou-badge ${resolveOuBadgeClass(ouValue)}`,
@@ -291,15 +412,15 @@ const columns = computed(() => {
   return [...baseColumns, ...statusColumns, ouColumn];
 });
 
-function handleCellClick({ payload }) {
+function handleCellClick({ payload }: { payload: MatrixFilter | null }): void {
   if (!payload) {
     return;
   }
   emit('cell-filter', payload);
 }
 
-function handleToggleAll(expand) {
-  const rowIds = [];
+function handleToggleAll(expand: boolean): void {
+  const rowIds: string[] = [];
   hierarchy.value.forEach((groupNode) => {
     rowIds.push(groupNode.id);
     groupNode.children.forEach((familyNode) => {

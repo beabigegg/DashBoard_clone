@@ -1,28 +1,23 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps({
-  cacheLevel: {
-    type: String,
-    default: 'loading',
-  },
-  cacheText: {
-    type: String,
-    default: '檢查中...',
-  },
-  lastUpdate: {
-    type: String,
-    default: '--',
-  },
-  refreshing: {
-    type: Boolean,
-    default: false,
-  },
+const props = withDefaults(defineProps<{
+  cacheLevel?: string;
+  cacheText?: string;
+  lastUpdate?: string;
+  refreshing?: boolean;
+}>(), {
+  cacheLevel: 'loading',
+  cacheText: '檢查中...',
+  lastUpdate: '--',
+  refreshing: false,
 });
 
-defineEmits(['refresh']);
+defineEmits<{
+  refresh: [];
+}>();
 
-const cacheDotClass = computed(() => {
+const cacheDotClass = computed<'' | 'error' | 'loading'>(() => {
   if (props.cacheLevel === 'ok') {
     return '';
   }

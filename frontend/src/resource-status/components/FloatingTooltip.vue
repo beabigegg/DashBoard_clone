@@ -1,34 +1,66 @@
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
-import { apiGet } from '../../core/api.js';
+import { apiGet } from '../../core/api';
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false,
-  },
-  type: {
-    type: String,
-    default: 'lot',
-  },
-  payload: {
-    type: [Array, Object],
-    default: null,
-  },
-  position: {
-    type: Object,
-    default: () => ({ x: 0, y: 0 }),
-  },
+interface LotItem {
+  RUNCARDLOTID?: string;
+  LOTTRACKINQTY_PCS?: number | null;
+  LOTTRACKINTIME?: string | null;
+}
+
+interface LotDetail {
+  [key: string]: string | number | null | undefined;
+}
+
+interface EquipmentItem {
+  RESOURCEID: string;
+  RESOURCENAME: string;
+  EQUIPMENTASSETSSTATUS: string;
+  WORKCENTER_GROUP: string;
+  WORKCENTER_GROUP_SEQ: number;
+  RESOURCEFAMILYNAME: string;
+  WORKCENTERNAME: string;
+  LOCATIONNAME: string;
+  LOT_COUNT: number | string;
+  LOT_DETAILS: LotItem[];
+  JOBORDER: string;
+  JOBSTATUS: string;
+  JOBMODEL: string;
+  JOBSTAGE: string;
+  JOBID: string;
+  CREATEDATE: string;
+  CREATEUSERNAME: string;
+  CREATEUSER: string;
+  TECHNICIANUSERNAME: string;
+  TECHNICIANUSER: string;
+  SYMPTOMCODE: string;
+  CAUSECODE: string;
+  REPAIRCODE: string;
+  STATUS_CATEGORY: string;
+}
+
+const props = withDefaults(defineProps<{
+  visible?: boolean;
+  type?: 'lot' | 'job';
+  payload?: LotItem[] | EquipmentItem | null;
+  position?: { x: number; y: number };
+}>(), {
+  visible: false,
+  type: 'lot',
+  payload: null,
+  position: () => ({ x: 0, y: 0 }),
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits<{
+  close: [];
+}>();
 
-const tooltipRef = ref(null);
-const tooltipStyle = reactive({ left: '0px', top: '0px' });
-const lotDetailMap = ref({});
+const tooltipRef = ref<HTMLElement | null>(null);
+const tooltipStyle = reactive<{ left: string; top: string }>({ left: '0px', top: '0px' });
+const lotDetailMap = ref<Record<string, LotDetail>>({});
 const isDragging = ref(false);
-const dragOffset = { x: 0, y: 0 };
+const dragOffset: { x: number; y: number } = { x: 0, y: 0 };
 
 const tooltipTitle = computed(() => {
   if (props.type === 'job') {
@@ -44,41 +76,43 @@ const lotItems = computed(() => {
   return props.payload;
 });
 
-async function fetchLotDetails(lots) {
-  const ids = lots.map((lot) => lot.RUNCARDLOTID).filter(Boolean);
+async function fetchLotDetails(lots: LotItem[]): Promise<void> {
+  const ids = lots.map((lot) => lot.RUNCARDLOTID).filter((id): id is string => Boolean(id));
   if (ids.length === 0) {
     return;
   }
 
-  const pending = ids.filter((id) => !lotDetailMap.value[id]);
+  const pending = ids.filter((id: string) => !lotDetailMap.value[id]);
   if (pending.length === 0) {
     return;
   }
 
   const results = await Promise.allSettled(
-    pending.map((id) =>
+    pending.map((id: string) =>
       apiGet(`/api/wip/lot/${encodeURIComponent(id)}`, { timeout: 15000 })
         .then((result) => {
-          const data = result?.success ? result.data : result?.data !== undefined ? result.data : result;
+          const r = result as { success?: boolean; data?: unknown } | null;
+          const data = r?.success ? r.data : r?.data !== undefined ? r.data : result;
           return { id, data };
         }),
     ),
   );
 
-  const updated = { ...lotDetailMap.value };
+  const updated: Record<string, LotDetail> = { ...lotDetailMap.value };
   for (const entry of results) {
     if (entry.status === 'fulfilled' && entry.value?.data) {
-      updated[entry.value.id] = entry.value.data;
+      updated[entry.value.id] = entry.value.data as LotDetail;
     }
   }
   lotDetailMap.value = updated;
 }
 
-function getLotDetail(lotId) {
+function getLotDetail(lotId: string | undefined): LotDetail | null {
+  if (!lotId) return null;
   return lotDetailMap.value[lotId] || null;
 }
 
-function lotDetailValue(detail, key) {
+function lotDetailValue(detail: LotDetail | null, key: string): string {
   const value = detail?.[key];
   if (value === null || value === undefined || value === '') {
     return '--';
@@ -86,12 +120,18 @@ function lotDetailValue(detail, key) {
   return String(value);
 }
 
-const jobFields = computed(() => {
+interface JobField {
+  label: string;
+  value: string | undefined;
+  highlight?: boolean;
+}
+
+const jobFields = computed<JobField[]>(() => {
   if (!props.payload || Array.isArray(props.payload)) {
     return [];
   }
 
-  const eq = props.payload;
+  const eq = props.payload as EquipmentItem;
   return [
     { label: 'JOBORDER', value: eq.JOBORDER, highlight: true },
     { label: 'JOBSTATUS', value: eq.JOBSTATUS, highlight: true },
@@ -107,7 +147,7 @@ const jobFields = computed(() => {
   ];
 });
 
-function formatDate(rawValue) {
+function formatDate(rawValue: string | null | undefined): string {
   if (!rawValue) {
     return '--';
   }
@@ -144,16 +184,16 @@ function positionTooltip() {
   tooltipStyle.top = `${nextY}px`;
 }
 
-function handleOutsideClick(event) {
+function handleOutsideClick(event: MouseEvent): void {
   if (!props.visible || !tooltipRef.value) {
     return;
   }
-  if (!tooltipRef.value.contains(event.target)) {
+  if (!tooltipRef.value.contains(event.target as Node)) {
     emit('close');
   }
 }
 
-function onDragStart(event) {
+function onDragStart(event: MouseEvent): void {
   if (event.button !== 0) {
     return;
   }
@@ -164,7 +204,7 @@ function onDragStart(event) {
   document.addEventListener('mouseup', onDragEnd);
 }
 
-function onDragMove(event) {
+function onDragMove(event: MouseEvent): void {
   if (!isDragging.value) {
     return;
   }

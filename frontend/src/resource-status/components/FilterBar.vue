@@ -1,48 +1,46 @@
-<script setup>
+<script setup lang="ts">
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
-const props = defineProps({
-  workcenterGroups: {
-    type: Array,
-    default: () => [],
-  },
-  selectedGroups: {
-    type: Array,
-    default: () => [],
-  },
-  flags: {
-    type: Object,
-    default: () => ({
-      isProduction: false,
-      isKey: false,
-      isMonitor: false,
-    }),
-  },
-  familyOptions: {
-    type: Array,
-    default: () => [],
-  },
-  machineOptions: {
-    type: Array,
-    default: () => [],
-  },
-  selectedFamilies: {
-    type: Array,
-    default: () => [],
-  },
-  selectedMachines: {
-    type: Array,
-    default: () => [],
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
+interface FilterFlags {
+  isProduction: boolean;
+  isKey: boolean;
+  isMonitor: boolean;
+}
+
+interface MachineOption {
+  label: string;
+  value: string;
+}
+
+const props = withDefaults(defineProps<{
+  workcenterGroups?: string[];
+  selectedGroups?: string[];
+  flags?: FilterFlags;
+  familyOptions?: string[];
+  machineOptions?: (string | number | Record<string, unknown>)[];
+  selectedFamilies?: string[];
+  selectedMachines?: string[];
+  loading?: boolean;
+}>(), {
+  workcenterGroups: () => [],
+  selectedGroups: () => [],
+  flags: () => ({ isProduction: false, isKey: false, isMonitor: false }),
+  familyOptions: () => [],
+  machineOptions: () => [],
+  selectedFamilies: () => [],
+  selectedMachines: () => [],
+  loading: false,
 });
 
-const emit = defineEmits(['change-groups', 'change-flags', 'change-families', 'change-machines']);
+const emit = defineEmits<{
+  'change-groups': [groups: string[]];
+  'change-flags': [flags: FilterFlags];
+  'change-families': [families: string[]];
+  'change-machines': [machines: string[]];
+}>();
 
-function updateFlag(key, checked) {
+function updateFlag(key: keyof FilterFlags, event: Event): void {
+  const checked = (event.target as HTMLInputElement).checked;
   emit('change-flags', {
     ...props.flags,
     [key]: checked,
@@ -92,7 +90,7 @@ function updateFlag(key, checked) {
           type="checkbox"
           :checked="flags.isProduction"
           :disabled="loading"
-          @change="updateFlag('isProduction', $event.target.checked)"
+          @change="updateFlag('isProduction', $event)"
         />
         生產設備
       </label>
@@ -102,7 +100,7 @@ function updateFlag(key, checked) {
           type="checkbox"
           :checked="flags.isKey"
           :disabled="loading"
-          @change="updateFlag('isKey', $event.target.checked)"
+          @change="updateFlag('isKey', $event)"
         />
         重點設備
       </label>
@@ -112,7 +110,7 @@ function updateFlag(key, checked) {
           type="checkbox"
           :checked="flags.isMonitor"
           :disabled="loading"
-          @change="updateFlag('isMonitor', $event.target.checked)"
+          @change="updateFlag('isMonitor', $event)"
         />
         監控設備
       </label>

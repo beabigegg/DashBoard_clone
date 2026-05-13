@@ -1,20 +1,59 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { getStatusDisplay, normalizeStatus } from '../../resource-shared/constants';
 
-const props = defineProps({
-  equipment: {
-    type: Object,
-    required: true,
-  },
-});
+interface LotItem {
+  RUNCARDLOTID?: string;
+  LOTTRACKINQTY_PCS?: number | null;
+  LOTTRACKINTIME?: string | null;
+}
 
-const emit = defineEmits(['show-lot', 'show-job']);
+interface EquipmentItem {
+  RESOURCEID: string;
+  RESOURCENAME: string;
+  EQUIPMENTASSETSSTATUS: string;
+  WORKCENTER_GROUP: string;
+  WORKCENTER_GROUP_SEQ: number;
+  RESOURCEFAMILYNAME: string;
+  WORKCENTERNAME: string;
+  LOCATIONNAME: string;
+  LOT_COUNT: number | string;
+  LOT_DETAILS: LotItem[];
+  JOBORDER: string;
+  JOBSTATUS: string;
+  JOBMODEL: string;
+  JOBSTAGE: string;
+  JOBID: string;
+  CREATEDATE: string;
+  CREATEUSERNAME: string;
+  CREATEUSER: string;
+  TECHNICIANUSERNAME: string;
+  TECHNICIANUSER: string;
+  SYMPTOMCODE: string;
+  CAUSECODE: string;
+  REPAIRCODE: string;
+  STATUS_CATEGORY: string;
+}
+
+interface TooltipPayload {
+  x: number;
+  y: number;
+  equipment: EquipmentItem;
+}
+
+const props = defineProps<{
+  equipment: EquipmentItem;
+}>();
+
+const emit = defineEmits<{
+  'show-lot': [payload: TooltipPayload];
+  'show-job': [payload: TooltipPayload];
+}>();
 
 const statusKey = computed(() => normalizeStatus(props.equipment.EQUIPMENTASSETSSTATUS));
 
-const statusClass = computed(() => {
+const statusClass = computed<string>(() => {
   const category = String(props.equipment.STATUS_CATEGORY || '').toLowerCase();
   if (category) {
     return category;
@@ -22,11 +61,11 @@ const statusClass = computed(() => {
   return statusKey.value.toLowerCase();
 });
 
-const statusLabel = computed(() => getStatusDisplay(props.equipment.EQUIPMENTASSETSSTATUS));
-const lotCount = computed(() => Number(props.equipment.LOT_COUNT || 0));
-const hasJob = computed(() => Boolean(props.equipment.JOBORDER));
+const statusLabel = computed<string>(() => getStatusDisplay(props.equipment.EQUIPMENTASSETSSTATUS));
+const lotCount = computed<number>(() => Number(props.equipment.LOT_COUNT || 0));
+const hasJob = computed<boolean>(() => Boolean(props.equipment.JOBORDER));
 
-function emitLot(event) {
+function emitLot(event: MouseEvent): void {
   event.stopPropagation();
   emit('show-lot', {
     x: event.clientX,
@@ -35,7 +74,7 @@ function emitLot(event) {
   });
 }
 
-function emitJob(event) {
+function emitJob(event: MouseEvent): void {
   event.stopPropagation();
   emit('show-job', {
     x: event.clientX,

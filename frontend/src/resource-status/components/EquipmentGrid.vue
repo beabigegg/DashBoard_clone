@@ -1,18 +1,58 @@
-<script setup>
+<script setup lang="ts">
 import EquipmentCard from './EquipmentCard.vue';
 
-const props = defineProps({
-  equipment: {
-    type: Array,
-    default: () => [],
-  },
-  activeFilterText: {
-    type: String,
-    default: '',
-  },
+interface LotItem {
+  RUNCARDLOTID?: string;
+  LOTTRACKINQTY_PCS?: number | null;
+  LOTTRACKINTIME?: string | null;
+}
+
+interface EquipmentItem {
+  RESOURCEID: string;
+  RESOURCENAME: string;
+  EQUIPMENTASSETSSTATUS: string;
+  WORKCENTER_GROUP: string;
+  WORKCENTER_GROUP_SEQ: number;
+  RESOURCEFAMILYNAME: string;
+  WORKCENTERNAME: string;
+  LOCATIONNAME: string;
+  LOT_COUNT: number | string;
+  LOT_DETAILS: LotItem[];
+  JOBORDER: string;
+  JOBSTATUS: string;
+  JOBMODEL: string;
+  JOBSTAGE: string;
+  JOBID: string;
+  CREATEDATE: string;
+  CREATEUSERNAME: string;
+  CREATEUSER: string;
+  TECHNICIANUSERNAME: string;
+  TECHNICIANUSER: string;
+  SYMPTOMCODE: string;
+  CAUSECODE: string;
+  REPAIRCODE: string;
+  STATUS_CATEGORY: string;
+}
+
+interface TooltipPayload {
+  x: number;
+  y: number;
+  equipment: EquipmentItem;
+}
+
+withDefaults(defineProps<{
+  equipment?: EquipmentItem[];
+  activeFilterText?: string;
+}>(), {
+  equipment: () => [],
+  activeFilterText: '',
 });
 
-defineEmits(['clear-filter', 'show-lot', 'show-job']);
+defineEmits<{
+  'clear-filter': [];
+  'show-lot': [payload: TooltipPayload];
+  'show-job': [payload: TooltipPayload];
+}>();
 </script>
 
 <template>

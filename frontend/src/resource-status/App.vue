@@ -1,11 +1,88 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 
-import { apiGet, ensureMesApiAvailable } from '../core/api.js';
-import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
-import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
+import { apiGet, ensureMesApiAvailable } from '../core/api';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { MATRIX_STATUS_COLUMNS, OU_BADGE_THRESHOLDS, STATUS_DISPLAY_MAP, normalizeStatus } from '../resource-shared/constants';
+
+// --- Domain Interfaces ---
+
+interface EquipmentItem {
+  RESOURCEID: string;
+  RESOURCENAME: string;
+  EQUIPMENTASSETSSTATUS: string;
+  WORKCENTER_GROUP: string;
+  WORKCENTER_GROUP_SEQ: number;
+  RESOURCEFAMILYNAME: string;
+  WORKCENTERNAME: string;
+  LOCATIONNAME: string;
+  LOT_COUNT: number | string;
+  LOT_DETAILS: LotItem[];
+  JOBORDER: string;
+  JOBSTATUS: string;
+  JOBMODEL: string;
+  JOBSTAGE: string;
+  JOBID: string;
+  CREATEDATE: string;
+  CREATEUSERNAME: string;
+  CREATEUSER: string;
+  TECHNICIANUSERNAME: string;
+  TECHNICIANUSER: string;
+  SYMPTOMCODE: string;
+  CAUSECODE: string;
+  REPAIRCODE: string;
+  STATUS_CATEGORY: string;
+}
+
+interface LotItem {
+  RUNCARDLOTID?: string;
+  LOTTRACKINQTY_PCS?: number | null;
+  LOTTRACKINTIME?: string | null;
+}
+
+interface ResourceOption {
+  id: string;
+  name: string;
+  family: string;
+  workcenterGroup: string;
+  isProduction: boolean;
+  isKey: boolean;
+  isMonitor: boolean;
+}
+
+interface SummaryData {
+  totalCount: number;
+  byStatus: Record<string, number>;
+  ouPct: number;
+  availabilityPct: number;
+}
+
+interface MatrixFilter {
+  workcenter_group: string;
+  status: string;
+  family: string | null;
+  resource: string | null;
+}
+
+interface TooltipState {
+  visible: boolean;
+  type: 'lot' | 'job';
+  payload: LotItem[] | EquipmentItem | null;
+  position: { x: number; y: number };
+}
+
+interface LoadingState {
+  initial: boolean;
+  refreshing: boolean;
+  options: boolean;
+}
+
+interface MachineOption {
+  label: string;
+  value: string;
+}
 
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
@@ -22,10 +99,10 @@ ensureMesApiAvailable();
 
 const API_TIMEOUT = 60000;
 
-const allEquipment = ref([]);
-const workcenterGroups = ref([]);
-const allResources = ref([]);
-const summary = ref({
+const allEquipment = ref<EquipmentItem[]>([]);
+const workcenterGroups = ref<string[]>([]);
+const allResources = ref<ResourceOption[]>([]);
+const summary = ref<SummaryData>({
   totalCount: 0,
   byStatus: {
     PRD: 0,
@@ -41,8 +118,18 @@ const summary = ref({
 });
 
 // --- Filter orchestration with cascading: group/flags -> families -> machines ---
+
+interface FilterState {
+  groups: string[];
+  isProduction: boolean;
+  isKey: boolean;
+  isMonitor: boolean;
+  families: string[];
+  machines: string[];
+}
+
 const {
-  committed: filterState,
+  committed: _filterStateRaw,
   updateField,
 } = useFilterOrchestrator({
   fields: {
@@ -63,11 +150,14 @@ const {
   onFetch: () => void applyFiltersAndReload(),
 });
 
-const matrixFilter = ref([]);
-const summaryStatusFilter = ref(null);
-const hierarchyState = reactive({});
+// Cast committed to typed FilterState for property access throughout the component
+const filterState = _filterStateRaw as unknown as FilterState;
 
-const loading = reactive({
+const matrixFilter = ref<MatrixFilter[]>([]);
+const summaryStatusFilter = ref<string | null>(null);
+const hierarchyState = reactive<Record<string, boolean>>({});
+
+const loading = reactive<LoadingState>({
   initial: true,
   refreshing: false,
   options: false,
@@ -83,7 +173,7 @@ const lastUpdate = ref('--');
 const summaryError = ref('');
 const equipmentError = ref('');
 
-const STATUS_ACCENT_MAP = {
+const STATUS_ACCENT_MAP: Record<string, string> = {
   PRD: 'prd',
   SBY: 'sby',
   UDT: 'udt',
@@ -93,7 +183,7 @@ const STATUS_ACCENT_MAP = {
   OTHER: 'neutral',
 };
 
-function resolveOuAccent(value) {
+function resolveOuAccent(value: number): string {
   const pct = Number(value || 0);
   if (pct >= OU_BADGE_THRESHOLDS.high) return 'success';
   if (pct >= OU_BADGE_THRESHOLDS.medium) return 'warning';
@@ -104,14 +194,14 @@ const statusTotalForPct = computed(() => {
   return MATRIX_STATUS_COLUMNS.reduce((total, status) => total + Number(summary.value.byStatus?.[status] || 0), 0);
 });
 
-function statusPctSub(status) {
+function statusPctSub(status: string): string {
   const count = Number(summary.value.byStatus?.[status] || 0);
   const total = statusTotalForPct.value;
   const pctStr = total > 0 ? `${((count / total) * 100).toFixed(1)}%` : '--';
   return `${STATUS_DISPLAY_MAP[status] || status} (${pctStr})`;
 }
 
-const tooltipState = reactive({
+const tooltipState = reactive<TooltipState>({
   visible: false,
   type: 'lot',
   payload: null,
@@ -120,8 +210,8 @@ const tooltipState = reactive({
 
 // unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
-function buildFilterParams() {
-  const params = {};
+function buildFilterParams(): Record<string, string | number> {
+  const params: Record<string, string | number> = {};
 
   if (filterState.groups.length > 0) {
     params.workcenter_groups = filterState.groups.join(',');
@@ -157,23 +247,23 @@ const filteredByUpstream = computed(() => {
   });
 });
 
-const familyOptions = computed(() => {
-  const set = new Set();
+const familyOptions = computed<string[]>(() => {
+  const set = new Set<string>();
   filteredByUpstream.value.forEach((r) => {
     if (r.family) set.add(r.family);
   });
   return [...set].sort();
 });
 
-const machineOptions = computed(() => {
+const machineOptions = computed<(string | number | Record<string, unknown>)[]>(() => {
   let list = filteredByUpstream.value;
   if (filterState.families.length > 0) {
-    const fset = new Set(filterState.families);
+    const fset = new Set<string>(filterState.families);
     list = list.filter((r) => fset.has(r.family));
   }
   return list
-    .map((r) => ({ label: r.name, value: r.id }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .map((r): Record<string, unknown> => ({ label: r.name, value: r.id }))
+    .sort((a, b) => String(a['label']).localeCompare(String(b['label'])));
 });
 
 function resetHierarchyState() {
@@ -190,9 +280,9 @@ async function loadOptions() {
       timeout: API_TIMEOUT,
       silent: true,
     });
-    const data = unwrapApiResult(result, '載入篩選選項失敗');
-    workcenterGroups.value = Array.isArray(data?.workcenter_groups) ? data.workcenter_groups : [];
-    allResources.value = Array.isArray(data?.resources) ? data.resources : [];
+    const data = unwrapApiResult(result, '載入篩選選項失敗') as { workcenter_groups?: unknown; resources?: unknown } | null | undefined;
+    workcenterGroups.value = Array.isArray(data?.workcenter_groups) ? (data.workcenter_groups as string[]) : [];
+    allResources.value = Array.isArray(data?.resources) ? (data.resources as ResourceOption[]) : [];
   } finally {
     loading.options = false;
   }
@@ -205,8 +295,13 @@ async function loadSummary() {
     silent: true,
   });
 
-  const data = unwrapApiResult(result, '載入摘要失敗');
-  const byStatus = data?.by_status || {};
+  const data = unwrapApiResult(result, '載入摘要失敗') as {
+    by_status?: Record<string, unknown>;
+    total_count?: unknown;
+    ou_pct?: unknown;
+    availability_pct?: unknown;
+  } | null | undefined;
+  const byStatus: Record<string, unknown> = data?.by_status || {};
 
   const normalizedStatus = Object.fromEntries(
     MATRIX_STATUS_COLUMNS.map((status) => [status, Number(byStatus[status] || 0)])
@@ -237,11 +332,15 @@ async function loadEquipment() {
 
 async function checkCacheStatus() {
   try {
-    const health = await apiGet('/health', {
+    const healthRaw = await apiGet('/health', {
       timeout: 15000,
       retries: 0,
       silent: true,
     });
+    const health = healthRaw as {
+      resource_cache?: { enabled?: boolean; loaded?: boolean; count?: number };
+      equipment_status_cache?: { updated_at?: string };
+    } | null | undefined;
 
     const resourceCache = health?.resource_cache || {};
     const equipmentCache = health?.equipment_status_cache || {};
@@ -259,7 +358,7 @@ async function checkCacheStatus() {
 
     if (equipmentCache.updated_at) {
       const d = new Date(equipmentCache.updated_at);
-      const pad = (n) => String(n).padStart(2, '0');
+      const pad = (n: number): string => String(n).padStart(2, '0');
       lastUpdate.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     } else {
       lastUpdate.value = '--';
@@ -271,7 +370,7 @@ async function checkCacheStatus() {
   }
 }
 
-function buildSingleFilterLabel(filter) {
+function buildSingleFilterLabel(filter: MatrixFilter): string {
   const parts = [filter.workcenter_group];
   if (filter.family) {
     parts.push(filter.family);
@@ -284,11 +383,11 @@ function buildSingleFilterLabel(filter) {
   return parts.join(' / ');
 }
 
-function filterKey(f) {
+function filterKey(f: MatrixFilter): string {
   return `${f.workcenter_group}|${f.status}|${f.family || ''}|${f.resource || ''}`;
 }
 
-function matchSingleFilter(eq, filter) {
+function matchSingleFilter(eq: EquipmentItem, filter: MatrixFilter): boolean {
   if ((eq.WORKCENTER_GROUP || 'UNKNOWN') !== filter.workcenter_group) {
     return false;
   }
@@ -329,7 +428,7 @@ const activeFilterText = computed(() => {
   return labels.join(' | ');
 });
 
-function applyMatrixFilter(nextFilter) {
+function applyMatrixFilter(nextFilter: MatrixFilter): void {
   const entry = {
     workcenter_group: nextFilter.workcenter_group,
     status: nextFilter.status,
@@ -350,15 +449,15 @@ function clearAllEquipmentFilters() {
   summaryStatusFilter.value = null;
 }
 
-function toggleSummaryStatus(status) {
+function toggleSummaryStatus(status: string): void {
   summaryStatusFilter.value = summaryStatusFilter.value === status ? null : status;
 }
 
-function handleToggleRow(rowId) {
+function handleToggleRow(rowId: string): void {
   hierarchyState[rowId] = !hierarchyState[rowId];
 }
 
-function handleToggleAllRows({ expand, rowIds }) {
+function handleToggleAllRows({ expand, rowIds }: { expand: boolean; rowIds: string[] }): void {
   (rowIds || []).forEach((rowId) => {
     hierarchyState[rowId] = Boolean(expand);
   });
@@ -369,7 +468,7 @@ function closeTooltip() {
   tooltipState.payload = null;
 }
 
-function openLotTooltip({ x, y, equipment }) {
+function openLotTooltip({ x, y, equipment }: { x: number; y: number; equipment: EquipmentItem }): void {
   const lotDetails = equipment?.LOT_DETAILS;
   if (!Array.isArray(lotDetails) || lotDetails.length === 0) {
     return;
@@ -381,7 +480,7 @@ function openLotTooltip({ x, y, equipment }) {
   tooltipState.visible = true;
 }
 
-function openJobTooltip({ x, y, equipment }) {
+function openJobTooltip({ x, y, equipment }: { x: number; y: number; equipment: EquipmentItem }): void {
   if (!equipment?.JOBORDER) {
     return;
   }
@@ -392,7 +491,7 @@ function openJobTooltip({ x, y, equipment }) {
   tooltipState.visible = true;
 }
 
-async function loadData(showOverlay = false) {
+async function loadData(showOverlay = false): Promise<void> {
   if (showOverlay) {
     loading.initial = true;
   }
@@ -433,21 +532,21 @@ async function applyFiltersAndReload() {
   resetAutoRefresh();
 }
 
-function updateGroups(groups) {
+function updateGroups(groups: string[]): void {
   updateField('groups', groups || []);
 }
 
-function updateFlags(nextFlags) {
+function updateFlags(nextFlags: { isProduction?: boolean; isKey?: boolean; isMonitor?: boolean }): void {
   updateField('isProduction', Boolean(nextFlags?.isProduction));
   updateField('isKey', Boolean(nextFlags?.isKey));
   updateField('isMonitor', Boolean(nextFlags?.isMonitor));
 }
 
-function updateFamilies(families) {
+function updateFamilies(families: string[]): void {
   updateField('families', families || []);
 }
 
-function updateMachines(machines) {
+function updateMachines(machines: string[]): void {
   updateField('machines', machines || []);
 }
 
@@ -463,11 +562,11 @@ async function handleManualRefresh() {
   await triggerRefresh({ force: true, resetTimer: true });
 }
 
-async function initPage() {
+async function initPage(): Promise<void> {
   try {
     await loadOptions();
   } catch (error) {
-    equipmentError.value = error?.message || '載入篩選選項失敗';
+    equipmentError.value = (error as Error)?.message || '載入篩選選項失敗';
   }
   await loadData(true);
 }
