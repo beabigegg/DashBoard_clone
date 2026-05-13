@@ -14,3 +14,4 @@
 | migrate-wip-hold-ts | 2026 | 2026-05-13 | specs/archive/2026/migrate-wip-hold-ts/ |
 | wip-hold-drilldown-filters | 2026 | 2026-05-13 | specs/archive/2026/wip-hold-drilldown-filters/ |
 | migrate-resource-status-ts | 2026 | 2026-05-13 | specs/archive/2026/migrate-resource-status-ts/ |
+| migrate-qc-gate-ts | 2026 | 2026-05-13 | specs/archive/2026/migrate-qc-gate-ts/ |
