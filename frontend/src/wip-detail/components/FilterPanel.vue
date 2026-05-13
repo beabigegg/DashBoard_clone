@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { reactive, watch } from 'vue';
 
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
@@ -29,7 +29,16 @@ const fields = [
   { key: 'waferdesc', label: 'Wafer Type', optionKey: 'waferdescs', placeholder: 'All Wafer Type' },
 ];
 
-const draft = reactive({
+type DraftFilters = {
+  workorder: string[];
+  lotid: string[];
+  package: string[];
+  type: string[];
+  firstname: string[];
+  waferdesc: string[];
+};
+
+const draft = reactive<DraftFilters>({
   workorder: [],
   lotid: [],
   package: [],
@@ -38,7 +47,7 @@ const draft = reactive({
   waferdesc: [],
 });
 
-function toArray(value) {
+function toArray(value: unknown): string[] {
   if (!value) {
     return [];
   }
@@ -75,8 +84,17 @@ watch(
   { immediate: true, deep: true }
 );
 
-function getOptions(field) {
-  return Array.isArray(props.options?.[field.optionKey]) ? props.options[field.optionKey] : [];
+function getOptions(field: { key: string; label: string; optionKey: string; placeholder: string }): string[] {
+  const opts = (props.options as Record<string, unknown>)?.[field.optionKey];
+  return Array.isArray(opts) ? (opts as string[]) : [];
+}
+
+function getDraftField(key: string): string[] {
+  return (draft as Record<string, string[]>)[key] ?? [];
+}
+
+function setDraftField(key: string, value: string[]): void {
+  (draft as Record<string, string[]>)[key] = value;
 }
 
 function notifyDraftChange() {
@@ -104,13 +122,13 @@ function clearFilters() {
     <div v-for="field in fields" :key="field.key" class="filter-group">
       <label>{{ field.label }}</label>
       <MultiSelect
-        :model-value="draft[field.key]"
+        :model-value="getDraftField(field.key)"
         :options="getOptions(field)"
         :disabled="loading"
         :placeholder="field.placeholder"
         searchable
         @update:model-value="
-          draft[field.key] = $event;
+          setDraftField(field.key, $event);
           notifyDraftChange();
         "
       />

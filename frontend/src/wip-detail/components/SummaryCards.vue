@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
 

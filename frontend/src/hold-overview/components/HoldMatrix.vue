@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -17,9 +17,11 @@ const emit = defineEmits(['select']);
 const workcenters = computed(() => props.data?.workcenters || []);
 const packages = computed(() => (props.data?.packages || []).slice(0, 15));
 
-const normalizedActiveFilter = computed(() => normalizeFilter(props.activeFilter));
+const normalizedActiveFilter = computed(() => normalizeFilter(props.activeFilter as MatrixFilterObj | null));
 
-function normalizeFilter(filter) {
+interface MatrixFilterObj { workcenter?: string | null; package?: string | null; }
+
+function normalizeFilter(filter: MatrixFilterObj | null | undefined): MatrixFilterObj | null {
   if (!filter || typeof filter !== 'object') {
     return null;
   }
@@ -31,7 +33,7 @@ function normalizeFilter(filter) {
   return { workcenter, package: pkg };
 }
 
-function isSameFilter(target) {
+function isSameFilter(target: MatrixFilterObj | null | undefined): boolean {
   const current = normalizedActiveFilter.value;
   const next = normalizeFilter(target);
   if (!current && !next) {
@@ -43,7 +45,7 @@ function isSameFilter(target) {
   return current.workcenter === next.workcenter && current.package === next.package;
 }
 
-function emitSelection(target) {
+function emitSelection(target: MatrixFilterObj | null | undefined): void {
   if (isSameFilter(target)) {
     emit('select', null);
     return;
@@ -51,41 +53,41 @@ function emitSelection(target) {
   emit('select', normalizeFilter(target));
 }
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   if (!value) {
     return '-';
   }
   return Number(value).toLocaleString('zh-TW');
 }
 
-function getMatrixValue(workcenter, pkg) {
-  return Number(props.data?.matrix?.[workcenter]?.[pkg] || 0);
+function getMatrixValue(workcenter: string, pkg: string): number {
+  return Number((props.data?.matrix as Record<string, Record<string, unknown>> | undefined)?.[workcenter]?.[pkg] || 0);
 }
 
-function isRowActive(workcenter) {
+function isRowActive(workcenter: string): boolean {
   const filter = normalizedActiveFilter.value;
   return Boolean(filter && filter.workcenter === workcenter && !filter.package);
 }
 
-function isColumnActive(pkg) {
+function isColumnActive(pkg: string): boolean {
   const filter = normalizedActiveFilter.value;
   return Boolean(filter && filter.package === pkg && !filter.workcenter);
 }
 
-function isCellActive(workcenter, pkg) {
+function isCellActive(workcenter: string, pkg: string): boolean {
   const filter = normalizedActiveFilter.value;
   return Boolean(filter && filter.workcenter === workcenter && filter.package === pkg);
 }
 
-function onCellClick(workcenter, pkg) {
+function onCellClick(workcenter: string, pkg: string): void {
   emitSelection({ workcenter, package: pkg });
 }
 
-function onWorkcenterClick(workcenter) {
+function onWorkcenterClick(workcenter: string): void {
   emitSelection({ workcenter });
 }
 
-function onPackageClick(pkg) {
+function onPackageClick(pkg: string): void {
   emitSelection({ package: pkg });
 }
 </script>

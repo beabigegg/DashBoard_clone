@@ -1,13 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
-import { apiPost } from '../core/api.js';
-import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
-import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
-import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state.js';
-import { buildWipOverviewQueryParams } from '../core/wip-derive.js';
-import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
+import { apiPost } from '../core/api';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
+import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation';
+import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state';
+import { buildWipOverviewQueryParams } from '../core/wip-derive';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -20,12 +20,38 @@ import FilterPanel from './components/FilterPanel.vue';
 import MatrixTable from './components/MatrixTable.vue';
 import StatusCards from './components/StatusCards.vue';
 
+// ── Local type aliases ──────────────────────────────────────────────────────
+interface WipOverviewSummary {
+  dataUpdateDate?: string;
+  totalLots?: number;
+  totalQtyPcs?: number;
+  byWipStatus?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface WipOverviewMatrix {
+  workcenters?: string[];
+  packages?: string[];
+  matrix?: Record<string, Record<string, unknown>>;
+  workcenter_totals?: Record<string, unknown>;
+  package_totals?: Record<string, unknown>;
+  grand_total?: unknown;
+  [key: string]: unknown;
+}
+
 const API_TIMEOUT = 60000;
 const FILTER_OPTION_DEBOUNCE_MS = 120;
 
-const summary = ref(null);
-const matrix = ref(null);
-const filterOptions = ref({
+const summary = ref<WipOverviewSummary | null>(null);
+const matrix = ref<WipOverviewMatrix | null>(null);
+const filterOptions = ref<{
+  workorders: string[];
+  lotids: string[];
+  packages: string[];
+  types: string[];
+  firstnames: string[];
+  waferdescs: string[];
+}>({
   workorders: [],
   lotids: [],
   packages: [],
@@ -34,13 +60,13 @@ const filterOptions = ref({
   waferdescs: [],
 });
 
-const activeStatusFilter = ref(null);
+const activeStatusFilter = ref<string | null>(null);
 const loading = ref(true);
 const refreshing = ref(false);
 const refreshSuccess = ref(false);
 const refreshError = ref(false);
 const errorMessage = ref('');
-let filterOptionsDebounceTimer = null;
+let filterOptionsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let filterOptionsRequestToken = 0;
 
 // -- useFilterOrchestrator: status=immediate (matrix only), panel fields=draft-apply (summary+matrix) --
@@ -62,7 +88,14 @@ const filterOrchestrator = useFilterOrchestrator({
 });
 
 // Keep a reactive proxy to the committed filters for building query params
-const filters = reactive({
+const filters = reactive<{
+  workorder: string[];
+  lotid: string[];
+  package: string[];
+  type: string[];
+  firstname: string[];
+  waferdesc: string[];
+}>({
   workorder: [],
   lotid: [],
   package: [],
@@ -73,11 +106,11 @@ const filters = reactive({
 
 // unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
-function getUrlParam(name) {
+function getUrlParam(name: string): string {
   return new URLSearchParams(window.location.search).get(name)?.trim() || '';
 }
 
-function parseCsvParam(name) {
+function parseCsvParam(name: string): string[] {
   const raw = getUrlParam(name);
   if (!raw) {
     return [];
@@ -88,7 +121,7 @@ function parseCsvParam(name) {
     .filter(Boolean);
 }
 
-function normalizeArrayValues(values) {
+function normalizeArrayValues(values: string | string[] | null | undefined): string[] {
   if (!values) {
     return [];
   }
@@ -101,32 +134,32 @@ function normalizeArrayValues(values) {
     .filter(Boolean);
 }
 
-function serializeFilterValue(values) {
+function serializeFilterValue(values: string | string[] | null | undefined): string {
   const normalized = normalizeArrayValues(values);
   return normalized.join(',');
 }
 
-function buildFilters(status = null) {
+function buildFilters(status: string | null = null) {
   return buildWipOverviewQueryParams(filters, status);
 }
 
-async function fetchSummary(signal) {
+async function fetchSummary(signal: AbortSignal): Promise<WipOverviewSummary> {
   const result = await apiPost('/api/wip/overview/summary', buildFilters(), {
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch summary');
+  return unwrapApiResult(result, 'Failed to fetch summary') as WipOverviewSummary;
 }
 
-async function fetchMatrix(signal) {
+async function fetchMatrix(signal: AbortSignal): Promise<WipOverviewMatrix> {
   const result = await apiPost('/api/wip/overview/matrix', buildFilters(activeStatusFilter.value), {
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch matrix');
+  return unwrapApiResult(result, 'Failed to fetch matrix') as WipOverviewMatrix;
 }
 
-async function loadFilterOptions(sourceFilters = filters) {
+async function loadFilterOptions(sourceFilters = filters): Promise<void> {
   const requestToken = ++filterOptionsRequestToken;
 
   try {
@@ -135,28 +168,29 @@ async function loadFilterOptions(sourceFilters = filters) {
       timeout: API_TIMEOUT,
       silent: true,
     });
-    const data = unwrapApiResult(result, '載入篩選選項失敗');
+    const data = unwrapApiResult(result, '載入篩選選項失敗') as Record<string, unknown>;
 
     if (requestToken !== filterOptionsRequestToken) {
       return;
     }
 
     filterOptions.value = {
-      workorders: Array.isArray(data?.workorders) ? data.workorders : [],
-      lotids: Array.isArray(data?.lotids) ? data.lotids : [],
-      packages: Array.isArray(data?.packages) ? data.packages : [],
-      types: Array.isArray(data?.types) ? data.types : [],
-      firstnames: Array.isArray(data?.firstnames) ? data.firstnames : [],
-      waferdescs: Array.isArray(data?.waferdescs) ? data.waferdescs : [],
+      workorders: Array.isArray(data?.workorders) ? (data.workorders as string[]) : [],
+      lotids: Array.isArray(data?.lotids) ? (data.lotids as string[]) : [],
+      packages: Array.isArray(data?.packages) ? (data.packages as string[]) : [],
+      types: Array.isArray(data?.types) ? (data.types as string[]) : [],
+      firstnames: Array.isArray(data?.firstnames) ? (data.firstnames as string[]) : [],
+      waferdescs: Array.isArray(data?.waferdescs) ? (data.waferdescs as string[]) : [],
     };
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string };
     if (error?.name !== 'AbortError') {
-      console.warn('載入 WIP 篩選選項失敗:', error);
+      console.warn('載入 WIP 篩選選項失敗:', err);
     }
   }
 }
 
-function scheduleFilterOptionsReload(nextDraftFilters) {
+function scheduleFilterOptionsReload(nextDraftFilters: typeof filters): void {
   if (filterOptionsDebounceTimer) {
     clearTimeout(filterOptionsDebounceTimer);
   }
@@ -166,7 +200,7 @@ function scheduleFilterOptionsReload(nextDraftFilters) {
   }, FILTER_OPTION_DEBOUNCE_MS);
 }
 
-function onFilterDraftChange(nextDraftFilters) {
+function onFilterDraftChange(nextDraftFilters: typeof filters): void {
   scheduleFilterOptionsReload(nextDraftFilters);
 }
 
@@ -221,12 +255,13 @@ async function loadAllData(showOverlay = true) {
     summary.value = summaryData;
     matrix.value = matrixData;
     showRefreshSuccess();
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError') {
       return;
     }
     refreshError.value = true;
-    errorMessage.value = error?.message || '載入資料失敗';
+    errorMessage.value = error?.message ?? '載入資料失敗';
   } finally {
     loading.value = false;
     refreshing.value = false;
@@ -241,18 +276,19 @@ async function loadMatrixOnly() {
   try {
     matrix.value = await fetchMatrix(signal);
     showRefreshSuccess();
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError') {
       return;
     }
     refreshError.value = true;
-    errorMessage.value = error?.message || '載入 Matrix 失敗';
+    errorMessage.value = error?.message ?? '載入 Matrix 失敗';
   } finally {
     refreshing.value = false;
   }
 }
 
-function toggleStatusFilter(status) {
+function toggleStatusFilter(status: string) {
   if (status === 'quality-hold') {
     navigateToRuntimeRoute('/hold-overview?hold_type=quality');
     return;
@@ -268,7 +304,7 @@ function toggleStatusFilter(status) {
   updateUrlState();
 }
 
-function updateFilters(nextFilters) {
+function updateFilters(nextFilters: Partial<typeof filters>) {
   filters.workorder = normalizeArrayValues(nextFilters.workorder);
   filters.lotid = normalizeArrayValues(nextFilters.lotid);
   filters.package = normalizeArrayValues(nextFilters.package);
@@ -322,7 +358,7 @@ function updateUrlState() {
   replaceRuntimeHistory(nextUrl);
 }
 
-function applyFilters(nextFilters) {
+function applyFilters(nextFilters: typeof filters) {
   updateFilters(nextFilters);
   // Commit draft-apply fields via orchestrator
   filterOrchestrator.applyDraft();
@@ -347,7 +383,7 @@ function clearFilters() {
   void loadAllData(false);
 }
 
-function navigateToDetail(workcenter) {
+function navigateToDetail(workcenter: string) {
   storeWipNavigationState(filters, activeStatusFilter.value);
 
   const params = new URLSearchParams();
@@ -368,12 +404,12 @@ async function initializePage() {
   const navState = loadWipNavigationState();
   if (navState) {
     updateFilters({
-      workorder: navState.workorder || [],
-      lotid: navState.lotid || [],
-      package: navState.package || [],
-      type: navState.type || [],
-      firstname: navState.firstname || [],
-      waferdesc: navState.waferdesc || [],
+      workorder: (navState.workorder || []) as string[],
+      lotid: (navState.lotid || []) as string[],
+      package: (navState.package || []) as string[],
+      type: (navState.type || []) as string[],
+      firstname: (navState.firstname || []) as string[],
+      waferdesc: (navState.waferdesc || []) as string[],
     });
     activeStatusFilter.value = navState.status || null;
   } else {
@@ -449,7 +485,7 @@ onBeforeUnmount(() => {
 
     <StatusCards
       :summary="summary?.byWipStatus || {}"
-      :active-status="activeStatusFilter"
+      :active-status="activeStatusFilter ?? undefined"
       @toggle="toggleStatusFilter"
     />
 
@@ -459,7 +495,7 @@ onBeforeUnmount(() => {
           <div class="card-title ui-card-title">{{ matrixTitle }}</div>
         </div>
         <div class="card-body ui-card-body matrix-container ui-table-wrap" :class="{ 'is-loading': refreshing }">
-          <MatrixTable :data="matrix" @drilldown="navigateToDetail" />
+          <MatrixTable :data="matrix ?? undefined" @drilldown="navigateToDetail" />
           <EmptyState v-if="!refreshing && !matrix" type="no-data" />
         </div>
       </section>

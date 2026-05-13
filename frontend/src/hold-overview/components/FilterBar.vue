@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
@@ -8,11 +8,11 @@ const props = defineProps({
     default: 'all',
   },
   reason: {
-    type: Array,
+    type: Array as () => string[],
     default: () => [],
   },
   reasons: {
-    type: Array,
+    type: Array as () => string[],
     default: () => [],
   },
   disabled: {
@@ -32,8 +32,8 @@ const HOLD_TYPE_OPTIONS = Object.freeze([
 const holdTypeModel = computed(() => props.holdType || 'all');
 
 const reasonOptions = computed(() => {
-  const unique = new Set();
-  const items = [];
+  const unique = new Set<string>();
+  const items: string[] = [];
   (props.reasons || []).forEach((reason) => {
     const value = String(reason || '').trim();
     if (!value || unique.has(value)) {
@@ -45,7 +45,7 @@ const reasonOptions = computed(() => {
   return items;
 });
 
-function selectHoldType(nextValue) {
+function selectHoldType(nextValue: string) {
   if (props.disabled) {
     return;
   }
@@ -59,7 +59,7 @@ function selectHoldType(nextValue) {
   });
 }
 
-function onReasonChange(nextValues) {
+function onReasonChange(nextValues: string[]) {
   emit('change', {
     holdType: props.holdType || 'all',
     reason: nextValues || [],

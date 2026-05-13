@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 const props = defineProps({
   summary: {
     type: Object,
@@ -19,17 +19,17 @@ const cards = [
   { key: 'non-quality-hold', label: '非品質異常', className: 'non-quality-hold' },
 ];
 
-function resolveData(key) {
+function resolveData(key: string): Record<string, unknown> {
   if (key === 'quality-hold') {
-    return props.summary?.qualityHold || {};
+    return (props.summary as Record<string, unknown>)?.qualityHold as Record<string, unknown> || {};
   }
   if (key === 'non-quality-hold') {
-    return props.summary?.nonQualityHold || {};
+    return (props.summary as Record<string, unknown>)?.nonQualityHold as Record<string, unknown> || {};
   }
-  return props.summary?.[key] || {};
+  return (props.summary as Record<string, unknown>)?.[key] as Record<string, unknown> || {};
 }
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   if (value === null || value === undefined || value === '-') {
     return '-';
   }

@@ -1,6 +1,6 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
-import { useSortableTable } from '../../shared-composables/useSortableTable.js';
+import { useSortableTable } from '../../shared-composables/useSortableTable';
 
 import Pagination from '../../shared-ui/components/PaginationControl.vue';
 
@@ -33,26 +33,41 @@ const props = defineProps({
 
 const emit = defineEmits(['select-lot', 'prev-page', 'next-page']);
 
-const lotsRef = computed(() => props.data.lots || []);
+type LotRow = {
+  lotId?: unknown;
+  wipStatus?: unknown;
+  holdReason?: unknown;
+  equipment?: unknown;
+  package?: unknown;
+  spec?: unknown;
+  qty?: unknown;
+  [key: string]: unknown;
+};
+
+const lotsRef = computed<LotRow[]>(() => (props.data.lots || []) as LotRow[]);
 const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(lotsRef);
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   if (value === null || value === undefined || value === '-') {
     return '-';
   }
   return Number(value).toLocaleString('zh-TW');
 }
 
-function statusClass(status) {
+function statusClass(status: unknown): string {
   const normalized = String(status || 'QUEUE').toLowerCase();
   return `wip-status-${normalized}`;
 }
 
-function statusText(lot) {
+function lotKey(lot: LotRow): string {
+  return String(lot.lotId ?? '');
+}
+
+function statusText(lot: Record<string, unknown>): string {
   if (lot?.wipStatus === 'HOLD' && lot?.holdReason) {
     return `HOLD (${lot.holdReason})`;
   }
-  return lot?.wipStatus || 'QUEUE';
+  return String(lot?.wipStatus || 'QUEUE');
 }
 
 const tableTitle = computed(() => {
@@ -112,13 +127,13 @@ const pageInfo = computed(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="lot in sortedData" :key="lot.lotId">
+          <tr v-for="lot in sortedData" :key="lotKey(lot)">
             <td class="fixed-col">
               <button
                 type="button"
                 class="lot-id-link"
-                :class="{ active: selectedLotId === lot.lotId }"
-                @click="emit('select-lot', lot.lotId)"
+                :class="{ active: selectedLotId === String(lot.lotId ?? '') }"
+                @click="emit('select-lot', String(lot.lotId ?? ''))"
               >
                 {{ lot.lotId || '-' }}
               </button>
@@ -128,7 +143,7 @@ const pageInfo = computed(() => {
             <td class="fixed-col">{{ lot.package || '-' }}</td>
             <td
               v-for="spec in data.specs"
-              :key="`${lot.lotId}-${spec}`"
+              :key="`${lotKey(lot)}-${spec}`"
               class="spec-cell"
               :class="{ 'has-data': lot.spec === spec }"
             >

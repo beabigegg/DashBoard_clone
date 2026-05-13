@@ -1,11 +1,13 @@
-<script setup>
+<script setup lang="ts">
+interface DistRow { name: string; lots: number; qty: number; percentage: number; }
+
 const props = defineProps({
   title: {
     type: String,
     required: true,
   },
   rows: {
-    type: Array,
+    type: Array as () => DistRow[],
     default: () => [],
   },
   activeName: {
@@ -16,7 +18,7 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle']);
 
-function formatNumber(value) {
+function formatNumber(value: number | undefined): string {
   return Number(value || 0).toLocaleString('zh-TW');
 }
 </script>

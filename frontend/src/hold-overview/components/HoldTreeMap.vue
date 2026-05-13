@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import VChart from 'vue-echarts';
 import { use } from 'echarts/core';
@@ -10,7 +10,7 @@ use([CanvasRenderer, TreemapChart, TooltipComponent, VisualMapComponent]);
 
 const props = defineProps({
   items: {
-    type: Array,
+    type: Array as () => Record<string, unknown>[],
     default: () => [],
   },
   activeFilter: {
@@ -22,9 +22,11 @@ const props = defineProps({
 const emit = defineEmits(['select']);
 
 const hasData = computed(() => Array.isArray(props.items) && props.items.length > 0);
-const normalizedActiveFilter = computed(() => normalizeFilter(props.activeFilter));
+const normalizedActiveFilter = computed(() => normalizeFilter(props.activeFilter as TreemapFilter | null));
 
-function normalizeFilter(filter) {
+interface TreemapFilter { workcenter?: string; reason?: string; }
+
+function normalizeFilter(filter: TreemapFilter | null | undefined): TreemapFilter | null {
   if (!filter || typeof filter !== 'object') {
     return null;
   }
@@ -36,11 +38,11 @@ function normalizeFilter(filter) {
   return { workcenter, reason };
 }
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   return Number(value || 0).toLocaleString('zh-TW');
 }
 
-function buildLeafItem(item, activeFilter) {
+function buildLeafItem(item: Record<string, unknown>, activeFilter: TreemapFilter | null) {
   const workcenter = String(item?.workcenter || '').trim();
   const reason = String(item?.reason || '').trim();
   const lots = Number(item?.lots || 0);
@@ -71,9 +73,9 @@ function buildLeafItem(item, activeFilter) {
 
 const treeData = computed(() => {
   const activeFilter = normalizedActiveFilter.value;
-  const workcenterMap = new Map();
+  const workcenterMap = new Map<string, { name: string; children: ReturnType<typeof buildLeafItem>[]; value?: number }>();
 
-  (props.items || []).forEach((item) => {
+  (props.items || []).forEach((item: Record<string, unknown>) => {
     const workcenter = String(item?.workcenter || '').trim();
     const reason = String(item?.reason || '').trim();
     if (!workcenter || !reason) {
@@ -86,13 +88,13 @@ const treeData = computed(() => {
         children: [],
       });
     }
-    const parent = workcenterMap.get(workcenter);
+    const parent = workcenterMap.get(workcenter)!;
     parent.children.push(buildLeafItem(item, activeFilter));
   });
 
   const data = Array.from(workcenterMap.values());
   data.forEach((parent) => {
-    parent.value = parent.children.reduce((sum, child) => sum + Number(child.qty || 0), 0);
+    parent.value = parent.children.reduce((sum: number, child) => sum + Number(child.qty || 0), 0);
     parent.children.sort((a, b) => Number(b.qty || 0) - Number(a.qty || 0));
   });
 
@@ -102,7 +104,8 @@ const treeData = computed(() => {
 const chartOption = computed(() => ({
   tooltip: {
     confine: true,
-    formatter(params) {
+    // TODO: type echarts callback
+    formatter(params: any) {
       const node = params?.data || {};
       if (!node?.reason) {
         return `<strong>${params?.name || ''}</strong>`;
@@ -144,7 +147,8 @@ const chartOption = computed(() => ({
       },
       label: {
         show: true,
-        formatter(params) {
+        // TODO: type echarts callback
+        formatter(params: any) {
           const reason = params?.data?.reason || params?.name || '';
           return reason.length > 14 ? `${reason.slice(0, 14)}…` : reason;
         },
@@ -178,7 +182,8 @@ const chartOption = computed(() => ({
   ],
 }));
 
-function handleChartClick(params) {
+// TODO: type echarts callback
+function handleChartClick(params: any) {
   if (params.componentType !== 'series' || params.seriesType !== 'treemap') {
     return;
   }

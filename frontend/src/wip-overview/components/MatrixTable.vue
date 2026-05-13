@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -13,15 +13,15 @@ const emit = defineEmits(['drilldown']);
 const workcenters = computed(() => props.data?.workcenters || []);
 const packages = computed(() => props.data?.packages || []);
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   if (!value) {
     return '-';
   }
   return Number(value).toLocaleString('zh-TW');
 }
 
-function getMatrixValue(workcenter, pkg) {
-  return props.data?.matrix?.[workcenter]?.[pkg] || 0;
+function getMatrixValue(workcenter: string, pkg: string): number {
+  return Number((props.data?.matrix as Record<string, Record<string, unknown>> | undefined)?.[workcenter]?.[pkg] || 0);
 }
 </script>
 

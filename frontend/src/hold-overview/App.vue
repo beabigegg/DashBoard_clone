@@ -1,13 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
-import { apiGet, apiPost } from '../core/api.js';
-import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
-import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
-import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive.js';
-import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
-import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
+import { apiGet, apiPost } from '../core/api';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
+import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation';
+import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
+import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
@@ -23,15 +23,47 @@ import FilterBar from './components/FilterBar.vue';
 import FilterIndicator from './components/FilterIndicator.vue';
 import HoldMatrix from './components/HoldMatrix.vue';
 
+// ── Local type aliases ──────────────────────────────────────────────────────
+interface HoldOverviewSummary {
+  dataUpdateDate?: string;
+  totalLots?: number;
+  totalQty?: number;
+  avgAge?: number;
+  maxAge?: number;
+  workcenterCount?: number;
+  reason_options?: string[];
+  reasonOptions?: string[];
+  topReasons?: string[];
+  by_reason?: Record<string, unknown>;
+  byReason?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface MatrixFilter {
+  workcenter?: string | null;
+  package?: string | null;
+}
+
+interface LotRecord { [key: string]: unknown; }
+interface PaginationState { page: number; perPage: number; total: number; totalPages: number; }
+interface LotsResult { lots?: LotRecord[]; pagination?: Partial<PaginationState>; }
+
 const API_TIMEOUT = 60000;
 const DEFAULT_PER_PAGE = 20;
 
-const summary = ref(null);
-const matrix = ref(null);
-const hold = ref(null);
-const lots = ref([]);
+const summary = ref<HoldOverviewSummary | null>(null);
+const matrix = ref<Record<string, unknown> | null>(null);
+const hold = ref<unknown>(null);
+const lots = ref<LotRecord[]>([]);
 
-const filterOptions = ref({
+const filterOptions = ref<{
+  workorders: string[];
+  lotids: string[];
+  packages: string[];
+  types: string[];
+  firstnames: string[];
+  waferdescs: string[];
+}>({
   workorders: [],
   lotids: [],
   packages: [],
@@ -40,7 +72,7 @@ const filterOptions = ref({
   waferdescs: [],
 });
 
-const matrixFilter = ref(null);
+const matrixFilter = ref<MatrixFilter | null>(null);
 
 const pagination = ref({
   page: 1,
@@ -62,7 +94,14 @@ const lotsError = ref('');
 const { nextRequestId, isStaleRequest } = useRequestGuard();
 
 // Panel filters kept as reactive for FilterPanel compatibility
-const filters = reactive({
+const filters = reactive<{
+  workorder: string[];
+  lotid: string[];
+  package: string[];
+  type: string[];
+  firstname: string[];
+  waferdesc: string[];
+}>({
   workorder: [],
   lotid: [],
   package: [],
@@ -89,7 +128,7 @@ const orchestrator = useFilterOrchestrator({
     void loadFilterOptions(filters);
     void loadAllData(false);
   },
-  onLoadOptions: async (fieldName, committed) => {
+  onLoadOptions: async (_fieldName: string, _committed: Record<string, unknown>) => {
     // reason options are derived from summary, reload via summary fetch
     return [];
   },
@@ -110,7 +149,7 @@ const showQualityPareto = computed(() => orchestrator.committed.holdType !== 'no
 const showNonQualityPareto = computed(() => orchestrator.committed.holdType !== 'quality');
 
 const lotFilterText = computed(() => {
-  const parts = [];
+  const parts: string[] = [];
   if (matrixFilter.value?.workcenter) {
     parts.push(`Workcenter=${matrixFilter.value.workcenter}`);
   }
@@ -135,17 +174,17 @@ const tablePagination = computed(() => {
   return { page: p, totalPages, infoText };
 });
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   if (value === null || value === undefined || value === '-') return '-';
   return Number(value).toLocaleString('zh-TW');
 }
 
-function formatAge(value) {
+function formatAge(value: unknown): string {
   if (value === null || value === undefined || value === '-') return '-';
   return `${value}天`;
 }
 
-function handleLotPageChange(nextPage) {
+function handleLotPageChange(nextPage: number) {
   if (paginationLoading.value) return;
   if (nextPage < 1 || nextPage > Number(pagination.value?.totalPages || 1)) return;
   page.value = nextPage;
@@ -182,18 +221,25 @@ const reasonOptions = computed(() => {
   );
 });
 
-const splitHold = computed(() => splitHoldByType(hold.value));
+const splitHold = computed(() => splitHoldByType(hold.value as Record<string, unknown> | null));
 
-let filterOptionsDebounceTimer = null;
+// Template-safe accessors for orchestrator.committed (typed as Record<string, unknown>)
+const committedHoldType = computed<string>(() => String(orchestrator.committed.holdType || 'all'));
+const committedReason = computed<string[]>(() => {
+  const r = orchestrator.committed.reason;
+  return Array.isArray(r) ? (r as string[]) : [];
+});
+
+let filterOptionsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let filterOptionsRequestToken = 0;
 
 // unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
-function getUrlParam(name) {
+function getUrlParam(name: string): string {
   return new URLSearchParams(window.location.search).get(name)?.trim() || '';
 }
 
-function parseCsvParam(name) {
+function parseCsvParam(name: string): string[] {
   const raw = getUrlParam(name);
   if (!raw) {
     return [];
@@ -204,7 +250,7 @@ function parseCsvParam(name) {
     .filter(Boolean);
 }
 
-function normalizeArrayValues(values) {
+function normalizeArrayValues(values: string | string[] | null | undefined): string[] {
   if (!values) {
     return [];
   }
@@ -217,11 +263,11 @@ function normalizeArrayValues(values) {
     .filter(Boolean);
 }
 
-function serializeFilterValue(values) {
+function serializeFilterValue(values: string | string[] | null | undefined): string {
   return normalizeArrayValues(values).join(',');
 }
 
-function normalizeHoldType(value) {
+function normalizeHoldType(value: unknown): string {
   const holdType = String(value || '').trim();
   if (holdType === 'quality' || holdType === 'non-quality' || holdType === 'all') {
     return holdType;
@@ -229,7 +275,7 @@ function normalizeHoldType(value) {
   return 'all';
 }
 
-function updateFilters(nextFilters) {
+function updateFilters(nextFilters: Partial<typeof filters>) {
   filters.workorder = normalizeArrayValues(nextFilters.workorder);
   filters.lotid = normalizeArrayValues(nextFilters.lotid);
   filters.package = normalizeArrayValues(nextFilters.package);
@@ -238,19 +284,19 @@ function updateFilters(nextFilters) {
   filters.waferdesc = normalizeArrayValues(nextFilters.waferdesc);
 }
 
-function buildFilterBarParams() {
-  const params = {
+function buildFilterBarParams(): Record<string, unknown> {
+  const params: Record<string, unknown> = {
     hold_type: orchestrator.committed.holdType || 'all',
   };
-  const reasonCsv = serializeFilterValue(orchestrator.committed.reason);
+  const reasonCsv = serializeFilterValue(orchestrator.committed.reason as string | string[] | undefined);
   if (reasonCsv) {
     params.reason = reasonCsv;
   }
   return params;
 }
 
-function buildMatrixFilterParams() {
-  const params = {};
+function buildMatrixFilterParams(): Record<string, unknown> {
+  const params: Record<string, unknown> = {};
   if (matrixFilter.value?.workcenter) {
     params.workcenter = matrixFilter.value.workcenter;
   }
@@ -276,8 +322,8 @@ function buildLotsParams() {
   };
 }
 
-function buildFilterOptionsParams(sourceFilters = filters) {
-  const params = {
+function buildFilterOptionsParams(sourceFilters = filters): Record<string, unknown> {
+  const params: Record<string, unknown> = {
     ...buildWipOverviewQueryParams(sourceFilters),
     status: 'HOLD',
   };
@@ -290,23 +336,23 @@ function buildFilterOptionsParams(sourceFilters = filters) {
   return params;
 }
 
-async function fetchSummary(signal) {
+async function fetchSummary(signal: AbortSignal): Promise<HoldOverviewSummary> {
   const result = await apiPost('/api/hold-overview/summary', buildAllFilterParams(), {
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch hold summary');
+  return unwrapApiResult(result, 'Failed to fetch hold summary') as HoldOverviewSummary;
 }
 
-async function fetchMatrix(signal) {
+async function fetchMatrix(signal: AbortSignal): Promise<Record<string, unknown>> {
   const result = await apiPost('/api/hold-overview/matrix', buildAllFilterParams(), {
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch hold matrix');
+  return unwrapApiResult(result, 'Failed to fetch hold matrix') as Record<string, unknown>;
 }
 
-async function fetchHold(signal, extraParams = {}) {
+async function fetchHold(signal: AbortSignal, extraParams: Record<string, unknown> = {}): Promise<unknown> {
   const result = await apiPost('/api/wip/overview/hold', { ...buildAllFilterParams(), ...extraParams }, {
     timeout: API_TIMEOUT,
     signal,
@@ -314,15 +360,15 @@ async function fetchHold(signal, extraParams = {}) {
   return unwrapApiResult(result, 'Failed to fetch hold data');
 }
 
-async function fetchLots(signal) {
+async function fetchLots(signal: AbortSignal): Promise<LotsResult> {
   const result = await apiPost('/api/hold-overview/lots', buildLotsParams(), {
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch hold lots');
+  return unwrapApiResult(result, 'Failed to fetch hold lots') as LotsResult;
 }
 
-async function loadFilterOptions(sourceFilters = filters) {
+async function loadFilterOptions(sourceFilters = filters): Promise<void> {
   const requestToken = ++filterOptionsRequestToken;
 
   try {
@@ -331,28 +377,29 @@ async function loadFilterOptions(sourceFilters = filters) {
       timeout: API_TIMEOUT,
       silent: true,
     });
-    const data = unwrapApiResult(result, '載入篩選選項失敗');
+    const data = unwrapApiResult(result, '載入篩選選項失敗') as Record<string, unknown>;
 
     if (requestToken !== filterOptionsRequestToken) {
       return;
     }
 
     filterOptions.value = {
-      workorders: Array.isArray(data?.workorders) ? data.workorders : [],
-      lotids: Array.isArray(data?.lotids) ? data.lotids : [],
-      packages: Array.isArray(data?.packages) ? data.packages : [],
-      types: Array.isArray(data?.types) ? data.types : [],
-      firstnames: Array.isArray(data?.firstnames) ? data.firstnames : [],
-      waferdescs: Array.isArray(data?.waferdescs) ? data.waferdescs : [],
+      workorders: Array.isArray(data?.workorders) ? (data.workorders as string[]) : [],
+      lotids: Array.isArray(data?.lotids) ? (data.lotids as string[]) : [],
+      packages: Array.isArray(data?.packages) ? (data.packages as string[]) : [],
+      types: Array.isArray(data?.types) ? (data.types as string[]) : [],
+      firstnames: Array.isArray(data?.firstnames) ? (data.firstnames as string[]) : [],
+      waferdescs: Array.isArray(data?.waferdescs) ? (data.waferdescs as string[]) : [],
     };
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string };
     if (error?.name !== 'AbortError') {
-      console.warn('載入 WIP 篩選選項失敗:', error);
+      console.warn('載入 WIP 篩選選項失敗:', err);
     }
   }
 }
 
-function scheduleFilterOptionsReload(nextDraftFilters) {
+function scheduleFilterOptionsReload(nextDraftFilters: typeof filters): void {
   if (filterOptionsDebounceTimer) {
     clearTimeout(filterOptionsDebounceTimer);
   }
@@ -362,11 +409,11 @@ function scheduleFilterOptionsReload(nextDraftFilters) {
   }, 120);
 }
 
-function onFilterDraftChange(nextDraftFilters) {
+function onFilterDraftChange(nextDraftFilters: typeof filters): void {
   scheduleFilterOptionsReload(nextDraftFilters);
 }
 
-function updateLotsState(payload) {
+function updateLotsState(payload: LotsResult): void {
   lots.value = Array.isArray(payload?.lots) ? payload.lots : [];
   pagination.value = {
     page: Number(payload?.pagination?.page || page.value || 1),
@@ -389,17 +436,17 @@ function updateUrlState() {
 
   const ht = orchestrator.committed.holdType;
   if (ht) {
-    params.set('hold_type', ht);
+    params.set('hold_type', String(ht));
   }
-  const reasonCsv = serializeFilterValue(orchestrator.committed.reason);
+  const reasonCsv = serializeFilterValue(orchestrator.committed.reason as string[] | undefined);
   if (reasonCsv) {
     params.set('reason', reasonCsv);
   }
   if (matrixFilter.value?.workcenter) {
-    params.set('workcenter', matrixFilter.value.workcenter);
+    params.set('workcenter', matrixFilter.value.workcenter ?? '');
   }
   if (matrixFilter.value?.package) {
-    params.set('matrix_package', matrixFilter.value.package);
+    params.set('matrix_package', matrixFilter.value.package ?? '');
   }
 
   const workorder = serializeFilterValue(filters.workorder);
@@ -471,12 +518,13 @@ async function loadAllData(showOverlay = true) {
     hold.value = holdData;
     updateLotsState(lotsData);
     showRefreshSuccess();
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
     refreshError.value = true;
-    const message = error?.message || '載入資料失敗';
+    const message = error?.message ?? '載入資料失敗';
     errorMessage.value = message;
     lotsError.value = message;
   } finally {
@@ -507,12 +555,13 @@ async function loadLots() {
     }
     updateLotsState(lotsData);
     showRefreshSuccess();
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
     refreshError.value = true;
-    const message = error?.message || '載入 Lot 資料失敗';
+    const message = error?.message ?? '載入 Lot 資料失敗';
     errorMessage.value = message;
     lotsError.value = message;
   } finally {
@@ -538,12 +587,12 @@ async function loadLotsPage() {
       return;
     }
     updateLotsState(lotsData);
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
-    const message = error?.message || '載入 Lot 資料失敗';
-    lotsError.value = message;
+    lotsError.value = error?.message ?? '載入 Lot 資料失敗';
   } finally {
     if (isStaleRequest(requestId)) {
       return;
@@ -552,18 +601,18 @@ async function loadLotsPage() {
   }
 }
 
-function navigateToHoldDetail(reason) {
+function navigateToHoldDetail(reason: string) {
   if (!reason) {
     return;
   }
   navigateToRuntimeRoute(`/hold-detail?reason=${encodeURIComponent(reason)}`);
 }
 
-function handleFilterChange(next) {
+function handleFilterChange(next: { holdType?: string; reason?: string[] }) {
   const nextHoldType = normalizeHoldType(next?.holdType || 'all');
   const nextReason = normalizeArrayValues(next?.reason);
 
-  const currentReasonCsv = serializeFilterValue(orchestrator.committed.reason);
+  const currentReasonCsv = serializeFilterValue(orchestrator.committed.reason as string[] | undefined);
   const nextReasonCsv = serializeFilterValue(nextReason);
   if (orchestrator.committed.holdType === nextHoldType && currentReasonCsv === nextReasonCsv) {
     return;
@@ -582,7 +631,7 @@ function handleFilterChange(next) {
   void loadAllData(false);
 }
 
-function handleMatrixSelect(nextFilter) {
+function handleMatrixSelect(nextFilter: MatrixFilter | null) {
   matrixFilter.value = nextFilter;
   page.value = 1;
   updateUrlState();
@@ -619,10 +668,11 @@ async function loadLotsAndHold() {
     updateLotsState(lotsData);
     hold.value = holdData;
     showRefreshSuccess();
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError' || isStaleRequest(requestId)) return;
     refreshError.value = true;
-    const message = error?.message || '載入資料失敗';
+    const message = error?.message ?? '載入資料失敗';
     errorMessage.value = message;
     lotsError.value = message;
   } finally {
@@ -632,7 +682,7 @@ async function loadLotsAndHold() {
   }
 }
 
-function applyFilters(nextFilters) {
+function applyFilters(nextFilters: typeof filters) {
   updateFilters(nextFilters);
   matrixFilter.value = null;
   page.value = 1;
@@ -760,8 +810,8 @@ onBeforeUnmount(() => {
     />
 
     <FilterBar
-      :hold-type="orchestrator.committed.holdType"
-      :reason="orchestrator.committed.reason"
+      :hold-type="committedHoldType"
+      :reason="committedReason"
       :reasons="reasonOptions"
       :disabled="refreshing && initialLoading"
       @change="handleFilterChange"
@@ -817,7 +867,7 @@ onBeforeUnmount(() => {
           <div class="card-title ui-card-title">Workcenter x Package Matrix (QTY)</div>
         </div>
         <div class="card-body ui-card-body matrix-container">
-          <HoldMatrix :data="matrix" :active-filter="matrixFilter" @select="handleMatrixSelect" />
+          <HoldMatrix :data="matrix ?? undefined" :active-filter="matrixFilter ?? undefined" @select="handleMatrixSelect" />
         </div>
       </section>
 
@@ -839,7 +889,7 @@ onBeforeUnmount(() => {
       </section>
 
       <FilterIndicator
-        :matrix-filter="matrixFilter"
+        :matrix-filter="matrixFilter ?? undefined"
         :show-clear-all="true"
         @clear-matrix="clearMatrixFilter"
         @clear-all="clearMatrixFilter"

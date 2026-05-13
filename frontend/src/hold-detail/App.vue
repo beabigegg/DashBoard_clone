@@ -1,13 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 
-import { apiGet } from '../core/api.js';
-import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
-import { navigateToRuntimeRoute, replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation.js';
+import { apiGet } from '../core/api';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
+import { navigateToRuntimeRoute, replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation';
 import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants';
-import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
-import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
+import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -20,12 +20,44 @@ import AgeDistribution from './components/AgeDistribution.vue';
 import DistributionTable from './components/DistributionTable.vue';
 import SummaryCards from './components/SummaryCards.vue';
 
+// ── Local type aliases ──────────────────────────────────────────────────────
+interface HoldDetailSummary {
+  dataUpdateDate?: string;
+  totalLots?: number;
+  totalQty?: number;
+  avgAge?: number;
+  maxAge?: number;
+  workcenterCount?: number;
+  [key: string]: unknown;
+}
+
+interface AgeItem { range: string; lots: number; qty: number; percentage: number; }
+interface DistributionRow { name: string; lots: number; qty: number; percentage: number; }
+interface DistributionData {
+  byAge?: AgeItem[];
+  byWorkcenter?: DistributionRow[];
+  byPackage?: DistributionRow[];
+  [key: string]: unknown;
+}
+
+interface LotRecord { [key: string]: unknown; }
+interface PaginationData {
+  page?: number;
+  perPage?: number;
+  total?: number;
+  totalPages?: number;
+}
+interface LotsResult {
+  lots?: LotRecord[];
+  pagination?: PaginationData;
+}
+
 const API_TIMEOUT = 60000;
 const reason = ref('');
 
-const summary = ref(null);
-const distribution = ref(null);
-const lots = ref([]);
+const summary = ref<HoldDetailSummary | null>(null);
+const distribution = ref<DistributionData | null>(null);
+const lots = ref<LotRecord[]>([]);
 const pagination = ref({
   page: 1,
   perPage: 20,
@@ -76,26 +108,26 @@ function goBackToOverview() {
 
 // unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
-async function fetchSummary(signal) {
+async function fetchSummary(signal: AbortSignal): Promise<HoldDetailSummary> {
   const result = await apiGet('/api/wip/hold-detail/summary', {
     params: { reason: reason.value },
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch summary');
+  return unwrapApiResult(result, 'Failed to fetch summary') as HoldDetailSummary;
 }
 
-async function fetchDistribution(signal) {
+async function fetchDistribution(signal: AbortSignal): Promise<DistributionData> {
   const result = await apiGet('/api/wip/hold-detail/distribution', {
     params: { reason: reason.value },
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch distribution');
+  return unwrapApiResult(result, 'Failed to fetch distribution') as DistributionData;
 }
 
-async function fetchLots(signal) {
-  const params = {
+async function fetchLots(signal: AbortSignal): Promise<LotsResult> {
+  const params: Record<string, unknown> = {
     reason: reason.value,
     page: page.value,
     per_page: pagination.value.perPage || 20,
@@ -116,7 +148,7 @@ async function fetchLots(signal) {
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch lots');
+  return unwrapApiResult(result, 'Failed to fetch lots') as LotsResult;
 }
 
 const holdType = computed(() => {
@@ -136,22 +168,36 @@ const headerStyle = computed(() => ({
 }));
 
 const filterText = computed(() => {
-  const parts = [];
+  const parts: string[] = [];
   if (orchestrator.committed.workcenter) {
-    parts.push(`Workcenter=${orchestrator.committed.workcenter}`);
+    parts.push(`Workcenter=${String(orchestrator.committed.workcenter)}`);
   }
   if (orchestrator.committed.package) {
-    parts.push(`Package=${orchestrator.committed.package}`);
+    parts.push(`Package=${String(orchestrator.committed.package)}`);
   }
   if (orchestrator.committed.ageRange) {
-    parts.push(`Age=${orchestrator.committed.ageRange}天`);
+    parts.push(`Age=${String(orchestrator.committed.ageRange)}天`);
   }
   return parts.join(', ');
 });
 
 const hasActiveFilters = computed(() => Boolean(filterText.value));
 
-function getUrlParam(name) {
+// Template-safe accessors for orchestrator.committed (typed as Record<string, unknown>)
+const committedAgeRange = computed<string | undefined>(() => {
+  const v = orchestrator.committed.ageRange;
+  return v != null ? String(v) : undefined;
+});
+const committedWorkcenter = computed<string | undefined>(() => {
+  const v = orchestrator.committed.workcenter;
+  return v != null ? String(v) : undefined;
+});
+const committedPackage = computed<string | undefined>(() => {
+  const v = orchestrator.committed.package;
+  return v != null ? String(v) : undefined;
+});
+
+function getUrlParam(name: string): string {
   return new URLSearchParams(window.location.search).get(name)?.trim() || '';
 }
 
@@ -164,13 +210,13 @@ function updateUrlState() {
   params.set('reason', reason.value);
 
   if (orchestrator.committed.workcenter) {
-    params.set('workcenter', orchestrator.committed.workcenter);
+    params.set('workcenter', String(orchestrator.committed.workcenter));
   }
   if (orchestrator.committed.package) {
-    params.set('package', orchestrator.committed.package);
+    params.set('package', String(orchestrator.committed.package));
   }
   if (orchestrator.committed.ageRange) {
-    params.set('age_range', orchestrator.committed.ageRange);
+    params.set('age_range', String(orchestrator.committed.ageRange));
   }
   if (page.value > 1) {
     params.set('page', String(page.value));
@@ -201,16 +247,17 @@ async function loadLots() {
     }
     lots.value = Array.isArray(result?.lots) ? result.lots : [];
     pagination.value = {
-      page: Number(result?.pagination?.page || 1),
-      perPage: Number(result?.pagination?.perPage || 20),
-      total: Number(result?.pagination?.total || 0),
-      totalPages: Number(result?.pagination?.totalPages || 1),
+      page: Number(result?.pagination?.page ?? 1),
+      perPage: Number(result?.pagination?.perPage ?? 20),
+      total: Number(result?.pagination?.total ?? 0),
+      totalPages: Number(result?.pagination?.totalPages ?? 1),
     };
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
-    lotsError.value = error?.message || '載入 Lot 資料失敗';
+    lotsError.value = error?.message ?? '載入 Lot 資料失敗';
   } finally {
     if (isStaleRequest(requestId)) {
       return;
@@ -233,16 +280,17 @@ async function loadLotsPage() {
     }
     lots.value = Array.isArray(result?.lots) ? result.lots : [];
     pagination.value = {
-      page: Number(result?.pagination?.page || 1),
-      perPage: Number(result?.pagination?.perPage || 20),
-      total: Number(result?.pagination?.total || 0),
-      totalPages: Number(result?.pagination?.totalPages || 1),
+      page: Number(result?.pagination?.page ?? 1),
+      perPage: Number(result?.pagination?.perPage ?? 20),
+      total: Number(result?.pagination?.total ?? 0),
+      totalPages: Number(result?.pagination?.totalPages ?? 1),
     };
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
-    lotsError.value = error?.message || '載入 Lot 資料失敗';
+    lotsError.value = error?.message ?? '載入 Lot 資料失敗';
   } finally {
     if (isStaleRequest(requestId)) {
       return;
@@ -279,19 +327,20 @@ async function loadAllData(showOverlay = true) {
     distribution.value = distributionData;
     lots.value = Array.isArray(lotsData?.lots) ? lotsData.lots : [];
     pagination.value = {
-      page: Number(lotsData?.pagination?.page || 1),
-      perPage: Number(lotsData?.pagination?.perPage || 20),
-      total: Number(lotsData?.pagination?.total || 0),
-      totalPages: Number(lotsData?.pagination?.totalPages || 1),
+      page: Number(lotsData?.pagination?.page ?? 1),
+      perPage: Number(lotsData?.pagination?.perPage ?? 20),
+      total: Number(lotsData?.pagination?.total ?? 0),
+      totalPages: Number(lotsData?.pagination?.totalPages ?? 1),
     };
 
     refreshSuccess.value = true;
     setTimeout(() => { refreshSuccess.value = false; }, 1500);
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError' || isStaleRequest(requestId)) {
       return;
     }
-    loadError.value = error?.message || '載入資料失敗';
+    loadError.value = error?.message ?? '載入資料失敗';
     refreshError.value = true;
   } finally {
     if (isStaleRequest(requestId)) {
@@ -302,17 +351,17 @@ async function loadAllData(showOverlay = true) {
   }
 }
 
-function toggleAgeFilter(range) {
+function toggleAgeFilter(range: string) {
   const next = orchestrator.committed.ageRange === range ? null : range;
   orchestrator.updateField('ageRange', next);
 }
 
-function toggleWorkcenterFilter(name) {
+function toggleWorkcenterFilter(name: string) {
   const next = orchestrator.committed.workcenter === name ? null : name;
   orchestrator.updateField('workcenter', next);
 }
 
-function togglePackageFilter(name) {
+function togglePackageFilter(name: string) {
   const next = orchestrator.committed.package === name ? null : name;
   orchestrator.updateField('package', next);
 }
@@ -399,12 +448,12 @@ onMounted(() => {
 
     <ErrorBanner :message="loadError" :dismissible="false" />
 
-    <SummaryCards :summary="summary" />
+    <SummaryCards :summary="summary ?? undefined" />
 
     <section class="section-title">當站滯留天數分佈 (Age at Current Station)</section>
     <AgeDistribution
       :items="distribution?.byAge || []"
-      :active-range="orchestrator.committed.ageRange"
+      :active-range="committedAgeRange"
       @toggle="toggleAgeFilter"
     />
 
@@ -412,13 +461,13 @@ onMounted(() => {
       <DistributionTable
         title="By Workcenter"
         :rows="distribution?.byWorkcenter || []"
-        :active-name="orchestrator.committed.workcenter"
+        :active-name="committedWorkcenter"
         @toggle="toggleWorkcenterFilter"
       />
       <DistributionTable
         title="By Package"
         :rows="distribution?.byPackage || []"
-        :active-name="orchestrator.committed.package"
+        :active-name="committedPackage"
         @toggle="togglePackageFilter"
       />
     </section>

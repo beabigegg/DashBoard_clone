@@ -1,8 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import { apiGet } from '../../core/api.js';
-import { unwrapApiData as unwrapApiResult } from '../../core/unwrap-api-result.js';
+import { apiGet } from '../../core/api';
+import { unwrapApiData as unwrapApiResult } from '../../core/unwrap-api-result';
 import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 
 const props = defineProps({
@@ -14,13 +14,21 @@ const props = defineProps({
 
 const emit = defineEmits(['close']);
 
+type LotDetail = {
+  fieldLabels?: Record<string, string>;
+  wipStatus?: string;
+  holdCount?: number;
+  ncrId?: unknown;
+  [key: string]: unknown;
+};
+
 const loading = ref(false);
 const errorMessage = ref('');
-const detail = ref(null);
+const detail = ref<LotDetail | null>(null);
 
 // unwrapApiResult imported from ../../core/unwrap-api-result.js (as unwrapApiData)
 
-async function loadLotDetail(lotId) {
+async function loadLotDetail(lotId: string): Promise<void> {
   if (!lotId) {
     detail.value = null;
     return;
@@ -33,8 +41,9 @@ async function loadLotDetail(lotId) {
     const result = await apiGet(`/api/wip/lot/${encodeURIComponent(lotId)}`, {
       timeout: 60000,
     });
-    detail.value = unwrapApiResult(result, 'Failed to fetch lot detail');
-  } catch (error) {
+    detail.value = unwrapApiResult(result, 'Failed to fetch lot detail') as LotDetail;
+  } catch (err: unknown) {
+    const error = err as { message?: string };
     detail.value = null;
     errorMessage.value = error?.message || '載入失敗';
   } finally {
@@ -54,20 +63,20 @@ watch(
   { immediate: true }
 );
 
-const labels = computed(() => detail.value?.fieldLabels || {});
+const labels = computed<Record<string, string>>(() => detail.value?.fieldLabels || {});
 
-function getLabel(key) {
+function getLabel(key: string): string {
   return labels.value[key] || key;
 }
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   if (value === null || value === undefined || value === '') {
     return '-';
   }
   return Number.isFinite(Number(value)) ? Number(value).toLocaleString('zh-TW') : String(value);
 }
 
-function fieldValue(key) {
+function fieldValue(key: string): string {
   const value = detail.value?.[key];
   if (value === null || value === undefined || value === '') {
     return '-';
@@ -78,7 +87,7 @@ function fieldValue(key) {
   return String(value);
 }
 
-function fieldClass(key) {
+function fieldClass(key: string): string {
   if (key !== 'wipStatus') {
     return '';
   }
@@ -87,7 +96,7 @@ function fieldClass(key) {
   return `status-${status}`;
 }
 
-function hasHoldSection() {
+function hasHoldSection(): boolean {
   return detail.value?.wipStatus === 'HOLD' || Number(detail.value?.holdCount || 0) > 0;
 }
 

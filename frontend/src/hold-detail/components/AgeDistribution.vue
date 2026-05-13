@@ -1,9 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
+
+interface AgeCard { range?: string; lots: number; qty: number; percentage: number; }
 
 const props = defineProps({
   items: {
-    type: Array,
+    type: Array as () => AgeCard[],
     default: () => [],
   },
   activeRange: {
@@ -17,8 +19,8 @@ const emit = defineEmits(['toggle']);
 const cardRanges = ['0-1', '1-3', '3-7', '7+'];
 
 const ageMap = computed(() => {
-  const map = {};
-  props.items.forEach((item) => {
+  const map: Record<string, AgeCard> = {};
+  props.items.forEach((item: AgeCard) => {
     if (item?.range) {
       map[item.range] = item;
     }
@@ -26,11 +28,11 @@ const ageMap = computed(() => {
   return map;
 });
 
-function getCard(range) {
+function getCard(range: string): AgeCard {
   return ageMap.value[range] || { lots: 0, qty: 0, percentage: 0 };
 }
 
-function formatNumber(value) {
+function formatNumber(value: number | undefined): string {
   return Number(value || 0).toLocaleString('zh-TW');
 }
 </script>

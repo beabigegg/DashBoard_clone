@@ -1,13 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 
-import { apiGet, apiPost } from '../core/api.js';
-import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result.js';
-import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
-import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state.js';
-import { buildWipDetailQueryParams, buildWipOverviewQueryParams } from '../core/wip-derive.js';
-import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
+import { apiGet, apiPost } from '../core/api';
+import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
+import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation';
+import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state';
+import { buildWipDetailQueryParams, buildWipOverviewQueryParams } from '../core/wip-derive';
+import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
@@ -17,13 +17,37 @@ import LotDetailPanel from './components/LotDetailPanel.vue';
 import LotTable from './components/LotTable.vue';
 import SummaryCards from './components/SummaryCards.vue';
 
+// ── Local type aliases ──────────────────────────────────────────────────────
+interface WipDetailData {
+  sys_date?: string;
+  summary?: Record<string, unknown> | null;
+  lots?: unknown[];
+  specs?: string[];
+  pagination?: {
+    page?: number;
+    page_size?: number;
+    total_count?: number;
+    total_pages?: number;
+  };
+  [key: string]: unknown;
+}
+
+interface WorkcenterEntry { name: string; [key: string]: unknown; }
+
 const API_TIMEOUT = 60000;
 const PAGE_SIZE = 20;
 const FILTER_OPTION_DEBOUNCE_MS = 120;
 
 const workcenter = ref('');
 const page = ref(1);
-const filters = reactive({
+const filters = reactive<{
+  workorder: string[];
+  lotid: string[];
+  package: string[];
+  type: string[];
+  firstname: string[];
+  waferdesc: string[];
+}>({
   workorder: [],
   lotid: [],
   package: [],
@@ -31,7 +55,14 @@ const filters = reactive({
   firstname: [],
   waferdesc: [],
 });
-const filterOptions = ref({
+const filterOptions = ref<{
+  workorders: string[];
+  lotids: string[];
+  packages: string[];
+  types: string[];
+  firstnames: string[];
+  waferdescs: string[];
+}>({
   workorders: [],
   lotids: [],
   packages: [],
@@ -40,9 +71,9 @@ const filterOptions = ref({
   waferdescs: [],
 });
 
-const activeStatusFilter = ref(null);
+const activeStatusFilter = ref<string | null>(null);
 
-const detailData = ref(null);
+const detailData = ref<WipDetailData | null>(null);
 const loading = ref(true);
 const tableLoading = ref(false);
 const paginationLoading = ref(false);
@@ -52,7 +83,7 @@ const refreshError = ref(false);
 const errorMessage = ref('');
 const selectedLotId = ref('');
 
-let filterOptionsDebounceTimer = null;
+let filterOptionsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let filterOptionsRequestToken = 0;
 
 // -- useFilterOrchestrator: status=immediate (page+lot clear+table reload), panel=draft-apply (status clear+page+lot clear+full reload) --
@@ -77,11 +108,11 @@ const filterOrchestrator = useFilterOrchestrator({
 
 // unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
-function getUrlParam(name) {
+function getUrlParam(name: string): string {
   return new URLSearchParams(window.location.search).get(name)?.trim() || '';
 }
 
-function parseCsvParam(name) {
+function parseCsvParam(name: string): string[] {
   const raw = getUrlParam(name);
   if (!raw) {
     return [];
@@ -92,7 +123,7 @@ function parseCsvParam(name) {
     .filter(Boolean);
 }
 
-function normalizeArrayValues(values) {
+function normalizeArrayValues(values: string | string[] | null | undefined): string[] {
   if (!values) {
     return [];
   }
@@ -105,7 +136,7 @@ function normalizeArrayValues(values) {
     .filter(Boolean);
 }
 
-function serializeFilterValue(values) {
+function serializeFilterValue(values: string | string[] | null | undefined): string {
   const normalized = normalizeArrayValues(values);
   return normalized.join(',');
 }
@@ -150,15 +181,15 @@ function updateUrlState() {
   replaceRuntimeHistory(`/wip-detail?${params.toString()}`);
 }
 
-async function fetchWorkcenters(signal) {
+async function fetchWorkcenters(signal: AbortSignal): Promise<WorkcenterEntry[]> {
   const result = await apiGet('/api/wip/meta/workcenters', {
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch workcenters');
+  return unwrapApiResult(result, 'Failed to fetch workcenters') as WorkcenterEntry[];
 }
 
-async function fetchDetail(signal) {
+async function fetchDetail(signal: AbortSignal): Promise<WipDetailData | null> {
   if (!workcenter.value) {
     return null;
   }
@@ -174,7 +205,7 @@ async function fetchDetail(signal) {
     timeout: API_TIMEOUT,
     signal,
   });
-  return unwrapApiResult(result, 'Failed to fetch detail');
+  return unwrapApiResult(result, 'Failed to fetch detail') as WipDetailData;
 }
 
 async function loadFilterOptions(sourceFilters = filters) {
@@ -192,22 +223,24 @@ async function loadFilterOptions(sourceFilters = filters) {
       return;
     }
 
+    const d = data as Record<string, unknown>;
     filterOptions.value = {
-      workorders: Array.isArray(data?.workorders) ? data.workorders : [],
-      lotids: Array.isArray(data?.lotids) ? data.lotids : [],
-      packages: Array.isArray(data?.packages) ? data.packages : [],
-      types: Array.isArray(data?.types) ? data.types : [],
-      firstnames: Array.isArray(data?.firstnames) ? data.firstnames : [],
-      waferdescs: Array.isArray(data?.waferdescs) ? data.waferdescs : [],
+      workorders: Array.isArray(d?.workorders) ? (d.workorders as string[]) : [],
+      lotids: Array.isArray(d?.lotids) ? (d.lotids as string[]) : [],
+      packages: Array.isArray(d?.packages) ? (d.packages as string[]) : [],
+      types: Array.isArray(d?.types) ? (d.types as string[]) : [],
+      firstnames: Array.isArray(d?.firstnames) ? (d.firstnames as string[]) : [],
+      waferdescs: Array.isArray(d?.waferdescs) ? (d.waferdescs as string[]) : [],
     };
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string };
     if (error?.name !== 'AbortError') {
-      console.warn('載入 WIP Detail 篩選選項失敗:', error);
+      console.warn('載入 WIP Detail 篩選選項失敗:', err);
     }
   }
 }
 
-function scheduleFilterOptionsReload(nextDraftFilters) {
+function scheduleFilterOptionsReload(nextDraftFilters: typeof filters): void {
   if (filterOptionsDebounceTimer) {
     clearTimeout(filterOptionsDebounceTimer);
   }
@@ -217,7 +250,7 @@ function scheduleFilterOptionsReload(nextDraftFilters) {
   }, FILTER_OPTION_DEBOUNCE_MS);
 }
 
-function onFilterDraftChange(nextDraftFilters) {
+function onFilterDraftChange(nextDraftFilters: typeof filters): void {
   scheduleFilterOptionsReload(nextDraftFilters);
 }
 
@@ -252,12 +285,13 @@ async function loadAllData(showOverlay = true) {
   try {
     detailData.value = await fetchDetail(signal);
     showRefreshSuccess();
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError') {
       return;
     }
     refreshError.value = true;
-    errorMessage.value = error?.message || '載入資料失敗';
+    errorMessage.value = error?.message ?? '載入資料失敗';
   } finally {
     loading.value = false;
     tableLoading.value = false;
@@ -277,12 +311,13 @@ async function loadTableOnly() {
   try {
     detailData.value = await fetchDetail(signal);
     showRefreshSuccess();
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError') {
       return;
     }
     refreshError.value = true;
-    errorMessage.value = error?.message || '載入表格失敗';
+    errorMessage.value = error?.message ?? '載入表格失敗';
   } finally {
     tableLoading.value = false;
     refreshing.value = false;
@@ -308,7 +343,7 @@ function navigateBack() {
   navigateToRuntimeRoute('/wip-overview');
 }
 
-function updateFilters(nextFilters) {
+function updateFilters(nextFilters: Partial<typeof filters>) {
   filters.workorder = normalizeArrayValues(nextFilters.workorder);
   filters.lotid = normalizeArrayValues(nextFilters.lotid);
   filters.package = normalizeArrayValues(nextFilters.package);
@@ -325,7 +360,7 @@ function updateFilters(nextFilters) {
   filterOrchestrator.draft.waferdesc = filters.waferdesc;
 }
 
-function applyFilters(nextFilters) {
+function applyFilters(nextFilters: typeof filters) {
   updateFilters(nextFilters);
   // Apply draft fields via orchestrator; status clear + page + lot clear
   activeStatusFilter.value = null;
@@ -355,7 +390,7 @@ function clearFilters() {
   void loadAllData(false);
 }
 
-function toggleStatusFilter(status) {
+function toggleStatusFilter(status: string) {
   activeStatusFilter.value = activeStatusFilter.value === status ? null : status;
   // Delegate to orchestrator immediate field; onFetch handles page/lot/table reload
   filterOrchestrator.updateField('status', activeStatusFilter.value);
@@ -372,11 +407,12 @@ async function loadPageData() {
 
   try {
     detailData.value = await fetchDetail(signal);
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
     if (error?.name === 'AbortError') {
       return;
     }
-    errorMessage.value = error?.message || '載入表格失敗';
+    errorMessage.value = error?.message ?? '載入表格失敗';
   } finally {
     paginationLoading.value = false;
   }
@@ -401,7 +437,7 @@ function nextPage() {
   void loadPageData();
 }
 
-function openLotDetail(lotId) {
+function openLotDetail(lotId: string) {
   selectedLotId.value = lotId;
 }
 
@@ -421,12 +457,12 @@ async function initializePage() {
   const navState = loadWipNavigationState();
   if (navState) {
     updateFilters({
-      workorder: navState.workorder || [],
-      lotid: navState.lotid || [],
-      package: navState.package || [],
-      type: navState.type || [],
-      firstname: navState.firstname || [],
-      waferdesc: navState.waferdesc || [],
+      workorder: (navState.workorder || []) as string[],
+      lotid: (navState.lotid || []) as string[],
+      package: (navState.package || []) as string[],
+      type: (navState.type || []) as string[],
+      firstname: (navState.firstname || []) as string[],
+      waferdesc: (navState.waferdesc || []) as string[],
     });
     activeStatusFilter.value = navState.status || getUrlParam('status') || null;
   } else {
@@ -449,9 +485,10 @@ async function initializePage() {
         workcenter.value = workcenters[0].name;
         updateUrlState();
       }
-    } catch (error) {
+    } catch (err: unknown) {
+      const error = err as { name?: string; message?: string };
       if (error?.name !== 'AbortError') {
-        errorMessage.value = error?.message || '無法取得工站列表';
+        errorMessage.value = error?.message ?? '無法取得工站列表';
       }
     }
   }
@@ -506,8 +543,8 @@ onBeforeUnmount(() => {
     />
 
     <SummaryCards
-      :summary="summary"
-      :active-status="activeStatusFilter"
+      :summary="summary ?? undefined"
+      :active-status="activeStatusFilter ?? undefined"
       @toggle="toggleStatusFilter"
     />
 
@@ -515,7 +552,7 @@ onBeforeUnmount(() => {
       :data="tableData"
       :loading="tableLoading"
       :paginating="paginationLoading"
-      :active-status="activeStatusFilter"
+      :active-status="activeStatusFilter ?? undefined"
       :selected-lot-id="selectedLotId"
       @select-lot="openLotDetail"
       @prev-page="prevPage"

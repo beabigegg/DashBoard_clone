@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.6
-last-changed: 2026-05-12
+schema-version: 1.3.7
+last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -81,6 +81,13 @@ breaking-change-policy: deprecate-2-minors
 - **From this change onward**: `include` gains `"src/hold-history/**/*"`, covering all `.ts`/`.vue` files migrated from `hold-history/` under `strict: true`.
 - **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.6 (patch)**: additive prose only — gate tier, command, and status are unchanged.
+
+### frontend-type-check scope expansion (Phase 3 — migrate-wip-hold-ts)
+
+- **Before this change**: `tsconfig.json` `include` covered `core/`, `shared-composables/`, `shared-ui/`, `admin-shared/`, `resource-shared/`, `wip-shared/`, `reject-history/`, `hold-history/`.
+- **From this change onward**: `include` gains `"src/wip-overview/**/*"`, `"src/wip-detail/**/*"`, `"src/hold-overview/**/*"`, `"src/hold-detail/**/*"`, covering all `.ts`/`.vue` files migrated from the four feature apps under `strict: true`.
+- **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.7 (patch)**: additive prose only — gate tier, command, and status are unchanged.
 
 ## Required Check Policy
 
