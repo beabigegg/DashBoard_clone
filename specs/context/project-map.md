@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 291
-visible-files: 895
+visible-dirs: 292
+visible-files: 917
 omitted-dirs: 105
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -470,7 +470,7 @@ DashBoard_vite/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- App.vue
 |   |   |   |-- index.html
-|   |   |   |-- main.js
+|   |   |   |-- main.ts
 |   |   |   \-- style.css
 |   |   |-- shared-composables/
 |   |   |   |-- index.ts
@@ -632,7 +632,23 @@ DashBoard_vite/
 |   |-- vite.config.ts
 |   \-- vitest.config.js
 |-- logs/
-|   \-- admin_logs.sqlite
+|   |-- archive/
+|   |   |-- access_20260513_120033.log
+|   |   \-- error_20260513_120033.log
+|   |-- access.log
+|   |-- admin_logs.sqlite
+|   |-- error.log
+|   |-- login_sessions.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
+|   |-- metrics_history.sqlite
+|   |-- rq_msd_worker.log
+|   |-- rq_prod_hist_worker.log
+|   |-- rq_reject_worker.log
+|   |-- rq_worker.log
+|   |-- rq_yield_alert_worker.log
+|   |-- startup.log
+|   \-- watchdog.log
 |-- openspec/
 |   |-- archive/
 |   |   |-- 2026-03-26-system-status-and-online-presence/
@@ -1298,8 +1314,15 @@ DashBoard_vite/
 |   |   |-- probe_13168.json
 |   |   |-- probe_13169.json
 |   |   |-- probe_132749.json
-|   |   \-- ... (265 more entries truncated; cap=50)
-|   \-- mes_dashboard_restart_state.json
+|   |   \-- ... (269 more entries truncated; cap=50)
+|   |-- gunicorn.pid
+|   |-- mes_dashboard_restart_state.json
+|   |-- rq_msd_worker.pid
+|   |-- rq_prod_hist_worker.pid
+|   |-- rq_reject_worker.pid
+|   |-- rq_trace_worker.pid
+|   |-- rq_yield_alert_worker.pid
+|   \-- worker_watchdog.pid
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py
