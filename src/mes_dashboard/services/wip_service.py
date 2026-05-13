@@ -551,18 +551,6 @@ def _materialize_search_payload(
     }
 
 
-def _build_wip_search_index(df: pd.DataFrame, include_dummy: bool) -> Dict[str, Any]:
-    filtered = _filter_base_conditions(df, include_dummy=include_dummy)
-    signatures, signature_fields = _build_search_signatures(filtered)
-    field_counters = _build_field_counters(signatures, signature_fields)
-    return _materialize_search_payload(
-        version=_get_wip_cache_version(),
-        row_count=len(filtered),
-        signature_counter=signatures,
-        field_counters=field_counters,
-        mode="full",
-    )
-
 
 def _try_incremental_search_sync(
     previous: Dict[str, Any],
@@ -640,7 +628,7 @@ def _try_incremental_search_sync(
                 field_counters["waferdescs"].pop(wafer, None)
 
     _increment_wip_metric("search_index_incremental_updates")
-    return _materialize_search_payload(
+    result = _materialize_search_payload(
         version=version,
         row_count=row_count,
         signature_counter=signature_counter,
@@ -650,6 +638,12 @@ def _try_incremental_search_sync(
         removed_rows=sum(removed.values()),
         drift_ratio=drift_ratio,
     )
+    # workflow/bop/pjFunction are not tracked in the signature system; carry them
+    # forward from the previous full-build until the next full rebuild refreshes them.
+    result["workflows"] = previous.get("workflows", [])
+    result["bops"] = previous.get("bops", [])
+    result["pjFunctions"] = previous.get("pjFunctions", [])
+    return result
 
 
 def _build_wip_snapshot(df: pd.DataFrame, include_dummy: bool, version: str) -> Dict[str, Any]:
@@ -755,6 +749,9 @@ def _get_wip_search_index(include_dummy: bool) -> Optional[Dict[str, Any]]:
             field_counters=field_counters,
             mode="full",
         )
+        index_payload["workflows"] = _distinct_non_empty_values(filtered, "WORKFLOWNAME")
+        index_payload["bops"] = _distinct_non_empty_values(filtered, "BOP")
+        index_payload["pjFunctions"] = _distinct_non_empty_values(filtered, "PJ_FUNCTION")
         _increment_wip_metric("search_index_rebuilds")
 
     with _wip_search_index_lock:
@@ -902,6 +899,9 @@ def get_wip_summary(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get WIP KPI summary for overview dashboard.
 
@@ -915,6 +915,9 @@ def get_wip_summary(
         pj_type: Optional PJ_TYPE filter (exact match)
         firstname: Optional FIRSTNAME filter (exact match)
         waferdesc: Optional WAFERDESC filter (exact match)
+        workflow: Optional WORKFLOWNAME filter (exact match)
+        bop: Optional BOP filter (exact match)
+        pj_function: Optional PJ_FUNCTION filter (exact match)
 
     Returns:
         Dict with summary stats (camelCase):
@@ -945,6 +948,9 @@ def get_wip_summary(
                     pj_type,
                     firstname,
                     waferdesc,
+                    workflow,
+                    bop,
+                    pj_function,
                 )
 
             if df.empty:
@@ -1009,6 +1015,9 @@ def get_wip_summary(
         pj_type,
         firstname,
         waferdesc,
+        workflow,
+        bop,
+        pj_function,
     )
 
 
@@ -1020,6 +1029,9 @@ def _get_wip_summary_from_oracle(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get WIP summary directly from Oracle (fallback)."""
     try:
@@ -1030,6 +1042,12 @@ def _get_wip_summary_from_oracle(
         _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
         _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
+        if workflow:
+            builder.add_param_condition("WORKFLOWNAME", workflow)
+        if bop:
+            builder.add_param_condition("BOP", bop)
+        if pj_function:
+            builder.add_param_condition("PJ_FUNCTION", pj_function)
 
         # Load SQL template and build query
         base_sql = SQLLoader.load("wip/summary")
@@ -1091,6 +1109,9 @@ def get_wip_matrix(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get workcenter x product line matrix for overview dashboard.
 
@@ -1149,6 +1170,9 @@ def get_wip_matrix(
                     pj_type,
                     firstname,
                     waferdesc,
+                    workflow,
+                    bop,
+                    pj_function,
                 )
 
             if reason_filter:
@@ -1188,6 +1212,9 @@ def get_wip_matrix(
         pj_type,
         firstname,
         waferdesc,
+        workflow,
+        bop,
+        pj_function,
     )
 
 
@@ -1255,6 +1282,9 @@ def _get_wip_matrix_from_oracle(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get WIP matrix directly from Oracle (fallback)."""
     try:
@@ -1267,6 +1297,12 @@ def _get_wip_matrix_from_oracle(
         _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
         _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
+        if workflow:
+            builder.add_param_condition("WORKFLOWNAME", workflow)
+        if bop:
+            builder.add_param_condition("BOP", bop)
+        if pj_function:
+            builder.add_param_condition("PJ_FUNCTION", pj_function)
 
         # WIP status filter
         if status:
@@ -1481,7 +1517,10 @@ def get_wip_detail(
     lotid: Optional[str] = None,
     include_dummy: bool = False,
     page: int = 1,
-    page_size: int = 100
+    page_size: int = 100,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get WIP detail for a specific workcenter group.
 
@@ -1539,6 +1578,9 @@ def get_wip_detail(
                     include_dummy,
                     page,
                     page_size,
+                    workflow,
+                    bop,
+                    pj_function,
                 )
 
             if summary_df.empty:
@@ -1601,6 +1643,9 @@ def get_wip_detail(
                         include_dummy,
                         page,
                         page_size,
+                        workflow,
+                        bop,
+                        pj_function,
                     )
                 df = filtered_df
 
@@ -1628,7 +1673,8 @@ def get_wip_detail(
                     'holdReason': _safe_value(row.get('HOLDREASONNAME')),
                     'qty': int(row.get('QTY', 0) or 0),
                     'package': _safe_value(row.get('PACKAGE_LEF')),
-                    'spec': _safe_value(row.get('SPECNAME'))
+                    'spec': _safe_value(row.get('SPECNAME')),
+                    'pjType': _safe_value(row.get('PJ_TYPE')),
                 })
 
             return {
@@ -1663,6 +1709,9 @@ def get_wip_detail(
         include_dummy,
         page,
         page_size,
+        workflow,
+        bop,
+        pj_function,
     )
 
 
@@ -1678,7 +1727,10 @@ def _get_wip_detail_from_oracle(
     lotid: Optional[str] = None,
     include_dummy: bool = False,
     page: int = 1,
-    page_size: int = 100
+    page_size: int = 100,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get WIP detail directly from Oracle (fallback)."""
     try:
@@ -1690,6 +1742,12 @@ def _get_wip_detail_from_oracle(
         _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
         _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
+        if workflow:
+            builder.add_param_condition("WORKFLOWNAME", workflow)
+        if bop:
+            builder.add_param_condition("BOP", bop)
+        if pj_function:
+            builder.add_param_condition("PJ_FUNCTION", pj_function)
 
         # WIP status filter (RUN/QUEUE/HOLD based on EQUIPMENTCOUNT and CURRENTHOLDCOUNT)
         if status:
@@ -1713,6 +1771,12 @@ def _get_wip_detail_from_oracle(
         _add_exact_filter_conditions(summary_builder, "PJ_TYPE", pj_type)
         _add_exact_filter_conditions(summary_builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(summary_builder, "WAFERDESC", waferdesc)
+        if workflow:
+            summary_builder.add_param_condition("WORKFLOWNAME", workflow)
+        if bop:
+            summary_builder.add_param_condition("BOP", bop)
+        if pj_function:
+            summary_builder.add_param_condition("PJ_FUNCTION", pj_function)
 
         summary_where, summary_params = summary_builder.build_where_only()
         non_quality_list = CommonFilters.get_non_quality_reasons_sql()
@@ -1816,7 +1880,8 @@ def _get_wip_detail_from_oracle(
                     'holdReason': _safe_value(row['HOLDREASONNAME']),
                     'qty': int(row['QTY'] or 0),
                     'package': _safe_value(row['PACKAGE_LEF']),
-                    'spec': _safe_value(row['SPECNAME'])
+                    'spec': _safe_value(row['SPECNAME']),
+                    'pjType': _safe_value(row['PJ_TYPE']) if 'PJ_TYPE' in row.index else None,
                 })
 
         total_pages = (filtered_count + page_size - 1) // page_size if filtered_count > 0 else 1
@@ -2027,6 +2092,9 @@ def _build_filter_options_payload(df: pd.DataFrame) -> Dict[str, List[str]]:
         "types": _distinct_non_empty_values(df, "PJ_TYPE"),
         "firstnames": _distinct_non_empty_values(df, "FIRSTNAME"),
         "waferdescs": _distinct_non_empty_values(df, "WAFERDESC"),
+        "workflows": _distinct_non_empty_values(df, "WORKFLOWNAME"),
+        "bops": _distinct_non_empty_values(df, "BOP"),
+        "pjFunctions": _distinct_non_empty_values(df, "PJ_FUNCTION"),
     }
 
 
@@ -2039,6 +2107,9 @@ def _query_distinct_values_from_oracle(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
     exclude_field: Optional[str] = None,
 ) -> Optional[List[str]]:
     try:
@@ -2056,6 +2127,12 @@ def _query_distinct_values_from_oracle(
             _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         if exclude_field != "waferdesc":
             _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
+        if exclude_field != "workflow" and workflow:
+            builder.add_param_condition("WORKFLOWNAME", workflow)
+        if exclude_field != "bop" and bop:
+            builder.add_param_condition("BOP", bop)
+        if exclude_field != "pj_function" and pj_function:
+            builder.add_param_condition("PJ_FUNCTION", pj_function)
         where_clause, params = builder.build_where_only()
         sql = f"""
             SELECT DISTINCT {column}
@@ -2083,6 +2160,9 @@ def _get_wip_filter_options_from_oracle(
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, List[str]]]:
     columns = {
         "workorder": ("workorders", "WORKORDER"),
@@ -2091,6 +2171,9 @@ def _get_wip_filter_options_from_oracle(
         "pj_type": ("types", "PJ_TYPE"),
         "firstname": ("firstnames", "FIRSTNAME"),
         "waferdesc": ("waferdescs", "WAFERDESC"),
+        "workflow": ("workflows", "WORKFLOWNAME"),
+        "bop": ("bops", "BOP"),
+        "pj_function": ("pjFunctions", "PJ_FUNCTION"),
     }
     payload: Dict[str, List[str]] = {}
     for field, (key, column) in columns.items():
@@ -2103,6 +2186,9 @@ def _get_wip_filter_options_from_oracle(
             pj_type=pj_type,
             firstname=firstname,
             waferdesc=waferdesc,
+            workflow=workflow,
+            bop=bop,
+            pj_function=pj_function,
             exclude_field=field,
         )
         if values is None:
@@ -2122,12 +2208,18 @@ def _get_filter_options_cache_payload(
     waferdesc: Optional[str] = None,
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, List[str]]]:
     """Compute cross-filter option lists from snapshot indexes without materialising DataFrames.
 
     For each filter field we compute positions with that field's own filter excluded
     (cross-filter semantics), then use _distinct_values_from_index to read distinct
     values directly from the index — no row-level scan required.
+
+    Note: workflow, bop, pj_function are not yet in the snapshot indexes, so they fall back
+    to materialising a filtered DataFrame for those three new arrays.
     """
     snapshot = _get_wip_snapshot(include_dummy=include_dummy)
     if snapshot is None:
@@ -2163,6 +2255,33 @@ def _get_filter_options_cache_payload(
             indexes[index_key], positions, row_count
         )
 
+    # For new columns not yet in snapshot indexes, materialise the filtered frame
+    filtered_df = _select_with_snapshot_indexes(
+        include_dummy=include_dummy,
+        workorder=workorder,
+        lotid=lotid,
+        package=package,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
+        status=status,
+        hold_type=hold_type,
+    )
+    if filtered_df is None:
+        filtered_df = snapshot["frame"]
+
+    # Apply new filters on top of the materialised frame
+    if workflow and "WORKFLOWNAME" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["WORKFLOWNAME"] == workflow]
+    if bop and "BOP" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["BOP"] == bop]
+    if pj_function and "PJ_FUNCTION" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["PJ_FUNCTION"] == pj_function]
+
+    payload["workflows"] = _distinct_non_empty_values(filtered_df, "WORKFLOWNAME")
+    payload["bops"] = _distinct_non_empty_values(filtered_df, "BOP")
+    payload["pjFunctions"] = _distinct_non_empty_values(filtered_df, "PJ_FUNCTION")
+
     return payload
 
 
@@ -2176,6 +2295,9 @@ def get_wip_filter_options(
     waferdesc: Optional[str] = None,
     status: Optional[str] = None,
     hold_type: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, List[str]]]:
     """Get interdependent filter option lists for WIP overview dropdowns."""
     has_filter = any(
@@ -2184,9 +2306,10 @@ def get_wip_filter_options(
     )
 
     has_status_filter = bool(status or hold_type)
+    has_new_filter = bool(workflow or bop or pj_function)
 
     indexed = _get_wip_search_index(include_dummy=include_dummy)
-    if indexed is not None and not has_filter and not has_status_filter:
+    if indexed is not None and not has_filter and not has_status_filter and not has_new_filter:
         return {
             "workorders": list(indexed.get("workorders", [])),
             "lotids": list(indexed.get("lotids", [])),
@@ -2194,6 +2317,9 @@ def get_wip_filter_options(
             "types": list(indexed.get("types", [])),
             "firstnames": list(indexed.get("firstnames", [])),
             "waferdescs": list(indexed.get("waferdescs", [])),
+            "workflows": list(indexed.get("workflows", [])),
+            "bops": list(indexed.get("bops", [])),
+            "pjFunctions": list(indexed.get("pjFunctions", [])),
         }
 
     cached_df = _get_wip_dataframe()
@@ -2209,6 +2335,9 @@ def get_wip_filter_options(
                 waferdesc=waferdesc,
                 status=status,
                 hold_type=hold_type,
+                workflow=workflow,
+                bop=bop,
+                pj_function=pj_function,
             )
             if payload is not None:
                 return payload
@@ -2225,6 +2354,9 @@ def get_wip_filter_options(
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
 
 

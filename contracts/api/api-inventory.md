@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.1.0
-last-changed: 2026-05-05
+schema-version: 1.1.1
+last-changed: 2026-05-13
 ---
 
 # API Inventory
@@ -19,7 +19,7 @@ last-changed: 2026-05-05
 
 | File | Scope |
 |---|---|
-| `wip_routes.py` | All JSON API endpoints — `GET /api/wip/overview/summary`, `/matrix`, `/meta/filter-options`, `/overview/hold`；同時接受 `POST` JSON body（避免 URL 過長） |
+| `wip_routes.py` | All JSON API endpoints — `GET /api/wip/overview/summary`, `/matrix`, `/meta/filter-options`, `/overview/hold`；同時接受 `POST` JSON body（避免 URL 過長）。`/overview/summary`、`/overview/matrix`、`/detail/<workcenter>`、`/meta/filter-options` 接受新增可選參數 `workflow`、`bop`、`pj_function`（wip-hold-drilldown-filters）。`/detail/<workcenter>` lot 列新增 `pjType` 欄位。`/meta/filter-options` response 新增 `workflows`、`bops`、`pjFunctions` 陣列。 |
 | `dashboard_routes.py` | All JSON API endpoints |
 | `hold_routes.py` | All JSON API endpoints |
 | `hold_overview_routes.py` | All JSON API endpoints — `/summary`, `/matrix`, `/treemap`, `/lots` 接受 `POST` JSON body；`reason` 可為 CSV string (GET) 或 JSON array (POST) |
@@ -94,6 +94,7 @@ last-changed: 2026-05-05
 
 ## Compatibility Notes
 
+- **2026-05-13（wip-hold-drilldown-filters）：** `wip_routes.py` 四個端點新增三個可選過濾參數（`workflow`、`bop`、`pj_function`）；`/detail/<workcenter>` lot 列新增 `pjType`；`/meta/filter-options` response 新增 `workflows`、`bops`、`pjFunctions`；全部 backward-compatible。
 - **2026-04-15：** 所有 `standard-json` 端點注入 `meta.app_version`（additive，backward-compatible）。
 - **2026-03-11：** `/health` / `/health/deep` 加入 `system_memory` + `async_workers`（backward-compatible）。
 

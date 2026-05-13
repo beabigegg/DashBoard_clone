@@ -96,6 +96,9 @@ def api_overview_summary():
     pj_type = (args.get('type', '') or '').strip() or None
     firstname = (args.get('firstname', '') or '').strip() or None
     waferdesc = (args.get('waferdesc', '') or '').strip() or None
+    workflow = (args.get('workflow', '') or '').strip()
+    bop = (args.get('bop', '') or '').strip()
+    pj_function = (args.get('pj_function', '') or '').strip()
     include_dummy = parse_bool_query(args.get('include_dummy'))
 
     result = get_wip_summary(
@@ -106,6 +109,9 @@ def api_overview_summary():
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
     if result is not None:
         return success_response(result)
@@ -143,6 +149,9 @@ def api_overview_matrix():
     pj_type = (args.get('type', '') or '').strip() or None
     firstname = (args.get('firstname', '') or '').strip() or None
     waferdesc = (args.get('waferdesc', '') or '').strip() or None
+    workflow = (args.get('workflow', '') or '').strip()
+    bop = (args.get('bop', '') or '').strip()
+    pj_function = (args.get('pj_function', '') or '').strip()
     include_dummy = parse_bool_query(args.get('include_dummy'))
     status = (args.get('status', '') or '').strip().upper() or None
     hold_type = (args.get('hold_type', '') or '').strip().lower() or None
@@ -165,6 +174,9 @@ def api_overview_matrix():
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
     if result is not None:
         return success_response(result)
@@ -253,6 +265,9 @@ def api_detail(workcenter: str):
     pj_type = (args.get('type', '') or '').strip() or None
     firstname = (args.get('firstname', '') or '').strip() or None
     waferdesc = (args.get('waferdesc', '') or '').strip() or None
+    workflow = (args.get('workflow', '') or '').strip()
+    bop = (args.get('bop', '') or '').strip()
+    pj_function = (args.get('pj_function', '') or '').strip()
     status = (args.get('status', '') or '').strip().upper() or None
     hold_type = (args.get('hold_type', '') or '').strip().lower() or None
     workorder = (args.get('workorder', '') or '').strip() or None
@@ -298,7 +313,10 @@ def api_detail(workcenter: str):
         lotid=lotid,
         include_dummy=include_dummy,
         page=page,
-        page_size=page_size
+        page_size=page_size,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
 
     if result is not None:
@@ -378,6 +396,9 @@ def api_meta_filter_options():
     pj_type = (args.get('type', '') or '').strip() or None
     firstname = (args.get('firstname', '') or '').strip() or None
     waferdesc = (args.get('waferdesc', '') or '').strip() or None
+    workflow = (args.get('workflow', '') or '').strip()
+    bop = (args.get('bop', '') or '').strip()
+    pj_function = (args.get('pj_function', '') or '').strip()
     status = (args.get('status', '') or '').strip() or None
     hold_type = (args.get('hold_type', '') or '').strip() or None
 
@@ -389,6 +410,9 @@ def api_meta_filter_options():
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
         status=status,
         hold_type=hold_type,
     )

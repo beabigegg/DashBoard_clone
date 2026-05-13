@@ -63,6 +63,9 @@ const filterOptions = ref<{
   types: string[];
   firstnames: string[];
   waferdescs: string[];
+  workflows: string[];
+  bops: string[];
+  pjFunctions: string[];
 }>({
   workorders: [],
   lotids: [],
@@ -70,6 +73,9 @@ const filterOptions = ref<{
   types: [],
   firstnames: [],
   waferdescs: [],
+  workflows: [],
+  bops: [],
+  pjFunctions: [],
 });
 
 const matrixFilter = ref<MatrixFilter | null>(null);
@@ -101,6 +107,9 @@ const filters = reactive<{
   type: string[];
   firstname: string[];
   waferdesc: string[];
+  workflow: string[];
+  bop: string[];
+  pjFunction: string[];
 }>({
   workorder: [],
   lotid: [],
@@ -108,6 +117,9 @@ const filters = reactive<{
   type: [],
   firstname: [],
   waferdesc: [],
+  workflow: [],
+  bop: [],
+  pjFunction: [],
 });
 
 // --- useFilterOrchestrator for holdType + reason (FilterBar) ---
@@ -282,6 +294,9 @@ function updateFilters(nextFilters: Partial<typeof filters>) {
   filters.type = normalizeArrayValues(nextFilters.type);
   filters.firstname = normalizeArrayValues(nextFilters.firstname);
   filters.waferdesc = normalizeArrayValues(nextFilters.waferdesc);
+  filters.workflow = normalizeArrayValues(nextFilters.workflow);
+  filters.bop = normalizeArrayValues(nextFilters.bop);
+  filters.pjFunction = normalizeArrayValues(nextFilters.pjFunction);
 }
 
 function buildFilterBarParams(): Record<string, unknown> {
@@ -390,6 +405,9 @@ async function loadFilterOptions(sourceFilters = filters): Promise<void> {
       types: Array.isArray(data?.types) ? (data.types as string[]) : [],
       firstnames: Array.isArray(data?.firstnames) ? (data.firstnames as string[]) : [],
       waferdescs: Array.isArray(data?.waferdescs) ? (data.waferdescs as string[]) : [],
+      workflows: Array.isArray(data?.workflows) ? (data.workflows as string[]) : [],
+      bops: Array.isArray(data?.bops) ? (data.bops as string[]) : [],
+      pjFunctions: Array.isArray(data?.pjFunctions) ? (data.pjFunctions as string[]) : [],
     };
   } catch (err: unknown) {
     const error = err as { name?: string };
@@ -455,25 +473,19 @@ function updateUrlState() {
   const type = serializeFilterValue(filters.type);
   const firstname = serializeFilterValue(filters.firstname);
   const waferdesc = serializeFilterValue(filters.waferdesc);
+  const workflow = serializeFilterValue(filters.workflow);
+  const bop = serializeFilterValue(filters.bop);
+  const pjFunction = serializeFilterValue(filters.pjFunction);
 
-  if (workorder) {
-    params.set('workorder', workorder);
-  }
-  if (lotid) {
-    params.set('lotid', lotid);
-  }
-  if (pkg) {
-    params.set('package', pkg);
-  }
-  if (type) {
-    params.set('type', type);
-  }
-  if (firstname) {
-    params.set('firstname', firstname);
-  }
-  if (waferdesc) {
-    params.set('waferdesc', waferdesc);
-  }
+  if (workorder) params.set('workorder', workorder);
+  if (lotid) params.set('lotid', lotid);
+  if (pkg) params.set('package', pkg);
+  if (type) params.set('type', type);
+  if (firstname) params.set('firstname', firstname);
+  if (waferdesc) params.set('waferdesc', waferdesc);
+  if (workflow) params.set('workflow', workflow);
+  if (bop) params.set('bop', bop);
+  if (pjFunction) params.set('pj_function', pjFunction);
   if (page.value > 1) {
     params.set('page', String(page.value));
   }
@@ -699,6 +711,9 @@ function clearAllFilters() {
     type: [],
     firstname: [],
     waferdesc: [],
+    workflow: [],
+    bop: [],
+    pjFunction: [],
   });
   matrixFilter.value = null;
   page.value = 1;
@@ -746,6 +761,9 @@ async function initializePage() {
     type: parseCsvParam('type'),
     firstname: parseCsvParam('firstname'),
     waferdesc: parseCsvParam('waferdesc'),
+    workflow: parseCsvParam('workflow'),
+    bop: parseCsvParam('bop'),
+    pjFunction: parseCsvParam('pj_function'),
   });
 
   const workcenter = getUrlParam('workcenter');

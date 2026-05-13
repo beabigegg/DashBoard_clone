@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.2.0
-last-changed: 2026-05-05
+schema-version: 1.2.1
+last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -250,6 +250,14 @@ breaking-change-policy: deprecate-2-minors
 - `meta.app_version`（2026-04-15）：所有 `success_response` / `error_response` 自動注入，backward-compatible。
 - `analytics-summary` 額外注入 `meta.cache_state ∈ {warm, cold, stale}`。
 - `/health` / `/health/deep`（2026-03-11）：additive `system_memory` + `async_workers` blocks，backward-compatible。
+- **WIP new filter params（2026-05-13，wip-hold-drilldown-filters）**：以下四個端點新增三個可選查詢參數，全部為 additive，不影響既有呼叫方：
+  - 端點：`GET/POST /api/wip/detail/<workcenter>`、`GET/POST /api/wip/overview/summary`、`GET/POST /api/wip/overview/matrix`、`GET/POST /api/wip/meta/filter-options`
+  - 新增參數：
+    - `workflow`（string，optional）：WORKFLOWNAME 精確比對過濾
+    - `bop`（string，optional）：BOP 精確比對過濾
+    - `pj_function`（string，optional）：PJ_FUNCTION 精確比對過濾
+  - `GET/POST /api/wip/detail/<workcenter>` lot 列新增 `pjType` 欄位（來源：DB `PJ_TYPE` 欄）；null 值以 `null` 回傳。
+  - `GET/POST /api/wip/meta/filter-options` response 新增三個 string array：`workflows`、`bops`、`pjFunctions`，與既有 `workorders` / `lotids` / `packages` / `types` / `firstnames` / `waferdescs` 並列。
 
 ## Breaking Change Policy
 

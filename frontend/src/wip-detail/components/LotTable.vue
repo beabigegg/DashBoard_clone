@@ -35,6 +35,7 @@ const emit = defineEmits(['select-lot', 'prev-page', 'next-page']);
 
 type LotRow = {
   lotId?: unknown;
+  pjType?: unknown;
   wipStatus?: unknown;
   holdReason?: unknown;
   equipment?: unknown;
@@ -120,6 +121,7 @@ const pageInfo = computed(() => {
         <thead>
           <tr>
             <th class="fixed-col cursor-pointer" @click="toggleSort('lotId')" :aria-sort="sortKey === 'lotId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOT ID <span>{{ sortKey === 'lotId' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col cursor-pointer" @click="toggleSort('pjType')" :aria-sort="sortKey === 'pjType' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Type <span>{{ sortKey === 'pjType' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
             <th class="fixed-col cursor-pointer" @click="toggleSort('equipment')" :aria-sort="sortKey === 'equipment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Equipment <span>{{ sortKey === 'equipment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
             <th class="fixed-col cursor-pointer" @click="toggleSort('wipStatus')" :aria-sort="sortKey === 'wipStatus' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WIP Status <span>{{ sortKey === 'wipStatus' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
             <th class="fixed-col cursor-pointer" @click="toggleSort('package')" :aria-sort="sortKey === 'package' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'package' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
@@ -138,6 +140,7 @@ const pageInfo = computed(() => {
                 {{ lot.lotId || '-' }}
               </button>
             </td>
+            <td class="fixed-col">{{ lot.pjType != null ? lot.pjType : '-' }}</td>
             <td class="fixed-col">{{ lot.equipment || '-' }}</td>
             <td class="fixed-col" :class="statusClass(lot.wipStatus)">{{ statusText(lot) }}</td>
             <td class="fixed-col">{{ lot.package || '-' }}</td>

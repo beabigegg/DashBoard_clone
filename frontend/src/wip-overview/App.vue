@@ -51,6 +51,9 @@ const filterOptions = ref<{
   types: string[];
   firstnames: string[];
   waferdescs: string[];
+  workflows: string[];
+  bops: string[];
+  pjFunctions: string[];
 }>({
   workorders: [],
   lotids: [],
@@ -58,6 +61,9 @@ const filterOptions = ref<{
   types: [],
   firstnames: [],
   waferdescs: [],
+  workflows: [],
+  bops: [],
+  pjFunctions: [],
 });
 
 const activeStatusFilter = ref<string | null>(null);
@@ -72,16 +78,19 @@ let filterOptionsRequestToken = 0;
 // -- useFilterOrchestrator: status=immediate (matrix only), panel fields=draft-apply (summary+matrix) --
 const filterOrchestrator = useFilterOrchestrator({
   fields: {
-    workorder:  { trigger: 'draft-apply', initial: [] },
-    lotid:      { trigger: 'draft-apply', initial: [] },
-    package:    { trigger: 'draft-apply', initial: [] },
-    type:       { trigger: 'draft-apply', initial: [] },
-    firstname:  { trigger: 'draft-apply', initial: [] },
-    waferdesc:  { trigger: 'draft-apply', initial: [] },
-    status:     { trigger: 'immediate', initial: null },
+    workorder:   { trigger: 'draft-apply', initial: [] },
+    lotid:       { trigger: 'draft-apply', initial: [] },
+    package:     { trigger: 'draft-apply', initial: [] },
+    type:        { trigger: 'draft-apply', initial: [] },
+    firstname:   { trigger: 'draft-apply', initial: [] },
+    waferdesc:   { trigger: 'draft-apply', initial: [] },
+    workflow:    { trigger: 'draft-apply', initial: [] },
+    bop:         { trigger: 'draft-apply', initial: [] },
+    pjFunction:  { trigger: 'draft-apply', initial: [] },
+    status:      { trigger: 'immediate', initial: null },
   },
   pagination: { resetOn: ['*'] },
-  onFetch(committed) {
+  onFetch(_committed) {
     // Immediate trigger (status change) -> matrix only reload
     void loadMatrixOnly();
   },
@@ -95,6 +104,9 @@ const filters = reactive<{
   type: string[];
   firstname: string[];
   waferdesc: string[];
+  workflow: string[];
+  bop: string[];
+  pjFunction: string[];
 }>({
   workorder: [],
   lotid: [],
@@ -102,7 +114,13 @@ const filters = reactive<{
   type: [],
   firstname: [],
   waferdesc: [],
+  workflow: [],
+  bop: [],
+  pjFunction: [],
 });
+
+// Active matrix filter: { workcenter, package } for cell click, { workcenter } for row click
+const activeMatrixFilter = ref<{ workcenter?: string | null; package?: string | null } | null>(null);
 
 // unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
@@ -181,6 +199,9 @@ async function loadFilterOptions(sourceFilters = filters): Promise<void> {
       types: Array.isArray(data?.types) ? (data.types as string[]) : [],
       firstnames: Array.isArray(data?.firstnames) ? (data.firstnames as string[]) : [],
       waferdescs: Array.isArray(data?.waferdescs) ? (data.waferdescs as string[]) : [],
+      workflows: Array.isArray(data?.workflows) ? (data.workflows as string[]) : [],
+      bops: Array.isArray(data?.bops) ? (data.bops as string[]) : [],
+      pjFunctions: Array.isArray(data?.pjFunctions) ? (data.pjFunctions as string[]) : [],
     };
   } catch (err: unknown) {
     const error = err as { name?: string };
@@ -311,6 +332,9 @@ function updateFilters(nextFilters: Partial<typeof filters>) {
   filters.type = normalizeArrayValues(nextFilters.type);
   filters.firstname = normalizeArrayValues(nextFilters.firstname);
   filters.waferdesc = normalizeArrayValues(nextFilters.waferdesc);
+  filters.workflow = normalizeArrayValues(nextFilters.workflow);
+  filters.bop = normalizeArrayValues(nextFilters.bop);
+  filters.pjFunction = normalizeArrayValues(nextFilters.pjFunction);
 
   // Sync to orchestrator draft
   filterOrchestrator.draft.workorder = filters.workorder;
@@ -319,6 +343,9 @@ function updateFilters(nextFilters: Partial<typeof filters>) {
   filterOrchestrator.draft.type = filters.type;
   filterOrchestrator.draft.firstname = filters.firstname;
   filterOrchestrator.draft.waferdesc = filters.waferdesc;
+  filterOrchestrator.draft.workflow = filters.workflow;
+  filterOrchestrator.draft.bop = filters.bop;
+  filterOrchestrator.draft.pjFunction = filters.pjFunction;
 }
 
 function updateUrlState() {
@@ -330,25 +357,19 @@ function updateUrlState() {
   const type = serializeFilterValue(filters.type);
   const firstname = serializeFilterValue(filters.firstname);
   const waferdesc = serializeFilterValue(filters.waferdesc);
+  const workflow = serializeFilterValue(filters.workflow);
+  const bop = serializeFilterValue(filters.bop);
+  const pjFunction = serializeFilterValue(filters.pjFunction);
 
-  if (workorder) {
-    params.set('workorder', workorder);
-  }
-  if (lotid) {
-    params.set('lotid', lotid);
-  }
-  if (pkg) {
-    params.set('package', pkg);
-  }
-  if (type) {
-    params.set('type', type);
-  }
-  if (firstname) {
-    params.set('firstname', firstname);
-  }
-  if (waferdesc) {
-    params.set('waferdesc', waferdesc);
-  }
+  if (workorder) params.set('workorder', workorder);
+  if (lotid) params.set('lotid', lotid);
+  if (pkg) params.set('package', pkg);
+  if (type) params.set('type', type);
+  if (firstname) params.set('firstname', firstname);
+  if (waferdesc) params.set('waferdesc', waferdesc);
+  if (workflow) params.set('workflow', workflow);
+  if (bop) params.set('bop', bop);
+  if (pjFunction) params.set('pj_function', pjFunction);
   if (activeStatusFilter.value) {
     params.set('status', activeStatusFilter.value);
   }
@@ -375,19 +396,45 @@ function clearFilters() {
     type: [],
     firstname: [],
     waferdesc: [],
+    workflow: [],
+    bop: [],
+    pjFunction: [],
   });
   activeStatusFilter.value = null;
+  activeMatrixFilter.value = null;
   filterOrchestrator.resetAll();
   updateUrlState();
   void loadFilterOptions(filters);
   void loadAllData(false);
 }
 
-function navigateToDetail(workcenter: string) {
-  storeWipNavigationState(filters, activeStatusFilter.value);
+function navigateToDetail(matrixPayload: { workcenter?: string | null; package?: string | null } | null) {
+  if (!matrixPayload) {
+    // Toggle-off: update activeMatrixFilter only, no navigation
+    activeMatrixFilter.value = null;
+    return;
+  }
+
+  const workcenter = String(matrixPayload.workcenter || '').trim();
+  const pkg = String(matrixPayload.package || '').trim();
+
+  if (!workcenter) {
+    activeMatrixFilter.value = matrixPayload;
+    return;
+  }
+
+  activeMatrixFilter.value = matrixPayload;
+
+  storeWipNavigationState({
+    ...filters,
+    matrixPackage: pkg || undefined,
+  }, activeStatusFilter.value);
 
   const params = new URLSearchParams();
   params.set('workcenter', workcenter);
+  if (pkg) {
+    params.set('package', pkg);
+  }
   if (activeStatusFilter.value) {
     params.set('status', activeStatusFilter.value);
   }
@@ -410,8 +457,14 @@ async function initializePage() {
       type: (navState.type || []) as string[],
       firstname: (navState.firstname || []) as string[],
       waferdesc: (navState.waferdesc || []) as string[],
+      workflow: (navState.workflow || []) as string[],
+      bop: (navState.bop || []) as string[],
+      pjFunction: (navState.pjFunction || []) as string[],
     });
     activeStatusFilter.value = navState.status || null;
+    if (navState.matrixPackage) {
+      activeMatrixFilter.value = { package: navState.matrixPackage };
+    }
   } else {
     updateFilters({
       workorder: parseCsvParam('workorder'),
@@ -420,6 +473,9 @@ async function initializePage() {
       type: parseCsvParam('type'),
       firstname: parseCsvParam('firstname'),
       waferdesc: parseCsvParam('waferdesc'),
+      workflow: parseCsvParam('workflow'),
+      bop: parseCsvParam('bop'),
+      pjFunction: parseCsvParam('pj_function'),
     });
     activeStatusFilter.value = getUrlParam('status') || null;
   }
@@ -495,7 +551,7 @@ onBeforeUnmount(() => {
           <div class="card-title ui-card-title">{{ matrixTitle }}</div>
         </div>
         <div class="card-body ui-card-body matrix-container ui-table-wrap" :class="{ 'is-loading': refreshing }">
-          <MatrixTable :data="matrix ?? undefined" @drilldown="navigateToDetail" />
+          <MatrixTable :data="matrix ?? undefined" :active-filter="activeMatrixFilter ?? undefined" @drilldown="navigateToDetail" />
           <EmptyState v-if="!refreshing && !matrix" type="no-data" />
         </div>
       </section>

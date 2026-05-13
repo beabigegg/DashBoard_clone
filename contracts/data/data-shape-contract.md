@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.0.0
-last-changed: 2026-05-05
+schema-version: 1.0.1
+last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -148,6 +148,31 @@ breaking-change-policy: deprecate-2-minors
 }
 ```
 
+### 2.5 WIP Filter-Options Response（`/api/wip/meta/filter-options`）
+
+```json
+{
+  "success": true,
+  "data": {
+    "workorders":   ["<string>"],
+    "lotids":       ["<string>"],
+    "packages":     ["<string>"],
+    "types":        ["<string>"],
+    "firstnames":   ["<string>"],
+    "waferdescs":   ["<string>"],
+    "workflows":    ["<string>"],
+    "bops":         ["<string>"],
+    "pjFunctions":  ["<string>"]
+  },
+  "meta": { "timestamp": "...", "app_version": "..." }
+}
+```
+
+- `workflows`、`bops`、`pjFunctions` 為 additive 新增欄位（wip-hold-drilldown-filters）。
+- 各欄位均為 distinct 排序字串陣列；若無符合值則回傳 `[]`。
+- 支援 cross-filter 語意：選取某過濾器時，其他欄位選項自動縮減至對應可選值。
+- 接受可選查詢參數 `workflow`、`bop`、`pj_function` 以在已選取過濾器後縮減選項。
+
 ### 2.4 Truncated Payload（memory pressure guard）
 
 Large payloads that hit the memory/row limit include:
@@ -174,6 +199,19 @@ Large payloads that hit the memory/row limit include:
 | product | string | yes | may be null for some lot types |
 | qty | integer | no | — |
 | location | string | yes | workcenter or step name |
+
+#### 3.1.1 WIP Detail Lot Row（`/api/wip/detail/<workcenter>` lots array）
+
+| column | type | nullable | notes |
+|---|---|---:|---|
+| lotId | string | no | LOTID |
+| equipment | string | yes | EQUIPMENTS |
+| wipStatus | string | yes | WIP_STATUS |
+| holdReason | string | yes | HOLDREASONNAME |
+| qty | integer | no | QTY |
+| package | string | yes | PACKAGE_LEF |
+| spec | string | yes | SPECNAME |
+| pjType | string | yes | PJ_TYPE；null renders as `-` in UI（additive, wip-hold-drilldown-filters）|
 
 ### 3.2 Duration Item
 

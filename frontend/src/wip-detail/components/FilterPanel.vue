@@ -20,13 +20,19 @@ const props = defineProps({
 
 const emit = defineEmits(['apply', 'clear', 'draft-change']);
 
+// Row 1: WORKORDER / LOT ID / PACKAGE
+// Row 2: WORKFLOW / BOP / TYPE
+// Row 3: FUNCTION / Wafer LOT / Wafer Type
 const fields = [
-  { key: 'workorder', label: 'WORKORDER', optionKey: 'workorders', placeholder: 'All WORKORDER' },
-  { key: 'lotid', label: 'LOT ID', optionKey: 'lotids', placeholder: 'All LOT ID' },
-  { key: 'package', label: 'PACKAGE', optionKey: 'packages', placeholder: 'All PACKAGE' },
-  { key: 'type', label: 'TYPE', optionKey: 'types', placeholder: 'All TYPE' },
-  { key: 'firstname', label: 'Wafer LOT', optionKey: 'firstnames', placeholder: 'All Wafer LOT' },
-  { key: 'waferdesc', label: 'Wafer Type', optionKey: 'waferdescs', placeholder: 'All Wafer Type' },
+  { key: 'workorder',   label: 'WORKORDER',  optionKey: 'workorders',   placeholder: 'All WORKORDER' },
+  { key: 'lotid',       label: 'LOT ID',     optionKey: 'lotids',       placeholder: 'All LOT ID' },
+  { key: 'package',     label: 'PACKAGE',    optionKey: 'packages',     placeholder: 'All PACKAGE' },
+  { key: 'workflow',    label: 'WORKFLOW',   optionKey: 'workflows',    placeholder: 'All WORKFLOW' },
+  { key: 'bop',         label: 'BOP',        optionKey: 'bops',         placeholder: 'All BOP' },
+  { key: 'type',        label: 'TYPE',       optionKey: 'types',        placeholder: 'All TYPE' },
+  { key: 'pjFunction',  label: 'FUNCTION',   optionKey: 'pjFunctions',  placeholder: 'All FUNCTION' },
+  { key: 'firstname',   label: 'Wafer LOT',  optionKey: 'firstnames',   placeholder: 'All Wafer LOT' },
+  { key: 'waferdesc',   label: 'Wafer Type', optionKey: 'waferdescs',   placeholder: 'All Wafer Type' },
 ];
 
 type DraftFilters = {
@@ -36,6 +42,9 @@ type DraftFilters = {
   type: string[];
   firstname: string[];
   waferdesc: string[];
+  workflow: string[];
+  bop: string[];
+  pjFunction: string[];
 };
 
 const draft = reactive<DraftFilters>({
@@ -45,6 +54,9 @@ const draft = reactive<DraftFilters>({
   type: [],
   firstname: [],
   waferdesc: [],
+  workflow: [],
+  bop: [],
+  pjFunction: [],
 });
 
 function toArray(value: unknown): string[] {
@@ -68,6 +80,9 @@ function cloneDraft() {
     type: [...draft.type],
     firstname: [...draft.firstname],
     waferdesc: [...draft.waferdesc],
+    workflow: [...draft.workflow],
+    bop: [...draft.bop],
+    pjFunction: [...draft.pjFunction],
   };
 }
 
@@ -80,6 +95,9 @@ watch(
     draft.type = toArray(nextFilters.type);
     draft.firstname = toArray(nextFilters.firstname);
     draft.waferdesc = toArray(nextFilters.waferdesc);
+    draft.workflow = toArray(nextFilters.workflow);
+    draft.bop = toArray(nextFilters.bop);
+    draft.pjFunction = toArray(nextFilters.pjFunction);
   },
   { immediate: true, deep: true }
 );
@@ -112,6 +130,9 @@ function clearFilters() {
   draft.type = [];
   draft.firstname = [];
   draft.waferdesc = [];
+  draft.workflow = [];
+  draft.bop = [];
+  draft.pjFunction = [];
   notifyDraftChange();
   emit('clear');
 }

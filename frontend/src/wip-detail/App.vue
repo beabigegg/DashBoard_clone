@@ -47,6 +47,9 @@ const filters = reactive<{
   type: string[];
   firstname: string[];
   waferdesc: string[];
+  workflow: string[];
+  bop: string[];
+  pjFunction: string[];
 }>({
   workorder: [],
   lotid: [],
@@ -54,6 +57,9 @@ const filters = reactive<{
   type: [],
   firstname: [],
   waferdesc: [],
+  workflow: [],
+  bop: [],
+  pjFunction: [],
 });
 const filterOptions = ref<{
   workorders: string[];
@@ -62,6 +68,9 @@ const filterOptions = ref<{
   types: string[];
   firstnames: string[];
   waferdescs: string[];
+  workflows: string[];
+  bops: string[];
+  pjFunctions: string[];
 }>({
   workorders: [],
   lotids: [],
@@ -69,6 +78,9 @@ const filterOptions = ref<{
   types: [],
   firstnames: [],
   waferdescs: [],
+  workflows: [],
+  bops: [],
+  pjFunctions: [],
 });
 
 const activeStatusFilter = ref<string | null>(null);
@@ -89,13 +101,16 @@ let filterOptionsRequestToken = 0;
 // -- useFilterOrchestrator: status=immediate (page+lot clear+table reload), panel=draft-apply (status clear+page+lot clear+full reload) --
 const filterOrchestrator = useFilterOrchestrator({
   fields: {
-    workorder:  { trigger: 'draft-apply', initial: [] },
-    lotid:      { trigger: 'draft-apply', initial: [] },
-    package:    { trigger: 'draft-apply', initial: [] },
-    type:       { trigger: 'draft-apply', initial: [] },
-    firstname:  { trigger: 'draft-apply', initial: [] },
-    waferdesc:  { trigger: 'draft-apply', initial: [] },
-    status:     { trigger: 'immediate', initial: null },
+    workorder:   { trigger: 'draft-apply', initial: [] },
+    lotid:       { trigger: 'draft-apply', initial: [] },
+    package:     { trigger: 'draft-apply', initial: [] },
+    type:        { trigger: 'draft-apply', initial: [] },
+    firstname:   { trigger: 'draft-apply', initial: [] },
+    waferdesc:   { trigger: 'draft-apply', initial: [] },
+    workflow:    { trigger: 'draft-apply', initial: [] },
+    bop:         { trigger: 'draft-apply', initial: [] },
+    pjFunction:  { trigger: 'draft-apply', initial: [] },
+    status:      { trigger: 'immediate', initial: null },
   },
   pagination: { resetOn: ['*'] },
   onFetch(_committed) {
@@ -155,25 +170,19 @@ function updateUrlState() {
   const type = serializeFilterValue(filters.type);
   const firstname = serializeFilterValue(filters.firstname);
   const waferdesc = serializeFilterValue(filters.waferdesc);
+  const workflow = serializeFilterValue(filters.workflow);
+  const bop = serializeFilterValue(filters.bop);
+  const pjFunction = serializeFilterValue(filters.pjFunction);
 
-  if (workorder) {
-    params.set('workorder', workorder);
-  }
-  if (lotid) {
-    params.set('lotid', lotid);
-  }
-  if (pkg) {
-    params.set('package', pkg);
-  }
-  if (type) {
-    params.set('type', type);
-  }
-  if (firstname) {
-    params.set('firstname', firstname);
-  }
-  if (waferdesc) {
-    params.set('waferdesc', waferdesc);
-  }
+  if (workorder) params.set('workorder', workorder);
+  if (lotid) params.set('lotid', lotid);
+  if (pkg) params.set('package', pkg);
+  if (type) params.set('type', type);
+  if (firstname) params.set('firstname', firstname);
+  if (waferdesc) params.set('waferdesc', waferdesc);
+  if (workflow) params.set('workflow', workflow);
+  if (bop) params.set('bop', bop);
+  if (pjFunction) params.set('pj_function', pjFunction);
   if (activeStatusFilter.value) {
     params.set('status', activeStatusFilter.value);
   }
@@ -231,6 +240,9 @@ async function loadFilterOptions(sourceFilters = filters) {
       types: Array.isArray(d?.types) ? (d.types as string[]) : [],
       firstnames: Array.isArray(d?.firstnames) ? (d.firstnames as string[]) : [],
       waferdescs: Array.isArray(d?.waferdescs) ? (d.waferdescs as string[]) : [],
+      workflows: Array.isArray(d?.workflows) ? (d.workflows as string[]) : [],
+      bops: Array.isArray(d?.bops) ? (d.bops as string[]) : [],
+      pjFunctions: Array.isArray(d?.pjFunctions) ? (d.pjFunctions as string[]) : [],
     };
   } catch (err: unknown) {
     const error = err as { name?: string };
@@ -350,6 +362,9 @@ function updateFilters(nextFilters: Partial<typeof filters>) {
   filters.type = normalizeArrayValues(nextFilters.type);
   filters.firstname = normalizeArrayValues(nextFilters.firstname);
   filters.waferdesc = normalizeArrayValues(nextFilters.waferdesc);
+  filters.workflow = normalizeArrayValues(nextFilters.workflow);
+  filters.bop = normalizeArrayValues(nextFilters.bop);
+  filters.pjFunction = normalizeArrayValues(nextFilters.pjFunction);
 
   // Sync to orchestrator draft
   filterOrchestrator.draft.workorder = filters.workorder;
@@ -358,6 +373,9 @@ function updateFilters(nextFilters: Partial<typeof filters>) {
   filterOrchestrator.draft.type = filters.type;
   filterOrchestrator.draft.firstname = filters.firstname;
   filterOrchestrator.draft.waferdesc = filters.waferdesc;
+  filterOrchestrator.draft.workflow = filters.workflow;
+  filterOrchestrator.draft.bop = filters.bop;
+  filterOrchestrator.draft.pjFunction = filters.pjFunction;
 }
 
 function applyFilters(nextFilters: typeof filters) {
@@ -380,6 +398,9 @@ function clearFilters() {
     type: [],
     firstname: [],
     waferdesc: [],
+    workflow: [],
+    bop: [],
+    pjFunction: [],
   });
   activeStatusFilter.value = null;
   filterOrchestrator.resetAll();
@@ -463,7 +484,15 @@ async function initializePage() {
       type: (navState.type || []) as string[],
       firstname: (navState.firstname || []) as string[],
       waferdesc: (navState.waferdesc || []) as string[],
+      workflow: (navState.workflow || []) as string[],
+      bop: (navState.bop || []) as string[],
+      pjFunction: (navState.pjFunction || []) as string[],
     });
+    // If navigation came from a cell click, pre-filter by package from matrixPackage
+    if (navState.matrixPackage && filters.package.length === 0) {
+      filters.package = [navState.matrixPackage];
+      filterOrchestrator.draft.package = filters.package;
+    }
     activeStatusFilter.value = navState.status || getUrlParam('status') || null;
   } else {
     updateFilters({
@@ -473,6 +502,9 @@ async function initializePage() {
       type: parseCsvParam('type'),
       firstname: parseCsvParam('firstname'),
       waferdesc: parseCsvParam('waferdesc'),
+      workflow: parseCsvParam('workflow'),
+      bop: parseCsvParam('bop'),
+      pjFunction: parseCsvParam('pj_function'),
     });
     activeStatusFilter.value = getUrlParam('status') || null;
   }

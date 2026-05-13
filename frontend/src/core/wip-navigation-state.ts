@@ -11,7 +11,11 @@ export interface WipNavigationFilters {
   type?: unknown[];
   firstname?: unknown[];
   waferdesc?: unknown[];
-  [key: string]: unknown[] | undefined;
+  workflow?: unknown[];
+  bop?: unknown[];
+  pjFunction?: unknown[];
+  matrixPackage?: string;
+  [key: string]: unknown[] | string | undefined;
 }
 
 export interface WipNavigationState {
@@ -21,6 +25,10 @@ export interface WipNavigationState {
   type: unknown[];
   firstname: unknown[];
   waferdesc: unknown[];
+  workflow: unknown[];
+  bop: unknown[];
+  pjFunction: unknown[];
+  matrixPackage: string;
   status: string | null;
   ts: number;
 }
@@ -42,6 +50,10 @@ export function storeWipNavigationState(
       type: filters.type || [],
       firstname: filters.firstname || [],
       waferdesc: filters.waferdesc || [],
+      workflow: filters.workflow || [],
+      bop: filters.bop || [],
+      pjFunction: filters.pjFunction || [],
+      matrixPackage: typeof filters.matrixPackage === 'string' ? filters.matrixPackage : '',
       status: status || null,
       ts: Date.now(),
     };

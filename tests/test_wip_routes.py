@@ -86,7 +86,27 @@ class TestOverviewSummaryRoute(TestWipRoutesBase):
             pj_type='PJA',
             firstname='WF001',
             waferdesc='SiC',
+            workflow='',
+            bop='',
+            pj_function='',
         )
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_summary')
+    def test_summary_forwards_workflow_bop_pj_function(self, mock_get_summary):
+        """workflow, bop, pj_function params must be forwarded to get_wip_summary."""
+        mock_get_summary.return_value = {
+            'totalLots': 0,
+            'totalQtyPcs': 0,
+            'byWipStatus': {},
+            'dataUpdateDate': None,
+        }
+
+        self.client.get('/api/wip/overview/summary?workflow=FLOW_A&bop=BOP_X&pj_function=FUNC_Y')
+
+        call_kwargs = mock_get_summary.call_args.kwargs
+        self.assertEqual(call_kwargs['workflow'], 'FLOW_A')
+        self.assertEqual(call_kwargs['bop'], 'BOP_X')
+        self.assertEqual(call_kwargs['pj_function'], 'FUNC_Y')
 
 
 class TestOverviewMatrixRoute(TestWipRoutesBase):
@@ -173,7 +193,29 @@ class TestOverviewMatrixRoute(TestWipRoutesBase):
             pj_type='PJA',
             firstname='WF001',
             waferdesc='SiC',
+            workflow='',
+            bop='',
+            pj_function='',
         )
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_matrix')
+    def test_matrix_forwards_workflow_bop_pj_function(self, mock_get_matrix):
+        """workflow, bop, pj_function params must be forwarded to get_wip_matrix."""
+        mock_get_matrix.return_value = {
+            'workcenters': [],
+            'packages': [],
+            'matrix': {},
+            'workcenter_totals': {},
+            'package_totals': {},
+            'grand_total': 0,
+        }
+
+        self.client.get('/api/wip/overview/matrix?workflow=FLOW_A&bop=BOP_X&pj_function=FUNC_Y')
+
+        call_kwargs = mock_get_matrix.call_args.kwargs
+        self.assertEqual(call_kwargs['workflow'], 'FLOW_A')
+        self.assertEqual(call_kwargs['bop'], 'BOP_X')
+        self.assertEqual(call_kwargs['pj_function'], 'FUNC_Y')
 
 
 class TestOverviewHoldRoute(TestWipRoutesBase):
@@ -297,7 +339,10 @@ class TestDetailRoute(TestWipRoutesBase):
             lotid=None,
             include_dummy=False,
             page=2,
-            page_size=50
+            page_size=50,
+            workflow='',
+            bop='',
+            pj_function='',
         )
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_detail')
@@ -403,6 +448,62 @@ class TestDetailRoute(TestWipRoutesBase):
         self.assertEqual(data['error']['code'], 'TOO_MANY_REQUESTS')
         mock_get_detail.assert_not_called()
 
+    @patch('mes_dashboard.routes.wip_routes.get_wip_detail')
+    def test_pj_type_appears_in_lot_rows(self, mock_get_detail):
+        """pjType key should appear in each lot dict returned by detail endpoint."""
+        mock_get_detail.return_value = {
+            'workcenter': '焊接_DB',
+            'summary': {'totalLots': 1, 'runLots': 1, 'queueLots': 0,
+                        'holdLots': 0, 'qualityHoldLots': 0, 'nonQualityHoldLots': 0},
+            'specs': [],
+            'lots': [
+                {'lotId': 'GA25102485', 'equipment': 'GSMP-0054',
+                 'wipStatus': 'RUN', 'holdReason': None,
+                 'qty': 750, 'package': 'SOT-23', 'spec': 'Spec1',
+                 'pjType': 'PJA'},
+                {'lotId': 'GA25102486', 'equipment': None,
+                 'wipStatus': 'QUEUE', 'holdReason': None,
+                 'qty': 500, 'package': 'SOT-23', 'spec': 'Spec1',
+                 'pjType': None},
+            ],
+            'pagination': {'page': 1, 'page_size': 100, 'total_count': 2, 'total_pages': 1},
+            'sys_date': '2026-01-26 19:18:29'
+        }
+
+        response = self.client.get('/api/wip/detail/焊接_DB')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['success'])
+        lots = data['data']['lots']
+        self.assertEqual(len(lots), 2)
+        self.assertIn('pjType', lots[0])
+        self.assertEqual(lots[0]['pjType'], 'PJA')
+        self.assertIn('pjType', lots[1])
+        self.assertIsNone(lots[1]['pjType'])
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_detail')
+    def test_detail_forwards_workflow_bop_pj_function(self, mock_get_detail):
+        """workflow, bop, pj_function params must be forwarded to get_wip_detail."""
+        mock_get_detail.return_value = {
+            'workcenter': '切割',
+            'summary': {'totalLots': 0, 'runLots': 0, 'queueLots': 0,
+                        'holdLots': 0, 'qualityHoldLots': 0, 'nonQualityHoldLots': 0},
+            'specs': [],
+            'lots': [],
+            'pagination': {'page': 1, 'page_size': 100, 'total_count': 0, 'total_pages': 1},
+            'sys_date': None,
+        }
+
+        self.client.get(
+            '/api/wip/detail/切割?workflow=FLOW_A&bop=BOP_X&pj_function=FUNC_Y'
+        )
+
+        call_kwargs = mock_get_detail.call_args.kwargs
+        self.assertEqual(call_kwargs['workflow'], 'FLOW_A')
+        self.assertEqual(call_kwargs['bop'], 'BOP_X')
+        self.assertEqual(call_kwargs['pj_function'], 'FUNC_Y')
+
 
 class TestMetaWorkcentersRoute(TestWipRoutesBase):
     """Test GET /api/wip/meta/workcenters endpoint."""
@@ -478,6 +579,9 @@ class TestMetaFilterOptionsRoute(TestWipRoutesBase):
             'types': ['TYPE1'],
             'firstnames': ['WF001'],
             'waferdescs': ['SiC'],
+            'workflows': ['WF_A'],
+            'bops': ['BOP1'],
+            'pjFunctions': ['FUNC1'],
         }
 
         response = self.client.get('/api/wip/meta/filter-options')
@@ -487,6 +591,33 @@ class TestMetaFilterOptionsRoute(TestWipRoutesBase):
         self.assertTrue(data['success'])
         self.assertEqual(data['data']['workorders'], ['WO1'])
         self.assertEqual(data['data']['waferdescs'], ['SiC'])
+        self.assertIn('workflows', data['data'])
+        self.assertIn('bops', data['data'])
+        self.assertIn('pjFunctions', data['data'])
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_filter_options')
+    def test_filter_options_includes_new_keys(self, mock_get_options):
+        """Response must include workflows, bops, pjFunctions keys."""
+        mock_get_options.return_value = {
+            'workorders': [],
+            'lotids': [],
+            'packages': [],
+            'types': [],
+            'firstnames': [],
+            'waferdescs': [],
+            'workflows': ['FLOW_A', 'FLOW_B'],
+            'bops': ['BOP_X'],
+            'pjFunctions': ['FUNC_Y'],
+        }
+
+        response = self.client.get('/api/wip/meta/filter-options')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['data']['workflows'], ['FLOW_A', 'FLOW_B'])
+        self.assertEqual(data['data']['bops'], ['BOP_X'])
+        self.assertEqual(data['data']['pjFunctions'], ['FUNC_Y'])
 
     @patch('mes_dashboard.routes.wip_routes.get_wip_filter_options')
     def test_passes_include_dummy_flag(self, mock_get_options):
@@ -497,6 +628,9 @@ class TestMetaFilterOptionsRoute(TestWipRoutesBase):
             'types': [],
             'firstnames': [],
             'waferdescs': [],
+            'workflows': [],
+            'bops': [],
+            'pjFunctions': [],
         }
 
         self.client.get('/api/wip/meta/filter-options?include_dummy=true')
@@ -508,6 +642,9 @@ class TestMetaFilterOptionsRoute(TestWipRoutesBase):
             pj_type=None,
             firstname=None,
             waferdesc=None,
+            workflow='',
+            bop='',
+            pj_function='',
             status=None,
             hold_type=None,
         )
@@ -521,6 +658,9 @@ class TestMetaFilterOptionsRoute(TestWipRoutesBase):
             'types': ['TYPE1'],
             'firstnames': ['WF001'],
             'waferdescs': ['SiC'],
+            'workflows': [],
+            'bops': [],
+            'pjFunctions': [],
         }
 
         self.client.get(
@@ -536,6 +676,43 @@ class TestMetaFilterOptionsRoute(TestWipRoutesBase):
             pj_type='PJA',
             firstname='WF001',
             waferdesc='SiC',
+            workflow='',
+            bop='',
+            pj_function='',
+            status=None,
+            hold_type=None,
+        )
+
+    @patch('mes_dashboard.routes.wip_routes.get_wip_filter_options')
+    def test_passes_new_filter_params(self, mock_get_options):
+        """workflow, bop, pj_function params must be forwarded to service."""
+        mock_get_options.return_value = {
+            'workorders': [],
+            'lotids': [],
+            'packages': [],
+            'types': [],
+            'firstnames': [],
+            'waferdescs': [],
+            'workflows': ['FLOW_A'],
+            'bops': ['BOP_X'],
+            'pjFunctions': ['FUNC_Y'],
+        }
+
+        self.client.get(
+            '/api/wip/meta/filter-options?workflow=FLOW_A&bop=BOP_X&pj_function=FUNC_Y'
+        )
+
+        mock_get_options.assert_called_once_with(
+            include_dummy=False,
+            workorder=None,
+            lotid=None,
+            package=None,
+            pj_type=None,
+            firstname=None,
+            waferdesc=None,
+            workflow='FLOW_A',
+            bop='BOP_X',
+            pj_function='FUNC_Y',
             status=None,
             hold_type=None,
         )

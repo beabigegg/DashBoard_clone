@@ -42,6 +42,10 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.wip-detail-page .summary-card-group {
+  margin-bottom: theme('spacing.token.p28');
+}
+
 .detail-summary-row .summary-card.status-run,
 .detail-summary-row .summary-card.status-queue,
 .detail-summary-row .summary-card.status-quality-hold,

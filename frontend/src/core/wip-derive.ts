@@ -40,6 +40,9 @@ export interface WipFilters {
   type?: unknown;
   firstname?: unknown;
   waferdesc?: unknown;
+  workflow?: unknown;
+  bop?: unknown;
+  pjFunction?: unknown;
   [key: string]: unknown;
 }
 
@@ -56,6 +59,9 @@ export function buildWipOverviewQueryParams(
   const type = normalizeFilterValue(filters.type);
   const firstname = normalizeFilterValue(filters.firstname);
   const waferdesc = normalizeFilterValue(filters.waferdesc);
+  const workflow = normalizeFilterValue(filters.workflow);
+  const bop = normalizeFilterValue(filters.bop);
+  const pjFunction = normalizeFilterValue(filters.pjFunction);
 
   if (workorder) params.workorder = workorder;
   if (lotid) params.lotid = lotid;
@@ -63,6 +69,9 @@ export function buildWipOverviewQueryParams(
   if (type) params.type = type;
   if (firstname) params.firstname = firstname;
   if (waferdesc) params.waferdesc = waferdesc;
+  if (workflow) params.workflow = workflow;
+  if (bop) params.bop = bop;
+  if (pjFunction) params.pj_function = pjFunction;
 
   return { ...params, ...normalizeStatusFilter(statusFilter) };
 }
