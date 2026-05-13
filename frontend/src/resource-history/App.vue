@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 
 import { apiGet, apiPost, ensureMesApiAvailable } from '../core/api';
 import { unwrapApiResult } from '../core/unwrap-api-result';
@@ -103,6 +103,76 @@ const autoPruneHint = ref('');
 
 const queryId = ref('');
 const lastPrimarySnapshot = ref('');
+
+// ── Batch query progress polling (AC-6, AC-7) ────────────────────────────────
+
+const PROGRESS_POLL_INTERVAL_MS = 1500;
+
+interface ProgressData {
+  query_id: string;
+  total_chunks: number;
+  completed_chunks: number;
+  percent: number;
+  status: 'running' | 'done' | 'error';
+}
+
+const isPolling = ref(false);
+const progressPercent = ref(0);
+let pollTimerId: ReturnType<typeof setInterval> | null = null;
+
+function stopPolling(): void {
+  if (pollTimerId !== null) {
+    clearInterval(pollTimerId);
+    pollTimerId = null;
+  }
+  isPolling.value = false;
+}
+
+async function fetchProgress(qid: string): Promise<void> {
+  try {
+    const response = await apiGet('/api/resource/history/query/progress', {
+      timeout: 10000,
+      silent: true,
+      params: { query_id: qid },
+    });
+    const raw = response as { data?: ProgressData } | null;
+    const data = raw?.data;
+    if (!data) {
+      return;
+    }
+
+    progressPercent.value = Math.min(100, Math.max(0, data.percent));
+
+    if (data.status === 'done' || data.status === 'error') {
+      stopPolling();
+
+      if (data.status === 'error') {
+        queryError.value = '批次查詢發生錯誤，請重試';
+        loading.querying = false;
+        loading.primaryQuery = false;
+        loading.initial = false;
+      }
+      // On 'done', the calling executePrimaryQuery() flow already handles applyViewResult;
+      // progress bar simply disappears via isPolling === false.
+    }
+  } catch {
+    // Network error mid-poll — stop polling to avoid zombie timer (AC-7)
+    stopPolling();
+  }
+}
+
+function startPolling(qid: string): void {
+  stopPolling();
+  isPolling.value = true;
+  progressPercent.value = 0;
+  pollTimerId = setInterval(() => {
+    void fetchProgress(qid);
+  }, PROGRESS_POLL_INTERVAL_MS);
+}
+
+onUnmounted(() => {
+  stopPolling();
+});
 
 // ── DuckDB local compute (Tasks 3.2–3.4) ─────────────────────────────────────
 const duckdb = useResourceHistoryDuckDB();
@@ -443,6 +513,20 @@ async function executePrimaryQuery() {
     const responseData = (payload?.data || {}) as Record<string, unknown>;
     queryId.value = String(responseData.query_id || '');
     lastPrimarySnapshot.value = buildPrimarySnapshot(committedFilters);
+
+    // Start progress polling if this is a batch query (total_chunks > 1) or
+    // if the backend signals a deferred result via a batch flag.
+    // We detect batch by checking the POST response for total_chunks; if absent,
+    // we use the date-range heuristic (> 10 days triggers polling).
+    const totalChunks = Number(responseData.total_chunks ?? 0);
+    const startDate = new Date(String(committedFilters.startDate));
+    const endDate = new Date(String(committedFilters.endDate));
+    const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    const isBatch = totalChunks > 1 || diffDays > 10;
+    if (queryId.value && isBatch) {
+      startPolling(queryId.value);
+    }
+
     applyViewResult(responseData);
 
     // Attempt to activate local compute (Task 3.2). Deactivate any previous session first.
@@ -472,6 +556,7 @@ async function executePrimaryQuery() {
     detailData.value = [];
     resetHierarchyState();
   } finally {
+    stopPolling();
     loading.querying = false;
     loading.primaryQuery = false;
     loading.initial = false;
@@ -643,6 +728,23 @@ onMounted(() => {
       <p v-if="autoPruneHint" class="filter-indicator">{{ autoPruneHint }}</p>
       <p v-if="detailWarning" class="filter-indicator active">{{ detailWarning }}</p>
       <p v-if="exportMessage" class="filter-indicator active">{{ exportMessage }}</p>
+
+      <div v-if="isPolling" class="mx-4 mb-4 rounded-lg bg-white p-4 shadow-sm" role="status" aria-live="polite">
+        <div class="mb-2 flex items-center justify-between text-sm text-gray-600">
+          <span>查詢中...</span>
+          <span class="font-medium text-blue-600">{{ Math.round(progressPercent) }}%</span>
+        </div>
+        <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+          <div
+            class="h-2 rounded-full bg-blue-500 transition-all duration-300"
+            :style="{ width: progressPercent + '%' }"
+            role="progressbar"
+            :aria-valuenow="Math.round(progressPercent)"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          ></div>
+        </div>
+      </div>
 
       <KpiCards :kpi="summaryData.kpi" />
 

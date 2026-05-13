@@ -12,12 +12,15 @@ from flask import Blueprint, request, redirect, Response
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.config.constants import CACHE_TTL_FILTER_OPTIONS
+from mes_dashboard.core.permissions import login_required
 from mes_dashboard.core.response import (
     cache_expired_error,
     internal_error,
+    not_found_error,
     success_response,
     validation_error,
 )
+from mes_dashboard.services.batch_query_engine import get_batch_progress
 from mes_dashboard.services.resource_history_service import (
     get_filter_options,
     export_csv,
@@ -249,6 +252,59 @@ def api_resource_history_view():
 
     _inject_resource_spool_info(result, query_id)
     return success_response(result)
+
+
+# ============================================================
+# Batch query progress endpoint (resource-history-perf)
+# ============================================================
+
+@resource_history_bp.route('/query/progress', methods=['GET'])
+@login_required
+def api_resource_history_query_progress():
+    """API: Batch query progress — return progress metadata for an in-flight or completed batch.
+
+    Query Parameters:
+        query_id: str (required) — hash returned by POST /query
+
+    Returns:
+        JSON { query_id, total_chunks, completed_chunks, percent, status }
+        Status enum: running | done | error
+        400 if query_id is missing; 404 if not found in Redis.
+    """
+    query_id = request.args.get("query_id", "").strip()
+    if not query_id:
+        return validation_error("必須提供 query_id")
+
+    raw = get_batch_progress("resource_history", query_id)
+    if raw is None:
+        return not_found_error("找不到指定的查詢進度，可能已過期或尚未建立")
+
+    # Decode bytes keys/values produced by Redis hgetall
+    def _decode(v) -> str:
+        return v.decode("utf-8") if isinstance(v, (bytes, bytearray)) else str(v)
+
+    total_chunks = int(_decode(raw.get(b"total", raw.get("total", 0))))
+    completed_chunks = int(_decode(raw.get(b"completed", raw.get("completed", 0))))
+    percent = float(_decode(raw.get(b"pct", raw.get("pct", 0))))
+    raw_status = _decode(raw.get(b"status", raw.get("status", "running")))
+
+    # Map batch_query_engine status enum → API status enum (AC-5)
+    # batch statuses: running | completed | partial | failed
+    # API statuses:   running | done      | done    | error
+    if raw_status in ("completed", "partial"):
+        status = "done"
+    elif raw_status == "failed":
+        status = "error"
+    else:
+        status = "running"
+
+    return success_response({
+        "query_id": query_id,
+        "total_chunks": total_chunks,
+        "completed_chunks": completed_chunks,
+        "percent": percent,
+        "status": status,
+    })
 
 
 # ============================================================

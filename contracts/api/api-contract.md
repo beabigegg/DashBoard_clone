@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.2.1
+schema-version: 1.2.2
 last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -112,6 +112,7 @@ breaking-change-policy: deprecate-2-minors
 | POST | /api/resource/history/query | required | JSON body | success_response | 400/410/500 | route tests |
 | GET | /api/resource/history/view | required | ?query_id= | success_response | 400/410 | route tests |
 | GET | /api/resource/history/export | required | query params | csv-stream | 400/410 | e2e tests |
+| GET | /api/resource/history/query/progress | required | ?query_id=<uuid> | success_response | 400/404 | route tests |
 | GET | /api/reject-history/options | required | — | success_response | 500 | route tests |
 | GET | /api/reject-history/summary | required | ?query_id= | success_response | 400/410 | route tests |
 | GET | /api/reject-history/trend | required | ?query_id= | success_response | 400/410 | route tests |
@@ -250,6 +251,7 @@ breaking-change-policy: deprecate-2-minors
 - `meta.app_version`（2026-04-15）：所有 `success_response` / `error_response` 自動注入，backward-compatible。
 - `analytics-summary` 額外注入 `meta.cache_state ∈ {warm, cold, stale}`。
 - `/health` / `/health/deep`（2026-03-11）：additive `system_memory` + `async_workers` blocks，backward-compatible。
+- **resource-history progress endpoint（2026-05-13，resource-history-perf）**：新增 `GET /api/resource/history/query/progress?query_id=<uuid>`；auth required；response shape: `{ query_id, total_chunks, completed_chunks, percent, status }`；`status` 為 closed enum `running | done | error`；400 on missing `query_id`，404 on unknown `query_id`；additive，不影響既有端點。
 - **WIP new filter params（2026-05-13，wip-hold-drilldown-filters）**：以下四個端點新增三個可選查詢參數，全部為 additive，不影響既有呼叫方：
   - 端點：`GET/POST /api/wip/detail/<workcenter>`、`GET/POST /api/wip/overview/summary`、`GET/POST /api/wip/overview/matrix`、`GET/POST /api/wip/meta/filter-options`
   - 新增參數：

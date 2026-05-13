@@ -451,3 +451,41 @@ class TestExportCsv(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# ============================================================
+# TTL bifurcation tests (resource-history-perf)
+# ============================================================
+
+class TestTtlBifurcation(unittest.TestCase):
+    """Tests for _is_historical helper and TTL bifurcation logic."""
+
+    def test_historical_query_gets_long_ttl(self):
+        """end_date < today - 2 days must be classified as historical."""
+        from mes_dashboard.services.resource_history_service import _is_historical
+        from datetime import date, timedelta
+        historical_date = (date.today() - timedelta(days=3)).isoformat()
+        self.assertTrue(
+            _is_historical(historical_date),
+            f"end_date {historical_date!r} (today - 3) should be historical",
+        )
+
+    def test_recent_query_keeps_short_ttl(self):
+        """end_date >= today - 2 days must NOT be classified as historical."""
+        from mes_dashboard.services.resource_history_service import _is_historical
+        from datetime import date
+        recent_date = date.today().isoformat()
+        self.assertFalse(
+            _is_historical(recent_date),
+            f"end_date {recent_date!r} (today) should not be historical",
+        )
+
+    def test_ttl_boundary_exactly_2_days_ago(self):
+        """end_date == today - 2 days is NOT historical (open boundary)."""
+        from mes_dashboard.services.resource_history_service import _is_historical
+        from datetime import date, timedelta
+        boundary_date = (date.today() - timedelta(days=2)).isoformat()
+        self.assertFalse(
+            _is_historical(boundary_date),
+            f"end_date {boundary_date!r} (today - 2) should NOT be historical (boundary is exclusive)",
+        )

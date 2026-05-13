@@ -8,6 +8,33 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.10] — 2026-05-13
+### Changed
+- Gate Compatibility Note added for `resource-history-perf`. New test coverage scope documented under existing gates: `tests/integration/test_resource_history_prewarm.py` (Tier 3 nightly, startup pre-warm + Redis key assertion); `tests/stress/test_resource_history_stress.py` extended with concurrent progress-poll stress (Tier 4); new Playwright resilience + data-boundary specs for progress endpoint (Tier 1). No gate tier, command, or status changes.
+- Source: change `resource-history-perf`.
+
+## [api 1.2.2] — 2026-05-13
+### Added (additive)
+- Section 4: new row for `GET /api/resource/history/query/progress?query_id=<uuid>` (auth required, response `success_response`, errors 400/404).
+- Section 10 Compatibility Note: documents progress endpoint as additive new endpoint from `resource-history-perf`.
+- Source: change `resource-history-perf`.
+
+## [api-inventory 1.1.2] — 2026-05-13
+### Changed (additive)
+- `resource_history_routes.py` scope extended with `GET /api/resource/history/query/progress` side-channel endpoint; Redis key pattern documented.
+- Compatibility Notes: new entry for `resource-history-perf` additive progress endpoint.
+- Source: change `resource-history-perf`.
+
+## [data 1.0.2] — 2026-05-13
+### Added (additive)
+- Section 2.6: Resource-History Batch Query Progress response shape (`query_id`, `total_chunks`, `completed_chunks`, `percent`, `status`); closed `status` enum `running | done | error`; all five fields required.
+- Source: change `resource-history-perf`.
+
+## [env 1.0.1] — 2026-05-13
+### Added (additive)
+- New section "Cache Tuning — Resource History": `RESOURCE_HISTORY_HISTORICAL_TTL` (optional, default 86400s) and `RESOURCE_HISTORY_PREWARM_MONTHS` (optional, default 3). Both optional with safe defaults; restart required.
+- Source: change `resource-history-perf`.
+
 ## [data 1.0.1] — 2026-05-13
 ### Added (additive)
 - Section 2.5: WIP Filter-Options Response shape documenting `workflows`, `bops`, `pjFunctions` arrays alongside existing arrays. All three are new additive fields from change `wip-hold-drilldown-filters`.

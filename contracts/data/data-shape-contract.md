@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.0.1
+schema-version: 1.0.2
 last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -172,6 +172,32 @@ breaking-change-policy: deprecate-2-minors
 - 各欄位均為 distinct 排序字串陣列；若無符合值則回傳 `[]`。
 - 支援 cross-filter 語意：選取某過濾器時，其他欄位選項自動縮減至對應可選值。
 - 接受可選查詢參數 `workflow`、`bop`、`pj_function` 以在已選取過濾器後縮減選項。
+
+### 2.6 Resource-History Batch Query Progress（`GET /api/resource/history/query/progress`）
+
+Response shape for an active or completed batch query (HTTP 200):
+
+```json
+{
+  "success": true,
+  "data": {
+    "query_id": "<uuid string>",
+    "total_chunks": "<integer>",
+    "completed_chunks": "<integer>",
+    "percent": "<float 0.0–100.0>",
+    "status": "<running | done | error>"
+  },
+  "meta": { "timestamp": "...", "app_version": "..." }
+}
+```
+
+Constraints:
+- All five `data` fields are required; the endpoint MUST NOT omit any of them in a 200 response.
+- `status` is a closed enum: `running | done | error` — any other value is invalid.
+- `percent` is `float`, range `[0.0, 100.0]`.
+- 400 and 404 responses follow the standard error envelope (Section 1.2).
+- This shape is wholly separate from the query result shape (Section 2.2); do not conflate.
+- Added by change `resource-history-perf`.
 
 ### 2.4 Truncated Payload（memory pressure guard）
 

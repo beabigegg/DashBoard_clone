@@ -112,6 +112,21 @@ def _warmup_resource_dataset_job() -> None:
         logger.warning("Warmup [resource_dataset] failed: %s", exc)
 
 
+def _warmup_resource_history_job() -> None:
+    """RQ worker function: pre-warm the last N months of resource-history chunks.
+
+    Reads RESOURCE_HISTORY_PREWARM_MONTHS from env (default 3).
+    Uses skip_cached=True so re-warm on gunicorn restart is idempotent (AC-8).
+    Catches Oracle unreachability and logs a warning — never raises (AC-4).
+    """
+    try:
+        from mes_dashboard.services.resource_history_service import prewarm_last_n_months
+        prewarm_last_n_months()
+        logger.info("Warmup [resource_history] complete")
+    except Exception as exc:
+        logger.warning("Warmup [resource_history] failed: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Warmup job registry
 # production-history is intentionally absent — it must NOT be added here.
@@ -123,6 +138,8 @@ _WARMUP_JOBS = [
     # resource-history canonical base dataset design is complete (task 2.2);
     # warmup enabled per task 3.3:
     ("warmup-resource-dataset", _warmup_resource_dataset_job),
+    # resource-history historical chunk pre-warm (resource-history-perf):
+    ("warmup-resource-history", _warmup_resource_history_job),
     # production-history intentionally absent — do NOT add here (task 3.4).
 ]
 

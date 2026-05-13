@@ -3,7 +3,7 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.1.1
+schema-version: 1.1.2
 last-changed: 2026-05-13
 ---
 
@@ -26,7 +26,7 @@ last-changed: 2026-05-13
 | `hold_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410)；`duration` payload: `{ items: [{range, count, qty, pct}], avgReleasedHours, avgOnHoldHours, maxReleasedHours, maxOnHoldHours }`；trend day 含 `repeatQualityHoldQty`；**`POST /api/hold-history/today-snapshot`**: inputs `{ hold_type, record_type, reason, duration_range, page, per_page }`，response `{ query_id, summary: { onHoldTotalCount, onHoldTotalQty, todayNewQty, todayReleaseQty, todayFutureHoldQty, onHoldAvgHours, onHoldMaxHours }, reason_pareto, duration, list }`；cache `hold_today:*` TTL 60s；DB 不可用 → 503 `service_unavailable` |
 | `reject_history_routes.py` | All JSON API endpoints — **Type B** (async 202 polling on 410)；含 `GET /api/reject-history/job/<job_id>`；`/batch-pareto` / `/view` 接受 `POST` JSON body |
 | `resource_routes.py` | All JSON API endpoints |
-| `resource_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410)；`POST /api/resource/history/query` 先查 canonical base spool（DuckDB filter）；response: `{query_id, summary, detail}` |
+| `resource_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410)；`POST /api/resource/history/query` 先查 canonical base spool（DuckDB filter）；response: `{query_id, summary, detail}`；**新增** `GET /api/resource/history/query/progress?query_id=<uuid>` — batch 查詢進度 side-channel；progress state 存於 Redis key `resource:history:progress:<query_id>`；400 on missing param，404 on unknown query_id；auth required（與其他端點相同 `login_required` guard）（resource-history-perf）。 |
 | `yield_alert_routes.py` | All JSON API endpoints — **Type B** (async 202 polling)；`POST /api/yield-alert/query` 可回傳 202；RQ 不可用 fallback sync 200；`GET /api/yield-alert/cross-filter-options?query_id=...&lines[]=...&packages[]=...`，410 on spool expired |
 | `production_history_routes.py` | All JSON API endpoints — `POST /api/production-history/query` 驗證 `pj_types`, `start_date`, `end_date`；缺少/無效 → 400 `VALIDATION_ERROR`；date range > 730d → 400；spool hit → 200，miss+RQ → 202；含 `POST /page`（DuckDB paged）、`/matrix`、`/options`；gated by `PROD_HISTORY_ENABLED` |
 | `admin_routes.py` | `POST /api/admin/analytics/recalculate`（admin required）、`GET /admin/api/user-usage-kpi`（params: `start_date`, `end_date`, `department`） |
@@ -94,6 +94,7 @@ last-changed: 2026-05-13
 
 ## Compatibility Notes
 
+- **2026-05-13（resource-history-perf）：** `resource_history_routes.py` 新增 `GET /api/resource/history/query/progress` 端點；progress state 以 Redis side-channel 儲存；auth required；400/404 error contract；additive，不影響既有端點及 Type A re-query 流程。
 - **2026-05-13（wip-hold-drilldown-filters）：** `wip_routes.py` 四個端點新增三個可選過濾參數（`workflow`、`bop`、`pj_function`）；`/detail/<workcenter>` lot 列新增 `pjType`；`/meta/filter-options` response 新增 `workflows`、`bops`、`pjFunctions`；全部 backward-compatible。
 - **2026-04-15：** 所有 `standard-json` 端點注入 `meta.app_version`（additive，backward-compatible）。
 - **2026-03-11：** `/health` / `/health/deep` 加入 `system_memory` + `async_workers`（backward-compatible）。

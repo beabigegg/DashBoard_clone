@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.0
-last-changed: 2026-05-05
+schema-version: 1.0.1
+last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -78,6 +78,16 @@ breaking-change-policy: deprecate-2-minors
 | PROD_HISTORY_ENABLED | feature | all | no | no | — | true | application-team | true or false | yes | production-history 端點 404 |
 | REGISTER_INTERNAL_METRICS | feature | dev | no | no | False | False | platform-team | True or False — production MUST NOT set True | yes | internal metrics blueprint 掛載 |
 | INTERNAL_METRICS_ENABLED | feature | dev | no | no | 0 | 0 | platform-team | 0 or 1 — production MUST NOT set 1 | no | handler guard |
+
+## Cache Tuning — Resource History
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| RESOURCE_HISTORY_HISTORICAL_TTL | cache | all | no | no | 86400 | 86400 | application-team | positive integer (seconds); minimum 3600 | yes | uses default 86400 |
+| RESOURCE_HISTORY_PREWARM_MONTHS | cache | all | no | no | 3 | 3 | application-team | positive integer 1–12; 0 disables pre-warm | yes | uses default 3 |
+
+- `RESOURCE_HISTORY_HISTORICAL_TTL`: Redis TTL for resource-history queries where `end_date < today − 2 days`. Historical data is immutable; default 86400s (24h) vs the general 2h TTL for recent queries. Added by change `resource-history-perf`.
+- `RESOURCE_HISTORY_PREWARM_MONTHS`: Number of calendar months of resource-history data to pre-warm into Redis on service startup. Pre-warm runs as a background thread after gunicorn workers are ready; `0` disables pre-warm entirely. Default 3 months. Oracle memory budget confirmed by spec-architect before deploying with values > 3. Added by change `resource-history-perf`.
 
 ## Observability / Circuit Breaker
 

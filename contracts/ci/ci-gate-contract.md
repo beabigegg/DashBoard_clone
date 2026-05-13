@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.9
+schema-version: 1.3.10
 last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -102,6 +102,14 @@ breaking-change-policy: deprecate-2-minors
 - **From this change onward**: `include` gains `"src/resource-history/**/*"`, covering all `.ts`/`.vue` files migrated from `resource-history/` (`main.ts`, `useResourceHistoryDuckDB.ts`, `App.vue`, `components/FilterBar.vue`, `components/KpiCards.vue`, `components/TrendChart.vue`, `components/StackedChart.vue`, `components/ComparisonChart.vue`, `components/HeatmapChart.vue`, `components/DetailSection.vue`) under `strict: true`.
 - **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.9 (patch)**: additive prose only — gate tier, command, and status are unchanged.
+
+### New test coverage — resource-history-perf
+
+- **New Tier 3 nightly integration test**: `tests/integration/test_resource_history_prewarm.py` — startup pre-warm + Redis key assertion (requires real Oracle + Redis; `integration_real` marker). Covered by existing `nightly-integration` gate command; no gate tier or command change.
+- **Tier 4 stress extension**: `tests/stress/test_resource_history_stress.py` extended with concurrent progress-endpoint poll test (N=50 concurrent pollers; `stress` marker). Covered by existing `stress-load` gate command; no gate tier or command change.
+- **Tier 1 Playwright extensions**: new `playwright/resilience/` and `playwright/data-boundary/` specs for progress endpoint (503 mid-poll resilience; malformed progress response boundary). Covered by existing `playwright-resilience` and `playwright-data-boundary` gates; no gate tier or command change.
+- **Schema-version bump to 1.3.10 (patch)**: additive prose documenting new test coverage scope under existing gates; gate tier, command, and status are unchanged.
+- **Source**: change `resource-history-perf`.
 
 ## Required Check Policy
 

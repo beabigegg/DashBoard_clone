@@ -308,6 +308,89 @@ if __name__ == '__main__':
 
 
 # ============================================================
+# Progress API tests (resource-history-perf)
+# ============================================================
+
+class TestResourceHistoryProgressAPI(unittest.TestCase):
+    """Tests for GET /api/resource/history/query/progress endpoint."""
+
+    def setUp(self):
+        """Set up test client with a logged-in session."""
+        import mes_dashboard.core.database as _db
+        _db._ENGINE = None
+        self.app = create_app('testing')
+        self.app.config['TESTING'] = True
+        self.client = self.app.test_client()
+        # Establish a logged-in session so login_required passes
+        with self.client.session_transaction() as sess:
+            sess['user'] = {'username': 'testuser', 'is_admin': False}
+
+    def test_progress_missing_query_id_returns_400(self):
+        """GET /progress without query_id must return 400 VALIDATION_ERROR."""
+        response = self.client.get('/api/resource/history/query/progress')
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error']['code'], 'VALIDATION_ERROR')
+
+    @patch('mes_dashboard.routes.resource_history_routes.get_batch_progress')
+    def test_progress_unknown_query_id_returns_404(self, mock_progress):
+        """GET /progress with unknown query_id must return 404."""
+        mock_progress.return_value = None
+        response = self.client.get(
+            '/api/resource/history/query/progress?query_id=nonexistent123'
+        )
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+
+    @patch('mes_dashboard.routes.resource_history_routes.get_batch_progress')
+    def test_progress_running_query_returns_200_with_shape(self, mock_progress):
+        """Running query returns 200 with all 5 required fields; status=running."""
+        mock_progress.return_value = {
+            b'total': b'3',
+            b'completed': b'1',
+            b'failed': b'0',
+            b'pct': b'33.3',
+            b'status': b'running',
+        }
+        response = self.client.get(
+            '/api/resource/history/query/progress?query_id=abc123def456gh78'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        payload = data['data']
+        self.assertIn('query_id', payload)
+        self.assertIn('total_chunks', payload)
+        self.assertIn('completed_chunks', payload)
+        self.assertIn('percent', payload)
+        self.assertIn('status', payload)
+        self.assertEqual(payload['status'], 'running')
+        self.assertEqual(payload['total_chunks'], 3)
+        self.assertEqual(payload['completed_chunks'], 1)
+
+    @patch('mes_dashboard.routes.resource_history_routes.get_batch_progress')
+    def test_progress_done_query_returns_200_status_done(self, mock_progress):
+        """Completed query returns status=done (mapped from completed)."""
+        mock_progress.return_value = {
+            b'total': b'3',
+            b'completed': b'3',
+            b'failed': b'0',
+            b'pct': b'100.0',
+            b'status': b'completed',
+        }
+        response = self.client.get(
+            '/api/resource/history/query/progress?query_id=abc123def456gh78'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['data']['status'], 'done')
+        self.assertEqual(data['data']['percent'], 100.0)
+
+
+# ============================================================
 # Spool metadata injection tests (pytest style)
 # ============================================================
 

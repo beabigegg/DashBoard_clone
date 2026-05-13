@@ -16,8 +16,9 @@ Architecture:
 import io
 import csv
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Optional, Dict, List, Any, Generator
 
 import pandas as pd
@@ -25,11 +26,20 @@ import pandas as pd
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.sql import SQLLoader
 from mes_dashboard.config.field_contracts import get_export_headers, get_export_api_keys
+from mes_dashboard.config.constants import CACHE_TTL_DATASET
 
 logger = logging.getLogger('mes_dashboard.resource_history')
 
 # Maximum allowed query range in days
 MAX_QUERY_DAYS = 730
+
+# ── TTL bifurcation (resource-history-perf) ──────────────────────────────────
+
+# Historical queries (end_date < today - 2 days) use a long TTL because
+# immutable-historical data never changes.  Recent queries keep the shorter
+# dataset TTL so today/yesterday data refreshes on the next cache miss.
+_HISTORICAL_TTL: int = int(os.getenv("RESOURCE_HISTORY_HISTORICAL_TTL", "86400"))
+_PREWARM_MONTHS: int = int(os.getenv("RESOURCE_HISTORY_PREWARM_MONTHS", "3"))
 
 # E10 Status definitions
 E10_STATUSES = ['PRD', 'SBY', 'UDT', 'SDT', 'EGT', 'NST']
@@ -1012,3 +1022,155 @@ def _build_detail_from_raw_df(
     # Sort by workcenter sequence (ascending, smaller first), then family, resource
     result.sort(key=lambda x: (x['workcenter_seq'], x['family'], x['resource']))
     return result
+
+
+# ============================================================
+# TTL bifurcation helpers (resource-history-perf)
+# ============================================================
+
+def _is_historical(end_date: str) -> bool:
+    """Return True when end_date is strictly before (today - 2 days).
+
+    Historical data is immutable and eligible for the long TTL.
+    The boundary (today - 2 days) is exclusive: a query ending exactly
+    2 days ago is NOT treated as historical (might still change via
+    late-arriving MES records).
+
+    Args:
+        end_date: ISO 8601 date string ``YYYY-MM-DD``.
+
+    Returns:
+        True if end_date < today - 2 days, False otherwise.
+    """
+    try:
+        cutoff = date.today() - timedelta(days=2)
+        return date.fromisoformat(end_date) < cutoff
+    except ValueError:
+        return False
+
+
+def get_chunk_ttl(end_date: str) -> int:
+    """Return the appropriate Redis TTL for a query ending on end_date.
+
+    Uses RESOURCE_HISTORY_HISTORICAL_TTL for historical queries and
+    CACHE_TTL_DATASET for recent queries.
+
+    Args:
+        end_date: ISO 8601 date string ``YYYY-MM-DD``.
+
+    Returns:
+        TTL in seconds.
+    """
+    if _is_historical(end_date):
+        return _HISTORICAL_TTL
+    return CACHE_TTL_DATASET
+
+
+# ============================================================
+# Pre-warm support (resource-history-perf)
+# ============================================================
+
+def _execute_prewarm_plan(
+    chunks: List[Dict[str, str]],
+    query_fn,
+    *,
+    skip_cached: bool,
+    cache_prefix: str,
+    chunk_ttl: int,
+) -> str:
+    """Thin wrapper around execute_plan for testability.
+
+    Delegates to ``batch_query_engine.execute_plan``.  Extracted so that
+    tests can patch this boundary without importing batch_query_engine.
+    """
+    from mes_dashboard.services.batch_query_engine import execute_plan
+    return execute_plan(
+        chunks,
+        query_fn,
+        skip_cached=skip_cached,
+        cache_prefix=cache_prefix,
+        chunk_ttl=chunk_ttl,
+    )
+
+
+def prewarm_last_n_months(months: Optional[int] = None) -> None:
+    """Pre-warm the last N months of 31-day resource-history chunks into Redis.
+
+    Reads ``RESOURCE_HISTORY_PREWARM_MONTHS`` from env (default 3) unless
+    *months* is explicitly provided.  Each 31-day chunk whose Redis key
+    already exists is skipped (``skip_cached=True``), making re-warm on
+    restart idempotent (AC-8).
+
+    Catches all exceptions and logs a warning rather than raising, so that
+    service startup is never blocked by Oracle unreachability (AC-4).
+
+    Args:
+        months: Number of calendar months to cover (default: env value).
+    """
+    if months is None:
+        months = _PREWARM_MONTHS
+
+    if months <= 0:
+        logger.info("Pre-warm disabled (RESOURCE_HISTORY_PREWARM_MONTHS=0)")
+        return
+
+    from mes_dashboard.services.batch_query_engine import (
+        decompose_by_time_range,
+        compute_query_hash,
+    )
+
+    end = date.today()
+    start = end - timedelta(days=months * 31)
+    chunks = decompose_by_time_range(start.isoformat(), end.isoformat())
+
+    logger.info(
+        "resource_history prewarm: %d chunks covering %s → %s (months=%d)",
+        len(chunks), start.isoformat(), end.isoformat(), months,
+    )
+
+    # Get resources once for all chunks (filter cache must be warm by prewarm time)
+    try:
+        resources = _get_filtered_resources()
+    except Exception as exc:
+        logger.warning("resource_history prewarm: failed to load resources: %s", exc)
+        return
+
+    if not resources:
+        logger.warning("resource_history prewarm: no resources in cache, skipping")
+        return
+
+    historyid_filter = _build_historyid_filter(resources)
+
+    base_sql_template = SQLLoader.load("resource_history/detail")
+    base_sql = base_sql_template.replace("{{ HISTORYID_FILTER }}", historyid_filter)
+
+    def _query_chunk(chunk: Dict[str, str], max_rows_per_chunk=None) -> "pd.DataFrame":
+        params = {
+            "start_date": chunk["chunk_start"],
+            "end_date": chunk["chunk_end"],
+        }
+        result = read_sql_df(base_sql, params)
+        return result if result is not None else pd.DataFrame()
+
+    # All historical chunks share the same long TTL
+    ttl = _HISTORICAL_TTL
+
+    query_hash = compute_query_hash({
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "prewarm": True,
+    })
+
+    try:
+        _execute_prewarm_plan(
+            chunks,
+            _query_chunk,
+            skip_cached=True,
+            cache_prefix="resource_history_prewarm",
+            chunk_ttl=ttl,
+        )
+        logger.info("resource_history prewarm complete: query_hash=%s", query_hash)
+    except Exception as exc:
+        logger.warning(
+            "resource_history prewarm failed (Oracle may be unreachable): %s", exc
+        )

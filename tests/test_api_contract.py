@@ -437,5 +437,52 @@ class TestErrorEnvelopeCodesInAllowlist(unittest.TestCase):
         self.assertEqual(data['error']['code'], INTERNAL_ERROR)
 
 
+class TestResourceHistoryProgressContract(unittest.TestCase):
+    """Contract tests for the resource-history batch query progress endpoint (resource-history-perf)."""
+
+    CONTRACTS_DIR = Path(__file__).parent.parent / "contracts"
+
+    def _read_contract(self, relative_path: str) -> str:
+        return (self.CONTRACTS_DIR / relative_path).read_text(encoding="utf-8")
+
+    def test_resource_history_progress_endpoint_in_inventory(self):
+        """api-inventory.md and api-contract.md must both register the progress endpoint."""
+        inventory = self._read_contract("api/api-inventory.md")
+        self.assertIn(
+            "resource/history/query/progress",
+            inventory,
+            "api-inventory.md does not mention resource/history/query/progress — "
+            "add the endpoint to resource_history_routes.py scope in the standard-json table.",
+        )
+
+        api_contract = self._read_contract("api/api-contract.md")
+        self.assertIn(
+            "GET /api/resource/history/query/progress",
+            api_contract,
+            "api-contract.md Section 4 does not contain a row for "
+            "GET /api/resource/history/query/progress.",
+        )
+
+    def test_resource_history_progress_response_matches_data_shape_contract(self):
+        """data-shape-contract.md Section 2.6 must declare all five required fields and closed enum values."""
+        data_shape = self._read_contract("data/data-shape-contract.md")
+
+        required_fields = ["query_id", "total_chunks", "completed_chunks", "percent", "status"]
+        for field in required_fields:
+            self.assertIn(
+                field,
+                data_shape,
+                f"data-shape-contract.md Section 2.6 is missing required field '{field}'.",
+            )
+
+        closed_enum_values = ["running", "done", "error"]
+        for value in closed_enum_values:
+            self.assertIn(
+                value,
+                data_shape,
+                f"data-shape-contract.md Section 2.6 is missing closed enum value '{value}'.",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
