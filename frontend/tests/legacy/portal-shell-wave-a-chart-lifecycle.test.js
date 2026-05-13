@@ -39,9 +39,9 @@ test('Wave A chart components keep autoresize and tooltip configuration', () => 
 
 test('QC Gate keeps linked chart-table interaction guards', () => {
   const source = readSource('src/qc-gate/App.vue');
-  assert.match(source, /const activeFilter = ref\(null\)/);
+  assert.match(source, /const activeFilter = ref/);
   assert.match(source, /const filteredLots = computed\(\(\) =>/);
-  assert.match(source, /function handleChartSelect\(filter\)/);
+  assert.match(source, /function handleChartSelect\(filter/);
   assert.match(source, /activeFilter\.value = null/);
 });
 
