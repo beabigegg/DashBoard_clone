@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue';
 
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -7,7 +7,12 @@ import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import QcGateChart from './components/QcGateChart.vue';
 import LotTable from './components/LotTable.vue';
-import { useQcGateData } from './composables/useQcGateData.js';
+import { useQcGateData } from './composables/useQcGateData';
+
+interface ActiveFilter {
+  station: string;
+  bucket: string;
+}
 
 const {
   stations,
@@ -21,18 +26,18 @@ const {
   refreshNow,
 } = useQcGateData();
 
-const activeFilter = ref(null);
+const activeFilter = ref<ActiveFilter | null>(null);
 
-const BUCKET_LABELS = {
+const BUCKET_LABELS: Record<string, string> = {
   lt_6h: '<6hr',
   '6h_12h': '6-12hr',
   '12h_24h': '12-24hr',
   gt_24h: '>24hr',
 };
 
-const hasStations = computed(() => stations.value.length > 0);
+const hasStations = computed<boolean>(() => stations.value.length > 0);
 
-const totalLots = computed(() => {
+const totalLots = computed<number>(() => {
   return stations.value.reduce((sum, station) => sum + Number(station.total || 0), 0);
 });
 
@@ -41,15 +46,16 @@ const filteredLots = computed(() => {
     return allLots.value;
   }
 
+  const filter = activeFilter.value;
   return allLots.value.filter((lot) => {
     return (
-      lot.step === activeFilter.value.station &&
-      lot.bucket === activeFilter.value.bucket
+      lot.step === filter.station &&
+      lot.bucket === filter.bucket
     );
   });
 });
 
-const formattedCacheTime = computed(() => {
+const formattedCacheTime = computed<string>(() => {
   if (!cacheTime.value) {
     return '--';
   }
@@ -59,11 +65,11 @@ const formattedCacheTime = computed(() => {
     return String(cacheTime.value);
   }
 
-  const pad = (n) => String(n).padStart(2, '0');
+  const pad = (n: number): string => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 });
 
-const activeFilterLabel = computed(() => {
+const activeFilterLabel = computed<string>(() => {
   if (!activeFilter.value) {
     return '';
   }
@@ -72,7 +78,7 @@ const activeFilterLabel = computed(() => {
   return `${activeFilter.value.station} / ${bucketLabel}`;
 });
 
-function handleChartSelect(filter) {
+function handleChartSelect(filter: ActiveFilter): void {
   if (!filter?.station || !filter?.bucket) {
     return;
   }
@@ -89,11 +95,11 @@ function handleChartSelect(filter) {
   activeFilter.value = filter;
 }
 
-function clearFilter() {
+function clearFilter(): void {
   activeFilter.value = null;
 }
 
-function handleManualRefresh() {
+function handleManualRefresh(): void {
   void refreshNow();
 }
 </script>

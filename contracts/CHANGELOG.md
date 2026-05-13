@@ -25,6 +25,11 @@ a corresponding entry below.
 - Compatibility Notes: new entry for wip-hold-drilldown-filters additive changes.
 - Source: change `wip-hold-drilldown-filters`.
 
+## [ci 1.3.8] — 2026-05-13
+### Changed
+- Gate Compatibility Note added for `migrate-qc-gate-ts` (Phase 3 item #17). `tsconfig.json` `include` expanded with `"src/qc-gate/**/*"`, covering `main.ts`, `App.vue`, `composables/useQcGateData.ts`, `components/LotTable.vue`, `components/QcGateChart.vue`. Gate tier unchanged (informational). Additive prose only.
+- Source: change `migrate-qc-gate-ts` Phase 3.
+
 ## [ci 1.3.7] — 2026-05-13
 ### Changed
 - Gate Compatibility Note added for `migrate-wip-hold-ts` (Phase 3). `tsconfig.json` `include` expanded with `"src/wip-overview/**/*"`, `"src/wip-detail/**/*"`, `"src/hold-overview/**/*"`, `"src/hold-detail/**/*"`. Gate tier unchanged (informational). Additive prose only.

@@ -1,19 +1,55 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
-import { apiGet } from '../../core/api.js';
+import { apiGet } from '../../core/api';
 
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const JITTER_FACTOR = 0.15;
 
-function jitteredInterval(baseMs) {
+function jitteredInterval(baseMs: number): number {
   const jitter = baseMs * JITTER_FACTOR * (2 * Math.random() - 1);
   return Math.max(1000, Math.round(baseMs + jitter));
 }
 const API_TIMEOUT_MS = 60000;
-const BUCKET_KEYS = ['lt_6h', '6h_12h', '12h_24h', 'gt_24h'];
+const BUCKET_KEYS = ['lt_6h', '6h_12h', '12h_24h', 'gt_24h'] as const;
 
-function normalizeBuckets(rawBuckets) {
-  const buckets = {};
+export type BucketKey = (typeof BUCKET_KEYS)[number];
+
+export interface BucketCounts {
+  lt_6h: number;
+  '6h_12h': number;
+  '12h_24h': number;
+  gt_24h: number;
+}
+
+export interface LotItem {
+  lot_id: string;
+  package: string;
+  product: string;
+  qty: number | string;
+  step: string;
+  workorder: string;
+  move_in_time: string | null;
+  wait_hours: number | string;
+  bucket: BucketKey;
+  status: string;
+  [key: string]: unknown;
+}
+
+export interface StationData {
+  specname: string;
+  spec_order: number;
+  buckets: BucketCounts;
+  total: number;
+  lots: LotItem[];
+}
+
+export interface ApiPayload {
+  cache_time?: string | null;
+  stations?: Array<Record<string, unknown>>;
+}
+
+function normalizeBuckets(rawBuckets: Record<string, unknown> | null | undefined): BucketCounts {
+  const buckets = {} as BucketCounts;
   for (const key of BUCKET_KEYS) {
     const value = Number(rawBuckets?.[key]);
     buckets[key] = Number.isFinite(value) ? value : 0;
@@ -21,20 +57,22 @@ function normalizeBuckets(rawBuckets) {
   return buckets;
 }
 
-function normalizeStation(rawStation) {
-  const lots = Array.isArray(rawStation?.lots) ? rawStation.lots : [];
+function normalizeStation(rawStation: Record<string, unknown> | null | undefined): StationData {
+  const lots = Array.isArray(rawStation?.lots) ? (rawStation.lots as LotItem[]) : [];
   return {
     specname: String(rawStation?.specname ?? '').trim(),
     spec_order: Number(rawStation?.spec_order ?? 999999),
-    buckets: normalizeBuckets(rawStation?.buckets),
+    buckets: normalizeBuckets(rawStation?.buckets as Record<string, unknown> | null | undefined),
     total: Number(rawStation?.total ?? lots.length),
     lots,
   };
 }
 
-function normalizePayload(payload) {
+function normalizePayload(payload: ApiPayload): { cache_time: string | null; stations: StationData[] } {
   const stations = Array.isArray(payload?.stations)
-    ? payload.stations.map(normalizeStation).filter((station) => station.specname)
+    ? payload.stations
+        .map((s) => normalizeStation(s as Record<string, unknown>))
+        .filter((station) => station.specname)
     : [];
 
   return {
@@ -43,26 +81,26 @@ function normalizePayload(payload) {
   };
 }
 
-function toComparableWaitHours(value) {
+function toComparableWaitHours(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export function useQcGateData() {
-  const stations = ref([]);
-  const cacheTime = ref(null);
-  const loading = ref(true);
-  const refreshing = ref(false);
-  const refreshSuccess = ref(false);
-  const refreshError = ref(false);
-  const errorMessage = ref('');
-  const lastFetchedAt = ref(null);
+  const stations = ref<StationData[]>([]);
+  const cacheTime = ref<string | null>(null);
+  const loading = ref<boolean>(true);
+  const refreshing = ref<boolean>(false);
+  const refreshSuccess = ref<boolean>(false);
+  const refreshError = ref<boolean>(false);
+  const errorMessage = ref<string>('');
+  const lastFetchedAt = ref<Date | null>(null);
 
-  let refreshTimer = null;
-  let currentRequest = null;
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  let currentRequest: AbortController | null = null;
 
-  const allLots = computed(() => {
-    const merged = [];
+  const allLots = computed<LotItem[]>(() => {
+    const merged: LotItem[] = [];
     for (const station of stations.value) {
       const stationLots = Array.isArray(station.lots) ? station.lots : [];
       merged.push(...stationLots);
@@ -72,7 +110,7 @@ export function useQcGateData() {
     );
   });
 
-  const fetchData = async ({ background = false } = {}) => {
+  const fetchData = async ({ background = false }: { background?: boolean } = {}): Promise<boolean> => {
     if (currentRequest) {
       currentRequest.abort();
     }
@@ -89,12 +127,12 @@ export function useQcGateData() {
     refreshError.value = false;
 
     try {
-      const response = await apiGet('/api/qc-gate/summary', {
+      const response = await apiGet<ApiPayload>('/api/qc-gate/summary', {
         timeout: API_TIMEOUT_MS,
         signal: currentRequest.signal,
       });
 
-      const payload = response?.success ? response.data : response;
+      const payload = response?.success ? response.data : (response as unknown as ApiPayload);
       const normalized = normalizePayload(payload || {});
 
       stations.value = normalized.stations;
@@ -104,10 +142,10 @@ export function useQcGateData() {
       setTimeout(() => { refreshSuccess.value = false; }, 1500);
       return true;
     } catch (error) {
-      if (error?.name === 'AbortError') {
+      if ((error as Error)?.name === 'AbortError') {
         return false;
       }
-      errorMessage.value = error?.message || '載入 QC-GATE 資料失敗';
+      errorMessage.value = (error as Error)?.message || '載入 QC-GATE 資料失敗';
       refreshError.value = true;
       return false;
     } finally {
@@ -116,14 +154,14 @@ export function useQcGateData() {
     }
   };
 
-  const stopAutoRefresh = () => {
+  const stopAutoRefresh = (): void => {
     if (refreshTimer) {
       clearTimeout(refreshTimer);
       refreshTimer = null;
     }
   };
 
-  const scheduleNextRefresh = () => {
+  const scheduleNextRefresh = (): void => {
     stopAutoRefresh();
     refreshTimer = setTimeout(() => {
       if (!document.hidden) {
@@ -133,20 +171,20 @@ export function useQcGateData() {
     }, jitteredInterval(REFRESH_INTERVAL_MS));
   };
 
-  const startAutoRefresh = () => {
+  const startAutoRefresh = (): void => {
     scheduleNextRefresh();
   };
 
-  const resetAutoRefresh = () => {
+  const resetAutoRefresh = (): void => {
     startAutoRefresh();
   };
 
-  const refreshNow = async () => {
+  const refreshNow = async (): Promise<void> => {
     resetAutoRefresh();
     await fetchData({ background: true });
   };
 
-  const handleVisibilityChange = () => {
+  const handleVisibilityChange = (): void => {
     if (document.hidden) {
       return;
     }

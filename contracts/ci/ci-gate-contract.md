@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.7
+schema-version: 1.3.8
 last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -88,6 +88,13 @@ breaking-change-policy: deprecate-2-minors
 - **From this change onward**: `include` gains `"src/wip-overview/**/*"`, `"src/wip-detail/**/*"`, `"src/hold-overview/**/*"`, `"src/hold-detail/**/*"`, covering all `.ts`/`.vue` files migrated from the four feature apps under `strict: true`.
 - **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.7 (patch)**: additive prose only — gate tier, command, and status are unchanged.
+
+### frontend-type-check scope expansion (Phase 3 — migrate-qc-gate-ts)
+
+- **Before this change**: `tsconfig.json` `include` covered `core/`, `shared-composables/`, `shared-ui/`, `admin-shared/`, `resource-shared/`, `wip-shared/`, `reject-history/`, `hold-history/`, `wip-overview/`, `wip-detail/`, `hold-overview/`, `hold-detail/`, `resource-status/`.
+- **From this change onward**: `include` gains `"src/qc-gate/**/*"`, covering all `.ts`/`.vue` files migrated from `qc-gate/` (`main.ts`, `App.vue`, `composables/useQcGateData.ts`, `components/LotTable.vue`, `components/QcGateChart.vue`) under `strict: true`.
+- **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.8 (patch)**: additive prose only — gate tier, command, and status are unchanged.
 
 ## Required Check Policy
 

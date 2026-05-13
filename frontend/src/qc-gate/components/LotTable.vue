@@ -1,36 +1,42 @@
-<script setup>
-import { computed } from 'vue';
+<script setup lang="ts">
 import DataTable from '../../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
+import type { LotItem } from '../composables/useQcGateData';
 
-const props = defineProps({
-  lots: {
-    type: Array,
-    default: () => [],
-  },
-  activeFilter: {
-    type: Object,
-    default: null,
-  },
+interface ActiveFilter {
+  station: string;
+  bucket: string;
+}
+
+interface Props {
+  lots?: LotItem[];
+  activeFilter?: ActiveFilter | null;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  lots: () => [],
+  activeFilter: null,
 });
 
-const emit = defineEmits(['clear-filter']);
+const emit = defineEmits<{
+  (e: 'clear-filter'): void;
+}>();
 
-const BUCKET_LABELS = {
+const BUCKET_LABELS: Record<string, string> = {
   lt_6h: '<6hr',
   '6h_12h': '6-12hr',
   '12h_24h': '12-24hr',
   gt_24h: '>24hr',
 };
 
-function formatValue(value, fallback = '-') {
+function formatValue(value: unknown, fallback = '-'): string {
   if (value == null || value === '') {
     return fallback;
   }
   return String(value);
 }
 
-function formatQty(value) {
+function formatQty(value: unknown): string {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
     return '-';
@@ -38,7 +44,7 @@ function formatQty(value) {
   return parsed.toLocaleString('zh-TW');
 }
 
-function formatWait(value) {
+function formatWait(value: unknown): string {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
     return '-';
@@ -46,11 +52,11 @@ function formatWait(value) {
   return parsed.toFixed(1);
 }
 
-function formatTime(value) {
+function formatTime(value: unknown): string {
   if (!value) {
     return '-';
   }
-  const date = new Date(value);
+  const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) {
     return String(value);
   }
@@ -63,11 +69,11 @@ function formatTime(value) {
   });
 }
 
-function bucketLabel(value) {
-  return BUCKET_LABELS[value] || value || '-';
+function bucketLabel(value: unknown): string {
+  return BUCKET_LABELS[String(value ?? '')] || String(value ?? '') || '-';
 }
 
-function bucketClass(value) {
+function bucketClass(value: unknown): string {
   return `bucket-pill bucket-${String(value || '').replace(/[^a-z0-9]+/gi, '-')}`;
 }
 </script>
