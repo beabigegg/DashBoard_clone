@@ -82,6 +82,9 @@ def test_wip_overview_and_detail_status_parameter_contract(client):
             pj_type="PJA3460",
             firstname=None,
             waferdesc=None,
+            workflow="",
+            bop="",
+            pj_function="",
         )
         mock_detail.assert_called_once_with(
             workcenter="TMTT",
@@ -96,6 +99,9 @@ def test_wip_overview_and_detail_status_parameter_contract(client):
             include_dummy=False,
             page=1,
             page_size=100,
+            workflow="",
+            bop="",
+            pj_function="",
         )
 
 
@@ -155,6 +161,9 @@ def test_wip_overview_post_avoids_url_length_limit(client):
             pj_type="PJA3460",
             firstname=None,
             waferdesc=None,
+            workflow="",
+            bop="",
+            pj_function="",
         )
         mock_matrix.assert_called_once_with(
             include_dummy=False,
@@ -166,6 +175,9 @@ def test_wip_overview_post_avoids_url_length_limit(client):
             pj_type="PJA3460",
             firstname=None,
             waferdesc=None,
+            workflow="",
+            bop="",
+            pj_function="",
         )
         mock_opts.assert_called_once_with(
             include_dummy=False,
@@ -175,6 +187,9 @@ def test_wip_overview_post_avoids_url_length_limit(client):
             pj_type="PJA3460",
             firstname=None,
             waferdesc=None,
+            workflow="",
+            bop="",
+            pj_function="",
             status=None,
             hold_type=None,
         )
@@ -218,6 +233,9 @@ def test_wip_detail_post_avoids_url_length_limit(client):
             include_dummy=False,
             page=1,
             page_size=20,
+            workflow="",
+            bop="",
+            pj_function="",
         )
 
 
@@ -243,6 +261,9 @@ def test_wip_overview_get_still_works_after_post_support(client):
             pj_type="PJA3460",
             firstname=None,
             waferdesc=None,
+            workflow="",
+            bop="",
+            pj_function="",
         )
 
 
