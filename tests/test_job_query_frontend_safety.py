@@ -12,7 +12,7 @@ def test_job_query_module_avoids_inline_onclick_string_interpolation():
         / "frontend"
         / "src"
         / "job-query"
-        / "main.js"
+        / "main.ts"
     ).read_text(encoding="utf-8")
 
     assert "onclick=" not in source
