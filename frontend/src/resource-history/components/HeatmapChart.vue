@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue';
 
 import { HeatmapChart } from 'echarts/charts';
@@ -9,19 +9,23 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, HeatmapChart, GridComponent, TooltipComponent, VisualMapComponent]);
 
-const props = defineProps({
-  heatmap: {
-    type: Array,
-    default: () => [],
-  },
+interface MetricOption {
+  value: string;
+  label: string;
+}
+
+const props = withDefaults(defineProps<{
+  heatmap?: Record<string, unknown>[];
+}>(), {
+  heatmap: () => [],
 });
 
-const metricOptions = [
+const metricOptions: MetricOption[] = [
   { value: 'ou_pct', label: 'OU%' },
   { value: 'oee_pct', label: 'OEE%' },
   { value: 'availability_pct', label: 'AVAIL%' },
 ];
-const selectedMetric = ref('ou_pct');
+const selectedMetric = ref<string>('ou_pct');
 
 const metricLabel = computed(() => {
   const opt = metricOptions.find((o) => o.value === selectedMetric.value);
@@ -34,19 +38,19 @@ const parsedHeatmap = computed(() => {
   const rows = props.heatmap || [];
   const metric = selectedMetric.value;
 
-  const seqByWorkcenter = {};
+  const seqByWorkcenter: Record<string, number> = {};
   rows.forEach((row) => {
-    seqByWorkcenter[row.workcenter] = Number(row.workcenter_seq ?? 999);
+    seqByWorkcenter[String(row.workcenter)] = Number(row.workcenter_seq ?? 999);
   });
 
-  const workcenters = [...new Set(rows.map((row) => row.workcenter))].sort(
+  const workcenters = [...new Set(rows.map((row) => String(row.workcenter)))].sort(
     (left, right) => Number(seqByWorkcenter[left] ?? 999) - Number(seqByWorkcenter[right] ?? 999)
   );
-  const dates = [...new Set(rows.map((row) => row.date))].sort();
+  const dates = [...new Set(rows.map((row) => String(row.date)))].sort();
 
   const matrixData = rows.map((row) => [
-    dates.indexOf(row.date),
-    workcenters.indexOf(row.workcenter),
+    dates.indexOf(String(row.date)),
+    workcenters.indexOf(String(row.workcenter)),
     Number(row[metric] || 0),
   ]);
 
@@ -63,10 +67,12 @@ const chartOption = computed(() => {
   return {
     tooltip: {
       position: 'top',
-      formatter(params) {
-        const xIndex = Number(params.value?.[0] || 0);
-        const yIndex = Number(params.value?.[1] || 0);
-        const value = Number(params.value?.[2] || 0);
+      // TODO: type echarts callback
+      formatter(params: unknown) {
+        const p = params as { value?: unknown[] };
+        const xIndex = Number(p.value?.[0] || 0);
+        const yIndex = Number(p.value?.[1] || 0);
+        const value = Number(p.value?.[2] || 0);
 
         return `${payload.workcenters[yIndex] || '--'}<br/>${payload.dates[xIndex] || '--'}<br/>${metricLabel.value}: <b>${value.toFixed(
           1

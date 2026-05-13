@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { LineChart } from 'echarts/charts';
@@ -9,11 +9,10 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent]);
 
-const props = defineProps({
-  trend: {
-    type: Array,
-    default: () => [],
-  },
+const props = withDefaults(defineProps<{
+  trend?: Record<string, unknown>[];
+}>(), {
+  trend: () => [],
 });
 
 const hasData = computed(() => props.trend.length > 0);

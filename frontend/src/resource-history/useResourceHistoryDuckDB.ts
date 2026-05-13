@@ -12,20 +12,135 @@
  */
 
 import { ref, readonly } from 'vue';
-import { getDuckDBClient, fetchParquetBuffer } from '../core/duckdb-client.js';
+import { getDuckDBClient, fetchParquetBuffer } from '../core/duckdb-client';
+import type { DuckDBClient } from '../core/duckdb-client';
 
 const TABLE_NAME = 'resource_history_data';
 
+// ── Resource metadata shape ───────────────────────────────────────────────────
+
+interface ResourceMeta {
+  workcenter?: unknown;
+  workcenter_seq?: unknown;
+  family?: unknown;
+  resource?: unknown;
+}
+
+type ResourceMetadataMap = Record<string, ResourceMeta>;
+
+// ── KPI result shapes ─────────────────────────────────────────────────────────
+
+interface LocalKpi {
+  ou_pct: number;
+  availability_pct: number;
+  oee_pct: null;
+  yield_pct: null;
+  trackout_qty: number;
+  ng_qty: number;
+  prd_hours: number;
+  prd_pct: number;
+  sby_hours: number;
+  sby_pct: number;
+  udt_hours: number;
+  udt_pct: number;
+  sdt_hours: number;
+  sdt_pct: number;
+  egt_hours: number;
+  egt_pct: number;
+  nst_hours: number;
+  nst_pct: number;
+  machine_count: number;
+}
+
+interface TrendItem {
+  date: string;
+  ou_pct: number;
+  availability_pct: number;
+  oee_pct: null;
+  yield_pct: null;
+  prd_hours: number;
+  sby_hours: number;
+  udt_hours: number;
+  sdt_hours: number;
+  egt_hours: number;
+  nst_hours: number;
+}
+
+interface HeatmapItem {
+  workcenter: string;
+  workcenter_seq: number;
+  date: string;
+  ou_pct: number;
+  oee_pct: null;
+  availability_pct: number;
+}
+
+interface ComparisonItem {
+  workcenter: string;
+  ou_pct: number;
+  prd_hours: number;
+  machine_count: number;
+}
+
+interface DetailItem {
+  workcenter: string;
+  workcenter_seq: number;
+  family: string;
+  resource: string;
+  ou_pct: number;
+  oee_pct: null;
+  availability_pct: number;
+  yield_pct: null;
+  trackout_qty: number;
+  ng_qty: number;
+  prd_hours: number;
+  prd_pct: number;
+  sby_hours: number;
+  sby_pct: number;
+  udt_hours: number;
+  udt_pct: number;
+  sdt_hours: number;
+  sdt_pct: number;
+  egt_hours: number;
+  egt_pct: number;
+  nst_hours: number;
+  nst_pct: number;
+  machine_count: number;
+}
+
+interface SummaryResult {
+  kpi: LocalKpi;
+  trend: TrendItem[];
+  heatmap: HeatmapItem[];
+  workcenter_comparison: ComparisonItem[];
+}
+
+interface DetailResult {
+  data: DetailItem[];
+  total: number;
+  truncated: boolean;
+  max_records: null;
+}
+
+interface ComputeViewResult {
+  summary: SummaryResult;
+  detail: DetailResult;
+}
+
+interface ComputeViewOptions {
+  granularity?: string;
+}
+
 // ── SQL helpers ───────────────────────────────────────────────────────────────
 
-function qid(name) {
+function qid(name: string): string {
   return '"' + String(name).replace(/"/g, '""') + '"';
 }
 
-function granularityExpr(col) {
+function granularityExpr(col: string): (granularity: string) => string {
   // Returns a SQL expression that truncates the date column to the given granularity.
   // Returns a closure so it can be used at query time.
-  return (granularity) => {
+  return (granularity: string): string => {
     const q = qid(col);
     switch (granularity) {
       case 'year':  return `strftime(CAST(${q} AS DATE), '%Y')`;
@@ -40,27 +155,27 @@ const datePeriod = granularityExpr('DATA_DATE');
 
 // ── KPI calculations (mirrors Python) ─────────────────────────────────────────
 
-function sf(val, def = 0) {
+function sf(val: unknown, def = 0): number {
   const n = Number(val);
   return isNaN(n) ? def : n;
 }
 
-function calcOuPct(prd, sby, udt, sdt, egt) {
+function calcOuPct(prd: number, sby: number, udt: number, sdt: number, egt: number): number {
   const denom = prd + sby + udt + sdt + egt;
   return denom > 0 ? Math.round((prd / denom) * 1000) / 10 : 0;
 }
 
-function calcAvailPct(prd, sby, udt, sdt, egt, nst) {
+function calcAvailPct(prd: number, sby: number, udt: number, sdt: number, egt: number, nst: number): number {
   const num = prd + sby + egt;
   const denom = prd + sby + egt + sdt + udt + nst;
   return denom > 0 ? Math.round((num / denom) * 1000) / 10 : 0;
 }
 
-function statusPct(val, total) {
+function statusPct(val: number, total: number): number {
   return total > 0 ? Math.round((val / total) * 1000) / 10 : 0;
 }
 
-function buildKpiFromRow(row) {
+function buildKpiFromRow(row: Record<string, unknown>): LocalKpi {
   const prd = sf(row.prd_hours);
   const sby = sf(row.sby_hours);
   const udt = sf(row.udt_hours);
@@ -91,10 +206,10 @@ function buildKpiFromRow(row) {
   };
 }
 
-function emptyKpi() {
+function emptyKpi(): LocalKpi {
   return {
     ou_pct: 0, availability_pct: 0,
-    oee_pct: 0, yield_pct: 0,
+    oee_pct: null, yield_pct: null,
     trackout_qty: 0, ng_qty: 0,
     prd_hours: 0, prd_pct: 0,
     sby_hours: 0, sby_pct: 0,
@@ -108,7 +223,7 @@ function emptyKpi() {
 
 // ── Sub-view queries ──────────────────────────────────────────────────────────
 
-async function queryKpi(client) {
+async function queryKpi(client: DuckDBClient): Promise<LocalKpi> {
   const sql = `
     SELECT
       SUM(COALESCE(${qid('PRD_HOURS')}, 0)) AS prd_hours,
@@ -122,10 +237,10 @@ async function queryKpi(client) {
   `;
   const rows = await client.sendQuery(sql);
   if (!rows.length) return emptyKpi();
-  return buildKpiFromRow(rows[0]);
+  return buildKpiFromRow(rows[0] as Record<string, unknown>);
 }
 
-async function queryTrend(client, granularity) {
+async function queryTrend(client: DuckDBClient, granularity: string): Promise<TrendItem[]> {
   const period = datePeriod(granularity);
   const sql = `
     SELECT
@@ -141,7 +256,8 @@ async function queryTrend(client, granularity) {
     ORDER BY 1
   `;
   const rows = await client.sendQuery(sql);
-  return rows.map(row => {
+  return rows.map((rawRow) => {
+    const row = rawRow as Record<string, unknown>;
     const prd = sf(row.prd_hours);
     const sby = sf(row.sby_hours);
     const udt = sf(row.udt_hours);
@@ -152,8 +268,8 @@ async function queryTrend(client, granularity) {
       date: String(row.period || ''),
       ou_pct: calcOuPct(prd, sby, udt, sdt, egt),
       availability_pct: calcAvailPct(prd, sby, udt, sdt, egt, nst),
-      oee_pct: null,
-      yield_pct: null,
+      oee_pct: null as null,
+      yield_pct: null as null,
       prd_hours: Math.round(prd * 10) / 10,
       sby_hours: Math.round(sby * 10) / 10,
       udt_hours: Math.round(udt * 10) / 10,
@@ -164,7 +280,7 @@ async function queryTrend(client, granularity) {
   });
 }
 
-async function queryByHistoryId(client) {
+async function queryByHistoryId(client: DuckDBClient): Promise<unknown[]> {
   // Aggregate by HISTORYID for heatmap, comparison, and detail derivation
   const sql = `
     SELECT
@@ -182,7 +298,7 @@ async function queryByHistoryId(client) {
   return client.sendQuery(sql);
 }
 
-async function queryByHistoryIdAndDate(client, granularity) {
+async function queryByHistoryIdAndDate(client: DuckDBClient, granularity: string): Promise<unknown[]> {
   // Used for heatmap: HISTORYID × period → hours
   const period = datePeriod(granularity);
   const sql = `
@@ -203,14 +319,15 @@ async function queryByHistoryIdAndDate(client, granularity) {
 
 // ── Derivation from raw query rows + resource_metadata ───────────────────────
 
-function deriveHeatmap(heatmapRows, resourceMetadata) {
+function deriveHeatmap(heatmapRows: unknown[], resourceMetadata: ResourceMetadataMap): HeatmapItem[] {
   // Aggregate by workcenter_group × period
-  const wcSeqMap = {};
-  const agg = {}; // key: "wc|period"
+  const wcSeqMap: Record<string, number> = {};
+  const agg: Record<string, { wc: string; period: string; prd: number; sby: number; udt: number; sdt: number; egt: number; nst: number }> = {};
 
-  for (const row of heatmapRows) {
+  for (const rawRow of heatmapRows) {
+    const row = rawRow as Record<string, unknown>;
     const meta = resourceMetadata[String(row.historyid || '')] || {};
-    const wc = meta.workcenter || '';
+    const wc = String(meta.workcenter || '');
     if (!wc) continue;
     const wcSeq = Number(meta.workcenter_seq ?? 999);
     wcSeqMap[wc] = wcSeq;
@@ -225,7 +342,7 @@ function deriveHeatmap(heatmapRows, resourceMetadata) {
     agg[key].egt += sf(row.egt_hours);
   }
 
-  const items = Object.values(agg).map(a => ({
+  const items: HeatmapItem[] = Object.values(agg).map((a) => ({
     workcenter: a.wc,
     workcenter_seq: wcSeqMap[a.wc] ?? 999,
     date: a.period,
@@ -240,11 +357,12 @@ function deriveHeatmap(heatmapRows, resourceMetadata) {
   return items;
 }
 
-function deriveComparison(byHistoryRows, resourceMetadata) {
-  const agg = {}; // wc_group → { prd, sby, udt, sdt, egt, mc }
-  for (const row of byHistoryRows) {
+function deriveComparison(byHistoryRows: unknown[], resourceMetadata: ResourceMetadataMap): ComparisonItem[] {
+  const agg: Record<string, { prd: number; sby: number; udt: number; sdt: number; egt: number; mc: number }> = {};
+  for (const rawRow of byHistoryRows) {
+    const row = rawRow as Record<string, unknown>;
     const meta = resourceMetadata[String(row.historyid || '')] || {};
-    const wc = meta.workcenter || '';
+    const wc = String(meta.workcenter || '');
     if (!wc) continue;
     if (!agg[wc]) agg[wc] = { prd: 0, sby: 0, udt: 0, sdt: 0, egt: 0, mc: 0 };
     agg[wc].prd += sf(row.prd_hours);
@@ -254,7 +372,7 @@ function deriveComparison(byHistoryRows, resourceMetadata) {
     agg[wc].egt += sf(row.egt_hours);
     agg[wc].mc += 1;
   }
-  const items = Object.entries(agg).map(([wc, d]) => ({
+  const items: ComparisonItem[] = Object.entries(agg).map(([wc, d]) => ({
     workcenter: wc,
     ou_pct: calcOuPct(d.prd, d.sby, d.udt, d.sdt, d.egt),
     prd_hours: Math.round(d.prd * 10) / 10,
@@ -264,9 +382,10 @@ function deriveComparison(byHistoryRows, resourceMetadata) {
   return items;
 }
 
-function deriveDetail(byHistoryRows, resourceMetadata) {
-  const data = [];
-  for (const row of byHistoryRows) {
+function deriveDetail(byHistoryRows: unknown[], resourceMetadata: ResourceMetadataMap): DetailResult {
+  const data: DetailItem[] = [];
+  for (const rawRow of byHistoryRows) {
+    const row = rawRow as Record<string, unknown>;
     const meta = resourceMetadata[String(row.historyid || '')] || {};
     if (!meta.workcenter) continue;
     const prd = sf(row.prd_hours);
@@ -277,10 +396,10 @@ function deriveDetail(byHistoryRows, resourceMetadata) {
     const nst = sf(row.nst_hours);
     const total = sf(row.total_hours);
     data.push({
-      workcenter: meta.workcenter,
+      workcenter: String(meta.workcenter),
       workcenter_seq: Number(meta.workcenter_seq ?? 999),
-      family: meta.family || '',
-      resource: meta.resource || '',
+      family: String(meta.family || ''),
+      resource: String(meta.resource || ''),
       ou_pct: calcOuPct(prd, sby, udt, sdt, egt),
       oee_pct: null,
       availability_pct: calcAvailPct(prd, sby, udt, sdt, egt, nst),
@@ -316,16 +435,16 @@ export function useResourceHistoryDuckDB() {
   const isActive = ref(false);
   const isLoading = ref(false);
   const error = ref('');
-  let _client = null;
+  let _client: DuckDBClient | null = null;
   let _isRegistered = false;
-  let _resourceMetadata = {}; // HISTORYID → { workcenter, workcenter_seq, family, resource }
+  let _resourceMetadata: ResourceMetadataMap = {};
 
   /**
    * Activate local compute mode.
-   * @param {string} spoolUrl        - Spool Parquet download URL
-   * @param {object} resourceMetadata - HISTORYID → dimension mapping from server response
+   * @param spoolUrl        - Spool Parquet download URL
+   * @param resourceMetadata - HISTORYID → dimension mapping from server response
    */
-  async function activate(spoolUrl, resourceMetadata) {
+  async function activate(spoolUrl: string, resourceMetadata: Record<string, unknown>): Promise<void> {
     isLoading.value = true;
     error.value = '';
     try {
@@ -333,11 +452,11 @@ export function useResourceHistoryDuckDB() {
       await _client.init();
       const buffer = await fetchParquetBuffer(spoolUrl);
       await _client.registerParquet(TABLE_NAME, buffer);
-      _resourceMetadata = resourceMetadata || {};
+      _resourceMetadata = (resourceMetadata || {}) as ResourceMetadataMap;
       _isRegistered = true;
       isActive.value = true;
     } catch (err) {
-      error.value = String(err?.message ?? err);
+      error.value = String((err as Error)?.message ?? err);
       isActive.value = false;
       console.warn('[resource-history] DuckDB activation failed:', err);
       throw err;
@@ -348,10 +467,10 @@ export function useResourceHistoryDuckDB() {
 
   /**
    * Compute all views locally (mirrors resource_dataset_cache.py derivation).
-   * @param {string} granularity - 'day' | 'week' | 'month' | 'year'
+   * @param options.granularity - 'day' | 'week' | 'month' | 'year'
    * @returns {{ summary, detail }}
    */
-  async function computeView({ granularity = 'day' } = {}) {
+  async function computeView({ granularity = 'day' }: ComputeViewOptions = {}): Promise<ComputeViewResult> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
 
     const [kpiResult, trendResult, byHistoryResult, heatmapResult] = await Promise.all([
@@ -361,7 +480,7 @@ export function useResourceHistoryDuckDB() {
       queryByHistoryIdAndDate(_client, granularity),
     ]);
 
-    const summary = {
+    const summary: SummaryResult = {
       kpi: kpiResult,
       trend: trendResult,
       heatmap: deriveHeatmap(heatmapResult, _resourceMetadata),
@@ -374,7 +493,7 @@ export function useResourceHistoryDuckDB() {
   }
 
   /** Tear down local mode and release DuckDB resources. */
-  function deactivate() {
+  function deactivate(): void {
     if (_client) {
       _client.destroy();
       _client = null;

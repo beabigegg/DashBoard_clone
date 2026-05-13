@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { BarChart } from 'echarts/charts';
@@ -9,11 +9,10 @@ import VChart from 'vue-echarts';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent]);
 
-const props = defineProps({
-  comparison: {
-    type: Array,
-    default: () => [],
-  },
+const props = withDefaults(defineProps<{
+  comparison?: Record<string, unknown>[];
+}>(), {
+  comparison: () => [],
 });
 
 const rankedData = computed(() => {
@@ -31,11 +30,13 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
-      formatter(params) {
-        if (!Array.isArray(params) || !params.length) {
+      // TODO: type echarts callback
+      formatter(params: unknown) {
+        const paramsList = params as Record<string, unknown>[];
+        if (!Array.isArray(paramsList) || !paramsList.length) {
           return '';
         }
-        const idx = Number(params[0].dataIndex || 0);
+        const idx = Number((paramsList[0] as Record<string, unknown>).dataIndex || 0);
         const row = rows[idx] || {};
         return `${row.workcenter || '--'}<br/>OU%: <b>${Number(row.ou_pct || 0).toFixed(1)}%</b><br/>機台數: ${
           Number(row.machine_count || 0)

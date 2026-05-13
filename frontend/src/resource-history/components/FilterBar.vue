@@ -1,38 +1,46 @@
-<script setup>
+<script setup lang="ts">
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
+import type { MachineOption } from '../../core/resource-history-filters';
 
-const GRANULARITY_ITEMS = [
+interface GranularityItem {
+  key: string;
+  label: string;
+}
+
+interface FilterOptions {
+  workcenterGroups: (string | number | Record<string, unknown>)[];
+  families: (string | number | Record<string, unknown>)[];
+}
+
+
+const GRANULARITY_ITEMS: GranularityItem[] = [
   { key: 'day', label: '日' },
   { key: 'week', label: '週' },
   { key: 'month', label: '月' },
   { key: 'year', label: '年' },
 ];
 
-const props = defineProps({
-  filters: {
-    type: Object,
-    required: true,
-  },
-  options: {
-    type: Object,
-    default: () => ({
-      workcenterGroups: [],
-      families: [],
-    }),
-  },
-  machineOptions: {
-    type: Array,
-    default: () => [],
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
+const props = withDefaults(defineProps<{
+  filters: Record<string, unknown>;
+  options?: FilterOptions;
+  machineOptions?: MachineOption[];
+  loading?: boolean;
+}>(), {
+  options: () => ({
+    workcenterGroups: [],
+    families: [],
+  }),
+  machineOptions: () => [],
+  loading: false,
 });
 
-const emit = defineEmits(['update-filters', 'query', 'clear']);
+const emit = defineEmits<{
+  'update-filters': [filters: Record<string, unknown>];
+  'query': [];
+  'clear': [];
+}>();
 
-function updateFilters(patch) {
+function updateFilters(patch: Record<string, unknown>): void {
   emit('update-filters', {
     ...props.filters,
     ...patch,
@@ -49,9 +57,9 @@ function updateFilters(patch) {
           <input
             id="history-start-date"
             type="date"
-            :value="filters.startDate"
+            :value="(filters.startDate as string)"
             :disabled="loading"
-            @input="updateFilters({ startDate: $event.target.value })"
+            @input="updateFilters({ startDate: ($event.target as HTMLInputElement).value })"
           />
         </div>
 
@@ -60,9 +68,9 @@ function updateFilters(patch) {
           <input
             id="history-end-date"
             type="date"
-            :value="filters.endDate"
+            :value="(filters.endDate as string)"
             :disabled="loading"
-            @input="updateFilters({ endDate: $event.target.value })"
+            @input="updateFilters({ endDate: ($event.target as HTMLInputElement).value })"
           />
         </div>
 
@@ -86,7 +94,7 @@ function updateFilters(patch) {
         <div class="filter-field">
           <label>工站群組</label>
           <MultiSelect
-            :model-value="filters.workcenterGroups"
+            :model-value="(filters.workcenterGroups as string[])"
             :options="options.workcenterGroups"
             :disabled="loading"
             placeholder="全部站點"
@@ -97,7 +105,7 @@ function updateFilters(patch) {
         <div class="filter-field">
           <label>型號</label>
           <MultiSelect
-            :model-value="filters.families"
+            :model-value="(filters.families as string[])"
             :options="options.families"
             :disabled="loading"
             placeholder="全部型號"
@@ -108,8 +116,8 @@ function updateFilters(patch) {
         <div class="filter-field">
           <label>機台</label>
           <MultiSelect
-            :model-value="filters.machines"
-            :options="machineOptions"
+            :model-value="(filters.machines as string[])"
+            :options="(machineOptions as unknown as (string | number | Record<string, unknown>)[])"
             :disabled="loading"
             placeholder="全部機台"
             searchable
@@ -121,27 +129,27 @@ function updateFilters(patch) {
           <label class="checkbox-pill">
             <input
               type="checkbox"
-              :checked="filters.isProduction"
+              :checked="(filters.isProduction as boolean)"
               :disabled="loading"
-              @change="updateFilters({ isProduction: $event.target.checked })"
+              @change="updateFilters({ isProduction: ($event.target as HTMLInputElement).checked })"
             />
             生產設備
           </label>
           <label class="checkbox-pill">
             <input
               type="checkbox"
-              :checked="filters.isKey"
+              :checked="(filters.isKey as boolean)"
               :disabled="loading"
-              @change="updateFilters({ isKey: $event.target.checked })"
+              @change="updateFilters({ isKey: ($event.target as HTMLInputElement).checked })"
             />
             重點設備
           </label>
           <label class="checkbox-pill">
             <input
               type="checkbox"
-              :checked="filters.isMonitor"
+              :checked="(filters.isMonitor as boolean)"
               :disabled="loading"
-              @change="updateFilters({ isMonitor: $event.target.checked })"
+              @change="updateFilters({ isMonitor: ($event.target as HTMLInputElement).checked })"
             />
             監控設備
           </label>

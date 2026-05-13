@@ -25,6 +25,11 @@ a corresponding entry below.
 - Compatibility Notes: new entry for wip-hold-drilldown-filters additive changes.
 - Source: change `wip-hold-drilldown-filters`.
 
+## [ci 1.3.9] — 2026-05-13
+### Changed
+- Gate Compatibility Note added for `migrate-resource-history-ts` (Phase 3 item #15). `tsconfig.json` `include` expanded with `"src/resource-history/**/*"`, covering `main.ts`, `useResourceHistoryDuckDB.ts`, `App.vue`, and 7 component SFCs (`FilterBar.vue`, `KpiCards.vue`, `TrendChart.vue`, `StackedChart.vue`, `ComparisonChart.vue`, `HeatmapChart.vue`, `DetailSection.vue`). Gate tier unchanged (informational). Additive prose only.
+- Source: change `migrate-resource-history-ts` Phase 3.
+
 ## [ci 1.3.8] — 2026-05-13
 ### Changed
 - Gate Compatibility Note added for `migrate-qc-gate-ts` (Phase 3 item #17). `tsconfig.json` `include` expanded with `"src/qc-gate/**/*"`, covering `main.ts`, `App.vue`, `composables/useQcGateData.ts`, `components/LotTable.vue`, `components/QcGateChart.vue`. Gate tier unchanged (informational). Additive prose only.

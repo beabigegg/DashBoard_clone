@@ -1,31 +1,31 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue'
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue'
-import { buildResourceKpiFromHours } from '../../core/compute.js'
+import { buildResourceKpiFromHours } from '../../core/compute'
+import type { ResourceKpi, ResourceHours } from '../../core/compute'
 import { OU_BADGE_THRESHOLDS } from '../../resource-shared/constants'
 
-const props = defineProps({
-  kpi: {
-    type: Object,
-    default: () => ({}),
-  },
+const props = withDefaults(defineProps<{
+  kpi?: Record<string, unknown>;
+}>(), {
+  kpi: () => ({}),
 })
 
-function resolveOuAccent(value) {
+function resolveOuAccent(value: unknown): string {
   const pct = Number(value || 0)
   if (pct >= OU_BADGE_THRESHOLDS.high) return 'success'
   if (pct >= OU_BADGE_THRESHOLDS.medium) return 'warning'
   return 'danger'
 }
 
-function formatHours(value) {
+function formatHours(value: unknown): string {
   const hours = Number(value || 0)
   if (hours >= 1000) return `${(hours / 1000).toFixed(1)}K`
   return `${hours.toFixed(1)}`
 }
 
-const kpi = computed(() => ({
+const kpi = computed((): ResourceKpi & ResourceHours & { machine_count?: number | null } => ({
   ...props.kpi,
   ...buildResourceKpiFromHours(props.kpi),
 }))

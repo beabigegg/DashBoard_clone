@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { BarChart } from 'echarts/charts';
@@ -11,17 +11,16 @@ import { STATUS_COLORS } from '../../resource-shared/constants';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent]);
 
-function resolveCssVar(varExpr) {
+function resolveCssVar(varExpr: unknown): string {
   const match = String(varExpr).match(/var\((--[\w-]+)\)/);
-  if (!match) return varExpr;
+  if (!match) return String(varExpr);
   return getComputedStyle(document.documentElement).getPropertyValue(match[1]).trim();
 }
 
-const props = defineProps({
-  trend: {
-    type: Array,
-    default: () => [],
-  },
+const props = withDefaults(defineProps<{
+  trend?: Record<string, unknown>[];
+}>(), {
+  trend: () => [],
 });
 
 const hasData = computed(() => props.trend.length > 0);
@@ -35,19 +34,21 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
-      formatter(params) {
-        if (!Array.isArray(params) || !params.length) {
+      // TODO: type echarts callback
+      formatter(params: unknown) {
+        const paramsList = params as Record<string, unknown>[];
+        if (!Array.isArray(paramsList) || !paramsList.length) {
           return '';
         }
 
-        const index = Number(params[0].dataIndex || 0);
+        const index = Number((paramsList[0] as Record<string, unknown>).dataIndex || 0);
         const current = trend[index] || {};
         const total = statuses.reduce(
           (sum, status) => sum + Number(current[`${status.toLowerCase()}_hours`] || 0),
           0
         );
 
-        const lines = params.map((item) => {
+        const lines = paramsList.map((item) => {
           const value = Number(item.value || 0);
           const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
           return `${item.marker}${item.seriesName}: ${value.toFixed(1)}h (${pct}%)`;

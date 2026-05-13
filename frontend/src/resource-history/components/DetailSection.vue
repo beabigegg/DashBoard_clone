@@ -1,31 +1,55 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-import { buildResourceKpiFromHours, calcYieldPct, calcOeePct } from '../../core/compute.js';
+import { buildResourceKpiFromHours, calcYieldPct, calcOeePct } from '../../core/compute';
 import HierarchyTable from '../../resource-shared/components/HierarchyTable.vue';
 
-const props = defineProps({
-  detailData: {
-    type: Array,
-    default: () => [],
-  },
-  expandedState: {
-    type: Object,
-    default: () => ({}),
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
+const props = withDefaults(defineProps<{
+  detailData?: unknown[];
+  expandedState?: Record<string, boolean>;
+  loading?: boolean;
+}>(), {
+  detailData: () => [],
+  expandedState: () => ({}),
+  loading: false,
 });
 
-const emit = defineEmits(['toggle-row', 'toggle-all', 'export-csv']);
+const emit = defineEmits<{
+  'toggle-row': [rowId: string];
+  'toggle-all': [payload: { expand: boolean; rowIds: string[] }];
+  'export-csv': [];
+}>();
 
-function normalizeKey(value) {
+interface HourBucket {
+  prd_hours: number;
+  sby_hours: number;
+  udt_hours: number;
+  sdt_hours: number;
+  egt_hours: number;
+  nst_hours: number;
+  trackout_qty: number;
+  ng_qty: number;
+  machine_count: number;
+  [key: string]: unknown;
+}
+
+interface HierarchyNode {
+  id: string;
+  level: number;
+  name: string;
+  metrics: Record<string, unknown>;
+  children?: HierarchyNode[];
+  workcenter?: string;
+  family?: string;
+  sequence?: number;
+  familyMap?: Map<string, HierarchyNode>;
+}
+
+function normalizeKey(value: unknown): string {
   return String(value || 'unknown').replace(/[^\w\u4e00-\u9fa5-]+/g, '_');
 }
 
-function createHourBucket() {
+function createHourBucket(): HourBucket {
   return {
     prd_hours: 0,
     sby_hours: 0,
@@ -39,7 +63,7 @@ function createHourBucket() {
   };
 }
 
-function mergeHours(target, source) {
+function mergeHours(target: HourBucket, source: Record<string, unknown>): void {
   target.prd_hours += Number(source.prd_hours || 0);
   target.sby_hours += Number(source.sby_hours || 0);
   target.udt_hours += Number(source.udt_hours || 0);
@@ -51,20 +75,21 @@ function mergeHours(target, source) {
   target.machine_count += Number(source.machine_count || 1);
 }
 
-function enrichWithKpi(hours) {
+function enrichWithKpi(hours: HourBucket): Record<string, unknown> {
   return {
     ...hours,
     ...buildResourceKpiFromHours(hours),
   };
 }
 
-function buildHierarchy(data) {
-  const wcMap = new Map();
+function buildHierarchy(data: unknown[]): HierarchyNode[] {
+  const wcMap = new Map<string, HierarchyNode>();
 
-  (data || []).forEach((item, index) => {
-    const workcenter = item.workcenter || 'UNKNOWN';
-    const family = item.family || 'UNKNOWN';
-    const resourceName = item.resource || item.HISTORYID || `RESOURCE_${index + 1}`;
+  (data || []).forEach((rawItem, index) => {
+    const item = rawItem as Record<string, unknown>;
+    const workcenter = String(item.workcenter || 'UNKNOWN');
+    const family = String(item.family || 'UNKNOWN');
+    const resourceName = String(item.resource || item.HISTORYID || `RESOURCE_${index + 1}`);
     const sequence = Number(item.workcenter_seq ?? 999);
 
     if (!wcMap.has(workcenter)) {
@@ -80,10 +105,10 @@ function buildHierarchy(data) {
       });
     }
 
-    const wcNode = wcMap.get(workcenter);
+    const wcNode = wcMap.get(workcenter)!;
 
-    if (!wcNode.familyMap.has(family)) {
-      const familyNode = {
+    if (!wcNode.familyMap!.has(family)) {
+      const familyNode: HierarchyNode = {
         id: `fam_${normalizeKey(workcenter)}_${normalizeKey(family)}`,
         level: 1,
         name: family,
@@ -93,11 +118,11 @@ function buildHierarchy(data) {
         children: [],
       };
 
-      wcNode.familyMap.set(family, familyNode);
-      wcNode.children.push(familyNode);
+      wcNode.familyMap!.set(family, familyNode);
+      wcNode.children!.push(familyNode);
     }
 
-    const familyNode = wcNode.familyMap.get(family);
+    const familyNode = wcNode.familyMap!.get(family)!;
 
     const resourceMetrics = enrichWithKpi({
       prd_hours: Number(item.prd_hours || 0),
@@ -111,22 +136,22 @@ function buildHierarchy(data) {
       machine_count: Number(item.machine_count || 1),
     });
 
-    familyNode.children.push({
+    familyNode.children!.push({
       id: `res_${normalizeKey(workcenter)}_${normalizeKey(family)}_${normalizeKey(resourceName)}_${index}`,
       level: 2,
       name: resourceName,
       metrics: resourceMetrics,
     });
 
-    mergeHours(familyNode.metrics, resourceMetrics);
-    mergeHours(wcNode.metrics, resourceMetrics);
+    mergeHours(familyNode.metrics as HourBucket, resourceMetrics);
+    mergeHours(wcNode.metrics as HourBucket, resourceMetrics);
   });
 
   return [...wcMap.values()]
     .map((wcNode) => {
-      wcNode.metrics = enrichWithKpi(wcNode.metrics);
+      wcNode.metrics = enrichWithKpi(wcNode.metrics as HourBucket);
 
-      wcNode.children.sort((left, right) => {
+      wcNode.children!.sort((left, right) => {
         const diff = Number(right.metrics.machine_count || 0) - Number(left.metrics.machine_count || 0);
         if (diff !== 0) {
           return diff;
@@ -134,8 +159,8 @@ function buildHierarchy(data) {
         return String(left.name).localeCompare(String(right.name), 'zh-Hant');
       });
 
-      wcNode.children.forEach((familyNode) => {
-        familyNode.metrics = enrichWithKpi(familyNode.metrics);
+      wcNode.children!.forEach((familyNode) => {
+        familyNode.metrics = enrichWithKpi(familyNode.metrics as HourBucket);
       });
 
       delete wcNode.familyMap;
@@ -150,7 +175,7 @@ function buildHierarchy(data) {
     });
 }
 
-function formatHourPct(hours, pct) {
+function formatHourPct(hours: unknown, pct: unknown): string {
   return `${Number(hours || 0).toFixed(1)}h (${Number(pct || 0).toFixed(1)}%)`;
 }
 
@@ -161,76 +186,87 @@ const columns = computed(() => {
     {
       key: 'ou',
       label: 'OU%',
-      value: (node) => `${Number(node.metrics?.ou_pct || 0).toFixed(1)}%`,
+      // TODO: type hierarchy node union
+      value: (node: unknown) => `${Number((node as HierarchyNode).metrics?.ou_pct || 0).toFixed(1)}%`,
       className: 'col-total',
     },
     {
       key: 'oee',
       label: 'OEE%',
-      value: (node) => {
-        const t = Number(node.metrics?.trackout_qty || 0);
-        const n = Number(node.metrics?.ng_qty || 0);
-        if (t + n === 0) return '—';
-        return `${Number(node.metrics?.oee_pct || 0).toFixed(1)}%`;
+      // TODO: type hierarchy node union
+      value: (node: unknown) => {
+        const n = node as HierarchyNode;
+        const t = Number(n.metrics?.trackout_qty || 0);
+        const ng = Number(n.metrics?.ng_qty || 0);
+        if (t + ng === 0) return '—';
+        return `${Number(n.metrics?.oee_pct || 0).toFixed(1)}%`;
       },
       className: 'col-total',
     },
     {
       key: 'availability',
       label: 'AVAIL%',
-      value: (node) => `${Number(node.metrics?.availability_pct || 0).toFixed(1)}%`,
+      // TODO: type hierarchy node union
+      value: (node: unknown) => `${Number((node as HierarchyNode).metrics?.availability_pct || 0).toFixed(1)}%`,
       className: 'col-total',
     },
     {
       key: 'PRD',
       label: 'PRD',
       className: 'col-prd detail-cell',
-      value: (node) => formatHourPct(node.metrics?.prd_hours, node.metrics?.prd_pct),
+      // TODO: type hierarchy node union
+      value: (node: unknown) => { const n = node as HierarchyNode; return formatHourPct(n.metrics?.prd_hours, n.metrics?.prd_pct); },
     },
     {
       key: 'SBY',
       label: 'SBY',
       className: 'col-sby detail-cell',
-      value: (node) => formatHourPct(node.metrics?.sby_hours, node.metrics?.sby_pct),
+      // TODO: type hierarchy node union
+      value: (node: unknown) => { const n = node as HierarchyNode; return formatHourPct(n.metrics?.sby_hours, n.metrics?.sby_pct); },
     },
     {
       key: 'UDT',
       label: 'UDT',
       className: 'col-udt detail-cell',
-      value: (node) => formatHourPct(node.metrics?.udt_hours, node.metrics?.udt_pct),
+      // TODO: type hierarchy node union
+      value: (node: unknown) => { const n = node as HierarchyNode; return formatHourPct(n.metrics?.udt_hours, n.metrics?.udt_pct); },
     },
     {
       key: 'SDT',
       label: 'SDT',
       className: 'col-sdt detail-cell',
-      value: (node) => formatHourPct(node.metrics?.sdt_hours, node.metrics?.sdt_pct),
+      // TODO: type hierarchy node union
+      value: (node: unknown) => { const n = node as HierarchyNode; return formatHourPct(n.metrics?.sdt_hours, n.metrics?.sdt_pct); },
     },
     {
       key: 'EGT',
       label: 'EGT',
       className: 'col-egt detail-cell',
-      value: (node) => formatHourPct(node.metrics?.egt_hours, node.metrics?.egt_pct),
+      // TODO: type hierarchy node union
+      value: (node: unknown) => { const n = node as HierarchyNode; return formatHourPct(n.metrics?.egt_hours, n.metrics?.egt_pct); },
     },
     {
       key: 'NST',
       label: 'NST',
       className: 'col-nst detail-cell',
-      value: (node) => formatHourPct(node.metrics?.nst_hours, node.metrics?.nst_pct),
+      // TODO: type hierarchy node union
+      value: (node: unknown) => { const n = node as HierarchyNode; return formatHourPct(n.metrics?.nst_hours, n.metrics?.nst_pct); },
     },
     {
       key: 'count',
       label: 'Count',
       className: 'col-total',
-      value: (node) => Number(node.metrics?.machine_count || 0),
+      // TODO: type hierarchy node union
+      value: (node: unknown) => Number((node as HierarchyNode).metrics?.machine_count || 0),
     },
   ];
 });
 
-function handleToggleAll(expand) {
-  const rowIds = [];
+function handleToggleAll(expand: boolean): void {
+  const rowIds: string[] = [];
   hierarchy.value.forEach((wcNode) => {
     rowIds.push(wcNode.id);
-    wcNode.children.forEach((familyNode) => {
+    wcNode.children!.forEach((familyNode) => {
       rowIds.push(familyNode.id);
     });
   });

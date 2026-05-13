@@ -1,21 +1,22 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
-import { apiGet, apiPost, ensureMesApiAvailable } from '../core/api.js';
-import { unwrapApiResult } from '../core/unwrap-api-result.js';
-import { buildResourceKpiFromHours } from '../core/compute.js';
-import { checkLocalComputeEligibility } from '../core/duckdb-activation-policy.js';
+import { apiGet, apiPost, ensureMesApiAvailable } from '../core/api';
+import { unwrapApiResult } from '../core/unwrap-api-result';
+import { buildResourceKpiFromHours } from '../core/compute';
+import { checkLocalComputeEligibility } from '../core/duckdb-activation-policy';
 import {
   buildResourceHistoryQueryParams,
   deriveResourceFamilyOptions,
   deriveResourceMachineOptions,
   pruneResourceFilterSelections,
   toResourceFilterSnapshot,
-} from '../core/resource-history-filters.js';
-import { replaceRuntimeHistory } from '../core/shell-navigation.js';
-import { postExport } from '../core/post-export.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
-import { useResourceHistoryDuckDB } from './useResourceHistoryDuckDB.js';
+} from '../core/resource-history-filters';
+import type { ResourceFilterSnapshot, ResourceItem } from '../core/resource-history-filters';
+import { replaceRuntimeHistory } from '../core/shell-navigation';
+import { postExport } from '../core/post-export';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
+import { useResourceHistoryDuckDB } from './useResourceHistoryDuckDB';
 
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
@@ -64,20 +65,29 @@ const {
   dependencies: [],
 });
 
-const options = reactive({
+const options = reactive<{
+  workcenterGroups: (string | number | Record<string, unknown>)[];
+  families: (string | number | Record<string, unknown>)[];
+  resources: ResourceItem[];
+}>({
   workcenterGroups: [],
   families: [],
   resources: [],
 });
 
-const summaryData = ref({
+const summaryData = ref<{
+  kpi: Record<string, unknown>;
+  trend: Record<string, unknown>[];
+  heatmap: Record<string, unknown>[];
+  workcenter_comparison: Record<string, unknown>[];
+}>({
   kpi: {},
   trend: [],
   heatmap: [],
   workcenter_comparison: [],
 });
-const detailData = ref([]);
-const hierarchyState = reactive({});
+const detailData = ref<unknown[]>([]);
+const hierarchyState = reactive<Record<string, boolean>>({});
 
 const loading = reactive({
   initial: true,
@@ -100,7 +110,7 @@ const duckdb = useResourceHistoryDuckDB();
 const draftWatchReady = ref(false);
 let suppressDraftPrune = false;
 
-function runWithDraftPruneSuppressed(callback) {
+function runWithDraftPruneSuppressed(callback: () => void): void {
   suppressDraftPrune = true;
   try {
     callback();
@@ -115,11 +125,11 @@ function resetHierarchyState() {
   });
 }
 
-function toDateString(value) {
+function toDateString(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-function setDefaultDates(target) {
+function setDefaultDates(target: Record<string, unknown> | ResourceFilterSnapshot): void {
   const today = new Date();
   const endDate = new Date(today);
   endDate.setDate(endDate.getDate() - 1);
@@ -127,12 +137,12 @@ function setDefaultDates(target) {
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - 6);
 
-  target.startDate = toDateString(startDate);
-  target.endDate = toDateString(endDate);
+  (target as Record<string, unknown>).startDate = toDateString(startDate);
+  (target as Record<string, unknown>).endDate = toDateString(endDate);
 }
 
-function assignFilterState(target, source) {
-  const snapshot = toResourceFilterSnapshot(source);
+function assignFilterState(target: Record<string, unknown>, source: Record<string, unknown> | ResourceFilterSnapshot): void {
+  const snapshot = toResourceFilterSnapshot(source as Record<string, unknown>);
   target.startDate = snapshot.startDate;
   target.endDate = snapshot.endDate;
   target.granularity = snapshot.granularity;
@@ -144,28 +154,26 @@ function assignFilterState(target, source) {
   target.isMonitor = snapshot.isMonitor;
 }
 
-function resetToDefaultFilters(target) {
+function resetToDefaultFilters(target: Record<string, unknown>): void {
   const defaults = createDefaultFilters();
   setDefaultDates(defaults);
   assignFilterState(target, defaults);
 }
 
-// unwrapApiResult imported from ../core/unwrap-api-result.js
-
-function mergeComputedKpi(source) {
+function mergeComputedKpi(source: Record<string, unknown>): Record<string, unknown> {
   return {
     ...source,
     ...buildResourceKpiFromHours(source),
   };
 }
 
-function appendArrayParams(params, key, values) {
+function appendArrayParams(params: URLSearchParams, key: string, values: string[]): void {
   for (const value of values || []) {
     params.append(key, value);
   }
 }
 
-function buildQueryStringFromFilters(filters) {
+function buildQueryStringFromFilters(filters: Record<string, unknown>): string {
   const queryParams = buildResourceHistoryQueryParams(filters);
   const params = new URLSearchParams();
 
@@ -189,7 +197,7 @@ function buildQueryStringFromFilters(filters) {
   return params.toString();
 }
 
-function readArrayParam(params, key) {
+function readArrayParam(params: URLSearchParams, key: string): string[] {
   const repeated = params.getAll(key).map((value) => String(value || '').trim()).filter(Boolean);
   if (repeated.length > 0) {
     return repeated;
@@ -200,7 +208,7 @@ function readArrayParam(params, key) {
     .filter(Boolean);
 }
 
-function readBooleanParam(params, key) {
+function readBooleanParam(params: URLSearchParams, key: string): boolean {
   const value = String(params.get(key) || '').trim().toLowerCase();
   return value === '1' || value === 'true' || value === 'yes';
 }
@@ -248,14 +256,14 @@ function updateUrlState() {
   replaceRuntimeHistory(nextUrl);
 }
 
-function validateDateRange(filters) {
+function validateDateRange(filters: Record<string, unknown>): string {
   if (!filters.startDate || !filters.endDate) {
     return '請先設定開始與結束日期';
   }
 
-  const start = new Date(filters.startDate);
-  const end = new Date(filters.endDate);
-  const diffDays = (end - start) / (1000 * 60 * 60 * 24);
+  const start = new Date(String(filters.startDate));
+  const end = new Date(String(filters.endDate));
+  const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
 
   if (diffDays < 0) {
     return '結束日期必須大於起始日期';
@@ -276,12 +284,12 @@ async function loadOptions() {
       silent: true,
     });
 
-    const payload = unwrapApiResult(response, '載入篩選選項失敗');
-    const data = payload.data || {};
+    const payload = unwrapApiResult(response, '載入篩選選項失敗') as Record<string, unknown>;
+    const data = (payload?.data || {}) as Record<string, unknown>;
 
-    options.workcenterGroups = Array.isArray(data.workcenter_groups) ? data.workcenter_groups : [];
-    options.families = Array.isArray(data.families) ? data.families : [];
-    options.resources = Array.isArray(data.resources) ? data.resources : [];
+    options.workcenterGroups = Array.isArray(data.workcenter_groups) ? (data.workcenter_groups as (string | number | Record<string, unknown>)[]) : [];
+    options.families = Array.isArray(data.families) ? (data.families as (string | number | Record<string, unknown>)[]) : [];
+    options.resources = Array.isArray(data.resources) ? (data.resources as ResourceItem[]) : [];
   } finally {
     loading.options = false;
   }
@@ -302,8 +310,8 @@ const filterBarOptions = computed(() => {
   };
 });
 
-function formatPruneHint(removed) {
-  const parts = [];
+function formatPruneHint(removed: { families: string[]; machines: string[] }): string {
+  const parts: string[] = [];
   if (removed.families.length > 0) {
     parts.push(`型號: ${removed.families.join(', ')}`);
   }
@@ -316,7 +324,7 @@ function formatPruneHint(removed) {
   return `已自動清除失效篩選：${parts.join('；')}`;
 }
 
-function pruneDraftSelections({ showHint = true } = {}) {
+function pruneDraftSelections({ showHint = true }: { showHint?: boolean } = {}): ReturnType<typeof pruneResourceFilterSelections> {
   const result = pruneResourceFilterSelections(draftFilters, {
     familyOptions: familyOptions.value,
     machineOptions: machineOptions.value,
@@ -359,7 +367,7 @@ watch(pruneSignature, () => {
  * Build a snapshot string of "primary" params (those that require a new Oracle query).
  * Granularity is NOT primary — it can be re-derived from cache.
  */
-function buildPrimarySnapshot(filters) {
+function buildPrimarySnapshot(filters: Record<string, unknown>): string {
   const p = buildResourceHistoryQueryParams(filters);
   return JSON.stringify({
     start_date: p.start_date,
@@ -373,16 +381,16 @@ function buildPrimarySnapshot(filters) {
   });
 }
 
-function applyViewResult(result) {
-  const summary = result.summary || {};
+function applyViewResult(result: Record<string, unknown>): void {
+  const summary = (result.summary || {}) as Record<string, unknown>;
   summaryData.value = {
-    kpi: mergeComputedKpi(summary.kpi || {}),
-    trend: (summary.trend || []).map((item) => mergeComputedKpi(item || {})),
-    heatmap: summary.heatmap || [],
-    workcenter_comparison: summary.workcenter_comparison || [],
+    kpi: mergeComputedKpi((summary.kpi || {}) as Record<string, unknown>),
+    trend: ((summary.trend || []) as Record<string, unknown>[]).map((item) => mergeComputedKpi(item || {})),
+    heatmap: (summary.heatmap || []) as Record<string, unknown>[],
+    workcenter_comparison: (summary.workcenter_comparison || []) as Record<string, unknown>[],
   };
 
-  const detail = result.detail || {};
+  const detail = (result.detail || {}) as Record<string, unknown>;
   detailData.value = Array.isArray(detail.data) ? detail.data : [];
   resetHierarchyState();
 
@@ -431,26 +439,30 @@ async function executePrimaryQuery() {
       silent: true,
     });
 
-    const payload = unwrapApiResult(response, '查詢失敗');
-    const responseData = payload.data;
-    queryId.value = responseData.query_id || '';
+    const payload = unwrapApiResult(response, '查詢失敗') as Record<string, unknown>;
+    const responseData = (payload?.data || {}) as Record<string, unknown>;
+    queryId.value = String(responseData.query_id || '');
     lastPrimarySnapshot.value = buildPrimarySnapshot(committedFilters);
     applyViewResult(responseData);
 
     // Attempt to activate local compute (Task 3.2). Deactivate any previous session first.
     duckdb.deactivate();
     const { eligible } = checkLocalComputeEligibility({
-      spoolDownloadUrl: responseData.spool_download_url,
-      totalRowCount: responseData.total_row_count,
+      spoolDownloadUrl: (responseData.spool_download_url as string | undefined) ?? undefined,
+      totalRowCount: Number(responseData.total_row_count || 0),
     });
     if (eligible) {
       try {
-        await duckdb.activate(responseData.spool_download_url, responseData.resource_metadata || {});
+        await duckdb.activate(
+          responseData.spool_download_url as string,
+          (responseData.resource_metadata || {}) as Record<string, unknown>,
+        );
       } catch (_) {
         // Activation failed — remain in server-view mode (Task 3.3)
       }
     }
-  } catch (error) {
+  } catch (err) {
+    const error = err as Error & { name?: string; status?: number };
     if (error?.name === 'AbortError') {
       queryError.value = '查詢逾時，請縮小日期範圍或資源篩選後重試';
     } else {
@@ -482,9 +494,9 @@ async function refreshView() {
     if (duckdb.isActive.value) {
       try {
         const result = await duckdb.computeView({
-          granularity: committedFilters.granularity || 'day',
+          granularity: String(committedFilters.granularity || 'day'),
         });
-        applyViewResult(result);
+        applyViewResult(result as unknown as Record<string, unknown>);
         return;
       } catch (localErr) {
         // Task 3.3: Local compute failed — fall through to server /view
@@ -499,19 +511,20 @@ async function refreshView() {
       silent: true,
       params: {
         query_id: queryId.value,
-        granularity: committedFilters.granularity || 'day',
+        granularity: String(committedFilters.granularity || 'day'),
       },
     });
 
-    if (response?.success === false && response?.error === 'cache_expired') {
+    if ((response as Record<string, unknown>)?.success === false && String((response as Record<string, unknown>)?.error || '') === 'cache_expired') {
       duckdb.deactivate();
       await executePrimaryQuery();
       return;
     }
 
-    const payload = unwrapApiResult(response, '查詢失敗');
-    applyViewResult(payload.data);
-  } catch (error) {
+    const payload = unwrapApiResult(response, '查詢失敗') as Record<string, unknown>;
+    applyViewResult(payload.data as Record<string, unknown>);
+  } catch (err) {
+    const error = err as Error & { status?: number };
     if (error?.message === 'cache_expired' || error?.status === 410) {
       duckdb.deactivate();
       await executePrimaryQuery();
@@ -551,24 +564,24 @@ async function clearFilters() {
   await executePrimaryQuery();
 }
 
-function updateFilters(nextFilters) {
+function updateFilters(nextFilters: Record<string, unknown>): void {
   runWithDraftPruneSuppressed(() => {
     assignFilterState(draftFilters, nextFilters);
   });
   pruneDraftSelections({ showHint: true });
 }
 
-function handleToggleRow(rowId) {
+function handleToggleRow(rowId: string): void {
   hierarchyState[rowId] = !hierarchyState[rowId];
 }
 
-function handleToggleAllRows({ expand, rowIds }) {
+function handleToggleAllRows({ expand, rowIds }: { expand: boolean; rowIds?: string[] }): void {
   (rowIds || []).forEach((rowId) => {
     hierarchyState[rowId] = Boolean(expand);
   });
 }
 
-async function exportCsv() {
+async function exportCsv(): Promise<void> {
   if (!committedFilters.startDate || !committedFilters.endDate) {
     queryError.value = '請先設定查詢條件';
     return;
@@ -579,13 +592,13 @@ async function exportCsv() {
   const filename = `resource_history_${committedFilters.startDate}_to_${committedFilters.endDate}.csv`;
   try {
     await postExport('/api/resource/history/export', queryParams, filename);
-  } catch (error) {
-    queryError.value = error?.message || 'CSV 匯出失敗';
+  } catch (err) {
+    queryError.value = (err as Error)?.message || 'CSV 匯出失敗';
     exportMessage.value = '';
   }
 }
 
-async function initPage() {
+async function initPage(): Promise<void> {
   resetToDefaultFilters(committedFilters);
   restoreCommittedFiltersFromUrl();
   runWithDraftPruneSuppressed(() => {
@@ -596,8 +609,8 @@ async function initPage() {
     await loadOptions();
     pruneDraftSelections({ showHint: true });
     assignFilterState(committedFilters, draftFilters);
-  } catch (error) {
-    queryError.value = error?.message || '載入篩選選項失敗';
+  } catch (err) {
+    queryError.value = (err as Error)?.message || '載入篩選選項失敗';
   }
 
   draftWatchReady.value = true;
