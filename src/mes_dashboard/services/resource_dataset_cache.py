@@ -35,12 +35,23 @@ logger = logging.getLogger("mes_dashboard.resource_dataset_cache")
 
 from mes_dashboard.config.constants import CACHE_TTL_DATASET
 _CACHE_TTL = CACHE_TTL_DATASET
+_HISTORICAL_TTL = int(os.getenv("RESOURCE_HISTORY_HISTORICAL_TTL", "86400"))
 _CACHE_MAX_SIZE = 1
 _RESOURCE_ENGINE_PARALLEL = max(1, int(os.getenv("RESOURCE_ENGINE_PARALLEL", "1")))
 _REDIS_NAMESPACE = "resource_dataset"
 _OEE_REDIS_NAMESPACE = "resource_oee"
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
+
+
+def _get_cache_ttl(end_date: str) -> int:
+    """Return 24h TTL for immutable historical queries (end_date < today-2d), 2h otherwise."""
+    try:
+        if date.fromisoformat(end_date) < date.today() - timedelta(days=2):
+            return _HISTORICAL_TTL
+    except (ValueError, TypeError):
+        pass
+    return _CACHE_TTL
 register_process_cache(
     "resource_dataset", _dataset_cache, "Resource Dataset (L1, 15min)"
 )
@@ -82,10 +93,10 @@ def _has_cached_df(query_id: str) -> bool:
     return get_spool_file_path(_REDIS_NAMESPACE, query_id) is not None
 
 
-def _store_df(query_id: str, df: pd.DataFrame) -> None:
+def _store_df(query_id: str, df: pd.DataFrame, end_date: str = "") -> None:
     """Write to spool; L1 gets lightweight marker."""
     _dataset_cache.set(query_id, True)  # lightweight marker
-    store_spooled_df(_REDIS_NAMESPACE, query_id, df, ttl_seconds=_CACHE_TTL)
+    store_spooled_df(_REDIS_NAMESPACE, query_id, df, ttl_seconds=_get_cache_ttl(end_date))
 
 
 def _has_cached_oee_df(query_id: str) -> bool:
@@ -93,9 +104,9 @@ def _has_cached_oee_df(query_id: str) -> bool:
     return get_spool_file_path(_OEE_REDIS_NAMESPACE, query_id) is not None
 
 
-def _store_oee_df(query_id: str, df: pd.DataFrame) -> None:
+def _store_oee_df(query_id: str, df: pd.DataFrame, end_date: str = "") -> None:
     """Write OEE data to separate spool."""
-    store_spooled_df(_OEE_REDIS_NAMESPACE, query_id, df, ttl_seconds=_CACHE_TTL)
+    store_spooled_df(_OEE_REDIS_NAMESPACE, query_id, df, ttl_seconds=_get_cache_ttl(end_date))
 
 
 # ============================================================
@@ -215,175 +226,201 @@ def execute_primary_query(
                 "detail": _empty_detail(),
             }
 
-        from mes_dashboard.services.batch_query_engine import (
-            decompose_by_time_range,
-            execute_plan,
-            get_batch_progress,
-            merge_chunks_to_spool,
-            compute_query_hash,
-            should_decompose_by_time,
-        )
-        from concurrent.futures import ThreadPoolExecutor
-
-        base_sql = _load_sql("base_facts")
-        base_sql = base_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
-
-        oee_sql = _load_sql("oee_facts")
-
-        # Compute reject date window (±30 days)
-        _reject_start = (
-            date.fromisoformat(start_date) - timedelta(days=30)
-        ).isoformat()
-        _reject_end = (
-            date.fromisoformat(end_date) + timedelta(days=30)
-        ).isoformat()
-
-        def _query_base_direct():
-            params = {"start_date": start_date, "end_date": end_date}
-            df = read_sql_df(
-                base_sql, params,
-                caller="resource_dataset_cache:execute_primary_query_direct",
+        # Try DuckDB cache for recent queries (end_date in [today-90d, yesterday])
+        if not (_spool_available and _oee_spool_available):
+            from mes_dashboard.services.resource_history_duckdb_cache import (
+                should_use_duckdb,
+                query_base_from_duckdb,
+                query_oee_from_duckdb,
             )
-            return df if df is not None else pd.DataFrame()
-
-        def _query_oee_direct():
-            params = {
-                "start_date": start_date,
-                "end_date": end_date,
-                "reject_start": _reject_start,
-                "reject_end": _reject_end,
-            }
-            df = read_sql_df(
-                oee_sql, params,
-                caller="resource_dataset_cache:execute_primary_query_oee_direct",
-            )
-            return df if df is not None else pd.DataFrame()
-
-        if should_decompose_by_time(start_date, end_date):
-            # --- Engine path for long date ranges ---
-            engine_chunks = decompose_by_time_range(start_date, end_date)
-            engine_hash = compute_query_hash(query_id_input)
-
-            def _run_base_chunk(chunk, max_rows_per_chunk=None):
-                params = {
-                    "start_date": chunk["chunk_start"],
-                    "end_date": chunk["chunk_end"],
-                }
-                result = read_sql_df(
-                    base_sql, params,
-                    caller="resource_dataset_cache:execute_primary_query_chunk",
-                )
-                return result if result is not None else pd.DataFrame()
-
-            def _run_oee_chunk(chunk, max_rows_per_chunk=None):
-                chunk_reject_start = (
-                    date.fromisoformat(chunk["chunk_start"]) - timedelta(days=30)
-                ).isoformat()
-                chunk_reject_end = (
-                    date.fromisoformat(chunk["chunk_end"]) + timedelta(days=30)
-                ).isoformat()
-                params = {
-                    "start_date": chunk["chunk_start"],
-                    "end_date": chunk["chunk_end"],
-                    "reject_start": chunk_reject_start,
-                    "reject_end": chunk_reject_end,
-                }
-                result = read_sql_df(
-                    oee_sql, params,
-                    caller="resource_dataset_cache:execute_primary_query_oee_chunk",
-                )
-                return result if result is not None else pd.DataFrame()
-
-            logger.info(
-                "Engine activated for resource: %d chunks (query_id=%s)",
-                len(engine_chunks), query_id,
-            )
-
-            if not _spool_available:
-                execute_plan(
-                    engine_chunks, _run_base_chunk,
-                    parallel=_RESOURCE_ENGINE_PARALLEL,
-                    query_hash=engine_hash,
-                    cache_prefix="resource",
-                    chunk_ttl=_CACHE_TTL,
-                )
-                _base_progress = get_batch_progress("resource", engine_hash) or {}
-                if _base_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
-                    _base_failed = {
-                        "has_partial_failure": True,
-                        "failed_chunk_count": _base_progress.get("failed_chunk_count"),
-                        "failed_ranges": _base_progress.get("failed_ranges"),
-                        "source": "base",
-                    }
-                    _partial_failure_meta.update(_base_failed)
-                    logger.warning(
-                        "resource base partial failure (query_id=%s): failed_ranges=%s",
-                        query_id, _base_progress.get("failed_ranges"),
-                    )
-                spool_tmp_path, spool_row_count = merge_chunks_to_spool(
-                    "resource", engine_hash, spool_dir=QUERY_SPOOL_DIR,
-                )
-                if spool_tmp_path is not None:
-                    register_spool_file(
-                        _REDIS_NAMESPACE, query_id,
-                        spool_tmp_path, spool_row_count,
-                        ttl_seconds=_CACHE_TTL,
-                    )
-                    _dataset_cache.set(query_id, True)
-                    _spool_available = True
-
-            if not _oee_spool_available:
-                oee_engine_hash = compute_query_hash({**query_id_input, "_oee": True})
-                execute_plan(
-                    engine_chunks, _run_oee_chunk,
-                    parallel=_RESOURCE_ENGINE_PARALLEL,
-                    query_hash=oee_engine_hash,
-                    cache_prefix="resource_oee",
-                    chunk_ttl=_CACHE_TTL,
-                )
-                _oee_progress = get_batch_progress("resource_oee", oee_engine_hash) or {}
-                if _oee_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
-                    _oee_failed = {
-                        "has_partial_failure": True,
-                        "failed_chunk_count": _oee_progress.get("failed_chunk_count"),
-                        "failed_ranges": _oee_progress.get("failed_ranges"),
-                        "source": "oee",
-                    }
-                    _partial_failure_meta.update(_oee_failed)
-                    logger.warning(
-                        "resource OEE partial failure (query_id=%s): failed_ranges=%s",
-                        query_id, _oee_progress.get("failed_ranges"),
-                    )
-                oee_spool_tmp_path, oee_spool_row_count = merge_chunks_to_spool(
-                    "resource_oee", oee_engine_hash, spool_dir=QUERY_SPOOL_DIR,
-                )
-                if oee_spool_tmp_path is not None:
-                    register_spool_file(
-                        _OEE_REDIS_NAMESPACE, query_id,
-                        oee_spool_tmp_path, oee_spool_row_count,
-                        ttl_seconds=_CACHE_TTL,
-                    )
-                    _oee_spool_available = True
-        else:
-            # --- Direct path (short query) — run base + OEE in parallel ---
-            futures = {}
-            with ThreadPoolExecutor(max_workers=2) as executor:
+            if should_use_duckdb(end_date):
+                hist_ids = [r["RESOURCEID"] for r in resources if r.get("RESOURCEID")]
                 if not _spool_available:
-                    futures["base"] = executor.submit(_query_base_direct)
+                    _base_from_duckdb = query_base_from_duckdb(hist_ids, start_date, end_date)
+                    if not _base_from_duckdb.empty:
+                        _store_df(query_id, _base_from_duckdb, end_date)
+                        _spool_available = True
                 if not _oee_spool_available:
-                    futures["oee"] = executor.submit(_query_oee_direct)
+                    _oee_from_duckdb = query_oee_from_duckdb(start_date, end_date)
+                    if not _oee_from_duckdb.empty:
+                        _store_oee_df(query_id, _oee_from_duckdb, end_date)
+                        _oee_spool_available = True
+                if _spool_available and _oee_spool_available:
+                    logger.info(
+                        "Resource dataset DuckDB cache served query_id=%s", query_id
+                    )
 
-            if "base" in futures:
-                df = futures["base"].result()
-                if not df.empty:
-                    _store_df(query_id, df)
-                    _spool_available = True
+        if not (_spool_available and _oee_spool_available):
+            # --- Oracle query path (DuckDB miss or outside cache window) ---
+            from mes_dashboard.services.batch_query_engine import (
+                decompose_by_time_range,
+                execute_plan,
+                get_batch_progress,
+                merge_chunks_to_spool,
+                compute_query_hash,
+                should_decompose_by_time,
+            )
+            from concurrent.futures import ThreadPoolExecutor
 
-            if "oee" in futures:
-                oee_df = futures["oee"].result()
-                if not oee_df.empty:
-                    _store_oee_df(query_id, oee_df)
-                    _oee_spool_available = True
+            base_sql = _load_sql("base_facts")
+            base_sql = base_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
+
+            oee_sql = _load_sql("oee_facts")
+
+            # Compute reject date window (±30 days)
+            _reject_start = (
+                date.fromisoformat(start_date) - timedelta(days=30)
+            ).isoformat()
+            _reject_end = (
+                date.fromisoformat(end_date) + timedelta(days=30)
+            ).isoformat()
+
+            def _query_base_direct():
+                params = {"start_date": start_date, "end_date": end_date}
+                df = read_sql_df(
+                    base_sql, params,
+                    caller="resource_dataset_cache:execute_primary_query_direct",
+                )
+                return df if df is not None else pd.DataFrame()
+
+            def _query_oee_direct():
+                params = {
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "reject_start": _reject_start,
+                    "reject_end": _reject_end,
+                }
+                df = read_sql_df(
+                    oee_sql, params,
+                    caller="resource_dataset_cache:execute_primary_query_oee_direct",
+                )
+                return df if df is not None else pd.DataFrame()
+
+            if should_decompose_by_time(start_date, end_date):
+                # --- Engine path for long date ranges ---
+                engine_chunks = decompose_by_time_range(start_date, end_date)
+                engine_hash = compute_query_hash(query_id_input)
+
+                def _run_base_chunk(chunk, max_rows_per_chunk=None):
+                    params = {
+                        "start_date": chunk["chunk_start"],
+                        "end_date": chunk["chunk_end"],
+                    }
+                    result = read_sql_df(
+                        base_sql, params,
+                        caller="resource_dataset_cache:execute_primary_query_chunk",
+                    )
+                    return result if result is not None else pd.DataFrame()
+
+                def _run_oee_chunk(chunk, max_rows_per_chunk=None):
+                    chunk_reject_start = (
+                        date.fromisoformat(chunk["chunk_start"]) - timedelta(days=30)
+                    ).isoformat()
+                    chunk_reject_end = (
+                        date.fromisoformat(chunk["chunk_end"]) + timedelta(days=30)
+                    ).isoformat()
+                    params = {
+                        "start_date": chunk["chunk_start"],
+                        "end_date": chunk["chunk_end"],
+                        "reject_start": chunk_reject_start,
+                        "reject_end": chunk_reject_end,
+                    }
+                    result = read_sql_df(
+                        oee_sql, params,
+                        caller="resource_dataset_cache:execute_primary_query_oee_chunk",
+                    )
+                    return result if result is not None else pd.DataFrame()
+
+                logger.info(
+                    "Engine activated for resource: %d chunks (query_id=%s)",
+                    len(engine_chunks), query_id,
+                )
+
+                if not _spool_available:
+                    execute_plan(
+                        engine_chunks, _run_base_chunk,
+                        parallel=_RESOURCE_ENGINE_PARALLEL,
+                        query_hash=engine_hash,
+                        cache_prefix="resource",
+                        chunk_ttl=_get_cache_ttl(end_date),
+                    )
+                    _base_progress = get_batch_progress("resource", engine_hash) or {}
+                    if _base_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
+                        _base_failed = {
+                            "has_partial_failure": True,
+                            "failed_chunk_count": _base_progress.get("failed_chunk_count"),
+                            "failed_ranges": _base_progress.get("failed_ranges"),
+                            "source": "base",
+                        }
+                        _partial_failure_meta.update(_base_failed)
+                        logger.warning(
+                            "resource base partial failure (query_id=%s): failed_ranges=%s",
+                            query_id, _base_progress.get("failed_ranges"),
+                        )
+                    spool_tmp_path, spool_row_count = merge_chunks_to_spool(
+                        "resource", engine_hash, spool_dir=QUERY_SPOOL_DIR,
+                    )
+                    if spool_tmp_path is not None:
+                        register_spool_file(
+                            _REDIS_NAMESPACE, query_id,
+                            spool_tmp_path, spool_row_count,
+                            ttl_seconds=_get_cache_ttl(end_date),
+                        )
+                        _dataset_cache.set(query_id, True)
+                        _spool_available = True
+
+                if not _oee_spool_available:
+                    oee_engine_hash = compute_query_hash({**query_id_input, "_oee": True})
+                    execute_plan(
+                        engine_chunks, _run_oee_chunk,
+                        parallel=_RESOURCE_ENGINE_PARALLEL,
+                        query_hash=oee_engine_hash,
+                        cache_prefix="resource_oee",
+                        chunk_ttl=_get_cache_ttl(end_date),
+                    )
+                    _oee_progress = get_batch_progress("resource_oee", oee_engine_hash) or {}
+                    if _oee_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
+                        _oee_failed = {
+                            "has_partial_failure": True,
+                            "failed_chunk_count": _oee_progress.get("failed_chunk_count"),
+                            "failed_ranges": _oee_progress.get("failed_ranges"),
+                            "source": "oee",
+                        }
+                        _partial_failure_meta.update(_oee_failed)
+                        logger.warning(
+                            "resource OEE partial failure (query_id=%s): failed_ranges=%s",
+                            query_id, _oee_progress.get("failed_ranges"),
+                        )
+                    oee_spool_tmp_path, oee_spool_row_count = merge_chunks_to_spool(
+                        "resource_oee", oee_engine_hash, spool_dir=QUERY_SPOOL_DIR,
+                    )
+                    if oee_spool_tmp_path is not None:
+                        register_spool_file(
+                            _OEE_REDIS_NAMESPACE, query_id,
+                            oee_spool_tmp_path, oee_spool_row_count,
+                            ttl_seconds=_get_cache_ttl(end_date),
+                        )
+                        _oee_spool_available = True
+            else:
+                # --- Direct path (short query) — run base + OEE in parallel ---
+                futures = {}
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    if not _spool_available:
+                        futures["base"] = executor.submit(_query_base_direct)
+                    if not _oee_spool_available:
+                        futures["oee"] = executor.submit(_query_oee_direct)
+
+                if "base" in futures:
+                    df = futures["base"].result()
+                    if not df.empty:
+                        _store_df(query_id, df, end_date)
+                        _spool_available = True
+
+                if "oee" in futures:
+                    oee_df = futures["oee"].result()
+                    if not oee_df.empty:
+                        _store_oee_df(query_id, oee_df, end_date)
+                        _oee_spool_available = True
 
     result = apply_view(query_id=query_id, granularity=granularity)
     if result is None:

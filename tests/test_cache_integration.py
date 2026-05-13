@@ -408,57 +408,36 @@ class TestFallbackToOracle:
 # Historical TTL idempotency test (resource-history-perf)
 # ============================================================
 
-class TestResourceHistoryPrewarmIdempotency:
-    """AC-8: pre-warm with skip_cached=True must not overwrite a longer TTL key."""
+class TestResourceHistoryHistoricalTtl:
+    """Verify that historical queries (end_date < today-2d) use the 24h TTL."""
 
-    def test_historical_ttl_does_not_overwrite_longer_ttl(self):
-        """Seeding a Redis key with TTL=172 800 s then calling prewarm must leave TTL unchanged.
+    def test_historical_end_date_uses_long_ttl(self):
+        """_store_df called with a historical end_date must use RESOURCE_HISTORY_HISTORICAL_TTL.
 
-        This test verifies the skip_cached=True contract via execute_plan:
-        when a chunk already exists in Redis (redis_chunk_exists returns True),
-        execute_plan skips it entirely — so the existing TTL is never touched.
+        This test verifies the _get_cache_ttl bifurcation in resource_dataset_cache:
+        an end_date strictly before today-2d returns _HISTORICAL_TTL (86400s default).
         """
         import sys
         import os
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-        from mes_dashboard.services.resource_history_service import prewarm_last_n_months
+        from datetime import date, timedelta
+        from unittest.mock import patch, MagicMock
+        import pandas as pd
 
-        # Track which chunks execute_plan was asked to process vs. skip
-        skipped_chunks = []
-        executed_chunks = []
+        from mes_dashboard.services import resource_dataset_cache as rdc
 
-        def _fake_execute_plan(chunks, query_fn, *, skip_cached, cache_prefix, chunk_ttl, **kwargs):
-            # Simulate that all chunks already exist (skip_cached=True scenario)
-            # The real execute_plan calls redis_chunk_exists; here we track the intent
-            assert skip_cached is True, "prewarm must pass skip_cached=True"
-            # Simulate all chunks being cached (none re-fetched)
-            skipped_chunks.extend(chunks)
-            return "fakehash"
+        historical_end = (date.today() - timedelta(days=10)).isoformat()
 
-        oracle_call_count = [0]
+        stored_ttl = [None]
+        original_store = rdc.store_spooled_df if hasattr(rdc, 'store_spooled_df') else None
 
-        def _fake_query_fn(chunk, max_rows_per_chunk=None):
-            oracle_call_count[0] += 1
-            import pandas as pd
-            return pd.DataFrame()
-
-        with (
-            patch(
-                'mes_dashboard.services.resource_history_service._execute_prewarm_plan',
-                side_effect=_fake_execute_plan,
-            ),
-            patch(
-                'mes_dashboard.services.resource_history_service._get_filtered_resources',
-                return_value=[{'RESOURCEID': 'R1', 'WORKCENTERNAME': 'WC1',
-                               'RESOURCEFAMILYNAME': 'FAM1', 'RESOURCENAME': 'R1'}],
-            ),
+        with patch(
+            'mes_dashboard.services.resource_dataset_cache.store_spooled_df',
+            side_effect=lambda ns, qid, df, ttl_seconds=None: stored_ttl.__setitem__(0, ttl_seconds),
         ):
-            prewarm_last_n_months(months=1)
+            rdc._store_df("test-query-id", pd.DataFrame({"col": [1]}), historical_end)
 
-        # Because skip_cached=True and all chunks were "cached", no Oracle calls
-        assert oracle_call_count[0] == 0, (
-            "Oracle must not be called when all chunks are already cached (skip_cached=True)"
+        assert stored_ttl[0] == rdc._HISTORICAL_TTL, (
+            f"Expected TTL={rdc._HISTORICAL_TTL} for historical end_date, got {stored_ttl[0]}"
         )
-        # All chunks should have been reported as skipped
-        assert len(skipped_chunks) >= 1, "Expected at least one chunk to be evaluated"

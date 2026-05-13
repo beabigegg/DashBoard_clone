@@ -645,6 +645,8 @@ def create_app(config_name: str | None = None) -> Flask:
             init_scrap_reason_exclusion_cache(app)  # Start exclusion-policy cache sync
             init_query_spool_cleanup(app)  # Start parquet spool cleanup worker
             init_anomaly_detection_scheduler(app)  # Start anomaly detection scheduler
+            from mes_dashboard.services.resource_history_duckdb_cache import start_duckdb_prewarm
+            start_duckdb_prewarm()  # Pre-warm resource-history DuckDB cache for 3-month queries
             from mes_dashboard.core.metrics_history import start_metrics_history
             start_metrics_history(app)  # Start metrics history collector
             from mes_dashboard.core.worker_memory_guard import start_worker_memory_guard

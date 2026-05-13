@@ -458,34 +458,41 @@ if __name__ == '__main__':
 # ============================================================
 
 class TestTtlBifurcation(unittest.TestCase):
-    """Tests for _is_historical helper and TTL bifurcation logic."""
+    """Tests for TTL bifurcation logic in resource_dataset_cache._get_cache_ttl.
+
+    _is_historical was removed from resource_history_service and the TTL
+    bifurcation logic now lives in resource_dataset_cache._get_cache_ttl.
+    """
 
     def test_historical_query_gets_long_ttl(self):
-        """end_date < today - 2 days must be classified as historical."""
-        from mes_dashboard.services.resource_history_service import _is_historical
+        """end_date < today - 2 days must return HISTORICAL_TTL."""
+        from mes_dashboard.services.resource_dataset_cache import _get_cache_ttl, _HISTORICAL_TTL
         from datetime import date, timedelta
         historical_date = (date.today() - timedelta(days=3)).isoformat()
-        self.assertTrue(
-            _is_historical(historical_date),
-            f"end_date {historical_date!r} (today - 3) should be historical",
+        self.assertEqual(
+            _get_cache_ttl(historical_date),
+            _HISTORICAL_TTL,
+            f"end_date {historical_date!r} (today - 3) should get HISTORICAL_TTL",
         )
 
     def test_recent_query_keeps_short_ttl(self):
-        """end_date >= today - 2 days must NOT be classified as historical."""
-        from mes_dashboard.services.resource_history_service import _is_historical
+        """end_date >= today - 2 days must return _CACHE_TTL."""
+        from mes_dashboard.services.resource_dataset_cache import _get_cache_ttl, _CACHE_TTL
         from datetime import date
         recent_date = date.today().isoformat()
-        self.assertFalse(
-            _is_historical(recent_date),
-            f"end_date {recent_date!r} (today) should not be historical",
+        self.assertEqual(
+            _get_cache_ttl(recent_date),
+            _CACHE_TTL,
+            f"end_date {recent_date!r} (today) should get _CACHE_TTL",
         )
 
     def test_ttl_boundary_exactly_2_days_ago(self):
         """end_date == today - 2 days is NOT historical (open boundary)."""
-        from mes_dashboard.services.resource_history_service import _is_historical
+        from mes_dashboard.services.resource_dataset_cache import _get_cache_ttl, _CACHE_TTL
         from datetime import date, timedelta
         boundary_date = (date.today() - timedelta(days=2)).isoformat()
-        self.assertFalse(
-            _is_historical(boundary_date),
+        self.assertEqual(
+            _get_cache_ttl(boundary_date),
+            _CACHE_TTL,
             f"end_date {boundary_date!r} (today - 2) should NOT be historical (boundary is exclusive)",
         )

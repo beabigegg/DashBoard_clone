@@ -257,8 +257,14 @@ class TestCacheTTLEnvVar:
         importlib.reload(constants_mod)
 
     def test_execute_primary_query_uses_cache_ttl(self, monkeypatch):
-        """execute_primary_query → store_spooled_df is called with ttl_seconds == _CACHE_TTL."""
+        """execute_primary_query → store_spooled_df is called with ttl_seconds == _CACHE_TTL
+        for recent (non-historical) queries (end_date within last 2 days)."""
         import mes_dashboard.services.batch_query_engine as engine_mod
+        from datetime import date, timedelta
+
+        # Use today as end_date so _get_cache_ttl returns _CACHE_TTL (not _HISTORICAL_TTL)
+        today = date.today().isoformat()
+        start = (date.today() - timedelta(days=29)).isoformat()
 
         ttl_calls = []
 
@@ -295,7 +301,7 @@ class TestCacheTTLEnvVar:
             },
         )
 
-        cache_svc.execute_primary_query(start_date="2025-06-01", end_date="2025-06-30")
+        cache_svc.execute_primary_query(start_date=start, end_date=today)
 
         assert len(ttl_calls) >= 1
         for ttl in ttl_calls:

@@ -3,7 +3,7 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.1
+schema-version: 1.0.2
 last-changed: 2026-05-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -84,10 +84,12 @@ breaking-change-policy: deprecate-2-minors
 | name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
 |---|---|---|---:|---:|---|---|---|---|---:|---|
 | RESOURCE_HISTORY_HISTORICAL_TTL | cache | all | no | no | 86400 | 86400 | application-team | positive integer (seconds); minimum 3600 | yes | uses default 86400 |
-| RESOURCE_HISTORY_PREWARM_MONTHS | cache | all | no | no | 3 | 3 | application-team | positive integer 1–12; 0 disables pre-warm | yes | uses default 3 |
+| RESOURCE_HISTORY_PREWARM_MONTHS | cache | all | no | no | 3 | 3 | application-team | positive integer 1–12; 0 disables DuckDB prewarm | yes | uses default 3 |
+| RESOURCE_HISTORY_DUCKDB_PATH | storage | all | no | no | tmp/resource_history.duckdb | /var/lib/mes/resource_history.duckdb | application-team | file path (relative resolved to CWD; use absolute for Docker) | yes | uses default path |
 
 - `RESOURCE_HISTORY_HISTORICAL_TTL`: Redis TTL for resource-history queries where `end_date < today − 2 days`. Historical data is immutable; default 86400s (24h) vs the general 2h TTL for recent queries. Added by change `resource-history-perf`.
-- `RESOURCE_HISTORY_PREWARM_MONTHS`: Number of calendar months of resource-history data to pre-warm into Redis on service startup. Pre-warm runs as a background thread after gunicorn workers are ready; `0` disables pre-warm entirely. Default 3 months. Oracle memory budget confirmed by spec-architect before deploying with values > 3. Added by change `resource-history-perf`.
+- `RESOURCE_HISTORY_PREWARM_MONTHS`: Number of calendar months of resource-history data to load into the persistent DuckDB cache at startup. Background thread starts 10s after worker boot; `0` disables entirely. Default 3 months (~25s Oracle load time, ~15MB DuckDB file). Added by change `resource-history-perf`.
+- `RESOURCE_HISTORY_DUCKDB_PATH`: Path to the persistent DuckDB file that caches the last N months of base_facts + oee_facts. Relative paths resolve against CWD (same as QUERY_SPOOL_DIR). For Docker set to an absolute path on a named volume. File is ~15MB; atomically replaced on each daily refresh. Added by change `resource-history-perf`.
 
 ## Observability / Circuit Breaker
 
@@ -127,3 +129,4 @@ Variables such as `VITE_`, `NEXT_PUBLIC_`, and `PUBLIC_` are browser-exposed. Ne
 - `FLASK_DEBUG=1` 在 production 是嚴重安全問題：啟動時 `_validate_production_security_settings()` 會拒絕。
 - `SECRET_KEY` 過短（< 32 bytes）：`_resolve_secret_key()` 會記錄 warning。
 - `DB_HOST` / `DB_SERVICE` 空值：app factory 啟動時即失敗，不會延遲到首次查詢。
+

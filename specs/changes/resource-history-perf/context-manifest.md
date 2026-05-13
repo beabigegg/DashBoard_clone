@@ -5,27 +5,17 @@ this change. The forbidden-paths baseline lives in `.cdd/context-policy.json`
 and is automatically applied by `cdd-kit gate` — do not duplicate it here.
 
 ## Affected Surfaces
-- `src/mes_dashboard/services/resource_history_service.py` (pre-warm method + TTL logic)
-- `src/mes_dashboard/routes/resource_history_routes.py` (new progress endpoint)
-- `src/mes_dashboard/core/cache.py` (or `cache_plane.py` — TTL assignment)
-- `src/mes_dashboard/core/spool_warmup_scheduler.py` (reference for async startup pattern)
-- `src/mes_dashboard/services/batch_query_engine.py` (query_id lifecycle reference)
-- `src/mes_dashboard/services/async_query_job_service.py` (query_id generation reference)
-- `frontend/src/resource-history/App.vue` (progress bar + polling loop)
-- `frontend/src/shared-composables/useAsyncJobPolling.ts` (reuse candidate)
-- `contracts/api/api-contract.md` (new endpoint)
-- `contracts/api/api-inventory.md` (new endpoint registration)
-- `contracts/data/data-shape-contract.md` (progress response shape)
-- `contracts/env/env-contract.md` (new env vars if added)
-- `contracts/ci/ci-gate-contract.md` (integration test gate)
+- `src/mes_dashboard/services/resource_history_duckdb_cache.py` (new — DuckDB persistent cache)
+- `src/mes_dashboard/services/resource_dataset_cache.py` (DuckDB routing in execute_primary_query + TTL bifurcation)
+- `src/mes_dashboard/services/resource_history_service.py` (removed wrong prewarm code)
+- `src/mes_dashboard/core/spool_warmup_scheduler.py` (removed warmup-resource-history job)
+- `src/mes_dashboard/app.py` (startup wiring: start_duckdb_prewarm)
+- `contracts/env/env-contract.md` (RESOURCE_HISTORY_HISTORICAL_TTL, RESOURCE_HISTORY_PREWARM_MONTHS, RESOURCE_HISTORY_DUCKDB_PATH)
+- `contracts/ci/ci-gate-contract.md` (DuckDB prewarm gate)
+- `tests/test_resource_history_duckdb_cache.py` (new)
 - `tests/test_resource_history_service.py`
-- `tests/test_resource_history_routes.py`
 - `tests/test_cache_integration.py`
-- `tests/e2e/test_resource_history_e2e.py`
-- `tests/e2e/test_resource_history_browser_e2e.py`
-- `tests/stress/test_resource_history_stress.py`
-- `tests/integration/test_redis_chaos.py`
-- `frontend/tests/legacy/resource-history.test.js`
+- `tests/test_resource_dataset_cache.py`
 
 ## Allowed Paths
 - specs/changes/resource-history-perf/
