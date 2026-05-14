@@ -32,8 +32,8 @@ tasks:
   - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer confirmed no contract impact (agent-log/contract-reviewer.yml)" }
   - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-report.md verdict: approved (all 8 ACs pass except AC-5 deferred for manual browser smoke)" }
   - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "type-check + build + 302 vitest + 62 pytest + 10 parity tests + css:check all green (see ci-gates.md)" }
-  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "PR not yet submitted — will be verified by GitHub Actions on PR submission" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "CI passed on commit 02688ee (user-confirmed 2026-05-14)" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: skipped, note: "no informational gates introduced by this change" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "not applicable" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done, note: "cdd-kit archive migrate-production-history-ts → specs/archive/2026/ on 2026-05-14" }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: skipped, note: "No novel learnings — migration followed established Phase 3 pattern; every applicable rule (index.html unchanged, abort-test .js specifier audit, tsconfig include) already documented in CLAUDE.md from reject-history-ts / job-query-ts / resource-status-ts" }
