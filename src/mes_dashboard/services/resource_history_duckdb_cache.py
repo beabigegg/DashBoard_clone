@@ -76,19 +76,27 @@ def is_duckdb_warm() -> bool:
     return _duckdb_ready
 
 
-def should_use_duckdb(end_date: str) -> bool:
-    """True when end_date falls inside the DuckDB cache window.
+def should_use_duckdb(end_date: str, start_date: Optional[str] = None) -> bool:
+    """True when the requested range falls entirely inside the DuckDB cache window.
 
     Window: [today - PREWARM_MONTHS*31d, yesterday].
     Queries ending today use Oracle (data still changing).
     Queries older than the window use Oracle + 24h TTL.
+    If start_date is provided, both bounds are checked — a start_date before
+    the cache window means DuckDB can only return partial data, so Oracle is used.
     """
     if not _duckdb_ready:
         return False
     try:
         ed = date.fromisoformat(end_date)
-        start, end, _, _ = _prewarm_dates()
-        return start <= ed <= end
+        cache_start, cache_end, _, _ = _prewarm_dates()
+        if not (cache_start <= ed <= cache_end):
+            return False
+        if start_date is not None:
+            sd = date.fromisoformat(start_date)
+            if sd < cache_start:
+                return False
+        return True
     except (ValueError, TypeError):
         return False
 

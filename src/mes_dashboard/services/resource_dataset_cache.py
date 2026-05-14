@@ -233,7 +233,7 @@ def execute_primary_query(
                 query_base_from_duckdb,
                 query_oee_from_duckdb,
             )
-            if should_use_duckdb(end_date):
+            if should_use_duckdb(end_date, start_date):
                 hist_ids = [r["RESOURCEID"] for r in resources if r.get("RESOURCEID")]
                 if not _spool_available:
                     _base_from_duckdb = query_base_from_duckdb(hist_ids, start_date, end_date)

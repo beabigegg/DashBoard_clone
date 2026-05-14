@@ -537,9 +537,13 @@ function updateGroups(groups: string[]): void {
 }
 
 function updateFlags(nextFlags: { isProduction?: boolean; isKey?: boolean; isMonitor?: boolean }): void {
-  updateField('isProduction', Boolean(nextFlags?.isProduction));
-  updateField('isKey', Boolean(nextFlags?.isKey));
-  updateField('isMonitor', Boolean(nextFlags?.isMonitor));
+  const keys = ['isProduction', 'isKey', 'isMonitor'] as const;
+  for (const key of keys) {
+    const next = Boolean(nextFlags?.[key]);
+    if (next !== filterState[key]) {
+      updateField(key, next);
+    }
+  }
 }
 
 function updateFamilies(families: string[]): void {
