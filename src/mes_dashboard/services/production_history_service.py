@@ -86,29 +86,24 @@ def _end_date_exclusive(end_date: date) -> str:
 def validate_query_params(params: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and normalize incoming query parameters.
 
+    Mode-split validation (prod-history-query-mode-tabs, PHF-07 / PHF-08):
+
+      * Identifier mode — at least one identifier wildcard token
+        (``mfg_orders`` / ``lot_ids`` / ``wafer_lots``, non-empty after
+        PHF-02 parsing) is present. Dates are optional and ``pj_types`` is
+        not required. When dates are absent a 730-day wide default window
+        (``end_date = today``, ``start_date = today − (MAX_DATE_RANGE_DAYS −
+        1)``) is substituted so the chunked-scan pipeline and SQL templates
+        stay byte-identical (proposal Option B). Explicit dates still obey
+        the 730-day cap (VAL-03).
+      * Classification mode — no identifier token. ``pj_types``,
+        ``start_date`` and ``end_date`` are all required (behavior identical
+        to before this change).
+
     Raises:
         ValueError: on any validation failure (caller should return 400).
     """
     pj_types: List[str] = [str(t).strip() for t in (params.get("pj_types") or []) if str(t).strip()]
-    if not pj_types:
-        raise ValueError("必要參數: pj_types（至少一個）")
-
-    start_raw = str(params.get("start_date") or "").strip()
-    end_raw = str(params.get("end_date") or "").strip()
-    if not start_raw or not end_raw:
-        raise ValueError("必要參數: start_date, end_date")
-
-    start_dt = _parse_date(start_raw)
-    end_dt = _parse_date(end_raw)
-
-    if start_dt > end_dt:
-        raise ValueError("start_date 不可晚於 end_date")
-
-    span = (end_dt - start_dt).days + 1
-    if span > MAX_DATE_RANGE_DAYS:
-        raise ValueError(
-            f"日期區間超過上限 {MAX_DATE_RANGE_DAYS} 天（實際 {span} 天）"
-        )
 
     # Optional filters — lists of strings
     def _str_list(key: str) -> List[str]:
@@ -144,6 +139,39 @@ def validate_query_params(params: Dict[str, Any]) -> Dict[str, Any]:
     lot_ids_tokens: List[WildcardToken] = []
     if lot_ids:
         lot_ids_tokens = parse_wildcard_tokens("lot_ids", lot_ids)
+
+    # ── Mode detection (PHF-07 / PHF-08) ─────────────────────────────────────
+    # Identifier mode = at least one identifier wildcard token survives PHF-02
+    # parsing. The identifier predicate already fully scopes the query.
+    is_identifier_mode = bool(mfg_orders_tokens or wafer_lots_tokens or lot_ids_tokens)
+
+    # ``pj_types`` is required only in classification mode.
+    if not is_identifier_mode and not pj_types:
+        raise ValueError("必要參數: pj_types（至少一個）")
+
+    start_raw = str(params.get("start_date") or "").strip()
+    end_raw = str(params.get("end_date") or "").strip()
+
+    if not start_raw or not end_raw:
+        if is_identifier_mode:
+            # Option B — substitute a 730-day wide default window anchored at
+            # today. span = (end - start).days + 1 == MAX_DATE_RANGE_DAYS.
+            end_dt = date.today()
+            start_dt = end_dt - timedelta(days=MAX_DATE_RANGE_DAYS - 1)
+        else:
+            raise ValueError("必要參數: start_date, end_date")
+    else:
+        start_dt = _parse_date(start_raw)
+        end_dt = _parse_date(end_raw)
+
+        if start_dt > end_dt:
+            raise ValueError("start_date 不可晚於 end_date")
+
+        span = (end_dt - start_dt).days + 1
+        if span > MAX_DATE_RANGE_DAYS:
+            raise ValueError(
+                f"日期區間超過上限 {MAX_DATE_RANGE_DAYS} 天（實際 {span} 天）"
+            )
 
     return {
         "pj_types": pj_types,

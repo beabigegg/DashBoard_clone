@@ -1,0 +1,28 @@
+agent: frontend-engineer
+change-id: prod-history-query-mode-tabs
+summary: >
+  Split the Production History 查詢 page into two explicit query-mode tabs
+  (Tab A 依產品分類查詢 / Tab B 依識別碼查詢) with a mode-gated payload builder,
+  a 清除篩選 button, and a broadened reset spanning both composables.
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/production-history/App.vue (full rewrite — tab control, mode-gated submit, clear button)" }
+  - { type: files-changed, pointer: "frontend/src/production-history/composables/useProductionHistory.ts:135-218 (validateQueryMode + buildModePayload exports), resetResults helper" }
+  - { type: files-changed, pointer: "frontend/src/production-history/style.css:60-82 (ph-mode-tabs styling)" }
+  - { type: files-changed, pointer: "frontend/tests/validation/useProductionHistory.validation.test.js (+24 tests: mode validation, mode-gated payload, clearAll/resetResults)" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/production-history-query-mode-tabs.spec.ts (new E2E spec — 4 tests)" }
+  - { type: components-affected, pointer: "production-history App.vue; useProductionHistory; useFirstTierFilters (clearAll wired, no edit)" }
+  - { type: accessibility-audit, pointer: "tablist/tab/tabpanel roles + aria-selected on mode tabs; focus-visible ring on .ph-mode-tab" }
+notes:
+  - i18n case: NO i18n layer in frontend/src/production-history/ — all strings are
+    hard-coded zh-TW. New strings (tab labels, 清除篩選, mode validation messages,
+    Tab B note + empty-state) added in the same single-language style. No i18n
+    system introduced.
+  - The active tab is the single source of truth — buildModePayload strips
+    wildcard fields in classification mode and strips classification fields +
+    omits start_date/end_date in identifier mode, so stale cross-tab state
+    cannot leak into a submit.
+  - "Gate results: type-check PASS; npm run test useProductionHistory.validation 45/45 PASS; npm run test:legacy 251/251 PASS; build PASS; css:check PASS (0 errors, warnings all pre-existing in shared-ui, none in production-history)."
+  - data-testid additions: ph-mode-tab-classification, ph-mode-tab-identifier,
+    ph-mode-panel-classification, ph-mode-panel-identifier, ph-start-date,
+    ph-end-date, ph-clear-filters, ph-query-btn, ph-empty-state. All existing
+    ph-first-tier-* testids preserved.

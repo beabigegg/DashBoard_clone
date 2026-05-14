@@ -484,5 +484,48 @@ class TestResourceHistoryProgressContract(unittest.TestCase):
             )
 
 
+class TestProductionHistoryQueryModeContract(unittest.TestCase):
+    """Contract: POST /api/production-history/query date optionality (api-contract 1.4.0).
+
+    Identifier mode (≥1 wildcard token) → start_date/end_date optional.
+    Classification mode (no token) → start_date/end_date still required.
+    """
+
+    def setUp(self):
+        db._ENGINE = None
+        self.app = create_app("testing")
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+
+    @patch("mes_dashboard.routes.production_history_routes.query_production_history")
+    def test_query_payload_dates_optional_with_identifier_tokens(self, mock_query):
+        """Endpoint accepts a payload with omitted start_date/end_date when identifier token present."""
+        mock_query.return_value = {
+            "dataset_id": "ph-ctr1",
+            "detail": {"rows": [], "pagination": {"page": 1, "per_page": 25, "total_rows": 0, "total_pages": 0}},
+            "matrix": {"tree": [], "month_columns": []},
+            "filter_options": {"pj_types": []},
+            "meta": {"ttl_seconds": 3600, "expires_at": 9999999999, "row_count": 0},
+        }
+        response = self.client.post(
+            "/api/production-history/query",
+            json={"lot_ids": ["GA001AB"]},
+        )
+        self.assertIn(response.status_code, (200, 202))
+        data = json.loads(response.data)
+        self.assertTrue(data["success"])
+
+    def test_query_payload_classification_mode_still_requires_dates(self):
+        """Endpoint still rejects a classification-mode payload that omits dates."""
+        response = self.client.post(
+            "/api/production-history/query",
+            json={"pj_types": ["GA"]},
+        )
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertFalse(data["success"])
+        self.assertEqual(data["error"]["code"], "VALIDATION_ERROR")
+
+
 if __name__ == "__main__":
     unittest.main()

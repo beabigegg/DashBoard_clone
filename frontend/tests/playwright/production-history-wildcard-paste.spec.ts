@@ -96,21 +96,15 @@ async function installMocks(
   return { queryRequests };
 }
 
-async function fillDateRangeAndPickType(page: Page) {
-  // Pick a Type (required field) and a date range so the query button enables.
-  const dateInputs = page.locator('input[type="date"]');
-  if ((await dateInputs.count()) >= 2) {
-    await dateInputs.nth(0).fill('2026-05-01');
-    await dateInputs.nth(1).fill('2026-05-07');
-  }
-  // Tick the first option in the Type MultiSelect.
-  const typeRoot = page.locator('[data-testid="ph-first-tier-type"]');
-  if (await typeRoot.isVisible()) {
-    await typeRoot.locator('.multi-select-trigger, button, [role="combobox"]').first().click();
-    const firstOpt = page.locator('.multi-select-option, [role="option"], label').first();
-    if (await firstOpt.isVisible()) await firstOpt.click();
-    await page.locator('body').click({ position: { x: 5, y: 5 } });
-  }
+// The two-tab redesign (prod-history-query-mode-tabs) moved the wildcard
+// textareas into Tab B 「依識別碼查詢」. Wildcard queries no longer require a
+// Type selection or a date range (D6-style mode split) — switching to Tab B is
+// the only precondition.
+async function switchToIdentifierTab(page: Page) {
+  await page.locator('[data-testid="ph-mode-tab-identifier"]').click();
+  await expect(page.locator('[data-testid="ph-mode-panel-identifier"]')).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 test.describe('Production History — wildcard textarea UX', () => {
@@ -118,10 +112,10 @@ test.describe('Production History — wildcard textarea UX', () => {
     const { queryRequests } = await installMocks(page);
     await loginViaApi(page);
     await navigateViaSidebar(page, 'production-history', {
-      waitForSelector: '[data-testid="ph-first-tier-mfg-orders"]',
+      waitForSelector: '[data-testid="ph-mode-tab-identifier"]',
     });
 
-    await fillDateRangeAndPickType(page);
+    await switchToIdentifierTab(page);
 
     const textarea = page.locator('[data-testid="ph-first-tier-mfg-orders"]');
     // Mixed separators: newlines, commas, multiple spaces, AND a duplicate.
@@ -145,10 +139,10 @@ test.describe('Production History — wildcard textarea UX', () => {
     await installMocks(page);
     await loginViaApi(page);
     await navigateViaSidebar(page, 'production-history', {
-      waitForSelector: '[data-testid="ph-first-tier-lot-ids"]',
+      waitForSelector: '[data-testid="ph-mode-tab-identifier"]',
     });
 
-    await fillDateRangeAndPickType(page);
+    await switchToIdentifierTab(page);
 
     await page.locator('[data-testid="ph-first-tier-lot-ids"]').fill('MA*');
 
@@ -179,10 +173,10 @@ test.describe('Production History — wildcard textarea UX', () => {
     });
     await loginViaApi(page);
     await navigateViaSidebar(page, 'production-history', {
-      waitForSelector: '[data-testid="ph-first-tier-lot-ids"]',
+      waitForSelector: '[data-testid="ph-mode-tab-identifier"]',
     });
 
-    await fillDateRangeAndPickType(page);
+    await switchToIdentifierTab(page);
     await page.locator('[data-testid="ph-first-tier-lot-ids"]').fill("MA' OR 1=1--");
 
     const queryBtn = page.locator('button:has-text("查詢")').first();

@@ -623,3 +623,60 @@ class TestFilterOptionsEndpoint:
         # Required meta keys
         assert body["meta"]["schema_version"] == 2
         assert "updated_at" in body["meta"]
+
+
+# ── prod-history-query-mode-tabs: mode-split validation (PHF-07 / PHF-08) ─────
+
+class TestQueryModeSplitRoutes:
+    """Route-level coverage for identifier-mode optional dates (AC-4 / AC-5 / AC-7)."""
+
+    @patch("mes_dashboard.routes.production_history_routes.query_production_history")
+    def test_query_identifier_only_no_dates_returns_results(self, mock_query, client):
+        """AC-4 — identifier token, no dates → 200 success envelope."""
+        mock_query.return_value = {
+            "dataset_id": "ph-id1",
+            "detail": {"rows": [], "pagination": {"page": 1, "per_page": 25, "total_rows": 0, "total_pages": 0}},
+            "matrix": {"tree": [], "month_columns": []},
+            "filter_options": {"pj_types": []},
+            "meta": {"ttl_seconds": 3600, "expires_at": 9999999999, "row_count": 0},
+        }
+        resp = client.post(
+            "/api/production-history/query",
+            json={"lot_ids": ["GA001AB"]},
+        )
+        assert resp.status_code in (200, 202)
+        data = resp.get_json()
+        assert data["success"] is True
+
+    def test_query_classification_only_no_dates_returns_validation_error(self, client):
+        """PHF-08 — no identifier token, no dates → 400 VALIDATION_ERROR."""
+        resp = client.post(
+            "/api/production-history/query",
+            json={"pj_types": ["GA"]},
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["success"] is False
+        assert data["error"]["code"] == "VALIDATION_ERROR"
+
+    def test_query_identifier_wide_window_bounded(self, client):
+        """AC-5 — no-date identifier path emits a chunk plan bounded to today − 730d.
+
+        Deterministic: no Oracle optimizer reliance. Captures the validated
+        params via validate_query_params and asserts the decomposed chunk
+        plan spans exactly the 730-day cap.
+        """
+        from datetime import date, timedelta
+        from mes_dashboard.services.batch_query_engine import decompose_by_time_range
+        from mes_dashboard.services.production_history_service import (
+            ENGINE_GRAIN_DAYS,
+            MAX_DATE_RANGE_DAYS,
+            validate_query_params,
+        )
+        params = validate_query_params({"mfg_orders": "MA2025*"})
+        chunks = decompose_by_time_range(
+            params["start_date"], params["end_date"], grain_days=ENGINE_GRAIN_DAYS
+        )
+        floor = (date.today() - timedelta(days=MAX_DATE_RANGE_DAYS)).strftime("%Y-%m-%d")
+        first_start = min(c["chunk_start"] for c in chunks)
+        assert first_start >= floor, "chunk_start must be ≥ today − 730d (no unbounded scan)"

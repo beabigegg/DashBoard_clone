@@ -23,13 +23,22 @@ test.describe('Production History — filter-options API failure', () => {
 
     await loginViaApi(page);
     await navigateViaSidebar(page, 'production-history', {
-      waitForSelector: '[data-testid="ph-first-tier-mfg-orders"]',
+      waitForSelector: '[data-testid="ph-mode-tab-identifier"]',
     });
 
-    // Error banner must appear within 15 s.
+    // Error banner must appear within 15 s. It is rendered outside the query-
+    // mode tab panels, so it is visible regardless of the active tab.
     const errorBanner = page.locator('[data-testid="ph-first-tier-error"]');
     await expect(errorBanner).toBeVisible({ timeout: 15_000 });
     await expect(errorBanner).not.toBeEmpty();
+
+    // The two-tab redesign (prod-history-query-mode-tabs) moved the wildcard
+    // textareas into Tab B 「依識別碼查詢」 — switch to it to verify the degraded
+    // mode (user can still submit by ID even when filter-options is down).
+    await page.locator('[data-testid="ph-mode-tab-identifier"]').click();
+    await expect(page.locator('[data-testid="ph-mode-panel-identifier"]')).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Wildcard textareas must remain enabled (degraded mode).
     for (const id of [

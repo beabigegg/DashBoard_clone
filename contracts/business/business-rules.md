@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.3.0
+schema-version: 1.4.0
 last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
@@ -132,6 +132,8 @@ breaking-change-policy: deprecate-2-minors
 | PHF-04 | Cache schema versioning | `container_filter_cache` payload 必含 `schema_version: int`；目前值 `2`。讀取時 schema-version mismatch → log INFO，回傳 None，強制走 Oracle 重建路徑；絕不嘗試以舊 shape 反序列化（AC-8）。Rollback 機制：bump 至 `3` 在下次 deploy 自動讓 L2 entries 失效，免去 `redis-cli DEL`。 | unit + integration tests |
 | PHF-05 | Multi-worker cache rebuild lock | `container_filter_cache` 冷啟動 / TTL 過期重建使用 file-based exclusive lock：`os.open('tmp/container_filter_cache.loading', O_CREAT\|O_EXCL\|O_WRONLY)`；勝出 worker 執行 Oracle 重建後 release（`finally` 區塊保證）；其餘 workers 每 5 s 輪詢 Redis L2 共 18 次（90 s 上限），命中後 reuse；逾時 fallback 至 Oracle 重試（AC-6）。Pattern 沿用 `resource_history_duckdb_cache._try_lock/_release_lock`。 | integration + multi_worker tests |
 | PHF-06 | SQL meta-char rejection | 高基數欄位 token 在進入 SQL bind 前必須通過 meta-char regex 拒絕：包含任一字元 `'`、`;`、`--`、`/*`、`*/` 或 control chars `\x00-\x1f` → 400 `VALIDATION_ERROR`，且**永不進入 Oracle**（AC-4）。Validation 集中於 `core/request_validation.py::parse_wildcard_tokens`，為高基數欄位的單一 trust boundary。 | unit + fuzz tests |
+| PHF-07 | Identifier-mode date optionality | `POST /api/production-history/query` 當 request 含至少一個 identifier wildcard token（`mfg_orders` / `lot_ids` / `wafer_lots`，通過 PHF-02 解析後非空）且未提供 `start_date` / `end_date` 時，`validate_query_params` 不再要求日期，改以 wide / all-time 查詢路徑執行（identifier 述詞已充分 scope 查詢）。日期若有提供仍套用 730d 上限（VAL-03 / SYS-04）。Identifier-mode 查詢不要求 `pj_types`。（AC-4） | unit + contract + integration tests |
+| PHF-08 | Classification-mode required params | `POST /api/production-history/query` 當 request 不含任何 identifier wildcard token 時為 classification mode：`pj_types`、`start_date`、`end_date` 皆為必填，缺少任一 → 400 `VALIDATION_ERROR`（行為與 prod-history-query-mode-tabs 之前完全一致，為 VAL-02 在 mode-split 後的精確化表述）。（AC-2、AC-7） | unit + contract + route tests |
 
 ## Analytics / Anomaly Detection Rules
 
@@ -199,6 +201,8 @@ breaking-change-policy: deprecate-2-minors
 | DB unavailable | HTTP 503 `service_unavailable` | SYS-01 | resilience |
 | Malicious input | HTTP 400 `VALIDATION_ERROR` | VAL-01 | fuzz tests |
 | Date range > 730d | HTTP 400 `VALIDATION_ERROR` | VAL-03 | route tests |
+| Identifier token present + no dates | wide / all-time query, no dates-required error | PHF-07 | contract + integration |
+| No identifier token + missing pj_types/dates | HTTP 400 `VALIDATION_ERROR` | PHF-08 | route tests |
 
 ## Change Policy
 

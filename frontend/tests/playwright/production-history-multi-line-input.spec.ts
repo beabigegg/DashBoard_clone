@@ -4,8 +4,15 @@
  * Verifies that:
  *   - Paste with mixed separators (CRLF + comma + tab) yields the right
  *     deduplicated token list in the outgoing query body
- *   - An empty textarea omits the wildcard field from the request body
- *     entirely (backward-compat — AC-3)
+ *   - An identifier-mode query with all wildcard textareas empty is blocked
+ *     client-side (no request sent) with a validation message
+ *
+ * Note (prod-history-query-mode-tabs): the old "empty textarea omits the
+ * wildcard field" back-compat case no longer exists by design. After the
+ * two-tab split, wildcard fields live only in Tab B 「依識別碼查詢」, and Tab B
+ * requires ≥1 identifier token to submit — there is no flow that sends a query
+ * with empty wildcard inputs. The empty-input case is therefore re-expressed
+ * as a client-side validation block.
  *
  * The parser idempotence proof at the data layer
  * (parse(parse(x)) == parse(x)) is covered by
@@ -76,28 +83,25 @@ async function installMocks(page: Page): Promise<{ queryRequests: Request[] }> {
   return { queryRequests };
 }
 
-async function pickTypeAndDates(page: Page) {
-  const dateInputs = page.locator('input[type="date"]');
-  if ((await dateInputs.count()) >= 2) {
-    await dateInputs.nth(0).fill('2026-05-01');
-    await dateInputs.nth(1).fill('2026-05-07');
-  }
-  const typeRoot = page.locator('[data-testid="ph-first-tier-type"]');
-  await typeRoot.locator('.multi-select-trigger, button, [role="combobox"]').first().click();
-  const firstOpt = page.locator('.multi-select-option, [role="option"], label').first();
-  if (await firstOpt.isVisible()) await firstOpt.click();
-  await page.locator('body').click({ position: { x: 5, y: 5 } });
+// The two-tab redesign (prod-history-query-mode-tabs) moved the wildcard
+// textareas into Tab B 「依識別碼查詢」. An identifier-mode query needs neither
+// a Type selection nor a date range — switching to Tab B is the only setup.
+async function switchToIdentifierTab(page: Page) {
+  await page.locator('[data-testid="ph-mode-tab-identifier"]').click();
+  await expect(page.locator('[data-testid="ph-mode-panel-identifier"]')).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
-test.describe('Production History — multi-line input (AC-5, AC-3)', () => {
+test.describe('Production History — multi-line input (AC-5)', () => {
   test('Mixed CRLF + comma + tab separators dedup into request body', async ({ page }) => {
     await installMocks(page);
     await loginViaApi(page);
     await navigateViaSidebar(page, 'production-history', {
-      waitForSelector: '[data-testid="ph-first-tier-mfg-orders"]',
+      waitForSelector: '[data-testid="ph-mode-tab-identifier"]',
     });
 
-    await pickTypeAndDates(page);
+    await switchToIdentifierTab(page);
 
     // Build a deliberately messy input: CRLF, commas, tabs, duplicates,
     // leading/trailing whitespace.
@@ -122,16 +126,16 @@ test.describe('Production History — multi-line input (AC-5, AC-3)', () => {
     ]);
   });
 
-  test('Empty textarea omits the wildcard field entirely (AC-3 back-compat)', async ({
+  test('Empty identifier query is blocked client-side — no request sent', async ({
     page,
   }) => {
     const { queryRequests } = await installMocks(page);
     await loginViaApi(page);
     await navigateViaSidebar(page, 'production-history', {
-      waitForSelector: '[data-testid="ph-first-tier-mfg-orders"]',
+      waitForSelector: '[data-testid="ph-mode-tab-identifier"]',
     });
 
-    await pickTypeAndDates(page);
+    await switchToIdentifierTab(page);
 
     // Leave all three wildcard textareas empty.
     await page.locator('[data-testid="ph-first-tier-mfg-orders"]').fill('');
@@ -140,16 +144,12 @@ test.describe('Production History — multi-line input (AC-5, AC-3)', () => {
 
     const queryBtn = page.locator('button:has-text("查詢")').first();
     await expect(queryBtn).toBeEnabled({ timeout: 10_000 });
-
-    const reqPromise = page.waitForRequest('**/api/production-history/query', { timeout: 10_000 });
     await queryBtn.click();
-    const req = await reqPromise;
 
-    const body = req.postDataJSON();
-    // Wildcard keys MUST be omitted entirely (not sent as empty arrays).
-    expect(body).not.toHaveProperty('mfg_orders');
-    expect(body).not.toHaveProperty('lot_ids');
-    expect(body).not.toHaveProperty('wafer_lots');
-    expect(queryRequests.length).toBeGreaterThan(0);
+    // A validation message must surface and NO query request is sent — Tab B
+    // requires at least one identifier token.
+    await expect(page.locator('.ph-app__form-error')).toBeVisible({ timeout: 5_000 });
+    await page.waitForTimeout(500);
+    expect(queryRequests.length).toBe(0);
   });
 });

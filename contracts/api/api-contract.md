@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.3.0
+schema-version: 1.4.0
 last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
@@ -266,6 +266,13 @@ breaking-change-policy: deprecate-2-minors
     - `wafer_lots[]`（string 陣列，支援 `*` 萬用字元，新欄位）
   - 萬用字元語法見 business-rules.md PHF-02；server-side validation 拒絕 SQL meta-char（PHF-06），最多 100 patterns/field。
   - Type-only flow 不變（其他欄位皆 optional，省略時即既有行為）。
+- **Production-History query-mode tabs（2026-05-14，prod-history-query-mode-tabs）**：以下為 additive，backward-compatible：
+  - `POST /api/production-history/query` 的 `start_date` / `end_date` 由「無條件必填」放寬為「條件必填」：
+    - **Classification mode**（request body 不含任何 identifier wildcard token — `mfg_orders` / `lot_ids` / `wafer_lots` 皆空或缺省）：`start_date` / `end_date` 仍為必填，缺少時 → 400 `VALIDATION_ERROR`（行為與舊版完全一致）。
+    - **Identifier mode**（request body 含至少一個 `mfg_orders` / `lot_ids` / `wafer_lots` token）：`start_date` / `end_date` 為可選；兩者皆缺省時執行 wide / all-time 查詢，不再回傳 dates-required 錯誤。
+  - 當 identifier token 存在「且」日期亦有提供時，日期上限規則（730d，VAL-03 / SYS-04）仍適用。
+  - 既有 callers（classification 流程、現有測試）一律持續送出 `start_date` / `end_date`，行為不變；此變更不影響 first-tier cache filter 機制、wildcard 文法、second-tier 過濾或 matrix/detail 渲染。
+  - Per-mode 驗證語意見 business-rules.md PHF-07 / PHF-08。
 - **WIP new filter params（2026-05-13，wip-hold-drilldown-filters）**：以下四個端點新增三個可選查詢參數，全部為 additive，不影響既有呼叫方：
   - 端點：`GET/POST /api/wip/detail/<workcenter>`、`GET/POST /api/wip/overview/summary`、`GET/POST /api/wip/overview/matrix`、`GET/POST /api/wip/meta/filter-options`
   - 新增參數：

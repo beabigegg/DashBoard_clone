@@ -127,9 +127,88 @@ export interface QueryParams {
   mfg_orders?: string[];
   lot_ids?: string[];
   wafer_lots?: string[];
-  start_date: string;
-  end_date: string;
+  /** Date range — required in classification mode, omitted in identifier mode
+   *  (backend substitutes a wide default window — proposal.md Option B). */
+  start_date?: string;
+  end_date?: string;
   [key: string]: unknown;
+}
+
+/** Query mode — the active tab is the single source of truth for which
+ *  payload fields are submitted (proposal.md cross-cutting concern). */
+export type QueryMode = 'classification' | 'identifier';
+
+/** First-tier query fragment built by useFirstTierFilters.buildQueryFragment. */
+export type QueryFragment = Record<string, string[]>;
+
+/** Inputs needed to validate a query submission for the active mode. */
+export interface ModeValidationInput {
+  /** Selected pj_types (classification mode required field). */
+  pjTypes: string[];
+  /** Date-range start (classification mode required field). */
+  startDate: string;
+  /** Date-range end (classification mode required field). */
+  endDate: string;
+  /** True when at least one wildcard textarea has ≥1 parsed token. */
+  hasIdentifierToken: boolean;
+}
+
+/** Mode-aware submission validation.
+ *
+ * - classification: requires ≥1 pj_type, both dates, start ≤ end.
+ * - identifier: requires ≥1 parsed identifier token; dates are never inspected.
+ *
+ * Returns an empty string when valid, otherwise a user-visible message. */
+export function validateQueryMode(mode: QueryMode, input: ModeValidationInput): string {
+  if (mode === 'identifier') {
+    if (!input.hasIdentifierToken) {
+      return '請至少輸入一個識別碼（工單號 / LOT ID / Wafer LOT）';
+    }
+    return '';
+  }
+  // classification
+  if (!input.pjTypes.length) {
+    return '請選擇至少一個 Type';
+  }
+  if (!input.startDate || !input.endDate) {
+    return '請填寫查詢起訖日期';
+  }
+  if (input.startDate > input.endDate) {
+    return '開始日期不可晚於結束日期';
+  }
+  return '';
+}
+
+/** Mode-gated payload builder — the active tab is the single source of truth.
+ *
+ * - classification: first-tier classification selections + dates. Wildcard
+ *   fields are stripped (Tab A has no wildcard inputs; this defends against
+ *   stale state leaking in).
+ * - identifier: ONLY the parsed wildcard fields. NO start_date/end_date —
+ *   the backend substitutes a wide default window (proposal.md Option B).
+ *
+ * `fragment` is the full output of useFirstTierFilters.buildQueryFragment(). */
+export function buildModePayload(
+  mode: QueryMode,
+  fragment: QueryFragment,
+  dates: { startDate: string; endDate: string },
+): Record<string, unknown> {
+  const wildcardKeys = ['mfg_orders', 'lot_ids', 'wafer_lots'] as const;
+  const classificationKeys = ['pj_types', 'pj_packages', 'pj_bops', 'pj_functions'] as const;
+  const out: Record<string, unknown> = {};
+  if (mode === 'identifier') {
+    for (const key of wildcardKeys) {
+      if (fragment[key]?.length) out[key] = fragment[key];
+    }
+    return out;
+  }
+  // classification
+  for (const key of classificationKeys) {
+    if (fragment[key]?.length) out[key] = fragment[key];
+  }
+  out.start_date = dates.startDate;
+  out.end_date = dates.endDate;
+  return out;
 }
 
 // ── Internal helper types ─────────────────────────────────────────────────
@@ -481,6 +560,31 @@ export function useProductionHistory() {
     await fetchSupplementaryOptions(stagedFilter);
   }
 
+  // ── Full results reset (清除篩選 button) ───────────────────────────────────
+  // Clears every piece of post-query state so the page returns to its
+  // pre-first-query empty state. First-tier selections + wildcard textareas
+  // are reset separately via useFirstTierFilters.clearAll() in App.vue.
+  function resetResults(): void {
+    if (_jobAbortController) {
+      _jobAbortController.abort();
+      _jobAbortController = null;
+    }
+    jobProgress.active = false;
+    datasetId.value = null;
+    datasetMeta.value = null;
+    matrixTree.value = [];
+    matrixMonthColumns.value = [];
+    detailRows.value = [];
+    pagination.value = { page: 1, per_page: 25, total_rows: 0, total_pages: 0 };
+    supplementaryOptions.value = { workcenter_groups: [], equipment_ids: [] };
+    _clearMatrixFilter();
+    _clearStagedFilter();
+    _clearSupplementaryFilter();
+    error.value = null;
+    overloadError.value = null;
+    expiredDataset.value = false;
+  }
+
   // ── Export ─────────────────────────────────────────────────────────────────
   async function exportCsv(): Promise<void> {
     if (!datasetId.value) return;
@@ -523,5 +627,6 @@ export function useProductionHistory() {
     applyMatrixFilter,
     stageSupplementaryFilter,
     exportCsv,
+    resetResults,
   };
 }

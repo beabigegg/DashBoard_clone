@@ -24,7 +24,13 @@ import { assertShape, _resetWarned as _resetSchemaWarned } from '../../src/core/
 import {
   parseWildcardInput,
   _buildUrl,
+  useFirstTierFilters,
 } from '../../src/production-history/composables/useFirstTierFilters.ts';
+import {
+  validateQueryMode,
+  buildModePayload,
+  useProductionHistory,
+} from '../../src/production-history/composables/useProductionHistory.ts';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -340,5 +346,192 @@ describe('_buildUrl — cross-filter URL construction', () => {
       bops: ['BOP-1'],
       pj_functions: ['FN-1'],
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateQueryMode — per-tab submission validation (AC-2, AC-3)
+// ---------------------------------------------------------------------------
+
+describe('validateQueryMode — Tab A (classification)', () => {
+  const base = { pjTypes: ['A'], startDate: '2026-05-01', endDate: '2026-05-07', hasIdentifierToken: false };
+
+  it('passes with a TYPE and a valid date range', () => {
+    expect(validateQueryMode('classification', base)).toBe('');
+  });
+
+  it('blocks submit when pj_types is empty', () => {
+    const msg = validateQueryMode('classification', { ...base, pjTypes: [] });
+    expect(msg).not.toBe('');
+    expect(msg).toContain('Type');
+  });
+
+  it('blocks submit when start_date is empty', () => {
+    const msg = validateQueryMode('classification', { ...base, startDate: '' });
+    expect(msg).not.toBe('');
+  });
+
+  it('blocks submit when end_date is empty', () => {
+    const msg = validateQueryMode('classification', { ...base, endDate: '' });
+    expect(msg).not.toBe('');
+  });
+
+  it('blocks submit when start_date is after end_date', () => {
+    const msg = validateQueryMode('classification', {
+      ...base,
+      startDate: '2026-05-09',
+      endDate: '2026-05-01',
+    });
+    expect(msg).not.toBe('');
+  });
+
+  it('ignores identifier tokens — classification still needs TYPE + dates', () => {
+    const msg = validateQueryMode('classification', {
+      pjTypes: [],
+      startDate: '',
+      endDate: '',
+      hasIdentifierToken: true,
+    });
+    expect(msg).not.toBe('');
+  });
+});
+
+describe('validateQueryMode — Tab B (identifier)', () => {
+  it('allows submit with only an identifier token, no TYPE, no dates', () => {
+    expect(
+      validateQueryMode('identifier', {
+        pjTypes: [],
+        startDate: '',
+        endDate: '',
+        hasIdentifierToken: true,
+      }),
+    ).toBe('');
+  });
+
+  it('blocks submit when no identifier token is present', () => {
+    const msg = validateQueryMode('identifier', {
+      pjTypes: [],
+      startDate: '',
+      endDate: '',
+      hasIdentifierToken: false,
+    });
+    expect(msg).not.toBe('');
+  });
+
+  it('never inspects dates — invalid date range is irrelevant in identifier mode', () => {
+    expect(
+      validateQueryMode('identifier', {
+        pjTypes: [],
+        startDate: '2026-12-31',
+        endDate: '2026-01-01',
+        hasIdentifierToken: true,
+      }),
+    ).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildModePayload — mode-gated payload builder (proposal.md cross-cutting)
+// ---------------------------------------------------------------------------
+
+describe('buildModePayload — mode-gated payload builder', () => {
+  const dates = { startDate: '2026-05-01', endDate: '2026-05-07' };
+
+  it('classification payload carries classification fields + dates', () => {
+    const payload = buildModePayload(
+      'classification',
+      { pj_types: ['A'], pj_packages: ['PKG-1'] },
+      dates,
+    );
+    expect(payload.pj_types).toEqual(['A']);
+    expect(payload.pj_packages).toEqual(['PKG-1']);
+    expect(payload.start_date).toBe('2026-05-01');
+    expect(payload.end_date).toBe('2026-05-07');
+  });
+
+  it('classification payload strips stale wildcard fields', () => {
+    const payload = buildModePayload(
+      'classification',
+      { pj_types: ['A'], lot_ids: ['L1'], mfg_orders: ['WO1'], wafer_lots: ['W1'] },
+      dates,
+    );
+    expect(payload.lot_ids).toBeUndefined();
+    expect(payload.mfg_orders).toBeUndefined();
+    expect(payload.wafer_lots).toBeUndefined();
+  });
+
+  it('identifier payload carries ONLY wildcard fields — no dates', () => {
+    const payload = buildModePayload(
+      'identifier',
+      { lot_ids: ['L1'], mfg_orders: ['WO1'] },
+      dates,
+    );
+    expect(payload.lot_ids).toEqual(['L1']);
+    expect(payload.mfg_orders).toEqual(['WO1']);
+    expect(payload.start_date).toBeUndefined();
+    expect(payload.end_date).toBeUndefined();
+  });
+
+  it('identifier payload strips stale Tab A classification state', () => {
+    const payload = buildModePayload(
+      'identifier',
+      { pj_types: ['A'], pj_packages: ['PKG-1'], lot_ids: ['L1'] },
+      dates,
+    );
+    expect(payload.pj_types).toBeUndefined();
+    expect(payload.pj_packages).toBeUndefined();
+    expect(payload.lot_ids).toEqual(['L1']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 清除篩選 — broadened reset across both composables (AC-6)
+// ---------------------------------------------------------------------------
+
+describe('清除篩選 — useFirstTierFilters.clearAll resets selections + wildcards', () => {
+  it('clears all first-tier selections and all 3 wildcard textareas', () => {
+    const ft = useFirstTierFilters({ fetcher: async () => ({ success: true, data: {}, meta: {} }) });
+    ft.selection.pj_types = ['A'];
+    ft.selection.packages = ['PKG-1'];
+    ft.selection.bops = ['BOP-1'];
+    ft.selection.pj_functions = ['FN-1'];
+    ft.wildcardInput.mfg_orders = 'WO-1';
+    ft.wildcardInput.lot_ids = 'L-1';
+    ft.wildcardInput.wafer_lots = 'W-1';
+
+    ft.clearAll();
+
+    expect(ft.selection.pj_types).toEqual([]);
+    expect(ft.selection.packages).toEqual([]);
+    expect(ft.selection.bops).toEqual([]);
+    expect(ft.selection.pj_functions).toEqual([]);
+    expect(ft.wildcardInput.mfg_orders).toBe('');
+    expect(ft.wildcardInput.lot_ids).toBe('');
+    expect(ft.wildcardInput.wafer_lots).toBe('');
+  });
+});
+
+describe('清除篩選 — useProductionHistory.resetResults clears results + supplementary/matrix', () => {
+  it('clears datasetId, detail rows, matrix, supplementary filter, and results state', () => {
+    const ph = useProductionHistory();
+    ph.datasetId.value = 'ds-123';
+    ph.detailRows.value = [{ lot_id: 'L1' }];
+    ph.matrixTree.value = [{ label: 'WC', count: 1 }];
+    ph.matrixMonthColumns.value = ['2026-05'];
+    ph.matrixFilter.workcenter_group = 'DB';
+    ph.supplementaryFilter.workcenter_groups = ['DB'];
+    ph.stagedFilter.equipment_ids = ['EQ1'];
+    ph.error.value = 'boom';
+
+    ph.resetResults();
+
+    expect(ph.datasetId.value).toBeNull();
+    expect(ph.detailRows.value).toEqual([]);
+    expect(ph.matrixTree.value).toEqual([]);
+    expect(ph.matrixMonthColumns.value).toEqual([]);
+    expect(ph.matrixFilter.workcenter_group).toBe('');
+    expect(ph.supplementaryFilter.workcenter_groups).toEqual([]);
+    expect(ph.stagedFilter.equipment_ids).toEqual([]);
+    expect(ph.error.value).toBeNull();
   });
 });

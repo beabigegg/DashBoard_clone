@@ -1,0 +1,29 @@
+agent: backend-engineer
+change-id: prod-history-query-mode-tabs
+summary: >
+  Implemented Option B mode-split validation in validate_query_params:
+  identifier mode (>=1 wildcard token) makes pj_types + dates optional and
+  substitutes a 730-day wide default window when dates absent; classification
+  mode unchanged. No SQL template or chunk-pipeline change.
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/services/production_history_service.py:86-176 (validate_query_params mode-split)" }
+  - { type: tests-added, pointer: "tests/test_production_history_service.py::TestValidateQueryParamsModeSplit (8 cases incl. test_query_identifier_wide_window_bounded)" }
+  - { type: tests-added, pointer: "tests/test_production_history_routes.py::TestQueryModeSplitRoutes (3 cases)" }
+  - { type: tests-added, pointer: "tests/test_api_contract.py::TestProductionHistoryQueryModeContract (2 cases)" }
+  - { type: test-output, pointer: "13 new passed; full sweep 102 passed in 33.08s (service+routes+api_contract+sql_runtime)" }
+  - { type: contracts-touched, pointer: "none (api 1.4.0 / business 1.4.0 PHF-07/PHF-08 already updated by main Claude)" }
+notes:
+  - AC-5 bounded-window assertion verified: validate_query_params substitutes
+    end_date=today, start_date=today-(MAX_DATE_RANGE_DAYS-1) so chunk span ==
+    730d exactly and chunk_start >= today-730d. Deterministic, no Oracle
+    optimizer reliance.
+  - pj_types requirement is now ALSO mode-gated (per PHF-07 "identifier-mode
+    queries do not require pj_types") — moved below token parsing so mode is
+    known first.
+  - Classification-mode behavior byte-identical: existing tests
+    (test_validate_query_params_missing_pj_types, _missing_dates,
+    _max_date_range, 730d boundary) all still pass.
+risks:
+  - FIRSTNAME (wafer_lots) index coverage unconfirmed (proposal open risk) —
+    scan stays date-bounded regardless; not a blocker.
+next-reviewer: contract-reviewer

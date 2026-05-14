@@ -158,7 +158,10 @@ test.describe('Production History — cross-filter (AC-2, AC-7)', () => {
     );
   });
 
-  test('renders 4 MultiSelects + 3 wildcard textareas (AC-7)', async ({ page }) => {
+  test('renders 4 MultiSelects (Tab A) + 3 wildcard textareas (Tab B) (AC-7)', async ({
+    page,
+  }) => {
+    // Tab A 「依產品分類查詢」 is the default tab — the 4 cached MultiSelects live here.
     for (const id of [
       'ph-first-tier-type',
       'ph-first-tier-package',
@@ -167,6 +170,12 @@ test.describe('Production History — cross-filter (AC-2, AC-7)', () => {
     ]) {
       await expect(page.locator(`[data-testid="${id}"]`)).toBeVisible({ timeout: 10_000 });
     }
+    // The two-tab redesign (prod-history-query-mode-tabs) moved the 3 wildcard
+    // textareas into Tab B 「依識別碼查詢」 — switch tabs to assert them.
+    await page.locator('[data-testid="ph-mode-tab-identifier"]').click();
+    await expect(page.locator('[data-testid="ph-mode-panel-identifier"]')).toBeVisible({
+      timeout: 10_000,
+    });
     for (const id of [
       'ph-first-tier-mfg-orders',
       'ph-first-tier-lot-ids',

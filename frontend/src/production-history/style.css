@@ -56,6 +56,29 @@
   @apply border border-gray-300 rounded px-2 py-1 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300;
 }
 
+/* ── Query-mode tabs (依產品分類查詢 / 依識別碼查詢) ──────────────────────── */
+
+.theme-production-history .ph-mode-tabs {
+  @apply flex gap-1 border-b border-gray-200 -mt-1;
+}
+
+.theme-production-history .ph-mode-tab {
+  @apply px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent
+    cursor-pointer transition-colors hover:text-gray-700;
+}
+
+.theme-production-history .ph-mode-tab:focus-visible {
+  @apply outline-none ring-2 ring-blue-300 rounded-t;
+}
+
+.theme-production-history .ph-mode-tab--active {
+  @apply text-blue-600 border-blue-500;
+}
+
+.theme-production-history .ph-mode-tab__note {
+  @apply text-xs text-gray-500 mt-2;
+}
+
 /* ── First-tier filter rows (cached cross-filter MultiSelects) ───────────── */
 
 .theme-production-history .ph-first-tier__multiselect-grid {
@@ -101,7 +124,7 @@
 }
 
 .theme-production-history .ph-app__filter-actions {
-  @apply flex items-center gap-3 pt-3 justify-end;
+  @apply flex flex-wrap justify-between items-center gap-3 gap-y-2 pt-3;
 }
 
 .theme-production-history .ph-app__filter-field--type {

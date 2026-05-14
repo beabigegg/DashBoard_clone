@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import pytest
 
 
 # ============================================================
@@ -271,3 +272,129 @@ class TestMainQueryNewParams:
                 ):
                     out = cache_mod.get_pj_types()
         assert out == []
+
+
+class TestValidateQueryParamsModeSplit:
+    """PHF-07 / PHF-08 — mode-split validation for prod-history-query-mode-tabs.
+
+    Identifier mode (≥1 wildcard token present):
+      - dates optional → wide 730-day window substituted when absent
+      - pj_types NOT required
+    Classification mode (no identifier token):
+      - pj_types + start_date + end_date all still required
+    """
+
+    def test_identifier_mode_no_dates_accepted(self):
+        """PHF-07 — wildcard tokens present, dates omitted → no raise, no pj_types needed."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        params = validate_query_params({"lot_ids": ["GA001AB"]})
+        assert params["lot_ids_tokens"], "lot_ids must parse to tokens"
+        assert params["pj_types"] == []
+        assert params["start_date"] and params["end_date"]
+
+    def test_identifier_mode_runs_wide_window(self):
+        """AC-5 — no-date identifier query produces a 730-day wide bind, not 30-day default."""
+        from datetime import date, datetime
+        from mes_dashboard.services.production_history_service import (
+            MAX_DATE_RANGE_DAYS,
+            validate_query_params,
+        )
+        params = validate_query_params({"mfg_orders": "MA2025*"})
+        start_dt = datetime.strptime(params["start_date"], "%Y-%m-%d").date()
+        end_dt = datetime.strptime(params["end_date"], "%Y-%m-%d").date()
+        span = (end_dt - start_dt).days + 1
+        assert span == MAX_DATE_RANGE_DAYS, f"wide window span must equal cap, got {span}"
+        assert end_dt == date.today(), "wide window must be anchored at today"
+        assert start_dt >= date.today() - __import__("datetime").timedelta(days=MAX_DATE_RANGE_DAYS)
+
+    def test_classification_mode_missing_dates_still_raises(self):
+        """PHF-08 — pj_types present, no identifier token, no dates → dates-required error."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        with pytest.raises(ValueError, match="start_date, end_date"):
+            validate_query_params({"pj_types": ["GA"]})
+
+    def test_classification_mode_missing_pj_types_still_raises(self):
+        """PHF-08 — no identifier token, no pj_types → pj_types-required error."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        with pytest.raises(ValueError, match="pj_types"):
+            validate_query_params({"start_date": "2026-03-01", "end_date": "2026-03-10"})
+
+    def test_classification_mode_unchanged_with_dates(self):
+        """AC-7 — existing type+date flow byte-identical bind."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        params = validate_query_params({
+            "pj_types": ["GA"],
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-10",
+        })
+        assert params["start_date"] == "2026-03-01"
+        assert params["end_date"] == "2026-03-10"
+        assert params["end_date_exclusive"] == "2026-03-11"
+
+    def test_identifier_mode_with_dates_still_honors_them(self):
+        """PHF-07 — dates supplied alongside tokens → date predicate kept verbatim."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        params = validate_query_params({
+            "lot_ids": ["GA001AB"],
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31",
+        })
+        assert params["start_date"] == "2026-01-01"
+        assert params["end_date"] == "2026-01-31"
+
+    def test_identifier_mode_with_dates_over_cap_still_raises(self):
+        """VAL-03 — identifier tokens + explicit dates > 730d → still raises."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        with pytest.raises(ValueError, match="日期區間超過上限"):
+            validate_query_params({
+                "lot_ids": ["GA001AB"],
+                "start_date": "2020-01-01",
+                "end_date": "2026-03-25",
+            })
+
+    def test_query_identifier_wide_window_bounded(self):
+        """AC-5 — no-date identifier path is date-bounded, never unbounded.
+
+        Deterministic verification: the substituted window spans exactly the
+        730-day cap and chunk_start ≥ today − 730d — no unbounded predicate
+        ever reaches Oracle. No Oracle optimizer reliance.
+        """
+        from datetime import date, timedelta
+        from mes_dashboard.services.batch_query_engine import decompose_by_time_range
+        from mes_dashboard.services.production_history_service import (
+            ENGINE_GRAIN_DAYS,
+            MAX_DATE_RANGE_DAYS,
+            validate_query_params,
+        )
+        params = validate_query_params({"wafer_lots": ["W12345*"]})
+        chunks = decompose_by_time_range(
+            params["start_date"], params["end_date"], grain_days=ENGINE_GRAIN_DAYS
+        )
+        assert chunks, "decompose must yield at least one chunk"
+        floor = date.today() - timedelta(days=MAX_DATE_RANGE_DAYS)
+        first_start = min(c["chunk_start"] for c in chunks)
+        last_end = max(c["chunk_end"] for c in chunks)
+        assert first_start >= floor.strftime("%Y-%m-%d"), "chunk_start must be ≥ today − 730d"
+        first_dt = datetime_from(first_start)
+        last_dt = datetime_from(last_end)
+        total_span = (last_dt - first_dt).days + 1
+        assert total_span == MAX_DATE_RANGE_DAYS, (
+            f"total chunk span must equal the 730d cap, got {total_span}"
+        )
+
+
+def datetime_from(value: str):
+    from datetime import datetime
+    return datetime.strptime(value, "%Y-%m-%d").date()

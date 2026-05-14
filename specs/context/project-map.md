@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 294
-visible-files: 980
+visible-dirs: 298
+visible-files: 995
 omitted-dirs: 105
 truncated-dirs: 8
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -51,6 +51,7 @@ DashBoard_vite/
 |   |   |-- 00731426b90af740
 |   |   |-- 00e4935d1440a2ca
 |   |   |-- 01ac26600a99dcaa
+|   |   |-- 01cb19e636d04082
 |   |   |-- 028b26de3bd91d6a
 |   |   |-- 02bca2c9d2f8566d
 |   |   |-- 0478f49b48ee4a27
@@ -88,6 +89,7 @@ DashBoard_vite/
 |   |   |-- 2d3a3f69d4e8aa6d
 |   |   |-- 2f2ae64af48e93fe
 |   |   |-- 2f46fe56abf81670
+|   |   |-- 304828cadcbaf843
 |   |   |-- 314c411df6192c80
 |   |   |-- 3240b7b84e21f638
 |   |   |-- 3247c74d4d5e4ad2
@@ -96,9 +98,7 @@ DashBoard_vite/
 |   |   |-- 3453e8fac951ce5c
 |   |   |-- 349505052d6929ea
 |   |   |-- 36c681f3d6d05607
-|   |   |-- 370b8fa4575b8f05
-|   |   |-- 374a27ac8e75b801
-|   |   \-- ... (162 more entries truncated; cap=50)
+|   |   \-- ... (169 more entries truncated; cap=50)
 |   |-- examples/
 |   |   |-- 04e6b3400353b141/
 |   |   |   |-- 13e0290a1a9c0bba
@@ -289,6 +289,8 @@ DashBoard_vite/
 |-- frontend/
 |   |-- logs/
 |   |   \-- admin_logs.sqlite
+|   |-- playwright-report/
+|   |   \-- index.html
 |   |-- scripts/
 |   |   |-- css-governance-check.js
 |   |   \-- ts-resolver-loader.mjs
@@ -537,6 +539,16 @@ DashBoard_vite/
 |   |       |-- YieldPackageChart.vue
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
+|   |-- test-results/
+|   |   |-- production-history-filter--562aa-ible-wildcards-still-usable-chromium/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- production-history-filter--562aa-ible-wildcards-still-usable-chromium-retry1/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
 |   |   |   |-- production-history-abort.test.js
@@ -598,6 +610,11 @@ DashBoard_vite/
 |   |   |   |-- _auth.js
 |   |   |   |-- hold-overview.spec.js
 |   |   |   |-- job-abandon-on-unload.spec.js
+|   |   |   |-- production-history-cross-filter.spec.ts
+|   |   |   |-- production-history-filter-options-error.spec.ts
+|   |   |   |-- production-history-multi-line-input.spec.ts
+|   |   |   |-- production-history-pruning-feedback.spec.ts
+|   |   |   |-- production-history-wildcard-paste.spec.ts
 |   |   |   |-- query-tool-url-state.spec.js
 |   |   |   |-- query-tool.spec.js
 |   |   |   |-- reject-history.spec.js
@@ -633,8 +650,6 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260513_143311.log
-|   |   |-- access_20260513_144430.log
 |   |   |-- access_20260513_151846.log
 |   |   |-- access_20260513_161734.log
 |   |   |-- access_20260513_162703.log
@@ -643,8 +658,8 @@ DashBoard_vite/
 |   |   |-- access_20260514_075632.log
 |   |   |-- access_20260514_081324.log
 |   |   |-- access_20260514_085721.log
-|   |   |-- error_20260513_143311.log
-|   |   |-- error_20260513_144430.log
+|   |   |-- access_20260514_130921.log
+|   |   |-- access_20260514_131740.log
 |   |   |-- error_20260513_151846.log
 |   |   |-- error_20260513_161734.log
 |   |   |-- error_20260513_162703.log
@@ -653,8 +668,8 @@ DashBoard_vite/
 |   |   |-- error_20260514_075632.log
 |   |   |-- error_20260514_081324.log
 |   |   |-- error_20260514_085721.log
-|   |   |-- rq_msd_worker_20260513_134105.log
-|   |   |-- rq_msd_worker_20260513_143311.log
+|   |   |-- error_20260514_130921.log
+|   |   |-- error_20260514_131740.log
 |   |   |-- rq_msd_worker_20260513_144430.log
 |   |   |-- rq_msd_worker_20260513_151846.log
 |   |   |-- rq_msd_worker_20260513_161734.log
@@ -663,8 +678,8 @@ DashBoard_vite/
 |   |   |-- rq_msd_worker_20260514_075133.log
 |   |   |-- rq_msd_worker_20260514_081324.log
 |   |   |-- rq_msd_worker_20260514_085721.log
-|   |   |-- rq_prod_hist_worker_20260513_134105.log
-|   |   |-- rq_prod_hist_worker_20260513_143311.log
+|   |   |-- rq_msd_worker_20260514_130921.log
+|   |   |-- rq_msd_worker_20260514_131740.log
 |   |   |-- rq_prod_hist_worker_20260513_144430.log
 |   |   |-- rq_prod_hist_worker_20260513_151846.log
 |   |   |-- rq_prod_hist_worker_20260513_161734.log
@@ -673,8 +688,8 @@ DashBoard_vite/
 |   |   |-- rq_prod_hist_worker_20260514_075133.log
 |   |   |-- rq_prod_hist_worker_20260514_081324.log
 |   |   |-- rq_prod_hist_worker_20260514_085721.log
-|   |   |-- rq_reject_worker_20260513_134105.log
-|   |   |-- rq_reject_worker_20260513_143311.log
+|   |   |-- rq_prod_hist_worker_20260514_130921.log
+|   |   |-- rq_prod_hist_worker_20260514_131740.log
 |   |   |-- rq_reject_worker_20260513_144430.log
 |   |   |-- rq_reject_worker_20260513_151846.log
 |   |   |-- rq_reject_worker_20260513_161734.log
@@ -683,9 +698,13 @@ DashBoard_vite/
 |   |   |-- rq_reject_worker_20260514_075133.log
 |   |   |-- rq_reject_worker_20260514_081324.log
 |   |   |-- rq_reject_worker_20260514_085721.log
+|   |   |-- rq_reject_worker_20260514_130921.log
+|   |   |-- rq_reject_worker_20260514_131740.log
 |   |   \-- ... (30 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
+|   |-- admin_logs.sqlite-shm
+|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
 |   |-- login_sessions.sqlite-shm
@@ -1126,7 +1145,8 @@ DashBoard_vite/
 |       |   |-- __init__.py
 |       |   |-- builder.py
 |       |   |-- filters.py
-|       |   \-- loader.py
+|       |   |-- loader.py
+|       |   \-- wildcards.py
 |       |-- static/
 |       |   |-- js/
 |       |   |   \-- ... (max depth)
@@ -1210,6 +1230,7 @@ DashBoard_vite/
 |   |   |-- conftest.py
 |   |   |-- README.md
 |   |   |-- strategies.py
+|   |   |-- test_cross_filter.py
 |   |   |-- test_filter_idempotence.py
 |   |   |-- test_filter_subset_invariant.py
 |   |   |-- test_hold_history_duration_invariants.py
@@ -1220,7 +1241,8 @@ DashBoard_vite/
 |   |   |-- test_request_validation_robustness.py
 |   |   |-- test_sort_allowlist.py
 |   |   |-- test_url_state_decode_robustness.py
-|   |   \-- test_url_state_roundtrip.py
+|   |   |-- test_url_state_roundtrip.py
+|   |   \-- test_wildcard_parser.py
 |   |-- routes/
 |   |   |-- _fuzz_payloads.py
 |   |   |-- test_fuzz_routes.py
@@ -1317,23 +1339,20 @@ DashBoard_vite/
 |   |   |-- production_history/
 |   |   |   |-- ph-27341ddf8cc4c8a7.parquet
 |   |   |   |-- ph-3ad613aaeb470f66.parquet
-|   |   |   \-- ph-802707dafb3d06ad.parquet
+|   |   |   |-- ph-802707dafb3d06ad.parquet
+|   |   |   \-- ph-e64f1580b8d1f92d.parquet
 |   |   |-- resource_dataset/
 |   |   |   |-- 2a692b9c32b461d2.parquet
 |   |   |   |-- 7e37d99ad559f8c8.parquet
-|   |   |   |-- 8a0d9dfe9ada2b79.parquet
 |   |   |   |-- a8df0741cccf4c66.parquet
 |   |   |   |-- c56732e86dc8a5ee.parquet
-|   |   |   |-- c95d31f0c140f227.parquet
-|   |   |   \-- ddfc022c315a795b.parquet
+|   |   |   \-- c95d31f0c140f227.parquet
 |   |   |-- resource_oee/
 |   |   |   |-- 2a692b9c32b461d2.parquet
 |   |   |   |-- 7e37d99ad559f8c8.parquet
-|   |   |   |-- 8a0d9dfe9ada2b79.parquet
 |   |   |   |-- a8df0741cccf4c66.parquet
 |   |   |   |-- c56732e86dc8a5ee.parquet
-|   |   |   |-- c95d31f0c140f227.parquet
-|   |   |   \-- ddfc022c315a795b.parquet
+|   |   |   \-- c95d31f0c140f227.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -1379,7 +1398,7 @@ DashBoard_vite/
 |   |   |-- probe_118725.json
 |   |   |-- probe_118748.json
 |   |   |-- probe_118789.json
-|   |   \-- ... (318 more entries truncated; cap=50)
+|   |   \-- ... (330 more entries truncated; cap=50)
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
 |   |-- resource_history.duckdb

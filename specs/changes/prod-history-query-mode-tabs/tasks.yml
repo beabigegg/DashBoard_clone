@@ -1,0 +1,39 @@
+change-id: prod-history-query-mode-tabs
+status: in-progress
+tier: 2
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done, note: "Tier 2 classified 2026-05-14; arch-review=yes; current-behavior + proposal + qa-report + regression-report required; spec/design n/a" }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "contract-reviewer 2026-05-14: api 1.3.0->1.4.0, api-inventory 1.1.3->1.1.4, business 1.3.0->1.4.0; css/data no-change" }
+  - { id: "1.3", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md written by ci-cd-gatekeeper; no new workflow files; existing gates absorb new tests; Rollback/Promotion Policy headings present" }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done, note: "Section 10 compat note: start_date/end_date conditionally-required (classification vs identifier mode); api 1.4.0 + api-inventory 1.1.4" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: done, note: "contract-reviewer: no-change; tab UI + 清除篩選 button covered by existing tokens + ui-btn BEM; production-history/style.css already governed" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "no env var change" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done, note: "contract-reviewer: no-change; all-time query is predicate-only, row shape/grain unchanged" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done, note: "PHF-07 (identifier-mode date optionality) + PHF-08 (classification-mode required params) + 2 decision-table rows; business 1.4.0" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "no CI gate/pipeline change; existing gates absorb new tests" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "backend TestValidateQueryParamsModeSplit (8) + test_api_contract (2); frontend useProductionHistory.validation.test.js +24 (45/45 pass)" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done, note: "test_production_history_routes TestQueryModeSplitRoutes (3) incl test_query_identifier_wide_window_bounded (AC-5)" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "new production-history-query-mode-tabs.spec.ts (4 tests); 4 regressed prior specs reconciled to tab split (wildcard-paste/multi-line-input/cross-filter/filter-options-error)" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "data-boundary folded into route integration assertions (all-time wide-window row shape); monkey n/a" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "test-strategist: no new stress scenario; AC-5 unbounded-scan risk is an arch decision verified by deterministic integration assertion" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "validate_query_params mode-aware (Option B 730d wide window); no SQL/pipeline change; 13 new tests, 102 full sweep pass; AC-5 bounded-window verified" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done, note: "App.vue two-tab redesign + queryMode SOT + mode-gated payload builder + 清除篩選 button; type-check/build/vitest 45+251/css:check all pass; no i18n layer (single-lang zh-TW)" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no env/deploy change" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "no workflow file changes" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done, note: "ui-ux-reviewer approved-with-changes; H1 ARIA tab widget + H2 hidden-panel inert + M2/M3/M4/L5 applied; type-check/vitest/build/css:check all pass" }
+  - { id: "5.2", section: Review, title: "Visual review", status: done, note: "visual-reviewer approved-with-changes; token-compliant + @layer-clean; SF-1 actions-row flex-wrap reconcile + SF-2 ph-form-error testid applied; all gates pass" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer 2026-05-14: api 1.4.0 + api-inventory 1.1.4 + business 1.4.0; all additive/non-breaking; CHANGELOG entries added; validate --contracts pass" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-report.md + regression-report.md: approved-with-conditions (8/8 AC covered, no-regression); conditions are CI-only (playwright + PR unit/frontend gates)" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed 2026-05-14; contracts + API semantic + env + CI gates + versions all green" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "awaiting CI run after commit/push" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "frontend type-check clean; mypy not run (env yml does not pin mypy)" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/manual gate; AC-5 covered by deterministic integration assertion, not staging gate" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
