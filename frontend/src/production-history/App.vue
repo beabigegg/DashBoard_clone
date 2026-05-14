@@ -1,8 +1,8 @@
-<script setup>
-import { ref, computed, onMounted } from 'vue';
-import { apiGet } from '../core/api.js';
-import { useProductionHistory } from './composables/useProductionHistory.js';
-import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { apiGet } from '../core/api';
+import { useProductionHistory, type SupplementaryFilterField, type MatrixFilter } from './composables/useProductionHistory';
+import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -38,14 +38,16 @@ const {
 const { nextRequestId, isStaleRequest } = useRequestGuard();
 
 // ── Type MultiSelect state ───────────────────────────────────────────────
-const typeOptions = ref([]);
+const typeOptions = ref<string[]>([]);
 const typeOptionsLoading = ref(false);
-const selectedTypes = ref([]);
+const selectedTypes = ref<string[]>([]);
 
 onMounted(async () => {
   typeOptionsLoading.value = true;
   try {
-    const resp = await apiGet('/api/production-history/type-options');
+    const resp = (await apiGet('/api/production-history/type-options')) as {
+      data?: { items?: string[] };
+    };
     typeOptions.value = resp.data?.items || [];
   } catch (_) {
     // non-critical
@@ -59,7 +61,7 @@ const formStartDate = ref('');
 const formEndDate = ref('');
 const formError = ref('');
 
-function validate() {
+function validate(): boolean {
   formError.value = '';
   if (!selectedTypes.value.length) {
     formError.value = '請選擇至少一個 Type';
@@ -76,7 +78,7 @@ function validate() {
   return true;
 }
 
-async function handleQuery() {
+async function handleQuery(): Promise<void> {
   if (loading.value) return;
   if (!validate()) return;
   const requestId = nextRequestId();
@@ -89,21 +91,21 @@ async function handleQuery() {
 }
 
 // ── Supplementary filter change handler (stage only, apply on 查詢) ────────
-function onSupplementaryChange(field, values) {
+function onSupplementaryChange(field: SupplementaryFilterField, values: string[]): void {
   stageSupplementaryFilter(field, values);
 }
 
 // ── Matrix interaction ─────────────────────────────────────────────────────
-async function handleMatrixSelect({ filter }) {
+async function handleMatrixSelect({ filter }: { filter: Partial<MatrixFilter> }): Promise<void> {
   await applyMatrixFilter(filter);
 }
 
-async function handleClearFilter() {
+async function handleClearFilter(): Promise<void> {
   await applyMatrixFilter({ workcenter_group: '', spec: '', equipment_id: '', month: '' });
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────
-async function exportCsv() {
+async function exportCsv(): Promise<void> {
   try {
     await doExportCsv();
   } catch (err) {
@@ -241,7 +243,7 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
     </div><!-- /ui-card -->
 
     <!-- Error banners -->
-    <ErrorBanner :message="error" :dismissible="false" />
+    <ErrorBanner :message="error || ''" :dismissible="false" />
 
     <ErrorBanner
       :message="overloadError ? `系統忙碌中（${overloadError.code}），請 ${overloadError.retryAfterSeconds} 秒後重試。` : ''"

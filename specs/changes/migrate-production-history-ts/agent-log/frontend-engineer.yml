@@ -1,0 +1,67 @@
+agent: frontend-engineer
+status: complete
+files-read:
+  - specs/changes/migrate-production-history-ts/change-request.md
+  - specs/changes/migrate-production-history-ts/change-classification.md
+  - specs/changes/migrate-production-history-ts/test-plan.md
+  - specs/changes/migrate-production-history-ts/context-manifest.md
+  - CLAUDE.md
+  - frontend/src/production-history/main.js
+  - frontend/src/production-history/App.vue
+  - frontend/src/production-history/composables/useProductionHistory.js
+  - frontend/src/production-history/components/ProductionMatrix.vue
+  - frontend/src/production-history/components/ProductionDetailTable.vue
+  - frontend/src/production-history/index.html
+  - frontend/src/core/api.ts
+  - frontend/src/core/post-export.ts
+  - frontend/src/shared-composables/useAsyncJobPolling.ts
+  - frontend/src/shared-composables/useRequestGuard.ts
+  - frontend/src/shared-ui/components/ErrorBanner.vue
+  - frontend/src/hold-history/main.ts
+  - frontend/src/hold-history/useHoldHistoryDuckDB.ts
+  - frontend/tests/abort/production-history-abort.test.js
+  - frontend/tests/legacy/production-history.test.js
+  - frontend/tests/validation/useProductionHistory.validation.test.js
+  - frontend/tsconfig.json
+files-written:
+  - frontend/src/production-history/main.ts
+  - frontend/src/production-history/App.vue
+  - frontend/src/production-history/composables/useProductionHistory.ts
+  - frontend/src/production-history/components/ProductionMatrix.vue
+  - frontend/src/production-history/components/ProductionDetailTable.vue
+  - frontend/tests/abort/production-history-abort.test.js
+  - frontend/tsconfig.json
+artifacts:
+  - pointer: frontend/src/production-history/main.ts
+    note: renamed from main.js via git mv; content unchanged (only Vue + CSS imports — no .js specifiers to fix).
+  - pointer: frontend/src/production-history/composables/useProductionHistory.ts
+    note: renamed from .js via git mv; rewrote with full type coverage. Exported interfaces MatrixFilter, SupplementaryFilter, SupplementaryFilterField, SupplementaryOptions, Pagination, DetailRow, MatrixEquipmentNode, MatrixSpecNode, MatrixWorkcenterNode, MatrixTree, OverloadError, JobProgressState, DatasetMeta, QueryParams. Internal types QueryResponseEnvelope, QueryResponseData, ApiErrorLike. ref<T> typing used for null/array initial values. apiPost return cast with concrete shape per endpoint. Imports stripped of .js extension (per CLAUDE.md rule). Removed unused `computed` import.
+  - pointer: frontend/src/production-history/App.vue
+    note: <script setup> -> <script setup lang="ts">. Imports stripped of .js extension. Added explicit types to typeOptions/selectedTypes refs. Annotated validate/handleQuery/onSupplementaryChange/handleMatrixSelect/handleClearFilter/exportCsv return types. Imported SupplementaryFilterField and MatrixFilter types from composable. ErrorBanner `:message="error"` changed to `:message="error || ''"` to satisfy `string | undefined` prop (error ref is `string | null`); zero runtime behavior change because v-if="message" treats null and '' identically.
+  - pointer: frontend/src/production-history/components/ProductionMatrix.vue
+    note: <script setup> -> <script setup lang="ts">. Replaced defineProps options-API with TS generic + withDefaults; typed emits via call-signature form. Imported MatrixTree/MatrixFilter/node types from composable. Added local MatrixSelectPayload interface for the select-node emit. Typed expandedWc/expandedSpec as Set<string>. Refactored ternary expressions inside toggleWc/toggleSpec to explicit if-statements (TS no-unused-expression compliance).
+  - pointer: frontend/src/production-history/components/ProductionDetailTable.vue
+    note: <script setup> -> <script setup lang="ts">. Typed props via generic + withDefaults (DetailRow/Pagination from composable). Typed emits. Fixed `isNaN(d)` -> `isNaN(d.getTime())` so Date is narrowed correctly under strict mode. formatTs signature accepts unknown.
+  - pointer: frontend/tests/abort/production-history-abort.test.js
+    note: Dropped `.js` extension from four dynamic `await import('../../src/production-history/composables/useProductionHistory.js')` specifiers (per CLAUDE.md rule). Pre-existing `useAsyncJobPolling.ts` import unchanged. All 7 abort tests pass.
+  - pointer: frontend/tsconfig.json
+    note: Added `src/production-history/**/*` to the include array (last entry).
+findings: |
+  Migration complete with strict zero behavior change. Type-check result: `npm run type-check` passes with 0 errors (clean run). Vitest results: `npm run test -- --run production-history` → 7/7 passed; `npm run test -- --run useProductionHistory` → 16/16 passed (validation tests). Legacy `node --test tests/legacy/production-history.test.js` → 11/11 passed.
+
+  Decisions:
+  - Interfaces are exported from `composables/useProductionHistory.ts` rather than a sibling `types.ts`. Single-file approach matches hold-history/reject-history precedent and keeps the composable + types co-located. App.vue and the two SFC components import the types from the composable.
+  - For ErrorBanner with `error` ref (`string | null`), used `error || ''` in the template binding. Alternative would be re-typing error as `string` (default `''`), but that changes the public API of the composable; chose the template-level coercion instead.
+  - All cross-module imports are TS already (`shared-ui`, `shared-composables`, `core/`), so no `@ts-expect-error` boundary shims were needed. No `as any` introduced anywhere.
+  - No echarts callbacks in this app (matrix is a custom tree table).
+
+  Audit verifications:
+  - `frontend/src/production-history/index.html` NOT modified — `git diff --stat` reports 0 changes; Vite resolves `main.ts` from `./main.js` reference per CLAUDE.md rule.
+  - No Python parity/safety tests reference production-history JS source paths (grep confirmed).
+  - `frontend/tests/legacy/production-history.test.js` does not read source files (pure inline test); no edits required.
+  - `frontend/tests/validation/useProductionHistory.validation.test.js` imports from `core/dev-warnings.js`, `core/endpoint-schemas.js`, `core/schema-guard.js` — those are extension-less in TS resolver and unaffected by this migration; no edits required.
+
+  Edge case: useProductionHistory.js previously imported `apiGet` but never called it; removed the unused import in the TS version. Also removed unused `computed` import. These are dead-code removals only.
+
+  Type-strictness: composable runtime cast `as QueryResponseEnvelope` etc. is necessary because `apiPost` is generically typed as `Promise<ApiResponse<T = unknown>>` — without per-call casts, every `resp.data.X` access would require runtime guards. Casts are confined to the immediate response-handling expression to minimize untyped surface.
+next-action: ci-cd-gatekeeper

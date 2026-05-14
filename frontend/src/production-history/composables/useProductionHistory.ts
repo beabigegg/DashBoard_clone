@@ -1,24 +1,163 @@
-import { ref, reactive, computed } from 'vue';
-import { apiPost, apiGet } from '../../core/api.js';
-import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling.js';
-import { postExport } from '../../core/post-export.js';
+import { ref, reactive } from 'vue';
+import { apiPost } from '../../core/api';
+import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling';
+import { postExport } from '../../core/post-export';
 
 const API_TIMEOUT = 360000;
+
+// ── Public types ───────────────────────────────────────────────────────────
+
+/** Matrix filter — single-row dimensions narrowed by matrix click. */
+export interface MatrixFilter {
+  workcenter_group: string;
+  spec: string;
+  equipment_id: string;
+  month: string;
+}
+
+/** Supplementary filter — multi-value dropdown selections. */
+export interface SupplementaryFilter {
+  work_orders: string[];
+  lot_ids: string[];
+  packages: string[];
+  bop_codes: string[];
+  workcenter_groups: string[];
+  equipment_ids: string[];
+}
+
+/** Field key used by stageSupplementaryFilter. */
+export type SupplementaryFilterField = keyof SupplementaryFilter;
+
+/** Options list available per supplementary-filter field. */
+export interface SupplementaryOptions {
+  work_orders: string[];
+  lot_ids: string[];
+  packages: string[];
+  bop_codes: string[];
+  workcenter_groups: string[];
+  equipment_ids: string[];
+}
+
+/** Pagination payload returned by the page endpoint. */
+export interface Pagination {
+  page: number;
+  per_page: number;
+  total_rows: number;
+  total_pages: number;
+}
+
+/** One row of the production-history detail table. */
+export interface DetailRow {
+  lot_id: string | null;
+  pj_type: string | null;
+  bop: string | null;
+  work_order: string | null;
+  wafer_lot: string | null;
+  package_name: string | null;
+  workcenter: string | null;
+  spec: string | null;
+  equipment_id: string | null;
+  equipment_name: string | null;
+  trackin_time: string | null;
+  trackout_time: string | null;
+  trackin_qty: number | null;
+  trackout_qty: number | null;
+  [key: string]: unknown;
+}
+
+/** Leaf node (equipment). */
+export interface MatrixEquipmentNode {
+  label: string;
+  equipment_name?: string | null;
+  count: number;
+  month_counts?: Record<string, number>;
+}
+
+/** Spec node — parent of equipment leaves. */
+export interface MatrixSpecNode {
+  label: string;
+  count: number;
+  month_counts?: Record<string, number>;
+  children?: MatrixEquipmentNode[];
+}
+
+/** Workcenter-group node — top-level. */
+export interface MatrixWorkcenterNode {
+  label: string;
+  count: number;
+  month_counts?: Record<string, number>;
+  children?: MatrixSpecNode[];
+}
+
+/** Tree returned by /matrix and embedded in /query response. */
+export type MatrixTree = MatrixWorkcenterNode[];
+
+/** 503-overload error payload surfaced to the UI. */
+export interface OverloadError {
+  code: string;
+  retryAfterSeconds: number;
+}
+
+/** Async-job progress state surfaced to the UI. */
+export interface JobProgressState {
+  active: boolean;
+  jobId: string | null;
+  status: string;
+  progress: string;
+  pct: number;
+}
+
+/** Dataset metadata (echoed from the response envelope's `meta`). */
+export type DatasetMeta = Record<string, unknown> | null;
+
+/** Primary query body (submitted by App.vue). */
+export interface QueryParams {
+  pj_types?: string[];
+  start_date: string;
+  end_date: string;
+  [key: string]: unknown;
+}
+
+// ── Internal helper types ─────────────────────────────────────────────────
+
+interface QueryResponseEnvelope {
+  _status?: number;
+  data?: QueryResponseData;
+  meta?: DatasetMeta;
+}
+
+interface QueryResponseData {
+  async?: boolean;
+  job_id?: string;
+  status_url?: string;
+  dataset_id?: string;
+  matrix?: { tree?: MatrixTree; month_columns?: string[] };
+  detail?: { rows?: DetailRow[]; pagination?: Pagination };
+}
+
+interface ApiErrorLike {
+  name?: string;
+  message?: string;
+  status?: number;
+  errorCode?: string;
+  retryAfterSeconds?: number;
+  payload?: { error?: { code?: string } };
+}
 
 export function useProductionHistory() {
   // ── Query state ────────────────────────────────────────────────────────────
   const loading = ref(false);
-  const error = ref(null);
-  const datasetId = ref(null);
-  const datasetMeta = ref(null);
+  const error = ref<string | null>(null);
+  const datasetId = ref<string | null>(null);
+  const datasetMeta = ref<DatasetMeta>(null);
 
   // ── Matrix state ───────────────────────────────────────────────────────────
-  const matrixTree = ref([]);
-  const matrixMonthColumns = ref([]);
+  const matrixTree = ref<MatrixTree>([]);
+  const matrixMonthColumns = ref<string[]>([]);
   const matrixLoading = ref(false);
 
   // ── Active matrix filter ───────────────────────────────────────────────────
-  const matrixFilter = reactive({
+  const matrixFilter = reactive<MatrixFilter>({
     workcenter_group: '',
     spec: '',
     equipment_id: '',
@@ -26,7 +165,7 @@ export function useProductionHistory() {
   });
 
   // ── Supplementary filter options & selections ─────────────────────────────
-  const supplementaryOptions = ref({
+  const supplementaryOptions = ref<SupplementaryOptions>({
     work_orders: [],
     lot_ids: [],
     packages: [],
@@ -36,7 +175,7 @@ export function useProductionHistory() {
   });
 
   // Applied filter — sent to detail/matrix query endpoints
-  const supplementaryFilter = reactive({
+  const supplementaryFilter = reactive<SupplementaryFilter>({
     work_orders: [],
     lot_ids: [],
     packages: [],
@@ -47,7 +186,7 @@ export function useProductionHistory() {
 
   // Staged filter — reflects what the user has selected in the UI but not yet
   // applied.  Triggers cross-filter option refresh; applied only on 查詢 click.
-  const stagedFilter = reactive({
+  const stagedFilter = reactive<SupplementaryFilter>({
     work_orders: [],
     lot_ids: [],
     packages: [],
@@ -59,16 +198,16 @@ export function useProductionHistory() {
   const supplementaryOptionsLoading = ref(false);
 
   // ── Detail table state ─────────────────────────────────────────────────────
-  const detailRows = ref([]);
-  const pagination = ref({ page: 1, per_page: 25, total_rows: 0, total_pages: 0 });
+  const detailRows = ref<DetailRow[]>([]);
+  const pagination = ref<Pagination>({ page: 1, per_page: 25, total_rows: 0, total_pages: 0 });
   const detailLoading = ref(false);
 
   // ── Overload/expire error state ────────────────────────────────────────────
-  const overloadError = ref(null);   // { code, retryAfterSeconds }
+  const overloadError = ref<OverloadError | null>(null);
   const expiredDataset = ref(false);
 
   // ── Async job progress state ────────────────────────────────────────────────
-  const jobProgress = reactive({
+  const jobProgress = reactive<JobProgressState>({
     active: false,
     jobId: null,
     status: '',
@@ -76,10 +215,10 @@ export function useProductionHistory() {
     pct: 0,
   });
 
-  let _jobAbortController = null;
+  let _jobAbortController: AbortController | null = null;
 
   // ── Primary query ──────────────────────────────────────────────────────────
-  async function runQuery(queryParams) {
+  async function runQuery(queryParams: QueryParams): Promise<void> {
     // Cancel any in-progress polling
     if (_jobAbortController) {
       _jobAbortController.abort();
@@ -96,12 +235,14 @@ export function useProductionHistory() {
     datasetId.value = null;
 
     try {
-      const resp = await apiPost('/api/production-history/query', queryParams, { timeout: API_TIMEOUT });
-      const respData = resp?.data || {};
+      const resp = (await apiPost('/api/production-history/query', queryParams, {
+        timeout: API_TIMEOUT,
+      })) as QueryResponseEnvelope;
+      const respData: QueryResponseData = resp?.data || {};
 
       // ---- Async 202 path ----
       if (resp?._status === 202 || (respData.async === true && respData.job_id)) {
-        const jobId = respData.job_id;
+        const jobId = respData.job_id as string;
         const statusUrl = respData.status_url || `/api/production-history/job/${jobId}`;
 
         jobProgress.active = true;
@@ -118,8 +259,8 @@ export function useProductionHistory() {
             signal: controller.signal,
             onProgress: (statusResp) => {
               jobProgress.status = statusResp.status;
-              jobProgress.progress = statusResp.progress || '';
-              jobProgress.pct = statusResp.pct || 0;
+              jobProgress.progress = (statusResp.progress as string) || '';
+              jobProgress.pct = (statusResp.pct as number) || 0;
             },
           });
         } finally {
@@ -146,7 +287,7 @@ export function useProductionHistory() {
 
       // ---- Sync 200 path ----
       const data = respData;
-      datasetId.value = data.dataset_id;
+      datasetId.value = data.dataset_id ?? null;
       datasetMeta.value = resp.meta || null;
 
       if (data.matrix) {
@@ -163,7 +304,9 @@ export function useProductionHistory() {
       }
       // If applied filters are active, re-fetch filtered page+matrix.
       // (The primary query response always returns an unfiltered first page.)
-      const hasActiveSuppFilter = Object.values(supplementaryFilter).some((arr) => arr.length > 0);
+      const hasActiveSuppFilter = Object.values(supplementaryFilter).some(
+        (arr) => (arr as string[]).length > 0,
+      );
       if (!datasetChanged && hasActiveSuppFilter) {
         await Promise.all([fetchPage(1), _fetchMatrix()]);
       } else if (data.detail) {
@@ -172,19 +315,20 @@ export function useProductionHistory() {
       }
       fetchSupplementaryOptions(stagedFilter);
     } catch (err) {
-      if (err?.name === 'AbortError') {
+      const e = err as ApiErrorLike;
+      if (e?.name === 'AbortError') {
         error.value = '查詢已取消';
-      } else if (err?.errorCode === 'JOB_FAILED') {
-        error.value = err?.message || '背景查詢失敗';
-      } else if (err?.errorCode === 'JOB_POLL_TIMEOUT') {
+      } else if (e?.errorCode === 'JOB_FAILED') {
+        error.value = e?.message || '背景查詢失敗';
+      } else if (e?.errorCode === 'JOB_POLL_TIMEOUT') {
         error.value = '背景查詢超時，請稍後重試';
-      } else if (err.status === 503) {
+      } else if (e.status === 503) {
         overloadError.value = {
-          code: err.payload?.error?.code || 'SERVICE_UNAVAILABLE',
-          retryAfterSeconds: err.retryAfterSeconds || 30,
+          code: e.payload?.error?.code || 'SERVICE_UNAVAILABLE',
+          retryAfterSeconds: e.retryAfterSeconds || 30,
         };
       } else {
-        error.value = err.message || '查詢失敗，請稍後再試';
+        error.value = e.message || '查詢失敗，請稍後再試';
       }
     } finally {
       loading.value = false;
@@ -193,36 +337,40 @@ export function useProductionHistory() {
   }
 
   // ── Page navigation ────────────────────────────────────────────────────────
-  async function fetchPage(page) {
+  async function fetchPage(page: number): Promise<void> {
     if (!datasetId.value) return;
     detailLoading.value = true;
     expiredDataset.value = false;
     try {
       // Build supplementary filter payload (only send non-empty arrays)
-      const suppPayload = {};
-      for (const [key, arr] of Object.entries(supplementaryFilter)) {
+      const suppPayload: Partial<SupplementaryFilter> = {};
+      for (const [key, arr] of Object.entries(supplementaryFilter) as [
+        SupplementaryFilterField,
+        string[],
+      ][]) {
         if (arr.length) suppPayload[key] = arr;
       }
 
-      const resp = await apiPost('/api/production-history/page', {
+      const resp = (await apiPost('/api/production-history/page', {
         dataset_id: datasetId.value,
         page,
         per_page: pagination.value.per_page,
         ...matrixFilter,
         ...suppPayload,
-      });
+      })) as { data: { rows?: DetailRow[]; pagination?: Pagination } };
       detailRows.value = resp.data.rows || [];
       pagination.value = resp.data.pagination || pagination.value;
     } catch (err) {
-      if (err.status === 410) {
+      const e = err as ApiErrorLike;
+      if (e.status === 410) {
         expiredDataset.value = true;
-      } else if (err.status === 503) {
+      } else if (e.status === 503) {
         overloadError.value = {
-          code: err.payload?.error?.code || 'SERVICE_UNAVAILABLE',
-          retryAfterSeconds: err.retryAfterSeconds || 30,
+          code: e.payload?.error?.code || 'SERVICE_UNAVAILABLE',
+          retryAfterSeconds: e.retryAfterSeconds || 30,
         };
       } else {
-        error.value = err.message || '分頁查詢失敗';
+        error.value = e.message || '分頁查詢失敗';
       }
     } finally {
       detailLoading.value = false;
@@ -230,7 +378,7 @@ export function useProductionHistory() {
   }
 
   // ── Matrix filter + re-fetch detail ───────────────────────────────────────
-  async function applyMatrixFilter(filter) {
+  async function applyMatrixFilter(filter: Partial<MatrixFilter>): Promise<void> {
     Object.assign(matrixFilter, {
       workcenter_group: filter.workcenter_group || '',
       spec: filter.spec || '',
@@ -242,23 +390,27 @@ export function useProductionHistory() {
     await fetchPage(1);
   }
 
-  async function _fetchMatrix() {
+  async function _fetchMatrix(): Promise<void> {
     if (!datasetId.value) return;
     matrixLoading.value = true;
     try {
-      const suppPayload = {};
-      for (const [key, arr] of Object.entries(supplementaryFilter)) {
+      const suppPayload: Partial<SupplementaryFilter> = {};
+      for (const [key, arr] of Object.entries(supplementaryFilter) as [
+        SupplementaryFilterField,
+        string[],
+      ][]) {
         if (arr.length) suppPayload[key] = arr;
       }
-      const resp = await apiPost('/api/production-history/matrix', {
+      const resp = (await apiPost('/api/production-history/matrix', {
         dataset_id: datasetId.value,
         ...matrixFilter,
         ...suppPayload,
-      });
+      })) as { data: { tree?: MatrixTree; month_columns?: string[] } };
       matrixTree.value = resp.data.tree || [];
       matrixMonthColumns.value = resp.data.month_columns || [];
     } catch (err) {
-      if (err.status === 410) {
+      const e = err as ApiErrorLike;
+      if (e.status === 410) {
         expiredDataset.value = true;
       }
     } finally {
@@ -266,14 +418,14 @@ export function useProductionHistory() {
     }
   }
 
-  function _clearMatrixFilter() {
+  function _clearMatrixFilter(): void {
     matrixFilter.workcenter_group = '';
     matrixFilter.spec = '';
     matrixFilter.equipment_id = '';
     matrixFilter.month = '';
   }
 
-  function _clearSupplementaryFilter() {
+  function _clearSupplementaryFilter(): void {
     supplementaryFilter.work_orders = [];
     supplementaryFilter.lot_ids = [];
     supplementaryFilter.packages = [];
@@ -282,7 +434,7 @@ export function useProductionHistory() {
     supplementaryFilter.equipment_ids = [];
   }
 
-  function _clearStagedFilter() {
+  function _clearStagedFilter(): void {
     stagedFilter.work_orders = [];
     stagedFilter.lot_ids = [];
     stagedFilter.packages = [];
@@ -291,7 +443,7 @@ export function useProductionHistory() {
     stagedFilter.equipment_ids = [];
   }
 
-  function _copyStagedToApplied() {
+  function _copyStagedToApplied(): void {
     supplementaryFilter.work_orders = [...stagedFilter.work_orders];
     supplementaryFilter.lot_ids = [...stagedFilter.lot_ids];
     supplementaryFilter.packages = [...stagedFilter.packages];
@@ -302,15 +454,19 @@ export function useProductionHistory() {
 
   // ── Supplementary options from spool (with cross-filter support) ───────────
   // filterParams: staged selections to narrow-down options (exclude-self per field)
-  async function fetchSupplementaryOptions(filterParams = {}) {
+  async function fetchSupplementaryOptions(
+    filterParams: Partial<SupplementaryFilter> = {},
+  ): Promise<void> {
     if (!datasetId.value) return;
     supplementaryOptionsLoading.value = true;
     try {
-      const body = { dataset_id: datasetId.value };
+      const body: Record<string, unknown> = { dataset_id: datasetId.value };
       for (const [key, arr] of Object.entries(filterParams)) {
         if (Array.isArray(arr) && arr.length) body[key] = arr;
       }
-      const resp = await apiPost('/api/production-history/options', body);
+      const resp = (await apiPost('/api/production-history/options', body)) as {
+        data?: Partial<SupplementaryOptions>;
+      };
       const d = resp.data || {};
       supplementaryOptions.value = {
         work_orders: d.work_orders || [],
@@ -331,23 +487,30 @@ export function useProductionHistory() {
   // Updates the staged selection and re-fetches options with cross-filtering so
   // other dropdowns narrow to only compatible values.  Detail/matrix are NOT
   // updated until 查詢 is clicked.
-  async function stageSupplementaryFilter(field, values) {
+  async function stageSupplementaryFilter(
+    field: SupplementaryFilterField,
+    values: string[],
+  ): Promise<void> {
     stagedFilter[field] = values;
     await fetchSupplementaryOptions(stagedFilter);
   }
 
   // ── Export ─────────────────────────────────────────────────────────────────
-  async function exportCsv() {
+  async function exportCsv(): Promise<void> {
     if (!datasetId.value) return;
-    const body = { dataset_id: datasetId.value };
+    const body: Record<string, unknown> = { dataset_id: datasetId.value };
     if (matrixFilter.workcenter_group) body.workcenter_group = matrixFilter.workcenter_group;
     if (matrixFilter.spec) body.spec = matrixFilter.spec;
     if (matrixFilter.equipment_id) body.equipment_id = matrixFilter.equipment_id;
     if (matrixFilter.month) body.month = matrixFilter.month;
     for (const [key, arr] of Object.entries(supplementaryFilter)) {
-      if (arr.length) body[key] = arr;
+      if ((arr as string[]).length) body[key] = arr;
     }
-    await postExport('/api/production-history/export', body, `production-history-${datasetId.value}.csv`);
+    await postExport(
+      '/api/production-history/export',
+      body,
+      `production-history-${datasetId.value}.csv`,
+    );
   }
 
   return {

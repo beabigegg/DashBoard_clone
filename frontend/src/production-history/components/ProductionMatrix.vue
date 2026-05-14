@@ -1,59 +1,98 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue';
 import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
+import type {
+  MatrixTree,
+  MatrixFilter,
+  MatrixWorkcenterNode,
+  MatrixSpecNode,
+} from '../composables/useProductionHistory';
 
-const props = defineProps({
-  tree: { type: Array, default: () => [] },
-  monthColumns: { type: Array, default: () => [] },
-  loading: { type: Boolean, default: false },
-  activeFilter: { type: Object, default: () => ({}) },
-});
+interface MatrixSelectPayload {
+  workcenter_group?: string;
+  spec?: string;
+  equipment_id?: string;
+  month?: string;
+}
 
-const emit = defineEmits(['select-node', 'clear-filter']);
+const props = withDefaults(
+  defineProps<{
+    tree?: MatrixTree;
+    monthColumns?: string[];
+    loading?: boolean;
+    activeFilter?: Partial<MatrixFilter>;
+  }>(),
+  {
+    tree: () => [],
+    monthColumns: () => [],
+    loading: false,
+    activeFilter: () => ({}),
+  },
+);
+
+const emit = defineEmits<{
+  (e: 'select-node', payload: { level: string; filter: MatrixSelectPayload }): void;
+  (e: 'clear-filter'): void;
+}>();
 
 // Track expanded nodes (using Set for O(1) lookup)
-const expandedWc = ref(new Set());
-const expandedSpec = ref(new Set());
+const expandedWc = ref<Set<string>>(new Set());
+const expandedSpec = ref<Set<string>>(new Set());
 
-function toggleWc(label) {
-  expandedWc.value.has(label) ? expandedWc.value.delete(label) : expandedWc.value.add(label);
+function toggleWc(label: string): void {
+  if (expandedWc.value.has(label)) {
+    expandedWc.value.delete(label);
+  } else {
+    expandedWc.value.add(label);
+  }
 }
 
-function toggleSpec(wcLabel, specLabel) {
+function toggleSpec(wcLabel: string, specLabel: string): void {
   const key = `${wcLabel}::${specLabel}`;
-  expandedSpec.value.has(key) ? expandedSpec.value.delete(key) : expandedSpec.value.add(key);
+  if (expandedSpec.value.has(key)) {
+    expandedSpec.value.delete(key);
+  } else {
+    expandedSpec.value.add(key);
+  }
 }
 
-function selectNode(level, filter) {
+function selectNode(level: string, filter: MatrixSelectPayload): void {
   emit('select-node', { level, filter });
 }
 
-function isActiveRow(wcLabel, specLabel, eqpId) {
-  const f = props.activeFilter;
+function isActiveRow(wcLabel: string, specLabel: string | null, eqpId: string | null): boolean {
+  const f = props.activeFilter ?? {};
   if (!f.workcenter_group) return false;
   if (eqpId) return f.equipment_id === eqpId;
   if (specLabel) return f.workcenter_group === wcLabel && f.spec === specLabel && !f.equipment_id;
   return f.workcenter_group === wcLabel && !f.spec && !f.equipment_id;
 }
 
-function isActiveCell(wcLabel, specLabel, eqpId, month) {
+function isActiveCell(
+  wcLabel: string,
+  specLabel: string | null,
+  eqpId: string | null,
+  month: string,
+): boolean {
   if (!isActiveRow(wcLabel, specLabel, eqpId)) return false;
-  return props.activeFilter.month === month;
+  return (props.activeFilter?.month ?? '') === month;
 }
 
-const hasActiveFilter = () =>
-  !!(props.activeFilter.workcenter_group || props.activeFilter.spec || props.activeFilter.equipment_id);
+const hasActiveFilter = (): boolean => {
+  const f = props.activeFilter ?? {};
+  return !!(f.workcenter_group || f.spec || f.equipment_id);
+};
 
-function expandAll() {
-  props.tree.forEach((wcNode) => {
+function expandAll(): void {
+  (props.tree ?? []).forEach((wcNode: MatrixWorkcenterNode) => {
     expandedWc.value.add(wcNode.label);
-    (wcNode.children || []).forEach((specNode) => {
+    (wcNode.children || []).forEach((specNode: MatrixSpecNode) => {
       expandedSpec.value.add(`${wcNode.label}::${specNode.label}`);
     });
   });
 }
 
-function collapseAll() {
+function collapseAll(): void {
   expandedWc.value.clear();
   expandedSpec.value.clear();
 }

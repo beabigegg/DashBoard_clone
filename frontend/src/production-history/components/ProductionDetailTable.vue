@@ -1,24 +1,33 @@
-<script setup>
+<script setup lang="ts">
 import DataTable from '../../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
+import type { DetailRow, Pagination } from '../composables/useProductionHistory';
 
-const props = defineProps({
-  rows: { type: Array, default: () => [] },
-  pagination: {
-    type: Object,
-    default: () => ({ page: 1, per_page: 25, total_rows: 0, total_pages: 0 }),
+withDefaults(
+  defineProps<{
+    rows?: DetailRow[];
+    pagination?: Pagination;
+    loading?: boolean;
+    canExport?: boolean;
+  }>(),
+  {
+    rows: () => [],
+    pagination: () => ({ page: 1, per_page: 25, total_rows: 0, total_pages: 0 }),
+    loading: false,
+    canExport: false,
   },
-  loading: { type: Boolean, default: false },
-  canExport: { type: Boolean, default: false },
-});
+);
 
-const emit = defineEmits(['page-change', 'export-csv']);
+const emit = defineEmits<{
+  (e: 'page-change', page: number): void;
+  (e: 'export-csv'): void;
+}>();
 
-function formatTs(value) {
+function formatTs(value: unknown): string {
   if (!value) return '';
   try {
-    const d = new Date(value);
-    if (isNaN(d)) return String(value);
+    const d = new Date(value as string | number | Date);
+    if (isNaN(d.getTime())) return String(value);
     return d.toLocaleString('zh-TW', { hour12: false });
   } catch {
     return String(value);

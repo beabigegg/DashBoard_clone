@@ -41,7 +41,7 @@ afterEach(() => {
 
 describe('production-history abort — _jobAbortController lifecycle', () => {
   it('no state mutation after abort — error reflects AbortError message', async () => {
-    const { useProductionHistory } = await import('../../src/production-history/composables/useProductionHistory.js');
+    const { useProductionHistory } = await import('../../src/production-history/composables/useProductionHistory');
 
     apiPost.mockResolvedValueOnce({
       _status: 202,
@@ -64,7 +64,7 @@ describe('production-history abort — _jobAbortController lifecycle', () => {
   });
 
   it('JOB_FAILED error is surfaced correctly', async () => {
-    const { useProductionHistory } = await import('../../src/production-history/composables/useProductionHistory.js');
+    const { useProductionHistory } = await import('../../src/production-history/composables/useProductionHistory');
 
     apiPost.mockResolvedValueOnce({
       _status: 202,
@@ -85,7 +85,7 @@ describe('production-history abort — _jobAbortController lifecycle', () => {
   });
 
   it('JOB_POLL_TIMEOUT error is surfaced correctly', async () => {
-    const { useProductionHistory } = await import('../../src/production-history/composables/useProductionHistory.js');
+    const { useProductionHistory } = await import('../../src/production-history/composables/useProductionHistory');
 
     apiPost.mockResolvedValueOnce({
       _status: 202,
@@ -108,7 +108,7 @@ describe('production-history abort — _jobAbortController lifecycle', () => {
 
 describe('production-history abort — runQuery cancels previous controller', () => {
   it('second runQuery call aborts the first poll signal', async () => {
-    const { useProductionHistory } = await import('../../src/production-history/composables/useProductionHistory.js');
+    const { useProductionHistory } = await import('../../src/production-history/composables/useProductionHistory');
 
     const capturedSignals = [];
 
