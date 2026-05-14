@@ -35,5 +35,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "same commands run on CI when PR is opened" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: pending, note: "Playwright E2E nightly — not blocking" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: pending, note: "manual browser smoke post-deploy" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "ci-gates.md literal section requirement promoted to CLAUDE.md §CDD Kit Commands" }

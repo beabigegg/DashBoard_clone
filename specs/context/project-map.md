@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 299
-visible-files: 941
+visible-dirs: 304
+visible-files: 948
 omitted-dirs: 105
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -443,7 +443,7 @@ DashBoard_vite/
 |   |   |   |-- utils/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- App.vue
-|   |   |   |-- main.js
+|   |   |   |-- main.ts
 |   |   |   \-- style.css
 |   |   |-- reject-history/
 |   |   |   |-- components/
@@ -651,6 +651,14 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
+|   |   |-- access_20260514_203109.log
+|   |   |-- error_20260514_203109.log
+|   |   |-- rq_msd_worker_20260514_203109.log
+|   |   |-- rq_prod_hist_worker_20260514_203109.log
+|   |   |-- rq_reject_worker_20260514_203109.log
+|   |   |-- rq_worker_20260514_203109.log
+|   |   |-- rq_yield_alert_worker_20260514_203109.log
+|   |   \-- watchdog_20260514_203109.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -1288,8 +1296,15 @@ DashBoard_vite/
 |   |   |   \-- 301649741a76a9aa.parquet
 |   |   |-- production_history/
 |   |   |   |-- ph-aaacd18241a5f3b7.parquet
-|   |   |   |-- ph-af0b6f8ba7f65517.parquet
-|   |   |   \-- ph-e64f1580b8d1f92d.parquet
+|   |   |   \-- ph-af0b6f8ba7f65517.parquet
+|   |   |-- query_tool_assoc_batch_holds/
+|   |   |   \-- 0b890e35611236eb.parquet
+|   |   |-- query_tool_assoc_batch_materials/
+|   |   |   \-- 5cde1904e6a1c3af.parquet
+|   |   |-- query_tool_assoc_batch_rejects/
+|   |   |   \-- 3d984b2324d0f336.parquet
+|   |   |-- query_tool_history_batch/
+|   |   |   \-- 59bf367dc141281f.parquet
 |   |   |-- resource_dataset/
 |   |   |   |-- 2a692b9c32b461d2.parquet
 |   |   |   |-- 7e37d99ad559f8c8.parquet
@@ -1298,6 +1313,8 @@ DashBoard_vite/
 |   |   |   |-- 2a692b9c32b461d2.parquet
 |   |   |   |-- 7e37d99ad559f8c8.parquet
 |   |   |   \-- a8df0741cccf4c66.parquet
+|   |   |-- trace_lineage/
+|   |   |   \-- trace-lineage-query-tool-fa5f9312f2052baaca91c599.parquet
 |   |   |-- yield_alert_dataset/
 |   |   |   \-- 2d2cfb707a60eb86.parquet
 |   |   |-- probe_100077.json
@@ -1339,12 +1356,7 @@ DashBoard_vite/
 |   |   |-- probe_113869.json
 |   |   |-- probe_116133.json
 |   |   |-- probe_116787.json
-|   |   |-- probe_116823.json
-|   |   |-- probe_117915.json
-|   |   |-- probe_117920.json
-|   |   |-- probe_118725.json
-|   |   |-- probe_118748.json
-|   |   \-- ... (343 more entries truncated; cap=50)
+|   |   \-- ... (350 more entries truncated; cap=50)
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
 |   |-- resource_history.duckdb
