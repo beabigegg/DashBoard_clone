@@ -19,3 +19,4 @@
 | resource-history-perf | 2026 | 2026-05-13 | specs/archive/2026/resource-history-perf/ |
 | migrate-job-query-ts | 2026 | 2026-05-13 | specs/archive/2026/migrate-job-query-ts/ |
 | migrate-production-history-ts | 2026 | 2026-05-14 | specs/archive/2026/migrate-production-history-ts/ |
+| prod-history-detail-raw-rows | 2026 | 2026-05-14 | specs/archive/2026/prod-history-detail-raw-rows/ |

@@ -32,8 +32,8 @@ tasks:
   - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer approved-with-changes; edits applied" }
   - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-report.md verdict: approved (manual gates resolved 2026-05-14 with live measurement)" }
   - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "type-check + build + 302 vitest + 75 pytest + 10 parity/safety + css:check + cdd-kit validate all green (see ci-gates.md)" }
-  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "PR not yet submitted — will be verified by GitHub Actions on PR submission" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "CI passed on commit b303e6a (user-confirmed 2026-05-14)" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: skipped, note: "no informational gates introduced" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: done, note: "AC-7 (warm p95 81ms, pagination p95 30ms, parquet 24.5KB, 4.78x partial ratio) + AC-3 (72/72 Matrix cells match) measured live 2026-05-14; results in qa-report.md Manual Gate Evidence" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done, note: "cdd-kit archive prod-history-detail-raw-rows → specs/archive/2026/ on 2026-05-14" }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "2 lessons promoted to CLAUDE.md Cache Architecture Notes: (1) spool schema breaking changes require post-deploy parquet cleanup; (2) backend SQL-to-API rename layer isolates frontend from Oracle column renames" }
