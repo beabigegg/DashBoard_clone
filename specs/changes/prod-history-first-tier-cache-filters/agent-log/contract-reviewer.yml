@@ -1,0 +1,86 @@
+agent: contract-reviewer
+change-id: prod-history-first-tier-cache-filters
+status: complete
+date: 2026-05-14
+verdict: |
+  Tier 1 contract review complete. Five contracts bumped and one CHANGELOG aggregate
+  entry added. All updates additive (no breaking changes); Type-only flow on the
+  existing main-query endpoint remains unchanged. Wildcard grammar in PHF-02 mirrors
+  design.md D2 exactly (single `*` any position, non-`*` chars ≥ 2 total, ≤ 100
+  patterns/field). `cdd-kit validate --contracts` passes cleanly.
+schema-bumps:
+  - file: contracts/api/api-contract.md
+    from: 1.2.2
+    to: 1.3.0
+    rationale: New endpoint `GET /api/production-history/filter-options` + 6 additive optional body fields on main query → minor bump.
+  - file: contracts/api/api-inventory.md
+    from: 1.1.2
+    to: 1.1.3
+    rationale: production_history_routes.py scope extended; compatibility note added → patch bump (additive prose only).
+  - file: contracts/data/data-shape-contract.md
+    from: 1.1.0
+    to: 1.2.0
+    rationale: Two additive sections (2.7 filter-options response shape, 2.8 internal container_filter_cache payload v2) → minor bump.
+  - file: contracts/business/business-rules.md
+    from: 1.2.0
+    to: 1.3.0
+    rationale: New Production-History Filter Rules group PHF-01..PHF-06 → minor bump.
+  - file: contracts/ci/ci-gate-contract.md
+    from: 1.3.11
+    to: 1.3.12
+    rationale: Gate Compatibility Note added for fuzz scope expansion + multi-worker concurrency + cache schema_version rollback primitive; gate tier/command/status unchanged → patch bump.
+no-change:
+  - file: contracts/css/css-contract.md
+    rationale: Design D6 reuses existing shared-ui MultiSelect + multi-line textarea (from material-trace); no new tokens, no new utility classes.
+  - file: contracts/env/env-contract.md
+    rationale: Per D2 and U1, max-patterns is a hard-coded constant (100/field) in v1. No new env var introduced. If a future change makes it env-driven, that is a follow-up scope.
+files-changed:
+  - contracts/api/api-contract.md
+  - contracts/api/api-inventory.md
+  - contracts/data/data-shape-contract.md
+  - contracts/business/business-rules.md
+  - contracts/ci/ci-gate-contract.md
+  - contracts/CHANGELOG.md
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/change-request.md
+  - specs/changes/prod-history-first-tier-cache-filters/change-classification.md
+  - specs/changes/prod-history-first-tier-cache-filters/design.md
+  - specs/changes/prod-history-first-tier-cache-filters/proposal.md
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/spec-architect.yml
+  - contracts/api/api-contract.md
+  - contracts/api/api-inventory.md
+  - contracts/data/data-shape-contract.md
+  - contracts/business/business-rules.md
+  - contracts/ci/ci-gate-contract.md
+  - contracts/CHANGELOG.md
+validation:
+  command: cdd-kit validate --contracts
+  result: passed
+  notes: |
+    All required contract files present. API semantic validation passed
+    (143 endpoints checked). Env semantic validation passed (44 variables;
+    three unrelated warnings for required-no-default DB_HOST/DB_SERVICE/LDAP_API_URL
+    pre-existing). No contract failures introduced.
+unresolved-addressed:
+  - id: U1
+    owner: contract-reviewer
+    resolution: |
+      Resolved: max-patterns (100/field) stays as a hard-coded constant in v1.
+      No env contract entry added. Follow-up scope only if production load
+      warrants user-tunable limit.
+unresolved-deferred:
+  - id: U2
+    owner: backend-engineer
+    question: Lift `_add_exact_or_pattern_condition` to shared `sql/wildcards.py` or duplicate locally?
+  - id: U3
+    owner: dependency-security-reviewer
+    question: Does the SQL-meta rejection regex cover Oracle q'[...]' literals and `||` concat?
+  - id: U4
+    owner: backend-engineer
+    question: Stale `tmp/container_filter_cache.loading` sentinel — add mtime-based reaper or accept current resource-history behavior?
+notes: |
+  Five schema bumps + one aggregated CHANGELOG entry (top-of-file). Each bumped
+  contract carries a corresponding entry. CSS / Env contracts intentionally
+  untouched per design D6 (reuse shared-ui) and D2 / U1 resolution (no new env var).
+  Next agent: test-strategist to author test-plan.md covering all 11 layers.

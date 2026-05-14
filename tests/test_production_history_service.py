@@ -140,3 +140,134 @@ class TestProductionPartialFailure:
         )
 
         assert result == {}
+
+
+# ============================================================
+# Change: prod-history-first-tier-cache-filters
+# AC-3 / AC-4 / AC-5 / AC-8 / PHF-02..PHF-06
+# ============================================================
+
+
+class TestMainQueryNewParams:
+    """validate_query_params + _build_extra_filters wire the 6 new filter params."""
+
+    def _base(self) -> dict:
+        return {
+            "pj_types": ["GA"],
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-10",
+        }
+
+    def test_main_query_accepts_new_filter_params(self):
+        """AC-3 — pj_packages/pj_bops/pj_functions accepted and reflected."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        params = validate_query_params({
+            **self._base(),
+            "pj_packages": ["PKG_A", "PKG_B"],
+            "pj_bops": ["BOP_1"],
+            "pj_functions": ["FN_X"],
+        })
+        assert params["pj_packages"] == ["PKG_A", "PKG_B"]
+        assert params["pj_bops"] == ["BOP_1"]
+        assert params["pj_functions"] == ["FN_X"]
+
+    def test_main_query_accepts_wildcard_params(self):
+        """AC-4 — mfg_orders / wafer_lots wildcard tokens parse OK."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        params = validate_query_params({
+            **self._base(),
+            "mfg_orders": "MA2025*\nMA2026",
+            "wafer_lots": ["W123*"],
+        })
+        mo = params["mfg_orders_tokens"]
+        wl = params["wafer_lots_tokens"]
+        assert any(t.bound_value == "MA2025%" for t in mo)
+        assert any(t.bound_value == "MA2026" for t in mo)
+        assert any(t.bound_value == "W123%" for t in wl)
+
+    def test_extra_filters_wildcard_bind_emits_like_escape(self):
+        """PHF-03 — wildcard token emits LIKE :bind ESCAPE '\\'."""
+        from mes_dashboard.services.production_history_service import (
+            _build_extra_filters,
+            validate_query_params,
+        )
+        params = validate_query_params({
+            **self._base(),
+            "mfg_orders": "MA2025*",
+        })
+        sql, binds = _build_extra_filters(params)
+        assert "c.MFGORDERNAME LIKE :" in sql
+        assert "ESCAPE '\\'" in sql
+        # Bound value must already contain the % translation.
+        assert any(v == "MA2025%" for v in binds.values())
+        # No string interpolation of the user token (PHF-03).
+        assert "MA2025%" not in sql
+
+    def test_backward_compat_type_only_flow_unchanged(self):
+        """AC-3 — empty filters reproduce today's Type-only SQL fragment."""
+        from mes_dashboard.services.production_history_service import (
+            _build_extra_filters,
+            validate_query_params,
+        )
+        params = validate_query_params(self._base())
+        sql, binds = _build_extra_filters(params)
+        # Only PJ_TYPE IN (...) appears
+        assert "c.PJ_TYPE IN" in sql
+        assert "MFGORDERNAME" not in sql
+        assert "FIRSTNAME" not in sql
+        assert "PJ_BOP" not in sql
+        assert "PJ_FUNCTION" not in sql
+
+    def test_empty_cache_state_validate_does_not_touch_cache(self):
+        """validate_query_params must not depend on container_filter_cache state."""
+        # If validation accidentally touched the cache, an empty cache state
+        # would surface as a 500 — instead it must succeed.
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        params = validate_query_params({
+            **self._base(),
+            "pj_packages": ["PKG_X"],
+        })
+        assert params["pj_packages"] == ["PKG_X"]
+
+    def test_pj_function_null_handled(self):
+        """Data-boundary — empty pj_functions list is valid (NULL-friendly)."""
+        from mes_dashboard.services.production_history_service import (
+            validate_query_params,
+        )
+        params = validate_query_params({
+            **self._base(),
+            "pj_functions": [],
+        })
+        assert params["pj_functions"] == []
+
+    def test_stale_schema_v1_payload_ignored_by_get_pj_types(self):
+        """AC-8 — get_pj_types after v1 payload encountered returns empty/safe."""
+        import mes_dashboard.services.container_filter_cache as cache_mod
+        # Force-clear and simulate L1 untouched + L2 returning legacy payload.
+        cache_mod._CACHE["loaded"] = False
+
+        class _FakeRedis:
+            def get(self, _key):
+                import json
+                return json.dumps({"packages": ["X"], "pj_types": ["Y"]})  # no schema_version
+
+            def set(self, *a, **kw):
+                pass
+
+        from unittest.mock import patch
+        # _read_from_redis returns None (schema mismatch) → would fall through to lock+Oracle.
+        # Patch Oracle to return empty so the cache stays unloaded but no crash.
+        with patch.object(cache_mod, "get_redis_client", return_value=_FakeRedis()):
+            with patch.object(cache_mod, "REDIS_ENABLED", True):
+                with patch(
+                    "mes_dashboard.services.container_filter_cache.read_sql_df",
+                    return_value=None,
+                ):
+                    out = cache_mod.get_pj_types()
+        assert out == []

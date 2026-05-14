@@ -1,0 +1,52 @@
+agent: change-classifier
+change-id: prod-history-first-tier-cache-filters
+status: complete
+date: 2026-05-14
+verdict: |
+  Tier 1 (high risk). Architecture review required.
+  Combined SQL-injection surface (wildcard input → Oracle LIKE) + cache schema
+  migration (flat distinct → DISTINCT 4-tuple cross-filter) + multi-worker
+  startup behavior justifies full Tier-1 ceremony.
+required-agents:
+  - spec-architect
+  - contract-reviewer
+  - test-strategist
+  - backend-engineer
+  - frontend-engineer
+  - dependency-security-reviewer
+  - e2e-resilience-engineer
+  - monkey-test-engineer
+  - ui-ux-reviewer
+  - visual-reviewer
+  - ci-cd-gatekeeper
+  - qa-reviewer
+key-decisions:
+  - tier: 1
+  - architecture-review: yes
+  - optional-artifacts:
+      current-behavior.md: yes
+      proposal.md: yes
+      design.md: yes
+      qa-report.md: yes
+      spec.md: no
+      regression-report.md: no
+  - in-repo-precedents-identified:
+      cached-multiselect: src/mes_dashboard/services/reason_filter_cache.py
+      multi-worker-lock: src/mes_dashboard/services/resource_history_duckdb_cache.py (_try_lock/_release_lock)
+      multi-line-wildcard-ux: src/mes_dashboard/services/material_trace_service.py + frontend/src/material-trace/
+  - dependency-satisfied: prod-history-detail-raw-rows (archived 2026-05-14); spool carries PJ_FUNCTION
+artifacts:
+  - pointer: specs/changes/prod-history-first-tier-cache-filters/change-classification.md
+    summary: Tier 1 classification with 8 inferred ACs and full agent flow
+  - pointer: specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+    summary: Updated with affected surfaces, allowed paths, and 13 agent work packets
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/change-request.md
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/context/project-map.md
+  - specs/context/contracts-index.md
+notes: |
+  Open questions from change-request.md (cross-filter strategy, wildcard grammar,
+  second-tier retention, cache versioning, Oracle pattern hardening) are
+  flagged for spec-architect to resolve. Default answers proposed in
+  Clarifications section of change-classification.md.

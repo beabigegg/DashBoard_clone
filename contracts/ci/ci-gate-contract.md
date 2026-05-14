@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.11
-last-changed: 2026-05-13
+schema-version: 1.3.12
+last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -117,6 +117,15 @@ breaking-change-policy: deprecate-2-minors
 - **Tier 1 Playwright extensions**: new `playwright/resilience/` and `playwright/data-boundary/` specs for progress endpoint (503 mid-poll resilience; malformed progress response boundary). Covered by existing `playwright-resilience` and `playwright-data-boundary` gates; no gate tier or command change.
 - **Schema-version bump to 1.3.10 (patch)**: additive prose documenting new test coverage scope under existing gates; gate tier, command, and status are unchanged.
 - **Source**: change `resource-history-perf`.
+
+### New fuzz + cache rollback coverage — prod-history-first-tier-cache-filters
+
+- **Tier 1 fuzz scope expansion**: `tests/routes/test_fuzz_routes.py` extended to fuzz the new `mfg_orders[]` / `lot_ids[]` / `wafer_lots[]` wildcard fields on `POST /api/production-history/query`. Malicious payloads (`'`, `;`, `--`, `/*`, `*/`, `\x00`, control chars, multi-`*`, pure `*`, 10 KB strings, 1000-pattern overflow) MUST resolve to `VALIDATION_ERROR` (400) and never reach Oracle (business-rules.md PHF-02, PHF-03, PHF-06). Covered by existing `unit-mock-integration` and route-fuzz gates; no gate tier or command change.
+- **Tier 1 contract assertion**: `GET /api/production-history/filter-options` response shape (`pj_types`/`packages`/`bops`/`pj_functions` arrays + `meta.schema_version: 2`) asserted under `unit-mock-integration` gate via `tests/test_production_history_routes.py`. No gate tier or command change.
+- **Tier 3 multi-worker coverage**: `tests/integration/test_multi_worker_concurrency.py` extended to assert `container_filter_cache` rebuild lock behavior (only one worker hits Oracle on simultaneous cold start; losers reuse via Redis L2 within 90 s; business-rules.md PHF-05). Covered by existing `nightly-integration` gate; `integration_real` marker.
+- **Rollback (cache schema_version)**: This change introduces a new rollback primitive — bumping `container_filter_cache` payload `schema_version` from `2` → `3` in a follow-up deploy invalidates all L2 entries on the next read (PHF-04). This avoids `redis-cli DEL` post-deploy. The runbook step for rollback is: (1) bump `schema_version` in `container_filter_cache.py`, (2) deploy, (3) optionally `rm tmp/container_filter_cache.loading` if stale sentinel is suspected. No parquet cleanup required (cache is Redis-only, not on-disk parquet).
+- **Schema-version bump to 1.3.12 (patch)**: additive prose only — gate tier, command, and status are unchanged.
+- **Source**: change `prod-history-first-tier-cache-filters`.
 
 ## Required Check Policy
 

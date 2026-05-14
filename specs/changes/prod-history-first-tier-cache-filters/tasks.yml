@@ -1,0 +1,39 @@
+change-id: prod-history-first-tier-cache-filters
+status: in-progress
+tier: 1
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on:
+  - "prod-history-detail-raw-rows"
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done, note: "Tier 1 classified 2026-05-14; arch-review=yes; current-behavior + proposal + design + qa-report required; spec/regression-report n/a" }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "contract-reviewer bumped api 1.2.2→1.3.0, api-inventory 1.1.2→1.1.3, data 1.1.0→1.2.0, business 1.2.0→1.3.0, ci 1.3.11→1.3.12" }
+  - { id: "1.3", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md written by ci-cd-gatekeeper; no new workflow files; ci-contract 1.3.12 covers compatibility notes" }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done, note: "new GET /api/production-history/filter-options + 6 additive main-query params (api 1.3.0, api-inventory 1.1.3)" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "reuses existing shared-ui MultiSelect + multi-line textarea; no new tokens" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "U1 resolved: max-patterns is hard-coded constant in v1, not env-driven" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done, note: "§2.7 filter-options response + §2.8 cache payload v2 (data 1.2.0)" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done, note: "PHF-01..PHF-06 added (business 1.3.0)" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: done, note: "fuzz scope expansion + multi-worker test + schema_version rollback primitive (ci 1.3.12)" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "test-plan.md AC-1..AC-8 mapping; backend-engineer + frontend-engineer write tests TDD-first" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done, note: "test-plan.md integration row (cross-filter chain + multi-worker harness + Redis chaos)" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "test-plan.md Playwright cross-filter + wildcard paste + multi-line input + lock-holder-crash resilience" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "test-plan.md fuzz on wildcard meta chars + control chars + 10KB strings + PJ_FUNCTION null boundary" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: done, note: "stress=done (cache rebuild thundering herd in test_multi_worker_concurrency::test_container_filter_cache_lock_under_4_workers; high-cardinality cap in test_fuzz_routes::test_high_cardinality_lot_in_list_rejected_at_cap); soak=skipped" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "parse_wildcard_tokens + shared sql/wildcards.py + container_filter_cache v2 (4-tuple + lock) + filter-options endpoint + 6 main-query params; 28 new tests; full sweep 3470 passed 0 failed" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done, note: "useFirstTierFilters composable + 4 MultiSelects + 3 wildcard textareas + D6 second-tier strip; type-check 0 errors, vitest 316/316, build 10.43s, css:check 0 errors" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no new env var (U1 resolved: hardcoded constant 100/field)" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "no workflow file changes; existing gates absorb new tests (per ci-gates.md)" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done, note: "ui-ux-reviewer approved-with-changes; 3 fixes applied (error banner, pruning notice, second-tier heading + grid-cols-2)" }
+  - { id: "5.2", section: Review, title: "Visual review", status: done, note: "visual-reviewer approved-with-changes; CSS token compliance + rows=2 + 9 testids applied; type-check + vitest + build + css:check all green" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer approved 2026-05-14; 5 contracts bumped + CHANGELOG entries" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-report.md verdict: approved-with-conditions; 8/8 AC covered; manual gate evidence required before close" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed 2026-05-14 after ci-gates.md Rollback/Promotion Policy fix; contracts + API semantic + env + CI gates + versions all green" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "awaiting CI run after commit/push" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "frontend-type-check 0 errors; mypy not run (env yml does not pin mypy)" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: pending, note: "manual gate evidence per qa-report.md: AC-1 p95 ≤100ms warm, AC-6 4-worker lock in staging, empty-cache cold-start <60s" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

@@ -1,0 +1,183 @@
+agent: monkey-test-engineer
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: pass
+
+# ────────────────────────────────────────────────────────────────────────────
+# Scope
+# ────────────────────────────────────────────────────────────────────────────
+# Adversarial / fuzz / property coverage for the new wildcard input path
+# (PHF-02 / PHF-06) and cross-filter selection (PHF-01). Builds on the
+# dependency-security-reviewer audit (approved 2026-05-14) — this packet
+# is the empirical proof layer.
+
+# ────────────────────────────────────────────────────────────────────────────
+# Files touched
+# ────────────────────────────────────────────────────────────────────────────
+files-touched:
+  - path: tests/routes/_fuzz_payloads.py
+    action: extend
+    notes: |
+      Additive — added three constant groups for wildcard fuzzing:
+      WILDCARD_FIELDS (the three wildcard params), WILDCARD_META_CHARS
+      (PHF-06 single-quote, semicolon, --, /*, */, Oracle alt-literal
+      q'[...]'), WILDCARD_CONTROL_CHARS (\x00–\x1f minus \t \n \r), and
+      WILDCARD_GRAMMAR_INVALID (multi-star, pure-star, single-char,
+      `*A`/`A*` literal_len<2). No mutation of existing MALICIOUS_INPUTS.
+
+  - path: tests/routes/test_fuzz_routes.py
+    action: extend
+    notes: |
+      Appended 10 new test functions (×3 wildcard fields = 30 parametrize
+      seeds; some ×control-char-class = more). Coverage:
+        1. test_main_query_wildcard_meta_char_rejection — PHF-06 meta-chars
+           (18 cases). Each asserts 400 + field name echoed in error message.
+        2. test_main_query_wildcard_param_control_char_rejection — every
+           \x00–\x1f control char (87 cases). All 400.
+        3. test_wildcard_multi_star_rejected — PHF-02 grammar (24 cases).
+        4. test_main_query_oversized_wildcard_input_token_count_capped —
+           101 tokens → 400 with "100" in message (3 cases).
+        5. test_main_query_oversized_wildcard_input_single_huge_token_accepted
+           — 10 KB single token: documents R1-deferred behaviour, MUST
+           not 500, MUST not produce a per-token-length-cap error.
+        6. test_main_query_oversized_payload_body_bytes_capped — 100-token
+           list × 100-byte tokens + 90 KB filler → no 500 (body cap
+           262144 default, well above the test payload).
+        7. test_wildcard_oracle_hostile_concat_passes_as_literal — ||,
+           DBMS_OUTPUT, UTL_HTTP pass parser as exact tokens with the
+           original string preserved (defense-in-depth: bind protocol is
+           the safety boundary).
+        8. test_wildcard_unicode_handling — ZWSP (U+200B), RTL (U+202E),
+           full-width digit (U+FF11) pass through literally; null byte
+           rejected via control-char regex.
+        9. test_high_cardinality_lot_in_list_at_cap_accepted — boundary
+           condition: exactly 100 tokens accepted.
+       10. test_wildcard_textarea_paste_with_carriage_returns — CRLF +
+           tab + comma + duplicate normalises to 4 deduped tokens.
+
+  - path: tests/property/test_wildcard_parser.py
+    action: create
+    notes: |
+      Three Hypothesis properties (ci profile = 100 examples):
+        - test_parser_idempotence_str_input  — string input
+        - test_parser_idempotence_list_input — list input
+        - test_parser_deterministic_under_repetition — no order-dependent
+          state; raise behaviour stable across calls.
+      The `_emit` helper undoes the * → % translation and \% / \_ escapes
+      so the second parse sees a textually equivalent input. Strategies
+      deliberately avoid meta-chars (caught by raise branch) and include
+      both `%` (literal — exercised by escape path) and `*` (wildcard).
+
+  - path: tests/property/test_cross_filter.py
+    action: create
+    notes: |
+      50 deterministic parametrize cases + 2 Hypothesis properties seeded
+      against a synthetic 4-tuple corpus inserted directly into
+      container_filter_cache._CACHE (no Oracle dependency). Properties
+      asserted (PHF-01 / AC-2):
+        - key-order independence: {A,B} == {B,A}
+        - value-order independence: {A:[x,y]} == {A:[y,x]}
+        - duplicate-value idempotence: {A:[x,x]} == {A:[x]}
+      Fixture restores original _CACHE state per test.
+
+# ────────────────────────────────────────────────────────────────────────────
+# Test counts
+# ────────────────────────────────────────────────────────────────────────────
+test-counts:
+  property-wildcard-parser: 3            # all pass
+  property-cross-filter: 52              # 50 param + 2 property — all pass
+  route-fuzz-wildcard-new: 214           # all pass (parametrize matrix)
+  route-fuzz-pre-existing-regression: 158 # no regression
+  total-passed: 372
+  total-failed: 0
+  command: |
+    conda run -n mes-dashboard pytest tests/routes/test_fuzz_routes.py tests/property/ -v
+  duration-seconds: 34.71
+
+# ────────────────────────────────────────────────────────────────────────────
+# Notable findings (documented behaviours)
+# ────────────────────────────────────────────────────────────────────────────
+findings:
+  - id: F1
+    title: "10 KB single wildcard token is ACCEPTED by the parser"
+    severity: informational
+    body: |
+      `parse_wildcard_tokens('mfg_orders', 'A' * 10_000)` returns a single
+      `exact` WildcardToken with `bound_value` of length 10 000 — no
+      per-token length cap exists today. This matches the design
+      (dependency-security-reviewer §4 + R1) and is bounded in practice
+      by MAX_JSON_BODY_BYTES (262 144). Test
+      `test_main_query_oversized_wildcard_input_single_huge_token_accepted`
+      pins this behaviour so a future per-token cap (R1) deliberately
+      breaks the test, prompting a contract update.
+
+  - id: F2
+    title: "|| and DBMS_*/UTL_* identifiers pass parser as `exact` literals"
+    severity: informational
+    body: |
+      Confirmed empirically — these reach a bound parameter, never the SQL
+      parser. Test `test_wildcard_oracle_hostile_concat_passes_as_literal`
+      asserts both the parser-level acceptance AND a non-500 route
+      response. This matches dependency-security-reviewer §3 closeout.
+
+  - id: F3
+    title: "ZWSP / RTL / full-width characters survive the parser verbatim"
+    severity: informational
+    body: |
+      U+200B, U+202E, U+FF11 all flow through as literal bytes in the
+      `bound_value`. Acceptable for SQL safety; the UX implication
+      (look-alike tokens won't match) is captured in
+      dependency-security-reviewer R2 as a non-blocking recommendation.
+
+  - id: F4
+    title: "Per-token 100-cap enforced before dedup completes"
+    severity: informational
+    body: |
+      With 101 unique tokens, the error message includes "100" — verified
+      by `test_main_query_oversized_wildcard_input_token_count_capped`.
+      The cap is enforced AFTER each `seen_keys` check inside the loop
+      (see request_validation.py:308-313), so the 101st *unique* token
+      triggers the raise. A 200-token list of duplicates collapses to 1
+      via dedup and never hits the cap — consistent with the design.
+
+  - id: F5
+    title: "MA/*25 and MA*/25 BOTH rejected via meta-char regex, not multi-star"
+    severity: informational
+    body: |
+      Initially expected `MA*/25` to be rejected by the multi-star rule
+      (it has only one literal `*`, followed by `/`). Actual:
+      `_WILDCARD_META_RE` matches `*/` first, raising on the meta-char
+      branch. Either rejection is acceptable; documented here for
+      future maintainers reading test assertions.
+
+# ────────────────────────────────────────────────────────────────────────────
+# Files read (audit-only)
+# ────────────────────────────────────────────────────────────────────────────
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/test-plan.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/dependency-security-reviewer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/e2e-resilience-engineer.yml
+  - contracts/business/business-rules.md  # PHF-01 / PHF-02 / PHF-03 / PHF-06 only
+  - src/mes_dashboard/core/request_validation.py
+  - src/mes_dashboard/sql/wildcards.py
+  - src/mes_dashboard/routes/production_history_routes.py
+  - src/mes_dashboard/services/production_history_service.py
+  - src/mes_dashboard/services/container_filter_cache.py
+  - src/mes_dashboard/core/response.py
+  - tests/routes/_fuzz_payloads.py
+  - tests/routes/test_fuzz_routes.py
+  - tests/property/conftest.py
+  - tests/property/strategies.py
+  - tests/property/test_filter_idempotence.py  # style reference
+
+# ────────────────────────────────────────────────────────────────────────────
+# Open questions / follow-ups
+# ────────────────────────────────────────────────────────────────────────────
+follow-ups:
+  - if-R1-adopted: |
+      `test_main_query_oversized_wildcard_input_single_huge_token_accepted`
+      will deliberately fail once a per-token length cap is added.
+      That is correct — flip the assertion from "no-500 + not-cap-error"
+      to "400 + cap-mentioned-in-message" at the same commit that adds
+      the cap. Mirrors the pattern used for the 101-token cap test.

@@ -1,0 +1,224 @@
+agent: ui-ux-reviewer
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: approved-with-changes
+
+checklist:
+  - id: "1-first-tier-panel-layout"
+    result: pass
+    evidence: |
+      App.vue:129-208 implements a clear two-row first-tier layout:
+        Row A (multiselect-grid): 4 cached MultiSelects in a 2-col (mobile) → 4-col (lg)
+          Tailwind grid (style.css:62). Hierarchy is clear — label+MultiSelect in ui-filter-group.
+        Row B (wildcard-grid): 3 textareas in a 1-col → 2-col → 3-col grid (style.css:68).
+      Spacing via Tailwind gap-3 throughout. `ph-first-tier__*` namespace is BEM-correct.
+      No inline styles; all gaps/paddings use Tailwind utilities or theme() tokens.
+
+  - id: "2-wildcard-hint-clarity"
+    result: minor-issue
+    evidence: |
+      App.vue:184,193,204 — textarea placeholders include a concrete example for 工單號
+      ("例如 MA2025*") and LOT ID ("例如 GA250605*") but Wafer LOT placeholder has no example
+      (App.vue:203: "支援 * 萬用字元" only).
+      App.vue:186,196,206 — each textarea has a redundant inline hint div that duplicates the
+      placeholder text ("支援 * 萬用字元；換行/逗號分隔多筆"). The placeholder already carries
+      this info; the hint adds visual noise without adding new information.
+      No char-count indicator is shown. Business rules cap at 100 patterns/field (design.md D2).
+      Users pasting a large list receive no visual feedback that excess entries will be silently
+      dropped by the backend (or whether they are dropped at all).
+    severity: low
+
+  - id: "3-loading-disabled-state-during-cross-filter-fetch"
+    result: pass
+    evidence: |
+      All 4 cached MultiSelects pass `:loading="firstTier.loading.value"` (App.vue:135,146,157,168).
+      MultiSelect.vue:129 disables the trigger button when loading is true
+      (`:disabled="disabled || loading"`), and replaces the chevron with a LoadingSpinner
+      (MultiSelect.vue:134-137). The dropdown is gated to `v-if="isOpen && !loading"` (line 145)
+      so the user cannot click stale options while the debounced GET is in flight.
+      Stale-response guard is in useFirstTierFilters.ts:156 (`requestToken !== _inFlightToken`).
+
+  - id: "4-fail-open-pruning-ux"
+    result: minor-issue
+    evidence: |
+      useFirstTierFilters.ts:246-253 — `_pruneSelection()` silently drops values that disappear
+      from the narrowed option set. There is zero visual feedback: no toast, no warning chip,
+      no "N items removed" hint. The user may not notice that a prior selection was dropped,
+      leading to confusion when their query returns different results than expected.
+    severity: medium
+
+  - id: "5-second-tier-minimization"
+    result: minor-issue
+    evidence: |
+      App.vue:226-249 — the supplementary filters section now contains only 2 fields
+      (WorkCenter 群組 + Equipment). The section has NO heading or label to distinguish it from
+      the first-tier panel above. The `ph-supplementary-filters` container is rendered inside
+      the same `ui-card-body` as the first-tier rows, with only a border-top (style.css:85)
+      separating them. A user new to the page cannot tell that these 2 fields are post-query
+      refinements (only visible when `v-if="datasetId"`) versus pre-query filter conditions.
+      The design comment in the HTML (App.vue:222-225) explains the architecture but is not
+      surfaced to the user. A section subtitle such as "查詢後細篩" would clarify the two-phase
+      workflow. Also, a 4-column grid for 2 fields leaves 2 empty grid cells on lg, which is
+      visually awkward.
+    severity: medium
+
+  - id: "6-mobile-narrow-viewport"
+    result: pass
+    evidence: |
+      First-tier MultiSelect grid: grid-cols-2 at mobile/sm (style.css:62) — 4 items → 2 rows
+      of 2, which is a reasonable stack.
+      Wildcard-grid: grid-cols-1 at mobile → single column (style.css:68). Textarea rows="3"
+      (App.vue:183,192,202) + min-height:64px (style.css:73) gives a workable touch target.
+      Date row uses `ph-app__filter-row` with `flex-wrap gap-3 items-end` (style.css:16) — wraps
+      naturally on narrow viewports.
+      No horizontal overflow detected from the grid structure.
+
+  - id: "7-empty-state-for-filter-options-api-failure"
+    result: minor-issue
+    evidence: |
+      useFirstTierFilters.ts:178-181 — on API error, `error.value` is set to
+      '篩選選項載入失敗'. However, `firstTier.error` is NOT bound to any UI element in App.vue
+      (confirmed by grep — no reference to `firstTier.error` in the template). The user sees
+      silent empty MultiSelect dropdowns with no indication of why they are empty. The only
+      visible effect is that options lists are empty (options_.value stays at its last value
+      or initial empty array). `firstTier.loading.value` returns false after the error, so the
+      MultiSelect trigger is re-enabled but shows empty dropdown — indistinguishable from a
+      "genuinely empty dataset" state.
+    severity: high
+
+  - id: "8-i18n"
+    result: pass
+    evidence: |
+      No `locales/` directory exists under `frontend/src/production-history/` (confirmed via ls).
+      No `useI18n()` usage anywhere in the production-history tree (confirmed via grep).
+      All existing strings pre-change are inline Chinese literals.
+      CLAUDE.md Hard Rule #5 qualifies with "if the project supports multi-language" — this app
+      surface does not; the rule is not triggered.
+      The frontend-engineer.yml unresolved item `i18n-locale-files` correctly documents the
+      technical debt for a future project-wide i18n adoption.
+      Verdict: acceptable per current project policy.
+
+  - id: "9-accessibility"
+    result: minor-issue
+    evidence: |
+      a) MultiSelect keyboard nav — MultiSelect.vue has NO keydown handlers (Escape, Arrow,
+         Enter) on the dropdown. Focus is moved to the search input when the dropdown opens
+         (line 117: `requestAnimationFrame(() => searchRef.value?.focus())`), but option
+         navigation is mouse-only. This is a pre-existing issue in the shared component, not
+         introduced by this change, but the new first-tier MultiSelects expose it to a more
+         prominent part of the UI.
+      b) Textarea ARIA — App.vue:180-207: the three wildcard `<textarea>` elements have no
+         `id` attributes, and their `<label>` elements have no `for` attribute. The
+         label-to-control association is purely visual (sibling layout). Screen readers will
+         not announce the label when the textarea receives focus.
+      c) Form error span — App.vue:252: `<span v-if="formError" class="ph-app__form-error">`
+         has no `role="alert"` and no `aria-live="polite"`. Per the system prompt accessibility
+         rules, error messages must have both. The shared `ErrorBanner` component (which does
+         carry `role="alert"`, confirmed in ErrorBanner.vue:18) is correctly used for API errors
+         but the inline form validation error does not follow the same pattern.
+      d) The `multi-select-trigger` button has no `aria-expanded` attribute to communicate
+         open/closed state to screen readers (pre-existing, not introduced here).
+    severity: medium
+
+  - id: "10-design-token-compliance"
+    result: minor-issue
+    evidence: |
+      style.css:52 — `box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18)` for `.ph-app__input:focus`
+      is a hardcoded rgba value. The same color (sky-500 / token h0ea5e9) is referenced via
+      `theme()` on line 51, but the opacity variant is raw rgba. This violates CSS contract §2.3
+      which requires all design value references to go through `theme()`. An equivalent using
+      Tailwind's ring utilities (`focus:ring-2 focus:ring-sky-500/20` or Tailwind ring color
+      token) would comply.
+      style.css:73-74 — `.ph-first-tier__wildcard-input` uses `min-height: 64px` (no Tailwind
+      equivalent at that exact value) and `font-family: ui-monospace, SFMono-Regular, Menlo,
+      monospace` as raw CSS values. The `tailwind.config.js` does not define a `mono` font
+      family key (only `sans` at line 182). Using raw `font-family` is not strictly forbidden by
+      contract since Tailwind cannot express the monospace stack without a config entry, but it
+      should be promoted to a `fontFamily.mono` token in tailwind.config.js to comply with
+      contract §2.2 ("all new design tokens must be added to theme.extend").
+      All other classes in style.css correctly use `@apply` with Tailwind utilities or
+      `theme()` for non-Tailwind properties. The `ph-first-tier__*` classes are properly scoped
+      under `.theme-production-history`.
+    severity: low
+
+recommendations:
+  - id: REC-01
+    severity: high
+    description: |
+      Surface `firstTier.error` in the template. When the filter-options API fails, the 4
+      cached MultiSelects silently show empty options. Add an inline warning (e.g., a `<p>`
+      with `role="alert"` and `aria-live="polite"`) near the first-tier grid that displays
+      `firstTier.error.value` when non-null, instructing the user to retry or proceed with
+      manual input via the wildcard textareas.
+    files:
+      - frontend/src/production-history/App.vue
+
+  - id: REC-02
+    severity: medium
+    description: |
+      Add visual feedback when `_pruneSelection()` removes at least one item. Options:
+      (a) a transient toast ("已移除 N 個不相容的選項") via a shared toast composable;
+      (b) a collapsible warning row below the multiselect-grid listing dropped values.
+      Silent drops cause subtle query-correctness confusion and are especially problematic
+      for power users who rely on precise filter combinations.
+    files:
+      - frontend/src/production-history/composables/useFirstTierFilters.ts
+      - frontend/src/production-history/App.vue
+
+  - id: REC-03
+    severity: medium
+    description: |
+      Add a visible section subtitle (e.g., `<p class="ui-filter-label">查詢後細篩</p>`) to
+      the supplementary filters section (App.vue:226), and change the grid from
+      `lg:grid-cols-4` to `lg:grid-cols-2` since there are only 2 fields remaining after D6.
+      The current 4-col grid leaves two ghost columns on wide screens.
+    files:
+      - frontend/src/production-history/App.vue
+      - frontend/src/production-history/style.css
+
+  - id: REC-04
+    severity: medium
+    description: |
+      Add `for`/`id` associations to the three wildcard `<textarea>` labels (App.vue:179-206)
+      and add `role="alert"` + `aria-live="polite"` to the form validation error span
+      (App.vue:252). Both are required by the system-prompt accessibility rules.
+    files:
+      - frontend/src/production-history/App.vue
+
+  - id: REC-05
+    severity: low
+    description: |
+      Replace the hardcoded `rgba(14, 165, 233, 0.18)` box-shadow in `.ph-app__input:focus`
+      (style.css:52) with a Tailwind ring utility on the element itself (`@apply focus:ring-2
+      focus:ring-sky-500/20`) to satisfy CSS contract §2.3. Promote the monospace font stack
+      to a `fontFamily.mono` entry in tailwind.config.js and reference it via
+      `@apply font-mono` in `.ph-first-tier__wildcard-input`.
+    files:
+      - frontend/src/production-history/style.css
+      - frontend/tailwind.config.js
+
+  - id: REC-06
+    severity: low
+    description: |
+      Add a Wafer LOT example pattern to its textarea placeholder (currently missing;
+      工單號 and LOT ID both have examples). Remove or consolidate the redundant hint `<div>`
+      below each textarea (the info is already in the placeholder). If the 100-pattern
+      cap is user-visible (e.g., entries silently truncated), add a live counter
+      (`X / 100 筆`) below the textarea.
+    files:
+      - frontend/src/production-history/App.vue
+
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/design.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/frontend-engineer.yml
+  - frontend/src/production-history/App.vue
+  - frontend/src/production-history/composables/useFirstTierFilters.ts
+  - frontend/src/production-history/composables/useProductionHistory.ts
+  - frontend/src/production-history/style.css
+  - frontend/src/shared-ui/components/MultiSelect.vue
+  - frontend/src/shared-ui/components/ErrorBanner.vue
+  - frontend/src/styles/tailwind.css
+  - frontend/src/resource-shared/styles.css
+  - frontend/tailwind.config.js
+  - contracts/css/css-contract.md

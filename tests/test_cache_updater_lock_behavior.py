@@ -71,3 +71,41 @@ class TestWipCacheUpdateFailClosed:
         updater._check_and_update()
 
         assert check_calls == [], "Oracle SYS_DATE check must not happen when lock fails"
+
+
+# ============================================================
+# Change: prod-history-first-tier-cache-filters
+# AC-6 / PHF-05 — file-based exclusive lock prevents Oracle thundering herd
+# ============================================================
+
+class TestContainerFilterCacheLockBehavior:
+    """File-based ``O_CREAT|O_EXCL`` lock on container_filter_cache."""
+
+    def test_container_filter_cache_lock_prevents_concurrent_oracle(self, tmp_path, monkeypatch):
+        """Two simulated workers — only the lock winner calls Oracle.
+
+        Re-points the lock file path to a tmp file so the test cannot
+        collide with a real cache rebuild on the dev machine.
+        """
+        import mes_dashboard.services.container_filter_cache as cache_mod
+
+        lock_file = tmp_path / "container_filter_cache.loading"
+        monkeypatch.setattr(cache_mod, "_LOCK_PATH", lock_file)
+
+        # Worker 1 acquires the lock.
+        first = cache_mod._try_lock()
+        try:
+            assert first is True
+            # Worker 2 attempts — denied (file already exists).
+            second = cache_mod._try_lock()
+            assert second is False
+        finally:
+            cache_mod._release_lock()
+        # After release, the lock file is gone.
+        assert not lock_file.exists()
+        # And a fresh worker can acquire it again.
+        third = cache_mod._try_lock()
+        try:
+            assert third is True
+        finally:
+            cache_mod._release_lock()

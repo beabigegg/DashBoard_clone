@@ -1,0 +1,267 @@
+agent: visual-reviewer
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: approved-with-changes
+
+# ── Checklist findings ────────────────────────────────────────────────────────
+
+findings:
+
+  - id: VR-01
+    check: Design-token usage
+    severity: warning
+    status: partial-violation
+    detail: |
+      The four new classes use Tailwind utilities exclusively — no raw hex or
+      hardcoded px values.
+
+      Compliant:
+        .ph-first-tier__multiselect-grid  → @apply grid grid-cols-2 … gap-3
+        .ph-first-tier__wildcard-grid     → @apply grid grid-cols-1 … gap-3 pt-1
+        .ph-first-tier__hint              → @apply text-xs text-gray-500 mt-1
+
+      Violation found in .ph-first-tier__wildcard-input:
+        `min-height: 64px;` — hardcoded px value outside the token spacing scale.
+        The spacing.token map has p64 missing; nearest neighbors are p48/p80.
+        `font-family: ui-monospace, SFMono-Regular, Menlo, monospace;` — raw
+        font-family string not routed through tailwind.config.js fontFamily.
+        Both should use Tailwind utilities (`min-h-16` for 64px, `font-mono` for
+        the monospace stack, which Tailwind provides via its default config).
+
+      css-contract §2.3: "CSS 檔案中引用設計規範必須透過 Tailwind theme() 函式"
+      css-contract §3.1: "優先使用 Tailwind 功能類別"
+
+  - id: VR-02
+    check: Grid alignment — multiselect-grid vs wildcard-grid
+    severity: info
+    status: pass-with-note
+    detail: |
+      .ph-first-tier__multiselect-grid: grid-cols-2 (sm) → grid-cols-4 (lg)
+      .ph-first-tier__wildcard-grid:    grid-cols-1 (sm) → grid-cols-3 (lg)
+      .ph-supplementary-filters:        grid-cols-2 (sm) → grid-cols-4 (lg)
+      .ph-app__filter-row (date range): flex wrap, not grid
+
+      Gap is consistently `gap-3` (12px) across all rows — visually coherent.
+      The base (mobile-first, below sm) breakpoints differ: multiselect-grid
+      starts at 2 columns while wildcard-grid starts at 1 column. This is
+      intentional — a textarea at mobile width is wider than a MultiSelect
+      trigger, so the single-column base is correct. No misalignment concern.
+
+      Minor note: `sm:grid-cols-2` on .ph-first-tier__multiselect-grid is
+      redundant because `grid-cols-2` is already the base (no-breakpoint)
+      value. This is harmless but adds noise.
+
+  - id: VR-03
+    check: Textarea visual weight — mixed-height grid balance
+    severity: warning
+    status: needs-review
+    detail: |
+      The wildcard textareas use `rows="3"` and a `min-height: 64px` floor.
+      A MultiSelect trigger is approximately 36–40px tall (one line + padding,
+      as rendered by `.multi-select-trigger` in shared-ui). Three textarea rows
+      at default line-height (~20px each) produce a rendered height of ~80–90px,
+      more than double a MultiSelect trigger.
+
+      The two grids are in separate rows (flex-col gap-3 container), so the
+      height mismatch does not cause inline misalignment. However, the wildcard
+      row will visually dominate the filter card: the three textarea blocks
+      together consume roughly twice the vertical real-estate of the four
+      MultiSelect row. This may be acceptable UX for a paste-heavy workflow,
+      but the design.md D2 specification does not address visual balance
+      between the two rows. A design decision note is missing.
+
+      Recommendation: reduce to `rows="2"` for the wildcard textareas, or
+      document the intent in design.md so future reviewers do not second-guess it.
+
+  - id: VR-04
+    check: Hint text styling — contrast and readability
+    severity: info
+    status: pass
+    detail: |
+      .ph-first-tier__hint applies `text-xs text-gray-500 mt-1`.
+      text-xs resolves to 12px / 1.125rem (from tailwind.config.js fontSize map).
+      text-gray-500 = #6b7280 on white (#ffffff) background gives a contrast
+      ratio of approximately 4.6:1, which passes WCAG AA for normal text at
+      12px (minimum threshold 4.5:1). This is borderline — any future background
+      color shift to anything darker than #f8f8f8 could drop it below 4.5:1.
+
+      No violation today, but the margin is thin. Consider text-gray-600
+      (#4b5563, ~6.9:1) if the card background ever shifts to a tinted surface.
+
+  - id: VR-05
+    check: Loading indicator during cross-filter fetch
+    severity: warning
+    status: partial
+    detail: |
+      The MultiSelect component renders a `<LoadingSpinner size="sm" />` in its
+      trigger button when `:loading="true"` (MultiSelect.vue line 134–136).
+      App.vue passes `:loading="firstTier.loading.value"` to all four cached
+      MultiSelects (lines 135, 147, 159, 171).
+
+      The loading state is therefore visible per-picker (spinner replaces the
+      chevron). However, because all four pickers share the single `loading`
+      ref, they all show spinners simultaneously — there is no per-field
+      granularity. This is correct for the initial mount fetch, but during a
+      cross-filter re-fetch triggered by selecting a value in one picker, the
+      selected picker itself is disabled+loading, which is slightly confusing
+      (the user just picked a value and the picker collapses and spins).
+
+      The existing UX is functional and matches the material-trace precedent.
+      Flagging as a future UX improvement, not a blocking issue.
+
+  - id: VR-06
+    check: MultiSelect option count visibility
+    severity: warning
+    status: gap
+    detail: |
+      MultiSelect.vue shows "已選 N 項" in the trigger when N > 1 (line 67), but
+      provides no indication of how many options are currently available in the
+      dropdown. After a cross-filter narrows Package from 100 to 8 options, the
+      trigger still shows "全部" (placeholder) or the selected items — there is
+      no "(8 options available)" indicator.
+
+      Design.md D1 and the business rules describe the fail-open picker behavior
+      but do not specify an option-count indicator. The absence of such an
+      indicator makes it hard for users to understand that the list has been
+      narrowed. This is a UX gap, not a CSS violation.
+
+      Recommendation: add a small badge or parenthetical count inside the
+      MultiSelect trigger or dropdown header (e.g., "(8 項)" appended to the
+      placeholder text) when fewer options are available than the base set.
+      This would require a change to shared-ui/MultiSelect.vue or a slot.
+
+  - id: VR-07
+    check: Second-tier panel after D6 stripping
+    severity: info
+    status: pass
+    detail: |
+      The second-tier `ph-supplementary-filters` block is conditionally rendered
+      via `v-if="datasetId"` (App.vue line 226) — it appears only after a
+      successful query. Before the first query, the section does not exist in
+      the DOM, so there is no empty-space artifact.
+
+      After a query, the panel contains two filters (WorkCenter 群組 + Equipment)
+      in a 4-column grid (`grid-cols-4` on lg). Two filters in a 4-column grid
+      leaves two empty grid slots, which renders as two items left-aligned with
+      blank space on the right. The `ph-supplementary-filters` class includes
+      `border-t border-gray-100 pt-1`, providing a visual separator from the
+      first-tier rows.
+
+      Minor: two items in a 4-col grid looks sparse — the original 6-col design
+      made sense for 6 items. With only 2 items, `grid-cols-2` (matching the
+      supplementary reality) would look better and align with the date-range
+      row's flex layout. This is a cosmetic refinement, not a blocking issue.
+
+  - id: VR-08
+    check: Color regression — brand colors / focus rings / hover states
+    severity: info
+    status: pass
+    detail: |
+      Reviewed all new CSS rules in style.css.
+      New rules do not touch brand colors, focus-ring definitions, or hover
+      states for any existing class. The `.ph-app__textarea` @apply rule uses
+      `focus:ring-blue-300` — this is a Tailwind built-in color (not a design
+      token), which is consistent with the pre-existing pattern in the
+      production-history stylesheet (the `ph-app__input` focus uses
+      `theme('colors.token.h0ea5e9')` which is sky-500/#0ea5e9, the same hue
+      family). No regression detected. No ECharts color constants modified.
+
+  - id: VR-09
+    check: Build artifacts
+    severity: info
+    status: pass
+    detail: |
+      frontend-engineer.yml verification block reports:
+        build: PASS (built in 10.43s)
+        css-check: PASS (0 errors, 47 pre-existing warnings; no new violations)
+      Build success is confirmed. css-governance-check reports no new errors from
+      the style.css changes. The 47 pre-existing warnings are pre-change baseline
+      and out of scope for this review.
+
+  - id: VR-10
+    check: Pixel-diff feasibility — stable selector proposal
+    severity: info
+    status: recommendation
+    detail: |
+      The filter panel structure is stable enough for a Playwright screenshot
+      test. Proposed selectors (use data-testid attributes to avoid class
+      coupling):
+
+        Filter card:            [data-testid="ph-filter-panel"]
+        Multiselect grid row:   .ph-first-tier__multiselect-grid
+        Wildcard grid row:      .ph-first-tier__wildcard-grid
+        Individual pickers:     add data-testid="ph-filter-pj-types",
+                                "ph-filter-packages", "ph-filter-bops",
+                                "ph-filter-pj-functions" on the MultiSelect
+                                root divs (requires App.vue change)
+        Wildcard textareas:     add data-testid="ph-wildcard-mfg-orders",
+                                "ph-wildcard-lot-ids", "ph-wildcard-wafer-lots"
+        Supplementary section:  .ph-supplementary-filters (only present after
+                                datasetId is set)
+
+      These would support the Playwright specs deferred to e2e-resilience-engineer
+      (frontend-engineer unresolved item e2e-playwright-specs).
+
+# ── Recommendations ──────────────────────────────────────────────────────────
+
+recommendations:
+
+  - id: REC-01
+    severity: must-fix
+    action: |
+      In style.css .ph-first-tier__wildcard-input, replace the raw `min-height`
+      and `font-family` declarations with Tailwind utilities:
+        min-height: 64px  →  add `@apply min-h-16 font-mono` (min-h-16 = 4rem =
+        64px via Tailwind default scale; font-mono = the monospace stack).
+      This brings the class into full css-contract §3.1 compliance and eliminates
+      the two hardcoded-value violations found in VR-01.
+
+  - id: REC-02
+    severity: should-fix
+    action: |
+      Remove the redundant `sm:grid-cols-2` from .ph-first-tier__multiselect-grid
+      since the base class is already `grid-cols-2`. Reduces noise, no visual
+      change. (VR-02)
+
+  - id: REC-03
+    severity: consider
+    action: |
+      Reduce wildcard textarea `rows` from 3 to 2, or add a design note in
+      design.md explaining why the larger textarea height is intentional (paste
+      workflow, expected long lists). (VR-03)
+
+  - id: REC-04
+    severity: consider
+    action: |
+      Change .ph-supplementary-filters grid from `grid-cols-4` to `grid-cols-2`
+      on lg, since only two filters remain after D6. This avoids two visually
+      empty right-side slots. (VR-07)
+
+  - id: REC-05
+    severity: future-ux
+    action: |
+      Add an option-count indicator to MultiSelect (or as a sibling element in
+      App.vue) that reflects the narrowed count vs. base count. E.g., show
+      "(8 / 100)" in the trigger label when a cross-filter has narrowed the
+      available options. This addresses the VR-06 gap without blocking this
+      change. (VR-06)
+
+  - id: REC-06
+    severity: future-a11y
+    action: |
+      Upgrade hint text from `text-gray-500` to `text-gray-600` (#4b5563) to
+      increase contrast ratio from ~4.6:1 to ~6.9:1, providing a comfortable
+      margin above the WCAG AA 4.5:1 threshold. (VR-04)
+
+# ── Files read ────────────────────────────────────────────────────────────────
+
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/design.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/frontend-engineer.yml
+  - frontend/src/production-history/App.vue
+  - frontend/src/production-history/style.css
+  - frontend/src/production-history/composables/useFirstTierFilters.ts
+  - frontend/src/shared-ui/components/MultiSelect.vue
+  - frontend/tailwind.config.js
+  - contracts/css/css-contract.md

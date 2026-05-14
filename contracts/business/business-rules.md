@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.2.0
+schema-version: 1.3.0
 last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
@@ -121,6 +121,17 @@ breaking-change-policy: deprecate-2-minors
 | PH-02 | Matrix lot-count semantics | Matrix `count` cell = `COUNT(DISTINCT CONTAINERNAME)` computed in DuckDB over the raw row source; equals prior aggregated-baseline lot count for the same (WC, Spec, Equipment × Month) cell | integration + e2e tests |
 | PH-03 | PJ_FUNCTION spool carriage | `PJ_FUNCTION` is carried through Oracle→spool→DuckDB schema and CSV export (pre-staged for Change 3); not yet exposed as a user filter | contract + parity tests |
 | PH-04 | Detail row ordering | Detail table sorts by `TRACKINTIMESTAMP` ascending; no "partial #" column (Resolved Decision 2 of change `prod-history-detail-raw-rows`) | e2e tests |
+
+## Production-History Filter Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| PHF-01 | Cross-filter cardinality | `GET /api/production-history/filter-options` 對 `selected={pj_types[], packages[], bops[], pj_functions[]}` 進行 in-memory 4-tuple 過濾（Option B）：對 `container_filter_cache.tuples` 做單次掃描，回傳「滿足當前 selected 子集」的 union of co-occurring values 給每一欄。empty `selected` → 直接回 `indices` 完整 distinct 集合（AC-1）。Cross-filter 在四個欄位之間對稱（AC-2）。 | unit + contract tests |
+| PHF-02 | Wildcard grammar | 高基數欄位（`mfg_orders`, `lot_ids`, `wafer_lots`）每筆 token 規則：(1) 最多一個 `*`（任意位置：prefix/suffix/infix；多 `*` 拒絕）；(2) 純 `*` 拒絕；(3) 去除 `*` 後的 non-`*` 字元數 ≥ 2（單字元 token 拒絕；`*A*` 不可，`*AB*` 可）；(4) 多行 textarea 解析：newline / comma / whitespace 分隔，trim 後 dedup；(5) 每欄位每 request 上限 100 patterns；(6) parser idempotent：`parse(parse(x)) == parse(x)`（AC-5）。 | unit + property tests |
+| PHF-03 | Wildcard SQL emit | 通過 PHF-02 的 pattern → bound parameter 形式 `col LIKE :bind ESCAPE '\'`；emit 前對 raw `%` 與 `_` 進行 escape（前綴 `\`），再將使用者的 `*` 一次性 translate 為 `%`；exact token（無 `*`）合併進 `IN (...)` batch。**禁止字串插值**；所有 binding 走 oracledb parameter style，與 `material_trace_service.py` 既有 `_add_exact_or_pattern_condition` 模式一致。 | unit + dependency-security audit |
+| PHF-04 | Cache schema versioning | `container_filter_cache` payload 必含 `schema_version: int`；目前值 `2`。讀取時 schema-version mismatch → log INFO，回傳 None，強制走 Oracle 重建路徑；絕不嘗試以舊 shape 反序列化（AC-8）。Rollback 機制：bump 至 `3` 在下次 deploy 自動讓 L2 entries 失效，免去 `redis-cli DEL`。 | unit + integration tests |
+| PHF-05 | Multi-worker cache rebuild lock | `container_filter_cache` 冷啟動 / TTL 過期重建使用 file-based exclusive lock：`os.open('tmp/container_filter_cache.loading', O_CREAT\|O_EXCL\|O_WRONLY)`；勝出 worker 執行 Oracle 重建後 release（`finally` 區塊保證）；其餘 workers 每 5 s 輪詢 Redis L2 共 18 次（90 s 上限），命中後 reuse；逾時 fallback 至 Oracle 重試（AC-6）。Pattern 沿用 `resource_history_duckdb_cache._try_lock/_release_lock`。 | integration + multi_worker tests |
+| PHF-06 | SQL meta-char rejection | 高基數欄位 token 在進入 SQL bind 前必須通過 meta-char regex 拒絕：包含任一字元 `'`、`;`、`--`、`/*`、`*/` 或 control chars `\x00-\x1f` → 400 `VALIDATION_ERROR`，且**永不進入 Oracle**（AC-4）。Validation 集中於 `core/request_validation.py::parse_wildcard_tokens`，為高基數欄位的單一 trust boundary。 | unit + fuzz tests |
 
 ## Analytics / Anomaly Detection Rules
 

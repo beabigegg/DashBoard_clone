@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.1.0
+schema-version: 1.2.0
 last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
@@ -198,6 +198,69 @@ Constraints:
 - 400 and 404 responses follow the standard error envelope (Section 1.2).
 - This shape is wholly separate from the query result shape (Section 2.2); do not conflate.
 - Added by change `resource-history-perf`.
+
+### 2.7 Production-History Filter-Options Response（`GET /api/production-history/filter-options`）
+
+Response shape for cross-filter cached options (HTTP 200):
+
+```json
+{
+  "success": true,
+  "data": {
+    "pj_types":     ["<string>"],
+    "packages":     ["<string>"],
+    "bops":         ["<string>"],
+    "pj_functions": ["<string>"]
+  },
+  "meta": {
+    "timestamp":      "<ISO 8601 local>",
+    "app_version":    "<string>",
+    "updated_at":     "<ISO 8601 UTC>",
+    "schema_version": 2
+  }
+}
+```
+
+Constraints:
+- All four `data` arrays are required and always present (may be `[]` when nothing co-occurs with the current `selected` set).
+- Each array contains distinct strings sorted ascending; duplicates MUST NOT appear.
+- `meta.schema_version` is an integer; current value `2`. Bumped when the underlying cache payload schema changes.
+- `meta.updated_at` reflects the last cache refresh ISO timestamp.
+- `selected` query param is URL-encoded JSON; unknown keys are ignored; values not present in cache are silently dropped (fail-open picker).
+- Empty `selected` (or omitted) → returns the full distinct set for each field from `container_filter_cache.indices`.
+- 400 on malformed `selected` JSON; 404 on cache cold-start failure; standard error envelope (Section 1.2).
+- Cross-filter semantics: given a non-empty `selected`, each field's array is narrowed to values co-occurring with the selection across the cached 4-tuple set (business-rules.md PHF-01).
+- Added by change `prod-history-first-tier-cache-filters`.
+
+### 2.8 Container Filter Cache Payload (internal — `container_filter_cache:data`)
+
+Internal Redis L2 / in-process L1 payload that backs §2.7 filter-options responses. Documented here for cache-rebuild and rollback governance.
+
+```json
+{
+  "schema_version": 2,
+  "tuples": [
+    ["<PJ_TYPE>", "<PRODUCTLINENAME>", "<PJ_BOP>", "<PJ_FUNCTION>"]
+  ],
+  "indices": {
+    "pj_types":     ["<string>"],
+    "packages":     ["<string>"],
+    "bops":         ["<string>"],
+    "pj_functions": ["<string>"]
+  },
+  "updated_at": "<ISO 8601 UTC>"
+}
+```
+
+Constraints:
+- `schema_version` is required `int`; current value `2` (was implicit `1` prior to this change). Readers MUST treat a missing or mismatched `schema_version` as a cache miss and trigger a rebuild rather than deserializing the old shape (business-rules.md PHF-04).
+- `tuples` is a list of 4-element arrays in fixed positional order `[PJ_TYPE, PRODUCTLINENAME, PJ_BOP, PJ_FUNCTION]`. Each tuple represents an observed co-occurrence row from `DW_MES_CONTAINER` (`SELECT DISTINCT`).
+- `indices` is a denormalised convenience map: each value is the deduplicated sorted distinct list of the corresponding column across all tuples — used to satisfy the empty-`selected` case without scanning tuples.
+- `updated_at` carries the Oracle refresh timestamp; rolled forward on every successful rebuild.
+- TTL governed by `CACHE_TTL_FILTER_GENERAL` (24 h).
+- Rollback: bump `schema_version` → `3` in a follow-up to invalidate L2 entries on next deploy without `redis-cli DEL`.
+- Multi-worker rebuild lock at `tmp/container_filter_cache.loading` (`O_CREAT|O_EXCL`); losers poll Redis L2 every 5 s up to 90 s (business-rules.md PHF-05).
+- Added by change `prod-history-first-tier-cache-filters`.
 
 ### 2.4 Truncated Payload（memory pressure guard）
 

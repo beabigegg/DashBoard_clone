@@ -134,6 +134,17 @@ export const PRODUCTION_HISTORY_COUNT_SCHEMA: SchemaObject = {
 };
 
 // ---------------------------------------------------------------------------
+// /api/production-history/filter-options (cached cross-filter response)
+// Added by change `prod-history-first-tier-cache-filters` (data-shape §2.7).
+// ---------------------------------------------------------------------------
+export const PRODUCTION_HISTORY_FILTER_OPTIONS_SCHEMA: SchemaObject = {
+  pj_types: 'array',
+  packages: 'array',
+  bops: 'array',
+  pj_functions: 'array',
+};
+
+// ---------------------------------------------------------------------------
 // /api/material-trace/spool (paged result from spool)
 // ---------------------------------------------------------------------------
 export const MATERIAL_TRACE_SPOOL_SCHEMA: SchemaObject = {
@@ -175,6 +186,7 @@ export const ENDPOINT_SCHEMAS: Record<string, SchemaObject> = {
   '/api/production-history/query': PRODUCTION_HISTORY_QUERY_SCHEMA,
   '/api/production-history/type-options': PRODUCTION_HISTORY_TYPE_OPTIONS_SCHEMA,
   '/api/production-history/count': PRODUCTION_HISTORY_COUNT_SCHEMA,
+  '/api/production-history/filter-options': PRODUCTION_HISTORY_FILTER_OPTIONS_SCHEMA,
   '/api/material-trace/spool': MATERIAL_TRACE_SPOOL_SCHEMA,
   '/api/material-trace/query': MATERIAL_TRACE_QUERY_SCHEMA,
   '/api/analytics/anomaly-summary': ANALYTICS_ANOMALY_SUMMARY_SCHEMA,

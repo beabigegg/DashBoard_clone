@@ -44,3 +44,40 @@ MALICIOUS_INPUTS = [
     _NULL_BYTE_STRING,
     _CSV_INJECTION,
 ]
+
+
+# ---------------------------------------------------------------------------
+# WILDCARD_HOSTILE — payloads for `mfg_orders`, `lot_ids`, `wafer_lots`
+# (change `prod-history-first-tier-cache-filters`, PHF-02 / PHF-06).
+#
+# Each entry MUST be rejected by `parse_wildcard_tokens` and surface as a
+# 400 VALIDATION_ERROR with `field` matching the offending wildcard key.
+# ---------------------------------------------------------------------------
+
+WILDCARD_FIELDS = ("mfg_orders", "lot_ids", "wafer_lots")
+
+# SQL meta-chars (PHF-06): each single-token MUST 400.
+WILDCARD_META_CHARS = [
+    "MA'25",       # single quote
+    "MA;25",       # semicolon
+    "MA--25",      # SQL line comment
+    "MA/*25",     # block-comment opener
+    "MA*/25",     # block-comment closer (also "looks like" two wildcards but caught by meta-char first)
+    "q'[malicious]'",  # Oracle alt literal — caught via leading single quote
+]
+
+# Control-char rejections (\x00-\x1f except the explicit \t \n \r separators).
+WILDCARD_CONTROL_CHARS = [chr(c) for c in range(0x00, 0x20) if c not in (0x09, 0x0a, 0x0d)]
+
+# Grammar violations: multi-`*`, pure-`*`, single-char literal.
+WILDCARD_GRAMMAR_INVALID = [
+    "MA**",
+    "M*A*B",
+    "***",
+    "*A*",        # 2 stars, non-`*` literal_len=1
+    "*",           # pure star
+    "A",           # single literal char
+    "*A",          # literal_len=1 after stripping *
+    "A*",          # literal_len=1 after stripping *
+]
+

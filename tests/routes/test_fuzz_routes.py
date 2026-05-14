@@ -25,7 +25,13 @@ import pytest
 
 # Add project root to path so we can import fuzz payloads
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from routes._fuzz_payloads import MALICIOUS_INPUTS
+from routes._fuzz_payloads import (
+    MALICIOUS_INPUTS,
+    WILDCARD_CONTROL_CHARS,
+    WILDCARD_FIELDS,
+    WILDCARD_GRAMMAR_INVALID,
+    WILDCARD_META_CHARS,
+)
 
 # ---------------------------------------------------------------------------
 # Shared app/client fixture
@@ -341,3 +347,231 @@ def test_wip_rejects_malicious_filter(payload):
     qs = _fuzz_query_string("workcenter_group", payload)
     r = client.get(f"/api/wip/overview/summary?{qs}")
     _assert_validation_error(r, payload, "/api/wip/overview/summary")
+
+
+# ---------------------------------------------------------------------------
+# Production History — wildcard input fuzz
+# (change `prod-history-first-tier-cache-filters`, PHF-02 / PHF-06)
+# ---------------------------------------------------------------------------
+#
+# `validate_query_params` performs `pj_types` and date validation BEFORE
+# parse_wildcard_tokens. So every wildcard fuzz request MUST carry the
+# minimal valid pj_types + date envelope; otherwise the route would 400 on
+# an unrelated field and we'd never exercise the wildcard path.
+# ---------------------------------------------------------------------------
+
+_PROD_HISTORY_QUERY_URL = "/api/production-history/query"
+
+
+def _base_prod_history_body() -> dict:
+    return {
+        "pj_types": ["DEMO_TYPE"],
+        "start_date": "2026-01-01",
+        "end_date": "2026-01-07",
+    }
+
+
+def _assert_wildcard_field_in_error(response, field: str, payload) -> None:
+    """Assert the error envelope mentions the offending wildcard field name.
+
+    `parse_wildcard_tokens` raises WildcardValidationError whose message is
+    prefixed with the field name (e.g. "mfg_orders 含有不允許的字元 …").
+    The route layer surfaces it via error_response(VALIDATION_ERROR, str(exc)),
+    so the field name MUST appear in error.message (data-shape §error).
+    """
+    body = response.get_json(silent=True) or {}
+    err = body.get("error") or {}
+    msg = str(err.get("message") or "")
+    assert field in msg, (
+        f"wildcard error envelope must mention field={field!r} for payload "
+        f"{payload!r}; got message={msg!r} (body={body})"
+    )
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+@pytest.mark.parametrize("token", WILDCARD_META_CHARS)
+def test_main_query_wildcard_meta_char_rejection(field, token):
+    """PHF-06: SQL meta-chars in any wildcard field MUST 400 with field context."""
+    client = _make_client()
+    body = _base_prod_history_body()
+    body[field] = [token]
+    r = client.post(_PROD_HISTORY_QUERY_URL, json=body, content_type="application/json")
+    _assert_validation_error(r, token, _PROD_HISTORY_QUERY_URL)
+    _assert_wildcard_field_in_error(r, field, token)
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+@pytest.mark.parametrize("ctrl", WILDCARD_CONTROL_CHARS)
+def test_main_query_wildcard_param_control_char_rejection(field, ctrl):
+    """PHF-06: control chars \\x00–\\x1f (except \\t \\n \\r) MUST 400."""
+    client = _make_client()
+    body = _base_prod_history_body()
+    # Embed control char mid-token so the splitter can't drop it as whitespace.
+    body[field] = [f"AB{ctrl}CD"]
+    r = client.post(_PROD_HISTORY_QUERY_URL, json=body, content_type="application/json")
+    _assert_validation_error(r, repr(ctrl), _PROD_HISTORY_QUERY_URL)
+    _assert_wildcard_field_in_error(r, field, repr(ctrl))
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+@pytest.mark.parametrize("token", WILDCARD_GRAMMAR_INVALID)
+def test_wildcard_multi_star_rejected(field, token):
+    """PHF-02 grammar: multi-`*`, pure-`*`, single-char tokens MUST 400."""
+    client = _make_client()
+    body = _base_prod_history_body()
+    body[field] = [token]
+    r = client.post(_PROD_HISTORY_QUERY_URL, json=body, content_type="application/json")
+    _assert_validation_error(r, token, _PROD_HISTORY_QUERY_URL)
+    _assert_wildcard_field_in_error(r, field, token)
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+def test_main_query_oversized_wildcard_input_token_count_capped(field):
+    """PHF-02 §5: per-field 100-token cap. 101 tokens MUST 400 mentioning 100."""
+    client = _make_client()
+    body = _base_prod_history_body()
+    # 101 distinct valid exact tokens. parse_wildcard_tokens caps at 100.
+    body[field] = [f"LO{idx:05d}" for idx in range(101)]
+    r = client.post(_PROD_HISTORY_QUERY_URL, json=body, content_type="application/json")
+    _assert_validation_error(r, f"101 tokens for {field}", _PROD_HISTORY_QUERY_URL)
+    body_json = r.get_json(silent=True) or {}
+    msg = str((body_json.get("error") or {}).get("message") or "")
+    assert "100" in msg, (
+        f"cap-violation error MUST mention 100; got message={msg!r}"
+    )
+    _assert_wildcard_field_in_error(r, field, "101 tokens")
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+def test_main_query_oversized_wildcard_input_single_huge_token_accepted(field):
+    """No per-token length cap exists today (R1 recommendation in
+    dependency-security-reviewer.yml). Document the actual behaviour: a
+    10 KB single token survives the parser and reaches the route as a bind
+    value. The route MAY then 400 for *unrelated* reasons (oracledb backend
+    rejection in real prod), but MUST NOT 500. Body-bytes cap is 262144
+    (MAX_JSON_BODY_BYTES default), so a 10 KB token is under the body cap.
+    """
+    client = _make_client()
+    body = _base_prod_history_body()
+    body[field] = ["A" * 10_000]
+    r = client.post(_PROD_HISTORY_QUERY_URL, json=body, content_type="application/json")
+    # The parser does NOT reject 10 KB tokens. We assert no 500; the route
+    # may proceed to Oracle (returning 200/202/503 depending on test-mode
+    # backend) but must not produce a wildcard-field VALIDATION_ERROR.
+    _assert_not_500(r, "10KB single token", _PROD_HISTORY_QUERY_URL)
+    _assert_valid_json(r, _PROD_HISTORY_QUERY_URL)
+    # If the route does 400, it must NOT be because of the wildcard parser
+    # (would require a per-token length cap, which is currently absent).
+    if r.status_code in (400, 422):
+        body_json = r.get_json(silent=True) or {}
+        msg = str((body_json.get("error") or {}).get("message") or "")
+        assert "萬用字元" not in msg or "上限" not in msg, (
+            f"10KB single token must not be rejected with a per-token "
+            f"length cap message; got: {msg!r}"
+        )
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+def test_main_query_oversized_payload_body_bytes_capped(field):
+    """MAX_JSON_BODY_BYTES = 262144 (~256 KB). 100 KB payload MUST NOT 500.
+
+    Build a list of 100-byte tokens at the 100-token cap, plus a 90 KB
+    junk filler — well under the 256 KB body cap but large enough to
+    exercise the JSON parser path.
+    """
+    client = _make_client()
+    body = _base_prod_history_body()
+    body[field] = [f"L{i:099d}" for i in range(100)]  # 100 tokens × 100 bytes
+    body["filler_for_payload_size"] = "X" * 90_000
+    r = client.post(_PROD_HISTORY_QUERY_URL, json=body, content_type="application/json")
+    _assert_not_500(r, "100KB payload", _PROD_HISTORY_QUERY_URL)
+    _assert_valid_json(r, _PROD_HISTORY_QUERY_URL)
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+def test_wildcard_oracle_hostile_concat_passes_as_literal(field):
+    """`||` and DBMS_*/UTL_* names are NOT rejected (defense-in-depth bind
+    binding) — dependency-security-reviewer §3 confirms. Confirm empirically
+    that the parser does not raise and the route does not 500.
+    """
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "src"))
+    from mes_dashboard.core.request_validation import parse_wildcard_tokens
+
+    # First — direct parser confidence: these reach a bound value, never raise.
+    for token in ("AA||BB", "DBMS_OUTPUT.PUT_LINE", "UTL_HTTP.REQUEST"):
+        tokens = parse_wildcard_tokens(field, [token])
+        assert tokens and tokens[0].kind == "exact"
+        assert tokens[0].bound_value == token
+
+    # Second — route-level: must not 500 even when these reach the SQL layer.
+    client = _make_client()
+    body = _base_prod_history_body()
+    body[field] = ["AA||BB", "DBMS_OUTPUT.PUT_LINE"]
+    r = client.post(_PROD_HISTORY_QUERY_URL, json=body, content_type="application/json")
+    _assert_not_500(r, "concat/DBMS literals", _PROD_HISTORY_QUERY_URL)
+    _assert_valid_json(r, _PROD_HISTORY_QUERY_URL)
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+@pytest.mark.parametrize(
+    "token,expected",
+    [
+        ("AB​CD", "pass"),    # ZWSP — literal
+        ("AB‮CD", "pass"),    # RTL override — literal
+        ("A１B", "pass"),       # full-width digit — literal
+        ("AB\x00CD", "reject"),    # null byte — control char rejected
+    ],
+)
+def test_wildcard_unicode_handling(field, token, expected):
+    """Unicode invisibles pass through as literal binds (per
+    dependency-security-reviewer §8); only the control-char class \\x00–\\x1f
+    is rejected (PHF-06).
+    """
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "src"))
+    from mes_dashboard.core.request_validation import parse_wildcard_tokens, WildcardValidationError
+
+    if expected == "pass":
+        tokens = parse_wildcard_tokens(field, [token])
+        assert tokens and tokens[0].kind == "exact"
+        assert tokens[0].bound_value == token  # passed through verbatim
+    else:
+        with pytest.raises(WildcardValidationError) as exc_info:
+            parse_wildcard_tokens(field, [token])
+        assert exc_info.value.field == field
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+def test_high_cardinality_lot_in_list_at_cap_accepted(field):
+    """Submit exactly 100 tokens — the cap boundary. Parser MUST accept."""
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "src"))
+    from mes_dashboard.core.request_validation import parse_wildcard_tokens
+
+    tokens = parse_wildcard_tokens(field, [f"LO{i:05d}" for i in range(100)])
+    assert len(tokens) == 100
+    assert all(t.kind == "exact" for t in tokens)
+
+
+@pytest.mark.parametrize("field", WILDCARD_FIELDS)
+def test_wildcard_textarea_paste_with_carriage_returns(field):
+    """PHF-02 §4: multi-line paste (CRLF + tabs + extra whitespace) is
+    parsed deterministically — dedup + trim + normalize all separators.
+    """
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "src"))
+    from mes_dashboard.core.request_validation import parse_wildcard_tokens
+
+    raw = "MA\r\nMB\r\n  MC\r\n\tMA\r\n,MD"
+    tokens = parse_wildcard_tokens(field, raw)
+    # Dedup case-insensitive — duplicate MA should collapse.
+    values = [t.bound_value for t in tokens]
+    assert values == ["MA", "MB", "MC", "MD"], (
+        f"CRLF/tab/comma paste did not normalise: got {values!r}"
+    )
+    assert all(t.kind == "exact" for t in tokens)

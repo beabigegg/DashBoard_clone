@@ -236,3 +236,40 @@ class TestFilterWhereMonth:
         assert "PRODUCTLINENAME" in where
         assert "WORK_ORDER" not in where
         assert "PACKAGE_NAME" not in where
+
+
+# ============================================================
+# Change: prod-history-first-tier-cache-filters
+# extra_filters wildcard emit
+# ============================================================
+
+class TestExtraFiltersWildcardEmit:
+    """_build_extra_filters wires wildcard tokens through the shared emitter."""
+
+    def test_extra_filters_wildcard_emit(self):
+        """All three wildcard fields produce LIKE ESCAPE clauses with bound params."""
+        from mes_dashboard.services.production_history_service import (
+            _build_extra_filters,
+            validate_query_params,
+        )
+        params = validate_query_params({
+            "pj_types": ["GA"],
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-10",
+            "mfg_orders": "MA2025*",
+            "wafer_lots": ["W001*"],
+            "lot_ids": ["GA*"],
+        })
+        sql, binds = _build_extra_filters(params)
+
+        # Three LIKE ESCAPE clauses appear, one per wildcard column.
+        assert sql.count("LIKE :") >= 3
+        assert "ESCAPE '\\'" in sql
+        # All three column references present.
+        assert "c.MFGORDERNAME" in sql
+        assert "c.FIRSTNAME" in sql
+        assert "c.CONTAINERNAME" in sql
+        # Bound values reflect % translation, NOT inline interpolation.
+        assert any(v == "MA2025%" for v in binds.values())
+        assert any(v == "W001%" for v in binds.values())
+        assert any(v == "GA%" for v in binds.values())

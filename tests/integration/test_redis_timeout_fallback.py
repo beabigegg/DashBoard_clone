@@ -211,6 +211,68 @@ class TestRedisTimeoutFallback:
             monkeypatch.undo()
 
     @pytest.mark.integration_real
+    def test_filter_options_l1_fallback(self, local_redis: str, monkeypatch):
+        """container_filter_cache L1 hit returns within budget when Redis is slow.
+
+        Scenario:
+          1. Seed in-process L1 cache via _apply_payload().
+          2. Replace get_redis_client() with a stub that raises TimeoutError
+             (simulating a slow Redis exceeding the socket budget).
+          3. Call get_filter_options() — must return the L1 payload immediately
+             without re-reading Redis or hitting Oracle.
+          4. Verify wall-clock < 1 s (degraded but functional).
+        """
+        import time as _time
+        import mes_dashboard.core.redis_client as rc_mod
+        import mes_dashboard.services.container_filter_cache as cache_mod
+
+        monkeypatch.setattr(rc_mod, "REDIS_URL", local_redis)
+        monkeypatch.setattr(rc_mod, "REDIS_ENABLED", True)
+
+        # Seed a known L1 payload (bypasses Oracle).
+        cache_mod._apply_payload(
+            {
+                "schema_version": cache_mod.SCHEMA_VERSION,
+                "tuples": [
+                    ["A", "PKG-1", "BOP-A", "FN-X"],
+                    ["B", "PKG-1", "BOP-B", "FN-Y"],
+                ],
+                "indices": {
+                    "pj_types": ["A", "B"],
+                    "packages": ["PKG-1"],
+                    "bops": ["BOP-A", "BOP-B"],
+                    "pj_functions": ["FN-X", "FN-Y"],
+                },
+                "updated_at": "2026-05-14T00:00:00Z",
+            }
+        )
+
+        def _raise_timeout():
+            raise redis_lib.exceptions.TimeoutError("simulated slow Redis")
+
+        # Patch both module references — the cache_mod import and the rc_mod one.
+        monkeypatch.setattr(rc_mod, "get_redis_client", _raise_timeout)
+        monkeypatch.setattr(cache_mod, "get_redis_client", _raise_timeout)
+
+        start = _time.monotonic()
+        try:
+            result = cache_mod.get_filter_options(None)
+        except redis_lib.exceptions.TimeoutError:
+            pytest.fail(
+                "L1 hit path must NOT touch Redis — TimeoutError propagated. "
+                "Loaded L1 should short-circuit the lookup."
+            )
+        elapsed = _time.monotonic() - start
+
+        assert elapsed < 1.0, (
+            f"L1 hit took {elapsed:.3f}s — should be near-instant; the function "
+            f"may be hitting Redis when L1 is already populated."
+        )
+        assert isinstance(result, dict)
+        assert sorted(result["pj_types"]) == ["A", "B"]
+        assert sorted(result["packages"]) == ["PKG-1"]
+
+    @pytest.mark.integration_real
     def test_fresh_client_reconnects_after_simulated_error(self, local_redis: str):
         """After a simulated error scenario, a new healthy client reads normally."""
         healthy = redis_lib.Redis.from_url(local_redis, decode_responses=True)

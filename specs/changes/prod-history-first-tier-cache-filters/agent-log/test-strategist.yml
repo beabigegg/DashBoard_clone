@@ -1,0 +1,73 @@
+agent: test-strategist
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: pass
+files-touched:
+  - path: specs/changes/prod-history-first-tier-cache-filters/test-plan.md
+    action: create
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/change-classification.md
+rationale:
+  unit-backend-cache: |
+    AC-1, AC-2, AC-6, AC-8 all bind to container_filter_cache internals
+    (4-tuple payload, narrow/symmetry, lock, schema version). Pre-merge tier 1
+    because cache correctness is the foundation of the cross-filter feature.
+  unit-backend-service: |
+    AC-3 (main-query param plumbing + back-compat) and wildcard→LIKE bind
+    boundary cases. Backward-compat test is non-negotiable to protect today's
+    Type-only flow against silent regression.
+  unit-backend-sql: |
+    EXTRA_FILTERS wildcard emit must be unit-tested at SQL-runtime level so a
+    bind-style regression surfaces without needing Oracle.
+  unit-backend-parser: |
+    Wildcard grammar is the SQL-injection blast surface; AC-4 + AC-5 demand
+    exhaustive boundary coverage (single-`*` anchor variants, rejection of
+    meta/control/short/pure-`*`/multi-`*`, dedup, cap=100, idempotence).
+    New file because no existing common-filters parser tests cover this grammar.
+  contract: |
+    data-shape §2.7 and §2.8 are new; contract assertions at route level lock
+    the JSON envelope so contract drift fails pre-merge.
+  route-fuzz: |
+    AC-4 mandates injection rejection. Route-level fuzz proves the
+    parser-rejection paths are wired into the request validator, not just the
+    pure parser unit.
+  integration-cache: |
+    AC-6 lock semantics cannot be validated in pure unit tests; needs the
+    multi-worker harness. Crash-release path is its own scenario.
+  integration-real: |
+    Oracle XE nightly run guards against pattern-translation regressions that
+    only manifest under real LIKE semantics (case, NLS, NULL handling).
+  integration-resilience: |
+    AC-6 + cache architecture demand a Redis-down L1 fallback path; CLAUDE.md
+    cache notes call this out as a recurring failure mode.
+  data-boundary: |
+    Empty cache, stale v1 payload, PJ_FUNCTION null are the three boundary
+    classes most likely to silently corrupt cross-filter narrowing.
+  property: |
+    Parser idempotence (AC-5) and cross-filter order-independence (AC-2) are
+    universal invariants; property tests catch the long tail unit tables miss.
+  frontend-unit: |
+    Multi-line parser and cross-filter loader composable are pure logic;
+    fast pre-merge feedback is cheap and high-value.
+  E2E: |
+    AC-7 is a UX assertion (4 MultiSelects + 3 textareas + second-tier chip
+    suppression); only Playwright can verify the rendered panel.
+  stress: |
+    Thundering-herd rebuild and 1000-LOT IN list are realistic production
+    risks; lightweight stress (not soak) is sufficient pre-merge.
+exclusions:
+  soak: |
+    No long-lived in-memory growth path beyond the 24h TTL window; classifier
+    flagged as not-required.
+  rownum-cap: |
+    D7 deferred this decision; testing would precede a contract.
+  visual-pixel-diff: |
+    DOM-level Playwright assertion suffices for chip-suppression check.
+  multi-star-wildcard: |
+    D2 rejects in v1; only rejection assertion is in scope.
+notes:
+  - test-plan.md is 78 lines (well within 100-line cap).
+  - All AC-N references quote change-classification.md verbatim.
+  - Test names mirror the suggested set in the work packet; new property and
+    stress files are introduced where no existing file fits.

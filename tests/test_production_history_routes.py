@@ -510,3 +510,116 @@ class TestProductionHistory730dBoundary:
         params_a = self._base_params()
         params_b = {**self._base_params(), "pj_types": ["FA"]}
         assert _make_dataset_id(params_a) != _make_dataset_id(params_b)
+
+
+# ============================================================
+# Change: prod-history-first-tier-cache-filters
+# Filter-options endpoint + main-query envelope unchanged
+# ============================================================
+
+class TestFilterOptionsEndpoint:
+    """GET /api/production-history/filter-options."""
+
+    def _stub_options(self, monkeypatch, payload):
+        """Patch get_filter_options at the module the route imports it from."""
+        from mes_dashboard.services import container_filter_cache as cfc
+        monkeypatch.setattr(cfc, "get_filter_options", lambda selected=None: payload)
+
+    def test_filter_options_endpoint_empty_selection(self, client, monkeypatch):
+        """AC-1 — no `selected` param → full sets returned."""
+        self._stub_options(monkeypatch, {
+            "pj_types": ["GA", "FA"],
+            "packages": ["PKG_A"],
+            "bops": ["BOP_1"],
+            "pj_functions": ["FN_X"],
+            "updated_at": "2026-05-14T00:00:00+00:00",
+            "schema_version": 2,
+        })
+
+        resp = client.get("/api/production-history/filter-options")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["success"] is True
+        assert body["data"]["pj_types"] == ["GA", "FA"]
+        assert body["data"]["packages"] == ["PKG_A"]
+        assert body["data"]["bops"] == ["BOP_1"]
+        assert body["data"]["pj_functions"] == ["FN_X"]
+        assert body["meta"]["schema_version"] == 2
+
+    def test_filter_options_endpoint_with_selected_package(self, client, monkeypatch):
+        """AC-2 — selected payload narrows the response."""
+        captured: dict = {}
+
+        from mes_dashboard.services import container_filter_cache as cfc
+
+        def _fake_get(selected=None):
+            captured["selected"] = selected
+            return {
+                "pj_types": ["GA"],
+                "packages": ["PKG_A"],
+                "bops": ["BOP_1"],
+                "pj_functions": ["FN_X"],
+                "updated_at": "2026-05-14T00:00:00+00:00",
+                "schema_version": 2,
+            }
+        monkeypatch.setattr(cfc, "get_filter_options", _fake_get)
+
+        import json as _json
+        from urllib.parse import quote
+        sel = quote(_json.dumps({"packages": ["PKG_A"]}))
+        resp = client.get(f"/api/production-history/filter-options?selected={sel}")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["data"]["packages"] == ["PKG_A"]
+        assert captured["selected"] == {"packages": ["PKG_A"]}
+
+    def test_filter_options_rejects_unknown_keys_is_fail_open(self, client, monkeypatch):
+        """Unknown selected keys are ignored — endpoint still returns 200."""
+        from mes_dashboard.services import container_filter_cache as cfc
+
+        def _fake_get(selected=None):
+            # Service ignores unknown keys at its own layer; route just forwards.
+            return {
+                "pj_types": ["GA"],
+                "packages": [],
+                "bops": [],
+                "pj_functions": [],
+                "updated_at": None,
+                "schema_version": 2,
+            }
+        monkeypatch.setattr(cfc, "get_filter_options", _fake_get)
+
+        import json as _json
+        from urllib.parse import quote
+        sel = quote(_json.dumps({"unknown_field": ["X"], "pj_types": ["GA"]}))
+        resp = client.get(f"/api/production-history/filter-options?selected={sel}")
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+    def test_filter_options_invalid_json_returns_400(self, client):
+        """Malformed JSON in `selected` → 400 VALIDATION_ERROR."""
+        resp = client.get(
+            "/api/production-history/filter-options?selected=%7Bnot-json"
+        )
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "VALIDATION_ERROR"
+
+    def test_filter_options_response_shape_matches_data_2_7(self, client, monkeypatch):
+        """Response shape matches data-shape §2.7 (four arrays + meta block)."""
+        from mes_dashboard.services import container_filter_cache as cfc
+        monkeypatch.setattr(cfc, "get_filter_options", lambda selected=None: {
+            "pj_types": ["A"], "packages": ["B"], "bops": ["C"], "pj_functions": ["D"],
+            "updated_at": "2026-05-14T00:00:00+00:00", "schema_version": 2,
+        })
+
+        resp = client.get("/api/production-history/filter-options")
+        body = resp.get_json()
+        # Required data keys
+        for key in ("pj_types", "packages", "bops", "pj_functions"):
+            assert key in body["data"]
+            assert isinstance(body["data"][key], list)
+        # Required meta keys
+        assert body["meta"]["schema_version"] == 2
+        assert "updated_at" in body["meta"]

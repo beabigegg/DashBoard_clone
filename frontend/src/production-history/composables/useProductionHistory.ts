@@ -15,12 +15,14 @@ export interface MatrixFilter {
   month: string;
 }
 
-/** Supplementary filter — multi-value dropdown selections. */
+/** Supplementary filter — multi-value dropdown selections.
+ *
+ * Per D6 (prod-history-first-tier-cache-filters), MFGORDERNAME / CONTAINERNAME
+ * (lot_ids) / Package / BOP / Function were promoted to the first-tier filter
+ * panel (cached cross-filter or wildcard textareas).  This interface now only
+ * carries the still-spool-derived fields: WorkCenter 群組 + Equipment.
+ */
 export interface SupplementaryFilter {
-  work_orders: string[];
-  lot_ids: string[];
-  packages: string[];
-  bop_codes: string[];
   workcenter_groups: string[];
   equipment_ids: string[];
 }
@@ -30,10 +32,6 @@ export type SupplementaryFilterField = keyof SupplementaryFilter;
 
 /** Options list available per supplementary-filter field. */
 export interface SupplementaryOptions {
-  work_orders: string[];
-  lot_ids: string[];
-  packages: string[];
-  bop_codes: string[];
   workcenter_groups: string[];
   equipment_ids: string[];
 }
@@ -121,6 +119,14 @@ export type DatasetMeta = Record<string, unknown> | null;
 /** Primary query body (submitted by App.vue). */
 export interface QueryParams {
   pj_types?: string[];
+  /** Cached MultiSelect — D7 first-tier filters. */
+  pj_packages?: string[];
+  pj_bops?: string[];
+  pj_functions?: string[];
+  /** Wildcard textarea fields — backend re-validates per PHF-02. */
+  mfg_orders?: string[];
+  lot_ids?: string[];
+  wafer_lots?: string[];
   start_date: string;
   end_date: string;
   [key: string]: unknown;
@@ -174,20 +180,12 @@ export function useProductionHistory() {
 
   // ── Supplementary filter options & selections ─────────────────────────────
   const supplementaryOptions = ref<SupplementaryOptions>({
-    work_orders: [],
-    lot_ids: [],
-    packages: [],
-    bop_codes: [],
     workcenter_groups: [],
     equipment_ids: [],
   });
 
   // Applied filter — sent to detail/matrix query endpoints
   const supplementaryFilter = reactive<SupplementaryFilter>({
-    work_orders: [],
-    lot_ids: [],
-    packages: [],
-    bop_codes: [],
     workcenter_groups: [],
     equipment_ids: [],
   });
@@ -195,10 +193,6 @@ export function useProductionHistory() {
   // Staged filter — reflects what the user has selected in the UI but not yet
   // applied.  Triggers cross-filter option refresh; applied only on 查詢 click.
   const stagedFilter = reactive<SupplementaryFilter>({
-    work_orders: [],
-    lot_ids: [],
-    packages: [],
-    bop_codes: [],
     workcenter_groups: [],
     equipment_ids: [],
   });
@@ -434,28 +428,16 @@ export function useProductionHistory() {
   }
 
   function _clearSupplementaryFilter(): void {
-    supplementaryFilter.work_orders = [];
-    supplementaryFilter.lot_ids = [];
-    supplementaryFilter.packages = [];
-    supplementaryFilter.bop_codes = [];
     supplementaryFilter.workcenter_groups = [];
     supplementaryFilter.equipment_ids = [];
   }
 
   function _clearStagedFilter(): void {
-    stagedFilter.work_orders = [];
-    stagedFilter.lot_ids = [];
-    stagedFilter.packages = [];
-    stagedFilter.bop_codes = [];
     stagedFilter.workcenter_groups = [];
     stagedFilter.equipment_ids = [];
   }
 
   function _copyStagedToApplied(): void {
-    supplementaryFilter.work_orders = [...stagedFilter.work_orders];
-    supplementaryFilter.lot_ids = [...stagedFilter.lot_ids];
-    supplementaryFilter.packages = [...stagedFilter.packages];
-    supplementaryFilter.bop_codes = [...stagedFilter.bop_codes];
     supplementaryFilter.workcenter_groups = [...stagedFilter.workcenter_groups];
     supplementaryFilter.equipment_ids = [...stagedFilter.equipment_ids];
   }
@@ -477,10 +459,6 @@ export function useProductionHistory() {
       };
       const d = resp.data || {};
       supplementaryOptions.value = {
-        work_orders: d.work_orders || [],
-        lot_ids: d.lot_ids || [],
-        packages: d.packages || [],
-        bop_codes: d.bop_codes || [],
         workcenter_groups: d.workcenter_groups || [],
         equipment_ids: d.equipment_ids || [],
       };

@@ -24,6 +24,8 @@ from __future__ import annotations
 import json
 import os
 import signal
+import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -344,3 +346,275 @@ def test_queue_fairness_no_starvation(mw_redis):
         f"got {len(participating_workers)}: {participating_workers}.\n"
         f"Worker logs: {harness.worker_logs}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 4.7  container_filter_cache rebuild lock under 4 workers (AC-6)
+# ---------------------------------------------------------------------------
+#
+# The container_filter_cache rebuild lock is process-local (file-based
+# O_CREAT|O_EXCL at ``tmp/container_filter_cache.loading``) and *not* an RQ
+# job — it runs synchronously inside each gunicorn worker's startup path.
+# We therefore exercise it by spawning multiple subprocesses that each
+# import the cache module and call _load(force=True), sharing the same
+# Redis L2 backend.
+
+
+_CACHE_WORKER_SCRIPT = r"""
+import os, sys, json, time
+project_root = os.environ["MWT_PROJECT_ROOT"]
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, "src"))
+
+# Force a unique lock path per test invocation.
+lock_path = os.environ["MWT_LOCK_PATH"]
+os.environ["CONTAINER_FILTER_CACHE_LOCK_PATH"] = lock_path
+os.environ["REDIS_URL"] = os.environ["MWT_REDIS_URL"]
+os.environ["REDIS_ENABLED"] = "true"
+
+# Reset Redis client globals so they pick up our test URL.
+import mes_dashboard.core.redis_client as rc  # noqa: E402
+rc.REDIS_URL = os.environ["MWT_REDIS_URL"]
+rc.REDIS_ENABLED = True
+rc._REDIS_CLIENT = None
+
+import mes_dashboard.services.container_filter_cache as cache_mod  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+# Point lock at our test path.
+cache_mod._LOCK_PATH = Path(lock_path)
+
+# Patch read_sql_df with a slow Oracle stub controlled via a Redis flag.
+# Each call to the patched stub increments a Redis counter so the parent
+# test can count Oracle hits.  The stub sleeps for `oracle_delay_s` seconds
+# (default 2) to give losing workers time to enter the polling branch.
+import pandas as pd  # noqa: E402
+
+_redis = rc.get_redis_client()
+
+def _fake_read_sql_df(sql, caller=""):
+    _redis.incr(os.environ["MWT_HIT_COUNTER_KEY"])
+    time.sleep(float(os.environ.get("MWT_ORACLE_DELAY_S", "2.0")))
+    return pd.DataFrame([
+        {"PJ_TYPE": "A", "PRODUCTLINENAME": "PKG-1", "PJ_BOP": "BOP-A", "PJ_FUNCTION": "FN-X"},
+        {"PJ_TYPE": "B", "PRODUCTLINENAME": "PKG-2", "PJ_BOP": "BOP-B", "PJ_FUNCTION": "FN-Y"},
+    ])
+
+cache_mod.read_sql_df = _fake_read_sql_df
+
+# Optional: barrier-style start so workers race genuinely.
+barrier_key = os.environ.get("MWT_BARRIER_KEY")
+expected_n = int(os.environ.get("MWT_BARRIER_N", "1"))
+if barrier_key:
+    n = _redis.incr(barrier_key)
+    _redis.expire(barrier_key, 60)
+    if n == expected_n:
+        for _ in range(expected_n):
+            _redis.rpush(barrier_key + ":go", "1")
+        _redis.expire(barrier_key + ":go", 60)
+    _redis.blpop(barrier_key + ":go", timeout=30)
+
+# Run the cache load (this is what every gunicorn worker does at startup).
+success = cache_mod._load(force=True)
+
+# Emit our payload so the test can verify equivalence.
+result = {
+    "success": success,
+    "pj_types": list(cache_mod._CACHE.get("pj_types") or []),
+    "packages": list(cache_mod._CACHE.get("packages") or []),
+    "indices": dict(cache_mod._CACHE.get("indices") or {}),
+}
+out_key = os.environ["MWT_RESULT_KEY"] + ":" + os.environ["MWT_WORKER_ID"]
+_redis.set(out_key, json.dumps(result), ex=120)
+print(f"WORKER_{os.environ['MWT_WORKER_ID']}_DONE", flush=True)
+"""
+
+
+def _spawn_cache_workers(
+    redis_url: str,
+    n: int,
+    lock_path: str,
+    hit_key: str,
+    result_key: str,
+    barrier_key: str | None = None,
+    oracle_delay_s: float = 2.0,
+    project_root: str | None = None,
+):
+    import subprocess
+    from pathlib import Path as _Path
+
+    if project_root is None:
+        project_root = str(_Path(__file__).resolve().parents[2])
+
+    procs = []
+    for i in range(n):
+        env = os.environ.copy()
+        env.update({
+            "MWT_REDIS_URL": redis_url,
+            "MWT_LOCK_PATH": lock_path,
+            "MWT_HIT_COUNTER_KEY": hit_key,
+            "MWT_RESULT_KEY": result_key,
+            "MWT_WORKER_ID": str(i),
+            "MWT_PROJECT_ROOT": project_root,
+            "MWT_ORACLE_DELAY_S": str(oracle_delay_s),
+        })
+        if barrier_key:
+            env["MWT_BARRIER_KEY"] = barrier_key
+            env["MWT_BARRIER_N"] = str(n)
+        proc = subprocess.Popen(
+            [sys.executable, "-c", _CACHE_WORKER_SCRIPT],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        procs.append(proc)
+    return procs
+
+
+def test_container_filter_cache_lock_under_4_workers(mw_redis, tmp_path):
+    """4 workers race to rebuild the cache; only one hits Oracle (AC-6, PHF-05).
+
+    Verifies the file-based ``O_CREAT|O_EXCL`` lock at
+    ``tmp/container_filter_cache.loading`` ensures exactly one process
+    queries Oracle while the others poll Redis L2 and reuse the result.
+    All four must end up with identical payloads.
+    """
+    redis_url, r = mw_redis
+    lock_path = str(tmp_path / "container_filter_cache.loading")
+    hit_key = f"mwt:cache:hit:{uuid.uuid4().hex[:6]}"
+    result_key = f"mwt:cache:result:{uuid.uuid4().hex[:6]}"
+    barrier_key = f"mwt:cache:barrier:{uuid.uuid4().hex[:6]}"
+
+    r.delete(hit_key, result_key, barrier_key, barrier_key + ":go")
+
+    procs = _spawn_cache_workers(
+        redis_url=redis_url,
+        n=4,
+        lock_path=lock_path,
+        hit_key=hit_key,
+        result_key=result_key,
+        barrier_key=barrier_key,
+        oracle_delay_s=2.0,
+    )
+
+    try:
+        # Workers should all finish within 120 s (2 s Oracle + up to 90 s lock wait).
+        for proc in procs:
+            try:
+                proc.wait(timeout=120)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                pytest.fail(
+                    f"Worker {procs.index(proc)} timed out after 120 s; "
+                    f"stderr={proc.stderr.read() if proc.stderr else ''}"
+                )
+            assert proc.returncode == 0, (
+                f"Worker {procs.index(proc)} exited non-zero ({proc.returncode}); "
+                f"stderr={proc.stderr.read() if proc.stderr else ''}"
+            )
+    finally:
+        for proc in procs:
+            if proc.poll() is None:
+                proc.kill()
+
+    # Exactly one worker should have hit Oracle.
+    hits = int(r.get(hit_key) or 0)
+    assert hits == 1, f"Expected exactly 1 Oracle hit, got {hits}"
+
+    # All four workers must have reported a successful load with the same payload.
+    payloads = []
+    for i in range(4):
+        raw = r.get(f"{result_key}:{i}")
+        assert raw, f"Worker {i} did not record a result"
+        payloads.append(json.loads(raw))
+    for p in payloads:
+        assert p["success"] is True, f"Worker reported failure: {p}"
+    canonical = payloads[0]["indices"]
+    for i, p in enumerate(payloads[1:], start=1):
+        assert p["indices"] == canonical, (
+            f"Worker {i} indices diverge from worker 0:\n"
+            f"worker_0={canonical}\nworker_{i}={p['indices']}"
+        )
+
+
+def test_lock_holder_crash_releases_lock(mw_redis, tmp_path):
+    """When the lock holder crashes, contenders fall through after 90 s timeout.
+
+    The current D4 design does NOT include a stale-sentinel reaper — instead,
+    losers poll Redis L2 for up to 90 s, then fall through to direct Oracle in
+    "degraded mode" (still query Oracle without holding the lock).
+
+    This test:
+      1. Pre-creates the lock file (simulates a crashed holder that never
+         released the sentinel)
+      2. Spawns a single worker — it must NOT acquire the lock and must
+         either reuse a pre-populated L2 entry or fall through to Oracle
+      3. Verifies the worker completes (does not hang forever) and returns a
+         successful payload
+
+    Since polling 90 s would make the test slow, we monkey-patch the lock-poll
+    constants down to 1 s × 2 iterations (2 s total) inside the spawned worker
+    script.
+    """
+    redis_url, r = mw_redis
+    lock_path = tmp_path / "container_filter_cache.loading"
+    # Pre-create the stale lock file BEFORE the worker starts.
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.touch()
+    assert lock_path.exists()
+
+    hit_key = f"mwt:cache:hit:{uuid.uuid4().hex[:6]}"
+    result_key = f"mwt:cache:result:{uuid.uuid4().hex[:6]}"
+
+    # Patch the poll constants down for fast test execution by appending a
+    # snippet to the worker script's env-based override.  We do this by
+    # spawning a custom script that imports cache_mod then overrides the
+    # constants before calling _load.
+    custom_script = (
+        _CACHE_WORKER_SCRIPT.replace(
+            "cache_mod._LOCK_PATH = Path(lock_path)",
+            (
+                "cache_mod._LOCK_PATH = Path(lock_path)\n"
+                "cache_mod._LOCK_POLL_INTERVAL_S = 1\n"
+                "cache_mod._LOCK_MAX_POLL_ITERATIONS = 2\n"
+            ),
+        )
+    )
+
+    env = os.environ.copy()
+    env.update({
+        "MWT_REDIS_URL": redis_url,
+        "MWT_LOCK_PATH": str(lock_path),
+        "MWT_HIT_COUNTER_KEY": hit_key,
+        "MWT_RESULT_KEY": result_key,
+        "MWT_WORKER_ID": "0",
+        "MWT_PROJECT_ROOT": str(__import__('pathlib').Path(__file__).resolve().parents[2]),
+        "MWT_ORACLE_DELAY_S": "0.1",
+    })
+
+    import subprocess as _sub
+    proc = _sub.Popen(
+        [sys.executable, "-c", custom_script],
+        env=env,
+        stdout=_sub.PIPE,
+        stderr=_sub.PIPE,
+        text=True,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=30)
+    except _sub.TimeoutExpired:
+        proc.kill()
+        pytest.fail("Worker hung waiting on stale lock — fall-through path broken")
+
+    assert proc.returncode == 0, (
+        f"Worker exited non-zero (rc={proc.returncode}); stderr={stderr}"
+    )
+    raw = r.get(f"{result_key}:0")
+    assert raw, "Worker did not write a result payload"
+    payload = json.loads(raw)
+    assert payload["success"] is True, f"Worker reported failure: {payload}"
+    # Oracle must have been hit at least once — the worker fell through to
+    # direct Oracle in degraded mode because the lock was held by a phantom.
+    hits = int(r.get(hit_key) or 0)
+    assert hits >= 1, "Worker should have hit Oracle in degraded fall-through mode"

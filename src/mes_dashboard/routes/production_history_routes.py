@@ -15,6 +15,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 
@@ -85,6 +86,59 @@ def _parse_filter_params(source: dict) -> dict:
         if isinstance(raw, list) and raw:
             result[key] = [str(v).strip() for v in raw if str(v).strip()]
     return result
+
+
+# ── GET /api/production-history/filter-options ────────────────────────────────
+
+@production_history_bp.route("/api/production-history/filter-options", methods=["GET"])
+def api_production_history_filter_options():
+    """Cross-filter cached options for production-history first-tier filters.
+
+    Query param ``selected`` is URL-encoded JSON of the form::
+
+        {"pj_types": [...], "packages": [...],
+         "bops": [...], "pj_functions": [...]}
+
+    Empty / omitted → returns the full distinct set for each field
+    (data-shape §2.7 / AC-1). Unknown keys are silently ignored;
+    selection values not present in the cache are silently dropped
+    (fail-open picker).
+    """
+    if not _ENABLED:
+        return not_found_error("production_history_disabled")
+
+    raw_selected = request.args.get("selected")
+    selected: dict | None = None
+    if raw_selected:
+        try:
+            parsed = json.loads(raw_selected)
+        except (TypeError, ValueError):
+            return validation_error("selected 參數需為合法 JSON")
+        if not isinstance(parsed, dict):
+            return validation_error("selected 參數需為 JSON 物件")
+        selected = parsed
+
+    try:
+        from mes_dashboard.services.container_filter_cache import (
+            SCHEMA_VERSION,
+            get_filter_options,
+        )
+        opts = get_filter_options(selected)
+        return success_response(
+            {
+                "pj_types": opts.get("pj_types") or [],
+                "packages": opts.get("packages") or [],
+                "bops": opts.get("bops") or [],
+                "pj_functions": opts.get("pj_functions") or [],
+            },
+            meta={
+                "updated_at": opts.get("updated_at"),
+                "schema_version": opts.get("schema_version", SCHEMA_VERSION),
+            },
+        )
+    except Exception:
+        logger.exception("production_history filter-options failed")
+        return internal_error("篩選選項查詢失敗")
 
 
 # ── GET /api/production-history/type-options ──────────────────────────────────

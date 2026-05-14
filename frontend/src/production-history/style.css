@@ -56,10 +56,48 @@
   @apply border border-gray-300 rounded px-2 py-1 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300;
 }
 
+/* ── First-tier filter rows (cached cross-filter MultiSelects) ───────────── */
+
+.theme-production-history .ph-first-tier__multiselect-grid {
+  @apply grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3;
+}
+
+/* ── First-tier wildcard textareas (multi-line input with * support) ─────── */
+
+.theme-production-history .ph-first-tier__wildcard-grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1;
+}
+
+.theme-production-history .ph-first-tier__wildcard-input {
+  @apply w-full min-h-16 font-mono text-xs;
+}
+
+.theme-production-history .ph-first-tier__hint {
+  @apply text-xs text-gray-500 mt-1;
+}
+
+/* ── First-tier filter-options API error banner (UI-UX REC-01) ───────────── */
+
+.theme-production-history .ph-first-tier__error {
+  @apply text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2;
+}
+
+/* ── First-tier transient auto-prune notice (UI-UX REC-02) ───────────────── */
+
+.theme-production-history .ph-first-tier__pruned-notice {
+  @apply text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2;
+}
+
+/* ── Second-tier panel heading (UI-UX REC-03 / VR-07) ────────────────────── */
+
+.theme-production-history .ph-second-tier__heading {
+  @apply text-xs font-medium text-gray-600 pt-2 mt-1 border-t border-gray-100;
+}
+
 /* ── Supplementary filters (post-query MultiSelect grid) ─────────────────── */
 
 .theme-production-history .ph-supplementary-filters {
-  @apply grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-1 border-t border-gray-100;
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3;
 }
 
 .theme-production-history .ph-app__filter-actions {

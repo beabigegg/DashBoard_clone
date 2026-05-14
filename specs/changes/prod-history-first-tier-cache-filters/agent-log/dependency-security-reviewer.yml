@@ -1,0 +1,240 @@
+agent: dependency-security-reviewer
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: approved
+
+# ────────────────────────────────────────────────────────────────────────────
+# Scope
+# ────────────────────────────────────────────────────────────────────────────
+# Audit of the new wildcard SQL input path (PHF-02 / PHF-03 / PHF-06) plus the
+# three new MultiSelect non-wildcard params (pj_packages / pj_bops /
+# pj_functions). Verdict applies only to this change's diff; pre-existing
+# surfaces (e.g., material_trace_service._add_exact_or_pattern_condition) are
+# out of scope and tracked in backend-engineer caveat MATERIAL-TRACE-
+# MIGRATION-FOLLOWUP.
+
+# ────────────────────────────────────────────────────────────────────────────
+# Checklist results (10 items)
+# ────────────────────────────────────────────────────────────────────────────
+checklist:
+  - id: 1
+    name: "String interpolation in SQL — every wildcard token bound, never concatenated"
+    result: pass
+    evidence:
+      - src/mes_dashboard/sql/wildcards.py:77-86  # IN(...) and LIKE :bind both via placeholder names
+      - src/mes_dashboard/services/production_history_service.py:260-266  # frag_params bind dict update
+      - src/mes_dashboard/sql/production_history/main_query.sql:42-46  # {{ EXTRA_FILTERS }} is the only template seam; bind params resolved at oracledb level
+    notes: |
+      build_wildcard_clause never f-strings user values into SQL. The two f-strings
+      it does emit (`:{name}` and `({column} IN (...))`) interpolate (a) generated
+      placeholder names (`{param_prefix}_in_{i}` / `_p_{i}`) and (b) the trusted
+      column literal passed from _build_extra_filters. User-supplied bound_value
+      is always assigned to the params dict, never spliced into the fragment.
+
+  - id: 2
+    name: "SQL meta-char rejection regex covers ' ; -- /* */ control chars"
+    result: pass
+    evidence:
+      - src/mes_dashboard/core/request_validation.py:132  # _WILDCARD_META_RE = [\'\;]|--|/\*|\*/
+      - src/mes_dashboard/core/request_validation.py:138  # _WILDCARD_CTRL_RE = [\x00-\x08\x0b\x0c\x0e-\x1f]
+      - src/mes_dashboard/core/request_validation.py:250-254  # CTRL check applied to raw entry BEFORE split (so \x00-\x1f cannot be silently consumed as whitespace)
+      - src/mes_dashboard/core/request_validation.py:268-273  # per-token META rejection
+    notes: |
+      The two-phase design (raw-entry CTRL pre-check + per-token META) closes
+      the gap where the splitter would otherwise eat \x00-\x1f as whitespace.
+      Tests live in tests/test_common_filters.py (9 new wildcard tests per
+      backend-engineer agent-log).
+
+  - id: 3
+    name: "Oracle-specific hostile sequences"
+    result: pass
+    evidence:
+      - src/mes_dashboard/core/request_validation.py:132  # q'[...] caught by single-quote in META regex
+      - src/mes_dashboard/core/request_validation.py:141  # newline/tab split via _WILDCARD_SPLIT_RE -> [\s,]+
+      - src/mes_dashboard/sql/wildcards.py:69-86  # || / DBMS_* are literal text bound to LIKE/IN — not parsed by Oracle
+    notes: |
+      Specifically against design U3:
+        * q'[...]'  — caught: regex matches the leading ' (verified at runtime).
+        * ||        — NOT caught by regex, but harmless: user input only reaches
+                      Oracle as a bind value, never as SQL concatenation. A bound
+                      string "a||b" compared to a VARCHAR column is a literal
+                      char-by-char compare, not a concat. Same conclusion for
+                      every other identifier-shaped attack (DBMS_OUTPUT,
+                      UTL_HTTP, EXECUTE IMMEDIATE, etc.): bind parameters cannot
+                      escape the LIKE/IN string context in oracledb's named-bind
+                      protocol.
+        * /* */     — caught by META regex (both directions tested).
+        * Trailing whitespace / newline injection — split regex consumes
+                      \s+ greedily, so trailing whitespace produces empty tokens
+                      that are dropped (request_validation.py:256-258). Embedded
+                      newlines are treated as separators by design (multi-line
+                      textarea paste), per contracts/business PHF-02.
+      No additional regex hardening needed. The single-trust-boundary design
+      (PHF-06) is sound because the bind protocol is the actual safety
+      property; the regex is defense-in-depth.
+
+  - id: 4
+    name: "Length / count caps — 100 patterns/field; per-token min char check"
+    result: pass
+    evidence:
+      - src/mes_dashboard/core/request_validation.py:144  # WILDCARD_MAX_PATTERNS_PER_FIELD = 100
+      - src/mes_dashboard/core/request_validation.py:283-289  # literal_len < 2 rejected (single-char & pure-* rejected)
+      - src/mes_dashboard/core/request_validation.py:308-313  # cap enforced inside the loop (DoS guard)
+    notes: |
+      No explicit per-token MAX length cap (e.g., 64 chars). Low risk in
+      practice — MES identifier lengths in this domain are < 30 chars; an
+      attacker submitting a 100-token list of 1 KB tokens would still face
+      the 100-cap and the route-level MAX_JSON_BODY_BYTES (262144 default,
+      request_validation.py:34). Recommendation R1 (non-blocking) below.
+
+  - id: 5
+    name: "Escape handling for literal % and _ in user input"
+    result: pass
+    evidence:
+      - src/mes_dashboard/core/request_validation.py:176-186  # _escape_like_literal: % -> \%, _ -> \_
+      - src/mes_dashboard/core/request_validation.py:291-298  # escape BEFORE * -> % translation (ordering critical)
+      - src/mes_dashboard/sql/wildcards.py:86  # ESCAPE '\' clause emitted for every LIKE
+    notes: |
+      Ordering is correct: literal % and _ in user input are escaped first,
+      THEN the user-typed * is translated to %. So input "MA%2025*" becomes
+      bound value "MA\%2025%" and emits LIKE :p ESCAPE '\' — Oracle treats
+      the first \% as a literal % and the trailing % as a wildcard. Literal
+      backslash in user input is NOT pre-escaped (acknowledged in the
+      docstring); MES tokens are not expected to contain \. Acceptable per
+      D5 hardening table.
+
+  - id: 6
+    name: "ESCAPE clause on every LIKE binding"
+    result: pass
+    evidence:
+      - src/mes_dashboard/sql/wildcards.py:86  # f"({column} LIKE :{name} ESCAPE '\\')"
+    notes: |
+      Single emit path; no LIKE binding elsewhere in the new code lacks
+      ESCAPE '\'.
+
+  - id: 7
+    name: "Whitespace normalization"
+    result: pass
+    evidence:
+      - src/mes_dashboard/core/request_validation.py:141  # _WILDCARD_SPLIT_RE = r"[\s,]+"
+      - src/mes_dashboard/core/request_validation.py:255-258  # split + strip + drop empties
+    notes: |
+      Leading/trailing whitespace stripped per piece. Embedded tabs and
+      newlines act as separators (intentional, per PHF-02 multi-line paste
+      contract). \x0b and \x0c are blocked by the CTRL pre-check (not by
+      the splitter) so they never produce silent token data loss.
+
+  - id: 8
+    name: "Unicode handling"
+    result: pass-with-note
+    evidence:
+      - src/mes_dashboard/core/request_validation.py:132-138  # META and CTRL regexes are ASCII-only
+    notes: |
+      RTL marks (U+202E), zero-width spaces (U+200B), full-width chars
+      (U+3000 etc.) are NOT rejected. They pass through to bind parameters
+      as literal text and reach Oracle as part of the bound VARCHAR
+      compare. This is consistent with the design contract (PHF-02 says
+      nothing about Unicode normalization) and safe at the SQL layer
+      (oracledb passes the string verbatim). UI-layer note: a token
+      containing ZWSP visually displays identical to a token without it,
+      so users may not understand why their "lookalike" filter doesn't
+      match. Not a security issue. Recommendation R2 (non-blocking).
+
+  - id: 9
+    name: "Defense in depth — frontend also validates"
+    result: pass
+    evidence:
+      - specs/changes/prod-history-first-tier-cache-filters/agent-log/frontend-engineer.yml:96-99  # "parseWildcardInput ... does NOT translate '*' to '%' — backend re-validates and binds per PHF-02"
+    notes: |
+      Frontend parseWildcardInput is a UX validator (separator/dedup/preview);
+      it intentionally leaves the '*' character intact so the backend remains
+      the single source of grammar truth. If the frontend is bypassed (curl
+      / direct API call), parse_wildcard_tokens still enforces every rule.
+      Tier 1 defense-in-depth posture confirmed.
+
+  - id: 10
+    name: "Defense breadth — pj_packages / pj_bops / pj_functions binding"
+    result: pass
+    evidence:
+      - src/mes_dashboard/services/production_history_service.py:215-223  # qb.add_in_condition(...) for all three
+      - src/mes_dashboard/sql/builder.py:69-80  # _build_in_clauses uses :p{n} bind names exclusively, no interpolation
+    notes: |
+      The three new non-wildcard MultiSelect params are routed through
+      QueryBuilder.add_in_condition, which emits an Oracle IN(...) clause
+      built entirely from generated bind names — user values never appear
+      in the SQL string. No additional injection surface introduced.
+
+# ────────────────────────────────────────────────────────────────────────────
+# Required fixes (blocking)
+# ────────────────────────────────────────────────────────────────────────────
+required-fixes: []
+
+# ────────────────────────────────────────────────────────────────────────────
+# Recommendations (low-priority, non-blocking)
+# ────────────────────────────────────────────────────────────────────────────
+recommendations:
+  - id: R1
+    title: "Add per-token max length cap (e.g., 128 chars)"
+    location: src/mes_dashboard/core/request_validation.py  # after step 6, before escape
+    rationale: |
+      Today the 100-pattern cap and the 256 KB body cap bound aggregate
+      payload, but a single 100 KB-long token would still build a 100 KB
+      LIKE pattern. MES identifier lengths are < 30 chars in practice;
+      a 128-char cap would not impact legitimate users and would cap
+      worst-case Oracle pattern-match cost. Suggested constant:
+      WILDCARD_MAX_TOKEN_LENGTH = 128.
+    severity: low
+
+  - id: R2
+    title: "Optional Unicode normalization for textarea inputs"
+    location: src/mes_dashboard/core/request_validation.py  # parse_wildcard_tokens step 2
+    rationale: |
+      Applying unicodedata.normalize('NFKC', text) before split would
+      collapse full-width digits, strip ZWSP-like invisibles, and reduce
+      "looks-the-same-but-doesn't-match" user confusion. Not a security
+      requirement — purely UX. If adopted, document in PHF-02.
+    severity: low
+
+  - id: R3
+    title: "Migrate material_trace_service to shared build_wildcard_clause"
+    location: src/mes_dashboard/services/material_trace_service.py  # _add_exact_or_pattern_condition
+    rationale: |
+      The shared emitter at sql/wildcards.py was lifted out specifically
+      to consolidate audit chokepoints (U2 decision). material_trace still
+      uses the older inline pattern without PHF-06 meta-char rejection.
+      Already tracked in backend-engineer caveat
+      MATERIAL-TRACE-MIGRATION-FOLLOWUP — no action needed for this
+      change, but worth carrying forward as a security follow-up.
+    severity: low
+
+# ────────────────────────────────────────────────────────────────────────────
+# Design U3 closeout
+# ────────────────────────────────────────────────────────────────────────────
+u3-closeout:
+  question: |
+    "Does the meta-char regex cover Oracle q'[...]' and ||?"
+  answer: |
+    Partial-but-sufficient. The regex catches q'[...]' (via the leading
+    single quote) and /*...*/ (both delimiters). It does NOT catch || or
+    DBMS_*/UTL_*/EXECUTE IMMEDIATE identifier-shaped sequences — and it
+    does not need to. User input flows ONLY through oracledb named bind
+    parameters into LIKE / IN string-compare contexts. Bind values cannot
+    escape into the SQL parser: || in a bound string is a literal
+    concatenation of two characters, not an operator. The regex is
+    defense-in-depth; the bind protocol is the actual security boundary.
+
+# ────────────────────────────────────────────────────────────────────────────
+# Files read (audit-only, no modifications)
+# ────────────────────────────────────────────────────────────────────────────
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/design.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/backend-engineer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/frontend-engineer.yml
+  - src/mes_dashboard/core/request_validation.py
+  - src/mes_dashboard/sql/wildcards.py
+  - src/mes_dashboard/sql/builder.py
+  - src/mes_dashboard/sql/production_history/main_query.sql
+  - src/mes_dashboard/services/production_history_service.py
+  - src/mes_dashboard/services/production_history_sql_runtime.py
+  - contracts/business/business-rules.md  # PHF-02 / PHF-03 / PHF-06 only

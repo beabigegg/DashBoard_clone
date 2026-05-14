@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.1.2
-last-changed: 2026-05-13
+schema-version: 1.1.3
+last-changed: 2026-05-14
 ---
 
 # API Inventory
@@ -28,7 +28,7 @@ last-changed: 2026-05-13
 | `resource_routes.py` | All JSON API endpoints |
 | `resource_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410)；`POST /api/resource/history/query` 先查 canonical base spool（DuckDB filter）；response: `{query_id, summary, detail}`；**新增** `GET /api/resource/history/query/progress?query_id=<uuid>` — batch 查詢進度 side-channel；progress state 存於 Redis key `resource:history:progress:<query_id>`；400 on missing param，404 on unknown query_id；auth required（與其他端點相同 `login_required` guard）（resource-history-perf）。 |
 | `yield_alert_routes.py` | All JSON API endpoints — **Type B** (async 202 polling)；`POST /api/yield-alert/query` 可回傳 202；RQ 不可用 fallback sync 200；`GET /api/yield-alert/cross-filter-options?query_id=...&lines[]=...&packages[]=...`，410 on spool expired |
-| `production_history_routes.py` | All JSON API endpoints — `POST /api/production-history/query` 驗證 `pj_types`, `start_date`, `end_date`；缺少/無效 → 400 `VALIDATION_ERROR`；date range > 730d → 400；spool hit → 200，miss+RQ → 202；含 `POST /page`（DuckDB paged）、`/matrix`、`/options`；gated by `PROD_HISTORY_ENABLED` |
+| `production_history_routes.py` | All JSON API endpoints — `POST /api/production-history/query` 驗證 `pj_types`, `start_date`, `end_date`；缺少/無效 → 400 `VALIDATION_ERROR`；date range > 730d → 400；spool hit → 200，miss+RQ → 202；含 `POST /page`（DuckDB paged）、`/matrix`、`/options`；gated by `PROD_HISTORY_ENABLED`。**新增** `GET /api/production-history/filter-options?selected=<json>` — cross-filter cached options（4-tuple in-memory filter over `container_filter_cache`），auth required，400 on malformed `selected` JSON，404 on cache cold start failure，500 on Oracle build error；payload schema `{data: {pj_types, packages, bops, pj_functions}, meta: {updated_at, schema_version: 2}}`（prod-history-first-tier-cache-filters）。主查詢端點 `POST /api/production-history/query` 新增可選欄位 `pj_packages[]`、`pj_bops[]`、`pj_functions[]`（cached MultiSelect，plain `IN`）、`mfg_orders[]`、`lot_ids[]`、`wafer_lots[]`（多行 + `*` 萬用字元，依 PHF-02 規則 `LIKE ESCAPE '\'` bind）；全部 additive、缺省時保持 Type-only 行為。 |
 | `admin_routes.py` | `POST /api/admin/analytics/recalculate`（admin required）、`GET /admin/api/user-usage-kpi`（params: `start_date`, `end_date`, `department`） |
 | `job_query_routes.py` | All JSON API endpoints |
 | `qc_gate_routes.py` | All JSON API endpoints |
@@ -94,6 +94,7 @@ last-changed: 2026-05-13
 
 ## Compatibility Notes
 
+- **2026-05-14（prod-history-first-tier-cache-filters）：** `production_history_routes.py` 新增 `GET /api/production-history/filter-options` 端點（cross-filter cached options，4-tuple in-memory filter）；主查詢端點新增六個 additive 可選 body 欄位（`pj_packages[]`、`pj_bops[]`、`pj_functions[]`、`mfg_orders[]`、`lot_ids[]`、`wafer_lots[]`）；萬用字元語法與安全性規則見 business-rules.md PHF-01..PHF-06；全部 backward-compatible。
 - **2026-05-13（resource-history-perf）：** `resource_history_routes.py` 新增 `GET /api/resource/history/query/progress` 端點；progress state 以 Redis side-channel 儲存；auth required；400/404 error contract；additive，不影響既有端點及 Type A re-query 流程。
 - **2026-05-13（wip-hold-drilldown-filters）：** `wip_routes.py` 四個端點新增三個可選過濾參數（`workflow`、`bop`、`pj_function`）；`/detail/<workcenter>` lot 列新增 `pjType`；`/meta/filter-options` response 新增 `workflows`、`bops`、`pjFunctions`；全部 backward-compatible。
 - **2026-04-15：** 所有 `standard-json` 端點注入 `meta.app_version`（additive，backward-compatible）。

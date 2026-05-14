@@ -1,0 +1,94 @@
+agent: spec-architect
+change-id: prod-history-first-tier-cache-filters
+status: complete
+date: 2026-05-14
+verdict: |
+  Tier 1 architecture review complete. Cross-filter strategy resolved to Option B
+  (cached 4-tuple set + in-memory filter). Wildcard grammar pinned to single-`*`
+  with 2-char anchor and SQL-meta rejection. Schema-version + multi-worker file
+  lock added as rollback / safety mechanisms.
+key-decisions:
+  - id: D1
+    decision: Cross-filter via cached 4-tuple DISTINCT set + in-memory filter (Option B)
+    rationale: |
+      Cardinality budget ~5k-20k tuples ≤ 2.4 MB JSON. In-memory filter is < 5 ms.
+      Option A (live SQL/keystroke) creates DBA load + latency jitter.
+      Option C (flat lists + filtered subquery) still needs Oracle co-occurrence
+      join — strictly worse than B.
+  - id: D2
+    decision: Wildcard grammar = single `*` any position, min 2-char anchor, max 100 patterns/field
+    rationale: |
+      Matches existing material-trace UX. Pure `*` and multi-`*` rejected.
+      SQL meta chars (`'`, `;`, `--`, `/*`, `*/`, control chars, null) rejected
+      before Oracle bind. Internal `%`/`_` escaped via `ESCAPE '\'`.
+  - id: D3
+    decision: Cache payload carries schema_version=2; mismatch → drop + rebuild
+    rationale: |
+      No prior cache in this repo has schema_version. Enables rollback by version
+      flip alone (no `redis-cli DEL`). New convention — document in ci-gates.md
+      and promote to CLAUDE.md after archive.
+  - id: D4
+    decision: Reuse resource_history_duckdb_cache._try_lock/_release_lock pattern
+    rationale: |
+      Battle-tested file-based O_CREAT|O_EXCL sentinel at
+      `tmp/container_filter_cache.loading`. Losers poll every 5 s for 90 s.
+      Cite resource_history_duckdb_cache.py:44-65 in backend implementation.
+  - id: D5
+    decision: Oracle LIKE hardening = 2-char anchor, infix only if ≥ 4 anchor chars, no ROWNUM cap in v1
+    rationale: |
+      Main query already has chunked TRACKINTIMESTAMP window — primary scope cap.
+      ROWNUM cap deferred unless monkey/stress tests reveal pathological latency.
+  - id: D6
+    decision: Remove (not hide) MFGORDERNAME / CONTAINERNAME / FIRSTNAME from second-tier
+    rationale: |
+      Conditional hiding produces dual-state bugs (first-tier wildcard `MA*` vs
+      second-tier literal `MA2025X`). Single source = first-tier wildcard textarea.
+  - id: D7
+    decision: New GET `/api/production-history/filter-options?selected=<json>` endpoint
+    rationale: |
+      Separates Oracle-cached (low cardinality) from spool-derived (WorkCenter /
+      Equipment) options. GET because pure-read + idempotent; query-string size
+      budget ~6 KB fits comfortably within 8 KB.
+artifacts:
+  - pointer: specs/changes/prod-history-first-tier-cache-filters/current-behavior.md
+    summary: Today's flow — Type-only first-tier, 6-chip second-tier, no PJ_FUNCTION filter, no wildcards
+  - pointer: specs/changes/prod-history-first-tier-cache-filters/proposal.md
+    summary: 4 cached MultiSelects (PJ_TYPE/Package/BOP/Function) + 3 wildcard textareas (工單/LOT/Wafer) promoted to first-tier
+  - pointer: specs/changes/prod-history-first-tier-cache-filters/design.md
+    summary: D1-D7 decisions with rationale, cache layout v2, rejected alternatives
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/change-request.md
+  - specs/changes/prod-history-first-tier-cache-filters/change-classification.md
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/change-classifier.yml
+  - specs/changes/prod-history-first-tier-cache-filters/test-plan.md
+  - src/mes_dashboard/services/container_filter_cache.py
+  - src/mes_dashboard/services/reason_filter_cache.py
+  - src/mes_dashboard/services/resource_history_duckdb_cache.py
+  - src/mes_dashboard/services/material_trace_service.py
+  - src/mes_dashboard/services/production_history_service.py
+  - src/mes_dashboard/services/production_history_sql_runtime.py
+  - src/mes_dashboard/sql/production_history/main_query.sql
+  - src/mes_dashboard/sql/builder.py
+  - src/mes_dashboard/sql/filters.py
+  - src/mes_dashboard/routes/production_history_routes.py
+  - frontend/src/core/reject-history-filters.ts
+  - frontend/src/material-trace/App.vue
+  - frontend/src/production-history/App.vue
+unresolved:
+  - id: U1
+    owner: contract-reviewer
+    question: Is PRODUCTION_HISTORY_WILDCARD_MAX_PATTERNS an env contract entry or hard-coded constant?
+  - id: U2
+    owner: backend-engineer
+    question: Lift `_add_exact_or_pattern_condition` to shared `sql/wildcards.py` or duplicate locally?
+  - id: U3
+    owner: dependency-security-reviewer
+    question: Does the SQL-meta rejection regex cover Oracle q'[...]' literals and `||` concat?
+  - id: U4
+    owner: backend-engineer
+    question: Stale `tmp/container_filter_cache.loading` sentinel — add mtime-based reaper or accept current resource-history behavior?
+notes: |
+  No source modified. Three artifacts (current-behavior.md, proposal.md, design.md)
+  + this agent-log written. Total ~ 380 lines of architecture, within Tier-1 budget.
+  Next agent: contract-reviewer to land api/data/business/ci contract updates per D1, D2, D3, D7.

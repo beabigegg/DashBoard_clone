@@ -1,0 +1,155 @@
+/**
+ * E2E spec: Production History — multi-line textarea parser idempotence (AC-5)
+ *
+ * Verifies that:
+ *   - Paste with mixed separators (CRLF + comma + tab) yields the right
+ *     deduplicated token list in the outgoing query body
+ *   - An empty textarea omits the wildcard field from the request body
+ *     entirely (backward-compat — AC-3)
+ *
+ * The parser idempotence proof at the data layer
+ * (parse(parse(x)) == parse(x)) is covered by
+ * frontend/tests/validation/useProductionHistory.validation.test.js;
+ * this spec asserts the user-visible end-to-end behaviour.
+ */
+
+import { test, expect, type Page, type Request } from '@playwright/test';
+import { loginViaApi, navigateViaSidebar } from './_auth.js';
+
+const FILTER_OPTIONS_PAYLOAD = {
+  success: true,
+  data: {
+    pj_types: ['A'],
+    packages: ['PKG-1'],
+    bops: ['BOP-A'],
+    pj_functions: ['FN-X'],
+  },
+  meta: {
+    updated_at: '2026-05-14T00:00:00Z',
+    schema_version: 2,
+    timestamp: new Date().toISOString(),
+    app_version: 'test',
+  },
+};
+
+async function installMocks(page: Page): Promise<{ queryRequests: Request[] }> {
+  const queryRequests: Request[] = [];
+
+  await page.route('**/api/production-history/filter-options**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(FILTER_OPTIONS_PAYLOAD),
+    }),
+  );
+
+  await page.route('**/api/production-history/type-options**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: { items: [{ value: 'A', label: 'A' }] },
+        meta: {},
+      }),
+    }),
+  );
+
+  await page.route('**/api/production-history/query', async (route) => {
+    queryRequests.push(route.request());
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          dataset_id: 'mock-ds',
+          rows: [],
+          pagination: { total: 0, page: 1, page_size: 50 },
+          matrix: { tree: [], month_columns: [] },
+        },
+        meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+      }),
+    });
+  });
+
+  return { queryRequests };
+}
+
+async function pickTypeAndDates(page: Page) {
+  const dateInputs = page.locator('input[type="date"]');
+  if ((await dateInputs.count()) >= 2) {
+    await dateInputs.nth(0).fill('2026-05-01');
+    await dateInputs.nth(1).fill('2026-05-07');
+  }
+  const typeRoot = page.locator('[data-testid="ph-first-tier-type"]');
+  await typeRoot.locator('.multi-select-trigger, button, [role="combobox"]').first().click();
+  const firstOpt = page.locator('.multi-select-option, [role="option"], label').first();
+  if (await firstOpt.isVisible()) await firstOpt.click();
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+}
+
+test.describe('Production History — multi-line input (AC-5, AC-3)', () => {
+  test('Mixed CRLF + comma + tab separators dedup into request body', async ({ page }) => {
+    await installMocks(page);
+    await loginViaApi(page);
+    await navigateViaSidebar(page, 'production-history', {
+      waitForSelector: '[data-testid="ph-first-tier-mfg-orders"]',
+    });
+
+    await pickTypeAndDates(page);
+
+    // Build a deliberately messy input: CRLF, commas, tabs, duplicates,
+    // leading/trailing whitespace.
+    const messy = '  GA250605\r\nGA250606,\tGA250607 \n  GA250605\r\n\r\n,GA250608  ';
+    await page.locator('[data-testid="ph-first-tier-lot-ids"]').fill(messy);
+
+    const queryBtn = page.locator('button:has-text("查詢")').first();
+    await expect(queryBtn).toBeEnabled({ timeout: 10_000 });
+
+    const reqPromise = page.waitForRequest('**/api/production-history/query', { timeout: 10_000 });
+    await queryBtn.click();
+    const req = await reqPromise;
+
+    const body = req.postDataJSON();
+    expect(body.lot_ids).toBeTruthy();
+    // 4 unique tokens — duplicate GA250605 must be deduplicated.
+    expect([...body.lot_ids].sort()).toEqual([
+      'GA250605',
+      'GA250606',
+      'GA250607',
+      'GA250608',
+    ]);
+  });
+
+  test('Empty textarea omits the wildcard field entirely (AC-3 back-compat)', async ({
+    page,
+  }) => {
+    const { queryRequests } = await installMocks(page);
+    await loginViaApi(page);
+    await navigateViaSidebar(page, 'production-history', {
+      waitForSelector: '[data-testid="ph-first-tier-mfg-orders"]',
+    });
+
+    await pickTypeAndDates(page);
+
+    // Leave all three wildcard textareas empty.
+    await page.locator('[data-testid="ph-first-tier-mfg-orders"]').fill('');
+    await page.locator('[data-testid="ph-first-tier-lot-ids"]').fill('');
+    await page.locator('[data-testid="ph-first-tier-wafer-lots"]').fill('');
+
+    const queryBtn = page.locator('button:has-text("查詢")').first();
+    await expect(queryBtn).toBeEnabled({ timeout: 10_000 });
+
+    const reqPromise = page.waitForRequest('**/api/production-history/query', { timeout: 10_000 });
+    await queryBtn.click();
+    const req = await reqPromise;
+
+    const body = req.postDataJSON();
+    // Wildcard keys MUST be omitted entirely (not sent as empty arrays).
+    expect(body).not.toHaveProperty('mfg_orders');
+    expect(body).not.toHaveProperty('lot_ids');
+    expect(body).not.toHaveProperty('wafer_lots');
+    expect(queryRequests.length).toBeGreaterThan(0);
+  });
+});

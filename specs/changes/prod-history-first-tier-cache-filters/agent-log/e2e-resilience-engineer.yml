@@ -1,0 +1,196 @@
+agent: e2e-resilience-engineer
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: pass
+files-touched:
+  - path: frontend/tests/playwright/production-history-cross-filter.spec.ts
+    action: create
+    notes: |
+      AC-2 + AC-7. Three tests: (1) renders 4 MultiSelects + 3 wildcard
+      textareas, (2) Package selection narrows BOP/Function/Type via a real
+      mocked filter-options endpoint that performs the 4-tuple narrow at the
+      mock layer, (3) reverse direction — select BOP after a Package selection,
+      symmetric. Stable selectors use the 9 data-testid anchors added by the
+      frontend-engineer (VR-10).
+  - path: frontend/tests/playwright/production-history-wildcard-paste.spec.ts
+    action: create
+    notes: |
+      AC-4 + AC-5. Three tests: (1) multi-line paste with mixed separators +
+      duplicate token → request body has 4 deduped tokens, (2) `MA*` wildcard
+      reaches request body unchanged (frontend MUST NOT translate * to %),
+      (3) SQL meta char (' OR 1=1--) → 400 response → UI shows error banner.
+  - path: frontend/tests/playwright/production-history-multi-line-input.spec.ts
+    action: create
+    notes: |
+      AC-5 + AC-3. Two tests: (1) CRLF + comma + tab + duplicate → 4 unique
+      tokens land in request body for the lot_ids field; (2) all three
+      wildcard textareas empty → wildcard keys MUST be entirely omitted from
+      the request body (not empty arrays — back-compat with Type-only flow).
+  - path: frontend/tests/playwright/production-history-pruning-feedback.spec.ts
+    action: create
+    notes: |
+      UI-UX REC-02 verification. Mocks filter-options so the second response
+      (after Package selection) drops BOP-B from the option set, triggering
+      the fail-open prune logic. Asserts [data-testid="ph-first-tier-pruned-notice"]
+      becomes visible and auto-hides within ~3 s. Stable selectors only.
+  - path: frontend/tests/playwright/production-history-filter-options-error.spec.ts
+    action: create
+    notes: |
+      Resilience. Stubs filter-options API to 500 via mockApiError(); asserts
+      [data-testid="ph-first-tier-error"] is visible with non-empty content;
+      asserts the 3 wildcard textareas remain enabled (degraded mode); listens
+      for pageerror events and asserts none fire (no JS uncaught teardown).
+  - path: tests/integration/test_multi_worker_concurrency.py
+    action: modify
+    notes: |
+      Added 2 tests + a shared cache-worker subprocess script
+      (_CACHE_WORKER_SCRIPT, _spawn_cache_workers helper):
+        - test_container_filter_cache_lock_under_4_workers (AC-6, PHF-05):
+          spawns 4 subprocesses sharing a Redis instance and a single test
+          lock-path; each runs cache_mod._load(force=True) after a Redis
+          barrier release. Patches read_sql_df to increment a Redis counter
+          and sleep 2 s, so the loser workers must enter the lock-wait branch.
+          Asserts exactly 1 Oracle hit and all 4 workers report identical
+          indices payload.
+        - test_lock_holder_crash_releases_lock: pre-creates the lock sentinel
+          (simulating a crashed prior holder), spawns 1 worker with the
+          lock-poll constants lowered to 1 s × 2 iterations for fast test
+          execution, asserts the worker (a) does not hang past 30 s, (b)
+          falls through to direct Oracle in degraded mode (Oracle hit count
+          >= 1), (c) returns a successful payload. Documents the explicit
+          design choice: D4 has no mtime reaper — fall-through is the
+          contracted behaviour, not stale-file deletion.
+      Imports added: subprocess, sys.
+  - path: tests/integration/test_redis_chaos.py
+    action: modify
+    notes: |
+      Added test_filter_options_falls_back_when_redis_down. Seeds L1 via
+      cache_mod._apply_payload(), kills the cache Redis (control_proc),
+      monkey-patches get_redis_client to raise ConnectionError, then calls
+      get_filter_options(None) and asserts it returns the L1 payload without
+      crashing. Validates the "L1 hit short-circuits Redis read" resilience
+      contract.
+  - path: tests/integration/test_redis_timeout_fallback.py
+    action: modify
+    notes: |
+      Added test_filter_options_l1_fallback (inside TestRedisTimeoutFallback
+      class). Seeds L1, monkey-patches get_redis_client to raise TimeoutError,
+      calls get_filter_options(None) and asserts: (a) no exception propagates,
+      (b) wall-clock under 1 s (proves Redis was not touched), (c) payload
+      matches the seeded indices. Validates the L1 in-process cache short-
+      circuits the Redis read path under slow-Redis conditions.
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/test-plan.md
+  - specs/changes/prod-history-first-tier-cache-filters/design.md
+  - specs/changes/prod-history-first-tier-cache-filters/change-classification.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/frontend-engineer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/test-strategist.yml
+  - src/mes_dashboard/routes/production_history_routes.py
+  - src/mes_dashboard/services/container_filter_cache.py
+  - frontend/src/production-history/App.vue
+  - frontend/src/production-history/composables/useFirstTierFilters.ts
+  - frontend/tests/playwright/_auth.js
+  - frontend/tests/playwright/reject-history.spec.js
+  - frontend/tests/playwright/query-tool.spec.js
+  - frontend/tests/playwright/data-boundary/malformed-input.spec.js
+  - frontend/tests/playwright/resilience/api-failure.spec.js
+  - frontend/playwright.config.js
+  - tests/integration/_multi_worker_harness.py
+  - tests/integration/test_multi_worker_concurrency.py
+  - tests/integration/test_redis_chaos.py
+  - tests/integration/test_redis_timeout_fallback.py
+  - tests/integration/conftest.py
+  - tests/test_container_filter_cache.py
+implementation-summary: |
+  Authored 5 Playwright E2E specs (10 tests total) + 4 Python integration
+  tests covering AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, plus the two UI-UX
+  fixes (REC-01 error banner; REC-02 pruning notice) and the
+  filter-options 500-degradation resilience path.
+
+  Backend resilience tests confirm the container_filter_cache layer:
+    1. Exactly-one-rebuild guarantee under 4-worker race (file-based
+       O_CREAT|O_EXCL lock + Redis L2 poll)
+    2. Graceful fall-through to direct Oracle when the lock sentinel is
+       stale (no mtime reaper — that is the documented v1 trade-off)
+    3. L1 in-process cache short-circuits Redis when Redis is down or slow
+       (ConnectionError + TimeoutError scenarios both covered)
+
+  All 4 Python tests pass under `--run-integration-real`. The 12 pre-existing
+  container_filter_cache unit tests continue to pass, confirming no
+  regression from the shared subprocess-script addition.
+
+  Playwright specs follow the existing data-testid + page.route() mock
+  conventions used by data-boundary/ and resilience/ sibling specs. No new
+  shared-ui changes required — the 9 testids were added by frontend-engineer
+  in fix-6 (VR-10). All selectors use stable testids; no time.sleep() for
+  cross-filter debounce (await actual fetch via page.waitForResponse()).
+
+verification:
+  python-tests-cache-and-filter-options:
+    command: |
+      conda run -n mes-dashboard pytest \\
+        tests/integration/test_multi_worker_concurrency.py \\
+        tests/integration/test_redis_chaos.py \\
+        tests/integration/test_redis_timeout_fallback.py \\
+        --run-integration-real -v -k "container_filter_cache or filter_options"
+    result: PASS (3 passed, 17 deselected in 33.51s)
+    breakdown:
+      - test_container_filter_cache_lock_under_4_workers — PASS (4-worker race, 1 Oracle hit)
+      - test_filter_options_falls_back_when_redis_down — PASS (L1 hit during Redis down)
+      - test_filter_options_l1_fallback — PASS (L1 hit during slow Redis)
+  python-test-lock-holder-crash:
+    command: |
+      conda run -n mes-dashboard pytest \\
+        tests/integration/test_multi_worker_concurrency.py::test_lock_holder_crash_releases_lock \\
+        --run-integration-real -v
+    result: PASS (1 passed in 8.23s)
+  python-regression-container-cache-units:
+    command: conda run -n mes-dashboard pytest tests/test_container_filter_cache.py -v
+    result: PASS (12 tests, no regression from shared subprocess-script addition)
+  playwright-list:
+    command: cd frontend && npx playwright test --list <5 specs>
+    result: PASS — all 10 tests parse and are discoverable
+    breakdown:
+      - production-history-cross-filter.spec.ts: 3 tests
+      - production-history-wildcard-paste.spec.ts: 3 tests
+      - production-history-multi-line-input.spec.ts: 2 tests
+      - production-history-pruning-feedback.spec.ts: 1 test
+      - production-history-filter-options-error.spec.ts: 1 test
+  playwright-execution:
+    command: cd frontend && npx playwright test <5 specs> --reporter=line
+    result: |
+      SKIPPED — no Flask backend running at http://127.0.0.1:8080 in this
+      session. loginViaApi() fails to reach /api/auth/login. Per work-packet
+      instructions: documented and skipped. Specs are syntactically valid
+      and Playwright-discoverable (see playwright-list above). They will run
+      in CI once the test harness brings up gunicorn + redis-server.
+unresolved:
+  - id: playwright-server-not-running
+    note: |
+      Local Flask server not running during test authoring; the specs use
+      page.route() API mocks for all data, so they only need the SPA shell
+      to mount. CI should bring up gunicorn + redis-server before running
+      the playwright job. The 5 specs do not require Oracle.
+  - id: multi-select-option-locator-robustness
+    note: |
+      The cross-filter and pruning-feedback specs use a label-based selector
+      to click MultiSelect options (filter by text). If the shared-ui
+      MultiSelect changes its option rendering (e.g., adds an icon prefix
+      or option count badge), these may need adjusting. Visual-reviewer
+      already noted VR-06 (option-count indicator) as a deferred improvement —
+      if implemented, update the regex to allow trailing "(N options)" text.
+
+deferred:
+  - id: AC-8-schema-version-mismatch-e2e
+    note: |
+      Schema version mismatch is exercised at the unit/integration tier
+      (tests/test_container_filter_cache.py::test_schema_version_mismatch_triggers_rebuild).
+      No e2e value-add — the front-end never sees the schema version
+      directly; it just sees a successful response. Documented in test-plan
+      as unit+data-boundary coverage.
+  - id: tier-3-integration-real-multi-worker
+    note: |
+      test_container_filter_cache_real_oracle (against Oracle XE) is tier 3
+      (nightly) and out of scope for this pre-merge gate per test-plan.md.
+      Coverage at tier 1 mock level is complete.

@@ -1,0 +1,168 @@
+agent: backend-engineer
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: complete
+
+# ──────────────────────────────────────────────────────────────────────────
+# U2 decision (deferred by spec-architect)
+# ──────────────────────────────────────────────────────────────────────────
+u2-decision:
+  choice: lift-to-shared
+  module: src/mes_dashboard/sql/wildcards.py
+  rationale: |
+    Wildcard grammar is now contractually defined (PHF-02/PHF-03) and applies
+    identically to any service emitting LIKE filters from user textarea input.
+    Single audit chokepoint; material_trace_service.py can migrate to the
+    shared emitter in a follow-up without behaviour change.
+
+# ──────────────────────────────────────────────────────────────────────────
+# Files changed
+# ──────────────────────────────────────────────────────────────────────────
+files-changed:
+  source-files:
+    - path: src/mes_dashboard/core/request_validation.py
+      action: modify
+      summary: |
+        Added WildcardToken, WildcardValidationError, parse_wildcard_tokens.
+        Implements PHF-02 grammar + PHF-06 SQL meta-char rejection. Pre-split
+        control-char check (\x00-\x1f) ensures the split regex cannot
+        silently consume control bytes. Per-field cap = 100; idempotent
+        under re-parsing (AC-5).
+    - path: src/mes_dashboard/sql/wildcards.py
+      action: create
+      summary: |
+        Shared SQL emitter build_wildcard_clause(column, tokens, param_prefix).
+        Combines exact tokens into a single IN(...) clause and emits one
+        LIKE :bind ESCAPE '\' term per pattern token, OR-joined.
+        Bind-only — no string interpolation of user input.
+    - path: src/mes_dashboard/services/container_filter_cache.py
+      action: rewrite
+      summary: |
+        Schema v2 payload: {schema_version: 2, tuples: list[[type,pkg,bop,fn]],
+        indices: {pj_types, packages, bops, pj_functions}, updated_at}.
+        Oracle SQL upgraded to SELECT DISTINCT 4-tuple. Schema-mismatch on
+        L2 read → log INFO + return None (force rebuild, PHF-04). Multi-worker
+        rebuild lock at tmp/container_filter_cache.loading via _try_lock /
+        _release_lock (pattern from resource_history_duckdb_cache.py:44-65).
+        Loser path polls Redis L2 every 5 s × 18 (90 s); timeout → degraded
+        direct-Oracle path. New get_filter_options(selected) cross-filter
+        helper performs in-memory tuple scan (Option B). Back-compat helpers
+        get_packages / get_pj_types preserved by reading from indices.
+    - path: src/mes_dashboard/services/production_history_service.py
+      action: modify
+      summary: |
+        validate_query_params accepts pj_packages[], pj_bops[], pj_functions[],
+        mfg_orders[], lot_ids[] (upgraded), wafer_lots[]. Wildcard fields go
+        through parse_wildcard_tokens (raises ValueError → 400 at the route
+        layer). _build_extra_filters composes plain-IN clauses for the three
+        MultiSelect fields and wildcard clauses via build_wildcard_clause
+        for the three wildcard fields. _make_dataset_id hash key extended so
+        new filters produce distinct spool ids.
+    - path: src/mes_dashboard/routes/production_history_routes.py
+      action: modify
+      summary: |
+        New GET /api/production-history/filter-options endpoint. Parses
+        ?selected=<urlencoded JSON>; unknown keys ignored (fail-open);
+        invalid JSON → 400 VALIDATION_ERROR. Returns success_response with
+        meta.{updated_at, schema_version: 2}.
+
+  test-files:
+    - path: tests/test_common_filters.py
+      action: extend
+      summary: |
+        +9 new tests for parse_wildcard_tokens — split/dedup, all positions,
+        SQL meta-char rejection (PHF-06), pure/short token rejection,
+        multi-star rejection, %/_ escaping, 100-cap, idempotence, empty input.
+    - path: tests/test_container_filter_cache.py
+      action: rewrite-and-extend
+      summary: |
+        Migrated existing fixtures + tests to the v2 4-tuple DataFrame shape.
+        +5 new tests: 4-tuple payload round-trip (AC-1), cross-filter narrow
+        by package (AC-2), schema_version mismatch triggers rebuild (AC-8),
+        lock acquired when no file exists (PHF-05), lock denied when held.
+    - path: tests/test_production_history_service.py
+      action: extend
+      summary: |
+        +7 new tests covering new params plumbing (AC-3), wildcard token
+        parsing, LIKE ESCAPE bind emission (PHF-03), back-compat type-only
+        flow (AC-3), validation independence from cache state, PJ_FUNCTION
+        null handling, stale v1 payload data-boundary (AC-8).
+    - path: tests/test_production_history_sql_runtime.py
+      action: extend
+      summary: |
+        +1 new test TestExtraFiltersWildcardEmit — three wildcard columns
+        produce LIKE ESCAPE clauses with bound params; no inline
+        interpolation.
+    - path: tests/test_production_history_routes.py
+      action: extend
+      summary: |
+        +5 new tests for filter-options endpoint: empty selection (AC-1),
+        with selected package (AC-2), unknown-keys fail-open, invalid JSON
+        400, response shape matches data-shape §2.7.
+    - path: tests/test_cache_updater_lock_behavior.py
+      action: extend
+      summary: |
+        +1 new test TestContainerFilterCacheLockBehavior — file-based lock
+        winner / loser semantics with tmp-path redirect for hermetic
+        execution.
+
+# ──────────────────────────────────────────────────────────────────────────
+# Verification
+# ──────────────────────────────────────────────────────────────────────────
+test-results:
+  new-tests:
+    test_common_filters.py: 9 wildcard parser tests
+    test_container_filter_cache.py: 5 schema-v2/cross-filter/lock tests
+    test_production_history_service.py: 7 main-query + data-boundary tests
+    test_production_history_sql_runtime.py: 1 wildcard emit test
+    test_production_history_routes.py: 5 filter-options endpoint tests
+    test_cache_updater_lock_behavior.py: 1 container_filter_cache lock test
+    total-new: 28
+  regression:
+    command: pytest tests/test_production_history*.py tests/test_container_filter_cache.py
+    result: 100 passed (75 pre-existing + 25 new — Change 2 baseline preserved)
+  full-sweep:
+    command: pytest tests/ --ignore=tests/integration --ignore=tests/stress --ignore=tests/e2e --ignore=tests/property --ignore=tests/routes
+    result: 3470 passed, 131 skipped, 0 failed
+  lint:
+    command: ruff check src/mes_dashboard/core/request_validation.py src/mes_dashboard/sql/wildcards.py src/mes_dashboard/services/container_filter_cache.py src/mes_dashboard/services/production_history_service.py src/mes_dashboard/routes/production_history_routes.py
+    result: All checks passed
+  type-check:
+    status: not-run
+    reason: |
+      mypy not installed in mes-dashboard conda env on this machine. Project
+      CLAUDE.md lists mypy under TypeScript Migration Rules but the env yml
+      does not pin it. No new typing concerns introduced — every new public
+      function has parameter and return annotations.
+
+# ──────────────────────────────────────────────────────────────────────────
+# Caveats / unresolved for downstream agents
+# ──────────────────────────────────────────────────────────────────────────
+caveats:
+  - id: U4-deferred
+    note: |
+      mtime-based stale-sentinel reaper for tmp/container_filter_cache.loading
+      not implemented (matches the resource_history_duckdb_cache precedent).
+      Runbook documents manual `rm` if a worker dies mid-rebuild — same as
+      the resource-history change. Reaper can land in a follow-up if
+      production logs show stuck locks.
+  - id: SCHEMA-BREAK-RUNBOOK
+    note: |
+      No spool parquet schema break this round (production-history spool
+      schema is untouched). Existing parquet files remain compatible.
+      Cache rollback is bump schema_version → 3 in a follow-up; no
+      `redis-cli DEL` required (PHF-04).
+  - id: MATERIAL-TRACE-MIGRATION-FOLLOWUP
+    note: |
+      material_trace_service._add_exact_or_pattern_condition still inlines
+      the older wildcard pattern (% only, no SQL meta-char rejection). A
+      future change should migrate it to parse_wildcard_tokens +
+      build_wildcard_clause once the contract owner approves applying
+      PHF-02/PHF-06 to that surface.
+  - id: FRONTEND-CONTRACT
+    note: |
+      frontend-engineer agent is now unblocked: the new endpoint
+      GET /api/production-history/filter-options is live, and the
+      main-query POST accepts pj_packages, pj_bops, pj_functions, mfg_orders,
+      lot_ids (wildcard-aware), wafer_lots. Backwards-compatible: empty/
+      missing fields reproduce today's Type-only behaviour.

@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.2.2
-last-changed: 2026-05-13
+schema-version: 1.3.0
+last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -138,6 +138,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/yield-alert/filter-options | required | — | success_response | 500 | route tests |
 | GET | /api/yield-alert/cross-filter-options | required | ?query_id=&lines[]=... | success_response | 400/410 | route tests |
 | GET | /api/production-history/type-options | required | — | success_response | 500 | route tests |
+| GET | /api/production-history/filter-options | required | ?selected=<json> | success_response | 400/404/500 | route tests |
 | GET | /api/production-history/options | required | — | success_response | 503 | route tests |
 | POST | /api/production-history/query | required | JSON body | success_response | 202/400/503 | route tests |
 | GET | /api/production-history/job/<job_id> | required | — | success_response | 404 | route tests |
@@ -252,6 +253,19 @@ breaking-change-policy: deprecate-2-minors
 - `analytics-summary` 額外注入 `meta.cache_state ∈ {warm, cold, stale}`。
 - `/health` / `/health/deep`（2026-03-11）：additive `system_memory` + `async_workers` blocks，backward-compatible。
 - **resource-history progress endpoint（2026-05-13，resource-history-perf）**：新增 `GET /api/resource/history/query/progress?query_id=<uuid>`；auth required；response shape: `{ query_id, total_chunks, completed_chunks, percent, status }`；`status` 為 closed enum `running | done | error`；400 on missing `query_id`，404 on unknown `query_id`；additive，不影響既有端點。
+- **Production-History first-tier cache filters（2026-05-14，prod-history-first-tier-cache-filters）**：以下為 additive，backward-compatible：
+  - 新增端點：`GET /api/production-history/filter-options?selected=<json>`；auth required；response `success_response`；errors 400/404/500。
+  - `selected` 為 URL-encoded JSON：`{"pj_types":[],"packages":[],"bops":[],"pj_functions":[]}`；空物件或省略 → 回傳完整四欄 distinct 集合（empty-selection 場景，AC-1）。
+  - Response payload：`data: {pj_types[], packages[], bops[], pj_functions[]}` + `meta: {updated_at, schema_version: 2}`。
+  - 主查詢端點 `POST /api/production-history/query` 新增六個可選 JSON body 欄位（全部 additive，缺省時與舊行為一致）：
+    - `pj_packages[]`（string 陣列，cached MultiSelect，plain `IN`）
+    - `pj_bops[]`（string 陣列，cached MultiSelect，plain `IN`）
+    - `pj_functions[]`（string 陣列，cached MultiSelect，plain `IN`）
+    - `mfg_orders[]`（string 陣列，支援 `*` 萬用字元，依 PHF-02/PHF-03 規則 bind `LIKE ESCAPE '\'`）
+    - `lot_ids[]`（string 陣列，支援 `*` 萬用字元；上游既有 `IN` 行為升級為 wildcard-aware）
+    - `wafer_lots[]`（string 陣列，支援 `*` 萬用字元，新欄位）
+  - 萬用字元語法見 business-rules.md PHF-02；server-side validation 拒絕 SQL meta-char（PHF-06），最多 100 patterns/field。
+  - Type-only flow 不變（其他欄位皆 optional，省略時即既有行為）。
 - **WIP new filter params（2026-05-13，wip-hold-drilldown-filters）**：以下四個端點新增三個可選查詢參數，全部為 additive，不影響既有呼叫方：
   - 端點：`GET/POST /api/wip/detail/<workcenter>`、`GET/POST /api/wip/overview/summary`、`GET/POST /api/wip/overview/matrix`、`GET/POST /api/wip/meta/filter-options`
   - 新增參數：

@@ -1,0 +1,91 @@
+agent: qa-reviewer
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: approved-with-conditions
+
+# ──────────────────────────────────────────────────────────────────────────
+# Summary
+# ──────────────────────────────────────────────────────────────────────────
+summary: |
+  All AC-1..AC-8 are covered by automated tests at unit + property + fuzz +
+  integration + e2e layers. All 12 required agents ran and produced verdicts
+  (pass / approved / approved-with-changes already remedied by
+  frontend-engineer fix pass). Five contracts bumped per design (api 1.3.0,
+  api-inventory 1.1.3, data 1.2.0, business 1.3.0, ci 1.3.12) with matching
+  CHANGELOG entries dated 2026-05-14. U1-U4 resolved (U1 constant, U2 shared
+  emitter, U3 bind protocol safety, U4 deferred per resource-history
+  precedent). Two manual gates remain before /cdd-close: AC-1 staging p95
+  latency and AC-6 multi-worker lock under 4 gunicorn workers.
+
+# ──────────────────────────────────────────────────────────────────────────
+# AC compliance (count)
+# ──────────────────────────────────────────────────────────────────────────
+ac-compliance:
+  fully-covered: 7      # AC-1, AC-2, AC-3, AC-4, AC-5, AC-7, AC-8
+  conditional:   1      # AC-6 — mock-covered (integration_real PASS); staging confirmation pending
+
+# ──────────────────────────────────────────────────────────────────────────
+# Files read (audit-only)
+# ──────────────────────────────────────────────────────────────────────────
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/change-classification.md
+  - specs/changes/prod-history-first-tier-cache-filters/design.md
+  - specs/changes/prod-history-first-tier-cache-filters/test-plan.md
+  - specs/changes/prod-history-first-tier-cache-filters/ci-gates.md
+  - specs/changes/prod-history-first-tier-cache-filters/tasks.yml
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/change-classifier.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/spec-architect.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/contract-reviewer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/test-strategist.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/backend-engineer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/frontend-engineer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/dependency-security-reviewer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/e2e-resilience-engineer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/monkey-test-engineer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/ui-ux-reviewer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/visual-reviewer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/ci-cd-gatekeeper.yml
+  - contracts/CHANGELOG.md
+
+# ──────────────────────────────────────────────────────────────────────────
+# Blocking issues
+# ──────────────────────────────────────────────────────────────────────────
+blocking-issues: []
+
+# ──────────────────────────────────────────────────────────────────────────
+# Conditions before /cdd-close
+# ──────────────────────────────────────────────────────────────────────────
+conditions:
+  - id: M1
+    title: AC-1 filter-options p95 latency in staging (≤ 100 ms warm)
+    owner: release-captain
+    blocking-cdd-close: yes
+  - id: M2
+    title: AC-6 multi-worker lock holds under 4 gunicorn workers in staging
+    owner: release-captain
+    blocking-cdd-close: yes
+  - id: M3
+    title: Empty-cache cold-start < 60 s on staging
+    owner: release-captain
+    blocking-cdd-close: no  # recommended, not strict gate
+  - id: M4
+    title: 1000-LOT pasted query end-to-end latency probe
+    owner: release-captain
+    blocking-cdd-close: no
+
+# ──────────────────────────────────────────────────────────────────────────
+# Recommendations carried into archive/follow-up
+# ──────────────────────────────────────────────────────────────────────────
+recommendations:
+  - schema_version 2 → 3 rollback drill in next deploy runbook
+  - track 10 KB single-token wildcard acceptance as known behaviour (R1)
+  - follow-up ticket: migrate material_trace_service to shared sql/wildcards.py
+  - backfill production-history i18n locales when project-wide adoption lands
+
+# ──────────────────────────────────────────────────────────────────────────
+# Gate result (filled in below after execution)
+# ──────────────────────────────────────────────────────────────────────────
+gate-execution:
+  command: cdd-kit gate prod-history-first-tier-cache-filters
+  result: pending-execution

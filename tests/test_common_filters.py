@@ -183,3 +183,105 @@ class TestCommonFilters:
         """Test that NON_QUALITY_HOLD_REASONS is defined and has content."""
         assert len(NON_QUALITY_HOLD_REASONS) > 0
         assert isinstance(NON_QUALITY_HOLD_REASONS, set)
+
+
+# ============================================================
+# Change: prod-history-first-tier-cache-filters
+# Wildcard parser tests — PHF-02 / PHF-06 / AC-4 / AC-5
+# ============================================================
+
+import pytest
+
+from mes_dashboard.core.request_validation import (
+    WILDCARD_MAX_PATTERNS_PER_FIELD,
+    WildcardToken,
+    WildcardValidationError,
+    parse_wildcard_tokens,
+)
+
+
+class TestParseWildcardTokens:
+    """parse_wildcard_tokens — PHF-02 grammar + PHF-06 SQL meta-char rejection."""
+
+    def test_parse_wildcard_tokens_splits_and_dedups(self):
+        """Newline / comma / whitespace separators; dedup case-insensitive."""
+        out = parse_wildcard_tokens(
+            "mfg_orders",
+            "MA2025\nMA2026, MA2025\tMA2025*\nMA2025*",
+        )
+        bound = [t.bound_value for t in out]
+        # MA2025 exact (case-folded dedup), MA2026 exact, MA2025% pattern
+        assert bound == ["MA2025", "MA2026", "MA2025%"]
+        assert [t.kind for t in out] == ["exact", "exact", "pattern"]
+
+    def test_parse_wildcard_tokens_accepts_all_positions(self):
+        """Prefix / suffix / infix — all single-`*` shapes accepted (PHF-02 §1)."""
+        out = parse_wildcard_tokens(
+            "lot_ids", ["MA2025*", "*2025", "MA*2025"],
+        )
+        assert {t.bound_value for t in out} == {"MA2025%", "%2025", "MA%2025"}
+        assert all(t.kind == "pattern" for t in out)
+
+    def test_parse_wildcard_tokens_rejects_sql_meta_chars(self):
+        """PHF-06 — `'`, `;`, `--`, `/*`, `*/`, control chars all reject."""
+        bad_inputs = [
+            "MA'2025", "MA;DROP", "MA--end", "MA/*comment*/", "MA*/end",
+            "MA\x00NUL", "MA\x1fctl",
+        ]
+        for bad in bad_inputs:
+            with pytest.raises(WildcardValidationError) as exc:
+                parse_wildcard_tokens("lot_ids", bad)
+            assert exc.value.field == "lot_ids"
+
+    def test_parse_wildcard_tokens_rejects_pure_or_short_tokens(self):
+        """`*`, `X`, `X*` (1-char literal) all rejected."""
+        for bad in ["*", "X", "X*", "*X", "***"]:
+            with pytest.raises(WildcardValidationError):
+                parse_wildcard_tokens("lot_ids", bad)
+
+    def test_parse_wildcard_tokens_rejects_multi_star(self):
+        """`MA**`, `*A*B*` rejected (more than one `*`)."""
+        for bad in ["MA**", "*A*B*", "**MA"]:
+            with pytest.raises(WildcardValidationError):
+                parse_wildcard_tokens("lot_ids", bad)
+
+    def test_parse_wildcard_tokens_escapes_percent_and_underscore(self):
+        """Literal `%` and `_` in source are LIKE-escaped before `*` → `%`."""
+        out = parse_wildcard_tokens("lot_ids", ["MA%25*", "MA_X*"])
+        bound = {t.bound_value for t in out}
+        # `%` becomes `\%`, then `*` → `%`. `_` becomes `\_`.
+        assert r"MA\%25%" in bound
+        assert r"MA\_X%" in bound
+
+    def test_parse_wildcard_tokens_caps_at_100(self):
+        """> 100 tokens per field rejected with 400."""
+        many = ",".join(f"LOT{i:04d}" for i in range(WILDCARD_MAX_PATTERNS_PER_FIELD + 5))
+        with pytest.raises(WildcardValidationError):
+            parse_wildcard_tokens("lot_ids", many)
+
+    def test_parse_wildcard_tokens_idempotent(self):
+        """AC-5 — re-parsing the bound_value (with * translated back) yields the same set."""
+        out1 = parse_wildcard_tokens(
+            "mfg_orders", ["MA2025", "MA2025*", "*2026"],
+        )
+
+        # Round-trip: re-emit each bound_value back into source form
+        # (replace leading/trailing/escape) and re-parse.
+        def _to_source(tok: WildcardToken) -> str:
+            if tok.kind == "exact":
+                return tok.bound_value
+            # Pattern: translate % back to * and unescape \% \_
+            s = tok.bound_value.replace(r"\%", "%").replace(r"\_", "_")
+            return s.replace("%", "*")
+
+        re_input = [_to_source(t) for t in out1]
+        out2 = parse_wildcard_tokens("mfg_orders", re_input)
+        assert [(t.kind, t.bound_value) for t in out1] == [
+            (t.kind, t.bound_value) for t in out2
+        ]
+
+    def test_parse_wildcard_tokens_empty_input_returns_empty_list(self):
+        assert parse_wildcard_tokens("lot_ids", "") == []
+        assert parse_wildcard_tokens("lot_ids", None) == []
+        assert parse_wildcard_tokens("lot_ids", []) == []
+        assert parse_wildcard_tokens("lot_ids", "   ,  \n\t  ") == []

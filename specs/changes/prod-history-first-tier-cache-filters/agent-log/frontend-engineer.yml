@@ -1,0 +1,273 @@
+agent: frontend-engineer
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: complete
+files-touched:
+  - path: frontend/src/production-history/composables/useFirstTierFilters.ts
+    action: create
+  - path: frontend/src/production-history/composables/useProductionHistory.ts
+    action: modify
+    notes: |
+      Removed promoted second-tier fields (work_orders, lot_ids, packages,
+      bop_codes) from SupplementaryFilter/Options interfaces and all helpers
+      (_clearSupplementaryFilter, _clearStagedFilter, _copyStagedToApplied,
+      fetchSupplementaryOptions); kept workcenter_groups + equipment_ids only.
+      Extended QueryParams with pj_packages / pj_bops / pj_functions /
+      mfg_orders / lot_ids / wafer_lots optional fields (back-compat: omit
+      when empty arrays).
+  - path: frontend/src/production-history/App.vue
+    action: modify
+    notes: |
+      Replaced first-tier filter row with 4 cached MultiSelects (Type, Package,
+      BOP, Function) + 3 wildcard textareas (工單號, LOT ID, Wafer LOT).
+      Wired useFirstTierFilters composable; runQuery payload now spreads
+      firstTier.buildQueryFragment(). Removed promoted fields from
+      second-tier panel; only WorkCenter 群組 + Equipment remain (D6).
+  - path: frontend/src/production-history/style.css
+    action: modify
+    notes: |
+      Added .ph-first-tier__multiselect-grid (4-col on lg) and
+      .ph-first-tier__wildcard-grid (3-col on lg) + .ph-first-tier__hint
+      + .ph-first-tier__wildcard-input styles. Reduced second-tier grid to
+      4 cols (was 6) since promoted fields removed.
+  - path: frontend/src/core/endpoint-schemas.ts
+    action: modify
+    notes: |
+      Added PRODUCTION_HISTORY_FILTER_OPTIONS_SCHEMA (data-shape §2.7:
+      pj_types/packages/bops/pj_functions all required arrays) and
+      registered it under '/api/production-history/filter-options'.
+  - path: frontend/scripts/ts-resolver-loader.mjs
+    action: modify
+    notes: |
+      Extended loader to also resolve extensionless relative imports (TS
+      convention) by probing .ts/.js + index.ts/index.js. Required so the
+      legacy node --test runner can load useFirstTierFilters.ts, which
+      imports apiGet from '../../core/api' (extensionless) per the CLAUDE.md
+      TS migration convention.
+  - path: frontend/tests/validation/useProductionHistory.validation.test.js
+    action: modify
+    notes: |
+      Added 4 assertShape tests for PRODUCTION_HISTORY_FILTER_OPTIONS_SCHEMA;
+      added 7 parseWildcardInput tests (separators, trim, dedup, * preservation,
+      CRLF/tab/comma, AC-5 idempotence); added 3 _buildUrl tests covering
+      empty-selection short-circuit, empty-array pruning, and full 4-field
+      encoding.
+  - path: frontend/tests/legacy/production-history.test.js
+    action: modify
+    notes: |
+      Added 7 tests for useFirstTierFilters composable using a mock fetcher:
+      initial empty-selection load, selection-driven re-fetch with
+      `?selected=` query string, automatic pruning of selection values that
+      vanish from new options (PHF-01 fail-open picker), buildQueryFragment
+      empty-field omission + wildcard parser pass-through, and parser
+      idempotence.
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/design.md
+  - specs/changes/prod-history-first-tier-cache-filters/test-plan.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/test-strategist.yml
+  - contracts/api/api-contract.md
+  - contracts/data/data-shape-contract.md
+  - contracts/business/business-rules.md
+  - frontend/src/production-history/App.vue
+  - frontend/src/production-history/composables/useProductionHistory.ts
+  - frontend/src/production-history/style.css
+  - frontend/src/material-trace/App.vue
+  - frontend/src/core/reject-history-filters.ts
+  - frontend/src/core/api.ts
+  - frontend/src/core/endpoint-schemas.ts
+  - frontend/src/reject-history/App.vue
+  - frontend/src/production-history/components/ProductionMatrix.vue
+  - frontend/src/production-history/components/ProductionDetailTable.vue
+  - frontend/tests/validation/useProductionHistory.validation.test.js
+  - frontend/tests/legacy/production-history.test.js
+  - frontend/tests/legacy/material-trace-composables.test.js
+  - frontend/scripts/ts-resolver-loader.mjs
+  - frontend/vitest.config.js
+  - frontend/package.json
+implementation-summary: |
+  D6: removed (not hidden) MFGORDERNAME / CONTAINERNAME / Package / BOP from
+  the second-tier panel by stripping those keys from SupplementaryFilter /
+  SupplementaryOptions interfaces; second-tier now carries only WorkCenter +
+  Equipment (still spool-derived). PHF-01 cross-filter implemented in a new
+  useFirstTierFilters composable: GET /api/production-history/filter-options
+  with a 200 ms debounce, stale-response guard via incrementing token, and
+  automatic pruning of selections that disappear from the narrowed option
+  set (fail-open picker). Multi-line wildcard parser parseWildcardInput
+  splits on newline/comma/whitespace, trims, dedups, is idempotent (AC-5),
+  and crucially does NOT translate '*' to '%' — the backend re-validates and
+  binds per PHF-02 (defense-in-depth). Wildcard fields (mfg_orders / lot_ids
+  / wafer_lots) added to QueryParams alongside the cached cross-filter
+  fields (pj_packages / pj_bops / pj_functions); all six are optional and
+  omitted when empty (back-compat AC-3).
+verification:
+  type-check:
+    command: npm run type-check
+    result: PASS (0 errors)
+  vitest-production-history:
+    command: npm run test -- production-history
+    result: PASS (30 tests, 1 file)
+  vitest-full:
+    command: npm run test
+    result: PASS (316 tests, 30 files)
+  legacy-production-history:
+    command: node --experimental-strip-types --experimental-loader ./scripts/ts-resolver-loader.mjs --test tests/legacy/production-history.test.js
+    result: PASS (18 tests — 11 pre-existing + 7 new)
+  legacy-full:
+    command: npm run test:legacy
+    result: PASS (251 tests)
+  build:
+    command: npm run build
+    result: PASS (built in 10.43s)
+  css-check:
+    command: npm run css:check
+    result: PASS (0 errors, 47 pre-existing warnings; no new violations from style.css changes)
+unresolved:
+  - id: i18n-locale-files
+    note: |
+      CLAUDE.md Hard Rule #5 requires locale-file parity for new user-visible
+      strings *if the project supports multi-language*. Production-history has
+      no `locales/` directory and no useI18n() usage anywhere in its tree
+      (verified via grep) — all existing strings are inline Chinese literals.
+      Followed the same pattern for the new labels / hints / placeholders.
+      If a project-wide i18n adoption lands later, this surface must be
+      backfilled alongside hold-history, reject-history, etc.
+  - id: e2e-playwright-specs
+    note: |
+      Per work-packet instructions, Playwright spec creation
+      (production-history-cross-filter.spec.ts,
+      production-history-wildcard-paste.spec.ts,
+      production-history-multi-line-input.spec.ts) is deferred to
+      e2e-resilience-engineer.
+  - id: ts-resolver-loader-extension
+    note: |
+      Extended ts-resolver-loader.mjs to resolve extensionless relative
+      imports (`from '../../core/api'`). Pre-existing loader only handled
+      `.js → .ts` swaps. The new branch probes .ts / .js / index.ts /
+      index.js in that order. Did not touch the existing .js→.ts path —
+      backward compatible. This unblocks the legacy node --test runner for
+      composables that follow the CLAUDE.md TS migration convention of
+      dropping extensions; will benefit future TS migrations too.
+
+## Follow-up applied 2026-05-14
+
+Review-fix pass after ui-ux-reviewer (approved-with-changes) and
+visual-reviewer (approved-with-changes). Applied 7 fixes; deferred items
+documented in the work-packet remain out of scope.
+
+fixes:
+  - id: fix-1-error-banner
+    addresses: UI-UX REC-01 (severity high) — id "7-empty-state-for-filter-options-api-failure"
+    description: |
+      Added a visible error banner above the first-tier rows in
+      production-history/App.vue that surfaces firstTier.error.value when
+      the GET /api/production-history/filter-options request fails. Uses a
+      dedicated `.ph-first-tier__error` class with red bg/border, role="alert",
+      aria-live="polite", and data-testid="ph-first-tier-error". Copy guides
+      the user to retry or fall back to manual wildcard input.
+    files:
+      - frontend/src/production-history/App.vue
+      - frontend/src/production-history/style.css
+
+  - id: fix-2-pruned-notice
+    addresses: UI-UX REC-02 (severity medium) — id "4-fail-open-pruning-ux"
+    description: |
+      Added `prunedFields: CachedFilterField[]` ref + `clearPrunedFields()`
+      action to useFirstTierFilters.ts. `_pruneSelection()` now records which
+      fields had selections dropped on the latest fetch. App.vue derives a
+      transient notice "篩選自動調整：Type、Package、…" that auto-clears after
+      3 s OR immediately when the user manually changes a selection (handled
+      by setSelection() which resets prunedFields). The notice has role="status",
+      aria-live="polite", and data-testid="ph-first-tier-pruned-notice".
+    files:
+      - frontend/src/production-history/composables/useFirstTierFilters.ts
+      - frontend/src/production-history/App.vue
+      - frontend/src/production-history/style.css
+
+  - id: fix-3-second-tier-heading
+    addresses: UI-UX REC-03 (severity medium) — id "5-second-tier-minimization"; VR-07
+    description: |
+      Added "查詢後細部篩選 (Spool)" heading (`<p class="ph-second-tier__heading">`)
+      above the supplementary-filters panel and reduced the panel grid from
+      lg:grid-cols-4 → lg:grid-cols-2 so the two remaining filters (WorkCenter,
+      Equipment) fill the row without empty slots. Heading style mirrors
+      `.ui-filter-label` weight with a top border-separator from the first-tier
+      block.
+    files:
+      - frontend/src/production-history/App.vue
+      - frontend/src/production-history/style.css
+
+  - id: fix-4-css-design-tokens
+    addresses: VR-01 must-fix; UI-UX id "10-design-token-compliance"
+    description: |
+      Replaced raw values in `.ph-first-tier__wildcard-input`:
+        min-height: 64px        → @apply min-h-16
+        font-family: ui-monospace,… → @apply font-mono
+        width: 100% + font-size: 12px → @apply w-full text-xs
+      The class is now a single `@apply` line, fully tailwind-utility based.
+      `font-mono` is Tailwind's built-in stack, no tailwind.config.js change
+      needed. css:check still reports 0 errors, no new warnings.
+    files:
+      - frontend/src/production-history/style.css
+
+  - id: fix-5-textarea-rows
+    addresses: VR-03 should-fix
+    description: |
+      Reduced rows="3" → rows="2" on all three wildcard textareas to balance
+      visual weight against the four 36–40 px MultiSelect triggers in the
+      adjacent row.
+    files:
+      - frontend/src/production-history/App.vue
+
+  - id: fix-6-playwright-testids
+    addresses: VR-10 stable selector proposal
+    description: |
+      Added 9 data-testid attributes for the e2e-resilience-engineer follow-up:
+        ph-first-tier-type / -package / -bop / -function (on each MultiSelect root)
+        ph-first-tier-mfg-orders / -lot-ids / -wafer-lots (on each textarea)
+        ph-first-tier-error (on the new error banner)
+        ph-first-tier-pruned-notice (on the new pruning notice)
+      MultiSelect.vue uses default inheritAttrs=true so data-testid passes
+      through to its root `<div class="multi-select">` automatically — no
+      shared-ui change required.
+    files:
+      - frontend/src/production-history/App.vue
+
+  - id: fix-7-a11y-label-and-alert
+    addresses: UI-UX REC-04 (severity medium) — id "9-accessibility" sub-items (b) + (c)
+    description: |
+      Added id="ph-mfg-orders" / "ph-lot-ids" / "ph-wafer-lots" on the three
+      textareas and matching `for=` on their labels for explicit label-control
+      association. Added role="alert" + aria-live="polite" to the inline form
+      validation `<span class="ph-app__form-error">` so screen readers announce
+      formError messages. The new error banner and pruning notice both carry
+      role + aria-live too. Sub-items (a) MultiSelect keyboard nav and (d)
+      aria-expanded on multi-select-trigger are pre-existing shared-ui gaps —
+      out of scope per the work packet.
+    files:
+      - frontend/src/production-history/App.vue
+
+verification-followup:
+  type-check:
+    command: cd frontend && npm run type-check
+    result: PASS (0 errors)
+  vitest-production-history:
+    command: cd frontend && npm run test -- production-history
+    result: PASS (7 tests, 1 file)
+  legacy-full:
+    command: cd frontend && npm run test:legacy
+    result: PASS (251 tests)
+  build:
+    command: cd frontend && npm run build
+    result: PASS (built in 9.69s)
+  css-check:
+    command: cd frontend && npm run css:check
+    result: PASS (0 errors, 47 pre-existing warnings; no new violations)
+
+deferred-still:
+  - VR-05 (loading indicator granularity per-field) — informational, future UX
+  - VR-06 (option-count "(N options)" indicator on MultiSelect) — informational, future UX
+  - VR-04 (hint contrast text-gray-500 → text-gray-600) — informational, no WCAG fail today
+  - UI-UX 9-accessibility (a) (d) — pre-existing shared-ui MultiSelect gaps
+  - i18n locale scaffolding — project-wide adoption pending
+  - Playwright spec authoring — handed to e2e-resilience-engineer

@@ -1,0 +1,103 @@
+agent: ci-cd-gatekeeper
+change-id: prod-history-first-tier-cache-filters
+date: 2026-05-14
+verdict: pass
+
+# ──────────────────────────────────────────────────────────────────────────
+# Scope
+# ──────────────────────────────────────────────────────────────────────────
+# Authored ci-gates.md mapping the change's local / PR / nightly / weekly /
+# manual gates onto existing workflows. No new workflow file introduced —
+# the new fuzz cases, multi-worker integration tests, and Playwright specs
+# are absorbed by existing pipelines per ci-contract §1.3.12.
+
+files-changed:
+  - path: specs/changes/prod-history-first-tier-cache-filters/ci-gates.md
+    action: rewrite
+    summary: |
+      Replaced the scaffolded template with the canonical gate plan:
+        - Local Gates (Tier 0): ruff + targeted pytest (8 file globs) +
+          frontend type-check + vitest + node --test legacy + build +
+          css:check + cdd-kit validate + cdd-kit gate.
+        - PR Required Gates (Tier 1): lint, unit-mock-integration
+          (3470 pass), route-fuzz (372 pass, 214 new wildcard cases),
+          property, frontend-unit (316/316), legacy (251), build,
+          css-governance, three playwright groups (resilience /
+          data-boundary / critical-journeys with 5 new specs / 10 tests),
+          contract:validate. Each row cites the existing workflow file.
+        - Informational (Tier 2): frontend-type-check, mypy (not pinned
+          in env yml — documented).
+        - Nightly (Tier 3): nightly-integration covers the 4 new
+          multi-worker + redis-fallback tests against real Oracle XE.
+        - Manual / Weekly (Tier 4): stress-load (thundering herd +
+          1000-LOT IN list); empirical close-out for AC-1 p95 latency
+          and AC-6 multi-worker confirmation in staging.
+      Rollback section enumerates 6 explicit steps with schema_version
+      bump as the primary primitive, lock-file cleanup, and the explicit
+      "no spool parquet schema break" note.
+      Gate Compatibility Notes cross-link ci-contract §1.3.12 (no tier /
+      command / status change; new fuzz scope and rollback convention
+      absorbed by patch bump).
+
+# ──────────────────────────────────────────────────────────────────────────
+# Files read (audit-only)
+# ──────────────────────────────────────────────────────────────────────────
+files-read:
+  - specs/changes/prod-history-first-tier-cache-filters/context-manifest.md
+  - specs/changes/prod-history-first-tier-cache-filters/change-classification.md
+  - specs/changes/prod-history-first-tier-cache-filters/design.md
+  - specs/changes/prod-history-first-tier-cache-filters/test-plan.md
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/backend-engineer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/frontend-engineer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/e2e-resilience-engineer.yml
+  - specs/changes/prod-history-first-tier-cache-filters/agent-log/monkey-test-engineer.yml
+  - contracts/ci/ci-gate-contract.md
+  - specs/archive/2026/prod-history-detail-raw-rows/ci-gates.md
+  - .github/workflows/  # ls only — confirmed backend-tests / frontend-tests / contract-driven-gates / e2e-tests / stress-tests workflows exist
+
+# ──────────────────────────────────────────────────────────────────────────
+# Soft cap compliance
+# ──────────────────────────────────────────────────────────────────────────
+soft-caps:
+  ci-gates-md-line-count:
+    limit: 80
+    actual: 74
+    status: ok
+
+# ──────────────────────────────────────────────────────────────────────────
+# Gate verdict by tier
+# ──────────────────────────────────────────────────────────────────────────
+gate-verdict:
+  tier-0-local: ready — commands documented; backend-engineer / frontend-engineer logs confirm all green locally
+  tier-1-pr-required: ready — 3470 pytest + 372 fuzz + 316 vitest + 251 legacy + build + css:check all green (per upstream agent logs); contract:validate not re-run here, deferred to qa-reviewer / pre-PR
+  tier-2-informational: ready — npm run type-check 0 errors; mypy gap is pre-existing env limitation, documented
+  tier-3-nightly: ready — 4 new integration tests pass under --run-integration-real (per e2e-resilience-engineer log); will run on next nightly schedule
+  tier-4-stress-manual: deferred — stress thundering-herd + 1000-LOT tests scheduled; empirical close-out (AC-1 p95, AC-6 multi-worker staging) flagged as manual qa-reviewer / release-captain action
+
+# ──────────────────────────────────────────────────────────────────────────
+# Caveats
+# ──────────────────────────────────────────────────────────────────────────
+caveats:
+  - id: cdd-kit-gate-not-executed
+    note: |
+      `cdd-kit gate prod-history-first-tier-cache-filters` listed under
+      Local Gates but not run from this agent's seat — qa-reviewer will
+      execute the strict gate as part of the close-out checklist.
+  - id: empirical-close-out
+    note: |
+      AC-1 (filter-options p95 latency) and AC-6 (multi-worker lock holds
+      under 4 gunicorn workers) need empirical confirmation in staging
+      before /cdd-close. Flagged as manual Tier-4 gate. Unit + mock
+      integration coverage (tests/test_container_filter_cache.py +
+      tests/integration/test_multi_worker_concurrency.py) provides the
+      structural guarantee; staging measurement provides the SLA proof.
+  - id: workflow-files-unchanged
+    note: |
+      `.github/workflows/` requires no edits — new fuzz tests live under
+      tests/routes/ (already picked up by unit-mock-integration glob);
+      new property tests under tests/property/ (already in the property
+      gate); new integration tests under tests/integration/ (nightly
+      pickup via `-m integration_real or multi_worker`); new Playwright
+      specs under frontend/tests/playwright/ (picked up by the directory
+      globs in playwright-resilience / -data-boundary /
+      -critical-journeys gates).

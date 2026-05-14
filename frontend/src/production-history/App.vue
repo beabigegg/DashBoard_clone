@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { apiGet } from '../core/api';
+import { computed, onMounted, watch } from 'vue';
 import { useProductionHistory, type SupplementaryFilterField, type MatrixFilter } from './composables/useProductionHistory';
+import { useFirstTierFilters, type CachedFilterField } from './composables/useFirstTierFilters';
+import { ref } from 'vue';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
@@ -35,25 +36,48 @@ const {
   exportCsv: doExportCsv,
 } = useProductionHistory();
 
+// ── First-tier cached cross-filter + wildcard composable ───────────────────
+const firstTier = useFirstTierFilters();
+
 const { nextRequestId, isStaleRequest } = useRequestGuard();
 
-// ── Type MultiSelect state ───────────────────────────────────────────────
-const typeOptions = ref<string[]>([]);
-const typeOptionsLoading = ref(false);
-const selectedTypes = ref<string[]>([]);
+// ── Pruning notice (UI-UX REC-02) ──────────────────────────────────────────
+// Surfaces fail-open silent drops to the user for ~3 s after a cross-filter
+// fetch removes selections. Maps internal field keys to user-visible labels.
+const PRUNED_LABELS: Record<CachedFilterField, string> = {
+  pj_types: 'Type',
+  packages: 'Package',
+  bops: 'BOP',
+  pj_functions: 'Function',
+};
+const prunedNotice = ref('');
+let _prunedNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+const prunedNoticeLabels = computed(() =>
+  firstTier.prunedFields.value.map((f) => PRUNED_LABELS[f]).join('、'),
+);
+watch(
+  () => firstTier.prunedFields.value.slice(),
+  (fields) => {
+    if (!fields.length) {
+      prunedNotice.value = '';
+      if (_prunedNoticeTimer !== null) {
+        clearTimeout(_prunedNoticeTimer);
+        _prunedNoticeTimer = null;
+      }
+      return;
+    }
+    prunedNotice.value = `篩選自動調整：${prunedNoticeLabels.value}`;
+    if (_prunedNoticeTimer !== null) clearTimeout(_prunedNoticeTimer);
+    _prunedNoticeTimer = setTimeout(() => {
+      _prunedNoticeTimer = null;
+      firstTier.clearPrunedFields();
+    }, 3000);
+  },
+);
 
 onMounted(async () => {
-  typeOptionsLoading.value = true;
-  try {
-    const resp = (await apiGet('/api/production-history/type-options')) as {
-      data?: { items?: string[] };
-    };
-    typeOptions.value = resp.data?.items || [];
-  } catch (_) {
-    // non-critical
-  } finally {
-    typeOptionsLoading.value = false;
-  }
+  // Load full distinct option set at mount (empty selection → returns indices).
+  await firstTier.fetchFilterOptions();
 });
 
 // ── Primary query state ────────────────────────────────────────────────────
@@ -63,7 +87,7 @@ const formError = ref('');
 
 function validate(): boolean {
   formError.value = '';
-  if (!selectedTypes.value.length) {
+  if (!firstTier.selection.pj_types.length) {
     formError.value = '請選擇至少一個 Type';
     return false;
   }
@@ -83,7 +107,7 @@ async function handleQuery(): Promise<void> {
   if (!validate()) return;
   const requestId = nextRequestId();
   await runQuery({
-    pj_types: selectedTypes.value,
+    ...firstTier.buildQueryFragment(),
     start_date: formStartDate.value,
     end_date: formEndDate.value,
   });
@@ -135,20 +159,122 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
         <span class="ui-card-title">查詢條件</span>
       </div>
       <div class="ui-card-body ph-app__filter-panel">
-        <!-- Row 1: Type (MultiSelect), date range -->
-        <div class="ph-app__filter-row">
-          <div class="ui-filter-group ph-app__filter-field--type">
+        <!-- First-tier filter-options API error (UI-UX REC-01) -->
+        <div
+          v-if="firstTier.error.value"
+          class="ph-first-tier__error"
+          role="alert"
+          aria-live="polite"
+          data-testid="ph-first-tier-error"
+        >
+          {{ firstTier.error.value }}：請稍後重試,或直接以下方萬用字元欄位輸入查詢條件。
+        </div>
+
+        <!-- Transient auto-prune notice (UI-UX REC-02) -->
+        <div
+          v-if="prunedNotice"
+          class="ph-first-tier__pruned-notice"
+          role="status"
+          aria-live="polite"
+          data-testid="ph-first-tier-pruned-notice"
+        >
+          {{ prunedNotice }}
+        </div>
+
+        <!-- Row 1: 4 cached MultiSelects (Type / Package / BOP / Function) -->
+        <div class="ph-first-tier__multiselect-grid">
+          <div class="ui-filter-group">
             <label class="ui-filter-label">Type <span class="ph-app__required">*</span></label>
             <MultiSelect
-              :model-value="selectedTypes"
-              :options="typeOptions"
-              :loading="typeOptionsLoading"
+              data-testid="ph-first-tier-type"
+              :model-value="firstTier.selection.pj_types"
+              :options="firstTier.options.value.pj_types"
+              :loading="firstTier.loading.value"
               :searchable="true"
               placeholder="選擇 Type"
-              @update:model-value="selectedTypes = $event"
+              @update:model-value="firstTier.setSelection('pj_types', $event)"
             />
           </div>
+          <div class="ui-filter-group">
+            <label class="ui-filter-label">Package</label>
+            <MultiSelect
+              data-testid="ph-first-tier-package"
+              :model-value="firstTier.selection.packages"
+              :options="firstTier.options.value.packages"
+              :loading="firstTier.loading.value"
+              :searchable="true"
+              placeholder="全部"
+              @update:model-value="firstTier.setSelection('packages', $event)"
+            />
+          </div>
+          <div class="ui-filter-group">
+            <label class="ui-filter-label">BOP</label>
+            <MultiSelect
+              data-testid="ph-first-tier-bop"
+              :model-value="firstTier.selection.bops"
+              :options="firstTier.options.value.bops"
+              :loading="firstTier.loading.value"
+              :searchable="true"
+              placeholder="全部"
+              @update:model-value="firstTier.setSelection('bops', $event)"
+            />
+          </div>
+          <div class="ui-filter-group">
+            <label class="ui-filter-label">Function</label>
+            <MultiSelect
+              data-testid="ph-first-tier-function"
+              :model-value="firstTier.selection.pj_functions"
+              :options="firstTier.options.value.pj_functions"
+              :loading="firstTier.loading.value"
+              :searchable="true"
+              placeholder="全部"
+              @update:model-value="firstTier.setSelection('pj_functions', $event)"
+            />
+          </div>
+        </div>
 
+        <!-- Row 2: 3 wildcard textareas (工單號 / LOT ID / Wafer LOT) -->
+        <div class="ph-first-tier__wildcard-grid">
+          <div class="ui-filter-group">
+            <label for="ph-mfg-orders" class="ui-filter-label">工單號</label>
+            <textarea
+              id="ph-mfg-orders"
+              v-model="firstTier.wildcardInput.mfg_orders"
+              class="ph-app__textarea ph-first-tier__wildcard-input"
+              rows="2"
+              placeholder="貼上多筆，以換行/逗號分隔。支援 * 萬用字元，例如 MA2025*"
+              data-testid="ph-first-tier-mfg-orders"
+            ></textarea>
+            <div class="ph-first-tier__hint">支援 * 萬用字元；換行/逗號分隔多筆</div>
+          </div>
+          <div class="ui-filter-group">
+            <label for="ph-lot-ids" class="ui-filter-label">LOT ID</label>
+            <textarea
+              id="ph-lot-ids"
+              v-model="firstTier.wildcardInput.lot_ids"
+              class="ph-app__textarea ph-first-tier__wildcard-input"
+              rows="2"
+              placeholder="貼上多筆，以換行/逗號分隔。支援 * 萬用字元，例如 GA250605*"
+              data-testid="ph-first-tier-lot-ids"
+            ></textarea>
+            <div class="ph-first-tier__hint">支援 * 萬用字元；換行/逗號分隔多筆</div>
+          </div>
+          <div class="ui-filter-group">
+            <label for="ph-wafer-lots" class="ui-filter-label">Wafer LOT</label>
+            <textarea
+              id="ph-wafer-lots"
+              v-model="firstTier.wildcardInput.wafer_lots"
+              class="ph-app__textarea ph-first-tier__wildcard-input"
+              rows="2"
+              placeholder="貼上多筆，以換行/逗號分隔。支援 * 萬用字元"
+              data-testid="ph-first-tier-wafer-lots"
+            ></textarea>
+            <div class="ph-first-tier__hint">支援 * 萬用字元；換行/逗號分隔多筆</div>
+          </div>
+        </div>
+
+        <!-- Row 3: date range -->
+        <div class="ph-app__filter-row">
           <div class="ui-filter-group">
             <label class="ui-filter-label">開始日期 <span class="ph-app__required">*</span></label>
             <input v-model="formStartDate" type="date" class="ph-app__input" />
@@ -159,78 +285,43 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
           </div>
         </div>
 
-        <!-- Supplementary filters — only after query returns data -->
+        <!-- Supplementary filters (second-tier): only WorkCenter + Equipment.
+             MFGORDERNAME / CONTAINERNAME / Package / BOP / Function were
+             promoted to first-tier in change `prod-history-first-tier-cache-filters`
+             (design D6) — removed here, not hidden, to avoid dual-state bugs. -->
+        <p v-if="datasetId" class="ph-second-tier__heading">查詢後細部篩選 (Spool)</p>
         <div v-if="datasetId" class="ph-supplementary-filters">
-        <div class="ui-filter-group">
-          <label class="ui-filter-label">工單號</label>
-          <MultiSelect
-            :model-value="stagedFilter.work_orders"
-            :options="supplementaryOptions.work_orders"
-            :loading="supplementaryOptionsLoading"
-            :searchable="true"
-            placeholder="全部"
-            @update:model-value="onSupplementaryChange('work_orders', $event)"
-          />
+          <div class="ui-filter-group">
+            <label class="ui-filter-label">WorkCenter 群組</label>
+            <MultiSelect
+              :model-value="stagedFilter.workcenter_groups"
+              :options="supplementaryOptions.workcenter_groups"
+              :loading="supplementaryOptionsLoading"
+              :searchable="true"
+              placeholder="全部"
+              @update:model-value="onSupplementaryChange('workcenter_groups', $event)"
+            />
+          </div>
+          <div class="ui-filter-group">
+            <label class="ui-filter-label">Equipment</label>
+            <MultiSelect
+              :model-value="stagedFilter.equipment_ids"
+              :options="supplementaryOptions.equipment_ids"
+              :loading="supplementaryOptionsLoading"
+              :searchable="true"
+              placeholder="全部"
+              @update:model-value="onSupplementaryChange('equipment_ids', $event)"
+            />
+          </div>
         </div>
-        <div class="ui-filter-group">
-          <label class="ui-filter-label">LOT ID</label>
-          <MultiSelect
-            :model-value="stagedFilter.lot_ids"
-            :options="supplementaryOptions.lot_ids"
-            :loading="supplementaryOptionsLoading"
-            :searchable="true"
-            placeholder="全部"
-            @update:model-value="onSupplementaryChange('lot_ids', $event)"
-          />
-        </div>
-        <div class="ui-filter-group">
-          <label class="ui-filter-label">Package</label>
-          <MultiSelect
-            :model-value="stagedFilter.packages"
-            :options="supplementaryOptions.packages"
-            :loading="supplementaryOptionsLoading"
-            :searchable="true"
-            placeholder="全部"
-            @update:model-value="onSupplementaryChange('packages', $event)"
-          />
-        </div>
-        <div class="ui-filter-group">
-          <label class="ui-filter-label">BOP</label>
-          <MultiSelect
-            :model-value="stagedFilter.bop_codes"
-            :options="supplementaryOptions.bop_codes"
-            :loading="supplementaryOptionsLoading"
-            :searchable="true"
-            placeholder="全部"
-            @update:model-value="onSupplementaryChange('bop_codes', $event)"
-          />
-        </div>
-        <div class="ui-filter-group">
-          <label class="ui-filter-label">WorkCenter 群組</label>
-          <MultiSelect
-            :model-value="stagedFilter.workcenter_groups"
-            :options="supplementaryOptions.workcenter_groups"
-            :loading="supplementaryOptionsLoading"
-            :searchable="true"
-            placeholder="全部"
-            @update:model-value="onSupplementaryChange('workcenter_groups', $event)"
-          />
-        </div>
-        <div class="ui-filter-group">
-          <label class="ui-filter-label">Equipment</label>
-          <MultiSelect
-            :model-value="stagedFilter.equipment_ids"
-            :options="supplementaryOptions.equipment_ids"
-            :loading="supplementaryOptionsLoading"
-            :searchable="true"
-            placeholder="全部"
-            @update:model-value="onSupplementaryChange('equipment_ids', $event)"
-          />
-        </div>
-      </div>
 
         <div class="ph-app__filter-actions">
-          <span v-if="formError" class="ph-app__form-error">{{ formError }}</span>
+          <span
+            v-if="formError"
+            class="ph-app__form-error"
+            role="alert"
+            aria-live="polite"
+          >{{ formError }}</span>
           <button
             class="ui-btn ui-btn--primary"
             :disabled="loading"
@@ -262,6 +353,9 @@ formStartDate.value = monthAgo.toISOString().slice(0, 10);
         <button class="ui-btn ui-btn--sm" @click="handleQuery">重新查詢</button>
       </template>
     </ErrorBanner>
+
+    <!-- Echo dataset meta only for type-check parity (unused in template) -->
+    <div v-if="false">{{ datasetMeta }}{{ matrixFilter }}{{ supplementaryFilter }}</div>
 
     <!-- Results -->
     <template v-if="datasetId">

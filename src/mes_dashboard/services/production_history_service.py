@@ -24,6 +24,10 @@ import pandas as pd
 
 from mes_dashboard.core.database import read_sql_df_slow
 from mes_dashboard.core.feature_flags import resolve_bool_flag
+from mes_dashboard.core.request_validation import (
+    WildcardToken,
+    parse_wildcard_tokens,
+)
 from mes_dashboard.core.global_concurrency import (
     acquire_heavy_query_slot,
     release_heavy_query_slot,
@@ -121,6 +125,26 @@ def validate_query_params(params: Dict[str, Any]) -> Dict[str, Any]:
     workcenter_names = _str_list("workcenter_names")
     equipment_ids = _str_list("equipment_ids")
 
+    # New first-tier filters (change `prod-history-first-tier-cache-filters`):
+    # — MultiSelect (plain IN): pj_packages, pj_bops, pj_functions
+    # — Wildcard (LIKE ESCAPE): mfg_orders, lot_ids, wafer_lots
+    pj_packages = _str_list("pj_packages")
+    pj_bops = _str_list("pj_bops")
+    pj_functions = _str_list("pj_functions")
+
+    # Wildcard fields: parse server-side; ValueError → 400 by route layer.
+    # ``lot_ids`` is dual-purposed for back-compat: the legacy ``lot_ids``
+    # input is still accepted and merged with the new wildcard parser
+    # output below.
+    mfg_orders_tokens = parse_wildcard_tokens("mfg_orders", params.get("mfg_orders"))
+    wafer_lots_tokens = parse_wildcard_tokens("wafer_lots", params.get("wafer_lots"))
+    # When ``lot_ids`` was supplied as a non-empty value with wildcards we
+    # still pass it through the parser so the new ``*`` grammar takes
+    # effect; legacy callers that pass plain strings get ``exact`` tokens.
+    lot_ids_tokens: List[WildcardToken] = []
+    if lot_ids:
+        lot_ids_tokens = parse_wildcard_tokens("lot_ids", lot_ids)
+
     return {
         "pj_types": pj_types,
         "start_date": start_dt.strftime("%Y-%m-%d"),
@@ -133,6 +157,14 @@ def validate_query_params(params: Dict[str, Any]) -> Dict[str, Any]:
         "workcenter_groups": workcenter_groups,
         "workcenter_names": workcenter_names,
         "equipment_ids": equipment_ids,
+        # New first-tier MultiSelect filters
+        "pj_packages": pj_packages,
+        "pj_bops": pj_bops,
+        "pj_functions": pj_functions,
+        # Parsed wildcard token lists (already validated)
+        "mfg_orders_tokens": mfg_orders_tokens,
+        "wafer_lots_tokens": wafer_lots_tokens,
+        "lot_ids_tokens": lot_ids_tokens,
     }
 
 
@@ -141,18 +173,31 @@ def validate_query_params(params: Dict[str, Any]) -> Dict[str, Any]:
 def _build_extra_filters(params: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
     """Build EXTRA_FILTERS SQL fragment + bind params from validated params.
 
+    Composes the legacy filters (PJ_TYPE, work_orders, packages, bop_codes,
+    workcenter_*, equipment_ids) with the new first-tier filters from
+    change ``prod-history-first-tier-cache-filters``:
+
+      * MultiSelect (plain ``IN``): ``pj_packages``, ``pj_bops``,
+        ``pj_functions``.
+      * Wildcard (``LIKE ESCAPE`` via shared emitter): pre-parsed token
+        lists ``mfg_orders_tokens``, ``wafer_lots_tokens``,
+        ``lot_ids_tokens``.
+
+    All wildcard fields go through
+    :func:`mes_dashboard.sql.wildcards.build_wildcard_clause`, which emits
+    bind-parameter-only SQL — no string interpolation of user input
+    (PHF-03).
+
     Returns:
         (extra_sql, bind_params) — extra_sql is prefixed with AND if non-empty.
     """
+    from mes_dashboard.sql.wildcards import build_wildcard_clause
+
     qb = QueryBuilder()
 
     pj_types = params.get("pj_types") or []
     if pj_types:
         qb.add_in_condition("c.PJ_TYPE", pj_types)
-
-    lot_ids = params.get("lot_ids") or []
-    if lot_ids:
-        qb.add_in_condition("c.CONTAINERNAME", lot_ids)
 
     work_orders = params.get("work_orders") or []
     if work_orders:
@@ -166,13 +211,24 @@ def _build_extra_filters(params: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
     if bop_codes:
         qb.add_in_condition("c.PJ_BOP", bop_codes)
 
-    # Workcenter names take priority over groups
+    # New first-tier MultiSelect filters (additive, AND-composed).
+    pj_packages = params.get("pj_packages") or []
+    if pj_packages:
+        qb.add_in_condition("c.PRODUCTLINENAME", pj_packages)
+    pj_bops = params.get("pj_bops") or []
+    if pj_bops:
+        qb.add_in_condition("c.PJ_BOP", pj_bops)
+    pj_functions = params.get("pj_functions") or []
+    if pj_functions:
+        qb.add_in_condition("c.PJ_FUNCTION", pj_functions)
+
+    # Workcenter names take priority over groups.
     wc_names = params.get("workcenter_names") or []
     wc_groups = params.get("workcenter_groups") or []
     if wc_names:
         qb.add_in_condition("h.WORKCENTERNAME", wc_names)
     elif wc_groups:
-        # Resolve groups to workcenter names if possible
+        # Resolve groups to workcenter names if possible.
         try:
             from mes_dashboard.config.workcenter_groups import get_workcenter_group
             wcs = []
@@ -188,9 +244,30 @@ def _build_extra_filters(params: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
     if equipment_ids:
         qb.add_in_condition("h.EQUIPMENTNAME", equipment_ids)
 
-    conditions_sql = qb.get_conditions_sql()
+    # ── Wildcard fields ──────────────────────────────────────────────────
+    # ``lot_ids`` is dual-purposed: validate_query_params routes a non-empty
+    # legacy ``lot_ids`` list through parse_wildcard_tokens, so
+    # ``lot_ids_tokens`` already covers both "plain exact" (kind='exact' →
+    # IN batch) and wildcard (kind='pattern' → LIKE) inputs. mfg_orders and
+    # wafer_lots are wildcard-only.
+    bind_params: Dict[str, Any] = dict(qb.params)
+    _wildcard_fields = [
+        ("c.CONTAINERNAME", list(params.get("lot_ids_tokens") or []), "lot"),
+        ("c.MFGORDERNAME", list(params.get("mfg_orders_tokens") or []), "mo"),
+        ("c.FIRSTNAME", list(params.get("wafer_lots_tokens") or []), "wl"),
+    ]
+    extra_fragments: List[str] = list(qb.conditions)
+    for column, tokens, prefix in _wildcard_fields:
+        if not tokens:
+            continue
+        frag, frag_params = build_wildcard_clause(column, tokens, prefix)
+        if frag:
+            extra_fragments.append(frag)
+            bind_params.update(frag_params)
+
+    conditions_sql = " AND ".join(extra_fragments) if extra_fragments else ""
     extra_sql = f"AND {conditions_sql}" if conditions_sql else ""
-    return extra_sql, qb.params
+    return extra_sql, bind_params
 
 
 # ── Oracle chunk query function ───────────────────────────────────────────────
@@ -435,7 +512,17 @@ def query_production_history(raw_params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _make_dataset_id(params: Dict[str, Any]) -> str:
-    """Compute stable dataset_id from query params (hash-based)."""
+    """Compute stable dataset_id from query params (hash-based).
+
+    Hash key incorporates the new first-tier filters and wildcard tokens
+    so repeat queries with identical filters reuse the same spool while
+    different wildcards generate distinct dataset IDs.
+    """
+    def _token_keys(name: str) -> list[tuple[str, str]]:
+        # Stable, hashable representation: list of (kind, bound_value) sorted.
+        toks = params.get(name) or []
+        return sorted((t.kind, t.bound_value) for t in toks)
+
     hash_key = {
         "pj_types": sorted(params["pj_types"]),
         "start_date": params["start_date"],
@@ -447,6 +534,14 @@ def _make_dataset_id(params: Dict[str, Any]) -> str:
         "workcenter_groups": sorted(params["workcenter_groups"]),
         "workcenter_names": sorted(params["workcenter_names"]),
         "equipment_ids": sorted(params["equipment_ids"]),
+        # New first-tier filters
+        "pj_packages": sorted(params.get("pj_packages") or []),
+        "pj_bops": sorted(params.get("pj_bops") or []),
+        "pj_functions": sorted(params.get("pj_functions") or []),
+        # Wildcard token sets
+        "mfg_orders_tokens": _token_keys("mfg_orders_tokens"),
+        "wafer_lots_tokens": _token_keys("wafer_lots_tokens"),
+        "lot_ids_tokens": _token_keys("lot_ids_tokens"),
     }
     return f"ph-{compute_query_hash(hash_key)}"
 

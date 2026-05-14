@@ -236,6 +236,78 @@ def test_reconnect_after_redis_restart(cache_and_control_redis, tmp_path, monkey
         new_proc.kill()
 
 
+def test_filter_options_falls_back_when_redis_down(
+    cache_and_control_redis, monkeypatch
+):
+    """container_filter_cache.get_filter_options returns L1 payload when Redis is down.
+
+    Scenario:
+      1. Seed in-process L1 cache with a known payload.
+      2. Kill the control Redis (and stub the cache Redis client to also fail).
+      3. Call get_filter_options() with empty selection — expect the function
+         to read from L1 instead of crashing or falling through to Oracle.
+
+    Resilience contract: a Redis outage MUST NOT take down the picker; an
+    already-loaded L1 payload is the degraded-mode fallback.
+    """
+    cache_url, control_url, control_proc = cache_and_control_redis
+
+    import mes_dashboard.core.redis_client as rc
+    import mes_dashboard.services.container_filter_cache as cache_mod
+
+    monkeypatch.setenv("REDIS_URL", cache_url)
+    monkeypatch.setenv("REDIS_ENABLED", "true")
+    rc.REDIS_URL = cache_url
+    rc.REDIS_ENABLED = True
+    rc._REDIS_CLIENT = None
+
+    # Seed L1 with a deterministic payload (bypass Oracle by writing directly).
+    cache_mod._apply_payload(
+        {
+            "schema_version": cache_mod.SCHEMA_VERSION,
+            "tuples": [
+                ["A", "PKG-1", "BOP-A", "FN-X"],
+                ["B", "PKG-2", "BOP-B", "FN-Y"],
+            ],
+            "indices": {
+                "pj_types": ["A", "B"],
+                "packages": ["PKG-1", "PKG-2"],
+                "bops": ["BOP-A", "BOP-B"],
+                "pj_functions": ["FN-X", "FN-Y"],
+            },
+            "updated_at": "2026-05-14T00:00:00Z",
+        }
+    )
+    assert cache_mod._CACHE["loaded"] is True
+
+    # Now kill the cache Redis (control_proc serves on the cache_url in this
+    # fixture).  After this, any Redis read MUST fail.
+    os.kill(control_proc.pid, signal.SIGKILL)
+    control_proc.wait(timeout=3)
+
+    # Force the redis client to be re-instantiated, then patch it to raise.
+    def _raise_connection_error():
+        raise redis_lib.exceptions.ConnectionError("Redis down (test)")
+
+    monkeypatch.setattr(rc, "get_redis_client", _raise_connection_error)
+    monkeypatch.setattr(cache_mod, "get_redis_client", _raise_connection_error)
+
+    # Call into the picker — must NOT crash; must return the L1-cached payload.
+    try:
+        result = cache_mod.get_filter_options(None)
+    except redis_lib.exceptions.ConnectionError:
+        pytest.fail(
+            "get_filter_options propagated a ConnectionError — Redis outage "
+            "should be tolerated when L1 is already populated"
+        )
+
+    assert isinstance(result, dict)
+    assert sorted(result["pj_types"]) == ["A", "B"]
+    assert sorted(result["packages"]) == ["PKG-1", "PKG-2"]
+    assert sorted(result["bops"]) == ["BOP-A", "BOP-B"]
+    assert result["schema_version"] == cache_mod.SCHEMA_VERSION
+
+
 def test_cache_eviction_does_not_affect_control(cache_and_control_redis, monkeypatch):
     """Cache-plane allkeys-lru eviction must not evict control-plane lock keys.
 
