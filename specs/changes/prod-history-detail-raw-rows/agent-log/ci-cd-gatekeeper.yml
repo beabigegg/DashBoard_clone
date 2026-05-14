@@ -1,0 +1,23 @@
+agent: ci-cd-gatekeeper
+status: complete
+files-read:
+  - path: specs/changes/prod-history-detail-raw-rows/change-classification.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/backend-engineer.yml
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/frontend-engineer.yml
+    lines: full
+artifacts:
+  - pointer: specs/changes/prod-history-detail-raw-rows/ci-gates.md
+    note: 7 required PR gates + 1 manual stress gate during qa-reviewer; no new workflow changes
+findings: |
+  No new CI workflow changes required. Existing pytest globs cover the 13 new sql_runtime tests
+  added by backend-engineer; existing vitest picks up production-history changes; build + type-check
+  + css:check + contract:validate remain unchanged.
+
+  Stress test is documented as a manual one-shot gate during qa-reviewer phase, not enforced by PR CI,
+  because production-history stress runs require Oracle fixtures + warm cache and exceed typical PR runtime.
+
+  Rollback policy explicitly calls out spool parquet invalidation under tmp/query_spool/production_history_*
+  because the new schema is incompatible with the prior aggregated alias form.
+next-action: qa-reviewer for final release readiness

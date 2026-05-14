@@ -1,0 +1,34 @@
+agent: test-strategist
+status: complete
+files-read:
+  - path: specs/changes/prod-history-detail-raw-rows/change-request.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/change-classification.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/contract-reviewer.yml
+    lines: full
+  - path: contracts/data/data-shape-contract.md
+    lines: §3.4
+  - path: contracts/business/business-rules.md
+    lines: PH-01..PH-04
+  - path: tests/test_production_history_sql_runtime.py
+    lines: skim
+  - path: tests/test_production_history_service.py
+    lines: skim
+  - path: tests/test_frontend_compute_parity.py
+    lines: skim
+  - path: tests/test_frontend_duckdb_parity.py
+    lines: skim
+artifacts:
+  - pointer: specs/changes/prod-history-detail-raw-rows/test-plan.md
+    note: 52 lines; 8 AC × test-family mapping; audit checklist with 5 BLOCKING items
+findings: |
+  Test plan covers 8 ACs across 8 test families. Sequencing matters:
+  1. Capture aggregated-baseline Matrix snapshot BEFORE backend SQL rewrite (for AC-3 parity)
+  2. Parity fixtures rebased BEFORE backend SQL rewrite passes parity tests
+  3. Stress test run AFTER backend implementation lands (qa-reviewer captures deltas)
+
+  Blocking items for downstream agents:
+  - backend-engineer: PJ_FUNCTION source verification on DWH.DW_MES_CONTAINER
+  - frontend-engineer: audit + rename hardcoded TRACKIN_TS / TRACKOUT_TS / TRACKIN_QTY / TRACKOUT_QTY in production-history/ and core/field-contracts.ts / endpoint-schemas.ts
+next-action: backend-engineer rewrites SQL + service + spool schema (parity fixture rebase happens within same agent's scope)

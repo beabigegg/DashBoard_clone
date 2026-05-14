@@ -111,15 +111,15 @@ def _build_filter_where(filter_params: Dict[str, Any]) -> tuple[str, List[Any]]:
         conditions.append("EQUIPMENTID = ?")
         params.append(equipment_id)
     if month:
-        conditions.append("strftime(TRACKIN_TS::TIMESTAMP, '%Y-%m') = ?")
+        conditions.append("strftime(TRACKINTIMESTAMP::TIMESTAMP, '%Y-%m') = ?")
         params.append(month)
 
     # ── Supplementary multi-select filters (arrays) ──────────────────────────
     # Simple column-based IN filters
     _SUPP_COLUMNS = [
-        ("work_orders", "WORK_ORDER"),
+        ("work_orders", "MFGORDERNAME"),
         ("lot_ids", "CONTAINERNAME"),
-        ("packages", "PACKAGE_NAME"),
+        ("packages", "PRODUCTLINENAME"),
         ("bop_codes", "PJ_BOP"),
         ("equipment_ids", "EQUIPMENTNAME"),
     ]
@@ -183,23 +183,24 @@ def compute_detail_page(
 
         page_sql = f"""
             SELECT
-                CONTAINERNAME   AS lot_id,
-                PJ_TYPE         AS pj_type,
-                PJ_BOP          AS bop,
-                WORK_ORDER      AS work_order,
-                WAFER_LOT       AS wafer_lot,
-                PACKAGE_NAME    AS package_name,
-                WORKCENTERNAME  AS workcenter,
-                SPECNAME        AS spec,
-                EQUIPMENTID     AS equipment_id,
-                EQUIPMENTNAME   AS equipment_name,
-                strftime(TRACKIN_TS::TIMESTAMP, '%Y-%m-%d %H:%M:%S')   AS trackin_time,
-                strftime(TRACKOUT_TS::TIMESTAMP, '%Y-%m-%d %H:%M:%S') AS trackout_time,
-                TRACKIN_QTY     AS trackin_qty,
-                TRACKOUT_QTY    AS trackout_qty
+                CONTAINERNAME    AS lot_id,
+                PJ_TYPE          AS pj_type,
+                PJ_BOP           AS bop,
+                PJ_FUNCTION      AS pj_function,
+                MFGORDERNAME     AS work_order,
+                FIRSTNAME        AS wafer_lot,
+                PRODUCTLINENAME  AS package_name,
+                WORKCENTERNAME   AS workcenter,
+                SPECNAME         AS spec,
+                EQUIPMENTID      AS equipment_id,
+                EQUIPMENTNAME    AS equipment_name,
+                strftime(TRACKINTIMESTAMP::TIMESTAMP,  '%Y-%m-%d %H:%M:%S') AS trackin_time,
+                strftime(TRACKOUTTIMESTAMP::TIMESTAMP, '%Y-%m-%d %H:%M:%S') AS trackout_time,
+                TRACKINQTY       AS trackin_qty,
+                TRACKOUTQTY      AS trackout_qty
             FROM ph_src
             {where}
-            ORDER BY TRACKIN_TS DESC NULLS LAST, CONTAINERNAME
+            ORDER BY TRACKINTIMESTAMP ASC NULLS LAST, CONTAINERNAME
             LIMIT ? OFFSET ?
         """
         rows = _fetch_dict_rows(conn, page_sql, params + [per_page, offset])
@@ -240,12 +241,13 @@ def _pandas_detail_page(
     page_df = df.iloc[offset: offset + per_page]
     rows = page_df.rename(columns={
         "CONTAINERNAME": "lot_id", "PJ_TYPE": "pj_type", "PJ_BOP": "bop",
-        "WORK_ORDER": "work_order", "WAFER_LOT": "wafer_lot",
-        "PACKAGE_NAME": "package_name",
+        "PJ_FUNCTION": "pj_function",
+        "MFGORDERNAME": "work_order", "FIRSTNAME": "wafer_lot",
+        "PRODUCTLINENAME": "package_name",
         "WORKCENTERNAME": "workcenter", "SPECNAME": "spec",
         "EQUIPMENTID": "equipment_id", "EQUIPMENTNAME": "equipment_name",
-        "TRACKIN_TS": "trackin_time", "TRACKOUT_TS": "trackout_time",
-        "TRACKIN_QTY": "trackin_qty", "TRACKOUT_QTY": "trackout_qty",
+        "TRACKINTIMESTAMP": "trackin_time", "TRACKOUTTIMESTAMP": "trackout_time",
+        "TRACKINQTY": "trackin_qty", "TRACKOUTQTY": "trackout_qty",
     }).to_dict(orient="records")
     return {
         "rows": rows,
@@ -279,15 +281,17 @@ def compute_matrix_view(
         conn = _get_duckdb_conn()
         _attach_spool_view(conn, spool_path)
 
-        # Aggregate at equipment level with month buckets
+        # Aggregate at equipment level with month buckets.
+        # Row source is raw LOTWIPHISTORY partial rows; lot-count semantics
+        # are preserved via COUNT(DISTINCT CONTAINERNAME) per PH-02.
         agg_sql = f"""
             SELECT
-                WORKCENTERNAME                                    AS wc,
-                SPECNAME                                          AS spec,
-                EQUIPMENTID                                       AS eqp_id,
-                EQUIPMENTNAME                                     AS eqp_name,
-                strftime(TRACKIN_TS::TIMESTAMP, '%Y-%m')          AS month_bucket,
-                COUNT(DISTINCT CONTAINERNAME)                     AS lot_count
+                WORKCENTERNAME                                       AS wc,
+                SPECNAME                                             AS spec,
+                EQUIPMENTID                                          AS eqp_id,
+                EQUIPMENTNAME                                        AS eqp_name,
+                strftime(TRACKINTIMESTAMP::TIMESTAMP, '%Y-%m')       AS month_bucket,
+                COUNT(DISTINCT CONTAINERNAME)                        AS lot_count
             FROM ph_src
             {where}
             GROUP BY wc, spec, eqp_id, eqp_name, month_bucket
@@ -424,13 +428,13 @@ def _apply_pandas_filter(df: "pd.DataFrame", filter_params: Dict[str, Any]) -> "
     if equipment_id:
         df = df[df["EQUIPMENTID"] == equipment_id]
     if month:
-        df = df[pd.to_datetime(df["TRACKIN_TS"], errors="coerce").dt.strftime("%Y-%m") == month]
+        df = df[pd.to_datetime(df["TRACKINTIMESTAMP"], errors="coerce").dt.strftime("%Y-%m") == month]
 
     # ── Supplementary multi-select filters (arrays) ──────────────────────────
     _SUPP_COLUMNS = [
-        ("work_orders", "WORK_ORDER"),
+        ("work_orders", "MFGORDERNAME"),
         ("lot_ids", "CONTAINERNAME"),
-        ("packages", "PACKAGE_NAME"),
+        ("packages", "PRODUCTLINENAME"),
         ("bop_codes", "PJ_BOP"),
         ("equipment_ids", "EQUIPMENTNAME"),
     ]
@@ -459,7 +463,7 @@ def _pandas_matrix_view(spool_path: str, filter_params: Dict[str, Any]) -> Dict[
     if df.empty:
         return {"tree": [], "month_columns": []}
 
-    df["month_bucket"] = pd.to_datetime(df["TRACKIN_TS"], errors="coerce").dt.strftime("%Y-%m")
+    df["month_bucket"] = pd.to_datetime(df["TRACKINTIMESTAMP"], errors="coerce").dt.strftime("%Y-%m")
     agg = (
         df.groupby(["WORKCENTERNAME", "SPECNAME", "EQUIPMENTID", "EQUIPMENTNAME", "month_bucket"])
         ["CONTAINERNAME"].nunique().reset_index()
@@ -495,9 +499,9 @@ def compute_filter_options(
     filter_params = filter_params or {}
 
     _SIMPLE_COLUMNS = [
-        ("work_orders",  "WORK_ORDER"),
+        ("work_orders",  "MFGORDERNAME"),
         ("lot_ids",      "CONTAINERNAME"),
-        ("packages",     "PACKAGE_NAME"),
+        ("packages",     "PRODUCTLINENAME"),
         ("bop_codes",    "PJ_BOP"),
     ]
 
@@ -575,18 +579,19 @@ def stream_export(
     EXPORT_COLUMNS = [
         ("CONTAINERNAME", "LotID"),
         ("PJ_TYPE", "Type"),
-        ("PACKAGE_NAME", "Package"),
+        ("PRODUCTLINENAME", "Package"),
         ("PJ_BOP", "BOP"),
-        ("WORK_ORDER", "WorkOrder"),
-        ("WAFER_LOT", "WaferLot"),
+        ("PJ_FUNCTION", "Function"),
+        ("MFGORDERNAME", "WorkOrder"),
+        ("FIRSTNAME", "WaferLot"),
         ("WORKCENTERNAME", "WorkCenter"),
         ("SPECNAME", "Spec"),
         ("EQUIPMENTID", "EquipmentID"),
         ("EQUIPMENTNAME", "EquipmentName"),
-        ("TRACKIN_TS", "TrackInTime"),
-        ("TRACKOUT_TS", "TrackOutTime"),
-        ("TRACKIN_QTY", "TrackInQty"),
-        ("TRACKOUT_QTY", "TrackOutQty"),
+        ("TRACKINTIMESTAMP", "TrackInTime"),
+        ("TRACKOUTTIMESTAMP", "TrackOutTime"),
+        ("TRACKINQTY", "TrackInQty"),
+        ("TRACKOUTQTY", "TrackOutQty"),
     ]
     col_selects = ", ".join(
         f"{_qid(src)} AS {_qid(dst)}" for src, dst in EXPORT_COLUMNS
@@ -619,7 +624,7 @@ def stream_export(
                 SELECT {col_selects}
                 FROM ph_src
                 {where}
-                ORDER BY TRACKIN_TS DESC NULLS LAST, CONTAINERNAME
+                ORDER BY TRACKINTIMESTAMP ASC NULLS LAST, CONTAINERNAME
                 LIMIT {BATCH_SIZE} OFFSET {offset}
             """
             rows = _fetch_dict_rows(conn, sql, params)

@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.1.0
-last-changed: 2026-05-05
+schema-version: 1.2.0
+last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -112,6 +112,15 @@ breaking-change-policy: deprecate-2-minors
 | RH-02 | Local compute flag | `RESOURCE_HISTORY_LOCAL_COMPUTE_ENABLED` env（預設 `true`）；`false` 時 `/page` endpoint 回重導向至舊路徑 | unit tests |
 | RH-03 | Metadata injection | `_inject_resource_spool_info` 與 `_inject_resource_metadata` 自動將 spool info 與設備 metadata 注入 response | unit tests |
 | RH-04 | Date validation | `start_date` / `end_date` 必需；無效日期格式或超過 730d → 400 `VALIDATION_ERROR` | route tests |
+
+## Production-History Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| PH-01 | Raw per-partial detail rows | Detail query returns one row per LOTWIPHISTORY partial track-out (no GROUP BY). `TRACKINTIMESTAMP / TRACKOUTTIMESTAMP / TRACKINQTY / TRACKOUTQTY` are raw per-partial values — prior assumption "first partial = original batch quantity" is dropped | unit + parity tests |
+| PH-02 | Matrix lot-count semantics | Matrix `count` cell = `COUNT(DISTINCT CONTAINERNAME)` computed in DuckDB over the raw row source; equals prior aggregated-baseline lot count for the same (WC, Spec, Equipment × Month) cell | integration + e2e tests |
+| PH-03 | PJ_FUNCTION spool carriage | `PJ_FUNCTION` is carried through Oracle→spool→DuckDB schema and CSV export (pre-staged for Change 3); not yet exposed as a user filter | contract + parity tests |
+| PH-04 | Detail row ordering | Detail table sorts by `TRACKINTIMESTAMP` ascending; no "partial #" column (Resolved Decision 2 of change `prod-history-detail-raw-rows`) | e2e tests |
 
 ## Analytics / Anomaly Detection Rules
 

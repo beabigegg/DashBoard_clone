@@ -1,0 +1,143 @@
+agent: frontend-engineer
+status: complete
+verdict: implemented
+files-read:
+  - path: specs/changes/prod-history-detail-raw-rows/context-manifest.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/backend-engineer.yml
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/change-classification.md
+    lines: full
+  - path: contracts/data/data-shape-contract.md
+    lines: "240-328"
+  - path: src/mes_dashboard/services/production_history_sql_runtime.py
+    lines: "160-260, 575-600"  # SELECT keys + EXPORT_COLUMNS verification
+  - path: frontend/src/production-history/composables/useProductionHistory.ts
+    lines: full
+  - path: frontend/src/production-history/components/ProductionDetailTable.vue
+    lines: full
+  - path: frontend/src/production-history/App.vue
+    lines: "grep only — confirmed no detail-column refs in App.vue"
+  - path: frontend/src/core/endpoint-schemas.ts
+    lines: "100-182"
+  - path: frontend/src/core/field-contracts.ts
+    lines: "grep — no production-history refs"
+  - path: frontend/src/shared-ui/components/DataTable.vue
+    lines: "50-140"  # confirm initial sort key empty -> backend ASC order preserved
+  - path: frontend/src/shared-composables/useSortableTable.ts
+    lines: "1-110"
+  - path: frontend/tests/legacy/production-history.test.js
+    lines: full
+  - path: frontend/tests/validation/useProductionHistory.validation.test.js
+    lines: full
+  - path: frontend/tests/abort/production-history-abort.test.js
+    lines: grep
+artifacts:
+  - pointer: frontend/src/production-history/composables/useProductionHistory.ts
+    note: |
+      Added pj_function: string | null to DetailRow interface (between bop
+      and work_order to match backend SELECT order and CSV column order).
+      Documented data-shape §3.4 row-grain semantics in interface JSDoc.
+      No aggregated-alias fields existed on DetailRow (already used the new
+      snake_case keys lot_id / trackin_time / trackin_qty etc.).
+  - pointer: frontend/src/production-history/components/ProductionDetailTable.vue
+    note: |
+      Added <DataTableColumn columnKey="pj_function" label="PJ Function"
+      :sortable="true" /> between BOP and WorkOrder columns. Order now matches
+      EXPORT_COLUMNS CSV order: LotID, Type, Package, BOP, PJ Function,
+      WorkOrder, WaferLot, WorkCenter, Spec, EquipName, TrackIn, TrackOut,
+      InQTY, OutQTY.
+findings: |
+  Task 1 — Alias rename audit:
+    grep across frontend/src/production-history/, frontend/src/core/field-contracts.ts,
+    frontend/src/core/endpoint-schemas.ts for old aggregated aliases
+    (TRACKIN_TS / TRACKOUT_TS / TRACKIN_QTY / TRACKOUT_QTY / *_MIN / *_MAX /
+    *_SUM and lower-case variants) — ZERO matches.
+    field-contracts.ts has no production-history references at all
+    (production-history is not enrolled in the field-contracts framework —
+    confirmed in backend-engineer.yml findings).
+    endpoint-schemas.ts only validates envelope shape { items: array } /
+    { count: number } for production-history endpoints — no column-name
+    coupling.
+
+  Backend JSON key naming verification:
+    production_history_sql_runtime.compute_detail_page projects raw Oracle
+    columns to snake_case JSON keys in the DuckDB SELECT (lines 184-205):
+      CONTAINERNAME    -> lot_id
+      PJ_TYPE          -> pj_type
+      PJ_BOP           -> bop
+      PJ_FUNCTION      -> pj_function   (NEW)
+      MFGORDERNAME     -> work_order
+      FIRSTNAME        -> wafer_lot
+      PRODUCTLINENAME  -> package_name
+      WORKCENTERNAME   -> workcenter
+      SPECNAME         -> spec
+      EQUIPMENTID      -> equipment_id
+      EQUIPMENTNAME    -> equipment_name
+      TRACKINTIMESTAMP -> trackin_time (formatted with strftime)
+      TRACKOUTTIMESTAMP-> trackout_time
+      TRACKINQTY       -> trackin_qty
+      TRACKOUTQTY      -> trackout_qty
+    Pandas fallback path (_pandas_detail_page lines 242-251) applies the
+    same rename map. Frontend snake_case keys are consistent with backend.
+
+  Task 2 — Detail table PJ Function column: added between BOP and WorkOrder
+    to match both backend SQL projection order and CSV export order
+    (EXPORT_COLUMNS in production_history_sql_runtime.py:579-595 places
+    PJ_FUNCTION immediately after PJ_BOP and before MFGORDERNAME).
+    Column header label "PJ Function" (English consistent with other column
+    labels in this table — Type, Package, BOP, WorkOrder etc.).
+
+  Task 3 — Sort direction:
+    Backend ORDER BY in compute_detail_page is TRACKINTIMESTAMP ASC NULLS
+    LAST, CONTAINERNAME (line 203). Frontend DataTable.vue uses
+    useSortableTable which initialises sortKey = '' (empty) — meaning no
+    client-side reorder is applied until the user clicks a column header.
+    Backend ASC order therefore flows through to UI unchanged. No visible
+    initial sort indicator exists (DataTable only highlights an active
+    sortKey), so no UI flip needed for AC-4 / PH-04.
+    Per AC-4 "ordered by TRACKIN_TS" is satisfied via backend ordering.
+
+  Task 4 — useProductionHistory.ts:
+    DetailRow already used snake_case keys aligned with backend; only the
+    new pj_function field needed to be added. No aggregated-alias fields
+    were present to remove. Updated JSDoc to point to data-shape §3.4 and
+    note row-grain semantics for future readers.
+
+  Task 5 — Test rebase:
+    frontend/tests/legacy/production-history.test.js: contains only
+    pagination/matrix-filter/supplementary-filter defaults + date-helper +
+    error-state-init tests. NO column-name assertions. No rebase needed.
+    frontend/tests/validation/useProductionHistory.validation.test.js:
+    only validates envelope shape ({ items: array }, { count: number })
+    against PRODUCTION_HISTORY_*_SCHEMA. Schemas in endpoint-schemas.ts
+    do not enumerate column names. No rebase needed.
+    frontend/tests/abort/production-history-abort.test.js: contains no
+    TRACKIN/TRACKOUT/sort references; passes as part of full vitest run.
+
+  Task 6 — Gates: all green (see tests: block below).
+
+  Larger-spool tolerance (PH-04 / abort spec):
+    No code change required. apiPost/postExport already pass timeouts and
+    AbortController signals; no row-count caps exist in the composable.
+    Pagination is server-driven (per_page max 200 per data-shape §6).
+
+tests:
+  type-check: passed (vue-tsc --noEmit, 0 errors)
+  vitest: passed (30 files, 302 tests, 0 failures)
+  build: passed (vite build, 15.07s, no errors)
+  css-check: passed (0 errors, 47 pre-existing warnings in shared-ui/* — none in production-history/)
+  pass-fail: 302/302
+blockers: []
+next-action: |
+  qa-reviewer can now verify end-to-end:
+    1. Multi-partial container renders multiple detail rows ordered by
+       trackin_time (AC-4).
+    2. CSV export contains "Function" column with raw per-partial rows
+       matching detail-table column order (AC-5).
+    3. No regression in production-history E2E / stress (per backend-engineer
+       qa hand-off).
+  Non-goals respected: no component-structure change, no new filter UI,
+  no new endpoints. Pre-stage of pj_function in detail row is data-only
+  (visible in table + CSV); supplementary filter for pj_function is
+  deferred to Change 3 per change-classification.md and AC-4 wording.

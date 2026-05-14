@@ -46,11 +46,19 @@ export interface Pagination {
   total_pages: number;
 }
 
-/** One row of the production-history detail table. */
+/** One row of the production-history detail table.
+ *
+ * Raw per-partial track-out row (data-shape §3.4) — one row per
+ * LOTWIPHISTORY partial track-out, not aggregated. `trackin_*` /
+ * `trackout_*` carry raw per-partial values (previously MIN/MAX/SUM aggregates).
+ * `pj_function` is sourced from `DWH.DW_MES_CONTAINER.PJ_FUNCTION` and is
+ * surfaced as the "PJ Function" detail-table column / "Function" CSV column.
+ */
 export interface DetailRow {
   lot_id: string | null;
   pj_type: string | null;
   bop: string | null;
+  pj_function: string | null;
   work_order: string | null;
   wafer_lot: string | null;
   package_name: string | null;

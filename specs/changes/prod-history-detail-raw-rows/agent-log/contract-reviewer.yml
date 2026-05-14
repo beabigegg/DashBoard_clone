@@ -1,0 +1,46 @@
+agent: contract-reviewer
+status: complete
+verdict: approved-with-changes
+files-read:
+  - path: contracts/data/data-shape-contract.md
+    lines: full
+  - path: contracts/business/business-rules.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/change-request.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/change-classification.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/context-manifest.md
+    lines: full
+artifacts:
+  - pointer: contracts/data/data-shape-contract.md
+    note: Added §3.4 Production-History Detail Row (15 columns + row-grain rule); schema-version 1.0.2 → 1.1.0
+  - pointer: contracts/business/business-rules.md
+    note: Added Production-History Rules group (PH-01..PH-04); schema-version 1.1.0 → 1.2.0
+findings: |
+  Both contract files lacked any production-history-specific section before this change.
+  New additive sections (§3.4 in data-shape, PH-rule-group in business-rules) document
+  the new row-grain contract, PJ_FUNCTION spool carriage, and Matrix lot-count semantics.
+
+  Schema-version bumps: minor (additive only). cdd-kit validate --contracts passed.
+
+  Critical blocker for backend-engineer: PJ_FUNCTION availability on DWH.DW_MES_CONTAINER
+  must be verified before the column is added to SQL projection. Existing data-shape §2.5
+  (pjFunctions in WIP filter-options, added by wip-hold-drilldown-filters) strongly implies
+  the column exists on the container source, but does not prove it for the production-history
+  query specifically. Backend-engineer must run DESCRIBE DWH.DW_MES_CONTAINER (or read the
+  existing wip filter-options service which already extracts PJ_FUNCTION).
+
+  Frontend-engineer must audit frontend/src/production-history/ and frontend/src/core/
+  field-contracts.ts / endpoint-schemas.ts for hardcoded references to old aggregated
+  column aliases (TRACKIN_TS, TRACKOUT_TS, TRACKIN_QTY, TRACKOUT_QTY). The aliases were
+  not previously enumerated in any contract, so contract-level breaking-change-policy
+  does not apply, but consumer code must still be updated.
+
+  Row-grain expansion grows spool parquet N× per change-request line 32. _meta.truncated
+  may trigger more often under §2.4 row-limit policy. qa-reviewer / ci-cd-gatekeeper
+  should evaluate whether MEMORY_GUARD or MAX_ROW_LIMIT env values need adjustment for
+  worst-case workloads — this is a runtime-config audit item, not a contract change.
+
+  API envelope unchanged — confirmed against §1.1 and §2.2.
+next-action: test-strategist writes test-plan.md

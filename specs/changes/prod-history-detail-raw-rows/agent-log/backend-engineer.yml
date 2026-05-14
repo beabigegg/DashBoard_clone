@@ -1,0 +1,139 @@
+agent: backend-engineer
+status: complete
+verdict: implemented
+files-read:
+  - path: specs/changes/prod-history-detail-raw-rows/change-request.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/change-classification.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/test-plan.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/contract-reviewer.yml
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/context-manifest.md
+    lines: full
+  - path: contracts/data/data-shape-contract.md
+    lines: "260-282"
+  - path: contracts/business/business-rules.md
+    lines: "120-123"
+  - path: src/mes_dashboard/sql/production_history/main_query.sql
+    lines: full
+  - path: src/mes_dashboard/sql/production_history/count_query.sql
+    lines: full
+  - path: src/mes_dashboard/services/production_history_sql_runtime.py
+    lines: full
+  - path: src/mes_dashboard/services/production_history_service.py
+    lines: full
+  - path: src/mes_dashboard/services/production_history_job_service.py
+    lines: full
+  - path: src/mes_dashboard/services/wip_service.py
+    lines: "754, 920, 1050, 3840"  # PJ_FUNCTION verification only
+  - path: src/mes_dashboard/sql/reject_history/performance_daily_lot.sql
+    lines: "31"  # PJ_FUNCTION verification (c.PJ_FUNCTION pattern)
+  - path: src/mes_dashboard/sql/yield_alert/reason_detail.sql
+    lines: "29"  # PJ_FUNCTION verification
+  - path: tests/test_production_history_sql_runtime.py
+    lines: full
+  - path: tests/test_production_history_service.py
+    lines: full
+  - path: tests/test_production_history_routes.py
+    lines: "290-330"
+  - path: tests/test_production_history_job_service.py
+    lines: full
+  - path: shared/field_contracts.json
+    lines: full   # confirmed: no production_history key — skip
+  - path: src/mes_dashboard/config/field_contracts.py
+    lines: full
+artifacts:
+  - pointer: src/mes_dashboard/sql/production_history/main_query.sql
+    note: Removed GROUP BY; SELECT raw columns per data-shape §3.4 incl. PJ_FUNCTION; container columns no longer aliased (MFGORDERNAME/FIRSTNAME/PRODUCTLINENAME); history columns raw (TRACKINTIMESTAMP/TRACKOUTTIMESTAMP/TRACKINQTY/TRACKOUTQTY); ORDER BY h.TRACKINTIMESTAMP ASC, c.CONTAINERNAME
+  - pointer: src/mes_dashboard/sql/production_history/count_query.sql
+    note: Removed inner-subquery GROUP BY; now counts raw partial rows directly
+  - pointer: src/mes_dashboard/services/production_history_sql_runtime.py
+    note: |
+      compute_detail_page — SELECT raw columns; added pj_function field; ORDER BY TRACKINTIMESTAMP ASC NULLS LAST per AC-4/PH-04.
+      compute_matrix_view — month_bucket built from raw TRACKINTIMESTAMP; COUNT(DISTINCT CONTAINERNAME) preserved (PH-02).
+      stream_export — EXPORT_COLUMNS uses raw column names; PJ_FUNCTION column added (header "Function"); ORDER BY TRACKINTIMESTAMP ASC NULLS LAST.
+      _build_filter_where — month filter expression updated to TRACKINTIMESTAMP; supplementary filters mapped to raw container columns (work_orders→MFGORDERNAME, packages→PRODUCTLINENAME).
+      compute_filter_options — _SIMPLE_COLUMNS use raw container names.
+      _apply_pandas_filter / _pandas_detail_page / _pandas_matrix_view — same renames applied to fallback path.
+  - pointer: src/mes_dashboard/services/production_history_service.py
+    note: Docstring of query_row_count updated to reflect raw row grain (no GROUP BY). No behavior change required — _make_chunk_query_fn already returns raw pandas DataFrame from SELECT, so PJ_FUNCTION column flows through to spool automatically.
+  - pointer: tests/test_production_history_sql_runtime.py
+    note: |
+      Added TestMainQueryRowGrain (AC-1): asserts no GROUP BY, PJ_FUNCTION present, raw columns present, aggregate aliases removed, raw container columns projected, count_query also raw.
+      Added TestExportColumns (AC-5/PH-03): stream_export uses raw columns + PJ_FUNCTION column + Function header; aggregate aliases removed.
+      Added TestDetailPagePjFunction (AC-1/PH-04): detail page SELECT includes pj_function, ORDER BY TRACKINTIMESTAMP ASC.
+      Added TestFilterWhereMonth: month filter and supplementary filters use raw columns.
+findings: |
+  PJ_FUNCTION verification — column confirmed on DWH.DW_MES_CONTAINER:
+    1. Existing production code references `c.PJ_FUNCTION` from the same container source:
+       - src/mes_dashboard/sql/reject_history/performance_daily_lot.sql:31 (`c.PJ_FUNCTION`)
+       - src/mes_dashboard/sql/yield_alert/reason_detail.sql:29 (`c.PJ_FUNCTION`)
+       - src/mes_dashboard/sql/reject_history/primary.sql:21 / list.sql:38 (alias b — joined container)
+       - src/mes_dashboard/sql/wip/detail.sql:23 (`PJ_FUNCTION`)
+    2. wip_service.py reads PJ_FUNCTION as an in-process filter index field (line 754),
+       implying it is part of the container join used by the WIP cache.
+    3. data-shape §2.5 already documents `pjFunctions` filter-options pre-staged by
+       wip-hold-drilldown-filters.
+  No Context Expansion Request required.
+
+  Field-contracts (shared/field_contracts.json) does NOT include a `production_history`
+  key — only job_query / resource_history / tables / resource_status. No update needed
+  to the JSON; production-history is not enrolled in the field-contracts framework yet.
+
+  Parity fixtures (tests/fixtures/frontend_compute_parity.json and
+  tests/fixtures/spool_snapshots/job__gpta0008_q1) do not cover production-history.
+  No fixture rebase required for this change.
+
+  Routes tests use mocks at the service-boundary (query_production_history /
+  compute_detail_page / compute_matrix_view / stream_export); they do not couple to
+  spool column names. All routes / async-routes / service / job-service tests pass
+  unchanged.
+
+  Spool column carriage: _make_chunk_query_fn reads from main_query.sql via
+  read_sql_df_slow → pandas DataFrame. PJ_FUNCTION is a top-level projection in the
+  new SQL so it is naturally carried into merge_chunks_to_spool → Parquet without
+  any explicit schema change in service code.
+
+  Aggregated alias removal scope (for frontend-engineer):
+    - Backend (DONE here): main_query.sql, count_query.sql, production_history_sql_runtime.py
+    - Frontend (still TODO — frontend-engineer scope):
+        - frontend/src/production-history/  — any consumer reading the `detail.rows[]`
+          fields should already use the camelCase keys produced by compute_detail_page
+          (lot_id, trackin_time, trackin_qty, etc.) and ALSO has the new `pj_function`
+          field available. Frontend should:
+            1. Add a PJ Function column to the detail table.
+            2. Audit any hardcoded references to OLD aggregated DuckDB column names
+               (`TRACKIN_TS`, `TRACKOUT_TS`, `TRACKIN_QTY`, `TRACKOUT_QTY`,
+               `WORK_ORDER`, `WAFER_LOT`, `PACKAGE_NAME`) inside ANY frontend code
+               that runs DuckDB-WASM queries directly against the spool parquet.
+               These aliases no longer exist in the spool; use raw names
+               (`TRACKINTIMESTAMP`, `TRACKOUTTIMESTAMP`, `TRACKINQTY`, `TRACKOUTQTY`,
+               `MFGORDERNAME`, `FIRSTNAME`, `PRODUCTLINENAME`).
+            3. Optionally surface the new `Function` CSV column in export-format
+               docs / tests.
+        - frontend/src/core/field-contracts.ts / endpoint-schemas.ts — audit for
+          the same aliases.
+        - frontend/tests/legacy/production-history.test.js,
+          frontend/tests/abort/production-history-abort.test.js,
+          frontend/tests/validation/useProductionHistory.validation.test.js —
+          rebase any column-name assertions.
+
+  Detail-row ordering semantics changed: previously DESC (newest first), now ASC
+  per PH-04. Frontend may need to update default sort indicator if visible.
+
+tests:
+  production_history_routes: passed (24)
+  production_history_service: passed (5)
+  production_history_sql_runtime: passed (28; 15 existing helper tests + 13 new row-grain tests)
+  production_history_job_service: passed (11)
+  production_history_async_routes: passed (7)
+  total: 75 passed, 0 failed
+  parity_safety:
+    test_frontend_compute_parity: passed (1)
+    test_frontend_duckdb_parity: passed (8)
+    test_job_query_frontend_safety: passed (1)
+    total: 10 passed, 0 failed
+blockers: []
+next-action: frontend-engineer audits production-history app + frontend/src/core/field-contracts.ts for aggregated-alias references; adds PJ Function column to detail table; rebases legacy/abort/validation frontend tests.

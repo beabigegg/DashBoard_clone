@@ -1,0 +1,47 @@
+agent: qa-reviewer
+status: complete
+verdict: approved-with-conditions
+files-read:
+  - path: specs/changes/prod-history-detail-raw-rows/change-classification.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/test-plan.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/ci-gates.md
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/contract-reviewer.yml
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/test-strategist.yml
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/backend-engineer.yml
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/frontend-engineer.yml
+    lines: full
+  - path: specs/changes/prod-history-detail-raw-rows/agent-log/ci-cd-gatekeeper.yml
+    lines: full
+  - path: contracts/data/data-shape-contract.md
+    lines: §3.4
+  - path: contracts/business/business-rules.md
+    lines: PH-01..PH-04
+artifacts:
+  - pointer: specs/changes/prod-history-detail-raw-rows/qa-report.md
+    note: 8 AC × evidence table; 6 risk rows; 5 recommendations; 2 conditions (AC-7 stress, AC-3 Matrix parity baseline)
+findings: |
+  6 of 8 ACs PASS unconditionally; AC-3 PASS structurally (DISTINCT preserved in SQL) but
+  empirical Oracle-fixture parity baseline deferred; AC-7 stress test deferred as manual
+  one-shot gate per ci-gates.md design.
+
+  All seven PR-required CI gates green at 2026-05-14:
+  - type-check 0 errors
+  - build 15.07s
+  - vitest 302/302 (30 files)
+  - pytest:production-history 75/75
+  - pytest:parity-safety 10/10
+  - css:check 0 errors
+  - cdd-kit validate --contracts passed
+
+  Contracts updated: data-shape §3.4 (v1.0.2→v1.1.0) + business-rules PH-01..PH-04
+  (v1.1.0→v1.2.0). Both schema bumps additive-only.
+
+  Single-commit merge is appropriate; rollback documented in ci-gates.md §Rollback
+  including the critical spool-parquet invalidation step.
+next-action: cdd-kit gate → PR submission

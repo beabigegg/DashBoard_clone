@@ -8,6 +8,16 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [data 1.1.0] — 2026-05-14
+### Added (additive)
+- Section 3.4: Production-History Detail Row schema (15 columns, raw per-partial-track-out grain, includes `PJ_FUNCTION` pre-staged for filter use by Change 3). Row-grain rule + Matrix `COUNT(DISTINCT CONTAINERNAME)` semantics documented. Aggregated aliases `TRACKIN_TS / TRACKOUT_TS / TRACKIN_QTY / TRACKOUT_QTY` removed; raw column names `TRACKINTIMESTAMP / TRACKOUTTIMESTAMP / TRACKINQTY / TRACKOUTQTY` are now contract-of-record.
+- Source: change `prod-history-detail-raw-rows`.
+
+## [business 1.2.0] — 2026-05-14
+### Added (additive)
+- Production-History Rules group (`PH-01` raw per-partial detail rows; `PH-02` Matrix lot-count via DuckDB `COUNT(DISTINCT CONTAINERNAME)`; `PH-03` `PJ_FUNCTION` spool carriage; `PH-04` detail row ordering by `TRACKINTIMESTAMP` ASC). Drops prior implicit assumption "first partial = original batch quantity".
+- Source: change `prod-history-detail-raw-rows`.
+
 ## [ci 1.3.11] — 2026-05-13
 ### Changed
 - Gate Compatibility Note added for `migrate-job-query-ts` (Phase 3). `tsconfig.json` `include` expanded with `"src/job-query/**/*"`, covering `main.ts`, `App.vue`, `composables/useJobQueryData.ts`. Gate tier unchanged (informational). Additive prose only.

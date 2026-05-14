@@ -1,0 +1,39 @@
+change-id: prod-history-detail-raw-rows
+status: in-progress
+tier: 2
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on:
+  - "migrate-production-history-ts"
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done, note: "Tier 2 classified 2026-05-14; current-behavior.md and qa-report.md required, others n/a" }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "contract-reviewer confirmed data-shape + business-rules updates (see agent-log)" }
+  - { id: "1.3", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md written by ci-cd-gatekeeper; no new workflow changes" }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: skipped, note: "response envelope unchanged (per classifier)" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no CSS change (per classifier)" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "no env change (per classifier)" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done, note: "§3.4 Production-History Detail Row added; schema-version 1.0.2 → 1.1.0" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done, note: "PH-01..PH-04 rule group added; schema-version 1.1.0 → 1.2.0" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "no CI workflow change (per classifier)" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "test-plan.md AC-1..AC-8 mapping; implementation tests will be rewritten by backend-engineer with row-grain assertions" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done, note: "test-plan.md integration row (Oracle fixture + Matrix parity)" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "test-plan.md e2e (multi-partial container) + resilience (abort under N× spool)" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "data-boundary planned (cross-month partial attribution); monkey n/a" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: done, note: "stress planned (one-shot manual gate during qa-reviewer); soak n/a" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "main_query.sql + count_query.sql + sql_runtime.py + service.py + 13 new sql_runtime tests; 75/75 production-history pytest + 10/10 parity/safety passed" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done, note: "added pj_function to DetailRow interface + PJ Function column in ProductionDetailTable; type-check 0 errors, vitest 302/302, build 15.07s, css:check 0 errors" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no env/deploy change (per classifier)" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "no workflow change (per classifier)" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "Non-goals forbid component-structure change (per classifier)" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no visual change (per classifier)" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer approved-with-changes; edits applied" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-report.md verdict: approved (manual gates resolved 2026-05-14 with live measurement)" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "type-check + build + 302 vitest + 75 pytest + 10 parity/safety + css:check + cdd-kit validate all green (see ci-gates.md)" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "PR not yet submitted — will be verified by GitHub Actions on PR submission" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: skipped, note: "no informational gates introduced" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: done, note: "AC-7 (warm p95 81ms, pagination p95 30ms, parquet 24.5KB, 4.78x partial ratio) + AC-3 (72/72 Matrix cells match) measured live 2026-05-14; results in qa-report.md Manual Gate Evidence" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

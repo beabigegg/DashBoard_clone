@@ -542,11 +542,12 @@ def query_row_count(
     end_date: str,
     pj_types: Optional[List[str]] = None,
 ) -> int:
-    """Return COUNT(*) of grouped production records for the given date range.
+    """Return COUNT(*) of raw LOTWIPHISTORY partial-row records for the given date range.
 
     Runs a single-pass query over the full date range (no chunking) using the
-    same GROUP BY as main_query.sql.  Used by the integrity-probe count endpoint
-    to detect truncation in the chunk-merge pipeline.
+    same row grain as main_query.sql (raw per-partial rows — no GROUP BY, see
+    change `prod-history-detail-raw-rows`). Used by the integrity-probe count
+    endpoint to detect truncation in the chunk-merge pipeline.
 
     If pj_types is None or empty, counts all product types.
     """

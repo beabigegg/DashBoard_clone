@@ -3,14 +3,14 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.0.2
-last-changed: 2026-05-13
+schema-version: 1.1.0
+last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
 
 # Data Shape Contract — MES Dashboard
 
-> 來源：掃描 `src/mes_dashboard/core/response.py`、`tests/test_api_contract.py`、`tests/test_field_contracts.py`（2026-05-05）
+> 來源：掃描 `src/mes_dashboard/core/response.py`、`tests/test_api_contract.py`、`tests/test_field_contracts.py`（2026-05-05；prod-history-detail-raw-rows 2026-05-14 加入 §3.4）
 
 ---
 
@@ -256,6 +256,30 @@ Large payloads that hit the memory/row limit include:
 | count | integer | no | occurrence count |
 | qty | integer | no | quantity sum |
 | pct | float | no | running cumulative % |
+
+### 3.4 Production-History Detail Row
+
+One row per LOTWIPHISTORY partial track-out (no GROUP BY aggregation). Spool parquet schema must include all columns below.
+
+| column | type | nullable | notes |
+|---|---|---:|---|
+| CONTAINERNAME | string | no | container id; multi-partial containers produce N rows |
+| PJ_TYPE | string | yes | from container |
+| PJ_BOP | string | yes | from container |
+| PJ_FUNCTION | string | yes | from container; pre-staged for filter use (Change 3) — present in spool, not yet a user filter |
+| MFGORDERNAME | string | yes | from container |
+| FIRSTNAME | string | yes | from container |
+| PRODUCTLINENAME | string | yes | from container |
+| WORKCENTERNAME | string | yes | from LOTWIPHISTORY row |
+| SPECNAME | string | yes | from LOTWIPHISTORY row |
+| EQUIPMENTID | string | yes | from LOTWIPHISTORY row |
+| EQUIPMENTNAME | string | yes | from LOTWIPHISTORY row |
+| TRACKINTIMESTAMP | datetime | yes | raw per-partial; replaces prior `TRACKIN_TS = MIN(...)` |
+| TRACKOUTTIMESTAMP | datetime | yes | raw per-partial; replaces prior `TRACKOUT_TS = MAX(...)` |
+| TRACKINQTY | integer | yes | raw per-partial; replaces prior `TRACKIN_QTY = MAX(...)` |
+| TRACKOUTQTY | integer | yes | raw per-partial; replaces prior `TRACKOUT_QTY = SUM(...)` |
+
+Row-grain rule: detail row count = LOTWIPHISTORY row count for matched containers (NOT distinct-container count). Detail table UI sorts by `TRACKINTIMESTAMP`. Matrix view's `count` cell is computed downstream in DuckDB as `COUNT(DISTINCT CONTAINERNAME)` over this row source — Matrix lot-count semantics are unchanged. Aggregated aliases `TRACKIN_TS / TRACKOUT_TS / TRACKIN_QTY / TRACKOUT_QTY` are removed; consumers must read raw column names. Added by change `prod-history-detail-raw-rows`.
 
 ---
 
