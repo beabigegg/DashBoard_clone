@@ -32,8 +32,8 @@ tasks:
   - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer 2026-05-14: api 1.4.0 + api-inventory 1.1.4 + business 1.4.0; all additive/non-breaking; CHANGELOG entries added; validate --contracts pass" }
   - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-report.md + regression-report.md: approved-with-conditions (8/8 AC covered, no-regression); conditions are CI-only (playwright + PR unit/frontend gates)" }
   - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed 2026-05-14; contracts + API semantic + env + CI gates + versions all green" }
-  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "awaiting CI run after commit/push" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "CI green on commit 7d65423 (user-confirmed 2026-05-14)" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "frontend type-check clean; mypy not run (env yml does not pin mypy)" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/manual gate; AC-5 covered by deterministic integration assertion, not staging gate" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done, note: "archived to specs/archive/2026/ 2026-05-14" }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: skipped, note: "durable product rule (mode-aware date optionality) already promoted during /cdd-new to api-contract §10 + business PHF-07/PHF-08; no additional process/guidance lesson from evidence — see archive.md" }

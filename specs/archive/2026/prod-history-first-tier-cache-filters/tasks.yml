@@ -32,8 +32,8 @@ tasks:
   - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer approved 2026-05-14; 5 contracts bumped + CHANGELOG entries" }
   - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-report.md verdict: approved-with-conditions; 8/8 AC covered; manual gate evidence required before close" }
   - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed 2026-05-14 after ci-gates.md Rollback/Promotion Policy fix; contracts + API semantic + env + CI gates + versions all green" }
-  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "awaiting CI run after commit/push" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "CI green on commit 4427c83 (user-confirmed 2026-05-14)" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "frontend-type-check 0 errors; mypy not run (env yml does not pin mypy)" }
-  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: pending, note: "manual gate evidence per qa-report.md: AC-1 p95 ≤100ms warm, AC-6 4-worker lock in staging, empty-cache cold-start <60s" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: done, note: "release-captain (user) authorized close 2026-05-14; AC-1 p95 / AC-6 4-worker lock / cold-start manual staging gates accepted — see archive.md Follow-up Work for staging-monitoring carryover" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done, note: "archived to specs/archive/2026/ 2026-05-14" }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: skipped, note: "all durable behavior already promoted during /cdd-new across 5 bumped contracts; cache-namespace + multi-worker-lock rules already in CLAUDE.md from resource-history-perf; no new lesson from evidence — see archive.md" }
