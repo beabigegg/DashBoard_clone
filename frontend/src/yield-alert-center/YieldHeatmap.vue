@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { HeatmapChart } from 'echarts/charts';
@@ -79,7 +79,8 @@ const chartOption = computed(() => {
           startValue: Math.max(0, dates.length - VISIBLE_DATE_COUNT),
           endValue: dates.length - 1,
           brushSelect: false,
-          labelFormatter: (_, val) => val,
+          // TODO: type echarts callback
+          labelFormatter: (_: unknown, val: unknown) => val,
         },
         { type: 'inside', xAxisIndex: 0 },
       ]
@@ -88,10 +89,12 @@ const chartOption = computed(() => {
   return {
     tooltip: {
       position: 'top',
-      formatter(params) {
-        const xIdx = Number(params.value?.[0] ?? 0);
-        const yIdx = Number(params.value?.[1] ?? 0);
-        const val = Number(params.value?.[2] ?? 0);
+      // TODO: type echarts callback
+      formatter(params: unknown) {
+        const p = params as { value?: unknown[] };
+        const xIdx = Number(p.value?.[0] ?? 0);
+        const yIdx = Number(p.value?.[1] ?? 0);
+        const val = Number(p.value?.[2] ?? 0);
         return `${stations[yIdx] ?? '--'}<br/>${dates[xIdx] ?? '--'}<br/>良率: <b>${val.toFixed(2)}%</b>`;
       },
     },
@@ -134,8 +137,10 @@ const chartOption = computed(() => {
         data: matrixData,
         label: {
           show: showLabel,
-          formatter: (p) => {
-            const v = Number(p.value?.[2] ?? 0);
+          // TODO: type echarts callback
+          formatter: (p: unknown) => {
+            const pt = p as { value?: unknown[] };
+            const v = Number(pt.value?.[2] ?? 0);
             return v === 100 ? '' : v.toFixed(1);
           },
           fontSize: 10,

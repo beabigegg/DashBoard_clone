@@ -103,7 +103,7 @@ describe('yield-alert abort — useYieldAlertDuckDB deactivate', () => {
     const { getDuckDBClient } = await import('../../src/core/duckdb-client.js');
     getDuckDBClient.mockReturnValue(mockClient);
 
-    const { useYieldAlertDuckDB } = await import('../../src/yield-alert-center/useYieldAlertDuckDB.js');
+    const { useYieldAlertDuckDB } = await import('../../src/yield-alert-center/useYieldAlertDuckDB');
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -122,7 +122,7 @@ describe('yield-alert abort — useYieldAlertDuckDB deactivate', () => {
   });
 
   it('no state mutation after deactivate (calling computeView throws, not corrupts state)', async () => {
-    const { useYieldAlertDuckDB } = await import('../../src/yield-alert-center/useYieldAlertDuckDB.js');
+    const { useYieldAlertDuckDB } = await import('../../src/yield-alert-center/useYieldAlertDuckDB');
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
