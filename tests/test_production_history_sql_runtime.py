@@ -273,3 +273,321 @@ class TestExtraFiltersWildcardEmit:
         assert any(v == "MA2025%" for v in binds.values())
         assert any(v == "W001%" for v in binds.values())
         assert any(v == "GA%" for v in binds.values())
+
+
+# ============================================================
+# Change: fix-matrix-distinct-count
+# Matrix parent-level count must be COUNT(DISTINCT CONTAINERNAME)
+# re-evaluated per grain, NOT the sum of child distinct counts.
+# Option C: raw distinct-tuple rows + Python set rollup in
+# _build_matrix_tree.
+#   row contract: {wc, spec, eqp_id, eqp_name, month_bucket, container}
+# ============================================================
+
+
+def _matrix_row(wc, spec, eqp_id, eqp_name, month, container):
+    """Build one distinct-tuple input row for _build_matrix_tree."""
+    return {
+        "wc": wc,
+        "spec": spec,
+        "eqp_id": eqp_id,
+        "eqp_name": eqp_name,
+        "month_bucket": month,
+        "container": container,
+    }
+
+
+def _find_node(nodes, label):
+    for n in nodes:
+        if n["label"] == label:
+            return n
+    raise AssertionError(f"node {label!r} not found in {[n['label'] for n in nodes]}")
+
+
+class TestMatrixDistinctCountRollup:
+    """AC-1..AC-3, AC-6: _build_matrix_tree distinct-count assignment per grain."""
+
+    def test_one_container_three_specs_workcenter_count_is_one(self):
+        """FAILING-FIRST anchor (AC-1): one CONTAINERNAME across 3 SPECs under one
+        workcenter → each spec count == 1 AND workcenter count == 1 (was 3)."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-X"),
+            _matrix_row("WC-A", "SPEC-2", "EQ2", "Eqp 2", "2026-01", "LOT-X"),
+            _matrix_row("WC-A", "SPEC-3", "EQ3", "Eqp 3", "2026-01", "LOT-X"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        assert wc_node["count"] == 1
+        for spec_label in ("SPEC-1", "SPEC-2", "SPEC-3"):
+            spec_node = _find_node(wc_node["children"], spec_label)
+            assert spec_node["count"] == 1
+
+    def test_one_lot_two_equipment_spec_count_is_one(self):
+        """AC-2: one CONTAINERNAME across 2 equipment under one spec →
+        spec count == 1 (was 2); equipment leaves remain correct."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-X"),
+            _matrix_row("WC-A", "SPEC-1", "EQ2", "Eqp 2", "2026-01", "LOT-X"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        spec_node = _find_node(wc_node["children"], "SPEC-1")
+        assert spec_node["count"] == 1
+        assert wc_node["count"] == 1
+        for eqp_label in ("EQ1", "EQ2"):
+            eqp_node = _find_node(spec_node["children"], eqp_label)
+            assert eqp_node["count"] == 1
+
+    def test_equipment_leaf_count_unchanged(self):
+        """AC-6: equipment-level leaf count and month_counts unchanged by the fix."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-A"),
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-B"),
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-02", "LOT-C"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        spec_node = _find_node(wc_node["children"], "SPEC-1")
+        eqp_node = _find_node(spec_node["children"], "EQ1")
+        assert eqp_node["count"] == 3
+        assert eqp_node["month_counts"] == {"2026-01": 2, "2026-02": 1}
+
+    def test_month_counts_distinct_at_every_level(self):
+        """AC-3: spec/workcenter month_counts[m] = independent distinct count at
+        that grain×month, not sum of children."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            # LOT-X spans two equipment within SPEC-1 in the same month
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-X"),
+            _matrix_row("WC-A", "SPEC-1", "EQ2", "Eqp 2", "2026-01", "LOT-X"),
+            # LOT-Y only on EQ1
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-Y"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        spec_node = _find_node(wc_node["children"], "SPEC-1")
+        # EQ1 month_counts = 2 (LOT-X, LOT-Y); EQ2 = 1 (LOT-X)
+        # spec independent distinct = {LOT-X, LOT-Y} = 2, NOT 2+1=3
+        assert spec_node["month_counts"]["2026-01"] == 2
+        assert wc_node["month_counts"]["2026-01"] == 2
+
+    def test_lot_spanning_two_months_one_equipment(self):
+        """AC-3: one CONTAINERNAME tracked-in across 2 months at one equipment →
+        counted once per month bucket, equipment total count == 1."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-X"),
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-02", "LOT-X"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        spec_node = _find_node(wc_node["children"], "SPEC-1")
+        eqp_node = _find_node(spec_node["children"], "EQ1")
+        assert eqp_node["count"] == 1
+        assert eqp_node["month_counts"] == {"2026-01": 1, "2026-02": 1}
+        assert spec_node["count"] == 1
+        assert wc_node["count"] == 1
+
+    def test_lot_same_month_two_specs(self):
+        """AC-3: one CONTAINERNAME in the same month under 2 specs → that
+        month_counts entry is 1 at workcenter and 1 at each spec."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-X"),
+            _matrix_row("WC-A", "SPEC-2", "EQ2", "Eqp 2", "2026-01", "LOT-X"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        assert wc_node["month_counts"]["2026-01"] == 1
+        for spec_label in ("SPEC-1", "SPEC-2"):
+            spec_node = _find_node(wc_node["children"], spec_label)
+            assert spec_node["month_counts"]["2026-01"] == 1
+
+    def test_distinct_containers_still_additive_when_disjoint(self):
+        """Guard: disjoint CONTAINERNAMEs across specs still roll up to the true
+        distinct total — the fix must not under-count."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-A"),
+            _matrix_row("WC-A", "SPEC-2", "EQ2", "Eqp 2", "2026-01", "LOT-B"),
+            _matrix_row("WC-A", "SPEC-3", "EQ3", "Eqp 3", "2026-01", "LOT-C"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        assert wc_node["count"] == 3
+        assert wc_node["month_counts"]["2026-01"] == 3
+        for spec_label in ("SPEC-1", "SPEC-2", "SPEC-3"):
+            spec_node = _find_node(wc_node["children"], spec_label)
+            assert spec_node["count"] == 1
+
+
+class TestMatrixTreeNodeShape:
+    """AC-5, AC-7: node-shape invariance + structural rule of data-shape §3.5."""
+
+    def test_node_shape_unchanged(self):
+        """AC-5: every node has exactly {label, level, count, month_counts,
+        children}; equipment node also keeps equipment_name."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-X"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        assert set(wc_node.keys()) == {"label", "level", "count", "month_counts", "children"}
+        spec_node = _find_node(wc_node["children"], "SPEC-1")
+        assert set(spec_node.keys()) == {"label", "level", "count", "month_counts", "children"}
+        eqp_node = _find_node(spec_node["children"], "EQ1")
+        assert set(eqp_node.keys()) == {
+            "label", "equipment_name", "level", "count", "month_counts", "children",
+        }
+
+    def test_parent_count_equals_independent_distinct_not_child_sum(self):
+        """AC-7: structural rule of data-shape §3.5 / business PH-05 — parent count
+        != Σ child count when a container spans children, equals independent distinct."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-X"),
+            _matrix_row("WC-A", "SPEC-2", "EQ2", "Eqp 2", "2026-01", "LOT-X"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        child_sum = sum(c["count"] for c in wc_node["children"])
+        assert child_sum == 2
+        assert wc_node["count"] == 1
+        assert wc_node["count"] != child_sum
+
+    def test_month_columns_and_levels_preserved(self):
+        """AC-5/AC-7: level values and month_columns ordering preserved."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-02", "LOT-A"),
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-B"),
+        ]
+        result = _build_matrix_tree(rows)
+        assert result["month_columns"] == ["2026-01", "2026-02"]
+        wc_node = _find_node(result["tree"], "WC-A")
+        assert wc_node["level"] == "workcenter"
+        spec_node = _find_node(wc_node["children"], "SPEC-1")
+        assert spec_node["level"] == "spec"
+        eqp_node = _find_node(spec_node["children"], "EQ1")
+        assert eqp_node["level"] == "equipment"
+
+
+class TestMatrixDualPathParity:
+    """AC-4: compute_matrix_view (DuckDB) vs _pandas_matrix_view (pandas) parity."""
+
+    def _write_spool(self, tmp_path, records):
+        import pandas as pd
+
+        df = pd.DataFrame.from_records(records)
+        path = str(tmp_path / "ph_spool.parquet")
+        df.to_parquet(path)
+        return path
+
+    def _records(self):
+        # Minimal spool schema fields consumed by the matrix path.
+        base = {
+            "MFGORDERNAME": "WO1", "FIRSTNAME": "WL1", "PRODUCTLINENAME": "PKG1",
+            "PJ_TYPE": "GA", "PJ_BOP": "B1", "PJ_FUNCTION": "F1",
+            "TRACKOUTTIMESTAMP": "2026-01-02 00:00:00",
+            "TRACKINQTY": 1, "TRACKOUTQTY": 1,
+        }
+        return base
+
+    def test_duckdb_and_pandas_produce_identical_tree(self, tmp_path):
+        from mes_dashboard.services.production_history_sql_runtime import (
+            compute_matrix_view, _pandas_matrix_view,
+        )
+        base = self._records()
+        records = [
+            {**base, "WORKCENTERNAME": "WC-A", "SPECNAME": "SPEC-1",
+             "EQUIPMENTID": "EQ1", "EQUIPMENTNAME": "Eqp 1",
+             "TRACKINTIMESTAMP": "2026-01-01 08:00:00", "CONTAINERNAME": "LOT-A"},
+            {**base, "WORKCENTERNAME": "WC-A", "SPECNAME": "SPEC-1",
+             "EQUIPMENTID": "EQ1", "EQUIPMENTNAME": "Eqp 1",
+             "TRACKINTIMESTAMP": "2026-02-01 08:00:00", "CONTAINERNAME": "LOT-B"},
+            {**base, "WORKCENTERNAME": "WC-A", "SPECNAME": "SPEC-2",
+             "EQUIPMENTID": "EQ2", "EQUIPMENTNAME": "Eqp 2",
+             "TRACKINTIMESTAMP": "2026-01-05 08:00:00", "CONTAINERNAME": "LOT-C"},
+        ]
+        path = self._write_spool(tmp_path, records)
+        duck = compute_matrix_view(path, {})
+        pan = _pandas_matrix_view(path, {})
+        assert duck == pan
+
+    def test_dual_path_parity_with_cross_spec_container(self, tmp_path):
+        from mes_dashboard.services.production_history_sql_runtime import (
+            compute_matrix_view, _pandas_matrix_view,
+        )
+        base = self._records()
+        records = [
+            # LOT-X spans SPEC-1/EQ1 and SPEC-2/EQ2 — exercises rollup on both engines
+            {**base, "WORKCENTERNAME": "WC-A", "SPECNAME": "SPEC-1",
+             "EQUIPMENTID": "EQ1", "EQUIPMENTNAME": "Eqp 1",
+             "TRACKINTIMESTAMP": "2026-01-01 08:00:00", "CONTAINERNAME": "LOT-X"},
+            {**base, "WORKCENTERNAME": "WC-A", "SPECNAME": "SPEC-2",
+             "EQUIPMENTID": "EQ2", "EQUIPMENTNAME": "Eqp 2",
+             "TRACKINTIMESTAMP": "2026-01-03 08:00:00", "CONTAINERNAME": "LOT-X"},
+            {**base, "WORKCENTERNAME": "WC-A", "SPECNAME": "SPEC-1",
+             "EQUIPMENTID": "EQ1", "EQUIPMENTNAME": "Eqp 1",
+             "TRACKINTIMESTAMP": "2026-01-04 08:00:00", "CONTAINERNAME": "LOT-Y"},
+        ]
+        path = self._write_spool(tmp_path, records)
+        duck = compute_matrix_view(path, {})
+        pan = _pandas_matrix_view(path, {})
+        assert duck == pan
+        wc_node = _find_node(duck["tree"], "WC-A")
+        assert wc_node["count"] == 2  # LOT-X, LOT-Y
+
+
+class TestMatrixDataBoundary:
+    """AC-1..AC-3 data-boundary: single-row, empty, overlapping month buckets."""
+
+    def test_single_row_input(self):
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [_matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-X")]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        spec_node = _find_node(wc_node["children"], "SPEC-1")
+        eqp_node = _find_node(spec_node["children"], "EQ1")
+        assert wc_node["count"] == 1
+        assert spec_node["count"] == 1
+        assert eqp_node["count"] == 1
+
+    def test_empty_input(self):
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        assert _build_matrix_tree([]) == {"tree": [], "month_columns": []}
+
+    def test_overlapping_month_buckets(self):
+        """Same (wc,spec,eqp) across multiple month buckets → per-month counts
+        isolated, total = distinct over all months."""
+        from mes_dashboard.services.production_history_sql_runtime import _build_matrix_tree
+
+        rows = [
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-01", "LOT-A"),
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-02", "LOT-A"),
+            _matrix_row("WC-A", "SPEC-1", "EQ1", "Eqp 1", "2026-02", "LOT-B"),
+        ]
+        result = _build_matrix_tree(rows)
+        wc_node = _find_node(result["tree"], "WC-A")
+        spec_node = _find_node(wc_node["children"], "SPEC-1")
+        eqp_node = _find_node(spec_node["children"], "EQ1")
+        assert eqp_node["month_counts"] == {"2026-01": 1, "2026-02": 2}
+        assert eqp_node["count"] == 2  # distinct {LOT-A, LOT-B}
+        assert spec_node["count"] == 2
+        assert wc_node["count"] == 2

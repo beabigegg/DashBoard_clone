@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.2.0
+schema-version: 1.3.0
 last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
@@ -342,7 +342,33 @@ One row per LOTWIPHISTORY partial track-out (no GROUP BY aggregation). Spool par
 | TRACKINQTY | integer | yes | raw per-partial; replaces prior `TRACKIN_QTY = MAX(...)` |
 | TRACKOUTQTY | integer | yes | raw per-partial; replaces prior `TRACKOUT_QTY = SUM(...)` |
 
-Row-grain rule: detail row count = LOTWIPHISTORY row count for matched containers (NOT distinct-container count). Detail table UI sorts by `TRACKINTIMESTAMP`. Matrix view's `count` cell is computed downstream in DuckDB as `COUNT(DISTINCT CONTAINERNAME)` over this row source — Matrix lot-count semantics are unchanged. Aggregated aliases `TRACKIN_TS / TRACKOUT_TS / TRACKIN_QTY / TRACKOUT_QTY` are removed; consumers must read raw column names. Added by change `prod-history-detail-raw-rows`.
+Row-grain rule: detail row count = LOTWIPHISTORY row count for matched containers (NOT distinct-container count). Detail table UI sorts by `TRACKINTIMESTAMP`. The matrix view's leaf `count` cell is computed downstream in DuckDB as `COUNT(DISTINCT CONTAINERNAME)` over this row source; parent-level distinct-count semantics are specified in §3.5. Aggregated aliases `TRACKIN_TS / TRACKOUT_TS / TRACKIN_QTY / TRACKOUT_QTY` are removed; consumers must read raw column names. Added by change `prod-history-detail-raw-rows`.
+
+### 3.5 Production-History Matrix Tree Node
+
+The Workcenter × Equipment Matrix view returns a hierarchy of nodes, each with
+the shape `{label, level, count, month_counts, children}` (`level` ∈
+`workcenter | spec | equipment`). This node shape is fixed; consumers
+(`frontend/src/production-history/components/ProductionMatrix.vue`) read
+`count` and `month_counts` per node.
+
+| field | type | nullable | notes |
+|---|---|---:|---|
+| label | string | no | node display name |
+| level | string | no | closed enum: `workcenter \| spec \| equipment` |
+| count | integer | no | `COUNT(DISTINCT CONTAINERNAME)` re-evaluated at this node's grain |
+| month_counts | object | no | `{ "<YYYY-MM>": integer }`; each value is `COUNT(DISTINCT CONTAINERNAME)` re-evaluated at this node's grain × month |
+| children | array | yes | child nodes; absent/empty at the `equipment` (leaf) level |
+
+Distinct-count grain rule: `count` and `month_counts` at the `workcenter` and
+`spec` levels are `COUNT(DISTINCT CONTAINERNAME)` **independently evaluated at
+that grain** — they are **NOT** the sum of child-node `count` / `month_counts`.
+Distinct counts are non-additive across hierarchy levels: one CONTAINERNAME
+passing through multiple specs (or multiple equipment under one spec) must be
+counted once at each ancestor node, not once per child path. The `equipment`
+(leaf) grain is the directly-grouped `COUNT(DISTINCT CONTAINERNAME)` by
+`(workcenter, spec, equipment, month)` and is unchanged. See business-rules.md
+PH-05. Added by change `fix-matrix-distinct-count`.
 
 ---
 

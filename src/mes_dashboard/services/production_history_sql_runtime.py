@@ -281,20 +281,23 @@ def compute_matrix_view(
         conn = _get_duckdb_conn()
         _attach_spool_view(conn, spool_path)
 
-        # Aggregate at equipment level with month buckets.
-        # Row source is raw LOTWIPHISTORY partial rows; lot-count semantics
-        # are preserved via COUNT(DISTINCT CONTAINERNAME) per PH-02.
+        # Emit raw distinct (wc, spec, eqp, month, container) tuples — NOT
+        # pre-counted rows.  Distinct counts are non-additive across the
+        # display hierarchy (PH-05), so all counting happens once in
+        # _build_matrix_tree via Python sets, where the canonical
+        # workcenter-group dedup also lives.  Row source is raw
+        # LOTWIPHISTORY partial rows; SELECT DISTINCT collapses the
+        # partial-row fan-out per (cell, container).
         agg_sql = f"""
-            SELECT
+            SELECT DISTINCT
                 WORKCENTERNAME                                       AS wc,
                 SPECNAME                                             AS spec,
                 EQUIPMENTID                                          AS eqp_id,
                 EQUIPMENTNAME                                        AS eqp_name,
                 strftime(TRACKINTIMESTAMP::TIMESTAMP, '%Y-%m')       AS month_bucket,
-                COUNT(DISTINCT CONTAINERNAME)                        AS lot_count
+                CONTAINERNAME                                        AS container
             FROM ph_src
             {where}
-            GROUP BY wc, spec, eqp_id, eqp_name, month_bucket
             ORDER BY wc, spec, eqp_id, month_bucket
         """
         rows = _fetch_dict_rows(conn, agg_sql, params)
@@ -309,11 +312,19 @@ def compute_matrix_view(
 
 
 def _build_matrix_tree(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Build hierarchical tree from flat aggregation rows.
+    """Build hierarchical tree from raw distinct-tuple rows.
 
-    Applies workcenter group mapping so that raw workcenter names are grouped
-    under their canonical group name (e.g. '焊_DB_料' → '焊接_DB') and sorted
-    by the configured group order.
+    Each input row is a distinct ``(wc, spec, eqp_id, eqp_name, month_bucket,
+    container)`` tuple.  Every node accumulates a Python ``set`` of container
+    ids (and a per-month set); ``count`` / ``month_counts`` are derived via
+    ``len()`` after the walk.  This is the single counting site — distinct
+    counts are non-additive across the hierarchy (PH-05), so they must be
+    re-evaluated independently per grain rather than summed from children.
+
+    The canonical workcenter-group dedup happens here naturally: containers
+    from several raw ``WORKCENTERNAME`` values that map to the same group
+    (e.g. '焊_DB_料' → '焊接_DB') land in the same group node's set, so a
+    container spanning two raw workcenters of one group is counted once.
     """
     from mes_dashboard.config.workcenter_groups import get_workcenter_group
 
@@ -330,13 +341,29 @@ def _build_matrix_tree(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     wc_map: Dict[str, Any] = {}
     wc_order: Dict[str, int] = {}
 
+    def _new_node(label: str, level: str, **extra: Any) -> Dict[str, Any]:
+        node = {
+            "label": label,
+            "level": level,
+            "_containers": set(),
+            "_month_containers": {},
+            "children": {},
+        }
+        node.update(extra)
+        return node
+
+    def _accumulate(node: Dict[str, Any], month: str, container: str) -> None:
+        node["_containers"].add(container)
+        if month:
+            node["_month_containers"].setdefault(month, set()).add(container)
+
     for r in rows:
         raw_wc = str(r.get("wc") or "")
         spec = str(r.get("spec") or "")
         eqp_id = str(r.get("eqp_id") or "")
         eqp_name = str(r.get("eqp_name") or "")
         month = str(r.get("month_bucket") or "")
-        count = int(r.get("lot_count") or 0)
+        container = str(r.get("container") or "")
 
         # Resolve workcenter to its group
         group_name, order = get_workcenter_group(raw_wc)
@@ -344,40 +371,36 @@ def _build_matrix_tree(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         wc_order.setdefault(wc_label, order)
 
         if wc_label not in wc_map:
-            wc_map[wc_label] = {"label": wc_label, "level": "workcenter", "count": 0,
-                                "month_counts": {}, "children": {}}
+            wc_map[wc_label] = _new_node(wc_label, "workcenter")
         wc_node = wc_map[wc_label]
 
         spec_key = spec
         if spec_key not in wc_node["children"]:
-            wc_node["children"][spec_key] = {"label": spec, "level": "spec", "count": 0,
-                                              "month_counts": {}, "children": {}}
+            wc_node["children"][spec_key] = _new_node(spec, "spec")
         spec_node = wc_node["children"][spec_key]
 
         eqp_key = eqp_id
         if eqp_key not in spec_node["children"]:
-            spec_node["children"][eqp_key] = {
-                "label": eqp_id,
-                "equipment_name": eqp_name,
-                "level": "equipment",
-                "count": 0,
-                "month_counts": {},
-                "children": {},
-            }
+            spec_node["children"][eqp_key] = _new_node(
+                eqp_id, "equipment", equipment_name=eqp_name,
+            )
         eqp_node = spec_node["children"][eqp_key]
 
-        if month:
-            eqp_node["month_counts"][month] = eqp_node["month_counts"].get(month, 0) + count
-            spec_node["month_counts"][month] = spec_node["month_counts"].get(month, 0) + count
-            wc_node["month_counts"][month] = wc_node["month_counts"].get(month, 0) + count
-        eqp_node["count"] += count
-        spec_node["count"] += count
-        wc_node["count"] += count
+        _accumulate(eqp_node, month, container)
+        _accumulate(spec_node, month, container)
+        _accumulate(wc_node, month, container)
 
     def _flatten(node_map: Dict) -> List[Dict]:
         result = []
         for node in node_map.values():
             n = dict(node)
+            # Convert transient container sets → distinct counts, then drop
+            # the transient keys so the node shape stays
+            # {label, level, count, month_counts, children}.
+            containers = n.pop("_containers")
+            month_containers = n.pop("_month_containers")
+            n["count"] = len(containers)
+            n["month_counts"] = {m: len(s) for m, s in month_containers.items()}
             n["children"] = _flatten(n.get("children", {}))
             result.append(n)
         return result
@@ -464,12 +487,16 @@ def _pandas_matrix_view(spool_path: str, filter_params: Dict[str, Any]) -> Dict[
         return {"tree": [], "month_columns": []}
 
     df["month_bucket"] = pd.to_datetime(df["TRACKINTIMESTAMP"], errors="coerce").dt.strftime("%Y-%m")
-    agg = (
-        df.groupby(["WORKCENTERNAME", "SPECNAME", "EQUIPMENTID", "EQUIPMENTNAME", "month_bucket"])
-        ["CONTAINERNAME"].nunique().reset_index()
+    # Emit raw distinct (wc, spec, eqp, month, container) tuples — identical
+    # row contract to compute_matrix_view's SELECT DISTINCT.  All distinct
+    # counting (incl. canonical-group dedup) happens in _build_matrix_tree.
+    distinct = (
+        df[["WORKCENTERNAME", "SPECNAME", "EQUIPMENTID", "EQUIPMENTNAME",
+            "month_bucket", "CONTAINERNAME"]]
+        .drop_duplicates()
     )
-    agg.columns = ["wc", "spec", "eqp_id", "eqp_name", "month_bucket", "lot_count"]
-    return _build_matrix_tree(agg.to_dict(orient="records"))
+    distinct.columns = ["wc", "spec", "eqp_id", "eqp_name", "month_bucket", "container"]
+    return _build_matrix_tree(distinct.to_dict(orient="records"))
 
 
 # ── Filter options ────────────────────────────────────────────────────────────

@@ -1,0 +1,26 @@
+agent: backend-engineer
+change-id: fix-matrix-distinct-count
+summary: >
+  Implemented Option C — raw distinct-tuple rows + Python set rollup. compute_matrix_view
+  now emits SELECT DISTINCT (wc, spec, eqp_id, eqp_name, month, container); _pandas_matrix_view
+  emits the identical contract via drop_duplicates(); _build_matrix_tree accumulates a Python
+  set() per node and per node×month, deriving count/month_counts via len() in _flatten and
+  dropping the transient set keys. Single counting site — canonical workcenter-group dedup
+  happens naturally because containers land in the same group node's set.
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/services/production_history_sql_runtime.py:287-303 (compute_matrix_view SQL)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/production_history_sql_runtime.py:311-410 (_build_matrix_tree set rollup)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/production_history_sql_runtime.py:476-487 (_pandas_matrix_view drop_duplicates)" }
+  - { type: tests-added, pointer: "tests/test_production_history_sql_runtime.py::TestMatrixDistinctCountRollup (7 cases)" }
+  - { type: tests-added, pointer: "tests/test_production_history_sql_runtime.py::TestMatrixTreeNodeShape (3 cases)" }
+  - { type: tests-added, pointer: "tests/test_production_history_sql_runtime.py::TestMatrixDualPathParity (2 cases, AC-4)" }
+  - { type: tests-added, pointer: "tests/test_production_history_sql_runtime.py::TestMatrixDataBoundary (3 cases)" }
+  - { type: test-output, pointer: "97 passed in 32.81s (sql_runtime + routes + api_contract)" }
+  - { type: contracts-touched, pointer: "none (data-shape 1.3.0 §3.5 + business 1.5.0 PH-05 pre-updated by main Claude)" }
+tdd:
+  failing-first: "11 of 15 new matrix tests failed against pre-fix code; anchor test_one_container_three_specs_workcenter_count_is_one showed workcenter count==3, asserts ==1"
+  after-fix: "all 15 matrix tests + full sweep green"
+notes:
+  - ruff clean on the changed file. mypy not installed in mes-dashboard env (could not run); new code is fully type-annotated.
+  - AC-4 dual-path parity confirmed: both TestMatrixDualPathParity cases assert duck == pan deep-equal, including the cross-spec-container fixture.
+next-reviewer: contract-reviewer / qa-reviewer
