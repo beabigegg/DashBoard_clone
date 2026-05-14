@@ -1,4 +1,4 @@
-export function parseTokenList(input) {
+export function parseTokenList(input: unknown): string[] {
   if (!input) {
     return [];
   }
@@ -18,7 +18,7 @@ export function parseTokenList(input) {
   return tokens;
 }
 
-export function toQueryParams(filters = {}) {
+export function toQueryParams(filters: Record<string, unknown> = {}): URLSearchParams {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
     if (value === null || value === undefined || value === '') {
@@ -37,7 +37,7 @@ export function toQueryParams(filters = {}) {
   return params;
 }
 
-export function buildDrilldownNotice(matchStatus, fallbackReason = '') {
+export function buildDrilldownNotice(matchStatus: unknown, fallbackReason: string = ''): string {
   const normalized = String(matchStatus || '').toLowerCase();
   if (normalized === 'exact') {
     return '';

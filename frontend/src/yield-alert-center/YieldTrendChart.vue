@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { LineChart } from 'echarts/charts';
@@ -35,11 +35,13 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross', crossStyle: { color: 'rgb(153, 153, 153)' } },
-      formatter(params) {
-        const idx = params[0]?.dataIndex ?? 0;
-        const item = items[idx] || {};
+      // TODO: type echarts callback
+      formatter(params: unknown) {
+        const p = Array.isArray(params) ? params : [];
+        const idx = (p[0] as Record<string, unknown>)?.dataIndex ?? 0;
+        const item = items[Number(idx)] || {};
         return [
-          `<b>${params[0]?.name ?? ''}</b>`,
+          `<b>${(p[0] as Record<string, unknown>)?.name ?? ''}</b>`,
           `良率：<b>${Number(item.yield_pct ?? 0).toFixed(2)}%</b>`,
           `移轉量：${Number(item.transaction_qty ?? 0).toLocaleString()}`,
           `報廢量：${Number(item.scrap_qty ?? 0).toLocaleString()}`,

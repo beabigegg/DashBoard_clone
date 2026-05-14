@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import { BarChart, LineChart } from 'echarts/charts';
@@ -35,9 +35,10 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross' },
-      formatter(params) {
+      // TODO: type echarts callback
+      formatter(params: unknown) {
         if (!Array.isArray(params) || !params.length) return '';
-        const idx = Number(params[0].dataIndex ?? 0);
+        const idx = Number((params[0] as Record<string, unknown>).dataIndex ?? 0);
         const row = rows[idx] || {};
         return [
           `<b>${row.package || '(NA)'}</b>`,

@@ -1,14 +1,14 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 
-import { apiGet, apiPost } from '../core/api.js';
-import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling.js';
-import { useYieldAlertDuckDB } from './useYieldAlertDuckDB.js';
-import { isDuckDBSupported } from '../core/duckdb-client.js';
+import { apiGet, apiPost } from '../core/api';
+import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling';
+import { useYieldAlertDuckDB } from './useYieldAlertDuckDB';
+import { isDuckDBSupported } from '../core/duckdb-client';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
-import { replaceRuntimeHistory } from '../core/shell-navigation.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
-import { toQueryParams } from './utils.js';
+import { replaceRuntimeHistory } from '../core/shell-navigation';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
+import { toQueryParams } from './utils';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -58,7 +58,13 @@ const committedDateRange = reactive({
   end_date: '',
 });
 
-const jobProgress = reactive({
+const jobProgress = reactive<{
+  active: boolean;
+  jobId: string | null;
+  status: string;
+  progress: string;
+  pct: number;
+}>({
   active: false,
   jobId: null,
   status: '',
@@ -66,7 +72,7 @@ const jobProgress = reactive({
   pct: 0,
 });
 
-let _jobAbortController = null;
+let _jobAbortController: AbortController | null = null;
 
 const granularity = ref('day');
 const GRANULARITY_OPTIONS = [
@@ -659,7 +665,7 @@ watch(granularity, (newVal, oldVal) => {
 
 // ── Cross-filter: dimension filter changes narrow other dropdowns' options ────
 // Does NOT auto-run the full query; user still clicks "套用篩選" to execute.
-let _crossFilterTimer = null;
+let _crossFilterTimer: ReturnType<typeof setTimeout> | null = null;
 async function fetchCrossFilterOptions() {
   if (!queryId.value || !hasQueried.value) return;
   const params = new URLSearchParams({ query_id: queryId.value });
