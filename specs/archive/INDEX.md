@@ -23,3 +23,4 @@
 | fix-matrix-distinct-count | 2026 | 2026-05-14 | specs/archive/2026/fix-matrix-distinct-count/ |
 | prod-history-query-mode-tabs | 2026 | 2026-05-14 | specs/archive/2026/prod-history-query-mode-tabs/ |
 | prod-history-first-tier-cache-filters | 2026 | 2026-05-14 | specs/archive/2026/prod-history-first-tier-cache-filters/ |
+| migrate-yield-alert-center-ts | 2026 | 2026-05-14 | specs/archive/2026/migrate-yield-alert-center-ts/ |
