@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.1.0
-last-changed: 2026-05-05
+schema-version: 1.2.0
+last-changed: 2026-05-15
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -89,8 +89,26 @@ breaking-change-policy: deprecate-2-minors
 | 7.3 | CSS 規則大幅搬移時，必須更新清單的 scope/notes 欄位 |
 | 7.4 | `src/mes_dashboard/static/dist/*` 產物不屬清單治理範圍 |
 
+## Detail Table Layout Rule
+
+明細表（detail table）必須渲染為單一平面表格，不得嵌套在額外的卡片或包裝容器內。
+
+| 頁面 | 明細表元件 / 區塊 | 規則 |
+|---|---|---|
+| `hold-history` | `DetailTable.vue`（Hold / Release 明細） | 必須直接使用 `DataTable` + `DataTableColumn` 渲染為單一平面表格，不得在 `<section class="card">` 之外再套額外 wrapper 卡片 |
+| `hold-overview` | `App.vue` 內的 "Hold Lot Details" 區塊 | 同上，`DataTable` 直接置於 `.card-body` 內，不允許嵌套額外容器卡片 |
+| `reject-history` | `components/DetailTable.vue`（明細列表） | `.card-body` 必須套用 `padding: 0` scoped override，DataTable 緊貼卡片邊緣，不得保留 `style.css` 的 `.card-body` 全域 padding |
+| `material-trace` | `App.vue` 內的 "查詢結果" 區塊（Result Card `.card-body`） | 同上，`.card-body` 必須套用 `padding: 0` scoped override，DataTable 緊貼卡片邊緣 |
+
+**參考實作**（正確模式）：`hold-detail/components/DistributionTable.vue`、`wip-detail/components/LotTable.vue`。
+
+- 明細表的外層容器只允許一層 `<section class="card ui-card">`，其 `.card-body` 直接包含 `DataTable`（或原生 `<table>`），不得再嵌套一層 `<section class="card">` 或其他 wrapper 卡片元件。
+- 表格的 column resize handle（`.col-resize-handle`）、tooltip teleport 等輔助元素不屬於「額外卡片包裝」，允許保留。
+- 違反此規則的佈局稱為「表中表（table-within-table）」，屬 Forbidden Practice。
+
 ## Forbidden Practices
 
+- 表中表（detail table 嵌套在額外卡片 wrapper 內）
 - 硬編碼 token 值（顏色、間距）繞過 `tailwind.config.js`
 - 功能區塊樣式洩漏至全域（缺少主題根類別作用域）
 - 從外部 CSS 覆寫共用元件內部樣式（DataTable、SummaryCard、Chip、SectionCard、ErrorBanner）

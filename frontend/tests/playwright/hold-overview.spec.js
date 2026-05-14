@@ -25,10 +25,23 @@ test.describe('Hold Overview page', () => {
     await expect(tables.first()).toBeVisible({ timeout: 20_000 });
   });
 
-  test('renders the Lot Details data table', async ({ page }) => {
-    const tables = page.locator('table');
-    const count = await tables.count();
-    expect(count).toBeGreaterThanOrEqual(1);
+  test('renders the Lot Details data table as a flat table (no nested .ui-card inside .card-body)', async ({ page }) => {
+    // Locate the Hold Lot Details card
+    const lotsCard = page.locator('.ui-card').filter({ hasText: 'Hold Lot Details' });
+    await expect(lotsCard.first()).toBeVisible({ timeout: 20_000 });
+
+    // The card-body must contain a <table> directly — not via a nested .ui-card wrapper
+    const cardBody = lotsCard.first().locator('.card-body, .ui-card-body').first();
+    await expect(cardBody).toBeVisible({ timeout: 10_000 });
+
+    // Assert no nested .ui-card inside .card-body (that would be "table within table")
+    const nestedCard = cardBody.locator('.ui-card');
+    const nestedCount = await nestedCard.count();
+    expect(nestedCount).toBe(0);
+
+    // Assert a <table> is present inside the card (directly or via DataTable)
+    const tableInCard = lotsCard.first().locator('table');
+    await expect(tableInCard.first()).toBeVisible({ timeout: 20_000 });
   });
 
   test('clicking a pareto drilldown item navigates to hold-detail', async ({ page }) => {

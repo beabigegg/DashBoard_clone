@@ -76,6 +76,11 @@
   padding: theme('spacing.token.p16');
 }
 
+/* Flat-table layout: Hold Lot Details table extends flush to card edges */
+.lots-card-body {
+  padding: 0;
+}
+
 .filter-bar {
   display: flex;
   align-items: flex-end;

@@ -235,7 +235,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="card-body ui-card-body">
+    <div class="card-body ui-card-body detail-card-body">
       <div ref="tableWrap" class="resizable-table-wrap">
         <DataTable
           :data="(items as Record<string, unknown>[])"
@@ -295,6 +295,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Flat-table layout: remove card-body padding so DataTable extends flush to card edges */
+.detail-card-body {
+  padding: 0;
+}
+
 .detail-header-actions {
   display: flex;
   align-items: center;

@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 304
-visible-files: 948
+visible-files: 957
 omitted-dirs: 105
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -608,6 +608,7 @@ DashBoard_vite/
 |   |   |   |-- resilience/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- _auth.js
+|   |   |   |-- hold-history-flat-table.spec.js
 |   |   |   |-- hold-overview.spec.js
 |   |   |   |-- job-abandon-on-unload.spec.js
 |   |   |   |-- production-history-cross-filter.spec.ts
@@ -652,13 +653,21 @@ DashBoard_vite/
 |-- logs/
 |   |-- archive/
 |   |   |-- access_20260514_203109.log
+|   |   |-- access_20260514_210452.log
 |   |   |-- error_20260514_203109.log
+|   |   |-- error_20260514_210452.log
 |   |   |-- rq_msd_worker_20260514_203109.log
+|   |   |-- rq_msd_worker_20260514_210452.log
 |   |   |-- rq_prod_hist_worker_20260514_203109.log
+|   |   |-- rq_prod_hist_worker_20260514_210452.log
 |   |   |-- rq_reject_worker_20260514_203109.log
+|   |   |-- rq_reject_worker_20260514_210452.log
 |   |   |-- rq_worker_20260514_203109.log
+|   |   |-- rq_worker_20260514_210452.log
 |   |   |-- rq_yield_alert_worker_20260514_203109.log
-|   |   \-- watchdog_20260514_203109.log
+|   |   |-- rq_yield_alert_worker_20260514_210452.log
+|   |   |-- watchdog_20260514_203109.log
+|   |   \-- watchdog_20260514_210452.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -1290,21 +1299,21 @@ DashBoard_vite/
 |   \-- ... (152 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
+|   |   |-- anomaly_hold_dataset/
+|   |   |   \-- 7c193f4e1ec6e300.parquet
 |   |   |-- anomaly_resource_dataset/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
+|   |   |-- hold_dataset/
+|   |   |   \-- d819c1954d0eb112.parquet
+|   |   |-- material_trace/
+|   |   |   \-- mtrace-67637df729fb11a2.parquet
 |   |   |-- production_history/
 |   |   |   |-- ph-aaacd18241a5f3b7.parquet
 |   |   |   \-- ph-af0b6f8ba7f65517.parquet
-|   |   |-- query_tool_assoc_batch_holds/
-|   |   |   \-- 0b890e35611236eb.parquet
-|   |   |-- query_tool_assoc_batch_materials/
-|   |   |   \-- 5cde1904e6a1c3af.parquet
-|   |   |-- query_tool_assoc_batch_rejects/
-|   |   |   \-- 3d984b2324d0f336.parquet
-|   |   |-- query_tool_history_batch/
-|   |   |   \-- 59bf367dc141281f.parquet
+|   |   |-- reject_dataset/
+|   |   |   \-- 2fc5b4f376a42669.parquet
 |   |   |-- resource_dataset/
 |   |   |   |-- 2a692b9c32b461d2.parquet
 |   |   |   |-- 7e37d99ad559f8c8.parquet
@@ -1356,7 +1365,7 @@ DashBoard_vite/
 |   |   |-- probe_113869.json
 |   |   |-- probe_116133.json
 |   |   |-- probe_116787.json
-|   |   \-- ... (350 more entries truncated; cap=50)
+|   |   \-- ... (352 more entries truncated; cap=50)
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
 |   |-- resource_history.duckdb

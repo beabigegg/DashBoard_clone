@@ -1,0 +1,39 @@
+change-id: hold-history-detail-flat-table
+status: in-progress
+tier: 3
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: skipped, note: "No API change — payloads already flat" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: done }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "No env change" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped, note: "Payload unchanged" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped, note: "No logic change" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "No pipeline change" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "No new unit tests needed; pure UI refactor; confirmed by test-strategist" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: skipped, note: "No backend/integration surface changes" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "New hold-history-flat-table.spec.js + updated hold-overview.spec.js" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped, note: "No data-handling change" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "UI refactor only" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: skipped, note: "Read-only verification only; no code change expected" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "No deploy change" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "No workflow change" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done, note: "APPROVED-WITH-NOTES; ErrorBanner concern resolved by its own internal padding" }
+  - { id: "5.2", section: Review, title: "Visual review", status: done, note: "APPROVED" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "approved — all 6 ACs satisfied" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed; css:check 0 errors; type-check clean" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "Requires PR creation — Playwright E2E on CI" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: pending, note: "type-check informational; passes locally" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "Not required for UI refactor" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

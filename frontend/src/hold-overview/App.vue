@@ -921,7 +921,7 @@ onBeforeUnmount(() => {
             <button type="button" class="text-brand-500 hover:underline" @click="clearMatrixFilter">清除</button>
           </div>
         </div>
-        <div class="card-body ui-card-body">
+        <div class="card-body ui-card-body lots-card-body">
           <ErrorBanner :message="lotsError" @dismiss="lotsError = ''" />
           <DataTable
             :data="lots"
