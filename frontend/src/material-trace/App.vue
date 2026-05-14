@@ -526,7 +526,7 @@ function onDocumentClick(e) {
           </template>
         </span>
       </div>
-      <div class="card-body ui-card-body">
+      <div class="card-body ui-card-body result-card-body">
         <DataTable
           :data="rows"
           :loading="loading || paginationLoading"

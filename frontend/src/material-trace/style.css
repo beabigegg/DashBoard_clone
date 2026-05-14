@@ -362,6 +362,11 @@
   background: theme('colors.surface.muted');
 }
 
+/* Flat-table layout: remove Result Card card-body padding so DataTable extends flush to card edges */
+.theme-material-trace .result-card-body {
+  padding: 0;
+}
+
 @media (max-width: 768px) {
   .theme-material-trace .filter-panel {
     grid-template-columns: 1fr;

@@ -53,7 +53,7 @@ function onPageChange(newPage: number): void {
         </span>
       </div>
     </div>
-    <div class="card-body ui-card-body">
+    <div class="card-body ui-card-body detail-card-body">
       <DataTable
         :data="items"
         :loading="loading || paginating"
@@ -120,6 +120,11 @@ function onPageChange(newPage: number): void {
 </template>
 
 <style scoped>
+/* Flat-table layout: remove card-body padding so DataTable extends flush to card edges */
+.detail-card-body {
+  padding: 0;
+}
+
 .expand-breakdown {
   padding: 4px 0;
 }
