@@ -1364,11 +1364,19 @@ do_start() {
             --daemon \
             "mes_dashboard:create_app()"
 
-        sleep 1
+        local readiness_timeout="${SERVER_STARTUP_TIMEOUT:-60}"
+        local waited=0
+        while [ "$waited" -lt "$readiness_timeout" ]; do
+            if is_running; then
+                break
+            fi
+            sleep 1
+            waited=$((waited + 1))
+        done
 
         if is_running; then
             local pid=$(get_pid)
-            log_success "Server started successfully (PID: ${pid})"
+            log_success "Server started successfully (PID: ${pid}, ready in ${waited}s)"
             log_info "Access URL: http://localhost:${PORT}"
             log_info "Logs: ${LOG_DIR}/"
             start_watchdog || return 1
