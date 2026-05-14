@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onMounted, ref, shallowRef, triggerRef, watch } from 'vue';
 
 import VChart from 'vue-echarts';
@@ -11,7 +11,7 @@ import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import ExportButton from './ExportButton.vue';
 import LoadingOverlay from '../../shared-ui/components/LoadingOverlay.vue';
 import PaginationControl from '../../shared-ui/components/PaginationControl.vue';
-import { normalizeText } from '../utils/values.js';
+import { normalizeText } from '../utils/values';
 
 use([CanvasRenderer, TreeChart, TooltipComponent, ToolboxComponent]);
 
@@ -142,7 +142,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['select-nodes']);
-const chartRef = ref(null);
+const chartRef = ref<{ getEchartsInstance?: () => unknown; chart?: unknown } | null>(null);
 const exportingTreeImage = ref(false);
 const exportingRelationCsv = ref(false);
 const exportErrorMessage = ref('');
@@ -169,17 +169,18 @@ const allSerialNames = computed(() => {
 });
 
 const relationRows = computed(() => {
-  const rows = [];
-  const seen = new Set();
+  const rows: Array<Record<string, string>> = [];
+  const seen = new Set<string>();
   const source = Array.isArray(props.graphEdges) ? props.graphEdges : [];
 
-  source.forEach((edge) => {
+  source.forEach((edge: unknown) => {
     if (!edge || typeof edge !== 'object') {
       return;
     }
-    const fromCid = normalizeText(edge.from_cid);
-    const toCid = normalizeText(edge.to_cid);
-    const edgeType = normalizeText(edge.edge_type);
+    const e = edge as Record<string, unknown>;
+    const fromCid = normalizeText(e.from_cid);
+    const toCid = normalizeText(e.to_cid);
+    const edgeType = normalizeText(e.edge_type);
     if (!fromCid || !toCid || !edgeType) {
       return;
     }
@@ -197,7 +198,7 @@ const relationRows = computed(() => {
       fromName: normalizeText(props.nameMap?.get?.(fromCid) || fromCid),
       toName: normalizeText(props.nameMap?.get?.(toCid) || toCid),
       edgeType,
-      edgeLabel: RELATION_TYPE_LABELS[edgeType] || edgeType,
+      edgeLabel: (RELATION_TYPE_LABELS as Record<string, string>)[edgeType] || edgeType,
     });
   });
 
@@ -216,7 +217,7 @@ const pagedRelationRows = computed(() => relationRows.value.slice(
 
 const relationTotalPages = computed(() => Math.max(1, Math.ceil(relationRows.value.length / RELATION_PAGE_SIZE)));
 
-function detectNodeType(cid, entry, serials) {
+function detectNodeType(cid: string, entry: { children?: string[] } | null, serials: unknown[]) {
   const explicitType = normalizeText(props.nodeMetaMap?.get?.(cid)?.node_type).toUpperCase();
   if (explicitType === 'WAFER') {
     return 'wafer';
@@ -244,7 +245,7 @@ function detectNodeType(cid, entry, serials) {
   return 'branch';
 }
 
-function lookupEdgeMeta(parentCid, childCid) {
+function lookupEdgeMeta(parentCid: string, childCid: string) {
   const parent = normalizeText(parentCid);
   const child = normalizeText(childCid);
   if (!parent || !child) {
@@ -261,15 +262,15 @@ function lookupEdgeMeta(parentCid, childCid) {
   return { edgeType: '', reversed: false };
 }
 
-function relationTag(edgeType, reversed) {
-  const spec = EDGE_TAGS[normalizeText(edgeType)];
+function relationTag(edgeType: string, reversed: boolean) {
+  const spec = (EDGE_TAGS as Record<string, { forward: string; reverse: string }>)[normalizeText(edgeType)];
   if (!spec) {
     return '';
   }
   return reversed ? spec.reverse : spec.forward;
 }
 
-function relationSentence({ edgeType, reversed, leftName, currentName }) {
+function relationSentence({ edgeType, reversed, leftName, currentName }: { edgeType: string; reversed: boolean; leftName: string; currentName: string }) {
   const left = normalizeText(leftName);
   const current = normalizeText(currentName);
   if (!edgeType || !left || !current) {
@@ -302,7 +303,9 @@ function relationSentence({ edgeType, reversed, leftName, currentName }) {
     : `${current} 與 ${left}（${edgeType}）`;
 }
 
-function buildNode(cid, visited, parentCid = '') {
+type TreeNode = Record<string, unknown> & { children?: TreeNode[] };
+
+function buildNode(cid: unknown, visited: Set<string>, parentCid = ''): TreeNode | null {
   const id = normalizeText(cid);
   if (!id || visited.has(id)) {
     return null;
@@ -334,20 +337,20 @@ function buildNode(cid, visited, parentCid = '') {
     // This ensures wafer_lot is "claimed" by the deepest ancestor (A01) via
     // the global visited set, and won't duplicate at shallower levels.
     const orderedChildIds = props.isReverse
-      ? [...childIds].sort((a, b) => {
+      ? [...(childIds as string[])].sort((a: string, b: string) => {
           const ea = normalizeText(lookupEdgeMeta(id, a).edgeType);
           const eb = normalizeText(lookupEdgeMeta(id, b).edgeType);
-          const priority = { split_from: 0, merge_source: 1, gd_rework_source: 2, wafer_origin: 3 };
+          const priority: Record<string, number> = { split_from: 0, merge_source: 1, gd_rework_source: 2, wafer_origin: 3 };
           return (priority[ea] ?? 1) - (priority[eb] ?? 1);
         })
-      : childIds;
+      : childIds as string[];
 
     children = orderedChildIds
-      .map((childId) => buildNode(childId, visited, id))
-      .filter(Boolean);
+      .map((childId: string) => buildNode(childId, visited, id))
+      .filter((n): n is TreeNode => n !== null);
 
     if (children.length === 0 && serials.length > 0) {
-      serials.forEach((sn) => {
+      (serials as string[]).forEach((sn: string) => {
         children.push({
           name: sn,
           value: { type: 'serial', cid: id },
@@ -379,22 +382,22 @@ function buildNode(cid, visited, parentCid = '') {
   }
 
   // Leaf node whose display name matches a known serial → render as serial style
-  const isSerialLike = nodeType === 'leaf'
+  const isSerialLike: boolean = nodeType === 'leaf'
     && serials.length === 0
     && children.length === 0
     && allSerialNames.value.has(name);
-  const effectiveType = isSerialLike ? 'serial' : nodeType;
-  const color = NODE_COLORS[effectiveType] || NODE_COLORS.branch;
+  const effectiveType: string = isSerialLike ? 'serial' : nodeType;
+  const color = (NODE_COLORS as Record<string, string>)[effectiveType] || NODE_COLORS.branch;
   const incomingMeta = lookupEdgeMeta(parentCid, id);
   const incomingEdgeType = incomingMeta.edgeType;
   const incomingEdgeReversed = incomingMeta.reversed;
-  const incomingEdgeStyle = EDGE_STYLES[incomingEdgeType] || EDGE_STYLES.default;
+  const incomingEdgeStyle = (EDGE_STYLES as Record<string, { color: string; type: string; width: number }>)[incomingEdgeType] || EDGE_STYLES.default;
   const parentName = normalizeText(props.nameMap?.get?.(normalizeText(parentCid)) || parentCid);
   const shortTag = relationTag(incomingEdgeType, incomingEdgeReversed);
   const displayLabel = shortTag ? `${shortTag} ${name}` : name;
   const isSelected = selectedSet.value.has(id);
 
-  const node = {
+  const node: TreeNode = {
     name,
     value: {
       cid: id,
@@ -439,16 +442,16 @@ const treesData = computed(() => {
 
   return props.treeRoots
     .map((rootId) => buildNode(rootId, new Set()))
-    .filter(Boolean);
+    .filter((n): n is TreeNode => n !== null);
 });
 
 const hasData = computed(() => treesData.value.length > 0);
 
-function countLeaves(node) {
+function countLeaves(node: { children?: unknown[] }): number {
   if (!node.children || node.children.length === 0) {
     return 1;
   }
-  return node.children.reduce((sum, child) => sum + countLeaves(child), 0);
+  return node.children.reduce((sum: number, child: unknown) => sum + countLeaves(child as { children?: unknown[] }), 0);
 }
 
 const chartHeight = computed(() => {
@@ -457,24 +460,25 @@ const chartHeight = computed(() => {
   return `${base}px`;
 });
 
-function countGraphemes(text) {
+function countGraphemes(text: unknown): number {
   return Array.from(normalizeText(text)).length;
 }
 
-function walkTreeMetrics(node, depth, metrics) {
+function walkTreeMetrics(node: Record<string, unknown>, depth: number, metrics: { maxDepth: number; maxLabelChars: number }) {
   if (!node || typeof node !== 'object') {
     return;
   }
 
   metrics.maxDepth = Math.max(metrics.maxDepth, depth);
-  const relationTag = normalizeText(node?.value?.relationTag);
+  const nodeVal = (node?.value as Record<string, unknown>) || {};
+  const relationTag = normalizeText(nodeVal?.relationTag);
   const labelText = relationTag
     ? `${relationTag} ${normalizeText(node.name)}`
     : normalizeText(node.name);
   metrics.maxLabelChars = Math.max(metrics.maxLabelChars, countGraphemes(labelText));
 
   const children = Array.isArray(node.children) ? node.children : [];
-  children.forEach((child) => walkTreeMetrics(child, depth + 1, metrics));
+  children.forEach((child: unknown) => walkTreeMetrics(child as Record<string, unknown>, depth + 1, metrics));
 }
 
 const treeMetrics = computed(() => {
@@ -487,7 +491,7 @@ const treeMetrics = computed(() => {
   return metrics;
 });
 
-function clampNumber(value, min, max) {
+function clampNumber(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
@@ -504,7 +508,7 @@ const depthSpacingPx = computed(() => clampNumber(
 ));
 
 const rootLabelWidthPx = computed(() => {
-  const maxChars = props.treeRoots.reduce((max, rootCid) => {
+  const maxChars = (props.treeRoots as unknown[]).reduce<number>((max, rootCid) => {
     const rootId = normalizeText(rootCid);
     const rootName = normalizeText(props.nameMap?.get?.(rootId) || rootId);
     return Math.max(max, countGraphemes(rootName));
@@ -582,12 +586,13 @@ const chartOption = computed(() => {
   const tooltip = {
     trigger: 'item',
     triggerOn: 'mousemove',
-    formatter(params) {
-      const data = params?.data;
+    // TODO: type echarts callback
+    formatter(params: Record<string, unknown>) {
+      const data = params?.data as Record<string, unknown> | undefined;
       if (!data) {
         return '';
       }
-      const val = data.value || {};
+      const val = (data.value || {}) as Record<string, unknown>;
       if (val.type === 'expand-toggle' || val.type === 'collapse-toggle') {
         return val.type === 'expand-toggle' ? '點擊展開' : '點擊收合';
       }
@@ -611,10 +616,10 @@ const chartOption = computed(() => {
       }
       if (val.edgeType) {
         const sentence = relationSentence({
-          edgeType: val.edgeType,
+          edgeType: String(val.edgeType),
           reversed: Boolean(val.edgeReversed),
-          leftName: val.parentName,
-          currentName: data.name,
+          leftName: String(val.parentName || ''),
+          currentName: String(data.name || ''),
         });
         if (sentence) {
           lines.push(`<span style="color:rgb(15, 23, 42);font-size:11px">讀法: ${sentence}</span>`);
@@ -661,15 +666,17 @@ const chartOption = computed(() => {
   };
 });
 
-function handleNodeClick(params) {
-  const data = params?.data;
+// TODO: type echarts callback
+function handleNodeClick(params: Record<string, unknown>) {
+  const data = params?.data as Record<string, unknown> | undefined;
   if (!data?.value) return;
 
-  const nodeType = data.value.type;
+  const nodeValue = data.value as Record<string, unknown>;
+  const nodeType = nodeValue.type;
 
   // Toggle expand/collapse via our managed state
   if (nodeType === 'collapse-toggle') {
-    const parentCid = data.value.parentCid;
+    const parentCid = String(nodeValue.parentCid || '');
     if (parentCid) {
       const next = new Set(collapsedCids.value);
       next.add(parentCid);
@@ -679,7 +686,7 @@ function handleNodeClick(params) {
     return;
   }
   if (nodeType === 'expand-toggle') {
-    const parentCid = data.value.parentCid;
+    const parentCid = String(nodeValue.parentCid || '');
     if (parentCid) {
       const next = new Set(collapsedCids.value);
       next.delete(parentCid);
@@ -693,7 +700,7 @@ function handleNodeClick(params) {
   if (nodeType === 'serial' || nodeType === 'virtual-root') return;
 
   // Toggle selection for filtering
-  const cid = data.value.cid;
+  const cid = String(nodeValue.cid || '');
   if (!cid) return;
   const current = new Set(selectedSet.value);
   if (current.has(cid)) {
@@ -721,7 +728,7 @@ function buildExportFileName(ext = 'png') {
   return `${safeBase}_${ts}.${ext}`;
 }
 
-function triggerDownloadByUrl(url, filename) {
+function triggerDownloadByUrl(url: string, filename: string): void {
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
@@ -731,15 +738,22 @@ function triggerDownloadByUrl(url, filename) {
   document.body.removeChild(link);
 }
 
-function getChartInstance() {
+interface EChartsInstance {
+  resize(): void;
+  setOption(option: unknown, opts?: unknown): void;
+  dispatchAction(payload: unknown): void;
+  getDataURL(opts?: unknown): string;
+}
+
+function getChartInstance(): EChartsInstance | null {
   const chartComponent = chartRef.value;
   if (!chartComponent) {
     return null;
   }
   if (typeof chartComponent.getEchartsInstance === 'function') {
-    return chartComponent.getEchartsInstance();
+    return (chartComponent.getEchartsInstance as () => EChartsInstance | null)();
   }
-  return chartComponent.chart || null;
+  return (chartComponent.chart as EChartsInstance) || null;
 }
 
 // Force ECharts tree to re-layout after SPA navigation or when data first
@@ -767,7 +781,7 @@ watch(hasData, (next) => {
   }
 });
 
-function escapeCsvField(value) {
+function escapeCsvField(value: unknown): string {
   const text = normalizeText(value);
   if (text === '') {
     return '';
@@ -796,14 +810,16 @@ function buildCsvContent() {
   return `\uFEFF${lines.join('\r\n')}`;
 }
 
-function collectBranchCids(node, result) {
+function collectBranchCids(node: unknown, result: Set<string>): void {
   if (!node || typeof node !== 'object') return;
-  const childIds = props.lineageMap.get(normalizeText(node?.value?.cid))?.children;
+  const n = node as Record<string, unknown>;
+  const val = n.value as Record<string, unknown> | undefined;
+  const childIds = props.lineageMap.get(normalizeText(val?.cid))?.children;
   if (childIds && childIds.length > 0) {
-    result.add(normalizeText(node.value.cid));
+    result.add(normalizeText(val?.cid));
   }
-  if (Array.isArray(node.children)) {
-    node.children.forEach((child) => collectBranchCids(child, result));
+  if (Array.isArray(n.children)) {
+    n.children.forEach((child) => collectBranchCids(child, result));
   }
 }
 
@@ -817,10 +833,11 @@ function collapseAll() {
   const allBranches = new Set();
   treesData.value.forEach((tree) => {
     // Don't collapse the root itself, but collapse its branch children
-    const rootCid = normalizeText(tree?.value?.cid);
+    const treeVal = (tree?.value as Record<string, unknown>) || {};
+    const rootCid = normalizeText(treeVal.cid);
     const rootEntry = props.lineageMap.get(rootCid);
     if (rootEntry?.children) {
-      rootEntry.children.forEach((childCid) => {
+      rootEntry.children.forEach((childCid: unknown) => {
         const childId = normalizeText(childCid);
         const childEntry = props.lineageMap.get(childId);
         if (childEntry?.children?.length > 0) {
@@ -833,7 +850,7 @@ function collapseAll() {
   triggerRef(collapsedCids);
 }
 
-function removeSelection(cid) {
+function removeSelection(cid: unknown): void {
   const current = new Set(selectedSet.value);
   current.delete(normalizeText(cid));
   emit('select-nodes', [...current]);
@@ -867,7 +884,7 @@ async function exportTreeAsPng() {
     });
     triggerDownloadByUrl(dataUrl, buildExportFileName('png'));
   } catch (error) {
-    exportErrorMessage.value = error?.message || '樹圖匯出失敗';
+    exportErrorMessage.value = (error as Error)?.message || '樹圖匯出失敗';
   } finally {
     exportingTreeImage.value = false;
   }
@@ -888,7 +905,7 @@ function exportRelationCsv() {
     triggerDownloadByUrl(href, buildExportFileName('csv'));
     URL.revokeObjectURL(href);
   } catch (error) {
-    exportErrorMessage.value = error?.message || '關係 CSV 匯出失敗';
+    exportErrorMessage.value = (error as Error)?.message || '關係 CSV 匯出失敗';
   } finally {
     exportingRelationCsv.value = false;
   }
@@ -989,7 +1006,7 @@ function exportRelationCsv() {
         ref="chartRef"
         class="lineage-tree-chart"
         :style="{ height: chartHeight, width: '100%' }"
-        :option="chartOption"
+        :option="chartOption ?? undefined"
         :autoresize="true"
         @click="handleNodeClick"
       />
@@ -1045,10 +1062,10 @@ function exportRelationCsv() {
         <span class="mr-1 text-xs font-medium lineage-selected-count">已選 {{ selectedContainerIds.length }} 個節點</span>
         <span
           v-for="cid in selectedContainerIds.slice(0, 8)"
-          :key="cid"
+          :key="cid as PropertyKey"
           class="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-white pl-2 pr-1 py-0.5 font-mono text-xs text-brand-800 shadow-sm"
         >
-          {{ nameMap?.get?.(cid) || cid }}
+          {{ nameMap?.get?.(cid as string) || cid }}
           <button
             type="button"
             class="lineage-chip-remove"

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 
 const props = defineProps({

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import FilterToolbar from '../../shared-ui/components/FilterToolbar.vue';
@@ -41,8 +41,8 @@ const inputCount = computed(() => {
 });
 
 const inputTypeLabel = computed(() => {
-  const selected = (props.inputTypeOptions || []).find((option) => option?.value === props.inputType);
-  return selected?.label || '查詢條件';
+  const selected = (props.inputTypeOptions || []).find((option) => (option as Record<string, unknown>)?.value === props.inputType);
+  return (selected as Record<string, unknown>)?.label as string || '查詢條件';
 });
 
 function handleResolve() {
@@ -60,14 +60,14 @@ function handleResolve() {
             class="query-tool-select"
             :value="inputType"
             :disabled="resolving"
-            @change="emit('update:inputType', $event.target.value)"
+            @change="emit('update:inputType', ($event.target as HTMLSelectElement).value)"
           >
             <option
               v-for="option in inputTypeOptions"
-              :key="option.value"
-              :value="option.value"
+              :key="(option as Record<string, unknown>).value as PropertyKey"
+              :value="(option as Record<string, unknown>).value"
             >
-              {{ option.label }}
+              {{ (option as Record<string, unknown>).label }}
             </option>
           </select>
         </label>
@@ -90,7 +90,7 @@ function handleResolve() {
           class="query-tool-textarea"
           :placeholder="`請輸入 ${inputTypeLabel}（換行或逗號分隔），最多 ${inputLimit} 筆`"
           :disabled="resolving"
-          @input="emit('update:inputText', $event.target.value)"
+          @input="emit('update:inputText', ($event.target as HTMLTextAreaElement).value)"
         />
         <p class="query-tool-input-help">
           支援萬用字元：<code>%</code>（任意長度）、<code>_</code>（單一字元），也可用 <code>*</code> 代表 <code>%</code>。

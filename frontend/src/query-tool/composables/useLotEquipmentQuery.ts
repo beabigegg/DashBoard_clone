@@ -1,8 +1,15 @@
 import { computed, reactive, readonly, ref } from 'vue';
 
-import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api.js';
-import { exportCsv } from '../utils/csv.js';
-import { normalizeText, parseInputValues } from '../utils/values.js';
+import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api';
+import { exportCsv } from '../utils/csv';
+import { normalizeText, parseInputValues } from '../utils/values';
+
+interface LotEquipmentQueryInitial {
+  inputType?: string;
+  inputText?: string;
+  workcenterGroups?: string[];
+  activeSubTab?: string;
+}
 
 const EQUIPMENT_SUB_TABS = Object.freeze(['lots', 'jobs', 'rejects']);
 const DEFAULT_LOTS_PER_PAGE = 25;
@@ -14,38 +21,38 @@ const INPUT_TYPE_OPTIONS = Object.freeze([
   { value: 'work_order', label: '工單' },
 ]);
 
-function normalizeSubTab(value) {
+function normalizeSubTab(value: unknown): string {
   const tab = normalizeText(value).toLowerCase();
   return EQUIPMENT_SUB_TABS.includes(tab) ? tab : 'lots';
 }
 
-function normalizeInputType(value) {
+function normalizeInputType(value: unknown): string {
   const text = normalizeText(value);
   return INPUT_TYPE_OPTIONS.some((opt) => opt.value === text) ? text : 'lot_id';
 }
 
-export function useLotEquipmentQuery(initial = {}) {
+export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
   ensureMesApiAvailable();
 
   // ── Input state ──
   const inputType = ref(normalizeInputType(initial.inputType));
   const inputText = ref(normalizeText(initial.inputText));
-  const workcenterGroups = ref([]);
+  const workcenterGroups = ref<Array<{ name: string; [key: string]: unknown }>>([]);
   const selectedWorkcenterGroups = ref(
     Array.isArray(initial.workcenterGroups) ? initial.workcenterGroups.filter(Boolean) : [],
   );
 
   // ── Resolved equipment ──
-  const resolvedEquipmentIds = ref([]);
-  const resolvedEquipmentNames = ref([]);
+  const resolvedEquipmentIds = ref<string[]>([]);
+  const resolvedEquipmentNames = ref<string[]>([]);
   const startDate = ref('');
   const endDate = ref('');
   const lookupMessage = ref('');
-  const traceMap = ref({});
+  const traceMap = ref<Record<string, string>>({});
 
   // ── Sub-tab data (same as useEquipmentQuery) ──
   const activeSubTab = ref(normalizeSubTab(initial.activeSubTab));
-  const _allLotsRows = ref([]);
+  const _allLotsRows = ref<Record<string, unknown>[]>([]);
   const _lotsPerPage = ref(DEFAULT_LOTS_PER_PAGE);
   const _lotsCurrentPage = ref(1);
 
@@ -64,8 +71,8 @@ export function useLotEquipmentQuery(initial = {}) {
       total_pages: Math.max(1, Math.ceil(total / perPage)),
     };
   });
-  const jobsRows = ref([]);
-  const rejectsRows = ref([]);
+  const jobsRows = ref<Record<string, unknown>[]>([]);
+  const rejectsRows = ref<Record<string, unknown>[]>([]);
 
   const loading = reactive({
     bootstrapping: false,
@@ -142,11 +149,11 @@ export function useLotEquipmentQuery(initial = {}) {
         timeout: 360000,
         silent: true,
       });
-      const inner = payload?.data || {};
+      const inner = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
       workcenterGroups.value = Array.isArray(inner?.data) ? inner.data : [];
       return true;
     } catch (error) {
-      errors.workcenterGroups = error?.message || '載入站點群組失敗';
+      errors.workcenterGroups = (error as Error)?.message || '載入站點群組失敗';
       workcenterGroups.value = [];
       return false;
     } finally {
@@ -181,7 +188,7 @@ export function useLotEquipmentQuery(initial = {}) {
     _lotsCurrentPage.value = 1;
     jobsRows.value = [];
     rejectsRows.value = [];
-    Object.keys(queried).forEach((k) => { queried[k] = false; });
+    Object.keys(queried).forEach((k) => { (queried as Record<string, boolean>)[k] = false; });
   }
 
   async function lookupEquipment() {
@@ -205,19 +212,20 @@ export function useLotEquipmentQuery(initial = {}) {
         workcenter_groups: selectedWorkcenterGroups.value,
       }, { timeout: 360000, silent: true });
 
-      const result = payload?.data || {};
-      resolvedEquipmentIds.value = result.equipment_ids || [];
-      resolvedEquipmentNames.value = result.equipment_names || [];
-      traceMap.value = result.trace_map || {};
+      const result = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
+      resolvedEquipmentIds.value = Array.isArray(result.equipment_ids) ? result.equipment_ids as string[] : [];
+      resolvedEquipmentNames.value = Array.isArray(result.equipment_names) ? result.equipment_names as string[] : [];
+      traceMap.value = (result.trace_map && typeof result.trace_map === 'object') ? result.trace_map as Record<string, string> : {};
 
       if (resolvedEquipmentIds.value.length === 0) {
-        lookupMessage.value = result.not_found_hint || '在指定站點群組中找不到這些批次的設備紀錄';
+        lookupMessage.value = (result.not_found_hint as string) || '在指定站點群組中找不到這些批次的設備紀錄';
         return false;
       }
 
-      if (result.date_range) {
-        startDate.value = result.date_range.start || '';
-        endDate.value = result.date_range.end || '';
+      const dateRange = result.date_range as Record<string, string> | null | undefined;
+      if (dateRange) {
+        startDate.value = dateRange.start || '';
+        endDate.value = dateRange.end || '';
       }
 
       lookupMessage.value = `找到 ${resolvedEquipmentIds.value.length} 台設備`;
@@ -226,7 +234,7 @@ export function useLotEquipmentQuery(initial = {}) {
       await queryActiveSubTab();
       return true;
     } catch (error) {
-      errors.lookup = error?.message || '查詢失敗';
+      errors.lookup = (error as Error)?.message || '查詢失敗';
       return false;
     } finally {
       loading.lookup = false;
@@ -235,7 +243,7 @@ export function useLotEquipmentQuery(initial = {}) {
 
   // ── Data queries (reuse equipment-period API) ──
 
-  function buildQueryPayload(queryType, options = {}) {
+  function buildQueryPayload(queryType: string, options: { page?: number | null; perPage?: number | null } = {}): Record<string, unknown> {
     return {
       equipment_ids: resolvedEquipmentIds.value,
       equipment_names: resolvedEquipmentNames.value,
@@ -249,7 +257,7 @@ export function useLotEquipmentQuery(initial = {}) {
     };
   }
 
-  async function fetchEquipmentPeriod(queryType, options = {}) {
+  async function fetchEquipmentPeriod(queryType: string, options: { page?: number | null; perPage?: number | null } = {}): Promise<Record<string, unknown>> {
     if (resolvedEquipmentIds.value.length === 0) {
       throw new Error('請先查詢批次對應的設備');
     }
@@ -259,7 +267,7 @@ export function useLotEquipmentQuery(initial = {}) {
       buildQueryPayload(queryType, options),
       { timeout: 360000, silent: true },
     );
-    return payload?.data || {};
+    return (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
   }
 
   async function queryLots() {
@@ -283,7 +291,7 @@ export function useLotEquipmentQuery(initial = {}) {
       queried.lots = true;
       return true;
     } catch (error) {
-      errors.lots = error?.message || '查詢生產紀錄失敗';
+      errors.lots = (error as Error)?.message || '查詢生產紀錄失敗';
       _allLotsRows.value = [];
       return false;
     } finally {
@@ -291,14 +299,14 @@ export function useLotEquipmentQuery(initial = {}) {
     }
   }
 
-  function changeLotsPage(page) {
+  function changeLotsPage(page: unknown): void {
     const p = Number(page);
     if (!Number.isNaN(p) && p >= 1 && p <= lotsPagination.value.total_pages) {
       _lotsCurrentPage.value = p;
     }
   }
 
-  function changeLotsPerPage(perPage) {
+  function changeLotsPerPage(perPage: unknown): void {
     _lotsPerPage.value = Number(perPage) || DEFAULT_LOTS_PER_PAGE;
     _lotsCurrentPage.value = 1;
   }
@@ -314,7 +322,7 @@ export function useLotEquipmentQuery(initial = {}) {
       queried.jobs = true;
       return true;
     } catch (error) {
-      errors.jobs = error?.message || '查詢維修紀錄失敗';
+      errors.jobs = (error as Error)?.message || '查詢維修紀錄失敗';
       jobsRows.value = [];
       return false;
     } finally {
@@ -333,7 +341,7 @@ export function useLotEquipmentQuery(initial = {}) {
       queried.rejects = true;
       return true;
     } catch (error) {
-      errors.rejects = error?.message || '查詢報廢紀錄失敗';
+      errors.rejects = (error as Error)?.message || '查詢報廢紀錄失敗';
       rejectsRows.value = [];
       return false;
     } finally {
@@ -348,7 +356,7 @@ export function useLotEquipmentQuery(initial = {}) {
     return queryRejects();
   }
 
-  async function setActiveSubTab(tab) {
+  async function setActiveSubTab(tab: unknown): Promise<boolean> {
     activeSubTab.value = normalizeSubTab(tab);
     if (resolvedEquipmentIds.value.length > 0) {
       return queryActiveSubTab();
@@ -356,7 +364,7 @@ export function useLotEquipmentQuery(initial = {}) {
     return true;
   }
 
-  function canExportSubTab(tab) {
+  function canExportSubTab(tab: unknown): boolean {
     const normalized = normalizeSubTab(tab);
     if (normalized === 'lots') return _allLotsRows.value.length > 0;
     if (normalized === 'jobs') return jobsRows.value.length > 0;
@@ -364,11 +372,13 @@ export function useLotEquipmentQuery(initial = {}) {
     return lotsRows.value.length > 0;
   }
 
-  async function exportSubTab(tab) {
+  async function exportSubTab(tab: unknown): Promise<boolean> {
     const normalized = normalizeSubTab(tab);
     if (!canExportSubTab(normalized)) return false;
 
-    exporting[normalized] = true;
+    const exportingMap = exporting as Record<string, boolean>;
+    const errorsMap = errors as Record<string, string>;
+    exportingMap[normalized] = true;
     try {
       let exportType = 'equipment_lots';
       if (normalized === 'jobs') exportType = 'equipment_jobs';
@@ -385,10 +395,10 @@ export function useLotEquipmentQuery(initial = {}) {
       });
       return true;
     } catch (error) {
-      errors[normalized] = error?.message || '匯出失敗';
+      errorsMap[normalized] = (error as Error)?.message || '匯出失敗';
       return false;
     } finally {
-      exporting[normalized] = false;
+      exportingMap[normalized] = false;
     }
   }
 

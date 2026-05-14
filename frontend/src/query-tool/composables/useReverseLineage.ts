@@ -1,13 +1,31 @@
 import { computed, reactive, ref } from 'vue';
 
-import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api.js';
-import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling.js';
-import { normalizeText, uniqueValues } from '../utils/values.js';
+import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api';
+import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling';
+import { normalizeText, uniqueValues } from '../utils/values';
+
+interface LineageEntry {
+  children: string[];
+  loading: boolean;
+  error: string;
+  fetched: boolean;
+  lastUpdatedAt: number;
+}
+
+interface LineageInitial {
+  selectedContainerId?: string;
+}
+
+interface SemaphoreItem {
+  task: () => Promise<unknown>;
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+}
 
 const MAX_CONCURRENCY = 3;
 const MAX_429_RETRY = 3;
 
-function emptyLineageEntry() {
+function emptyLineageEntry(): LineageEntry {
   return {
     children: [],
     loading: false,
@@ -17,15 +35,16 @@ function emptyLineageEntry() {
   };
 }
 
-function extractContainerId(row) {
+function extractContainerId(row: unknown): string {
   if (!row || typeof row !== 'object') {
     return '';
   }
-  return normalizeText(row.container_id || row.CONTAINERID || row.containerId);
+  const r = row as Record<string, unknown>;
+  return normalizeText(r.container_id || r.CONTAINERID || r.containerId);
 }
 
-function createSemaphore(maxConcurrency) {
-  const queue = [];
+function createSemaphore(maxConcurrency: number) {
+  const queue: SemaphoreItem[] = [];
   let active = 0;
 
   function pump() {
@@ -34,6 +53,9 @@ function createSemaphore(maxConcurrency) {
     }
 
     const item = queue.shift();
+    if (!item) {
+      return;
+    }
     active += 1;
 
     Promise.resolve()
@@ -47,7 +69,7 @@ function createSemaphore(maxConcurrency) {
   }
 
   return {
-    schedule(task) {
+    schedule(task: () => Promise<unknown>): Promise<unknown> {
       return new Promise((resolve, reject) => {
         queue.push({ task, resolve, reject });
         pump();
@@ -59,11 +81,11 @@ function createSemaphore(maxConcurrency) {
   };
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function edgeKey(fromCid, toCid) {
+function edgeKey(fromCid: unknown, toCid: unknown): string {
   const from = normalizeText(fromCid);
   const to = normalizeText(toCid);
   if (!from || !to) {
@@ -72,17 +94,20 @@ function edgeKey(fromCid, toCid) {
   return `${from}->${to}`;
 }
 
-function collectAncestors(parentMap, startCid) {
+function collectAncestors(parentMap: Record<string, string[]>, startCid: unknown): Set<string> {
   const start = normalizeText(startCid);
   if (!start) {
-    return new Set();
+    return new Set<string>();
   }
 
-  const visited = new Set();
+  const visited = new Set<string>();
   const stack = [start];
 
   while (stack.length > 0) {
     const current = stack.pop();
+    if (!current) {
+      continue;
+    }
     const parents = Array.isArray(parentMap?.[current]) ? parentMap[current] : [];
     parents.forEach((parentId) => {
       const parent = normalizeText(parentId);
@@ -97,28 +122,28 @@ function collectAncestors(parentMap, startCid) {
   return visited;
 }
 
-export function useReverseLineage(initial = {}) {
+export function useReverseLineage(initial: LineageInitial = {}) {
   ensureMesApiAvailable();
 
   const lineageMap = reactive(new Map());
   const nameMap = reactive(new Map());
   const nodeMetaMap = reactive(new Map());
   const edgeTypeMap = reactive(new Map());
-  const graphEdges = ref([]);
+  const graphEdges = ref<Array<{ from_cid: string; to_cid: string; edge_type: string }>>([]);
   const leafSerials = reactive(new Map());
   const selectedContainerId = ref(normalizeText(initial.selectedContainerId));
   const selectedContainerIds = ref(
     initial.selectedContainerId ? [normalizeText(initial.selectedContainerId)] : [],
   );
-  const rootRows = ref([]);
-  const rootContainerIds = ref([]);
-  const treeRoots = ref([]);
+  const rootRows = ref<Record<string, unknown>[]>([]);
+  const rootContainerIds = ref<string[]>([]);
+  const treeRoots = ref<string[]>([]);
 
-  const inFlight = new Map();
+  const inFlight = new Map<string, Promise<LineageEntry | null>>();
   const semaphore = createSemaphore(MAX_CONCURRENCY);
   let generation = 0;
 
-  function ensureEntry(containerId) {
+  function ensureEntry(containerId: unknown): LineageEntry | null {
     const id = normalizeText(containerId);
     if (!id) {
       return null;
@@ -131,7 +156,7 @@ export function useReverseLineage(initial = {}) {
     return lineageMap.get(id);
   }
 
-  function patchEntry(containerId, patch) {
+  function patchEntry(containerId: unknown, patch: Partial<LineageEntry>): void {
     const id = normalizeText(containerId);
     if (!id) {
       return;
@@ -144,7 +169,7 @@ export function useReverseLineage(initial = {}) {
     });
   }
 
-  function getEntry(containerId) {
+  function getEntry(containerId: unknown): LineageEntry {
     const id = normalizeText(containerId);
     if (!id) {
       return emptyLineageEntry();
@@ -152,19 +177,19 @@ export function useReverseLineage(initial = {}) {
     return lineageMap.get(id) || emptyLineageEntry();
   }
 
-  function getChildren(containerId) {
+  function getChildren(containerId: unknown): string[] {
     const entry = getEntry(containerId);
     return Array.isArray(entry.children) ? entry.children : [];
   }
 
-  function getSubtreeCids(containerId) {
+  function getSubtreeCids(containerId: unknown): string[] {
     const id = normalizeText(containerId);
     if (!id) {
       return [];
     }
-    const result = [];
-    const visited = new Set();
-    function walk(nodeId) {
+    const result: string[] = [];
+    const visited = new Set<string>();
+    function walk(nodeId: string): void {
       if (!nodeId || visited.has(nodeId)) {
         return;
       }
@@ -176,7 +201,7 @@ export function useReverseLineage(initial = {}) {
     return result;
   }
 
-  function selectNode(containerId) {
+  function selectNode(containerId: unknown): void {
     const id = normalizeText(containerId);
     selectedContainerId.value = id;
     if (id && !selectedContainerIds.value.includes(id)) {
@@ -184,7 +209,7 @@ export function useReverseLineage(initial = {}) {
     }
   }
 
-  function setSelectedNodes(cids) {
+  function setSelectedNodes(cids: unknown[]): void {
     const normalized = (Array.isArray(cids) ? cids : [])
       .map(normalizeText)
       .filter(Boolean);
@@ -206,7 +231,7 @@ export function useReverseLineage(initial = {}) {
     return false;
   });
 
-  async function requestLineageWithRetry(containerIds) {
+  async function requestLineageWithRetry(containerIds: string[]): Promise<Record<string, unknown> | null> {
     let attempt = 0;
 
     while (attempt <= MAX_429_RETRY) {
@@ -219,23 +244,24 @@ export function useReverseLineage(initial = {}) {
           },
           { timeout: 360000, silent: true },
         );
-        const payload = envelope?.data || {};
+        const payload = (envelope as Record<string, unknown>)?.data as Record<string, unknown> || {};
         if (payload?.async === true && payload?.status_url) {
-          await pollJobUntilComplete(payload.status_url);
+          await pollJobUntilComplete(payload.status_url as string);
           const resultEnvelope = await apiGet(`${payload.status_url}/result`, {
             timeout: 360000,
             silent: true,
           });
-          return resultEnvelope?.data || {};
+          return (resultEnvelope as Record<string, unknown>)?.data as Record<string, unknown> || {};
         }
         return payload;
       } catch (error) {
-        const status = Number(error?.status || 0);
+        const err = error as Record<string, unknown>;
+        const status = Number(err?.status || 0);
         if (status !== 429 || attempt >= MAX_429_RETRY) {
           throw error;
         }
 
-        const retryAfter = Number(error?.retryAfterSeconds || 0);
+        const retryAfter = Number(err?.retryAfterSeconds || 0);
         const fallbackSeconds = 2 ** attempt;
         const waitSeconds = Math.max(1, Math.min(30, retryAfter || fallbackSeconds));
         await sleep(waitSeconds * 1000);
@@ -246,34 +272,34 @@ export function useReverseLineage(initial = {}) {
     return null;
   }
 
-  function normalizeParentMap(payload) {
+  function normalizeParentMap(payload: Record<string, unknown> | null): Record<string, string[]> {
     const parentMapData = payload?.parent_map;
     if (!parentMapData || typeof parentMapData !== 'object') {
       return {};
     }
 
-    const normalized = {};
-    Object.entries(parentMapData).forEach(([childId, parentIds]) => {
+    const normalized: Record<string, string[]> = {};
+    Object.entries(parentMapData as Record<string, unknown>).forEach(([childId, parentIds]) => {
       const child = normalizeText(childId);
       if (!child) {
         return;
       }
       const values = Array.isArray(parentIds) ? parentIds : [];
-      normalized[child] = uniqueValues(values.map((parentId) => normalizeText(parentId)));
+      normalized[child] = uniqueValues(values.map((parentId: unknown) => normalizeText(parentId)));
     });
     return normalized;
   }
 
-  function deriveDisplayRoots(candidateRoots, parentMap) {
+  function deriveDisplayRoots(candidateRoots: string[], parentMap: Record<string, string[]>): string[] {
     const roots = uniqueValues((candidateRoots || []).map((cid) => normalizeText(cid)).filter(Boolean));
     if (roots.length <= 1) {
       return roots;
     }
 
     const candidateSet = new Set(roots);
-    const groupedRoots = [];
-    const groupsByInput = new Map();
-    const assigned = new Set();
+    const groupedRoots: string[][] = [];
+    const groupsByInput = new Map<string, string[]>();
+    const assigned = new Set<string>();
 
     // Keep reduction within each query input token to avoid cross-token interference.
     rootRows.value.forEach((row) => {
@@ -287,10 +313,10 @@ export function useReverseLineage(initial = {}) {
 
       if (!groupsByInput.has(key)) {
         groupsByInput.set(key, []);
-        groupedRoots.push(groupsByInput.get(key));
+        groupedRoots.push(groupsByInput.get(key) as string[]);
       }
 
-      const group = groupsByInput.get(key);
+      const group = groupsByInput.get(key) as string[];
       if (!group.includes(cid)) {
         group.push(cid);
         assigned.add(cid);
@@ -298,16 +324,16 @@ export function useReverseLineage(initial = {}) {
     });
 
     // Roots not found in rootRows still need a standalone group.
-    roots.forEach((cid) => {
+    roots.forEach((cid: string) => {
       if (assigned.has(cid)) {
         return;
       }
       groupedRoots.push([cid]);
     });
 
-    const reduced = [];
+    const reduced: string[] = [];
 
-    groupedRoots.forEach((group) => {
+    groupedRoots.forEach((group: string[]) => {
       if (group.length <= 1) {
         const only = group[0];
         if (only && !reduced.includes(only)) {
@@ -316,20 +342,20 @@ export function useReverseLineage(initial = {}) {
         return;
       }
 
-      const ancestorCache = new Map();
-      const getAncestors = (cid) => {
+      const ancestorCache = new Map<string, Set<string>>();
+      const getAncestors = (cid: string): Set<string> => {
         if (!ancestorCache.has(cid)) {
           ancestorCache.set(cid, collectAncestors(parentMap, cid));
         }
-        return ancestorCache.get(cid);
+        return ancestorCache.get(cid) as Set<string>;
       };
 
-      const kept = group.filter((cid) => !group.some((otherCid) => (
+      const kept = group.filter((cid: string) => !group.some((otherCid: string) => (
         otherCid !== cid && getAncestors(otherCid).has(cid)
       )));
 
       const finalGroup = kept.length > 0 ? kept : group;
-      finalGroup.forEach((cid) => {
+      finalGroup.forEach((cid: string) => {
         if (cid && !reduced.includes(cid)) {
           reduced.push(cid);
         }
@@ -339,7 +365,7 @@ export function useReverseLineage(initial = {}) {
     return reduced;
   }
 
-  function populateReverseTree(payload, requestedRoots = []) {
+  function populateReverseTree(payload: Record<string, unknown> | null, requestedRoots: string[] = []): void {
     const parentMap = normalizeParentMap(payload);
     const names = payload?.names;
     const typedNodes = payload?.nodes;
@@ -368,16 +394,17 @@ export function useReverseLineage(initial = {}) {
     }
 
     edgeTypeMap.clear();
-    const normalizedEdges = [];
+    const normalizedEdges: Array<{ from_cid: string; to_cid: string; edge_type: string }> = [];
     if (Array.isArray(typedEdges)) {
-      typedEdges.forEach((edge) => {
+      typedEdges.forEach((edge: unknown) => {
         if (!edge || typeof edge !== 'object') {
           return;
         }
-        const from = normalizeText(edge.from_cid);
-        const to = normalizeText(edge.to_cid);
+        const e = edge as Record<string, unknown>;
+        const from = normalizeText(e.from_cid);
+        const to = normalizeText(e.to_cid);
         const key = edgeKey(from, to);
-        const type = normalizeText(edge.edge_type);
+        const type = normalizeText(e.edge_type);
         if (key && type) {
           edgeTypeMap.set(key, type);
           normalizedEdges.push({ from_cid: from, to_cid: to, edge_type: type });
@@ -396,9 +423,9 @@ export function useReverseLineage(initial = {}) {
       });
     });
 
-    const allParentIds = new Set();
+    const allParentIds = new Set<string>();
     Object.values(parentMap).forEach((parentIds) => {
-      (parentIds || []).forEach((parentId) => {
+      (parentIds || []).forEach((parentId: string) => {
         const normalized = normalizeText(parentId);
         if (normalized) {
           allParentIds.add(normalized);
@@ -406,7 +433,7 @@ export function useReverseLineage(initial = {}) {
       });
     });
 
-    allParentIds.forEach((parentId) => {
+    allParentIds.forEach((parentId: string) => {
       if (!parentMap[parentId] && !getEntry(parentId).fetched) {
         patchEntry(parentId, {
           children: [],
@@ -418,11 +445,11 @@ export function useReverseLineage(initial = {}) {
       }
     });
 
-    const roots = (payload?.roots || requestedRoots || [])
-      .map((cid) => normalizeText(cid))
-      .filter(Boolean);
+    const roots: string[] = ((Array.isArray(payload?.roots) ? payload?.roots : requestedRoots) || [])
+      .map((cid: unknown) => normalizeText(cid))
+      .filter(Boolean) as string[];
 
-    roots.forEach((cid) => {
+    roots.forEach((cid: string) => {
       if (!getEntry(cid).fetched) {
         patchEntry(cid, {
           children: uniqueValues(parentMap[cid] || []),
@@ -437,7 +464,7 @@ export function useReverseLineage(initial = {}) {
     treeRoots.value = deriveDisplayRoots(roots, parentMap);
   }
 
-  async function fetchLineage(containerIds, { force = false } = {}) {
+  async function fetchLineage(containerIds: unknown[] | unknown, { force = false }: { force?: boolean } = {}): Promise<LineageEntry | null> {
     const ids = (Array.isArray(containerIds) ? containerIds : [containerIds])
       .map((c) => normalizeText(c))
       .filter(Boolean);
@@ -455,7 +482,7 @@ export function useReverseLineage(initial = {}) {
 
     const cacheKey = [...ids].sort().join(',');
     if (inFlight.has(cacheKey)) {
-      return inFlight.get(cacheKey);
+      return inFlight.get(cacheKey) ?? null;
     }
 
     const runGeneration = generation;
@@ -483,7 +510,7 @@ export function useReverseLineage(initial = {}) {
               children: [],
               loading: false,
               fetched: true,
-              error: error?.message || '反向血緣查詢失敗',
+              error: (error as Error)?.message || '反向血緣查詢失敗',
               lastUpdatedAt: Date.now(),
             });
           });
@@ -495,7 +522,7 @@ export function useReverseLineage(initial = {}) {
       .catch((error) => {
         inFlight.delete(cacheKey);
         throw error;
-      });
+      }) as Promise<LineageEntry | null>;
 
     inFlight.set(cacheKey, promise);
     return promise;
@@ -517,7 +544,7 @@ export function useReverseLineage(initial = {}) {
     clearSelection();
   }
 
-  async function primeResolvedLots(rows) {
+  async function primeResolvedLots(rows: Record<string, unknown>[]): Promise<void> {
     resetLineageState();
     rootRows.value = Array.isArray(rows) ? [...rows] : [];
 

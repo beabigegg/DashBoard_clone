@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
-// @ts-expect-error <not-yet-migrated: query-tool/utils — Phase 3 scope>
-import { formatDateTime, normalizeText, parseDateTime } from '../../query-tool/utils/values.js';
+import { formatDateTime, normalizeText, parseDateTime } from '../../query-tool/utils/values';
 
 interface TimelineBar {
   id?: string;

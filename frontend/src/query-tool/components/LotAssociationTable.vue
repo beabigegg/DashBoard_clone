@@ -1,8 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-import { useSortableTable } from '../../shared-composables/useSortableTable.js';
-import { formatCellValue } from '../utils/values.js';
+import { useSortableTable } from '../../shared-composables/useSortableTable';
+import { formatCellValue } from '../utils/values';
 import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 
 const props = defineProps({
@@ -45,12 +45,13 @@ const columns = computed(() => {
     return visible;
   }
 
-  const ordered = [];
-  const seen = new Set();
+  const ordered: string[] = [];
+  const seen = new Set<string>();
   props.columnOrder.forEach((column) => {
-    if (visible.includes(column) && !seen.has(column)) {
-      ordered.push(column);
-      seen.add(column);
+    const col = String(column);
+    if (visible.includes(col) && !seen.has(col)) {
+      ordered.push(col);
+      seen.add(col);
     }
   });
   visible.forEach((column) => {
@@ -61,21 +62,21 @@ const columns = computed(() => {
   return ordered;
 });
 
-const rowsRef = computed(() => props.rows);
+const rowsRef = computed(() => props.rows as Record<string, unknown>[]);
 const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(rowsRef);
 
-function sortLabel(key) {
+function sortLabel(key: string): string {
   if (sortKey.value !== key) return '⇕';
   return sortDirection.value === 'asc' ? '▲' : '▼';
 }
 
-function ariaSortFor(key) {
+function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
   if (sortKey.value !== key) return 'none';
   return sortDirection.value === 'asc' ? 'ascending' : 'descending';
 }
 
-function resolveColumnLabel(column) {
-  return props.columnLabels?.[column] || column;
+function resolveColumnLabel(column: string): string {
+  return (props.columnLabels as Record<string, string>)?.[column] || column;
 }
 </script>
 
@@ -105,7 +106,7 @@ function resolveColumnLabel(column) {
         </thead>
 
         <tbody>
-          <tr v-for="(row, rowIndex) in sortedData" :key="row.id || row.JOBID || rowIndex">
+          <tr v-for="(row, rowIndex) in sortedData" :key="(row.id || row.JOBID || rowIndex) as PropertyKey">
             <td v-for="column in columns" :key="`${rowIndex}-${column}`">
               {{ formatCellValue(row[column]) }}
             </td>

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import QueryBar from './QueryBar.vue';
 import LineageTreeChart from './LineageTreeChart.vue';
 import LotDetail from './LotDetail.vue';

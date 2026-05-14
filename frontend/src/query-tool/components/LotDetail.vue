@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
@@ -116,7 +116,7 @@ const activeExporting = computed(() => {
 });
 
 const activeEmptyText = computed(() => {
-  return tabMeta[props.activeSubTab]?.emptyText || '無資料';
+  return (tabMeta as Record<string, { label: string; emptyText: string }>)[props.activeSubTab]?.emptyText || '無資料';
 });
 
 const activeColumnLabels = computed(() => {
@@ -244,7 +244,7 @@ const detailCountLabel = computed(() => {
           <ExportButton
             :disabled="!canExport"
             :loading="activeExporting"
-            :label="`${tabMeta[activeSubTab]?.label || ''} 匯出 CSV`"
+            :label="`${(tabMeta as Record<string, { label: string; emptyText: string }>)[activeSubTab]?.label || ''} 匯出 CSV`"
             @click="emit('export-tab', activeSubTab)"
           />
         </div>
@@ -258,7 +258,7 @@ const detailCountLabel = computed(() => {
             :class="{ active: tab === activeSubTab }"
             @click="emit('change-sub-tab', tab)"
           >
-            {{ tabMeta[tab].label }}
+            {{ (tabMeta as Record<string, { label: string; emptyText: string }>)[tab].label }}
           </button>
         </div>
 
@@ -319,9 +319,9 @@ const detailCountLabel = computed(() => {
           每頁
           <select
             :value="activePagination.per_page"
-            @change="emit('change-page-size', { tab: activeSubTab, perPage: Number($event.target.value) })"
+            @change="emit('change-page-size', { tab: activeSubTab, perPage: Number(($event.target as HTMLSelectElement).value) })"
           >
-            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+            <option v-for="size in pageSizeOptions" :key="(size as PropertyKey)" :value="size">{{ size }}</option>
           </select>
           筆
         </label>

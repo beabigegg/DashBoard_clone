@@ -1,9 +1,20 @@
-function getCsrfToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.content || '';
+interface ErrorPayload {
+  error?: { message?: string } | string;
+  message?: string;
 }
 
-function resolveErrorMessage(status, payload) {
-  if (payload?.error?.message) {
+interface ExportCsvOptions {
+  exportType: string;
+  params?: Record<string, unknown>;
+  fallbackFilename?: string | null;
+}
+
+function getCsrfToken(): string {
+  return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+}
+
+function resolveErrorMessage(status: number, payload: ErrorPayload | null): string {
+  if (payload?.error && typeof payload.error === 'object' && 'message' in payload.error) {
     return String(payload.error.message);
   }
   if (typeof payload?.error === 'string') {
@@ -15,7 +26,7 @@ function resolveErrorMessage(status, payload) {
   return `匯出失敗 (${status})`;
 }
 
-function resolveDownloadFilename(response, fallbackName) {
+function resolveDownloadFilename(response: Response, fallbackName: string): string {
   const disposition = response.headers.get('Content-Disposition') || '';
   const match = disposition.match(/filename=([^;]+)/i);
   if (!match?.[1]) {
@@ -24,12 +35,12 @@ function resolveDownloadFilename(response, fallbackName) {
   return match[1].replace(/(^['\"]|['\"]$)/g, '').trim() || fallbackName;
 }
 
-export async function exportCsv({ exportType, params = {}, fallbackFilename = null }) {
+export async function exportCsv({ exportType, params = {}, fallbackFilename = null }: ExportCsvOptions): Promise<string> {
   if (!exportType) {
     throw new Error('缺少匯出類型');
   }
 
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 

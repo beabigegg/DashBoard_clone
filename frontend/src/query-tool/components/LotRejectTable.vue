@@ -1,8 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { useSortableTable } from '../../shared-composables/useSortableTable.js';
-import { formatDateTime, parseDateTime } from '../utils/values.js';
+import { useSortableTable } from '../../shared-composables/useSortableTable';
+import { formatDateTime, parseDateTime } from '../utils/values';
 import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 
 const props = defineProps({
@@ -22,21 +22,45 @@ const props = defineProps({
 
 const showRejectBreakdown = ref(false);
 
-function toNumber(value, defaultValue = 0) {
+function toNumber(value: unknown, defaultValue = 0): number {
   const num = Number(value);
   return Number.isFinite(num) ? num : defaultValue;
 }
 
-function formatNumber(value) {
+function formatNumber(value: unknown): string {
   return toNumber(value).toLocaleString('zh-TW');
 }
 
-function normalizeText(value, fallback = '') {
+function normalizeText(value: unknown, fallback = ''): string {
   const text = String(value || '').trim();
   return text || fallback;
 }
 
-function normalizeRejectRow(row) {
+interface NormalizedRejectRow extends Record<string, unknown> {
+  CONTAINERNAME: string;
+  WORKCENTERNAME: string;
+  PRODUCTLINENAME: string;
+  PJ_FUNCTION: string;
+  PJ_TYPE: string;
+  PRODUCTNAME: string;
+  LOSSREASONNAME: string;
+  EQUIPMENTNAME: string;
+  REJECTCOMMENT: string;
+  REJECT_TOTAL_QTY: number;
+  REJECT_QTY: number;
+  STANDBY_QTY: number;
+  QTYTOPROCESS_QTY: number;
+  INPROCESS_QTY: number;
+  PROCESSED_QTY: number;
+  DEFECT_QTY: number;
+  TXN_TIME_RAW: unknown;
+  TXN_TIME: string;
+  TXN_DAY_SORT: number;
+  WORKCENTERSEQUENCE_GROUP: number;
+}
+
+function normalizeRejectRow(rawRow: unknown): NormalizedRejectRow {
+  const row = rawRow as Record<string, unknown>;
   const rejectQty = toNumber(row?.REJECT_QTY ?? row?.REJECTQTY);
   const standbyQty = toNumber(row?.STANDBY_QTY ?? row?.STANDBYQTY);
   const qtyToProcessQty = toNumber(row?.QTYTOPROCESS_QTY ?? row?.QTYTOPROCESS);
@@ -79,7 +103,7 @@ const normalizedRows = computed(() => {
 });
 
 const defaultSorted = computed(() => {
-  return [...normalizedRows.value].sort((a, b) => {
+  return [...normalizedRows.value].sort((a: NormalizedRejectRow, b: NormalizedRejectRow) => {
     if (a.TXN_DAY_SORT !== b.TXN_DAY_SORT) {
       return b.TXN_DAY_SORT - a.TXN_DAY_SORT;
     }
@@ -98,12 +122,12 @@ const defaultSorted = computed(() => {
 
 const { sortKey, sortDirection, sortedData: displayRows, toggleSort } = useSortableTable(defaultSorted);
 
-function sortLabel(key) {
+function sortLabel(key: string): string {
   if (sortKey.value !== key) return '⇕';
   return sortDirection.value === 'asc' ? '▲' : '▼';
 }
 
-function ariaSortFor(key) {
+function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
   if (sortKey.value !== key) return 'none';
   return sortDirection.value === 'asc' ? 'ascending' : 'descending';
 }

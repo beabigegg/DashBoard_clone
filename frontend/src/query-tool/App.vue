@@ -1,21 +1,21 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation.js';
-import { useRequestGuard } from '../shared-composables/useRequestGuard.js';
+import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation';
+import { useRequestGuard } from '../shared-composables/useRequestGuard';
 
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import EquipmentView from './components/EquipmentView.vue';
 import LotEquipmentView from './components/LotEquipmentView.vue';
 import LotTraceView from './components/LotTraceView.vue';
 import SerialReverseTraceView from './components/SerialReverseTraceView.vue';
-import { useEquipmentQuery } from './composables/useEquipmentQuery.js';
-import { useLotEquipmentQuery } from './composables/useLotEquipmentQuery.js';
-import { useLotDetail } from './composables/useLotDetail.js';
-import { useLotLineage } from './composables/useLotLineage.js';
-import { useLotResolve } from './composables/useLotResolve.js';
-import { useReverseLineage } from './composables/useReverseLineage.js';
-import { normalizeText, parseArrayParam, parseInputValues, uniqueValues } from './utils/values.js';
+import { useEquipmentQuery } from './composables/useEquipmentQuery';
+import { useLotEquipmentQuery } from './composables/useLotEquipmentQuery';
+import { useLotDetail } from './composables/useLotDetail';
+import { useLotLineage } from './composables/useLotLineage';
+import { useLotResolve } from './composables/useLotResolve';
+import { useReverseLineage } from './composables/useReverseLineage';
+import { normalizeText, parseArrayParam, parseInputValues, uniqueValues } from './utils/values';
 
 const TAB_LOT = 'lot';
 const TAB_REVERSE = 'reverse';
@@ -31,7 +31,7 @@ const tabItems = Object.freeze([
   { key: TAB_LOT_EQUIPMENT, label: '批次追蹤生產設備', subtitle: '由批次名稱 + 站點群組查詢處理設備' },
 ]);
 
-function normalizeTopTab(value) {
+function normalizeTopTab(value: unknown) {
   const tab = normalizeText(value).toLowerCase();
   return VALID_TABS.has(tab) ? tab : TAB_LOT;
 }
@@ -137,11 +137,17 @@ const reverseSelectedContainerName = computed(() => {
   return cid ? (reverseLineage.nameMap.get(cid) || '') : '';
 });
 
+// Spread readonly arrays to mutable for component props
+const lotPageSizeOptions = [...lotDetail.pageSizeOptions] as unknown[];
+const equipmentPageSizeOptions = [...equipmentQuery.pageSizeOptions] as unknown[];
+const lotInputTypeOptions = [...lotResolve.inputTypeOptions] as unknown[];
+
 // Compatibility placeholders for existing table parity tests.
 const resolvedColumns = computed(() => Object.keys(lotResolve.resolvedLots.value[0] || {}));
 const historyColumns = computed(() => Object.keys(lotDetail.historyRows.value[0] || {}));
 const associationColumns = computed(() => {
-  const rows = lotDetail.associationRows[lotDetail.activeSubTab.value] || [];
+  const assocMap = lotDetail.associationRows as Record<string, unknown[]>;
+  const rows = assocMap[lotDetail.activeSubTab.value] || [];
   return Object.keys(rows[0] || {});
 });
 const equipmentColumns = computed(() => {
@@ -278,10 +284,10 @@ function syncUrlState() {
   replaceRuntimeHistory(target);
 }
 
-async function applyHydratedUrlState(state) {
+async function applyHydratedUrlState(state: Record<string, unknown>) {
   suppressUrlSync.value = true;
 
-  activeTab.value = state.tab;
+  activeTab.value = String(state.tab || '');
 
   lotResolve.setInputType(state.lotInputType);
   lotResolve.setInputText(state.lotInputText);
@@ -289,21 +295,21 @@ async function applyHydratedUrlState(state) {
   reverseResolve.setInputType(state.reverseInputType);
   reverseResolve.setInputText(state.reverseInputText);
 
-  lotDetail.activeSubTab.value = state.lotSubTab;
-  lotDetail.selectedWorkcenterGroups.value = state.lotWorkcenterGroups;
+  lotDetail.activeSubTab.value = String(state.lotSubTab || '');
+  lotDetail.selectedWorkcenterGroups.value = Array.isArray(state.lotWorkcenterGroups) ? state.lotWorkcenterGroups as string[] : [];
 
-  reverseDetail.activeSubTab.value = state.reverseSubTab;
-  reverseDetail.selectedWorkcenterGroups.value = state.reverseWorkcenterGroups;
+  reverseDetail.activeSubTab.value = String(state.reverseSubTab || '');
+  reverseDetail.selectedWorkcenterGroups.value = Array.isArray(state.reverseWorkcenterGroups) ? state.reverseWorkcenterGroups as string[] : [];
 
-  equipmentQuery.selectedEquipmentIds.value = state.equipmentIds;
-  equipmentQuery.startDate.value = state.startDate || equipmentQuery.startDate.value;
-  equipmentQuery.endDate.value = state.endDate || equipmentQuery.endDate.value;
-  equipmentQuery.activeSubTab.value = state.equipmentSubTab;
+  equipmentQuery.selectedEquipmentIds.value = Array.isArray(state.equipmentIds) ? state.equipmentIds as string[] : [];
+  equipmentQuery.startDate.value = String(state.startDate || '') || equipmentQuery.startDate.value;
+  equipmentQuery.endDate.value = String(state.endDate || '') || equipmentQuery.endDate.value;
+  equipmentQuery.activeSubTab.value = String(state.equipmentSubTab || '');
 
-  lotEquipmentQuery.inputType.value = state.leInputType || 'lot_id';
-  lotEquipmentQuery.inputText.value = state.leInputText || '';
-  lotEquipmentQuery.selectedWorkcenterGroups.value = state.leWorkcenterGroups || [];
-  lotEquipmentQuery.activeSubTab.value = state.leSubTab || 'lots';
+  lotEquipmentQuery.inputType.value = String(state.leInputType || 'lot_id');
+  lotEquipmentQuery.inputText.value = String(state.leInputText || '');
+  lotEquipmentQuery.selectedWorkcenterGroups.value = Array.isArray(state.leWorkcenterGroups) ? state.leWorkcenterGroups as string[] : [];
+  lotEquipmentQuery.activeSubTab.value = String(state.leSubTab || 'lots');
 
   suppressUrlSync.value = false;
 
@@ -327,7 +333,7 @@ function handlePopState() {
   void applyStateFromUrl();
 }
 
-function activateTab(tab) {
+function activateTab(tab: unknown) {
   activeTab.value = normalizeTopTab(tab);
 }
 
@@ -354,70 +360,70 @@ async function handleResolveReverse() {
   reverseDetail.clearTabData();
 }
 
-async function handleSelectNodes(containerIds) {
+async function handleSelectNodes(containerIds: string[]) {
   lotLineage.setSelectedNodes(containerIds);
 
   // Expand each selected node to include its entire subtree for detail loading
-  const seen = new Set();
-  containerIds.forEach((cid) => {
-    lotLineage.getSubtreeCids(cid).forEach((id) => seen.add(id));
+  const seen = new Set<string>();
+  containerIds.forEach((cid: string) => {
+    lotLineage.getSubtreeCids(cid).forEach((id: string) => seen.add(id));
   });
 
   await lotDetail.setSelectedContainerIds([...seen]);
 }
 
-async function handleSelectReverseNodes(containerIds) {
+async function handleSelectReverseNodes(containerIds: string[]) {
   reverseLineage.setSelectedNodes(containerIds);
 
-  const seen = new Set();
-  containerIds.forEach((cid) => {
-    reverseLineage.getSubtreeCids(cid).forEach((id) => seen.add(id));
+  const seen = new Set<string>();
+  containerIds.forEach((cid: string) => {
+    reverseLineage.getSubtreeCids(cid).forEach((id: string) => seen.add(id));
   });
 
   await reverseDetail.setSelectedContainerIds([...seen]);
 }
 
-async function handleChangeLotSubTab(tab) {
+async function handleChangeLotSubTab(tab: unknown) {
   await lotDetail.setActiveSubTab(tab);
 }
 
-async function handleChangeReverseSubTab(tab) {
+async function handleChangeReverseSubTab(tab: unknown) {
   await reverseDetail.setActiveSubTab(tab);
 }
 
-async function handleWorkcenterGroupChange(groups) {
+async function handleWorkcenterGroupChange(groups: unknown[]) {
   await lotDetail.setSelectedWorkcenterGroups(groups);
 }
 
-async function handleReverseWorkcenterGroupChange(groups) {
+async function handleReverseWorkcenterGroupChange(groups: unknown[]) {
   await reverseDetail.setSelectedWorkcenterGroups(groups);
 }
 
-async function handleExportLotTab(tab) {
+async function handleExportLotTab(tab: unknown) {
   await lotDetail.exportSubTab(tab);
 }
 
-async function handleExportReverseTab(tab) {
+async function handleExportReverseTab(tab: unknown) {
   await reverseDetail.exportSubTab(tab);
 }
 
-async function handleLotDetailPageChange({ tab, page }) {
+async function handleLotDetailPageChange({ tab, page }: { tab: unknown; page: unknown }) {
   await lotDetail.setSubTabPage(tab, page);
 }
 
-async function handleLotDetailPageSizeChange({ tab, perPage }) {
+async function handleLotDetailPageSizeChange({ tab, perPage }: { tab: unknown; perPage: unknown }) {
   await lotDetail.setSubTabPerPage(tab, perPage);
 }
 
-async function handleReverseDetailPageChange({ tab, page }) {
+async function handleReverseDetailPageChange({ tab, page }: { tab: unknown; page: unknown }) {
   await reverseDetail.setSubTabPage(tab, page);
 }
 
-async function handleReverseDetailPageSizeChange({ tab, perPage }) {
+async function handleReverseDetailPageSizeChange({ tab, perPage }: { tab: unknown; perPage: unknown }) {
   await reverseDetail.setSubTabPerPage(tab, perPage);
 }
 
-async function handleChangeEquipmentSubTab(tab) {
+async function handleChangeEquipmentSubTab(tab: unknown) {
   await equipmentQuery.setActiveSubTab(tab, { autoQuery: true });
 }
 
@@ -425,7 +431,7 @@ async function handleQueryEquipmentActiveTab() {
   await equipmentQuery.queryActiveSubTab();
 }
 
-async function handleExportEquipmentSubTab(tab) {
+async function handleExportEquipmentSubTab(tab: unknown) {
   await equipmentQuery.exportSubTab(tab);
 }
 
@@ -433,19 +439,19 @@ async function handleLotEquipmentLookup() {
   await lotEquipmentQuery.lookupEquipment();
 }
 
-async function handleChangeLotEquipmentSubTab(tab) {
+async function handleChangeLotEquipmentSubTab(tab: unknown) {
   await lotEquipmentQuery.setActiveSubTab(tab);
 }
 
-async function handleExportLotEquipmentSubTab(tab) {
+async function handleExportLotEquipmentSubTab(tab: unknown) {
   await lotEquipmentQuery.exportSubTab(tab);
 }
 
-async function handleEquipmentLotsPageSizeChange(perPage) {
-  await equipmentQuery.queryLots({ page: 1, perPage });
+async function handleEquipmentLotsPageSizeChange(perPage: unknown) {
+  await equipmentQuery.queryLots({ page: 1, perPage: Number(perPage) });
 }
 
-function handleLotEquipmentLotsPageSizeChange(perPage) {
+function handleLotEquipmentLotsPageSizeChange(perPage: unknown) {
   lotEquipmentQuery.changeLotsPerPage(perPage);
 }
 
@@ -583,7 +589,7 @@ watch(
           :detail-quality-meta="lotDetail.qualityMeta"
           :workcenter-groups="lotDetail.workcenterGroups.value"
           :selected-workcenter-groups="lotDetail.selectedWorkcenterGroups.value"
-          :page-size-options="lotDetail.pageSizeOptions"
+          :page-size-options="lotPageSizeOptions"
           @update:input-type="lotResolve.setInputType($event)"
           @update:input-text="lotResolve.setInputText($event)"
           @resolve="handleResolveLots"
@@ -628,7 +634,7 @@ watch(
           :detail-quality-meta="reverseDetail.qualityMeta"
           :workcenter-groups="reverseDetail.workcenterGroups.value"
           :selected-workcenter-groups="reverseDetail.selectedWorkcenterGroups.value"
-          :page-size-options="reverseDetail.pageSizeOptions"
+          :page-size-options="lotPageSizeOptions"
           @update:input-type="reverseResolve.setInputType($event)"
           @update:input-text="reverseResolve.setInputText($event)"
           @resolve="handleResolveReverse"
@@ -643,7 +649,7 @@ watch(
         <LotEquipmentView
           v-show="activeTab === TAB_LOT_EQUIPMENT"
           :input-type="lotEquipmentQuery.inputType.value"
-          :input-type-options="lotEquipmentQuery.inputTypeOptions"
+          :input-type-options="[...lotEquipmentQuery.inputTypeOptions]"
           :input-text="lotEquipmentQuery.inputText.value"
           :parsed-input-count="lotEquipmentQuery.parsedInputCount.value"
           :workcenter-group-options="lotEquipmentQuery.workcenterGroupOptions.value"
@@ -663,7 +669,7 @@ watch(
           :rejects-rows="lotEquipmentQuery.rejectsRows.value"
           :exporting="lotEquipmentQuery.exporting"
           :can-export-sub-tab="lotEquipmentQuery.canExportSubTab"
-          :page-size-options="lotEquipmentQuery.pageSizeOptions"
+          :page-size-options="equipmentPageSizeOptions"
           @update:input-type="lotEquipmentQuery.inputType.value = $event"
           @update:input-text="lotEquipmentQuery.inputText.value = $event"
           @update:selected-workcenter-groups="lotEquipmentQuery.selectedWorkcenterGroups.value = $event"
@@ -689,7 +695,7 @@ watch(
           :rejects-rows="equipmentQuery.rejectsRows.value"
           :exporting="equipmentQuery.exporting"
           :can-export-sub-tab="equipmentQuery.canExportSubTab"
-          :page-size-options="equipmentQuery.pageSizeOptions"
+          :page-size-options="equipmentPageSizeOptions"
           @update:selected-equipment-ids="equipmentQuery.setSelectedEquipmentIds($event)"
           @update:start-date="equipmentQuery.startDate.value = $event"
           @update:end-date="equipmentQuery.endDate.value = $event"

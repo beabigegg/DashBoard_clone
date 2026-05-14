@@ -1,10 +1,10 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-import { useSortableTable } from '../../shared-composables/useSortableTable.js';
+import { useSortableTable } from '../../shared-composables/useSortableTable';
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
-import { formatCellValue } from '../utils/values.js';
+import { formatCellValue } from '../utils/values';
 
 const props = defineProps({
   rows: {
@@ -40,25 +40,26 @@ const columns = computed(() =>
   Object.keys(props.rows[0] || {}).filter((col) => !HIDDEN_COLUMNS.has(col)),
 );
 
-const rowsRef = computed(() => props.rows);
+const rowsRef = computed(() => props.rows as Record<string, unknown>[]);
 const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(rowsRef);
 
-function sortLabel(key) {
+function sortLabel(key: string): string {
   if (sortKey.value !== key) return '⇕';
   return sortDirection.value === 'asc' ? '▲' : '▼';
 }
 
-function ariaSortFor(key) {
+function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
   if (sortKey.value !== key) return 'none';
   return sortDirection.value === 'asc' ? 'ascending' : 'descending';
 }
 
 const workcenterOptions = computed(() => {
-  return props.workcenterGroups.map((group) => {
-    const name = typeof group === 'string' ? group : group?.name || group?.WORKCENTER_GROUP || '';
+  return props.workcenterGroups.map((rawGroup) => {
+    const group = rawGroup as Record<string, unknown>;
+    const name = typeof rawGroup === 'string' ? rawGroup : String(group?.name || group?.WORKCENTER_GROUP || '');
     return {
-      value: String(name),
-      label: String(name),
+      value: name,
+      label: name,
     };
   }).filter((option) => option.value);
 });
@@ -72,7 +73,7 @@ const workcenterOptions = computed(() => {
       <label class="filter-group filter-group--wide">
         <span class="filter-label">站點群組篩選</span>
         <MultiSelect
-          :model-value="selectedWorkcenterGroups"
+          :model-value="selectedWorkcenterGroups as (string | number)[]"
           :options="workcenterOptions"
           placeholder="全部群組"
           searchable
@@ -99,7 +100,7 @@ const workcenterOptions = computed(() => {
               :aria-sort="ariaSortFor(column)"
               @click="toggleSort(column)"
             >
-              {{ COLUMN_LABELS[column] || column }}
+              {{ (COLUMN_LABELS as Record<string, string>)[column] || column }}
               <span class="sort-indicator">{{ sortLabel(column) }}</span>
             </th>
           </tr>
@@ -108,7 +109,7 @@ const workcenterOptions = computed(() => {
         <tbody>
           <tr
             v-for="(row, rowIndex) in sortedData"
-            :key="row.HISTORYMAINLINEID || row.TRACKINTIMESTAMP || rowIndex"
+            :key="(row.HISTORYMAINLINEID || row.TRACKINTIMESTAMP || rowIndex) as PropertyKey"
           >
             <td v-for="column in columns" :key="`${rowIndex}-${column}`">
               {{ formatCellValue(row[column]) }}

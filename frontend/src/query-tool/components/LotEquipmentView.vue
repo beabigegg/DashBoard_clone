@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
@@ -137,8 +137,8 @@ function inputPlaceholder() {
             <label class="filter-group le-wc-group">
               <span class="filter-label">站點群組（可複選）</span>
               <MultiSelect
-                :model-value="selectedWorkcenterGroups"
-                :options="workcenterGroupOptions"
+                :model-value="selectedWorkcenterGroups as (string | number)[]"
+                :options="workcenterGroupOptions as (string | number | Record<string, unknown>)[]"
                 :disabled="loading.bootstrapping"
                 searchable
                 placeholder="請選擇站點群組"
@@ -151,14 +151,14 @@ function inputPlaceholder() {
               <select
                 class="query-tool-select"
                 :value="inputType"
-                @change="emit('update:input-type', $event.target.value)"
+                @change="emit('update:input-type', ($event.target as HTMLSelectElement).value)"
               >
                 <option
                   v-for="opt in inputTypeOptions"
-                  :key="opt.value"
-                  :value="opt.value"
+                  :key="(opt as Record<string, unknown>).value as PropertyKey"
+                  :value="(opt as Record<string, unknown>).value"
                 >
-                  {{ opt.label }}
+                  {{ (opt as Record<string, unknown>).label }}
                 </option>
               </select>
             </label>
@@ -175,7 +175,7 @@ function inputPlaceholder() {
                 rows="3"
                 :value="inputText"
                 :placeholder="inputPlaceholder()"
-                @input="emit('update:input-text', $event.target.value)"
+                @input="emit('update:input-text', ($event.target as HTMLTextAreaElement).value)"
               />
               <span class="query-tool-muted le-input-count">
                 已輸入 {{ parsedInputCount }} / {{ MAX_INPUT }}
@@ -213,8 +213,8 @@ function inputPlaceholder() {
         <div v-if="traceEntries.length > 0" class="le-trace-panel">
           <p class="le-trace-title">以下批次在指定站點無紀錄，已自動追溯至母批：</p>
           <div class="le-trace-list">
-            <span v-for="entry in traceEntries" :key="entry.from" class="le-trace-item">
-              {{ entry.from }} → {{ entry.to }}
+            <span v-for="entry in traceEntries" :key="(entry as Record<string, unknown>).from as PropertyKey" class="le-trace-item">
+              {{ (entry as Record<string, unknown>).from }} → {{ (entry as Record<string, unknown>).to }}
             </span>
           </div>
         </div>
@@ -233,7 +233,7 @@ function inputPlaceholder() {
             :class="{ active: tab === activeSubTab }"
             @click="emit('change-sub-tab', tab)"
           >
-            {{ tabMeta[tab] }}
+            {{ (tabMeta as Record<string, string>)[tab] }}
           </button>
         </div>
 
@@ -258,9 +258,9 @@ function inputPlaceholder() {
             每頁
             <select
               :value="lotsPagination.per_page"
-              @change="emit('change-lots-page-size', Number($event.target.value))"
+              @change="emit('change-lots-page-size', Number(($event.target as HTMLSelectElement).value))"
             >
-              <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+              <option v-for="size in pageSizeOptions" :key="(size as PropertyKey)" :value="size">{{ size }}</option>
             </select>
             筆
           </label>

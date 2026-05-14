@@ -1,9 +1,9 @@
-<script setup>
+<script setup lang="ts">
 import DataTable from '../../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import ExportButton from './ExportButton.vue';
-import { formatCellValue } from '../utils/values.js';
+import { formatCellValue } from '../utils/values';
 
 const props = defineProps({
   rows: {
@@ -61,7 +61,7 @@ const COLUMN_DEFS = Object.freeze([
     <ErrorBanner :message="error" />
 
     <DataTable
-      :data="rows"
+      :data="rows as Record<string, unknown>[]"
       :loading="loading"
       empty-type="no-data"
     >

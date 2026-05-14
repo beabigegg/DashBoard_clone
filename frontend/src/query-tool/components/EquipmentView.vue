@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../../shared-ui/components/FilterToolbar.vue';
@@ -96,8 +96,8 @@ const subTabs = Object.keys(tabMeta);
           <label class="filter-group filter-group--equipment">
             <span class="filter-label">設備（可複選）</span>
             <MultiSelect
-              :model-value="selectedEquipmentIds"
-              :options="equipmentOptions"
+              :model-value="selectedEquipmentIds as (string | number)[]"
+              :options="equipmentOptions as (string | number | Record<string, unknown>)[]"
               :disabled="loading.bootstrapping"
               searchable
               placeholder="請選擇設備"
@@ -111,7 +111,7 @@ const subTabs = Object.keys(tabMeta);
               type="date"
               class="query-tool-date-input"
               :value="startDate"
-              @input="emit('update:start-date', $event.target.value)"
+              @input="emit('update:start-date', ($event.target as HTMLInputElement).value)"
             />
           </label>
 
@@ -121,7 +121,7 @@ const subTabs = Object.keys(tabMeta);
               type="date"
               class="query-tool-date-input"
               :value="endDate"
-              @input="emit('update:end-date', $event.target.value)"
+              @input="emit('update:end-date', ($event.target as HTMLInputElement).value)"
             />
           </label>
 
@@ -160,7 +160,7 @@ const subTabs = Object.keys(tabMeta);
             :class="{ active: tab === activeSubTab }"
             @click="emit('change-sub-tab', tab)"
           >
-            {{ tabMeta[tab] }}
+            {{ (tabMeta as Record<string, string>)[tab] }}
           </button>
         </div>
 
@@ -185,9 +185,9 @@ const subTabs = Object.keys(tabMeta);
           每頁
           <select
             :value="lotsPagination.per_page"
-            @change="emit('change-lots-page-size', Number($event.target.value))"
+            @change="emit('change-lots-page-size', Number(($event.target as HTMLSelectElement).value))"
           >
-            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+            <option v-for="size in pageSizeOptions" :key="(size as PropertyKey)" :value="size">{{ size }}</option>
           </select>
           筆
         </label>

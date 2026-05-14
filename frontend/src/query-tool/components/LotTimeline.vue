@@ -1,8 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 import TimelineChart from '../../shared-ui/components/TimelineChart.vue';
-import { formatDateTime, hashColor, normalizeText, parseDateTime } from '../utils/values.js';
+import { formatDateTime, hashColor, normalizeText, parseDateTime } from '../utils/values';
 
 const props = defineProps({
   historyRows: {
@@ -19,12 +19,12 @@ const props = defineProps({
   },
 });
 
-function safeDate(value) {
+function safeDate(value: unknown): Date | null {
   const parsed = parseDateTime(value);
   return parsed ? parsed : null;
 }
 
-function normalizedKey(value) {
+function normalizedKey(value: unknown): string {
   return normalizeText(value).toUpperCase();
 }
 
@@ -32,7 +32,8 @@ function normalizedKey(value) {
 const tracks = computed(() => {
   const grouped = new Map();
 
-  props.historyRows.forEach((row, index) => {
+  props.historyRows.forEach((rawRow, index) => {
+    const row = rawRow as Record<string, unknown>;
     const groupName = normalizeText(row?.WORKCENTER_GROUP)
       || normalizeText(row?.WORKCENTERNAME)
       || `WORKCENTER-${index + 1}`;
@@ -52,7 +53,7 @@ const tracks = computed(() => {
         groupName,
         lotId,
         equipment,
-        containerId: normalizeText(row?.CONTAINERID),
+        containerId: normalizeText(row.CONTAINERID),
         bars: [],
       });
     }
@@ -62,7 +63,7 @@ const tracks = computed(() => {
       start,
       end,
       type: groupName,
-      label: row?.SPECNAME || groupName,
+      label: normalizeText(row?.SPECNAME) || groupName,
     });
   });
 
@@ -120,11 +121,11 @@ const containerSpecWindows = computed(() => {
       return;
     }
     (track.layers || []).forEach((layer) => {
-      (layer.bars || []).forEach((bar) => {
+      (layer.bars || []).forEach((bar: { start?: Date; end?: Date; label?: string; type?: string }) => {
         const specKey = normalizedKey(bar?.label || bar?.type);
         const startMs = bar?.start instanceof Date ? bar.start.getTime() : null;
         const endMs = bar?.end instanceof Date ? bar.end.getTime() : null;
-        if (!specKey || !Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+        if (startMs === null || endMs === null || !specKey) {
           return;
         }
 
@@ -144,13 +145,14 @@ const containerSpecWindows = computed(() => {
   return map;
 });
 
-function pickClosestTrack(windows, timeMs) {
+function pickClosestTrack(windows: Array<{ trackId: string; startMs: number; endMs: number }>, timeMs: number | null): string {
   if (!Array.isArray(windows) || windows.length === 0) {
     return '';
   }
-  if (!Number.isFinite(timeMs)) {
+  if (timeMs === null || !Number.isFinite(timeMs)) {
     return windows[0]?.trackId || '';
   }
+  const t: number = timeMs;
 
   let best = '';
   let bestDistance = Number.POSITIVE_INFINITY;
@@ -158,16 +160,16 @@ function pickClosestTrack(windows, timeMs) {
     if (!window?.trackId) {
       return;
     }
-    if (timeMs >= window.startMs && timeMs <= window.endMs) {
+    if (t >= window.startMs && t <= window.endMs) {
       if (0 < bestDistance) {
         best = window.trackId;
         bestDistance = 0;
       }
       return;
     }
-    const distance = timeMs < window.startMs
-      ? (window.startMs - timeMs)
-      : (timeMs - window.endMs);
+    const distance = t < window.startMs
+      ? (window.startMs - t)
+      : (t - window.endMs);
     if (distance < bestDistance) {
       best = window.trackId;
       bestDistance = distance;
@@ -177,7 +179,7 @@ function pickClosestTrack(windows, timeMs) {
   return best;
 }
 
-function resolveHoldTrackId(row) {
+function resolveHoldTrackId(row: Record<string, unknown>): string {
   const groupKey = normalizedKey(row?.WORKCENTER_GROUP) || normalizedKey(row?.WORKCENTERNAME);
   if (groupKey) {
     const trackId = groupToFirstTrackId.value.get(groupKey);
@@ -197,7 +199,7 @@ function resolveHoldTrackId(row) {
   return '';
 }
 
-function resolveMaterialTrackId(row, time) {
+function resolveMaterialTrackId(row: Record<string, unknown>, time: Date | null): string {
   const specKey = normalizedKey(row?.SPECNAME);
   const containerKey = normalizedKey(row?.CONTAINERID);
   if (!specKey || !containerKey) {
@@ -209,10 +211,21 @@ function resolveMaterialTrackId(row, time) {
   return pickClosestTrack(windows, timeMs);
 }
 
-const events = computed(() => {
-  const markers = [];
+interface LocalTimelineEvent {
+  id: string;
+  trackId: string;
+  time: number;
+  type: string;
+  shape: string;
+  label: string;
+  detail: string;
+}
 
-  props.holdRows.forEach((row, index) => {
+const events = computed(() => {
+  const markers: LocalTimelineEvent[] = [];
+
+  props.holdRows.forEach((rawRow, index) => {
+    const row = rawRow as Record<string, unknown>;
     const time = safeDate(row?.HOLDTXNDATE);
     if (!time) {
       return;
@@ -225,7 +238,7 @@ const events = computed(() => {
     markers.push({
       id: `hold-${index}`,
       trackId,
-      time,
+      time: time.getTime(),
       type: 'HOLD',
       shape: 'diamond',
       label: 'Hold',
@@ -233,7 +246,8 @@ const events = computed(() => {
     });
   });
 
-  props.materialRows.forEach((row, index) => {
+  props.materialRows.forEach((rawRow, index) => {
+    const row = rawRow as Record<string, unknown>;
     const time = safeDate(row?.TXNDATE);
     if (!time) {
       return;
@@ -246,7 +260,7 @@ const events = computed(() => {
     markers.push({
       id: `material-${index}`,
       trackId,
-      time,
+      time: time.getTime(),
       type: 'MATERIAL',
       shape: 'triangle',
       label: normalizeText(row?.MATERIALPARTNAME) || 'Material',
@@ -261,7 +275,8 @@ const materialMappingStats = computed(() => {
   let total = 0;
   let mapped = 0;
 
-  props.materialRows.forEach((row) => {
+  props.materialRows.forEach((rawRow) => {
+    const row = rawRow as Record<string, unknown>;
     const time = safeDate(row?.TXNDATE);
     if (!time) {
       return;
@@ -280,7 +295,7 @@ const materialMappingStats = computed(() => {
 });
 
 const colorMap = computed(() => {
-  const colors = {
+  const colors: Record<string, string> = {
     HOLD: 'var(--color-token-hf59e0b)',
     MATERIAL: 'var(--color-token-h0ea5e9)',
   };
@@ -301,11 +316,11 @@ const timeRange = computed(() => {
   // Derive range ONLY from history bars so it updates when LOT selection
   // or workcenter group filter changes. Hold/material events are supplementary
   // markers and should not stretch the visible range.
-  const timestamps = [];
+  const timestamps: number[] = [];
 
   tracks.value.forEach((track) => {
     (track.layers || []).forEach((layer) => {
-      (layer.bars || []).forEach((bar) => {
+      (layer.bars || []).forEach((bar: { start?: Date; end?: Date }) => {
         timestamps.push(bar.start?.getTime?.() || 0);
         timestamps.push(bar.end?.getTime?.() || 0);
       });
@@ -317,9 +332,10 @@ const timeRange = computed(() => {
     return null;
   }
 
+  // Return as numbers (ms) so TimelineChart's TimeRange { start?: string|number } is satisfied
   return {
-    start: new Date(Math.min(...normalized)),
-    end: new Date(Math.max(...normalized)),
+    start: Math.min(...normalized),
+    end: Math.max(...normalized),
   };
 });
 </script>

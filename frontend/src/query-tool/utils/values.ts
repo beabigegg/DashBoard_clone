@@ -1,10 +1,10 @@
-export function normalizeText(value) {
+export function normalizeText(value: unknown): string {
   return String(value || '').trim();
 }
 
-export function uniqueValues(values = []) {
-  const seen = new Set();
-  const list = [];
+export function uniqueValues(values: unknown[] = []): string[] {
+  const seen = new Set<string>();
+  const list: string[] = [];
   values.forEach((value) => {
     const normalized = normalizeText(value);
     if (!normalized || seen.has(normalized)) {
@@ -16,11 +16,11 @@ export function uniqueValues(values = []) {
   return list;
 }
 
-export function parseInputValues(raw) {
+export function parseInputValues(raw: unknown): string[] {
   return uniqueValues(String(raw || '').split(/[\n,]/));
 }
 
-export function parseArrayParam(params, key) {
+export function parseArrayParam(params: URLSearchParams, key: string): string[] {
   const repeated = params.getAll(key).map((item) => normalizeText(item)).filter(Boolean);
   if (repeated.length > 0) {
     return uniqueValues(repeated);
@@ -32,18 +32,18 @@ export function parseArrayParam(params, key) {
   return uniqueValues(fallback.split(','));
 }
 
-export function toDateInputValue(value) {
+export function toDateInputValue(value: unknown): string {
   if (!value) {
     return '';
   }
-  const date = value instanceof Date ? value : new Date(value);
+  const date = value instanceof Date ? value : new Date(value as string | number);
   if (Number.isNaN(date.getTime())) {
     return '';
   }
   return date.toISOString().slice(0, 10);
 }
 
-export function parseDateTime(value) {
+export function parseDateTime(value: unknown): Date | null {
   if (!value) {
     return null;
   }
@@ -57,7 +57,7 @@ export function parseDateTime(value) {
   return date;
 }
 
-export function formatDateTime(value) {
+export function formatDateTime(value: unknown): string {
   const date = parseDateTime(value);
   if (!date) {
     return '-';
@@ -71,7 +71,7 @@ export function formatDateTime(value) {
   return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 }
 
-export function formatCellValue(value) {
+export function formatCellValue(value: unknown): string {
   if (value === null || value === undefined || value === '') {
     return '-';
   }
@@ -81,7 +81,7 @@ export function formatCellValue(value) {
   return String(value);
 }
 
-export function hashColor(seed) {
+export function hashColor(seed: unknown): string {
   const text = normalizeText(seed) || 'fallback';
   let hash = 0;
   for (let i = 0; i < text.length; i += 1) {

@@ -1,19 +1,38 @@
 import { computed, reactive, ref } from 'vue';
 
-import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api.js';
-import { exportCsv } from '../utils/csv.js';
-import { normalizeText, toDateInputValue, uniqueValues } from '../utils/values.js';
+import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api';
+import { exportCsv } from '../utils/csv';
+import { normalizeText, toDateInputValue, uniqueValues } from '../utils/values';
+
+interface EquipmentItem {
+  RESOURCEID: string | number;
+  RESOURCENAME: string;
+}
+
+interface Pagination {
+  page: number;
+  per_page: number;
+  total: number;
+  total_pages: number;
+}
+
+interface EquipmentQueryInitial {
+  selectedEquipmentIds?: string[];
+  activeSubTab?: string;
+  startDate?: string;
+  endDate?: string;
+}
 
 const EQUIPMENT_SUB_TABS = Object.freeze(['lots', 'jobs', 'rejects']);
 const DEFAULT_LOTS_PER_PAGE = 25;
 const PAGE_SIZE_OPTIONS = Object.freeze([25, 50, 100, 200]);
 
-function normalizeSubTab(value) {
+function normalizeSubTab(value: unknown): string {
   const tab = normalizeText(value).toLowerCase();
   return EQUIPMENT_SUB_TABS.includes(tab) ? tab : 'lots';
 }
 
-function defaultDateRange(days = 30) {
+function defaultDateRange(days = 30): { startDate: string; endDate: string } {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - Number(days || 30));
@@ -23,7 +42,7 @@ function defaultDateRange(days = 30) {
   };
 }
 
-function emptyTabFlags() {
+function emptyTabFlags(): Record<string, boolean> {
   return {
     lots: false,
     jobs: false,
@@ -32,10 +51,10 @@ function emptyTabFlags() {
   };
 }
 
-export function useEquipmentQuery(initial = {}) {
+export function useEquipmentQuery(initial: EquipmentQueryInitial = {}) {
   ensureMesApiAvailable();
 
-  const equipmentOptions = ref([]);
+  const equipmentOptions = ref<EquipmentItem[]>([]);
 
   const selectedEquipmentIds = ref(uniqueValues(initial.selectedEquipmentIds || []));
   const activeSubTab = ref(normalizeSubTab(initial.activeSubTab));
@@ -44,11 +63,11 @@ export function useEquipmentQuery(initial = {}) {
   const startDate = ref(normalizeText(initial.startDate) || rangeDefaults.startDate);
   const endDate = ref(normalizeText(initial.endDate) || rangeDefaults.endDate);
 
-  const lotsRows = ref([]);
-  const lotsPagination = ref({ page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 });
-  const jobsRows = ref([]);
-  const rejectsRows = ref([]);
-  const statusRows = ref([]);
+  const lotsRows = ref<Record<string, unknown>[]>([]);
+  const lotsPagination = ref<Pagination>({ page: 1, per_page: DEFAULT_LOTS_PER_PAGE, total: 0, total_pages: 1 });
+  const jobsRows = ref<Record<string, unknown>[]>([]);
+  const rejectsRows = ref<Record<string, unknown>[]>([]);
+  const statusRows = ref<Record<string, unknown>[]>([]);
 
   const loading = reactive({
     bootstrapping: false,
@@ -99,8 +118,8 @@ export function useEquipmentQuery(initial = {}) {
     return '';
   }
 
-  function buildQueryPayload(queryType, options = {}) {
-    const payload = {
+  function buildQueryPayload(queryType: string, options: { page?: number | null; perPage?: number | null } = {}): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
       equipment_ids: selectedEquipmentIds.value,
       equipment_names: selectedEquipmentNames.value,
       start_date: startDate.value,
@@ -114,7 +133,7 @@ export function useEquipmentQuery(initial = {}) {
     return payload;
   }
 
-  async function fetchEquipmentPeriod(queryType, options = {}) {
+  async function fetchEquipmentPeriod(queryType: string, options: { page?: number | null; perPage?: number | null } = {}): Promise<Record<string, unknown>> {
     const validation = validateFilters();
     if (validation) {
       throw new Error(validation);
@@ -126,7 +145,7 @@ export function useEquipmentQuery(initial = {}) {
       { timeout: 360000, silent: true },
     );
 
-    return payload?.data || {};
+    return (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
   }
 
   async function loadEquipmentOptions() {
@@ -138,11 +157,11 @@ export function useEquipmentQuery(initial = {}) {
         timeout: 360000,
         silent: true,
       });
-      const inner = payload?.data || {};
+      const inner = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
       equipmentOptions.value = Array.isArray(inner?.data) ? inner.data : [];
       return true;
     } catch (error) {
-      errors.equipmentOptions = error?.message || '載入設備清單失敗';
+      errors.equipmentOptions = (error as Error)?.message || '載入設備清單失敗';
       equipmentOptions.value = [];
       return false;
     } finally {
@@ -150,15 +169,15 @@ export function useEquipmentQuery(initial = {}) {
     }
   }
 
-  async function queryLots({ page = null, perPage = null } = {}) {
+  async function queryLots({ page = null, perPage = null }: { page?: number | null; perPage?: number | null } = {}): Promise<boolean> {
     loading.lots = true;
     errors.filters = '';
     errors.lots = '';
 
     try {
       const payload = await fetchEquipmentPeriod('lots', { page, perPage: perPage ?? lotsPagination.value.per_page });
-      lotsRows.value = Array.isArray(payload?.data) ? payload.data : [];
-      lotsPagination.value = payload?.pagination || {
+      lotsRows.value = Array.isArray(payload?.data) ? payload.data as Record<string, unknown>[] : [];
+      lotsPagination.value = (payload?.pagination as Pagination) || {
         page: Number(page || 1),
         per_page: DEFAULT_LOTS_PER_PAGE,
         total: lotsRows.value.length,
@@ -167,7 +186,7 @@ export function useEquipmentQuery(initial = {}) {
       queried.lots = true;
       return true;
     } catch (error) {
-      errors.lots = error?.message || '查詢生產紀錄失敗';
+      errors.lots = (error as Error)?.message || '查詢生產紀錄失敗';
       if (!errors.filters) {
         errors.filters = errors.lots;
       }
@@ -190,7 +209,7 @@ export function useEquipmentQuery(initial = {}) {
       queried.jobs = true;
       return true;
     } catch (error) {
-      errors.jobs = error?.message || '查詢維修紀錄失敗';
+      errors.jobs = (error as Error)?.message || '查詢維修紀錄失敗';
       if (!errors.filters) {
         errors.filters = errors.jobs;
       }
@@ -212,7 +231,7 @@ export function useEquipmentQuery(initial = {}) {
       queried.rejects = true;
       return true;
     } catch (error) {
-      errors.rejects = error?.message || '查詢報廢紀錄失敗';
+      errors.rejects = (error as Error)?.message || '查詢報廢紀錄失敗';
       if (!errors.filters) {
         errors.filters = errors.rejects;
       }
@@ -240,8 +259,8 @@ export function useEquipmentQuery(initial = {}) {
       ]);
 
       statusRows.value = Array.isArray(statusPayload?.data) ? statusPayload.data : [];
-      lotsRows.value = Array.isArray(lotsPayload?.data) ? lotsPayload.data : [];
-      lotsPagination.value = lotsPayload?.pagination || {
+      lotsRows.value = Array.isArray(lotsPayload?.data) ? lotsPayload.data as Record<string, unknown>[] : [];
+      lotsPagination.value = (lotsPayload?.pagination as Pagination) || {
         page: 1,
         per_page: DEFAULT_LOTS_PER_PAGE,
         total: lotsRows.value.length,
@@ -251,7 +270,7 @@ export function useEquipmentQuery(initial = {}) {
       queried.timeline = true;
       return true;
     } catch (error) {
-      errors.filters = error?.message || '查詢時間軸資料失敗';
+      errors.filters = (error as Error)?.message || '查詢時間軸資料失敗';
       return false;
     }
   }
@@ -267,7 +286,7 @@ export function useEquipmentQuery(initial = {}) {
     return queryRejects();
   }
 
-  async function setActiveSubTab(tab, { autoQuery = true } = {}) {
+  async function setActiveSubTab(tab: unknown, { autoQuery = true }: { autoQuery?: boolean } = {}): Promise<boolean> {
     activeSubTab.value = normalizeSubTab(tab);
     if (!autoQuery) {
       return true;
@@ -275,11 +294,11 @@ export function useEquipmentQuery(initial = {}) {
     return queryActiveSubTab();
   }
 
-  function setSelectedEquipmentIds(ids = []) {
+  function setSelectedEquipmentIds(ids: unknown[] = []): void {
     selectedEquipmentIds.value = uniqueValues(ids);
   }
 
-  function canExportSubTab(tab) {
+  function canExportSubTab(tab: unknown): boolean {
     const normalized = normalizeSubTab(tab);
     if (normalized === 'lots') {
       return lotsRows.value.length > 0;
@@ -293,7 +312,7 @@ export function useEquipmentQuery(initial = {}) {
     return lotsRows.value.length > 0;
   }
 
-  async function exportSubTab(tab) {
+  async function exportSubTab(tab: unknown): Promise<boolean> {
     const normalized = normalizeSubTab(tab);
 
     if (!canExportSubTab(normalized)) {
@@ -304,7 +323,7 @@ export function useEquipmentQuery(initial = {}) {
 
     try {
       let exportType = 'equipment_lots';
-      const params = {
+      const params: Record<string, unknown> = {
         equipment_ids: selectedEquipmentIds.value,
         equipment_names: selectedEquipmentNames.value,
         start_date: startDate.value,
@@ -324,11 +343,11 @@ export function useEquipmentQuery(initial = {}) {
 
       return true;
     } catch (error) {
-      const message = error?.message || '匯出失敗';
-      errors[normalized] = message;
+      const message = (error as Error)?.message || '匯出失敗';
+      (errors as Record<string, string>)[normalized] = message;
       return false;
     } finally {
-      exporting[normalized] = false;
+      (exporting as Record<string, boolean>)[normalized] = false;
     }
   }
 

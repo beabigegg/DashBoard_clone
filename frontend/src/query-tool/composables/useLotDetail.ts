@@ -1,8 +1,26 @@
 import { reactive, ref } from 'vue';
 
-import { apiGet, ensureMesApiAvailable } from '../../core/api.js';
-import { exportCsv } from '../utils/csv.js';
-import { normalizeText, parseDateTime, uniqueValues, formatDateTime } from '../utils/values.js';
+import { apiGet, ensureMesApiAvailable } from '../../core/api';
+import { exportCsv } from '../utils/csv';
+import { normalizeText, parseDateTime, uniqueValues, formatDateTime } from '../utils/values';
+
+interface Pagination {
+  page: number;
+  per_page: number;
+  total: number;
+  total_pages: number;
+}
+
+interface QualityMeta {
+  status: string;
+  reasons?: string[];
+}
+
+interface LotDetailInitial {
+  selectedContainerId?: string;
+  activeSubTab?: string;
+  workcenterGroups?: string[];
+}
 
 const LOT_SUB_TABS = Object.freeze([
   'history',
@@ -74,7 +92,7 @@ function emptyPaginationMap() {
   };
 }
 
-function emptyQualityMetaMap() {
+function emptyQualityMetaMap(): Record<string, QualityMeta | null> {
   return {
     history: null,
     materials: null,
@@ -84,18 +102,18 @@ function emptyQualityMetaMap() {
   };
 }
 
-function normalizeSubTab(value) {
+function normalizeSubTab(value: unknown): string {
   const tab = normalizeText(value).toLowerCase();
   return LOT_SUB_TABS.includes(tab) ? tab : 'history';
 }
 
-function resolveTimeRangeFromHistory(rows) {
+function resolveTimeRangeFromHistory(rows: Record<string, unknown>[]): { time_start: string; time_end: string } | null {
   if (!Array.isArray(rows) || rows.length === 0) {
     return null;
   }
 
-  let minTrackIn = null;
-  let maxTrackOut = null;
+  let minTrackIn: Date | null = null;
+  let maxTrackOut: Date | null = null;
 
   rows.forEach((row) => {
     const trackIn = parseDateTime(row?.TRACKINTIMESTAMP || row?.TRACKINTIME);
@@ -109,7 +127,7 @@ function resolveTimeRangeFromHistory(rows) {
       maxTrackOut = trackOut;
     }
 
-    if (!maxTrackOut && trackIn && (!maxTrackOut || trackIn > maxTrackOut)) {
+    if (!maxTrackOut && trackIn) {
       maxTrackOut = trackIn;
     }
   });
@@ -124,7 +142,7 @@ function resolveTimeRangeFromHistory(rows) {
   };
 }
 
-function resolveEquipmentIdFromHistory(rows) {
+function resolveEquipmentIdFromHistory(rows: Record<string, unknown>[]): string {
   if (!Array.isArray(rows) || rows.length === 0) {
     return '';
   }
@@ -139,7 +157,7 @@ function resolveEquipmentIdFromHistory(rows) {
   return '';
 }
 
-export function useLotDetail(initial = {}) {
+export function useLotDetail(initial: LotDetailInitial = {}) {
   ensureMesApiAvailable();
 
   const selectedContainerId = ref(normalizeText(initial.selectedContainerId));
@@ -148,10 +166,10 @@ export function useLotDetail(initial = {}) {
   );
   const activeSubTab = ref(normalizeSubTab(initial.activeSubTab));
 
-  const workcenterGroups = ref([]);
+  const workcenterGroups = ref<Record<string, unknown>[]>([]);
   const selectedWorkcenterGroups = ref(uniqueValues(initial.workcenterGroups || []));
 
-  const historyRows = ref([]);
+  const historyRows = ref<Record<string, unknown>[]>([]);
   const associationRows = reactive(emptyAssociations());
   const pagination = reactive(emptyPaginationMap());
   const qualityMeta = reactive(emptyQualityMetaMap());
@@ -172,20 +190,26 @@ export function useLotDetail(initial = {}) {
   function clearTabData() {
     historyRows.value = [];
     const nextAssociations = emptyAssociations();
+    const assocMap = associationRows as Record<string, unknown>;
     Object.keys(nextAssociations).forEach((key) => {
-      associationRows[key] = nextAssociations[key];
+      assocMap[key] = nextAssociations[key as keyof ReturnType<typeof emptyAssociations>];
     });
     const nextPagination = emptyPaginationMap();
+    const paginationMap = pagination as Record<string, unknown>;
+    const qualityMap = qualityMeta as Record<string, unknown>;
     Object.keys(nextPagination).forEach((key) => {
-      pagination[key] = nextPagination[key];
-      qualityMeta[key] = null;
+      paginationMap[key] = nextPagination[key as keyof ReturnType<typeof emptyPaginationMap>];
+      qualityMap[key] = null;
     });
 
     const nextLoaded = emptyTabFlags();
+    const loadedMap = loaded as Record<string, unknown>;
+    const exportingMap = exporting as Record<string, unknown>;
+    const errorsMap = errors as Record<string, unknown>;
     Object.keys(nextLoaded).forEach((key) => {
-      loaded[key] = nextLoaded[key];
-      exporting[key] = false;
-      errors[key] = '';
+      loadedMap[key] = nextLoaded[key as keyof ReturnType<typeof emptyTabFlags>];
+      exportingMap[key] = false;
+      errorsMap[key] = '';
     });
   }
 
@@ -207,11 +231,11 @@ export function useLotDetail(initial = {}) {
         silent: true,
       });
 
-      const inner = payload?.data || {};
+      const inner = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
       workcenterGroups.value = Array.isArray(inner?.data) ? inner.data : [];
       return true;
     } catch (error) {
-      errors.workcenterGroups = error?.message || '載入站點群組失敗';
+      errors.workcenterGroups = (error as Error)?.message || '載入站點群組失敗';
       workcenterGroups.value = [];
       return false;
     } finally {
@@ -219,7 +243,7 @@ export function useLotDetail(initial = {}) {
     }
   }
 
-  async function loadHistory({ force = false, page = null } = {}) {
+  async function loadHistory({ force = false, page = null }: { force?: boolean; page?: number | null } = {}): Promise<boolean> {
     const cids = getActiveCids();
     if (cids.length === 0) {
       return false;
@@ -252,19 +276,19 @@ export function useLotDetail(initial = {}) {
         silent: true,
       });
 
-      const inner = payload?.data || {};
+      const inner = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
       historyRows.value = Array.isArray(inner?.data) ? inner.data : [];
-      pagination.history = inner?.pagination || {
+      pagination.history = (inner?.pagination as Pagination) || {
         page: targetPage,
         per_page: pagination.history.per_page || DEFAULT_PER_PAGE,
         total: historyRows.value.length,
         total_pages: 1,
       };
-      qualityMeta.history = inner?.quality_meta || null;
+      qualityMeta.history = (inner?.quality_meta as QualityMeta) || null;
       loaded.history = true;
       return true;
     } catch (error) {
-      errors.history = error?.message || '載入 LOT 歷程失敗';
+      errors.history = (error as Error)?.message || '載入 LOT 歷程失敗';
       historyRows.value = [];
       pagination.history = emptyPagination();
       qualityMeta.history = null;
@@ -274,7 +298,7 @@ export function useLotDetail(initial = {}) {
     }
   }
 
-  async function loadAssociation(tab, { force = false, silentError = false, page = null } = {}) {
+  async function loadAssociation(tab: unknown, { force = false, silentError = false, page = null }: { force?: boolean; silentError?: boolean; page?: number | null } = {}): Promise<boolean> {
     const associationType = normalizeSubTab(tab);
     if (!ASSOCIATION_TABS.has(associationType)) {
       return false;
@@ -285,13 +309,20 @@ export function useLotDetail(initial = {}) {
       return false;
     }
 
-    if (!force && loaded[associationType]) {
+    const loadedMap = loaded as Record<string, unknown>;
+    const loadingMap = loading as Record<string, unknown>;
+    const errorsMap = errors as Record<string, unknown>;
+    const assocMap = associationRows as Record<string, unknown>;
+    const paginationMap = pagination as Record<string, unknown>;
+    const qualityMap = qualityMeta as Record<string, unknown>;
+
+    if (!force && loadedMap[associationType]) {
       return true;
     }
 
-    loading[associationType] = true;
+    loadingMap[associationType] = true;
     if (!silentError) {
-      errors[associationType] = '';
+      errorsMap[associationType] = '';
     }
 
     try {
@@ -320,10 +351,10 @@ export function useLotDetail(initial = {}) {
           silent: true,
         });
 
-        const inner = payload?.data || {};
-        associationRows[associationType] = Array.isArray(inner?.data) ? inner.data : [];
-        pagination[associationType] = emptyPagination(0);
-        qualityMeta[associationType] = null;
+        const inner = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
+        assocMap[associationType] = Array.isArray(inner?.data) ? inner.data : [];
+        paginationMap[associationType] = emptyPagination(0);
+        qualityMap[associationType] = null;
       } else {
         // Non-jobs tabs: batch all CIDs into a single request
         const params = new URLSearchParams();
@@ -333,10 +364,11 @@ export function useLotDetail(initial = {}) {
           params.set('container_id', cids[0]);
         }
         params.set('type', associationType);
-        const targetPage = Number(page || pagination[associationType].page || 1);
+        const pagRow = paginationMap[associationType] as Pagination;
+        const targetPage = Number(page || pagRow?.page || 1);
         if (PAGED_SUB_TABS.has(associationType)) {
           params.set('page', String(targetPage));
-          params.set('per_page', String(pagination[associationType].per_page || DEFAULT_PER_PAGE));
+          params.set('per_page', String(pagRow?.per_page || DEFAULT_PER_PAGE));
         }
 
         const payload = await apiGet(`/api/query-tool/lot-associations?${params.toString()}`, {
@@ -344,36 +376,36 @@ export function useLotDetail(initial = {}) {
           silent: true,
         });
 
-        const inner = payload?.data || {};
-        associationRows[associationType] = Array.isArray(inner?.data) ? inner.data : [];
+        const inner = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
+        assocMap[associationType] = Array.isArray(inner?.data) ? inner.data : [];
         if (PAGED_SUB_TABS.has(associationType)) {
-          pagination[associationType] = inner?.pagination || {
+          paginationMap[associationType] = inner?.pagination || {
             page: targetPage,
-            per_page: pagination[associationType].per_page || DEFAULT_PER_PAGE,
-            total: associationRows[associationType].length,
+            per_page: pagRow?.per_page || DEFAULT_PER_PAGE,
+            total: (assocMap[associationType] as unknown[]).length,
             total_pages: 1,
           };
-          qualityMeta[associationType] = inner?.quality_meta || null;
+          qualityMap[associationType] = inner?.quality_meta || null;
         } else {
-          pagination[associationType] = emptyPagination(0);
-          qualityMeta[associationType] = null;
+          paginationMap[associationType] = emptyPagination(0);
+          qualityMap[associationType] = null;
         }
       }
 
-      loaded[associationType] = true;
+      loadedMap[associationType] = true;
       return true;
     } catch (error) {
-      associationRows[associationType] = [];
-      pagination[associationType] = PAGED_SUB_TABS.has(associationType)
+      assocMap[associationType] = [];
+      paginationMap[associationType] = PAGED_SUB_TABS.has(associationType)
         ? emptyPagination()
         : emptyPagination(0);
-      qualityMeta[associationType] = null;
+      qualityMap[associationType] = null;
       if (!silentError) {
-        errors[associationType] = error?.message || '載入關聯資料失敗';
+        errorsMap[associationType] = (error as Error)?.message || '載入關聯資料失敗';
       }
       return false;
     } finally {
-      loading[associationType] = false;
+      loadingMap[associationType] = false;
     }
   }
 
@@ -393,12 +425,12 @@ export function useLotDetail(initial = {}) {
     return loadAssociation(activeSubTab.value);
   }
 
-  async function setActiveSubTab(tab) {
+  async function setActiveSubTab(tab: unknown): Promise<boolean> {
     activeSubTab.value = normalizeSubTab(tab);
     return ensureActiveSubTabData();
   }
 
-  async function setSelectedContainerId(containerId) {
+  async function setSelectedContainerId(containerId: unknown): Promise<boolean> {
     const nextId = normalizeText(containerId);
     selectedContainerIds.value = nextId ? [nextId] : [];
 
@@ -416,7 +448,7 @@ export function useLotDetail(initial = {}) {
     return ensureActiveSubTabData();
   }
 
-  async function setSelectedContainerIds(cids) {
+  async function setSelectedContainerIds(cids: unknown[]): Promise<boolean> {
     const normalized = uniqueValues(
       (Array.isArray(cids) ? cids : []).map(normalizeText).filter(Boolean),
     );
@@ -431,7 +463,7 @@ export function useLotDetail(initial = {}) {
     return ensureActiveSubTabData();
   }
 
-  async function setSelectedWorkcenterGroups(groups) {
+  async function setSelectedWorkcenterGroups(groups: unknown[]): Promise<boolean> {
     selectedWorkcenterGroups.value = uniqueValues(groups || []);
 
     if (!selectedContainerId.value) {
@@ -442,7 +474,7 @@ export function useLotDetail(initial = {}) {
     return loadHistory({ force: true });
   }
 
-  async function setSubTabPage(tab, nextPage) {
+  async function setSubTabPage(tab: unknown, nextPage: unknown): Promise<boolean> {
     const normalized = normalizeSubTab(tab);
     if (!PAGED_SUB_TABS.has(normalized)) {
       return false;
@@ -454,19 +486,19 @@ export function useLotDetail(initial = {}) {
     return loadAssociation(normalized, { force: true, page: pageNumber });
   }
 
-  async function setSubTabPerPage(tab, perPage) {
+  async function setSubTabPerPage(tab: unknown, perPage: unknown): Promise<boolean> {
     const normalized = normalizeSubTab(tab);
     if (!PAGED_SUB_TABS.has(normalized)) {
       return false;
     }
-    pagination[normalized].per_page = Number(perPage) || DEFAULT_PER_PAGE;
+    (pagination as Record<string, Pagination>)[normalized].per_page = Number(perPage) || DEFAULT_PER_PAGE;
     if (normalized === 'history') {
       return loadHistory({ force: true, page: 1 });
     }
     return loadAssociation(normalized, { force: true, page: 1 });
   }
 
-  function getRowsByTab(tab) {
+  function getRowsByTab(tab: unknown): Record<string, unknown>[] {
     const normalized = normalizeSubTab(tab);
     if (normalized === 'history') {
       return historyRows.value;
@@ -474,23 +506,25 @@ export function useLotDetail(initial = {}) {
     if (!ASSOCIATION_TABS.has(normalized)) {
       return [];
     }
-    return associationRows[normalized] || [];
+    return (associationRows as Record<string, Record<string, unknown>[]>)[normalized] || [];
   }
 
-  async function exportSubTab(tab) {
+  async function exportSubTab(tab: unknown): Promise<boolean> {
     const normalized = normalizeSubTab(tab);
-    const exportType = EXPORT_TYPE_MAP[normalized];
+    const exportType = (EXPORT_TYPE_MAP as Record<string, string>)[normalized];
     const cids = getActiveCids();
+    const exportingMap = exporting as Record<string, unknown>;
+    const errorsMap = errors as Record<string, unknown>;
 
     if (!exportType || cids.length === 0) {
       return false;
     }
 
-    exporting[normalized] = true;
-    errors[normalized] = '';
+    exportingMap[normalized] = true;
+    errorsMap[normalized] = '';
 
     try {
-      const params = {
+      const params: Record<string, unknown> = {
         container_ids: cids,
       };
 
@@ -515,10 +549,10 @@ export function useLotDetail(initial = {}) {
 
       return true;
     } catch (error) {
-      errors[normalized] = error?.message || '匯出失敗';
+      errorsMap[normalized] = (error as Error)?.message || '匯出失敗';
       return false;
     } finally {
-      exporting[normalized] = false;
+      exportingMap[normalized] = false;
     }
   }
 

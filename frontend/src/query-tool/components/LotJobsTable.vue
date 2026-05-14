@@ -1,12 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { apiGet, ensureMesApiAvailable } from '../../core/api.js';
-import { useSortableTable } from '../../shared-composables/useSortableTable.js';
+import { apiGet, ensureMesApiAvailable } from '../../core/api';
+import { useSortableTable } from '../../shared-composables/useSortableTable';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import StatusBadge from '../../shared-ui/components/StatusBadge.vue';
 import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
-import { formatCellValue, formatDateTime, parseDateTime } from '../utils/values.js';
+import { formatCellValue, formatDateTime, parseDateTime } from '../utils/values';
 
 const props = defineProps({
   rows: {
@@ -59,17 +59,19 @@ const TXN_COLUMN_PRIORITY = Object.freeze([
 ]);
 
 const selectedJobId = ref('');
-const txnRows = ref([]);
+const txnRows = ref<Record<string, unknown>[]>([]);
 const loadingTxn = ref(false);
 const txnError = ref('');
 
-function buildOrderedColumns(rows, preferred) {
-  const keys = new Set(Object.keys(rows?.[0] || {}));
+function buildOrderedColumns(rows: unknown[], preferred: readonly string[]): string[] {
+  const keys = new Set(Object.keys((rows?.[0] as Record<string, unknown>) || {}));
   return preferred.filter((column) => keys.has(column));
 }
 
 const sortedRows = computed(() => {
-  return [...(props.rows || [])].sort((a, b) => {
+  return [...(props.rows || [])].sort((rawA, rawB) => {
+    const a = rawA as Record<string, unknown>;
+    const b = rawB as Record<string, unknown>;
     const aDate = parseDateTime(a?.CREATEDATE);
     const bDate = parseDateTime(b?.CREATEDATE);
     const aTime = aDate ? aDate.getTime() : 0;
@@ -78,14 +80,15 @@ const sortedRows = computed(() => {
   });
 });
 
-const { sortKey, sortDirection, sortedData: displayRows, toggleSort } = useSortableTable(sortedRows);
+const sortedRowsTyped = sortedRows as unknown as import('vue').ComputedRef<Record<string, unknown>[]>;
+const { sortKey, sortDirection, sortedData: displayRows, toggleSort } = useSortableTable(sortedRowsTyped);
 
-function sortLabel(key) {
+function sortLabel(key: string): string {
   if (sortKey.value !== key) return '⇕';
   return sortDirection.value === 'asc' ? '▲' : '▼';
 }
 
-function ariaSortFor(key) {
+function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
   if (sortKey.value !== key) return 'none';
   return sortDirection.value === 'asc' ? 'ascending' : 'descending';
 }
@@ -98,11 +101,11 @@ const txnColumns = computed(() => {
   return buildOrderedColumns(txnRows.value, TXN_COLUMN_PRIORITY);
 });
 
-function rowKey(row, index) {
+function rowKey(row: Record<string, unknown>, index: number): string {
   return String(row?.JOBID || `${row?.RESOURCEID || ''}-${index}`);
 }
 
-function buildStatusTone(status) {
+function buildStatusTone(status: unknown): 'success' | 'warning' | 'neutral' | 'danger' | 'info' {
   const text = String(status || '').trim().toLowerCase();
   if (!text) {
     return 'neutral';
@@ -119,14 +122,14 @@ function buildStatusTone(status) {
   return 'neutral';
 }
 
-function renderJobCellValue(row, column) {
+function renderJobCellValue(row: Record<string, unknown>, column: string): string {
   if (column === 'CREATEDATE' || column === 'COMPLETEDATE') {
     return formatDateTime(row?.[column]);
   }
   return formatCellValue(row?.[column]);
 }
 
-function renderTxnCellValue(row, column) {
+function renderTxnCellValue(row: Record<string, unknown>, column: string): string {
   const normalizedColumn = String(column || '').toUpperCase();
   if (normalizedColumn.includes('DATE') || normalizedColumn.includes('TIME')) {
     return formatDateTime(row?.[column]);
@@ -137,7 +140,7 @@ function renderTxnCellValue(row, column) {
   return formatCellValue(row?.[column]);
 }
 
-async function loadTxn(jobId) {
+async function loadTxn(jobId: unknown): Promise<void> {
   const id = String(jobId || '').trim();
   if (!id) {
     return;
@@ -153,10 +156,10 @@ async function loadTxn(jobId) {
       timeout: 360000,
       silent: true,
     });
-    const inner = payload?.data || {};
-    txnRows.value = Array.isArray(inner?.data) ? inner.data : [];
+    const inner = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
+    txnRows.value = Array.isArray(inner?.data) ? inner.data as Record<string, unknown>[] : [];
   } catch (error) {
-    txnError.value = error?.message || '載入交易歷程失敗';
+    txnError.value = (error as Error)?.message || '載入交易歷程失敗';
     txnRows.value = [];
   } finally {
     loadingTxn.value = false;
@@ -243,7 +246,7 @@ async function loadTxn(jobId) {
           <tbody>
             <tr
               v-for="(row, rowIndex) in txnRows"
-              :key="row?.JOBTXNHISTORYID || `${selectedJobId}-${rowIndex}`"
+              :key="(row?.JOBTXNHISTORYID || `${selectedJobId}-${rowIndex}`) as PropertyKey"
             >
               <td v-for="column in txnColumns" :key="`${row?.JOBTXNHISTORYID || rowIndex}-${column}`">
                 <StatusBadge

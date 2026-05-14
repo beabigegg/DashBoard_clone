@@ -1,7 +1,13 @@
 import { computed, reactive, ref } from 'vue';
 
-import { apiPost, ensureMesApiAvailable } from '../../core/api.js';
-import { parseInputValues } from '../utils/values.js';
+import { apiPost, ensureMesApiAvailable } from '../../core/api';
+import { parseInputValues } from '../utils/values';
+
+interface LotResolveInitial {
+  inputType?: string;
+  inputText?: string;
+  allowedTypes?: string[];
+}
 
 const INPUT_TYPE_OPTIONS = Object.freeze([
   { value: 'wafer_lot', label: 'Wafer LOT' },
@@ -12,16 +18,16 @@ const INPUT_TYPE_OPTIONS = Object.freeze([
   { value: 'gd_lot_id', label: 'GD LOT ID' },
 ]);
 
-const INPUT_LIMITS = Object.freeze({
+const INPUT_LIMITS: Record<string, number> = Object.freeze({
   wafer_lot: 100,
   lot_id: 100,
   serial_number: 100,
   work_order: 50,
   gd_work_order: 100,
   gd_lot_id: 100,
-});
+}) as Record<string, number>;
 
-function normalizeInputType(value) {
+function normalizeInputType(value: unknown): string {
   const text = String(value || '').trim();
   if (INPUT_LIMITS[text]) {
     return text;
@@ -29,7 +35,7 @@ function normalizeInputType(value) {
   return 'lot_id';
 }
 
-function normalizeAllowedTypes(input) {
+function normalizeAllowedTypes(input: unknown): string[] {
   const values = Array.isArray(input)
     ? input.map((item) => String(item || '').trim()).filter(Boolean)
     : [];
@@ -40,7 +46,7 @@ function normalizeAllowedTypes(input) {
   return filtered;
 }
 
-export function useLotResolve(initial = {}) {
+export function useLotResolve(initial: LotResolveInitial = {}) {
   ensureMesApiAvailable();
 
   const allowedTypes = normalizeAllowedTypes(initial.allowedTypes);
@@ -53,9 +59,9 @@ export function useLotResolve(initial = {}) {
   }
   const inputText = ref(String(initial.inputText || ''));
 
-  const resolvedLots = ref([]);
-  const notFound = ref([]);
-  const expansionInfo = ref({});
+  const resolvedLots = ref<Record<string, unknown>[]>([]);
+  const notFound = ref<string[]>([]);
+  const expansionInfo = ref<Record<string, unknown>>({});
 
   const errorMessage = ref('');
   const successMessage = ref('');
@@ -85,16 +91,16 @@ export function useLotResolve(initial = {}) {
     clearResults();
   }
 
-  function setInputType(nextType) {
+  function setInputType(nextType: unknown): void {
     const normalized = normalizeInputType(nextType);
     inputType.value = allowedTypes.includes(normalized) ? normalized : defaultType;
   }
 
-  function setInputText(text) {
+  function setInputText(text: unknown): void {
     inputText.value = String(text || '');
   }
 
-  function validateInput(values) {
+  function validateInput(values: string[]): string {
     if (values.length === 0) {
       const labels = inputTypeOptions
         .map((option) => option.label)
@@ -137,10 +143,10 @@ export function useLotResolve(initial = {}) {
         { timeout: 360000, silent: true },
       );
 
-      const inner = payload?.data || {};
+      const inner = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
       resolvedLots.value = Array.isArray(inner?.data) ? inner.data : [];
       notFound.value = Array.isArray(inner?.not_found) ? inner.not_found : [];
-      expansionInfo.value = inner?.expansion_info || {};
+      expansionInfo.value = (inner?.expansion_info as Record<string, unknown>) || {};
 
       successMessage.value = `解析完成：${resolvedLots.value.length} 筆，未命中 ${notFound.value.length} 筆`;
 
@@ -150,7 +156,7 @@ export function useLotResolve(initial = {}) {
         notFound: notFound.value,
       };
     } catch (error) {
-      errorMessage.value = error?.message || '解析失敗';
+      errorMessage.value = (error as Error)?.message || '解析失敗';
       return {
         ok: false,
         reason: 'request',
