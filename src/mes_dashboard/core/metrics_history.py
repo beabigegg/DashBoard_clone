@@ -209,9 +209,13 @@ class MetricsHistoryStore:
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         if not hasattr(self._local, 'connection') or self._local.connection is None:
             self._local.connection = sqlite3.connect(
-                self.db_path, timeout=10.0, check_same_thread=False,
+                self.db_path, timeout=30.0, check_same_thread=False,
             )
             self._local.connection.row_factory = sqlite3.Row
+            # WAL allows concurrent readers + one writer across gunicorn workers;
+            # default rollback-journal mode throws "database is locked" on startup.
+            self._local.connection.execute('PRAGMA journal_mode=WAL')
+            self._local.connection.execute('PRAGMA synchronous=NORMAL')
         try:
             yield self._local.connection
         except sqlite3.Error as exc:
