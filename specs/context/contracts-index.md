@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: d2452ccd20db0782689430fd537d885de7ae8963336a678b0d33249eaece11ce
+inputs-digest: 6fc58f247df68d88a423a0ed00cab8a698b0d07f530c2157773f25a7f3025d01
 ---
 
 # Contracts Index
@@ -99,7 +99,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - owner: application-team
 - surface: ui
 - schema-version: 1.2.0
-- last-changed: 2026-05-14
+- last-changed: 2026-05-15
 - breaking-change-policy: deprecate-2-minors
 - summary: UI token policy, component styling rules, and visual review constraints.
 
