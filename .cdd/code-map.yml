@@ -1,6 +1,6 @@
-# generated: 2026-05-14T06:03:12Z by cdd-kit 2.0.17
-# files: 771, src-lines: 208091, map-lines: 16462, compression: 12.6x
-# sources-digest: f5557386163a58cf690286c329b976317ff58086c099908672bcb46e1a66d995
+# generated: 2026-05-15T04:03:53Z by cdd-kit 2.0.18
+# files: 774, src-lines: 209915, map-lines: 16271, compression: 12.9x
+# sources-digest: 170e84d2274f1df3417af115b1b19757906ee43d1522cc38e682c56668bd9603
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -702,7 +702,7 @@ frontend/src/hold-history/App.vue:  # 1109 lines
 
 frontend/src/hold-history/components/DailyTrend.vue:  # 145 lines
 
-frontend/src/hold-history/components/DetailTable.vue:  # 326 lines
+frontend/src/hold-history/components/DetailTable.vue:  # 331 lines
 
 frontend/src/hold-history/components/DurationChart.vue:  # 130 lines
 
@@ -1198,7 +1198,7 @@ frontend/src/portal/main.js:  # 160 lines
   imports:
     - { module: './portal.css', items: [], line: 1 }
 
-frontend/src/production-history/App.vue:  # 390 lines
+frontend/src/production-history/App.vue:  # 559 lines
 
 frontend/src/production-history/components/ProductionDetailTable.vue:  # 86 lines
 
@@ -1223,7 +1223,7 @@ frontend/src/production-history/composables/useFirstTierFilters.ts:  # 317 lines
     - { name: CachedFilterField, lines: 35-35 }
     - { name: WildcardField, lines: 39-39 }
 
-frontend/src/production-history/composables/useProductionHistory.ts:  # 527 lines
+frontend/src/production-history/composables/useProductionHistory.ts:  # 632 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiPost], line: 2 }
@@ -1232,7 +1232,9 @@ frontend/src/production-history/composables/useProductionHistory.ts:  # 527 line
   constants:
     - { name: API_TIMEOUT, line: 6 }
   functions:
-    - { name: useProductionHistory, lines: 161-527 }
+    - { name: validateQueryMode, lines: 162-180 }
+    - { name: buildModePayload, lines: 191-212 }
+    - { name: useProductionHistory, lines: 240-632 }
   interfaces:
     - { name: MatrixFilter, lines: 11-16 }
     - { name: SupplementaryFilter, lines: 25-28 }
@@ -1244,14 +1246,17 @@ frontend/src/production-history/composables/useProductionHistory.ts:  # 527 line
     - { name: MatrixWorkcenterNode, lines: 91-96 }
     - { name: OverloadError, lines: 102-105 }
     - { name: JobProgressState, lines: 108-114 }
-    - { name: QueryParams, lines: 120-133 }
-    - { name: QueryResponseEnvelope, lines: 137-141 }  # local
-    - { name: QueryResponseData, lines: 143-150 }  # local
-    - { name: ApiErrorLike, lines: 152-159 }  # local
+    - { name: QueryParams, lines: 120-135 }
+    - { name: ModeValidationInput, lines: 145-154 }
+    - { name: QueryResponseEnvelope, lines: 216-220 }  # local
+    - { name: QueryResponseData, lines: 222-229 }  # local
+    - { name: ApiErrorLike, lines: 231-238 }  # local
   types:
     - { name: SupplementaryFilterField, lines: 31-31 }
     - { name: MatrixTree, lines: 99-99 }
     - { name: DatasetMeta, lines: 117-117 }
+    - { name: QueryMode, lines: 139-139 }
+    - { name: QueryFragment, lines: 142-142 }
 
 frontend/src/production-history/main.ts:  # 7 lines
   imports:
@@ -1296,388 +1301,186 @@ frontend/src/qc-gate/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/query-tool/App.vue:  # 706 lines
-  imports:
-    - { module: vue, items: [computed, onBeforeUnmount, onMounted, ref, watch], line: 2 }
-    - { module: '../core/shell-navigation.js', items: [navigateToRuntimeRoute, replaceRuntimeHistory], line: 4 }
-    - { module: '../shared-composables/useRequestGuard.js', items: [useRequestGuard], line: 5 }
-    - { module: '../shared-ui/components/PageHeader.vue', items: ['default:PageHeader'], line: 7 }
-    - { module: './components/EquipmentView.vue', items: ['default:EquipmentView'], line: 8 }
-    - { module: './components/LotEquipmentView.vue', items: ['default:LotEquipmentView'], line: 9 }
-    - { module: './components/LotTraceView.vue', items: ['default:LotTraceView'], line: 10 }
-    - { module: './components/SerialReverseTraceView.vue', items: ['default:SerialReverseTraceView'], line: 11 }
-    - { module: './composables/useEquipmentQuery.js', items: [useEquipmentQuery], line: 12 }
-    - { module: './composables/useLotEquipmentQuery.js', items: [useLotEquipmentQuery], line: 13 }
-    - { module: './composables/useLotDetail.js', items: [useLotDetail], line: 14 }
-    - { module: './composables/useLotLineage.js', items: [useLotLineage], line: 15 }
-    - { module: './composables/useLotResolve.js', items: [useLotResolve], line: 16 }
-    - { module: './composables/useReverseLineage.js', items: [useReverseLineage], line: 17 }
-    - { module: './utils/values.js', items: [normalizeText, parseArrayParam, parseInputValues, uniqueValues], line: 18 }
-  constants:
-    - { name: TAB_LOT, line: 20 }
-    - { name: TAB_REVERSE, line: 21 }
-    - { name: TAB_EQUIPMENT, line: 22 }
-    - { name: TAB_LOT_EQUIPMENT, line: 23 }
-    - { name: VALID_TABS, line: 25 }
-  functions:
-    - { name: normalizeTopTab, lines: 34-37 }
-    - { name: readStateFromUrl, lines: 39-75 }
-    - { name: buildUrlState, lines: 162-257 }
-    - { name: syncUrlState, lines: 259-279 }
-    - { name: async applyHydratedUrlState, lines: 281-319 }
-    - { name: async applyStateFromUrl, lines: 321-324 }
-    - { name: handlePopState, lines: 326-328 }
-    - { name: activateTab, lines: 330-332 }
-    - { name: async handleResolveLots, lines: 334-344 }
-    - { name: async handleResolveReverse, lines: 346-355 }
-    - { name: async handleSelectNodes, lines: 357-367 }
-    - { name: async handleSelectReverseNodes, lines: 369-378 }
-    - { name: async handleChangeLotSubTab, lines: 380-382 }
-    - { name: async handleChangeReverseSubTab, lines: 384-386 }
-    - { name: async handleWorkcenterGroupChange, lines: 388-390 }
-    - { name: async handleReverseWorkcenterGroupChange, lines: 392-394 }
-    - { name: async handleExportLotTab, lines: 396-398 }
-    - { name: async handleExportReverseTab, lines: 400-402 }
-    - { name: async handleLotDetailPageChange, lines: 404-406 }
-    - { name: async handleLotDetailPageSizeChange, lines: 408-410 }
-    - { name: async handleReverseDetailPageChange, lines: 412-414 }
-    - { name: async handleReverseDetailPageSizeChange, lines: 416-418 }
-    - { name: async handleChangeEquipmentSubTab, lines: 420-422 }
-    - { name: async handleQueryEquipmentActiveTab, lines: 424-426 }
-    - { name: async handleExportEquipmentSubTab, lines: 428-430 }
-    - { name: async handleLotEquipmentLookup, lines: 432-434 }
-    - { name: async handleChangeLotEquipmentSubTab, lines: 436-438 }
-    - { name: async handleExportLotEquipmentSubTab, lines: 440-442 }
-    - { name: async handleEquipmentLotsPageSizeChange, lines: 444-446 }
-    - { name: handleLotEquipmentLotsPageSizeChange, lines: 448-450 }
+frontend/src/query-tool/App.vue:  # 712 lines
 
 frontend/src/query-tool/components/EquipmentJobsPanel.vue:  # 77 lines
-  imports:
-    - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 2 }
-    - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 3 }
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 4 }
-    - { module: './ExportButton.vue', items: ['default:ExportButton'], line: 5 }
-    - { module: '../utils/values.js', items: [formatCellValue], line: 6 }
 
 frontend/src/query-tool/components/EquipmentLotsTable.vue:  # 80 lines
-  imports:
-    - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 2 }
-    - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 3 }
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 4 }
-    - { module: './ExportButton.vue', items: ['default:ExportButton'], line: 5 }
-    - { module: '../utils/values.js', items: [formatCellValue], line: 6 }
-  constants:
-    - { name: COLUMN_DEFS, line: 33 }
 
 frontend/src/query-tool/components/EquipmentRejectsTable.vue:  # 63 lines
-  imports:
-    - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 2 }
-    - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 3 }
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 4 }
-    - { module: './ExportButton.vue', items: ['default:ExportButton'], line: 5 }
-    - { module: '../utils/values.js', items: [formatCellValue], line: 6 }
 
 frontend/src/query-tool/components/EquipmentView.vue:  # 246 lines
-  imports:
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 2 }
-    - { module: '../../shared-ui/components/MultiSelect.vue', items: ['default:MultiSelect'], line: 3 }
-    - { module: '../../shared-ui/components/FilterToolbar.vue', items: ['default:FilterToolbar'], line: 4 }
-    - { module: './EquipmentJobsPanel.vue', items: ['default:EquipmentJobsPanel'], line: 6 }
-    - { module: './EquipmentLotsTable.vue', items: ['default:EquipmentLotsTable'], line: 7 }
-    - { module: './EquipmentRejectsTable.vue', items: ['default:EquipmentRejectsTable'], line: 8 }
-    - { module: './LotTimeline.vue', items: ['default:LotTimeline'], line: 9 }
 
 frontend/src/query-tool/components/ExportButton.vue:  # 30 lines
-  imports:
-    - { module: '../../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 2 }
 
-frontend/src/query-tool/components/LineageTreeChart.vue:  # 1149 lines
-  imports:
-    - { module: vue, items: [computed, nextTick, onMounted, ref, shallowRef, triggerRef, watch], line: 2 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 4 }
-    - { module: echarts/core, items: [use], line: 5 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 6 }
-    - { module: echarts/charts, items: [TreeChart], line: 7 }
-    - { module: echarts/components, items: [TooltipComponent, ToolboxComponent], line: 8 }
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 10 }
-    - { module: './ExportButton.vue', items: ['default:ExportButton'], line: 11 }
-    - { module: '../../shared-ui/components/LoadingOverlay.vue', items: ['default:LoadingOverlay'], line: 12 }
-    - { module: '../../shared-ui/components/PaginationControl.vue', items: ['default:PaginationControl'], line: 13 }
-    - { module: '../utils/values.js', items: [normalizeText], line: 14 }
-  constants:
-    - { name: NODE_COLORS, line: 18 }
-    - { name: EDGE_STYLES, line: 29 }
-    - { name: EDGE_TAGS, line: 37 }
-    - { name: RELATION_TYPE_LABELS, line: 44 }
-    - { name: LABEL_BASE_STYLE, line: 51 }
-    - { name: TOGGLE_EXPAND_STYLE, line: 57 }
-    - { name: TOGGLE_COLLAPSE_STYLE, line: 69 }
-    - { name: RELATION_PAGE_SIZE, line: 150 }
-    - { name: TREE_SERIES_DEFAULTS, line: 527 }
-  functions:
-    - { name: detectNodeType, lines: 219-245 }
-    - { name: lookupEdgeMeta, lines: 247-262 }
-    - { name: relationTag, lines: 264-270 }
-    - { name: relationSentence, lines: 272-303 }
-    - { name: buildNode, lines: 305-428 }
-    - { name: countLeaves, lines: 447-452 }
-    - { name: countGraphemes, lines: 460-462 }
-    - { name: walkTreeMetrics, lines: 464-478 }
-    - { name: clampNumber, lines: 490-492 }
-    - { name: handleNodeClick, lines: 664-705 }
-    - { name: buildExportFileName, lines: 707-722 }
-    - { name: triggerDownloadByUrl, lines: 724-732 }
-    - { name: getChartInstance, lines: 734-743 }
-    - { name: async forceRelayout, lines: 750-756 }
-    - { name: escapeCsvField, lines: 770-779 }
-    - { name: buildCsvContent, lines: 781-797 }
-    - { name: collectBranchCids, lines: 799-808 }
-    - { name: expandAll, lines: 810-813 }
-    - { name: collapseAll, lines: 815-834 }
-    - { name: removeSelection, lines: 836-840 }
-    - { name: resetView, lines: 842-846 }
-    - { name: async exportTreeAsPng, lines: 848-874 }
-    - { name: exportRelationCsv, lines: 876-895 }
+frontend/src/query-tool/components/LineageTreeChart.vue:  # 1166 lines
 
-frontend/src/query-tool/components/LotAssociationTable.vue:  # 117 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: '../../shared-composables/useSortableTable.js', items: [useSortableTable], line: 4 }
-    - { module: '../utils/values.js', items: [formatCellValue], line: 5 }
-    - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 6 }
-  functions:
-    - { name: sortLabel, lines: 67-70 }
-    - { name: ariaSortFor, lines: 72-75 }
-    - { name: resolveColumnLabel, lines: 77-79 }
+frontend/src/query-tool/components/LotAssociationTable.vue:  # 118 lines
 
 frontend/src/query-tool/components/LotDetail.vue:  # 350 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 4 }
-    - { module: './ExportButton.vue', items: ['default:ExportButton'], line: 5 }
-    - { module: './LotAssociationTable.vue', items: ['default:LotAssociationTable'], line: 6 }
-    - { module: './LotHistoryTable.vue', items: ['default:LotHistoryTable'], line: 7 }
-    - { module: './LotJobsTable.vue', items: ['default:LotJobsTable'], line: 8 }
-    - { module: './LotRejectTable.vue', items: ['default:LotRejectTable'], line: 9 }
-    - { module: './LotTimeline.vue', items: ['default:LotTimeline'], line: 10 }
 
 frontend/src/query-tool/components/LotEquipmentView.vue:  # 392 lines
-  imports:
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 2 }
-    - { module: '../../shared-ui/components/MultiSelect.vue', items: ['default:MultiSelect'], line: 3 }
-    - { module: './EquipmentJobsPanel.vue', items: ['default:EquipmentJobsPanel'], line: 5 }
-    - { module: './EquipmentLotsTable.vue', items: ['default:EquipmentLotsTable'], line: 6 }
-    - { module: './EquipmentRejectsTable.vue', items: ['default:EquipmentRejectsTable'], line: 7 }
-    - { module: './LotTimeline.vue', items: ['default:LotTimeline'], line: 8 }
-  constants:
-    - { name: MAX_INPUT, line: 120 }
-  functions:
-    - { name: inputPlaceholder, lines: 122-126 }
 
-frontend/src/query-tool/components/LotHistoryTable.vue:  # 127 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: '../../shared-composables/useSortableTable.js', items: [useSortableTable], line: 4 }
-    - { module: '../../shared-ui/components/MultiSelect.vue', items: ['default:MultiSelect'], line: 5 }
-    - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 6 }
-    - { module: '../utils/values.js', items: [formatCellValue], line: 7 }
-  constants:
-    - { name: HIDDEN_COLUMNS, line: 30 }
-    - { name: COLUMN_LABELS, line: 32 }
-  functions:
-    - { name: sortLabel, lines: 46-49 }
-    - { name: ariaSortFor, lines: 51-54 }
+frontend/src/query-tool/components/LotHistoryTable.vue:  # 128 lines
 
-frontend/src/query-tool/components/LotJobsTable.vue:  # 262 lines
-  imports:
-    - { module: vue, items: [computed, ref], line: 2 }
-    - { module: '../../core/api.js', items: [apiGet, ensureMesApiAvailable], line: 4 }
-    - { module: '../../shared-composables/useSortableTable.js', items: [useSortableTable], line: 5 }
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 6 }
-    - { module: '../../shared-ui/components/StatusBadge.vue', items: ['default:StatusBadge'], line: 7 }
-    - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 8 }
-    - { module: '../utils/values.js', items: [formatCellValue, formatDateTime, parseDateTime], line: 9 }
-  constants:
-    - { name: JOB_COLUMN_PRIORITY, line: 28 }
-    - { name: TXN_COLUMN_PRIORITY, line: 50 }
-  functions:
-    - { name: buildOrderedColumns, lines: 66-69 }
-    - { name: sortLabel, lines: 83-86 }
-    - { name: ariaSortFor, lines: 88-91 }
-    - { name: rowKey, lines: 101-103 }
-    - { name: buildStatusTone, lines: 105-120 }
-    - { name: renderJobCellValue, lines: 122-127 }
-    - { name: renderTxnCellValue, lines: 129-138 }
-    - { name: async loadTxn, lines: 140-164 }
+frontend/src/query-tool/components/LotJobsTable.vue:  # 265 lines
 
-frontend/src/query-tool/components/LotRejectTable.vue:  # 194 lines
-  imports:
-    - { module: vue, items: [computed, ref], line: 2 }
-    - { module: '../../shared-composables/useSortableTable.js', items: [useSortableTable], line: 4 }
-    - { module: '../utils/values.js', items: [formatDateTime, parseDateTime], line: 5 }
-    - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 6 }
-  functions:
-    - { name: toNumber, lines: 25-28 }
-    - { name: formatNumber, lines: 30-32 }
-    - { name: normalizeText, lines: 34-37 }
-    - { name: normalizeRejectRow, lines: 39-75 }
-    - { name: sortLabel, lines: 101-104 }
-    - { name: ariaSortFor, lines: 106-109 }
+frontend/src/query-tool/components/LotRejectTable.vue:  # 218 lines
 
-frontend/src/query-tool/components/LotTimeline.vue:  # 366 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: '../../shared-ui/components/TimelineChart.vue', items: ['default:TimelineChart'], line: 4 }
-    - { module: '../utils/values.js', items: [formatDateTime, hashColor, normalizeText, parseDateTime], line: 5 }
-  functions:
-    - { name: safeDate, lines: 22-25 }
-    - { name: normalizedKey, lines: 27-29 }
-    - { name: pickClosestTrack, lines: 147-178 }
-    - { name: resolveHoldTrackId, lines: 180-198 }
-    - { name: resolveMaterialTrackId, lines: 200-210 }
+frontend/src/query-tool/components/LotTimeline.vue:  # 382 lines
 
 frontend/src/query-tool/components/LotTraceView.vue:  # 207 lines
-  imports:
-    - { module: './QueryBar.vue', items: ['default:QueryBar'], line: 2 }
-    - { module: './LineageTreeChart.vue', items: ['default:LineageTreeChart'], line: 3 }
-    - { module: './LotDetail.vue', items: ['default:LotDetail'], line: 4 }
 
 frontend/src/query-tool/components/QueryBar.vue:  # 112 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: '../../shared-ui/components/FilterToolbar.vue', items: ['default:FilterToolbar'], line: 4 }
-  functions:
-    - { name: handleResolve, lines: 48-50 }
 
 frontend/src/query-tool/components/SerialReverseTraceView.vue:  # 212 lines
-  imports:
-    - { module: './QueryBar.vue', items: ['default:QueryBar'], line: 2 }
-    - { module: './LineageTreeChart.vue', items: ['default:LineageTreeChart'], line: 3 }
-    - { module: './LotDetail.vue', items: ['default:LotDetail'], line: 4 }
 
-frontend/src/query-tool/composables/useEquipmentQuery.js:  # 373 lines
+frontend/src/query-tool/composables/useEquipmentQuery.ts:  # 392 lines
   imports:
     - { module: vue, items: [computed, reactive, ref], line: 1 }
-    - { module: '../../core/api.js', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
-    - { module: '../utils/csv.js', items: [exportCsv], line: 4 }
-    - { module: '../utils/values.js', items: [normalizeText, toDateInputValue, uniqueValues], line: 5 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../utils/csv', items: [exportCsv], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, toDateInputValue, uniqueValues], line: 5 }
   constants:
-    - { name: EQUIPMENT_SUB_TABS, line: 7 }
-    - { name: DEFAULT_LOTS_PER_PAGE, line: 8 }
-    - { name: PAGE_SIZE_OPTIONS, line: 9 }
+    - { name: EQUIPMENT_SUB_TABS, line: 26 }
+    - { name: DEFAULT_LOTS_PER_PAGE, line: 27 }
+    - { name: PAGE_SIZE_OPTIONS, line: 28 }
   functions:
-    - { name: normalizeSubTab, lines: 11-14 }
-    - { name: defaultDateRange, lines: 16-24 }
-    - { name: emptyTabFlags, lines: 26-33 }
-    - { name: useEquipmentQuery, lines: 35-373 }
+    - { name: normalizeSubTab, lines: 30-33 }
+    - { name: defaultDateRange, lines: 35-43 }
+    - { name: emptyTabFlags, lines: 45-52 }
+    - { name: useEquipmentQuery, lines: 54-392 }
+  interfaces:
+    - { name: EquipmentItem, lines: 7-10 }  # local
+    - { name: Pagination, lines: 12-17 }  # local
+    - { name: EquipmentQueryInitial, lines: 19-24 }  # local
 
-frontend/src/query-tool/composables/useLotDetail.js:  # 555 lines
+frontend/src/query-tool/composables/useLotDetail.ts:  # 589 lines
   imports:
     - { module: vue, items: [reactive, ref], line: 1 }
-    - { module: '../../core/api.js', items: [apiGet, ensureMesApiAvailable], line: 3 }
-    - { module: '../utils/csv.js', items: [exportCsv], line: 4 }
-    - { module: '../utils/values.js', items: [normalizeText, parseDateTime, uniqueValues, formatDateTime], line: 5 }
+    - { module: '../../core/api', items: [apiGet, ensureMesApiAvailable], line: 3 }
+    - { module: '../utils/csv', items: [exportCsv], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, parseDateTime, uniqueValues, formatDateTime], line: 5 }
   constants:
-    - { name: LOT_SUB_TABS, line: 7 }
-    - { name: PAGED_SUB_TABS, line: 14 }
-    - { name: DEFAULT_PER_PAGE, line: 15 }
-    - { name: PAGE_SIZE_OPTIONS, line: 16 }
-    - { name: ASSOCIATION_TABS, line: 18 }
-    - { name: EXPORT_TYPE_MAP, line: 20 }
+    - { name: LOT_SUB_TABS, line: 25 }
+    - { name: PAGED_SUB_TABS, line: 32 }
+    - { name: DEFAULT_PER_PAGE, line: 33 }
+    - { name: PAGE_SIZE_OPTIONS, line: 34 }
+    - { name: ASSOCIATION_TABS, line: 36 }
+    - { name: EXPORT_TYPE_MAP, line: 38 }
   functions:
-    - { name: emptyTabFlags, lines: 28-36 }
-    - { name: emptyTabErrors, lines: 38-47 }
-    - { name: emptyAssociations, lines: 49-56 }
-    - { name: emptyPagination, lines: 58-65 }
-    - { name: emptyPaginationMap, lines: 67-75 }
-    - { name: emptyQualityMetaMap, lines: 77-85 }
-    - { name: normalizeSubTab, lines: 87-90 }
-    - { name: resolveTimeRangeFromHistory, lines: 92-125 }
-    - { name: resolveEquipmentIdFromHistory, lines: 127-140 }
-    - { name: useLotDetail, lines: 142-555 }
+    - { name: emptyTabFlags, lines: 46-54 }
+    - { name: emptyTabErrors, lines: 56-65 }
+    - { name: emptyAssociations, lines: 67-74 }
+    - { name: emptyPagination, lines: 76-83 }
+    - { name: emptyPaginationMap, lines: 85-93 }
+    - { name: emptyQualityMetaMap, lines: 95-103 }
+    - { name: normalizeSubTab, lines: 105-108 }
+    - { name: resolveTimeRangeFromHistory, lines: 110-143 }
+    - { name: resolveEquipmentIdFromHistory, lines: 145-158 }
+    - { name: useLotDetail, lines: 160-589 }
+  interfaces:
+    - { name: Pagination, lines: 7-12 }  # local
+    - { name: QualityMeta, lines: 14-17 }  # local
+    - { name: LotDetailInitial, lines: 19-23 }  # local
 
-frontend/src/query-tool/composables/useLotEquipmentQuery.js:  # 433 lines
+frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 443 lines
   imports:
     - { module: vue, items: [computed, reactive, readonly, ref], line: 1 }
-    - { module: '../../core/api.js', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
-    - { module: '../utils/csv.js', items: [exportCsv], line: 4 }
-    - { module: '../utils/values.js', items: [normalizeText, parseInputValues], line: 5 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../utils/csv', items: [exportCsv], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, parseInputValues], line: 5 }
   constants:
-    - { name: EQUIPMENT_SUB_TABS, line: 7 }
-    - { name: DEFAULT_LOTS_PER_PAGE, line: 8 }
-    - { name: PAGE_SIZE_OPTIONS, line: 9 }
-    - { name: MAX_INPUT, line: 10 }
+    - { name: EQUIPMENT_SUB_TABS, line: 14 }
+    - { name: DEFAULT_LOTS_PER_PAGE, line: 15 }
+    - { name: PAGE_SIZE_OPTIONS, line: 16 }
+    - { name: MAX_INPUT, line: 17 }
+    - { name: INPUT_TYPE_OPTIONS, line: 19 }
+  functions:
+    - { name: normalizeSubTab, lines: 24-27 }
+    - { name: normalizeInputType, lines: 29-32 }
+    - { name: useLotEquipmentQuery, lines: 34-443 }
+  interfaces:
+    - { name: LotEquipmentQueryInitial, lines: 7-12 }  # local
+
+frontend/src/query-tool/composables/useLotLineage.ts:  # 582 lines
+  imports:
+    - { module: vue, items: [computed, reactive, ref], line: 1 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../../shared-composables/useAsyncJobPolling', items: [pollJobUntilComplete], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, uniqueValues], line: 5 }
+  constants:
+    - { name: MAX_CONCURRENCY, line: 25 }
+    - { name: MAX_429_RETRY, line: 26 }
+  functions:
+    - { name: emptyLineageEntry, lines: 28-36 }
+    - { name: extractContainerId, lines: 38-44 }
+    - { name: createSemaphore, lines: 46-82 }
+    - { name: sleep, lines: 84-86 }
+    - { name: edgeKey, lines: 88-95 }
+    - { name: useLotLineage, lines: 97-582 }
+  interfaces:
+    - { name: LineageEntry, lines: 7-13 }  # local
+    - { name: LineageInitial, lines: 15-17 }  # local
+    - { name: SemaphoreItem, lines: 19-23 }  # local
+
+frontend/src/query-tool/composables/useLotResolve.ts:  # 188 lines
+  imports:
+    - { module: vue, items: [computed, reactive, ref], line: 1 }
+    - { module: '../../core/api', items: [apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../utils/values', items: [parseInputValues], line: 4 }
+  constants:
     - { name: INPUT_TYPE_OPTIONS, line: 12 }
+    - { name: INPUT_LIMITS, line: 21 }
   functions:
-    - { name: normalizeSubTab, lines: 17-20 }
-    - { name: normalizeInputType, lines: 22-25 }
-    - { name: useLotEquipmentQuery, lines: 27-433 }
+    - { name: normalizeInputType, lines: 30-36 }
+    - { name: normalizeAllowedTypes, lines: 38-47 }
+    - { name: useLotResolve, lines: 49-188 }
+  interfaces:
+    - { name: LotResolveInitial, lines: 6-10 }  # local
 
-frontend/src/query-tool/composables/useLotLineage.js:  # 557 lines
+frontend/src/query-tool/composables/useReverseLineage.ts:  # 580 lines
   imports:
     - { module: vue, items: [computed, reactive, ref], line: 1 }
-    - { module: '../../core/api.js', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
-    - { module: '../../shared-composables/useAsyncJobPolling.js', items: [pollJobUntilComplete], line: 4 }
-    - { module: '../utils/values.js', items: [normalizeText, uniqueValues], line: 5 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../../shared-composables/useAsyncJobPolling', items: [pollJobUntilComplete], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, uniqueValues], line: 5 }
   constants:
-    - { name: MAX_CONCURRENCY, line: 7 }
-    - { name: MAX_429_RETRY, line: 8 }
+    - { name: MAX_CONCURRENCY, line: 25 }
+    - { name: MAX_429_RETRY, line: 26 }
   functions:
-    - { name: emptyLineageEntry, lines: 10-18 }
-    - { name: extractContainerId, lines: 20-25 }
-    - { name: createSemaphore, lines: 27-60 }
-    - { name: sleep, lines: 62-64 }
-    - { name: edgeKey, lines: 66-73 }
-    - { name: useLotLineage, lines: 75-557 }
+    - { name: emptyLineageEntry, lines: 28-36 }
+    - { name: extractContainerId, lines: 38-44 }
+    - { name: createSemaphore, lines: 46-82 }
+    - { name: sleep, lines: 84-86 }
+    - { name: edgeKey, lines: 88-95 }
+    - { name: collectAncestors, lines: 97-123 }
+    - { name: useReverseLineage, lines: 125-580 }
+  interfaces:
+    - { name: LineageEntry, lines: 7-13 }  # local
+    - { name: LineageInitial, lines: 15-17 }  # local
+    - { name: SemaphoreItem, lines: 19-23 }  # local
 
-frontend/src/query-tool/composables/useLotResolve.js:  # 182 lines
-  imports:
-    - { module: vue, items: [computed, reactive, ref], line: 1 }
-    - { module: '../../core/api.js', items: [apiPost, ensureMesApiAvailable], line: 3 }
-    - { module: '../utils/values.js', items: [parseInputValues], line: 4 }
-  constants:
-    - { name: INPUT_TYPE_OPTIONS, line: 6 }
-    - { name: INPUT_LIMITS, line: 15 }
-  functions:
-    - { name: normalizeInputType, lines: 24-30 }
-    - { name: normalizeAllowedTypes, lines: 32-41 }
-    - { name: useLotResolve, lines: 43-182 }
-
-frontend/src/query-tool/composables/useReverseLineage.js:  # 553 lines
-  imports:
-    - { module: vue, items: [computed, reactive, ref], line: 1 }
-    - { module: '../../core/api.js', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
-    - { module: '../../shared-composables/useAsyncJobPolling.js', items: [pollJobUntilComplete], line: 4 }
-    - { module: '../utils/values.js', items: [normalizeText, uniqueValues], line: 5 }
-  constants:
-    - { name: MAX_CONCURRENCY, line: 7 }
-    - { name: MAX_429_RETRY, line: 8 }
-  functions:
-    - { name: emptyLineageEntry, lines: 10-18 }
-    - { name: extractContainerId, lines: 20-25 }
-    - { name: createSemaphore, lines: 27-60 }
-    - { name: sleep, lines: 62-64 }
-    - { name: edgeKey, lines: 66-73 }
-    - { name: collectAncestors, lines: 75-98 }
-    - { name: useReverseLineage, lines: 100-553 }
-
-frontend/src/query-tool/main.js:  # 10 lines
+frontend/src/query-tool/main.ts:  # 10 lines
   imports:
     - { module: vue, items: [createApp], line: 1 }
     - { module: '../wip-shared/styles.css', items: [], line: 3 }
     - { module: '../styles/tailwind.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
     - { module: './App.vue', items: ['default:App'], line: 6 }
-    - { module: '../core/shell-navigation.js', items: [restoreUrlState], line: 7 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
 
-frontend/src/query-tool/utils/csv.js:  # 76 lines
+frontend/src/query-tool/utils/csv.ts:  # 87 lines
   functions:
-    - { name: getCsrfToken, lines: 1-3 }
-    - { name: resolveErrorMessage, lines: 5-16 }
-    - { name: resolveDownloadFilename, lines: 18-25 }
-    - { name: async exportCsv, lines: 27-76 }
+    - { name: getCsrfToken, lines: 12-14 }
+    - { name: resolveErrorMessage, lines: 16-27 }
+    - { name: resolveDownloadFilename, lines: 29-36 }
+    - { name: async exportCsv, lines: 38-87 }
+  interfaces:
+    - { name: ErrorPayload, lines: 1-4 }  # local
+    - { name: ExportCsvOptions, lines: 6-10 }  # local
 
-frontend/src/query-tool/utils/values.js:  # 93 lines
+frontend/src/query-tool/utils/values.ts:  # 93 lines
   functions:
     - { name: normalizeText, lines: 1-3 }
     - { name: uniqueValues, lines: 5-17 }
@@ -1691,7 +1494,7 @@ frontend/src/query-tool/utils/values.js:  # 93 lines
 
 frontend/src/reject-history/App.vue:  # 1522 lines
 
-frontend/src/reject-history/components/DetailTable.vue:  # 158 lines
+frontend/src/reject-history/components/DetailTable.vue:  # 163 lines
 
 frontend/src/reject-history/components/FilterPanel.vue:  # 295 lines
 
@@ -2050,7 +1853,7 @@ frontend/src/shared-ui/components/SummaryCard.vue:  # 218 lines
 
 frontend/src/shared-ui/components/SummaryCardGroup.vue:  # 43 lines
 
-frontend/src/shared-ui/components/TimelineChart.vue:  # 567 lines
+frontend/src/shared-ui/components/TimelineChart.vue:  # 566 lines
 
 frontend/src/shared-ui/index.ts:  # 22 lines
 
@@ -2187,115 +1990,30 @@ frontend/src/workers/duckdb-worker.js:  # 147 lines
     - { name: async execQuery, lines: 81-98 }
     - { name: async destroyDuckDB, lines: 100-105 }
 
-frontend/src/yield-alert-center/App.vue:  # 979 lines
-  imports:
-    - { module: vue, items: [computed, onMounted, onUnmounted, reactive, ref, watch], line: 2 }
-    - { module: '../core/api.js', items: [apiGet, apiPost], line: 4 }
-    - { module: '../shared-composables/useAsyncJobPolling.js', items: [pollJobUntilComplete], line: 5 }
-    - { module: './useYieldAlertDuckDB.js', items: [useYieldAlertDuckDB], line: 6 }
-    - { module: '../core/duckdb-client.js', items: [isDuckDBSupported], line: 7 }
-    - { module: '../shared-ui/components/MultiSelect.vue', items: ['default:MultiSelect'], line: 8 }
-    - { module: '../core/shell-navigation.js', items: [replaceRuntimeHistory], line: 9 }
-    - { module: '../shared-composables/useFilterOrchestrator.js', items: [useFilterOrchestrator], line: 10 }
-    - { module: './utils.js', items: [toQueryParams], line: 11 }
-    - { module: '../shared-ui/components/EmptyState.vue', items: ['default:EmptyState'], line: 13 }
-    - { module: '../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 14 }
-    - { module: '../shared-ui/components/LoadingOverlay.vue', items: ['default:LoadingOverlay'], line: 15 }
-    - { module: '../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 16 }
-    - { module: '../shared-ui/components/PageHeader.vue', items: ['default:PageHeader'], line: 17 }
-    - { module: '../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 18 }
-    - { module: '../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 19 }
-    - { module: './YieldHeatmap.vue', items: ['default:YieldHeatmap'], line: 20 }
-    - { module: './YieldStationChart.vue', items: ['default:YieldStationChart'], line: 21 }
-    - { module: './YieldPackageChart.vue', items: ['default:YieldPackageChart'], line: 22 }
-    - { module: './YieldTrendChart.vue', items: ['default:YieldTrendChart'], line: 23 }
-  constants:
-    - { name: API_TIMEOUT, line: 25 }
-    - { name: DEFAULT_PER_PAGE, line: 26 }
-    - { name: DEFAULT_WORKCENTER_GROUP_OPTIONS, line: 27 }
-    - { name: GRANULARITY_OPTIONS, line: 72 }
-    - { name: DUCKDB_THRESHOLD, line: 107 }
-  functions:
-    - { name: alertRowKey, lines: 192-194 }
-    - { name: setDefaultDateRange, lines: 198-203 }
-    - { name: syncUrlState, lines: 205-224 }
-    - { name: readArrayParam, lines: 226-235 }
-    - { name: restoreFromUrl, lines: 237-281 }
-    - { name: async loadFilterOptions, lines: 283-298 }
-    - { name: isCacheExpiredError, lines: 300-307 }
-    - { name: async executePrimaryQuery, lines: 309-370 }
-    - { name: buildViewParams, lines: 372-388 }
-    - { name: async fetchViewPayload, lines: 390-459 }
-    - { name: applyFullView, lines: 461-475 }
-    - { name: async loadCachedView, lines: 477-480 }
-    - { name: async loadAlertPage, lines: 482-486 }
-    - { name: async runQuery, lines: 488-528 }
-    - { name: async runAlertPage, lines: 530-555 }
-    - { name: onSort, lines: 557-568 }
-    - { name: goToPage, lines: 570-581 }
-    - { name: sortIcon, lines: 583-586 }
-    - { name: riskClass, lines: 588-592 }
-    - { name: async toggleReasonDetail, lines: 594-622 }
-    - { name: resetFilters, lines: 624-651 }
-    - { name: async fetchCrossFilterOptions, lines: 663-682 }
-    - { name: scheduleCrossFilter, lines: 683-687 }
+frontend/src/yield-alert-center/App.vue:  # 985 lines
 
-frontend/src/yield-alert-center/YieldHeatmap.vue:  # 168 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: echarts/charts, items: [HeatmapChart], line: 4 }
-    - { module: echarts/components, items: [DataZoomComponent, GridComponent, TooltipComponent, VisualMapComponent], line: 5 }
-    - { module: echarts/core, items: [use], line: 6 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
-  constants:
-    - { name: GRANULARITY_LABEL, line: 23 }
-    - { name: ROW_HEIGHT, line: 54 }
-    - { name: VISIBLE_DATE_COUNT, line: 55 }
+frontend/src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
 
-frontend/src/yield-alert-center/YieldPackageChart.vue:  # 127 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: echarts/charts, items: [BarChart, LineChart], line: 4 }
-    - { module: echarts/components, items: [GridComponent, LegendComponent, TooltipComponent], line: 5 }
-    - { module: echarts/core, items: [use], line: 10 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 11 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 12 }
+frontend/src/yield-alert-center/YieldPackageChart.vue:  # 128 lines
 
-frontend/src/yield-alert-center/YieldStationChart.vue:  # 92 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: echarts/charts, items: [BarChart], line: 4 }
-    - { module: echarts/components, items: [GridComponent, TooltipComponent], line: 5 }
-    - { module: echarts/core, items: [use], line: 6 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
+frontend/src/yield-alert-center/YieldStationChart.vue:  # 94 lines
 
-frontend/src/yield-alert-center/YieldTrendChart.vue:  # 102 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: echarts/charts, items: [LineChart], line: 4 }
-    - { module: echarts/components, items: [GridComponent, MarkLineComponent, TooltipComponent], line: 5 }
-    - { module: echarts/core, items: [use], line: 6 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
-  constants:
-    - { name: GRANULARITY_LABEL, line: 12 }
+frontend/src/yield-alert-center/YieldTrendChart.vue:  # 104 lines
 
-frontend/src/yield-alert-center/main.js:  # 10 lines
+frontend/src/yield-alert-center/main.ts:  # 10 lines
   imports:
     - { module: vue, items: [createApp], line: 1 }
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: '../wip-shared/styles.css', items: [], line: 4 }
     - { module: '../resource-shared/styles.css', items: [], line: 5 }
     - { module: './style.css', items: [], line: 6 }
-    - { module: '../core/shell-navigation.js', items: [restoreUrlState], line: 7 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
 
-frontend/src/yield-alert-center/useYieldAlertDuckDB.js:  # 562 lines
+frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 678 lines
   imports:
-    - { module: vue, items: [ref, readonly], line: 15 }
-    - { module: '../core/duckdb-client.js', items: [getDuckDBClient, isDuckDBSupported], line: 16 }
-    - { module: '../core/risk-score.js', items: [calcRiskScore, calcRiskLevel], line: 17 }
+    - { module: vue, items: [ref, readonly, Ref], line: 15 }
+    - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported, DuckDBClient], line: 16 }
+    - { module: '../core/risk-score', items: [calcRiskScore, calcRiskLevel, RiskLevel], line: 17 }
   constants:
     - { name: TABLE_NAME, line: 41 }
     - { name: TX_DEDUP_COLS, line: 43 }
@@ -2303,22 +2021,35 @@ frontend/src/yield-alert-center/useYieldAlertDuckDB.js:  # 562 lines
   functions:
     - { name: getCsrfToken, lines: 19-21 }
     - { name: async fetchParquetBuffer, lines: 23-37 }
-    - { name: qs, lines: 56-59 }
-    - { name: qid, lines: 61-63 }
-    - { name: granularityExpr, lines: 65-73 }
-    - { name: buildDimensionWhere, lines: 75-91 }
-    - { name: buildReasonExclusionWhere, lines: 93-104 }
-    - { name: sf, lines: 106-109 }
-    - { name: async querySummary, lines: 113-143 }
-    - { name: async queryTrend, lines: 145-187 }
-    - { name: async queryHeatmap, lines: 189-239 }
-    - { name: async queryStationSummary, lines: 241-281 }
-    - { name: async queryPackageSummary, lines: 283-320 }
-    - { name: async queryAlerts, lines: 322-456 }
-    - { name: async queryFilterOptions, lines: 458-481 }
-    - { name: useYieldAlertDuckDB, lines: 485-562 }
+    - { name: qs, lines: 161-164 }
+    - { name: qid, lines: 166-168 }
+    - { name: granularityExpr, lines: 170-178 }
+    - { name: buildDimensionWhere, lines: 180-196 }
+    - { name: buildReasonExclusionWhere, lines: 198-209 }
+    - { name: sf, lines: 211-214 }
+    - { name: async querySummary, lines: 218-248 }
+    - { name: async queryTrend, lines: 250-292 }
+    - { name: async queryHeatmap, lines: 294-344 }
+    - { name: async queryStationSummary, lines: 346-387 }
+    - { name: async queryPackageSummary, lines: 389-427 }
+    - { name: async queryAlerts, lines: 429-564 }
+    - { name: async queryFilterOptions, lines: 566-589 }
+    - { name: useYieldAlertDuckDB, lines: 593-678 }
+  interfaces:
+    - { name: SummaryResult, lines: 56-60 }  # local
+    - { name: TrendItem, lines: 62-67 }  # local
+    - { name: HeatmapItem, lines: 69-76 }  # local
+    - { name: StationItem, lines: 78-84 }  # local
+    - { name: PackageItem, lines: 86-91 }  # local
+    - { name: AlertItem, lines: 93-114 }  # local
+    - { name: AlertsResult, lines: 116-121 }  # local
+    - { name: FilterOptions, lines: 123-125 }  # local
+    - { name: ComputeViewParams, lines: 127-137 }  # local
+    - { name: WhereParams, lines: 139-142 }  # local
+    - { name: TrendWhereParams, lines: 144-146 }  # local
+    - { name: AlertQueryParams, lines: 148-157 }  # local
 
-frontend/src/yield-alert-center/utils.js:  # 52 lines
+frontend/src/yield-alert-center/utils.ts:  # 52 lines
   functions:
     - { name: parseTokenList, lines: 1-19 }
     - { name: toQueryParams, lines: 21-38 }
@@ -2687,7 +2418,7 @@ frontend/tests/legacy/yield-alert-center-utils.test.js:  # 33 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 1 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
-    - { module: '../../src/yield-alert-center/utils.js', items: [buildDrilldownNotice, parseTokenList, toQueryParams], line: 4 }
+    - { module: '../../src/yield-alert-center/utils', items: [buildDrilldownNotice, parseTokenList, toQueryParams], line: 4 }
 
 frontend/tests/pending-jobs-registry.test.js:  # 177 lines
   imports:
@@ -2747,7 +2478,12 @@ frontend/tests/playwright/data-boundary/resource-history-progress-malformed.spec
   functions:
     - { name: async setupResourceHistoryWithMalformedProgress, lines: 32-72 }
 
-frontend/tests/playwright/hold-overview.spec.js:  # 53 lines
+frontend/tests/playwright/hold-history-flat-table.spec.js:  # 81 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 10 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+
+frontend/tests/playwright/hold-overview.spec.js:  # 66 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 7 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 8 }
@@ -2757,7 +2493,7 @@ frontend/tests/playwright/job-abandon-on-unload.spec.js:  # 133 lines
     - { module: '@playwright/test', items: [test, expect], line: 13 }
     - { module: './_auth.js', items: [loginViaApi, BASE_URL], line: 14 }
 
-frontend/tests/playwright/production-history-cross-filter.spec.ts:  # 223 lines
+frontend/tests/playwright/production-history-cross-filter.spec.ts:  # 232 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 14 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 15 }
@@ -2769,20 +2505,20 @@ frontend/tests/playwright/production-history-cross-filter.spec.ts:  # 223 lines
     - { name: async selectOption, lines: 113-127 }
     - { name: async readOptions, lines: 130-140 }
 
-frontend/tests/playwright/production-history-filter-options-error.spec.ts:  # 50 lines
+frontend/tests/playwright/production-history-filter-options-error.spec.ts:  # 59 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 12 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar, mockApiError], line: 13 }
 
 frontend/tests/playwright/production-history-multi-line-input.spec.ts:  # 155 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect, Page, Request], line: 16 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 17 }
+    - { module: '@playwright/test', items: [test, expect, Page, Request], line: 23 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 24 }
   constants:
-    - { name: FILTER_OPTIONS_PAYLOAD, line: 19 }
+    - { name: FILTER_OPTIONS_PAYLOAD, line: 26 }
   functions:
-    - { name: async installMocks, lines: 35-77 }
-    - { name: async pickTypeAndDates, lines: 79-90 }
+    - { name: async installMocks, lines: 42-84 }
+    - { name: async switchToIdentifierTab, lines: 89-94 }
 
 frontend/tests/playwright/production-history-pruning-feedback.spec.ts:  # 99 lines
   imports:
@@ -2792,7 +2528,16 @@ frontend/tests/playwright/production-history-pruning-feedback.spec.ts:  # 99 lin
     - { name: async installPruningMock, lines: 13-46 }
     - { name: async pickByTestidLabel, lines: 48-58 }
 
-frontend/tests/playwright/production-history-wildcard-paste.spec.ts:  # 209 lines
+frontend/tests/playwright/production-history-query-mode-tabs.spec.ts:  # 180 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page, Request], line: 15 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 16 }
+  constants:
+    - { name: FILTER_OPTIONS_PAYLOAD, line: 18 }
+  functions:
+    - { name: async installMocks, lines: 34-87 }
+
+frontend/tests/playwright/production-history-wildcard-paste.spec.ts:  # 203 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page, Request], line: 15 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 16 }
@@ -2800,7 +2545,7 @@ frontend/tests/playwright/production-history-wildcard-paste.spec.ts:  # 209 line
     - { name: FILTER_OPTIONS_PAYLOAD, line: 18 }
   functions:
     - { name: async installMocks, lines: 34-97 }
-    - { name: async fillDateRangeAndPickType, lines: 99-114 }
+    - { name: async switchToIdentifierTab, lines: 103-108 }
 
 frontend/tests/playwright/query-tool-url-state.spec.js:  # 92 lines
   imports:
@@ -2822,6 +2567,11 @@ frontend/tests/playwright/reject-history.spec.js:  # 134 lines
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 9 }
   functions:
     - { name: defaultDateRange, lines: 11-18 }
+
+frontend/tests/playwright/reject-material-flat-table.spec.js:  # 126 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 10 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
 
 frontend/tests/playwright/resilience/api-failure.spec.js:  # 204 lines
   imports:
@@ -2935,13 +2685,14 @@ frontend/tests/validation/useMaterialTrace.validation.test.js:  # 220 lines
     - { module: '../../src/core/endpoint-schemas.js', items: [MATERIAL_TRACE_SPOOL_SCHEMA, MATERIAL_TRACE_QUERY_SCHEMA], line: 19 }
     - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 23 }
 
-frontend/tests/validation/useProductionHistory.validation.test.js:  # 344 lines
+frontend/tests/validation/useProductionHistory.validation.test.js:  # 537 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 15 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 16 }
     - { module: '../../src/core/endpoint-schemas.js', items: [PRODUCTION_HISTORY_QUERY_SCHEMA, PRODUCTION_HISTORY_TYPE_OPTIONS_SCHEMA, PRODUCTION_HISTORY_COUNT_SCHEMA, PRODUCTION_HISTORY_FILTER_OPTIONS_SCHEMA], line: 17 }
     - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 23 }
-    - { module: '../../src/production-history/composables/useFirstTierFilters.ts', items: [parseWildcardInput, _buildUrl], line: 24 }
+    - { module: '../../src/production-history/composables/useFirstTierFilters.ts', items: [parseWildcardInput, _buildUrl, useFirstTierFilters], line: 24 }
+    - { module: '../../src/production-history/composables/useProductionHistory.ts', items: [validateQueryMode, buildModePayload, useProductionHistory], line: 29 }
 
 frontend/tests/validation/useRejectHistory.validation.test.js:  # 205 lines
   imports:
@@ -3827,7 +3578,7 @@ src/mes_dashboard/core/metrics.py:  # 231 lines
     - { name: get_metrics_summary, lines: 205-222 }
     - { name: record_query_latency, lines: 225-231 }
 
-src/mes_dashboard/core/metrics_history.py:  # 778 lines
+src/mes_dashboard/core/metrics_history.py:  # 782 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -3852,34 +3603,34 @@ src/mes_dashboard/core/metrics_history.py:  # 778 lines
     - { name: COLUMNS, line: 113 }
   classes:
     - name: MetricsHistoryStore
-      lines: 176-495
+      lines: 176-499
       methods:
         - { name: __init__, lines: 179-183 }
         - { name: initialize, lines: 185-206 }
-        - { name: _get_connection, lines: 209-224 }
-        - { name: _generate_sync_id, lines: 226-227 }
-        - { name: write_snapshot, lines: 229-306 }
-        - { name: query_snapshots, lines: 308-321 }
-        - { name: query_snapshots_aggregated, lines: 323-387 }
-        - { name: cleanup, lines: 389-423 }
-        - { name: get_unsynced, lines: 425-438 }
-        - { name: mark_synced, lines: 440-454 }
-        - { name: cleanup_synced, lines: 456-475 }
-        - { name: purge, lines: 477-495 }
+        - { name: _get_connection, lines: 209-228 }
+        - { name: _generate_sync_id, lines: 230-231 }
+        - { name: write_snapshot, lines: 233-310 }
+        - { name: query_snapshots, lines: 312-325 }
+        - { name: query_snapshots_aggregated, lines: 327-391 }
+        - { name: cleanup, lines: 393-427 }
+        - { name: get_unsynced, lines: 429-442 }
+        - { name: mark_synced, lines: 444-458 }
+        - { name: cleanup_synced, lines: 460-479 }
+        - { name: purge, lines: 481-499 }
     - name: MetricsHistoryCollector
-      lines: 502-748
+      lines: 506-752
       methods:
-        - { name: __init__, lines: 505-516 }
-        - { name: start, lines: 518-528 }
-        - { name: stop, lines: 530-534 }
-        - { name: _run, lines: 536-549 }
-        - { name: _reset_route_cache_hit_miss_counts, lines: 551-590 }
-        - { name: _collect_snapshot, lines: 592-748 }
+        - { name: __init__, lines: 509-520 }
+        - { name: start, lines: 522-532 }
+        - { name: stop, lines: 534-538 }
+        - { name: _run, lines: 540-553 }
+        - { name: _reset_route_cache_hit_miss_counts, lines: 555-594 }
+        - { name: _collect_snapshot, lines: 596-752 }
   functions:
     - { name: cleanup_archive_logs, lines: 140-169 }
-    - { name: get_metrics_history_store, lines: 759-764 }
-    - { name: start_metrics_history, lines: 767-771 }
-    - { name: stop_metrics_history, lines: 774-778 }
+    - { name: get_metrics_history_store, lines: 763-768 }
+    - { name: start_metrics_history, lines: 771-775 }
+    - { name: stop_metrics_history, lines: 778-782 }
 
 src/mes_dashboard/core/modernization_policy.py:  # 167 lines
   imports:
@@ -6101,7 +5852,7 @@ src/mes_dashboard/services/production_history_job_service.py:  # 138 lines
     - { name: enqueue_production_history_query, lines: 62-86 }
     - { name: execute_production_history_job, lines: 93-138 }
 
-src/mes_dashboard/services/production_history_service.py:  # 672 lines
+src/mes_dashboard/services/production_history_service.py:  # 700 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: logging, items: [], line: 17 }
@@ -6126,19 +5877,19 @@ src/mes_dashboard/services/production_history_service.py:  # 672 lines
   functions:
     - { name: _parse_date, lines: 72-76 }
     - { name: _end_date_exclusive, lines: 79-81 }
-    - { name: validate_query_params, lines: 86-168 }
-    - { name: _build_extra_filters, lines: 173-270 }
-    - { name: _make_chunk_query_fn, lines: 275-311 }
-    - { name: _resolve_lot_ids_with_trace, lines: 316-381 }
-    - { name: _resolve_container_ids_by_names, lines: 384-408 }
-    - { name: get_type_options, lines: 417-424 }
-    - { name: query_production_history, lines: 429-511 }
-    - { name: _make_dataset_id, lines: 514-546 }
-    - { name: _run_oracle_to_spool, lines: 549-607 }
-    - { name: make_canonical_spool_id, lines: 621-631 }
-    - { name: query_row_count, lines: 634-672 }
+    - { name: validate_query_params, lines: 86-196 }
+    - { name: _build_extra_filters, lines: 201-298 }
+    - { name: _make_chunk_query_fn, lines: 303-339 }
+    - { name: _resolve_lot_ids_with_trace, lines: 344-409 }
+    - { name: _resolve_container_ids_by_names, lines: 412-436 }
+    - { name: get_type_options, lines: 445-452 }
+    - { name: query_production_history, lines: 457-539 }
+    - { name: _make_dataset_id, lines: 542-574 }
+    - { name: _run_oracle_to_spool, lines: 577-635 }
+    - { name: make_canonical_spool_id, lines: 649-659 }
+    - { name: query_row_count, lines: 662-700 }
 
-src/mes_dashboard/services/production_history_sql_runtime.py:  # 668 lines
+src/mes_dashboard/services/production_history_sql_runtime.py:  # 695 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: csv, items: [], line: 16 }
@@ -6156,14 +5907,14 @@ src/mes_dashboard/services/production_history_sql_runtime.py:  # 668 lines
     - { name: _build_filter_where, lines: 79-144 }
     - { name: compute_detail_page, lines: 149-225 }
     - { name: _pandas_detail_page, lines: 228-260 }
-    - { name: compute_matrix_view, lines: 265-308 }
-    - { name: _build_matrix_tree, lines: 311-394 }
-    - { name: _apply_pandas_wc_group_filter, lines: 397-411 }
-    - { name: _apply_pandas_filter, lines: 414-455 }
-    - { name: _pandas_matrix_view, lines: 458-472 }
-    - { name: compute_filter_options, lines: 477-565 }
-    - { name: stream_export, lines: 570-645 }
-    - { name: _pandas_stream_export, lines: 648-668 }
+    - { name: compute_matrix_view, lines: 265-311 }
+    - { name: _build_matrix_tree, lines: 314-417 }
+    - { name: _apply_pandas_wc_group_filter, lines: 420-434 }
+    - { name: _apply_pandas_filter, lines: 437-478 }
+    - { name: _pandas_matrix_view, lines: 481-499 }
+    - { name: compute_filter_options, lines: 504-592 }
+    - { name: stream_export, lines: 597-672 }
+    - { name: _pandas_stream_export, lines: 675-695 }
 
 src/mes_dashboard/services/qc_gate_service.py:  # 248 lines
   imports:
@@ -10177,7 +9928,7 @@ tests/test_anomaly_detection_sql_runtime.py:  # 91 lines
         - { name: test_hold_percentile_is_between_0_and_1, lines: 87-88 }
         - { name: test_deviation_threshold_is_positive, lines: 90-91 }
 
-tests/test_api_contract.py:  # 488 lines
+tests/test_api_contract.py:  # 531 lines
   imports:
     - { module: ast, items: [], line: 13 }
     - { module: unittest, items: [], line: 14 }
@@ -10238,6 +9989,12 @@ tests/test_api_contract.py:  # 488 lines
         - { name: _read_contract, lines: 445-446 }
         - { name: test_resource_history_progress_endpoint_in_inventory, lines: 448-464 }
         - { name: test_resource_history_progress_response_matches_data_shape_contract, lines: 466-484 }
+    - name: TestProductionHistoryQueryModeContract
+      lines: 487-527
+      methods:
+        - { name: setUp, lines: 494-498 }
+        - { name: test_query_payload_dates_optional_with_identifier_tokens, lines: 501-516 }
+        - { name: test_query_payload_classification_mode_still_requires_dates, lines: 518-527 }
   functions:
     - { name: _count_jsonify_in_file, lines: 46-63 }
 
@@ -13378,7 +13135,7 @@ tests/test_production_history_job_service.py:  # 180 lines
         - { name: test_spool_miss_calls_query_and_complete_job, lines: 127-151 }
         - { name: test_failure_path_calls_complete_job_with_error_and_reraises, lines: 153-180 }
 
-tests/test_production_history_routes.py:  # 625 lines
+tests/test_production_history_routes.py:  # 682 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: unittest.mock, items: [patch], line: 16 }
@@ -13413,6 +13170,12 @@ tests/test_production_history_routes.py:  # 625 lines
         - { name: test_filter_options_rejects_unknown_keys_is_fail_open, lines: 576-597 }
         - { name: test_filter_options_invalid_json_returns_400, lines: 599-607 }
         - { name: test_filter_options_response_shape_matches_data_2_7, lines: 609-625 }
+    - name: TestQueryModeSplitRoutes
+      lines: 630-682
+      methods:
+        - { name: test_query_identifier_only_no_dates_returns_results, lines: 634-649 }
+        - { name: test_query_classification_only_no_dates_returns_validation_error, lines: 651-660 }
+        - { name: test_query_identifier_wide_window_bounded, lines: 662-682 }
   functions:
     - { name: app, lines: 24-27 }  # @pytest.fixture
     - { name: client, lines: 31-32 }  # @pytest.fixture
@@ -13435,36 +13198,50 @@ tests/test_production_history_routes.py:  # 625 lines
     - { name: test_matrix_accepts_same_filter_schema, lines: 276-293 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
     - { name: test_export_accepts_filter_query_params, lines: 300-314 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
 
-tests/test_production_history_service.py:  # 273 lines
+tests/test_production_history_service.py:  # 400 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
+    - { module: pytest, items: [], line: 6 }
   classes:
     - name: TestProductionEngineParallel
-      lines: 12-82
+      lines: 13-83
       methods:
-        - { name: _make_spool_env, lines: 15-27 }
-        - { name: test_no_hardcoded_parallel_1, lines: 29-34 }
-        - { name: test_default_parallel_is_1, lines: 36-58 }
-        - { name: test_parallel_2_passed_to_execute_plan, lines: 60-82 }
+        - { name: _make_spool_env, lines: 16-28 }
+        - { name: test_no_hardcoded_parallel_1, lines: 30-35 }
+        - { name: test_default_parallel_is_1, lines: 37-59 }
+        - { name: test_parallel_2_passed_to_execute_plan, lines: 61-83 }
     - name: TestProductionPartialFailure
-      lines: 89-142
+      lines: 90-143
       methods:
-        - { name: _make_spool_env, lines: 92-99 }
-        - { name: test_partial_failure_returned_from_spool, lines: 101-122 }
-        - { name: test_no_partial_failure_returns_empty_dict, lines: 124-142 }
+        - { name: _make_spool_env, lines: 93-100 }
+        - { name: test_partial_failure_returned_from_spool, lines: 102-123 }
+        - { name: test_no_partial_failure_returns_empty_dict, lines: 125-143 }
     - name: TestMainQueryNewParams
-      lines: 151-273
+      lines: 152-274
       methods:
-        - { name: _base, lines: 154-159 }
-        - { name: test_main_query_accepts_new_filter_params, lines: 161-174 }
-        - { name: test_main_query_accepts_wildcard_params, lines: 176-190 }
-        - { name: test_extra_filters_wildcard_bind_emits_like_escape, lines: 192-208 }
-        - { name: test_backward_compat_type_only_flow_unchanged, lines: 210-223 }
-        - { name: test_empty_cache_state_validate_does_not_touch_cache, lines: 225-236 }
-        - { name: test_pj_function_null_handled, lines: 238-247 }
-        - { name: test_stale_schema_v1_payload_ignored_by_get_pj_types, lines: 249-273 }
+        - { name: _base, lines: 155-160 }
+        - { name: test_main_query_accepts_new_filter_params, lines: 162-175 }
+        - { name: test_main_query_accepts_wildcard_params, lines: 177-191 }
+        - { name: test_extra_filters_wildcard_bind_emits_like_escape, lines: 193-209 }
+        - { name: test_backward_compat_type_only_flow_unchanged, lines: 211-224 }
+        - { name: test_empty_cache_state_validate_does_not_touch_cache, lines: 226-237 }
+        - { name: test_pj_function_null_handled, lines: 239-248 }
+        - { name: test_stale_schema_v1_payload_ignored_by_get_pj_types, lines: 250-274 }
+    - name: TestValidateQueryParamsModeSplit
+      lines: 277-395
+      methods:
+        - { name: test_identifier_mode_no_dates_accepted, lines: 287-295 }
+        - { name: test_identifier_mode_runs_wide_window, lines: 297-310 }
+        - { name: test_classification_mode_missing_dates_still_raises, lines: 312-318 }
+        - { name: test_classification_mode_missing_pj_types_still_raises, lines: 320-326 }
+        - { name: test_classification_mode_unchanged_with_dates, lines: 328-340 }
+        - { name: test_identifier_mode_with_dates_still_honors_them, lines: 342-353 }
+        - { name: test_identifier_mode_with_dates_over_cap_still_raises, lines: 355-365 }
+        - { name: test_query_identifier_wide_window_bounded, lines: 367-395 }
+  functions:
+    - { name: datetime_from, lines: 398-400 }
 
-tests/test_production_history_sql_runtime.py:  # 275 lines
+tests/test_production_history_sql_runtime.py:  # 593 lines
   imports:
     - { module: sys, items: [], line: 4 }
     - { module: os, items: [], line: 5 }
@@ -13529,6 +13306,38 @@ tests/test_production_history_sql_runtime.py:  # 275 lines
       lines: 246-275
       methods:
         - { name: test_extra_filters_wildcard_emit, lines: 249-275 }
+    - name: TestMatrixDistinctCountRollup
+      lines: 307-431
+      methods:
+        - { name: test_one_container_three_specs_workcenter_count_is_one, lines: 310-325 }
+        - { name: test_one_lot_two_equipment_spec_count_is_one, lines: 327-343 }
+        - { name: test_equipment_leaf_count_unchanged, lines: 345-359 }
+        - { name: test_month_counts_distinct_at_every_level, lines: 361-379 }
+        - { name: test_lot_spanning_two_months_one_equipment, lines: 381-397 }
+        - { name: test_lot_same_month_two_specs, lines: 399-413 }
+        - { name: test_distinct_containers_still_additive_when_disjoint, lines: 415-431 }
+    - name: TestMatrixTreeNodeShape
+      lines: 434-486
+      methods:
+        - { name: test_node_shape_unchanged, lines: 437-453 }
+        - { name: test_parent_count_equals_independent_distinct_not_child_sum, lines: 455-469 }
+        - { name: test_month_columns_and_levels_preserved, lines: 471-486 }
+    - name: TestMatrixDualPathParity
+      lines: 489-553
+      methods:
+        - { name: _write_spool, lines: 492-498 }
+        - { name: _records, lines: 500-508 }
+        - { name: test_duckdb_and_pandas_produce_identical_tree, lines: 510-529 }
+        - { name: test_dual_path_parity_with_cross_spec_container, lines: 531-553 }
+    - name: TestMatrixDataBoundary
+      lines: 556-593
+      methods:
+        - { name: test_single_row_input, lines: 559-569 }
+        - { name: test_empty_input, lines: 571-574 }
+        - { name: test_overlapping_month_buckets, lines: 576-593 }
+  functions:
+    - { name: _matrix_row, lines: 288-297 }
+    - { name: _find_node, lines: 300-304 }
 
 tests/test_qc_gate_routes.py:  # 62 lines
   imports:
