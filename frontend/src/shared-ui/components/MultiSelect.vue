@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 
 interface NormalizedOption {
@@ -29,6 +29,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string[]): void;
+  (e: 'dropdown-close', value: string[]): void;
 }>();
 
 const rootRef = ref<HTMLElement | null>(null);
@@ -69,6 +70,11 @@ const selectedText = computed(() => {
 
 function closeDropdown() {
   isOpen.value = false;
+  // WAI-ARIA combobox: return focus to the trigger after the popup closes so
+  // keyboard users (Escape, 關閉 button) keep their place in the tab order.
+  void nextTick(() => {
+    rootRef.value?.querySelector<HTMLButtonElement>('.multi-select-trigger')?.focus();
+  });
 }
 
 function toggleDropdown() {
@@ -117,6 +123,15 @@ watch(isOpen, (open) => {
   }
 });
 
+// Emit `dropdown-close` with the final selection whenever the dropdown closes.
+// Single emit site covers all close paths: outside-click, closeDropdown(),
+// toggleDropdown() when already open, and the new Escape handler below.
+watch(isOpen, (now, prev) => {
+  if (prev && !now) {
+    emit('dropdown-close', [...(props.modelValue || [])].map(String));
+  }
+});
+
 onMounted(() => document.addEventListener('click', handleOutsideClick, true));
 onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, true));
 </script>
@@ -142,7 +157,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
       </span>
     </button>
 
-    <div v-if="isOpen && !loading" class="multi-select-dropdown">
+    <div v-if="isOpen && !loading" class="multi-select-dropdown" @keydown.esc.stop="closeDropdown">
       <input
         v-if="searchable"
         ref="searchRef"

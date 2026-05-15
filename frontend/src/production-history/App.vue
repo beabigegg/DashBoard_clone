@@ -325,6 +325,7 @@ async function exportCsv(): Promise<void> {
                 :searchable="true"
                 placeholder="選擇 Type"
                 @update:model-value="firstTier.setSelection('pj_types', $event)"
+                @dropdown-close="firstTier.commitSelection('pj_types')"
               />
             </div>
             <div class="ui-filter-group">
@@ -337,6 +338,7 @@ async function exportCsv(): Promise<void> {
                 :searchable="true"
                 placeholder="全部"
                 @update:model-value="firstTier.setSelection('packages', $event)"
+                @dropdown-close="firstTier.commitSelection('packages')"
               />
             </div>
             <div class="ui-filter-group">
@@ -349,6 +351,7 @@ async function exportCsv(): Promise<void> {
                 :searchable="true"
                 placeholder="全部"
                 @update:model-value="firstTier.setSelection('bops', $event)"
+                @dropdown-close="firstTier.commitSelection('bops')"
               />
             </div>
             <div class="ui-filter-group">
@@ -361,6 +364,7 @@ async function exportCsv(): Promise<void> {
                 :searchable="true"
                 placeholder="全部"
                 @update:model-value="firstTier.setSelection('pj_functions', $event)"
+                @dropdown-close="firstTier.commitSelection('pj_functions')"
               />
             </div>
           </div>

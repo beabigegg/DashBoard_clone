@@ -137,6 +137,120 @@ import {
   _buildUrl,
 } from '../../src/production-history/composables/useFirstTierFilters.ts';
 
+// ── useFirstTierFilters — buffer/commit split ──────────────────────────────
+//
+// Added by change `fix-prod-history-multiselect-filter`.
+// Exercises: setSelection() is buffer-only; commitSelection() diffs and fires.
+
+test('setSelection() updates buffer but does not call fetcher', async () => {
+  const calls = [];
+  const fetcher = async (url) => {
+    calls.push(url);
+    return { success: true, data: { pj_types: [], packages: [], bops: [], pj_functions: [] }, meta: {} };
+  };
+  const ft = useFirstTierFilters({ fetcher, debounceMs: 0 });
+
+  ft.setSelection('pj_types', ['A']);
+  // Give the event loop a tick — no debounce should fire.
+  await new Promise((r) => setTimeout(r, 5));
+
+  // Buffer is updated…
+  assert.deepEqual(ft.selection.pj_types, ['A']);
+  // …but fetcher was NOT called.
+  assert.equal(calls.length, 0);
+});
+
+test('setSelection() does not start debounce timer', async () => {
+  let timerFired = false;
+  const fetcher = async () => {
+    timerFired = true;
+    return { success: true, data: { pj_types: [], packages: [], bops: [], pj_functions: [] }, meta: {} };
+  };
+  const ft = useFirstTierFilters({ fetcher, debounceMs: 1 });
+
+  ft.setSelection('pj_types', ['B']);
+  await new Promise((r) => setTimeout(r, 20)); // well past debounce window
+
+  assert.equal(timerFired, false);
+});
+
+test('commitSelection() fires fetcher exactly once with debounce', async () => {
+  const calls = [];
+  const fetcher = async (url) => {
+    calls.push(url);
+    return { success: true, data: { pj_types: ['A'], packages: [], bops: [], pj_functions: [] }, meta: {} };
+  };
+  const ft = useFirstTierFilters({ fetcher, debounceMs: 0 });
+
+  ft.setSelection('pj_types', ['A']);
+  ft.commitSelection('pj_types');
+  await new Promise((r) => setTimeout(r, 5));
+
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].includes('selected='), 'request should carry selected=');
+  const parsed = JSON.parse(decodeURIComponent(calls[0].split('selected=')[1]));
+  assert.deepEqual(parsed, { pj_types: ['A'] });
+});
+
+test('commitSelection() with unchanged selection is a no-op', async () => {
+  const calls = [];
+  const fetcher = async (url) => {
+    calls.push(url);
+    return { success: true, data: { pj_types: ['A'], packages: [], bops: [], pj_functions: [] }, meta: {} };
+  };
+  const ft = useFirstTierFilters({ fetcher, debounceMs: 0 });
+
+  // Prime: initial fetch sets _lastCommitted
+  await ft.fetchFilterOptions();
+  const callsAfterInit = calls.length;
+
+  // setSelection + commitSelection with same value as _lastCommitted (empty [] === [])
+  ft.setSelection('packages', []);
+  ft.commitSelection('packages');
+  await new Promise((r) => setTimeout(r, 5));
+
+  // No additional fetch should have fired.
+  assert.equal(calls.length, callsAfterInit);
+});
+
+test('commitSelection() reads from buffer (latest setSelection wins)', async () => {
+  const calls = [];
+  const fetcher = async (url) => {
+    calls.push(url);
+    return { success: true, data: { pj_types: ['A', 'B'], packages: [], bops: [], pj_functions: [] }, meta: {} };
+  };
+  const ft = useFirstTierFilters({ fetcher, debounceMs: 0 });
+
+  ft.setSelection('pj_types', ['A']);
+  ft.setSelection('pj_types', ['A', 'B']); // latest wins
+  ft.commitSelection('pj_types');
+  await new Promise((r) => setTimeout(r, 5));
+
+  assert.equal(calls.length, 1);
+  const parsed = JSON.parse(decodeURIComponent(calls[0].split('selected=')[1]));
+  assert.deepEqual(parsed, { pj_types: ['A', 'B'] });
+});
+
+test('multiple setSelection followed by single commitSelection produces one fetcher call', async () => {
+  const calls = [];
+  const fetcher = async (url) => {
+    calls.push(url);
+    return { success: true, data: { pj_types: [], packages: [], bops: [], pj_functions: [] }, meta: {} };
+  };
+  const ft = useFirstTierFilters({ fetcher, debounceMs: 0 });
+
+  // Simulate user toggling multiple options inside an open dropdown.
+  ft.setSelection('pj_types', ['A']);
+  ft.setSelection('pj_types', ['A', 'B']);
+  ft.setSelection('pj_types', ['A', 'B', 'C']);
+  // User closes dropdown — exactly ONE commit.
+  ft.commitSelection('pj_types');
+  await new Promise((r) => setTimeout(r, 5));
+
+  // Only one fetch call, with the final buffer value.
+  assert.equal(calls.length, 1);
+});
+
 test('parseWildcardInput handles material-trace-style multi-line paste', () => {
   const raw = '  MA2025*\n*2025\nMA*2025,MA2025\nMA2025*\n  ';
   const out = parseWildcardInput(raw);
@@ -180,7 +294,7 @@ test('useFirstTierFilters loads base options on first call (empty selection)', a
   assert.equal(ft.lastUpdatedAt.value, '2026-05-14T00:00:00Z');
 });
 
-test('useFirstTierFilters re-fetches with selected payload after setSelection', async () => {
+test('useFirstTierFilters re-fetches with selected payload after setSelection+commitSelection', async () => {
   const calls = [];
   let responseIdx = 0;
   const responses = [
@@ -204,8 +318,10 @@ test('useFirstTierFilters re-fetches with selected payload after setSelection', 
 
   await ft.fetchFilterOptions(); // initial load
   ft.setSelection('pj_types', ['A']);
+  // Migrated: setSelection no longer auto-fires; call commitSelection to apply.
+  ft.commitSelection('pj_types');
 
-  // setSelection schedules via setTimeout(..., 0) — give it one tick.
+  // commitSelection schedules via setTimeout(..., 0) — give it one tick.
   await new Promise((r) => setTimeout(r, 5));
 
   assert.equal(calls.length, 2);
@@ -236,6 +352,8 @@ test('useFirstTierFilters prunes selection values that vanish from new options',
   // Pretend the user picked BOTH packages.
   ft.selection.packages = ['PKG-1', 'PKG-2'];
   ft.setSelection('pj_types', ['A']);
+  // Migrated: setSelection no longer auto-fires; call commitSelection to apply.
+  ft.commitSelection('pj_types');
   await new Promise((r) => setTimeout(r, 5));
 
   // PKG-2 is no longer in the narrowed options → must be pruned silently.
