@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 304
-visible-files: 958
-omitted-dirs: 105
+visible-dirs: 303
+visible-files: 1024
+omitted-dirs: 106
 truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -33,6 +33,7 @@ Use this deterministic map to choose candidate context paths before reading file
 ```
 DashBoard_vite/
 |-- .cdd/
+|   |-- .hooks-installed
 |   |-- code-map.yml
 |   |-- context-policy.json
 |   \-- model-policy.json
@@ -290,6 +291,63 @@ DashBoard_vite/
 |   |-- logs/
 |   |   \-- admin_logs.sqlite
 |   |-- playwright-report/
+|   |   |-- data/
+|   |   |   |-- 05bc07a551e5b3c5cb0248f918687a96c54c1602.webm
+|   |   |   |-- 0e2ff92a6f87dd904ce789664a505aec0d039283.webm
+|   |   |   |-- 0efa9cfcc2ec494a394ed419c3df5907ceb3ed7d.webm
+|   |   |   |-- 1418e7f892ef984c73039d7a0752d9ecc10b3d68.zip
+|   |   |   |-- 16d252a15de9f2dadcc2d2156930fca67d125f1b.webm
+|   |   |   |-- 23ae1cfef511ac7060ad4756fea49d01e65d9cf8.zip
+|   |   |   |-- 23afb7cc517a4f54a44be913216de624000b0e9c.webm
+|   |   |   |-- 4ba811c64e07c9ba17f807d12a488f3c33ac65b8.zip
+|   |   |   |-- 699e3b2855d8e6e707b00ca89a3e381a6018787b.webm
+|   |   |   |-- 74b8d9c6dcb8bc10adaa2ef1a73fce3ada76f4b2.webm
+|   |   |   |-- 7a33d5db6370b6de345e990751aa1f1da65ad675.png
+|   |   |   |-- 7a584419ce9f27e163392c74f70e15394c7357fe.webm
+|   |   |   |-- 7e29e847cf9363fb3f7c22889ec5281bb78b0f76.zip
+|   |   |   |-- 82c7fe733a0c0e461553dc058c68377e358e47b1.webm
+|   |   |   |-- 84dd3b4967d2ced4b7a28dca653bdc1fa4b5b12d.webm
+|   |   |   |-- 910cd91e46a066bb820fcab62168909ffa7ba5bf.webm
+|   |   |   |-- 97468ad40c9eb510ba015132145bcf63d80e6c52.webm
+|   |   |   |-- 9927c5b7396701724c61298b2b159ef6f7063459.png
+|   |   |   |-- 9f8bd61ead2a829a82ac0c70f33a2dfd1baf3a72.zip
+|   |   |   |-- a4255fa6fa930d6300598821270dbbdacc90cc6c.webm
+|   |   |   |-- a6c4cf421715d0479bd3d193a47874c926d73446.zip
+|   |   |   |-- a8d577c0c2bad7a125d919fbabd01a705efecab7.zip
+|   |   |   |-- ad7cf6e9fd333bb94a32830b1a329c34530e10b7.zip
+|   |   |   |-- af3879267287718738485fa457778138825eb0ba.zip
+|   |   |   |-- b2110cafeee4ada689e55ad595cc22689119a376.zip
+|   |   |   |-- b7c08dce21418835d75b77b2c77ad81f3827ddd4.webm
+|   |   |   |-- bc065a6f480a692a14959766789b39e69a05be0e.zip
+|   |   |   |-- bcf62e9658a04e9e02762d51906e57f41e649c8f.zip
+|   |   |   |-- bd401e020833d594ee37f7a460efc99fd8f1f799.webm
+|   |   |   |-- c656573b6901d834ffd218d40ab507dce100fb24.md
+|   |   |   |-- cd72af057e4bbd4dfebf216d8867c079ba6d6776.zip
+|   |   |   |-- d0befbd7919c99126661bfb066e415a532863e55.zip
+|   |   |   |-- dce1ffe887caf66a1f8c1b920a10cfc121041981.zip
+|   |   |   |-- e1252acb9c10a4b3af2b4d301a498091d7a88705.webm
+|   |   |   |-- e221a721d128f9e961f91c8ac92fbc847ce43c5c.zip
+|   |   |   |-- eb9aad92b9fa2c13e1fadb729356749393ee3b69.webm
+|   |   |   |-- ef57318d293a3d86884ddfb6aed480e4db20be0e.zip
+|   |   |   |-- efd6a816ccc63ca8638846010189f7ec22faf770.webm
+|   |   |   \-- f0a333cc1e6a46b17fc14170e5ec6267568abe8b.zip
+|   |   |-- trace/
+|   |   |   |-- assets/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- codeMirrorModule.DYBRYzYX.css
+|   |   |   |-- codicon.DCmgc-ay.ttf
+|   |   |   |-- defaultSettingsView.7ch9cixO.css
+|   |   |   |-- index.BDwrLSGN.js
+|   |   |   |-- index.BVu7tZDe.css
+|   |   |   |-- index.html
+|   |   |   |-- manifest.webmanifest
+|   |   |   |-- playwright-logo.svg
+|   |   |   |-- snapshot.html
+|   |   |   |-- sw.bundle.js
+|   |   |   |-- uiMode.Btcz36p_.css
+|   |   |   |-- uiMode.CQJ9SCIQ.js
+|   |   |   |-- uiMode.html
+|   |   |   \-- xtermModule.DYP7pi_n.css
 |   |   \-- index.html
 |   |-- scripts/
 |   |   |-- css-governance-check.js
@@ -540,11 +598,7 @@ DashBoard_vite/
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
 |   |-- test-results/
-|   |   |-- production-history-filter--562aa-ible-wildcards-still-usable-chromium/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- production-history-filter--562aa-ible-wildcards-still-usable-chromium-retry1/
+|   |   |-- production-history-cross-f-76db1-dcard-textareas-Tab-B-AC-7--chromium/
 |   |   |   |-- test-failed-1.png
 |   |   |   |-- trace.zip
 |   |   |   \-- video.webm
@@ -654,27 +708,43 @@ DashBoard_vite/
 |-- logs/
 |   |-- archive/
 |   |   |-- access_20260515_113239.log
+|   |   |-- access_20260515_130312.log
+|   |   |-- access_20260515_134658.log
 |   |   |-- error_20260515_113239.log
 |   |   |-- error_20260515_113624.log
 |   |   |-- error_20260515_113842.log
+|   |   |-- error_20260515_130312.log
+|   |   |-- error_20260515_134658.log
 |   |   |-- rq_msd_worker_20260515_113239.log
 |   |   |-- rq_msd_worker_20260515_113624.log
 |   |   |-- rq_msd_worker_20260515_113842.log
+|   |   |-- rq_msd_worker_20260515_130312.log
+|   |   |-- rq_msd_worker_20260515_134658.log
 |   |   |-- rq_prod_hist_worker_20260515_113239.log
 |   |   |-- rq_prod_hist_worker_20260515_113624.log
 |   |   |-- rq_prod_hist_worker_20260515_113842.log
+|   |   |-- rq_prod_hist_worker_20260515_130312.log
+|   |   |-- rq_prod_hist_worker_20260515_134658.log
 |   |   |-- rq_reject_worker_20260515_113239.log
 |   |   |-- rq_reject_worker_20260515_113624.log
 |   |   |-- rq_reject_worker_20260515_113842.log
+|   |   |-- rq_reject_worker_20260515_130312.log
+|   |   |-- rq_reject_worker_20260515_134658.log
 |   |   |-- rq_worker_20260515_113239.log
 |   |   |-- rq_worker_20260515_113624.log
 |   |   |-- rq_worker_20260515_113842.log
+|   |   |-- rq_worker_20260515_130312.log
+|   |   |-- rq_worker_20260515_134658.log
 |   |   |-- rq_yield_alert_worker_20260515_113239.log
 |   |   |-- rq_yield_alert_worker_20260515_113624.log
 |   |   |-- rq_yield_alert_worker_20260515_113842.log
+|   |   |-- rq_yield_alert_worker_20260515_130312.log
+|   |   |-- rq_yield_alert_worker_20260515_134658.log
 |   |   |-- watchdog_20260515_113239.log
 |   |   |-- watchdog_20260515_113624.log
-|   |   \-- watchdog_20260515_113842.log
+|   |   |-- watchdog_20260515_113842.log
+|   |   |-- watchdog_20260515_130312.log
+|   |   \-- watchdog_20260515_134658.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -1317,18 +1387,12 @@ DashBoard_vite/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- hold_dataset/
-|   |   |   \-- d819c1954d0eb112.parquet
-|   |   |-- job_query/
-|   |   |   \-- b49d20bc6fee6aa2.parquet
 |   |   |-- material_trace/
 |   |   |   |-- mtrace-54f41cb7bba7dbe0.parquet
-|   |   |   |-- mtrace-67637df729fb11a2.parquet
-|   |   |   \-- mtrace-83386ebf143afd1b.parquet
+|   |   |   \-- mtrace-67637df729fb11a2.parquet
 |   |   |-- production_history/
-|   |   |   \-- ph-33d97c65ff83e256.parquet
-|   |   |-- reject_dataset/
-|   |   |   \-- 5c75e6cd84fc487b.parquet
+|   |   |   |-- ph-33d97c65ff83e256.parquet
+|   |   |   \-- ph-594670cd0801903b.parquet
 |   |   |-- resource_dataset/
 |   |   |   \-- 193031c7bf14ea7d.parquet
 |   |   |-- resource_oee/
@@ -1357,6 +1421,8 @@ DashBoard_vite/
 |   |   |-- probe_107593.json
 |   |   |-- probe_108245.json
 |   |   |-- probe_108246.json
+|   |   |-- probe_108255.json
+|   |   |-- probe_108256.json
 |   |   |-- probe_109468.json
 |   |   |-- probe_109469.json
 |   |   |-- probe_109596.json
@@ -1368,14 +1434,14 @@ DashBoard_vite/
 |   |   |-- probe_112498.json
 |   |   |-- probe_112650.json
 |   |   |-- probe_112651.json
+|   |   |-- probe_113602.json
+|   |   |-- probe_113603.json
 |   |   |-- probe_113666.json
 |   |   |-- probe_113869.json
 |   |   |-- probe_116133.json
-|   |   |-- probe_116787.json
-|   |   \-- ... (364 more entries truncated; cap=50)
+|   |   \-- ... (365 more entries truncated; cap=50)
 |   |-- mes_dashboard_restart_state.json
-|   |-- resource_history.duckdb
-|   \-- rq_yield_alert_worker.pid
+|   \-- resource_history.duckdb
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py

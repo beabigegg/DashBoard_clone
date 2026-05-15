@@ -27,3 +27,4 @@
 | migrate-query-tool-ts | 2026 | 2026-05-14 | specs/archive/2026/migrate-query-tool-ts/ |
 | hold-history-detail-flat-table | 2026 | 2026-05-15 | specs/archive/2026/hold-history-detail-flat-table/ |
 | reject-material-flat-table | 2026 | 2026-05-15 | specs/archive/2026/reject-material-flat-table/ |
+| fix-prod-history-multiselect-filter | 2026 | 2026-05-15 | specs/archive/2026/fix-prod-history-multiselect-filter/ |
