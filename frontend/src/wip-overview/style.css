@@ -2,12 +2,12 @@
 @import '../resource-shared/styles.css';
 @import '../wip-shared/pareto-styles.css';
 
-.wip-overview-page .header h1 {
+.theme-wip-overview .wip-overview-page .header h1 {
   font-size: 24px;
 }
 
 
-.filters {
+.theme-wip-overview .filters {
   background: var(--card-bg);
   padding: theme('spacing.token.p16') theme('spacing.token.p20');
   border-radius: 10px;
@@ -19,20 +19,20 @@
   align-items: start;
 }
 
-.filter-group {
+.theme-wip-overview .filter-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
 }
 
-.filter-group label {
+.theme-wip-overview .filter-group label {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
 }
 
-.filters-actions {
+.theme-wip-overview .filters-actions {
   grid-column: 1 / -1;
   display: inline-flex;
   gap: 10px;
@@ -40,11 +40,11 @@
   justify-content: flex-end;
 }
 
-.overview-summary-row {
+.theme-wip-overview .overview-summary-row {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.wip-status-row {
+.theme-wip-overview .wip-status-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
@@ -52,7 +52,7 @@
   margin-bottom: theme('spacing.token.p16');
 }
 
-.wip-status-card {
+.theme-wip-overview .wip-status-card {
   background: var(--card-bg);
   border-radius: 10px;
   padding: theme('spacing.token.p12') theme('spacing.token.p16');
@@ -62,12 +62,12 @@
   transition: all var(--motion-normal) var(--motion-ease);
 }
 
-.wip-status-card:hover {
+.theme-wip-overview .wip-status-card:hover {
   transform: var(--hover-lift);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
-.wip-status-card .status-header {
+.theme-wip-overview .wip-status-card .status-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -76,142 +76,142 @@
   margin-bottom: theme('spacing.token.p8');
 }
 
-.wip-status-card .status-header .dot {
+.theme-wip-overview .wip-status-card .status-header .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: currentColor;
 }
 
-.wip-status-card .status-values {
+.theme-wip-overview .wip-status-card .status-values {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 24px;
 }
 
-.wip-status-card .status-values span {
+.theme-wip-overview .wip-status-card .status-values span {
   font-size: 24px;
   font-weight: 700;
   color: var(--text);
 }
 
-.wip-status-card.run {
+.theme-wip-overview .wip-status-card.run {
   background: theme('colors.token.hf0fdf4');
   border-color: theme('colors.token.h22c55e');
 }
 
-.wip-status-card.queue {
+.theme-wip-overview .wip-status-card.queue {
   background: theme('colors.token.hfffbeb');
   border-color: theme('colors.token.hf59e0b');
 }
 
-.wip-status-card.quality-hold {
+.theme-wip-overview .wip-status-card.quality-hold {
   background: theme('colors.token.hfef2f2');
   border-color: theme('colors.token.hef4444');
 }
 
-.wip-status-card.non-quality-hold {
+.theme-wip-overview .wip-status-card.non-quality-hold {
   background: theme('colors.token.hfff7ed');
   border-color: theme('colors.token.hf97316');
 }
 
-.wip-status-card.run .status-header {
+.theme-wip-overview .wip-status-card.run .status-header {
   color: theme('colors.token.h166534');
 }
 
-.wip-status-card.queue .status-header {
+.theme-wip-overview .wip-status-card.queue .status-header {
   color: theme('colors.token.h92400e');
 }
 
-.wip-status-card.quality-hold .status-header {
+.theme-wip-overview .wip-status-card.quality-hold .status-header {
   color: theme('colors.token.h991b1b');
 }
 
-.wip-status-card.non-quality-hold .status-header {
+.theme-wip-overview .wip-status-card.non-quality-hold .status-header {
   color: theme('colors.token.h9a3412');
 }
 
-.wip-status-card.active {
+.theme-wip-overview .wip-status-card.active {
   border-width: 4px;
   transform: scale(1.03);
 }
 
-.wip-status-card.run.active {
+.theme-wip-overview .wip-status-card.run.active {
   background: theme('colors.token.hdcfce7');
   box-shadow: 0 6px 25px rgba(34, 197, 94, 0.5);
 }
 
-.wip-status-card.queue.active {
+.theme-wip-overview .wip-status-card.queue.active {
   background: theme('colors.token.hfef3c7');
   box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5);
 }
 
-.wip-status-card.quality-hold.active {
+.theme-wip-overview .wip-status-card.quality-hold.active {
   background: theme('colors.token.hfee2e2');
   box-shadow: 0 6px 25px rgba(239, 68, 68, 0.5);
 }
 
-.wip-status-card.non-quality-hold.active {
+.theme-wip-overview .wip-status-card.non-quality-hold.active {
   background: theme('colors.token.hffedd5');
   box-shadow: 0 6px 25px rgba(249, 115, 22, 0.5);
 }
 
-.wip-status-row.filtering .wip-status-card:not(.active) {
+.theme-wip-overview .wip-status-row.filtering .wip-status-card:not(.active) {
   opacity: 0.5;
 }
 
-.content-grid {
+.theme-wip-overview .content-grid {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.card {
+.theme-wip-overview .card {
   background: var(--card-bg);
   border-radius: 10px;
   box-shadow: var(--shadow);
   overflow: hidden;
 }
 
-.card-header {
+.theme-wip-overview .card-header {
   padding: theme('spacing.token.p14') theme('spacing.token.p20');
   border-bottom: 1px solid var(--border);
   background: theme('colors.token.hfafbfc');
 }
 
-.card-title {
+.theme-wip-overview .card-title {
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
 }
 
-.card-body {
+.theme-wip-overview .card-body {
   padding: theme('spacing.token.p16');
   overflow-x: auto;
 }
 
-.card-body.matrix-container {
+.theme-wip-overview .card-body.matrix-container {
   padding: 0;
   max-height: 500px;
   overflow: auto;
 }
 
-.matrix-table {
+.theme-wip-overview .matrix-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 12px;
 }
 
-.matrix-table th,
-.matrix-table td {
+.theme-wip-overview .matrix-table th,
+.theme-wip-overview .matrix-table td {
   padding: theme('spacing.token.p8') theme('spacing.token.p10');
   text-align: right;
   white-space: nowrap;
 }
 
-.matrix-table th {
+.theme-wip-overview .matrix-table th {
   background: theme('colors.brand.50');
   font-weight: 600;
   position: sticky;
@@ -220,11 +220,11 @@
   border-bottom: 2px solid theme('colors.stroke.panel');
 }
 
-.matrix-table td {
+.theme-wip-overview .matrix-table td {
   border-bottom: 1px solid theme('colors.stroke.soft');
 }
 
-.matrix-table th:first-child {
+.theme-wip-overview .matrix-table th:first-child {
   text-align: left;
   position: sticky;
   left: 0;
@@ -234,7 +234,7 @@
   border-right: 1px solid theme('colors.stroke.soft');
 }
 
-.matrix-table td:first-child {
+.theme-wip-overview .matrix-table td:first-child {
   text-align: left;
   font-weight: 600;
   position: sticky;
@@ -244,26 +244,26 @@
   border-right: 1px solid theme('colors.stroke.soft');
 }
 
-.matrix-table tbody tr:hover td {
+.theme-wip-overview .matrix-table tbody tr:hover td {
   background: theme('colors.surface.hover');
 }
 
-.matrix-table tbody tr:hover td:first-child {
+.theme-wip-overview .matrix-table tbody tr:hover td:first-child {
   background: theme('colors.brand.50');
 }
 
-.matrix-table .total-row td,
-.matrix-table .total-col {
+.theme-wip-overview .matrix-table .total-row td,
+.theme-wip-overview .matrix-table .total-col {
   background: theme('colors.token.he5e7eb');
   font-weight: 700;
 }
 
-.matrix-table .clickable {
+.theme-wip-overview .matrix-table .clickable {
   cursor: pointer;
   color: var(--primary);
 }
 
-.matrix-table .clickable:hover {
+.theme-wip-overview .matrix-table .clickable:hover {
   text-decoration: underline;
 }
 
@@ -272,26 +272,26 @@
 }
 
 @media (max-width: 1000px) {
-  .filters {
+  .theme-wip-overview .filters {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
 
-  .wip-status-row {
+  .theme-wip-overview .wip-status-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
-  .filters {
+  .theme-wip-overview .filters {
     grid-template-columns: 1fr;
   }
 
-  .filters-actions {
+  .theme-wip-overview .filters-actions {
     justify-content: flex-start;
   }
 
-  .overview-summary-row,
-  .wip-status-row {
+  .theme-wip-overview .overview-summary-row,
+  .theme-wip-overview .wip-status-row {
     grid-template-columns: 1fr;
   }
 }
