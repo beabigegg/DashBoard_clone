@@ -20,6 +20,133 @@ logger = logging.getLogger("mes_dashboard.query_tool_sql_runtime")
 
 _SQL_ENABLED = resolve_bool_flag("QUERY_TOOL_SQL_BATCH_ENABLED", default=True)
 
+# ── Partial-trackout aggregation constants (QT-05 / QT-06) ────────────────────
+
+# 4-tuple key for lot_history and equipment_lots
+_PARTIAL_KEY_COLS_4 = ["CONTAINERID", "EQUIPMENTID", "SPECNAME", "TRACKINTIMESTAMP"]
+
+# 3-tuple key for adjacent_lots (SPECNAME is a non-key column there)
+_PARTIAL_KEY_COLS_3 = ["CONTAINERID", "EQUIPMENTID", "TRACKINTIMESTAMP"]
+
+_PARTIAL_NONKEY_COLS_LOT = [
+    "WORKCENTERNAME", "EQUIPMENTNAME", "FINISHEDRUNCARD", "PJ_WORKORDER",
+    "CONTAINERNAME", "PJ_TYPE", "PJ_BOP", "WAFER_LOT_ID",
+]
+
+# adjacent_lots has SPECNAME as non-key (it's not in the 3-tuple key)
+_PARTIAL_NONKEY_COLS_ADJACENT = [
+    "EQUIPMENTNAME", "SPECNAME", "FINISHEDRUNCARD", "PJ_WORKORDER",
+    "CONTAINERNAME", "PJ_TYPE", "PJ_BOP", "WAFER_LOT_ID",
+]
+
+
+def aggregate_partial_trackouts(
+    df: Any,
+    key_cols: List[str],
+    nonkey_cols: List[str],
+    *,
+    query_id: Optional[str] = None,
+) -> Any:
+    """Apply partial-trackout aggregation with strict guard (QT-05 / QT-06).
+
+    Consistent groups (all non-key columns identical within the key-tuple group)
+    collapse to one row: TRACKINQTY=MAX, TRACKOUTTIMESTAMP=MAX, TRACKOUTQTY=SUM,
+    partial_count=COUNT(*).
+    Divergent groups (strict guard, QT-06) emit their original raw rows each
+    with partial_count=1.  Emits one INFO log when divergent groups exist.
+
+    Columns listed in key_cols or nonkey_cols that are absent from df are
+    silently skipped so callers need not pre-filter for optional columns.
+
+    Returns a DataFrame sorted by TRACKINTIMESTAMP ASC (NULLS LAST), CONTAINERID.
+    """
+    import pandas as pd
+
+    if df.empty:
+        result = df.copy()
+        result["partial_count"] = pd.array([], dtype="Int64")
+        return result
+
+    active_key_cols = [c for c in key_cols if c in df.columns]
+    active_nonkey_cols = [c for c in nonkey_cols if c in df.columns]
+
+    # If the full key tuple is not present (any required key col absent), we cannot
+    # perform meaningful partial-trackout aggregation.  Return as-is with partial_count=1.
+    if len(active_key_cols) < len(key_cols):
+        result = df.copy()
+        result["partial_count"] = 1
+        return result
+
+    grouped = df.groupby(active_key_cols, sort=False)
+
+    agg_rows: List[Dict[str, Any]] = []
+    raw_rows: List[Any] = []
+    divergent_count = 0
+    total_groups = grouped.ngroups
+
+    for _, grp in grouped:
+        # Check strict guard: all non-key columns must be identical within group
+        is_consistent = all(
+            grp[col].nunique(dropna=False) == 1
+            for col in active_nonkey_cols
+        )
+        if is_consistent:
+            # Aggregate: TRACKINQTY=MAX (original load), TRACKOUTTIMESTAMP=MAX,
+            # TRACKOUTQTY=SUM (sum of all partial outs), partial_count=COUNT(*).
+            row = grp.iloc[0].to_dict()
+            if "TRACKINQTY" in grp.columns:
+                row["TRACKINQTY"] = grp["TRACKINQTY"].max()
+            if "TRACKOUTTIMESTAMP" in grp.columns:
+                row["TRACKOUTTIMESTAMP"] = grp["TRACKOUTTIMESTAMP"].max()
+            if "TRACKOUTQTY" in grp.columns:
+                row["TRACKOUTQTY"] = grp["TRACKOUTQTY"].sum()
+            row["partial_count"] = len(grp)
+            agg_rows.append(row)
+        else:
+            # Strict guard fallback: emit raw rows with partial_count=1
+            divergent_count += 1
+            for _, raw_row in grp.iterrows():
+                d = raw_row.to_dict()
+                d["partial_count"] = 1
+                raw_rows.append(d)
+
+    # Emit summary INFO log when divergent groups exist (QT-06)
+    if divergent_count > 0:
+        logger.info(
+            "query-tool partial-trackout strict-guard: %d divergent groups fell back to raw rows "
+            "(query_id=%s, total_groups=%d)",
+            divergent_count,
+            query_id,
+            total_groups,
+        )
+
+    parts: List[Any] = []
+    if agg_rows:
+        parts.append(pd.DataFrame(agg_rows))
+    if raw_rows:
+        parts.append(pd.DataFrame(raw_rows))
+
+    if not parts:
+        result = df.iloc[0:0].copy()
+        result["partial_count"] = pd.array([], dtype="Int64")
+        return result
+
+    result = pd.concat(parts, ignore_index=True)
+
+    # Sort: TRACKINTIMESTAMP ASC (NaT/None last), then CONTAINERID
+    sort_cols = [c for c in ["TRACKINTIMESTAMP", "CONTAINERID"] if c in result.columns]
+    if sort_cols:
+        result = result.sort_values(
+            by=sort_cols,
+            ascending=[True] * len(sort_cols),
+            na_position="last",
+        ).reset_index(drop=True)
+
+    # Ensure partial_count is int (not float from concat)
+    result["partial_count"] = result["partial_count"].astype(int)
+
+    return result
+
 SQL_FALLBACK_DISABLED = "query_tool_sql_disabled"
 SQL_FALLBACK_DEP_MISSING = "query_tool_sql_dependency_missing"
 SQL_FALLBACK_SPOOL_MISS = "query_tool_sql_spool_miss"

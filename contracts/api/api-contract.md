@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.5.1
+schema-version: 1.6.0
 last-changed: 2026-05-15
 breaking-change-policy: deprecate-2-minors
 ---
@@ -287,6 +287,13 @@ breaking-change-policy: deprecate-2-minors
   - `pagination.total_rows`（`POST /api/production-history/page`）語意更新：反映聚合後的列數，而非 raw spool 列數。當查詢無 partial trackout 時兩者相同；當有合併群組時 `total_rows` 小於原 LOTWIPHISTORY 列數。
   - 三條後端路徑（DuckDB SQL 主路徑、pandas fallback、CSV 匯出）一致套用相同聚合邏輯。
   - 嚴格守門：群組內非鍵欄位若有差異則該群組退回 raw rows（不合併），對 API consumer 透明 — 無新錯誤碼。詳見 business-rules.md PH-06 / PH-07。
+- **Query-Tool partial-trackout aggregation (2026-05-15, query-tool-partial-trackout)**：以下為 additive，backward-compatible：
+  - `GET /api/query-tool/lot-history` 與 `POST /api/query-tool/equipment-period`（`query_type=lots`）response rows 新增 `partial_count: integer (≥ 1)`。`TRACKINQTY` 改為 `MAX(TRACKINQTY)`（原始上機量，因 MES `TRACKINQTY` 隨 partial 遞減）；`TRACKOUTQTY` 改為 `SUM(TRACKOUTQTY)`（累計下機量）；`TRACKOUTTIMESTAMP` 改為 `MAX(TRACKOUTTIMESTAMP)`。舊行為為 `ROW_NUMBER() ... WHERE rn=1` 取最後一筆 partial —— 為靜默的數據準確性 bug。
+  - `GET /api/query-tool/adjacent-lots` response rows 同樣新增 `partial_count: integer (≥ 1)`，使用 3-tuple `(CONTAINERID, EQUIPMENTID, TRACKINTIMESTAMP)` 聚合語意。
+  - `partial_count` 為 additive 新欄位；既有忽略未知欄位的 consumer 不受影響。
+  - 無端點移除、無欄位移除、無錯誤碼變更。
+  - 嚴格守門：群組內非鍵欄位差異 → raw rows 各帶 `partial_count = 1`，對 API consumer 透明。詳見 business-rules.md QT-05 / QT-06。
+  - `POST /api/query-tool/export-csv`（`export_type=lot_history` 與 `export_type=equipment_lots`）CSV 新增 `partial_count` 為傳遞欄位；以位置解析 CSV 的 consumer 需處理新尾欄。
 
 ## Breaking Change Policy
 

@@ -45,6 +45,13 @@ from mes_dashboard.core.exceptions import (
 )
 from mes_dashboard.core.query_quality_contract import unpack_event_fetch_result
 from mes_dashboard.services.event_fetcher import EventFetcher
+from mes_dashboard.services.query_tool_sql_runtime import (
+    aggregate_partial_trackouts,
+    _PARTIAL_KEY_COLS_4,
+    _PARTIAL_KEY_COLS_3,
+    _PARTIAL_NONKEY_COLS_LOT,
+    _PARTIAL_NONKEY_COLS_ADJACENT,
+)
 
 try:
     from mes_dashboard.core.database import read_sql_df_slow
@@ -1066,6 +1073,16 @@ def get_lot_history(
         events_by_cid, quality_meta = _fetch_domain_records([container_id], "history")
         rows = list(events_by_cid.get(container_id, []))
 
+        # Aggregate partial trackouts (QT-05/QT-06 strict guard)
+        if rows:
+            _agg_df = aggregate_partial_trackouts(
+                pd.DataFrame(rows),
+                _PARTIAL_KEY_COLS_4,
+                _PARTIAL_NONKEY_COLS_LOT,
+                query_id=container_id,
+            )
+            rows = _agg_df.to_dict(orient='records')
+
         if workcenter_groups:
             workcenters = _get_workcenters_for_groups(workcenter_groups)
             if workcenters:
@@ -1145,6 +1162,13 @@ def get_adjacent_lots(
         }
 
         df = read_sql_df_slow(sql, params)
+        # Aggregate partial trackouts using 3-tuple key (QT-05/QT-06 strict guard)
+        df = aggregate_partial_trackouts(
+            df,
+            _PARTIAL_KEY_COLS_3,
+            _PARTIAL_NONKEY_COLS_ADJACENT,
+            query_id=f"adjacent:{equipment_id}",
+        )
         data = _df_to_records(df)
 
         logger.debug(f"Adjacent lots: {len(data)} records for {equipment_id}")
@@ -1233,6 +1257,17 @@ def get_lot_history_batch(
         rows = []
         for cid in container_ids:
             rows.extend(events_by_cid.get(cid, []))
+
+        # Aggregate partial trackouts (QT-05/QT-06 strict guard)
+        if rows:
+            _agg_df = aggregate_partial_trackouts(
+                pd.DataFrame(rows),
+                _PARTIAL_KEY_COLS_4,
+                _PARTIAL_NONKEY_COLS_LOT,
+                query_id=spool_query_id,
+            )
+            rows = _agg_df.to_dict(orient='records')
+
         _store_query_tool_batch_spool(
             namespace=spool_namespace,
             query_id=spool_query_id,
@@ -2399,6 +2434,13 @@ def get_equipment_lots(
         params = {'start_date': start_date, 'end_date': end_date}
         params.update(builder.params)
         df = read_sql_df_slow(sql, params)
+        # Aggregate partial trackouts (QT-05/QT-06 strict guard)
+        df = aggregate_partial_trackouts(
+            df,
+            _PARTIAL_KEY_COLS_4,
+            _PARTIAL_NONKEY_COLS_LOT,
+            query_id=f"equipment_lots:{start_date}:{end_date}",
+        )
         records = _df_to_records(df)
         paged_rows, pagination = _paginate_rows(
             records,

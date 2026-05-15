@@ -170,7 +170,7 @@ def test_equipment_lots_returns_paginated_rows(monkeypatch):
         "total": 5,
         "total_pages": 3,
     }
-    assert result["data"] == [{"CONTAINERID": "CID-5"}]
+    assert result["data"][0]["CONTAINERID"] == "CID-5"
 
 
 def test_lot_associations_batch_rejects_applies_policy_and_group_alignment(monkeypatch):

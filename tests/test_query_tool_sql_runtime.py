@@ -18,6 +18,8 @@ from decimal import Decimal
 from unittest.mock import patch
 
 
+import pandas as pd
+
 from mes_dashboard.services.query_tool_sql_runtime import (
     _qid,
     _sql_str_literal,
@@ -25,6 +27,9 @@ from mes_dashboard.services.query_tool_sql_runtime import (
     _serialize_rows,
     _normalize_tokens,
     try_compute_page_from_spool,
+    aggregate_partial_trackouts,
+    _PARTIAL_KEY_COLS_4,
+    _PARTIAL_NONKEY_COLS_LOT,
     SQL_FALLBACK_DISABLED,
     SQL_FALLBACK_SPOOL_MISS,
     SQL_FALLBACK_DEP_MISSING,
@@ -169,3 +174,34 @@ class TestTryComputePageFromSpool:
                 per_page=50,
             )
         assert result is None or (isinstance(result, tuple) and result[0] is None)
+
+    def test_partial_count_present_in_returned_data(self):
+        """aggregate_partial_trackouts produces partial_count in the result DataFrame."""
+        from datetime import datetime
+
+        T = datetime(2024, 1, 15, 8, 0, 0)
+        row1 = {
+            "CONTAINERID": "AAAA000000000001",
+            "EQUIPMENTID": "EQ01",
+            "SPECNAME": "SPEC_A",
+            "TRACKINTIMESTAMP": T,
+            "TRACKOUTTIMESTAMP": datetime(2024, 1, 15, 9, 0),
+            "TRACKINQTY": 100,
+            "TRACKOUTQTY": 60,
+            "WORKCENTERNAME": "WC01",
+            "EQUIPMENTNAME": "EQ_NAME_01",
+            "FINISHEDRUNCARD": "RC01",
+            "PJ_WORKORDER": "WO01",
+            "CONTAINERNAME": "LOT_A",
+            "PJ_TYPE": "TYPE_A",
+            "PJ_BOP": "BOP_A",
+            "WAFER_LOT_ID": "W_LOT_01",
+        }
+        row2 = {**row1, "TRACKINQTY": 40, "TRACKOUTQTY": 40,
+                "TRACKOUTTIMESTAMP": datetime(2024, 1, 15, 10, 0)}
+        df = pd.DataFrame([row1, row2])
+        df["partial_count"] = [1, 2]  # pre-existing column values (should be replaced)
+
+        result = aggregate_partial_trackouts(df, _PARTIAL_KEY_COLS_4, _PARTIAL_NONKEY_COLS_LOT)
+        assert "partial_count" in result.columns, "partial_count must be in result"
+        assert int(result.iloc[0]["partial_count"]) == 2, "merged group must have partial_count=2"

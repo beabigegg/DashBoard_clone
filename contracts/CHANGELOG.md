@@ -8,6 +8,24 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.6.0] — 2026-05-15
+### Added (additive)
+- Section 10 Compatibility Note: query-tool `lot_history`, `equipment_lots`, and `adjacent_lots` responses gain `partial_count: integer (≥ 1)`. `TRACKINQTY` now = `MAX(TRACKINQTY)` (original load qty); `TRACKOUTQTY` now = `SUM(TRACKOUTQTY)` (cumulative). Prior `ROW_NUMBER()` deduplication was a silent data-accuracy bug returning only the last partial's values. Additive; no endpoint removed; no error-code change. Strict-guard divergence is transparent to consumers. Export CSV (`lot_history` / `equipment_lots`) gains `partial_count` as a pass-through column.
+- Source: change `query-tool-partial-trackout`.
+
+## [data 1.5.0] — 2026-05-15
+### Added (additive)
+- Section 3.6: Query-Tool Lot-History / Equipment-Lots / Adjacent-Lots Row schema. 17-column table documenting the post-aggregation row shape, grouping keys (4-tuple for lot_history/equipment_lots, 3-tuple for adjacent_lots), `TRACKINQTY = MAX` / `TRACKOUTQTY = SUM` semantics, strict-guard fallback (`partial_count = 1`), and `RELATIVE_POSITION` column (adjacent_lots only). Documents prior wrong behavior (ROW_NUMBER last-partial deduplication). Cross-referenced to QT-05 / QT-06.
+- Source: change `query-tool-partial-trackout`.
+
+## [business 1.7.0] — 2026-05-15
+### Added (additive)
+- Query Tool Rules: `QT-05` (partial-trackout aggregation for `lot_history.sql`, `equipment_lots.sql`, `adjacent_lots.sql`) and `QT-06` (strict guard with per-SQL non-key column lists; INFO log per request; no error to client).
+### Changed (additive scope extension)
+- PH-06: extended to also enumerate query-tool SQL paths as additional surfaces governed by the same aggregation semantics.
+- PH-07: scope note extended to include query-tool paths; query-tool log prefix documented.
+- Source: change `query-tool-partial-trackout`.
+
 ## [data 1.4.1] — 2026-05-15
 ### Changed (semantic refinement, same-day patch over 1.4.0)
 - Section 3.4: aggregation key reduced from 5-tuple to 4-tuple — TRACKINQTY removed from grouping key. Reason: this MES records TRACKINQTY as qty REMAINING at each partial's start (decreases across partials of one upload), not the original load. Keeping TRACKINQTY in the key prevented real partial-trackout rows from ever merging. Aggregated TRACKINQTY now = `MAX(TRACKINQTY)` = original load qty. TRACKINQTY/TRACKINTIMESTAMP column-note prose updated accordingly.

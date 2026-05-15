@@ -1,6 +1,6 @@
-# generated: 2026-05-15T09:08:36Z by cdd-kit 2.0.19
-# files: 781, src-lines: 211901, map-lines: 18293, compression: 11.6x
-# sources-digest: 86f6bcc991d0351b3ce626590419eeb310519830fd1e2419b2169d73a0d3655c
+# generated: 2026-05-15T11:28:57Z by cdd-kit 2.0.19
+# files: 782, src-lines: 212601, map-lines: 18389, compression: 11.6x
+# sources-digest: 298d28c13d9bc9fda3c729a02381d228ea4c599b17aa322d39eecb04ea19bd6e
 frontend/playwright-report/trace/assets/codeMirrorModule-a5XoALAZ.js:  # 32 lines
   imports:
     - { module: './defaultSettingsView-CJSZINFr.js', items: [v], line: 1 }
@@ -7925,7 +7925,7 @@ src/mes_dashboard/services/qc_gate_service.py:  # 248 lines
     - { name: _build_lot_payload, lines: 139-171 }
     - { name: get_qc_gate_summary, lines: 174-248 }
 
-src/mes_dashboard/services/query_tool_service.py:  # 2714 lines
+src/mes_dashboard/services/query_tool_service.py:  # 2756 lines
   imports:
     - { module: csv, items: [], line: 18 }
     - { module: hashlib, items: [], line: 19 }
@@ -7944,85 +7944,86 @@ src/mes_dashboard/services/query_tool_service.py:  # 2714 lines
     - { module: mes_dashboard.core.exceptions, items: [UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError], line: 39 }
     - { module: mes_dashboard.core.query_quality_contract, items: [unpack_event_fetch_result], line: 46 }
     - { module: mes_dashboard.services.event_fetcher, items: [EventFetcher], line: 47 }
+    - { module: mes_dashboard.services.query_tool_sql_runtime, items: [aggregate_partial_trackouts, _PARTIAL_KEY_COLS_4, _PARTIAL_KEY_COLS_3, _PARTIAL_NONKEY_COLS_LOT, _PARTIAL_NONKEY_COLS_ADJACENT], line: 48 }
   constants:
-    - { name: BATCH_SIZE, line: 59 }
-    - { name: MAX_DATE_RANGE_DAYS, line: 60 }
-    - { name: DEFAULT_TIME_WINDOW_HOURS, line: 61 }
-    - { name: ADJACENT_LOTS_COUNT, line: 62 }
-    - { name: QUERY_TOOL_RSS_REJECT_MB, line: 70 }
-    - { name: QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE, line: 71 }
-    - { name: QUERY_TOOL_DETAIL_MAX_PER_PAGE, line: 72 }
-    - { name: QUERY_TOOL_SPOOL_TTL_SECONDS, line: 73 }
-    - { name: QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP, line: 74 }
-    - { name: QUERY_TOOL_REJECT_EXCLUDE_MATERIAL_SCRAP, line: 78 }
-    - { name: QUERY_TOOL_REJECT_EXCLUDE_PB_DIODE, line: 82 }
-    - { name: QUERY_TOOL_SPOOL_NS_HISTORY_BATCH, line: 86 }
-    - { name: QUERY_TOOL_SPOOL_NS_ASSOC_BATCH_PREFIX, line: 87 }
-    - { name: MAX_LOT_EQUIPMENT_INPUT, line: 1918 }
-    - { name: MAX_PARENT_TRACE_DEPTH, line: 1919 }
+    - { name: BATCH_SIZE, line: 66 }
+    - { name: MAX_DATE_RANGE_DAYS, line: 67 }
+    - { name: DEFAULT_TIME_WINDOW_HOURS, line: 68 }
+    - { name: ADJACENT_LOTS_COUNT, line: 69 }
+    - { name: QUERY_TOOL_RSS_REJECT_MB, line: 77 }
+    - { name: QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE, line: 78 }
+    - { name: QUERY_TOOL_DETAIL_MAX_PER_PAGE, line: 79 }
+    - { name: QUERY_TOOL_SPOOL_TTL_SECONDS, line: 80 }
+    - { name: QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP, line: 81 }
+    - { name: QUERY_TOOL_REJECT_EXCLUDE_MATERIAL_SCRAP, line: 85 }
+    - { name: QUERY_TOOL_REJECT_EXCLUDE_PB_DIODE, line: 89 }
+    - { name: QUERY_TOOL_SPOOL_NS_HISTORY_BATCH, line: 93 }
+    - { name: QUERY_TOOL_SPOOL_NS_ASSOC_BATCH_PREFIX, line: 94 }
+    - { name: MAX_LOT_EQUIPMENT_INPUT, line: 1953 }
+    - { name: MAX_PARENT_TRACE_DEPTH, line: 1954 }
   functions:
-    - { name: _env_bool, lines: 65-67 }
-    - { name: _fetch_domain_records, lines: 90-92 }
-    - { name: _sanitize_page, lines: 95-99 }
-    - { name: _sanitize_per_page, lines: 102-111 }
-    - { name: _paginate_rows, lines: 114-135 }
-    - { name: _check_rss_guard, lines: 138-155 }
-    - { name: _max_batch_container_ids, lines: 158-162 }
-    - { name: _build_query_tool_batch_query_id, lines: 165-176 }
-    - { name: _query_tool_batch_namespace, lines: 179-183 }
-    - { name: _query_tool_reject_policy, lines: 186-191 }
-    - { name: _store_query_tool_batch_spool, lines: 194-222 }
-    - { name: _try_query_tool_spool_page, lines: 225-253 }
-    - { name: validate_date_range, lines: 260-284 }
-    - { name: validate_lot_input, lines: 287-297 }
-    - { name: validate_equipment_input, lines: 300-312 }
-    - { name: _df_to_records, lines: 315-344 }
-    - { name: _normalize_search_tokens, lines: 347-357 }
-    - { name: _normalize_wildcard_token, lines: 360-365 }
-    - { name: _is_pattern_token, lines: 368-370 }
-    - { name: _to_like_regex, lines: 373-396 }
-    - { name: _add_exact_or_pattern_condition, lines: 399-432 }
-    - { name: _match_rows_by_tokens, lines: 435-495 }
-    - { name: resolve_lots, lines: 502-570 }
-    - { name: _resolve_by_lot_id, lines: 573-615 }
-    - { name: _resolve_by_wafer_lot, lines: 618-656 }
-    - { name: _is_gd_like, lines: 659-661 }
-    - { name: _literal_prefix_before_wildcard, lines: 664-669 }
-    - { name: _resolve_by_gd_lot_id, lines: 672-712 }
-    - { name: _resolve_by_serial_number, lines: 715-838 }
-    - { name: _resolve_by_work_order, lines: 841-890 }
-    - { name: _resolve_by_gd_work_order, lines: 893-935 }
-    - { name: _get_workcenters_for_groups, lines: 942-952 }
-    - { name: _enrich_workcenter_group, lines: 955-989 }
-    - { name: _apply_query_tool_reject_policy, lines: 992-1040 }
-    - { name: get_lot_history, lines: 1043-1109 }
-    - { name: get_adjacent_lots, lines: 1112-1164 }
-    - { name: get_lot_history_batch, lines: 1171-1280 }
-    - { name: get_lot_associations_batch, lines: 1283-1388 }
-    - { name: get_lot_materials, lines: 1395-1434 }
-    - { name: get_lot_rejects, lines: 1437-1477 }
-    - { name: get_lot_holds, lines: 1480-1518 }
-    - { name: get_lot_split_merge_history, lines: 1521-1626 }
-    - { name: _get_mfg_order_for_lot, lines: 1629-1654 }
-    - { name: get_lot_splits, lines: 1657-1791 }
-    - { name: get_lot_jobs, lines: 1794-1849 }
-    - { name: get_lot_jobs_with_history, lines: 1852-1911 }
-    - { name: _resolve_container_ids_by_names, lines: 1922-1944 }
-    - { name: _build_two_filters, lines: 1947-1961 }
-    - { name: _check_names_with_equipment, lines: 1964-1991 }
-    - { name: _lookup_equipment_by_names, lines: 1994-2021 }
-    - { name: _trace_parents_for_equipment, lines: 2024-2116 }
-    - { name: resolve_lot_equipment, lines: 2119-2260 }
-    - { name: get_equipment_status_hours, lines: 2267-2360 }
-    - { name: get_equipment_lots, lines: 2363-2424 }
-    - { name: get_equipment_materials, lines: 2427-2479 }
-    - { name: get_equipment_rejects, lines: 2482-2534 }
-    - { name: get_equipment_jobs, lines: 2537-2588 }
-    - { name: export_to_csv, lines: 2595-2631 }
-    - { name: generate_csv_stream, lines: 2634-2676 }
-    - { name: get_equipment_recent_jobs, lines: 2683-2714 }
+    - { name: _env_bool, lines: 72-74 }
+    - { name: _fetch_domain_records, lines: 97-99 }
+    - { name: _sanitize_page, lines: 102-106 }
+    - { name: _sanitize_per_page, lines: 109-118 }
+    - { name: _paginate_rows, lines: 121-142 }
+    - { name: _check_rss_guard, lines: 145-162 }
+    - { name: _max_batch_container_ids, lines: 165-169 }
+    - { name: _build_query_tool_batch_query_id, lines: 172-183 }
+    - { name: _query_tool_batch_namespace, lines: 186-190 }
+    - { name: _query_tool_reject_policy, lines: 193-198 }
+    - { name: _store_query_tool_batch_spool, lines: 201-229 }
+    - { name: _try_query_tool_spool_page, lines: 232-260 }
+    - { name: validate_date_range, lines: 267-291 }
+    - { name: validate_lot_input, lines: 294-304 }
+    - { name: validate_equipment_input, lines: 307-319 }
+    - { name: _df_to_records, lines: 322-351 }
+    - { name: _normalize_search_tokens, lines: 354-364 }
+    - { name: _normalize_wildcard_token, lines: 367-372 }
+    - { name: _is_pattern_token, lines: 375-377 }
+    - { name: _to_like_regex, lines: 380-403 }
+    - { name: _add_exact_or_pattern_condition, lines: 406-439 }
+    - { name: _match_rows_by_tokens, lines: 442-502 }
+    - { name: resolve_lots, lines: 509-577 }
+    - { name: _resolve_by_lot_id, lines: 580-622 }
+    - { name: _resolve_by_wafer_lot, lines: 625-663 }
+    - { name: _is_gd_like, lines: 666-668 }
+    - { name: _literal_prefix_before_wildcard, lines: 671-676 }
+    - { name: _resolve_by_gd_lot_id, lines: 679-719 }
+    - { name: _resolve_by_serial_number, lines: 722-845 }
+    - { name: _resolve_by_work_order, lines: 848-897 }
+    - { name: _resolve_by_gd_work_order, lines: 900-942 }
+    - { name: _get_workcenters_for_groups, lines: 949-959 }
+    - { name: _enrich_workcenter_group, lines: 962-996 }
+    - { name: _apply_query_tool_reject_policy, lines: 999-1047 }
+    - { name: get_lot_history, lines: 1050-1126 }
+    - { name: get_adjacent_lots, lines: 1129-1188 }
+    - { name: get_lot_history_batch, lines: 1195-1315 }
+    - { name: get_lot_associations_batch, lines: 1318-1423 }
+    - { name: get_lot_materials, lines: 1430-1469 }
+    - { name: get_lot_rejects, lines: 1472-1512 }
+    - { name: get_lot_holds, lines: 1515-1553 }
+    - { name: get_lot_split_merge_history, lines: 1556-1661 }
+    - { name: _get_mfg_order_for_lot, lines: 1664-1689 }
+    - { name: get_lot_splits, lines: 1692-1826 }
+    - { name: get_lot_jobs, lines: 1829-1884 }
+    - { name: get_lot_jobs_with_history, lines: 1887-1946 }
+    - { name: _resolve_container_ids_by_names, lines: 1957-1979 }
+    - { name: _build_two_filters, lines: 1982-1996 }
+    - { name: _check_names_with_equipment, lines: 1999-2026 }
+    - { name: _lookup_equipment_by_names, lines: 2029-2056 }
+    - { name: _trace_parents_for_equipment, lines: 2059-2151 }
+    - { name: resolve_lot_equipment, lines: 2154-2295 }
+    - { name: get_equipment_status_hours, lines: 2302-2395 }
+    - { name: get_equipment_lots, lines: 2398-2466 }
+    - { name: get_equipment_materials, lines: 2469-2521 }
+    - { name: get_equipment_rejects, lines: 2524-2576 }
+    - { name: get_equipment_jobs, lines: 2579-2630 }
+    - { name: export_to_csv, lines: 2637-2673 }
+    - { name: generate_csv_stream, lines: 2676-2718 }
+    - { name: get_equipment_recent_jobs, lines: 2725-2756 }
 
-src/mes_dashboard/services/query_tool_sql_runtime.py:  # 269 lines
+src/mes_dashboard/services/query_tool_sql_runtime.py:  # 396 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -8032,21 +8033,22 @@ src/mes_dashboard/services/query_tool_sql_runtime.py:  # 269 lines
     - { module: mes_dashboard.core.feature_flags, items: [resolve_bool_flag], line: 16 }
     - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path], line: 17 }
   constants:
-    - { name: SQL_FALLBACK_DISABLED, line: 23 }
-    - { name: SQL_FALLBACK_DEP_MISSING, line: 24 }
-    - { name: SQL_FALLBACK_SPOOL_MISS, line: 25 }
-    - { name: SQL_FALLBACK_RUNTIME_ERROR, line: 26 }
+    - { name: SQL_FALLBACK_DISABLED, line: 150 }
+    - { name: SQL_FALLBACK_DEP_MISSING, line: 151 }
+    - { name: SQL_FALLBACK_SPOOL_MISS, line: 152 }
+    - { name: SQL_FALLBACK_RUNTIME_ERROR, line: 153 }
   functions:
-    - { name: _qid, lines: 29-30 }
-    - { name: _sql_str_literal, lines: 33-34 }
-    - { name: _fetch_dict_rows, lines: 37-40 }
-    - { name: _serialize_value, lines: 43-50 }
-    - { name: _serialize_rows, lines: 53-57 }
-    - { name: _normalize_tokens, lines: 60-69 }
-    - { name: _available_columns, lines: 72-74 }
-    - { name: _best_order_clause, lines: 77-81 }
-    - { name: _append_reject_policy_conditions, lines: 84-150 }
-    - { name: try_compute_page_from_spool, lines: 153-269 }
+    - { name: aggregate_partial_trackouts, lines: 43-148 }
+    - { name: _qid, lines: 156-157 }
+    - { name: _sql_str_literal, lines: 160-161 }
+    - { name: _fetch_dict_rows, lines: 164-167 }
+    - { name: _serialize_value, lines: 170-177 }
+    - { name: _serialize_rows, lines: 180-184 }
+    - { name: _normalize_tokens, lines: 187-196 }
+    - { name: _available_columns, lines: 199-201 }
+    - { name: _best_order_clause, lines: 204-208 }
+    - { name: _append_reject_policy_conditions, lines: 211-277 }
+    - { name: try_compute_page_from_spool, lines: 280-396 }
 
 src/mes_dashboard/services/realtime_equipment_cache.py:  # 813 lines
   imports:
@@ -15566,6 +15568,98 @@ tests/test_query_tool_pagination_contract.py:  # 324 lines
     - { name: test_lot_associations_batch_rejects_spool_runtime_receives_policy, lines: 251-283 }
     - { name: test_lot_rejects_single_applies_policy_filter, lines: 286-324 }
 
+tests/test_query_tool_partial_trackout.py:  # 495 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 13 }
+    - { module: pathlib, items: [], line: 15 }
+    - { module: re, items: [], line: 16 }
+    - { module: unittest, items: [], line: 17 }
+    - { module: datetime, items: [datetime], line: 18 }
+    - { module: pandas, items: [], line: 20 }
+    - { module: mes_dashboard.services.query_tool_sql_runtime, items: [aggregate_partial_trackouts, _PARTIAL_KEY_COLS_4, _PARTIAL_KEY_COLS_3, _PARTIAL_NONKEY_COLS_LOT, _PARTIAL_NONKEY_COLS_ADJACENT], line: 22 }
+  classes:
+    - name: TestLotHistorySqlStructure
+      lines: 124-155
+      methods:
+        - { name: test_lot_history_sql_has_no_row_number_dedup, lines: 126-132 }
+        - { name: test_lot_history_sql_has_group_by_four_tuple, lines: 134-137 }
+        - { name: test_lot_history_sql_projects_partial_count, lines: 139-147 }
+        - { name: test_lot_history_sql_projects_trackinqty_max, lines: 149-151 }
+        - { name: test_lot_history_sql_projects_trackoutqty_sum, lines: 153-155 }
+    - name: TestEquipmentLotsSqlStructure
+      lines: 158-180
+      methods:
+        - { name: test_equipment_lots_sql_has_no_row_number_dedup, lines: 160-166 }
+        - { name: test_equipment_lots_sql_has_group_by_four_tuple, lines: 168-170 }
+        - { name: test_equipment_lots_sql_projects_partial_count, lines: 172-180 }
+    - name: TestAdjacentLotsSqlStructure
+      lines: 183-197
+      methods:
+        - { name: test_adjacent_lots_inner_dedup_is_group_by_three_tuple, lines: 185-188 }
+        - { name: test_adjacent_lots_outer_row_number_preserved, lines: 190-193 }
+        - { name: test_adjacent_lots_sql_projects_partial_count, lines: 195-197 }
+    - name: TestLotHistoryAggregation
+      lines: 204-239
+      methods:
+        - { name: test_two_partials_same_trackin_merge_to_one_row, lines: 206-213 }
+        - { name: test_partial_count_equals_group_size, lines: 215-222 }
+        - { name: test_different_trackin_timestamps_not_merged, lines: 224-230 }
+        - { name: test_trackouttimestamp_is_max_over_group, lines: 232-239 }
+    - name: TestEquipmentLotsAggregation
+      lines: 242-264
+      methods:
+        - { name: test_two_partials_same_trackin_merge_to_one_row, lines: 244-249 }
+        - { name: test_partial_count_equals_group_size, lines: 251-256 }
+        - { name: test_trackinqty_is_max_trackoutqty_is_sum, lines: 258-264 }
+    - name: TestAdjacentLotsAggregation
+      lines: 267-281
+      methods:
+        - { name: test_two_partials_same_trackin_merge_in_inner_dedup, lines: 269-274 }
+        - { name: test_relative_position_of_target_is_zero, lines: 276-281 }
+    - name: TestAdjacentLotsRelativePosition
+      lines: 284-296
+      methods:
+        - { name: test_neighbors_have_correct_relative_positions_after_aggregation, lines: 286-296 }
+    - name: TestStrictGuardLotHistory
+      lines: 303-335
+      methods:
+        - { name: test_divergent_equipmentname_emits_raw_rows_partial_count_one, lines: 305-311 }
+        - { name: test_divergent_workcentername_emits_raw_rows, lines: 313-319 }
+        - { name: test_divergent_finishedruncard_emits_raw_rows, lines: 321-327 }
+        - { name: test_consistent_non_key_columns_merge_normally, lines: 329-335 }
+    - name: TestStrictGuardEquipmentLots
+      lines: 338-354
+      methods:
+        - { name: test_divergent_pj_type_emits_raw_rows_partial_count_one, lines: 340-346 }
+        - { name: test_consistent_non_key_columns_merge_normally, lines: 348-354 }
+    - name: TestStrictGuardAdjacentLots
+      lines: 357-374
+      methods:
+        - { name: test_divergent_specname_emits_raw_rows_partial_count_one, lines: 359-366 }
+        - { name: test_consistent_non_key_columns_merge_normally, lines: 368-374 }
+    - name: TestDecrementingTrackinQty
+      lines: 381-441
+      methods:
+        - { name: _make_two_partials, lines: 389-409 }
+        - { name: test_lot_history_decrementing_trackinqty_produces_max_and_sum, lines: 411-418 }
+        - { name: test_equipment_lots_decrementing_trackinqty_produces_max_and_sum, lines: 420-427 }
+        - { name: test_adjacent_lots_decrementing_trackinqty_produces_max_and_sum, lines: 429-441 }
+    - name: TestApiResponseShape
+      lines: 448-471
+      methods:
+        - { name: test_lot_history_response_includes_partial_count_field, lines: 450-455 }
+        - { name: test_equipment_lots_response_includes_partial_count_field, lines: 457-462 }
+        - { name: test_trackinqty_trackoutqty_field_names_unchanged, lines: 464-471 }
+    - name: TestContractFilePresence
+      lines: 478-491
+      methods:
+        - { name: test_business_rules_enumerates_query_tool_ph06, lines: 480-482 }
+        - { name: test_business_rules_enumerates_query_tool_ph07, lines: 484-486 }
+        - { name: test_data_shape_contract_includes_partial_count_query_tool, lines: 488-491 }
+  functions:
+    - { name: _lot_row, lines: 36-70 }
+    - { name: _adj_row, lines: 73-107 }
+
 tests/test_query_tool_routes.py:  # 1443 lines
   imports:
     - { module: pytest, items: [], line: 10 }
@@ -15762,60 +15856,62 @@ tests/test_query_tool_service.py:  # 523 lines
         - { name: test_empty_groups_list_no_filter, lines: 493-506 }
         - { name: test_filter_with_empty_workcenters_result, lines: 508-523 }
 
-tests/test_query_tool_sql_runtime.py:  # 171 lines
+tests/test_query_tool_sql_runtime.py:  # 207 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: datetime, items: [date, datetime], line: 16 }
     - { module: decimal, items: [Decimal], line: 17 }
     - { module: unittest.mock, items: [patch], line: 18 }
-    - { module: mes_dashboard.services.query_tool_sql_runtime, items: [_qid, _sql_str_literal, _serialize_value, _serialize_rows, _normalize_tokens, try_compute_page_from_spool, SQL_FALLBACK_DISABLED, SQL_FALLBACK_SPOOL_MISS, SQL_FALLBACK_DEP_MISSING, SQL_FALLBACK_RUNTIME_ERROR], line: 21 }
+    - { module: pandas, items: [], line: 21 }
+    - { module: mes_dashboard.services.query_tool_sql_runtime, items: [_qid, _sql_str_literal, _serialize_value, _serialize_rows, _normalize_tokens, try_compute_page_from_spool, aggregate_partial_trackouts, _PARTIAL_KEY_COLS_4, _PARTIAL_NONKEY_COLS_LOT, SQL_FALLBACK_DISABLED, SQL_FALLBACK_SPOOL_MISS, SQL_FALLBACK_DEP_MISSING, SQL_FALLBACK_RUNTIME_ERROR], line: 23 }
   classes:
     - name: TestQid
-      lines: 35-45
+      lines: 40-50
       methods:
-        - { name: test_wraps_in_double_quotes, lines: 38-39 }
-        - { name: test_escapes_embedded_double_quotes, lines: 41-42 }
-        - { name: test_empty_string, lines: 44-45 }
+        - { name: test_wraps_in_double_quotes, lines: 43-44 }
+        - { name: test_escapes_embedded_double_quotes, lines: 46-47 }
+        - { name: test_empty_string, lines: 49-50 }
     - name: TestSqlStrLiteral
-      lines: 48-58
+      lines: 53-63
       methods:
-        - { name: test_wraps_in_single_quotes, lines: 51-52 }
-        - { name: test_escapes_single_quotes, lines: 54-55 }
-        - { name: test_empty_string, lines: 57-58 }
+        - { name: test_wraps_in_single_quotes, lines: 56-57 }
+        - { name: test_escapes_single_quotes, lines: 59-60 }
+        - { name: test_empty_string, lines: 62-63 }
     - name: TestSerializeValue
-      lines: 61-87
+      lines: 66-92
       methods:
-        - { name: test_datetime_formats_correctly, lines: 64-67 }
-        - { name: test_date_formats_correctly, lines: 69-72 }
-        - { name: test_decimal_converts_to_float, lines: 74-78 }
-        - { name: test_string_passes_through, lines: 80-81 }
-        - { name: test_int_passes_through, lines: 83-84 }
-        - { name: test_none_passes_through, lines: 86-87 }
+        - { name: test_datetime_formats_correctly, lines: 69-72 }
+        - { name: test_date_formats_correctly, lines: 74-77 }
+        - { name: test_decimal_converts_to_float, lines: 79-83 }
+        - { name: test_string_passes_through, lines: 85-86 }
+        - { name: test_int_passes_through, lines: 88-89 }
+        - { name: test_none_passes_through, lines: 91-92 }
     - name: TestSerializeRows
-      lines: 90-101
+      lines: 95-106
       methods:
-        - { name: test_serializes_each_value, lines: 93-98 }
-        - { name: test_empty_rows_returns_empty, lines: 100-101 }
+        - { name: test_serializes_each_value, lines: 98-103 }
+        - { name: test_empty_rows_returns_empty, lines: 105-106 }
     - name: TestNormalizeTokens
-      lines: 104-123
+      lines: 109-128
       methods:
-        - { name: test_strips_whitespace, lines: 107-109 }
-        - { name: test_deduplicates, lines: 111-113 }
-        - { name: test_removes_empty_strings, lines: 115-117 }
-        - { name: test_none_input, lines: 119-120 }
-        - { name: test_empty_list, lines: 122-123 }
+        - { name: test_strips_whitespace, lines: 112-114 }
+        - { name: test_deduplicates, lines: 116-118 }
+        - { name: test_removes_empty_strings, lines: 120-122 }
+        - { name: test_none_input, lines: 124-125 }
+        - { name: test_empty_list, lines: 127-128 }
     - name: TestFallbackConstants
-      lines: 126-139
+      lines: 131-144
       methods:
-        - { name: test_disabled_constant, lines: 129-130 }
-        - { name: test_spool_miss_constant, lines: 132-133 }
-        - { name: test_dep_missing_constant, lines: 135-136 }
-        - { name: test_runtime_error_constant, lines: 138-139 }
+        - { name: test_disabled_constant, lines: 134-135 }
+        - { name: test_spool_miss_constant, lines: 137-138 }
+        - { name: test_dep_missing_constant, lines: 140-141 }
+        - { name: test_runtime_error_constant, lines: 143-144 }
     - name: TestTryComputePageFromSpool
-      lines: 142-171
+      lines: 147-207
       methods:
-        - { name: test_returns_none_when_spool_file_missing, lines: 145-157 }
-        - { name: test_returns_none_when_feature_disabled, lines: 159-171 }
+        - { name: test_returns_none_when_spool_file_missing, lines: 150-162 }
+        - { name: test_returns_none_when_feature_disabled, lines: 164-176 }
+        - { name: test_partial_count_present_in_returned_data, lines: 178-207 }
 
 tests/test_rate_limit.py:  # 223 lines
   imports:

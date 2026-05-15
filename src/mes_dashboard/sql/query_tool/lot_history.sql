@@ -12,8 +12,9 @@
 --
 -- Note: Uses EQUIPMENTID/EQUIPMENTNAME (NOT RESOURCEID/RESOURCENAME)
 --       Time fields: TRACKINTIMESTAMP/TRACKOUTTIMESTAMP (NOT TXNDATETIME)
---       Partial track-out: Same LOT may have multiple records with same track-in
---       but different track-out times. We take the latest track-out time.
+--       Partial track-out: Raw per-partial rows are projected here; Python layer
+--       aggregates by 4-tuple (CONTAINERID, EQUIPMENTID, SPECNAME, TRACKINTIMESTAMP)
+--       per QT-05/QT-06 strict guard.
 --       Only includes records with actual equipment (excludes checkpoint stations)
 
 WITH ranked_history AS (
@@ -32,11 +33,7 @@ WITH ranked_history AS (
         c.CONTAINERNAME,
         c.PJ_TYPE,
         c.PJ_BOP,
-        c.FIRSTNAME AS WAFER_LOT_ID,
-        ROW_NUMBER() OVER (
-            PARTITION BY h.CONTAINERID, h.EQUIPMENTID, h.SPECNAME, h.TRACKINTIMESTAMP
-            ORDER BY h.TRACKOUTTIMESTAMP DESC NULLS LAST
-        ) AS rn
+        c.FIRSTNAME AS WAFER_LOT_ID
     FROM DWH.DW_MES_LOTWIPHISTORY h
     LEFT JOIN DWH.DW_MES_CONTAINER c ON h.CONTAINERID = c.CONTAINERID
     WHERE h.CONTAINERID = :container_id
@@ -61,5 +58,4 @@ SELECT
     PJ_BOP,
     WAFER_LOT_ID
 FROM ranked_history
-WHERE rn = 1
 ORDER BY TRACKINTIMESTAMP

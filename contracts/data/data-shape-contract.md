@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.4.1
+schema-version: 1.5.0
 last-changed: 2026-05-15
 breaking-change-policy: deprecate-2-minors
 ---
@@ -370,6 +370,32 @@ counted once at each ancestor node, not once per child path. The `equipment`
 (leaf) grain is the directly-grouped `COUNT(DISTINCT CONTAINERNAME)` by
 `(workcenter, spec, equipment, month)` and is unchanged. See business-rules.md
 PH-05. Added by change `fix-matrix-distinct-count`.
+
+### 3.6 Query-Tool Lot-History / Equipment-Lots / Adjacent-Lots Row
+
+One row per aggregated partial-trackout group for `GET /api/query-tool/lot-history`, `POST /api/query-tool/equipment-period` (`query_type=lots`), and `GET /api/query-tool/adjacent-lots`. Aggregation semantics mirror §3.4 (PH-06 / QT-05): TRACKINQTY is NOT a key because MES stores per-partial REMAINING qty (decreasing); MAX recovers the original load qty. A strict guard (QT-06) applies: if any non-key column diverges within a group, raw rows are emitted instead, each with `partial_count = 1`.
+
+| column | type | nullable | notes |
+|---|---|---:|---|
+| CONTAINERID | string | no | internal Oracle container ID |
+| CONTAINERNAME | string | yes | display lot ID |
+| WORKCENTERNAME | string | yes | from LOTWIPHISTORY row (absent in adjacent_lots output) |
+| EQUIPMENTID | string | no | key column — part of grouping 4-tuple (lot_history, equipment_lots) or 3-tuple (adjacent_lots) |
+| EQUIPMENTNAME | string | yes | non-key column |
+| SPECNAME | string | yes | key column for lot_history and equipment_lots; non-key for adjacent_lots (adjacent_lots groups by 3-tuple without SPECNAME) |
+| TRACKINTIMESTAMP | datetime | yes | key column — shared by all partials of one upload session |
+| TRACKOUTTIMESTAMP | datetime | yes | aggregated row → `MAX(TRACKOUTTIMESTAMP)`; raw row (strict-guard fallback) → per-partial value |
+| TRACKINQTY | integer | yes | aggregated row → `MAX(TRACKINQTY)` (original load qty before any partial trackouts); raw row → per-partial remaining qty |
+| TRACKOUTQTY | integer | yes | aggregated row → `SUM(TRACKOUTQTY)`; raw row (strict-guard fallback) → per-partial value |
+| FINISHEDRUNCARD | string | yes | from LOTWIPHISTORY row |
+| PJ_WORKORDER | string | yes | from LOTWIPHISTORY row |
+| PJ_TYPE | string | yes | from DW_MES_CONTAINER |
+| PJ_BOP | string | yes | from DW_MES_CONTAINER |
+| WAFER_LOT_ID | string | yes | FIRSTNAME from DW_MES_CONTAINER |
+| RELATIVE_POSITION | integer | yes | adjacent_lots only — lot position relative to target lot (negative = before, 0 = target, positive = after) |
+| partial_count | integer | no | group size; `1` for unaggregated rows (single partial or strict-guard divergence); `≥ 2` for merged partial-trackout groups. Computed by service layer; not stored in Oracle. |
+
+**Prior behavior (before `query-tool-partial-trackout`):** `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY TRACKOUTTIMESTAMP DESC) WHERE rn = 1` was used in all three SQL files. This returned only the last partial row, emitting the wrong TRACKINQTY (remaining qty of the last partial, not original load) and wrong TRACKOUTQTY (only the last partial's output, not cumulative). The `partial_count` column did not exist. Added by change `query-tool-partial-trackout`.
 
 ---
 

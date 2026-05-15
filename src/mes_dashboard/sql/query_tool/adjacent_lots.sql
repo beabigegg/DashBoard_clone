@@ -24,21 +24,12 @@ raw_lots AS (
         c.CONTAINERNAME,
         c.PJ_TYPE,
         c.PJ_BOP,
-        c.FIRSTNAME AS WAFER_LOT_ID,
-        ROW_NUMBER() OVER (
-            PARTITION BY h.CONTAINERID, h.EQUIPMENTID, h.TRACKINTIMESTAMP
-            ORDER BY h.TRACKOUTTIMESTAMP DESC NULLS LAST
-        ) AS dedup_rn
+        c.FIRSTNAME AS WAFER_LOT_ID
     FROM DWH.DW_MES_LOTWIPHISTORY h
     LEFT JOIN DWH.DW_MES_CONTAINER c ON h.CONTAINERID = c.CONTAINERID
     CROSS JOIN time_bounds tb
     WHERE h.EQUIPMENTID = :equipment_id
       AND h.TRACKINTIMESTAMP BETWEEN tb.time_start AND tb.time_end
-),
-deduped_lots AS (
-    SELECT *
-    FROM raw_lots
-    WHERE dedup_rn = 1
 ),
 ranked_lots AS (
     SELECT /*+ MATERIALIZE */
@@ -47,7 +38,7 @@ ranked_lots AS (
             PARTITION BY d.EQUIPMENTID
             ORDER BY d.TRACKINTIMESTAMP
         ) AS rn
-    FROM deduped_lots d
+    FROM raw_lots d
 ),
 target_lot AS (
     SELECT rn AS target_rn, PJ_TYPE AS target_pj_type

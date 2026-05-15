@@ -1,0 +1,26 @@
+change-id: query-tool-partial-trackout
+agent: test-strategist
+timestamp: "2026-05-15T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/query-tool-partial-trackout/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_query_tool_partial_trackout.py — src/mes_dashboard/sql/query_tool/lot_history.sql" }
+  - { type: tdd-pairs, pointer: "tests/test_query_tool_partial_trackout.py — src/mes_dashboard/sql/query_tool/equipment_lots.sql" }
+  - { type: tdd-pairs, pointer: "tests/test_query_tool_partial_trackout.py — src/mes_dashboard/sql/query_tool/adjacent_lots.sql" }
+  - { type: tdd-pairs, pointer: "tests/test_query_tool_sql_runtime.py — src/mes_dashboard/services/query_tool_sql_runtime.py" }
+  - { type: coverage-tiers, pointer: "unit, contract, data-boundary, integration" }
+  - { type: mapping-completeness, pointer: "AC-1 through AC-8 all covered; 33 named test functions across 13 test classes" }
+next-action: none
+files-read:
+  - specs/changes/query-tool-partial-trackout/context-manifest.md
+  - specs/changes/query-tool-partial-trackout/change-classification.md
+  - tests/test_production_history_sql_runtime.py
+  - tests/test_query_tool_sql_runtime.py
+  - src/mes_dashboard/services/query_tool_sql_runtime.py
+  - src/mes_dashboard/sql/query_tool/lot_history.sql
+  - src/mes_dashboard/sql/query_tool/equipment_lots.sql
+  - src/mes_dashboard/sql/query_tool/adjacent_lots.sql
+notes: >
+  SQL structure tests (Tier 0) use SQLLoader.load + substring/regex checks — no Oracle or DuckDB connection required.
+  Aggregation tests use parquet fixture pattern from TestPartialMergeAggregation in test_production_history_sql_runtime.py.
+  Decrementing-TRACKINQTY fixture discipline enforced per CLAUDE.md: uniform-TRACKINQTY fixtures are insufficient alone.
