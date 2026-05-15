@@ -25,3 +25,5 @@
 | prod-history-first-tier-cache-filters | 2026 | 2026-05-14 | specs/archive/2026/prod-history-first-tier-cache-filters/ |
 | migrate-yield-alert-center-ts | 2026 | 2026-05-14 | specs/archive/2026/migrate-yield-alert-center-ts/ |
 | migrate-query-tool-ts | 2026 | 2026-05-14 | specs/archive/2026/migrate-query-tool-ts/ |
+| hold-history-detail-flat-table | 2026 | 2026-05-15 | specs/archive/2026/hold-history-detail-flat-table/ |
+| reject-material-flat-table | 2026 | 2026-05-15 | specs/archive/2026/reject-material-flat-table/ |
