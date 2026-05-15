@@ -28,3 +28,4 @@
 | hold-history-detail-flat-table | 2026 | 2026-05-15 | specs/archive/2026/hold-history-detail-flat-table/ |
 | reject-material-flat-table | 2026 | 2026-05-15 | specs/archive/2026/reject-material-flat-table/ |
 | fix-prod-history-multiselect-filter | 2026 | 2026-05-15 | specs/archive/2026/fix-prod-history-multiselect-filter/ |
+| prod-history-detail-partial-merge | 2026 | 2026-05-15 | specs/archive/2026/prod-history-detail-partial-merge/ |
