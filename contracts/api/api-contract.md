@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.4.0
-last-changed: 2026-05-14
+schema-version: 1.5.1
+last-changed: 2026-05-15
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -281,6 +281,12 @@ breaking-change-policy: deprecate-2-minors
     - `pj_function`（string，optional）：PJ_FUNCTION 精確比對過濾
   - `GET/POST /api/wip/detail/<workcenter>` lot 列新增 `pjType` 欄位（來源：DB `PJ_TYPE` 欄）；null 值以 `null` 回傳。
   - `GET/POST /api/wip/meta/filter-options` response 新增三個 string array：`workflows`、`bops`、`pjFunctions`，與既有 `workorders` / `lotids` / `packages` / `types` / `firstnames` / `waferdescs` 並列。
+- **Production-History detail partial-trackout aggregation (2026-05-15, prod-history-detail-partial-merge)**：以下為 additive，backward-compatible：
+  - `POST /api/production-history/page` response：`data.rows` 每筆 row 新增 `partial_count: integer (≥ 1)`。`1` 表示未合併列；`≥ 2` 表示這列聚合了多筆 partial track-out（同一上機 session，4 鍵 `lot_id + spec + equipment_id + trackin_time`）。當 `partial_count ≥ 2` 時 `trackin_qty` 為原始上機量（`MAX(...)`，因 MES `TRACKINQTY` 隨 partial 遞減），`trackout_time = MAX(...)`，`trackout_qty = SUM(...)`。Additive；既有忽略未知欄位的 consumer 不受影響。
+  - `GET /api/production-history/export` CSV：在原最後一欄 `TrackOutQty` 之後新增一欄 `PartialCount`。完整欄位順序：`LotID, Type, Package, BOP, Function, WorkOrder, WaferLot, WorkCenter, Spec, EquipmentID, EquipmentName, TrackInTime, TrackOutTime, TrackInQty, TrackOutQty, PartialCount`。以位置解析 CSV 的 consumer 需處理新尾欄；視為 additive（沿用 Breaking Change Policy）。
+  - `pagination.total_rows`（`POST /api/production-history/page`）語意更新：反映聚合後的列數，而非 raw spool 列數。當查詢無 partial trackout 時兩者相同；當有合併群組時 `total_rows` 小於原 LOTWIPHISTORY 列數。
+  - 三條後端路徑（DuckDB SQL 主路徑、pandas fallback、CSV 匯出）一致套用相同聚合邏輯。
+  - 嚴格守門：群組內非鍵欄位若有差異則該群組退回 raw rows（不合併），對 API consumer 透明 — 無新錯誤碼。詳見 business-rules.md PH-06 / PH-07。
 
 ## Breaking Change Policy
 

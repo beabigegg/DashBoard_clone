@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.3.0
-last-changed: 2026-05-14
+schema-version: 1.4.1
+last-changed: 2026-05-15
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -322,11 +322,11 @@ Large payloads that hit the memory/row limit include:
 
 ### 3.4 Production-History Detail Row
 
-One row per LOTWIPHISTORY partial track-out (no GROUP BY aggregation). Spool parquet schema must include all columns below.
+One row per aggregated partial-trackout group (4-tuple `CONTAINERNAME + SPECNAME + EQUIPMENTID + TRACKINTIMESTAMP`), subject to the strict guard in business-rules.md PH-06 / PH-07. TRACKINQTY is intentionally NOT part of the key because this MES records TRACKINQTY as the qty REMAINING at each partial's start (it decreases across partials of the same upload), not the original load qty. When all non-key columns are consistent within a group, the row is a single aggregated record; when any non-key column diverges, each spool row in that group is emitted individually with `partial_count = 1`. Spool parquet schema must include all columns below (aggregation is a view-layer operation; the parquet schema is unchanged).
 
 | column | type | nullable | notes |
 |---|---|---:|---|
-| CONTAINERNAME | string | no | container id; multi-partial containers produce N rows |
+| CONTAINERNAME | string | no | container id; multi-partial containers produce N rows in spool but ≤ N rows after view-layer aggregation |
 | PJ_TYPE | string | yes | from container |
 | PJ_BOP | string | yes | from container |
 | PJ_FUNCTION | string | yes | from container; pre-staged for filter use (Change 3) — present in spool, not yet a user filter |
@@ -337,12 +337,13 @@ One row per LOTWIPHISTORY partial track-out (no GROUP BY aggregation). Spool par
 | SPECNAME | string | yes | from LOTWIPHISTORY row |
 | EQUIPMENTID | string | yes | from LOTWIPHISTORY row |
 | EQUIPMENTNAME | string | yes | from LOTWIPHISTORY row |
-| TRACKINTIMESTAMP | datetime | yes | raw per-partial; replaces prior `TRACKIN_TS = MIN(...)` |
-| TRACKOUTTIMESTAMP | datetime | yes | raw per-partial; replaces prior `TRACKOUT_TS = MAX(...)` |
-| TRACKINQTY | integer | yes | raw per-partial; replaces prior `TRACKIN_QTY = MAX(...)` |
-| TRACKOUTQTY | integer | yes | raw per-partial; replaces prior `TRACKOUT_QTY = SUM(...)` |
+| TRACKINTIMESTAMP | datetime | yes | shared by the 4-tuple group; per-partial in spool, identical across all rows of one group |
+| TRACKOUTTIMESTAMP | datetime | yes | aggregated row → `MAX(TRACKOUTTIMESTAMP)` of the group; raw row (strict-guard fallback) → per-partial value |
+| TRACKINQTY | integer | yes | aggregated row → `MAX(TRACKINQTY)` (= original load qty before any partial trackouts); raw row → per-partial value. MES stores per-partial REMAINING qty, so spool rows of one group have DIFFERENT TRACKINQTY values — MAX recovers the original load. |
+| TRACKOUTQTY | integer | yes | aggregated row → `SUM(TRACKOUTQTY)` of the group; raw row (strict-guard fallback) → per-partial value |
+| partial_count | integer | no | group size; `1` for unaggregated rows (single partial or strict-guard divergence); `≥ 2` for merged partial-trackout groups. Computed by the view layer; not stored in spool parquet. |
 
-Row-grain rule: detail row count = LOTWIPHISTORY row count for matched containers (NOT distinct-container count). Detail table UI sorts by `TRACKINTIMESTAMP`. The matrix view's leaf `count` cell is computed downstream in DuckDB as `COUNT(DISTINCT CONTAINERNAME)` over this row source; parent-level distinct-count semantics are specified in §3.5. Aggregated aliases `TRACKIN_TS / TRACKOUT_TS / TRACKIN_QTY / TRACKOUT_QTY` are removed; consumers must read raw column names. Added by change `prod-history-detail-raw-rows`.
+Row-grain rule: detail row count ≤ LOTWIPHISTORY row count for matched containers — equal when no groups are merged (strict-guard fallback applies to every group, e.g. divergent `PJ_FUNCTION` within the same trackin), smaller when partial track-outs are collapsed (PH-06). Detail table UI sorts by `TRACKINTIMESTAMP` (aggregated rows use the shared group `TRACKINTIMESTAMP`). The matrix view's leaf `count` cell is computed downstream in DuckDB as `COUNT(DISTINCT CONTAINERNAME)` over the raw spool source (not the aggregated view); parent-level distinct-count semantics are specified in §3.5. Aggregated aliases `TRACKIN_TS / TRACKOUT_TS / TRACKIN_QTY / TRACKOUT_QTY` are removed; consumers must read raw column names. `partial_count` is synthesized by the view layer and is not present in the spool parquet. Added by change `prod-history-detail-raw-rows`; updated by change `prod-history-detail-partial-merge`.
 
 ### 3.5 Production-History Matrix Tree Node
 

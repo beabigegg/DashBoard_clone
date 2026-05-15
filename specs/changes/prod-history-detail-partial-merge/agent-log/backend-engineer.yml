@@ -1,0 +1,50 @@
+agent: backend-engineer
+change-id: prod-history-detail-partial-merge
+date: 2026-05-15
+status: complete
+
+summary: |
+  Implemented partial-trackout aggregation (PH-06/PH-07) across all three
+  production-history detail paths: DuckDB SQL compute_detail_page, pandas
+  fallback _pandas_detail_page, and CSV stream_export/_pandas_stream_export.
+  TDD order followed: failing tests written first (red), then implementation
+  (green). 17 new tests all pass; full pre-merge gate (3893 tests) shows 0
+  failures.
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/production_history_sql_runtime.py:165-340,813-1010"
+  - type: tests-added
+    pointer: "tests/test_production_history_service.py::TestPandasFallbackAggregation (6 tests)"
+  - type: tests-added
+    pointer: "tests/test_production_history_sql_runtime.py::TestPartialMergeAggregation (9 tests)"
+  - type: tests-added
+    pointer: "tests/test_api_contract.py::TestProductionHistoryPartialMergeContract (2 tests)"
+  - type: test-output
+    pointer: "17 passed (all new); 3893 passed 131 skipped (full gate)"
+  - type: contracts-touched
+    pointer: "none (contracts already updated by contract-reviewer per implementation-plan.md)"
+
+decisions-made:
+  - id: D-01
+    description: |
+      DuckDB count_sql uses a compound SELECT over combined CTE with subquery
+      for divergent_groups count. The subquery approach (vs a separate second
+      query) avoids re-executing the filter params twice while keeping the
+      grouped CTE result available. Params list is doubled (params + params)
+      because the CTE WHERE clause appears twice: once in grouped, once in raw.
+    risk: low
+
+  - id: D-02
+    description: |
+      stream_export builds the aggregation CTE with params + params (filter
+      applied to grouped branch AND raw branch), then executes log_sql and
+      page batches each with params + params. This matches compute_detail_page.
+    risk: low
+
+known-risks:
+  - Parity between SQL path and pandas path verified by test_duckdb_pandas_parity_aggregation_output.
+  - CSV PartialCount header key used in stream_export is "PartialCount" matching EXPORT_COLUMNS dst.
+  - The test_strict_guard_no_log_when_all_consistent test covers the PH-07 suppress-when-N==0 invariant.
+
+next-reviewer: frontend-engineer (badge rendering in ProductionDetailTable.vue), qa-reviewer (final gate)

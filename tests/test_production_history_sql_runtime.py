@@ -591,3 +591,351 @@ class TestMatrixDataBoundary:
         assert eqp_node["count"] == 2  # distinct {LOT-A, LOT-B}
         assert spec_node["count"] == 2
         assert wc_node["count"] == 2
+
+
+# ============================================================
+# Change: prod-history-detail-partial-merge
+# AC-1: DuckDB path aggregates partial track-outs (MAX trackout_time, SUM qty, partial_count)
+# AC-2: ABA interleave (different TRACKINTIMESTAMP) is NOT merged
+# AC-3: strict guard falls back to raw rows when non-key columns diverge
+# AC-4: pagination.total_rows = post-aggregation count
+# AC-5: CSV export rows match API rows (parity)
+# AC-6: partial_count field present in row schema
+# PH-06 parity: DuckDB path == pandas path
+# ============================================================
+
+def _ph_base_record(overrides: dict | None = None) -> dict:
+    """Build a minimal spool record for production-history detail tests."""
+    base = {
+        "CONTAINERNAME": "LOT-A",
+        "SPECNAME": "SPEC-1",
+        "EQUIPMENTID": "EQ-01",
+        "TRACKINTIMESTAMP": "2026-01-01 08:00:00",
+        "TRACKINQTY": 100,
+        "TRACKOUTTIMESTAMP": "2026-01-01 10:00:00",
+        "TRACKOUTQTY": 50,
+        "MFGORDERNAME": "WO-001",
+        "FIRSTNAME": "WL-001",
+        "PJ_TYPE": "GA",
+        "PJ_BOP": "BOP1",
+        "PJ_FUNCTION": "FN1",
+        "PRODUCTLINENAME": "PKG-A",
+        "WORKCENTERNAME": "WC-X",
+        "EQUIPMENTNAME": "EQP-NAME-01",
+    }
+    if overrides:
+        base.update(overrides)
+    return base
+
+
+def _write_ph_spool(tmp_path, records: list) -> str:
+    import pandas as pd
+    df = pd.DataFrame.from_records(records)
+    path = str(tmp_path / "ph_spool.parquet")
+    df.to_parquet(path)
+    return path
+
+
+class TestPartialMergeAggregation:
+    """DuckDB primary path (compute_detail_page) + CSV export (stream_export)
+    must apply 5-tuple aggregation with strict guard.  Covers AC-1..AC-6, PH-06.
+    """
+
+    # AC-1: two partial track-outs of the same 5-tuple → ONE aggregated row
+    def test_partial_merge_sum_qty_max_time(self, tmp_path):
+        """AC-1: two partials collapse to one row; trackout_qty=SUM, trackout_time=MAX."""
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        records = [
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 30}),
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 12:00:00", "TRACKOUTQTY": 70}),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+        result = compute_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert len(rows) == 1, f"expected 1 aggregated row, got {len(rows)}"
+        row = rows[0]
+        assert row["trackout_qty"] == 100, f"SUM trackout_qty must be 100, got {row['trackout_qty']}"
+        assert "12:00:00" in str(row["trackout_time"]), (
+            f"MAX trackout_time must be 12:00:00, got {row['trackout_time']}"
+        )
+
+    # AC-1: partial_count equals group size
+    def test_partial_count_equals_group_size(self, tmp_path):
+        """AC-1: partial_count == number of spool rows sharing the 5-tuple key."""
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        records = [
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 09:00:00", "TRACKOUTQTY": 20}),
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 30}),
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 11:00:00", "TRACKOUTQTY": 50}),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+        result = compute_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert len(rows) == 1
+        assert rows[0]["partial_count"] == 3, (
+            f"partial_count must be 3, got {rows[0].get('partial_count')}"
+        )
+
+    # AC-2: ABA interleave — different TRACKINTIMESTAMP → two rows
+    def test_aba_interleave_not_merged(self, tmp_path):
+        """AC-2: same lot/spec/equip but different TRACKINTIMESTAMP → 2 rows, NOT merged."""
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        records = [
+            _ph_base_record({
+                "TRACKINTIMESTAMP": "2026-01-01 08:00:00",
+                "TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 50,
+            }),
+            _ph_base_record({
+                "TRACKINTIMESTAMP": "2026-01-02 08:00:00",
+                "TRACKOUTTIMESTAMP": "2026-01-02 10:00:00", "TRACKOUTQTY": 50,
+            }),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+        result = compute_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert len(rows) == 2, f"ABA interleave must produce 2 rows, got {len(rows)}"
+        for row in rows:
+            assert row["partial_count"] == 1, (
+                f"single-row group must have partial_count=1, got {row.get('partial_count')}"
+            )
+
+    # AC-3: strict guard — non-key column diverges → raw rows
+    def test_duckdb_strict_guard_fallback_to_raw_rows(self, tmp_path):
+        """AC-3: when MFGORDERNAME (non-key) diverges, emit 2 raw rows each with partial_count=1."""
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        records = [
+            _ph_base_record({
+                "MFGORDERNAME": "WO-001",
+                "TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 40,
+            }),
+            _ph_base_record({
+                "MFGORDERNAME": "WO-002",   # diverges
+                "TRACKOUTTIMESTAMP": "2026-01-01 11:00:00", "TRACKOUTQTY": 60,
+            }),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+        result = compute_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert len(rows) == 2, (
+            f"strict guard must emit 2 raw rows when non-key diverges, got {len(rows)}"
+        )
+        for row in rows:
+            assert row["partial_count"] == 1, (
+                f"strict-guard raw rows must have partial_count=1, got {row.get('partial_count')}"
+            )
+
+    # AC-4: pagination.total_rows = post-aggregation row count
+    def test_pagination_total_rows_is_post_aggregation_count(self, tmp_path):
+        """AC-4: total_rows must equal the number of aggregated rows, not raw spool rows."""
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        # 3 spool rows in one 5-tuple group → 1 aggregated row → total_rows should be 1
+        records = [
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 09:00:00", "TRACKOUTQTY": 20}),
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 30}),
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 11:00:00", "TRACKOUTQTY": 50}),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+        result = compute_detail_page(path, {}, page=1, per_page=25)
+        assert result["pagination"]["total_rows"] == 1, (
+            f"total_rows must be 1 (post-agg), got {result['pagination']['total_rows']}"
+        )
+
+    # AC-6: partial_count field present in row dict with integer type
+    def test_detail_row_includes_partial_count_field(self, tmp_path):
+        """AC-6: every row in compute_detail_page result must have 'partial_count' as an integer >=1."""
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        records = [_ph_base_record()]
+        path = _write_ph_spool(tmp_path, records)
+        result = compute_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert rows, "expected at least one row in result"
+        row = rows[0]
+        assert "partial_count" in row, f"'partial_count' field missing from row: {list(row.keys())}"
+        assert isinstance(row["partial_count"], int), (
+            f"partial_count must be int, got {type(row['partial_count'])}"
+        )
+        assert row["partial_count"] >= 1, f"partial_count must be >= 1, got {row['partial_count']}"
+
+    # AC-5: CSV rows match API rows in count and partial_count
+    def test_csv_rows_match_api_rows_aggregated(self, tmp_path):
+        """AC-5: stream_export emits the same number of rows as compute_detail_page
+        (both apply the same aggregation logic)."""
+        import csv
+        import io
+        from mes_dashboard.services.production_history_sql_runtime import (
+            compute_detail_page, stream_export,
+        )
+
+        # 2 raw rows merging into 1 aggregated row
+        records = [
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 30}),
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 12:00:00", "TRACKOUTQTY": 70}),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+
+        api_result = compute_detail_page(path, {}, page=1, per_page=25)
+        api_rows = api_result["rows"]
+
+        # Collect CSV output (skip BOM + header)
+        csv_text = "".join(stream_export(path, {}))
+        csv_text = csv_text.lstrip('﻿')
+        reader = csv.DictReader(io.StringIO(csv_text))
+        csv_rows = list(reader)
+
+        assert len(csv_rows) == len(api_rows), (
+            f"CSV row count ({len(csv_rows)}) must equal API row count ({len(api_rows)})"
+        )
+
+    # AC-5: CSV PartialCount matches API partial_count per row
+    def test_csv_partial_count_matches_api(self, tmp_path):
+        """AC-5: PartialCount column in CSV must match partial_count in API response."""
+        import csv
+        import io
+        from mes_dashboard.services.production_history_sql_runtime import (
+            compute_detail_page, stream_export,
+        )
+
+        records = [
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 30}),
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 12:00:00", "TRACKOUTQTY": 70}),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+
+        api_result = compute_detail_page(path, {}, page=1, per_page=25)
+        api_partial_count = api_result["rows"][0]["partial_count"]
+
+        csv_text = "".join(stream_export(path, {}))
+        csv_text = csv_text.lstrip('﻿')
+        reader = csv.DictReader(io.StringIO(csv_text))
+        csv_rows = list(reader)
+        assert csv_rows, "CSV must have at least one data row"
+        csv_partial_count = int(csv_rows[0]["PartialCount"])
+        assert csv_partial_count == api_partial_count, (
+            f"CSV PartialCount ({csv_partial_count}) != API partial_count ({api_partial_count})"
+        )
+
+    # PH-06 parity: DuckDB SQL path == pandas fallback path
+    def test_duckdb_pandas_parity_aggregation_output(self, tmp_path):
+        """PH-06 parity: compute_detail_page (DuckDB) and _pandas_detail_page (pandas)
+        must produce identical row count, per-row field values, and partial_count."""
+        from mes_dashboard.services.production_history_sql_runtime import (
+            compute_detail_page, _pandas_detail_page,
+        )
+
+        # Mix: one group with 2 consistent partials (will merge), one group with divergent non-key (strict guard)
+        records = [
+            # Group A — consistent (will merge)
+            _ph_base_record({
+                "CONTAINERNAME": "LOT-A",
+                "TRACKINTIMESTAMP": "2026-01-01 08:00:00",
+                "TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 30,
+            }),
+            _ph_base_record({
+                "CONTAINERNAME": "LOT-A",
+                "TRACKINTIMESTAMP": "2026-01-01 08:00:00",
+                "TRACKOUTTIMESTAMP": "2026-01-01 12:00:00", "TRACKOUTQTY": 70,
+            }),
+            # Group B — divergent MFGORDERNAME (strict guard)
+            _ph_base_record({
+                "CONTAINERNAME": "LOT-B", "MFGORDERNAME": "WO-X",
+                "TRACKINTIMESTAMP": "2026-01-02 08:00:00",
+                "TRACKOUTTIMESTAMP": "2026-01-02 10:00:00", "TRACKOUTQTY": 40,
+            }),
+            _ph_base_record({
+                "CONTAINERNAME": "LOT-B", "MFGORDERNAME": "WO-Y",
+                "TRACKINTIMESTAMP": "2026-01-02 08:00:00",
+                "TRACKOUTTIMESTAMP": "2026-01-02 11:00:00", "TRACKOUTQTY": 60,
+            }),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+
+        duck_result = compute_detail_page(path, {}, page=1, per_page=25)
+        pandas_result = _pandas_detail_page(path, {}, page=1, per_page=25)
+
+        duck_rows = duck_result["rows"]
+        pan_rows = pandas_result["rows"]
+
+        assert len(duck_rows) == len(pan_rows), (
+            f"DuckDB row count ({len(duck_rows)}) != pandas row count ({len(pan_rows)})"
+        )
+        # Compare partial_count per row (sort by lot_id for determinism)
+        duck_counts = sorted((r["lot_id"], r["partial_count"]) for r in duck_rows)
+        pan_counts = sorted((r["lot_id"], r["partial_count"]) for r in pan_rows)
+        assert duck_counts == pan_counts, (
+            f"partial_count mismatch:\n  DuckDB: {duck_counts}\n  pandas: {pan_counts}"
+        )
+        # total_rows must also match
+        assert duck_result["pagination"]["total_rows"] == pandas_result["pagination"]["total_rows"], (
+            "pagination.total_rows mismatch between DuckDB and pandas paths"
+        )
+
+    # Regression: real-MES partial trackouts share TRACKINTIMESTAMP but have
+    # DIFFERENT TRACKINQTY (MES records qty REMAINING at each partial's start,
+    # not the original load).  Must still merge under 4-tuple key.
+    # Evidence: lot GA26041607-A00-005 on equipment GWBA-0146, TrackIn 2026-04-30
+    # 00:09:29 had TrackInQty=99424 (first partial) and 26624 (second partial);
+    # 5-tuple key wrongly emitted two rows.  4-tuple must produce one row with
+    # TRACKINQTY=MAX (= 99424 original load), TRACKOUTQTY=SUM, partial_count=2.
+    def test_partial_merge_same_trackin_time_different_trackin_qty(self, tmp_path):
+        """PH-06 4-tuple: TrackInQty differs across partials (MES records remaining qty).
+        Must merge into one row with TrackInQty=MAX (original load)."""
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        records = [
+            # First partial: starts with 99424 on equipment, 72800 leaves at 06:54
+            _ph_base_record({
+                "TRACKINTIMESTAMP": "2026-04-30 00:09:29",
+                "TRACKOUTTIMESTAMP": "2026-04-30 06:54:26",
+                "TRACKINQTY": 99424, "TRACKOUTQTY": 72800,
+            }),
+            # Second partial: starts with 26624 remaining (= 99424 - 72800), 26606 leaves at 10:26
+            _ph_base_record({
+                "TRACKINTIMESTAMP": "2026-04-30 00:09:29",
+                "TRACKOUTTIMESTAMP": "2026-04-30 10:26:11",
+                "TRACKINQTY": 26624, "TRACKOUTQTY": 26606,
+            }),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+        result = compute_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert len(rows) == 1, (
+            f"expected 1 merged row, got {len(rows)} (TRACKINQTY must NOT be a key)"
+        )
+        row = rows[0]
+        assert row["partial_count"] == 2, f"partial_count must be 2, got {row['partial_count']}"
+        assert row["trackin_qty"] == 99424, (
+            f"trackin_qty must be MAX=99424 (original load), got {row['trackin_qty']}"
+        )
+        assert row["trackout_qty"] == 99406, (
+            f"trackout_qty must be SUM(72800+26606)=99406, got {row['trackout_qty']}"
+        )
+        assert "10:26:11" in str(row["trackout_time"]), (
+            f"trackout_time must be MAX=10:26:11, got {row['trackout_time']}"
+        )
+
+    # Regression: raw-branch WHERE must compose with user filter via AND, not WHERE.
+    # The raw CTE already opens `WHERE (key-tuple) IN (...)`; a second `WHERE` is
+    # a Parser Error.  This failure mode hit production on 2026-05-15 because all
+    # prior unit tests used `{}` filter, leaving `where_for_raw=""` and never
+    # exercising the concat path.  Any non-empty filter must succeed.
+    def test_compute_detail_page_succeeds_with_non_empty_filter(self, tmp_path):
+        """Regression: filter_params must not cause `... WHERE (...) IN (...) WHERE ...`
+        Parser Error.  See logs/error.log 2026-05-15 16:32:32."""
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        records = [
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 30}),
+            _ph_base_record({"TRACKOUTTIMESTAMP": "2026-01-01 12:00:00", "TRACKOUTQTY": 70}),
+        ]
+        path = _write_ph_spool(tmp_path, records)
+        # `lot_ids` triggers _build_filter_where to emit a `WHERE ...` clause.
+        # Without the AND-prefix fix, this raises duckdb.ParserException.
+        result = compute_detail_page(path, {"lot_ids": ["LOT-A"]}, page=1, per_page=25)
+        assert isinstance(result["rows"], list)
+        assert result["pagination"]["total_rows"] >= 0  # must not crash

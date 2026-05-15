@@ -1,6 +1,6 @@
-# generated: 2026-05-15T06:44:38Z by cdd-kit 2.0.19
-# files: 780, src-lines: 210772, map-lines: 18246, compression: 11.6x
-# sources-digest: a9bc69c434313a03df1b42d11fb289106343c1e0cf10e9af14e7460ec15bb93b
+# generated: 2026-05-15T09:08:36Z by cdd-kit 2.0.19
+# files: 781, src-lines: 211901, map-lines: 18293, compression: 11.6x
+# sources-digest: 86f6bcc991d0351b3ce626590419eeb310519830fd1e2419b2169d73a0d3655c
 frontend/playwright-report/trace/assets/codeMirrorModule-a5XoALAZ.js:  # 32 lines
   imports:
     - { module: './defaultSettingsView-CJSZINFr.js', items: [v], line: 1 }
@@ -3164,7 +3164,7 @@ frontend/src/portal/main.js:  # 160 lines
 
 frontend/src/production-history/App.vue:  # 563 lines
 
-frontend/src/production-history/components/ProductionDetailTable.vue:  # 86 lines
+frontend/src/production-history/components/ProductionDetailTable.vue:  # 102 lines
 
 frontend/src/production-history/components/ProductionMatrix.vue:  # 245 lines
 
@@ -3187,7 +3187,7 @@ frontend/src/production-history/composables/useFirstTierFilters.ts:  # 365 lines
     - { name: CachedFilterField, lines: 35-35 }
     - { name: WildcardField, lines: 39-39 }
 
-frontend/src/production-history/composables/useProductionHistory.ts:  # 632 lines
+frontend/src/production-history/composables/useProductionHistory.ts:  # 637 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiPost], line: 2 }
@@ -3196,31 +3196,31 @@ frontend/src/production-history/composables/useProductionHistory.ts:  # 632 line
   constants:
     - { name: API_TIMEOUT, line: 6 }
   functions:
-    - { name: validateQueryMode, lines: 162-180 }
-    - { name: buildModePayload, lines: 191-212 }
-    - { name: useProductionHistory, lines: 240-632 }
+    - { name: validateQueryMode, lines: 167-185 }
+    - { name: buildModePayload, lines: 196-217 }
+    - { name: useProductionHistory, lines: 245-637 }
   interfaces:
     - { name: MatrixFilter, lines: 11-16 }
     - { name: SupplementaryFilter, lines: 25-28 }
     - { name: SupplementaryOptions, lines: 34-37 }
     - { name: Pagination, lines: 40-45 }
-    - { name: DetailRow, lines: 55-72 }
-    - { name: MatrixEquipmentNode, lines: 75-80 }
-    - { name: MatrixSpecNode, lines: 83-88 }
-    - { name: MatrixWorkcenterNode, lines: 91-96 }
-    - { name: OverloadError, lines: 102-105 }
-    - { name: JobProgressState, lines: 108-114 }
-    - { name: QueryParams, lines: 120-135 }
-    - { name: ModeValidationInput, lines: 145-154 }
-    - { name: QueryResponseEnvelope, lines: 216-220 }  # local
-    - { name: QueryResponseData, lines: 222-229 }  # local
-    - { name: ApiErrorLike, lines: 231-238 }  # local
+    - { name: DetailRow, lines: 55-77 }
+    - { name: MatrixEquipmentNode, lines: 80-85 }
+    - { name: MatrixSpecNode, lines: 88-93 }
+    - { name: MatrixWorkcenterNode, lines: 96-101 }
+    - { name: OverloadError, lines: 107-110 }
+    - { name: JobProgressState, lines: 113-119 }
+    - { name: QueryParams, lines: 125-140 }
+    - { name: ModeValidationInput, lines: 150-159 }
+    - { name: QueryResponseEnvelope, lines: 221-225 }  # local
+    - { name: QueryResponseData, lines: 227-234 }  # local
+    - { name: ApiErrorLike, lines: 236-243 }  # local
   types:
     - { name: SupplementaryFilterField, lines: 31-31 }
-    - { name: MatrixTree, lines: 99-99 }
-    - { name: DatasetMeta, lines: 117-117 }
-    - { name: QueryMode, lines: 139-139 }
-    - { name: QueryFragment, lines: 142-142 }
+    - { name: MatrixTree, lines: 104-104 }
+    - { name: DatasetMeta, lines: 122-122 }
+    - { name: QueryMode, lines: 144-144 }
+    - { name: QueryFragment, lines: 147-147 }
 
 frontend/src/production-history/main.ts:  # 7 lines
   imports:
@@ -4117,6 +4117,15 @@ frontend/tests/components/ParetoGrid.test.js:  # 104 lines
     - { module: '@vue/test-utils', items: [shallowMount], line: 21 }
     - { module: '../../src/reject-history/components/ParetoGrid.vue', items: ['default:ParetoGrid'], line: 22 }
 
+frontend/tests/components/ProductionDetailTable.test.js:  # 70 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 11 }
+    - { module: '@vue/test-utils', items: [mount], line: 12 }
+    - { module: vue, items: [nextTick], line: 13 }
+    - { module: '../../src/production-history/components/ProductionDetailTable.vue', items: ['default:ProductionDetailTable'], line: 14 }
+  functions:
+    - { name: makeRow, lines: 17-36 }
+
 frontend/tests/core/api-dedup.test.js:  # 172 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 12 }
@@ -4320,7 +4329,7 @@ frontend/tests/legacy/portal-shell-wave-b-native-smoke.test.js:  # 71 lines
   constants:
     - { name: WAVE_B_NATIVE_CASES, line: 8 }
 
-frontend/tests/legacy/production-history.test.js:  # 392 lines
+frontend/tests/legacy/production-history.test.js:  # 440 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 9 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 10 }
@@ -4328,6 +4337,8 @@ frontend/tests/legacy/production-history.test.js:  # 392 lines
   functions:
     - { name: computeDefaultDateRange, lines: 19-27 }
     - { name: buildPageQueryParams, lines: 29-31 }
+    - { name: shouldRenderBadge, lines: 407-409 }
+    - { name: badgeText, lines: 412-414 }
 
 frontend/tests/legacy/query-tool-composables.test.js:  # 471 lines
   imports:
@@ -7864,7 +7875,7 @@ src/mes_dashboard/services/production_history_service.py:  # 700 lines
     - { name: make_canonical_spool_id, lines: 649-659 }
     - { name: query_row_count, lines: 662-700 }
 
-src/mes_dashboard/services/production_history_sql_runtime.py:  # 695 lines
+src/mes_dashboard/services/production_history_sql_runtime.py:  # 1047 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: csv, items: [], line: 16 }
@@ -7880,16 +7891,17 @@ src/mes_dashboard/services/production_history_sql_runtime.py:  # 695 lines
     - { name: _fetch_dict_rows, lines: 53-57 }
     - { name: _build_wc_group_condition, lines: 62-76 }
     - { name: _build_filter_where, lines: 79-144 }
-    - { name: compute_detail_page, lines: 149-225 }
-    - { name: _pandas_detail_page, lines: 228-260 }
-    - { name: compute_matrix_view, lines: 265-311 }
-    - { name: _build_matrix_tree, lines: 314-417 }
-    - { name: _apply_pandas_wc_group_filter, lines: 420-434 }
-    - { name: _apply_pandas_filter, lines: 437-478 }
-    - { name: _pandas_matrix_view, lines: 481-499 }
-    - { name: compute_filter_options, lines: 504-592 }
-    - { name: stream_export, lines: 597-672 }
-    - { name: _pandas_stream_export, lines: 675-695 }
+    - { name: compute_detail_page, lines: 149-339 }
+    - { name: _pandas_detail_page, lines: 342-383 }
+    - { name: _pandas_aggregate_partial_trackouts, lines: 406-496 }
+    - { name: compute_matrix_view, lines: 501-547 }
+    - { name: _build_matrix_tree, lines: 550-653 }
+    - { name: _apply_pandas_wc_group_filter, lines: 656-670 }
+    - { name: _apply_pandas_filter, lines: 673-714 }
+    - { name: _pandas_matrix_view, lines: 717-735 }
+    - { name: compute_filter_options, lines: 740-828 }
+    - { name: stream_export, lines: 833-1001 }
+    - { name: _pandas_stream_export, lines: 1004-1047 }
 
 src/mes_dashboard/services/qc_gate_service.py:  # 248 lines
   imports:
@@ -11903,7 +11915,7 @@ tests/test_anomaly_detection_sql_runtime.py:  # 91 lines
         - { name: test_hold_percentile_is_between_0_and_1, lines: 87-88 }
         - { name: test_deviation_threshold_is_positive, lines: 90-91 }
 
-tests/test_api_contract.py:  # 531 lines
+tests/test_api_contract.py:  # 643 lines
   imports:
     - { module: ast, items: [], line: 13 }
     - { module: unittest, items: [], line: 14 }
@@ -11970,6 +11982,14 @@ tests/test_api_contract.py:  # 531 lines
         - { name: setUp, lines: 494-498 }
         - { name: test_query_payload_dates_optional_with_identifier_tokens, lines: 501-516 }
         - { name: test_query_payload_classification_mode_still_requires_dates, lines: 518-527 }
+    - name: TestProductionHistoryPartialMergeContract
+      lines: 530-639
+      methods:
+        - { name: _make_spool, lines: 537-543 }
+        - { name: _base_record, lines: 545-565 }
+        - { name: test_production_history_detail_pagination_total_rows_post_aggregation, lines: 567-591 }
+        - { name: _make_spool_path, lines: 593-602 }
+        - { name: test_detail_row_schema_has_partial_count_integer, lines: 604-639 }
   functions:
     - { name: _count_jsonify_in_file, lines: 46-63 }
 
@@ -15173,7 +15193,7 @@ tests/test_production_history_routes.py:  # 682 lines
     - { name: test_matrix_accepts_same_filter_schema, lines: 276-293 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
     - { name: test_export_accepts_filter_query_params, lines: 300-314 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
 
-tests/test_production_history_service.py:  # 400 lines
+tests/test_production_history_service.py:  # 578 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: pytest, items: [], line: 6 }
@@ -15213,10 +15233,21 @@ tests/test_production_history_service.py:  # 400 lines
         - { name: test_identifier_mode_with_dates_still_honors_them, lines: 342-353 }
         - { name: test_identifier_mode_with_dates_over_cap_still_raises, lines: 355-365 }
         - { name: test_query_identifier_wide_window_bounded, lines: 367-395 }
+    - name: TestPandasFallbackAggregation
+      lines: 417-578
+      methods:
+        - { name: _write_spool, lines: 439-444 }
+        - { name: test_pandas_fallback_sum_qty_max_time, lines: 447-463 }
+        - { name: test_pandas_fallback_partial_count, lines: 466-479 }
+        - { name: test_pandas_aba_interleave_not_merged, lines: 482-500 }
+        - { name: test_strict_guard_fallback_to_raw_rows, lines: 503-523 }
+        - { name: test_strict_guard_logs_summary_with_divergent_count, lines: 526-554 }
+        - { name: test_strict_guard_no_log_when_all_consistent, lines: 557-578 }
   functions:
     - { name: datetime_from, lines: 398-400 }
+    - { name: _make_spool_records, lines: 412-414 }
 
-tests/test_production_history_sql_runtime.py:  # 593 lines
+tests/test_production_history_sql_runtime.py:  # 941 lines
   imports:
     - { module: sys, items: [], line: 4 }
     - { module: os, items: [], line: 5 }
@@ -15310,9 +15341,25 @@ tests/test_production_history_sql_runtime.py:  # 593 lines
         - { name: test_single_row_input, lines: 559-569 }
         - { name: test_empty_input, lines: 571-574 }
         - { name: test_overlapping_month_buckets, lines: 576-593 }
+    - name: TestPartialMergeAggregation
+      lines: 639-941
+      methods:
+        - { name: test_partial_merge_sum_qty_max_time, lines: 645-661 }
+        - { name: test_partial_count_equals_group_size, lines: 664-679 }
+        - { name: test_aba_interleave_not_merged, lines: 682-703 }
+        - { name: test_duckdb_strict_guard_fallback_to_raw_rows, lines: 706-729 }
+        - { name: test_pagination_total_rows_is_post_aggregation_count, lines: 732-746 }
+        - { name: test_detail_row_includes_partial_count_field, lines: 749-763 }
+        - { name: test_csv_rows_match_api_rows_aggregated, lines: 766-793 }
+        - { name: test_csv_partial_count_matches_api, lines: 796-821 }
+        - { name: test_duckdb_pandas_parity_aggregation_output, lines: 824-876 }
+        - { name: test_partial_merge_same_trackin_time_different_trackin_qty, lines: 885-920 }
+        - { name: test_compute_detail_page_succeeds_with_non_empty_filter, lines: 927-941 }
   functions:
     - { name: _matrix_row, lines: 288-297 }
     - { name: _find_node, lines: 300-304 }
+    - { name: _ph_base_record, lines: 607-628 }
+    - { name: _write_ph_spool, lines: 631-636 }
 
 tests/test_qc_gate_routes.py:  # 62 lines
   imports:

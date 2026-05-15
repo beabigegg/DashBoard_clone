@@ -1,0 +1,53 @@
+agent: contract-reviewer
+change-id: prod-history-detail-partial-merge
+status: complete
+date: 2026-05-15
+
+decision: changes-required → applied
+notes: |
+  Contract-reviewer (read-only) produced exact diff plan; main Claude applied
+  edits to all three contracts plus CHANGELOG. cdd-kit validate passed.
+
+artifacts:
+  - type: business-rules
+    pointer: contracts/business/business-rules.md
+    notes: schema 1.5.0 → 1.6.0; added PH-06 (5-tuple aggregation), PH-07 (strict guard); amended PH-01/PH-04; added 2 decision-table rows
+  - type: api-contract
+    pointer: contracts/api/api-contract.md
+    notes: schema 1.4.0 → 1.5.0; added §10 compatibility note for partial-trackout aggregation (additive partial_count field + PartialCount CSV column + total_rows post-aggregation semantics)
+  - type: data-shape
+    pointer: contracts/data/data-shape-contract.md
+    notes: schema 1.3.0 → 1.4.0; §3.4 added partial_count column; opening sentence + row-grain rule rewritten to cover aggregated vs raw-fallback modes; TRACKINTIMESTAMP/TRACKINQTY marked as shared group keys
+  - type: changelog
+    pointer: contracts/CHANGELOG.md
+    notes: prepended three entries (data 1.4.0, business 1.6.0, api 1.5.0)
+
+decisions-made:
+  - csv-column-position: PartialCount appended after TrackOutQty (was previous last column)
+  - json-key-naming: snake_case partial_count (matches existing API rename layer convention)
+  - csv-column-naming: PascalCase PartialCount (matches existing CSV convention)
+  - partial-count-on-fallback: raw rows under strict-guard fallback receive partial_count = 1 (so the field is always meaningful as "group size used to produce this row")
+  - total-rows-classified-as-non-breaking: pagination.total_rows semantic delta (raw → post-aggregation) treated as additive — same field name/type, value only decreases, no known asserting consumer; if a partner consumer surfaces later, add a separate raw_row_count via deprecate-2-minors
+
+breaking-change-risk: none
+  - All API changes are additive; existing consumers ignoring partial_count continue to work
+  - CSV column added at the end; positional parsers may need to allow extra trailing column (treated as additive per Breaking Change Policy)
+
+consumers-impacted:
+  - frontend/src/production-history/  (primary, intended — renders partial_count badge)
+  - CSV human download (visually additive trailing column)
+  - matrix view, filter-options, AI-query endpoints — unaffected
+
+validator-result: pass
+  - cdd-kit validate: All validations passed.
+  - No new env warnings introduced by this change.
+
+files-read:
+  - specs/changes/prod-history-detail-partial-merge/context-manifest.md
+  - specs/changes/prod-history-detail-partial-merge/change-request.md
+  - specs/changes/prod-history-detail-partial-merge/change-classification.md
+  - contracts/business/business-rules.md
+  - contracts/api/api-contract.md
+  - contracts/data/data-shape-contract.md
+  - contracts/CHANGELOG.md
+  - src/mes_dashboard/services/production_history_sql_runtime.py

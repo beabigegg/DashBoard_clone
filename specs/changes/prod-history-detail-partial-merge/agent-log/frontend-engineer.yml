@@ -1,0 +1,51 @@
+agent: frontend-engineer
+change-id: prod-history-detail-partial-merge
+date: 2026-05-15
+status: complete
+
+summary: >
+  Added partial_count badge (×N 合併) to ProductionDetailTable.vue lot_id cell.
+  Badge renders only when partial_count > 1 (defensive: undefined/null/0/1 → no badge).
+  Added partial_count?: number field to DetailRow interface.
+  Written TDD-first: Vitest component tests written before feature code.
+
+tdd-order:
+  - step: 1
+    action: "Written failing Vitest tests in tests/components/ProductionDetailTable.test.js"
+    signal: "1 failed (badge not rendered), 2 passed (absence cases correct)"
+  - step: 2
+    action: "Added partial_count?: number to DetailRow in useProductionHistory.ts"
+    signal: "Interface updated; still failing"
+  - step: 3
+    action: "Added lot_id branch + badge span to ProductionDetailTable.vue template"
+    signal: "Type error on row.partial_count (unknown type from slot)"
+  - step: 4
+    action: "Added getPartialCount() helper to script section; updated template to use it"
+    signal: "type-check clean; all 3 Vitest tests green"
+  - step: 5
+    action: "Added 5 logic tests to legacy file (production-history.test.js)"
+    signal: "all 5 pass via npm run test:legacy"
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/production-history/composables/useProductionHistory.ts:55-77" }
+  - { type: files-changed, pointer: "frontend/src/production-history/components/ProductionDetailTable.vue:36-50,81-87" }
+  - { type: files-changed, pointer: "frontend/tests/components/ProductionDetailTable.test.js:1-68" }
+  - { type: files-changed, pointer: "frontend/tests/legacy/production-history.test.js:394-445" }
+  - { type: components-affected, pointer: "ProductionDetailTable" }
+  - { type: accessibility-audit, pointer: "Badge is a <span> (non-interactive); no focus trap or role needed. Inline text content is readable by screen readers." }
+
+gate-results:
+  vitest: "32 passed (340 tests + 1 skipped); 0 failures"
+  type-check: "vue-tsc --noEmit: 0 errors"
+  css-check: "0 errors, 47 warnings (all pre-existing in shared-ui)"
+  legacy-tests: "5 new partial_count tests pass via npm run test:legacy"
+
+badge-markup: |
+  <span
+    v-if="getPartialCount(row) > 1"
+    class="ml-1 inline-block text-xs bg-gray-100 text-gray-600 rounded px-1"
+  >×{{ getPartialCount(row) }} 合併</span>
+
+risks:
+  - "getPartialCount() called twice per cell render (v-if + interpolation); negligible perf impact for table rows. Could be a v-memo if needed."
+  - "DataTable slot types row as Record<string, unknown>; getPartialCount() helper is the correct pattern for typed access."

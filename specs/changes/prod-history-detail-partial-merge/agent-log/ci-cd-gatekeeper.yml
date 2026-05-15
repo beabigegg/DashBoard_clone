@@ -1,0 +1,22 @@
+agent: ci-cd-gatekeeper
+change-id: prod-history-detail-partial-merge
+date: 2026-05-15
+status: complete
+
+files-read:
+  - specs/changes/prod-history-detail-partial-merge/context-manifest.md
+  - specs/changes/prod-history-detail-partial-merge/change-classification.md
+  - specs/changes/prod-history-detail-partial-merge/test-plan.md
+  - contracts/ci/ci-gate-contract.md
+
+artifacts:
+  - { type: tiers-modified, pointer: "1 (unit-mock-integration, frontend-unit, css-governance, playwright-critical-journeys), 2 (visual-regression — informational, unchanged)" }
+  - { type: gate-promotions, pointer: "n/a (no gate promotions; Tier 2 change, task 2.6 skipped per change-classification.md)" }
+  - { type: workflow-files-changed, pointer: "n/a (no .github/workflows/* files modified; all required gates already defined in existing workflows)" }
+  - { type: required-status-checks, pointer: "lint, cdd-kit-validate, unit-mock-integration, frontend-unit, css-governance, frontend-type-check (informational), playwright-critical-journeys" }
+
+notes: >
+  No new CI gate added. No workflow file modified. All 15 new test names from test-plan.md
+  are exercised by existing unit-mock-integration and frontend-unit gates. visual-regression
+  remains informational (Tier 2 policy). Rollback requires no parquet cleanup (spool schema
+  unchanged). Staging smoke test is the promotion gate to production.

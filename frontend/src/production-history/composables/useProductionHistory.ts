@@ -68,6 +68,11 @@ export interface DetailRow {
   trackout_time: string | null;
   trackin_qty: number | null;
   trackout_qty: number | null;
+  /** Number of partial track-out rows merged into this aggregated row.
+   * Present only when the backend aggregation is active (≥ 2026-05-15).
+   * Optional for backward-compat with older backend / rollback scenarios.
+   * A value of 1 means no merge occurred. */
+  partial_count?: number;
   [key: string]: unknown;
 }
 

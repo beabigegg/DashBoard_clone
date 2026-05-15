@@ -1,0 +1,83 @@
+agent: qa-reviewer
+change-id: prod-history-detail-partial-merge
+status: complete
+date: 2026-05-15
+
+decision: approved
+
+artifacts:
+  - { type: gate-results, pointer: "cdd-kit-validate: pass; api-semantic: pass (143 endpoints); env-semantic: pass; ci-gates: pass; spec-traceability: pass; contract-versions: pass" }
+  - { type: ci-run-url, pointer: "n/a (local validate only; PR CI will run unit-mock-integration + frontend-unit + css-governance + playwright-critical-journeys per ci-gates.md)" }
+  - { type: evidence-quality, pointer: "log (cdd-kit validate locally) + artifact (test file content verified by grep) + agent-log handoffs" }
+  - { type: decision, pointer: "approved" }
+  - { type: failure-routing, pointer: "none" }
+
+ac-traceability:
+  AC-1: "tests/test_production_history_sql_runtime.py::test_partial_merge_sum_qty_max_time, test_partial_count_equals_group_size (line 645,664); tests/test_production_history_service.py::test_pandas_fallback_sum_qty_max_time, test_pandas_fallback_partial_count (line 447,466) — present"
+  AC-2: "tests/test_production_history_sql_runtime.py::test_aba_interleave_not_merged (line 682); tests/test_production_history_service.py::test_pandas_aba_interleave_not_merged (line 482) — present"
+  AC-3: "tests/test_production_history_service.py::test_strict_guard_fallback_to_raw_rows, test_strict_guard_logs_summary_with_divergent_count (line 503,526); tests/test_production_history_sql_runtime.py::test_duckdb_strict_guard_fallback_to_raw_rows (line 706) — present"
+  AC-4: "tests/test_production_history_sql_runtime.py::test_pagination_total_rows_is_post_aggregation_count (line 732); tests/test_api_contract.py::test_production_history_detail_pagination_total_rows_post_aggregation (line 567) — present"
+  AC-5: "tests/test_production_history_sql_runtime.py::test_csv_rows_match_api_rows_aggregated, test_csv_partial_count_matches_api (line 766,796) — present"
+  AC-6: "tests/test_production_history_sql_runtime.py::test_detail_row_includes_partial_count_field (line 749); tests/test_api_contract.py::test_detail_row_schema_has_partial_count_integer (line 604); frontend/tests/legacy/production-history.test.js partial_count badge (line 416,422); frontend/tests/components/ProductionDetailTable.test.js (3 tests) — present"
+  PH-06-parity: "tests/test_production_history_sql_runtime.py::test_duckdb_pandas_parity_aggregation_output (line 824) — present"
+
+contract-traceability:
+  business-rules: "contracts/business/business-rules.md PH-06 line 125, PH-07 line 126, decision-table rows line 209-210; schema 1.5.0 → 1.6.0 per contract-reviewer.yml"
+  api-contract: "contracts/api/api-contract.md §10 2026-05-15 entry line 284-286; schema 1.4.0 → 1.5.0"
+  data-shape: "contracts/data/data-shape-contract.md §3.4 line 323-346 includes partial_count column line 344; schema 1.3.0 → 1.4.0"
+
+implementation-traceability:
+  backend-sql: "src/mes_dashboard/services/production_history_sql_runtime.py:189-211 (compute_detail_page 5-tuple GROUP BY); 869-891 (stream_export 5-tuple GROUP BY); 275, 445, 941 (INFO log 'partial-trackout strict-guard')"
+  backend-pandas: "src/mes_dashboard/services/production_history_sql_runtime.py:342-474 (_pandas_detail_page aggregation + INFO log)"
+  frontend-type: "frontend/src/production-history/composables/useProductionHistory.ts:75 partial_count?: number"
+  frontend-badge: "frontend/src/production-history/components/ProductionDetailTable.vue:41-43 (getPartialCount helper); 92-95 (badge markup with aria-label and ×N 合併 text)"
+  csv-export: "src/mes_dashboard/services/production_history_sql_runtime.py:839 EXPORT_COLUMNS appends ('partial_count', 'PartialCount')"
+
+agent-log-completeness:
+  required:
+    - contract-reviewer.yml: present
+    - ci-cd-gatekeeper.yml: present
+    - ui-ux-reviewer.yml: present (suggestion-1 applied inline; aria-label added)
+    - visual-reviewer.yml: present (approved)
+  optional:
+    - implementation-planner.yml: present
+    - test-strategist.yml: present
+    - backend-engineer.yml: present (17 tests, 3893 full-suite passing per self-report)
+    - frontend-engineer.yml: present (32 vitest + 5 legacy tests passing per self-report)
+
+pre-existing-risks:
+  - "Engineer self-reported test counts (backend 3893 passing / frontend 32 passing) are not independently verified in this review — PR CI gates (unit-mock-integration, frontend-unit) will confirm before merge per ci-gates.md."
+  - "Partial-deploy ordering risk documented in implementation-plan.md §Known Risks (backend before frontend = no badge; frontend before backend = field absent, defensively handled). Both are safe interim states per ci-gates.md §Rollback step 2."
+
+residual-gaps: none
+
+recommendations:
+  - "Staging smoke test (ci-gates.md §Promotion Policy step 4) must verify: (a) badge appears on detail row with multi-partial lot, (b) aggregated row count < raw spool count for known date range, (c) CSV PartialCount column populated."
+  - "Visual-regression snapshot is informational; visual-reviewer.yml suggests capturing post-merge baselines (desktop/tablet/mobile) if team wants future regression coverage."
+
+files-read:
+  - specs/changes/prod-history-detail-partial-merge/context-manifest.md
+  - specs/changes/prod-history-detail-partial-merge/change-classification.md
+  - specs/changes/prod-history-detail-partial-merge/test-plan.md
+  - specs/changes/prod-history-detail-partial-merge/implementation-plan.md
+  - specs/changes/prod-history-detail-partial-merge/ci-gates.md
+  - specs/changes/prod-history-detail-partial-merge/tasks.yml
+  - specs/changes/prod-history-detail-partial-merge/agent-log/contract-reviewer.yml
+  - specs/changes/prod-history-detail-partial-merge/agent-log/ci-cd-gatekeeper.yml
+  - specs/changes/prod-history-detail-partial-merge/agent-log/implementation-planner.yml
+  - specs/changes/prod-history-detail-partial-merge/agent-log/test-strategist.yml
+  - specs/changes/prod-history-detail-partial-merge/agent-log/backend-engineer.yml
+  - specs/changes/prod-history-detail-partial-merge/agent-log/frontend-engineer.yml
+  - specs/changes/prod-history-detail-partial-merge/agent-log/ui-ux-reviewer.yml
+  - specs/changes/prod-history-detail-partial-merge/agent-log/visual-reviewer.yml
+  - contracts/business/business-rules.md
+  - contracts/api/api-contract.md
+  - contracts/data/data-shape-contract.md
+  - src/mes_dashboard/services/production_history_sql_runtime.py
+  - frontend/src/production-history/components/ProductionDetailTable.vue
+  - frontend/src/production-history/composables/useProductionHistory.ts
+  - frontend/tests/components/ProductionDetailTable.test.js
+  - frontend/tests/legacy/production-history.test.js
+  - tests/test_production_history_sql_runtime.py
+  - tests/test_production_history_service.py
+  - tests/test_api_contract.py

@@ -8,6 +8,36 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [data 1.4.1] — 2026-05-15
+### Changed (semantic refinement, same-day patch over 1.4.0)
+- Section 3.4: aggregation key reduced from 5-tuple to 4-tuple — TRACKINQTY removed from grouping key. Reason: this MES records TRACKINQTY as qty REMAINING at each partial's start (decreases across partials of one upload), not the original load. Keeping TRACKINQTY in the key prevented real partial-trackout rows from ever merging. Aggregated TRACKINQTY now = `MAX(TRACKINQTY)` = original load qty. TRACKINQTY/TRACKINTIMESTAMP column-note prose updated accordingly.
+- Source: change `prod-history-detail-partial-merge` (post-smoke-test correction).
+
+## [business 1.6.1] — 2026-05-15
+### Changed (semantic refinement, same-day patch over 1.6.0)
+- PH-06 and PH-07 updated from 5-tuple → 4-tuple key (`CONTAINERNAME, SPECNAME, EQUIPMENTID, TRACKINTIMESTAMP`). PH-06 adds `TRACKINQTY = MAX(...)` clause for aggregated rows. PH-07 strict-guard log description corrected to "summary count per request" matching the locked log policy. Decision Table rows updated to 4-tuple.
+- Source: change `prod-history-detail-partial-merge` (post-smoke-test correction).
+
+## [api 1.5.1] — 2026-05-15
+### Changed (semantic refinement, same-day patch over 1.5.0)
+- Section 10 Compatibility Note: aggregation key reduced from 5-tuple to 4-tuple. `partial_count`, CSV `PartialCount`, `total_rows` semantics unchanged. `trackin_qty` for aggregated rows now documented as `MAX(...)` (= original load qty).
+- Source: change `prod-history-detail-partial-merge` (post-smoke-test correction).
+
+## [data 1.4.0] — 2026-05-15
+### Added (additive)
+- Section 3.4: added `partial_count` column (`integer`, not null, view-layer computed) to Production-History Detail Row table. Updated opening sentence to describe aggregated grain (PH-06/PH-07 view-layer) versus raw spool grain. Updated Row-grain rule paragraph to note `detail row count ≤ LOTWIPHISTORY row count` and clarify `partial_count` is synthesized in view layer (not in spool parquet). `TRACKINTIMESTAMP` / `TRACKINQTY` notes updated to mark them as group-shared keys; `TRACKOUTTIMESTAMP` / `TRACKOUTQTY` notes describe both aggregated (MAX/SUM) and raw (strict-guard fallback) modes.
+- Source: change `prod-history-detail-partial-merge`.
+
+## [business 1.6.0] — 2026-05-15
+### Added (additive)
+- Production-History Rules: `PH-06` (partial-trackout aggregation — 5-tuple key `(CONTAINERNAME, SPECNAME, EQUIPMENTID, TRACKINTIMESTAMP, TRACKINQTY)`; `TRACKOUTTIMESTAMP = MAX(...)`, `TRACKOUTQTY = SUM(...)`, `partial_count = COUNT(*)`; A/B-lot interleaving preserved; all three paths DuckDB/pandas/CSV must match; `pagination.total_rows` post-aggregation) and `PH-07` (strict guard — non-key column divergence → raw rows for that group with `partial_count = 1` + INFO log; no error returned). Additive cross-reference clauses appended to `PH-01` (points to PH-06 for view-layer aggregation) and `PH-04` (sort key for aggregated groups uses shared `TRACKINTIMESTAMP`). Two Decision Table rows added for consistent-group and divergent-group branches.
+- Source: change `prod-history-detail-partial-merge`.
+
+## [api 1.5.0] — 2026-05-15
+### Added (additive)
+- Section 10 Compatibility Note: `POST /api/production-history/page` rows gain `partial_count: integer (≥ 1)` (additive). `GET /api/production-history/export` CSV gains trailing column `PartialCount` after `TrackOutQty`. `pagination.total_rows` semantics clarified as post-aggregation count. Aggregation applied consistently across DuckDB SQL, pandas fallback, and CSV stream. Strict-guard divergence behavior is transparent to API consumers (no new error code). See business-rules.md PH-06/PH-07.
+- Source: change `prod-history-detail-partial-merge`.
+
 ## [css 1.2.0] — 2026-05-15
 ### Added (additive)
 - Detail Table Layout Rule: hold-history `DetailTable.vue`, hold-overview "Hold Lot Details", reject-history `components/DetailTable.vue`, and material-trace "查詢結果" Result Card must all render as single flat tables — one outer card wrapper with `DataTable` directly inside `.card-body`; `.card-body` global padding must not frame the DataTable (apply `padding: 0` scoped override where needed). Reference implementations: `hold-detail/DistributionTable.vue`, `wip-detail/LotTable.vue`. "表中表（table-within-table）" added to Forbidden Practices list.

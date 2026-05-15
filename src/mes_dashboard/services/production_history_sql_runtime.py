@@ -171,17 +171,127 @@ def compute_detail_page(
     offset = (page - 1) * per_page
 
     where, params = _build_filter_where(filter_params)
+    # Build an AND-prefixed filter fragment for the raw branch inside the CTE.
+    # The raw branch already has `WHERE (key-tuple) IN (...)`, so the user
+    # filter must continue that WHERE with AND, not start a second WHERE.
+    where_for_raw = (" AND " + where[len("WHERE "):]) if where else ""
 
     try:
         conn = _get_duckdb_conn()
         _attach_spool_view(conn, spool_path)
 
-        count_sql = f"SELECT COUNT(*) AS total FROM ph_src {where}"
-        count_row = conn.execute(count_sql, params).fetchone()
-        total_rows = int(count_row[0]) if count_row else 0
+        # ── Partial-trackout aggregation SQL (PH-06 / PH-07) ─────────────────
+        # The CTE groups by the 4-tuple key (lot, spec, equipment, trackin_time);
+        # TRACKINQTY is intentionally NOT a key because this MES records the qty
+        # remaining at each partial's start, so successive partials of the same
+        # upload have different TRACKINQTY values.  TRACKINQTY=MAX(...) is emitted
+        # = original load before any partial trackouts.  A/B lot interleaving is
+        # preserved by TRACKINTIMESTAMP (A's re-upload has a different timestamp).
+        #
+        # The grouped CTE splits into:
+        #   agg  — groups where all 8 non-key columns are identical (collapse)
+        #   raw  — groups where any non-key column diverges (strict guard fallback)
+        agg_cte_sql = f"""
+            WITH grouped AS (
+                SELECT
+                    CONTAINERNAME, SPECNAME, EQUIPMENTID, TRACKINTIMESTAMP,
+                    COUNT(*) AS partial_count,
+                    MAX(TRACKINQTY)        AS TRACKINQTY,
+                    MAX(TRACKOUTTIMESTAMP) AS TRACKOUTTIMESTAMP,
+                    SUM(TRACKOUTQTY)       AS TRACKOUTQTY,
+                    COUNT(DISTINCT MFGORDERNAME)    AS dc_work_order,
+                    COUNT(DISTINCT FIRSTNAME)        AS dc_wafer_lot,
+                    COUNT(DISTINCT PJ_TYPE)          AS dc_pj_type,
+                    COUNT(DISTINCT PJ_BOP)           AS dc_pj_bop,
+                    COUNT(DISTINCT PJ_FUNCTION)      AS dc_pj_function,
+                    COUNT(DISTINCT PRODUCTLINENAME)  AS dc_package,
+                    COUNT(DISTINCT WORKCENTERNAME)   AS dc_wc,
+                    COUNT(DISTINCT EQUIPMENTNAME)    AS dc_eq_name,
+                    ANY_VALUE(MFGORDERNAME)    AS MFGORDERNAME,
+                    ANY_VALUE(FIRSTNAME)       AS FIRSTNAME,
+                    ANY_VALUE(PJ_TYPE)         AS PJ_TYPE,
+                    ANY_VALUE(PJ_BOP)          AS PJ_BOP,
+                    ANY_VALUE(PJ_FUNCTION)     AS PJ_FUNCTION,
+                    ANY_VALUE(PRODUCTLINENAME) AS PRODUCTLINENAME,
+                    ANY_VALUE(WORKCENTERNAME)  AS WORKCENTERNAME,
+                    ANY_VALUE(EQUIPMENTNAME)   AS EQUIPMENTNAME
+                FROM ph_src
+                {where}
+                GROUP BY CONTAINERNAME, SPECNAME, EQUIPMENTID, TRACKINTIMESTAMP
+            ),
+            agg AS (
+                SELECT * FROM grouped
+                WHERE dc_work_order=1 AND dc_wafer_lot=1 AND dc_pj_type=1 AND dc_pj_bop=1
+                  AND dc_pj_function=1 AND dc_package=1 AND dc_wc=1 AND dc_eq_name=1
+            ),
+            raw AS (
+                SELECT
+                    p.CONTAINERNAME, p.SPECNAME, p.EQUIPMENTID,
+                    p.TRACKINTIMESTAMP,
+                    1 AS partial_count,
+                    p.TRACKINQTY,
+                    p.TRACKOUTTIMESTAMP, p.TRACKOUTQTY,
+                    0 AS dc_work_order, 0 AS dc_wafer_lot, 0 AS dc_pj_type, 0 AS dc_pj_bop,
+                    0 AS dc_pj_function, 0 AS dc_package, 0 AS dc_wc, 0 AS dc_eq_name,
+                    p.MFGORDERNAME, p.FIRSTNAME, p.PJ_TYPE, p.PJ_BOP,
+                    p.PJ_FUNCTION, p.PRODUCTLINENAME, p.WORKCENTERNAME, p.EQUIPMENTNAME
+                FROM ph_src p
+                WHERE (p.CONTAINERNAME, p.SPECNAME, p.EQUIPMENTID,
+                       p.TRACKINTIMESTAMP) IN (
+                    SELECT CONTAINERNAME, SPECNAME, EQUIPMENTID, TRACKINTIMESTAMP
+                    FROM grouped
+                    WHERE dc_work_order>1 OR dc_wafer_lot>1 OR dc_pj_type>1 OR dc_pj_bop>1
+                       OR dc_pj_function>1 OR dc_package>1 OR dc_wc>1 OR dc_eq_name>1
+                )
+                {where_for_raw}
+            ),
+            combined AS (
+                SELECT * FROM agg UNION ALL SELECT * FROM raw
+            )
+        """
+
+        # Post-aggregation count for total_rows (AC-4) and summary log
+        count_sql = f"""
+            {agg_cte_sql}
+            SELECT
+                COUNT(*) AS total_rows,
+                COUNT(*) FILTER (
+                    WHERE dc_work_order>1 OR dc_wafer_lot>1 OR dc_pj_type>1 OR dc_pj_bop>1
+                       OR dc_pj_function>1 OR dc_package>1 OR dc_wc>1 OR dc_eq_name>1
+                ) AS divergent_groups_raw_rows,
+                (SELECT COUNT(DISTINCT (CONTAINERNAME, SPECNAME, EQUIPMENTID,
+                                        TRACKINTIMESTAMP)) FROM grouped
+                 WHERE dc_work_order>1 OR dc_wafer_lot>1 OR dc_pj_type>1 OR dc_pj_bop>1
+                    OR dc_pj_function>1 OR dc_package>1 OR dc_wc>1 OR dc_eq_name>1
+                ) AS divergent_groups,
+                (SELECT COUNT(*) FROM grouped) AS total_groups
+            FROM combined
+        """
+        count_row = conn.execute(count_sql, params + params).fetchone()
+        if count_row:
+            total_rows = int(count_row[0])
+            divergent_groups = int(count_row[2]) if count_row[2] is not None else 0
+            total_groups = int(count_row[3]) if count_row[3] is not None else 0
+        else:
+            total_rows = 0
+            divergent_groups = 0
+            total_groups = 0
+
         total_pages = max(1, (total_rows + per_page - 1) // per_page)
 
+        # Emit summary INFO log when strict-guard fallback occurs (PH-07)
+        if divergent_groups > 0:
+            query_id = filter_params.get("query_id")
+            logger.info(
+                "partial-trackout strict-guard: %d divergent groups fell back to raw rows "
+                "(query_id=%s, total_groups=%d)",
+                divergent_groups,
+                query_id,
+                total_groups,
+            )
+
         page_sql = f"""
+            {agg_cte_sql}
             SELECT
                 CONTAINERNAME    AS lot_id,
                 PJ_TYPE          AS pj_type,
@@ -197,13 +307,17 @@ def compute_detail_page(
                 strftime(TRACKINTIMESTAMP::TIMESTAMP,  '%Y-%m-%d %H:%M:%S') AS trackin_time,
                 strftime(TRACKOUTTIMESTAMP::TIMESTAMP, '%Y-%m-%d %H:%M:%S') AS trackout_time,
                 TRACKINQTY       AS trackin_qty,
-                TRACKOUTQTY      AS trackout_qty
-            FROM ph_src
-            {where}
+                TRACKOUTQTY      AS trackout_qty,
+                partial_count
+            FROM combined
             ORDER BY TRACKINTIMESTAMP ASC NULLS LAST, CONTAINERNAME
             LIMIT ? OFFSET ?
         """
-        rows = _fetch_dict_rows(conn, page_sql, params + [per_page, offset])
+        rows = _fetch_dict_rows(conn, page_sql, params + params + [per_page, offset])
+        # Ensure partial_count is int (DuckDB may return it as a different numeric type)
+        for row in rows:
+            if "partial_count" in row:
+                row["partial_count"] = int(row["partial_count"])
         conn.close()
 
         return {
@@ -231,14 +345,23 @@ def _pandas_detail_page(
     page: int,
     per_page: int,
 ) -> Dict[str, Any]:
-    """Fallback pandas path when DuckDB is disabled."""
+    """Fallback pandas path when DuckDB is disabled.
+
+    Applies the same 4-tuple partial-trackout aggregation as compute_detail_page
+    (PH-06 / PH-07).  Groups sharing all non-key columns are collapsed into one
+    row with TRACKOUTTIMESTAMP=MAX, TRACKOUTQTY=SUM, partial_count=COUNT(*).
+    Groups where any non-key column diverges emit raw rows with partial_count=1.
+    """
     import pandas as pd
 
     df = pd.read_parquet(spool_path)
     df = _apply_pandas_filter(df, filter_params)
-    total_rows = len(df)
+
+    agg_df = _pandas_aggregate_partial_trackouts(df, query_id=None)
+
+    total_rows = len(agg_df)
     offset = (page - 1) * per_page
-    page_df = df.iloc[offset: offset + per_page]
+    page_df = agg_df.iloc[offset: offset + per_page]
     rows = page_df.rename(columns={
         "CONTAINERNAME": "lot_id", "PJ_TYPE": "pj_type", "PJ_BOP": "bop",
         "PJ_FUNCTION": "pj_function",
@@ -258,6 +381,119 @@ def _pandas_detail_page(
             "total_pages": max(1, (total_rows + per_page - 1) // per_page),
         },
     }
+
+
+# ── Partial-trackout aggregation constants ─────────────────────────────────────
+
+# 4-tuple key that defines one partial-trackout upload session (PH-06).
+# TRACKINQTY is intentionally NOT a key — in this MES, TRACKINQTY records the
+# qty AT EACH PARTIAL's start (i.e. remaining on the equipment), so successive
+# partials of the same upload have DIFFERENT TRACKINQTY values.  Aggregation
+# emits TRACKINQTY=MAX(...) (= the original load before any partial trackouts).
+# A/B lot interleaving (A out → B in/out → A back in) is preserved because
+# A's second upload has a DIFFERENT TRACKINTIMESTAMP from the first.
+_PARTIAL_KEY_COLS = [
+    "CONTAINERNAME", "SPECNAME", "EQUIPMENTID", "TRACKINTIMESTAMP",
+]
+
+# Non-key columns that must be identical within a group for aggregation (PH-07)
+_PARTIAL_NONKEY_COLS = [
+    "MFGORDERNAME", "FIRSTNAME", "PJ_TYPE", "PJ_BOP", "PJ_FUNCTION",
+    "PRODUCTLINENAME", "WORKCENTERNAME", "EQUIPMENTNAME",
+]
+
+
+def _pandas_aggregate_partial_trackouts(
+    df: Any,
+    query_id: Optional[str] = None,
+) -> Any:
+    """Apply 4-tuple partial-trackout aggregation to a pandas DataFrame.
+
+    Consistent groups (all non-key columns identical within the 4-tuple group)
+    collapse to one row: TRACKOUTTIMESTAMP=MAX, TRACKOUTQTY=SUM, TRACKINQTY=MAX
+    (= original load qty before any partial trackouts), partial_count=COUNT(*).
+    Divergent groups (strict guard, PH-07) emit their original raw rows each
+    with partial_count=1.  Emits one INFO log when divergent groups exist.
+
+    Returns a DataFrame sorted by TRACKINTIMESTAMP ASC NULLS LAST, CONTAINERNAME.
+    """
+    import pandas as pd
+
+    if df.empty:
+        result = df.copy()
+        result["partial_count"] = pd.array([], dtype="Int64")
+        return result
+
+    key_cols = [c for c in _PARTIAL_KEY_COLS if c in df.columns]
+    nonkey_cols = [c for c in _PARTIAL_NONKEY_COLS if c in df.columns]
+
+    grouped = df.groupby(key_cols, sort=False)
+
+    agg_rows: List[Dict[str, Any]] = []
+    raw_rows: List[Any] = []
+    divergent_count = 0
+    total_groups = grouped.ngroups
+
+    for _, grp in grouped:
+        # Check strict guard: all non-key columns must be identical
+        is_consistent = all(
+            grp[col].nunique(dropna=False) == 1
+            for col in nonkey_cols
+        )
+        if is_consistent:
+            # Aggregate: TRACKINQTY=MAX (original load), TRACKOUTTIMESTAMP=MAX,
+            # TRACKOUTQTY=SUM (sum of all partial outs), partial_count=COUNT(*).
+            row = grp.iloc[0].to_dict()
+            if "TRACKINQTY" in grp.columns:
+                row["TRACKINQTY"] = grp["TRACKINQTY"].max()
+            if "TRACKOUTTIMESTAMP" in grp.columns:
+                row["TRACKOUTTIMESTAMP"] = grp["TRACKOUTTIMESTAMP"].max()
+            if "TRACKOUTQTY" in grp.columns:
+                row["TRACKOUTQTY"] = grp["TRACKOUTQTY"].sum()
+            row["partial_count"] = len(grp)
+            agg_rows.append(row)
+        else:
+            # Strict guard fallback: emit raw rows with partial_count=1
+            divergent_count += 1
+            for _, raw_row in grp.iterrows():
+                d = raw_row.to_dict()
+                d["partial_count"] = 1
+                raw_rows.append(d)
+
+    # Emit summary INFO log when divergent groups exist (PH-07)
+    if divergent_count > 0:
+        logger.info(
+            "partial-trackout strict-guard: %d divergent groups fell back to raw rows "
+            "(query_id=%s, total_groups=%d)",
+            divergent_count,
+            query_id,
+            total_groups,
+        )
+
+    parts: List[Any] = []
+    if agg_rows:
+        parts.append(pd.DataFrame(agg_rows))
+    if raw_rows:
+        parts.append(pd.DataFrame(raw_rows))
+
+    if not parts:
+        result = df.iloc[0:0].copy()
+        result["partial_count"] = pd.array([], dtype="Int64")
+        return result
+
+    result = pd.concat(parts, ignore_index=True)
+
+    # Sort: TRACKINTIMESTAMP ASC (NaT/None last), then CONTAINERNAME
+    result = result.sort_values(
+        by=["TRACKINTIMESTAMP", "CONTAINERNAME"],
+        ascending=[True, True],
+        na_position="last",
+    ).reset_index(drop=True)
+
+    # Ensure partial_count is int (not float from concat)
+    result["partial_count"] = result["partial_count"].astype(int)
+
+    return result
 
 
 # ── Matrix summary ────────────────────────────────────────────────────────────
@@ -598,10 +834,11 @@ def stream_export(
     spool_path: str,
     filter_params: Dict[str, Any],
 ) -> Generator[str, None, None]:
-    """Stream CSV rows from spool.
+    """Stream CSV rows from spool applying partial-trackout aggregation (PH-06/PH-07).
 
     Yields:
         CSV row strings (header first, then data rows).
+        Column 16 (final) is PartialCount \u2014 additive per api-contract.md \u00a710.
     """
     EXPORT_COLUMNS = [
         ("CONTAINERNAME", "LotID"),
@@ -619,12 +856,12 @@ def stream_export(
         ("TRACKOUTTIMESTAMP", "TrackOutTime"),
         ("TRACKINQTY", "TrackInQty"),
         ("TRACKOUTQTY", "TrackOutQty"),
+        ("partial_count", "PartialCount"),  # column 16 \u2014 additive per api-contract \u00a710
     ]
-    col_selects = ", ".join(
-        f"{_qid(src)} AS {_qid(dst)}" for src, dst in EXPORT_COLUMNS
-    )
 
     where, params = _build_filter_where(filter_params)
+    # See compute_detail_page for why the raw branch needs AND, not WHERE.
+    where_for_raw = (" AND " + where[len("WHERE "):]) if where else ""
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -646,15 +883,107 @@ def stream_export(
         conn = _get_duckdb_conn()
         _attach_spool_view(conn, spool_path)
 
-        while True:
-            sql = f"""
-                SELECT {col_selects}
+        # Build same aggregation CTE as compute_detail_page (PH-06/PH-07) — 4-tuple key
+        agg_cte_sql = f"""
+            WITH grouped AS (
+                SELECT
+                    CONTAINERNAME, SPECNAME, EQUIPMENTID, TRACKINTIMESTAMP,
+                    COUNT(*) AS partial_count,
+                    MAX(TRACKINQTY)        AS TRACKINQTY,
+                    MAX(TRACKOUTTIMESTAMP) AS TRACKOUTTIMESTAMP,
+                    SUM(TRACKOUTQTY)       AS TRACKOUTQTY,
+                    COUNT(DISTINCT MFGORDERNAME)    AS dc_work_order,
+                    COUNT(DISTINCT FIRSTNAME)        AS dc_wafer_lot,
+                    COUNT(DISTINCT PJ_TYPE)          AS dc_pj_type,
+                    COUNT(DISTINCT PJ_BOP)           AS dc_pj_bop,
+                    COUNT(DISTINCT PJ_FUNCTION)      AS dc_pj_function,
+                    COUNT(DISTINCT PRODUCTLINENAME)  AS dc_package,
+                    COUNT(DISTINCT WORKCENTERNAME)   AS dc_wc,
+                    COUNT(DISTINCT EQUIPMENTNAME)    AS dc_eq_name,
+                    ANY_VALUE(MFGORDERNAME)    AS MFGORDERNAME,
+                    ANY_VALUE(FIRSTNAME)       AS FIRSTNAME,
+                    ANY_VALUE(PJ_TYPE)         AS PJ_TYPE,
+                    ANY_VALUE(PJ_BOP)          AS PJ_BOP,
+                    ANY_VALUE(PJ_FUNCTION)     AS PJ_FUNCTION,
+                    ANY_VALUE(PRODUCTLINENAME) AS PRODUCTLINENAME,
+                    ANY_VALUE(WORKCENTERNAME)  AS WORKCENTERNAME,
+                    ANY_VALUE(EQUIPMENTNAME)   AS EQUIPMENTNAME
                 FROM ph_src
                 {where}
+                GROUP BY CONTAINERNAME, SPECNAME, EQUIPMENTID, TRACKINTIMESTAMP
+            ),
+            agg AS (
+                SELECT * FROM grouped
+                WHERE dc_work_order=1 AND dc_wafer_lot=1 AND dc_pj_type=1 AND dc_pj_bop=1
+                  AND dc_pj_function=1 AND dc_package=1 AND dc_wc=1 AND dc_eq_name=1
+            ),
+            raw AS (
+                SELECT
+                    p.CONTAINERNAME, p.SPECNAME, p.EQUIPMENTID,
+                    p.TRACKINTIMESTAMP,
+                    1 AS partial_count,
+                    p.TRACKINQTY,
+                    p.TRACKOUTTIMESTAMP, p.TRACKOUTQTY,
+                    0 AS dc_work_order, 0 AS dc_wafer_lot, 0 AS dc_pj_type, 0 AS dc_pj_bop,
+                    0 AS dc_pj_function, 0 AS dc_package, 0 AS dc_wc, 0 AS dc_eq_name,
+                    p.MFGORDERNAME, p.FIRSTNAME, p.PJ_TYPE, p.PJ_BOP,
+                    p.PJ_FUNCTION, p.PRODUCTLINENAME, p.WORKCENTERNAME, p.EQUIPMENTNAME
+                FROM ph_src p
+                WHERE (p.CONTAINERNAME, p.SPECNAME, p.EQUIPMENTID,
+                       p.TRACKINTIMESTAMP) IN (
+                    SELECT CONTAINERNAME, SPECNAME, EQUIPMENTID, TRACKINTIMESTAMP
+                    FROM grouped
+                    WHERE dc_work_order>1 OR dc_wafer_lot>1 OR dc_pj_type>1 OR dc_pj_bop>1
+                       OR dc_pj_function>1 OR dc_package>1 OR dc_wc>1 OR dc_eq_name>1
+                )
+                {where_for_raw}
+            ),
+            combined AS (
+                SELECT * FROM agg UNION ALL SELECT * FROM raw
+            )
+        """
+
+        # Compute divergent-group count for summary INFO log
+        log_sql = f"""
+            {agg_cte_sql}
+            SELECT
+                (SELECT COUNT(DISTINCT (CONTAINERNAME, SPECNAME, EQUIPMENTID,
+                                        TRACKINTIMESTAMP)) FROM grouped
+                 WHERE dc_work_order>1 OR dc_wafer_lot>1 OR dc_pj_type>1 OR dc_pj_bop>1
+                    OR dc_pj_function>1 OR dc_package>1 OR dc_wc>1 OR dc_eq_name>1
+                ) AS divergent_groups,
+                (SELECT COUNT(*) FROM grouped) AS total_groups
+        """
+        log_row = conn.execute(log_sql, params + params).fetchone()
+        if log_row:
+            divergent_groups = int(log_row[0]) if log_row[0] is not None else 0
+            total_groups = int(log_row[1]) if log_row[1] is not None else 0
+            if divergent_groups > 0:
+                query_id = filter_params.get("query_id")
+                logger.info(
+                    "partial-trackout strict-guard: %d divergent groups fell back to raw rows "
+                    "(query_id=%s, total_groups=%d)",
+                    divergent_groups,
+                    query_id,
+                    total_groups,
+                )
+
+        # Stream aggregated rows in batches
+        # Build column select from EXPORT_COLUMNS (excluding partial_count which is already in CTE)
+        _NON_PARTIAL_EXPORT = [(s, d) for s, d in EXPORT_COLUMNS if s != "partial_count"]
+        col_selects = ", ".join(
+            f"{_qid(src)} AS {_qid(dst)}" for src, dst in _NON_PARTIAL_EXPORT
+        ) + ', "partial_count" AS "PartialCount"'
+
+        while True:
+            sql = f"""
+                {agg_cte_sql}
+                SELECT {col_selects}
+                FROM combined
                 ORDER BY TRACKINTIMESTAMP ASC NULLS LAST, CONTAINERNAME
                 LIMIT {BATCH_SIZE} OFFSET {offset}
             """
-            rows = _fetch_dict_rows(conn, sql, params)
+            rows = _fetch_dict_rows(conn, sql, params + params)
             if not rows:
                 break
             for row in rows:
@@ -677,19 +1006,42 @@ def _pandas_stream_export(
     filter_params: Dict[str, Any],
     columns: List[tuple[str, str]],
 ) -> Generator[str, None, None]:
+    """Pandas fallback for stream_export \u2014 applies the same partial-trackout aggregation."""
     import pandas as pd
 
     df = pd.read_parquet(spool_path)
     df = _apply_pandas_filter(df, filter_params)
 
+    # Apply same 4-tuple aggregation as DuckDB path (PH-06/PH-07)
+    df = _pandas_aggregate_partial_trackouts(df, query_id=filter_params.get("query_id"))
+
     buf = io.StringIO()
     writer = csv.writer(buf)
     BATCH = 500
 
+    # Build a mapping from column name \u2192 CSV header for the aggregated DataFrame
+    # EXPORT_COLUMNS uses raw Oracle column names for non-partial_count columns
+    # but the aggregated df retains original column names, so we read by src name.
+    # For partial_count column we use the column name directly.
+    _RENAME_BACK = {
+        "LotID": "CONTAINERNAME", "Type": "PJ_TYPE", "Package": "PRODUCTLINENAME",
+        "BOP": "PJ_BOP", "Function": "PJ_FUNCTION", "WorkOrder": "MFGORDERNAME",
+        "WaferLot": "FIRSTNAME", "WorkCenter": "WORKCENTERNAME", "Spec": "SPECNAME",
+        "EquipmentID": "EQUIPMENTID", "EquipmentName": "EQUIPMENTNAME",
+        "TrackInTime": "TRACKINTIMESTAMP", "TrackOutTime": "TRACKOUTTIMESTAMP",
+        "TrackInQty": "TRACKINQTY", "TrackOutQty": "TRACKOUTQTY",
+        "PartialCount": "partial_count",
+    }
+
     for i in range(0, max(len(df), 1), BATCH):
         chunk = df.iloc[i: i + BATCH]
         for _, row in chunk.iterrows():
-            writer.writerow([row.get(src, "") for src, _ in columns])
+            csv_row = []
+            for src, dst in columns:
+                # src is the Oracle column name (or 'partial_count'); dst is CSV header
+                col_name = src if src != "partial_count" else "partial_count"
+                csv_row.append(row.get(col_name, ""))
+            writer.writerow(csv_row)
         yield buf.getvalue()
         buf.truncate(0)
         buf.seek(0)

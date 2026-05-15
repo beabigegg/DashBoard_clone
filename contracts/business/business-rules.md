@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.5.0
-last-changed: 2026-05-14
+schema-version: 1.6.1
+last-changed: 2026-05-15
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -117,11 +117,13 @@ breaking-change-policy: deprecate-2-minors
 
 | rule id | name | current behavior | tests |
 |---|---|---|---|
-| PH-01 | Raw per-partial detail rows | Detail query returns one row per LOTWIPHISTORY partial track-out (no GROUP BY). `TRACKINTIMESTAMP / TRACKOUTTIMESTAMP / TRACKINQTY / TRACKOUTQTY` are raw per-partial values — prior assumption "first partial = original batch quantity" is dropped | unit + parity tests |
+| PH-01 | Raw per-partial detail rows | Detail query draws from one raw row per LOTWIPHISTORY partial track-out in the spool. `TRACKINTIMESTAMP / TRACKOUTTIMESTAMP / TRACKINQTY / TRACKOUTQTY` are raw per-partial values in the spool — prior assumption "first partial = original batch quantity" is dropped. A view-layer aggregation (see PH-06) is applied above this row source before the API response is emitted. | unit + parity tests |
 | PH-02 | Matrix lot-count semantics | Matrix `count` cell = `COUNT(DISTINCT CONTAINERNAME)` computed in DuckDB over the raw row source; equals prior aggregated-baseline lot count for the same (WC, Spec, Equipment × Month) cell. Parent-level (workcenter/spec) distinct-count rollup semantics are governed by PH-05. | integration + e2e tests |
 | PH-03 | PJ_FUNCTION spool carriage | `PJ_FUNCTION` is carried through Oracle→spool→DuckDB schema and CSV export (pre-staged for Change 3); not yet exposed as a user filter | contract + parity tests |
-| PH-04 | Detail row ordering | Detail table sorts by `TRACKINTIMESTAMP` ascending; no "partial #" column (Resolved Decision 2 of change `prod-history-detail-raw-rows`) | e2e tests |
+| PH-04 | Detail row ordering | Detail table sorts by `TRACKINTIMESTAMP` ascending. For aggregated groups (PH-06), the shared `TRACKINTIMESTAMP` of the group serves as the sort key. No "partial #" column (Resolved Decision 2 of change `prod-history-detail-raw-rows`). | e2e tests |
 | PH-05 | Matrix distinct-count non-additivity | Matrix tree parent-level `count` and `month_counts` (at `workcenter` and `spec` grain) are `COUNT(DISTINCT CONTAINERNAME)` re-evaluated independently at that grain — NOT the sum of child-node counts. Distinct LOT-ID counts are non-additive across the hierarchy: one CONTAINERNAME spanning multiple specs (or multiple equipment under one spec) is counted once at each ancestor node. Equipment (leaf) grain counts are unchanged (PH-02). Both code paths — DuckDB SQL (`compute_matrix_view`) and pandas fallback (`_pandas_matrix_view`) — must produce identical trees. | unit + contract + integration tests |
+| PH-06 | Partial-trackout aggregation | Detail rows aggregate partial track-outs of the same upload session by the 4-tuple `(CONTAINERNAME, SPECNAME, EQUIPMENTID, TRACKINTIMESTAMP)`. The aggregated row carries `TRACKINQTY = MAX(TRACKINQTY)` (= the original load qty before any partial trackouts), `TRACKOUTTIMESTAMP = MAX(TRACKOUTTIMESTAMP)`, `TRACKOUTQTY = SUM(TRACKOUTQTY)`, and `partial_count = COUNT(*)`. TRACKINQTY is intentionally NOT a key because this MES records TRACKINQTY as the qty REMAINING at each partial's start (decreasing across partials of the same upload), not the original load. A/B-lot interleaving (same CONTAINERNAME re-entering the same EQUIPMENTID with a different TRACKINTIMESTAMP) produces distinct rows and is never merged. All three paths — DuckDB SQL `compute_detail_page`, pandas fallback `_pandas_detail_page`, and the CSV export stream — must apply identical aggregation logic. `pagination.total_rows` reflects the post-aggregation row count. | unit + parity + contract tests |
+| PH-07 | Partial-trackout strict guard | Aggregation under PH-06 collapses a group only when all non-key columns (`MFGORDERNAME`, `FIRSTNAME`, `PJ_TYPE`, `PJ_BOP`, `PJ_FUNCTION`, `PRODUCTLINENAME`, `WORKCENTERNAME`, `EQUIPMENTNAME`) are identical within the group. If any non-key column diverges across partial track-outs of the same 4-tuple, the group falls back to raw rows (no merge) for that group only; each raw row receives `partial_count = 1`. Divergence is logged at INFO level as a summary count per request (`partial-trackout strict-guard: <N> divergent groups fell back to raw rows ...`). No error is returned to the client; the raw rows remain correct data. | unit tests |
 
 ## Production-History Filter Rules
 
@@ -204,6 +206,8 @@ breaking-change-policy: deprecate-2-minors
 | Date range > 730d | HTTP 400 `VALIDATION_ERROR` | VAL-03 | route tests |
 | Identifier token present + no dates | wide / all-time query, no dates-required error | PHF-07 | contract + integration |
 | No identifier token + missing pj_types/dates | HTTP 400 `VALIDATION_ERROR` | PHF-08 | route tests |
+| Partial trackout group — 4-tuple match, non-key columns consistent | Single aggregated row; `trackin_qty = MAX(...)` (original load), `trackout_qty = SUM(...)`, `trackout_time = MAX(...)`, `partial_count ≥ 2` | PH-06 | unit tests |
+| Partial trackout group — 4-tuple match, any non-key column diverges | Multiple raw rows emitted, `partial_count = 1` each; per-request INFO log with divergent-group count | PH-07 | unit tests |
 
 ## Change Policy
 

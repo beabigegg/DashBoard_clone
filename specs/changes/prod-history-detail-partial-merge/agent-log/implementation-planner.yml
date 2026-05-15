@@ -1,0 +1,37 @@
+agent: implementation-planner
+change-id: prod-history-detail-partial-merge
+status: complete
+date: 2026-05-15
+
+decision: plan-written
+notes: |
+  Wrote implementation-plan.md as the handoff packet for backend-engineer and
+  frontend-engineer. Plan references test-plan.md / ci-gates.md / contracts by
+  path+section without copying their prose. Two open decisions surfaced for
+  implementers: (1) SQL-only vs shared pandas helper for backend aggregation
+  (helper recommended), (2) frontend badge text vs numeric count
+  (ui-ux-reviewer adjudicates). Contracts already updated by contract-reviewer;
+  implementers must not re-edit.
+
+artifacts:
+  - type: plan-written
+    pointer: specs/changes/prod-history-detail-partial-merge/implementation-plan.md
+  - type: owner-map
+    pointer: backend-engineer, frontend-engineer
+  - type: scope-summary
+    pointer: "in-scope: aggregation helper module + 3 backend paths (DuckDB / pandas / CSV) + frontend DetailRow type + badge in ProductionDetailTable.vue + 4 extended test files. out-of-scope: shared DataTable, parquet schema, new e2e/stress, new CSS contract, new CI gate."
+
+files-read:
+  - specs/changes/prod-history-detail-partial-merge/change-request.md
+  - specs/changes/prod-history-detail-partial-merge/change-classification.md
+  - specs/changes/prod-history-detail-partial-merge/context-manifest.md
+  - specs/changes/prod-history-detail-partial-merge/test-plan.md
+  - specs/changes/prod-history-detail-partial-merge/ci-gates.md
+  - specs/changes/prod-history-detail-partial-merge/agent-log/contract-reviewer.yml
+  - contracts/business/business-rules.md
+  - contracts/api/api-contract.md  # PH-06/PH-07 + §10 partial_count compat note
+  - contracts/data/data-shape-contract.md  # detail-row partial_count field
+  - src/mes_dashboard/services/production_history_sql_runtime.py
+  - src/mes_dashboard/routes/production_history_routes.py  # export route ref
+  - frontend/src/production-history/components/ProductionDetailTable.vue
+  - frontend/src/production-history/composables/useProductionHistory.ts

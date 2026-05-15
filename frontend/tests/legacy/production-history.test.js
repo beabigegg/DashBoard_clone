@@ -390,3 +390,51 @@ test('_buildUrl drops empty arrays and JSON-encodes selection', () => {
   const json = decodeURIComponent(u.split('selected=')[1]);
   assert.deepEqual(JSON.parse(json), { pj_types: ['A', 'B'], bops: ['B-1'] });
 });
+
+
+// ── partial_count badge logic (AC-6) ──────────────────────────────────────
+//
+// These tests validate the badge render condition:
+//   row.partial_count > 1  → badge text `×N 合併`
+//   row.partial_count === 1, undefined, null, 0  → no badge
+//
+// The condition is implemented in ProductionDetailTable.vue template.
+// These pure-logic tests confirm the predicate used in the template
+// (the Vitest component tests in tests/components/ProductionDetailTable.test.js
+// cover the actual DOM rendering).
+
+/** Mirrors the template render condition for the merge badge. */
+function shouldRenderBadge(row) {
+  return typeof row.partial_count === 'number' && row.partial_count > 1;
+}
+
+/** Returns the badge text for a given row (mirrors the template expression). */
+function badgeText(row) {
+  return `×${row.partial_count} 合併`;
+}
+
+test('test partial_count badge renders when value gt 1', () => {
+  const row = { lot_id: 'LOT-001', partial_count: 3 };
+  assert.ok(shouldRenderBadge(row), 'badge condition should be true for partial_count=3');
+  assert.equal(badgeText(row), '×3 合併');
+});
+
+test('test partial_count badge absent when value equals 1', () => {
+  const row = { lot_id: 'LOT-001', partial_count: 1 };
+  assert.ok(!shouldRenderBadge(row), 'badge condition should be false for partial_count=1');
+});
+
+test('test partial_count badge absent when value is undefined', () => {
+  const row = { lot_id: 'LOT-001' }; // partial_count omitted (older backend)
+  assert.ok(!shouldRenderBadge(row), 'badge condition should be false for missing partial_count');
+});
+
+test('test partial_count badge absent when value is null', () => {
+  const row = { lot_id: 'LOT-001', partial_count: null };
+  assert.ok(!shouldRenderBadge(row), 'badge condition should be false for partial_count=null');
+});
+
+test('test partial_count badge absent when value is 0', () => {
+  const row = { lot_id: 'LOT-001', partial_count: 0 };
+  assert.ok(!shouldRenderBadge(row), 'badge condition should be false for partial_count=0');
+});

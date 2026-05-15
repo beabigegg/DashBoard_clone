@@ -1,0 +1,49 @@
+agent: visual-reviewer
+change-id: prod-history-detail-partial-merge
+status: approved
+date: 2026-05-15
+
+decision: approved
+
+state-coverage:
+  - partial_count > 1: badge shown (pass)
+  - partial_count == 1: badge absent (pass)
+  - partial_count undefined/null/0: badge absent (pass)
+  - keyboard nav: no regression (pass)
+
+css-contract:
+  utilities-used: [ml-1, inline-block, text-xs, bg-gray-100, text-gray-600, rounded, px-1]
+  all-standard-tailwind: true
+  custom-tokens-violated: none
+  scoped-under: .theme-production-history
+  unscoped-rules-introduced: none
+
+contrast-ratio: 6.87:1 (gray-600 on gray-100) — WCAG AA pass (>= 4.5:1)
+
+responsive:
+  desktop: ok
+  tablet: ok (DataTable horizontal scroll handles badge)
+  mobile: ok (same scroll mechanism)
+  badge-overflow-handling: graceful via horizontal scroll
+
+snapshot-baseline:
+  required: no (visual-regression gate is informational per ci-gates.md)
+  post-merge-suggestion: capture baselines if team wants regression coverage
+    - desktop 1920px with 3-partial-count row
+    - tablet 768px confirming scroll
+    - mobile 375px confirming no corruption
+
+verification-path:
+  - ui-ux-reviewer: approved-with-suggestions; aria-label applied inline
+  - frontend-engineer: 3 Vitest + 5 legacy tests green; vue-tsc clean; css:check clean
+  - contract-reviewer: api/business/data contracts updated
+
+files-read:
+  - frontend/src/production-history/components/ProductionDetailTable.vue
+  - frontend/src/production-history/style.css
+  - frontend/src/production-history/App.vue
+  - frontend/tailwind.config.js
+  - frontend/src/shared-ui/components/DataTable.vue
+  - contracts/css/css-contract.md
+  - contracts/css/design-tokens.md
+  - specs/changes/prod-history-detail-partial-merge/agent-log/ui-ux-reviewer.yml

@@ -527,5 +527,117 @@ class TestProductionHistoryQueryModeContract(unittest.TestCase):
         self.assertEqual(data["error"]["code"], "VALIDATION_ERROR")
 
 
+class TestProductionHistoryPartialMergeContract(unittest.TestCase):
+    """Contract assertions for prod-history-detail-partial-merge (2026-05-15).
+
+    AC-4: pagination.total_rows must equal post-aggregation row count.
+    AC-6: every detail row must carry partial_count as an integer >= 1.
+    """
+
+    def _make_spool(self, tmp_dir, records):
+        import os
+        import pandas as pd
+        df = pd.DataFrame.from_records(records)
+        path = os.path.join(tmp_dir, "ph_spool.parquet")
+        df.to_parquet(path)
+        return path
+
+    def _base_record(self, overrides=None):
+        base = {
+            "CONTAINERNAME": "LOT-A",
+            "SPECNAME": "SPEC-1",
+            "EQUIPMENTID": "EQ-01",
+            "TRACKINTIMESTAMP": "2026-01-01 08:00:00",
+            "TRACKINQTY": 100,
+            "TRACKOUTTIMESTAMP": "2026-01-01 10:00:00",
+            "TRACKOUTQTY": 50,
+            "MFGORDERNAME": "WO-001",
+            "FIRSTNAME": "WL-001",
+            "PJ_TYPE": "GA",
+            "PJ_BOP": "BOP1",
+            "PJ_FUNCTION": "FN1",
+            "PRODUCTLINENAME": "PKG-A",
+            "WORKCENTERNAME": "WC-X",
+            "EQUIPMENTNAME": "EQP-NAME-01",
+        }
+        if overrides:
+            base.update(overrides)
+        return base
+
+    def test_production_history_detail_pagination_total_rows_post_aggregation(self):
+        """AC-4: pagination.total_rows == post-aggregation count, not raw spool row count.
+
+        3 raw spool rows sharing the same 5-tuple must produce total_rows=1.
+        """
+        import os
+        import tempfile
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            records = [
+                self._base_record({"TRACKOUTTIMESTAMP": "2026-01-01 09:00:00", "TRACKOUTQTY": 20}),
+                self._base_record({"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 30}),
+                self._base_record({"TRACKOUTTIMESTAMP": "2026-01-01 11:00:00", "TRACKOUTQTY": 50}),
+            ]
+            path = self._make_spool(tmp_dir, records)
+            result = compute_detail_page(path, {}, page=1, per_page=25)
+            total_rows = result["pagination"]["total_rows"]
+            self.assertEqual(
+                total_rows,
+                1,
+                f"AC-4 FAIL: total_rows must be 1 (post-aggregation) when 3 raw rows share "
+                f"the same 5-tuple key, but got {total_rows}. "
+                "The contract requires total_rows = post-aggregation row count (api-contract.md §10, 2026-05-15).",
+            )
+
+    def _make_spool_path(self, records):
+        """Helper that returns (path, tmpdir_obj) — caller must keep tmpdir alive."""
+        import os
+        import tempfile
+        import pandas as pd
+        tmpdir = tempfile.mkdtemp()
+        df = pd.DataFrame.from_records(records)
+        path = os.path.join(tmpdir, "ph_spool.parquet")
+        df.to_parquet(path)
+        return path, tmpdir
+
+    def test_detail_row_schema_has_partial_count_integer(self):
+        """AC-6: every row returned by compute_detail_page must contain 'partial_count'
+        as an integer >= 1, as declared in contracts/data/data-shape-contract.md §3.4
+        and contracts/api/api-contract.md §10 (2026-05-15).
+        """
+        import shutil
+        from mes_dashboard.services.production_history_sql_runtime import compute_detail_page
+
+        records = [
+            self._base_record({"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 50}),
+            self._base_record({"TRACKOUTTIMESTAMP": "2026-01-01 11:00:00", "TRACKOUTQTY": 50}),
+        ]
+        path, tmpdir = self._make_spool_path(records)
+        try:
+            result = compute_detail_page(path, {}, page=1, per_page=25)
+            rows = result["rows"]
+            self.assertTrue(rows, "detail page must return at least one row")
+            for i, row in enumerate(rows):
+                self.assertIn(
+                    "partial_count",
+                    row,
+                    f"AC-6 FAIL: row[{i}] missing 'partial_count' field. "
+                    "Contract requires this field (data-shape-contract.md §3.4).",
+                )
+                self.assertIsInstance(
+                    row["partial_count"],
+                    int,
+                    f"AC-6 FAIL: row[{i}]['partial_count'] must be int, got {type(row['partial_count'])}.",
+                )
+                self.assertGreaterEqual(
+                    row["partial_count"],
+                    1,
+                    f"AC-6 FAIL: row[{i}]['partial_count'] must be >= 1, got {row['partial_count']}.",
+                )
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()

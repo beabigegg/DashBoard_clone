@@ -1,0 +1,52 @@
+agent: ui-ux-reviewer
+change-id: prod-history-detail-partial-merge
+status: approved-with-suggestions → suggestion-1-applied-inline
+date: 2026-05-15
+
+verdict: approved-with-suggestions
+suggestions:
+  - id: 1
+    severity: low
+    title: Add aria-label to badge span
+    location: frontend/src/production-history/components/ProductionDetailTable.vue:93
+    rationale: |
+      Screen reader otherwise reads "×3 合併" with "×" pronounced "multiplication sign"
+      in Chinese TTS engines. aria-label gives natural reading without affecting visuals.
+    status: applied
+    applied-by: main-claude (inline before merge, per CLAUDE.md ui-ux-reviewer convention)
+    verification: |
+      vue-tsc --noEmit: 0 errors
+      vitest tests/components/ProductionDetailTable.test.js: 3/3 passing
+  - id: 2
+    severity: low
+    title: Conditional footnote in section header explaining merge semantics
+    location: frontend/src/production-history/components/ProductionDetailTable.vue section-header
+    rationale: |
+      First-time engineers may not know what "合併" means in the badge. A footnote
+      "含 partial trackout 合併列（同上機批次多次下機已彙整為單列）" near the row count
+      would help discoverability.
+    status: not-applied
+    decision-rationale: |
+      Marked informational/optional by reviewer; locked decision §2 says no i18n text expansion;
+      visual-reviewer can re-raise if discoverability is shown to be a problem in practice.
+
+files-read:
+  - specs/changes/prod-history-detail-partial-merge/context-manifest.md
+  - specs/changes/prod-history-detail-partial-merge/change-request.md
+  - specs/changes/prod-history-detail-partial-merge/implementation-plan.md
+  - specs/changes/prod-history-detail-partial-merge/change-classification.md
+  - frontend/src/production-history/components/ProductionDetailTable.vue
+  - frontend/src/production-history/composables/useProductionHistory.ts
+  - frontend/src/production-history/App.vue
+  - frontend/src/shared-ui/components/DataTable.vue
+  - contracts/business/business-rules.md
+
+state-coverage:
+  - partial_count > 1: badge shown (pass)
+  - partial_count == 1: badge absent (pass)
+  - partial_count undefined/null/0: badge absent — defensive (pass)
+  - loading / empty state: unchanged upstream (pass)
+  - keyboard nav: non-interactive span, no tab order regression (pass)
+  - contrast: gray-600 on gray-100 ≈ 7:1 (pass WCAG AA)
+
+post-fix verdict: approved

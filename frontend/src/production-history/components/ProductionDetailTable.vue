@@ -33,6 +33,15 @@ function formatTs(value: unknown): string {
     return String(value);
   }
 }
+
+/**
+ * Returns partial_count from a DataTable slot row (typed as Record<string, unknown>).
+ * Guards against missing / non-numeric values so older backends are safe.
+ */
+function getPartialCount(row: Record<string, unknown>): number {
+  const v = row['partial_count'];
+  return typeof v === 'number' ? v : 0;
+}
 </script>
 
 <template>
@@ -78,6 +87,13 @@ function formatTs(value: unknown): string {
       <template #cell="{ row, columnKey, value }">
         <template v-if="columnKey === 'trackin_time'">{{ formatTs(value) }}</template>
         <template v-else-if="columnKey === 'trackout_time'">{{ formatTs(value) }}</template>
+        <template v-else-if="columnKey === 'lot_id'">
+          {{ value ?? '' }}<span
+            v-if="getPartialCount(row) > 1"
+            class="ml-1 inline-block text-xs bg-gray-100 text-gray-600 rounded px-1"
+            :aria-label="`此列合併了 ${getPartialCount(row)} 筆 partial trackout`"
+          >×{{ getPartialCount(row) }} 合併</span>
+        </template>
         <template v-else>{{ value ?? '' }}</template>
       </template>
     </DataTable>

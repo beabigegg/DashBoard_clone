@@ -398,3 +398,181 @@ class TestValidateQueryParamsModeSplit:
 def datetime_from(value: str):
     from datetime import datetime
     return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+# ============================================================
+# Change: prod-history-detail-partial-merge
+# AC-1: pandas fallback aggregates partial track-outs (MAX trackout_time, SUM trackout_qty, partial_count)
+# AC-2: ABA interleave (different TRACKINTIMESTAMP) is NOT merged
+# AC-3: strict guard falls back to raw rows when non-key columns diverge; logs INFO summary
+# PH-06 / PH-07
+# ============================================================
+
+
+def _make_spool_records(base: dict, overrides_list: list[dict]) -> list[dict]:
+    """Build a list of spool row dicts from a base dict + per-row overrides."""
+    return [{**base, **overrides} for overrides in overrides_list]
+
+
+class TestPandasFallbackAggregation:
+    """Pandas fallback (_pandas_detail_page) must apply 5-tuple aggregation
+    identical to the DuckDB SQL primary path.  Covers AC-1, AC-2, AC-3, PH-07.
+    """
+
+    # ── Shared minimal spool base ──────────────────────────────────────────────
+    _BASE = {
+        "CONTAINERNAME": "LOT-A",
+        "SPECNAME": "SPEC-1",
+        "EQUIPMENTID": "EQ-01",
+        "TRACKINTIMESTAMP": "2026-01-01 08:00:00",
+        "TRACKINQTY": 100,
+        "MFGORDERNAME": "WO-001",
+        "FIRSTNAME": "WL-001",
+        "PJ_TYPE": "GA",
+        "PJ_BOP": "BOP1",
+        "PJ_FUNCTION": "FN1",
+        "PRODUCTLINENAME": "PKG-A",
+        "WORKCENTERNAME": "WC-X",
+        "EQUIPMENTNAME": "EQP-NAME-01",
+    }
+
+    def _write_spool(self, tmp_path, records: list[dict]) -> str:
+        import pandas as pd
+        df = pd.DataFrame.from_records(records)
+        path = str(tmp_path / "ph_spool.parquet")
+        df.to_parquet(path)
+        return path
+
+    # AC-1: two partial track-outs of the same 5-tuple → ONE row with SUM qty and MAX time
+    def test_pandas_fallback_sum_qty_max_time(self, tmp_path):
+        """AC-1: two partial track-outs collapse to one row; trackout_qty=SUM, trackout_time=MAX."""
+        import mes_dashboard.services.production_history_sql_runtime as mod
+        import importlib
+        importlib.reload(mod)  # ensure flag is re-evaluated in test environment
+
+        records = _make_spool_records(self._BASE, [
+            {"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 30},
+            {"TRACKOUTTIMESTAMP": "2026-01-01 12:00:00", "TRACKOUTQTY": 70},
+        ])
+        path = self._write_spool(tmp_path, records)
+        result = mod._pandas_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert len(rows) == 1, f"expected 1 aggregated row, got {len(rows)}"
+        row = rows[0]
+        assert row["trackout_qty"] == 100, f"SUM trackout_qty expected 100, got {row['trackout_qty']}"
+        assert "12:00:00" in str(row["trackout_time"]), f"MAX trackout_time expected 12:00, got {row['trackout_time']}"
+
+    # AC-1: partial_count equals number of raw rows in the group
+    def test_pandas_fallback_partial_count(self, tmp_path):
+        """AC-1: partial_count == number of raw spool rows in the merged group."""
+        import mes_dashboard.services.production_history_sql_runtime as mod
+
+        records = _make_spool_records(self._BASE, [
+            {"TRACKOUTTIMESTAMP": "2026-01-01 09:00:00", "TRACKOUTQTY": 25},
+            {"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 25},
+            {"TRACKOUTTIMESTAMP": "2026-01-01 11:00:00", "TRACKOUTQTY": 50},
+        ])
+        path = self._write_spool(tmp_path, records)
+        result = mod._pandas_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert len(rows) == 1
+        assert rows[0]["partial_count"] == 3, f"expected partial_count=3, got {rows[0].get('partial_count')}"
+
+    # AC-2: A/B interleave — different TRACKINTIMESTAMP → separate rows, NOT merged
+    def test_pandas_aba_interleave_not_merged(self, tmp_path):
+        """AC-2: same CONTAINERNAME+SPECNAME+EQUIPMENTID but different TRACKINTIMESTAMP →
+        two distinct rows, never merged."""
+        import mes_dashboard.services.production_history_sql_runtime as mod
+
+        records = [
+            {**self._BASE, "TRACKINTIMESTAMP": "2026-01-01 08:00:00",
+             "TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 50},
+            {**self._BASE, "TRACKINTIMESTAMP": "2026-01-02 08:00:00",
+             "TRACKOUTTIMESTAMP": "2026-01-02 10:00:00", "TRACKOUTQTY": 50},
+        ]
+        path = self._write_spool(tmp_path, records)
+        result = mod._pandas_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert len(rows) == 2, f"ABA interleave must produce 2 rows, got {len(rows)}"
+        for row in rows:
+            assert row["partial_count"] == 1, (
+                f"single-row group must have partial_count=1, got {row.get('partial_count')}"
+            )
+
+    # AC-3: strict guard — non-key column diverges → raw rows, each partial_count=1
+    def test_strict_guard_fallback_to_raw_rows(self, tmp_path):
+        """AC-3: when MFGORDERNAME differs within the same 5-tuple group,
+        each raw row is emitted individually with partial_count=1."""
+        import mes_dashboard.services.production_history_sql_runtime as mod
+
+        records = [
+            {**self._BASE, "MFGORDERNAME": "WO-001",
+             "TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 40},
+            {**self._BASE, "MFGORDERNAME": "WO-002",   # diverges!
+             "TRACKOUTTIMESTAMP": "2026-01-01 11:00:00", "TRACKOUTQTY": 60},
+        ]
+        path = self._write_spool(tmp_path, records)
+        result = mod._pandas_detail_page(path, {}, page=1, per_page=25)
+        rows = result["rows"]
+        assert len(rows) == 2, (
+            f"strict guard must emit 2 raw rows when non-key diverges, got {len(rows)}"
+        )
+        for row in rows:
+            assert row["partial_count"] == 1, (
+                f"strict-guard raw rows must have partial_count=1, got {row.get('partial_count')}"
+            )
+
+    # AC-3 / PH-07: summary INFO log emitted when N>0 divergent groups
+    def test_strict_guard_logs_summary_with_divergent_count(self, tmp_path, caplog):
+        """AC-3/PH-07: one INFO line per request when divergent groups exist;
+        format: 'partial-trackout strict-guard: <N> divergent groups fell back to raw rows'."""
+        import logging
+        import mes_dashboard.services.production_history_sql_runtime as mod
+
+        records = [
+            {**self._BASE, "MFGORDERNAME": "WO-001",
+             "TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 40},
+            {**self._BASE, "MFGORDERNAME": "WO-002",
+             "TRACKOUTTIMESTAMP": "2026-01-01 11:00:00", "TRACKOUTQTY": 60},
+        ]
+        path = self._write_spool(tmp_path, records)
+
+        with caplog.at_level(logging.INFO, logger="mes_dashboard.production_history_sql_runtime"):
+            mod._pandas_detail_page(path, {}, page=1, per_page=25)
+
+        info_lines = [r for r in caplog.records if r.levelno == logging.INFO]
+        guard_lines = [r for r in info_lines if "partial-trackout strict-guard" in r.getMessage()]
+        assert len(guard_lines) == 1, (
+            f"expected exactly 1 strict-guard INFO line, got {len(guard_lines)}: "
+            f"{[r.getMessage() for r in guard_lines]}"
+        )
+        msg = guard_lines[0].getMessage()
+        assert "divergent groups fell back to raw rows" in msg, (
+            f"log message format wrong: {msg!r}"
+        )
+        # Should say "1 divergent groups" (one 5-tuple group diverged)
+        assert "1 divergent" in msg, f"expected '1 divergent' in msg: {msg!r}"
+
+    # AC-3 / PH-07: NO log when all groups are consistent
+    def test_strict_guard_no_log_when_all_consistent(self, tmp_path, caplog):
+        """AC-3/PH-07: strict-guard INFO must NOT be emitted when N==0 divergent groups."""
+        import logging
+        import mes_dashboard.services.production_history_sql_runtime as mod
+
+        records = _make_spool_records(self._BASE, [
+            {"TRACKOUTTIMESTAMP": "2026-01-01 10:00:00", "TRACKOUTQTY": 50},
+            {"TRACKOUTTIMESTAMP": "2026-01-01 11:00:00", "TRACKOUTQTY": 50},
+        ])
+        path = self._write_spool(tmp_path, records)
+
+        with caplog.at_level(logging.INFO, logger="mes_dashboard.production_history_sql_runtime"):
+            mod._pandas_detail_page(path, {}, page=1, per_page=25)
+
+        guard_lines = [
+            r for r in caplog.records
+            if r.levelno == logging.INFO and "partial-trackout strict-guard" in r.getMessage()
+        ]
+        assert len(guard_lines) == 0, (
+            f"strict-guard log must be suppressed when N==0, found: "
+            f"{[r.getMessage() for r in guard_lines]}"
+        )
