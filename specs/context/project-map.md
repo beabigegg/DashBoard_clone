@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 301
-visible-files: 1046
+visible-dirs: 306
+visible-files: 1043
 omitted-dirs: 106
 truncated-dirs: 8
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -84,6 +84,7 @@ DashBoard_vite/
 |   |   |-- 263226a93d9fd720
 |   |   |-- 267688019eacc507
 |   |   |-- 27e483e573db703b
+|   |   |-- 296b4f265252c452
 |   |   |-- 2ab6068320c1832c
 |   |   |-- 2b2923cb2e7b99f7
 |   |   |-- 2bed5af1a1ea5659
@@ -98,8 +99,7 @@ DashBoard_vite/
 |   |   |-- 3399b41644e40c25
 |   |   |-- 3453e8fac951ce5c
 |   |   |-- 349505052d6929ea
-|   |   |-- 36c681f3d6d05607
-|   |   \-- ... (173 more entries truncated; cap=50)
+|   |   \-- ... (176 more entries truncated; cap=50)
 |   |-- examples/
 |   |   |-- 04e6b3400353b141/
 |   |   |   |-- 13e0290a1a9c0bba
@@ -714,6 +714,7 @@ DashBoard_vite/
 |   |   |-- access_20260515_163007.log
 |   |   |-- access_20260515_163738.log
 |   |   |-- access_20260515_170327.log
+|   |   |-- access_20260515_191511.log
 |   |   |-- error_20260515_113239.log
 |   |   |-- error_20260515_113624.log
 |   |   |-- error_20260515_113842.log
@@ -722,6 +723,7 @@ DashBoard_vite/
 |   |   |-- error_20260515_163007.log
 |   |   |-- error_20260515_163738.log
 |   |   |-- error_20260515_170327.log
+|   |   |-- error_20260515_191511.log
 |   |   |-- rq_msd_worker_20260515_113239.log
 |   |   |-- rq_msd_worker_20260515_113624.log
 |   |   |-- rq_msd_worker_20260515_113842.log
@@ -730,6 +732,7 @@ DashBoard_vite/
 |   |   |-- rq_msd_worker_20260515_163007.log
 |   |   |-- rq_msd_worker_20260515_163738.log
 |   |   |-- rq_msd_worker_20260515_170327.log
+|   |   |-- rq_msd_worker_20260515_191511.log
 |   |   |-- rq_prod_hist_worker_20260515_113239.log
 |   |   |-- rq_prod_hist_worker_20260515_113624.log
 |   |   |-- rq_prod_hist_worker_20260515_113842.log
@@ -738,6 +741,7 @@ DashBoard_vite/
 |   |   |-- rq_prod_hist_worker_20260515_163007.log
 |   |   |-- rq_prod_hist_worker_20260515_163738.log
 |   |   |-- rq_prod_hist_worker_20260515_170327.log
+|   |   |-- rq_prod_hist_worker_20260515_191511.log
 |   |   |-- rq_reject_worker_20260515_113239.log
 |   |   |-- rq_reject_worker_20260515_113624.log
 |   |   |-- rq_reject_worker_20260515_113842.log
@@ -746,6 +750,7 @@ DashBoard_vite/
 |   |   |-- rq_reject_worker_20260515_163007.log
 |   |   |-- rq_reject_worker_20260515_163738.log
 |   |   |-- rq_reject_worker_20260515_170327.log
+|   |   |-- rq_reject_worker_20260515_191511.log
 |   |   |-- rq_worker_20260515_113239.log
 |   |   |-- rq_worker_20260515_113624.log
 |   |   |-- rq_worker_20260515_113842.log
@@ -753,12 +758,7 @@ DashBoard_vite/
 |   |   |-- rq_worker_20260515_134658.log
 |   |   |-- rq_worker_20260515_163007.log
 |   |   |-- rq_worker_20260515_163738.log
-|   |   |-- rq_worker_20260515_170327.log
-|   |   |-- rq_yield_alert_worker_20260515_113239.log
-|   |   |-- rq_yield_alert_worker_20260515_113624.log
-|   |   |-- rq_yield_alert_worker_20260515_113842.log
-|   |   |-- rq_yield_alert_worker_20260515_130312.log
-|   |   \-- ... (12 more entries truncated; cap=50)
+|   |   \-- ... (20 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -1390,7 +1390,7 @@ DashBoard_vite/
 |   |-- test_dashboard_service.py
 |   |-- test_database_redaction.py
 |   |-- test_database_slow_circuit_breaker.py
-|   \-- ... (152 more entries truncated; cap=50)
+|   \-- ... (153 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
 |   |   |-- anomaly_hold_dataset/
@@ -1401,14 +1401,28 @@ DashBoard_vite/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- material_trace/
-|   |   |   \-- mtrace-67637df729fb11a2.parquet
+|   |   |-- hold_dataset/
+|   |   |   |-- 4bd16ea73a4bbf32.parquet
+|   |   |   \-- 95e42fcaaa327839.parquet
 |   |   |-- production_history/
 |   |   |   |-- ph-043e0eabf07ba3c3.parquet
-|   |   |   |-- ph-33d97c65ff83e256.parquet
 |   |   |   |-- ph-594670cd0801903b.parquet
 |   |   |   |-- ph-dc1eb0568290c52f.parquet
 |   |   |   \-- ph-e0f0c7afebd990ee.parquet
+|   |   |-- reject_dataset/
+|   |   |   \-- 3511280f81a0f4eb.parquet
+|   |   |-- resource_dataset/
+|   |   |   |-- 44404b8c8320a4dc.parquet
+|   |   |   \-- c5c811f2b223e0cf.parquet
+|   |   |-- resource_oee/
+|   |   |   |-- 44404b8c8320a4dc.parquet
+|   |   |   \-- c5c811f2b223e0cf.parquet
+|   |   |-- trace_lineage/
+|   |   |   \-- trace-lineage-query-tool-ce8fc4723ffc9baba1ad31fc.parquet
+|   |   |-- yield_alert_dataset/
+|   |   |   |-- 5fdd52d6df79c582.parquet
+|   |   |   |-- b14cb138e6173d12.parquet
+|   |   |   \-- f90475d8fa771e62.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -1448,21 +1462,9 @@ DashBoard_vite/
 |   |   |-- probe_112651.json
 |   |   |-- probe_113602.json
 |   |   |-- probe_113603.json
-|   |   |-- probe_113666.json
-|   |   |-- probe_113869.json
-|   |   |-- probe_116133.json
-|   |   |-- probe_116787.json
-|   |   |-- probe_116823.json
-|   |   \-- ... (375 more entries truncated; cap=50)
-|   |-- gunicorn.pid
+|   |   \-- ... (385 more entries truncated; cap=50)
 |   |-- mes_dashboard_restart_state.json
-|   |-- resource_history.duckdb
-|   |-- rq_msd_worker.pid
-|   |-- rq_prod_hist_worker.pid
-|   |-- rq_reject_worker.pid
-|   |-- rq_trace_worker.pid
-|   |-- rq_yield_alert_worker.pid
-|   \-- worker_watchdog.pid
+|   \-- resource_history.duckdb
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py

@@ -1,0 +1,15 @@
+change-id: query-tool-partial-trackout
+agent: ci-cd-gatekeeper
+timestamp: "2026-05-15T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1 (unit-mock-integration — unchanged, confirmed sufficient)" }
+  - { type: gate-promotions, pointer: "n/a (no tier changes; all gates already in place)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow files modified; existing backend-tests.yml path filters cover sql/** and tests/**)" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests (backend-tests.yml), contract-and-fast-tests (contract-driven-gates.yml)" }
+next-action: none
+notes: >
+  No new CI workflows needed. backend-tests.yml path filter `src/mes_dashboard/sql/**`
+  already covers lot_history.sql, equipment_lots.sql, adjacent_lots.sql.
+  No integration_real-marked query-tool tests exist pre-merge; nightly gate is
+  informational for this change. No parquet or cache cleanup in rollback path.
