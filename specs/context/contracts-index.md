@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 9468cdd5debbc4137feccdc686cf548f6cfc3c65b1c741849be091f814cb0beb
+inputs-digest: 3981a9aa67122921ca6f8a7d49bd38c839056a427c5e18e5a11465856d45a844
 ---
 
 # Contracts Index
@@ -48,7 +48,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Inventory
 - owner: application-team
 - surface: api
-- schema-version: 1.1.5
+- schema-version: 1.1.6
 - last-changed: 2026-05-18
 - summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 
@@ -85,7 +85,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CI/CD Gate Contract — MES Dashboard
 - owner: platform-team
 - surface: delivery-pipeline
-- schema-version: 1.3.14
+- schema-version: 1.3.15
 - last-changed: 2026-05-18
 - breaking-change-policy: deprecate-2-minors
 - summary: CI gate inventory, artifact retention, and rollback requirements.
@@ -109,9 +109,10 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - type: css-inventory
 - directory: contracts/css
 - title: CSS Inventory (Governed Source List)
+- schema-version: 1.2.1
 - owner: application-team
 - surface: ui
-- last-changed: 2026-05-05
+- last-changed: 2026-05-18
 - summary: Governed inventory of authored CSS source files under frontend/src/.
 
 

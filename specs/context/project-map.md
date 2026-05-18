@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 299
-visible-files: 1045
-omitted-dirs: 106
+visible-dirs: 293
+visible-files: 1028
+omitted-dirs: 103
 truncated-dirs: 8
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -55,6 +55,7 @@ DashBoard_vite/
 |   |   |-- 01cb19e636d04082
 |   |   |-- 028b26de3bd91d6a
 |   |   |-- 02bca2c9d2f8566d
+|   |   |-- 03d72be617fe07b9
 |   |   |-- 0478f49b48ee4a27
 |   |   |-- 04f75a340f5aee98
 |   |   |-- 06e37be44b7c2558
@@ -67,6 +68,7 @@ DashBoard_vite/
 |   |   |-- 0e749cfd569a40b7
 |   |   |-- 11815b8e122a7f29
 |   |   |-- 148861a8d0e5c483
+|   |   |-- 17a6952f61650689
 |   |   |-- 1a1983b4680d2470
 |   |   |-- 1bd126f84a2f6572
 |   |   |-- 1fcb892092629696
@@ -97,9 +99,7 @@ DashBoard_vite/
 |   |   |-- 3247c74d4d5e4ad2
 |   |   |-- 327c52ae13744797
 |   |   |-- 3399b41644e40c25
-|   |   |-- 3453e8fac951ce5c
-|   |   |-- 349505052d6929ea
-|   |   \-- ... (176 more entries truncated; cap=50)
+|   |   \-- ... (180 more entries truncated; cap=50)
 |   |-- examples/
 |   |   |-- 04e6b3400353b141/
 |   |   |   |-- 13e0290a1a9c0bba
@@ -360,13 +360,6 @@ DashBoard_vite/
 |   |   |   |-- index.html
 |   |   |   |-- main.js
 |   |   |   \-- style.css
-|   |   |-- admin-performance/
-|   |   |   |-- components/
-|   |   |   |   \-- ... (max depth)
-|   |   |   |-- App.vue
-|   |   |   |-- index.html
-|   |   |   |-- main.js
-|   |   |   \-- style.css
 |   |   |-- admin-shared/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
@@ -374,12 +367,8 @@ DashBoard_vite/
 |   |   |   |   \-- ... (max depth)
 |   |   |   \-- index.ts
 |   |   |-- admin-user-usage-kpi/
-|   |   |   |-- components/
-|   |   |   |   \-- ... (max depth)
-|   |   |   |-- App.vue
-|   |   |   |-- index.html
-|   |   |   |-- main.js
-|   |   |   \-- style.css
+|   |   |   \-- components/
+|   |   |       \-- ... (max depth)
 |   |   |-- anomaly-overview/
 |   |   |   |-- App.vue
 |   |   |   |-- index.html
@@ -552,15 +541,6 @@ DashBoard_vite/
 |   |   |   \-- index.ts
 |   |   |-- styles/
 |   |   |   \-- tailwind.css
-|   |   |-- tables/
-|   |   |   |-- components/
-|   |   |   |   \-- ... (max depth)
-|   |   |   |-- composables/
-|   |   |   |   \-- ... (max depth)
-|   |   |   |-- App.vue
-|   |   |   |-- index.html
-|   |   |   |-- main.js
-|   |   |   \-- style.css
 |   |   |-- wip-detail/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
@@ -625,8 +605,6 @@ DashBoard_vite/
 |   |   |   \-- api-dedup.test.js
 |   |   |-- legacy/
 |   |   |   |-- admin-dashboard.test.js
-|   |   |   |-- admin-performance.test.js
-|   |   |   |-- admin-user-usage-kpi.test.js
 |   |   |   |-- anomaly-overview.test.js
 |   |   |   |-- AUDIT.md
 |   |   |   |-- autocomplete.test.js
@@ -709,8 +687,6 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260515_163738.log
-|   |   |-- access_20260515_170327.log
 |   |   |-- access_20260515_191511.log
 |   |   |-- access_20260518_085458.log
 |   |   |-- access_20260518_092351.log
@@ -719,46 +695,48 @@ DashBoard_vite/
 |   |   |-- access_20260518_111718.log
 |   |   |-- access_20260518_133418.log
 |   |   |-- access_20260518_151925.log
-|   |   |-- error_20260515_163738.log
-|   |   |-- error_20260515_170327.log
-|   |   |-- error_20260515_191511.log
-|   |   |-- error_20260518_085458.log
+|   |   |-- access_20260518_173219.log
+|   |   |-- access_20260518_180051.log
 |   |   |-- error_20260518_092351.log
 |   |   |-- error_20260518_104923.log
 |   |   |-- error_20260518_105558.log
 |   |   |-- error_20260518_111718.log
 |   |   |-- error_20260518_133418.log
 |   |   |-- error_20260518_151925.log
-|   |   |-- rq_msd_worker_20260515_163738.log
-|   |   |-- rq_msd_worker_20260515_170327.log
-|   |   |-- rq_msd_worker_20260515_191511.log
-|   |   |-- rq_msd_worker_20260518_085458.log
+|   |   |-- error_20260518_173219.log
+|   |   |-- error_20260518_173338.log
+|   |   |-- error_20260518_174505.log
+|   |   |-- error_20260518_180051.log
 |   |   |-- rq_msd_worker_20260518_092351.log
 |   |   |-- rq_msd_worker_20260518_104923.log
 |   |   |-- rq_msd_worker_20260518_105558.log
 |   |   |-- rq_msd_worker_20260518_111718.log
 |   |   |-- rq_msd_worker_20260518_133418.log
 |   |   |-- rq_msd_worker_20260518_151925.log
-|   |   |-- rq_prod_hist_worker_20260515_163738.log
-|   |   |-- rq_prod_hist_worker_20260515_170327.log
-|   |   |-- rq_prod_hist_worker_20260515_191511.log
-|   |   |-- rq_prod_hist_worker_20260518_085458.log
+|   |   |-- rq_msd_worker_20260518_173219.log
+|   |   |-- rq_msd_worker_20260518_173338.log
+|   |   |-- rq_msd_worker_20260518_174505.log
+|   |   |-- rq_msd_worker_20260518_180051.log
 |   |   |-- rq_prod_hist_worker_20260518_092351.log
 |   |   |-- rq_prod_hist_worker_20260518_104923.log
 |   |   |-- rq_prod_hist_worker_20260518_105558.log
 |   |   |-- rq_prod_hist_worker_20260518_111718.log
 |   |   |-- rq_prod_hist_worker_20260518_133418.log
 |   |   |-- rq_prod_hist_worker_20260518_151925.log
-|   |   |-- rq_reject_worker_20260515_163738.log
-|   |   |-- rq_reject_worker_20260515_170327.log
-|   |   |-- rq_reject_worker_20260515_191511.log
-|   |   |-- rq_reject_worker_20260518_085458.log
+|   |   |-- rq_prod_hist_worker_20260518_173219.log
+|   |   |-- rq_prod_hist_worker_20260518_173338.log
+|   |   |-- rq_prod_hist_worker_20260518_174505.log
+|   |   |-- rq_prod_hist_worker_20260518_180051.log
 |   |   |-- rq_reject_worker_20260518_092351.log
 |   |   |-- rq_reject_worker_20260518_104923.log
 |   |   |-- rq_reject_worker_20260518_105558.log
 |   |   |-- rq_reject_worker_20260518_111718.log
 |   |   |-- rq_reject_worker_20260518_133418.log
 |   |   |-- rq_reject_worker_20260518_151925.log
+|   |   |-- rq_reject_worker_20260518_173219.log
+|   |   |-- rq_reject_worker_20260518_173338.log
+|   |   |-- rq_reject_worker_20260518_174505.log
+|   |   |-- rq_reject_worker_20260518_180051.log
 |   |   \-- ... (30 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
@@ -1234,8 +1212,6 @@ DashBoard_vite/
 |   |   |-- conftest.py
 |   |   |-- test_admin_auth_e2e.py
 |   |   |-- test_admin_dashboard_e2e.py
-|   |   |-- test_admin_performance_e2e.py
-|   |   |-- test_admin_user_usage_kpi_e2e.py
 |   |   |-- test_anomaly_overview_e2e.py
 |   |   |-- test_cache_e2e.py
 |   |   |-- test_global_connection.py
@@ -1254,7 +1230,6 @@ DashBoard_vite/
 |   |   |-- test_resource_cache_e2e.py
 |   |   |-- test_resource_history_browser_e2e.py
 |   |   |-- test_resource_history_e2e.py
-|   |   |-- test_tables_e2e.py
 |   |   |-- test_trace_pipeline_e2e.py
 |   |   |-- test_unified_ux_verification_e2e.py
 |   |   |-- test_url_length_guard_e2e.py
@@ -1396,14 +1371,12 @@ DashBoard_vite/
 |   |-- query_spool/
 |   |   |-- material_trace/
 |   |   |   \-- mtrace-e2376e60c9af59c5.parquet
-|   |   |-- msd_detect/
-|   |   |   \-- d6793ded73985780.parquet
 |   |   |-- msd-events/
 |   |   |   |-- msd-abba46ef1d70f733_detection.parquet
 |   |   |   |-- msd-abba46ef1d70f733_events.parquet
 |   |   |   \-- msd-abba46ef1d70f733_lineage.parquet
 |   |   |-- trace_lineage/
-|   |   |   \-- trace-lineage-mid-section-defect-68dd1806a78fbee63e53b9f6.parquet
+|   |   |   \-- trace-lineage-query-tool-27401944e4fdb50195eea1c3.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -1450,7 +1423,8 @@ DashBoard_vite/
 |   |   |-- probe_116823.json
 |   |   |-- probe_117915.json
 |   |   |-- probe_117920.json
-|   |   \-- ... (393 more entries truncated; cap=50)
+|   |   |-- probe_118725.json
+|   |   \-- ... (401 more entries truncated; cap=50)
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
 |   |-- resource_history.duckdb
