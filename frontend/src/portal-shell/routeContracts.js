@@ -171,13 +171,13 @@ const ROUTE_CONTRACTS = Object.freeze({
   '/admin/pages': buildContract({
     route: '/admin/pages',
     routeId: 'admin-pages',
-    renderMode: 'external',
+    renderMode: 'native',
     owner: 'frontend-platform-admin',
     title: '頁面管理',
-    rollbackStrategy: 'external_route_reversion',
+    rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'admin_only',
     scope: 'in-scope',
-    compatibilityPolicy: 'external_target_redirect',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),
   '/admin/dashboard': buildContract({
     route: '/admin/dashboard',

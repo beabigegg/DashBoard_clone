@@ -107,7 +107,7 @@ test('buildDynamicNavigationState can include standalone drilldown routes withou
 });
 
 
-test('buildDynamicNavigationState keeps admin routes as governed external targets', () => {
+test('buildDynamicNavigationState resolves admin routes with correct contract metadata', () => {
   const state = buildDynamicNavigationState(
     [
       {
@@ -124,7 +124,7 @@ test('buildDynamicNavigationState keeps admin routes as governed external target
   assert.equal(state.diagnostics.missingContractRoutes.length, 0);
   assert.equal(state.dynamicRoutes.length, 1);
   assert.equal(state.dynamicRoutes[0].targetRoute, '/admin/pages');
-  assert.equal(state.dynamicRoutes[0].renderMode, 'external');
+  assert.equal(state.dynamicRoutes[0].renderMode, 'native');
   assert.equal(state.dynamicRoutes[0].visibilityPolicy, 'admin_only');
   assert.equal(state.dynamicRoutes[0].scope, 'in-scope');
 });

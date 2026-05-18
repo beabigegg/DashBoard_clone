@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.15
+schema-version: 1.3.16
 last-changed: 2026-05-18
 breaking-change-policy: deprecate-2-minors
 ---
@@ -134,6 +134,13 @@ breaking-change-policy: deprecate-2-minors
 - **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.13 (patch)**: additive prose only — gate tier, command, and status are unchanged.
 - **Source**: change `migrate-material-trace-ts`.
+
+### frontend-type-check scope expansion + frontend-build addition (admin-pages-vue-spa + admin-dashboard-ts-entry)
+
+- **Before**: `tsconfig.json` `include` covered `core/` through `mid-section-defect/`. Vite build input did not include `admin-pages`.
+- **From this change**: `include` gains `"src/admin-dashboard/**/*"` and `"src/admin-pages/**/*"`. Vite `rollupOptions.input` gains `admin-pages: src/admin-pages/index.html`, producing `dist/admin-pages.{html,js,css}`.
+- Gate tier unchanged: informational (continue-on-error: true).
+- Source: change `admin-pages-vue-spa-and-admin-dashboard-ts-entry`.
 
 ### frontend-build scope change (remove-unused-pages)
 

@@ -1,6 +1,6 @@
-# generated: 2026-05-18T09:31:36Z by cdd-kit 2.0.19
-# files: 765, src-lines: 211451, map-lines: 18127, compression: 11.7x
-# sources-digest: bf62b3350a6846b1299b343cf5d484079fee42939366d49a3e921021ed527daf
+# generated: 2026-05-18T11:06:59Z by cdd-kit 2.0.19
+# files: 765, src-lines: 211432, map-lines: 18127, compression: 11.7x
+# sources-digest: 0369f1070f3f84bfff8224694a8c636eff5346a88c4a9f620d832938bf96ddea
 frontend/playwright-report/trace/assets/codeMirrorModule-a5XoALAZ.js:  # 32 lines
   imports:
     - { module: './defaultSettingsView-CJSZINFr.js', items: [v], line: 1 }
@@ -2012,6 +2012,48 @@ frontend/src/admin-dashboard/App.vue:  # 149 lines
     - { name: setActiveTab, lines: 79-83 }
     - { name: toggleAutoRefresh, lines: 85-91 }
 
+frontend/src/admin-dashboard/components/DauTrendChart.vue:  # 65 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+    - { module: echarts/charts, items: [LineChart], line: 4 }
+    - { module: echarts/components, items: [GridComponent, LegendComponent, TooltipComponent], line: 5 }
+    - { module: echarts/core, items: [use], line: 6 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
+    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
+
+frontend/src/admin-dashboard/components/DeptBreakdownTable.vue:  # 36 lines
+  functions:
+    - { name: formatDuration, lines: 6-11 }
+
+frontend/src/admin-dashboard/components/DurationDistChart.vue:  # 53 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+    - { module: echarts/charts, items: [BarChart], line: 4 }
+    - { module: echarts/components, items: [GridComponent, TooltipComponent], line: 5 }
+    - { module: echarts/core, items: [use], line: 6 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
+    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
+
+frontend/src/admin-dashboard/components/HourlyLoginChart.vue:  # 53 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+    - { module: echarts/charts, items: [BarChart], line: 4 }
+    - { module: echarts/components, items: [GridComponent, TooltipComponent], line: 5 }
+    - { module: echarts/core, items: [use], line: 6 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
+    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
+
+frontend/src/admin-dashboard/components/KpiCard.vue:  # 14 lines
+
+frontend/src/admin-dashboard/components/RecentSessionsTable.vue:  # 47 lines
+  functions:
+    - { name: formatTime, lines: 6-9 }
+    - { name: formatDuration, lines: 11-16 }
+
+frontend/src/admin-dashboard/components/TopUsersTable.vue:  # 36 lines
+  functions:
+    - { name: formatDuration, lines: 6-11 }
+
 frontend/src/admin-dashboard/main.js:  # 7 lines
   imports:
     - { module: vue, items: [createApp], line: 1 }
@@ -2095,13 +2137,13 @@ frontend/src/admin-dashboard/tabs/PerformanceTab.vue:  # 192 lines
 frontend/src/admin-dashboard/tabs/UsageTab.vue:  # 155 lines
   imports:
     - { module: vue, items: [computed, onMounted, ref], line: 2 }
-    - { module: '../../admin-user-usage-kpi/components/DauTrendChart.vue', items: ['default:DauTrendChart'], line: 4 }
-    - { module: '../../admin-user-usage-kpi/components/DeptBreakdownTable.vue', items: ['default:DeptBreakdownTable'], line: 5 }
-    - { module: '../../admin-user-usage-kpi/components/DurationDistChart.vue', items: ['default:DurationDistChart'], line: 6 }
-    - { module: '../../admin-user-usage-kpi/components/HourlyLoginChart.vue', items: ['default:HourlyLoginChart'], line: 7 }
-    - { module: '../../admin-user-usage-kpi/components/KpiCard.vue', items: ['default:KpiCard'], line: 8 }
-    - { module: '../../admin-user-usage-kpi/components/RecentSessionsTable.vue', items: ['default:RecentSessionsTable'], line: 9 }
-    - { module: '../../admin-user-usage-kpi/components/TopUsersTable.vue', items: ['default:TopUsersTable'], line: 10 }
+    - { module: '../components/DauTrendChart.vue', items: ['default:DauTrendChart'], line: 4 }
+    - { module: '../components/DeptBreakdownTable.vue', items: ['default:DeptBreakdownTable'], line: 5 }
+    - { module: '../components/DurationDistChart.vue', items: ['default:DurationDistChart'], line: 6 }
+    - { module: '../components/HourlyLoginChart.vue', items: ['default:HourlyLoginChart'], line: 7 }
+    - { module: '../components/KpiCard.vue', items: ['default:KpiCard'], line: 8 }
+    - { module: '../components/RecentSessionsTable.vue', items: ['default:RecentSessionsTable'], line: 9 }
+    - { module: '../components/TopUsersTable.vue', items: ['default:TopUsersTable'], line: 10 }
     - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 11 }
     - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 12 }
     - { module: '../../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 13 }
@@ -2171,48 +2213,6 @@ frontend/src/admin-shared/composables/useAdminData.ts:  # 205 lines
     - { name: HealthPayload, lines: 178-182 }  # local
 
 frontend/src/admin-shared/index.ts:  # 14 lines
-
-frontend/src/admin-user-usage-kpi/components/DauTrendChart.vue:  # 65 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: echarts/charts, items: [LineChart], line: 4 }
-    - { module: echarts/components, items: [GridComponent, LegendComponent, TooltipComponent], line: 5 }
-    - { module: echarts/core, items: [use], line: 6 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
-
-frontend/src/admin-user-usage-kpi/components/DeptBreakdownTable.vue:  # 36 lines
-  functions:
-    - { name: formatDuration, lines: 6-11 }
-
-frontend/src/admin-user-usage-kpi/components/DurationDistChart.vue:  # 53 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: echarts/charts, items: [BarChart], line: 4 }
-    - { module: echarts/components, items: [GridComponent, TooltipComponent], line: 5 }
-    - { module: echarts/core, items: [use], line: 6 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
-
-frontend/src/admin-user-usage-kpi/components/HourlyLoginChart.vue:  # 53 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: echarts/charts, items: [BarChart], line: 4 }
-    - { module: echarts/components, items: [GridComponent, TooltipComponent], line: 5 }
-    - { module: echarts/core, items: [use], line: 6 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
-
-frontend/src/admin-user-usage-kpi/components/KpiCard.vue:  # 14 lines
-
-frontend/src/admin-user-usage-kpi/components/RecentSessionsTable.vue:  # 47 lines
-  functions:
-    - { name: formatTime, lines: 6-9 }
-    - { name: formatDuration, lines: 11-16 }
-
-frontend/src/admin-user-usage-kpi/components/TopUsersTable.vue:  # 36 lines
-  functions:
-    - { name: formatDuration, lines: 6-11 }
 
 frontend/src/anomaly-overview/App.vue:  # 521 lines
   imports:
@@ -3120,7 +3120,7 @@ frontend/src/query-tool/components/EquipmentJobsPanel.vue:  # 77 lines
 
 frontend/src/query-tool/components/EquipmentLotsTable.vue:  # 80 lines
 
-frontend/src/query-tool/components/EquipmentRejectsTable.vue:  # 275 lines
+frontend/src/query-tool/components/EquipmentRejectsTable.vue:  # 256 lines
 
 frontend/src/query-tool/components/EquipmentView.vue:  # 246 lines
 

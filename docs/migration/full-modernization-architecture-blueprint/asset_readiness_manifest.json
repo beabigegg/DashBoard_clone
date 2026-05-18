@@ -14,7 +14,8 @@
     "/production-history": ["production-history.js"],
     "/mid-section-defect": ["mid-section-defect.js"],
     "/yield-alert-center": ["yield-alert-center.js"],
-    "/admin/dashboard": ["admin-dashboard.js"]
+    "/admin/dashboard": ["admin-dashboard.js"],
+    "/admin/pages": ["admin-pages.js"]
   },
   "deferred_routes": []
 }

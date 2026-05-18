@@ -1239,8 +1239,30 @@ def api_user_usage_kpi():
 @admin_bp.route("/pages")
 @admin_required
 def pages():
-    """Page management interface."""
-    return render_template("admin/pages.html")
+    """Page management interface (Vue SPA)."""
+    dist_dir = os.path.join(current_app.static_folder or "", "dist")
+    html_path = os.path.join(dist_dir, "admin-pages.html")
+    csrf_meta = f'<meta name="csrf-token" content="{get_csrf_token()}">'
+
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            html = f.read()
+        html = html.replace("<meta charset", f"{csrf_meta}\n    <meta charset", 1)
+        return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
+
+    # Test/local fallback when frontend artifacts are not yet built.
+    html = (
+        "<!doctype html><html lang=\"zh-Hant\"><head>"
+        f"{csrf_meta}"
+        "<meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+        "<title>頁面管理</title>"
+        "<link rel=\"stylesheet\" href=\"/static/dist/tailwind.css\">"
+        "<link rel=\"stylesheet\" href=\"/static/dist/admin-pages.css\">"
+        "<script type=\"module\" src=\"/static/dist/admin-pages.js\"></script>"
+        "</head><body><div id='app'></div></body></html>"
+    )
+    return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
 
 
 @admin_bp.route("/api/pages", methods=["GET"])

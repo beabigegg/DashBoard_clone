@@ -86,6 +86,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../admin-dashboard/App.vue'),
     [() => import('../styles/tailwind.css'), () => import('../admin-dashboard/style.css')],
   ),
+  '/admin/pages': createNativeLoader(
+    () => import('../admin-pages/App.vue'),
+    [() => import('../styles/tailwind.css'), () => import('../admin-pages/style.css')],
+  ),
 });
 
 export function getNativeModuleLoader(route) {
